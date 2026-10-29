@@ -33,6 +33,7 @@ MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', '
 MAIN.push('ascent', 'spaceflight', 'entry');   // u-ascent: the climb, space, the way down (after the space scene: they draw with it and wrap the play frame after it)
 MAIN.push('cruise');   // u-cruise: the Reiseantrieb between the worlds, the descent into a moon's world, the Konvoi (src/main/cruise.js)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels', 'foes', 'liberate');   // a-foes: the Leuchtfeuer (appended last, after the bodies' blocks), the foes' models, VR.Foes, VR.Liberate (after quests.js and ctx.js, whose parts they use)
+MAIN.push('../shared/story', 'regie', 'story');   // a-story: the book (src/shared/story.js — pure, main thread only), die Regie, the story's player (after funke, quests, liberate, ctx and the space scene, whose parts it uses)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

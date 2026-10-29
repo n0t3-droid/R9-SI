@@ -19,7 +19,7 @@
 // Checks: a Heartland world of vgen ≥ 11; each session ≥ 290 s of play with ~1 sample a second and its events; the JSON and the sheet written; the log
 // ≤ 0.05 ms a frame; no page error.
 //   nohup bash test/wt_run.sh session.mjs 5400 > .tmp_tests/session.log 2>&1 &
-//   ONLY=builder|walk|pilot (pilot only when asked: e-ctx's trips by intent) · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
+//   ONLY=builder|walk|pilot|adventurer (pilot and adventurer only when asked: e-ctx's trips by intent; a-story's Abenteuer with the story) · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
 //   stand-in, a synthetic sheet in the scratch folder) · SHEET_ONLY=builder|walk (rebuild a sheet from its JSON and frames) · f-flow: SIZE=480x270 (the
 //   canvas; 960x540 the old pictures) · PIC_EVERY=2 (s between pictures) · REAL_BUDGET=5400 (s a session) — in the release lane:
 //   R9_EXCLUSIVE=1 nohup bash test/wt_run.sh session.mjs 12000 > .tmp_tests/session.log 2>&1 &
@@ -237,6 +237,7 @@ function pageHelpers(win, VRx) {
       const last = !!render && i === n - 1;
       win.__norender = !last;
       S.control(1 / 30);
+      if (S.acceptStory && VR.Story && VR.Story.offer && VR.Story.offer(g)) VR.Story.watch(g);   // a-story: the adventurer takes a beat Funke offers ([V])
       const t0 = performance.now();
       g.last = t0 - 1000 / 30; g.loop(t0);
       if (last) { try { g.renderer.gl.finish(); } catch (e) { /* no GL in a stand-in */ } rms = performance.now() - t0; S.capture(); }
@@ -611,6 +612,25 @@ try {
     { name: 'isles', de: 'Bei den Inseln: umsehen', mode: { kind: 'look', sec: 8, speed: 0.3 }, max: 8 },
     { name: 'to_nova', de: 'Reise nach Nova Haven', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt', mode: { kind: 'intent', target: 'nova' }, max: DUR },
   ]);
+  // a-story · the adventurer (erlebnis §7; plan docs/superpowers/plans/2026-10-29-a-story.md): an Abenteuer world (Begegnungen normal), the story on —
+  // Funke offers chapter 1 in the Hangar Hall after 20 s of calm and the adventurer takes it ([V]); the ways to Nova Haven and through the city (c1.b2 out
+  // there, 5 min after the first). Only when asked (ONLY=adventurer; DUR=600 for ten minutes: two beats)
+  if (ONLY && ONLY.includes('adventurer')) {
+    await ev(() => { const A = VR.Adventure; if (A && A.setOn) { A.setOn(true); A.setEnc('normal'); } window.__S.acceptStory = true; });
+    recs.adventurer = await session('adventurer', { tod: 9200, notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once; the quest, the outpost and the shop of erlebnis §7 are not scripted yet — the walk to Nova Haven stands in (no contested zone on it: no encounters)'] }, [
+      { name: 'hangar', de: 'Hangarhalle: umsehen (Kapitel 1)', mode: { kind: 'look', sec: 50, speed: 0.25 }, max: 50 },
+      { name: 'to_nova', de: 'Weg nach Nova Haven', mode: { kind: 'walk', route: ROUTES.walkA }, max: 220 },
+      { name: 'city_plaza', de: 'Stadtplatz: umsehen', mode: { kind: 'look', sec: 15, speed: 0.45 }, max: 15 },
+      { name: 'city', de: 'Durch die Stadt', mode: { kind: 'walk', route: ROUTES.walkB }, max: DUR },
+    ]);
+    await ev(() => { window.__S.acceptStory = false; });
+    const st = recs.adventurer && recs.adventurer.metrics ? recs.adventurer.metrics : null;
+    if (st) {
+      const beats = recs.adventurer.events.filter(e => e.kind === 'story').length;
+      check(beats / (recs.adventurer.played / 600) >= 1, `adventurer: ${beats} story beat(s) in ${recs.adventurer.played.toFixed(0)} s (≥ 1 per 10 min)`);
+      check(st.gaps.longest.d <= 60, `adventurer: the longest gap ${st.gaps.longest.d.toFixed(0)} s (≤ 60)`);
+    }
+  }
 } catch (e) { check(false, 'the sessions ran (' + String(e && e.stack || e).slice(0, 600) + ')'); }
 
 // ============================================================================ the log's cost: Very Low and High — on · sampler off · off
