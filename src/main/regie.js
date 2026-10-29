@@ -20,7 +20,7 @@
 (function (VR) {
   'use strict';
   const R = VR.Regie = VR.Regie || {};
-  R.RULES = { min: 18, max: 42, gap: 75, gapBuilder: 90, space: 8, major: 60, beat: 300, bauruhe: 2 };
+  R.RULES = { min: 18, max: 42, gap: 75, gapBuilder: 90, space: 8, major: 60, beat: 300, bauruhe: 2, seenFrac: 0.005 };
   // a hash in [0, 1) of three integers (the life director's own, LifeKit.h, when it is there)
   const h = (a, b, c) => { let x = (a | 0) ^ Math.imul(b | 0, 0x9E3779B1) ^ Math.imul((c | 0) + 0x7F4A7C15, 0x85EBCA77); x ^= x >>> 16; x = Math.imul(x, 0x7FEB352D); x ^= x >>> 15; x = Math.imul(x, 0x846CA68B); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
   const sh = (s) => { let x = 0x811c9dc5; s = String(s || ''); for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193); } return x | 0; };
@@ -38,9 +38,10 @@
     // the budget now: the heaviest weight that may start
     budget(t) { if (this.bauruhe) return this.o.bauruhe; return t - this.lastMajor >= this.o.major ? 5 : 3; }
     // an event of weight w seen at t (in view): the clocks move
-    seen(t, w, kind) {
+    // (small: seen too small to end a gap — it still counts for the spacing and the kinds)
+    seen(t, w, kind, small) {
       if (!(w >= 2)) return;
-      if (t > this.last2) { this.last2 = t; this.slot++; this.target = this.jit(this.slot); }
+      if (!small && t > this.last2) { this.last2 = t; this.slot++; this.target = this.jit(this.slot); }
       if (t > this.lastStart) this.lastStart = t;
       if (w >= 4 && t > this.lastMajor) this.lastMajor = t;
       if (kind === 'story' && t > this.lastBeat) this.lastBeat = t;
@@ -133,7 +134,9 @@
     const L = VR.EventLog, t = now(g);
     if (L && L.count > S.n) {
       const list = L.events(S.n); S.n = L.count;
-      for (const e of list) if (e.inView && e.w >= 2) { S.sched.seen(e.t, e.w, e.kind); S.st.seen++; }
+      // (seen as the measure sees it — sessionstats.js SEEN_HALF: in view, and half of a full sighting, 0.5 % of the screen,
+      // or on the screen by itself: a cat across the plaza at 0.3 % does not end a gap)
+      for (const e of list) if (e.inView && e.w >= 2) { const small = e.frac > 0 && e.frac < R.RULES.seenFrac; S.sched.seen(e.t, e.w, e.kind, small); if (!small) S.st.seen++; }
     }
     const F = g.funke;
     S.sched.bauruhe = !!(F && ((F.budget && F.budget.quiet(t)) || (F.buildFocus && F.buildFocus())));
@@ -145,7 +148,7 @@
     const of = S.sched.choose(t, offers, ctx.place);
     if (!of) return;
     let ok = false; try { ok = of.start() !== false; } catch (e) { ok = false; }
-    if (ok) { S.sched.started(t, of); S.st.started++; S.st[of.source] = (S.st[of.source] | 0) + 1; if (of.kind === 'story') { S.sched.lastBeat = t; S.sched.lastStart = t; } }
+    if (ok) { S.sched.started(t, of); S.sched.lastStart = Math.max(S.sched.lastStart, t); S.st.started++; S.st[of.source] = (S.st[of.source] | 0) + 1; if (of.kind === 'story') { S.sched.lastBeat = t; S.sched.lastStart = t; } }
   };
   R.stats = function (g) { const S = R.of(g); if (!S) return null; const q = S.sched; return { st: Object.assign({}, S.st), last2: q.last2, target: +q.target.toFixed(1), slot: q.slot, kinds: q.kinds.slice(), scene: q.scene, bauruhe: q.bauruhe, builder: !!q.o.builder, log: q.log.slice(-12) }; };
 

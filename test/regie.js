@@ -38,6 +38,8 @@ console.log('1 · the rules');
   const A = { source: 'a', act: 'birds', weight: 2, kind: 'sky' }, B = { source: 'a', act: 'cart', weight: 2, kind: 'ambient' };
   check(q2.choose(80, [A, B], 'plaza') === B && q2.choose(80, [A], 'plaza') === A, 'not the kind of the last two (unless nothing else)');
   check(q2.choose(12, [A, B], 'plaza') === null, 'no fill before the gap is due');
+  const q3 = new S(5); q3.seen(0, 2, 'sky'); q3.seen(30, 2, 'ambient', true);
+  check(q3.last2 === 0 && q3.lastStart === 30 && !q3.allow(35, 2, 'ambient'), 'an event seen too small (a cat across the plaza) does not end the gap, but counts for the spacing');
 }
 
 console.log('2 · synthetic streams');
