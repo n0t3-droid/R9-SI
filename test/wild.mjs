@@ -29,9 +29,9 @@
 //   ONLY=murm,heron · NO_COST=1 · NO_POTATO=1 · ROUNDS=3 · N=8 · SEED=53
 // regress: skip  (a showcase: the pictures and the numbers are the evidence; the gates are test/wild_sim.js and test/wild_game.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
-import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import { createRequire } from 'module';
 import fs from 'fs';
+const sharp = createRequire(import.meta.url)('/home/dev/.npm-global/lib/node_modules/sharp');   // (the package's own entry: sharp 0.35 moved lib/ to dist/)
 const require = createRequire(import.meta.url);
 // (every path from this checkout: the test runs from test/ or from .tmp_tests/ — one level under the root either way)
 const ROOT = new URL('../', import.meta.url).pathname;
