@@ -9,6 +9,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
 b=$(basename "$1"); to=${2:-900}
 TMP=$ROOT/.tmp_tests; mkdir -p "$TMP" "$ROOT/test/shots"
 sed -e "s#/home/dev/vr#$ROOT#g" -e "s#require('\./#require('$ROOT/test/#g" "$ROOT/test/$b" > "$TMP/$b"
+# (sharp ≥ 0.35 moved its entry from lib/index.js to dist/index.mjs: the copy follows whichever is installed)
+SH=/home/dev/.npm-global/lib/node_modules/sharp
+if [ ! -f $SH/lib/index.js ] && [ -f $SH/dist/index.mjs ]; then sed -i "s#sharp/lib/index.js#sharp/dist/index.mjs#g" "$TMP/$b"; fi
 if [[ $b == *.mjs ]]; then kind=browser; else kind=node; fi
 # the release lane: R9_EXCLUSIVE=1 (the coordinator's release regression) runs on its own third slot, one test at a
 # time, so a release never queues behind the agents' tests (a blocking wait on both slots sat for hours once)

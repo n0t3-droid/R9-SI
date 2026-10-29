@@ -287,6 +287,7 @@
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(p.u.u_noise, 1);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE);
       let n = 0, tris = 0;
+      const soft = !!(E.climb && E.climb.cut1 > 0); if (soft) { gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }   // u-orbitlod: the climb's far edge blends softly into Herzwelt's impostor (LOD_FS climbA)
       for (const t of list) {
         const ox = t.x0 - cam.x, oz = t.z0 - cam.z;
         const cv = r.uCurve ? r.uCurve * (Math.max((ox + t.bx0) ** 2, (ox + t.bx1) ** 2) + Math.max((oz + t.bz0) ** 2, (oz + t.bz1) ** 2)) : 0;   // u-ascent: the bend lowers the far boxes
@@ -297,6 +298,7 @@
         n++; tris += t.count / 3;
       }
       gl.bindVertexArray(null);
+      if (soft) { gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }   // u-orbitlod
       this.stats.drawn = n; this.stats.tris = tris;
       r.stats.draws += n; r.stats.tris += tris;
     }

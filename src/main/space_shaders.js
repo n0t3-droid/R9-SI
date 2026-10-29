@@ -56,6 +56,16 @@ const float TAU_M = 0.005;            // aerosol (Mie) zenith extinction, single
 const float KT_R = 70.7;              // the tangent column over the zenith column, √(2π/H)
 const float KT_M = 182.8;
 const vec3 AG_COL = vec3(0.32, 1.0, 0.5);   // the airglow's green (O 557.7 nm)
+// u-orbitlod · the aurora (REFERENCE §3): the oval round the pole (colatitude ~11.5°, ±2°), on the night
+// side; curtains along it (rays across), drifting slowly. Returns the oval's strength at a body-frame direction
+float auroraAt(vec3 Nb, float t) {
+  float th = acos(clamp(abs(Nb.y), 0.0, 1.0)), lam = atan(-Nb.z, Nb.x);
+  float wob = 0.012 * sin(lam * 3.0 + t * 0.0021) + 0.008 * sin(lam * 7.0 - t * 0.0013);
+  float band = exp(-pow((th - 0.2 - wob) / 0.05, 2.0));   // (the oval ~20 km round the pole: poleward of the Heartland, on its northern limb from orbit)
+  float cur = vnoise3(vec3(lam * 26.0, t * 0.004, 1.3)) * 0.65 + vnoise3(vec3(lam * 90.0, t * 0.011, 4.1)) * 0.35;
+  float surge = 0.55 + 0.45 * vnoise3(vec3(lam * 2.0, t * 0.0007, 9.0));
+  return band * smoothstep(0.35, 0.8, cur) * surge;
+}
 float phaseR(float c) { return 0.75 * (1.0 + c * c); }
 float phaseM(float c) { const float g = 0.76; float d = 1.0 + g * g - 2.0 * g * c; return (1.0 - g * g) / (d * sqrt(d)); }
 float airmass(float mu) { mu = max(mu, 0.0); return 1.0 / (mu + 0.025 * exp(-11.0 * mu)); }
@@ -76,6 +86,7 @@ uniform vec3 u_cdir;
 uniform vec3 u_bu;
 uniform vec3 u_bv;
 uniform float u_half;
+uniform float u_zFar;       // u-orbitlod: 1 = at the far plane (the planet tiles drawn first keep their ground: early depth)
 out vec3 v_dir;
 void main() {
   int id = gl_VertexID;
@@ -83,7 +94,7 @@ void main() {
     vec2 p = vec2(float((id << 1) & 2), float(id & 2)) * 2.0 - 1.0;
     vec4 w = u_invViewProj * vec4(p, 1.0, 1.0);
     v_dir = w.xyz / w.w;
-    gl_Position = vec4(p, 0.5, 1.0);
+    gl_Position = vec4(p, u_zFar > 0.5 ? 0.999999 : 0.5, 1.0);
     return;
   }
   const vec2 C[6] = vec2[6](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
@@ -91,6 +102,7 @@ void main() {
   vec3 pos = u_cdir + (u_bu * c.x + u_bv * c.y) * u_half;
   v_dir = pos;
   gl_Position = u_viewProj * vec4(pos, 1.0);
+  if (u_zFar > 0.5) gl_Position.z = gl_Position.w * 0.999999;
 }`;
   // the ring's square in Amarant's equator plane (corner = centre ± a ± b, all scaled to about unit distance)
   const RING_VS = `
@@ -183,6 +195,11 @@ uniform vec4 u_air;         // the clouds' drift (rad), time, tier, airglow
 uniform vec4 u_look;        // night lights, haze, limb, clouds
 uniform vec2 u_px;          // the patch's metres a texel, the cloud height (m)
 in vec3 v_dir;
+#ifdef PTILE
+in vec3 v_nb;               // u-orbitlod: a planet tile's point — its own sphere normal (body frame), the mesh's normal
+in vec3 v_nl;
+in float v_fade;
+#endif
 out vec4 o;
 float ggx(float nh, float r) { float a = r * r, d = nh * nh * (a * a - 1.0) + 1.0; return a * a / (PI * d * d); }
 // the height code (bodytex.js) → metres over the sea: 3 a metre below it, h / (h + 48) above (the coast where it is 128)
@@ -193,10 +210,19 @@ void main() {
   float s2 = Di.x * Di.x + Di.y * Di.y, q = u_d * sqrt(s2);
   vec3 L = u_sunB, Db = u_toBody * D;
   vec3 col = vec3(0.0); float alpha = 0.0;
-  if (q < 1.0 && Di.z > 0.0) {
+#ifdef PTILE
+  bool hitG = true;
+#else
+  bool hitG = q < 1.0 && Di.z > 0.0;
+#endif
+  if (hitG) {
+#ifdef PTILE
+    vec3 N = normalize(v_nb);
+#else
     float sq = sqrt(1.0 - q * q);
     vec3 Ni = vec3(u_d * Di.z * Di.x, u_d * Di.z * Di.y, -u_d * s2) - Di * sq;
     vec3 N = normalize(u_toBody * (Ni.x * u_bu + Ni.y * u_bv + Ni.z * u_cdir));
+#endif
     // the ground: the globe, and the patch where it lies (the plane by the chart: azimuthal equidistant about the pole)
     vec3 Nc = vec3(N.x * cos(u_air.x) - N.z * sin(u_air.x), N.y, N.x * sin(u_air.x) + N.z * cos(u_air.x));   // (the clouds drift east)
     vec2 guv = eqUV(N);
@@ -236,11 +262,15 @@ void main() {
     float water = 1.0 - smoothstep(126.5, 129.5, hc), depth = max(0.0, (128.0 - hc) / 3.0);
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
     // its grain below the texel (fields, woods, rock) from tier 1
-    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, 0.8);
+    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, 0.9);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already)
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
-    vec3 Nl = N;
-    if (pw > 0.0) {
+#ifdef PTILE
+    vec3 Nl = normalize(v_nl); bool reliefP = false;   // (the mesh's own relief)
+#else
+    vec3 Nl = N; bool reliefP = pw > 0.0;
+#endif
+    if (reliefP) {
       vec3 nN = vec3(-cos(th) * cos(lam), sin(th), cos(th) * sin(lam)), eN = vec3(-sin(lam), 0.0, -cos(lam));
       float dS = dot(grad, vec2(cos(ph), sin(ph))), dE = dot(grad, vec2(sin(ph), -cos(ph))) * th / max(sin(th), 1e-4);
       Nl = normalize(N + (dS * nN - dE * eN) * 2.2);
@@ -263,7 +293,8 @@ void main() {
     float day = smoothstep(-0.02, 0.07, mus);
     vec3 Ed = u_sunCol * max(musl, 0.0) * Ts;
     vec3 sky = vec3(0.05, 0.09, 0.17) * u_sunCol * smoothstep(-0.15, 0.3, mus) * sunTrans(HR, mus);
-    vec3 twi = vec3(0.07, 0.05, 0.06) * smoothstep(-0.3, 0.02, mus) * (1.0 - day);
+    // u-orbitlod: the terminator a graded band (~18° of twilight, ~31 km here): warm at the line, deep blue beyond
+    vec3 twi = mix(vec3(0.018, 0.028, 0.07), vec3(0.13, 0.075, 0.05), smoothstep(-0.16, 0.0, mus)) * smoothstep(-0.31, 0.0, mus) * (1.0 - day);
     // the clouds' shadow on the ground: the cloud field toward Helia (the patch: the clouds ~200 m up)
     float csh = 1.0;
     if (pw > 0.0 && mus > 0.02) {
@@ -279,12 +310,17 @@ void main() {
     // water: turquoise over the shallows, deep blue to navy with depth, ice white; the sky in it by Fresnel, the
     // sunglint (GGX on a wind-roughened sea)
     if (water > 0.001) {
-      vec3 seaC = mix(vec3(0.030, 0.30, 0.33), vec3(0.010, 0.10, 0.24), smoothstep(0.7, 5.0, depth));
+      vec3 seaC = mix(vec3(0.034, 0.15, 0.17), vec3(0.010, 0.058, 0.135), smoothstep(0.7, 5.0, depth));   // (u-orbitlod: muted as orbital photographs show water — dark teal shallows, navy depths)
       seaC = mix(seaC, vec3(0.004, 0.022, 0.08), smoothstep(6.0, 22.0, depth));
       if (ice > 0.0) seaC = mix(seaC, vec3(0.62, 0.74, 0.86) * (1.0 + detailN(N, 1900.0) * 0.5 + detailN(N, 520.0) * 0.4), ice);   // (the floes' cracks and ridges)
       vec3 H = normalize(L - Db);
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
-      float spec = ggx(max(dot(N, H), 0.0), 0.22) * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
+      // u-orbitlod · the sunglint: a mirror core (calm water) in a broad sheen whose roughness the wind varies (lanes)
+      // (branches, not ?: — a select may evaluate both sides: Very Low keeps v0.50's one lobe and nothing more)
+      float glint;
+      if (u_air.z > 0.5) { float wind = 0.26 + 0.16 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)); glint = ggx(max(dot(N, H), 0.0), 0.09) * 0.6 + ggx(max(dot(N, H), 0.0), wind) * 2.6; }
+      else glint = ggx(max(dot(N, H), 0.0), 0.22);
+      float spec = glint * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
       albG = mix(alb, seaC, water);
@@ -312,11 +348,13 @@ void main() {
     }
     col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.6) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
     col += AG_COL * u_air.w * 0.06 * night;
+    // u-orbitlod: the aurora's oval seen from above (night side): green curtains over the land, a pink lower fringe
+    if (u_air.z > 0.5 && mus < 0.0) { float au = auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)); col += (vec3(0.12, 1.0, 0.42) * 0.3 + vec3(0.5, 0.1, 0.3) * 0.05) * au * u_look.z * Tv; }   // (from Low)
     alpha = 1.0;
   } else if (Di.z > 0.0) {
     // the limb: the ray passes the planet at h radii up; the tangent column (white low down, blue above, black at the top)
     float h = q - 1.0;
-    if (h < ATOP * 1.1) {
+    if (h < ATOP * (u_air.z > 0.5 ? 3.4 : 1.1)) {   // (u-orbitlod: the aurora's heights from Low; Very Low the old rim)
       vec3 Pt = (u_d * Di.z * Di.x) * u_bu + (u_d * Di.z * Di.y) * u_bv + (-u_d * s2) * u_cdir;
       vec3 Ptb = normalize(u_toBody * Pt);
       float mus = dot(Ptb, L), c = dot(Db, L);
@@ -328,11 +366,60 @@ void main() {
       col = sc * Ts * u_sunCol * u_look.z * 0.42;
       // the airglow: a thin shell at the 94-km equivalent seen edge-on, on the night side
       float ag = exp(-pow((h - 0.0147) / 0.0005, 2.0)) * (1.0 - smoothstep(-0.16, 0.02, mus));
-      col += AG_COL * u_air.w * ag * 0.45;
+      col += AG_COL * u_air.w * ag * 0.11;   // (u-orbitlod: thin and faint — ~1/10 of starlight; v0.50 ×0.45)
+      // u-orbitlod · the sunset's layers in the limb (REFERENCE §3): along the terminator the troposphere glows orange to
+      // yellow with dark cloud layers in it, a white-pink stratosphere above, then the blue fading to black
+      float tz = smoothstep(-0.12, -0.01, mus) * (1.0 - smoothstep(0.04, 0.18, mus));
+      if (tz > 0.0 && h < 0.012 && u_air.z > 0.5) {
+        float cb = smoothstep(0.5, 0.72, vnoise3(Ptb * 700.0 + vec3(0.0, h * 2600.0, 0.0))) * (1.0 - smoothstep(0.0009, 0.0016, h));
+        vec3 tro = vec3(1.0, 0.36, 0.07) * exp(-h / 0.0006) + vec3(1.0, 0.72, 0.3) * exp(-h / 0.0014) * 0.45;
+        vec3 strat = vec3(0.92, 0.78, 0.82) * exp(-pow((h - 0.0042) / 0.0022, 2.0)) * 0.22;
+        col += (tro * (1.0 - 0.75 * cb) + strat) * tz * u_sunCol * u_look.z * (0.5 + 1.5 * smoothstep(-0.2, 0.7, c));
+      }
+      // u-orbitlod · the aurora over the limb (night side): green curtains 100–200 km up (their lower edge crisp, a pink
+      // fringe below it), red tops fading out above 200 km
+      float au = 0.0;
+      if (u_air.z > 0.5) au = auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus));
+      if (au > 0.001) {
+        // (the rays: tall streaks along the curtain — the noise across it, the same up its height)
+        float rays = 0.55 + 0.45 * vnoise3(vec3(atan(-Ptb.z, Ptb.x) * 160.0, 0.5, u_air.y * 0.02));
+        float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.011);
+        float red = smoothstep(0.026, 0.036, h) * exp(-max(h - 0.036, 0.0) / 0.012);
+        float pink = exp(-pow((h - 0.0152) / 0.0007, 2.0));
+        col += (vec3(0.15, 1.0, 0.45) * green * 0.9 * rays + vec3(0.9, 0.12, 0.2) * red * 0.22 + vec3(0.9, 0.3, 0.6) * pink * 0.2) * au * u_look.z;
+      }
       alpha = clamp(1.0 - exp(-dot(tt, vec3(0.2, 0.3, 0.5))), 0.0, 1.0);
     }
   }
+#ifdef PTILE
+  if (v_fade < 0.5) discard;   // (the climb: the horizon tiles' inner part is theirs)
+  o = vec4(col, 1.0);
+#else
   o = vec4(col, alpha);
+#endif
+}`;
+  // u-orbitlod · a planet tile (planetlod.js): its body-frame vertices put round the camera in the view's axes (the map's
+  // east, up, south at the eye: u_toBody's transpose), its own depth (logarithmic to 64 km: the pass clears it after),
+  // its fade (the reach's outer fifth; in the climb the horizon tiles' inner part)
+  const PTILE_VS = `
+uniform mat4 u_viewProj;
+uniform mat3 u_toBody;
+uniform vec3 u_camB;        // the camera in the body frame (m)
+uniform vec4 u_tfade;       // the climb's inner cut from, to (m, 0: none); the reach's fade from, to (m)
+layout(location=0) in vec3 a_pos;
+layout(location=1) in vec3 a_nrm;
+out vec3 v_dir;
+out vec3 v_nb;
+out vec3 v_nl;
+out float v_fade;
+void main() {
+  vec3 rm = (a_pos - u_camB) * u_toBody;
+  v_dir = rm; v_nb = a_pos; v_nl = a_nrm;
+  float dh = length(rm.xz);
+  v_fade = (1.0 - smoothstep(u_tfade.z, u_tfade.w, dh)) * (u_tfade.y > 0.0 ? smoothstep(u_tfade.x, u_tfade.y, dh) : 1.0);
+  gl_Position = u_viewProj * vec4(rm, 1.0);
+  float w = max(gl_Position.w, 1e-3);
+  gl_Position.z = (log2(1.0 + w) / log2(1.0 + 64000.0) * 2.0 - 1.0) * gl_Position.w;
 }`;
 
   // ---------------------------------------------------------------- Amarant
@@ -792,5 +879,6 @@ vec3 skyColor(vec3 dir, bool withSun) { return u_dim == 5 ? bodySky(dir, withSun
   SH.programs = () => ({
     bg: { vs: FULL_VS, fs: BG_FS }, herz: { vs: QUAD_VS, fs: HERZ_FS }, giant: { vs: QUAD_VS, fs: GIANT_FS },
     ring: { vs: RING_VS, fs: RING_FS }, moon: { vs: QUAD_VS, fs: MOON_FS }, glare: { vs: QUAD_VS, fs: GLARE_FS },
+    ptile: { vs: PTILE_VS, fs: '#define PTILE\n' + HERZ_FS },   // u-orbitlod: the planet tiles (planetlod_gl.js)
   });
 })(VR);

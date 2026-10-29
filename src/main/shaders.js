@@ -19,6 +19,7 @@ uniform vec3 u_skyHorizon;
 uniform vec3 u_skyMid;       // t-sky: the sky's middle stop (env.js VR.Sky): the blue between the horizon's white-cyan and space
 uniform vec4 u_skyStops;     // t-sky: x 1/h1 (the horizon gives way to the middle by dir.y h1); y h2a, z 1/(h2b - h2a) (the middle to the zenith from h2a to h2b); w the sun's halo — reciprocals from renderer.js, no division per pixel
 uniform vec4 u_skySpace;     // t-sky: space (stars, nebula) shows through the day sky from dir.y x (none) over 1/y (all), z of it at the top; w: the nebula's brightness by day
+uniform float u_dip;        // u-orbitlod: the horizon's dip in the climb, sin(acos(R/(R+h))) (0 below 300 m: ascent.js) — the band sits on the limb
 uniform vec4 u_skyDay;       // t-sky2 (env.js VR.Sky): x, y the white-cyan haze band over the horizon — its strength and tightness (the band is (1 − y·dir.y)^16); z the day palette's weight (1 by day, 0 at dusk and night: the space by day and the nebula's day look follow it)
 // t-sky: smoothstep from an edge and the reciprocal of the width (the renderer passes 1 / width: a multiply, not a division)
 float sstepR(float e0, float rw, float x) { float t = clamp((x - e0) * rw, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -374,7 +375,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     c += nebula(dir, 0.0) * 0.8;
     return c;
   }
-  float h = max(dir.y, 0.0);
+  float h = max(dir.y + u_dip, 0.0);
   // t-sky: the trailer's sky in three stops (env.js VR.Sky) — by day white-cyan at the horizon, the blue middle, navy
   // space at the zenith; at dusk lavender, violet, navy — over a thin, luminous haze band at the horizon
   vec3 col = mix(u_skyHorizon, u_skyMid, sstepR(0.0, u_skyStops.x, h));
@@ -403,17 +404,17 @@ vec3 skyColor(vec3 dir, bool withSun) {
 #ifdef SKY3
   col = s3Layers(col, dir, h);   // t-sky3: the sun-side band (gold → peach → pink) and the earth's shadow with its belt (sky3.js)
 #endif
-  if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
+  if (dir.y + u_dip < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-(dir.y + u_dip) * 2.5, 0.0, 1.0));
   if (withSun) {
     float clear = 1.0 - u_rain;
     // cosmic layer: the nebula owns the night; by day it shows above the blue band, and the ringed giant and its moons
     // keep hanging in the daylight sky. t-sky2: the 'Kosmischer Himmel am Tag' setting at its default (0.8) shows space
     // fully by day (the trailer's day: deep navy space with dense stars and the nebula over the top of every view)
     float magicDay = min(1.0, u_skyMagic * (1.0 + 0.25 * u_skyDay.z)) * (1.0 - u_night);
-    float horizonFade = smoothstep(-0.12, 0.08, dir.y);
+    float horizonFade = smoothstep(-0.12, 0.08, dir.y + u_dip);
     // t-sky: space shows through the day sky by height — none over the clean, bright horizon, all of it above the blue
     // band (u_skySpace: t-sky2 from dir.y 0.18 to 0.42) — and all of it at night; the stars and the nebula follow it
-    float cosmic = clamp(u_night + magicDay * sstepR(u_skySpace.x, u_skySpace.y, dir.y) * u_skySpace.z, 0.0, 1.0) * clear * horizonFade;
+    float cosmic = clamp(u_night + magicDay * sstepR(u_skySpace.x, u_skySpace.y, dir.y + u_dip) * u_skySpace.z, 0.0, 1.0) * clear * horizonFade;
     cosmic *= 1.0 - 0.6 * smoothstep(0.45, 0.92, toSun) * u_skyDay.z;   // t-sky2: by day space fades toward the sun (its light washes the sky within ~60° of it)
     float planetsK = clamp(u_night + magicDay * 0.85, 0.0, 1.0) * clear * horizonFade;
     if (planetsK > 0.01) {
@@ -643,12 +644,12 @@ float hShadow(vec3 lp, vec3 n, vec3 L) {
 // the colour of the air in a direction: the sky's gradient with a warm, soft glow toward the sun —
 // calmer than the sky itself, so haze tints the land instead of washing it out when looking sunward
 vec3 hazeColor(vec3 dir) {
-  float h = max(dir.y, 0.0);
+  float h = max(dir.y + u_dip, 0.0);
   vec3 col = mix(u_skyHorizon, u_skyMid, sstepR(0.0, u_skyStops.x, h));   // t-sky: the haze follows the sky's lower stops
   float toSun = max(dot(dir, u_sunDir), 0.0);
   float t2 = toSun * toSun, t4 = t2 * t2, t8 = t4 * t4, t16 = t8 * t8, qh = 1.0 - h, qh2 = qh * qh;   // powers as products (the haze runs on every fogged pixel)
   col += u_sunset * (t4 * t2 * 0.55 + qh2 * qh2 * qh2 * 0.18) + u_sunColor * t16 * t16 * 0.1 * (1.0 - u_rain);
-  if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.6, clamp(-dir.y * 2.0, 0.0, 1.0));
+  if (dir.y + u_dip < 0.0) col = mix(col, u_skyHorizon * 0.6, clamp(-(dir.y + u_dip) * 2.0, 0.0, 1.0));
   return col;
 }
 ${(VR.Light2 && VR.Light2.glslCommon) ? VR.Light2.glslCommon() : ''}
@@ -2498,7 +2499,8 @@ vec3 waveN(vec2 p) {
 }
 void main() {
   // real chunks are drawn here: the far terrain steps aside
-  if (u_climbCut.y > 0.0 && bayer4(gl_FragCoord.xy) < smoothstep(u_climbCut.x, u_climbCut.y, length(v_rel.xz))) discard;   // u-ascent: Herzwelt's impostor takes the land beyond (spaceflight.js)
+  float climbA = u_climbCut.y > 0.0 ? 1.0 - smoothstep(u_climbCut.x, u_climbCut.y, length(v_rel.xz)) : 1.0;   // u-ascent: Herzwelt's impostor takes the land beyond (spaceflight.js);
+  if (climbA < 0.004) discard;   // u-orbitlod: a wide soft edge (blended in horizon.js), no Bayer stipple
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
 #if defined(FAR1) || defined(FORM)
   // F-Far · three rings: per column R = the chunk's fade (ring 0), G = the form's (ring 1). Ring 1 draws where
@@ -2639,6 +2641,7 @@ void main() {
   col = applyFog(col, v_rel, dist);
 #endif
   o = vec4(col, 1.0);
+  o.a = climbA;   // u-orbitlod: the climb's soft edge (1 on the ground)
 }`;
 
   // ------------------------------------------------------------ micro-voxel models (creatures, turrets, ships' props)

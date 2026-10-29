@@ -391,6 +391,7 @@ void main() {
     if ((SF.needT = (SF.needT || 0) - 1) <= 0) { SF.needT = 15; SS.needs(g, anc, tier); }
     SF.S.anc = anc;
     const fr = SS.frameSetup(SF.S, eph, { H: r.H, tier, bloom: !!(r.q.bloom && r.hdr), patch: SS.state.patch });
+    if (VR.PlanetLODGL && fr.bodies.herz && r.gl) VR.PlanetLODGL.update(g, r.gl, fr.bodies.herz.camB, tier);   // u-orbitlod: the planet tiles asked for every frame the scene is set up
     // the nadir in Herzwelt's body frame (BodyTex: x the prime meridian, y the pole, z = x × y) for the impostor's cut
     const n = S.chart('herz').toSphere(cam.x, cam.z, v3());
     fr.nadirB = [n[0], n[2], -n[1]];
@@ -428,6 +429,7 @@ void main() {
       if (!lay || !(lay[0] > 0.001 || lay[1] > 0.001)) continue;
       if (L.strict) { let miss = false; for (const k in d.tex) if (!ST.tex[map[d.tex[k]]]) miss = true; if (miss) continue; }
       const p = prog(d.prog); if (!p) continue;
+      const tn = d.prog === 'herz' && VR.PlanetLODGL ? VR.PlanetLODGL.draw(r, d, fr.bodies.herz, lay, L.tcut || null, map, (k) => ST.tex[k] || blankT) : 0;   // u-orbitlod: the planet tiles first, the impostor at the far plane behind them
       gl.useProgram(p.p);
       if (d.prog === 'bg' && !lay[3]) gl.disable(gl.BLEND);
       else { gl.enable(gl.BLEND); if (d.add || lay[3]) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
@@ -437,7 +439,9 @@ void main() {
       if (d.prog === 'herz') { setU(gl, p, 'u_cut', L.cut || [0, 0, 0, 0]); setU(gl, p, 'u_nadirB', fr.nadirB || [0, 1, 0]); }
       let unit = 0;
       for (const k in d.tex) { if (!p.u[k]) continue; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, ST.tex[map[d.tex[k]]] || blankT); gl.uniform1i(p.u[k], unit); unit++; }
+      if (tn) VR.PlanetLODGL.before(gl, p, tn, setU);   // u-orbitlod
       gl.drawArrays(gl.TRIANGLES, 0, d.full ? 3 : 6);
+      if (tn) VR.PlanetLODGL.after(gl, p, tn, setU);   // u-orbitlod
       r.stats.draws++; r.stats.tris += d.full ? 1 : 2; n++;
     }
     gl.activeTexture(gl.TEXTURE0);
@@ -446,7 +450,7 @@ void main() {
     return n;
   };
   // the cut where the horizon tiles end (their radius in metres, the share of it the tiles keep; 0: no cut)
-  SF.cutFor = (hzR) => { const R = A.R(); return hzR > 0 ? [Math.sin(0.6 * hzR / R), Math.sin(0.75 * hzR / R), 1, 0] : null; };
+  SF.cutFor = (hzR) => { const R = A.R(); return hzR > 0 ? [Math.sin(0.3 * hzR / R), Math.sin(0.45 * hzR / R), 1, 0] : null; };   // (u-orbitlod: whole before the tiles' soft band begins, 0.45–0.95)
 
   // the climb's layers (renderer.js, right after its sky pass → VR.Ascent.drawSky): Herzwelt beyond the tiles from 400 m,
   // space's background behind the thinning air from 1,200 m (added: the air's light stays), the true bodies over the
@@ -458,12 +462,12 @@ void main() {
     const fl = g.flight, a = fl && fl.asc;
     const fr = SF.cameraFrame(g, cam, c.t, a ? a.st : null, fl ? fl.b : null);
     const Gn = fr.look.exposure / Math.max(0.05, E.exposure || 1);
-    return SF.drawLayers(r, fr, { bg: c.bg > 0.001 ? [c.bg, c.bg, Gn, 1] : null, bodies: c.body > 0.001 ? [c.body, c.body, Gn, 0] : null, herz: c.imp > 0.001 ? [c.imp, c.imp, Gn, 0] : null, cut: SF.cutFor(c.hzR), strict: true });
+    return SF.drawLayers(r, fr, { bg: c.bg > 0.001 ? [c.bg, c.bg, Gn, 1] : null, bodies: c.body > 0.001 ? [c.body, c.body, Gn, 0] : null, herz: c.imp > 0.001 ? [c.imp, c.imp, Gn, 0] : null, cut: SF.cutFor(c.hzR), tcut: c.hzR > 0 ? [c.hzR * 0.3, c.hzR * 0.45] : null, strict: true });   // (u-orbitlod: tcut — the planet tiles whole under the horizon tiles' soft band)
   };
   // the space frame's layers: all of them whole; Herzwelt's cut only while the horizon tiles still fade out
   SF.spaceLayers = function (g, r, E, cam) {
     const fr = SF.cur; if (!fr) return 0;
-    return SF.drawLayers(r, fr, { bg: [1, 1, 1, 0], bodies: [1, 1, 1, 0], herz: [1, 1, 1, 0], cut: E.climb.hzR > 0 ? SF.cutFor(E.climb.hzR) : null, strict: false });
+    return SF.drawLayers(r, fr, { bg: [1, 1, 1, 0], bodies: [1, 1, 1, 0], herz: [1, 1, 1, 0], cut: E.climb.hzR > 0 ? SF.cutFor(E.climb.hzR) : null, tcut: E.climb.hzR > 0 ? [E.climb.hzR * 0.3, E.climb.hzR * 0.45] : null, strict: false });   // (u-orbitlod: tcut)
   };
 
   // ---------------------------------------------------------------- the space frame (the play frame while the ship is in space)
@@ -510,7 +514,7 @@ void main() {
     // the horizon tiles of the hand-off fade out over the first five seconds (their cut shrinks from the edge in)
     const hz = g.horizon, onHerz = st.frame === 'herz', tilesK = onHerz && hz && hz.enabled() && !a.jump ? 1 - ss(1.5, 5, since) : 0;
     const hzR = tilesK > 0.01 ? (A.view.hzR || 0) * tilesK : 0;
-    ES2.climb = { space: true, y: A.mapY(st), curve: hzR > 0 && A.view.curve !== false ? 0.5 / A.R() : 0, cut0: hzR * 0.75, cut1: hzR * 0.95, hzR, t };
+    ES2.climb = { space: true, y: A.mapY(st), curve: hzR > 0 && A.view.curve !== false ? 0.5 / A.R() : 0, cut0: hzR * 0.45, cut1: hzR * 0.95, hzR, t };   // (u-orbitlod: the wide soft band)
     ES2.bodies = null;
     if (hzR > 0) hz.update(cam);
     r.render({ cam, world: null, env: ES2, noSky: true, horizon: hzR > 0 ? hz : null, particles: g.particles,
