@@ -492,7 +492,9 @@ if (!process.env.NO_COST) {
       const o = out[label].own, dd = out[label].on.draws - out[label].off.draws;
       check(cpu + o.cpu < 3.0, `High · ${label}: the actor's CPU ${cpu.toFixed(2)} ms (update) + ${o.cpu} ms (its draw, the GPU drained before) a frame on SwiftShader (per piece ${JSON.stringify(a.ms)})`);
       check(o.gpu - o.cpu <= Math.max(3, 0.15 * out[label].off.ms), `High · ${label}: the animals' GPU work ${(o.gpu - o.cpu).toFixed(2)} ms a frame (≤ 15 % of the frame without them, ${out[label].off.ms} ms)`);
-      check(o.inst <= 9 && dd <= o.inst + o.vox + 2, `High · ${label}: ${dd} draws more with the animals (${o.inst} instanced, ${a.inst} instances; ${o.vox} for the voxel animals' parts)`);
+      // (+6: the rays' trails and motes ride the trails' and the particles' own draws, which skip when nothing is emitted —
+      //  run 3 of 29 Oct: the lake +9 = 4 instanced + 5 of those)
+      check(o.inst <= 9 && dd <= o.inst + o.vox + 6, `High · ${label}: ${dd} draws more with the animals (${o.inst} instanced, ${a.inst} instances; ${o.vox} for the voxel animals' parts)`);
     }
     rec.cost = out; save();
   } catch (e) { check(false, 'the cost on High is measured: ' + String(e.message || e).slice(0, 300)); }
