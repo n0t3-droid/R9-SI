@@ -264,6 +264,7 @@
     trip.tPlay = now();
     Travel.last = { from: trip.from, to: trip.to, via: trip.via, veilMs: Math.round(trip.tSwitch - trip.t0), loadMs: Math.round(trip.tPlay - trip.tSwitch), totalMs: Math.round(trip.tPlay - trip.t0), face: trip.face || null };   // (f-arrival: face — Heimkehr's view out)
     if (VR.NewLife) VR.NewLife.arrived(g, trip);   // u-home: the far lane back, the trip's phases, Heimkehr's ships to the home pad
+    if (VR.Cruise && VR.Cruise.arrived) VR.Cruise.arrived(g, trip);   // u-cruise: a trip by ship arrives in the air over the site
     S.trip = null; S.armed = false;   // (arrived in a gate: it waits until you have stepped out)
     veilHide();
     const home = g.dim === homeDimOf(g);   // u-home: „wieder daheim" on the home's world
@@ -280,6 +281,7 @@
     const s = SS.ships.find((q) => q.d.seed === R0.seed && Math.abs(q.pos[0] - R0.at[0]) < 1e-6 && Math.abs(q.pos[2] - R0.at[2]) < 1e-6);
     if (!s) { S.ride = null; return; }
     if (!s.d.meta || !s.d.cells) return;
+    if (VR.Cruise && VR.Cruise.ride && VR.Cruise.ride(g, S, s, R0)) { S.ride = null; return; }   // u-cruise: over the site, flying (the descent)
     s.pos[0] = p.pos[0]; s.pos[2] = p.pos[2];
     const y = SS.groundY(s, p.pos[1] + 8, 40); s.pos[1] = y !== null ? y : p.pos[1];
     S.ride = null;
@@ -292,6 +294,7 @@
     const S = g.travel || st(g);
     if (S.arriving && g.state === 'play') arrived(g, S);
     if (S.ride) rideTick(g, S, dt);
+    if (g.cruiseLand && VR.Cruise && VR.Cruise.landTick) VR.Cruise.landTick(g, dt);   // u-cruise: the ship sinks to the site, hovers while it is surveyed
     if (g.nl && VR.NewLife) VR.NewLife.tick(g, dt);   // u-home: a recalled ship set down on the ground under the home pad
     if (S.trip) return;
     const p = g.player, ui = g.ui;

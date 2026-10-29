@@ -248,6 +248,310 @@
   C.travelMsg = (dim, at, host) => ({ type: 'travel', dim, at: at ? at.map((x) => Math.round(x * 10) / 10) : null, host: host || null });
 
   // ================================================================ the game's glue (a page with the game)
-  if (typeof window === 'undefined' || !VR.Game) return;
+  if (typeof window === 'undefined' || !VR.Game || !VR.Ascent || !VR.SpaceFlight) return;
   C.page = true;
+  const A = VR.Ascent, SF = VR.SpaceFlight, AM = A.math;
+  if (VR.Quests) VR.Quests.TRAVEL_ON = true;   // (the Abenteuer's Reisen: the moons are reached now)
+  const fxOn = (g) => !(g && g.settings && g.settings.cruiseFx === false);
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'cruiseFx', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.cruiseFx', tip: 'g.set.cruiseFx.tip', cost: 'low', def: true });
+  const ECL_UP = [0, 0, 1];
+
+  // ---------------------------------------------------------------- the frame the ship and its cameras are drawn in
+  // (ascent.js A.localFrame's first line) the cruise and the jump fly in the system frame: there the map's axes are the
+  // ecliptic's — up its north, east +x — fixed for the whole way, so the cameras never swing; on the way in and out the
+  // frame turns from the body's (its radial frame, Herzwelt's map) to the ecliptic's and back in two seconds
+  C.blend = null;   // {a, b: 'ecl' | a body id, s, dur}
+  const ecl = (o) => { o[0] = 1; o[3] = 0; o[6] = 0; o[1] = 0; o[4] = 0; o[7] = 1; o[2] = 0; o[5] = -1; o[8] = 0; return o; };
+  const _Ma = new Float64Array(9), _Mb = new Float64Array(9), _Mr = new Float64Array(9), _Ms = new Float64Array(9), _pr = v3(), _pb = v3();
+  const _tmpSt = { frame: 'herz', r: v3(), v: v3(), t: 0 };
+  function frameOf(kind, st, o) {
+    if (kind === 'ecl') return ecl(o);
+    const S = UNI().home;
+    // the ship's place relative to that body
+    if (st.frame === kind) _pr.set(st.r);
+    else { S.pos(st.frame, st.t, _pb); const q = S.pos(kind, st.t, v3()); set3(_pr, _pb[0] + st.r[0] - q[0], _pb[1] + st.r[1] - q[1], _pb[2] + st.r[2] - q[2]); }
+    if (kind === 'herz') { _tmpSt.r.set(_pr); _tmpSt.t = st.t; return A.localAt(_tmpSt, o); }
+    const b = S.body(kind), ax = b && b.spin && b.spin.axis ? b.spin.axis : [0, 0, 1], n = unit(_pr, v3());
+    let ex = ax[1] * n[2] - ax[2] * n[1], ey = ax[2] * n[0] - ax[0] * n[2], ez = ax[0] * n[1] - ax[1] * n[0], l = Math.hypot(ex, ey, ez);
+    if (l < 1e-9) { ex = 1; ey = 0; ez = 0; l = 1; }
+    ex /= l; ey /= l; ez /= l;
+    o[0] = ex; o[3] = ey; o[6] = ez; o[1] = n[0]; o[4] = n[1]; o[7] = n[2];
+    o[2] = ey * n[2] - ez * n[1]; o[5] = ez * n[0] - ex * n[2]; o[8] = ex * n[1] - ey * n[0];
+    return o;
+  }
+  const mm = (a, b, o) => { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) o[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]; return o; };
+  const mmT = (a, b, o) => { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) o[i * 3 + j] = a[i * 3] * b[j * 3] + a[i * 3 + 1] * b[j * 3 + 1] + a[i * 3 + 2] * b[j * 3 + 2]; return o; };   // a · bᵀ
+  C.localFrame = (st, out) => {
+    const B = C.blend;
+    if (!B) return st.frame === 'helia' ? ecl(out) : null;
+    const k = sstep(B.s / B.dur);
+    if (k >= 1 && B.b !== 'ecl') { C.blend = null; return null; }
+    frameOf(B.a, st, _Ma); frameOf(B.b, st, _Mb);
+    mmT(_Mb, _Ma, _Mr);                       // the turn from a to b
+    UNI().slerpRot(_Mr, k, _Ms);
+    return mm(_Ms, _Ma, out);
+  };
+
+  // ---------------------------------------------------------------- the space scene, on every way in (a debug start too)
+  C.ensureScene = (g) => {
+    const SS = VR.SpaceScene; if (!SS || !SS.state) return;
+    const seed = ((g && g.meta && g.meta.seed) >>> 0) || 0x5eed;
+    if (SS.state.seed !== seed) { if (SS.state.seed && SS.drop) SS.drop(g); SS.state.seed = seed; }
+  };
+
+  // ---------------------------------------------------------------- starting, the step, the end
+  const _P = v3(), _V = v3();
+  C.start = (fl, to, quiet) => {
+    const g = fl.g, a = A.ascOf(fl), st = a.st, S = UNI().home;
+    if (fl.regime !== 'space' || a.jump || a.cruise || !S.body(to)) return false;
+    C.ensureScene(g);
+    const sys = S.state(st.t), pf = sys.b[st.frame];
+    set3(_P, pf.r[0] + st.r[0], pf.r[1] + st.r[1], pf.r[2] + st.r[2]); set3(_V, pf.v[0] + st.v[0], pf.v[1] + st.v[1], pf.v[2] + st.v[2]);
+    const from = st.frame === 'helia' ? S.dominant(_P, st.t) : st.frame;
+    if (from === to) { SF.hint(fl, 'g.asc.arrived', { name: SF.nameOf(to) }); return false; }
+    const c = C.create(_P, _V, from, to, st.t, [-a.S[2], -a.S[5], -a.S[8]]);
+    a.cruise = c;
+    C.blend = { a: st.frame === 'helia' ? 'ecl' : st.frame, b: 'ecl', s: 0, dur: 2.2 };
+    st.frame = 'helia'; st.r.set(_P); st.v.set(_V); st.coast = false;
+    const b = fl.b, name = SF.nameOf(to), D = Math.hypot(sys.b[to].r[0] - _P[0], sys.b[to].r[1] - _P[1], sys.b[to].r[2] - _P[2]);
+    const est = Math.round(C.tripEstimate(from, to, D) + 4 + (len(st.r) ? 0 : 0));
+    fl.auto = { space: 'cruise', phase: null, t: 0, to, site: { id: 'space:cruise:' + to, name, x: b.pos[0], y: b.pos[1], z: b.pos[2] }, spot: null, dist: D, eta: est, landing: false };
+    if (fl.state !== 'flying') { fl.state = 'flying'; fl.holdAlt = null; }
+    if (!quiet) SF.say(fl, 'g.cr.go', { name, s: est });
+    C.last = { from, to, t0: performance.now(), est, phases: null, total: 0, t2R: null };
+    return true;
+  };
+  // the pilot's hands back where the drive is: coasting in the dominant body's frame on the velocity it had
+  C.abort = (fl, key) => {
+    const a = A.ascOf(fl), st = a.st, c = a.cruise, S = UNI().home; if (!c) return;
+    a.cruise = null;
+    if (c.kind === 'descent') return;
+    const dom = S.dominant(c.P, c.t);
+    S.toFrame('helia', dom, c.P, c.V, c.t, st.r, st.v); st.frame = dom; st.t = c.t; st.coast = true;
+    UNI().verletInit(st, S.body(dom).mu);
+    unit(st.r, a.prevUp);
+    C.blend = { a: 'ecl', b: dom, s: 0, dur: 2.5 };
+    if (key) SF.hint(fl, key);
+  };
+  const punch = (fl) => {
+    const g = fl.g;
+    if (fxOn(g)) fl.fovKick = 0.16;
+    fl.bump = Math.max(fl.bump || 0, 0.9);
+    if (g && g.audio && g.audio.play) g.audio.play('boost');
+  };
+  let hintT = 0;
+  C.stepFl = (fl, h) => {
+    const a = A.ascOf(fl), st = a.st, c = a.cruise;
+    if (C.blend) C.blend.s += h;
+    if (c.kind === 'descent') return descentStep(fl, a, c, h);
+    if (!fl.auto || fl.auto.space !== 'cruise') { C.abort(fl, 'g.cr.off'); a.cruiseThr = 0; return; }
+    const was = c.phase;
+    C.step(c, h);
+    if (c.phase === 'punch' && was !== 'punch') punch(fl);
+    if (c.phase === 'arrive' && was !== 'arrive') fl.bump = Math.max(fl.bump || 0, 0.45);
+    st.frame = 'helia'; st.r.set(c.P); st.v.set(c.V); st.t = c.t; st.coast = false;
+    A.slew(a.S, c.nose, ECL_UP, 2.4 * h, 1.2 * h); AM.ortho(a.S);
+    a.cruiseThr = c.phase === 'punch' || c.phase === 'depart' ? 3 : c.phase === 'cruise' ? 1.4 : c.phase === 'arrive' ? 2.2 : 0.2;
+    fl.auto.dist = c.dist; fl.auto.eta = c.eta;
+    if (C.last) { C.last.total = c.total; C.last.phases = c.times; C.last.t2R = c.t2R === undefined ? null : c.t2R; C.last.phase = c.phase; }
+    if ((hintT -= h) <= 0 && c.phase !== 'done') {
+      hintT = 1;
+      SF.hint(fl, 'g.cr.hud', { name: SF.nameOf(c.to), km: Math.round(c.dist / 1000).toLocaleString(), v: (c.speed / 1000).toFixed(1), s: Math.max(0, Math.round(c.eta)) }, 1200);
+    }
+    if (c.phase === 'done') C.finish(fl, a, c);
+  };
+  C.finish = (fl, a, c) => {
+    const st = a.st, e = c.end, S = UNI().home;
+    st.frame = e.frame; st.r.set(e.r); st.v.set(e.v); st.t = e.t; st.coast = true;
+    UNI().verletInit(st, S.body(st.frame).mu);
+    unit(st.r, a.prevUp);
+    a.cruise = null; a.cruiseThr = 0; fl.auto = null; fl.regime = 'space';
+    C.blend = { a: 'ecl', b: e.frame, s: 0, dur: 2.5 };
+    if (C.last) C.last.done = performance.now();
+    SF.say(fl, 'g.cr.arrived', { name: SF.nameOf(e.frame) });
+    if (!SF.landable(e.frame) && e.frame !== 'herz') SF.hint(fl, 'g.asc.noLand', { name: SF.nameOf(e.frame) }, 4200);
+  };
+  // the HUD's numbers in a cruise (the system frame's speed means nothing to a pilot): the drive's speed, the way left
+  C.hudFix = (fl, a) => {
+    const c = a.cruise, I = a.info; if (!c || !I) return;
+    if (c.kind !== 'descent') { I.speed = c.speed; I.alt = c.near.d; I.vs = 0; }
+  };
+
+  // ---------------------------------------------------------------- travel by intent: G at a world in the sky
+  const _m9 = new Float64Array(9), _r = v3(), _vv = v3(), _f = v3(), _d = v3();
+  C.lookPick = (g, fl) => {
+    const cam = g && g.cam; if (!cam || !fl) return null;
+    const S = UNI().home, a = fl.asc, st = a && a.st, cp = Math.cos(cam.pitch || 0);
+    set3(_f, -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch || 0), -Math.cos(cam.yaw) * cp);
+    let t, skip;
+    if (st && fl.regime && fl.regime !== 'air') {
+      t = st.t; A.localFrame(st, _m9);
+      const pf = S.pos(st.frame, t, v3()); set3(_P, pf[0] + st.r[0], pf[1] + st.r[1], pf[2] + st.r[2]);
+      skip = st.frame === 'helia' ? S.dominant(_P, t) : st.frame;
+    } else {
+      t = A.clock(fl) + (a && a.tOff || 0); A.localM(cam.x, cam.z, t, _m9);
+      S.chartToInertial('herz', [cam.x, cam.y, cam.z], null, t, _r, _vv);
+      const pf = S.pos('herz', t, v3()); set3(_P, pf[0] + _r[0], pf[1] + _r[1], pf[2] + _r[2]);
+      skip = 'herz';
+    }
+    AM.mulv(_m9, _f, _d); unit(_d);
+    return C.pick(S.state(t), _P, _d, skip);
+  };
+  // G in space: the world looked at → the Reiseantrieb armed (2 s); G again → the Reisesprung there; again → off.
+  // High in the air or in the climb with a world looked at: Zum Orbit, then the cruise on its own
+  const toggle0 = SF.toggle;
+  SF.toggle = (fl) => {
+    const r = fl.regime || 'air', a = fl.asc, A_ = fl.auto;
+    if (a && a.cruise) { C.abort(fl, 'g.cr.off'); fl.auto = null; return true; }
+    if (r === 'space' && !(a && a.jump)) {
+      if (A_ && A_.space === 'arm' && A_.cruiseTo) { A_.cruiseTo = null; A_.armT = 2; SF.hint(fl, 'g.cr.armJump', { name: SF.nameOf(A_.to) }, 2200); return true; }
+      if (A_ && A_.space === 'arm' && A_.byIntent) { fl.auto = null; SF.hint(fl, 'g.fl.autoOff2'); return true; }
+      if (!A_) {
+        const p = C.lookPick(fl.g, fl);
+        if (p) { SF.start(fl, 'arm', { to: p.id, armT: 2, cruiseTo: p.id, byIntent: true }); SF.hint(fl, 'g.cr.arm', { name: SF.nameOf(p.id) }, 2200); return true; }
+      }
+    }
+    const res = toggle0(fl);
+    if ((r === 'air' || r === 'climb') && fl.auto && fl.auto.space === 'orbit' && !fl.auto.then) {
+      const p = C.lookPick(fl.g, fl);
+      if (p && p.id !== 'herz') { fl.auto.then = p.id; SF.hint(fl, 'g.cr.go', { name: SF.nameOf(p.id), s: '…' }, 2600); }
+    }
+    return res;
+  };
+  // the arm's end: the cruise when it was armed for it (the Reisesprung otherwise, spaceflight.js)
+  const guide0 = A.guide;
+  A.guide = (fl, h, a) => {
+    const A_ = fl.auto;
+    if (A_ && A_.space === 'arm' && A_.cruiseTo && A_.armT - h <= 0) { const to = A_.cruiseTo; fl.auto = null; C.start(fl, to); return null; }
+    return guide0(fl, h, a);
+  };
+  SF.guide = A.guide;
+  // Zum Orbit → Kreisbahn → the cruise to the world looked at when G was pressed
+  const done0 = SF.done;
+  SF.done = (fl, A_) => {
+    const then = A_ && A_.then, wasCirc = A_ && A_.space === 'circ';
+    done0(fl, A_);
+    if (then && wasCirc && !fl.auto) C.start(fl, then);
+  };
+
+  // ---------------------------------------------------------------- Landen round a moon: the descent into its world
+  // in space: five seconds down from the orbit toward the ground below, the retro burn lit, the moon swelling; then the
+  // trip (VR.Travel, the ship along) — in the moon's world the ship sinks from 420 m over the site (landTick)
+  C.DESCENT_S = 5; C.HOVER = 420;
+  C.descend = (fl, body) => {
+    const g = fl.g, a = A.ascOf(fl), st = a.st, dim = SF.DIM_OF[body];
+    if (!g || !VR.Travel || !dim) return false;
+    const why = VR.Travel.canGo(g, dim);
+    if (why) { SF.hint(fl, why); return true; }
+    C.ensureScene(g);
+    const B = UNI().home.body(body), r0 = len(st.r);
+    const n = cross(st.r, st.v, v3()); unit(n);
+    a.cruise = { kind: 'descent', body, dim, s: 0, r0: Float64Array.from(st.r), n, w: len(st.v) / Math.max(1, r0), R0: r0, R1: B.R * 1.1, phase: 'descent' };
+    fl.auto = { space: 'cruise', phase: 'descent', t: 0, to: body, site: { id: 'space:descent:' + body, name: SF.nameOf(body), x: fl.b.pos[0], y: fl.b.pos[1], z: fl.b.pos[2] }, spot: null, dist: r0 - B.R, eta: C.DESCENT_S, landing: true };
+    SF.say(fl, 'g.cr.descent', { name: SF.nameOf(body) });
+    if (g.audio && g.audio.play) g.audio.play('boost');
+    fl.bump = Math.max(fl.bump || 0, 0.5);
+    return true;
+  };
+  SF.onLandBody = (fl, body) => C.descend(fl, body);
+  const _rot = new Float64Array(9), _nd = v3();
+  function descentStep(fl, a, c, h) {
+    const st = a.st, g = fl.g;
+    c.s += h; st.t += h;
+    const u = sstep(c.s / C.DESCENT_S), ang = c.w * c.s * (1 - 0.4 * u);
+    // the way round the orbit (the speed kept, the radius falling toward 1.1 R)
+    const n = c.n, r0 = c.r0, ca = Math.cos(ang), sa = Math.sin(ang), k = (c.R0 + (c.R1 - c.R0) * u) / c.R0;
+    const nx = cross(n, r0, v3());
+    const prev = Float64Array.from(st.r);
+    set3(st.r, (r0[0] * ca + nx[0] * sa) * k, (r0[1] * ca + nx[1] * sa) * k, (r0[2] * ca + nx[2] * sa) * k);
+    set3(st.v, (st.r[0] - prev[0]) / h, (st.r[1] - prev[1]) / h, (st.r[2] - prev[2]) / h);
+    st.coast = false;
+    // the nose: against the way and down (the retro burn), the ship's up away from the ground
+    const up = unit(st.r, v3());
+    set3(_nd, -st.v[0], -st.v[1], -st.v[2]); unit(_nd);
+    set3(_nd, _nd[0] * 0.75 - up[0] * 0.35, _nd[1] * 0.75 - up[1] * 0.35, _nd[2] * 0.75 - up[2] * 0.35); unit(_nd);
+    A.slew(a.S, _nd, up, 1.6 * h, 1.2 * h); AM.ortho(a.S);
+    a.cruiseThr = 2.6;
+    if (fl.auto) { fl.auto.dist = len(st.r) - c.R1 / 1.1; fl.auto.eta = Math.max(0, C.DESCENT_S - c.s); }
+    if (c.s < C.DESCENT_S) return;
+    // the trip: the world below starts while the veil is closed; the ship comes along (travel.js switchNow)
+    a.cruise = null; a.cruiseThr = 0; fl.auto = null; fl.regime = 'air';
+    C.landing = { dim: c.dim, body: c.body, t0: performance.now() };
+    try { VR.Travel.go(g, { dim: c.dim, via: 'ship' }); } catch (e) { console.warn(e); }
+  }
+
+  // ---------------------------------------------------------------- in the moon's world: the ship over the site
+  // travel.js arrived(): a trip by ship puts the ship in the air (its ride: 420 m over the arrival place)
+  C.arrived = (g, trip) => { if (trip && trip.via === 'ship' && trip.ride) trip.ride.air = C.HOVER; };
+  // travel.js rideTick(): the ship that came along, built — placed over the player, boarded, flying (true: done here)
+  C.ride = (g, S, s, R0) => {
+    if (!R0 || !R0.air) return false;
+    const p = g.player, SS = g.starships;
+    s.pos[0] = p.pos[0]; s.pos[1] = p.pos[1] + R0.air; s.pos[2] = p.pos[2];
+    SS.board(s, p);
+    const fl = s.flight; if (!fl) return true;
+    fl.power = 'running'; fl.startT = 3; fl.state = 'flying'; fl.holdAlt = null; fl.auto = null;
+    g.cruiseLand = { s, fl, t: 0, ground: p.pos[1], dim: g.dim, body: (C.landing && C.landing.body) || g.dim, hintT: 0, surveyT: 0, firstK: null };
+    if (C.landing) C.landing.tAir = performance.now();
+    return true;
+  };
+  // the near columns there and shown (the 3 × 3 round the ship)
+  C.nearReady = (g, x, z) => {
+    const w = g.world; if (!w || !w.cols) return false;
+    const cx = Math.floor(x) >> 4, cz = Math.floor(z) >> 4;
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const c = w.cols.get(VR.ckey(cx + dx, cz + dz));
+      if (!c || !c.ready) return false;
+      for (const sc of c.sec) if (sc.count > 0 && (sc.dirty || sc.pending || !sc.hasMesh)) return false;
+    }
+    return true;
+  };
+  // per frame in the moon's world (travel.js update): sink fast, hover while the site is surveyed, flight.js lands
+  C.landTick = (g, dt) => {
+    const L = g.cruiseLand, fl = L.fl, b = fl.b, SS = g.starships;
+    L.t += dt;
+    if (!SS || SS.pilot !== L.s || L.t > 150 || g.dim !== L.dim) { g.cruiseLand = null; return; }
+    const top = fl.groundTop ? fl.groundTop(b.pos[0], b.pos[1], b.pos[2], 700) : null;
+    const gy = top !== null && top > -1e8 ? top : L.ground, alt = b.pos[1] - gy;
+    L.alt = alt;
+    const ready = C.nearReady(g, b.pos[0], b.pos[2]);
+    if (!L.tReady && ready) L.tReady = L.t;
+    if (fl.state === 'landed') {
+      g.cruiseLand = null;
+      const m = g.meta, U2 = m && (m.universe || (m.universe = { v: 1 })), F = U2 && (U2.firsts || (U2.firsts = {}));
+      const name = SF.nameOf(L.body);
+      if (F && !F[L.dim]) { F[L.dim] = g.env ? g.env.day | 0 : 1; if (g.ui && g.ui.toast) g.ui.toast(T('g.cr.firstStep', { name }), name, null); else if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.cr.firstStep', { name }), '#ffd98a'); }
+      if (VR.Quests && VR.Quests.emit) { try { VR.Quests.emit('arrive', { dim: L.dim }); } catch (e) { /* (an Abenteuer world only) */ } }
+      if (C.landing) C.landing.tLanded = performance.now();
+      return;
+    }
+    if (fl.state === 'landing') { C.plume(g, fl, alt, dt); return; }
+    if (!ready && alt < 320) {
+      // the site not surveyed yet: hover (flight.js's altitude hold) with the line on the screen
+      if (fl.holdAlt === null) fl.holdAlt = b.pos[1];
+      if ((L.surveyT -= dt) <= 0) { L.surveyT = 2; if (g.ui && g.ui.hint) g.ui.hint(T('g.cr.survey'), 2100); }
+      L.hovered = (L.hovered || 0) + dt;
+      return;
+    }
+    if (alt > 60) {
+      const vs = clamp(alt * 0.12, 7, 34);
+      b.pos[1] -= vs * dt; b.vel[1] = -vs; fl.holdAlt = null; fl.ctl.climb = 0;
+      if (alt < 120) C.plume(g, fl, alt, dt);
+      return;
+    }
+    fl.state = 'landing'; fl.throttle = 0; fl.boost = false; fl.holdAlt = null;
+  };
+  // the engine's wash on airless ground: regolith thrown out in a widening ring below 50 m (the world's ground colour)
+  const _col = [0.6, 0.58, 0.55];
+  const DUST = { opal: [0.86, 0.9, 0.96], basalt: [0.56, 0.54, 0.52], zinn: [0.86, 0.76, 0.38], ocker: [0.74, 0.5, 0.33], aqua: [0.72, 0.7, 0.64] };
+  C.plume = (g, fl, alt, dt) => {
+    const P = g.particles, b = fl.b; if (!P || !fxOn(g) || alt > 50 || alt < 0) return;
+    const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 3 : 9) * k + 1);
+    const gy = b.pos[1] - alt, col = DUST[g.dim] || _col;
+    const ring = 3 + alt * 0.25;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.2832, r = ring * (0.6 + Math.random() * 0.6), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 8 + Math.random() * 10 * k;
+      P.spawn(x, gy + 0.3, z, Math.cos(a) * sp, 0.6 + Math.random() * 2.5 * k, Math.sin(a) * sp, { life: 1.2 + Math.random() * 1.4, size: 0.5 + Math.random() * 0.9 * k, grav: 0.4, col: [col[0] * 0.9, col[1] * 0.9, col[2] * 0.88], drag: 0.9, grow: 1.6, collide: false });
+    }
+  };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));

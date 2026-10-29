@@ -2541,6 +2541,8 @@
     'g.asc.stay': 'Up here you stay at the controls.',
     'g.set.curvature': 'Curvature of the world in the climb',
     'g.set.curvature.tip': 'As you climb, the land bends away toward the horizon as on a real sphere. Off: the land stays flat to the edge. Costs next to nothing.',
+    'g.set.cruiseFx': 'Cruise drive effects',
+    'g.set.cruiseFx.tip': 'When the cruise drive kicks in the view widens for a moment, and landing on a moon the thrust throws up dust. Off: a calm view, no dust. Costs almost nothing.',
     // u-cruise: the Reiseantrieb, the descent, the Konvoi
     'g.cr.arm': '🚀 Cruise drive to {name} in 2 seconds — G again: jump.',
     'g.cr.armJump': '✨ Jump to {name} in 2 seconds — G again: off.',

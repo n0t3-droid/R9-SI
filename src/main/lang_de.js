@@ -2541,6 +2541,8 @@
     'g.asc.stay': 'Hier oben bleibst du am Steuer.',
     'g.set.curvature': 'Krümmung der Welt im Steigflug',
     'g.set.curvature.tip': 'Beim Aufstieg biegt sich das Land zum Horizont hin weg, wie auf einer echten Kugel. Aus: das Land bleibt bis zum Rand flach. Kostet fast nichts.',
+    'g.set.cruiseFx': 'Reiseantrieb-Effekte',
+    'g.set.cruiseFx.tip': 'Wenn der Reiseantrieb anspringt, weitet sich kurz das Bild, und beim Landen auf einem Mond wirbelt der Schub Staub auf. Aus: ruhiges Bild, kein Staub. Kostet fast nichts.',
     // u-cruise: the Reiseantrieb, the descent, the Konvoi
     'g.cr.arm': '🚀 Reiseantrieb nach {name} in 2 Sekunden — G nochmal: Reisesprung.',
     'g.cr.armJump': '✨ Reisesprung nach {name} in 2 Sekunden — G nochmal: aus.',
