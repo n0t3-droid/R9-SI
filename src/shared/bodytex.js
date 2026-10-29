@@ -138,6 +138,7 @@
     c += MAC.bias[0] * (1 - ss(MAC.bias[1], MAC.bias[2], d));   // (the home's continent)
     o.c = c;
     o.land = 0.5 + (ss(MAC.thr - MAC.band, MAC.thr + MAC.band, c) - 0.5) * k;
+    if (c < MAC.thr - MAC.band - 0.02) return o;   // (the open sea: no climate, no rivers, no people)
     // the continents' climate: warm toward the equator (the pole is north: y = sin latitude), moist near the coasts and
     // in broad belts, dry in the continents' hearts and the horse latitudes; mountain ranges along ridged lines
     const lat = Math.abs(y), mo = S2.n3(x * 4.2 + 3, y * 4.2, z * 4.2) * 0.5 + S2.n3(x * 13, y * 13, z * 13 + 5) * 0.2;
@@ -180,7 +181,7 @@
     const dx = gx - (cx + 0.3 + 0.4 * h3), dy = gy - (cy + 0.3 + 0.4 * h4), dz = gz - (cz + 0.3 + 0.4 * h5), d = Math.sqrt(dx * dx + dy * dy + dz * dz) / sz;
     if (d >= 1) return 0;
     const q = 1 - d;
-    return (110 + 145 * h2) * q * Math.sqrt(q);
+    return Math.min(255, (150 + 140 * h2) * Math.sqrt(q));
   };
 
   // the sampler: a cell's colour by its biome (lod.js LOD.look once a biome, the canopy blended in — the far horizon's
@@ -371,7 +372,7 @@
         // u-orbit2: away from home the macro's people — the villages brighter on the coasts and the rivers, fainter in the
         // empty country; the macro's towns where the generator has none; the farmsteads only where many live
         let fs = 0.07;
-        if (BT.MACRO && macO.k > 0) { const P = BT.people(macO), kf = ss(1500, 6000, Math.hypot(x, z)); L *= 1 - kf * (0.6 - Math.min(0.9, P * 1.5)); if (o[5] || macO.river > 0) L = Math.max(L, BT.town(N, P, g.seed) * kf); fs = 0.07 * (1 - kf * (1 - clamp(P * 1.5, 0.1, 1))); }
+        if (BT.MACRO && macO.k > 0) { const P = BT.people(macO), kf = ss(1500, 6000, Math.hypot(x, z)); L *= 1 + kf * (Math.min(1.0, P * 2.2) - 0.3); if (o[5] || macO.river > 0) L = Math.max(L, BT.town(N, P, g.seed) * kf); fs = 0.07 * (1 - kf * (1 - clamp(P * 1.5, 0.1, 1))); }
         // the farmsteads and roads between: a faint scatter on liveable land
         if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < fs) L = 30;
         // u-orbitlod: the roads between them — a web of curving lines (|noise| near 0, ~1.4-km meshes) on liveable land,

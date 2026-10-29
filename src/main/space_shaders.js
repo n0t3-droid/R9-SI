@@ -276,7 +276,7 @@ void main() {
     float water = 1.0 - smoothstep(126.5, 129.5, hc), depth = max(0.0, (128.0 - hc) / 3.0);
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
     // its grain below the texel (fields, woods, rock) from tier 1
-    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, AIRZ > 0.5 ? 0.9 : 1.14);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already; u-orbit2: Very Low, without the grain below the texel, keeps its biomes' colour a step fuller — a constant there, no cost)
+    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, AIRZ > 0.5 ? 1.05 : 1.14);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already; u-orbit2: Very Low, without the grain below the texel, keeps its biomes' colour a step fuller — a constant there, no cost)
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
 #ifdef PTILE
@@ -346,7 +346,7 @@ void main() {
     vec3 Tv = exp(-tv), Tvc = exp(-tv * 0.4);
     float cv = dot(Db, L);
     vec3 haze = (1.0 - exp(-TAU_R * airmass(muv))) * SCAT_R * phaseR(cv) * sunTrans(HR, mus) + (1.0 - exp(-TAU_M * airmass(muv))) * 0.9 * phaseM(cv) * sunTrans(HM, mus);
-    haze *= u_sunCol * u_look.y * 0.3;   // (the phase's 1/4π against a Lambert surface's 1/π, a little more for the light scattered twice)
+    haze *= u_sunCol * u_look.y * 0.19;   // (u-orbit2: 0.3 → 0.19 — the land read milky from 3 km, R52-10; u-orbitlod's self-review item 3)   // (the phase's 1/4π against a Lambert surface's 1/π, a little more for the light scattered twice)
     col = mix(ground * Tv, cloudCol * Tvc, cl) + haze;
     // the night: the villages' lights (points within the texel), Amarant's light, the airglow seen from above
     float night = 1.0 - smoothstep(-0.1, 0.04, mus);
@@ -400,19 +400,15 @@ void main() {
         float th0, lam0, c00;
         float env = auroraEnv(Ptb, u_air.y, th0, lam0, c00);
         if (env > 0.01) {
+          // (the footprint at the lowest point and a little before and behind it along the view: the sample heights move
+          // with the pixel's, so the curtains run up continuously — run 3's fixed shells drew stacked stripes)
           vec3 Pt0 = Ptb * (1.0 + h);
-          float gacc = 0.0;
-          for (int i = 0; i < 4; i++) {
-            float ha = 0.0150 + float(i) * 0.0034;
-            if (ha <= h) continue;
-            float sx = sqrt(max((1.0 + ha) * (1.0 + ha) - (1.0 + h) * (1.0 + h), 0.0));
-            float wgt = exp(-(ha - 0.015) / 0.0075);
-            gacc += (auroraAt(normalize(Pt0 - Db * sx), u_air.y) + auroraAt(normalize(Pt0 + Db * sx), u_air.y)) * wgt;
-          }
-          float green = smoothstep(0.0146, 0.0156, h + 0.0012) * 0.5;
+          float sx = sqrt(max((1.0 + h + 0.006) * (1.0 + h + 0.006) - (1.0 + h) * (1.0 + h), 0.0));
+          float gacc = auroraAt(Ptb, u_air.y) + 0.7 * (auroraAt(normalize(Pt0 - Db * sx), u_air.y) + auroraAt(normalize(Pt0 + Db * sx), u_air.y));
+          float green = smoothstep(0.0144, 0.0154, h) * exp(-max(h - 0.0154, 0.0) / 0.009);
           float red = smoothstep(0.024, 0.033, h) * exp(-max(h - 0.033, 0.0) / 0.012);
           float pink = exp(-pow((h - 0.0149) / 0.0006, 2.0));
-          col += (vec3(0.15, 1.0, 0.45) * gacc * 0.55 * (0.4 + green) + vec3(0.9, 0.12, 0.2) * red * env * 0.12 + vec3(0.9, 0.3, 0.6) * pink * gacc * 0.12) * nite * u_look.z;
+          col += (vec3(0.15, 1.0, 0.45) * gacc * green * 0.75 + vec3(0.9, 0.12, 0.2) * red * env * 0.12 + vec3(0.9, 0.3, 0.6) * pink * gacc * 0.12) * nite * u_look.z;
         }
       }
       alpha = clamp(1.0 - exp(-dot(tt, vec3(0.2, 0.3, 0.5))), 0.0, 1.0);
