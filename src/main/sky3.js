@@ -842,7 +842,7 @@ float c3Y = 210.0;         // the texel's height in the world (PUFF_FS sets it f
 float c3Seed = 0.0;        // f-sky4: the sprite's own number (PUFF_FS sets it: the torn base differs from puff to puff)
 float c3Grad = 1.0;        // f-sky4: the light's fall from the top to the base (c3Shade sets it; PUFF_FS's storm slate keeps it)
 // f-sky5 (R52-03: a bank of the isles lay as a white sheet over the canyon floor under the eye): the mist fades near the
-// eye — none within ${S3.MIST_NEAR[0]} blocks (horizontal), full from ${S3.MIST_NEAR[1]} (S3.mistNear); far off the banks stay
+// eye (S3.mistNear: none within MIST_NEAR[0] blocks horizontally, full from MIST_NEAR[1]); far off the banks stay
 float c3MistNear(float d) { return smoothstep(${S3.MIST_NEAR[0].toFixed(1)}, ${S3.MIST_NEAR[1].toFixed(1)}, d); }
 vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec4 t = texture(u_cloudTex, c3At(cell, uv));
