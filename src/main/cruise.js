@@ -603,7 +603,7 @@
   C.plume = (g, fl, alt, dt) => {
     const P = g.particles, b = fl.b; if (!P || !fxOn(g) || alt > 50 || alt < 0) return;
     // (run 2: big round puffs thrown up like smoke; regolith in a vacuum flies flat and fast, in a thin sheet, and settles)
-    const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 4 : 14) * k + 1);
+    const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', ice = g.dim === 'opal', n = Math.round((low ? 4 : ice ? 22 : 14) * k + 1);
     const gy = b.pos[1] - alt, BC = VR.BodySky && VR.BodySky.cur;
     // (Basalt: the dust of the ground under the ship — the maria's dark or the highlands' bright — a shade darker than it)
     const col = g.dim === 'basalt' && BC && BC.alb > 0 ? [BC.alb * 0.72, BC.alb * 0.69, BC.alb * 0.66] : DUST[g.dim] || _col;
@@ -624,7 +624,7 @@
       const a = Math.random() * 6.2832, r = ring * (0.5 + Math.random() * 0.7), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 12 + Math.random() * 14 * k;
       // (Opal: one crystal in five glints — the sun's or the engine's light off a facet)
       const sh = (0.85 + Math.random() * 0.3) * (g.dim === 'opal' && Math.random() < 0.2 ? 1.8 : 1);
-      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh * lk, col[1] * sh * lk, col[2] * sh * lk], emis, drag: 0.6, grow: 1.2, collide: false });
+      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: (0.18 + Math.random() * 0.4 * k) * (ice ? 1.6 : 1), grav: 0.8, col: [col[0] * sh * lk, col[1] * sh * lk, col[2] * sh * lk], emis, drag: 0.6, grow: 1.2, collide: false });
     }
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));
