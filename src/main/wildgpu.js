@@ -284,7 +284,7 @@ void main() {
   float w = a_col.a, em = a_em;
   v_q = vec2(0.0);
   if (u_mode == 3) {
-    // f-wild2 · an impostor of the density cloud: a disc of radius i_p.w (cut at ${CUT}) turned to the camera
+    // f-wild2 · an impostor of the density cloud: a disc of radius i_p.w (cut at W.PUFF.cut) turned to the camera
     vec3 c = i_p.xyz, f = normalize(c), up0 = abs(f.y) > 0.95 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
     vec3 rt = normalize(cross(f, up0)), up = cross(rt, f), rel = c + (rt * a_pos.x + up * a_pos.y) * i_p.w * ${CUT};
     v_q = a_pos.xy * ${CUT}; v_rel = rel; v_n = -f; v_col = i_c.rgb; v_em = 0.0; v_l = vec4(1.0, i_c.w, i_y.x, 0.0);
