@@ -10,6 +10,9 @@
 //  · the herds' paths: the deer walk out of the wood in single file and graze at the end; the sheep's herd point stays
 //    in its pasture and moves
 //  · Low: no murmuration, no rays; the cost of an update with everything near (node)
+//  f-wild2 (R50-10): the murmuration as birds near and a density cloud far (the impostors in the translucent pass, their
+//  depth from the boids' density); the pass at dusk (a young ray within 40 of the eye at the day's moment, none in the
+//  rain); the shoal comes to a still player's shadow on the water, scatters from a running one, its flanks flash
 //   bash test/wt_run.sh wild_game.js 300
 const V = require('./load_shared.js');
 global.window = global.window || {};
@@ -98,13 +101,17 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   const c = M.fl.ctr, d = Math.hypot(c[0] - M.st.x, c[2] - M.st.z);
   check(d < 90 && Math.abs(c[1] - M.st.y) < 40, `it swirls round its stage over the lake (its middle ${d.toFixed(0)} from the stage, ${(c[1] - M.st.y).toFixed(0)} in height)`);
   GLC.draws.length = 0; A.draw(rr, {}, 'opaque', { x: M.st.x - 120, y: M.st.y - 20, z: M.st.z });
-  check(GLC.draws.includes(M.n) && A.stats.draws >= 1, `the whole murmuration is one instanced draw (${GLC.draws.join(', ')} instances)`);
+  { const FK = A.list.filter(([K]) => /^flock/.test(K.name)), nb = FK.reduce((q, [, n]) => q + n, 0);
+    // (f-wild2, 29 Oct: the parties by the birds they show, in up to four draws — wildlife.js FLOCK_TIERS)
+    check(nb === M.n && FK.length <= 4 && A.stats.draws >= 1, `the whole murmuration in ${FK.length} instanced draws (${FK.map(([K, n]) => K.name + ' ' + n).join(', ')} instances)`); }
   // each boid a party of MURM_K birds: the kind's mesh holds K birds, each at its own place in the party (the first on the
   // boid itself), each with its own beat
   {
-    const L = A.list.find(([K]) => K.name === 'flock'), mesh = V.WildGPU.mesh('flock'), VS = 11, places = new Set(), beats = new Set();
+    const FK = A.list.filter(([K]) => /^flock/.test(K.name)), L = FK.length ? [FK[0][0], FK.reduce((q, [, n]) => q + n, 0)] : null, mesh = V.WildGPU.mesh('flock'), VS = 11, places = new Set(), beats = new Set();
     for (let i = 0; i < mesh.length; i += VS) { places.add(mesh[i + 3].toFixed(3) + ',' + mesh[i + 4].toFixed(3) + ',' + mesh[i + 5].toFixed(3)); beats.add(mesh[i + 10].toFixed(3)); }
     check(!!L && L[1] === M.n && places.size === W.MURM_K && places.has('0.000,0.000,0.000') && beats.size === W.MURM_K, `drawn as parties: ${L ? L[1] : 0} boids × ${places.size} birds (${beats.size} beats), ${M.n * places.size} birds in the sky`);
+    const m3 = V.WildGPU.mesh('flock3');
+    check(m3.length * W.MURM_K === mesh.length * 3 && m3.every((v, i) => v === mesh[i]), 'a far party\'s small mesh is the same party\'s first three birds');
     let flat = 0, wide = 0; for (const q of places) { const [x, y, z] = q.split(',').map(Number); flat = Math.max(flat, Math.abs(y)); wide = Math.max(wide, Math.abs(x), Math.abs(z)); }
     check(flat < wide * 0.3 && wide <= W.MURM_RC + 0.01, `a party is a flat sheet round its boid (${wide.toFixed(1)} wide, ${flat.toFixed(2)} high)`);
   }
@@ -153,8 +160,10 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   const S = A.shoals.find(s => s.key === 'fish:70,0');
   check(!!S && S.n === W.CAPS.fish[3], `a shoal of ${S ? S.n : 0} at the pier's anchor`);
   if (S) {
-    let out = 0; for (let i = 0; i < S.n; i++) { const x = S.fl.pos[i * 3], y = S.fl.pos[i * 3 + 1], z = S.fl.pos[i * 3 + 2]; if (getBlock(x, y, z) !== WATER || y > SEA + 0.88) out++; }
-    check(out === 0 && S.b.y1 <= SEA + 0.55 && S.b.y0 >= 60.9, `every fish in the water under the surface (${out} out; band ${S.b.y0.toFixed(2)} … ${S.b.y1.toFixed(2)})`);
+    let out = 0; for (let i = 0; i < S.n; i++) { const x = S.fl.pos[i * 3], y = S.fl.pos[i * 3 + 1], z = S.fl.pos[i * 3 + 2]; if (getBlock(x, y, z) !== WATER || y > SEA + 0.88) { out++; if (process.env.DBG) console.log("out", x.toFixed(2), y.toFixed(2), z.toFixed(2), getBlock(x, y, z)); } }
+    check(out === 0 && S.b.y1 <= SEA + 0.88 - 0.12 && S.b.y0 >= 60.9, `every fish in the water under the surface (${out} out; band ${S.b.y0.toFixed(2)} … ${S.b.y1.toFixed(2)})`);
+    // f-wild2: close under the surface, where the eye on the pier sees them (the band within 1.2 of it)
+    check(S.b.y1 >= SEA + 0.88 - 0.25 && S.b.y0 >= SEA + 0.88 - 1.25, `close under the surface (the band ${(SEA + 0.88 - S.b.y1).toFixed(2)} … ${(SEA + 0.88 - S.b.y0).toFixed(2)} under it)`);
   }
   if (S) { let inPost = 0; for (let i = 0; i < S.n; i++) if (isPost(Math.floor(S.fl.pos[i * 3]), Math.floor(S.fl.pos[i * 3 + 2]))) inPost++; check(Math.hypot(S.b.x - 70.5, S.b.z - 0.5) <= 4 && S.b.r >= 3, `the pier's posts round its end do not end the water: the shoal's disc ${S.b.r.toFixed(1)} wide, ${Math.hypot(S.b.x - 70.5, S.b.z - 0.5).toFixed(1)} from the anchor (${inPost} fish-places in a post)`); }
   // the shallows: the eye at the lake's edge over a hand's depth of clear water — minnows there too
@@ -258,6 +267,86 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   check(inside && path > 15, `the sheep's herd point drifts inside its pasture (${path.toFixed(0)} blocks in two minutes)`);
   const m = { id: 3, herd: H }, ht = W.herdTarget(m);
   check(Math.hypot(ht[0] - H.x, ht[1] - H.z) < 4.5, 'a sheep keeps its slot round the herd\'s point');
+}
+
+// ================================================================ f-wild2 (R50-10): the wild reads at its distance
+// ---------------------------------------------------------------- 10. the density cloud: the birds near, the impostor far
+{
+  const eye = [300, 81, 100], g = mkGame('high', eye, 11000), A = new W.Actor(g);
+  run(A, g, 30, 0.05);
+  const M = A.murm, far = { x: M.st.x - 150, y: M.st.y - 20, z: M.st.z };
+  GLC.calls = 0; GLC.draws.length = 0; A.draw(rr, {}, 'opaque', far);
+  // (29 Oct, the cost: a far party draws a few birds, so it is drawn from a smaller party mesh — 'flock12', 'flock6',
+  //  'flock3' — the vertex shader no longer runs all 20 birds' vertices for the 2 it shows; ≤ 4 draws for the parties)
+  const FK = A.list.filter(([K]) => /^flock/.test(K.name)), nAll = FK.reduce((s, [, n]) => s + n, 0);
+  const vAll = FK.reduce((s, [K, n]) => s + K.count * n, 0), vFull = M.n * V.WildGPU.kind(fakeGL, 'flock', 900).count;
+  check(FK.length >= 2 && FK.length <= 4 && nAll === M.n, `the birds: ${FK.length} instanced draws of the parties by their birds shown (${FK.map(([K, n]) => K.name + ' ' + n).join(', ')}; ${nAll} of ${M.n})`);
+  check(vAll <= 0.45 * vFull, `150 blocks off, the parties' vertices ${(vAll / vFull * 100).toFixed(0)} % of drawing every party whole (≤ 45 %)`);
+  let fit = true; for (const [K, n] of FK) { const kb = +K.name.slice(5) || W.MURM_K; for (let i = 0; i < n; i++) if (K.data[i * V.WildGPU.STRIDE + 19] > kb + 1e-6) fit = false; }
+  check(fit, 'each party in a mesh with at least the birds it shows');
+  const fl = FK.length ? [FK[0][0], FK.reduce((s, [, n]) => s + n, 0)] : null;
+  // each party draws its birds by the distance (all near, a few far): the instance carries how many
+  if (fl) { let lo = 1e9, hi = 0; for (const [K, n] of FK) for (let i = 0; i < n; i++) { const k = K.data[i * V.WildGPU.STRIDE + 19]; lo = Math.min(lo, k); hi = Math.max(hi, k); } check(lo >= W.PUFF.kMin - 1e-6 && hi <= W.MURM_K && lo < W.MURM_K, `150 blocks off, a party draws ${lo.toFixed(1)}–${hi.toFixed(1)} of its ${W.MURM_K} birds`); }
+  GLC.draws.length = 0; A.draw(rr, {}, 'trans', far);
+  const pf = A.list.find(([K]) => K.name === 'puff');
+  check(!!pf && pf[1] >= M.n * 0.8 && GLC.draws.includes(pf[1]), `the density cloud: one instanced draw of ${pf ? pf[1] : 0} impostors in the translucent pass`);
+  if (pf) {
+    const D = pf[0].data; let tmax = 0, tmin = 1e9; for (let i = 0; i < pf[1]; i++) { const t = D[i * V.WildGPU.STRIDE + 11]; tmax = Math.max(tmax, t); tmin = Math.min(tmin, t); }
+    check(tmax > 2 * tmin && tmax > 0.2, `their optical depth follows the boids' density (${tmin.toFixed(3)} … ${tmax.toFixed(3)})`);
+  }
+  // near the flock: the birds carry it, the impostors fade
+  const c = M.fl.ctr; GLC.draws.length = 0; A.draw(rr, {}, 'trans', { x: c[0] + 20, y: c[1], z: c[2] });
+  const pn = A.list.find(([K]) => K.name === 'puff');
+  check(!pn || pn[1] < M.n * 0.6, `inside the flock the birds take over (${pn ? pn[1] : 0} impostors left)`);
+  // Very Low: nothing in either layer
+  const gV = mkGame('potato', eye, 11000), AV = new W.Actor(gV); run(AV, gV, 5, 0.05);
+  GLC.calls = 0; AV.draw(rr, {}, 'trans', far); AV.draw(rr, {}, 'opaque', far);
+  check(GLC.calls === 0, `Very Low: no impostor, no bird, no GL call (${GLC.calls})`);
+}
+
+// ---------------------------------------------------------------- 11. the pass at dusk
+{
+  const eye = [300, 81, 100], g = mkGame('high', eye, 6000), A = new W.Actor(g);
+  const tn = W.passTime(A.seed, 4), Tn = (4 * 24000 + tn) / 20;
+  g.env.ticks = tn - 100 * 20;
+  let dmin = 1e9, at = null, k = -1, scale = 0, seenPass = false;
+  run(A, g, 140, 0.05, () => {
+    const P = A.pass; if (P && P.plan) { k = P.plan.k; seenPass = true; }
+    if (k >= 0 && A.rays[k]) { const R = A.rays[k], d = Math.hypot(R[0] - eye[0], R[1] - (eye[1] + 1.62), R[2] - eye[2]); if (d < dmin) { dmin = d; at = A.clock; scale = R[7]; } }
+  });
+  check(seenPass, 'at dusk a young ray leaves the circuit for the pass');
+  check(dmin <= 40 && Math.abs(at - Tn) < 3, `it passes within ${dmin.toFixed(1)} blocks of the eye at the day's moment (${(at - Tn).toFixed(1)} s off)`);
+  check(scale >= 6 && scale <= 10, `${scale.toFixed(1)} blocks across`);
+  const rep = A.report();
+  check(rep.rays.length === W.CAPS.ray[3], `the circuit keeps its ${rep.rays.length} rays (the young one is back in its slot)`);
+  // in the rain, no pass
+  const gR = mkGame('high', eye, 6000), AR = new W.Actor(gR); gR.env.E.rain = 0.8; gR.env.ticks = tn - 30 * 20;
+  let passR = false; run(AR, gR, 40, 0.05, () => { if (AR.pass && AR.pass.plan) passR = true; });
+  check(!passR, 'no pass in the rain');
+}
+
+// ---------------------------------------------------------------- 12. the shoal comes to your shadow
+{
+  // the player stands still at the pier's end over the shoal's water (the deck at 65); the sun at the stand-in's angle
+  const feet = [70.5, 65, 3.2], g = mkGame('high', feet, 6000), A = new W.Actor(g);
+  run(A, g, 4, 0.05);
+  const S = A.shoals.find(s => s.key === 'fish:70,0');
+  check(!!S, 'the shoal at the pier');
+  if (S) {
+    const sun = g.env.E.sunDir, k = (feet[1] - S.b.surf) / sun[1], sh = [feet[0] - sun[0] * k, feet[2] - sun[2] * k];
+    let feared = false; run(A, g, 14, 0.05, () => { if (S.fl.fear) feared = true; });
+    const c = S.fl.ctr, tg = S.fl.tgt, d = Math.hypot(c[0] - sh[0], c[2] - sh[1]);
+    check(!feared, 'a still player on the pier does not scatter them');
+    check(d < 2.6 && Math.hypot(tg[0] - sh[0], tg[2] - sh[1]) < 1.5, `they gather in its shadow on the water (${d.toFixed(2)} from it)`);
+    // a running player: they scatter
+    g.player.pos = [S.fl.ctr[0] + 1.5, 64.2, S.fl.ctr[2]]; g.player.vel = [4.5, 0, 0];
+    let sc = false; run(A, g, 1, 0.05, () => { if (S.fl.fear) sc = true; });
+    check(sc, 'a player running at them: they scatter');
+  }
+  // the fish flash as they turn: some instances carry a flash
+  g.player.vel = [0, 0, 0]; g.player.pos = feet.slice();
+  let flash = 0; for (let r = 0; r < 20; r++) { run(A, g, 0.25, 0.05); A.draw(rr, {}, 'opaque', cam(g)); const L = A.list.find(([K]) => K.name === 'fish'); if (L) for (let i = 0; i < L[1]; i++) flash = Math.max(flash, L[0].data[i * V.WildGPU.STRIDE + 16]); }
+  check(flash > 0.3, `the flanks flash as the shoal turns (the strongest ${flash.toFixed(2)})`);
 }
 
 // ---------------------------------------------------------------- 9. the cost of an update with everything near (node)
