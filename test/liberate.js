@@ -251,6 +251,28 @@ console.log('11 · a-foes2: the land heals, the moment\'s camera');
 // beacon, the award, Helfer standing up), an Ohnmacht (waking at the freed beacon), the calm way with Begegnungen aus
 // (passive strays, the timing ring, the Lichtleiter), Kindersicher (no machine at all, the Lichtleiter alone) and a
 // reload (the record keeps every site)
+// a-regie (R52-07): the moment's shot clear of the parked ship — L.occ on a synthetic pad, then L.compose with the ship
+// parked between the player and the beacon (the shot the v0.51 review saw: the hull over 40 % of the frame)
+console.log('10 · a-regie: the freeing shot clear of the hull');
+{
+  const air = (x, y, z) => y >= 70;   // (flat land, its top at y 69)
+  const ship = { x: 0, y: 70, z: 7, yaw: 0, ex: 3, ez: 5, h: 6.5 };
+  const look = (cx, cy, cz, tx, ty, tz) => ({ x: cx, y: cy, z: cz, yaw: Math.atan2(-(tx - cx), -(tz - cz)), pitch: Math.atan2(ty - cy, Math.hypot(tx - cx, tz - cz)) });
+  const behind = L.occ(look(0, 77.5, 14, 0, 75, 0), 1.35, 16 / 9, 14, [ship], air, 70.5);
+  const side = L.occ(look(14, 77.5, 0, 0, 75, 0), 1.35, 16 / 9, 14, [ship], air, 70.5);
+  const none = L.occ(look(0, 77.5, 14, 0, 75, 0), 1.35, 16 / 9, 14, [], air, 70.5);
+  check(behind > 0.3 && none === 0, `the hull between the camera and the beacon blocks ${(behind * 100).toFixed(0)} % of the rays; the land below the subject none (${none})`);
+  check(side < behind, `from the side ${(side * 100).toFixed(0)} %`);
+  const wall = L.occ(look(0, 77.5, 14, 0, 75, 0), 1.35, 16 / 9, 14, [], (x, y, z) => y >= 70 && !(z > 8 && z < 9 && y < 80), 70.5);
+  check(wall > 0.5, `a wall in front of the camera: ${(wall * 100).toFixed(0)} %`);
+  // compose on a stand-in game: the player south of the beacon, the ship parked between them
+  const SOL = V.R.byName.stone.state ? V.R.byName.stone.state({}) : V.R.byName.stone.id;
+  const g = { world: { getBlock: (x, y, z) => (y < 70 ? SOL : 0) }, player: { pos: [0, 70, 30] }, settings: { fov: 70 }, renderer: { W: 1280, H: 720 },
+    starships: { ships: [{ pos: [0, 70, 7], yaw: 0, d: { meta: { width: 6, length: 10, height: 6, bounds: [-3, 0, -5, 3, 6, 5] } } }] } };
+  const c = L.compose(g, { x: 0, y: 69, z: 7, beacon: [0, 70, 0] });
+  check(!!c && c.occ <= L.OCC.ok, `compose picks a frame with ≤ ${L.OCC.ok * 100} % blocked (candidate ${c && c.k}, ${c && (c.occ * 100).toFixed(0)} %; straight from the player's side it would be ${(L.occ(look(0, 77.5, 14, 0, 75, 0), 1.35, 16 / 9, 14, L.shipBoxes(g, 0, 7, 40), air, 70.5) * 100).toFixed(0)} %)`);
+}
+
 async function glue() {
   console.log('10 · the glue in a small world');
   { const r = rng(20261023); Math.random = r; }   // (the same run every time: the foes' places and patrols are random)
