@@ -229,8 +229,8 @@
         case 'close': {
           // beside the subject, a little below its eye line, on the player's side; a slow push-in
           const d = (sh.target === 'funke' ? 2.3 : 4.5) * (1 - 0.15 * smooth(u)), dir = [pe[0] - Q[0], 0, pe[2] - Q[2]], L0 = Math.hypot(dir[0], dir[2]);
-          if (L0 < 0.3) { dir[0] = f[0]; dir[2] = f[2]; }   // (the subject at the player's own place: from in front)
-          const L = Math.hypot(dir[0], dir[2]) || 1, sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] - 0.18 * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
+          if (L0 < 0.3 || sh.target === 'funke') { dir[0] = f[0]; dir[2] = f[2]; }   // (Funke: from in front, looking back at it with the player behind — the hall, not the sky, behind them)
+          const L = Math.hypot(dir[0], dir[2]) || 1, sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] - (sh.target === 'funke' ? 0.06 : 0.18) * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
           // (a little from below — the hero's angle — the subject a touch above the middle)
           return lookAt(lift(C, Q), [Q[0], Q[1] - 0.12 * d, Q[2]], sh.target === 'funke' ? 48 : 50, base);
         }
@@ -476,7 +476,7 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
             const bu = Math.abs(dS[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], k = bu[0] * dS[0] + bu[1] * dS[1] + bu[2] * dS[2];
             let u = [bu[0] - dS[0] * k, bu[1] - dS[1] * k, bu[2] - dS[2] * k]; const ul = Math.hypot(u[0], u[1], u[2]); u = [u[0] / ul, u[1] / ul, u[2] / ul];
             const v = [dS[1] * u[2] - dS[2] * u[1], dS[2] * u[0] - dS[0] * u[2], dS[0] * u[1] - dS[1] * u[0]], bl = 0.18 + 0.82 * P.blink(tt);
-            fr.draws.push({ prog: 'glare', add: true, story: true, u: { u_cdir: dS, u_bu: u, u_bv: v, u_half: Math.tan(9 * DEG), u_sunDir: dS, u_sunCol: [1.0, 0.13, 0.07], u_gl: [bl, 0.0016, 2.4, 0] }, tex: {} });
+            fr.draws.push({ prog: 'glare', add: true, story: true, u: { u_cdir: dS, u_bu: u, u_bv: v, u_half: Math.tan(25 * DEG),   /* (the glare's own fade ends at 24.6°: a smaller quad shows its edge) */ u_sunDir: dS, u_sunCol: [1.0, 0.13, 0.07], u_gl: [bl, 0.0016, 2.4, 0] }, tex: {} });
             P.station = { dir: dS, blink: bl };
           }
         }

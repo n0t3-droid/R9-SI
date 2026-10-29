@@ -267,6 +267,7 @@ try {
       await settle(20, 'home again');
     }
     check(await ev(() => VR.game.dim) === 'overworld', 'back on Herzwelt');
+    await ev(() => VR.StoryPlay.debug.reach('c3.b2'));
     const ap = await ev(() => VR.SpaceFlight.apron());
     const ay = await ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 220; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & (F.OPAQUE | F.FLUID)) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [ap.x, ap.z]);
     await arrive({ x: ap.x, y: ay, z: ap.z + 12 });
