@@ -495,7 +495,7 @@
     const Dk = S3.deck(E), deck = mix3(mix3(C.grey, C.top, 0.35), Dk.base, Dk.on * 0.6);   // (f-sky5: the storm's deck a charcoal)
     set4(u.u_s3Rain, deck[0], deck[1], deck[2], 0);
     set4(u.u_s3Deck2, over ? Dk.on : 0, over ? Dk.shafts : 0, over ? Dk.edge : 0, (E.time || 0) * 0.02);
-    set4(u.u_c3Deck, Dk.puff, Dk.on, 0, 0);
+    set4(u.u_c3Deck, Dk.puff, Dk.on, S3.mistK(E), 0);
     const dr = E.cloudDrift, dx = dr ? dr[0] : (E.time || 0) * 0.9, dz = dr ? dr[1] : 0;
     set4(u.u_s3Drift, dx / 900, dz / 900, dx / 340, dz / 340);
     // the aurora (level 2): its strength, its curtains' seed, the time, its span round north
@@ -817,7 +817,11 @@ vec3 s3Fan(vec3 dir) {
   // thick cores dark, the thin edges lit); the silver lining — forward scattering round the light's direction (u_c3Ld,
   // world) through the thin parts; the sky's light from above and the low light from below by the normal, the creases
   // darker; far ones take the sky's horizon colour. Returns the colour and the coverage (a < 0: nothing)
-  S3.MIST_NEAR = [60, 180];
+  // the banks' share by the hour (R52-03: at the golden hour the isles drowned in their grey-lilac smear; the frames'
+  // clouds under the isles are few and white — u_c3Deck.z)
+  S3.MISTK = { gold: 0.55 };
+  S3.mistK = (E) => 1 - (1 - S3.MISTK.gold) * (E && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0);
+  S3.MIST_NEAR = [120, 280];   // (the first browser run: at 60–180 the sheet stayed — its bank 70–100 m off, 130 wide)
   S3.mistNear = (d) => sstep(S3.MIST_NEAR[0], S3.MIST_NEAR[1], d);
   S3.glslPuff = () => `
 #ifndef SKY3
@@ -849,7 +853,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
     float d = smoothstep(0.0, 0.22, th);
     if (d < 0.02) return vec4(0.0, 0.0, 0.0, -1.0);
     vec3 mc = mix(u_c3Low, u_c3Top, 0.6) + u_c3Sun * 0.35;
-    return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist));
+    return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist) * u_c3Deck.z);
   }
   float cov = smoothstep(0.0, 0.08, th);
   if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);

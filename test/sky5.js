@@ -1,7 +1,7 @@
 // f-sky5 (docs/superpowers/plans/2026-10-29-f-sky5.md; docs/reviews/v0.51.md R52-03, R52-04, R52-11) · node:
 //  a · the weather and the light traffic: a 'dry' act running when the rain comes ends — the balloon sinks and lands
 //      within 25 s (it never flies on through the rain), the birds and the flights leave; none starts while it rains
-//  b · the golden land clear: the isles' fog banks fade near the eye (S3.mistNear: none within 60 blocks, full from 180 —
+//  b · the golden land clear: the isles' fog banks fade near the eye (S3.mistNear: none within 120 blocks, full from 280 —
 //      the sheet over the canyon floor); at the golden hour the far air (L2.airGold: the aerial perspective's and the end
 //      fog's colour) a blue-lilac darker than the horizon, away from the sun bluer than beside it; the valley haze no
 //      denser than f-sky4's
@@ -46,11 +46,13 @@ console.log('a · the weather and the light traffic');
   const started = A.force('balloon');
   check(started && A.events.some(e => e.kind === 'balloon'), 'the balloon starts in dry weather');
   for (let i = 0; i < 100; i++) { g.time += 0.05; A.update(0.05); }
-  const b = A.events.find(e => e.kind === 'balloon'), y0 = b ? b.pos[1] : 0;
+  const b = A.events.find(e => e.kind === 'balloon');
+  if (b) b.y0 = b.pos[1] = 80 + 80;   // (80 m over the ground: the sky3.mjs canyon's balloon flies that high over the canyon floor)
+  const y0 = b ? b.pos[1] : 0;
   g.env.E.rain = 0.8;   // the rain comes
   let t = 0, minY = y0, gone = false;
   for (; t < 40; t += 0.05) { g.time += 0.05; A.update(0.05); const e = A.events.find(q => q.kind === 'balloon'); if (!e) { gone = true; break; } minY = Math.min(minY, e.pos[1]); }
-  check(gone && t <= 25, `in the rain the balloon goes within 25 s (${gone ? t.toFixed(1) + ' s' : 'still flying after 40 s'})`);
+  check(gone && t <= 20, `in the rain the balloon (80 m up) lands within 20 s (${gone ? t.toFixed(1) + ' s' : 'still flying after 40 s'})`);
   check(minY < y0 - 6 && minY <= 80 + 6, `it sinks and lands, not vanishes in the air (from ${y0.toFixed(0)} down to ${minY.toFixed(0)}, the ground 80)`);
   check(!LD.allowed('balloon', { place: 'hills', hour: 'morning', wet: true, tier: 2, has: {} }) && LD.allowed('balloon', { place: 'hills', hour: 'morning', wet: false, tier: 2, has: {} }), 'no balloon starts while it rains');
   const wetDry = ['balloon', 'flyover', 'flyby', 'birds', 'skyray', 'pigeons'].filter(n => LD.ACTS[n] && LD.ACTS[n].wx === 'dry');
@@ -67,8 +69,8 @@ console.log('b · the golden land clear');
 {
   check(typeof S3.mistNear === 'function', 'S3.mistNear exists');
   if (S3.mistNear) {
-    check(S3.mistNear(20) === 0 && S3.mistNear(60) === 0 && S3.mistNear(180) === 1 && S3.mistNear(400) === 1 && S3.mistNear(120) > 0.2 && S3.mistNear(120) < 0.8,
-      `the fog banks fade near the eye: ${[20, 60, 120, 180, 400].map(d => d + ' → ' + S3.mistNear(d).toFixed(2)).join(', ')}`);
+    check(S3.mistNear(20) === 0 && S3.mistNear(120) === 0 && S3.mistNear(280) === 1 && S3.mistNear(400) === 1 && S3.mistNear(200) > 0.2 && S3.mistNear(200) < 0.8,
+      `the fog banks fade near the eye: ${[20, 120, 200, 280, 400].map(d => d + ' → ' + S3.mistNear(d).toFixed(2)).join(', ')}`);
     check(/mistNear|c3MistNear/.test(S3.glslPuff()), 'the puff shader (CLOUD3) fades the mist by the distance');
   }
   check(typeof L2.airGold === 'function', 'L2.airGold exists (the golden far air)');
@@ -93,6 +95,9 @@ console.log('b · the golden land clear');
     const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], C = S3.cloudLight({ rain: 0, cloudCover: 0.2, sunDir: sun7 });
     check(lum(C.sun) >= 1.45, `the golden cumulus' sunlit tops bright (the sun's light on them, luma ${lum(C.sun).toFixed(2)} ≥ 1.45)`);
   }
+  if (S3.mistK) { const sun7 = [0, Math.sin(7 * Math.PI / 180), Math.cos(7 * Math.PI / 180)], sun24 = [0, Math.sin(24 * Math.PI / 180), Math.cos(24 * Math.PI / 180)];
+    check(S3.mistK({ sunDir: sun7 }) <= 0.6 && S3.mistK({ sunDir: sun24 }) === 1, `the isles' banks thinner at the golden hour (${S3.mistK({ sunDir: sun7 }).toFixed(2)}; noon ${S3.mistK({ sunDir: sun24 })})`); }
+  else check(false, 'S3.mistK exists');
   check(L2.FOG.gold[0] <= 0.0016, `the golden valley haze no denser than f-sky4's (${L2.FOG.gold[0]})`);
   check(/u_l2Air/.test(L2.glslCommon ? L2.glslCommon() : ''), 'l2Fog (AIR2, Low and up) mixes the golden far air');
 }

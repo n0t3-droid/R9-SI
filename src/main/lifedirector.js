@@ -429,13 +429,13 @@
       ev.v = [w[0] * sp, 0, w[1] * sp]; ev.yaw = rnd(ev, 5) * TAU; ev.burn = 3; ev.y0 = ev.pos[1];
       D.st.balloon = 1;
     },
-    // f-sky5: the rain comes — the pilot vents and sinks (3 m/s, slowing over the ground), drifting less, and lands
+    // f-sky5: the rain comes — the pilot vents and sinks (up to 6.8 m/s, slowing over the ground), drifting less, and lands
     wet(D, ev) { ev.land = 1; ev.dur = ev.age + 30; },
     update(D, ev, dt) {
       if (ev.land) {
         const top = D.top(ev.pos[0], ev.pos[2]), over = ev.pos[1] - (top + 1);
         ev.pos[0] += ev.v[0] * dt * 0.4; ev.pos[2] += ev.v[2] * dt * 0.4;
-        ev.pos[1] -= Math.min(over, (0.8 + Math.min(over, 12) * 0.18) * dt);
+        ev.pos[1] -= Math.min(over, (0.8 + Math.min(over, 20) * 0.3) * dt);
         return over > 0.05;
       }
       ev.pos[0] += ev.v[0] * dt; ev.pos[2] += ev.v[2] * dt; ev.pos[1] = ev.y0 + Math.sin(ev.age * 0.11) * 3; ev.yaw += dt * 0.03;
