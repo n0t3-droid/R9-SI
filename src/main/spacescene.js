@@ -335,6 +335,7 @@
       const sunB = SS.toBody(F, norm(sub(bs.helia.p, b.p)));
       const base = { u_cdir: cd, u_bu: bu, u_bv: bv, u_half: full ? 0 : Math.tan(angQ) * 1.02, u_toBody: m3, u_sunB: sunB, u_sunCol: SUN };
       fr.bodies[id] = { ang, d, full };
+      if (id === 'herz') fr.bodies[id].camB = SS.toBody(F, sub(cam, b.p));   // u-orbitlod: the camera in Herzwelt's body frame (m) for the planet tiles
       if (id === 'amarant') {
         const camB = mul(SS.toBody(F, sub(cam, b.p)), 1 / R), flat = B.amarant.Rp / R;
         fr.draws.push({ prog: 'giant', full, u: Object.assign(base, { u_camB: camB, u_flat: flat, u_flow: [eph.t % 300000, 2.2e-5, tier, 1], u_ringK: [RING.r0, RING.r1, 0, 0] }), tex: { u_bands: 'amarant', u_ring: 'ring' } });
@@ -429,6 +430,7 @@
   // the textures a view needs at a tier (asked for once); true when all are there
   const MOONS = () => VR.BodyTex.MOONS;
   SS.needs = function (g, anc, tier) {
+    if (VR.PlanetLODGL) VR.PlanetLODGL.game = g;   // u-orbitlod
     const want = [request(g, 'herz', tier), request(g, 'amarant', tier), request(g, 'ring', tier)];
     for (const id of MOONS()) want.push(request(g, id, tier));
     let pst = null;
@@ -446,6 +448,7 @@
   SS.drop = function (g) {
     const gl = g && g.renderer && g.renderer.gl;
     if (gl) for (const k in ST.tex) gl.deleteTexture(ST.tex[k]);
+    if (gl && VR.PlanetLODGL) VR.PlanetLODGL.clear(gl);   // u-orbitlod
     ST.tex = {}; ST.texBytes = {}; ST.bytes = 0; ST.jobs = {}; ST.patch = null; ST.patchKeys = [];
   };
   // the renderer's own frame calls this (F.drawOpaque) with the scene's framebuffer bound
@@ -464,6 +467,7 @@
       for (const k in d.tex) { if (!p.u[k]) continue; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, ST.tex[map[d.tex[k]]] || blank(gl)); gl.uniform1i(p.u[k], unit); unit++; }
       gl.drawArrays(gl.TRIANGLES, 0, d.full ? 3 : 6);
       r.stats.draws++; r.stats.tris += d.full ? 1 : 2;
+      if (d.prog === 'herz' && VR.PlanetLODGL) VR.PlanetLODGL.draw(r, d, fr.bodies.herz, null, null, map, (k) => ST.tex[k] || blank(gl));   // u-orbitlod: the planet tiles over the impostor
     }
     gl.activeTexture(gl.TEXTURE0);
     gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);

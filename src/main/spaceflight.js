@@ -439,6 +439,7 @@ void main() {
       for (const k in d.tex) { if (!p.u[k]) continue; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, ST.tex[map[d.tex[k]]] || blankT); gl.uniform1i(p.u[k], unit); unit++; }
       gl.drawArrays(gl.TRIANGLES, 0, d.full ? 3 : 6);
       r.stats.draws++; r.stats.tris += d.full ? 1 : 2; n++;
+      if (d.prog === 'herz' && VR.PlanetLODGL) VR.PlanetLODGL.draw(r, d, fr.bodies.herz, lay, L.tcut || null, map, (k) => ST.tex[k] || blankT);   // u-orbitlod: the planet tiles over the impostor
     }
     gl.activeTexture(gl.TEXTURE0);
     gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -458,12 +459,12 @@ void main() {
     const fl = g.flight, a = fl && fl.asc;
     const fr = SF.cameraFrame(g, cam, c.t, a ? a.st : null, fl ? fl.b : null);
     const Gn = fr.look.exposure / Math.max(0.05, E.exposure || 1);
-    return SF.drawLayers(r, fr, { bg: c.bg > 0.001 ? [c.bg, c.bg, Gn, 1] : null, bodies: c.body > 0.001 ? [c.body, c.body, Gn, 0] : null, herz: c.imp > 0.001 ? [c.imp, c.imp, Gn, 0] : null, cut: SF.cutFor(c.hzR), strict: true });
+    return SF.drawLayers(r, fr, { bg: c.bg > 0.001 ? [c.bg, c.bg, Gn, 1] : null, bodies: c.body > 0.001 ? [c.body, c.body, Gn, 0] : null, herz: c.imp > 0.001 ? [c.imp, c.imp, Gn, 0] : null, cut: SF.cutFor(c.hzR), tcut: c.hzR > 0 ? [c.hzR * 0.3, c.hzR * 0.45] : null, strict: true });   // (u-orbitlod: tcut — the planet tiles whole under the horizon tiles' soft band)
   };
   // the space frame's layers: all of them whole; Herzwelt's cut only while the horizon tiles still fade out
   SF.spaceLayers = function (g, r, E, cam) {
     const fr = SF.cur; if (!fr) return 0;
-    return SF.drawLayers(r, fr, { bg: [1, 1, 1, 0], bodies: [1, 1, 1, 0], herz: [1, 1, 1, 0], cut: E.climb.hzR > 0 ? SF.cutFor(E.climb.hzR) : null, strict: false });
+    return SF.drawLayers(r, fr, { bg: [1, 1, 1, 0], bodies: [1, 1, 1, 0], herz: [1, 1, 1, 0], cut: E.climb.hzR > 0 ? SF.cutFor(E.climb.hzR) : null, tcut: E.climb.hzR > 0 ? [E.climb.hzR * 0.3, E.climb.hzR * 0.45] : null, strict: false });   // (u-orbitlod: tcut)
   };
 
   // ---------------------------------------------------------------- the space frame (the play frame while the ship is in space)

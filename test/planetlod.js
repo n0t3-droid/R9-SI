@@ -24,7 +24,7 @@ console.log('the horizon\'s dip');
   const hz = S.slice(S.indexOf('vec3 hazeColor(vec3 dir)'), S.indexOf('vec3 hazeColor(vec3 dir)') + 900);
   check(/max\(dir\.y \+ u_dip, 0\.0\)/.test(hz), 'hazeColor too (the far land\'s haze meets the band)');
   const asc = SRC('main/ascent.js'), ren = SRC('main/renderer.js');
-  check(/dip: /.test(asc) && /u_dip/.test(ren), 'E.climb.dip is set in the climb (ascent.js) and fed to u_dip (renderer.js)');
+  check(/E\.climb\.dip = /.test(asc) && /u_dip/.test(ren), 'E.climb.dip is set in the climb (ascent.js) and fed to u_dip (renderer.js)');
   // the normalised text is the base's: one test sets u_dip aside (vl_programs.js, motion_wind.js)
   check(/u_dip/.test(SRC('../test/vl_programs.js')) && /u_dip/.test(SRC('../test/motion_wind.js')), 'vl_programs.js and motion_wind.js set u_dip aside');
 }
