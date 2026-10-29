@@ -298,24 +298,20 @@
   }
 
   // ---------------------------------------------------------------- Amarant: zones and belts
-  const ZONE = [238, 226, 204], ZONE2 = [232, 210, 200], ZONE3 = [244, 236, 220], BELT = [172, 132, 200], BELT2 = [148, 108, 184], BELT3 = [196, 156, 182], BELT4 = [126, 98, 170], POLE = [122, 118, 166], JET = [92, 80, 150];
+  // f-sky5 (docs/reviews/v0.51.md R52-11: candy stripes — 17 bands of cream and lilac with 1.1° edges): six broad bands of
+  // near tones within ±60° — belts and zones of rose-cream, lilac and a dusty blue-violet, never more than ~25 ΔE apart —
+  // with soft 7° transitions (the edges wander with the turbulence and curl in a few eddies), the polar caps a violet
+  const ZONE = [232, 216, 206], ZONE2 = [216, 196, 214], ZONE3 = [204, 190, 216], BELT = [190, 152, 190], BELT2 = [166, 140, 192], BELT4 = [146, 142, 194], POLE = [120, 118, 172], JET = [98, 88, 152];
   // north → south: [latitude of the band's southern edge, colour] (the first band runs from the pole)
-  const BANDS = [[66, POLE], [58, BELT4], [51, ZONE2], [45, BELT3], [38, ZONE], [32, BELT], [24, ZONE2], [9, BELT2], [-7, ZONE3], [-20, BELT], [-27, ZONE], [-33, BELT2], [-40, ZONE2], [-46, BELT3], [-53, ZONE], [-61, BELT4], [-90, POLE]];
+  const BANDS = [[62, POLE], [40, BELT2], [16, ZONE2], [-8, ZONE], [-30, BELT], [-46, ZONE3], [-64, BELT4], [-90, POLE]];
+  const HW = 3.5;   // the half-width of a band's transition (degrees)
   function bandAt(lat) {
-    let prevEdge = 90, prev = BANDS[0][1];
-    for (let i = 0; i < BANDS.length; i++) {
-      const [edge, col] = BANDS[i];
-      if (lat >= edge) {
-        // soft edges, 1.1° each side
-        const up = i > 0 ? ss(prevEdge - 1.1, prevEdge + 1.1, lat) : 0, dn = i < BANDS.length - 1 ? 1 - ss(edge - 1.1, edge + 1.1, lat) : 0;
-        let c = col;
-        if (up > 0) c = mix3(c, BANDS[i - 1][1], up * 0.5);
-        if (dn > 0 && i + 1 < BANDS.length) c = mix3(c, BANDS[i + 1][1], dn * 0.5);
-        return c;
-      }
-      prevEdge = edge; prev = col;
-    }
-    return prev;
+    let i = 0; while (i < BANDS.length - 1 && lat < BANDS[i][0]) i++;
+    let c = BANDS[i][1];
+    // (the band's colour blended halfway into each neighbour at its edges, smoothly over ±HW)
+    if (i > 0) { const e = BANDS[i - 1][0], t = ss(e, e - HW, lat); c = mix3(BANDS[i - 1][1], c, 0.5 + 0.5 * t); }
+    if (i < BANDS.length - 1) { const e = BANDS[i][0], t = ss(e, e + HW, lat); c = mix3(BANDS[i + 1][1], c, 0.5 + 0.5 * t); }
+    return c;
   }
   function amarant(seed, w, h, y0, y1, a) {
     const S = new VR.Simplex((seed ^ 0xa3a2) >>> 0), S2 = new VR.Simplex((seed ^ 0x51c7) >>> 0), M = VR.M;
@@ -328,7 +324,7 @@
         const lam = (i + 0.5) / w * TAU - Math.PI;
         const px = cphi * Math.cos(lam), pz = cphi * Math.sin(lam);
         // the band edges wander: noise drawn out along the longitude (the sphere point squeezed across the bands)
-        const turb = S.n3(px * 2.6, sphi * 26, pz * 2.6) * 1.5 + S2.n3(px * 7, sphi * 70, pz * 7) * 0.6;
+        const turb = S.n3(px * 2.6, sphi * 26, pz * 2.6) * 2.4 + S2.n3(px * 7, sphi * 70, pz * 7) * 1.0;   // (f-sky5: the broad bands' edges wander further)
         const latE = lat + turb;
         let c = bandAt(latE);
         // streaks inside the bands, stronger in the belts
@@ -337,7 +333,7 @@
         const k1 = 1 + st * 0.11 * belt;
         c = [c[0] * k1, c[1] * k1, c[2] * k1];
         // festoons: blue-violet plumes from the northern equatorial belt into the bright zone
-        if (lat < 9 && lat > -4) { const f = S2.n3(px * 9, sphi * 22, pz * 9); if (f > 0.42) c = mix3(c, BELT4, ss(0.42, 0.6, f) * ss(-4, 7, lat) * 0.7); }
+        if (lat < 16 && lat > 2) { const f = S2.n3(px * 5, sphi * 40, pz * 5); if (f > 0.4) c = mix3(c, BELT2, ss(0.4, 0.75, f) * ss(2, 8, lat) * (1 - ss(10, 16, lat)) * 0.35); }   // (f-sky5: plumes at the zone's northern edge, soft)
         // white ovals along the belts' edges
         for (const ov of ovals) { const dl = wrapPi(lam - ov[1]) / D2R * cphi, dp = lat - ov[0]; const q = (dl * dl) / (ov[2] * ov[2] * 2.2) + (dp * dp) / (ov[2] * ov[2] * 0.5); if (q < 1) c = mix3(c, [248, 244, 238], (1 - q) * 0.85); }
         // the great storm: a teal eye in a pale collar, a darker ring round it, the inside swirled

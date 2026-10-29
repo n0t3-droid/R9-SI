@@ -65,7 +65,7 @@
       if (u.u_l2Glow) gl.uniform3f(u.u_l2Glow, 0, 0, 0);
       if (u.u_l2Pool) gl.uniform4f(u.u_l2Pool, L2.K.poolHot, L2.K.poolK, L2.K.poolTail, L2.K.poolHue);
       if (u.u_l2K) gl.uniform4f(u.u_l2K, 0, 0.94, L2.K.wrapLeaf, L2.K.wrapSkin);
-      if (u.u_l2Fog) { gl.uniform4f(u.u_l2Fog, 0, 0.06, 62, 64); gl.uniform4f(u.u_l2Fog2, 0, 0, 0, 0); gl.uniform3f(u.u_l2FogCol, 0, 0, 0); }
+      if (u.u_l2Fog) { gl.uniform4f(u.u_l2Fog, 0, 0.06, 62, 64); gl.uniform4f(u.u_l2Fog2, 0, 0, 0, 0); gl.uniform3f(u.u_l2FogCol, 0, 0, 0); if (u.u_l2Air) gl.uniform4f(u.u_l2Air, 0, 0, 0, 0); }
       if (u.u_l2Room) gl.uniform4f(u.u_l2Room, 0, 0, 0, 0);   // (t-polish2: no room air)
       return;
     }
@@ -82,6 +82,7 @@
       gl.uniform4f(u.u_l2Fog, a.rho * L2.fogEye(ey, a.base), a.k, a.base, ey);   // (no valley haze far under the sea level)
       gl.uniform4f(u.u_l2Fog2, 1 / a.apDist, a.apMax, a.sunK, 0);
       gl.uniform3f(u.u_l2FogCol, m[0], m[1], m[2]);
+      if (u.u_l2Air) { const A = L2.AIRGOLD; gl.uniform4f(u.u_l2Air, A.away[0], A.away[1], A.away[2], l.airK || 0); gl.uniform3f(u.u_l2Air2, A.side[0], A.side[1], A.side[2]); }   // (f-sky5: the golden far air)
       if (u.u_l2Room) { const r = this.l2Room; gl.uniform4f(u.u_l2Room, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); }   // (t-polish2: the room's air)
     }
   };

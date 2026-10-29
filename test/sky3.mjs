@@ -122,7 +122,7 @@ for (const h of ['noon', 'golden', 'dusk']) VIEWS.push({ name: 'isles_' + h, pla
 VIEWS.push({ name: 'up', place: 'city', hour: 'noon', pitch: 85 * Math.PI / 180, measure: false });
 VIEWS.push({ name: 'upnight', place: 'city', hour: 'night', pitch: 85 * Math.PI / 180, measure: false });
 VIEWS.push({ name: 'gap', place: 'canyon', hour: 'golden', wx: 'bewoelkt', aim: 'sun', pitch: 8 * Math.PI / 180, measure: false, clouds: true });
-VIEWS.push({ name: 'storm', place: 'canyon', hour: 'noon', wx: 'regen', measure: false, clouds: true });
+VIEWS.push({ name: 'storm', place: 'canyon', hour: 'noon', wx: 'regen', measure: false, clouds: true, deck: true, balloon: true });
 VIEWS.push({ name: 'aurora', place: 'city', hour: 'night', yaw: 0, pitch: 10 * Math.PI / 180, aurora: true, measure: false });
 VIEWS.push({ name: 'meteor', place: 'city', hour: 'night', meteor: true, measure: false });
 VIEWS.push({ name: 'moons', place: 'canyon', hour: 'afterglow', moons: true, measure: false });
@@ -136,6 +136,28 @@ const place = (P, tod, yaw, pitch, pins) => ev(([cam, yaw, pitch, tod, pins]) =>
 // the weather forced and its visuals set to the state at once (weather.js eases over ~20 s; a frame steps 0.1 s at most)
 const weather = (wx) => ev((wx) => { const g = VR.game, X = g.env.wx; X.force(wx); if (VR.WX && VR.WX.VIS[wx]) Object.assign(X.v, VR.WX.VIS[wx]); X.front = wx === 'gewitter' ? 1 : 0; X.bow = 0; X.washed = 0; }, wx || 'klar');
 const easeWeather = async () => { await step(40, 100); };
+// f-sky5 · the deck's coverage (load: {data, w, h, ch} as sky_ref.js load gives)
+function deckOf(img) {
+  const data = img.d, w = img.w, h = img.h, ch = 3, rows = Math.floor(h / 3), G = 4, gw = Math.floor(w / G), gh = Math.floor(rows / G);
+  let clear = 0, n = 0, lsum = 0;
+  const grid = new Uint8Array(gw * gh);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) {
+    const k = (y * w + x) * ch, r = data[k] / 255, g = data[k + 1] / 255, b = data[k + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let hue = 0; if (d > 1e-6) hue = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4); if (hue < 0) hue += 360;
+    lsum += (0.2126 * r + 0.7152 * g + 0.0722 * b) * 255;
+    const isClear = (mx > 0 && d / mx >= 0.2 && hue >= 190 && hue <= 290) || (0.2126 * r + 0.7152 * g + 0.0722 * b) * 255 > 155;
+    n++; if (isClear) { clear++; const gx = Math.floor(x / G), gy = Math.floor(y / G); if (gx < gw && gy < gh) grid[gy * gw + gx]++; }
+  }
+  // the gaps: grid cells mostly clear, 8-connected
+  const seen = new Uint8Array(gw * gh); let big = 0;
+  for (let i = 0; i < gw * gh; i++) {
+    if (seen[i] || grid[i] < G * G / 2) continue;
+    let sz = 0; const st = [i]; seen[i] = 1;
+    while (st.length) { const c = st.pop(); sz++; const cx = c % gw, cy = (c - cx) / gw; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x2 = cx + dx, y2 = cy + dy; if (x2 < 0 || y2 < 0 || x2 >= gw || y2 >= gh) continue; const j = y2 * gw + x2; if (!seen[j] && grid[j] >= G * G / 2) { seen[j] = 1; st.push(j); } } }
+    big = Math.max(big, sz);
+  }
+  return { cover: +(1 - clear / n).toFixed(3), gap: +(big / (gw * gh)).toFixed(4), luma: +(lsum / n).toFixed(1) };
+}
 
 // ---------------------------------------------------------------- the measurement of one picture
 const W = 640, H = 360;
@@ -209,11 +231,16 @@ async function shoot(V, preset) {
     // facing the sun at that hour (its azimuth from env.js: the day's angle + 0.4)
     const th = tod / 24000 * Math.PI * 2, az = th + 0.4; yaw = Math.atan2(-Math.cos(az), -Math.sin(az));
   }
+  // (f-sky5, R52-04: a balloon aloft before the rain comes — the rain must send it down)
+  let balloon0 = null;
+  if (V.balloon) { await place(P, todN, yaw, pitch, pins); if (lastPlace !== V.place) { await settle(); lastPlace = V.place; } await step(12); balloon0 = await ev(() => { const L = VR.game.lifeDirector; if (!L || !L.force) return null; L.events.length = 0; const ok = L.force('balloon'); return ok && L.events.some(e => e.kind === 'balloon'); }); }
   if ((V.wx || 'klar') !== lastWx) { await weather(V.wx); lastWx = V.wx || 'klar'; }
   await place(P, todN, yaw, pitch, pins);
   let st = 0;
   if (lastPlace !== V.place) { st = await settle(); lastPlace = V.place; } else await step(12);
   if ((V.wx || 'klar') !== 'klar' || V.wxEase) await easeWeather();
+  if (V.balloon) await step(300, 100);   // (30 s in the rain: time to land)
+  const balloon1 = V.balloon ? await ev(() => { const L = VR.game.lifeDirector; return !!(L && L.events && L.events.some(e => e.kind === 'balloon')); }) : null;
   await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; });
   // (the shooting star: the life director's balloon hung right over it in the second run — its acts off for this view)
   if (V.meteor) await ev(() => { const L = VR.game.lifeDirector; if (L && L.events) L.events.length = 0; });
@@ -239,14 +266,37 @@ async function shoot(V, preset) {
   }
   const target = m && hr[1] && m.curve ? ref.targets[hr[1]] : null;
   const dEs = target ? compare(m.curve, target) : null;
-  const r = { name, view: V.name, place: V.place, hour: V.hour, kind: hr[1], preset, note, settleS: st, geo: { sun: geo.sun, night: geo.night, ticks: geo.ticks, day: geo.day, yaw: geo.yaw, pitch: geo.pitch }, ...(m || {}), dE: dEs };
+  // (f-sky5 · the storm deck's coverage: the top third of the picture, the share of its pixels that are deck — not a gap:
+  // a gap is clear sky (HSV hue 190–290°, saturation ≥ 0.2) or the pale overcast between separate puffs (luma > 155; v0.51's
+  // 180–200 between its charcoal balls) — and the largest gap (8-connected, on a 4-px grid) of the third)
+  const deck = V.deck ? deckOf(await load(SHOTS + name + '.png', W, H)) : null;
+  if (deck) console.log(`   deck coverage ${deck.cover} · largest gap ${deck.gap} · balloon before the rain ${balloon0} → after ${balloon1}`);
+  const r = { name, view: V.name, place: V.place, hour: V.hour, kind: hr[1], preset, note, settleS: st, deck, balloon: V.balloon ? { before: balloon0, after: balloon1 } : undefined, geo: { sun: geo.sun, night: geo.night, ticks: geo.ticks, day: geo.day, yaw: geo.yaw, pitch: geo.pitch }, ...(m || {}), dE: dEs };
   results.push(r);
   if (m && m.structure) console.log(`   structure sd ${m.structure.sd} sat ${m.structure.sat} land ${m.structure.land} (luma ${m.structure.luma})${m.disc ? ` · disc ${m.disc.width}° max ${m.disc.max} rings ${Object.values(m.disc.ring).join('/')}` : ''}${m.clouds ? ` · clouds ${JSON.stringify(m.clouds)}` : ''}`);
+  // (f-sky5 · DIAG=1: what lays the veil over the canyon's lower right — the canyon's golden view again after 12 more frames
+  // (the temporal history settled), then without the cloud sprites, without the far land's tiles, without the particles,
+  // without the water's pass: test/shots/sky3_canyon_golden_<TAG>_d<what>.png)
+  if (process.env.DIAG && V.name === 'canyon_golden' && preset === 'high') {
+    const shot = async (k) => { await page.screenshot({ path: SHOTS + name + '_d' + k + '.png', timeout: 240000 }); console.log('   diag ' + k); };
+    const frames = (n) => ev((n) => { const g = VR.game; window.__norender = false; for (let i = 0; i < n; i++) { g.last = performance.now() - 33; g.loop(performance.now()); g.env.anim = 80; } g.renderer.gl.finish(); window.__norender = true; }, n);
+    await frames(12); await shot('tsr');
+    await ev(() => { const R = VR.game.renderer; R.__dc = R.drawClouds; R.drawClouds = () => {}; }); await frames(8); await shot('nocl');
+    await ev(() => { const R = VR.game.renderer; R.drawClouds = R.__dc; const h = VR.game.horizon; if (h) { h.__d = h.draw; h.draw = () => {}; } }); await frames(8); await shot('nohz');
+    await ev(() => { const R = VR.game.renderer, h = VR.game.horizon; if (h && h.__d) h.draw = h.__d; R.__dp = R.drawParticles; R.drawParticles = () => {}; }); await frames(8); await shot('nopart');
+    await ev(() => { const R = VR.game.renderer; R.drawParticles = R.__dp; R.__qw = R.q.water; R.q.water = 0; }); await frames(8); await shot('nowater');
+    await ev(() => { const R = VR.game.renderer; R.q.water = R.__qw; }); await frames(4);
+  }
   // (f-sky4: the palette variants on the golden views — set in the page, the picture and the probe again, put back after)
   if (VARIANTS && preset === 'high' && V.hour === 'golden' && V.measure !== false) for (const [vt, VV] of Object.entries(VARIANTS)) {
     await ev((VV) => {
       const S3 = VR.Sky3, L2 = VR.Light2;
-      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold, fog: L2.FOG || null });
+      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold, fog: L2.FOG || null, air: L2.AIRGOLD || null, ap: L2.AP ? L2.AP.gold : null, gc: S3.GOLDCLOUD ? S3.GOLDCLOUD.add : null, mist: S3.MISTK ? S3.MISTK.gold : null });
+      if (VV.mist !== undefined && S3.MISTK) S3.MISTK.gold = VV.mist;
+      // (f-sky5: the golden far air, the aerial perspective's share, the golden cumulus' extra cover)
+      if (VV.air && L2.AIRGOLD) Object.assign(L2.AIRGOLD, VV.air);
+      if (VV.ap !== undefined && L2.AP) L2.AP.gold = VV.ap;
+      if (VV.gc !== undefined && S3.GOLDCLOUD) S3.GOLDCLOUD.add = VV.gc;
       if (VV.fog && L2.FOG) for (const k of Object.keys(VV.fog)) L2.FOG[k] = VV.fog[k].slice();
       if (VV.gold) Object.assign(S3.PAL.gold, VV.gold);
       if (VV.sun) Object.assign(S3.SKYL.sun, VV.sun);
@@ -261,7 +311,7 @@ async function shoot(V, preset) {
     await page.screenshot({ path: TMP + 'sky3probe_' + vn + '.png', timeout: 240000 });
     await draw(false);
     const vm = await measure(vn, vgeo, hr[1]);
-    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); if (k.fog && L2.FOG) for (const f of Object.keys(k.fog)) L2.FOG[f] = k.fog[f]; });
+    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); if (k.fog && L2.FOG) for (const f of Object.keys(k.fog)) L2.FOG[f] = k.fog[f]; if (k.air) Object.assign(L2.AIRGOLD, k.air); if (k.ap !== null && L2.AP) L2.AP.gold = k.ap; if (k.gc !== null && S3.GOLDCLOUD) S3.GOLDCLOUD.add = k.gc; if (k.mist !== null && S3.MISTK) S3.MISTK.gold = k.mist; });
     const vd = compare(vm.curve, ref.targets[hr[1]]);
     results.push({ name: vn, view: V.name + '+' + vt, variant: vt, place: V.place, hour: V.hour, kind: hr[1], preset, ...vm, dE: vd });
     console.log(`   variant ${vt}: ΔE ${vd.map(v => (v === null ? '—' : v.toFixed(1))).join(' ')}  mean ${mean(vd)} · L* ${vm.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' ')} · structure sd ${vm.structure.sd} sat ${vm.structure.sat} land ${vm.structure.land}${vm.disc ? ` · disc ${vm.disc.width}°` : ''}`);
@@ -427,7 +477,17 @@ if (skyRatio !== null) check(skyRatio <= 1.05, `Very Low: the sky pass not slowe
 if (sameSky !== null) check(sameSky, 'Very Low: the sky program uses the same uniforms as the build before\'s (no new work in it)');
 // f-sky4 · the review's gates (test/sky_ref.js gates: the golden views' bands, structure and disc; the storm's clouds); the
 // variants' for the record
-for (const g of SR.gates(hi)) check(g.ok, 'gate ' + g.msg);
+// (f-sky5: in a storm the sprites dissolve into the sky's deck — f-sky4's measure of the sprites' weight has nothing left to
+// weigh when they cover under 2 % of the sky; the deck's own weight stands in: the top third's mean luma ≤ 120)
+const dissolved = (g) => /^storm: the storm's clouds/.test(g.msg) && hi.some(r => r.view === 'storm' && r.deck && r.clouds && r.clouds.share < 0.02);
+for (const g of SR.gates(hi)) { if (dissolved(g)) { console.log('  · gate ' + g.msg + ' — the sprites dissolved into the deck'); continue; } check(g.ok, 'gate ' + g.msg); }
+for (const r of hi.filter(r => r.deck && r.deck.luma !== undefined)) check(r.deck.luma <= 120, `gate ${r.view}: the deck has weight (the top third's mean luma ${r.deck.luma} ≤ 120)`);
+// f-sky5 · the storm deck (R52-04): the top third closed (≥ 70 % not clear sky, no clear gap over 3 % of it); the balloon
+// that was aloft before the rain is gone
+for (const r of hi.filter(r => r.deck)) {
+  check(r.deck.cover >= 0.7 && r.deck.gap <= 0.03, `gate ${r.view}: the deck closes the top third (coverage ${r.deck.cover} ≥ 0.7, largest clear gap ${r.deck.gap} ≤ 0.03)`);
+  if (r.balloon) check(r.balloon.before !== true || r.balloon.after === false, `gate ${r.view}: the balloon aloft before the rain has landed (before ${r.balloon.before}, after ${r.balloon.after})`);
+}
 const vres = results.filter(r => r.variant);
 if (vres.length) { console.log('\nthe variants (for the record)'); for (const g of SR.gates(vres)) console.log((g.ok ? '  ✓ ' : '  · ') + g.msg); }
 fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, view: r.view, variant: r.variant, place: r.place, hour: r.hour, kind: r.kind, preset: r.preset, note: r.note, H: r.H, sky: r.sky, space: r.space, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve ? r.curve.map(b => ({ n: b.n, rgb: b.rgb, lab: b.lab, L: b.L, C: b.C, h: b.h })) : null, geo: r.geo, structure: r.structure, disc: r.disc, clouds: r.clouds })), sky: { ratio: skyRatio, same: sameSky, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) }, hiSky }, null, 1));

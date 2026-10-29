@@ -429,7 +429,15 @@
       ev.v = [w[0] * sp, 0, w[1] * sp]; ev.yaw = rnd(ev, 5) * TAU; ev.burn = 3; ev.y0 = ev.pos[1];
       D.st.balloon = 1;
     },
+    // f-sky5: the rain comes — the pilot vents and sinks (up to 6.8 m/s, slowing over the ground), drifting less, and lands
+    wet(D, ev) { ev.land = 1; ev.dur = ev.age + 30; },
     update(D, ev, dt) {
+      if (ev.land) {
+        const top = D.top(ev.pos[0], ev.pos[2]), over = ev.pos[1] - (top + 1);
+        ev.pos[0] += ev.v[0] * dt * 0.4; ev.pos[2] += ev.v[2] * dt * 0.4;
+        ev.pos[1] -= Math.min(over, (0.8 + Math.min(over, 20) * 0.3) * dt);
+        return over > 0.05;
+      }
       ev.pos[0] += ev.v[0] * dt; ev.pos[2] += ev.v[2] * dt; ev.pos[1] = ev.y0 + Math.sin(ev.age * 0.11) * 3; ev.yaw += dt * 0.03;
       ev.burn -= dt;
       if (ev.burn < 0) { if (ev.burn < -1.3) ev.burn = 6 + 5 * Math.random(); else if (D.tier >= 1) { D.P.spawn(ev.pos[0], ev.pos[1] + 2.2, ev.pos[2], 0, 1.5, 0, { life: 0.25, size: 0.55, grav: 0, col: [1, 0.62, 0.2], emis: 1, drag: 0, collide: false, force: true }); } }
@@ -940,6 +948,9 @@
         // (an act above the tier ends at once — Very Low chosen while it runs; an act the eye has left 200 blocks behind
         // ends too: a flight, a teleport — unless the eye is near the act itself, the balloon it flew to)
         const far = Math.hypot(e0[0] - ev.eye0[0], e0[2] - ev.eye0[2]) > 200 && !(ev.pos && Math.hypot(e0[0] - ev.pos[0], e0[2] - ev.pos[2]) < 150);
+        // f-sky5 (docs/reviews/v0.51.md R52-04: the balloon flew on through the storm): a dry-weather act running when the
+        // rain comes ends — the balloon sinks and lands (A.wet), the others (the birds, the flights' acts) leave at once
+        if (!ev.wet && LD.ACTS[ev.kind].wx === 'dry' && this.ctx && this.ctx.wet && this.ctx.place !== 'hall') { ev.wet = true; if (!A.wet || A.wet(this, ev) === false) ev.dur = 0; }
         if (LD.ACTS[ev.kind].tier > this.tier || far) alive = false;
         else try { alive = A.update(this, ev, dt) !== false && ev.age < ev.dur; } catch (e) { alive = false; if (!this.warned) { this.warned = true; console.warn('life director', ev.kind, e); } }
         if (!alive) { if (A.end) A.end(this, ev); this.events.splice(i, 1); }

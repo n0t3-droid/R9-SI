@@ -263,12 +263,34 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     vec3 N = normalize(X * q.x + Y * q.y - C * zz);
     float lat = dot(N, RN);
     float w = fbm3(N * 3.0 + vec3(u_time * 0.004, 0.0, 0.0));
+#ifndef SKY3
     float bands = sin(lat * 22.0 + w * 5.0) * 0.5 + 0.5;
     vec3 c1 = vec3(0.80, 0.62, 0.95), c2 = vec3(0.46, 0.24, 0.66), c3 = vec3(1.0, 0.86, 0.95);
     vec3 alb = mix(c2, c1, bands);
     alb = mix(alb, c3, smoothstep(0.62, 0.9, fbm3(N * 7.0 + 4.0)) * 0.5);
     float storm = exp(-pow(length(N - normalize(RN * -0.3 + X * 0.6 + C * -0.5)) * 5.0, 2.0));
     alb = mix(alb, vec3(0.25, 0.85, 0.9), storm * 0.8);
+#else
+    // f-sky5 (docs/reviews/v0.51.md R52-11: hard two-tone candy stripes): six broad bands of near tones (bodytex.js's
+    // belts and zones: rose-cream, lilac, a dusty blue-violet; the caps violet) with soft edges at the sines of 62°, 40°,
+    // 16°, −8°, −30°, −46°, −64° — wandering with the gas (w), a little streaked, one storm oval in the southern belt.
+    // (Very Low — no SKY3 — and the programs without the sky's level: v0.48's stripes, above)
+    float la = lat + (w - 0.5) * 0.1, hw = 0.07;
+    vec3 alb = vec3(0.40, 0.30, 0.76);
+    alb = mix(alb, vec3(0.55, 0.32, 0.86), smoothstep(0.883 + hw, 0.883 - hw, la));
+    alb = mix(alb, vec3(0.92, 0.60, 0.92), smoothstep(0.643 + hw, 0.643 - hw, la));
+    alb = mix(alb, vec3(1.0, 0.80, 0.76), smoothstep(0.276 + hw, 0.276 - hw, la));
+    alb = mix(alb, vec3(0.76, 0.36, 0.80), smoothstep(-0.139 + hw, -0.139 - hw, la));
+    alb = mix(alb, vec3(0.70, 0.60, 0.98), smoothstep(-0.5 + hw, -0.5 - hw, la));
+    alb = mix(alb, vec3(0.38, 0.42, 0.92), smoothstep(-0.719 + hw, -0.719 - hw, la));
+    alb = mix(alb, vec3(0.40, 0.30, 0.76), smoothstep(-0.899 + hw, -0.899 - hw, la));
+    float fs = fbm3(vec3(N.x * 4.0, la * 34.0, N.z * 4.0) + 4.0);   // (streaks drawn out along the bands)
+    alb *= 0.9 + 0.18 * fs;
+    alb = mix(alb, vec3(0.98, 0.92, 0.94), smoothstep(0.7, 0.92, fs) * 0.3);
+    float storm = exp(-pow(length(N - normalize(RN * -0.3 + X * 0.6 + C * -0.5)) * 5.0, 2.0));
+    alb = mix(alb, vec3(0.93, 0.86, 0.86), smoothstep(0.25, 0.6, storm) * 0.6);
+    alb = mix(alb, vec3(0.42, 0.72, 0.8), smoothstep(0.7, 1.0, storm) * 0.6);
+#endif
     // t-sky2: a soft terminator (wrapped), the ring's shadow on the body (the ray to the light crosses the ring plane
     // inside the ring), the limb darkened
     float diff = smoothstep(-0.25, 0.55, dot(N, Lb));
@@ -2421,7 +2443,8 @@ void main() {
     float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
     // (the thick core opaque: a cumulus sprite's 0.92 let the moon and the bright stars through; a sprite faded on purpose — the
     // high ones by day, clouds.js HIGH — keeps its alpha)
-    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near);
+    // (f-sky5, R52-04: in a storm the cumulus dissolve into the sky's deck — u_c3Deck.x of them left, the fog banks kept)
+    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near * mix(u_c3Deck.x, 1.0, u_fogK * (1.0 - step(160.0, v_y3))));   // (the citadel's anchors, up at y 207, dissolve too)
     return;
   }
 #endif
