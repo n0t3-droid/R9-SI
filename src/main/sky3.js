@@ -407,7 +407,7 @@
   // f-sky5 · the golden hour's cumulus: in clear weather at the golden hour a few more of them (the frames t1_07, t1_09:
   // big white clouds over the land) — the sprites' cover (renderer.updatePuffs) raised by add × the golden weight, under
   // half cover and dry only; cloudVol only (Very Low and Low draw the sprites they drew)
-  S3.GOLDCLOUD = { add: 0.12 };
+  S3.GOLDCLOUD = { add: 0.05 };   // (the second browser run: 0.12 lifted the top's contrast 26.6 → 31 but the sky's saturation 79 → 72 under the white clouds; the third: none → 76)
   S3.puffCover = function (E) {
     const c = clamp(E.cloudCover || 0, 0, 1), q = S3.q || OFF;
     if (!q.cloudVol || !(q.sky3 >= 1) || !E.sunDir) return c;
@@ -819,9 +819,10 @@ vec3 s3Fan(vec3 dir) {
   // darker; far ones take the sky's horizon colour. Returns the colour and the coverage (a < 0: nothing)
   // the banks' share by the hour (R52-03: at the golden hour the isles drowned in their grey-lilac smear; the frames'
   // clouds under the isles are few and white — u_c3Deck.z)
-  S3.MISTK = { gold: 0.55 };
+  S3.MISTK = { gold: 0.3 };   // (the third browser run: 0.55 → 0.3 lifted the canyon's land saturation 88 → 90, with the far air 98)
   S3.mistK = (E) => 1 - (1 - S3.MISTK.gold) * (E && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0);
-  S3.MIST_NEAR = [120, 280];   // (the first browser run: at 60–180 the sheet stayed — its bank 70–100 m off, 130 wide)
+  S3.MIST_NEAR = [150, 340];   // (the browser runs: at 60–180 the sheet stayed — its bank 111 m off, 140 wide, its plane cutting the canyon at
+  // the canyon floor; at 120–280 the next one, 186 m off, still lay over the right third (DIAG: gone without the sprites))
   S3.mistNear = (d) => sstep(S3.MIST_NEAR[0], S3.MIST_NEAR[1], d);
   S3.glslPuff = () => `
 #ifndef SKY3

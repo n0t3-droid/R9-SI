@@ -276,14 +276,14 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     // 16°, −8°, −30°, −46°, −64° — wandering with the gas (w), a little streaked, one storm oval in the southern belt.
     // (Very Low — no SKY3 — and the programs without the sky's level: v0.48's stripes, above)
     float la = lat + (w - 0.5) * 0.1, hw = 0.07;
-    vec3 alb = vec3(0.44, 0.40, 0.72);
-    alb = mix(alb, vec3(0.56, 0.40, 0.80), smoothstep(0.883 + hw, 0.883 - hw, la));
-    alb = mix(alb, vec3(0.88, 0.68, 0.90), smoothstep(0.643 + hw, 0.643 - hw, la));
-    alb = mix(alb, vec3(0.98, 0.84, 0.80), smoothstep(0.276 + hw, 0.276 - hw, la));
-    alb = mix(alb, vec3(0.72, 0.44, 0.76), smoothstep(-0.139 + hw, -0.139 - hw, la));
-    alb = mix(alb, vec3(0.76, 0.66, 0.94), smoothstep(-0.5 + hw, -0.5 - hw, la));
-    alb = mix(alb, vec3(0.44, 0.46, 0.86), smoothstep(-0.719 + hw, -0.719 - hw, la));
-    alb = mix(alb, vec3(0.44, 0.40, 0.72), smoothstep(-0.899 + hw, -0.899 - hw, la));
+    vec3 alb = vec3(0.40, 0.30, 0.76);
+    alb = mix(alb, vec3(0.55, 0.32, 0.86), smoothstep(0.883 + hw, 0.883 - hw, la));
+    alb = mix(alb, vec3(0.92, 0.60, 0.92), smoothstep(0.643 + hw, 0.643 - hw, la));
+    alb = mix(alb, vec3(1.0, 0.80, 0.76), smoothstep(0.276 + hw, 0.276 - hw, la));
+    alb = mix(alb, vec3(0.76, 0.36, 0.80), smoothstep(-0.139 + hw, -0.139 - hw, la));
+    alb = mix(alb, vec3(0.70, 0.60, 0.98), smoothstep(-0.5 + hw, -0.5 - hw, la));
+    alb = mix(alb, vec3(0.38, 0.42, 0.92), smoothstep(-0.719 + hw, -0.719 - hw, la));
+    alb = mix(alb, vec3(0.40, 0.30, 0.76), smoothstep(-0.899 + hw, -0.899 - hw, la));
     float fs = fbm3(vec3(N.x * 4.0, la * 34.0, N.z * 4.0) + 4.0);   // (streaks drawn out along the bands)
     alb *= 0.9 + 0.18 * fs;
     alb = mix(alb, vec3(0.98, 0.92, 0.94), smoothstep(0.7, 0.92, fs) * 0.3);

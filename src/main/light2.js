@@ -181,8 +181,10 @@
   // the air by the hour: the haze's density at the valley floor (per block), its scale height, its base, the aerial
   // perspective's distance, the morning layer (thicker and lower round sunrise); the sea level is the Heartland's 62
   // (by day a light haze — the far shore stays crisp at noon; the valleys fill toward evening, at night and at dawn)
-  const FOG = { day: [0.0007, 1 / 14, 62], gold: [0.0016, 1 / 13, 62], dusk: [0.0022, 1 / 12, 60], night: [0.0016, 1 / 12, 60] };
+  const FOG = { day: [0.0007, 1 / 14, 62], gold: [0.0008, 1 / 13, 62], dusk: [0.0022, 1 / 12, 60], night: [0.0016, 1 / 12, 60] };
   L2.FOG = FOG;   // (f-sky4: open to the tests — sky3.mjs's palette variants try the golden valley haze too)
+  // (f-sky5, R52-03, the third browser run: the golden valley haze halved, 0.0016 → 0.0008 — with the far air and the banks
+  // thinner the canyon's land saturation 88 → 98)
   L2.air = function (E, ticks) {
     const m = L2.moods(E.sunDir[1]);
     const f = byMood(m, FOG);
@@ -239,7 +241,7 @@
   // perspective and the end fog took the luminous horizon's pink-white (hazeColor) — at the golden hour they take the
   // golden far air instead: away from the sun a blue-lilac darker than the sky over it (the frames' far land 109,148,189),
   // beside the sun the pale lilac of the mist (192,198,227); k: its share at the golden hour (less in rain)
-  L2.AIRGOLD = { away: [0.2, 0.29, 0.55], side: [0.46, 0.47, 0.72], k: 0.75 };
+  L2.AIRGOLD = { away: [0.2, 0.29, 0.55], side: [0.46, 0.47, 0.72], k: 1.0 };   // (k: the third browser run, 0.75 → 1)
   L2.airGold = (t) => { const A = L2.AIRGOLD, q = clamp(t, 0, 1); return [0, 1, 2].map(i => A.away[i] + (A.side[i] - A.away[i]) * q); };
   L2.airGoldK = (E) => L2.moods(E.sunDir[1]).gold * (1 - clamp(E.rain || 0, 0, 1)) * L2.AIRGOLD.k;
   L2.mistColor = function (E) {
