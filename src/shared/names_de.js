@@ -17,6 +17,7 @@
     'Palm Crown': 'Palmenkrone', 'Round Tree Small': 'Rundbaum klein', 'Round Tree Large': 'Rundbaum groß', 'Grass Tuft': 'Grasbüschel',
     'Flower Cluster': 'Blumenbüschel', 'Blossom Bush': 'Blütenbusch', 'Rice Row Crop': 'Reisreihen-Feld',
     'Glass Stair Tread': 'Glas-Treppenstufe', 'Light Pad': 'Lichtsockel', 'Nova Window': 'Nova-Fenster', 'Orange Frame': 'oranger Rahmen',
+    'Hangar Screen': 'Hangar-Bildschirm', 'Radar': 'Radaranzeige', 'Gauges': 'Messanzeigen', 'Hangar Console': 'Hangar-Konsole',   // (t-hangar)
     'Arched Window': 'Bogenfenster', 'Stained Glass': 'Buntglas', 'Town Lamp': 'Stadtlaterne', 'Striped Awning': 'Streifenmarkise',
     'Shop Sign': 'Ladenschild', 'Market Stall': 'Marktstand', 'Town Fountain': 'Stadtbrunnen', 'Gold Band': 'Goldband', 'White Stone': 'weißer Stein',
     'Blue': 'Blau', 'Gold': 'Gold', 'Rose': 'Rosé', 'Amber': 'Bernstein', 'Teal': 'Petrol', 'Bread': 'Brot', 'Cup': 'Tasse', 'Book': 'Buch', 'Flower': 'Blume',

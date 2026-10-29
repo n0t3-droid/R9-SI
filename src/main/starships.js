@@ -160,7 +160,8 @@
         this.spawned.add(key); this.meta.starshipSpawns = [...this.spawned];
         // the Gate Temple's pad: a shuttle that stays parked there, its thrusters burning (hangarFx)
         const hangar = s[6] === 'hangar';
-        const ship = this.spawn(s[1], hangar ? 'shuttle' : null, null, [s[2], s[3], s[4]], -((s[5] || 0) & 3) * QT, key);
+        // (vgen 14, t-hangar: the pad's craft is the hero craft, shipgen.js ARCH.hero)
+        const ship = this.spawn(s[1], hangar ? (s[7] === 'hero' ? 'hero' : 'shuttle') : null, null, [s[2], s[3], s[4]], -((s[5] || 0) & 3) * QT, key);
         if (hangar && ship) ship.hangar = true;
       }
     }

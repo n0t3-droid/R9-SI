@@ -297,6 +297,8 @@
       for (const s of SS.ships) if (s.hangar && s !== SS.pilot && s.state === 'parked' && Math.abs(s.pos[0]) < 3 && Math.abs(s.pos[2] - PADZ) < 3 && Math.abs(s.pos[1] - DECK) < 2) return s;
       return null;
     }
+    // the pad's parked craft is the hero craft (a vgen-14 world: gen_temple.js 'hero')
+    heroArch() { const h = this.hidden || this.homeShip(); return !!(h && h.d && h.d.arch === 'hero'); }
     // another ship stands on the pad (an older world's pad ship, a player's ship): the two land on the apron
     padTaken(home) {
       const SS = this.g.starships; if (!SS) return false;
@@ -332,7 +334,9 @@
       const outs = this.outs || (this.outs = this.crafts.map(C => C.q)), list = HF.sched(this.clock, this.cache, outs, this.spot, this.list || (this.list = [])), pl = g.player.pos;
       for (const s of list) {
         const C = this.crafts[s.c];
-        if (!C.d || !SS.designs.has(C.d.key)) { C.d = SS.design(HF.SEEDS[C.c], 'shuttle', HF.PALS[C.c]); C.inst.d = C.d; }
+        // (vgen 14, t-hangar: the hangar's own craft flies as the hero craft its pad holds)
+        const arch = C.c === 0 && this.heroArch() ? 'hero' : 'shuttle';
+        if (!C.d || !SS.designs.has(C.d.key) || C.d.arch !== arch) { C.d = SS.design(HF.SEEDS[C.c], arch, HF.PALS[C.c]); C.inst.d = C.d; }
         C.d.last = performance.now();
         const I = C.inst, k = C.snap ? 1 : 1 - Math.exp(-dt * 5); C.snap = false;
         I.pos[0] = s.pos[0]; I.pos[1] = s.pos[1]; I.pos[2] = s.pos[2]; I.gear = s.gear;

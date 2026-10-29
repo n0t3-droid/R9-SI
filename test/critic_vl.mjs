@@ -7,6 +7,7 @@
 //     hall    Weißstadt's hall street under the glass vault (wow48.mjs's 'hallcity': the hall of cell (−2, −1), u 0.5, v −24.5)
 //     canyon  the Ember Canyon's site (the land plan's 'canyon', (−246, 112)) toward the Spire Citadel
 //     isles   on the Sky Isles (the landmark's centre, (330, 140)) toward the lighthouse
+//     hangar  the Hangar Hall from the spawn on its deck down the axis over the pad (t-hangar)
 //     space   /raum herz on this build (the first look into space — no counterpart before it: against its own plaza)
 //   numbers   the wall time of a synced frame (the median of N in a round, then the median of the rounds) and the CPU of the
 //             browser's processes a frame; draws and triangles; the JS heap after the plaza; the time from createWorld to
@@ -45,6 +46,8 @@ const PLACES = [
   { id: 'hall', hall: { u: 0.5, v: -24.5, at: [0.5, 40, 8] }, fov: 66 },
   { id: 'canyon', x: -246, z: 112, at: [-420, 180, 380], fov: 70, lift: 1, clear: true },
   { id: 'isles', x: 330, z: 140, at: [484, 95, 136], fov: 70, top: true, clear: true },
+  // (t-hangar: the Hangar Hall from the spawn on its deck, down the axis over the pad — the place every old world starts)
+  { id: 'hangar', x: 0.5, z: 4.5, feet: 81, at: [0.5, 85, -20], fov: 70 },
 ].filter(p => !ONLY || ONLY.includes(p.id));
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
@@ -169,7 +172,7 @@ async function prepare(P) {
   for (const pl of PLACES) {
     const t1 = Date.now();
     try {
-      let x = pl.x, z = pl.z, at = pl.at, fov = pl.fov, feetY = null;
+      let x = pl.x, z = pl.z, at = pl.at, fov = pl.fov, feetY = pl.feet !== undefined ? pl.feet : null;
       if (pl.hall) {
         // the hall city of seed 53, cell (−2, −1): its site and its hall's turn from the game's own generator (wow48.mjs)
         const site0 = await P.ev(() => { try { const W = VR.game.world, VG = VR.VillageGen, og = new VR.OverworldGen(W.seed, W.genOpts); const s = VG.site(og, -2, -1); if (!s) return null; const Pl = VG.plan(og, s), h = Pl.hall || null; return h ? { x: s.x, z: s.z, r: h.r, F: h.F, style: s.style } : { x: s.x, z: s.z, r: (s.seed >>> 3) & 3, F: s.y, style: s.style }; } catch (e) { return { err: String(e.message || e) }; } });

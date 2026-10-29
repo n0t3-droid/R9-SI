@@ -67,6 +67,9 @@
     dropship: { label: 'Dropship', code: 'DM', weight: 2 },
     shuttle: { label: 'Shuttle', code: 'SH', weight: 2 },
     carrier: { label: 'Carrier', code: 'CV', weight: 0, big: true },
+    // (t-hangar: the Gate Temple's own craft on the Hangar Hall's pad in vgen-14 worlds — never picked at random,
+    // not offered in the shipyard)
+    hero: { label: 'Gate Craft', code: 'GC', weight: 0, hidden: true },
   };
 
   // ---------------------------------------------------------------- builder
@@ -417,6 +420,56 @@
     B.prebuilt = true;
   };
 
+  // ---- t-hangar: the Gate Temple's hero craft (our own design, the trailer's hangar shots as the mood): a chunky
+  // white craft with a rounded nose, a dark face with four orange lamps, a glazed cockpit hump, a dorsal spine with a
+  // mast, swept wings with cyan leading edges and orange tips, twin engine pods with cyan rings and a centre engine.
+  // Inside the classic shuttle's envelope (17 wide, 19 long), so it parks, flies and passes the gate as the shuttle did.
+  ARCHS.hero = (rng, B) => {
+    const P = (u, yy, v, s) => { if (!B.in(u, yy, v)) return; const i = B.i(u, yy, v); if (s) { B.fixt[i] = s; B.role[i] = HULL; } else { B.fixt[i] = 0; B.role[i] = AIR; } };
+    const W = S('hull_plating'), G = S('hull_plating_gray'), D = S('hull_plating_dark'), GL = S('viewport'), CY = S('neon_cyan'), AM = S('neon_amber'), OR = S('hull_stripe_orange', { axis: 2 }) || AM;
+    const CY0 = 3;
+    const hwAt = (v) => v <= -6 ? 1.6 + (v + 9) * 0.65 : v >= 4 ? 3.6 - (v - 4) * 0.45 : 3.6;
+    const hhAt = (v) => v <= -7 ? 1.5 + (v + 9) * 0.35 : 2.3;
+    const inBody = (u, yy, v, k) => { if (v < -9 || v > 7) return false; const hw = hwAt(v) * k, hh = hhAt(v) * k; return Math.pow(Math.abs(u) / hw, 4) + Math.pow(Math.abs(yy - CY0) / hh, 4) <= 1; };
+    for (let v = -9; v <= 7; v++) for (let u = -5; u <= 5; u++) for (let yy = 1; yy <= 6; yy++) {
+      if (!inBody(u, yy, v, 1)) continue;
+      if (inBody(u, yy, v, 0.62) && yy > 1) { P(u, yy, v, 0); continue; }   // the cabin
+      let s = yy > CY0 ? W : yy === CY0 ? (Math.abs(u) >= 2 ? OR : W) : yy === 1 ? D : G;
+      if (!inBody(u, yy, v - 1, 1) && v <= -6) s = (Math.abs(u) <= 1 && (yy === 2 || yy === 3)) ? AM : D;   // the dark face, its four lamps
+      if (yy > CY0 && v >= -7 && v <= -4 && Math.abs(u) <= 1) s = GL;                                   // the windscreen
+      P(u, yy, v, s);
+    }
+    // the cockpit hump and the dorsal spine with its mast
+    for (let v = -6; v <= -3; v++) for (let u = -1; u <= 1; u++) P(u, 6, v, v === -3 || Math.abs(u) === 1 && v === -6 ? W : GL);
+    for (let v = -2; v <= 6; v++) P(0, 6, v, v === 6 ? AM : W);
+    P(0, 7, 2, S('antenna')); P(0, 8, 2, S('antenna')); P(0, 7, -2, G);
+    // the swept wings: a white top, a grey panel line, cyan leading edges, orange tips with a small upturned fin
+    for (let v = -2; v <= 6; v++) {
+      const tip = Math.min(8, Math.round(4 + (v + 2) * 0.55));
+      for (const sx of [-1, 1]) for (let a = 4; a <= tip; a++) {
+        const lead = v === -2 || a > Math.round(4 + (v + 1) * 0.55);
+        P(sx * a, 2, v, a === tip ? AM : lead ? CY : a === 6 ? G : W);
+      }
+      if (v >= 4) for (const sx of [-1, 1]) P(sx * tip, 3, v, G);
+    }
+    // the engine pods (grey, cyan rings at their mouths) and the three engines
+    for (const sx of [-1, 1]) for (let v = 4; v <= 8; v++) for (let du = -1; du <= 1; du++) for (let yy = 1; yy <= 3; yy++) {
+      if (Math.abs(du) === 1 && (yy === 1 || yy === 3)) continue;
+      const u = sx * 4 + du;
+      if (B.fixt[B.i(u, yy, v)] && v < 8) continue;
+      P(u, yy, v, v === 8 ? (du === 0 && yy === 2 ? S('thruster', { facing: 2, lit: 1 }) : CY) : G);
+    }
+    P(0, 3, 8, S('thruster', { facing: 2, lit: 1 })); P(-1, 3, 8, G); P(1, 3, 8, G);
+    // inside: the floor, the helm and the pilot's seat, two seats behind, a side door on the port side
+    for (let v = -6; v <= 5; v++) for (let u = -1; u <= 1; u++) if (B.role[B.i(u, 1, v)] !== AIR) P(u, 1, v, D);
+    P(0, 2, -6, S('helm', { facing: 0 })); P(0, 2, -5, S('pilot_seat', { facing: 0 }));
+    P(-1, 2, -1, S('pilot_seat', { facing: 0 })); P(1, 2, -1, S('pilot_seat', { facing: 0 }));
+    for (let yy = 2; yy <= 3; yy++) for (let v = 0; v <= 1; v++) { P(-3, yy, v, 0); P(-4, yy, v, 0); }
+    for (const [u, v] of [[-2, -4], [2, -4], [-2, 5], [2, 5]]) P(u, 0, v, D);   // the landing gear
+    void rng;
+    B.prebuilt = true;
+  };
+
   // ---------------------------------------------------------------- generic detailing: stripes, windows, nav lights, vents
   function detail(B, rng, arch, st) {
     // longitudinal accent stripe at the widest row
@@ -541,7 +594,7 @@
   // ---------------------------------------------------------------- public API
   const ShipGen = VR.ShipGen = {
     ARCH, PALETTES,
-    archetypes: Object.keys(ARCH),
+    archetypes: Object.keys(ARCH).filter(k => !ARCH[k].hidden),
     pickArch(rng, allow) {
       const keys = (allow || Object.keys(ARCH)).filter(k => ARCH[k]);
       let tot = 0; for (const k of keys) tot += ARCH[k].weight;

@@ -125,18 +125,19 @@
     FL('vx_floor_hangar', 'Hangar Tile Deck', { pat: 'plaza', col: 0x4A5462, col2: 0x2C3446 });
     FL('vx_floor_hangar_line', 'Hangar Light-Line', { pat: 'line', family: 'hangar', col: 0x4A5462, col2: 0x2C3446, glow: T_.cyan }, { light: [0, 7, 9] });
     VM.registerLate(NAMES);
-    // the Gate Temple's dark stone (texture recipes in src/main/tex_recipes4.js)
+    // the Gate Temple's dark stone (texture recipes in src/main/tex_recipes4.js). The faces are named lazily — in
+    // R.finalize, at these (the last) types — so the new texture names come after every older one and no older block's
+    // texture layer moves (test/mesh_same.js)
     const stone = { cat: 'build', group: G_.HEART, tool: 'pick', needTool: true, sound: 'stone', hard: 2, blast: 8 };
-    const sm = T('temple_stone_dark_smooth');
-    def2('temple_stone_dark', Object.assign({ display: 'Dark Temple Stone', tex: T('temple_stone_dark') }, stone));
+    const sm = () => T('temple_stone_dark_smooth'), side = (n) => () => { const s = sm(); return { top: s, bottom: s, side: T(n) }; };
+    def2('temple_stone_dark', Object.assign({ display: 'Dark Temple Stone', tex: () => T('temple_stone_dark') }, stone));
     def2('temple_stone_dark_smooth', Object.assign({ display: 'Smooth Dark Temple Stone', tex: sm }, stone));
-    def2('temple_stone_dark_band', Object.assign({ display: 'Carved Dark Temple Band', tex: { top: sm, bottom: sm, side: T('temple_stone_dark_band') } }, stone));
-    def2('temple_pilaster_dark', Object.assign({ display: 'Dark Temple Pilaster', props: [VR.PROPS.AXIS], tex: VR.axisTex(T('temple_pilaster_dark'), sm) }, stone));
-    def2('temple_light_bar_dark', Object.assign({ display: 'Orange Light Bar · Dark Stone', tex: { top: sm, bottom: sm, side: T('temple_light_bar_dark') }, light: [11, 5, 1], flags: F.EMISSIVE }, stone, { hard: 1 }));
-    def2('temple_slit_dark', Object.assign({ display: 'Cyan Light Slit · Dark Stone', tex: { top: sm, bottom: sm, side: T('temple_slit_dark') }, light: [3, 9, 11], flags: F.EMISSIVE }, stone, { hard: 1 }));
-    def2('amber_window_tall', Object.assign({ display: 'Tall Amber Window', tex: T('amber_window_tall'), light: [12, 7, 2], flags: F.EMISSIVE }, stone, { hard: 1, sound: 'glass' }));
+    def2('temple_stone_dark_band', Object.assign({ display: 'Carved Dark Temple Band', tex: side('temple_stone_dark_band') }, stone));
+    def2('temple_pilaster_dark', Object.assign({ display: 'Dark Temple Pilaster', props: [VR.PROPS.AXIS], tex: (p, s) => VR.axisTex(T('temple_pilaster_dark'), sm())(p, s) }, stone));
+    def2('temple_light_bar_dark', Object.assign({ display: 'Orange Light Bar · Dark Stone', tex: side('temple_light_bar_dark'), light: [11, 5, 1], flags: F.EMISSIVE }, stone, { hard: 1 }));
+    def2('temple_slit_dark', Object.assign({ display: 'Cyan Light Slit · Dark Stone', tex: side('temple_slit_dark'), light: [3, 9, 11], flags: F.EMISSIVE }, stone, { hard: 1 }));
+    def2('amber_window_tall', Object.assign({ display: 'Tall Amber Window', tex: () => T('amber_window_tall'), light: [12, 7, 2], flags: F.EMISSIVE }, stone, { hard: 1, sound: 'glass' }));
     // the gate's energy field: four rings, each its own colour (the generator lays them as concentric octagons)
-    const GT = [0, 1, 2, 3].map(k => T('gate_glow_' + k));
-    def2('gate_glow', Object.assign({ display: 'Gate Glow', props: [['ring', 4]], tex: (p) => GT[p.ring | 0], layer: 'trans', opaque: false, filter: 0, light: [15, 9, 3], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500, sound: 'glass' }));
+    def2('gate_glow', Object.assign({ display: 'Gate Glow', props: [['ring', 4]], tex: (p) => T('gate_glow_' + (p.ring | 0)), layer: 'trans', opaque: false, filter: 0, light: [15, 9, 3], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500, sound: 'glass' }));
   });
 })(VR);
