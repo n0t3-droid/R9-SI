@@ -582,7 +582,11 @@
     }
     if (f.st === 'tele') {   // the telegraph: a halo growing round the optic, sparks off it
       const oa = OPTIC_AT[f.k], oy = y + (oa ? oa[0] : K.h * 0.8), of = oa ? oa[1] : K.w * 1.2, ox = m.pos[0] - Math.sin(m.yaw) * of, oz = m.pos[2] - Math.cos(m.yaw) * of;
-      P.glow(ox, oy, oz, [1, 0.28, 0.9], 0.22, 0.1 + 0.16 * f.flare, 0);
+      // a-foes2: ONE soft red-violet halo a fx tick (its life the tick), its size bounded by the distance to the eye and
+      // never opaque — the lost run of 23 Oct saw three stacked opaque lilac discs over a quarter of the screen up close
+      const cm = g.cam, hd = cm ? Math.hypot(ox - cm.x, oy - cm.y, oz - cm.z) : 8, H = F.teleHalo(hd, f.flare), HO = F._ho || (F._ho = { life: 0, size: 0, grav: 0, col: [0.55, 0.12, 0.42], emis: 1, drag: 0, collide: false, alpha: 0, fade: false });
+      HO.life = f.fx * 1.15; HO.size = H.size; HO.alpha = H.alpha;
+      P.spawn(ox, oy, oz, 0, 0, 0, HO);
       if (Math.random() < 0.6) { const c = F.optic(m); P.spark(ox, oy, oz, [Math.min(1, c[0] * 0.5), Math.min(1, c[1] * 0.5), Math.min(1, c[2] * 0.5)], 3, 1.6, 1); }
     }
     if (f.st === 'down') {
@@ -596,6 +600,9 @@
     }
     if (f.st === 'calm' && f.t < 1.4 && Math.random() < 0.6) P.glow(m.pos[0] + (Math.random() - 0.5) * 0.8, y + K.h * 0.7, m.pos[2] + (Math.random() - 0.5) * 0.8, [0.5, 1, 0.75], 1.4, 0.05, 0.5);
   };
+  // a-foes2 · the telegraph's halo: size (the quad's half side, blocks) ≤ 6 % of the distance to the eye (≤ ~7 % of the
+  // view's height at 70°), at most 0.2; alpha ≤ 0.55 (never opaque); it grows with the flare
+  F.teleHalo = (dist, flare) => { const fl = Math.max(0, Math.min(1, +flare || 0)); return { size: Math.min(0.06 + 0.14 * fl, 0.06 * Math.max(0, +dist || 0)), alpha: 0.3 + 0.25 * fl }; };
   // where the optic sits: [height, forward] in blocks (the models' layouts; the Kranarm's moves with its arm: by its size)
   const OPTIC_AT = { driller: [13 / 16, 9.5 / 16], sentry: [29 / 16, 5.5 / 16], drone: [4.5 / 16, 6 / 16], wisp: [13 / 16, 5 / 16] };
   // a plate, a gear, a shard: tumbling with a little bounce, gone in five seconds
