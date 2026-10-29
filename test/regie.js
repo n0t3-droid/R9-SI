@@ -176,6 +176,17 @@ console.log('7 · a-regie: the first acts (src/main/regie_acts.js)');
   check(Math.abs(P0[0]) < 1e-9 && P0[1] < 0 && d0 >= RA.RULES.dmin && d0 <= RA.RULES.dmax && P1[0] < 0, 'the spots ahead: in the view\'s direction, ' + RA.RULES.dmin + '–' + RA.RULES.dmax + ' m');
 }
 
+console.log('8 · a-regie: busy — a toast waits');
+{
+  const g = { state: 'play', world: {}, time: 100, meta: { seed: 5 }, player: { pos: [0, 70, 0] }, wow: { active: false, list: new Map([['v', { id: 'v', x: 25, z: 5, wow: true }]]) } };
+  R.frame(g, 0.25);
+  check(R.busy(g), 'just bound (a start 4 s ago): busy');
+  g.time = 130; check(R.busy(g), 'an unseen vista 25 m away: its moment is coming — busy');
+  g.wow.list.get('v').x = 300; check(!R.busy(g), 'nothing near, nothing within 8 s: free');
+  g.regie.sched.seen(128, 2, 'ambient'); check(R.busy(g), 'a weighted event seen 2 s ago: busy');
+  g.time = 140; g.wow.active = true; check(R.busy(g), 'a wow moment: busy');
+}
+
 console.log('3 · pure');
 const a = run(4242).choices.join(','), b = run(4242).choices.join(','), c = run(4243).choices.join(',');
 check(a === b && a.length > 100, 'the same seed and stream: the same choices');
