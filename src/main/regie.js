@@ -156,12 +156,16 @@
   // the director's next act (its rotation's order), pulled forward into a gap
   R.addSource(function ldOffer(g) {
     const D = g.lifeDirector, LD = VR.LifeDirector, S = R.of(g);
-    if (!D || !D.on || !D.ctx || !LD || D.pend || (D.events && D.events.length >= (D.tier >= 2 ? 4 : 2)) || D.time < D.flyUntil) return null;
-    const k = (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return null;
+    const no = (w) => { if (S) { const q = S.st.ldNo || (S.st.ldNo = {}); q[w] = (q[w] | 0) + 1; } return null; };   // (a-regie: why the director offered nothing — the session's JSON)
+    if (!D || !D.on || !D.ctx || !LD) return no('off');
+    if (D.pend) return no('pend');
+    if (D.events && D.events.length >= (D.tier >= 2 ? 4 : 2)) return no('full');
+    if (D.time < D.flyUntil) return no('fly');
+    const k = (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return no('none');
     const since = S ? now(g) - S.sched.last2 : 0, HEARD = {};
     for (const c of C) if (LD.ACTS[c] && LD.ACTS[c].heard) HEARD[c] = 1;
     const order = R.fillOrder(LD.order(D.seed, k, C, D.acts, D.time, LD.pick(D.seed, k, D.ctx)), C, D.acts, D.time, since, HEARD);
-    if (!order.length) return null;
+    if (!order.length) return no('order');
     // a-regie: the first three of the order with different kinds (the event log's own kind for each act) — the Regie
     // chooses among them by its rules (the variety, the cooldown); the one chosen plays first, the rest of the order after it
     const EA = VR.EventLog && VR.EventLog.ACTS, out = [], kinds = {};
