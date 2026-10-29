@@ -1227,6 +1227,7 @@
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();
       if (driving) gad.drive(dt, input, this.ui.blocking);
       else if (this.director && this.director.active) { /* the director moves the player */ }
+      else if (VR.StoryPlay && VR.StoryPlay.holds(this)) { /* a-story: a scene of the story holds the view: the player stands (story.js) */ }
       else if (this.wow && this.wow.active) { /* a wow moment holds the view: the player stands (t-vista) */ }
       else if (this.arrival && this.arrival.holds()) { /* t-first: the arrival's veil holds the view (first.js) */ }
       else if (this.photoCam && this.photoCam.on) this.photoCam.update(dt, input);   // (t-first: 📷 the free camera glides, the player stands — photomode.js)
@@ -1277,6 +1278,7 @@
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (VR.BodyLife) VR.BodyLife.update(this, dt, eye, E);   // u-moons1: the moons' life — geysers, dust in vacuum arcs, impacts, the suit's sound, the codex finds (bodylife.js; returns at once elsewhere)
       if (VR.Liberate && VR.Liberate.frame) VR.Liberate.frame(this, dt, eye, E);   // a-foes2: the land's tint round a disturbed outpost and its heal, the moment's camera (liberate.js)
+      if (VR.StoryPlay) VR.StoryPlay.frame(this, dt);   // a-story: the story's offer and scene, the Regie (story.js, regie.js)
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
@@ -1308,6 +1310,7 @@
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
       if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }   // a-foes2: the freeing's swing over the land and back (any key: back now)
+      if (VR.StoryPlay && VR.StoryPlay.holds(this)) { const sc = VR.StoryPlay.cam(this, cam); if (sc) cam = sc; }   // a-story: the scene's shots (story.js)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
       if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }   // e-funke: the photo from Funke's spot
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {

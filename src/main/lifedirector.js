@@ -646,11 +646,13 @@
       const t = this.time, R = LD.ROT;
       if (t - this.lastStart < R.pace || t < this.flyUntil) return false;
       if (this.g.wow && this.g.wow.active) return false;
+      if (VR.Regie && !VR.Regie.allow(this.g, 2, 'ambient')) return false;   // a-story: the Regie's spacing, its scenes, Bauruhe (regie.js)
       return this.sinceSeen() >= R.pace;
     }
     // the acts in order until one starts (one may find no place), within the cap of acts at once
     play(order, o) {
       if (this.events.length >= (this.tier >= 2 ? 4 : 2)) return null;
+      if (VR.Regie && !VR.Regie.allow(this.g, 2, 'ambient')) return null;   // a-story: the idle fill and the Regie's own asks wait for its spacing too
       for (let i = 0; i < order.length && i < 5; i++) { const kind = order[i]; if (this.events.some(e => e.kind === kind)) continue; const ev = this.start(kind, o); if (ev) return ev; }
       return null;
     }
