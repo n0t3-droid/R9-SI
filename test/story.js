@@ -273,5 +273,44 @@ const rl = S.load(JSON.parse(JSON.stringify(Object.assign({}, ra, { acts: Object
 check(rl.acts['c1.b2'] === 1 && !rl.acts['c9.b9'] && !rl.acts['c2.b2'] && JSON.stringify(S.load(JSON.parse(JSON.stringify(rl)))) === JSON.stringify(rl), 'the record keeps the deeds (sanitised, a round trip)');
 check(S.next(ra, calm({ place: 'hills', adv: true, near: { outpost: 300 } }), 0) && S.next(ra, calm({ place: 'hills', adv: true, near: { outpost: 300 } }), 0).id === 'c1.b3', 'a deed never holds the story back');
 
+
+console.log('12 · the deeds and the faces in the player (a stand-in game)');
+{
+  const said = [];
+  const g = { state: 'play', world: {}, time: 0, dim: 'overworld', settings: { storyOffer: true }, meta: { seed: 7, story: { v: 1, beats: { 'c1.b1': 'done' }, later: {} } }, ui: { screen: null },
+    player: { pos: [0, 70, 0], yaw: 0, pitch: 0, spawn: [0, 70, 0], onGround: true, eyePos() { return [0, 71.6, 0]; } },
+    cam: { x: 0, y: 71.6, z: 0, yaw: Math.PI / 2, pitch: 0 },
+    wow: { list: new Map([['v', { x: 0, y: 75, z: -200 }]]) },
+    funke: { on: () => true, show: (t) => said.push(t), budget: { quiet: () => false }, buildFocus: () => false, startWay: () => {} },
+    lifeDirector: { ctx: { place: 'hills', hour: 'noon' } }, saveMeta: () => {} };
+  VR.game = g;
+  const run = (sec) => { for (let i = 0; i < sec * 20; i++) { g.time += 0.05; SP.frame(g, 0.05); } };
+  run(3);
+  check(!SP.of(g).rec.acts['c1.b1'], 'the vista to the side: the look is not done (' + SP.of(g).actSt.last + ')');
+  g.cam.yaw = 0; g.cam.pitch = Math.atan2(75 + 1 - 71.6, 200.5); run(1.0);
+  check(!SP.of(g).rec.acts['c1.b1'], 'looking at it: not yet after 1 s');
+  run(1.0);
+  check(SP.of(g).rec.acts['c1.b1'] === 1 && said.some(t => /Tagebuch/.test(t)), 'held 1.5 s: the deed is done, Funke says so, it is in the record');
+  check(/✓/.test(SP.journalHTML()), 'the journal shows it ✓');
+  // c1.b2's deed: scan the outpost with Funke ([V] through ctx row 3)
+  VR.Liberate = { sites: () => new Map([['o', { x: 300, y: 70, z: 0, st: 'wild', beacon: [300, 72, 0] }]]) };
+  S.mark(SP.of(g).rec, 'c1.b2'); g.cam.yaw = 0; g.cam.pitch = 0; run(1);
+  check(!SP.armedAct(g) && /☐/.test(SP.journalHTML()), 'the outpost behind the view: not armed; the journal shows ☐');
+  g.cam.yaw = -Math.PI / 2; run(1);
+  const ar = SP.armedAct(g);
+  check(!!(ar && ar.storyAct === 'scan'), 'aimed at the outpost: the deed is armed — row 3 says „Scannen" (' + (ar && ar.storyAct) + ')');
+  check(S.watch(g) && SP.of(g).rec.acts['c1.b2'] === 1 && said.some(t => /Scanne/.test(t)), '[V]: Funke scans, the deed is done');
+  // the faces in a scene
+  SP.debug.play('c2.b2'); run(1.5);
+  const sc = SP.of(g).scene;
+  check(sc && sc.por && sc.por.who === 'funke' && sc.por.mood === 'happy', 'a scene: the subtitle has the speaker\'s face (' + (sc && sc.por && sc.por.who + ' · ' + sc.por.mood) + ')');
+  const p0 = SP.stats.porPaints || 0; run(2);
+  const p1 = SP.stats.porPaints || 0;
+  check(p1 > p0 && p1 - p0 < 2 * 20, `the face moves (${p1 - p0} repaints in 2 s — only when the blink or the mouth changes, ≤ 20 a second)`);
+  while (SP.holds(g)) run(0.5);
+  g.settings.storyOffer = false; S.mark(SP.of(g).rec, 'c2.b2'); g.cam.pitch = 0.9; run(1);
+  check(!SP.armedAct(g), '⚙ storyOffer off: no deed armed');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
