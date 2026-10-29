@@ -271,7 +271,7 @@ try {
   const py = `import json,sys\nfrom PIL import Image, ImageDraw\nS=json.load(open(sys.argv[1]));W,H=640,360;out=Image.new('RGB',(W*2+12,(H+26)*len(S['rows'])),(14,14,20));d=ImageDraw.Draw(out)\nfor i,r in enumerate(S['rows']):\n  y=i*(H+26);d.text((6,y+6),r['label']+'   [links neu | rechts vorher]',fill=(240,240,245))\n  for j,k in enumerate(['a','b']):\n    p=r.get(k)\n    if not p: continue\n    try: im=Image.open(p).convert('RGB').resize((W,H))\n    except Exception: continue\n    out.paste(im,(j*(W+12),y+26))\nout.save(sys.argv[2])\n`;
   fs.writeFileSync(ROOT + '.tmp_tests/critic_vl_sheet.py', py);
   execSync(`python3 -I ${ROOT}.tmp_tests/critic_vl_sheet.py ${ROOT}.tmp_tests/critic_vl_sheet.json ${SHOTS}${PFX}_sheet.png`);
-  console.log('  sheet test/shots/critic_v0.49_vl_sheet.png');
+  console.log('  sheet test/shots/' + PFX + '_sheet.png');
 } catch (e) { console.log('  (no sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
 save();
 console.log(`\n${fails ? 'FAILED ' + fails : 'ALL OK'} (${secs()})`);
