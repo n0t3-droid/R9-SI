@@ -121,17 +121,15 @@ async function openWorld(dist, tag, preset, seed) {
 
 // ---------------------------------------------------------------- frames
 // the screen read back right after a drawn frame (no compositor wait: page.screenshot hangs on a loaded machine)
-const grab = async (P, file) => {
-  const m = await P.ev(() => {
-    const gl = VR.game.renderer.gl, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
-    return { png: btoa(s), W, H };
-  });
-  await sharp(Buffer.from(m.png, 'base64'), { raw: { width: m.W, height: m.H, channels: 4 } }).flip().removeAlpha().png().toFile(file);
-};
-// one frame on the walk's clock (33 ms), the eye moved by (dx, dz) — drawn, so the TSR's history builds as in play
-const frame = (P, dx, dz) => P.ev(([dx, dz]) => { const g = VR.game, p = g.player; p.pos[0] += dx; p.pos[2] += dz; window.__vt += 33; g.last = window.__vt - 33; g.loop(window.__vt); }, [dx, dz]);
+// (in the same task as the frame's drawing: the canvas is cleared once it is presented)
+const READ = `(() => { const gl = VR.game.renderer.gl, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
+  return { png: btoa(s), W, H }; })()`;
+const toPng = (m, file) => sharp(Buffer.from(m.png, 'base64'), { raw: { width: m.W, height: m.H, channels: 4 } }).flip().removeAlpha().png().toFile(file);
+// one frame on the walk's clock (33 ms), the eye moved by (dx, dz) — drawn, so the TSR's history builds as in play;
+// `read`: the screen read back right after it
+const frame = (P, dx, dz, read) => P.ev(([dx, dz, read, READ]) => { const g = VR.game, p = g.player; p.pos[0] += dx; p.pos[2] += dz; window.__vt += 33; g.last = window.__vt - 33; g.loop(window.__vt); return read ? (0, eval)(READ) : null; }, [dx, dz, !!read, READ]);
 // the scene settled at a pose, then ARRIVING again: every shown column and far form shown anew this frame (the game's own
 // checkShown — on this build its plan; the far forms as farring.js does it), the eye walking on at 4.3 blocks a second;
 // pictures at frames 3, 5 and 8 (the 300 ms fade's first half, its middle, its end), each measured
@@ -150,10 +148,10 @@ async function arrival(P, scene, x, feet, z, yaw, pitch, fov, tod) {
   });
   const out = { shots: [], arrived: st };
   for (let f = 1; f <= 8; f++) {
-    await frame(P, vx, vz);
-    if (f === 3 || f === 5 || f === 8) {
+    const shot = f === 3 || f === 5 || f === 8, px = await frame(P, vx, vz, shot);
+    if (shot) {
       const pic = `${SHOTS}stipple_${scene}_${TAG}_f${f}.png`;
-      await grab(P, pic);
+      await toPng(px, pic);
       const m = await measure(pic), d = await P.ev(() => { const w = VR.game.world; let part = 0, grow = 0; for (const c of w.cols.values()) for (const s of c.sec) { if (s && s.hasMesh && s.fade > 0 && s.fade < 1) part++; if (s && s.hasMesh && s.grow < 1) grow++; } return { part, grow }; });
       out.shots.push({ f, share: r1(m.share * 100), midFade: d.part, growing: d.grow, pic: pic.replace(ROOTR, '') });
       console.log(`  ${scene} f${f}: ${r1(m.share * 100)} % stippled · sections mid-fade ${d.part}, growing ${d.grow} (${secs()})`);
@@ -168,9 +166,9 @@ const arrive = async (P, x, z) => { await P.ev(([x, z]) => { const p = VR.game.p
 const still = async (P, scene, x, feet, z, yaw, pitch, fov, tod) => {
   await P.pose(x, feet, z, yaw, pitch, fov); if (tod !== undefined) await P.ev((t) => VR.game.env.setTime(t), tod);
   await P.settle(240, 20); await P.step(4); await P.warmVx(); await P.step(3);
-  await P.ev((t) => { window.__norender = false; const g = VR.game; if (t !== undefined) g.env.setTime(t); for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } }, tod);
+  const px = await P.ev(([t, READ]) => { window.__norender = false; const g = VR.game; if (t !== undefined) g.env.setTime(t); for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } return (0, eval)(READ); }, [tod, READ]);
   const pic = `${SHOTS}stipple_${scene}_${TAG}_0.png`;
-  await grab(P, pic);
+  await toPng(px, pic);
   await P.ev(() => { window.__norender = true; });
   const m = await measure(pic);
   console.log(`  ${scene}: ${r1(m.share * 100)} % stippled (${secs()})`);
