@@ -176,12 +176,12 @@ function pageHelpers(win, VRx) {
   };
   function walk(g, p, I, dt) {
     const R = S.R, st = S.st;
-    if (g.wow && g.wow.active) { release(I); return; }                 // a wow moment holds the view: the player stands
+    if ((g.wow && g.wow.active) || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) { release(I); st.t0 = S.t; return; }   // a wow moment (a-regie: a story scene) holds the view: the player stands
     const s = S.progress(R, p.pos[0], p.pos[2]);
     if (s >= R.L - 1.2) { release(I); S.done = true; return; }
     const tg = S.pointAt(R, s + 3.5);
     let off = turnTo(p, tg[0], tg[1], dt, 3.2);
-    const dg = S.dodge(p); if (dg) { p.yaw += Math.max(-3.2 * dt, Math.min(3.2 * dt, dg)); off = Math.min(off, 0.5); st.dodges = (st.dodges | 0) + 1; }   // a-regie: round a wall, not into it
+    const dg = off < 0.6 ? S.dodge(p) : 0; if (dg) { p.yaw += Math.max(-3.2 * dt, Math.min(3.2 * dt, dg)); st.dodges = (st.dodges | 0) + 1; }   // a-regie: round a wall, not into it (only while it heads along the route)
     p.pitch += (-0.06 - p.pitch) * Math.min(1, dt * 3);
     if (off > 1.1) I.keys.delete('KeyW'); else I.keys.add('KeyW');
     if (s > st.s0 + 0.5) { st.s0 = s; st.t0 = S.t; }
@@ -191,6 +191,7 @@ function pageHelpers(win, VRx) {
     if (still > 5) {
       let q = S.pointAt(R, s + 4), gy = S.groundY(q[0], q[1], p.pos[1], true);   // a-regie: a hop lands under the open sky
       for (let k = 8; gy === null && k <= 24; k += 4) { q = S.pointAt(R, s + k); gy = S.groundY(q[0], q[1], p.pos[1], true); }
+      if (gy === null) { q = S.pointAt(R, s + 4); gy = S.groundY(q[0], q[1], p.pos[1]); }   // (a route inside a hall: its floor)
       if (gy !== null) { p.pos[0] = q[0]; p.pos[1] = gy; p.pos[2] = q[1]; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } S.stat.hops++; S.log.push(['hop', +(+g.time).toFixed(1), Math.round(q[0]), Math.round(q[1])]); R.s = Math.min(R.L, s + 4); }
       st.s0 = R.s; st.t0 = S.t;
     }
@@ -656,7 +657,7 @@ try {
   // there, 5 min after the first). Only when asked (ONLY=adventurer; DUR=600 for ten minutes: two beats)
   if (ONLY && ONLY.includes('adventurer')) {
     await ev(() => { const A = VR.Adventure; if (A && A.setOn) { A.setOn(true); A.setEnc('normal'); } window.__S.acceptStory = true; });
-    recs.adventurer = await session('adventurer', { tod: 9200, notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once', 'a-regie: the adventurer follows Funke\'s call toward the nearest disturbed outpost ' + JSON.stringify(ROUTES.outpost) + ' and stops 90 m short; the Regie\'s lost stray on the way'] }, [
+    recs.adventurer = await session('adventurer', { tod: 9200, at: [0.5, 81, 4.5], notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once', 'a-regie: the adventurer follows Funke\'s call toward the nearest disturbed outpost ' + JSON.stringify(ROUTES.outpost) + ' and stops 90 m short; the Regie\'s lost stray on the way'] }, [
       { name: 'hangar', de: 'Hangarhalle: umsehen (Kapitel 1)', mode: { kind: 'look', sec: 40, speed: 0.25 }, max: 40 },
     ].concat(ROUTES.advA ? [
       // a-regie: Funke's call — the way to the nearest disturbed outpost (its beam on the horizon), a look at it at the end

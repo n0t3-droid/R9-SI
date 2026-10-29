@@ -186,13 +186,15 @@ console.log('7 · a-regie: the first acts (src/main/regie_acts.js)');
 
 console.log('8 · a-regie: busy — a toast waits');
 {
-  const g = { state: 'play', world: {}, time: 100, meta: { seed: 5 }, player: { pos: [0, 70, 0] }, wow: { active: false, list: new Map([['v', { id: 'v', x: 25, z: 5, wow: true }]]) } };
+  const g = { state: 'play', world: {}, time: 100, meta: { seed: 5 }, player: { pos: [0, 70, 0] }, wow: { active: false, list: new Map([['v', { id: 'v', x: 300, z: 5, wow: true }]]) } };
   R.frame(g, 0.25);
   check(R.busy(g), 'just bound (a start 4 s ago): busy');
-  g.time = 130; check(R.busy(g), 'an unseen vista 25 m away: its moment is coming — busy');
+  g.time = 130; g.wow.list.get('v').x = 25; check(R.busy(g), 'an unseen vista 25 m away: its moment is coming — busy');
   g.wow.list.get('v').x = 300; g.time = 131.5; check(!R.busy(g), 'nothing near, nothing within 8 s: free');
   g.regie.sched.seen(129.5, 2, 'ambient'); check(R.busy(g), 'a weighted event seen 2 s ago: busy');
   g.time = 140; g.wow.active = true; check(R.busy(g), 'a wow moment: busy');
+  g.wow.active = false; g.wow.list.get('v').x = 20; g.time = 150; const a1 = R.vistaNear(g); g.time = 160; const a2 = R.vistaNear(g); g.time = 171.5; const a3 = R.vistaNear(g);
+  check(a1 && a2 && !a3, 'lingering near a vista without reaching it: the hold ends after ' + R.RULES.vistaHold + ' s');
 }
 
 console.log('3 · pure');

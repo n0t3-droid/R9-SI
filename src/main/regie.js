@@ -24,7 +24,7 @@
   // a-regie (plan docs/superpowers/plans/2026-10-29-a-regie.md §2.1): the repeat cooldown per act (s); the adventurer's
   // rhythm (an Abenteuer world: a shorter target, a lower cap) — its first offers (`first`) are taken at the first allowed
   // moment like a story beat
-  R.RULES.cool = 90; R.RULES.vary = 180; R.ADV = { min: 12, max: 30, gap: 55 };
+  R.RULES.cool = 90; R.RULES.vary = 180; R.RULES.vistaHold = 20; R.ADV = { min: 12, max: 30, gap: 55 };
   // a hash in [0, 1) of three integers (the life director's own, LifeKit.h, when it is there)
   const h = (a, b, c) => { let x = (a | 0) ^ Math.imul(b | 0, 0x9E3779B1) ^ Math.imul((c | 0) + 0x7F4A7C15, 0x85EBCA77); x ^= x >>> 16; x = Math.imul(x, 0x7FEB352D); x ^= x >>> 15; x = Math.imul(x, 0x846CA68B); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
   const sh = (s) => { let x = 0x811c9dc5; s = String(s || ''); for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193); } return x | 0; };
@@ -123,10 +123,11 @@
   // an unseen vista within 40 m (its wow moment is coming as the player walks on) — checked once a second
   R.vistaNear = function (g) {
     const S = R.of(g), t = now(g); if (S && S.vt !== undefined && Math.abs(t - S.vt) < 1) return S.vn;
-    let near = false; const P = g.player && g.player.pos, WM = VR.WowMoment;
-    if (P && g.wow && g.wow.list && !(g.settings && g.settings.wowMoments === false)) for (const v of g.wow.list.values()) { if (v.wow === false || Math.abs(v.x - P[0]) > 40 || Math.abs(v.z - P[2]) > 40) continue; if (Math.hypot(v.x - P[0], v.z - P[2]) < 40 && !(WM && WM.seen && WM.seen(g.meta, v.id))) { near = true; break; } }
-    if (S) { S.vt = t; S.vn = near; }
-    return near;
+    let near = null; const P = g.player && g.player.pos, WM = VR.WowMoment;
+    if (P && g.wow && g.wow.list && !(g.settings && g.settings.wowMoments === false)) for (const v of g.wow.list.values()) { if (v.wow === false || Math.abs(v.x - P[0]) > 40 || Math.abs(v.z - P[2]) > 40) continue; if (Math.hypot(v.x - P[0], v.z - P[2]) < 40 && !(WM && WM.seen && WM.seen(g.meta, v.id))) { near = v.id; break; } }
+    // (a player who lingers near a vista without reaching it: the hold ends after RULES.vistaHold s)
+    if (S) { if (near !== S.vid) { S.vid = near; S.v0 = t; } if (near && t - S.v0 > R.RULES.vistaHold) near = null; S.vt = t; S.vn = !!near; }
+    return !!near;
   };
   R.inScene = (g, on) => { const S = R.of(g); if (S) S.sched.scene = !!on; };
   function bind(g) {
