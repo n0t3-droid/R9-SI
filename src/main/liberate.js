@@ -24,6 +24,7 @@
   const L = VR.Liberate = VR.Liberate || {};
   const TAU = Math.PI * 2;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const smooth = (x) => { const u = x <= 0 ? 0 : x >= 1 ? 1 : x; return u * u * (3 - 2 * u); };   // (a-foes2)
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const num = (v, d) => (Number.isFinite(+v) ? +v : d);
@@ -211,6 +212,39 @@
   L.nameOf = (s) => L.NAMES[Math.floor(L.rng('name:' + s.id)() * L.NAMES.length)];
   // the moment's beats (s from the start)
   L.TIMELINE = [{ t: 0, k: 'flicker' }, { t: 0.6, k: 'cyan' }, { t: 0.6, k: 'beam' }, { t: 0.75, k: 'ring' }, { t: 0.9, k: 'music' }, { t: 1.6, k: 'stand' }, { t: 2.2, k: 'funke' }, { t: 2.4, k: 'banner' }, { t: 6.2, k: 'end' }];
+  // ---------------------------------------------------------------- a-foes2 · the land heals, the moment's camera (pure)
+  // (docs/superpowers/plans/2026-10-29-a-foes2.md §2) the disturbed tint of the land by the distance to an unfreed outpost
+  L.moodK = (d) => (d <= 30 ? 1 : d >= 80 ? 0 : 1 - smooth((d - 30) / 50));
+  // the light ring's radius at the moment's time t (−1 before and after it runs): out of the beacon, over the land
+  L.RING_T0 = 0.75; L.RING_DUR = 3.85;
+  L.ringR = (t) => { const u = (t - L.RING_T0) / L.RING_DUR; return u < 0 || u >= 1 ? -1 : 2 + 128 * (1 - Math.pow(1 - u, 2.2)); };
+  // the heal at the eye, s seconds after the ring's front passed it (s < 0: not yet): k the tint left, c the clear colours
+  L.heal = (s) => (s < 0 ? { k: 1, c: 0 } : s < 0.8 ? { k: 1 - smooth(s / 0.8), c: smooth(s / 0.8) } : { k: 0, c: Math.max(0, 1 - smooth((s - 0.8) / 4)) });
+  // the grade: k the disturbed tint (red-violet, a little less colour), c the clear colours after the heal
+  L.applyMood = (E, k, c) => {
+    if (!(k > 0) && !(c > 0)) return E;
+    const G = E.grade; G[0] *= 1 + 0.035 * k + 0.01 * c; G[1] *= 1 - 0.1 * k + 0.03 * c; G[2] *= 1 + 0.06 * k + 0.005 * c;
+    E.saturation = (E.saturation || 1.12) * (1 - 0.18 * k) + 0.14 * c; E.exposure = (E.exposure || 1) * (1 + 0.05 * c);
+    return E;
+  };
+  // the camera: out from the eye to the composition in RISE, held with a slow push-in, back in FALL; t the curve's clock
+  // (a key moves it on), e the time since the start (the drift's: never moved, so a skip never jumps the view)
+  L.CAM = { RISE: 1.4, HOLD: 4.0, FALL: 1.6, DRIFT: 2.4 };
+  const smoother = (x) => { const u = x <= 0 ? 0 : x >= 1 ? 1 : x; return u * u * u * (u * (u * 6 - 15) + 10); };
+  const camDur = () => L.CAM.RISE + L.CAM.HOLD + L.CAM.FALL;
+  L.camCurve = (t) => { const C = L.CAM, D = camDur(); return t <= 0 || t >= D ? 0 : t < C.RISE ? smoother(t / C.RISE) : t < C.RISE + C.HOLD ? 1 : smoother((D - t) / C.FALL); };
+  L.camDrift = (e) => { const C = L.CAM; return smoother((e - C.RISE * 0.5) / (C.HOLD + (C.RISE + C.FALL) * 0.5)); };
+  L.camStep = (c, dt) => { c.t += dt; c.e += dt; return c; };
+  L.camSkip = (c) => { const C = L.CAM, D = camDur(); c.skipped = true; if (c.t < C.RISE) c.t = D - C.FALL * Math.max(0, c.t) / C.RISE; else if (c.t < C.RISE + C.HOLD) c.t = C.RISE + C.HOLD; return c; };
+  L.camAt = (c, a, b, out) => {
+    const u = L.camCurve(c.t), push = L.CAM.DRIFT * L.camDrift(c.e);
+    let dy = b.yaw - a.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU;
+    const cp = Math.cos(b.pitch), bx = b.x - Math.sin(b.yaw) * cp * push, by = b.y + Math.sin(b.pitch) * push, bz = b.z - Math.cos(b.yaw) * cp * push;
+    out.x = a.x + (bx - a.x) * u; out.y = a.y + (by - a.y) * u; out.z = a.z + (bz - a.z) * u;
+    out.yaw = a.yaw + dy * u; out.pitch = a.pitch + (b.pitch - a.pitch) * u; out.fov = a.fov + (b.fov - a.fov) * u;
+    return out;
+  };
+  L.STAND_GAP = 0.55;   // s between two strays standing up
   L.beatsBetween = (a, b) => L.TIMELINE.filter(q => q.t > a - 1e-9 && q.t <= b + 1e-9 && !(a > 0 && q.t <= a));
   L.KEYS = ['g.lib.calm.hint', 'g.lib.calm.ok', 'g.lib.calm.miss', 'g.lib.ring', 'g.lib.ring.out', 'g.lib.ring.wave', 'g.lib.ring.start', 'g.lib.puz.title', 'g.lib.puz.help', 'g.lib.puz.later', 'g.lib.puz.done', 'g.lib.puz.hint',
     'g.lib.freed.kick', 'g.lib.freed.title', 'g.lib.freed.sub', 'g.lib.funke.freed', 'g.lib.funke.ready', 'g.lib.funke.helper', 'g.lib.funke.ring', 'g.lib.funke.stoer', 'g.lib.trader', 'g.lib.fast.title', 'g.lib.fast.none', 'g.lib.fast.go', 'g.lib.fast.close',
@@ -524,6 +558,7 @@
   L.free = function (g, s) {
     if (!s || s.st === 'frei' || (L.moment && L.moment.s === s)) return false;
     L.moment = { s, t: 0, done: new Set() };
+    L.passAt = null; try { L.camStart(g, s); } catch (e) { L.mcam = null; }   // (a-foes2: the moment seen)
     L.ringSite = null; L.ring(g, null);
     if (F() && g.entities) { const Fo = F(); for (const m of g.entities.mobs) { const f = m.foe; if (f && !f.gone && f.wave && f.site === s.id) { f.st = 'leave'; f.t = 0; if (f.tok) { Fo.W.tokens.give(m.id); f.tok = false; } } } }
     return true;
@@ -534,7 +569,98 @@
     for (const q of L.beatsBetween(t0 === 0 ? 0 : t0, M.t)) { if (M.done.has(q.k)) continue; M.done.add(q.k); L.beat(g, s, q.k); }
     if (P && M.t < 0.6) { if (Math.random() < 0.6) P.spark(b[0] + 0.5, b[1] + 0.8, b[2] + 0.5, Math.random() < 0.5 ? [1, 0.3, 0.9] : [0.5, 0.95, 1], 6, 2.5, 1); }
     if (P && M.t > 0.6 && M.t < 3.5 && Math.random() < 0.5) P.glow(b[0] + 0.5 + (Math.random() - 0.5) * 2, b[1] + 1 + Math.random() * 3, b[2] + 0.5 + (Math.random() - 0.5) * 2, [0.55, 1, 1], 2.2, 0.06, 1.6);
+    if (P && L.ringR(M.t) > 0) L.glints(g, M, b, dt);
     if (M.done.has('end')) L.moment = null;
+  };
+  // a-foes2 · the ring brightens the grass it passes: glints on the ground along its front (world.topAt), rising a
+  // little, gold and green; by the particle tier (28 · 14 · 6 a frame at 60 Hz; the pool's budget thins them further)
+  L.GLINTS = [6, 14, 28];
+  L.glints = function (g, M, b, dt) {
+    const P = g.particles, w = g.world, q = g.renderer && g.renderer.q, R = L.ringR(M.t); if (!P || !w || R < 0) return;
+    const tier = q ? clamp(q.particles | 0, 0, 2) : 1, eye = g.player.pos;
+    let n = L.GLINTS[tier] * Math.min(2, dt * 60); n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
+    const o = L._go || (L._go = { life: 1, size: 0.07, grav: -0.15, col: [1, 1, 1], emis: 1, drag: 0.6, collide: false });
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, r = R - Math.random() * 2.5, x = b[0] + 0.5 + Math.cos(a) * r, z = b[2] + 0.5 + Math.sin(a) * r;
+      if (Math.abs(x - eye[0]) > 90 || Math.abs(z - eye[2]) > 90 || !w.isLoaded(Math.floor(x), Math.floor(z))) continue;
+      const y = w.topAt(Math.floor(x), Math.floor(z)) + 1.05, gold = Math.random() < 0.35, long = Math.random() < 0.3;
+      o.life = long ? 2.4 : 1 + Math.random() * 0.4; o.size = long ? 0.045 : 0.06 + Math.random() * 0.03;
+      o.col = gold ? [1, 0.86, 0.45] : [0.62, 1, 0.5];
+      P.spawn(x, y, z, (Math.random() - 0.5) * 0.3, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 0.3, o);
+    }
+  };
+  // a-foes2 · each frame (game.js, one marked line after the env): the land's tint and the heal, the moment's camera
+  L.clock = 0; L.moodNow = 0; L.moodTgt = 0; L.moodScan = 0; L.passAt = null; L.mcam = null;
+  L.frame = function (g, dt, eye, E) {
+    L.clock += dt;
+    const on = !!(F() && F().on(g));
+    if (!on) { L.moodNow = 0; L.passAt = null; if (L.mcam) L.camEnd(g); return; }
+    const M = L.moment;
+    if ((L.moodScan -= dt) <= 0) {
+      L.moodScan = 0.5; let d = 1e9;
+      for (const s of W0.sites.values()) { if (!s.known) continue; if (s.st === 'frei' && !(M && M.s === s && L.passAt === null)) continue; const dd = Math.hypot(s.x - eye[0], s.z - eye[2]); if (dd < d) d = dd; }
+      L.moodTgt = L.moodK(d);
+    }
+    L.moodNow += (L.moodTgt - L.moodNow) * Math.min(1, dt * 1.2);
+    if (M && M.s && L.passAt === null && M.t > L.RING_T0) {
+      const b = M.s.beacon || [M.s.x, M.s.y, M.s.z], R = L.ringR(M.t);
+      if (R < 0 || R >= Math.hypot(b[0] + 0.5 - eye[0], b[2] + 0.5 - eye[2])) L.passAt = L.clock;
+    }
+    const hs = L.passAt === null ? -1 : L.clock - L.passAt, H = L.heal(hs);
+    if (hs > 4.8) L.passAt = null;
+    if (E && E.grade) L.applyMood(E, L.moodNow * H.k, H.c);
+    if (L.mcam) L.stepCam(g, dt);
+  };
+  // the moment's camera: a swing to a composition above and behind the beacon with the land beyond in view, a slow
+  // push-in, back by 7 s; any key brings it back from where it is (no jump: L.camSkip). ⚙ „Wow-Momente" off, a guest or
+  // guests in the world, another camera holding the view: none
+  L.camOk = function (g) {
+    const mp = g.mp;
+    return !!(g.settings && g.settings.wowMoments !== false) && !(g.meta && g.meta.guest) && !(mp && (mp.isClient || (mp.isHost && mp.remote && mp.remote.size > 0))) && !(g.director && g.director.active) && !(g.wow && g.wow.active) && !(g.gadgets && g.gadgets.controlling) && !g.photo;
+  };
+  L.compose = function (g, s) {
+    const b = s.beacon, w = g.world, p = g.player; if (!b || !w || !p) return null;
+    const RT = VR.R && VR.R.T, SOLID = VR.F ? VR.F.SOLID : 1;
+    const air = (x, y, z) => { const k = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !k || !(RT.flags[k] & SOLID); };
+    const tx = b[0] + 0.5, ty = b[1] + 1.5, tz = b[2] + 0.5, y0 = Math.atan2(p.pos[0] - tx, p.pos[2] - tz);
+    for (let k = 0; k < 12; k++) {
+      const yaw = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, D = k < 8 ? 14 : 10, H = k < 8 ? 6 : 5;
+      const cx = tx + Math.sin(yaw) * D, cz = tz + Math.cos(yaw) * D, cy = ty + H;
+      let ok = air(cx, cy, cz) && air(cx, cy + 1, cz);
+      for (let i = 1; i < 20 && ok; i++) { const u = i / 20; if (u > 0.9) break; if (!air(cx + (tx - cx) * u, cy + (ty - cy) * u, cz + (tz - cz) * u)) ok = false; }
+      if (!ok) continue;
+      // the beacon in the lower middle, its beam rising through the frame, the land beyond to the horizon
+      const lx = tx, lz = tz, ly = b[1] + 5;
+      return { x: cx, y: cy, z: cz, yaw: Math.atan2(-(lx - cx), -(lz - cz)), pitch: Math.atan2(ly - cy, Math.hypot(lx - cx, lz - cz)), fov: null };
+    }
+    return null;
+  };
+  L.camStart = function (g, s) {
+    L.mcam = null; if (!L.camOk(g)) return false;
+    const c = L.compose(g, s); if (!c) return false;
+    L.mcam = { t: 0, e: 0, skipped: false, first: true, a: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }, b: c, o: {}, hud: !!g.hideHud };
+    g.hideHud = true; const hud = typeof document !== 'undefined' && document.getElementById ? document.getElementById('hud') : null; if (hud) hud.style.visibility = 'hidden';   // (the hand and the HUD away; the banner is in #app)
+    return true;
+  };
+  L.stepCam = function (g, dt) {
+    const C = L.mcam; if (!C) return;
+    const I = g.input, any = !!I && ((I.pressed && I.pressed.size > 0) || (I.mouse && I.mouse.clicked && I.mouse.clicked.some(Boolean)) || (I.padPressed && I.padPressed.size > 0) || (I.tPressed && I.tPressed.size > 0));
+    if (any && !C.first && !C.skipped) L.camSkip(C);
+    C.first = false;
+    L.camStep(C, dt);
+    if (C.t >= L.CAM.RISE + L.CAM.HOLD + L.CAM.FALL || !L.camOk(g)) L.camEnd(g);
+  };
+  L.camEnd = function (g) {
+    const C = L.mcam; L.mcam = null; if (!C || !g) return;
+    g.hideHud = C.hud; const hud = typeof document !== 'undefined' && document.getElementById ? document.getElementById('hud') : null; if (hud) hud.style.visibility = g.hideHud ? 'hidden' : 'visible';
+  };
+  // the camera handed to the renderer (game.js, one marked line beside the other view hooks)
+  L.cam = function (g, base) {
+    const C = L.mcam; if (!C || !base) return null;
+    const a = C.a; a.x = base.x; a.y = base.y; a.z = base.z; a.yaw = base.yaw; a.pitch = base.pitch; a.fov = base.fov;
+    if (C.b.fov === null) C.b.fov = (base.fov || 1.2) * 1.1;
+    const o = L.camAt(C, a, C.b, C.o);
+    return Object.assign({}, base, { x: o.x, y: o.y, z: o.z, yaw: o.yaw, pitch: o.pitch, fov: o.fov, roll: 0, fixed: true });
   };
   L.beat = function (g, s, k) {
     const b = s.beacon || [s.x, s.y + 1, s.z], au = g.audio, P = g.particles;
@@ -576,12 +702,14 @@
     const r0 = rec(); let follower = null, trader = null, crew = 0;
     for (const m of En.mobs) { const f = m.foe; if (!f || f.gone) continue; if (f.mine) follower = m; if (f.trader && f.site === s.id) trader = m; }
     let newFollower = false;
-    calm.forEach((m) => {
+    const pp = g.player ? g.player.pos : [s.x, s.y, s.z];
+    calm.sort((a, b) => Math.hypot(a.pos[0] - pp[0], a.pos[2] - pp[2]) - Math.hypot(b.pos[0] - pp[0], b.pos[2] - pp[2]));   // (a-foes2: the nearest first)
+    calm.forEach((m, i) => {
       const f = m.foe; f.st = 'helper'; f.t = 0; f.helper = true; f.calm = 1; f.kneel = 1;
+      f.rise = 0.05 + i * L.STAND_GAP; f.bowT = null;   // (a-foes2: one by one, each with a small bow: foes.js 'helper')
       if (!follower && f.k !== 'crane') { follower = m; newFollower = true; f.mine = true; f.follow = null; f.site = null; if (r0) r0.helper = { k: f.k }; Fo.stats.helpers++; }
       else if (!trader) { trader = m; f.trader = true; f.site = s.id; const q = L.rot(s.dir, 4, -4); f.follow = [s.x + q[0] + 0.5, s.y + 1, s.z + q[1] + 0.5]; }
       else { f.site = s.id; const q = L.rot(s.dir, -3 + 3 * (crew % 3), 3 + 2.5 * Math.floor(crew / 3)); crew++; f.follow = [s.x + q[0] + 0.5, s.y + 1, s.z + q[1] + 0.5]; }   // (the rest: the outpost's crew, about the pad)
-      if (g.particles) g.particles.spark(m.pos[0], m.pos[1] + 0.8, m.pos[2], [0.4, 1, 0.6], 18, 3, 1);
     });
     if (newFollower) setTimeout(() => { const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(T('g.lib.funke.helper')); }, 4600);
   };
@@ -675,7 +803,9 @@
   // ---------------------------------------------------------------- [V]: e-ctx's row 4 — Beruhigen · Reparieren · Schnellreise · Einkaufen
   L.near = function (g, eye, dir) {
     if (!F() || !F().on(g)) return null;
-    if (L.calmSt) return { kind: 'machine', pos: [L.calmSt.m.pos[0], L.calmSt.m.pos[1] + 0.8, L.calmSt.m.pos[2]], r: 1.2, act: (gg) => L.calmTap(gg) };
+    // (a-foes2) while the timing ring runs, [V] taps it wherever the eye is (the ring is on the screen): the target sits on
+    // the view ray, so Funke's row never takes the key from it (run 2 of abenteuer2: „[V] Funke fragen" over the ring)
+    if (L.calmSt) { const k = L.calmSt.m.foe ? L.calmSt.m.foe.k : 'driller'; return { kind: 'machine', name: T('g.foe.name.' + k), pos: [eye[0] + dir[0] * 2, eye[1] + dir[1] * 2, eye[2] + dir[2] * 2], r: 1.2, act: (gg) => L.calmTap(gg) }; }
     const En = g.entities, list = NEAR; list.length = 0;
     if (En) for (const m of En.mobs) {
       const f = m.foe; if (!f || f.gone || f.remote || Math.abs(m.pos[0] - eye[0]) > 6 || Math.abs(m.pos[2] - eye[2]) > 6) continue;
@@ -825,8 +955,8 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
         drawGeo(gl, p, beam, dx, b[1] + 0.8 - cam.y, dz, 1.1, 14, 1.1, 1, 0.25, 0.8, 0.45 * fl);
       }
       // the light ring sweeping over the land
-      if (M && M.t >= 0.75 && M.t < 4.6) {
-        const u = (M.t - 0.75) / 3.85, R = 2 + 128 * (1 - Math.pow(1 - u, 2.2)), fade = 1 - u;
+      if (M && L.ringR(M.t) > 0) {
+        const u = (M.t - L.RING_T0) / L.RING_DUR, R = L.ringR(M.t), fade = 1 - u;
         drawGeo(gl, p, thin, dx, b[1] + 0.6 - cam.y, dz, R, 1, R, 0.35, 1, 1, 1.4 * fade);
         drawGeo(gl, p, thick, dx, b[1] + 0.4 - cam.y, dz, R * 0.985, 1, R * 0.985, 0.2, 0.7, 1, 0.5 * fade);
       }

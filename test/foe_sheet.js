@@ -140,6 +140,54 @@ scene('foe_sheet_warn', [
   mob('drone', X[3], 0, -0.3, (f) => { f.st = 'tele'; f.t = 0.5; f.flare = 0.85; }),
   mob('wisp', X[4], 0, -0.5, (f) => { f.st = 'tele'; f.t = 0.5; f.flare = 0.85; }),
 ]);
+// a-foes2 · the warning close to the eye: the game's own F.life spawns the telegraph's halo; the particles are drawn as
+// the particle shader draws them (a camera-facing quad, size = half its side; the soft disc 1 − smoothstep(0.3, 1, d);
+// colour × (1 + 3·emissive), alpha-blended). The lost run of 23 Oct saw an opaque lilac disc over a quarter of the
+// screen here: the halo must stay small on the screen and never opaque
+{
+  const GLOW = [];
+  const Pst = { spawn() { return -1; }, spark() {}, glow(x, y, z, col, life, size, vy) { GLOW.push({ x, y, z, col, life: life || 2, size: size || 0.06, alpha: 1, emis: 1 }); return 0; } };
+  Pst.spawn = (x, y, z, vx, vy, vz, o) => { if (o && o.emis >= 0.5 && o.life < 1) GLOW.push({ x, y, z, col: o.col, life: o.life, size: o.size, alpha: o.alpha === undefined ? 1 : o.alpha, emis: o.emis }); return 0; };
+  const closeRow = (name, d) => {
+    ID = 1; GLOW.length = 0;
+    const m = mob('driller', 0, 0, 0, (f) => { f.st = 'tele'; f.t = 0.7; f.flare = 0.95; f.fx = 0; });
+    // the optic sits 13/16 up and 9.5/16 ahead (yaw 0 looks toward −z); the eye d blocks in front of it, looking at it
+    const ox = 0, oy = 13 / 16, oz = -9.5 / 16, eye = [ox + 0.15, oy + 0.1, oz - d];
+    const g = { particles: Pst, player: { pos: [eye[0], eye[1] - 1.62, eye[2]] }, cam: { x: eye[0], y: eye[1], z: eye[2] }, renderer: { q: { lite: false } } };
+    const E2 = { game: g };
+    // 0.5 s of the warning at 60 frames a second; the halos alive at the end are drawn (age < life)
+    const born = [];
+    for (let i = 0; i < 30; i++) { const n0 = GLOW.length; F.life(E2, m, m.foe, F.KINDS.driller, 1 / 60); for (let k = n0; k < GLOW.length; k++) born.push([GLOW[k], i / 60]); }
+    const alive = born.filter(([q, t]) => 29 / 60 - t < q.life).map(([q]) => q);
+    REC.length = 0; En.game = null; F.draw(En, r, prog, m, cam, 0);
+    const cv = new Canvas(1280, 480, [0.62, 0.74, 0.88, 0.86, 0.84, 0.8]); cv.cam(eye, [ox, oy, oz], 70);
+    for (const q of REC) cv.mesh(q.M, q.mat, q.tint, q.flash);
+    // the quads (camera-facing: right and up from the view matrix)
+    const w = cv.W * cv.S, h = cv.H * cv.S, vp = cv.vp, V0 = cv.view, R0 = [V0[0], V0[4], V0[8]], U0 = [V0[1], V0[5], V0[9]];
+    const cov = new Float32Array(w * h);
+    for (const q of alive) {
+      const corner = (a, b) => { const px = q.x + (R0[0] * a + U0[0] * b) * q.size, py = q.y + (R0[1] * a + U0[1] * b) * q.size, pz = q.z + (R0[2] * a + U0[2] * b) * q.size; const cw = vp[3] * px + vp[7] * py + vp[11] * pz + vp[15]; return [((vp[0] * px + vp[4] * py + vp[8] * pz + vp[12]) / cw * 0.5 + 0.5) * w, (1 - ((vp[1] * px + vp[5] * py + vp[9] * pz + vp[13]) / cw * 0.5 + 0.5)) * h, cw]; };
+      const c0 = corner(-1, -1), c1 = corner(1, 1); if (c0[2] < 0.05 || c1[2] < 0.05) continue;
+      const x0 = Math.min(c0[0], c1[0]), x1 = Math.max(c0[0], c1[0]), y0 = Math.min(c0[1], c1[1]), y1 = Math.max(c0[1], c1[1]);
+      const col = q.col.map(v => Math.pow(Math.min(1, v * (1 + 3 * q.emis)), 1 / 2.2));
+      for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(h - 1, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(w - 1, Math.ceil(x1)); x++) {
+        const u = ((x + 0.5 - x0) / (x1 - x0)) * 2 - 1, v = ((y + 0.5 - y0) / (y1 - y0)) * 2 - 1, dd = Math.hypot(u, v);
+        const s = Math.min(1, Math.max(0, (dd - 0.3) / 0.7)), a = (1 - s * s * (3 - 2 * s)) * q.alpha; if (a < 0.05) continue;
+        const i = y * w + x; for (let k = 0; k < 3; k++) cv.col[i * 3 + k] = cv.col[i * 3 + k] * (1 - a) + col[k] * a;
+        cov[i] = 1 - (1 - cov[i]) * (1 - a);
+      }
+    }
+    fs.writeFileSync(path.join(OUT, name + '.png'), cv.png());
+    let lit = 0, opaque = 0; for (let i = 0; i < cov.length; i++) { if (cov[i] > 0.1) lit++; if (cov[i] > 0.9) opaque++; }
+    return { halos: alive.length, lit: lit / cov.length, opaque: opaque / cov.length };
+  };
+  const n1 = closeRow('foe_sheet_close', 0.9), n2 = closeRow('foe_sheet_close45', 0.45), mid = closeRow('foe_sheet_close6', 6);
+  const near = { halos: Math.max(n1.halos, n2.halos), lit: Math.max(n1.lit, n2.lit), opaque: Math.max(n1.opaque, n2.opaque) };
+  check(near.halos === 1, 'the warning near the eye: one soft halo a frame (' + near.halos + ' alive)');
+  check(near.lit <= 0.03, 'a Bohrläufer warning 0.45 and 0.9 blocks from the eye: the halo covers ' + (100 * near.lit).toFixed(2) + ' % of the screen (≤ 3 %; the lost run: a quarter)');
+  check(near.opaque === 0, 'never opaque (' + (100 * near.opaque).toFixed(2) + ' % of the screen over 90 % cover)');
+  check(mid.lit > 0.0003, 'six blocks off it still reads: ' + (100 * mid.lit).toFixed(3) + ' % of the screen');
+}
 F.bits.length = 0;
 for (const [what, x, y, z, a, b] of [['plate', -0.2, 0.06, -0.6, 0.4, 1.2], ['plate', 0.35, 0.3, -0.9, 1.5, 0.3], ['gear', 0.8, 0.06, -0.4, 0, 0.8], ['shard', 1.3, 0.06, -0.7, 0.7, 2.1], ['shard', 1.55, 0.4, -0.5, 2.0, 0.5]]) F.bits.push({ model: 'foe_' + what, pos: [x, y, z], vel: [0, 0, 0], rot: [a, b], spin: [0, 0], t: 1 });
 F.bolts.length = 0; F.bolts.push({ pos: [2.2, 1.2, -0.8], vel: [0, 0, -6], t: 0.3, k: 'drone' });

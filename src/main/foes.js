@@ -130,10 +130,20 @@
   F.wake = function (o) {
     let best = null;
     for (const f of (o && o.freed) || []) if (f && Array.isArray(f.pos) && (!best || (+f.t || 0) > (+best.t || 0))) best = f;
+    if (best && Array.isArray(best.beacon)) {
+      // a-foes2: 5 blocks out from the beacon (away from the pad's middle), facing it and looking up its beam
+      const b = best.beacon, cx = b[0] + 0.5, cz = b[2] + 0.5, pd = Array.isArray(best.pad) ? best.pad : [cx, cz - 1];
+      let ux = cx - pd[0], uz = cz - pd[1]; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
+      const x = cx + ux * 5, z = cz + uz * 5;
+      return { pos: [x, b[1] + 1, z], why: 'beacon', id: best.id, yaw: Math.atan2(ux, uz), pitch: 0.45, at: [cx, b[1] + 4, cz] };
+    }
     if (best) return { pos: best.pos.slice(0, 3), why: 'beacon', id: best.id };
     const h = o && Array.isArray(o.home) ? o.home : [0.5, 100, 0.5];
     return { pos: h.slice(0, 3), why: 'home' };
   };
+  // a-foes2 · the bow after standing up: 0.7 s to stand, then a small nod of the body (≤ 0.3 rad) over 0.9 s
+  F.BOW_END = 1.6;
+  F.bowOf = (f) => { const t = f && f.bowT; if (t === undefined || t === null || t < 0.7 || t >= F.BOW_END) return 0; return 0.3 * Math.sin(Math.PI * (t - 0.7) / 0.9); };
   F.lostTaler = (band, taler) => (band === 'hard' ? Math.floor(Math.max(0, taler | 0) * 0.05) : 0);
   // a hit in half-hearts on the 20 of survival: Ausdauer's extra hearts make it a smaller bite
   F.dmgFor = (dmg, mode, hpMax) => (mode === 'survival' ? dmg * 20 / Math.max(20, hpMax || 20) : dmg);
@@ -347,6 +357,13 @@
       }
       case 'helper': {
         f.helper = true; f.calm = 1; f.flare = 0;
+        // a-foes2: freed, they stand up one by one (f.rise: the wait) and bow a little toward the player (f.bowT)
+        if (f.rise > 0) { f.rise -= dt; stop(m, dt); f.kneel = 1; if (f.rise <= 0) { f.rise = 0; f.bowT = 0; W.out.events.push({ k: 'rise', id: m.id, f: f.k }); } hover(m, W, f, K, dt); break; }
+        if (f.bowT !== undefined && f.bowT !== null) {
+          f.bowT += dt; stop(m, dt); if (pp && !K.fixed) faceTo(m, dx, dz, dt, 4);
+          f.kneel = Math.max(0, f.kneel - dt * 1.5); if (f.bowT >= F.BOW_END) f.bowT = null;
+          hover(m, W, f, K, dt); break;
+        }
         const hp = f.follow ? f.follow : pp, near = f.sit ? 0.8 : 4.2;   // (at night by the home's door: close, and it sits)
         let sat = false;
         if (hp && !K.fixed) {
@@ -545,6 +562,7 @@
     else if (what === 'bolt') { const o = au.tone(880, 0.06 * v, 0.25, 'triangle', true, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(330, t + 0.25); }
     else if (what === 'down') { const o = au.tone(420, 0.09 * v, 1.4, 'sawtooth', false, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(70, t + 1.3); if (au.play) au.play('clatter', { vol: v }); }
     else if (what === 'calm') { [523, 659, 784].forEach((f2, i) => au.tone(f2, 0.07 * v, 0.9, 'sine', true, t + i * 0.09)); }
+    else if (what === 'rise') { const o = au.tone(392, 0.05 * v, 0.7, 'sine', true, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(784, t + 0.5); au.tone(1175, 0.02 * v, 0.5, 'sine', true, t + 0.25); }
     else if (what === 'motes') { if (au.play) au.play('twinkle', { vol: 0.6 * v }); }
     else if (what === 'clang') { if (au.play) au.play('clang', { vol: 0.8 * v }); }
   };
@@ -557,6 +575,7 @@
       case 'slam': if (g.particles) { g.particles.spark(e.x, e.y + 0.2, e.z, [1, 0.35, 0.9], 22, 4); g.particles.smoke(e.x, e.y + 0.2, e.z, 6, false); } if (g.audio && g.audio.play) g.audio.play('thump', { vol: 0.5 }); break;
       case 'down': F.stats.downs++; if (m) F.sound(g, F.KINDS[m.foe.k].fam === 'stray' ? 'down' : 'motes', m.pos); break;
       case 'calm': F.stats.calms++; if (m) F.sound(g, 'calm', m.pos); break;
+      case 'rise': if (m) { if (g.particles) g.particles.spark(m.pos[0], m.pos[1] + 0.8, m.pos[2], [0.4, 1, 0.6], 14, 2.6, 1); F.sound(g, 'rise', m.pos); } break;   // (a-foes2: one by one)
       case 'gone': if (m) { m.foe.gone = true; m.dead = true; m.deathT = 99; } break;
     }
     if (F.net && F.net.ev && (e.k === 'down' || e.k === 'calm' || e.k === 'tele')) F.net.ev.push([e.id & 0xffff, e.k]);
@@ -582,7 +601,11 @@
     }
     if (f.st === 'tele') {   // the telegraph: a halo growing round the optic, sparks off it
       const oa = OPTIC_AT[f.k], oy = y + (oa ? oa[0] : K.h * 0.8), of = oa ? oa[1] : K.w * 1.2, ox = m.pos[0] - Math.sin(m.yaw) * of, oz = m.pos[2] - Math.cos(m.yaw) * of;
-      P.glow(ox, oy, oz, [1, 0.28, 0.9], 0.22, 0.1 + 0.16 * f.flare, 0);
+      // a-foes2: ONE soft red-violet halo a fx tick (its life the tick), its size bounded by the distance to the eye and
+      // never opaque — the lost run of 23 Oct saw three stacked opaque lilac discs over a quarter of the screen up close
+      const cm = g.cam, hd = cm ? Math.hypot(ox - cm.x, oy - cm.y, oz - cm.z) : 8, H = F.teleHalo(hd, f.flare), HO = F._ho || (F._ho = { life: 0, size: 0, grav: 0, col: [0.55, 0.12, 0.42], emis: 1, drag: 0, collide: false, alpha: 0, fade: false });
+      HO.life = f.fx * 1.15; HO.size = H.size; HO.alpha = H.alpha;
+      P.spawn(ox, oy, oz, 0, 0, 0, HO);
       if (Math.random() < 0.6) { const c = F.optic(m); P.spark(ox, oy, oz, [Math.min(1, c[0] * 0.5), Math.min(1, c[1] * 0.5), Math.min(1, c[2] * 0.5)], 3, 1.6, 1); }
     }
     if (f.st === 'down') {
@@ -596,6 +619,9 @@
     }
     if (f.st === 'calm' && f.t < 1.4 && Math.random() < 0.6) P.glow(m.pos[0] + (Math.random() - 0.5) * 0.8, y + K.h * 0.7, m.pos[2] + (Math.random() - 0.5) * 0.8, [0.5, 1, 0.75], 1.4, 0.05, 0.5);
   };
+  // a-foes2 · the telegraph's halo: size (the quad's half side, blocks) ≤ 6 % of the distance to the eye (≤ ~7 % of the
+  // view's height at 70°), at most 0.2; alpha ≤ 0.55 (never opaque); it grows with the flare
+  F.teleHalo = (dist, flare) => { const fl = Math.max(0, Math.min(1, +flare || 0)); return { size: Math.min(0.06 + 0.14 * fl, 0.06 * Math.max(0, +dist || 0)), alpha: 0.3 + 0.25 * fl }; };
   // where the optic sits: [height, forward] in blocks (the models' layouts; the Kranarm's moves with its arm: by its size)
   const OPTIC_AT = { driller: [13 / 16, 9.5 / 16], sentry: [29 / 16, 5.5 / 16], drone: [4.5 / 16, 6 / 16], wisp: [13 / 16, 5 / 16] };
   // a plate, a gear, a shard: tumbling with a little bounce, gone in five seconds
@@ -696,16 +722,21 @@
     if (S.t >= 1.1 && !S.moved) {
       S.moved = true;
       const L = VR.Liberate, r0 = rec(), freed = [];
-      if (L && L.freedList && r0) for (const s of L.freedList(r0)) freed.push({ id: s.id, pos: s.beacon ? [s.beacon[0] + 0.5, s.beacon[1] + 1, s.beacon[2] + 2.5] : [s.x, s.y + 2, s.z], t: s.t || s.day || 0 });
+      if (L && L.freedList && r0) for (const s of L.freedList(r0)) freed.push({ id: s.id, pos: s.beacon ? [s.beacon[0] + 0.5, s.beacon[1] + 1, s.beacon[2] + 2.5] : [s.x, s.y + 2, s.z], beacon: s.beacon || null, pad: [s.x + 0.5, s.z + 0.5], t: s.t || s.day || 0 });
       const NL = VR.NewLife, h = NL && NL.home ? NL.home(g) : null;
       const home = h && h.dim === g.dim && Array.isArray(h.pos) ? h.pos : (Array.isArray(p.spawn) && p.spawn.every(Number.isFinite) ? p.spawn : g.worldSpawn ? g.worldSpawn() : [0.5, 100, 0.5]);
       const wk = F.wake({ freed, home }); S.why = wk.why;
-      try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2]); } catch (e) { p.pos = wk.pos.slice(); }
+      // (a-foes2) on the ground out there: the hold's nearest floor would else be the beacon's own top (the lost run's black wake)
+      if (Number.isFinite(wk.yaw) && g.world && g.world.isLoaded(Math.floor(wk.pos[0]), Math.floor(wk.pos[2]))) wk.pos[1] = g.world.topAt(Math.floor(wk.pos[0]), Math.floor(wk.pos[2])) + 1;
+      try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2], Number.isFinite(wk.yaw) ? { yaw: wk.yaw, pitch: wk.pitch } : undefined); } catch (e) { p.pos = wk.pos.slice(); }
+      if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; S.look = wk.at; }   // (a-foes2: up the cyan beam)
       if (p.mode === 'survival') { p.health = 20; if (g.ui && g.ui.updateHUD) g.ui.updateHUD(true); }
       F.hp = F.hpMax();
     }
     if (S.t >= 2.2) {
       F.fainting = null; F.veil(false);
+      // (a-foes2) wherever the hold set the feet down: face the beacon, its beam through the middle of the view
+      if (S.look && !p.hold) { const e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = S.look[0] - e[0], dz = S.look[2] - e[2]; if (dx * dx + dz * dz > 1) { p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.max(0.2, Math.min(0.6, Math.atan2(S.look[1] - e[1], Math.hypot(dx, dz)) + 0.25)); } }
       const fk = g.funke;
       const say = (txt) => { if (fk && fk.on && fk.on() && fk.show) fk.show(txt); else if (g.ui && g.ui.toast) g.ui.toast(txt, '', null); };
       say(T('g.foe.funke.faint') + ' ' + T(S.why === 'beacon' ? 'g.foe.wake.beacon' : 'g.foe.wake.home'));
@@ -955,6 +986,7 @@
     mat4.translate(B, B, m.pos[0] - cam.x, m.pos[1] - cam.y + bob - kn * K.kneel / 16, m.pos[2] - cam.z);
     mat4.rotY(B, B, m.yaw);
     if (f.st === 'tele' && f.k === 'driller') mat4.rotX(B, B, -0.1 * f.flare);
+    { const bw = F.bowOf(f); if (bw) mat4.rotX(B, B, -bw); }   // (a-foes2: the bow after standing up, from the feet)
     if (f.st === 'recover' && f.k === 'driller') mat4.rotX(B, B, -0.22);
     if (kn && f.k !== 'drone') mat4.rotX(B, B, -0.12 * kn);
     if (f.k === 'drone') { mat4.rotZ(B, B, clamp(m.vel[0] * 0.05, -0.3, 0.3)); if (f.st === 'down') mat4.rotX(B, B, f.t * 4); }

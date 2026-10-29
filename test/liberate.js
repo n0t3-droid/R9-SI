@@ -168,6 +168,7 @@ console.log('6 · the Leuchtfeuer block');
     const un = (e) => VR.unpackLight ? VR.unpackLight(e) : [(e >> 8) & 15, (e >> 4) & 15, e & 15];
     const a = un(e0), b = un(e1);
     check(a[0] > a[1] && a[2] > a[1] && b[2] > b[0] && b[1] > b[0], 'red-violet light while disturbed (' + a.join(',') + '), cyan when free (' + b.join(',') + ')');
+    check(Math.max(...a) <= 8 && Math.max(...b) <= 9, 'a lamp\'s glow at its foot, not a coloured floor (a-foes2: the lost run saw a 13-block lilac ellipse; ' + Math.max(...a) + ' / ' + Math.max(...b) + ' ≤ 8 / 9)');
     check(R.models[t.state({ frei: 0 })] && R.models[t.state({ frei: 0 })].length > 6, 'a model of its own (plinth, pillar, the lamp)');
   }
 }
@@ -206,6 +207,41 @@ console.log('9 · the moment');
   const miss = keys.filter(k => !(k in de) || !(k in en));
   check(keys.length >= 15 && !miss.length, keys.length + ' keys of the liberation in both tables' + (miss.length ? ' — missing ' + miss.slice(0, 6).join(', ') : ''));
   check(!/Sterntaler|Heliataler/.test(fs.readFileSync(SRC + 'liberate.js', 'utf8')), 'no currency word written in the code');
+}
+
+
+// ---------------------------------------------------------------- 11 · a-foes2: the land heals, the moment's camera
+console.log('11 · a-foes2: the land heals, the moment\'s camera');
+{
+  // the disturbed tint by the distance to an unfreed outpost; gone where it is freed
+  check(L.moodK(10) === 1 && L.moodK(30) === 1 && L.moodK(55) > 0 && L.moodK(55) < 1 && L.moodK(80) === 0 && L.moodK(200) === 0, 'the disturbed tint: full within 30 blocks, fading to none at 80 (' + L.moodK(55).toFixed(2) + ' at 55)');
+  // the ring's front: from the beacon over the land; the heal at the eye once it passes
+  check(L.ringR(0.5) < 0 && L.ringR(0.8) > 0 && L.ringR(2) > L.ringR(1) && L.ringR(4.5) > 100 && L.ringR(5) < 0, 'the light ring: out of the beacon at 0.75 s, past 100 blocks by 4.5 s (' + [1, 2, 3, 4.5].map(t => L.ringR(t).toFixed(0)).join(' · ') + ')');
+  const h = (s) => L.heal(s);
+  check(h(-1).k === 1 && h(-1).c === 0 && h(0.4).k > 0 && h(0.4).k < 1 && h(0.8).k === 0 && h(0.8).c > 0.9 && h(3).c > 0 && h(5.2).c === 0, 'the front passes: the tint fades in 0.8 s, the colours clearer for 4 s after (c ' + [0.4, 0.8, 2, 3, 5.2].map(t => h(t).c.toFixed(2)).join(' · ') + ')');
+  const E0 = { grade: [1.02, 1, 0.97], saturation: 1.12, exposure: 1 };
+  const E1 = L.applyMood({ grade: E0.grade.slice(), saturation: E0.saturation, exposure: 1 }, 1, 0), E2 = L.applyMood({ grade: E0.grade.slice(), saturation: E0.saturation, exposure: 1 }, 0, 1), E3 = L.applyMood({ grade: E0.grade.slice(), saturation: E0.saturation, exposure: 1 }, 0, 0);
+  check(E1.grade[1] < E0.grade[1] && E1.grade[0] >= E0.grade[0] * 0.99 && E1.saturation < E0.saturation && E1.saturation > 0.9, 'disturbed: the grade leans red-violet, the colour a little lower (' + E1.grade.map(v => v.toFixed(2)).join(',') + ', sat ' + E1.saturation.toFixed(2) + ')');
+  check(E2.saturation > E0.saturation && E2.exposure > 1 && E2.exposure < 1.1 && E3.saturation === E0.saturation && E3.grade.every((v, i) => v === E0.grade[i]), 'healed: clearer colours for a while (sat ' + E2.saturation.toFixed(2) + ', exposure ' + E2.exposure.toFixed(2) + '); outside, nothing changes');
+  // the camera: a swing out, a hold with a slow push-in, back; ≤ 8 s; a key at any moment brings it back without a jump
+  const C = L.CAM, D = C.RISE + C.HOLD + C.FALL;
+  check(D <= 8 && L.camCurve(0) === 0 && L.camCurve(C.RISE + 0.1) === 1 && L.camCurve(D) === 0, 'the moment\'s camera: ' + D.toFixed(1) + ' s (≤ 8), out, held, back');
+  const a = { x: 0, y: 70, z: 0, yaw: 0, pitch: 0, fov: 1.2 }, b = { x: 9, y: 80, z: 14, yaw: 2.4, pitch: -0.35, fov: 1.1 }, o = {};
+  const fly = (sk) => {   // the largest step of the view in a frame, a key pressed at sk s (none: Infinity)
+    const cam = { t: 0, e: 0, skipped: false }; let prev = null, w = 0;
+    for (let k = 0; k < 600 && cam.t < D; k++) {
+      if (!cam.skipped && cam.e >= sk) L.camSkip(cam);
+      L.camStep(cam, 1 / 60);
+      const q = L.camAt(cam, a, b, o), p = [q.x, q.y, q.z];
+      if (prev) w = Math.max(w, Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]));
+      prev = p;
+    }
+    return w;
+  };
+  const base = fly(Infinity); let worst = 0, worstAt = 0;
+  for (let sk = 0; sk <= D; sk += 0.1) { const w = fly(sk); if (w > worst) { worst = w; worstAt = sk; } }
+  check(worst <= base * 1.4 + 0.02 && worst < 0.6, 'a key at any moment: the view turns back from where it is — at most ' + worst.toFixed(3) + ' blocks a frame (the swing itself ' + base.toFixed(3) + '; the lost run jumped 2.2 in the hold; worst at ' + worstAt.toFixed(1) + ' s)');
+  check(L.TIMELINE.find(q => q.k === 'end').t <= 8 && L.STAND_GAP > 0.3 && L.STAND_GAP < 0.8, 'the moment within 8 s, the strays rising ' + L.STAND_GAP + ' s apart');
 }
 
 // ---------------------------------------------------------------- 10 · the glue in a small world
@@ -335,8 +371,9 @@ async function glue() {
   Fo.hitPlayer(g, { p: Fo.W.player, dmg: 2, x: p.pos[0], y: p.pos[1], z: p.pos[2] });
   check(!!Fo.fainting && p.health === 1, 'a last hit: Ohnmacht instead of death');
   sec(2.5);
-  const wk = [b1[0] + 0.5, b1[1] + 1, b1[2] + 2.5];
-  check(!Fo.fainting && p.health === 20 && Math.hypot(p.pos[0] - wk[0], p.pos[2] - wk[2]) < 0.01, 'woke at the freed beacon with full hearts (' + p.pos.map(v => v.toFixed(1)).join(', ') + ')');
+  const wd = Math.hypot(p.pos[0] - b1[0] - 0.5, p.pos[2] - b1[2] - 0.5), wl = -Math.sin(p.yaw) * (b1[0] + 0.5 - p.pos[0]) / wd - Math.cos(p.yaw) * (b1[2] + 0.5 - p.pos[2]) / wd;
+  check(!Fo.fainting && p.health === 20 && wd > 4.5 && wd < 5.5, 'woke at the freed beacon with full hearts, 5 blocks out (' + p.pos.map(v => v.toFixed(1)).join(', ') + ')');
+  check(wl > 0.97 && p.pitch > 0.3, 'facing the beacon and up its beam (a-foes2: the lost run woke facing its pillar, the picture black; ' + wl.toFixed(2) + ', pitch ' + p.pitch.toFixed(2) + ')');
   check(A.rec.faints.length === 1, 'counted for Spannung (' + A.rec.faints.length + ')');
   // the calm way: Begegnungen aus
   check(A.setEnc('off') && Fo.enc() === 'off', 'Begegnungen aus (VR.Adventure.enc() → off)');
@@ -350,6 +387,8 @@ async function glue() {
   for (const m of g2) {
     p.pos = [m.pos[0] + 2, 64, m.pos[2]];
     check(L.calmBegin(g, m), 'the timing ring opens at the ' + m.foe.k);
+    if (!miss) { const e0 = [p.pos[0], 65.6, p.pos[2]], nr = L.near(g, e0, [0, 0, 1]), d = nr ? [nr.pos[0] - e0[0], nr.pos[1] - e0[1], nr.pos[2] - e0[2]] : null, dl = d ? Math.hypot(...d) : 99;
+      check(!!nr && nr.kind === 'machine' && dl <= 4.5 && d[2] / dl > 0.999, 'while the ring runs, [V] taps it wherever the eye looks (a-foes2: Funke\'s row took the key in run 2)'); }
     if (!miss) { const S = L.calmSt; g.time = S.t0 + ((S.c + 180) % 360) / 360 * L.CALM_T; miss = L.calmTap(g) === false && !!L.calmSt; check(miss, 'a press outside the arc: a miss, the ring stays'); }
     let ok = false; for (let i = 0; i < 80 && !ok; i++) { g.time += 0.025; if (L.calmPress(L.calmSt, g.time)) ok = L.calmTap(g); }
     check(ok && m.foe.st === 'calm', 'calmed in the arc (' + m.foe.k + ')');

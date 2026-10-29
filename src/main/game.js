@@ -1276,6 +1276,7 @@
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (VR.BodyLife) VR.BodyLife.update(this, dt, eye, E);   // u-moons1: the moons' life — geysers, dust in vacuum arcs, impacts, the suit's sound, the codex finds (bodylife.js; returns at once elsewhere)
+      if (VR.Liberate && VR.Liberate.frame) VR.Liberate.frame(this, dt, eye, E);   // a-foes2: the land's tint round a disturbed outpost and its heal, the moment's camera (liberate.js)
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
@@ -1306,6 +1307,7 @@
       if (VR.Intent) { const ic = VR.Intent.cam(this, cam); if (ic) cam = ic; }   // e-ctx: the travel camera on foot (directorcam.js)
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
+      if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }   // a-foes2: the freeing's swing over the land and back (any key: back now)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
       if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }   // e-funke: the photo from Funke's spot
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {

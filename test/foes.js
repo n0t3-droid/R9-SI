@@ -367,5 +367,26 @@ console.log('10 · the words');
   check(!/Sterntaler|Heliataler/.test(src), 'no currency word written in the code (the coin\'s name comes from the tables: g.adv.taler)');
 }
 
+
+// ---------------------------------------------------------------- 11 · a-foes2: the wake's view, the halo, the stand-up
+console.log('11 · a-foes2: waking up the beam, the warning\'s halo, the strays standing up one by one');
+{
+  // the freed beacon at (100, 70, 100) on a pad whose middle is 6 blocks off: wake 5 blocks out, facing up the beam
+  const b = [100, 70, 100], w = F.wake({ freed: [{ id: 'a', pos: [b[0] + 0.5, b[1] + 1, b[2] + 2.5], beacon: b, pad: [94, 106], t: 5 }], home: [0, 80, 0] });
+  const ex = w.pos[0] - (b[0] + 0.5), ez = w.pos[2] - (b[2] + 0.5), d = Math.hypot(ex, ez), out = (ex * 6 + ez * -6) / (d * Math.hypot(6, 6));
+  const lx = -Math.sin(w.yaw), lz = -Math.cos(w.yaw), face = (lx * -ex + lz * -ez) / d;
+  check(w.why === 'beacon' && d > 4 && d < 6 && out > 0.9, 'waking 5 blocks out from the freed beacon, away from the pad (' + d.toFixed(2) + ' blocks, ' + out.toFixed(2) + ')');
+  check(Number.isFinite(w.yaw) && face > 0.97 && w.pitch > 0.25 && w.pitch < 0.75, 'facing the beacon (' + face.toFixed(3) + '), looking up its beam (pitch ' + (w.pitch || 0).toFixed(2) + ' rad)');
+  const h0 = F.teleHalo(0.4, 1), h1 = F.teleHalo(8, 1), h2 = F.teleHalo(8, 0);
+  check(h0.size <= 0.06 * 0.4 + 1e-9 && h0.alpha <= 0.55 && h1.size <= 0.2 && h1.size > h2.size, 'the warning\'s halo: ≤ 6 % of the distance to the eye (' + h0.size.toFixed(3) + ' at 0.4), never opaque (α ' + h1.alpha + '), grows with the flare');
+  // three Helfer standing up 0.55 s apart, each with a small bow toward the player
+  const W = world({ seed: 21, pos: [0, 64, 6] }), list = [0, 1, 2].map((i) => { const m = mob('driller', 50 + i, [i * 2, 64, 0], W); const f = m.foe; f.st = 'helper'; f.helper = true; f.calm = 1; f.kneel = 1; f.rise = i * 0.55; f.follow = [i * 2, 64, 0]; return m; });
+  const up = [null, null, null]; let bowMax = 0, bowEnd = 1;
+  for (let k = 0; k < 240; k++) { stepAll(list, 1 / 60, W); list.forEach((m, i) => { const f = m.foe; if (up[i] === null && f.kneel < 0.5) up[i] = k / 60; bowMax = Math.max(bowMax, F.bowOf(f)); }); }
+  bowEnd = Math.max(...list.map(m => F.bowOf(m.foe)));
+  check(up.every(x => x !== null) && up[0] < up[1] && up[1] < up[2] && up[2] - up[0] > 0.9, 'they stand up one by one (' + up.map(x => x === null ? '—' : x.toFixed(2)).join(' · ') + ' s)');
+  check(bowMax > 0.15 && bowMax <= 0.32 && bowEnd < 0.01, 'each with a small bow (≤ ' + bowMax.toFixed(2) + ' rad), upright after it');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
