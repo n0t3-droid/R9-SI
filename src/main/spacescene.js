@@ -458,7 +458,7 @@
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(r.emptyVAO);
     for (const d of fr.draws) {
-      const p = program(d.prog); if (!p) continue;
+      const p = program(VR.SpaceShaders.progFor(d)); if (!p) continue;
       const tn = d.prog === 'herz' && VR.PlanetLODGL ? VR.PlanetLODGL.draw(r, d, fr.bodies.herz, null, null, map, (k) => ST.tex[k] || blank(gl)) : 0;   // u-orbitlod: the planet tiles first, the impostor at the far plane behind them
       gl.useProgram(p.p);
       if (d.prog === 'bg') gl.disable(gl.BLEND); else { gl.enable(gl.BLEND); if (d.add) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }

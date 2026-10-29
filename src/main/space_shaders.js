@@ -876,9 +876,14 @@ vec3 skyColor(vec3 dir, bool withSun) { return u_dim == 5 ? bodySky(dir, withSun
   SH.bodySky = () => BODY_SKY;
 
   const FULL_VS = QUAD_VS;   // (the background is the quad shader with u_half 0: the full-screen triangle)
+  // f-rules (review v0.51 R52-02): the planet program's tier as AIRZ — the uniform from Low up, the constant 0.0 in
+  // Very Low's own program herz_vl, so u-orbitlod's Low-and-up looks compile away there (v0.50's cost; test/orbit_vl.js)
+  const HERZ_SRC = HERZ_FS.replace(/u_air\.z/g, 'AIRZ');
+  SH.progFor = (d) => (d.prog === 'herz' && d.u && d.u.u_air && !(d.u.u_air[2] > 0.5) ? 'herz_vl' : d.prog);
   SH.programs = () => ({
-    bg: { vs: FULL_VS, fs: BG_FS }, herz: { vs: QUAD_VS, fs: HERZ_FS }, giant: { vs: QUAD_VS, fs: GIANT_FS },
+    bg: { vs: FULL_VS, fs: BG_FS }, herz: { vs: QUAD_VS, fs: '#define AIRZ u_air.z\n' + HERZ_SRC }, giant: { vs: QUAD_VS, fs: GIANT_FS },
+    herz_vl: { vs: QUAD_VS, fs: '#define AIRZ 0.0\n' + HERZ_SRC },   // f-rules: Very Low's Herzwelt
     ring: { vs: RING_VS, fs: RING_FS }, moon: { vs: QUAD_VS, fs: MOON_FS }, glare: { vs: QUAD_VS, fs: GLARE_FS },
-    ptile: { vs: PTILE_VS, fs: '#define PTILE\n' + HERZ_FS },   // u-orbitlod: the planet tiles (planetlod_gl.js)
+    ptile: { vs: PTILE_VS, fs: '#define PTILE\n#define AIRZ u_air.z\n' + HERZ_SRC },   // u-orbitlod: the planet tiles (planetlod_gl.js)
   });
 })(VR);

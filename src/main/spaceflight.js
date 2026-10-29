@@ -330,9 +330,9 @@
   }`;
   const wrapFS = (name, fs) => !/\bout\s+(?:(?:high|medium|low)p\s+)?vec4\s+o\s*;/.test(fs) || (fs.match(/void main\(\)\s*\{/g) || []).length !== 1 ? fs : fs.replace(/void main\(\)\s*\{/, 'void spaceMain() {') + `
 uniform vec4 u_fadeOut;   // u-ascent (spaceflight.js)
-${name === 'herz' ? 'uniform vec4 u_cut;\nuniform vec3 u_nadirB;' : ''}
+${name === 'herz' || name === 'herz_vl' ? 'uniform vec4 u_cut;\nuniform vec3 u_nadirB;' : ''}
 void main() {
-  spaceMain();${name === 'herz' ? CUT : ''}
+  spaceMain();${name === 'herz' || name === 'herz_vl' ? CUT : ''}
   o.rgb *= (1.0 - u_fadeOut.x) * exp2(u_fadeOut.z);
   o.a *= 1.0 - u_fadeOut.y;
 }`;
@@ -428,7 +428,7 @@ void main() {
       const lay = d.prog === 'bg' ? L.bg : d.prog === 'herz' ? L.herz : L.bodies;
       if (!lay || !(lay[0] > 0.001 || lay[1] > 0.001)) continue;
       if (L.strict) { let miss = false; for (const k in d.tex) if (!ST.tex[map[d.tex[k]]]) miss = true; if (miss) continue; }
-      const p = prog(d.prog); if (!p) continue;
+      const p = prog(VR.SpaceShaders.progFor(d)); if (!p) continue;
       const tn = d.prog === 'herz' && VR.PlanetLODGL ? VR.PlanetLODGL.draw(r, d, fr.bodies.herz, lay, L.tcut || null, map, (k) => ST.tex[k] || blankT) : 0;   // u-orbitlod: the planet tiles first, the impostor at the far plane behind them
       gl.useProgram(p.p);
       if (d.prog === 'bg' && !lay[3]) gl.disable(gl.BLEND);
