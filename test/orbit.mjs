@@ -161,7 +161,7 @@ const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight
 const VIEWS = ['climb', 'day', 'glint', 'sunset', 'night', 'aurora', 'cockpit', 'opal'];
 // the kept frame looked at another way (the space frame's layers do not depend on the camera's turn: the map's axes)
 // (hide: the ship and its trails out of the frame — the views toward Helia and the limb look past them)
-const aim = (P, key, yaw, pitch, fov, hide) => P.ev(([key, yaw, pitch, fov, hide]) => { const F = window[key], g = VR.game, s = g.starships && g.starships.pilot; if (s) s.hidden = !!hide; const T = g.trails; if (T) { if (!T.__draw) T.__draw = T.draw; T.draw = hide ? () => {} : T.__draw; } F.cam = Object.assign({}, F.cam, { yaw: yaw === null ? F.cam.yaw : yaw, pitch, roll: 0 }); if (fov) F.cam.fov = fov * Math.PI / 180; }, [key, yaw, pitch, fov || 0, !!hide]);
+const aim = (P, key, yaw, pitch, fov, hide) => P.ev(([key, yaw, pitch, fov, hide]) => { const F = window[key], g = VR.game, s = g.starships && g.starships.pilot; if (s) s.hidden = !!hide; const T = g.trails; if (T) { if (!T.__draw) T.__draw = T.draw; T.draw = hide ? () => {} : T.__draw; } if (hide) { if (F.particles) F.__pa = F.particles; F.particles = null; } else if (F.__pa) F.particles = F.__pa; F.cam = Object.assign({}, F.cam, { yaw: yaw === null ? F.cam.yaw : yaw, pitch, roll: 0 }); if (fov) F.cam.fov = fov * Math.PI / 180; }, [key, yaw, pitch, fov || 0, !!hide]);
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
 // the tick of day 2 when Helia stands at `el` degrees over (x, z) at 3 km, rising (am) or setting
 const tickFor = (P, el, setting, x, z) => P.ev(([el, setting, x, z]) => {
@@ -210,7 +210,8 @@ async function run(preset, url, base) {
       Rr.climbTex = await P.ev(() => { const SS = VR.SpaceScene, ST = SS.state, map = SS.texMap || {}, need = SS.cur_need || []; return { need: need.length, done: need.filter(s => s.done).length, open: need.filter(s => !s.done).map(s => s.key + ' ' + s.left + '/' + s.jobs), missing: ['herzA', 'herzB', 'patchA', 'patchB'].filter(k => !ST.tex[map[k]]), patch: !!ST.patch }; });
       console.log(`  the climb's textures: ${JSON.stringify(Rr.climbTex)}`);
     }
-    const orbitAt = async (x, z, tk) => { await P.ev(([x, z, tk]) => { const g = VR.game; g.env.day = 2; g.env.setTime(tk); VR.SpaceFlight.debug.orbit(g, x, z, 3063); }, [x, z, tk]); await view(P, 1, 0.45); await waitTex(P, 60000, 1); await waitTiles(P, 30000); await P.step(6, 1); await P.ev(() => { window.__Fo = window.__F; }); };
+    // (the wait: the hand-off's horizon tiles fade over the first 5 s of the space frame, by the wall clock)
+    const orbitAt = async (x, z, tk) => { await P.ev(([x, z, tk]) => { const g = VR.game; g.env.day = 2; g.env.setTime(tk); VR.SpaceFlight.debug.orbit(g, x, z, 3063); }, [x, z, tk]); await view(P, 1, 0.45); await waitTex(P, 60000, 1); await waitTiles(P, 30000); await P.step(6, 1); await P.wait(5600); await P.step(2, 1); await P.ev(() => { window.__Fo = window.__F; }); };
     // ---- by day over the Heartland: the land ahead to the horizon; the costs
     if (V('day')) {
       await orbitAt(0, 40, 5200);
@@ -258,8 +259,8 @@ async function run(preset, url, base) {
       Rr.cockpitProbe = await P.ev(() => {
         const g = VR.game, r = g.renderer, gl = r.gl, F = window.__Fk, s = g.starships.pilot, d = s && s.d, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
         const grab = () => { window.__norender = false; r.frameNo = 1000; r.tsrReset = true; if (g.cockpit) g.cockpit.drawnAt = -1; r.render(F); window.__norender = true; const px = new Uint8Array(W * H * 4); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
-        const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) n++; return n; };
-        const base = grab(), out = { camMode: g.camMode, view: g.flight && g.flight.view, ready: !!(g.cockpit && g.cockpit.ready(g.flight)), horizon: !!F.horizon };
+        const diff = (a, b) => { let n = 0, wl = 0, wn = 0; for (let i = 0; i < a.length; i += 4) { if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) n++; const px = (i >> 2) % W, py = H - 1 - ((i >> 2) / W | 0); if (px < W / 2 && py < H * 0.4) { wl += b[i] + b[i + 1] + b[i + 2]; wn++; } } return n + ' (window ' + (wl / wn / 3).toFixed(1) + ')'; };
+        const base = grab(); let wl0 = 0, wn0 = 0; for (let i = 0; i < base.length; i += 4) { const px = (i >> 2) % W, py = H - 1 - ((i >> 2) / W | 0); if (px < W / 2 && py < H * 0.4) { wl0 += base[i] + base[i + 1] + base[i + 2]; wn0++; } } const out = { window: +(wl0 / wn0 / 3).toFixed(1), camMode: g.camMode, view: g.flight && g.flight.view, ready: !!(g.cockpit && g.cockpit.ready(g.flight)), horizon: !!F.horizon };
         if (d && d.gpu) for (const k of Object.keys(d.gpu)) { const m = d.gpu[k]; if (!m) continue; d.gpu[k] = null; out[k] = diff(base, grab()); d.gpu[k] = m; }
         if (F.horizon) { const hz = F.horizon; F.horizon = null; out.hz = diff(base, grab()); F.horizon = hz; }
         const rm = g.cockpit && g.cockpit.drawRoom; if (rm) { g.cockpit.drawRoom = () => {}; out.room = diff(base, grab()); g.cockpit.drawRoom = rm; }
@@ -290,7 +291,7 @@ await browser.close();
 for (const p of PRESETS) {
   const t = TAGP[p] || p, a = rec.presets[t + '_base'], b = rec.presets[t];
   if (a && b && a.cost && b.cost) { console.log(`  ${NAMEP[p]}: the orbit frame ${a.cost.wall} → ${b.cost.wall} ms (CPU ${a.cost.cpu} → ${b.cost.cpu})`); if (p === 'potato') check(b.cost.wall <= a.cost.wall * 1.1 || b.cost.cpu <= a.cost.cpu * 1.1, `Very Low: the orbit frame not dearer (${b.cost.wall} vs ${a.cost.wall} ms)`); }
-  if (b && b.tiles && b.tiles.tiles) { const T = b.tiles.tiles; console.log(`  ${NAMEP[p]}: tiles ${T.drawn} of ${T.tiles} drawn, ${T.cached} kept, ${r1(T.bytes / 1048576)} MB, a tile ${T.ms} ms (slowest ${T.maxMs})`); if (p !== 'potato') check(T.drawn > 0 && T.maxMs <= 12 && T.bytes <= 48 * 1048576, `${NAMEP[p]}: the tiles drawn (${T.drawn}), ≤ 48 MB (${r1(T.bytes / 1048576)} MB)`); else check(!T.drawn, 'Very Low: no tiles'); }
+  if (b && b.tiles && b.tiles.tiles) { const T = b.tiles.tiles; console.log(`  ${NAMEP[p]}: tiles ${T.drawn} of ${T.tiles} drawn, ${T.cached} kept, ${r1(T.bytes / 1048576)} MB, a tile ${T.medMs} ms in the page's busy workers (median; the slowest ${T.maxMs}; node's CPU measure is the gate, test/planetlod.js)`); if (p !== 'potato') check(T.drawn > 0 && T.bytes <= 48 * 1048576, `${NAMEP[p]}: the tiles drawn (${T.drawn}), ≤ 48 MB (${r1(T.bytes / 1048576)} MB)`); else check(!T.drawn, 'Very Low: no tiles'); }
 }
 // the sheet: v0.50 | now, a row a view
 try {

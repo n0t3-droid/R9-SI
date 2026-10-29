@@ -459,15 +459,17 @@
     gl.bindVertexArray(r.emptyVAO);
     for (const d of fr.draws) {
       const p = program(d.prog); if (!p) continue;
+      const tn = d.prog === 'herz' && VR.PlanetLODGL ? VR.PlanetLODGL.draw(r, d, fr.bodies.herz, null, null, map, (k) => ST.tex[k] || blank(gl)) : 0;   // u-orbitlod: the planet tiles first, the impostor at the far plane behind them
       gl.useProgram(p.p);
       if (d.prog === 'bg') gl.disable(gl.BLEND); else { gl.enable(gl.BLEND); if (d.add) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
       setU(gl, p, 'u_viewProj', r.viewProj); setU(gl, p, 'u_invViewProj', r.invViewProj);
       for (const k in d.u) setU(gl, p, k, d.u[k]);
       let unit = 0;
       for (const k in d.tex) { if (!p.u[k]) continue; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, ST.tex[map[d.tex[k]]] || blank(gl)); gl.uniform1i(p.u[k], unit); unit++; }
+      if (tn) VR.PlanetLODGL.before(gl, p, tn, setU);   // u-orbitlod
       gl.drawArrays(gl.TRIANGLES, 0, d.full ? 3 : 6);
+      if (tn) VR.PlanetLODGL.after(gl, p, tn, setU);   // u-orbitlod
       r.stats.draws++; r.stats.tris += d.full ? 1 : 2;
-      if (d.prog === 'herz' && VR.PlanetLODGL) VR.PlanetLODGL.draw(r, d, fr.bodies.herz, null, null, map, (k) => ST.tex[k] || blank(gl));   // u-orbitlod: the planet tiles over the impostor
     }
     gl.activeTexture(gl.TEXTURE0);
     gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);

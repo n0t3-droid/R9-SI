@@ -155,7 +155,7 @@
   // snow by temperature and height — with a little of the biome's own vista colour (LOD.look, half desaturated) for
   // its character. The fields are continuous, so the land has gradients, not outlines; muted for the distance
   BT.ALB2 = true;
-  const N_W = [[0, [178, 152, 106]], [0.28, [146, 140, 80]], [0.48, [98, 120, 56]], [0.7, [56, 90, 40]], [1, [38, 78, 32]]];
+  const N_W = [[0, [170, 150, 104]], [0.25, [138, 136, 76]], [0.42, [92, 118, 54]], [0.65, [54, 90, 40]], [1, [36, 76, 32]]];
   const N_C = [[0, [134, 126, 102]], [0.4, [102, 110, 72]], [0.75, [52, 76, 46]], [1, [40, 64, 42]]];
   const ROCK = [122, 112, 98], SNOW2 = [214, 222, 232];
   const ramp = (R, x) => { if (x <= R[0][0]) return R[0][1]; for (let i = 1; i < R.length; i++) if (x <= R[i][0]) { const a = R[i - 1], b = R[i]; return mix3(a[1], b[1], ss(0, 1, (x - a[0]) / (b[0] - a[0]))); } return R[R.length - 1][1]; };

@@ -2,11 +2,11 @@
 // u-orbitlod · VR.PlanetLODGL — the planet tiles drawn (docs/superpowers/plans/2026-10-29-u-orbitlod.md §4; the pure part
 // and the worker's job are src/shared/planetlod.js). Called right after Herzwelt's impostor in the space scene's two
 // drawers (spacescene.js SS.draw for /raum, spaceflight.js drawLayers for the climb and the space frame) with that
-// draw's own uniforms and textures: the tiles are HERZ_FS under #define PTILE — the same colours, clouds, haze, night
+// draw's own uniforms and textures, just before it: the tiles are HERZ_FS under #define PTILE — the same colours, clouds, haze, night
 // lights and glint as the impostor round them, the relief their own. The tiles nearest the nadir come first from the
 // workers (a few in flight at a time); a tile not there yet is stood in for by its coarser parent, else the impostor
-// shows. Own depth (logarithmic, cleared after the pass: the ship and the voxel world draw over the far ground as they
-// always did). Balanced and up (PlanetLOD.on); Very Low and Low never reach it.
+// shows. Own depth (logarithmic); the impostor then drawn at the far plane with the depth test, so the ground under the
+// tiles is shaded once (early depth); the depth cleared after it (the ship and the voxel world draw as they always did). Balanced and up (PlanetLOD.on); Very Low and Low never reach it.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -65,7 +65,7 @@
         PG.inFlight = Math.max(0, PG.inFlight - 1); PG.stats.got++;
         if (PG.seed !== seed || PG.tiles.get(x.key) !== t) return;
         if (!m || m.type !== 'ptile' || !m.pos) { t.asked = false; PG.stats.err++; PG.stats.lastErr = String(m && (m.msg || m.type)).slice(0, 200); return; }
-        PG.stats.ms = m.ms; PG.stats.maxMs = Math.max(PG.stats.maxMs, m.ms);
+        PG.stats.ms = m.ms; PG.stats.maxMs = Math.max(PG.stats.maxMs, m.ms); const L = PG.msList || (PG.msList = []); L.push(m.ms); if (L.length > 64) L.shift(); PG.stats.medMs = L.slice().sort((a, b) => a - b)[L.length >> 1];
         try { upload(gl, t, m); } catch (e) { PG.stats.err++; PG.stats.lastErr = String(e && e.message).slice(0, 200); }
       }, 2);
     }
@@ -107,6 +107,10 @@
     PG.stats.tiles = sel.length;
     return true;
   };
+  // the drawers' two hooks round the impostor: before it (the tiles drawn first, their depth kept; n tiles) and after it
+  // (the depth cleared: the ship and the voxel world draw as they always did)
+  PG.before = function (gl, p, n, setU2) { if (!n) return; setU2(gl, p, 'u_zFar', 1); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false); };
+  PG.after = function (gl, p, n, setU2) { if (!n) return; setU2(gl, p, 'u_zFar', 0); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.DEPTH_TEST); gl.depthMask(false); };
   // how many of the selected tiles are still on their way (tests)
   PG.again = () => (PG.last ? PG.update.apply(null, PG.last) : false);
   PG.pending = () => sel.filter(x => { const t = PG.tiles.get(x.key); return !(t && t.ready); }).length;
@@ -135,8 +139,8 @@
       n++; r.stats.draws++; r.stats.tris += PG.count / 3;
     }
     gl.bindVertexArray(r.emptyVAO);
-    gl.clear(gl.DEPTH_BUFFER_BIT);
-    gl.disable(gl.DEPTH_TEST); gl.depthMask(false);
+    // (the depth stays for the impostor drawn next at the far plane — PG.after clears it)
+    gl.depthMask(false);
     gl.activeTexture(gl.TEXTURE0);
     PG.stats.drawn = n; PG.stats.tiles = sel.length;
     return n;

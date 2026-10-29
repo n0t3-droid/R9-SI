@@ -86,6 +86,7 @@ uniform vec3 u_cdir;
 uniform vec3 u_bu;
 uniform vec3 u_bv;
 uniform float u_half;
+uniform float u_zFar;       // u-orbitlod: 1 = at the far plane (the planet tiles drawn first keep their ground: early depth)
 out vec3 v_dir;
 void main() {
   int id = gl_VertexID;
@@ -93,7 +94,7 @@ void main() {
     vec2 p = vec2(float((id << 1) & 2), float(id & 2)) * 2.0 - 1.0;
     vec4 w = u_invViewProj * vec4(p, 1.0, 1.0);
     v_dir = w.xyz / w.w;
-    gl_Position = vec4(p, 0.5, 1.0);
+    gl_Position = vec4(p, u_zFar > 0.5 ? 0.999999 : 0.5, 1.0);
     return;
   }
   const vec2 C[6] = vec2[6](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
@@ -101,6 +102,7 @@ void main() {
   vec3 pos = u_cdir + (u_bu * c.x + u_bv * c.y) * u_half;
   v_dir = pos;
   gl_Position = u_viewProj * vec4(pos, 1.0);
+  if (u_zFar > 0.5) gl_Position.z = gl_Position.w * 0.999999;
 }`;
   // the ring's square in Amarant's equator plane (corner = centre ± a ± b, all scaled to about unit distance)
   const RING_VS = `
@@ -314,8 +316,8 @@ void main() {
       vec3 H = normalize(L - Db);
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
       // u-orbitlod · the sunglint: a mirror core (calm water) in a broad sheen whose roughness the wind varies (lanes)
-      float wind = u_air.z > 0.5 ? 0.2 + 0.14 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)) : 0.22;
-      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.06) * 0.22 + ggx(max(dot(N, H), 0.0), wind) * 0.78 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
+      float wind = u_air.z > 0.5 ? 0.26 + 0.16 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)) : 0.22;
+      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.06) * 0.3 + ggx(max(dot(N, H), 0.0), wind) * 1.4 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
       float spec = glint * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
@@ -366,12 +368,12 @@ void main() {
       col += AG_COL * u_air.w * ag * 0.11;   // (u-orbitlod: thin and faint — ~1/10 of starlight; v0.50 ×0.45)
       // u-orbitlod · the sunset's layers in the limb (REFERENCE §3): along the terminator the troposphere glows orange to
       // yellow with dark cloud layers in it, a white-pink stratosphere above, then the blue fading to black
-      float tz = smoothstep(-0.07, 0.0, mus) * (1.0 - smoothstep(0.03, 0.16, mus));
+      float tz = smoothstep(-0.12, -0.01, mus) * (1.0 - smoothstep(0.04, 0.18, mus));
       if (tz > 0.0 && h < 0.012 && u_air.z > 0.5) {
         float cb = smoothstep(0.5, 0.72, vnoise3(Ptb * 700.0 + vec3(0.0, h * 2600.0, 0.0))) * (1.0 - smoothstep(0.0009, 0.0016, h));
         vec3 tro = vec3(1.0, 0.36, 0.07) * exp(-h / 0.0006) + vec3(1.0, 0.72, 0.3) * exp(-h / 0.0014) * 0.45;
         vec3 strat = vec3(0.92, 0.78, 0.82) * exp(-pow((h - 0.0042) / 0.0022, 2.0)) * 0.22;
-        col += (tro * (1.0 - 0.75 * cb) + strat) * tz * u_sunCol * u_look.z * (0.4 + 0.6 * smoothstep(-0.2, 0.6, c));
+        col += (tro * (1.0 - 0.75 * cb) + strat) * tz * u_sunCol * u_look.z * (0.5 + 1.5 * smoothstep(-0.2, 0.7, c));
       }
       // u-orbitlod · the aurora over the limb (night side): green curtains 100–200 km up (their lower edge crisp, a pink
       // fringe below it), red tops fading out above 200 km
@@ -388,7 +390,8 @@ void main() {
     }
   }
 #ifdef PTILE
-  o = vec4(col, 1.0) * v_fade;
+  if (v_fade < 0.5) discard;   // (the climb: the horizon tiles' inner part is theirs)
+  o = vec4(col, 1.0);
 #else
   o = vec4(col, alpha);
 #endif
