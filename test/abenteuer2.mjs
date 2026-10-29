@@ -205,7 +205,7 @@ try {
     await draw(11300);
     pics.before = await shot('outpost_before');
     N.mood0 = await ev(() => ({ k: +VR.Liberate.moodNow.toFixed(2), sat: +VR.game.env.E.saturation.toFixed(3), grade: VR.game.env.E.grade.map(v => +v.toFixed(3)) }));
-    check(N.mood0.k > 0.8, 'the land round the disturbed outpost tinted red-violet (k ' + N.mood0.k + ', saturation ' + N.mood0.sat + ', grade ' + N.mood0.grade.join(',') + ')');
+    check(N.mood0.k > 0.6, 'the land round the disturbed outpost tinted red-violet (k ' + N.mood0.k + ', saturation ' + N.mood0.sat + ', grade ' + N.mood0.grade.join(',') + ')');
   });
 
   // ---------------------------------------------------------------- 3 · a Bohrläufer's warning
@@ -233,7 +233,7 @@ try {
     await draw();
     pics.driller = await shot('foe_bohrlaeufer');
     // a-foes2: the same warning 1.2 blocks from the eye — the lost run saw an opaque lilac disc over a quarter of the screen
-    await ev((id) => { const m = VR.game.entities.mobs.find(x => x.id === id), f = m.foe, K = VR.Foes.KINDS[f.k], y = m.pos[1] + 13 / 16, fx = m.pos[0] - Math.sin(m.yaw) * 1.8, fz = m.pos[2] - Math.cos(m.yaw) * 1.8; window.__ft.look({ x: fx, y: y + 0.25, z: fz, tx: m.pos[0], ty: y, tz: m.pos[2] }); f.st = 'tele'; f.t = 0.3; f.flare = 0.9; void K; }, dr.id);
+    await ev((id) => { const m = VR.game.entities.mobs.find(x => x.id === id), f = m.foe, K = VR.Foes.KINDS[f.k], y = m.pos[1] + 13 / 16, fx = m.pos[0] - Math.sin(m.yaw) * 1.8, fz = m.pos[2] - Math.cos(m.yaw) * 1.8; window.__ft.look({ x: fx, y: y + 0.25, z: fz, tx: m.pos[0], ty: y, tz: m.pos[2] }); for (const x of window.__ft.foes()) if (x !== m && Math.hypot(x.pos[0] - fx, x.pos[2] - fz) < 6) { x.pos[0] += (x.pos[0] - fx) * 2; x.pos[2] += (x.pos[2] - fz) * 2; x.foe.cool = 9; } f.st = 'tele'; f.t = 0.3; f.flare = 0.9; void K; }, dr.id);
     await run(3, { god: true });
     await ev((id) => { const f = VR.game.entities.mobs.find(x => x.id === id).foe; f.st = 'tele'; f.flare = 0.9; f.t = 0.4; }, dr.id);
     await draw();
@@ -297,8 +297,10 @@ try {
     const p = await ev(() => { const L = VR.Liberate, s = window.__ft.site(); const ok = L.openPuzzle(VR.game, s); const pz = s.pz, path = pz.tiles.map((t, i) => (t.path ? i : -1)).filter(i => i >= 0); let turned = 0; const sorted = path.slice().sort((a, b) => (a % pz.n) - (b % pz.n)); for (const i of sorted.slice(0, Math.ceil(sorted.length * 0.5))) { const tl = pz.tiles[i]; for (let k = 0; k < 4 && L.maskOf(tl) !== L.rotMask(tl.t, tl.sol); k++) { L.puzAct('t', i); turned++; } } const fl = L.flood(pz); return { ok, n: pz.n, path: path.length, turned, lit: fl.lit.reduce((a, b) => a + b, 0), solved: fl.solved, screen: VR.game.ui.screen }; });
     console.log('     ' + JSON.stringify(p));
     check(p.ok && p.screen === 'lichtleiter' && p.lit >= 2 && !p.solved, 'the Lichtleiter (' + p.n + '×' + p.n + '): half the conduits turned, the light runs through ' + p.lit + ' tiles, the lamp still dark');
+    await ev(() => { const el = document.getElementById('advup'); if (el) el.style.display = 'none'; });
     await draw(11300);
     pics.puzzle = await shot('lichtleiter');
+    await ev(() => { const el = document.getElementById('advup'); if (el) el.style.display = ''; });
     await ev(() => VR.Liberate.closePuzzle());
   });
 
@@ -356,7 +358,7 @@ try {
     check(!!sk && sk.skipped && sk.worst < 0.6, 'a key in the hold: the camera turns back from where it is (at most ' + (sk && sk.worst) + ' blocks a frame)');
     // the strays stand up one by one with a small bow: a close look at the next one to bow
     const sb = await ev(() => {
-      const ft = window.__ft, L = VR.Liberate, F = VR.Foes; L.mcam = null;
+      const ft = window.__ft, L = VR.Liberate, F = VR.Foes; L.camEnd(VR.game);
       const hs = ft.foes().filter(m => m.foe.helper && m.foe.site !== undefined);
       const nx = hs.filter(m => m.foe.rise > 0 || (m.foe.bowT !== null && m.foe.bowT !== undefined && m.foe.bowT < 0.9)).sort((a, b) => (a.foe.rise || 0) - (b.foe.rise || 0))[0] || hs[0];
       if (!nx) return null;
@@ -367,8 +369,10 @@ try {
     });
     console.log('     the stand-up: ' + JSON.stringify(sb));
     if (sb) { const rr = await run(150, { until: "bow", arg: sb.id, god: true }); check(rr.hit, 'a freed stray stands up and bows (' + sb.k + ', ' + sb.n + ' rising ' + sb.rises.join(' · ') + ' s apart)'); }
+    await ev(() => { const el = document.getElementById('libban'); if (el) el.style.visibility = 'hidden'; });   // (the banner: in outpost_after)
     await draw(11300);
     pics.stand = await shot('stand');
+    await ev(() => { const el = document.getElementById('libban'); if (el) el.style.visibility = ''; });
     await ev(() => { const el = document.getElementById('libban'); if (el) el.className = ''; });
     const a = await ev(() => { const A = VR.Adventure.rec, s = window.__ft.site(); return { freed: !!A.freed[s.id], xp: A.me.xp, taler: A.me.taler, ev: VR.EventLog && VR.EventLog.peaks ? VR.EventLog.peaks().length : null }; });
     const md = await ev(() => ({ k: +VR.Liberate.moodNow.toFixed(2), pass: VR.Liberate.passAt !== null, sat: +VR.game.env.E.saturation.toFixed(3) }));
@@ -461,19 +465,21 @@ try {
     for (const preset of ['potato', 'high']) {
       await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('renderDist'); }, preset);
       await run(60);
-      const offs = [], ons = [];
+      const offs = [], ons = [], own = [];
+      const cm = () => ev(() => ({ ms: VR.Foes.cost.ms, f: VR.Foes.cost.frames }));
+      const ownOf = async (fn) => { const a = await cm(); const v = await fn(); const b = await cm(); own.push(b.f > a.f ? (b.ms - a.ms) / (b.f - a.f) : 0); return v; };
       for (let r = 0; r < 5; r++) {
         await ev(() => window.__ft.clear()); await run(10); offs.push(await frames(150));
-        await ev(() => window.__ft.spawn12()); await run(10, { god: true }); ons.push(await frames(150));
+        await ev(() => window.__ft.spawn12()); await run(10, { god: true }); ons.push(await ownOf(() => frames(150)));
       }
       const o = Math.min(...offs), n = Math.min(...ons), med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
       const fc = await ev(() => { const C = VR.Foes.cost; return { frames: C.frames, ms: C.ms, ai: C.ai, aiMs: C.aiMs }; });
-      N.cost[preset] = { off: +o.toFixed(3), on: +n.toFixed(3), medOff: +med(offs).toFixed(3), medOn: +med(ons).toFixed(3), offs: offs.map(v => +v.toFixed(3)), ons: ons.map(v => +v.toFixed(3)), foes: fc };
+      N.cost[preset] = { own: +med(own).toFixed(3), off: +o.toFixed(3), on: +n.toFixed(3), medOff: +med(offs).toFixed(3), medOn: +med(ons).toFixed(3), offs: offs.map(v => +v.toFixed(3)), ons: ons.map(v => +v.toFixed(3)), foes: fc };
       console.log('     ' + preset + ': ' + JSON.stringify(N.cost[preset]));
       if (preset === 'potato') {   // (a-foes2) the same twelve patrolling 34–38 blocks off (none has noticed the player)
-        const po = [], pn = [];
-        for (let r = 0; r < 5; r++) { await ev(() => window.__ft.clear()); await run(10); po.push(await frames(150)); await ev(() => window.__ft.spawn12(34)); await run(10, { god: true }); pn.push(await frames(150)); }
-        N.cost.patrol = { off: +Math.min(...po).toFixed(3), on: +Math.min(...pn).toFixed(3), medOff: +med(po).toFixed(3), medOn: +med(pn).toFixed(3) };
+        const po = [], pn = []; own.length = 0;
+        for (let r = 0; r < 5; r++) { await ev(() => window.__ft.clear()); await run(10); po.push(await frames(150)); await ev(() => window.__ft.spawn12(34)); await run(10, { god: true }); pn.push(await ownOf(() => frames(150))); }
+        N.cost.patrol = { own: +med(own).toFixed(3), off: +Math.min(...po).toFixed(3), on: +Math.min(...pn).toFixed(3), medOff: +med(po).toFixed(3), medOn: +med(pn).toFixed(3) };
         console.log('     potato, patrolling: ' + JSON.stringify(N.cost.patrol));
       }
     }

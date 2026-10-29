@@ -726,6 +726,8 @@
       const NL = VR.NewLife, h = NL && NL.home ? NL.home(g) : null;
       const home = h && h.dim === g.dim && Array.isArray(h.pos) ? h.pos : (Array.isArray(p.spawn) && p.spawn.every(Number.isFinite) ? p.spawn : g.worldSpawn ? g.worldSpawn() : [0.5, 100, 0.5]);
       const wk = F.wake({ freed, home }); S.why = wk.why;
+      // (a-foes2) on the ground out there: the hold's nearest floor would else be the beacon's own top (the lost run's black wake)
+      if (Number.isFinite(wk.yaw) && g.world && g.world.isLoaded(Math.floor(wk.pos[0]), Math.floor(wk.pos[2]))) wk.pos[1] = g.world.topAt(Math.floor(wk.pos[0]), Math.floor(wk.pos[2])) + 1;
       try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2], Number.isFinite(wk.yaw) ? { yaw: wk.yaw, pitch: wk.pitch } : undefined); } catch (e) { p.pos = wk.pos.slice(); }
       if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; }   // (a-foes2: up the cyan beam)
       if (p.mode === 'survival') { p.health = 20; if (g.ui && g.ui.updateHUD) g.ui.updateHUD(true); }

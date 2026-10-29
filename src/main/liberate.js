@@ -223,8 +223,8 @@
   // the grade: k the disturbed tint (red-violet, a little less colour), c the clear colours after the heal
   L.applyMood = (E, k, c) => {
     if (!(k > 0) && !(c > 0)) return E;
-    const G = E.grade; G[0] *= 1 + 0.03 * k + 0.01 * c; G[1] *= 1 - 0.075 * k + 0.03 * c; G[2] *= 1 + 0.05 * k + 0.005 * c;
-    E.saturation = (E.saturation || 1.12) * (1 - 0.14 * k) + 0.14 * c; E.exposure = (E.exposure || 1) * (1 + 0.05 * c);
+    const G = E.grade; G[0] *= 1 + 0.035 * k + 0.01 * c; G[1] *= 1 - 0.1 * k + 0.03 * c; G[2] *= 1 + 0.06 * k + 0.005 * c;
+    E.saturation = (E.saturation || 1.12) * (1 - 0.18 * k) + 0.14 * c; E.exposure = (E.exposure || 1) * (1 + 0.05 * c);
     return E;
   };
   // the camera: out from the eye to the composition in RISE, held with a slow push-in, back in FALL; t the curve's clock
@@ -594,7 +594,7 @@
   L.frame = function (g, dt, eye, E) {
     L.clock += dt;
     const on = !!(F() && F().on(g));
-    if (!on) { L.moodNow = 0; L.passAt = null; L.mcam = null; return; }
+    if (!on) { L.moodNow = 0; L.passAt = null; if (L.mcam) L.camEnd(g); return; }
     const M = L.moment;
     if ((L.moodScan -= dt) <= 0) {
       L.moodScan = 0.5; let d = 1e9;
@@ -624,13 +624,13 @@
     const air = (x, y, z) => { const k = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !k || !(RT.flags[k] & SOLID); };
     const tx = b[0] + 0.5, ty = b[1] + 1.5, tz = b[2] + 0.5, y0 = Math.atan2(p.pos[0] - tx, p.pos[2] - tz);
     for (let k = 0; k < 12; k++) {
-      const yaw = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, D = k < 8 ? 13 : 9, H = k < 8 ? 8 : 6;
+      const yaw = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, D = k < 8 ? 14 : 10, H = k < 8 ? 6 : 5;
       const cx = tx + Math.sin(yaw) * D, cz = tz + Math.cos(yaw) * D, cy = ty + H;
       let ok = air(cx, cy, cz) && air(cx, cy + 1, cz);
       for (let i = 1; i < 20 && ok; i++) { const u = i / 20; if (u > 0.9) break; if (!air(cx + (tx - cx) * u, cy + (ty - cy) * u, cz + (tz - cz) * u)) ok = false; }
       if (!ok) continue;
-      // look over the beacon toward the land beyond: a point 10 blocks past it, at its height
-      const lx = tx - Math.sin(yaw) * 10, lz = tz - Math.cos(yaw) * 10, ly = b[1] + 1;
+      // the beacon in the lower middle, its beam rising through the frame, the land beyond to the horizon
+      const lx = tx, lz = tz, ly = b[1] + 5;
       return { x: cx, y: cy, z: cz, yaw: Math.atan2(-(lx - cx), -(lz - cz)), pitch: Math.atan2(ly - cy, Math.hypot(lx - cx, lz - cz)), fov: null };
     }
     return null;
@@ -638,7 +638,8 @@
   L.camStart = function (g, s) {
     L.mcam = null; if (!L.camOk(g)) return false;
     const c = L.compose(g, s); if (!c) return false;
-    L.mcam = { t: 0, e: 0, skipped: false, first: true, a: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }, b: c, o: {} };
+    L.mcam = { t: 0, e: 0, skipped: false, first: true, a: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }, b: c, o: {}, hud: !!g.hideHud };
+    g.hideHud = true; const hud = typeof document !== 'undefined' && document.getElementById ? document.getElementById('hud') : null; if (hud) hud.style.visibility = 'hidden';   // (the hand and the HUD away; the banner is in #app)
     return true;
   };
   L.stepCam = function (g, dt) {
@@ -647,13 +648,17 @@
     if (any && !C.first && !C.skipped) L.camSkip(C);
     C.first = false;
     L.camStep(C, dt);
-    if (C.t >= L.CAM.RISE + L.CAM.HOLD + L.CAM.FALL || !L.camOk(g)) L.mcam = null;
+    if (C.t >= L.CAM.RISE + L.CAM.HOLD + L.CAM.FALL || !L.camOk(g)) L.camEnd(g);
+  };
+  L.camEnd = function (g) {
+    const C = L.mcam; L.mcam = null; if (!C || !g) return;
+    g.hideHud = C.hud; const hud = typeof document !== 'undefined' && document.getElementById ? document.getElementById('hud') : null; if (hud) hud.style.visibility = g.hideHud ? 'hidden' : 'visible';
   };
   // the camera handed to the renderer (game.js, one marked line beside the other view hooks)
   L.cam = function (g, base) {
     const C = L.mcam; if (!C || !base) return null;
     const a = C.a; a.x = base.x; a.y = base.y; a.z = base.z; a.yaw = base.yaw; a.pitch = base.pitch; a.fov = base.fov;
-    if (C.b.fov === null) C.b.fov = (base.fov || 1.2) * 1.06;
+    if (C.b.fov === null) C.b.fov = (base.fov || 1.2) * 1.1;
     const o = L.camAt(C, a, C.b, C.o);
     return Object.assign({}, base, { x: o.x, y: o.y, z: o.z, yaw: o.yaw, pitch: o.pitch, fov: o.fov, roll: 0, fixed: true });
   };
