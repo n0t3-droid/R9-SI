@@ -534,6 +534,7 @@ void main() {
   // the play frame: the space frame while the ship is up there (a /raum view keeps its own wrapper, spacescene.js)
   const origPlay = Game.prototype.playFrame;
   Game.prototype.playFrame = function (dt) {
+    if (VR.Ascent && !VR.Ascent.game) VR.Ascent.game = this;   // (a ship put straight into orbit never ran the climb's frame: space drew black — a-story's finding)
     if (!this.space && SF.inSpace(this)) return SF.frame(this, dt);
     if (this.flight && this.flight.asc && VR.Ascent.frame) VR.Ascent.frame(this, dt);
     return origPlay.call(this, dt);
