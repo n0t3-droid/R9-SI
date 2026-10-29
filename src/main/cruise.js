@@ -244,6 +244,19 @@
   C.spOf = (st, q) => ({ f: st.frame, r: [rd(st.r[0], 1), rd(st.r[1], 1), rd(st.r[2], 1)], v: [rd(st.v[0], 10), rd(st.v[1], 10), rd(st.v[2], 10)], q: [rd(q[0], 1e4), rd(q[1], 1e4), rd(q[2], 1e4), rd(q[3], 1e4)], t: rd(st.t, 100), c: st.coast ? 1 : 0 });
   // a space presence's bytes a second: 10 Hz under way, the conic once a 10 s while coasting
   C.presenceRate = (sp) => { const b = JSON.stringify(sp).length + 8; return sp && sp.c ? b / 10 : b * 10; };
+  // the presence's space part for mp.js publish (10 Hz): null on the ground; a coasting ship keeps the conic it sent (its
+  // epoch's r, v, t — the JSON unchanged, so mp.js sends nothing more) until it drifts 5 m off it (a burn)
+  let _spLast = null; const _cr = new Float64Array(3), _cv = new Float64Array(3);
+  C.spFor = (g) => {
+    const fl = g && g.flight, a = fl && fl.asc;
+    if (!a || fl.regime !== 'space') { _spLast = null; return null; }
+    const st = a.st;
+    if (st.coast && _spLast && _spLast.c && _spLast.f === st.frame && VR.Universe.coast) {
+      try { VR.Universe.coast(_spLast.r, _spLast.v, VR.Universe.home.body(st.frame).mu, st.t - _spLast.t, _cr, _cv); if (Math.hypot(_cr[0] - st.r[0], _cr[1] - st.r[1], _cr[2] - st.r[2]) < 5) return _spLast; } catch (e) { /* (a new conic below) */ }
+    }
+    const q = VR.Universe.matToQuat ? VR.Universe.matToQuat(a.S, [0, 0, 0, 1]) : [0, 0, 0, 1];
+    return (_spLast = C.spOf(st, q));
+  };
   // the host's travel message (topic 'travel'): {dim, at, host} — guests are asked „Mitreisen?"
   C.travelMsg = (dim, at, host) => ({ type: 'travel', dim, at: at ? at.map((x) => Math.round(x * 10) / 10) : null, host: host || null });
 

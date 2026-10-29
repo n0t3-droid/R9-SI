@@ -162,6 +162,14 @@ console.log('(i) the wiring: a shuttle in orbit, the cruise to Opal through flig
   check(maxFov > 1.08, 'the punch: the FOV kick', 'fovK max ' + maxFov.toFixed(3));
   check(worstJump < 50, 'no jump in the ship\'s place along the way', f1(worstJump) + ' m beyond v·dt');
   check(CRg.last && CRg.last.t2R > 25 && CRg.last.t2R < 70, `the trip's time to 2 R of Opal ${f1(CRg.last && CRg.last.t2R)} s (the phases ${CRg.last && JSON.stringify(Object.fromEntries(Object.entries(CRg.last.phases).map(([k, v]) => [k, +v.toFixed(1)])))})`);
+  { // the space presence of a coasting ship: its conic once (the same object while it stays on it), ≤ 2 KB/s under way
+    g.flight = fl;
+    const a1 = CRg.spFor(g); for (let i = 0; i < 30; i++) frame(1 / 60); const a2 = CRg.spFor(g);
+    check(a1 && a1 === a2 && a1.f === 'opal' && a1.c === 1, 'coasting round Opal: the conic sent once (the presence unchanged a half second on)', JSON.stringify(a1));
+    const pl = { n: 'Buddy', p: [12.34, 70.5, -3.21], r: [1.234, -0.123], f: 0, h: null, m: 'creative', hp: 20, v: { s: 4242, a: 'shuttle', pa: null, y: 1.234, pi: 0.1, ro: 0, p: [12.34, 70.5, -3.21], g: 0, r: 0, l: 0, t: 0.8, b: 0 }, co: null, lk: [1, 2, 3, 4, 0], d: 'space', sp: Object.assign({}, a1, { c: 0 }) };
+    const spB = JSON.stringify({ d: 'space', sp: pl.sp }).length * 10, allB = JSON.stringify(pl).length * 10;
+    check(spB <= 2048, `under way at 10 Hz: the space part ${spB} B/s (≤ 2 KB/s); the whole presence ${allB} B/s`);
+  }
   // G by intent: the camera looking at Herzwelt from Opal's orbit → the cruise armed, G again → the jump there, again → off
   for (let i = 0; i < 300; i++) frame(1 / 60);   // (the frame's turn from the ecliptic's into Opal's)
   const S2 = U.home, st2 = fl.asc.st, ph = S2.pos('opal', st2.t, new Float64Array(3)), hz = S2.pos('herz', st2.t, new Float64Array(3));

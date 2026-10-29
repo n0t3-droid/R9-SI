@@ -11,7 +11,6 @@
 //   PRESETS=high,potato · ONLY=cruise,opal,home,basalt · SEED=53 · RD=6 · K=3
 // regress: skip  (a showcase: the pictures are the evidence; the gates are test/cruise.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
-import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
 import { execSync, execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (the test runs from test/ or from .tmp_tests/)
@@ -33,22 +32,6 @@ const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s[s.lengt
 const rec = { dist: DIST, seed: SEED, presets: {} };
 const save = () => { try { fs.writeFileSync(ROOT + '.tmp_tests/cruise_run.json', JSON.stringify(rec, null, 1)); } catch (e) { /* a convenience */ } };
 fs.mkdirSync(SHOTS, { recursive: true });
-const spread = async (path) => {
-  const { data, info } = await sharp(path).raw().toBuffer({ resolveWithObject: true });
-  const C = info.channels; let s = 0, s2 = 0, n = 0;
-  for (let i = 0; i < data.length; i += C * 7) { const L = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]; s += L; s2 += L * L; n++; }
-  const m = s / n; return { mean: r1(m), sd: r1(Math.sqrt(Math.max(0, s2 / n - m * m))) };
-};
-
-// two pictures of the same view: the mean |Δ| (0–255, over r g b) and the share of pixels off by more than 24 levels
-const pixDiff = async (a, b) => {
-  const A = await sharp(a).raw().toBuffer({ resolveWithObject: true }), B = await sharp(b).raw().toBuffer({ resolveWithObject: true });
-  if (A.info.width !== B.info.width || A.info.height !== B.info.height) return { mean: 255, big: 1 };
-  const C = A.info.channels; let s = 0, big = 0, n = 0;
-  for (let i = 0; i < A.data.length; i += C) { const d0 = Math.abs(A.data[i] - B.data[i]), d1 = Math.abs(A.data[i + 1] - B.data[i + 1]), d2 = Math.abs(A.data[i + 2] - B.data[i + 2]); s += d0 + d1 + d2; if (Math.max(d0, d1, d2) > 24) big++; n++; }
-  return { mean: Math.round(s / n / 3 * 100) / 100, big: Math.round(big / n * 10000) / 10000 };
-};
-
 // ---------------------------------------------------------------- the browser, a page (space0.mjs's helpers)
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const cpuNow = () => {
@@ -107,30 +90,28 @@ async function makeWorld(P, preset) {
 }
 // a kept frame (window[key]) drawn k times, the screen read back into a picture (with the overlay canvas laid over)
 const picture = async (P, key, path, k, overlay) => {
+  // (the PNG made in the page: the read-back flipped into a 2D canvas, the screen's overlay drawn over it)
   const m = await P.ev(([key, k, overlay]) => {
     const g = VR.game, r = g.renderer, gl = r.gl, F = window[key];
     if (!F) return { err: 'no frame kept' };
     window.__norender = false;
     r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false;
-    // (the furnished cockpit is drawn once a game frame — cockpit.js drawKit's drawnAt — and a kept frame drawn again is
-    // the same game frame: each draw here forgets it, or the last one shows the seat without its room, as run 2's did)
     try { for (let i = 0; i < k; i++) { if (g.cockpit) g.cockpit.drawnAt = -1; r.render(F); } } catch (e) { window.__norender = true; return { err: String(e && e.stack || e).slice(0, 600) }; }
     const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
     window.__norender = true;
-    let ov = null; const fx = document.getElementById('ascFx'); if (overlay && fx && fx.style.display !== 'none') ov = fx.toDataURL('image/png');
-    return { png: btoa(s), W, H, draws: r.stats.draws, tris: Math.round(r.stats.tris), ov };
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'), id = x.createImageData(W, H);
+    let s = 0, s2 = 0, n = 0;
+    for (let y = 0; y < H; y++) { const src = (H - 1 - y) * W * 4; id.data.set(px.subarray(src, src + W * 4), y * W * 4); }
+    for (let i = 0; i < id.data.length; i += 4) { id.data[i + 3] = 255; if ((i >> 2) % 7 === 0) { const L = 0.2126 * id.data[i] + 0.7152 * id.data[i + 1] + 0.0722 * id.data[i + 2]; s += L; s2 += L * L; n++; } }
+    x.putImageData(id, 0, 0);
+    let ov = false; const fx = document.getElementById('ascFx'); if (overlay && fx && fx.style.display !== 'none') { x.drawImage(fx, 0, 0, W, H); ov = true; }
+    const mean = s / n;
+    return { png: c.toDataURL('image/png').split(',')[1], W, H, draws: r.stats.draws, tris: Math.round(r.stats.tris), overlay: ov, mean: Math.round(mean * 10) / 10, sd: Math.round(Math.sqrt(Math.max(0, s2 / n - mean * mean)) * 10) / 10 };
   }, [key, k, !!overlay]);
   if (m.err) return m;
-  let img = sharp(Buffer.from(m.png, 'base64'), { raw: { width: m.W, height: m.H, channels: 4 } }).flip().removeAlpha();
-  if (m.ov) {
-    const base = await img.png().toBuffer(), ov = await sharp(Buffer.from(m.ov.split(',')[1], 'base64')).resize(m.W, m.H).png().toBuffer();
-    img = sharp(base).composite([{ input: ov, blend: 'over' }]);
-    m.overlay = true;
-  }
-  await img.png().toFile(path);
-  delete m.png; delete m.ov;
+  fs.writeFileSync(path, Buffer.from(m.png, 'base64'));
+  delete m.png;
   return m;
 };
 // the flown ship in a kept frame: the frame drawn as it is and once without the ship, the pixels that differ (runs 1–2 flew
@@ -285,6 +266,7 @@ async function runPreset(preset) {
           await waitTex(P, 20000, 1);
           await keep(P, '__Fc2');
           const m = await picture(P, '__Fc2', SH(hi ? 'cruise_mid.png' : 'cruise_vl_mid.png'), K); mid = true;
+          check(!m.err && m.sd > 4, `mid-way: the picture not blank (L ${m.mean} ± ${m.sd})`);
           const c2 = await cost(P, '__Fc2', 2, hi ? 4 : 6);
           Rr.cruiseFrame = { wall: r1(c2.wallMs), cpu: r1(c2.cpuMs), draws: m.draws, km: Math.round(s.dist / 1000) };
           console.log(`  mid-way: ${Math.round(s.dist / 1000)} km to go at ${r1(s.speed / 1000)} km/s; the cruise frame ${Rr.cruiseFrame.wall} ms (CPU ${Rr.cruiseFrame.cpu}), ${m.draws} draws — the plaza's ${Rr.plaza.wall} ms (${secs()})`);
@@ -297,7 +279,7 @@ async function runPreset(preset) {
       await P.step(40);
       await chase(P, 0.2, 0.4); await waitTex(P, 60000, 1); await P.step(4);
       await keep(P, '__Fc3'); const m3 = await picture(P, '__Fc3', SH(hi ? 'cruise_arrive_opal.png' : 'cruise_vl_opal.png'), K);
-      check(!m3.err, `the arrival picture (${m3.err || m3.draws + ' draws'})`);
+      check(!m3.err && m3.sd > 4, `the arrival picture (${m3.err || m3.draws + ' draws'}, L ${m3.mean} ± ${m3.sd}: not blank)`);
       save();
       // ---- Landen: the descent into Opal's world, then Heimkehr from there to the apron
       if (hi && want('opal')) {
