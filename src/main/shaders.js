@@ -1080,14 +1080,7 @@ void main() {
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #endif
 #ifdef CUTOUT
-#ifdef SOFTFADE
-  // f-stipple2 (R52-05): where nothing resolves the jitter (u_mipScale = Stream.MIP_CALM: no TSR, or frames far apart) a
-  // cut-out's edge is read two mips coarser — blades side by side merge instead of alternating pixel by pixel (tall grass
-  // walked past as a 1-px checker); the colour stays the texel's
-  if (u_mipScale > 1.3 ? textureGrad(u_albedo, vec3(fu, layer), dx * 4.0, dy * 4.0).a < 0.5 : alb.a < 0.5) discard;
-#else
   if (alb.a < 0.5) discard;
-#endif
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif

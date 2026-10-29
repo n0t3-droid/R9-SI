@@ -78,7 +78,7 @@ if (typeof S.mipK === 'function') {
 check((rd.match(/u_mipScale, VR\.Stream\.mipK\(/g) || []).length === 2, 'renderer: both terrain passes (the depth pre-pass and the colour) take Stream.mipK');
 
 { const sh0 = fs.readFileSync(path.join(ROOT, 'src/main/shaders.js'), 'utf8');
-  check(/#ifdef CUTOUT\n#ifdef SOFTFADE[\s\S]{0,500}u_mipScale > 1\.3 \? textureGrad\(u_albedo, vec3\(fu, layer\), dx \* 4\.0, dy \* 4\.0\)\.a < 0\.5/.test(sh0), 'TERRAIN_FS: a cut-out\'s edge two mips coarser where nothing resolves the jitter (SOFTFADE only)');
+  check(!/dx \* 4\.0, dy \* 4\.0\)\.a < 0\.5/.test(sh0), 'TERRAIN_FS: the cut-outs\' alpha as before (a coarser alpha read thinned the tufts to dark stubs: walk4, dropped)');
   check(/'ZPRE', \.\.\.\(this\.q\.lite \? \[\] : \['SOFTFADE'\]\)/.test(rd), 'the cut-out depth pre-pass cuts as the colour pass (SOFTFADE off the lite look)'); }
 
 console.log('(d)(e) the shaders');
