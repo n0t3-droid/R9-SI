@@ -591,7 +591,7 @@ vec3 s3Deck(vec3 col, vec3 dir) {
     vec2 st = normalize(dir.xz + vec2(1e-5, 0.0)) * 0.22;
     float bil2 = vnoise(qd + st) * 0.55 + vnoise((qd + st) * 2.3 + 1.3) * 0.3 + vnoise((qd + st) * 5.1 - 4.2) * 0.15;
     float lump = smoothstep(0.25, 0.8, bil), relief = clamp(0.5 + (bil2 - bil) * 5.0, 0.0, 1.0);
-    vec3 dk = u_s3Rain.rgb * mix(1.08, 0.45, lump) * (0.74 + 0.5 * relief);
+    vec3 dk = u_s3Rain.rgb * mix(0.98, 0.42, lump) * (0.8 + 0.36 * relief);
     float rag = smoothstep(0.02, 0.16, dir.y + (bil - 0.5) * 0.1);   // (the base's torn edge low over the horizon)
     dk = mix(u_skyHorizon * 0.82 + u_s3Rain.rgb * 0.25, dk, rag);
 #ifdef SKY3HI
