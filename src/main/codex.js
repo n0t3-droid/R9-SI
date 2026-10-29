@@ -71,7 +71,7 @@
       if (!p || !w) return;
       this.t -= dt; if (this.t > 0) return;
       this.t = 1;
-      if (this.held && this.held.length) { const h = this.held[0]; if (!(VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) || (g.time || 0) - h.t >= ((VR.Regie && VR.Regie.HOLD) || 15)) { this.held.shift(); this.unlock(h.id, false, true); } }   // a-regie
+      if (this.held && this.held.length) { const h = this.held[0]; if (!(VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) || ((g.time || 0) - h.t >= ((VR.Regie && VR.Regie.HOLD) || 15) && !VR.Regie.busy(g, true))) { this.held.shift(); this.unlock(h.id, false, true); } }   // a-regie
       const x = Math.floor(p.pos[0]), y = Math.floor(p.pos[1]), z = Math.floor(p.pos[2]);
       const b = VR.BIOMES[w.biomeAt(x, z)];
       if (b) {

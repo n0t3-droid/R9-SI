@@ -195,6 +195,7 @@ console.log('8 · a-regie: busy — a toast waits');
   g.time = 140; g.wow.active = true; check(R.busy(g), 'a wow moment: busy');
   g.wow.active = false; g.wow.list.get('v').x = 20; g.time = 150; const a1 = R.vistaNear(g); g.time = 160; const a2 = R.vistaNear(g); g.time = 171.5; const a3 = R.vistaNear(g);
   check(a1 && a2 && !a3, 'lingering near a vista without reaching it: the hold ends after ' + R.RULES.vistaHold + ' s');
+  g.time = 200; g.wow.list.get('v').x = 22; g.wow.list.get('v').id = 'v2'; check(R.busy(g) && !R.busy(g, true), 'busy(g, true): only the spacing, a scene, a wow moment (a held toast\'s last wait)');
 }
 
 console.log('3 · pure');

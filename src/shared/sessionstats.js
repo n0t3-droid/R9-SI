@@ -124,7 +124,7 @@
     const Mj = evs.filter(e => e.w >= 4 && seenOK(e));
     let close = 0; for (let i = 1; i < Mj.length; i++) if (C.at(Mj[i].t) - C.at(Mj[i - 1].t) < MAJOR_GAP) close++;
     m.majors = { n: Mj.length, perMin: minutes > 0 ? Mj.length / minutes : 0, close };
-    const enc = evs.filter(e => e.kind === 'encounter').length, story = evs.filter(e => e.kind === 'story' && !/^offer/.test(e.sub || '')).length;   // (a-regie: an offer is seen, not a beat)
+    const enc = evs.filter(e => e.kind === 'encounter').length, story = evs.filter(e => e.kind === 'story' && e.src !== 'offer').length;   // (a-regie: an offer is seen, not a beat)
     m.encounters = { n: enc, per10: per10(enc) };
     m.story = { n: story, per10: per10(story) };
     // f-flow: the act that repeats — over all of the session's events; the kind seen most beside it

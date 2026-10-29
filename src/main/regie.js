@@ -114,11 +114,11 @@
   // a-regie: is the screen busy — a weighted event seen or started within the spacing, a wow moment, an unseen vista
   // within 40 m (its moment is coming)? A toast (codex.js) waits meanwhile (≤ HOLD s)
   R.HOLD = 15;
-  R.busy = function (g) {
+  R.busy = function (g, hard) {
     const S = R.of(g); if (!S) return false;
     const t = now(g), q = S.sched; if (t - Math.max(q.last2, q.lastStart) < q.o.space || q.scene) return true;
     if (g.wow && g.wow.active) return true;
-    return R.vistaNear(g);
+    return hard ? false : R.vistaNear(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
   };
   // an unseen vista within 40 m (its wow moment is coming as the player walks on) — checked once a second
   R.vistaNear = function (g) {
@@ -159,7 +159,8 @@
     const no = (w) => { if (S) { const q = S.st.ldNo || (S.st.ldNo = {}); q[w] = (q[w] | 0) + 1; } return null; };   // (a-regie: why the director offered nothing — the session's JSON)
     if (!D || !D.on || !D.ctx || !LD) return no('off');
     if (D.events && D.events.length >= (D.tier >= 2 ? 4 : 2)) return no('full');
-    if (D.time < D.flyUntil) return no('fly');
+    const since0 = S ? now(g) - S.sched.last2 : 0;
+    if (D.time < D.flyUntil && since0 < R.RULES.urgent) return no('fly');   // (a-regie: a fly-by's moment holds the rest — not once the gap is long: v0.51's passes went unseen and held it 2 min)
     // a-regie: a slot of the director's own waiting for its pace (D.pend) is offered as it is — the Regie's spacing decides
     // (v0.51's sessions: the pending slot held the Regie's fill up a third of the time)
     const P = D.pend, k = P ? P.k : (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return no('none');

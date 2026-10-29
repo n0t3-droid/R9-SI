@@ -671,7 +671,7 @@ try {
     await ev(() => { window.__S.acceptStory = false; });
     const st = recs.adventurer && recs.adventurer.metrics ? recs.adventurer.metrics : null;
     if (st) {
-      const beats = recs.adventurer.events.filter(e => e.kind === 'story' && !/^offer/.test(e.sub || '')).length;
+      const beats = recs.adventurer.events.filter(e => e.kind === 'story' && e.src !== 'offer').length;
       check(beats / (recs.adventurer.played / 600) >= 1, `adventurer: ${beats} story beat(s) in ${recs.adventurer.played.toFixed(0)} s (≥ 1 per 10 min)`);
       check(st.gaps.longest.d <= 60, `adventurer: the longest gap ${st.gaps.longest.d.toFixed(0)} s (≤ 60)`);
     }
