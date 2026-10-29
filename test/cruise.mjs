@@ -187,7 +187,7 @@ async function pickHour(P) {
 }
 // frames rendered for real, each synced: their times (ms)
 const realFrames = (P, n) => P.ev((n) => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); out.push(+(performance.now() - t0).toFixed(1)); } window.__norender = true; return out; }, n);
-async function waitPlay(P, maxMs) { const t0 = Date.now(); for (;;) { const s = await P.ev(() => VR.game.state); if (s === 'play') return true; if (Date.now() - t0 > maxMs) return false; await P.wait(250); } }
+async function waitPlay(P, maxMs) { const t0 = Date.now(); for (;;) { await P.step(2); const s = await P.ev(() => VR.game.state); if (s === 'play') return true; if (Date.now() - t0 > maxMs) return false; await P.wait(150); } }
 const keep = (P, k) => P.ev((k) => { window[k] = window.__F; }, k);
 // the descent into the world below the orbit (V): the trip, the ship over the site, the frames while it streams, the
 // plume picture at ~30 m, the landing
@@ -218,7 +218,7 @@ async function descent(P, body, tag, Rr) {
       D.plume = { alt: Math.round(s.land.alt), draws: mm.draws, err: mm.err || null }; shot = true;
       console.log(`  ${body}: the plume picture at ${Math.round(s.land.alt)} m (${mm.err || mm.draws + ' draws'}) (${secs()})`);
     }
-    if (i % 20 === 0) await P.wait(40);
+    if (i % 20 === 0) { await P.wait(40); if (i % 100 === 0) console.log(`    ${body}: ${s.flState}, ${Math.round(s.land.alt)} m, t ${r1(s.land.t)} s, ready ${s.land.ready}, hovered ${r1(s.land.hovered)} s`); }
   }
   const fin = await cr(P);
   D.hovered = s.land ? s.land.hovered : null; D.landed = fin.flState === 'landed';

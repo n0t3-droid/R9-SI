@@ -306,7 +306,10 @@
   };
 
   // ---------------------------------------------------------------- the space scene, on every way in (a debug start too)
+  // (the black space of the 23-Oct run: a ship put into orbit without the climb before it never ran A.frame — A.game, the
+  // game the space layers are drawn for, stayed null, and the seed of the bodies' textures 0)
   C.ensureScene = (g) => {
+    if (g && !A.game) A.game = g;
     const SS = VR.SpaceScene; if (!SS || !SS.state) return;
     const seed = ((g && g.meta && g.meta.seed) >>> 0) || 0x5eed;
     if (SS.state.seed !== seed) { if (SS.state.seed && SS.drop) SS.drop(g); SS.state.seed = seed; }
@@ -387,8 +390,15 @@
   // the HUD's numbers in a cruise (the system frame's speed means nothing to a pilot): the drive's speed, the way left
   C.hudFix = (fl, a) => {
     const c = a.cruise, I = a.info; if (!c || !I) return;
-    if (c.kind !== 'descent') { I.speed = c.speed; I.alt = c.near.d; I.vs = 0; }
+    // (the speed the engine's smoke reads stays 0: no smoke in a vacuum, none piling on the ship's frozen map spot —
+    // the HUD line says the drive's speed)
+    if (c.kind !== 'descent') { I.speed = 0; I.alt = c.near.d; I.vs = 0; }
+    else I.speed = 0;
   };
+  // every way into space sets the scene up (the Reisesprung, the test's orbit)
+  const jumpStart0 = SF.jumpStart;
+  SF.jumpStart = (fl, to, opts) => { C.ensureScene(fl && fl.g); return jumpStart0(fl, to, opts); };
+  if (SF.debug && SF.debug.orbit) { const orbit0 = SF.debug.orbit; SF.debug.orbit = (g, x, z, y) => { C.ensureScene(g); return orbit0(g, x, z, y); }; }
 
   // ---------------------------------------------------------------- travel by intent: G at a world in the sky
   const _m9 = new Float64Array(9), _r = v3(), _vv = v3(), _f = v3(), _d = v3();
@@ -459,7 +469,7 @@
     C.ensureScene(g);
     const B = UNI().home.body(body), r0 = len(st.r);
     const n = cross(st.r, st.v, v3()); unit(n);
-    a.cruise = { kind: 'descent', body, dim, s: 0, r0: Float64Array.from(st.r), n, w: len(st.v) / Math.max(1, r0), R0: r0, R1: B.R * 1.1, phase: 'descent' };
+    a.cruise = { kind: 'descent', body, dim, s: 0, r0: Float64Array.from(st.r), v0: Float64Array.from(st.v), n, w: len(st.v) / Math.max(1, r0), R0: r0, R1: B.R * 1.1, phase: 'descent' };
     fl.auto = { space: 'cruise', phase: 'descent', t: 0, to: body, site: { id: 'space:descent:' + body, name: SF.nameOf(body), x: fl.b.pos[0], y: fl.b.pos[1], z: fl.b.pos[2] }, spot: null, dist: r0 - B.R, eta: C.DESCENT_S, landing: true };
     SF.say(fl, 'g.cr.descent', { name: SF.nameOf(body) });
     if (g.audio && g.audio.play) g.audio.play('boost');
@@ -487,10 +497,15 @@
     a.cruiseThr = 2.6;
     if (fl.auto) { fl.auto.dist = len(st.r) - c.R1 / 1.1; fl.auto.eta = Math.max(0, C.DESCENT_S - c.s); }
     if (c.s < C.DESCENT_S) return;
-    // the trip: the world below starts while the veil is closed; the ship comes along (travel.js switchNow)
-    a.cruise = null; a.cruiseThr = 0; fl.auto = null; fl.regime = 'air';
+    if (c.phase === 'wait') { st.r.set(prev); st.v.fill(0); c.s = C.DESCENT_S; return; }   // (the veil closing: the ship waits up there)
+    // the trip: the world below starts while the veil is closed; the ship comes along (travel.js switchNow). Until the
+    // switch the ship stays in the space regime (in the air regime at its map spot 3 km up it would climb into space again)
+    c.phase = 'wait'; a.cruiseThr = 0.3;
     C.landing = { dim: c.dim, body: c.body, t0: performance.now() };
-    try { VR.Travel.go(g, { dim: c.dim, via: 'ship' }); } catch (e) { console.warn(e); }
+    let p0 = null;
+    try { p0 = VR.Travel.go(g, { dim: c.dim, via: 'ship' }); } catch (e) { console.warn(e); }
+    const back = () => { if (a.cruise !== c) return; a.cruise = null; a.cruiseThr = 0; fl.auto = null; st.r.set(c.r0); st.v.set(c.v0); st.coast = true; UNI().verletInit(st, UNI().home.body(st.frame).mu); SF.hint(fl, 'g.asc.noLand', { name: SF.nameOf(c.body) }); };
+    if (p0 && p0.then) p0.then((ok) => { if (!ok) back(); }, back); else if (!p0) back();
   }
 
   // ---------------------------------------------------------------- in the moon's world: the ship over the site
@@ -517,7 +532,7 @@
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       const c = w.cols.get(VR.ckey(cx + dx, cz + dz));
       if (!c || !c.ready) return false;
-      for (const sc of c.sec) if (sc.count > 0 && (sc.dirty || sc.pending || !sc.hasMesh)) return false;
+      for (const sc of c.sec) if (sc.count > 0 && (sc.dirty || sc.pending)) return false;
     }
     return true;
   };
