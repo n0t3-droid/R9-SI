@@ -23,11 +23,15 @@
   const bayer2 = (x, y) => { const a = Math.floor(x), b = Math.floor(y); const f = (a * 0.5 + b * b * 0.75) % 1; return f < 0 ? f + 1 : f; };
   S.bayer4 = function (x, y) { return bayer2(0.5 * x, 0.5 * y) * 0.25 + bayer2(x, y); };
   S.chunkKeeps = function (fade, x, y) { return S.bayer4(x, y) < fade; };
-  // f-stipple (R50-08) · no screen-door: where the upscaler runs the threshold turns with the frame — fract(bayer4 + phase),
+  // f-stipple (R50-08) · no screen-door: where the upscaler runs the threshold turns with the frame — fract(ign + phase),
   // the phase the frame's golden-ratio step — so over the frames every pixel is drawn in the fade's share of them and the
   // TSR's history resolves the dither into a soft blend (the shaders' fadeT under SOFTFADE, the same arithmetic)
   S.fadePhase = function (frame) { const f = (frame * 0.6180339887498949) % 1; return f < 0 ? f + 1 : f; };
-  S.fadeT = function (x, y, phase) { const t = S.bayer4(x, y) + (phase || 0); return t >= 1 ? t - 1 : t; };
+  // the spatial part: interleaved gradient noise (no 2-px period — what the TSR has not resolved yet is a grain, not a
+  // screen-door), the same arithmetic as the shaders' fadeT
+  const fr = (v) => v - Math.floor(v);
+  S.ign = function (x, y) { return fr(52.9829189 * fr(Math.floor(x) * 0.06711056 + Math.floor(y) * 0.00583715)); };
+  S.fadeT = function (x, y, phase) { return fr(S.ign(x, y) + (phase || 0)); };
   // an arriving column's plan: within NEAR_COLS chunks of the player never a dither — whole at once, growing up from the
   // ground over GROW_MS; beyond, the soft fade from 0 where it is soft (the TSR runs, „Sanftes Einblenden" on), else whole
   // at once (a pop: the far tiles stood in until now)

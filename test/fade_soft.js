@@ -2,7 +2,7 @@
 // Bayer pattern — trees as gridded ghosts, translucent green walls. Now (src/shared/stream.js, world.js, farring.js,
 // the terrain and far shaders):
 //   (a) where the upscaler (TSR) runs and „Sanftes Einblenden" is on, the dither's threshold turns with the frame
-//       (fadeT = fract(bayer4 + phase), phase = the frame's golden-ratio step): over the frames every pixel is drawn in
+//       (fadeT = fract(ign + phase): interleaved gradient noise, phase = the frame's golden-ratio step): over the frames every pixel is drawn in
 //       the fade's share of them — the TSR's history resolves it into a soft blend, no fixed pattern stays
 //   (b) a column arriving within two chunks of the player never fades: it is whole at once and grows up from the
 //       ground in 150 ms (the origins' w carries 2 + growth; the vertex shader scales it about the feet)
@@ -21,7 +21,12 @@ const check = (ok, msg, info) => { if (!ok) fails++; console.log((ok ? '  ✓ ' 
 console.log('(a) the turning threshold');
 check(typeof S.fadeT === 'function' && typeof S.fadePhase === 'function', 'Stream.fadeT and Stream.fadePhase exist');
 if (typeof S.fadeT === 'function') {
-  check(S.fadeT(1, 2, 0) === S.bayer4(1, 2), 'phase 0 is the plain Bayer threshold');
+  check(S.fadeT(1, 2, 0) === S.ign(1, 2), 'phase 0 is the plain interleaved-gradient threshold');
+  // no 2-px period: a fade of ½ drawn by it is no checkerboard (test/stipple.js on a synthetic frame)
+  { const St = require('./stipple.js'), W = 320, H = 180, L = new Float32Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) L[y * W + x] = S.fadeT(x, y, S.fadePhase(3)) < 0.5 ? 200 : 40;
+    const sh = St.measureRaw(L, W, H); check(sh < 0.01, 'one frame of it at fade ½ is no screen-door (the detector)', (sh * 100).toFixed(1) + ' %');
+    const B = new Float32Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) B[y * W + x] = S.bayer4(x, y) < 0.5 ? 200 : 40;
+    check(St.measureRaw(B, W, H) > 0.9, '… where the Bayer dither was one (' + (St.measureRaw(B, W, H) * 100).toFixed(0) + ' %)'); }
   let worst = 0;
   for (const f of [0.1, 0.25, 0.5, 0.75, 0.9]) for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
     let k = 0; const N = 64;
@@ -79,7 +84,7 @@ console.log('(e) the shaders');
   const sh = fs.readFileSync(path.join(ROOT, 'src/main/shaders.js'), 'utf8'), rd = fs.readFileSync(path.join(ROOT, 'src/main/renderer.js'), 'utf8');
   const plain = (sh.match(/bayer4\(gl_FragCoord\.xy\)/g) || []).length, soft = (sh.match(/fadeT\(gl_FragCoord\.xy\)/g) || []).length;
   check(plain >= 4 && soft === plain, 'every fade/cut threshold has its soft twin behind SOFTFADE', plain + ' plain, ' + soft + ' soft');
-  check(/#ifdef SOFTFADE[\s\S]{0,400}uniform float u_fadePhase;[\s\S]{0,200}float fadeT\(vec2 a\)/.test(sh), 'COMMON: u_fadePhase and fadeT only under SOFTFADE');
+  check(/#ifdef SOFTFADE[\s\S]{0,500}uniform float u_fadePhase;[\s\S]{0,200}float fadeT\(vec2 a\)/.test(sh), 'COMMON: u_fadePhase and fadeT only under SOFTFADE');
   check(/SOFTFADE[\s\S]{0,300}v_fade > 1\.5[\s\S]{0,200}rel\.y/.test(sh), 'TERRAIN_VS: the growth about the feet under SOFTFADE');
   check(/const sf = this\.q\.lite \? \[\] : \['SOFTFADE'\]/.test(rd), 'renderer: SOFTFADE never on the lite look (Very Low)');
   check(/this\.fadePhase = /.test(rd) && /u_fadePhase/.test(rd) && /this\.fadeSoft = /.test(rd), 'renderer: the phase turns with the TSR, fadeSoft for the world');

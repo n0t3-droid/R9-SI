@@ -1002,8 +1002,9 @@
         if (!m) continue;
         // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
         // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
-        const fade = s.fade === undefined ? 1 : s.fade;
+        let fade = s.fade === undefined ? 1 : s.fade;
         if (fade <= 0 && !this.shtAll) continue;
+        if (this.mirrorPass && fade < 1) { if (fade < 0.5) continue; fade = 1; }   // (f-stipple: no dither in the planar mirror — it has no TSR; a fading column shows there from its half way)
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
@@ -2397,7 +2398,7 @@
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
         this.shadowOffUni(p.u);
         if (layer === 1) gl.disable(gl.CULL_FACE);
-        this.drawSections(list, layer, p, camPos, this.planesR, false);
+        this.mirrorPass = true; this.drawSections(list, layer, p, camPos, this.planesR, false); this.mirrorPass = false;
         gl.enable(gl.CULL_FACE);
       }
       // the props in the mirror (t-smooth2): the palms and the furniture by the water, so a palm on the shore and the loungers

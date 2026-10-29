@@ -88,10 +88,11 @@ float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); re
 float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
 float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
 #ifdef SOFTFADE
-// f-stipple (R50-08): the threshold turns with the frame (u_fadePhase, the golden-ratio step; 0 without the TSR) — over
-// the frames every pixel is drawn in the fade's share of them and the TSR's history makes a soft blend of it (stream.js fadeT)
+// f-stipple (R50-08): the threshold is interleaved gradient noise (no 2-px period: what the TSR has not resolved yet is
+// a fine grain, never a screen-door) turning with the frame (u_fadePhase, the golden-ratio step) — over the frames every
+// pixel is drawn in the fade's share of them and the TSR's history makes a soft blend of it (stream.js fadeT)
 uniform float u_fadePhase;
-float fadeT(vec2 a){ return fract(bayer4(a) + u_fadePhase); }
+float fadeT(vec2 a){ a = floor(a); return fract(fract(52.9829189 * fract(dot(a, vec2(0.06711056, 0.00583715)))) + u_fadePhase); }
 #endif
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(hash12(i), hash12(i+vec2(1,0)), f.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), f.x), f.y); }
