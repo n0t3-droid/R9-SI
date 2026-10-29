@@ -160,7 +160,8 @@ const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight
 
 const VIEWS = ['climb', 'day', 'glint', 'sunset', 'night', 'aurora', 'cockpit', 'opal'];
 // the kept frame looked at another way (the space frame's layers do not depend on the camera's turn: the map's axes)
-const aim = (P, key, yaw, pitch, fov) => P.ev(([key, yaw, pitch, fov]) => { const F = window[key]; F.cam = Object.assign({}, F.cam, { yaw, pitch, roll: 0 }); if (fov) F.cam.fov = fov * Math.PI / 180; }, [key, yaw, pitch, fov || 0]);
+// (hide: the ship and its trails out of the frame — the views toward Helia and the limb look past them)
+const aim = (P, key, yaw, pitch, fov, hide) => P.ev(([key, yaw, pitch, fov, hide]) => { const F = window[key], g = VR.game, s = g.starships && g.starships.pilot; if (s) s.hidden = !!hide; const T = g.trails; if (T) { if (!T.__draw) T.__draw = T.draw; T.draw = hide ? () => {} : T.__draw; } F.cam = Object.assign({}, F.cam, { yaw: yaw === null ? F.cam.yaw : yaw, pitch, roll: 0 }); if (fov) F.cam.fov = fov * Math.PI / 180; }, [key, yaw, pitch, fov || 0, !!hide]);
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
 // the tick of day 2 when Helia stands at `el` degrees over (x, z) at 3 km, rising (am) or setting
 const tickFor = (P, el, setting, x, z) => P.ev(([el, setting, x, z]) => {
@@ -174,7 +175,9 @@ const tickFor = (P, el, setting, x, z) => P.ev(([el, setting, x, z]) => {
 }, [el, setting, x, z]);
 const sunNow = (P) => P.ev(() => { const fr = VR.SpaceFlight.cur; return fr ? fr.sunS.slice() : null; });
 const tileStats = (P) => P.ev(() => { const PG = VR.PlanetLODGL, SS = VR.SpaceScene; return { tiles: PG ? Object.assign({}, PG.stats, { cached: PG.tiles.size }) : null, texMB: SS && SS.state ? Math.round(SS.state.bytes / 1048576 * 10) / 10 : null }; });
-const waitTiles = async (P, maxMs) => { const t0 = Date.now(); for (;;) { await P.step(4, 1); const s = await tileStats(P); if (!s.tiles || (s.tiles.drawn >= s.tiles.tiles && s.tiles.tiles > 0) || Date.now() - t0 > maxMs) return s; await P.wait(80); } };
+const waitTiles = async (P, maxMs) => { const t0 = Date.now(); for (;;) { await P.step(4, 1); const s = await P.ev(() => { const PG = VR.PlanetLODGL; return PG ? { n: PG.stats.tiles, left: PG.pending() } : null; }); if (!s || !s.n || s.left === 0 || Date.now() - t0 > maxMs) return s; await P.wait(80); } };
+// the climb's textures asked for while the test steps without drawing (in play every drawn frame asks: climbLayers)
+const waitClimb = async (P, maxMs) => { await P.ev(() => { const r = VR.game.renderer; window.__norender = false; r.render(window.__F); window.__norender = true; }); const t0 = Date.now(); for (;;) { await P.step(4); const s = await P.ev(() => { const g = VR.game, SF = VR.SpaceFlight, SS = VR.SpaceScene; if (SF.S.anc) SS.needs(g, SF.S.anc, SS.tier(g)); if (VR.PlanetLODGL) VR.PlanetLODGL.again(); const need = SS.cur_need || []; const PG = VR.PlanetLODGL; return { need: need.length, done: need.filter(q => q.done).length, tiles: PG && PG.last ? PG.pending() : 0 }; }); if ((s.need && s.done === s.need && !s.tiles) || Date.now() - t0 > maxMs) return s; await P.wait(80); } };
 
 async function run(preset, url, base) {
   const tag = (TAGP[preset] || preset) + (base ? '_base' : ''), Rr = rec.presets[tag] = {};
@@ -195,12 +198,17 @@ async function run(preset, url, base) {
     if (!boarded) return;
     await P.step(30);
     // ---- the climb at 1,200 m (the band on the dipped horizon), the chase view level toward the horizon
+    // (always: the climb's play frames hand the game to the space layers — VR.Ascent.game — before any orbit)
+    await P.ev(() => { const g = VR.game; g.env.day = 2; g.env.setTime(2250); VR.SpaceFlight.debug.climb(g, 1200, 10, 0.6); });
+    await P.step(8);
     if (V('climb')) {
-      await P.ev(() => { const g = VR.game; g.env.day = 2; g.env.setTime(2250); VR.SpaceFlight.debug.climb(g, 1200, 10, 0.6); });
-      await P.step(8); await waitTex(P, 90000); await P.settle(120);
+      await P.settle(120); await waitClimb(P, 120000);
       await view(P, 1, 0.1); await P.step(3);
       await P.ev(() => { window.__Fc = window.__F; });
       await shot('__Fc', 'climb_1200');
+      // (what the climb's impostor waits for: the textures not yet there skip its draw — drawLayers' strict)
+      Rr.climbTex = await P.ev(() => { const SS = VR.SpaceScene, ST = SS.state, map = SS.texMap || {}, need = SS.cur_need || []; return { need: need.length, done: need.filter(s => s.done).length, open: need.filter(s => !s.done).map(s => s.key + ' ' + s.left + '/' + s.jobs), missing: ['herzA', 'herzB', 'patchA', 'patchB'].filter(k => !ST.tex[map[k]]), patch: !!ST.patch }; });
+      console.log(`  the climb's textures: ${JSON.stringify(Rr.climbTex)}`);
     }
     const orbitAt = async (x, z, tk) => { await P.ev(([x, z, tk]) => { const g = VR.game; g.env.day = 2; g.env.setTime(tk); VR.SpaceFlight.debug.orbit(g, x, z, 3063); }, [x, z, tk]); await view(P, 1, 0.45); await waitTex(P, 60000, 1); await waitTiles(P, 30000); await P.step(6, 1); await P.ev(() => { window.__Fo = window.__F; }); };
     // ---- by day over the Heartland: the land ahead to the horizon; the costs
@@ -218,31 +226,32 @@ async function run(preset, url, base) {
     if (V('glint')) {
       await orbitAt(0, 40, 5200);
       const s = await sunNow(P);
-      if (s) { await aim(P, '__Fo', yawTo(s[0], s[2]), -Math.asin(s[1]) * 0.9, 70); await shot('__Fo', 'sunglint'); }
+      if (s) { Rr.glintSunEl = r1(Math.asin(s[1]) * 180 / Math.PI); await aim(P, '__Fo', yawTo(s[0], s[2]), -Math.asin(s[1]), 70, true); await shot('__Fo', 'sunglint'); console.log(`  sunglint: Helia ${Rr.glintSunEl}° high`); }
     }
     // ---- the sunset limb: Helia 6° under the level at the nadir (just under the limb from 3 km), looking at it
     if (V('sunset')) {
-      const tk = await tickFor(P, -6, true, 0, 40);
+      const tk = await tickFor(P, -15.5, true, 0, 40);   // (the limb dips 13.9° from 3 km: Helia just under it)
       await orbitAt(0, 40, tk || 12000);
       const s = await sunNow(P);
-      if (s) { await aim(P, '__Fo', yawTo(s[0], s[2]), -0.2, 70); await shot('__Fo', 'limb_sunset'); }
+      if (s) { await aim(P, '__Fo', yawTo(s[0], s[2]), -0.2, 70, true); await shot('__Fo', 'limb_sunset'); }
       Rr.sunsetTick = tk;
     }
     // ---- the night: the Heartland's lights from 9 km off; the aurora toward the pole over the limb
     if (V('night')) {
       await orbitAt(0, 9000, 20500);
-      await aim(P, '__Fo', yawTo(0, -9000), -0.3, 70);
+      await aim(P, '__Fo', yawTo(0, -9000), -0.3, 70, true);
       await shot('__Fo', 'night_lights');
     }
     if (V('aurora')) {
       await orbitAt(0, 40, 20500);
       const C = await P.ev(() => [VR.BodyTex.CHART.Px, VR.BodyTex.CHART.Pz]);
-      await aim(P, '__Fo', yawTo(C[0], C[1] - 40), -0.16, 75);
+      await aim(P, '__Fo', yawTo(C[0], C[1] - 40), -0.16, 75, true);
       await shot('__Fo', 'aurora');
     }
     // ---- the cockpit's window in orbit (High)
     if (hi && V('cockpit')) {
       await orbitAt(0, 40, 5200);
+      await P.ev(() => { const s = VR.game.starships.pilot; if (s) s.hidden = false; });
       await view(P, 0, -0.1); await P.step(3, 1); await P.ev(() => { window.__Fk = window.__F; });
       await shot('__Fk', 'cockpit');
       // the hide-diff probe (u-ascent §9.2): which mesh is in the window — the frame drawn without each part in turn
@@ -265,6 +274,7 @@ async function run(preset, url, base) {
       await view(P, 1, 0.12);
       await P.step(200); await waitTex(P, 60000); await P.step(6);
       await P.ev(() => { window.__Fj = window.__F; });
+      await aim(P, '__Fj', null, -0.5, 70, true);
       await shot('__Fj', 'opal');
     }
     Rr.errors = errsOf(P);

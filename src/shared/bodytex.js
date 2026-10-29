@@ -155,15 +155,15 @@
   // snow by temperature and height — with a little of the biome's own vista colour (LOD.look, half desaturated) for
   // its character. The fields are continuous, so the land has gradients, not outlines; muted for the distance
   BT.ALB2 = true;
-  const N_W = [[0, [184, 164, 124]], [0.3, [158, 146, 102]], [0.5, [112, 120, 72]], [0.72, [70, 92, 52]], [1, [46, 74, 40]]];
-  const N_C = [[0, [140, 132, 114]], [0.4, [114, 114, 88]], [0.75, [58, 76, 56]], [1, [46, 64, 50]]];
+  const N_W = [[0, [178, 152, 106]], [0.28, [146, 140, 80]], [0.48, [98, 120, 56]], [0.7, [56, 90, 40]], [1, [38, 78, 32]]];
+  const N_C = [[0, [134, 126, 102]], [0.4, [102, 110, 72]], [0.75, [52, 76, 46]], [1, [40, 64, 42]]];
   const ROCK = [122, 112, 98], SNOW2 = [214, 222, 232];
   const ramp = (R, x) => { if (x <= R[0][0]) return R[0][1]; for (let i = 1; i < R.length; i++) if (x <= R[i][0]) { const a = R[i - 1], b = R[i]; return mix3(a[1], b[1], ss(0, 1, (x - a[0]) / (b[0] - a[0]))); } return R[R.length - 1][1]; };
   BT.albedo = function (cl, a, bc, bSnow, o) {
     const m = clamp((cl.h + 1) / 2, 0, 1), w = ss(0.22, 0.62, (cl.t + 1) / 2);
     let c = mix3(ramp(N_C, m), ramp(N_W, m), w);
     const gy = 0.3 * bc[0] + 0.59 * bc[1] + 0.11 * bc[2], bd = [gy + (bc[0] - gy) * 0.5, gy + (bc[1] - gy) * 0.5, gy + (bc[2] - gy) * 0.5];
-    c = mix3(c, bd, bSnow ? 0 : 0.28);
+    c = mix3(c, bd, bSnow ? 0 : 0.18);
     c = mix3(c, ROCK, 0.65 * ss(45, 115, a) + 0.25 * clamp(cl.mountain || 0, 0, 1));
     const sn = ss(-0.28, -0.62, cl.t - Math.max(0, a - 26) * 0.004);
     c = mix3(c, SNOW2, Math.max(sn, bSnow ? 0.5 : 0));
@@ -250,6 +250,7 @@
   }
   function patch(g, m, w, h, y0, y1, a, b) {
     const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M;
+    const ROADS = new VR.Simplex((g.seed ^ 0x40ad) >>> 0);   // u-orbitlod
     const step = m.step || 100, cx = m.cx || 0, cz = m.cz || 0, half = w * step / 2;
     const X0 = cx - half, Z0 = cz - half;
     const V = villages(g, X0, Z0 + y0 * step, X0 + w * step, Z0 + y1 * step);
@@ -267,6 +268,9 @@
         if (Math.abs(x) < 1400 && Math.abs(z) < 1400) L = Math.max(L, heartLight(x, z, step));
         // the farmsteads and roads between: a faint scatter on liveable land
         if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < 0.07) L = 30;
+        // u-orbitlod: the roads between them — a web of curving lines (|noise| near 0, ~1.4-km meshes) on liveable land,
+        // lit sparsely: the villages' lights joined into webs at night, as real towns are by their roads
+        if (!L && o[5] && BT.ALB2 && Math.abs(ROADS.n2(x / 1400, z / 1400)) < step * 0.00045) L = 44;
         b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 9) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
     }

@@ -444,7 +444,7 @@
           if (!aboard) mesh(d.gpu.cabin);
         }
       } else if (d.gpu.glass && !hideGlass) {
-        if (room) gl.uniform1f(prog.u.u_alpha, 0.13);
+        if (room) gl.uniform1f(prog.u.u_alpha, VR.SpaceFlight && VR.SpaceFlight.inSpace && VR.SpaceFlight.inSpace(this.g) ? 0.02 : 0.13);   // u-orbitlod: in space the window clear (against black its tinted voxels showed as dark blue blocks)
         gl.bindVertexArray(d.gpu.glass.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.glass.count);
         if (room) gl.uniform1f(prog.u.u_alpha, 0.42);
       }

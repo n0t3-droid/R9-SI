@@ -391,6 +391,7 @@ void main() {
     if ((SF.needT = (SF.needT || 0) - 1) <= 0) { SF.needT = 15; SS.needs(g, anc, tier); }
     SF.S.anc = anc;
     const fr = SS.frameSetup(SF.S, eph, { H: r.H, tier, bloom: !!(r.q.bloom && r.hdr), patch: SS.state.patch });
+    if (VR.PlanetLODGL && fr.bodies.herz && r.gl) VR.PlanetLODGL.update(g, r.gl, fr.bodies.herz.camB, tier);   // u-orbitlod: the planet tiles asked for every frame the scene is set up
     // the nadir in Herzwelt's body frame (BodyTex: x the prime meridian, y the pole, z = x × y) for the impostor's cut
     const n = S.chart('herz').toSphere(cam.x, cam.z, v3());
     fr.nadirB = [n[0], n[2], -n[1]];

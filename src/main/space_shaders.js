@@ -61,7 +61,7 @@ const vec3 AG_COL = vec3(0.32, 1.0, 0.5);   // the airglow's green (O 557.7 nm)
 float auroraAt(vec3 Nb, float t) {
   float th = acos(clamp(abs(Nb.y), 0.0, 1.0)), lam = atan(-Nb.z, Nb.x);
   float wob = 0.012 * sin(lam * 3.0 + t * 0.0021) + 0.008 * sin(lam * 7.0 - t * 0.0013);
-  float band = exp(-pow((th - 0.2 - wob) / 0.035, 2.0));   // (the oval ~20 km round the pole: poleward of the Heartland, on its northern limb from orbit)
+  float band = exp(-pow((th - 0.2 - wob) / 0.05, 2.0));   // (the oval ~20 km round the pole: poleward of the Heartland, on its northern limb from orbit)
   float cur = vnoise3(vec3(lam * 26.0, t * 0.004, 1.3)) * 0.65 + vnoise3(vec3(lam * 90.0, t * 0.011, 4.1)) * 0.35;
   float surge = 0.55 + 0.45 * vnoise3(vec3(lam * 2.0, t * 0.0007, 9.0));
   return band * smoothstep(0.35, 0.8, cur) * surge;
@@ -260,7 +260,7 @@ void main() {
     float water = 1.0 - smoothstep(126.5, 129.5, hc), depth = max(0.0, (128.0 - hc) / 3.0);
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
     // its grain below the texel (fields, woods, rock) from tier 1
-    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, 0.8);
+    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, 0.9);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already)
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
 #ifdef PTILE
@@ -308,7 +308,7 @@ void main() {
     // water: turquoise over the shallows, deep blue to navy with depth, ice white; the sky in it by Fresnel, the
     // sunglint (GGX on a wind-roughened sea)
     if (water > 0.001) {
-      vec3 seaC = mix(vec3(0.030, 0.30, 0.33), vec3(0.010, 0.10, 0.24), smoothstep(0.7, 5.0, depth));
+      vec3 seaC = mix(vec3(0.034, 0.15, 0.17), vec3(0.010, 0.058, 0.135), smoothstep(0.7, 5.0, depth));   // (u-orbitlod: muted as orbital photographs show water — dark teal shallows, navy depths)
       seaC = mix(seaC, vec3(0.004, 0.022, 0.08), smoothstep(6.0, 22.0, depth));
       if (ice > 0.0) seaC = mix(seaC, vec3(0.62, 0.74, 0.86) * (1.0 + detailN(N, 1900.0) * 0.5 + detailN(N, 520.0) * 0.4), ice);   // (the floes' cracks and ridges)
       vec3 H = normalize(L - Db);
@@ -346,7 +346,7 @@ void main() {
     col += AG_COL * u_air.w * 0.06 * night;
     // u-orbitlod: the aurora's oval seen from above (night side): green curtains over the land, a pink lower fringe
     float au = u_air.z > 0.5 && mus < 0.0 ? auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)) : 0.0;   // (from Low)
-    col += (vec3(0.12, 1.0, 0.42) * 0.22 + vec3(0.5, 0.1, 0.3) * 0.04) * au * u_look.z;
+    col += (vec3(0.12, 1.0, 0.42) * 0.3 + vec3(0.5, 0.1, 0.3) * 0.05) * au * u_look.z * Tv;
     alpha = 1.0;
   } else if (Di.z > 0.0) {
     // the limb: the ray passes the planet at h radii up; the tangent column (white low down, blue above, black at the top)
@@ -377,10 +377,12 @@ void main() {
       // fringe below it), red tops fading out above 200 km
       float au = u_air.z > 0.5 ? auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus)) : 0.0;
       if (au > 0.001 && u_air.z > 0.5) {
-        float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.006);
-        float red = smoothstep(0.024, 0.032, h) * exp(-max(h - 0.032, 0.0) / 0.009);
+        // (the rays: tall streaks along the curtain — the noise across it, the same up its height)
+        float rays = 0.55 + 0.45 * vnoise3(vec3(atan(-Ptb.z, Ptb.x) * 160.0, 0.5, u_air.y * 0.02));
+        float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.011);
+        float red = smoothstep(0.026, 0.036, h) * exp(-max(h - 0.036, 0.0) / 0.012);
         float pink = exp(-pow((h - 0.0152) / 0.0007, 2.0));
-        col += (vec3(0.15, 1.0, 0.45) * green * 0.5 + vec3(0.9, 0.12, 0.18) * red * 0.16 + vec3(0.9, 0.3, 0.6) * pink * 0.14) * au * u_look.z;
+        col += (vec3(0.15, 1.0, 0.45) * green * 0.9 * rays + vec3(0.9, 0.12, 0.2) * red * 0.22 + vec3(0.9, 0.3, 0.6) * pink * 0.2) * au * u_look.z;
       }
       alpha = clamp(1.0 - exp(-dot(tt, vec3(0.2, 0.3, 0.5))), 0.0, 1.0);
     }
