@@ -56,15 +56,29 @@ const float TAU_M = 0.005;            // aerosol (Mie) zenith extinction, single
 const float KT_R = 70.7;              // the tangent column over the zenith column, √(2π/H)
 const float KT_M = 182.8;
 const vec3 AG_COL = vec3(0.32, 1.0, 0.5);   // the airglow's green (O 557.7 nm)
-// u-orbitlod · the aurora (REFERENCE §3): the oval round the pole (colatitude ~11.5°, ±2°), on the night
-// side; curtains along it (rays across), drifting slowly. Returns the oval's strength at a body-frame direction
+// u-orbitlod · the aurora (REFERENCE §3): the oval round the pole (colatitude ~11.5°, ±2°), on the night side.
+// u-orbit2 (R52-10: a spike crown): curtains, not rays from the pole — the oval's envelope holds three ribbons (arcs a
+// few hundred metres thin, a little apart), each folded at three scales and lit only along part of its length; fine
+// rays along each ribbon. auroraEnv is the envelope alone (the red tops: diffuse). Returns the footprint's strength at
+// a body-frame direction
+float auroraEnv(vec3 Nb, float t, out float th, out float lam, out float c0) {
+  th = acos(clamp(abs(Nb.y), 0.0, 1.0)); lam = atan(-Nb.z, Nb.x);
+  c0 = 0.2 + 0.012 * sin(lam * 3.0 + t * 0.0021) + 0.008 * sin(lam * 7.0 - t * 0.0013);
+  return exp(-pow((th - c0) / 0.05, 2.0)) * (0.55 + 0.45 * vnoise3(vec3(lam * 2.0, t * 0.0007, 9.0)));
+}
 float auroraAt(vec3 Nb, float t) {
-  float th = acos(clamp(abs(Nb.y), 0.0, 1.0)), lam = atan(-Nb.z, Nb.x);
-  float wob = 0.012 * sin(lam * 3.0 + t * 0.0021) + 0.008 * sin(lam * 7.0 - t * 0.0013);
-  float band = exp(-pow((th - 0.2 - wob) / 0.05, 2.0));   // (the oval ~20 km round the pole: poleward of the Heartland, on its northern limb from orbit)
-  float cur = vnoise3(vec3(lam * 26.0, t * 0.004, 1.3)) * 0.65 + vnoise3(vec3(lam * 90.0, t * 0.011, 4.1)) * 0.35;
-  float surge = 0.55 + 0.45 * vnoise3(vec3(lam * 2.0, t * 0.0007, 9.0));
-  return band * smoothstep(0.35, 0.8, cur) * surge;
+  float th, lam, c0;
+  float env = auroraEnv(Nb, t, th, lam, c0);
+  if (env < 0.01) return 0.0;
+  float a = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float fold = 0.0055 * sin(lam * (17.0 + 6.0 * fk) + t * 0.003 + fk * 2.1) + 0.005 * (vnoise3(vec3(lam * 38.0 + fk * 9.0, t * 0.002, fk)) - 0.5) + 0.0022 * sin(lam * 63.0 - t * 0.006 + fk);
+    float d = (th - c0 - (fk - 1.0) * 0.02 - fold) / (0.0018 + 0.0008 * fk);
+    float act = smoothstep(0.32, 0.72, vnoise3(vec3(lam * 5.0 + fk * 5.0, t * 0.0009, 2.0 + fk)));
+    a += exp(-d * d) * act * (k == 1 ? 1.0 : 0.65);
+  }
+  return env * a * (0.55 + 0.45 * vnoise3(vec3(lam * 320.0, t * 0.02, 0.5)));
 }
 float phaseR(float c) { return 0.75 * (1.0 + c * c); }
 float phaseM(float c) { const float g = 0.76; float d = 1.0 + g * g - 2.0 * g * c; return (1.0 - g * g) / (d * sqrt(d)); }
@@ -262,7 +276,7 @@ void main() {
     float water = 1.0 - smoothstep(126.5, 129.5, hc), depth = max(0.0, (128.0 - hc) / 3.0);
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
     // its grain below the texel (fields, woods, rock) from tier 1
-    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, 0.9);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already)
+    alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, AIRZ > 0.5 ? 0.9 : 1.14);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already; u-orbit2: Very Low, without the grain below the texel, keeps its biomes' colour a step fuller — a constant there, no cost)
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
 #ifdef PTILE
@@ -378,15 +392,28 @@ void main() {
       }
       // u-orbitlod · the aurora over the limb (night side): green curtains 100–200 km up (their lower edge crisp, a pink
       // fringe below it), red tops fading out above 200 km
-      float au = 0.0;
-      if (u_air.z > 0.5) au = auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus));
-      if (au > 0.001) {
-        // (the rays: tall streaks along the curtain — the noise across it, the same up its height)
-        float rays = 0.55 + 0.45 * vnoise3(vec3(atan(-Ptb.z, Ptb.x) * 160.0, 0.5, u_air.y * 0.02));
-        float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.011);
-        float red = smoothstep(0.026, 0.036, h) * exp(-max(h - 0.036, 0.0) / 0.012);
-        float pink = exp(-pow((h - 0.0152) / 0.0007, 2.0));
-        col += (vec3(0.15, 1.0, 0.45) * green * 0.9 * rays + vec3(0.9, 0.12, 0.2) * red * 0.22 + vec3(0.9, 0.3, 0.6) * pink * 0.2) * au * u_look.z;
+      // u-orbit2: the curtains seen edge-on — the view's way crosses the curtains' shells (100–190 km) on both sides of
+      // its lowest point; the ribbons' footprint there, weighted by the green's height profile (brightest at the crisp
+      // lower edge, fading up), so the folds hang as curtains along the limb; the red tops a diffuse glow of the envelope
+      float nite = u_air.z > 0.5 ? 1.0 - smoothstep(-0.14, -0.02, mus) : 0.0;
+      if (nite > 0.0 && h < 0.04) {
+        float th0, lam0, c00;
+        float env = auroraEnv(Ptb, u_air.y, th0, lam0, c00);
+        if (env > 0.01) {
+          vec3 Pt0 = Ptb * (1.0 + h);
+          float gacc = 0.0;
+          for (int i = 0; i < 4; i++) {
+            float ha = 0.0150 + float(i) * 0.0034;
+            if (ha <= h) continue;
+            float sx = sqrt(max((1.0 + ha) * (1.0 + ha) - (1.0 + h) * (1.0 + h), 0.0));
+            float wgt = exp(-(ha - 0.015) / 0.0075);
+            gacc += (auroraAt(normalize(Pt0 - Db * sx), u_air.y) + auroraAt(normalize(Pt0 + Db * sx), u_air.y)) * wgt;
+          }
+          float green = smoothstep(0.0146, 0.0156, h + 0.0012) * 0.5;
+          float red = smoothstep(0.024, 0.033, h) * exp(-max(h - 0.033, 0.0) / 0.012);
+          float pink = exp(-pow((h - 0.0149) / 0.0006, 2.0));
+          col += (vec3(0.15, 1.0, 0.45) * gacc * 0.55 * (0.4 + green) + vec3(0.9, 0.12, 0.2) * red * env * 0.12 + vec3(0.9, 0.3, 0.6) * pink * gacc * 0.12) * nite * u_look.z;
+        }
       }
       alpha = clamp(1.0 - exp(-dot(tt, vec3(0.2, 0.3, 0.5))), 0.0, 1.0);
     }
@@ -651,6 +678,7 @@ uniform vec4 u_bsGround;   // the far ground: its colour (linear, lit), w: the h
 uniform vec4 u_bsJ[4];     // the plumes: the vent from the eye (blocks), w: the column's top over it now (0: none)
 uniform vec4 u_bsJs;       // their strengths (1 while the vent fires, fading as the ice falls back)
 uniform vec4 u_bsJk;       // x the plumes' brightness, y the horizon's distance (blocks), z the moon's radius (blocks), w the eye over the ground
+uniform vec3 u_bsEye;      // u-orbit2: the eye (blocks) — the far ground's texture stands on the ground
 uniform vec2 u_bsLum;      // x Amarant's and its ring's brightness, y the other worlds' — the eye's exposure undone for them, so they read
                            //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
 const float BS_D2R = 0.0174532925;
@@ -855,6 +883,22 @@ vec3 bsPlumes(vec3 D, vec3 col) {
   float ph = 0.25 + 2.2 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 5.0);
   return col + vec3(0.86, 0.93, 1.0) * u_bsSunCol * ph * pl * u_bsJk.x;
 }
+// u-orbit2 (R52-09: a uniform grey band): the far ground beyond the world's columns — where the view meets the ground
+// (a plane at the eye's height over it), the regolith's or the ice's patches at four scales (30 m to 3 km), each faded
+// out as its cells get smaller than the pixel's footprint there. From Low up (Very Low: the flat colour)
+vec3 bsFarGround(vec3 D, float px) {
+  vec3 g = u_bsGround.rgb;
+  if (u_bsSunK.w < 0.5) return g;
+  float dn = max(-D.y, 2e-4), t = u_bsJk.w / dn, fp = t * px / dn;
+  vec2 q = u_bsEye.xz + D.xz * t;
+  float v = 0.0, sc = 30.0, amp = 0.5;
+  for (int i = 0; i < 4; i++) {
+    float fade = 1.0 - smoothstep(0.25 * sc, sc, fp);
+    if (fade > 0.0) v += (vnoise3(vec3(q / sc, float(i) * 3.7)) - 0.5) * amp * fade;
+    sc *= 4.6; amp *= 0.8;
+  }
+  return g * (1.0 + v * 0.75);
+}
 vec3 bodySky(vec3 dir, bool withSun) {
   vec3 D = normalize(dir);
   float px = max(length(fwidth(D)), 1e-5);
@@ -865,7 +909,8 @@ vec3 bodySky(vec3 dir, bool withSun) {
   col = bsAmarant(D, col, px);
   col = bsPlumes(D, col);
   // the far ground below the true horizon (where the world's columns end): its lit colour, a one-pixel edge
-  col = mix(col, u_bsGround.rgb, 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y));
+  float gk = 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y);
+  if (gk > 0.0) col = mix(col, bsFarGround(D, px), gk);
   if (withSun) col += bsGlare(D);
   return col;
 }

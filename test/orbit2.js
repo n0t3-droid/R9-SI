@@ -6,7 +6,8 @@
 //      dark country between (≥ 50 % of the land's blocks unlit)
 //   3. the truth at home: within 1.2 km of the Heartland the generator's own land and water (BT.macro says 0.5); the
 //      planet tiles follow the macro's seas (a forced sea is flat at the sea)
-//   4. the airless sky (bodysky.js): the sky's stops black on a body; the far ground stays its own colour
+//   4. the airless sky (bodysky.js): no haze over the near land; the far ground's texture placed by the eye; Basalt's
+//      darkest night readable (the starlight, the other worlds, the eye opening)
 //   5. the plume's colour: Opal's ice brighter than its ground, Basalt's dust darker than its ground
 //   bash test/wt_run.sh orbit2.js 300
 const V = require('./load_shared.js');
@@ -57,20 +58,30 @@ let home = true;
 for (let k = 0; k < 200; k++) { const a = k * 2.399, d = 1200 * Math.sqrt(k / 200); const m = BT.macro && BT.macro(Math.cos(a) * d, Math.sin(a) * d, g.seed); if (!m || Math.abs(m.land - 0.5) > 1e-9 || m.river) home = false; }
 check(home, 'within 1.2 km of the Heartland the generator\'s own coast (BT.macro: 0.5, no river)');
 let sea = null;
-for (let k = 0; k < 4000 && !sea; k++) { const x = 20000 + (k % 63) * 1500, z = -60000 + Math.floor(k / 63) * 1500; const m = BT.macro(x, z, g.seed); if (m.land < 0.05 && g.computeClimate(x, z).H > (V.C.SEA + 6)) sea = [x, z]; }
+const deep = (x, z) => BT.macro(x, z, g.seed).land < 0.05;
+for (let k = 0; k < 4000 && !sea; k++) { const x = 20000 + (k % 63) * 1500, z = -60000 + Math.floor(k / 63) * 1500; if (deep(x, z) && deep(x - 600, z - 600) && deep(x + 1600, z - 600) && deep(x - 600, z + 1600) && deep(x + 1600, z + 1600) && g.computeClimate(x, z).H > (V.C.SEA + 6)) sea = [x, z]; }
 if (sea) { const t = PL.job({ type: 'ptile', x0: sea[0] - 4 * 128, z0: sea[1] - 4 * 128, s: 128 }, gen); check(t.hMin === 0 && t.hMax < 3, `a forced sea's tile flat at the sea (${t.hMin}–${t.hMax.toFixed(1)} m)`); }
 else check(false, 'no forced sea over high land found');
 
 console.log('4 · the airless sky');
 require('../src/main/bodysky.js');
-const BS = V.BodySky;
+const BS = V.BodySky, U = V.Universe;
 {
   const E = {}, env = { day: 3, ticks: 6000 };
   BS.eye = [0, 120, 0]; BS.groundY = 90;
   BS.env(E, env, { dim: 'opal', renderDist: 8 }, 0.016);
-  const mx = (c) => Math.max(c[0], c[1], c[2]);
-  check(E.zenith && mx(E.zenith) < 0.002 && mx(E.skyMid) < 0.002 && mx(E.horizon) < 0.002, `Opal: the sky's stops black (zenith ${E.zenith && E.zenith.map(v => v.toFixed(3))}, horizon ${E.horizon && E.horizon.map(v => v.toFixed(3))})`);
-  check(E.bodySky && mx(E.bodySky.ground) > 0.01, `the far ground keeps its colour (${E.bodySky && Array.from(E.bodySky.ground).slice(0, 3).map(v => v.toFixed(3))})`);
+  check(E.fog && E.fog[0] >= 0.88 * 128, `Opal: no haze over the near land — the fade only at the columns' edge (from ${E.fog && E.fog[0].toFixed(0)} of 128 blocks)`);
+  check(E.bodySky && E.bodySky.eye && E.bodySky.eye.length === 3, 'the sky program gets the eye (the far ground\'s texture stands on the ground)');
+  // Basalt's darkest night (Amarant down): the starlight and the other worlds keep the ground readable
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  let worst = Infinity;
+  for (let day = 1; day < 30; day++) for (let tk = 0; tk < 24000; tk += 500) {
+    const r = BS.compute('basalt', [0, 120, 0], U.worldSeconds(day, tk), { tier: 2, groundY: 100 });
+    if (!r || r.light.sunEl > -0.12) continue;
+    const L = r.light, gL = (lum(L.moonColor) * Math.max(0, L.moonDir[1]) + lum(L.ambSky)) * r.expo;
+    worst = Math.min(worst, gL);
+  }
+  check(worst >= 0.03, `Basalt's darkest night: the ground's light × the eye ${worst.toFixed(3)} (≥ 0.03; v0.51 0.004)`);
 }
 
 console.log('5 · the plume');

@@ -20,6 +20,12 @@
   const unit = (a, o) => { const l = len(a) || 1; o = o || a; o[0] = a[0] / l; o[1] = a[1] / l; o[2] = a[2] / l; return o; };
   const cross = (a, b, o) => set3(o || v3(), a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
   const D2R = Math.PI / 180;
+  // u-orbit2 (R52-09: a dark grey plume on white ice): the wash's colour against the ground's (C.GROUND: the ground's
+  // albedo there) — on Opal fresh ice crystals, brighter than the old ice they come from (they scatter Helia's and the
+  // engine's light forward and sparkle), on Basalt the fine dark dust under the bright crust; both lit by the light on
+  // that ground (bodysky.js: the sun, Amarant's light, the bounce), not by the sky's light a home particle takes
+  C.DUST = { opal: [1.0, 1.04, 1.12], basalt: [0.16, 0.152, 0.146], zinn: [0.8, 0.7, 0.34], ocker: [0.66, 0.44, 0.29], aqua: [0.62, 0.6, 0.55] };
+  C.GROUND = { opal: [0.78, 0.82, 0.88], basalt: [0.3, 0.29, 0.28] };
   const sstep = (u) => { u = clamp(u, 0, 1); return u * u * u * (u * (u * 6 - 15) + 10); };
 
   // ---------------------------------------------------------------- the law (U§5.5)
@@ -593,7 +599,7 @@
   };
   // the engine's wash on airless ground: regolith thrown out in a widening ring below 50 m (the world's ground colour)
   const _col = [0.6, 0.58, 0.55];
-  const DUST = { opal: [0.78, 0.82, 0.88], basalt: [0.34, 0.33, 0.32], zinn: [0.8, 0.7, 0.34], ocker: [0.66, 0.44, 0.29], aqua: [0.62, 0.6, 0.55] };
+  const DUST = C.DUST;
   C.plume = (g, fl, alt, dt) => {
     const P = g.particles, b = fl.b; if (!P || !fxOn(g) || alt > 50 || alt < 0) return;
     // (run 2: big round puffs thrown up like smoke; regolith in a vacuum flies flat and fast, in a thin sheet, and settles)
@@ -601,12 +607,22 @@
     const gy = b.pos[1] - alt, col = DUST[g.dim] || _col;
     // (the particles are lit by the sky's light, which an airless moon keeps up at night: the dust by the sun's height —
     // run 3's plume shone white over Basalt's night side)
-    const E = g.env && g.env.E, sy = E && E.sunDir ? E.sunDir[1] : 1, lk = clamp(0.22 + 0.78 * clamp(sy * 3, 0, 1), 0.22, 1);
+    const E = g.env && g.env.E, sy = E && E.sunDir ? E.sunDir[1] : 1;
+    let lk = clamp(0.22 + 0.78 * clamp(sy * 3, 0, 1), 0.22, 1), emis = 0;
+    const BL = VR.BodySky && VR.BodySky.cur && VR.BodySky.cur.light;
+    if (BL && E) {
+      // the light on the ground here (direct, Amarant's, the bounce), as the terrain takes it: the particle drawn
+      // emissive at that radiance (emis > 0: particles.js skips the sky's light for it)
+      const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      lk = lum(E.sunColor) * Math.max(0, E.sunDir[1]) + lum(E.moonColor) * Math.max(0, E.moonDir[1]) + lum(E.ambSky);
+      emis = 0.001;
+    }
     const ring = 2 + alt * 0.2;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * 6.2832, r = ring * (0.5 + Math.random() * 0.7), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 12 + Math.random() * 14 * k;
-      const sh = 0.85 + Math.random() * 0.3;
-      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh * lk, col[1] * sh * lk, col[2] * sh * lk], drag: 0.6, grow: 1.2, collide: false });
+      // (Opal: one crystal in five glints — the sun's or the engine's light off a facet)
+      const sh = (0.85 + Math.random() * 0.3) * (g.dim === 'opal' && Math.random() < 0.2 ? 1.8 : 1);
+      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh * lk, col[1] * sh * lk, col[2] * sh * lk], emis, drag: 0.6, grow: 1.2, collide: false });
     }
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));
