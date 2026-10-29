@@ -187,8 +187,18 @@
   // the dusk around the second browser run (its residual per view and band, measured − model, held: 5.5 → 4.7 predicted;
   // the golden hour's refit gained 0.1 and its bands 3–5 are a zig-zag in the frames — pink between two blues — that one
   // smooth gradient cannot follow, so it stays)
+  // (f-sky4, docs/reviews/v0.49.md R50-01: that fit made the golden hour one pastel — the frames' band means are the
+  // average of a saturated blue away from the sun and a magenta-pink beside it, and every pixel took the average; the
+  // luminous horizon 1.44 / 1.15 / 1.65 over the bloom's threshold veiled the far land. Refitted with the grade (light2.js
+  // GRADE.gold) on test/sky_offline.js — the real sky program drawn offline — for the band means AND the structure: the
+  // horizon less luminous, the upper sky a deeper blue-violet, the nebula and the stars back (space 1, neb ×2.5 of the
+  // day's), the planets less pale (pale), the stratus lit pink (cirPink, cirMore); the magenta-pink toward the sun is
+  // the sun-side band's (SKYL warm2 at 9°))
   const PAL = S3.PAL = {
-    gold: { hor: [1.44, 1.147, 1.652], mid: [0.5, 0.323, 0.541], zen: [0.114, 0.141, 0.381], stops: [0.386, 0.297, 0.837, 0.5], space: 0.15, sunset: 0.6 },
+    gold: { hor: [1.054, 0.953, 1.056], mid: [0.27, 0.2, 0.4], zen: [0.06, 0.09, 0.289], stops: [0.393, 0.341, 0.773, 0.05], space: 1.0, neb: 2.5, pale: 0.35, sunset: 0.35, cirPink: 1, cirMore: 0.15 },
+    // (f-sky4: t-sky3's golden palette, kept for the low sun — the dusk's fit holds a quarter of the golden palette at the
+    // sunset (S3.weights at 0.6°) and stays as it was; the refit above takes over from 1.5° to 5° up: S3.goldK)
+    goldLow: { hor: [1.44, 1.147, 1.652], mid: [0.5, 0.323, 0.541], zen: [0.114, 0.141, 0.381], stops: [0.386, 0.297, 0.837, 0.5], space: 0.15, neb: 1, sunset: 0.6 },
     dusk: { hor: [0.493, 0.456, 1.771], mid: [0.265, 0.291, 0.681], zen: [0.018, 0.045, 0.129], stops: [0.223, 0.303, 0.67, 0.45], space: 0.9, sunset: 0.2 },
   };
   // the weights by the sun's height: the day above ~17°, the golden hour from ~10° down to the horizon (fading by −1°), the
@@ -200,13 +210,23 @@
   };
   // the palette at the sun's height sy: SKY = VR.Sky (its day and night palettes, its space); returns {hor, mid, zen,
   // stops, space (u_skySpace's four), sunset (factor)}
+  // f-sky4: the refit's share of the golden palette by the sun's height (0 at the sunset side: t-sky3's goldLow, 1 from 5° up)
+  S3.goldK = (sy) => sstep(1.5, 5, Math.asin(clamp(sy, -1, 1)) * 180 / Math.PI);
+  const GB = { hor: [0, 0, 0], mid: [0, 0, 0], zen: [0, 0, 0], stops: [0, 0, 0, 0], space: 0, neb: 1, sunset: 0 };
+  const goldAt = (sy) => {
+    const k = S3.goldK(sy), A = PAL.goldLow, B = PAL.gold;
+    if (!A || k >= 1) return B;
+    for (const key of ['hor', 'mid', 'zen', 'stops']) for (let i = 0; i < B[key].length; i++) GB[key][i] = A[key][i] + (B[key][i] - A[key][i]) * k;
+    for (const key of ['space', 'neb', 'sunset']) { const a = A[key] === undefined ? 1 : A[key], b = B[key] === undefined ? 1 : B[key]; GB[key] = a + (b - a) * k; }
+    return GB;
+  };
   S3.palette = function (sy, SKY) {
-    const w = S3.weights(sy), D = SKY.day, N = SKY.night, G = PAL.gold, K = PAL.dusk;
+    const w = S3.weights(sy), D = SKY.day, N = SKY.night, G = goldAt(sy), K = PAL.dusk;
     const m = (k) => [0, 1, 2].map(i => D[k][i] * w.day + G[k][i] * w.gold + K[k][i] * w.dusk + N[k][i] * w.night);
     const stops = [0, 1, 2, 3].map(i => D.stops[i] * w.day + G.stops[i] * w.gold + K.stops[i] * w.dusk + N.stops[i] * w.night);
     // the space: by day VR.Sky.space (full over the blue band), the golden hour a share of it, at dusk t-sky's spaceDusk
     const sd = SKY.spaceDusk, sp = SKY.space;
-    const space = [sd[0] + (sp[0] - sd[0]) * (w.day + w.gold), sd[1] + (sp[1] - sd[1]) * (w.day + w.gold), sp[2] * w.day + sp[2] * G.space * w.gold + K.space * w.dusk + sd[2] * w.night, SKY.nebDay * (w.day + w.gold) + sd[3] * (w.dusk + w.night)];
+    const space = [sd[0] + (sp[0] - sd[0]) * (w.day + w.gold), sd[1] + (sp[1] - sd[1]) * (w.day + w.gold), sp[2] * w.day + sp[2] * G.space * w.gold + K.space * w.dusk + sd[2] * w.night, SKY.nebDay * (w.day + (G.neb || 1) * w.gold) + sd[3] * (w.dusk + w.night)];
     return { hor: m('hor'), mid: m('mid'), zen: m('zen'), stops, space, sunset: w.day + G.sunset * w.gold + K.sunset * w.dusk + w.night, w };
   };
   // ---------------------------------------------------------------- the sky's layers by the hour (SKY3)
@@ -216,18 +236,24 @@
   // whole sky's lean toward the sun's side (lean, leanR); shade / belt: the earth's shadow opposite the sun at dusk and
   // dawn, a blue-grey band rising as the sun sinks, the pink belt over it; sun: the disc's radius (rad; larger at the
   // horizon), its limb's softness, its brightness, the corona
+  // (f-sky4: the stops at 9° (6° for the reach, 4° and 10° for the lean, 8° for the aureole's tightness) are the golden
+  // hour's refit — the band over the horizon toward the sun a strong magenta-pink at ~11° up, gathered round the sun's
+  // azimuth (reach 5: blue stays blue away from it), the aureole tight (k 400: half at ~3.4°) so the white disc reads in
+  // gold, peach and pink; the stops of the sunset and the afterglow (−9 … 3°, 0° for the aureole) as they were)
   const SKYL = S3.SKYL = {
-    warm: [[-9, [0, 0, 0]], [-4, [0.36, 0.13, 0.1]], [-0.5, [0.8, 0.36, 0.17]], [3, [0.7, 0.42, 0.22]], [9, [0.45, 0.36, 0.26]], [16, [0, 0, 0]]],
-    warm2: [[-9, [0, 0, 0]], [-4, [0.26, 0.09, 0.17]], [-0.5, [0.52, 0.22, 0.3]], [3, [0.48, 0.27, 0.34]], [9, [0.3, 0.22, 0.3]], [16, [0, 0, 0]]],
-    height: [[-9, 0.06], [0, 0.12], [9, 0.2], [16, 0.25]],
-    reach: [[-9, 12], [0, 30], [6, 18], [16, 12]],
-    lean: [[-6, 0], [-1, 0.02], [4, 0.03], [10, 0.02], [16, 0]], leanR: 1.6,
+    warm: [[-9, [0, 0, 0]], [-4, [0.36, 0.13, 0.1]], [-0.5, [0.8, 0.36, 0.17]], [3, [0.7, 0.42, 0.22]], [9, [0.42, 0.18, 0.14]], [16, [0, 0, 0]]],
+    warm2: [[-9, [0, 0, 0]], [-4, [0.26, 0.09, 0.17]], [-0.5, [0.52, 0.22, 0.3]], [3, [0.48, 0.27, 0.34]], [9, [1.3, 0.4, 1.1]], [16, [0, 0, 0]]],
+    height: [[-9, 0.06], [0, 0.12], [9, 0.18], [16, 0.25]],
+    reach: [[-9, 12], [0, 30], [6, 5], [16, 12]],
+    lean: [[-6, 0], [-1, 0.02], [4, 0.0222], [10, 0.0148], [16, 0]], leanR: 1.6,
     shade: [0.13, 0.15, 0.3], belt: [0.34, 0.17, 0.26], shadeK: [[-12, 0], [-8, 0.5], [-2, 0.72], [1.5, 0.3], [4, 0]],
-    sun: { r: 0.0185, rHor: 0.006, soft: 0.0035, k: 9, corona: 1.1 },
+    // (f-sky4: white, coreR, coreK, flat — the white-hot core: toward white and brighter within coreR of the radius, fully
+    // white over `flat` of that (through the hue-keeping tone map only a neutral colour displays white); the corona less)
+    sun: { r: 0.0185, rHor: 0.006, soft: 0.0035, k: 9, corona: 0.3, white: 1, coreR: 1, coreK: 4, flat: 0.55 },
     // the aureole: a wide soft glow round the sun (exp((cos θ − 1)·k): k 30 is ~15° to half), white-gold by day's end,
     // gold-peach at the sunset, rose in the afterglow
-    glow: [[-7, [0, 0, 0]], [-3, [0.3, 0.1, 0.08]], [0, [1.0, 0.5, 0.22]], [4, [1.2, 0.85, 0.5]], [9, [0.9, 0.74, 0.52]], [16, [0, 0, 0]]],
-    glowK: [[-6, 10], [0, 20], [8, 36], [16, 50]],
+    glow: [[-7, [0, 0, 0]], [-3, [0.3, 0.1, 0.08]], [0, [1.0, 0.5, 0.22]], [4, [1.2, 0.85, 0.5]], [9, [0.45, 0.3, 0.18]], [16, [0, 0, 0]]],
+    glowK: [[-6, 10], [0, 20], [8, 400], [16, 50]],
   };
   const stops = (tab, el) => {
     if (el <= tab[0][0]) return tab[0][1].slice();
@@ -356,23 +382,32 @@
     top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.46, 0.41, 0.58]], [8, [0.52, 0.5, 0.64]], [16, [0.5, 0.56, 0.72]]],
     low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.32, 0.25, 0.34]], [8, [0.35, 0.31, 0.42]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
     moon: [0.1, 0.12, 0.19], rainGrey: [0.42, 0.44, 0.48], k: [1.0, 1.0, 0.3, 0.5],
+    // f-sky4 (docs/reviews/v0.49.md R50-11: storm clouds bright white flat slabs): under rain and a closed cover the clouds
+    // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
+    // of a fair cloud's lit top); in the puffs (glslPuff, u_c3Storm) the body darkens from its top to its base (base: the
+    // base's light over the top's in a storm, fair: in fair weather) and the base is torn (rag: its depth, of the sprite)
+    storm: { top: 1.45, low: 0.75, base: 0.06, fair: 0.82, rag: 0.09 },
   };
+  // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
+  S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));
   S3.cloudLight = function (E) {
     const sy = clamp(E.sunDir[1], -1, 1), el = Math.asin(sy) * 180 / Math.PI, rain = clamp(E.rain || 0, 0, 1);
     let sun = stops(CL.sun, el), L = E.sunDir;
     const moonK = 1 - sstep(-9, -5, el);
     if (moonK > 0) { const m = E.sky3 && E.sky3.moons ? 0.35 + 0.65 * E.sky3.moons[0].k : 1; sun = mix3(sun, CL.moon.map(v => v * m), moonK); if (moonK > 0.5) L = E.moonDir; }
     let top = stops(CL.top, el), low = stops(CL.low, el);
-    const dayK = sstep(-6, 6, el), grey = CL.rainGrey.map(v => v * (0.25 + 0.75 * dayK));
-    sun = sun.map(v => v * (1 - 0.88 * rain)); top = mix3(top, grey, rain * 0.85); low = mix3(low, grey.map(v => v * 0.8), rain * 0.85);
-    return { sun, top, low, L, el, grey };
+    const dayK = sstep(-6, 6, el), grey = CL.rainGrey.map(v => v * (0.25 + 0.75 * dayK)), st = S3.stormK(E);
+    // (f-sky4: the overcast's light — from above a lighter grey, from below a dark slate, by the storm's strength)
+    const gTop = grey.map(v => v * (1 + (CL.storm.top - 1) * st)), gLow = grey.map(v => v * (0.8 + (CL.storm.low - 0.8) * st));
+    sun = sun.map(v => v * (1 - 0.88 * rain)); top = mix3(top, gTop, rain * 0.85); low = mix3(low, gLow, rain * (0.85 + 0.07 * st));
+    return { sun, top, low, L, el, grey, storm: st };
   };
 
   // ---------------------------------------------------------------- the per-frame values (env.js calls it last)
   // env: the Env (its day, ticks, weather seed); E: its frame. E.sky3 holds the schedules' state and the uniforms (o.u:
   // name → Float32Array, filled in place: no allocation per frame for them); nothing of E's own values changes (with the
   // sky's level on env.js takes the palette of the golden hour and the dusk from S3.palette)
-  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K'];
+  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3SunW', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K', 'u_c3Storm'];
   const U3 = S3.U3 = ['u_c3Sun', 'u_c3Top', 'u_c3Low', 'u_c3Ld', 'u_c3Haze'];
   S3.state = function () {
     const u = {};
@@ -401,6 +436,7 @@
     set4(u.u_s3Shade, Y.shade[0], Y.shade[1], Y.shade[2], Y.top);
     set4(u.u_s3Belt, Y.belt[0], Y.belt[1], Y.belt[2], Y.shadeK * k0);
     set4(u.u_s3Sun, Su.r + Su.rHor * (1 - sstep(0, 0.2, E.sunDir[1])), Su.soft, Su.k, Su.corona);
+    set4(u.u_s3SunW, Su.white, Su.coreR, Su.coreK, Su.flat || 0);   // (f-sky4: the white-hot core)
     // the two moons in their phases (lit from the sun's true direction); by day pale in the blue
     o.moons = lv ? S3.moonsAt(A, E.sunDir) : null;
     o.bodies.length = 0;
@@ -409,7 +445,10 @@
     set4(u.u_s3MoonA, mA ? mA.dir[0] : 0, mA ? mA.dir[1] : -1, mA ? mA.dir[2] : 0, mA && over ? mA.r : 0);
     set4(u.u_s3MoonB, mB ? mB.dir[0] : 0, mB ? mB.dir[1] : -1, mB ? mB.dir[2] : 0, mB && over ? mB.r : 0);
     const occ = sstep(0.15, 0.75, night);
-    set4(u.u_s3Night, occ, 0.035 + 0.03 * occ, (0.35 + 0.65 * night) * (1 - rain), over ? (1 - night) * (E.skyDay ? E.skyDay[2] : 0) : 0);
+    // (f-sky4: the planets less pale at the golden hour — the frames' giant and moons are vivid over the low sun: PAL.gold.pale
+    // of the day's paleness)
+    const pw = S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]);
+    set4(u.u_s3Night, occ, 0.035 + 0.03 * occ, (0.35 + 0.65 * night) * (1 - rain), over ? (1 - night) * (E.skyDay ? E.skyDay[2] : 0) * (1 - (1 - (PAL.gold.pale === undefined ? 1 : PAL.gold.pale)) * pw) : 0);
     // the shooting star: its head and its tail's end along its arc, its brightness (a dark sky only)
     const vis = S3.meteorVis(night) * (1 - rain) * (1 - sstep(0.6, 0.9, cover)) * k0;
     const m = vis > 0.001 && lv ? S3.meteorAt(seed, A) : null;
@@ -422,7 +461,10 @@
     set4(u.u_s3Neb, 0.06, 0.4, over ? sstep(0.12, 0.55, rain) : 0, 0.25);   // (the filaments at 0.22 still drew ripples on the lab's zenith: near off)
     // the high streaks by the hour: lit by the clouds' light from the afternoon through the afterglow, more of them round the sunset
     const elc = Math.asin(clamp(E.sunDir[1], -1, 1)) * 180 / Math.PI, golden = sstep(-6, -1, elc) * (1 - sstep(10, 18, elc));
-    set4(u.u_s3Cir, 0.3 + 0.7 * golden * (1 - night), 0.55 * golden * (1 - rain), 0, 0);
+    // (f-sky4: at the golden hour the streaks lit pink and a few more of them — PAL.gold.cirPink, cirMore: the frames' pink
+    // stratus over the sun's side; its share of the hour by the golden weight)
+    const gw = S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) * (1 - rain);
+    set4(u.u_s3Cir, 0.3 + 0.7 * golden * (1 - night), 0.55 * golden * (1 - rain), (PAL.gold.cirPink || 0) * gw, (PAL.gold.cirMore || 0) * gw);
     const C = S3.cloudLight(E);
     const deck = mix3(C.grey, C.top, 0.35);
     set4(u.u_s3Rain, deck[0], deck[1], deck[2], 0);
@@ -445,6 +487,7 @@
     const h = E.horizon || [0.6, 0.7, 0.8], mi = E.skyMid || h;
     u.u_c3Haze[0] = h[0] * 0.8 + mi[0] * 0.2; u.u_c3Haze[1] = h[1] * 0.8 + mi[1] * 0.2; u.u_c3Haze[2] = h[2] * 0.8 + mi[2] * 0.2;
     set4(u.u_c3K, CL.k[0], CL.k[1], CL.k[2], CL.k[3]);
+    set4(u.u_c3Storm, C.storm, CL.storm.base, CL.storm.rag, CL.storm.fair);   // (f-sky4: the storm in the puffs — R50-11)
     return o;
   };
   // the camera's axes (the renderer's camera: yaw 0 looks along −z): the billboards' frame
@@ -481,6 +524,7 @@ uniform vec4 u_s3Glow;     // rgb the aureole round the sun by the hour, w its t
 uniform vec4 u_s3Shade;    // rgb the earth's shadow, w its top (dir.y)
 uniform vec4 u_s3Belt;     // rgb the belt over it, w the shadow's strength
 uniform vec4 u_s3Sun;      // x the disc's radius (rad), y the limb's softness, z the disc's brightness, w the corona
+uniform vec4 u_s3SunW;     // f-sky4: the disc's white-hot core — x its whiteness, y its radius over the disc's, z its extra brightness, w the share of it fully white
 uniform vec4 u_s3MoonA;    // the big moon: its direction, its angular radius (0: not drawn)
 uniform vec4 u_s3MoonB;    // the small moon
 uniform vec4 u_s3Night;    // x the night (the moons occlude the sky behind them), y the earthshine, z the bright stars' sparkle, w the bodies' paleness by day
@@ -489,7 +533,7 @@ uniform vec4 u_s3MetT;     // its tail's end (direction), w its hue (0 white-gol
 uniform vec4 u_s3Neb;      // x the filaments' share, y the swirl's share, z the rain's closed deck, w the lit rims' share
 uniform vec4 u_s3Rain;     // rgb the deck's underside
 uniform vec4 u_s3Drift;    // xy the deck's drift, zw the scud's (faster, lower)
-uniform vec4 u_s3Cir;      // the high streaks: x lit by the hour (the clouds' light), y more of them at the golden hour and the sunset
+uniform vec4 u_s3Cir;      // the high streaks: x lit by the hour (the clouds' light), y more of them at the golden hour and the sunset, z their pink at the golden hour, w their extra cover then
 uniform vec3 u_c3Sun;      // the clouds' light (sky3.js cloudLight): the sun's on them, the sky's from above, the light from below, toward the light
 uniform vec3 u_c3Top;
 uniform vec3 u_c3Low;
@@ -537,7 +581,12 @@ vec3 s3SunDisc(vec3 dir, float sd) {
   float disc = 1.0 - smoothstep(r - u_s3Sun.y, r + u_s3Sun.y, th);
   float q = clamp(th / r, 0.0, 1.0), limb = 0.72 + 0.28 * sqrt(1.0 - q * q);
   float t = th / (r * 4.0);
-  return sc * (disc * limb * u_s3Sun.z + vec3(1.05, 0.82, 0.55) * u_s3Sun.w * (exp(-t * t * 3.0) * 0.6 + exp(-t * 1.6) * 0.25));
+  // f-sky4: the white-hot core (the trailer's sun a white disc in a gold glow: through the hue-keeping tone map a warm
+  // disc and its glow both displayed at luma ~238, no disc read) — toward white and brighter within u_s3SunW.y of the radius,
+  // fully white within u_s3SunW.w of that
+  float core = u_s3SunW.x * (1.0 - smoothstep(r * u_s3SunW.y * u_s3SunW.w, r * u_s3SunW.y, th));
+  vec3 dc = mix(sc, vec3(dot(sc, vec3(0.3, 0.59, 0.11))), core) * (1.0 + u_s3SunW.z * core);
+  return dc * (disc * limb * u_s3Sun.z) + sc * (vec3(1.05, 0.82, 0.55) * u_s3Sun.w * (exp(-t * t * 3.0) * 0.6 + exp(-t * 1.6) * 0.25));
 }
 // one moon at M (direction, radius) lit from the sun: rgb its light, a its coverage
 vec4 s3Moon(vec3 dir, vec4 M, float seed) {
@@ -721,9 +770,12 @@ uniform vec3 u_c3Ld;       // toward the light, world
 uniform vec3 u_c3L;        // toward the light in the billboard's frame (x right, y up, z toward the eye)
 uniform vec4 u_c3K;        // x the self-shadow's density, y the silver lining, z the wrap, w the powder
 uniform vec3 u_c3Haze;     // the far ones' colour (the sky at the horizon)
+uniform vec4 u_c3Storm;    // f-sky4: x the storm (rain under a closed cover: 0 fair … 1 a thunderstorm), y a storm base's light over its top's, z the torn base's depth, w a fair base's light over its top's
 vec2 c3At(vec2 cell, vec2 uv) { return cell + clamp(uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5; }
 float c3Core = 0.0;         // the thick core of this texel (PUFF_FS: there the sprite is opaque — the second run's moon shone through)
 float c3Y = 210.0;         // the texel's height in the world (PUFF_FS sets it from the vertex shader: one shading over a cluster's sprites)
+float c3Seed = 0.0;        // f-sky4: the sprite's own number (PUFF_FS sets it: the torn base differs from puff to puff)
+float c3Grad = 1.0;        // f-sky4: the light's fall from the top to the base (c3Shade sets it; PUFF_FS's storm slate keeps it)
 vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec4 t = texture(u_cloudTex, c3At(cell, uv));
   float th = t.r;
@@ -741,7 +793,16 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   c3Core = smoothstep(0.12, 0.3, th);
   // the flat base a soft fringe, not a cut: a cluster's sprites stand on one another, and their bases drawn hard read as
   // stacked slabs (the second run's golden hour)
-  cov *= mix(0.3, 1.0, smoothstep(0.0, 0.06, texture(u_cloudTex, c3At(cell, uv - vec2(0.0, 0.06))).r));
+  cov *= mix(mix(0.3, 0.75, u_c3Storm.x), 1.0, smoothstep(0.0, 0.06, texture(u_cloudTex, c3At(cell, uv - vec2(0.0, 0.06))).r));   // (f-sky4: a storm's base dense, not a pale fringe)
+  // f-sky4 (R50-11) · c3Rag, the ragged base: its coverage eaten upward by a noise along it, deeper in a storm — a row of
+  // puffs no longer stands on one ruled line (the review: "thirty separate cartoon puffs in rows, each with a hard flat base")
+  float hb = uv.y - 0.28;   // the height over the atlas's flat base (S3.ATLAS base −0.44 → uv 0.28)
+  float c3Rag = u_c3Storm.z * (0.6 + 0.4 * u_c3Storm.x);
+  if (c3Rag > 0.0 && hb < c3Rag + 0.04) {
+    float rn = vnoise(vec2(uv.x * 7.0 + c3Seed * 31.7, c3Seed * 13.1)) * 0.7 + vnoise(vec2(uv.x * 19.0 - c3Seed * 17.3, 4.7)) * 0.3;
+    cov *= smoothstep(0.0, 0.035, hb - c3Rag * rn);
+    if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);
+  }
   vec3 N = vec3(t.gb * 2.0 - 1.0, 0.0);
   N.z = sqrt(max(0.0, 1.0 - dot(N.xy, N.xy)));
   float ao = t.a;
@@ -768,7 +829,14 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   sun += u_c3Sun * ((ph * 0.11 * exp(-th * 7.0) + edge * edge * 2.6 * (0.3 + 0.7 * toL) * smoothstep(0.7, 0.995, cs)) * u_c3K.y * smoothstep(0.0, 0.04, th));
   vec3 amb = mix(u_c3Low, u_c3Top, clamp(N.y * 0.25 + 0.25 + 0.5 * hc, 0.0, 1.0)) * (0.35 + 0.65 * ao) * (1.0 - 0.55 * back);
   vec3 col = sun * (0.55 + 0.45 * ao) + amb;
+  // f-sky4 (R50-11): the body darker from its top to its base — by its height in the cluster and a little in the sprite:
+  // a storm's base u_c3Storm.y of its top's light (heavy, slate), a fair cloud's u_c3Storm.w (volume, not a sticker)
+  // (after the haze: far off the haze's light lies over the cloud, but a storm's far bases stay dark — offline the haze
+  // mixed in after the fall left the storm's far clouds at a base/top of 0.73)
+  float hl = smoothstep(0.0, mix(0.55, 0.7, u_c3Storm.x), hb), hv = clamp(mix(0.85 * hc + 0.15 * hl, 0.0 * hc + 1.0 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
+  c3Grad = mix(mix(u_c3Storm.w, u_c3Storm.y, u_c3Storm.x), 1.0, hv);
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
+  col *= c3Grad;
   return vec4(col, cov);
 }
 `;

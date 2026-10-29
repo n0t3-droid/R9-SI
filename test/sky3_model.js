@@ -81,6 +81,31 @@ function s3Layers(col, dir, h, E, U) {
   }
   return col;
 }
+// f-sky4 · the sun's disc (sky3.js glslSky s3SunDisc — the same arithmetic) added where the sky shader adds it (sd > 0.95)
+function sunDisc(E, U, dir) {
+  const sd = dot(dir, E.sunDir);
+  if (!U || sd <= 0.95) return [0, 0, 0];
+  const e = 1 - sd, th = Math.sqrt(2 * e), S = U.u_s3Sun, r = S[0];
+  const c = E.sunColor, sl = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11, sc = c.map(v => v * (Math.max(sl, 0.9) / Math.max(sl, 1e-3)));
+  const disc = 1 - ss(r - S[1], r + S[1], th);
+  const q = clamp(th / r, 0, 1), limb = 0.72 + 0.28 * Math.sqrt(1 - q * q);
+  const t = th / (r * 4), cor = Math.exp(-t * t * 3) * 0.6 + Math.exp(-t * 1.6) * 0.25;
+  const W = U.u_s3SunW || null;   // (f-sky4: the white-hot core — u_s3SunW: x its share of white, y its radius over the disc's, w its fully white share)
+  const core = W ? W[0] * (1 - ss(r * W[1] * W[3], r * W[1], th)) : 0;
+  const lc = sc[0] * 0.3 + sc[1] * 0.59 + sc[2] * 0.11;
+  return sc.map((v, i) => (v + (lc - v) * core) * (W ? 1 + W[2] * core : 1) * disc * limb * S[2] + v * [1.05, 0.82, 0.55][i] * S[3] * cor);
+}
+// the sky in dir with the sun's disc (the model's HDR, clear weather)
+function skyWithSun(E, dir, U) { const c = skyHDR(E, dir, U), d = sunDisc(E, U, dir), k = 1 - (E.rain || 0); return c.map((v, i) => v + d[i] * k); }
+// the sun's profile: the displayed colour at the angles (degrees) from the sun toward the zenith, at the picture's middle
+function sunProfile(E, U, G, angles) {
+  const s = E.sunDir, k = s[1], pe = norm([-s[0] * k, 1 - s[1] * k, -s[2] * k]);
+  return angles.map(a => {
+    const t = a * Math.PI / 180, dir = norm([s[0] * Math.cos(t) + pe[0] * Math.sin(t), s[1] * Math.cos(t) + pe[1] * Math.sin(t), s[2] * Math.cos(t) + pe[2] * Math.sin(t)]);
+    const d = display(skyWithSun(E, dir, U), E, G, [0.5, 0.5], 16 / 9);
+    return { a, rgb: d, luma: 0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2] };
+  });
+}
 // the composite (shaders.js COMPOSITE_FS) and t-light2's grade (light2.js l2Grade) for one HDR colour at the picture's
 // place uv (0..1, y up); G: L2.grade(E) or null (the grade off: the old contrast and vignette)
 function display(c, E, G, uv, aspect) {
@@ -145,4 +170,4 @@ function bands(E, view, U, G, opt) {
   }
   return out;
 }
-module.exports = { skyHDR, s3Layers, cirrus, vnoise, display, bands, camAxes, masked };
+module.exports = { skyHDR, s3Layers, cirrus, vnoise, display, bands, camAxes, masked, sunDisc, skyWithSun, sunProfile };
