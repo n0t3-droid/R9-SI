@@ -123,6 +123,7 @@
   // from the body's centre and its spin axis (columns east, up, south; row-major, local → system)
   A.localFrame = (st, out) => {
     out = out || m9();
+    if (VR.Cruise && VR.Cruise.localFrame && VR.Cruise.localFrame(st, out)) return out;   // u-cruise: the system frame's fixed axes, the turn into and out of it
     if (st.frame === 'herz') return A.localAt(st, out);
     const b = UNI().home.body(st.frame), ax = b && b.spin && b.spin.axis ? b.spin.axis : [0, 0, 1];
     unit(st.r, _n);
@@ -304,7 +305,7 @@
     const a = ascOf(fl), from = fl.regime || 'air';
     if (from === 'air') a.ground = [pos[0], pos[1], pos[2]];
     A.fromMap(a.st, pos, vel, A.clock(fl) + (a.tOff || 0));
-    fl.regime = 'climb'; fl.holdAlt = null; a.jump = null;
+    fl.regime = 'climb'; fl.holdAlt = null; a.jump = null; a.cruise = null;   // u-cruise: a reset ends a cruise too
     if (from === 'air') fl.alt = null;   // (a landed ship set up here kept its 0 m: the climb measures its own clearance)
     a.pos[0] = pos[0]; a.pos[1] = pos[1]; a.pos[2] = pos[2]; a.vel[0] = vel[0]; a.vel[1] = vel[1]; a.vel[2] = vel[2];
     unit(a.st.r, a.prevUp);
@@ -361,6 +362,7 @@
     if (!(h > 0) || h > 0.25) h = dt;   // (a paused or a jumping clock: the frame's own time)
     // ---- the Reisesprung and the home jump: the path flies the ship (spaceflight.js)
     if (a.jump && VR.SpaceFlight && VR.SpaceFlight.jumpStep) { VR.SpaceFlight.jumpStep(fl, h); hud(fl, a, 0, null); return true; }
+    if (a.cruise && VR.Cruise && VR.Cruise.stepFl) { VR.Cruise.stepFl(fl, h); hud(fl, a, a.cruiseThr || 0, null); VR.Cruise.hudFix(fl, a); return true; }   // u-cruise: the Reiseantrieb and the descent fly the ship (cruise.js)
     // ---- guidance (the autopilot) and the pilot's stick
     const G = fl.auto && fl.auto.space && A.guide ? A.guide(fl, h, a) : null;
     const space = fl.regime === 'space';
@@ -500,7 +502,7 @@
     const a = ascOf(fl), st = a.st, b = fl.b, from = fl.regime || 'air';
     if (t === undefined) t = A.clock(fl) + (a.tOff || 0);
     A.circularAt(st, pos, t);
-    a.tOff = t - A.clock(fl); a.jump = null;
+    a.tOff = t - A.clock(fl); a.jump = null; a.cruise = null;   // u-cruise
     unit(st.r, _up); unit(st.v, _tmp);
     A.frameFrom(_tmp, _up, a.S);
     unit(st.r, a.prevUp);
@@ -826,7 +828,7 @@
       const s = this.pilot, fl = s && s.flight, a = fl && fl.asc;
       if (fl && fl.regime && fl.regime !== 'air' && a && a.ground) {
         const gd = a.ground;
-        fl.regime = 'air'; fl.auto = null; a.jump = null;
+        fl.regime = 'air'; fl.auto = null; a.jump = null; a.cruise = null;   // u-cruise
         s.pos[0] = gd[0]; s.pos[1] = gd[1]; s.pos[2] = gd[2]; s.vel[0] = s.vel[1] = s.vel[2] = 0;
         fl.state = 'landed'; fl.pitch = 0; fl.roll = 0; fl.b.setAttitude(0, 0); fl.orient();
       }

@@ -2543,5 +2543,20 @@
     'g.set.planetTiles.tip': 'Aus dem Orbit zeigt Herzwelt ihre echten Hügel, Täler und Küsten bis zum Horizont (ab „Ausgewogen“ und Weltraum-Detail 2). Aus: der Planet als glatte Kugel mit seiner Karte. Kostet etwas Grafikleistung im Orbit, am Boden nichts.',
     'g.set.curvature': 'Krümmung der Welt im Steigflug',
     'g.set.curvature.tip': 'Beim Aufstieg biegt sich das Land zum Horizont hin weg, wie auf einer echten Kugel. Aus: das Land bleibt bis zum Rand flach. Kostet fast nichts.',
+    'g.set.cruiseFx': 'Reiseantrieb-Effekte',
+    'g.set.cruiseFx.tip': 'Wenn der Reiseantrieb anspringt, weitet sich kurz das Bild, und beim Landen auf einem Mond wirbelt der Schub Staub auf. Aus: ruhiges Bild, kein Staub. Kostet fast nichts.',
+    // u-cruise: the Reiseantrieb, the descent, the Konvoi
+    'g.cr.arm': '🚀 Reiseantrieb nach {name} in 2 Sekunden — G nochmal: Reisesprung.',
+    'g.cr.armJump': '✨ Reisesprung nach {name} in 2 Sekunden — G nochmal: aus.',
+    'g.cr.go': '🚀 Reiseantrieb: Kurs auf {name} — etwa {s} Sekunden.',
+    'g.cr.hud': '🚀 {name} · {km} km · {v} km/s · noch {s} s',
+    'g.cr.arrived': '🛰 In der Umlaufbahn um {name}. V: Landen.',
+    'g.cr.off': 'Reiseantrieb aus — das Schiff treibt weiter.',
+    'g.cr.survey': 'Landeplatz wird vermessen …',
+    'g.cr.descent': '⬇ Landeanflug auf {name}: Bremsschub, der Boden kommt näher.',
+    'g.cr.along': '🚀 Du reist mit {host} nach {dim}.',
+    'g.cr.alongQ': '{host} fliegt nach {dim}. Mitreisen? J: ja · N: nein',
+    'g.cr.firstStep': '👣 Erster Schritt auf {name}!',
+    'g.cr.look': 'Schau eine Welt am Himmel an und drück G: dorthin fliegt der Reiseantrieb.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -2543,5 +2543,20 @@
     'g.set.planetTiles.tip': 'From orbit Herzwelt shows its real hills, valleys and coasts out to the horizon (from Balanced and space detail 2). Off: the planet as a smooth sphere with its map. Costs some GPU time in orbit, nothing on the ground.',
     'g.set.curvature': 'Curvature of the world in the climb',
     'g.set.curvature.tip': 'As you climb, the land bends away toward the horizon as on a real sphere. Off: the land stays flat to the edge. Costs next to nothing.',
+    'g.set.cruiseFx': 'Cruise drive effects',
+    'g.set.cruiseFx.tip': 'When the cruise drive kicks in the view widens for a moment, and landing on a moon the thrust throws up dust. Off: a calm view, no dust. Costs almost nothing.',
+    // u-cruise: the Reiseantrieb, the descent, the Konvoi
+    'g.cr.arm': '🚀 Cruise drive to {name} in 2 seconds — G again: jump.',
+    'g.cr.armJump': '✨ Jump to {name} in 2 seconds — G again: off.',
+    'g.cr.go': '🚀 Cruise drive: heading for {name} — about {s} seconds.',
+    'g.cr.hud': '🚀 {name} · {km} km · {v} km/s · {s} s to go',
+    'g.cr.arrived': '🛰 In orbit round {name}. V: land.',
+    'g.cr.off': 'Cruise drive off — the ship drifts on.',
+    'g.cr.survey': 'Surveying the landing site …',
+    'g.cr.descent': '⬇ Landing on {name}: retro burn, the ground comes closer.',
+    'g.cr.along': '🚀 You travel with {host} to {dim}.',
+    'g.cr.alongQ': '{host} is flying to {dim}. Travel along? Y: yes · N: no',
+    'g.cr.firstStep': '👣 First step on {name}!',
+    'g.cr.look': 'Look at a world in the sky and press G: the cruise drive flies there.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

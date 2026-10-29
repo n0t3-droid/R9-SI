@@ -629,6 +629,7 @@
         f: (p.flying ? 1 : 0) | (p.sneaking ? 2 : 0) | (p.handSwing > 0 ? 4 : 0) | (p.dead ? 8 : 0),
         h: p.inv && p.inv.held ? p.inv.held.id : null, m: p.mode, hp: Math.round(p.health), v: veh, co: g.companions ? g.companions.presence() : null,
         lk: (() => { const o = g.heroOpts ? g.heroOpts() : null; return o ? [o.suit | 0, o.hair | 0, o.hs | 0, o.skin | 0, o.lashes ? 1 : 0] : null; })(),
+        d: g.dim || 'overworld', sp: VR.Cruise && VR.Cruise.spFor ? VR.Cruise.spFor(g) : null,   // u-cruise: the world one is in (or 'space') and the ship's conic in space (U§10)
       };
       const s = JSON.stringify(pl);
       if (!force && s === this.lastPres) return;
