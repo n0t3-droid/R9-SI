@@ -65,8 +65,10 @@
   // party in the normal's slot (the boid's frame: x across the wings, z along the heading, y up — flattened into the
   // sheet), its bird's beat offset in the emission's slot; the shader spreads the party (i_x.w) and lets each bird drift
   // a little in its place. The first bird sits on the boid itself
-  function party() {
-    const Wd = VR.Wild || {}, K = Wd.MURM_K || 12, RC = Wd.MURM_RC || 3.5, hh = Wd.h || ((a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1);
+  // (f-wild2 cost: party(kn) builds the first kn birds of the same party — a far boid that shows a few birds is drawn
+  //  from a small mesh, the same birds in the same places)
+  function party(kn) {
+    const Wd = VR.Wild || {}, K = Math.min(kn || 99, Wd.MURM_K || 12), RC = Wd.MURM_RC || 3.5, hh = Wd.h || ((a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1);
     const out = [], body = lin([0.09, 0.09, 0.11]), wing = lin([0.11, 0.10, 0.13]), tipC = lin([0.07, 0.07, 0.08]);
     for (let k = 0; k < K; k++) {
       const h = (q) => hh(k, 77, q);
@@ -239,7 +241,10 @@
   // dashes), 3 the density cloud's impostors (blended, the translucent pass), 4 the sky ray (the wing curve)
   WG.KINDS = {
     bird: { make: () => bird(false), mode: 0 },
-    flock: { make: party, mode: 2, fog: 1 },
+    flock: { make: () => party(), mode: 2, fog: 1 },
+    flock12: { make: () => party(12), mode: 2, fog: 1 },
+    flock6: { make: () => party(6), mode: 2, fog: 1 },
+    flock3: { make: () => party(3), mode: 2, fog: 1 },
     gull: { make: () => bird(true), mode: 0 },
     fish: { make: () => fish(false), mode: 1 },
     carp: { make: () => fish(true), mode: 1 },

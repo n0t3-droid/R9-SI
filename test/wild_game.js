@@ -101,13 +101,17 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   const c = M.fl.ctr, d = Math.hypot(c[0] - M.st.x, c[2] - M.st.z);
   check(d < 90 && Math.abs(c[1] - M.st.y) < 40, `it swirls round its stage over the lake (its middle ${d.toFixed(0)} from the stage, ${(c[1] - M.st.y).toFixed(0)} in height)`);
   GLC.draws.length = 0; A.draw(rr, {}, 'opaque', { x: M.st.x - 120, y: M.st.y - 20, z: M.st.z });
-  check(GLC.draws.includes(M.n) && A.stats.draws >= 1, `the whole murmuration is one instanced draw (${GLC.draws.join(', ')} instances)`);
+  { const FK = A.list.filter(([K]) => /^flock/.test(K.name)), nb = FK.reduce((q, [, n]) => q + n, 0);
+    // (f-wild2, 29 Oct: the parties by the birds they show, in up to four draws — wildlife.js FLOCK_TIERS)
+    check(nb === M.n && FK.length <= 4 && A.stats.draws >= 1, `the whole murmuration in ${FK.length} instanced draws (${FK.map(([K, n]) => K.name + ' ' + n).join(', ')} instances)`); }
   // each boid a party of MURM_K birds: the kind's mesh holds K birds, each at its own place in the party (the first on the
   // boid itself), each with its own beat
   {
-    const L = A.list.find(([K]) => K.name === 'flock'), mesh = V.WildGPU.mesh('flock'), VS = 11, places = new Set(), beats = new Set();
+    const FK = A.list.filter(([K]) => /^flock/.test(K.name)), L = FK.length ? [FK[0][0], FK.reduce((q, [, n]) => q + n, 0)] : null, mesh = V.WildGPU.mesh('flock'), VS = 11, places = new Set(), beats = new Set();
     for (let i = 0; i < mesh.length; i += VS) { places.add(mesh[i + 3].toFixed(3) + ',' + mesh[i + 4].toFixed(3) + ',' + mesh[i + 5].toFixed(3)); beats.add(mesh[i + 10].toFixed(3)); }
     check(!!L && L[1] === M.n && places.size === W.MURM_K && places.has('0.000,0.000,0.000') && beats.size === W.MURM_K, `drawn as parties: ${L ? L[1] : 0} boids × ${places.size} birds (${beats.size} beats), ${M.n * places.size} birds in the sky`);
+    const m3 = V.WildGPU.mesh('flock3');
+    check(m3.length * W.MURM_K === mesh.length * 3 && m3.every((v, i) => v === mesh[i]), 'a far party\'s small mesh is the same party\'s first three birds');
     let flat = 0, wide = 0; for (const q of places) { const [x, y, z] = q.split(',').map(Number); flat = Math.max(flat, Math.abs(y)); wide = Math.max(wide, Math.abs(x), Math.abs(z)); }
     check(flat < wide * 0.3 && wide <= W.MURM_RC + 0.01, `a party is a flat sheet round its boid (${wide.toFixed(1)} wide, ${flat.toFixed(2)} high)`);
   }
@@ -272,10 +276,17 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   run(A, g, 30, 0.05);
   const M = A.murm, far = { x: M.st.x - 150, y: M.st.y - 20, z: M.st.z };
   GLC.calls = 0; GLC.draws.length = 0; A.draw(rr, {}, 'opaque', far);
-  const fl = A.list.find(([K]) => K.name === 'flock');
-  check(!!fl && fl[1] === M.n, `the birds: one instanced draw of the parties (${fl ? fl[1] : 0})`);
+  // (29 Oct, the cost: a far party draws a few birds, so it is drawn from a smaller party mesh — 'flock12', 'flock6',
+  //  'flock3' — the vertex shader no longer runs all 20 birds' vertices for the 2 it shows; ≤ 4 draws for the parties)
+  const FK = A.list.filter(([K]) => /^flock/.test(K.name)), nAll = FK.reduce((s, [, n]) => s + n, 0);
+  const vAll = FK.reduce((s, [K, n]) => s + K.count * n, 0), vFull = M.n * V.WildGPU.kind(fakeGL, 'flock', 900).count;
+  check(FK.length >= 2 && FK.length <= 4 && nAll === M.n, `the birds: ${FK.length} instanced draws of the parties by their birds shown (${FK.map(([K, n]) => K.name + ' ' + n).join(', ')}; ${nAll} of ${M.n})`);
+  check(vAll <= 0.45 * vFull, `150 blocks off, the parties' vertices ${(vAll / vFull * 100).toFixed(0)} % of drawing every party whole (≤ 45 %)`);
+  let fit = true; for (const [K, n] of FK) { const kb = +K.name.slice(5) || W.MURM_K; for (let i = 0; i < n; i++) if (K.data[i * V.WildGPU.STRIDE + 19] > kb + 1e-6) fit = false; }
+  check(fit, 'each party in a mesh with at least the birds it shows');
+  const fl = FK.length ? [FK[0][0], FK.reduce((s, [, n]) => s + n, 0)] : null;
   // each party draws its birds by the distance (all near, a few far): the instance carries how many
-  if (fl) { const D = fl[0].data; let lo = 1e9, hi = 0; for (let i = 0; i < fl[1]; i++) { const k = D[i * V.WildGPU.STRIDE + 19]; lo = Math.min(lo, k); hi = Math.max(hi, k); } check(lo >= W.PUFF.kMin - 1e-6 && hi <= W.MURM_K && lo < W.MURM_K, `150 blocks off, a party draws ${lo.toFixed(1)}–${hi.toFixed(1)} of its ${W.MURM_K} birds`); }
+  if (fl) { let lo = 1e9, hi = 0; for (const [K, n] of FK) for (let i = 0; i < n; i++) { const k = K.data[i * V.WildGPU.STRIDE + 19]; lo = Math.min(lo, k); hi = Math.max(hi, k); } check(lo >= W.PUFF.kMin - 1e-6 && hi <= W.MURM_K && lo < W.MURM_K, `150 blocks off, a party draws ${lo.toFixed(1)}–${hi.toFixed(1)} of its ${W.MURM_K} birds`); }
   GLC.draws.length = 0; A.draw(rr, {}, 'trans', far);
   const pf = A.list.find(([K]) => K.name === 'puff');
   check(!!pf && pf[1] >= M.n * 0.8 && GLC.draws.includes(pf[1]), `the density cloud: one instanced draw of ${pf ? pf[1] : 0} impostors in the translucent pass`);

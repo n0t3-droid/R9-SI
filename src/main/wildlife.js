@@ -197,6 +197,7 @@
   // ---------------------------------------------------------------- the actor
   const RAYCOL = [[0.32, 0.85, 1.0], [0.72, 0.5, 1.0]], MOTECOL = [[0.5, 0.95, 1.0], [0.82, 0.62, 1.0]];
   const TKEY = []; for (let k = 0; k < 8; k++) TKEY.push('wray' + (k >> 1) + (k & 1 ? 'r' : 'l'));
+  const FLOCK_TIERS = [20, 12, 6, 3];   // (f-wild2 cost: the party meshes by the birds shown; the first is W.MURM_K)
   const KINDCAP = { flock: 900, gull: 16, fish: 340, carp: 64, bfly: 128, dfly: 64, ray: 8 };   // (f-wild2: the murmuration's 840 boids on Ultra)
   const PIECES = ['birds', 'fish', 'bugs', 'rays', 'herds'];
   class Actor {
@@ -893,11 +894,14 @@
         // each boid a party of W.MURM_K birds (wildgpu.js 'flock'): spread round it in the sky, close together on the
         // perch; (f-wild2) the party draws its first W.birdsVisible(d) birds as dashes — all near, a few sparkle birds
         // far off — and the density cloud (drawCloud, the translucent pass) carries the rest
-        const K = WG.kind(gl, 'flock', KINDCAP.flock), D = K.data, fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch, S = WG.STRIDE;
+        // (f-wild2 cost: four meshes by the birds a party shows — all 20, 12, 6, 3 (wildgpu.js 'flock', 'flock12', …) — so a
+        //  far party's vertex work is its few birds', not the whole party's)
+        const KT = this.flockKinds || (this.flockKinds = []), PT = FLOCK_TIERS;
+        for (let t = 0; t < PT.length; t++) { KT[t] = WG.kind(gl, t ? 'flock' + PT[t] : 'flock', KINDCAP.flock); KT[t].nn = 0; }
+        const fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch, S = WG.STRIDE;
         const dc = Mu.state === 'seated' && Mu.roost ? Math.hypot(Mu.roost[0] - cx, Mu.roost[2] - cz) : Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz);
         const roosting = Mu.ph === 'roost' && P;
-        let n = 0;
-        if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 520)) for (let i = 0; i < Mu.n && n < K.cap; i++) {
+        if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 520)) for (let i = 0; i < Mu.n && i < KINDCAP.flock; i++) {
           const o = i * 3, sit = Mu.landed[i] === 1, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
           const x = fl.pos[o] + (sit ? 0 : vx * ex) - cx, y = fl.pos[o + 1] + (sit ? 0 : vy * ex) - cy, z = fl.pos[o + 2] + (sit ? 0 : vz * ex) - cz;
           // (the birds' size: half a block, a little more far off; the shader keeps a dash at least ~1.3 px thick)
@@ -905,10 +909,13 @@
           const hv = Math.hypot(vx, vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
           // the party's spread: 1 in the sky; closing to its perch while it lands; small on the perch
           const spread = sit ? 0.22 : roosting ? 0.22 + 0.78 * sm(Math.hypot(P[o] - fl.pos[o], P[o + 1] - fl.pos[o + 1], P[o + 2] - fl.pos[o + 2]) / 14) : 1;
-          put(D, n++, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
-          D[(n - 1) * S + 19] = sit || Mu.state !== 'fly' ? W.MURM_K : W.birdsVisible(d);
+          const kv = sit || Mu.state !== 'fly' ? W.MURM_K : W.birdsVisible(d);
+          let t = PT.length - 1; while (t > 0 && kv > PT[t] + 1e-6) t--;
+          const K = KT[t], D = K.data, n = K.nn++;
+          put(D, n, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
+          D[n * S + 19] = kv;
         }
-        if (n) list.push([K, n]);
+        for (let t = 0; t < PT.length; t++) if (KT[t].nn) list.push([KT[t], KT[t].nn]);
       }
       if (this.gulls.length) {
         const K = WG.kind(gl, 'gull', KINDCAP.gull), D = K.data; let n = 0;

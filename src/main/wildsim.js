@@ -352,7 +352,7 @@
   // each carries more) · fog: the share of the distance the flock's own air counts (a dark mass stays dark at dusk)
   // (f-wild2 cost, 29 Oct: R 5.2 → 2.2, cut 1.6 → 1.2 — the impostors rasterized 2.7× the frame for 4.7 % of it on
   //  SwiftShader, now 0.19×; denser and with more turn in it, the cloud keeps its cover and core and shows its grain)
-  W.PUFF = { R: 2.2, tau0: 0.6, gam: 2.0, dref: 9, base: 0.15, nRef: 720, kFar: [100, 160], kMin: 2, fog: 0.55, cut: 1.2 };
+  W.PUFF = { R: 2.2, tau0: 0.6, gam: 2.0, dref: 9, base: 0.15, nRef: 720, kFar: [90, 150], kMin: 2, fog: 0.55, cut: 1.2 };
   W.birdsVisible = function (d) {
     const P = W.PUFF, K = W.MURM_K;
     if (d <= P.kFar[0]) return K;
