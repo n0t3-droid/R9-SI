@@ -284,8 +284,8 @@ async function runPreset(preset) {
       s = await cr(P);
       Rr.trip = s.last;
       check(s.frame === 'opal' && s.regime === 'space' && !s.phase, `arrived in orbit round Opal (${s.frame}, ${s.regime}); the trip ${r1(s.last && s.last.total)} s, to 2 R ${r1(s.last && s.last.t2R)} s`);
-      await P.step(40);
-      await chase(P, 0.2, 0.4); await waitTex(P, 60000, 1); await P.step(4);
+      await P.step(110);   // (the frame's turn into Opal's: 2.5 s)
+      await chase(P, 0.24, 0.5); await waitTex(P, 60000, 1); await P.step(4);
       await keep(P, '__Fc3'); const m3 = await picture(P, '__Fc3', SH(hi ? 'cruise_arrive_opal.png' : 'cruise_vl_opal.png'), K);
       check(!m3.err && m3.sd > 4, `the arrival picture (${m3.err || m3.draws + ' draws'}, L ${m3.mean} ± ${m3.sd}: not blank)`);
       save();

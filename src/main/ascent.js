@@ -305,7 +305,7 @@
     const a = ascOf(fl), from = fl.regime || 'air';
     if (from === 'air') a.ground = [pos[0], pos[1], pos[2]];
     A.fromMap(a.st, pos, vel, A.clock(fl) + (a.tOff || 0));
-    fl.regime = 'climb'; fl.holdAlt = null; a.jump = null; a.cruise = null;
+    fl.regime = 'climb'; fl.holdAlt = null; a.jump = null; a.cruise = null;   // u-cruise: a reset ends a cruise too
     if (from === 'air') fl.alt = null;   // (a landed ship set up here kept its 0 m: the climb measures its own clearance)
     a.pos[0] = pos[0]; a.pos[1] = pos[1]; a.pos[2] = pos[2]; a.vel[0] = vel[0]; a.vel[1] = vel[1]; a.vel[2] = vel[2];
     unit(a.st.r, a.prevUp);
@@ -502,7 +502,7 @@
     const a = ascOf(fl), st = a.st, b = fl.b, from = fl.regime || 'air';
     if (t === undefined) t = A.clock(fl) + (a.tOff || 0);
     A.circularAt(st, pos, t);
-    a.tOff = t - A.clock(fl); a.jump = null; a.cruise = null;
+    a.tOff = t - A.clock(fl); a.jump = null; a.cruise = null;   // u-cruise
     unit(st.r, _up); unit(st.v, _tmp);
     A.frameFrom(_tmp, _up, a.S);
     unit(st.r, a.prevUp);
@@ -827,7 +827,7 @@
       const s = this.pilot, fl = s && s.flight, a = fl && fl.asc;
       if (fl && fl.regime && fl.regime !== 'air' && a && a.ground) {
         const gd = a.ground;
-        fl.regime = 'air'; fl.auto = null; a.jump = null; a.cruise = null;
+        fl.regime = 'air'; fl.auto = null; a.jump = null; a.cruise = null;   // u-cruise
         s.pos[0] = gd[0]; s.pos[1] = gd[1]; s.pos[2] = gd[2]; s.vel[0] = s.vel[1] = s.vel[2] = 0;
         fl.state = 'landed'; fl.pitch = 0; fl.roll = 0; fl.b.setAttitude(0, 0); fl.orient();
       }
