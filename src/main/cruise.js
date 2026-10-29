@@ -274,7 +274,20 @@
   // ecliptic's — up its north, east +x — fixed for the whole way, so the cameras never swing; on the way in and out the
   // frame turns from the body's (its radial frame, Herzwelt's map) to the ecliptic's and back in two seconds
   C.blend = null;   // {a, b: 'ecl' | a body id, s, dur}
-  const ecl = (o) => { o[0] = 1; o[3] = 0; o[6] = 0; o[1] = 0; o[4] = 0; o[7] = 1; o[2] = 0; o[5] = -1; o[8] = 0; return o; };
+  const ecl = (o) => { if (C.tripM) { o.set(C.tripM); return o; } o[0] = 1; o[3] = 0; o[6] = 0; o[1] = 0; o[4] = 0; o[7] = 1; o[2] = 0; o[5] = -1; o[8] = 0; return o; };
+  // the cruise's own fixed axes: the target due north and level (up: the ecliptic's north made square to the way) — the
+  // ship flies level toward it, so the chase camera, which follows the heading, keeps the target above the nose (run 2:
+  // the ecliptic's axes pitched the nose 26° up and the target sat off the top of the picture)
+  C.tripM = null;
+  C.tripFrame = (d, out) => {
+    out = out || new Float64Array(9);
+    let u = [0, 0, 1]; const k = dot(u, d); u = [u[0] - d[0] * k, u[1] - d[1] * k, u[2] - d[2] * k];
+    if (len(u) < 1e-3) u = [1, 0, 0]; unit(u);
+    const sx = -d[0], sy = -d[1], sz = -d[2];                       // south: away from the target
+    const e = cross(u, [sx, sy, sz], v3());                         // east = up × south
+    out[0] = e[0]; out[3] = e[1]; out[6] = e[2]; out[1] = u[0]; out[4] = u[1]; out[7] = u[2]; out[2] = sx; out[5] = sy; out[8] = sz;
+    return out;
+  };
   const _Ma = new Float64Array(9), _Mb = new Float64Array(9), _Mr = new Float64Array(9), _Ms = new Float64Array(9), _pr = v3(), _pb = v3();
   const _tmpSt = { frame: 'herz', r: v3(), v: v3(), t: 0 };
   function frameOf(kind, st, o) {
@@ -327,6 +340,7 @@
     if (from === to) { SF.hint(fl, 'g.asc.arrived', { name: SF.nameOf(to) }); return false; }
     const c = C.create(_P, _V, from, to, st.t, [-a.S[2], -a.S[5], -a.S[8]]);
     a.cruise = c;
+    const tq = sys.b[to].r; C.tripM = C.tripFrame(unit(set3(v3(), tq[0] - _P[0], tq[1] - _P[1], tq[2] - _P[2])));
     C.blend = { a: st.frame === 'helia' ? 'ecl' : st.frame, b: 'ecl', s: 0, dur: 2.2 };
     st.frame = 'helia'; st.r.set(_P); st.v.set(_V); st.coast = false;
     const b = fl.b, name = SF.nameOf(to), D = Math.hypot(sys.b[to].r[0] - _P[0], sys.b[to].r[1] - _P[1], sys.b[to].r[2] - _P[2]);
@@ -366,7 +380,7 @@
     if (c.phase === 'punch' && was !== 'punch') punch(fl);
     if (c.phase === 'arrive' && was !== 'arrive') fl.bump = Math.max(fl.bump || 0, 0.45);
     st.frame = 'helia'; st.r.set(c.P); st.v.set(c.V); st.t = c.t; st.coast = false;
-    A.slew(a.S, c.nose, ECL_UP, 2.4 * h, 1.2 * h); AM.ortho(a.S);
+    A.slew(a.S, c.nose, C.tripM ? [C.tripM[1], C.tripM[4], C.tripM[7]] : ECL_UP, 2.4 * h, 1.2 * h); AM.ortho(a.S);
     a.cruiseThr = c.phase === 'punch' || c.phase === 'depart' ? 3 : c.phase === 'cruise' ? 1.4 : c.phase === 'arrive' ? 2.2 : 0.2;
     fl.auto.dist = c.dist; fl.auto.eta = c.eta;
     if (C.last) { C.last.total = c.total; C.last.phases = c.times; C.last.t2R = c.t2R === undefined ? null : c.t2R; C.last.phase = c.phase; }
@@ -397,7 +411,7 @@
   };
   // every way into space sets the scene up (the Reisesprung, the test's orbit)
   const jumpStart0 = SF.jumpStart;
-  SF.jumpStart = (fl, to, opts) => { C.ensureScene(fl && fl.g); return jumpStart0(fl, to, opts); };
+  SF.jumpStart = (fl, to, opts) => { C.ensureScene(fl && fl.g); C.tripM = null; C.blend = null; return jumpStart0(fl, to, opts); };
   if (SF.debug && SF.debug.orbit) { const orbit0 = SF.debug.orbit; SF.debug.orbit = (g, x, z, y) => { C.ensureScene(g); return orbit0(g, x, z, y); }; }
 
   // ---------------------------------------------------------------- travel by intent: G at a world in the sky
@@ -526,10 +540,10 @@
     return true;
   };
   // the near columns there and shown (the 3 × 3 round the ship)
-  C.nearReady = (g, x, z) => {
+  C.nearReady = (g, x, z, rr) => {
     const w = g.world; if (!w || !w.cols) return false;
-    const cx = Math.floor(x) >> 4, cz = Math.floor(z) >> 4;
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    const cx = Math.floor(x) >> 4, cz = Math.floor(z) >> 4, r = rr || 1;
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
       const c = w.cols.get(VR.ckey(cx + dx, cz + dz));
       if (!c || !c.ready) return false;
       for (const sc of c.sec) if (sc.count > 0 && (sc.dirty || sc.pending)) return false;
@@ -544,7 +558,10 @@
     const top = fl.groundTop ? fl.groundTop(b.pos[0], b.pos[1], b.pos[2], 700) : null;
     const gy = top !== null && top > -1e8 ? top : L.ground, alt = b.pos[1] - gy;
     L.alt = alt;
-    const ready = C.nearReady(g, b.pos[0], b.pos[2]);
+    // the site surveyed: the columns round it out to the ring the player sees (run 2: at 30 m only the 3 × 3 were there, the
+    // rest grey fog); looked at twice a second; after 25 s of hovering the ship goes down anyway
+    if ((L.chkT = (L.chkT || 0) - dt) <= 0 || L.ok === undefined) { L.chkT = 0.5; L.ok = C.nearReady(g, b.pos[0], b.pos[2], clamp(((g.world && g.world.renderDist) | 0) - 2, 1, 4)); }
+    const ready = L.ok || (L.hovered || 0) > 25;
     if (!L.tReady && ready) L.tReady = L.t;
     if (fl.state === 'landed') {
       g.cruiseLand = null;
@@ -573,15 +590,17 @@
   };
   // the engine's wash on airless ground: regolith thrown out in a widening ring below 50 m (the world's ground colour)
   const _col = [0.6, 0.58, 0.55];
-  const DUST = { opal: [0.86, 0.9, 0.96], basalt: [0.56, 0.54, 0.52], zinn: [0.86, 0.76, 0.38], ocker: [0.74, 0.5, 0.33], aqua: [0.72, 0.7, 0.64] };
+  const DUST = { opal: [0.78, 0.82, 0.88], basalt: [0.34, 0.33, 0.32], zinn: [0.8, 0.7, 0.34], ocker: [0.66, 0.44, 0.29], aqua: [0.62, 0.6, 0.55] };
   C.plume = (g, fl, alt, dt) => {
     const P = g.particles, b = fl.b; if (!P || !fxOn(g) || alt > 50 || alt < 0) return;
-    const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 3 : 9) * k + 1);
+    // (run 2: big round puffs thrown up like smoke; regolith in a vacuum flies flat and fast, in a thin sheet, and settles)
+    const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 4 : 14) * k + 1);
     const gy = b.pos[1] - alt, col = DUST[g.dim] || _col;
-    const ring = 3 + alt * 0.25;
+    const ring = 2 + alt * 0.2;
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * 6.2832, r = ring * (0.6 + Math.random() * 0.6), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 8 + Math.random() * 10 * k;
-      P.spawn(x, gy + 0.3, z, Math.cos(a) * sp, 0.6 + Math.random() * 2.5 * k, Math.sin(a) * sp, { life: 1.2 + Math.random() * 1.4, size: 0.5 + Math.random() * 0.9 * k, grav: 0.4, col: [col[0] * 0.9, col[1] * 0.9, col[2] * 0.88], drag: 0.9, grow: 1.6, collide: false });
+      const a = Math.random() * 6.2832, r = ring * (0.5 + Math.random() * 0.7), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 12 + Math.random() * 14 * k;
+      const sh = 0.85 + Math.random() * 0.3;
+      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh, col[1] * sh, col[2] * sh], drag: 0.6, grow: 1.2, collide: false });
     }
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));

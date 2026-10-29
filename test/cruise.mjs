@@ -251,18 +251,26 @@ async function runPreset(preset) {
       await waitTex(P, 60000, 1); await P.step(6);
       const started = await P.ev(() => VR.Cruise.start(VR.game.flight, 'opal'));
       check(started, 'the Reiseantrieb to Opal engaged');
-      let s = await cr(P), dep = false, mid = false, D0 = null;
+      let s = await cr(P), dep = false, mid = false, half = false, D0 = null;
       for (let i = 0; i < 2000 && s.phase; i++) {
         await P.step(hi ? 3 : 6); s = await cr(P);
         if (D0 === null && s.dist) D0 = s.dist;
-        if (hi && !dep && s.phase === 'depart' && s.total > 2.6) {
-          await chase(P, 0.16, 0.55); await P.step(1); await keep(P, '__Fc1');
+        if (hi && !dep && s.phase === 'depart' && s.total > 2.4) {
+          // the departure from the side and a little ahead, looking back along the ship at Herzwelt falling away
+          await chase(P, 0.12, 2.3); await P.step(1); await keep(P, '__Fc1');
           const m = await picture(P, '__Fc1', SH('cruise_depart.png'), K, true); dep = true;
+          check(!m.err && m.sd > 4, `depart: the picture not blank (L ${m.mean} ± ${m.sd})`);
           console.log(`  depart: ${Math.round(s.speed)} m/s, ${Math.round(s.dist / 1000)} km to go (${m.err || m.draws + ' draws'}) (${secs()})`);
           await chase(P, 0.1, 0);
         }
-        if (!mid && s.phase === 'cruise' && s.dist < 0.12 * D0) {
-          await P.ev(() => { const fl = VR.game.flight; fl.headPitch = 0.06; });
+        if (hi && !half && s.phase === 'cruise' && s.dist < 0.5 * D0) {
+          await chase(P, 0.14, 0.35); await P.step(1); await keep(P, '__Fc4');
+          const m = await picture(P, '__Fc4', SH('cruise_half.png'), K); half = true;
+          console.log(`  half way: ${Math.round(s.dist / 1000)} km to go at ${r1(s.speed / 1000)} km/s (${m.err || m.draws + ' draws'}, L ${m.mean} ± ${m.sd}) (${secs()})`);
+          await chase(P, 0.1, 0);
+        }
+        if (!mid && s.phase === 'cruise' && s.dist < 140000) {
+          await chase(P, 0.2, 0.25); await P.step(1);
           await waitTex(P, 20000, 1);
           await keep(P, '__Fc2');
           const m = await picture(P, '__Fc2', SH(hi ? 'cruise_mid.png' : 'cruise_vl_mid.png'), K); mid = true;
@@ -304,8 +312,9 @@ async function runPreset(preset) {
     if (hi && want('basalt')) {
       const st0 = await P.ev(() => VR.game.dim);
       if (st0 !== 'overworld') { await P.ev(() => VR.game.goHome()); await waitPlay(P, 60000); }
-      const bd2 = await P.ev(() => !!(VR.game.starships && VR.game.starships.pilot));
-      if (!bd2) await board(P);
+      await P.step(60);
+      const bd2 = await P.ev(() => !!(VR.game.flight && VR.game.flight.b && VR.game.starships.pilot));
+      if (!bd2) { const b2 = await board(P); console.log(`  boarded again: ${JSON.stringify(b2)}`); }
       await P.ev(() => { const g = VR.game; VR.SpaceFlight.debug.orbit(g, 0, 40, 3063); VR.SpaceFlight.jumpStart(g.flight, 'basalt'); });
       await P.step(220);
       const s = await cr(P);
@@ -327,7 +336,8 @@ try {
   const f = (n) => { const p = SHOTS + n; try { return fs.statSync(p).mtimeMs >= T0 ? p : null; } catch (e) { return null; } };
   const rows = [];
   const row = (label, names) => { const imgs = names.map(f).filter(Boolean); if (imgs.length) rows.push({ label, imgs }); };
-  row('Reiseantrieb · los, halbwegs, Ankunft (High)', ['cruise_depart.png', 'cruise_mid.png', 'cruise_arrive_opal.png']);
+  row('Reiseantrieb · los, halbwegs (High)', ['cruise_depart.png', 'cruise_half.png']);
+  row('Opal wächst heran, Ankunft (High)', ['cruise_mid.png', 'cruise_arrive_opal.png']);
   row('Landen · Opal, Basalt, gelandet', ['descent_opal.png', 'descent_basalt.png', 'cruise_landed_opal.png']);
   row('Very Low · halbwegs, Opal · Plätze', ['cruise_vl_mid.png', 'cruise_vl_opal.png', 'cruise_plaza_high.png']);
   fs.writeFileSync(ROOT + '.tmp_tests/cruise_sheet.json', JSON.stringify({ w: 620, rows }));
