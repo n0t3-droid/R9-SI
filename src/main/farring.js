@@ -147,7 +147,8 @@
       this.set.ready(t, bytes);
       this.stats.uploads++;
       if (this.firstUpAt < 0) this.firstUpAt = performance.now();
-      if (t.shownAt < 0) { t.shownAt = performance.now(); t.fade = 0; this.fading.push(t); }
+      // (f-stipple) the soft fade where the renderer has it (the TSR resolves the turning dither), else whole at once
+      if (t.shownAt < 0) { const r = this.g && this.g.renderer; t.shownAt = performance.now(); if (r && r.fadeSoft) { t.fade = 0; this.fading.push(t); } else t.fade = 1; }
       this.maskDirty = true;
     }
     stepFades(now) {

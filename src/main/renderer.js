@@ -173,9 +173,11 @@
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
       const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th]));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th)));   // (F10 · zPre: invariant positions)
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb]));
+      // f-stipple (R50-08): SOFTFADE — the turning dither the TSR resolves, a near column's growth; Very Low pops (its text as before)
+      const sf = this.q.lite ? [] : ['SOFTFADE'];
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th, ...sf]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th, sf)));   // (F10 · zPre: invariant positions)
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb, ...sf]));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT', ...pb.filter(d => d !== 'SSR')]);
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
@@ -199,7 +201,7 @@
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain', this.q.wxDrama ? ['WXDRAMA'] : []);   // (t-motion: the rain blown sideways in sheets)
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
-      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
+      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod', this.q.lite ? [] : ['SOFTFADE']);   // (f-stipple: the far tiles' cut turns with the chunks' dither)
       // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
@@ -267,7 +269,7 @@
     farProgram(name) {
       const P = this.P, k = 'far_' + name;
       if (P[k] !== undefined) return P[k];
-      try { P[k] = GL.program(S.LOD_VS, S.LOD_FS, name, [name === 'form' ? 'FORM' : 'FAR1']); } catch (e) { console.error(e); P[k] = null; }
+      try { P[k] = GL.program(S.LOD_VS, S.LOD_FS, name, [name === 'form' ? 'FORM' : 'FAR1'].concat(this.q.lite ? [] : ['SOFTFADE'])); } catch (e) { console.error(e); P[k] = null; }
       return P[k];
     }
 
@@ -510,10 +512,12 @@
       const data = [opaque, cutout, trans, vx, vxFar];
       if (sec.mesh.length < 5) sec.mesh.push(null, null);
       for (let l = 0; l < 5; l++) {
-        if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
         const d = data[l];
         const n = d ? d.length >> 3 : 0;
-        if (l === 3) { sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
+        // (f-stipple, R50-12) a resident detail keeps drawing until the new one is up (vxOld), never the far boxes
+        if (l === 3 && sec.mesh[3] && n) { sec.vxOld = true; sec.vxData = d; sec.vxDropped = false; continue; }
+        if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
+        if (l === 3) { sec.vxOld = false; sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
         if (!n) continue;
         const m = this.allocMesh(n);
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
@@ -558,12 +562,15 @@
     commitStage(st, sec, col, sy) {
       this.propSet(sec, st.props);
       if (sec.mesh.length < 5) sec.mesh.push(null, null);
+      const vn = st.vx ? st.vx.length >> 3 : 0;
       for (let l = 0; l < 5; l++) {
         const o = sec.mesh[l];
+        // (f-stipple, R50-12) the resident detail draws on until the new detail is up (vxResidency asks for it at once);
+        // without new detail it goes now
+        if (l === 3) { if (o && vn) { sec.vxOld = true; continue; } sec.vxOld = false; }
         if (o) o.arena.release(o.off, o.cap);
         sec.mesh[l] = st.m[l]; st.m[l] = null;
       }
-      const vn = st.vx ? st.vx.length >> 3 : 0;
       sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(st.d[2]);   // (F10 · postLite: water or aether among its translucent faces)
@@ -666,7 +673,7 @@
     queueVx(s, Q) {
       const d = s.vxData, n = d.length >> 3, R = this;
       const it = { x: s.ox + 8, z: s.oz + 8, bytes: n * VSTRIDE, m: null, o: 0,
-        alive: () => s.vxData === d && !s.mesh[3],
+        alive: () => s.vxData === d && (!s.mesh[3] || s.vxOld),
         step: (max) => {
           const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
           if (k <= 0) return 0;
@@ -677,7 +684,7 @@
           it.o += k;
           return k * VSTRIDE;
         },
-        commit: () => { s.vxQ = null; s.mesh[3] = it.m; it.m = null; R.nearShadow(s); },
+        commit: () => { s.vxQ = null; const o = s.mesh[3]; if (o) o.arena.release(o.off, o.cap); s.mesh[3] = it.m; s.vxOld = false; it.m = null; R.nearShadow(s); },
         abort: () => { if (s.vxQ === it) s.vxQ = null; if (it.m) { it.m.arena.release(it.m.off, it.m.cap); it.m = null; } } };
       s.vxQ = it;
       Q.push(it);
@@ -692,7 +699,7 @@
     freeSection(sec) {
       if (sec.hasMesh) this.nearShadow(sec);
       for (let l = 0; l < sec.mesh.length; l++) if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
-      sec.vxData = null; sec.transW = false;
+      sec.vxData = null; sec.vxOld = false; sec.transW = false;
       this.propSet(sec, null);
       sec.hasMesh = false; sec.meshed = false;
       this.visDirty = true;
@@ -708,7 +715,7 @@
       for (const s of list) {
         if (!s.vxData && !s.mesh[3]) { if (s.vxDropped) { const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2]; if (dx * dx + dy * dy * 0.5 + dz * dz < back2) { s.vxDropped = false; s.dirty = true; } } continue; }
         const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2], d2 = dx * dx + dy * dy * 0.5 + dz * dz;
-        if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; } continue; }
+        if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; s.vxOld = false; continue; } if (!s.vxOld) continue; }   // (vxOld: a stale detail draws while the new one goes up)
         if (d2 > keep2) { s.vxData = null; s.vxDropped = true; continue; }
         if (d2 < up2) {
           if (this.upQ) { if (!s.vxQ) this.queueVx(s, this.upQ); }   // (F10: the world's upload queue — one budget for everything)
@@ -723,7 +730,8 @@
       const m = this.allocMesh(n);
       gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
       gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
-      s.mesh[3] = m;
+      if (s.mesh[3]) s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap);
+      s.mesh[3] = m; s.vxOld = false;
       this.nearShadow(s);
     }
     gpuMemoryMB() { let u = 0; for (const a of this.arenas) u += a.used; return (u * VSTRIDE / 1048576); }
@@ -821,6 +829,10 @@
         this.proj[8] += jx; this.proj[9] += jy;
         this.jit = [jx * 0.5, jy * 0.5];
       }
+      // f-stipple (R50-08): with the TSR the fade's dither turns with the frame (its history makes a soft blend of it);
+      // without it, or with „Sanftes Einblenden" off, things arrive whole (world.js / farring.js read fadeSoft)
+      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite);
+      this.fadePhase = this.fadeSoft ? VR.Stream.fadePhase(this.frameNo) : 0;
       mat4.mul(this.viewProj, this.proj, v);
       mat4.invert(this.invViewProj, this.viewProj);
       mat4.frustum(this.planes, this.viewProj);
@@ -837,6 +849,7 @@
     common(p, E) {
       const gl = this.gl, u = p.u;
       const v3 = (n, a) => { if (u[n]) gl.uniform3f(u[n], a[0], a[1], a[2]); };
+      if (u.u_fadePhase) gl.uniform1f(u.u_fadePhase, this.fadePhase || 0);   // (f-stipple)
       v3('u_sunDir', E.sunDir); v3('u_moonDir', E.moonDir); v3('u_sunColor', E.sunColor); v3('u_moonColor', E.moonColor);
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       // t-sky: the sky's middle stop, the stops' heights and the space by day (env.js VR.Sky)
@@ -989,13 +1002,14 @@
         if (!m) continue;
         // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
         // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
-        const fade = s.fade === undefined ? 1 : s.fade;
+        let fade = s.fade === undefined ? 1 : s.fade;
         if (fade <= 0 && !this.shtAll) continue;
+        if (this.mirrorPass && fade < 1) { if (fade < 0.5) continue; fade = 1; }   // (f-stipple: no dither in the planar mirror — it has no TSR; a fading column shows there from its half way)
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
         firsts[cnt] = m.off; counts[cnt] = m.count;
-        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = fade;
+        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = s.grow !== undefined && s.grow < 1 ? 2 + s.grow : fade;   // (f-stipple: Stream.originW — a near column growing)
         cnt++;
         this.stats.tris += m.count / 3;
       }
@@ -2384,7 +2398,7 @@
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
         this.shadowOffUni(p.u);
         if (layer === 1) gl.disable(gl.CULL_FACE);
-        this.drawSections(list, layer, p, camPos, this.planesR, false);
+        this.mirrorPass = true; this.drawSections(list, layer, p, camPos, this.planesR, false); this.mirrorPass = false;
         gl.enable(gl.CULL_FACE);
       }
       // the props in the mirror (t-smooth2): the palms and the furniture by the water, so a palm on the shore and the loungers

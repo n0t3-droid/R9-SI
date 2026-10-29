@@ -4,6 +4,7 @@
 //   fadeCurve(ms)              smoothstep of a chunk's fade-in (300 ms): 0 when it appears, 1 when it is whole
 //   bayer4(x, y)               4x4 ordered-dither threshold in [0, 15/16] (the shaders' bayer4, same closed form)
 //   chunkKeeps(fade, x, y)     a chunk fragment is drawn iff its dither threshold is under the fade
+//   fadeT · fadePhase · fadePlan · growCurve · originW   f-stipple: the turning threshold, an arriving column's plan
 //   lodCover(near, bilinear)   the far tile's cut: min(bilinear mask, the nearest chunk's fade). Never above the
 //                              chunk's own fade, so every pixel is drawn by the chunk or by the tile (no holes)
 //   maskSample(tex, n, u, v)   the GPU's bilinear read of the n×n mask (texel centres at i + 0.5)
@@ -22,6 +23,26 @@
   const bayer2 = (x, y) => { const a = Math.floor(x), b = Math.floor(y); const f = (a * 0.5 + b * b * 0.75) % 1; return f < 0 ? f + 1 : f; };
   S.bayer4 = function (x, y) { return bayer2(0.5 * x, 0.5 * y) * 0.25 + bayer2(x, y); };
   S.chunkKeeps = function (fade, x, y) { return S.bayer4(x, y) < fade; };
+  // f-stipple (R50-08) · no screen-door: where the upscaler runs the threshold turns with the frame — fract(ign + phase),
+  // the phase the frame's golden-ratio step — so over the frames every pixel is drawn in the fade's share of them and the
+  // TSR's history resolves the dither into a soft blend (the shaders' fadeT under SOFTFADE, the same arithmetic)
+  S.fadePhase = function (frame) { const f = (frame * 0.6180339887498949) % 1; return f < 0 ? f + 1 : f; };
+  // the spatial part: interleaved gradient noise (no 2-px period — what the TSR has not resolved yet is a grain, not a
+  // screen-door), the same arithmetic as the shaders' fadeT
+  const fr = (v) => v - Math.floor(v);
+  S.ign = function (x, y) { return fr(52.9829189 * fr(Math.floor(x) * 0.06711056 + Math.floor(y) * 0.00583715)); };
+  S.fadeT = function (x, y, phase) { return fr(S.ign(x, y) + (phase || 0)); };
+  // an arriving column's plan: within NEAR_COLS chunks of the player never a dither — whole at once, growing up from the
+  // ground over GROW_MS; beyond, the soft fade from 0 where it is soft (the TSR runs, „Sanftes Einblenden" on), else whole
+  // at once (a pop: the far tiles stood in until now)
+  S.NEAR_COLS = 2; S.GROW_MS = 150;
+  S.fadePlan = function (dcx, dcz, soft) {
+    if (Math.max(Math.abs(dcx), Math.abs(dcz)) <= S.NEAR_COLS) return { fade: 1, grow: true };
+    return soft ? { fade: 0, grow: false } : { fade: 1, grow: false };
+  };
+  S.growCurve = function (ms) { const t = clamp01(ms / S.GROW_MS); return t * t * (3 - 2 * t); };
+  // the origins' w for a section: its fade, or 2 + its growth while it grows (the vertex shader takes the growth out)
+  S.originW = function (fade, grow) { return grow !== undefined && grow < 1 ? 2 + grow : fade; };
   S.lodCover = function (near, bilinear) { const n = clamp01(near), b = clamp01(bilinear); return b < n ? b : n; };
   S.maskSample = function (tex, n, u, v) {
     const x = u - 0.5, y = v - 0.5;

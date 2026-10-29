@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '..');
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'OK   ' : 'FAIL ') + what); if (!ok) fail++; };
 const build = (root) => execFileSync(process.execPath, ['build.js'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
-const hashIn = (html) => { const m = /VR\.TEX_SRC_HASH = "([0-9a-f]+)"/.exec(html); return m ? m[1] : null; };
+const hashIn = (html) => { const m = /VR\.TEX_SRC_HASH ?= ?"([0-9a-f]+)"/.exec(html); return m ? m[1] : null; };
 const workerIn = (html) => { const m = /<script type="text\/js-worker" id="worker-src">([\s\S]*?)<\/script>/.exec(html); return m ? m[1].replace(/<\\\/script/gi, '</script') : null; };
 const dig = (t) => { const h = crypto.createHash('sha256'); for (const a of [...t.albedo, ...t.material, t.avgColor, t.noise]) h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); return h.digest('hex').slice(0, 20); };
 const bytesEq = (a, b) => a.byteLength === b.byteLength && Buffer.compare(Buffer.from(a.buffer, a.byteOffset, a.byteLength), Buffer.from(b.buffer, b.byteOffset, b.byteLength)) === 0;

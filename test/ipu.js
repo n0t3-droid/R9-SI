@@ -167,9 +167,9 @@ console.log('e · zPre and texLite: their programs and the sampler; off: the ter
   const defsOf = (r, q) => { progs.length = 0; Object.assign(r.q, q); r.buildPrograms(); const o = {}; for (const p of progs) o[p.name] = p.defs.join(' '); return o; };
   const r = make({ shadows: 2048, hshadow: true });
   const off = defsOf(r, {});
-  check(off.terrain === 'SHADOWS HSHADOW FADE' && off.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE', 'off: the opaque and cut-out programs with the defines they had', `${off.terrain} · ${off.terrainCut}`);
+  check(off.terrain === 'SHADOWS HSHADOW FADE SOFTFADE' && off.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE SOFTFADE', 'off: the opaque and cut-out programs with the defines they had (+ SOFTFADE, f-stipple)', `${off.terrain} · ${off.terrainCut}`);
   const z = defsOf(r, { zPre: true });
-  check(z.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE ZINV' && z.terrain === off.terrain, 'zPre: the cut-out colour pass with invariant positions (ZINV), the opaque one unchanged', z.terrainCut);
+  check(z.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE ZINV SOFTFADE' && z.terrain === off.terrain, 'zPre: the cut-out colour pass with invariant positions (ZINV), the opaque one unchanged', z.terrainCut);
   progs.length = 0; const zp = r.zProgram();
   check(progs.length === 1 && progs[0].defs.join(' ') === 'SHADOWS HSHADOW CUTOUT FADE ZINV ZPRE' && r.zProgram() === zp, 'its prepass program: the same defines and ZPRE, made once', progs.length ? progs[0].defs.join(' ') : 'none');
   const fsSrc = require('fs').readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');

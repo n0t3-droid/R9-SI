@@ -87,6 +87,13 @@ float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); re
 // 4x4 ordered dither in [0, 15/16] (McGuire's closed form): the chunks' fade-in and the far tiles' cut use the same thresholds
 float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
 float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+#ifdef SOFTFADE
+// f-stipple (R50-08): the threshold is interleaved gradient noise (no 2-px period: what the TSR has not resolved yet is
+// a fine grain, never a screen-door) turning with the frame (u_fadePhase, the golden-ratio step) — over the frames every
+// pixel is drawn in the fade's share of them and the TSR's history makes a soft blend of it (stream.js fadeT)
+uniform float u_fadePhase;
+float fadeT(vec2 a){ a = floor(a); return fract(fract(52.9829189 * fract(dot(a, vec2(0.06711056, 0.00583715)))) + u_fadePhase); }
+#endif
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(hash12(i), hash12(i+vec2(1,0)), f.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), f.x), f.y); }
 float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -745,6 +752,11 @@ void main() {
 #else
   vec3 rel = org + local;
 #endif
+#if defined(SOFTFADE) && defined(FADE)
+  // f-stipple: a column arriving within two chunks of the player is whole at once and grows up from the ground under the
+  // eye in 150 ms (the origin's w is 2 + its growth, Stream.originW) — never a dither in the near field
+  if (v_fade > 1.5) { rel.y = -1.62 + (rel.y + 1.62) * (v_fade - 2.0); v_fade = 1.0; }
+#endif
   vec3 wp = rel + u_camFrac;           // world pos relative to integer camera cell
   bool ctmFace = ((a_w5 >> 14u) & 1u) == 1u;   // connected glass: bits 5-7 are its frame mask, not sway
   uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
@@ -1018,7 +1030,11 @@ void main() {
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
 #ifdef FADE
+#ifdef SOFTFADE
+  if (v_fade < 1.0 && fadeT(gl_FragCoord.xy) >= v_fade) discard;
+#else
   if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
+#endif
 #endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
@@ -1870,7 +1886,11 @@ void main() {
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
 #ifdef FADE
+#ifdef SOFTFADE
+  if (v_fade < 1.0 && fadeT(gl_FragCoord.xy) >= v_fade) discard;
+#else
   if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
+#endif
 #endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
@@ -2514,7 +2534,11 @@ void main() {
     nR = texelFetch(u_mask, ch, 0).r; bR = textureLod(u_mask, muv, 0.0).r;
     nG = texelFetch(u_mask1, ch, 0).r; bG = textureLod(u_mask1, muv, 0.0).r;
   }
+#ifdef SOFTFADE
+  float th = fadeT(gl_FragCoord.xy), cR = min(bR, nR);
+#else
   float th = bayer4(gl_FragCoord.xy), cR = min(bR, nR);
+#endif
 #ifdef FORM
   if (th < cR || th >= nG) discard;
   // t-polish2 · a night light (a glowing box with aux bit 7: the citadel's beam, CitadelGen.lodBoxes): drawn at night only,
@@ -2531,7 +2555,11 @@ void main() {
   // threshold, so a pixel is always drawn by one of the two (no holes)
   float cover = 0.0;
   if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64) cover = min(texelFetch(u_mask, ch, 0).r, textureLod(u_mask, (cl / 16.0 + 32.0) / 64.0, 0.0).r);
+#ifdef SOFTFADE
+  if (cover > 0.0 && fadeT(gl_FragCoord.xy) < cover) discard;
+#else
   if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
+#endif
   // never right in front of the eyes: coarse cells only stand in at a distance
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 #endif
