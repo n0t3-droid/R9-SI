@@ -580,30 +580,44 @@ void main() {
     fxC.style.display = 'block'; fxOn = true;
     const x = fxX; x.clearRect(0, 0, W, H);
     if (glow > 0.01) {
-      // where the nose meets the air: the screen point of a spot ahead of the ship (the cockpit: the middle of the view)
+      // u-orbit2 (R52-09: no true entry glow): the shock layer as it hugs the ship — the stagnation point where the hull
+      // meets the air (the velocity's side, else the nose), a white-yellow core there, the sheath an elongated envelope
+      // of orange to rose drawn back along the flow, the wake's ribbons streaming from its rim and curling behind
       const r = g.renderer, b = fl.b, cam = r.cam || g.cam || {};
-      let sx = W / 2, sy = H * 0.45, rad = Math.max(W, H) * 0.75;
+      let sx = W / 2, sy = H * 0.45, rad = Math.max(W, H) * 0.75, ang = Math.PI / 2;
       if (fl.view !== 0 && r.viewProj && cam.x !== undefined) {
-        const n = fl.dirWorld([0, 0, -1]), Lb = (b.length || 12) * 0.6;
-        const px = b.pos[0] + n[0] * Lb - cam.x, py = b.pos[1] + (b.height || 4) * 0.4 + n[1] * Lb - cam.y, pz = b.pos[2] + n[2] * Lb - cam.z, m = r.viewProj;
-        const cw = m[3] * px + m[7] * py + m[11] * pz + m[15];
-        if (cw > 0.1) { sx = ((m[0] * px + m[4] * py + m[8] * pz + m[12]) / cw * 0.5 + 0.5) * W; sy = (0.5 - (m[1] * px + m[5] * py + m[9] * pz + m[13]) / cw * 0.5) * H; rad = Math.max(W, H) * 0.35; }
+        const vl = Math.hypot(b.vel[0], b.vel[1], b.vel[2]);
+        const n = vl > 40 ? [b.vel[0] / vl, b.vel[1] / vl, b.vel[2] / vl] : fl.dirWorld([0, 0, -1]), Lb = (b.length || 12) * 0.55, m = r.viewProj;
+        const scr = (wx, wy, wz) => { const px = wx - cam.x, py = wy - cam.y, pz = wz - cam.z, cw = m[3] * px + m[7] * py + m[11] * pz + m[15]; return cw > 0.1 ? [((m[0] * px + m[4] * py + m[8] * pz + m[12]) / cw * 0.5 + 0.5) * W, (0.5 - (m[1] * px + m[5] * py + m[9] * pz + m[13]) / cw * 0.5) * H] : null; };
+        const cy0 = b.pos[1] + (b.height || 4) * 0.4, s0 = scr(b.pos[0] + n[0] * Lb, cy0 + n[1] * Lb, b.pos[2] + n[2] * Lb), s1 = scr(b.pos[0] - n[0] * Lb, cy0 - n[1] * Lb, b.pos[2] - n[2] * Lb);
+        if (s0) { sx = s0[0]; sy = s0[1]; rad = Math.max(W, H) * 0.3; if (s1) { ang = Math.atan2(s1[1] - s0[1], s1[0] - s0[0]); rad = Math.max(rad * 0.6, Math.min(rad * 1.6, Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) * 1.1)); } }
       }
       const t = performance.now() / 1000, fl1 = 0.85 + 0.15 * Math.sin(t * 37) * Math.sin(t * 13.1);
-      const gr = x.createRadialGradient(sx, sy, 0, sx, sy, rad);
-      gr.addColorStop(0, `rgba(255,250,225,${0.85 * glow * fl1})`);
-      gr.addColorStop(0.18, `rgba(255,214,140,${0.6 * glow * fl1})`);
-      gr.addColorStop(0.45, `rgba(170,120,255,${0.32 * glow})`);
-      gr.addColorStop(0.75, `rgba(90,110,255,${0.16 * glow})`);
-      gr.addColorStop(1, 'rgba(60,60,200,0)');
       x.globalCompositeOperation = 'lighter';
-      x.fillStyle = gr; x.fillRect(0, 0, W, H);
-      // the wake: orange-yellow streaks from the edge of the sheath outward
+      // the sheath: a radial glow stretched back along the flow (the stagnation point at its front)
+      x.save(); x.translate(sx, sy); x.rotate(ang); x.scale(1.9, 1);
+      const sh = x.createRadialGradient(rad * 0.18, 0, 0, rad * 0.32, 0, rad * 0.62);
+      sh.addColorStop(0, `rgba(255,236,190,${0.75 * glow * fl1})`);
+      sh.addColorStop(0.25, `rgba(255,170,90,${0.5 * glow * fl1})`);
+      sh.addColorStop(0.6, `rgba(255,96,120,${0.26 * glow})`);
+      sh.addColorStop(1, 'rgba(140,60,200,0)');
+      x.fillStyle = sh; x.fillRect(-rad * 0.6, -rad, rad * 2.2, rad * 2);
+      x.restore();
+      // the core at the stagnation point
+      const co = x.createRadialGradient(sx, sy, 0, sx, sy, rad * 0.16);
+      co.addColorStop(0, `rgba(255,252,236,${0.9 * glow * fl1})`); co.addColorStop(1, 'rgba(255,200,140,0)');
+      x.fillStyle = co; x.fillRect(sx - rad * 0.2, sy - rad * 0.2, rad * 0.4, rad * 0.4);
+      // the wake: ribbons from the sheath's rim, bending back along the flow and fading
+      const ca = Math.cos(ang), sa = Math.sin(ang);
       x.lineCap = 'round';
-      for (let i = 0; i < 26; i++) {
-        const ph = (i * 2.399 + Math.floor(t * 9 + i * 0.37)) % 6.2832, r0 = rad * (0.25 + 0.2 * ((i * 0.618) % 1)), L = rad * (0.4 + 0.6 * (((i * 0.31) + t * 1.7) % 1));
-        x.strokeStyle = `rgba(255,${150 + (i % 5) * 18},70,${0.28 * glow})`; x.lineWidth = 1 + (i % 3);
-        x.beginPath(); x.moveTo(sx + Math.cos(ph) * r0, sy + Math.sin(ph) * r0); x.lineTo(sx + Math.cos(ph) * (r0 + L), sy + Math.sin(ph) * (r0 + L)); x.stroke();
+      for (let i = 0; i < 30; i++) {
+        const side = i % 2 ? 1 : -1, u = ((i * 0.618) % 1), off = (0.12 + 0.3 * u) * rad * side, ph = t * 2.3 + i * 1.7;
+        const L = rad * (0.9 + 1.4 * (((i * 0.37) + t * 0.9) % 1)), wob = Math.sin(ph) * rad * 0.05;
+        const p0x = sx + ca * rad * 0.1 - sa * off, p0y = sy + sa * rad * 0.1 + ca * off;
+        const p1x = p0x + ca * L * 0.5 - sa * (off * 0.5 + wob), p1y = p0y + sa * L * 0.5 + ca * (off * 0.5 + wob);
+        const p2x = p0x + ca * L - sa * (off * 0.2 - wob), p2y = p0y + sa * L + ca * (off * 0.2 - wob);
+        x.strokeStyle = `rgba(255,${120 + (i % 5) * 22},${60 + (i % 3) * 20},${(0.12 + 0.16 * (1 - u)) * glow})`; x.lineWidth = 1 + (i % 3) * 0.8;
+        x.beginPath(); x.moveTo(p0x, p0y); x.quadraticCurveTo(p1x, p1y, p2x, p2y); x.stroke();
       }
       x.globalCompositeOperation = 'source-over';
     }

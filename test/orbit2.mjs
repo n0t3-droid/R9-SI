@@ -17,7 +17,7 @@ const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const SHOTS = ROOT + 'test/shots/';
 const BASE = process.env.BASE_DIST !== undefined ? process.env.BASE_DIST : (fs.existsSync(ROOT + '.tmp_tests/base/dist/index.html') ? 'file://' + ROOT + '.tmp_tests/base/dist/index.html' : '');
-const SEED = process.env.SEED || '53', RD = +(process.env.RD || 8), K = +(process.env.K || 3);
+const SEED = process.env.SEED || '53', RD = +(process.env.RD || 8), K = +(process.env.K || 3), HP = +(process.env.HP || 0.1);   // (HP: the chase camera's pitch in the descent — v0.51's cruise.mjs looked down at 0.32, the sky out of the frame)
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const want = (s) => !ONLY || ONLY.includes(s);
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
@@ -125,7 +125,7 @@ const state = (P) => P.ev(() => { const g = VR.game, fl = g.flight, a = fl && fl
 const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight; fl.view = v; VR.game.camMode = v === 0 ? 0 : 1; fl.headPitch = hp; fl.headYaw = hy || 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; }, [v, hp, hy]);
 const chase = (P, hp, hy) => view(P, 1, hp, hy);
 const keep = (P, k) => P.ev((k) => { window[k] = window.__F; }, k);
-async function waitPlay(P, maxMs) { const t0 = Date.now(); for (;;) { await P.step(2); const s = await P.ev(() => VR.game.state); if (s === 'play') return true; if (Date.now() - t0 > maxMs) return false; await P.wait(150); } }
+async function waitPlay(P, maxMs) { const t0 = Date.now(); for (;;) { await P.step(2); const s = await P.ev(() => VR.game.state === 'play' && !(VR.Travel && VR.Travel.busy && VR.Travel.busy(VR.game))); if (s) return true; if (Date.now() - t0 > maxMs) return false; await P.wait(150); } }
 async function board(P) {
   const ap = await P.ev(() => VR.SpaceFlight.apron());
   const ay = await P.groundY(ap.x, ap.z);
@@ -136,6 +136,18 @@ async function board(P) {
 }
 // the moon's sky now (bodysky.js): its light, the sky's stops
 const skyNow = (P) => P.ev(() => { const g = VR.game, E = g.env && g.env.E, B = VR.BodySky, c = B && B.cur; return { dimId: E && E.dimId, want: B && B.want, zenith: E && E.zenith && E.zenith.map(v => +v.toFixed(3)), fog: E && E.fog && E.fog.map(v => +(+v).toFixed(2)), expo: E && +(+E.exposure).toFixed(2), sunEl: c && +c.light.sunEl.toFixed(3), parEl: c && +c.light.parEl.toFixed(3), parPhase: c && +c.light.parPhase.toFixed(2), amb: c && c.light.ambSky.map(v => +v.toFixed(4)), moon: c && c.light.moonColor.map(v => +v.toFixed(4)), par: c && c.raw && c.raw.parent && Array.from(c.raw.parent.dir).map(v => +v.toFixed(3)), parId: c && c.raw && c.raw.parent && c.raw.parent.id }; });
+// day on the moon's site: Helia 15–35° up, the parent over the horizon (the black sky's showpiece: sharp shadows)
+const dayHour = (P) => P.ev(() => {
+  const g = VR.game, U = VR.Universe, B = VR.BodySky; let best = null;
+  for (let day = 1; day < 30; day++) for (let tk = 0; tk < 24000; tk += 500) {
+    const r = B.compute(g.dim, B.eye, U.worldSeconds(day, tk), { tier: 2 });
+    if (!r || r.light.sunEl < 0.25 || r.light.sunEl > 0.62 || r.light.free < 0.99) continue;
+    const sc = (r.light.parEl > 0.1 ? 1 : 0) - Math.abs(r.light.sunEl - 0.4);
+    if (!best || sc > best.sc) best = { day, tk, sc, sunEl: +r.light.sunEl.toFixed(2), parEl: +r.light.parEl.toFixed(2) };
+  }
+  if (best) { g.env.day = best.day; g.env.setTime(best.tk); }
+  return best;
+});
 // night on the moon's site: the hour (within 30 days) when Helia is down and the parent's light is the most
 const nightHour = (P) => P.ev(() => {
   const g = VR.game, U = VR.Universe, B = VR.BodySky; let best = null;
@@ -159,13 +171,13 @@ async function descent(P, body, name, sfx, Rr, night) {
   for (let i = 0; i < 200 && !s.land; i++) { await P.step(5); await P.wait(50); s = await state(P); }
   check(ok && s.dim === body && !!s.land, `${body}: the trip with the ship, over the site (${s.dim}, ${s.land ? Math.round(s.land.alt) + ' m up' : 'not in the air'}) (${secs()})`);
   if (!s.land) return D;
-  if (night) { D.hour = await nightHour(P); console.log(`  ${body}: night ${JSON.stringify(D.hour)}`); }
+  D.hour = night ? await nightHour(P) : await dayHour(P); console.log(`  ${body}: ${night ? 'night' : 'day'} ${JSON.stringify(D.hour)}`);
   let shot = false;
   for (let i = 0; i < 700; i++) {
     await P.step(10); s = await state(P);
     if (!s.land) break;
     if (!shot && s.land.alt < 34 && s.land.alt > 12) {
-      await chase(P, 0.32, 2.6); await P.step(3);
+      await chase(P, HP, 2.6); await P.step(3);
       await keep(P, '__Fd');
       const m = await picture(P, '__Fd', SH(`${name}${sfx}.png`), K), m0 = await picture(P, '__Fd', SH(`${name}${sfx}_np.png`), 1, { noPart: true });
       D.pic = m; D.plume = await plumeOf(SH(`${name}${sfx}.png`), SH(`${name}${sfx}_np.png`)); D.sky = await skyNow(P); shot = true;
