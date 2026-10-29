@@ -27,7 +27,8 @@ const DIST_PREV = process.env.DIST_PREV || 'file:///tmp/r9prev/dist/index.html';
 const SEED = process.env.SEED || '53', ROUNDS = +(process.env.ROUNDS || 7), N = +(process.env.N || 4);
 const VW = +(process.env.W || 1280), VH = +(process.env.H || 720);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
-const TAG = { cur: 'v049', prev: 'v048' };
+const TAG = { cur: process.env.TAG_CUR || 'v049', prev: process.env.TAG_PREV || 'v048' };   // (v0.51 review: TAG_CUR=v051 TAG_PREV=v050 REL=0.51)
+const PFX = 'critic_v' + (process.env.REL || '0.49') + '_vl';
 const EYE = 1.62;
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -35,7 +36,7 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const r1 = (x) => Math.round(x * 10) / 10, r3 = (x) => Math.round(x * 1000) / 1000;
 const med = (a) => { const s = a.filter(Number.isFinite).slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : NaN; };
 const rec = { dist: DIST, distPrev: DIST_PREV, seed: SEED, rounds: ROUNDS, n: N, size: [VW, VH], pages: {}, places: {}, space: null };
-const save = () => { try { fs.mkdirSync(ROOT + '.tmp_tests', { recursive: true }); fs.writeFileSync(ROOT + '.tmp_tests/critic_vl.json', JSON.stringify(rec, null, 1)); fs.writeFileSync(SHOTS + 'critic_v0.49_vl.json', JSON.stringify(rec, null, 1)); } catch (e) { /* a convenience */ } };
+const save = () => { try { fs.mkdirSync(ROOT + '.tmp_tests', { recursive: true }); fs.writeFileSync(ROOT + '.tmp_tests/critic_vl.json', JSON.stringify(rec, null, 1)); fs.writeFileSync(SHOTS + PFX + '.json', JSON.stringify(rec, null, 1)); } catch (e) { /* a convenience */ } };
 fs.mkdirSync(SHOTS, { recursive: true });
 const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
 const aimAt = (x, y, z, at) => { const dx = at[0] - x, dy = at[1] - y, dz = at[2] - z; return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))]; };
@@ -186,7 +187,7 @@ async function prepare(P) {
       await P.pose(x, eyeY - EYE, z, yaw, pitch, fov);
       const s1 = await P.settle(240, 20); await P.step(4); await P.warmVx(); await P.step(3);
       await P.ev((id) => { window['__F_' + id] = window.__F; }, pl.id);
-      const pic = SHOTS + `critic_v0.49_vl_${pl.id}_${TAG[P.tag]}.png`, m = await picture(P, '__F_' + pl.id, pic, 2);
+      const pic = SHOTS + `${PFX}_${pl.id}_${TAG[P.tag]}.png`, m = await picture(P, '__F_' + pl.id, pic, 2);
       const heap = await P.ev(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null));
       out[pl.id] = { pose: { x: r1(x), feet: r1(eyeY - EYE), z: r1(z), yaw: r3(yaw), pitch: r3(pitch), fov, moved }, settle: [s0 && s0.s, s1 && s1.s], draws: m.draws, tris: m.tris, fs: m.fs, err: m.err, heapMB: heap, s: Math.round((Date.now() - t1) / 1000) };
       console.log(`  ${P.tag} ${pl.id}: ${m.err ? 'ERR ' + m.err : m.draws + ' draws, ' + m.tris + ' tris, ' + m.fs + ' passes'} · heap ${heap} MB · settled ${s0 && s0.s} + ${s1 && s1.s} s (${secs()})`);
@@ -222,13 +223,15 @@ for (const pl of PLACES) {
   R.ratio = r3(R.curMs / R.prevMs); R.ratioCpu = r3(R.curCpu / R.prevCpu);
   const a = rec.pages.cur.places[pl.id] || {}, b = rec.pages.prev.places[pl.id] || {};
   R.draws = [a.draws, b.draws]; R.tris = [a.tris, b.tris];
-  console.log(`  ${pl.id}: v0.49 ${R.curMs} ms (CPU ${R.curCpu}) · v0.48 ${R.prevMs} ms (CPU ${R.prevCpu}) → ×${R.ratio} (CPU ×${R.ratioCpu}) · draws ${R.draws.join(' / ')} · tris ${R.tris.join(' / ')}`);
-  check(Number.isFinite(R.ratio) && R.ratio <= 1.03, `${pl.id}: Very Low not slower than v0.48 (×${R.ratio} ≤ 1.03)`);
+  console.log(`  ${pl.id}: ${TAG.cur} ${R.curMs} ms (CPU ${R.curCpu}) · ${TAG.prev} ${R.prevMs} ms (CPU ${R.prevCpu}) → ×${R.ratio} (CPU ×${R.ratioCpu}) · draws ${R.draws.join(' / ')} · tris ${R.tris.join(' / ')}`);
+  check(Number.isFinite(R.ratio) && R.ratio <= 1.03, `${pl.id}: Very Low not slower than ${TAG.prev} (×${R.ratio} ≤ 1.03)`);
 }
 save();
 
 // /raum herz on this build against its own plaza (space0.mjs's view: day 2, noon, toward Helia)
-if (!process.env.NO_SPACE) {
+const A0 = A, B0 = B;
+rec.spaceBy = {};
+if (!process.env.NO_SPACE) for (const A of [A0, B0]) {
   try {
     await A.ev(() => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); const ui = VR.game.ui, cl = ui.chatLine.bind(ui); window.__lines = []; ui.chatLine = (t, c) => { window.__lines.push(String(t)); return cl(t, c); }; });
     await A.ev(() => { const g = VR.game, p = g.player, SS = VR.SpaceScene, BT = VR.BodyTex; g.env.day = 2; g.env.ticks = 6000; if (SS && BT) { const sp = BT.toSphere(p.pos[0], p.pos[2]), e = SS.ephemeris(SS.worldTime(2, 6000), {}), s = SS.localSun(e, sp[0], sp[1]); p.yaw = p.viewYaw = SS.yawFor(s.az - 0.3, p.pos[0], p.pos[2]); } g.chat('/raum herz'); });
@@ -241,19 +244,21 @@ if (!process.env.NO_SPACE) {
       await A.wait(40);
     }
     await A.ev(() => { window.__F_space = window.__F; });
-    const m = await picture(A, '__F_space', SHOTS + 'critic_v0.49_vl_space_herz_v049.png', 2);
+    const m = await picture(A, '__F_space', SHOTS + `${PFX}_space_herz_${TAG[A.tag]}.png`, 2);
     const cp = [], cs = [], wp = [], ws = [];
     for (let rd = 0; rd < ROUNDS; rd++) {
       const order = rd % 2 ? ['__F_space', '__F_plaza'] : ['__F_plaza', '__F_space'];
       for (const key of order) { const c = await cost(A, key, 2, N); if (key === '__F_space') { cs.push(c.cpuMs); ws.push(c.wallMs); } else { cp.push(c.cpuMs); wp.push(c.wallMs); } }
     }
-    rec.space = { shownS: r1((Date.now() - t1) / 1000), state: st, draws: m.draws, err: m.err, spaceMs: r1(med(ws)), plazaMs: r1(med(wp)), spaceCpu: r1(med(cs)), plazaCpu: r1(med(cp)), prevPlazaMs: rec.places.plaza ? rec.places.plaza.prevMs : null };
-    console.log(`  space (/raum herz): ${rec.space.spaceMs} ms (CPU ${rec.space.spaceCpu}) against this build's plaza ${rec.space.plazaMs} ms (CPU ${rec.space.plazaCpu}); ${m.draws} draws; shown after ${rec.space.shownS} s`);
+    rec.space = rec.spaceBy[A.tag] = { shownS: r1((Date.now() - t1) / 1000), state: st, draws: m.draws, err: m.err, spaceMs: r1(med(ws)), plazaMs: r1(med(wp)), spaceCpu: r1(med(cs)), plazaCpu: r1(med(cp)), prevPlazaMs: rec.places.plaza ? rec.places.plaza.prevMs : null };
+    console.log(`  ${A.tag} space (/raum herz): ${rec.space.spaceMs} ms (CPU ${rec.space.spaceCpu}) against this build's plaza ${rec.space.plazaMs} ms (CPU ${rec.space.plazaCpu}); ${m.draws} draws; shown after ${rec.space.shownS} s`);
     check(st && st.ready && rec.space.spaceMs <= rec.space.plazaMs, `Very Low: the space frame is not dearer than the plaza (${rec.space.spaceMs} ≤ ${rec.space.plazaMs} ms)`);
     await A.ev(() => { if (VR.game.space) VR.game.chat('/raum'); }).catch(() => {});
   } catch (e) { check(false, 'space: ' + String(e.stack || e.message || e).slice(0, 300)); }
   save();
 }
+if (rec.spaceBy.cur && rec.spaceBy.prev) { rec.space = rec.spaceBy.cur; rec.space.ratio = r3(rec.spaceBy.cur.spaceMs / rec.spaceBy.prev.spaceMs); rec.space.ratioCpu = r3(rec.spaceBy.cur.spaceCpu / rec.spaceBy.prev.spaceCpu); console.log(`  space: ${TAG.cur} ${rec.spaceBy.cur.spaceMs} ms (CPU ${rec.spaceBy.cur.spaceCpu}) · ${TAG.prev} ${rec.spaceBy.prev.spaceMs} ms (CPU ${rec.spaceBy.prev.spaceCpu}) → ×${rec.space.ratio} (CPU ×${rec.space.ratioCpu})`); }
+save();
 for (const P of [A, B]) { const e = errsOf(P); check(e.length === 0, `${P.tag}: no page error (${e.length})` + (e.length ? ': ' + e[0].slice(0, 300) : '')); }
 await A.ctx.close().catch(() => {}); await B.ctx.close().catch(() => {});
 await browser.close();
@@ -261,12 +266,12 @@ await browser.close();
 // the sheet: a row a place, this build | the previous release (PIL; a label over each picture)
 try {
   const rows = PLACES.map(p => p.id).concat(rec.space ? ['space_herz'] : []);
-  const spec = { rows: rows.map(id => ({ id, a: SHOTS + `critic_v0.49_vl_${id}_v049.png`, b: id === 'space_herz' ? null : SHOTS + `critic_v0.49_vl_${id}_v048.png`, label: id === 'space_herz' ? `space /raum herz: ${rec.space && rec.space.spaceMs} ms (plaza ${rec.space && rec.space.plazaMs} ms)` : `${id}: v0.49 ${rec.places[id] && rec.places[id].curMs} ms · v0.48 ${rec.places[id] && rec.places[id].prevMs} ms · ×${rec.places[id] && rec.places[id].ratio}` })) };
+  const spec = { rows: rows.map(id => ({ id, a: SHOTS + `${PFX}_${id}_${TAG.cur}.png`, b: SHOTS + `${PFX}_${id}_${TAG.prev}.png`, label: id === 'space_herz' ? `space /raum herz: ${TAG.cur} ${rec.spaceBy.cur && rec.spaceBy.cur.spaceMs} ms · ${TAG.prev} ${rec.spaceBy.prev && rec.spaceBy.prev.spaceMs} ms · ×${rec.space && rec.space.ratio}` : `${id}: ${TAG.cur} ${rec.places[id] && rec.places[id].curMs} ms · ${TAG.prev} ${rec.places[id] && rec.places[id].prevMs} ms · ×${rec.places[id] && rec.places[id].ratio}` })) };
   fs.writeFileSync(ROOT + '.tmp_tests/critic_vl_sheet.json', JSON.stringify(spec));
-  const py = `import json,sys\nfrom PIL import Image, ImageDraw\nS=json.load(open(sys.argv[1]));W,H=640,360;out=Image.new('RGB',(W*2+12,(H+26)*len(S['rows'])),(14,14,20));d=ImageDraw.Draw(out)\nfor i,r in enumerate(S['rows']):\n  y=i*(H+26);d.text((6,y+6),r['label']+'   [left v0.49 | right v0.48]',fill=(240,240,245))\n  for j,k in enumerate(['a','b']):\n    p=r.get(k)\n    if not p: continue\n    try: im=Image.open(p).convert('RGB').resize((W,H))\n    except Exception: continue\n    out.paste(im,(j*(W+12),y+26))\nout.save(sys.argv[2])\n`;
+  const py = `import json,sys\nfrom PIL import Image, ImageDraw\nS=json.load(open(sys.argv[1]));W,H=640,360;out=Image.new('RGB',(W*2+12,(H+26)*len(S['rows'])),(14,14,20));d=ImageDraw.Draw(out)\nfor i,r in enumerate(S['rows']):\n  y=i*(H+26);d.text((6,y+6),r['label']+'   [links neu | rechts vorher]',fill=(240,240,245))\n  for j,k in enumerate(['a','b']):\n    p=r.get(k)\n    if not p: continue\n    try: im=Image.open(p).convert('RGB').resize((W,H))\n    except Exception: continue\n    out.paste(im,(j*(W+12),y+26))\nout.save(sys.argv[2])\n`;
   fs.writeFileSync(ROOT + '.tmp_tests/critic_vl_sheet.py', py);
-  execSync(`python3 -I ${ROOT}.tmp_tests/critic_vl_sheet.py ${ROOT}.tmp_tests/critic_vl_sheet.json ${SHOTS}critic_v0.49_vl_sheet.png`);
-  console.log('  sheet test/shots/critic_v0.49_vl_sheet.png');
+  execSync(`python3 -I ${ROOT}.tmp_tests/critic_vl_sheet.py ${ROOT}.tmp_tests/critic_vl_sheet.json ${SHOTS}${PFX}_sheet.png`);
+  console.log('  sheet test/shots/' + PFX + '_sheet.png');
 } catch (e) { console.log('  (no sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
 save();
 console.log(`\n${fails ? 'FAILED ' + fails : 'ALL OK'} (${secs()})`);
