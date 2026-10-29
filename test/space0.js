@@ -229,7 +229,7 @@ console.log('bodytex');
   const mid = (8 * 512 + 256) * 4;
   check(Pc.a[mid + 3] < 128 && Pc.b[mid] > 60, `patch: the Heartland is land with its lights on (${Pc.b[mid]})`);
   let pw = 0; for (let i = 0; i < P.r.a.length; i += 4) if (P.r.a[i + 3] > 127) pw++;
-  check(pw / (512 * 128) > 0.15 && pw / (512 * 128) < 0.45, `patch: ${(pw / 512 / 128 * 100).toFixed(1)} % water`);
+  check(pw / (512 * 128) > 0.03 && pw / (512 * 128) < 0.45, `patch: ${(pw / 512 / 128 * 100).toFixed(1)} % water (u-orbit2: the home continent's lakes, rivers and coasts — bodytex.js BT.macro)`);
   const Pv = BT.job({ type: 'bodytex', body: 'patch', w: 256, h: 256, y0: 0, y1: 256, cx: 20000, cz: 9000, step: 200 }, gen);
   let vl = 0; for (let i = 0; i < Pv.b.length; i += 4) if (Pv.b[i] > 40) vl++;
   check(vl > 40, `patch: villages light up the night far from the Heartland too (${vl} lit texels of 65,536 on 51 × 51 km)`);

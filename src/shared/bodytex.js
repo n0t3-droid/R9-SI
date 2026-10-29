@@ -111,6 +111,78 @@
   const BAD = /ocean|river|beach|shore|swamp|mangrove|mushroom|peaks|ice_spikes|deep_dark|frozen_river|stony/;   // (gen_village.js: no village there)
   const CANON = { c: 0, e: 0, w: 0, t: 0, h: 0, H: 70, A: 3, river: 0, mountain: 0, ember: 0, canyon: 0, prism: 0, hz1: 1, hz2: 0, hz3: 0, heart: 0 };
   const COAST = [214, 204, 166], ICE = [206, 220, 236];   // (a water texel's albedo is the beach the coast blends into; the sea itself is the shader's, by depth)
+  // ---------------------------------------------------------------- u-orbit2 · the continents (R52-10)
+  // The generator's land and water change every few hundred metres (its continentalness has km-sized cells): from orbit,
+  // where a texel is 50 m to 600 m, that read as camouflage — lakes half the disc, no coast, no sea. Real worlds seen
+  // from orbit have continents and seas at a few scales. Here a field of our own on the sphere (three octaves: ~45, 15
+  // and 5 km) says where the far land is a continent (1) or a sea (0); in a band round its coast (0.5) the generator's own
+  // land and water show — the coasts fray into its islands, bays and lakes. Inland the generator's small lakes are land
+  // (a few big ones stay: its deep basins), out at sea its islets are sea; rivers of our own cross the inland (~100 m
+  // wide, the patch's scale). Within 1.2 km of the Heartland the generator's own pattern, everywhere, and a continent
+  // round the home (to ~30 km). The orbital view only: the world below is the generator's (the entry's hand-off at
+  // ~1.4 km shows the true ground); the planet tiles (planetlod.js) follow the macro's seas.
+  const MAC = BT.MACRO = { thr: -0.12, band: 0.05, home: [1200, 3000], bias: [0.34, 14000, 34000], river: 0.011 };
+  let macS = null;
+  const macCl = { h: 0, t: 0, mountain: 0 }, macA = [0, 0, 0], MACBC = [104, 118, 70];
+  const macN = [0, 0, 0], macO = { land: 0.5, c: 0, river: 0 };
+  BT.macro = function (X, Z, seed, out) {
+    const o = out || macO;
+    if (!macS || macS.seed !== seed) macS = { seed, a: new VR.Simplex((seed ^ 0xc0a57) >>> 0), b: new VR.Simplex((seed ^ 0x5eaf1) >>> 0), r: new VR.Simplex((seed ^ 0x41fe2) >>> 0) };
+    const d = Math.hypot(X, Z), k = ss(MAC.home[0], MAC.home[1], d);
+    o.land = 0.5; o.c = 0; o.river = 0; o.k = k; o.near = 0; o.T = 0.5; o.M = 0.5; o.ridge = 0;
+    if (k <= 0) return o;
+    const sp = BT.toSphere(X, Z), N = BT.normal(sp[0], sp[1], macN), S = macS.a, S2 = macS.b;
+    const wx = S2.n3(N[0] * 3.1, N[1] * 3.1, N[2] * 3.1) * 0.08, wz = S2.n3(N[0] * 3.1 + 7, N[1] * 3.1, N[2] * 3.1) * 0.08;
+    const x = N[0] + wx, y = N[1] + wz, z = N[2] - wx;
+    let c = S.n3(x * 2.3, y * 2.3, z * 2.3) * 0.62 + S.n3(x * 6.8, y * 6.8, z * 6.8) * 0.3 + S.n3(x * 19, y * 19, z * 19) * 0.16;
+    c += MAC.bias[0] * (1 - ss(MAC.bias[1], MAC.bias[2], d));   // (the home's continent)
+    o.c = c;
+    o.land = 0.5 + (ss(MAC.thr - MAC.band, MAC.thr + MAC.band, c) - 0.5) * k;
+    // the continents' climate: warm toward the equator (the pole is north: y = sin latitude), moist near the coasts and
+    // in broad belts, dry in the continents' hearts and the horse latitudes; mountain ranges along ridged lines
+    const lat = Math.abs(y), mo = S2.n3(x * 4.2 + 3, y * 4.2, z * 4.2) * 0.5 + S2.n3(x * 13, y * 13, z * 13 + 5) * 0.2;
+    o.T = clamp(1.2 - 0.95 * lat * lat * lat + wx * 1.8, 0, 1);
+    o.M = clamp(0.72 + mo - 0.9 * clamp(c - MAC.thr - 0.25, 0, 0.5) - 0.35 * Math.exp(-(((lat - 0.42) / 0.12) ** 2)) + 0.25 * (1 - ss(0, 0.3, c - MAC.thr)), 0, 1);
+    o.reg = ss(0.0, 0.55, macS.r.n3(x * 8.5 + 4, y * 8.5 + 9, z * 8.5));   // (the settled regions: corridors of towns)
+    const rg = 1 - Math.abs(S2.n3(x * 9 + 11, y * 9, z * 9)); o.ridge = rg * rg * ss(MAC.thr + 0.1, MAC.thr + 0.4, c);
+    // the rivers: the zero lines of a warped noise, inland only, widening downstream (toward the coast: c falling); the
+    // noise's closed loops broken into reaches that taper at their sources
+    const inl = ss(MAC.thr + MAC.band, MAC.thr + MAC.band + 0.08, c) * k;
+    o.near = 0;
+    if (inl > 0) { const rv = Math.abs(macS.r.n3(x * 7.5 + wz * 3, y * 7.5, z * 7.5 - wx * 3)); o.near = clamp(1 - rv / (MAC.river * 4), 0, 1) * inl; const wdt = MAC.river * inl * (0.5 + 0.5 * (1 - ss(MAC.thr + MAC.band, MAC.thr + 0.6, c))) * ss(-0.05, 0.3, S.n3(x * 3.7 + 5, y * 3.7, z * 3.7 + 2)); if (rv < wdt) o.river = 1 - rv / wdt; }
+    return o;
+  };
+  // the land's height over the sea as the orbit shows it (m): the macro's seas at the sea, its land over it
+  BT.macroH = function (X, Z, h, seed, cc) {
+    const m = BT.macro(X, Z, seed);
+    if (m.land < 0.15) return Math.min(h, -(2 + 60 * clamp((MAC.thr - MAC.band) - m.c, 0, 0.6)));
+    if (m.river > 0) return Math.min(h, -2 * m.river);
+    if (m.land > 0.85 && h < 0) return 1 + 12 * clamp(m.c - MAC.thr, 0, 1);
+    return h;
+  };
+
+  // u-orbit2 · where people live (R52-10: an even sprinkle of gold dots): the macro's people — along the coasts and the
+  // rivers, on warm and moist lowland, few in the deserts, the cold and on the ranges — and their towns: cells of ~1.7 km
+  // on the sphere, one town in a cell by that chance, its size (a hamlet to a city of ~1.5 km) by a second; the roads a
+  // faint web between where many live. The dark country between stays dark
+  BT.people = function (m) {
+    if (!(m.k > 0)) return 0;
+    const coast = Math.exp(-(((m.c - MAC.thr - MAC.band) / 0.08) ** 2));
+    const warm = ss(0.18, 0.55, m.T), wet = ss(0.12, 0.4, m.M);
+    return clamp((0.04 + 1.0 * Math.max(coast, m.near * 0.9)) * warm * wet * (1 - 0.8 * m.ridge) * (0.15 + 1.6 * (m.reg || 0)), 0, 1) * m.k;
+  };
+  BT.town = function (N, P, seed) {
+    const M = VR.M, F = 60, gx = N[0] * F, gy = N[1] * F, gz = N[2] * F, cx = Math.floor(gx), cy = Math.floor(gy), cz = Math.floor(gz);
+    const hk = (cx * 73856093) ^ (cy * 19349663), h1 = M.hashf2(hk, cz, seed ^ 0x70e1);
+    if (h1 > P * 2.3 - 0.06) return 0;
+    const h2 = M.hashf2(hk, cz, seed ^ 0x51ce), h3 = M.hashf2(hk, cz, seed ^ 0x3c3), h4 = M.hashf2(hk, cz, seed ^ 0x9f1), h5 = M.hashf2(hk, cz, seed ^ 0x2d7);
+    const sz = 0.14 + 0.5 * h2 * h2 * (0.3 + P);   // (the town's radius in cells)
+    const dx = gx - (cx + 0.3 + 0.4 * h3), dy = gy - (cy + 0.3 + 0.4 * h4), dz = gz - (cz + 0.3 + 0.4 * h5), d = Math.sqrt(dx * dx + dy * dy + dz * dz) / sz;
+    if (d >= 1) return 0;
+    const q = 1 - d;
+    return (110 + 145 * h2) * q * Math.sqrt(q);
+  };
+
   // the sampler: a cell's colour by its biome (lod.js LOD.look once a biome, the canopy blended in — the far horizon's
   // colours), the water by depth, snow by height; the clouds a field of our own on the sphere
   function sampler(g) {
@@ -135,6 +207,26 @@
     return function (X, Z, o) {
       const cl = g.computeClimate(X, Z), y = Math.round(cl.H), bi = g.biomeFor(cl, y), c = land(bi, cl, X, Z, y);
       const cold = (c.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
+      if (BT.ALB2 && BT.MACRO) {
+        // u-orbit2: the continents' say over the generator's land and water (BT.macro), the inland lakes the land's own
+        // colour at their shores (the old sand rims read as tan blotches), the sea's coasts a little sand
+        const hm = BT.macroH(X, Z, cl.H - SEA, g.seed, cl.c), m = macO;
+        if (hm >= 0) {
+          BT.albedo(cl, hm, y >= SEA ? c.t : MACBC, c.kd === 6 && y >= SEA, o); o[3] = 0; o[4] = 0;   // (a lake made land: no water biome's colour)
+          o[5] = c.live && hm > 2 && y <= 150 && cl.river < 0.3 && !(cl.ember > 0.45) ? 1 : 0; o[6] = BT.hcode(hm);
+          // far from home the continents' own climate takes over the generator's few-hundred-metre mosaic (a speckle
+          // from orbit): soft gradients of desert, steppe, grass, forest and tundra, rock and snow on the ranges
+          const kc = 0.95 * ss(1500, 6000, Math.hypot(X, Z)) * m.k;
+          if (kc > 0) { macCl.h = m.M * 2 - 1; macCl.t = m.T * 2 - 1; macCl.mountain = m.ridge * 0.6; BT.albedo(macCl, hm + m.ridge * 75, MACBC, false, macA); for (let q = 0; q < 3; q++) o[q] += (macA[q] - o[q]) * kc; if (kc > 0.5) o[5] = hm > 1 && hm < 100 && m.ridge < 0.5 ? 1 : 0; }   // (far off, the macro's land is where people can live)
+          return o;
+        }
+        const ice = cold || c.frozen || (m.land < 0.5 && c.temp < 0.15);
+        BT.albedo(cl, 0, c.t, false, o);
+        const t = ice ? ICE : COAST, sk = ice ? 1 : m.land < 0.5 ? 0.55 : 0.12;
+        o[0] += (t[0] - o[0]) * sk; o[1] += (t[1] - o[1]) * sk; o[2] += (t[2] - o[2]) * sk;
+        o[3] = 1; o[4] = ice ? 1 : 0; o[5] = 0; o[6] = BT.hcode(hm);
+        return o;
+      }
       if (BT.ALB2 && y >= SEA) { BT.albedo(cl, y - SEA, c.t, c.kd === 6, o); o[3] = 0; o[4] = 0; o[5] = c.live && y > SEA + 2 && y <= 150 && cl.river < 0.3 && !(cl.ember > 0.45) ? 1 : 0; o[6] = BT.hcode(cl.H - SEA); return o; }   // u-orbitlod: one albedo
       if (y < SEA) {
         const ice = cold || c.frozen;
@@ -181,7 +273,13 @@
       let v = 0, amp = 1, f = 9.5, norm = 0;
       for (let o = 0; o < oct; o++) { v += S.n3(px * f, py * f, pz * f) * amp; norm += amp; amp *= o < 2 ? 0.7 : 0.55; f *= 2.07; }
       v /= norm;
-      return ss(0.0, 0.3, v + 0.06 * Math.cos(y * 9.0));   // (a hint of latitude belts)
+      if (!BT.MACRO) return ss(0.0, 0.3, v + 0.06 * Math.cos(y * 9.0));   // (a hint of latitude belts)
+      // u-orbit2 (R52-10: flat cut-outs): the weather's systems (~50 km: fronts and the lows' shields, the fair high
+      // pressure between) gather the field; inside them the density grows gradually to thick cores — a texture the
+      // shader's light and relief can show, not a stencil
+      const sys = Wx.n3(x * 2.1 + 3.3, y * 2.1, z * 2.1) * 0.75 + Wy.n3(x * 4.4, y * 4.4 + 1.7, z * 4.4) * 0.25 + 0.05 * Math.cos(y * 9.0);
+      const m = ss(-0.28, 0.32, sys);
+      return clamp(ss(-0.16, 0.62, v + 0.42 * (m - 0.42)) * (0.25 + 0.75 * m), 0, 1);
     };
   }
   const putA = (a, i, o) => { a[i] = clamp(o[0], 0, 255); a[i + 1] = clamp(o[1], 0, 255); a[i + 2] = clamp(o[2], 0, 255); a[i + 3] = o[3] * 255; };
@@ -194,7 +292,7 @@
     return v;
   }
   function herz(g, m, w, h, y0, y1, a, b) {
-    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M, POP = new VR.Simplex((g.seed ^ 0x9e0) >>> 0);
+    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M, POP = new VR.Simplex((g.seed ^ 0x9e0) >>> 0), ROADW = new VR.Simplex((g.seed ^ 0x40ad) >>> 0);
     const oct = w >= 1024 ? 5 : 4;   // (the fifth octave's cells are ~0.6 km: below a Very Low texel, only noise there)
     for (let j = y0; j < y1; j++) {
       const th = (j + 0.5) / h * Math.PI;
@@ -209,7 +307,11 @@
         // twelve lit, gathered into clusters of ~15 km and empty land between (points and webs from far, not a glow) —
         // far views only
         let L = 0;
-        if (o[5]) { const hsh = M.hashf2(i, j, g.seed ^ 0x11657); if (hsh < 0.19) { const pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7))); if (hsh < pl) L = 60 + (hsh / pl) * 140; } }   // (pl ≤ 0.185)
+        if (BT.MACRO && macO.k > 0) {
+          // u-orbit2: the towns where the people are, the roads between them
+          if (o[5] || macO.river > 0) { const P = BT.people(macO); if (P > 0.02) { L = BT.town(N, P, g.seed); if (!L && P > 0.3 && Math.abs(ROADW.n3(N[0] * 16, N[1] * 16, N[2] * 16)) < 0.04 && M.hashf2(i, j, g.seed ^ 0x40d) < 0.15 + 0.45 * P) L = 26 + 50 * P; } }
+          L *= macO.k;
+        } else if (o[5]) { const hsh = M.hashf2(i, j, g.seed ^ 0x11657); if (hsh < 0.19) { const pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7))); if (hsh < pl) L = 60 + (hsh / pl) * 140; } }   // (pl ≤ 0.185)
         if (Math.hypot(p[0], p[1]) < 1500) L = 255;
         b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], oct) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
@@ -266,8 +368,12 @@
         let L = 0;
         for (const v of VR_) { const dx = x - v[0], dz = z - v[1], r = v[2] * v[4] + step * 0.4; if (dx * dx + dz * dz < r * r) { const q = 1 - (dx * dx + dz * dz) / (r * r); L = Math.max(L, v[3] * q * Math.sqrt(q) * (0.55 + 0.45 * M.hashf2(Math.floor(x / step), Math.floor(z / step), 0x5e7))); } }
         if (Math.abs(x) < 1400 && Math.abs(z) < 1400) L = Math.max(L, heartLight(x, z, step));
+        // u-orbit2: away from home the macro's people — the villages brighter on the coasts and the rivers, fainter in the
+        // empty country; the macro's towns where the generator has none; the farmsteads only where many live
+        let fs = 0.07;
+        if (BT.MACRO && macO.k > 0) { const P = BT.people(macO), kf = ss(1500, 6000, Math.hypot(x, z)); L *= 1 - kf * (0.6 - Math.min(0.9, P * 1.5)); if (o[5] || macO.river > 0) L = Math.max(L, BT.town(N, P, g.seed) * kf); fs = 0.07 * (1 - kf * (1 - clamp(P * 1.5, 0.1, 1))); }
         // the farmsteads and roads between: a faint scatter on liveable land
-        if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < 0.07) L = 30;
+        if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < fs) L = 30;
         // u-orbitlod: the roads between them — a web of curving lines (|noise| near 0, ~1.4-km meshes) on liveable land,
         // lit sparsely: the villages' lights joined into webs at night, as real towns are by their roads
         if (!L && o[5] && BT.ALB2 && Math.abs(ROADS.n2(x / 1400, z / 1400)) < step * 0.00045) L = 44;

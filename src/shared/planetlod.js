@@ -67,7 +67,9 @@
     const H = new Float32Array(G * G);
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
       const X = x0 + (i - 1) * s, Z = z0 + (j - 1) * s;
-      const h = g && g.computeClimate ? g.computeClimate(Math.round(X), Math.round(Z)).H - SEA : 0;
+      const cl = g && g.computeClimate ? g.computeClimate(Math.round(X), Math.round(Z)) : null;
+      let h = cl ? cl.H - SEA : 0;
+      if (cl && BT.macroH) h = BT.macroH(X, Z, h, g.seed, cl.c);   // u-orbit2: the continents' seas (bodytex.js BT.macro)
       H[j * G + i] = Math.max(0, h);   // (the sea: its surface)
     }
     const P = new Float32Array(G * G * 3), n3 = [0, 0, 0];
