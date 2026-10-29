@@ -140,6 +140,7 @@ try {
     await sceneTo(2.3);
     s = await state();
     console.log('     ' + JSON.stringify(s.scene));
+    await wait(1200);   // (the subtitle's fade and the skip hint run on the page's own clock)
     await draw(); await shot('c1_funke_wakes');
     await sceneTo(6.5);
     await page.keyboard.press('KeyE'); await run(4);
@@ -275,7 +276,7 @@ try {
     check(!!boarded && boarded.pilot, 'the shuttle boarded');
     if (!boarded) return;
     await run(30);
-    await ev(() => { const g = VR.game; g.env.day = 2; g.env.setTime(5200); VR.SpaceFlight.debug.orbit(g, 0, 40, 3063); const fl = g.flight; fl.view = 1; g.camMode = 1; fl.headPitch = 0.45; fl.headYaw = 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; });
+    await ev(() => { const g = VR.game; g.env.day = 2; g.env.setTime(5200); VR.SpaceFlight.debug.orbit(g, 0, 40, 3063); VR.Ascent.game = g; const fl = g.flight;   /* (straight into orbit there is no climb frame: Ascent.frame never ran, its game unset — the space layers need it) */ fl.view = 1; g.camMode = 1; fl.headPitch = 0.45; fl.headYaw = 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; });
     const t0 = Date.now(); let sp = null;
     for (;;) { await run(6, 1); sp = await ev(() => { const need = VR.SpaceScene.cur_need || []; return { done: need.filter(s => s.done).length, need: need.length }; }); if ((sp.need && sp.done === sp.need) || Date.now() - t0 > 90000) break; await wait(60); }
     for (let i = 0; i < 60; i++) { await run(4, 1); const s = await ev(() => { const PG = VR.PlanetLODGL; return PG ? { n: PG.stats.tiles, left: PG.pending() } : null; }); if (!s || !s.n || s.left === 0) break; await wait(80); }
@@ -290,6 +291,13 @@ try {
     check(!!st.station, 'the Ringstation\'s beacon in the space scene\'s list (' + JSON.stringify(st) + ')');
     // (the blink's bright phase for the picture: the page's clock decides it — a few tries)
     for (let i = 0; i < 6; i++) { await draw(null, 1); await draw(null, 1); const b = await ev(() => VR.StoryPlay.station ? VR.StoryPlay.station.blink : 0); if (b > 0.7) break; await wait(200); }
+    await ev(() => {
+      const A = VR.Ascent, SF = VR.SpaceFlight, D = window.__diag = { sky: 0, layers: 0, draws: 0, why: null };
+      if (!A.__d) { A.__d = A.drawSky; A.drawSky = function (r, E, F) { D.sky++; D.why = { climb: !!E.climb, space: !!(E.climb && E.climb.space), game: !!A.game, ss: !!(VR.SpaceScene && VR.SpaceScene.state), cur: !!SF.cur, n: SF.cur ? SF.cur.draws.length : -1 }; return A.__d.apply(this, arguments); }; }
+      if (!SF.__dl) { SF.__dl = SF.drawLayers; SF.drawLayers = function (r, fr, L) { D.layers++; const n = SF.__dl.apply(this, arguments); D.draws += n; D.L = { bg: L.bg, bodies: L.bodies, herz: L.herz, strict: L.strict }; return n; }; }
+    });
+    await draw(null, 1);
+    console.log('     diag: ' + JSON.stringify(await ev(() => window.__diag)));
     console.log('     space: ' + JSON.stringify(await ev(() => { const g = VR.game, r = g.renderer, SS = VR.SpaceScene, need = SS.cur_need || []; return { draws: r.stats.draws, tris: Math.round(r.stats.tris), need: need.length, done: need.filter(q => q.done).length, regime: g.flight && g.flight.regime, view: g.flight && g.flight.view, hp: g.flight && g.flight.headPitch, cam: VR.StoryPlay.station ? VR.StoryPlay.station.dir.map(v => +v.toFixed(3)) : null }; })));
     await shot('c3_station_beacon');
     N.c3 = { o, st };

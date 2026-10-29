@@ -253,7 +253,7 @@
         case 'up': {
           // the sky's subject on the upper third, the land's edge in the frame below it when the subject stands low enough
           const C = [pe[0] - f[0] * 1.5, pe[1] - 0.3, pe[2] - f[2] * 1.5], fov = 66 - 8 * smooth(u), c = lookAt(C, Q, fov, base);
-          c.pitch = Math.max(c.pitch * 0.45, c.pitch - fov * DEG * 0.3);
+          c.pitch = Math.max(c.pitch * 0.55, c.pitch - fov * DEG * 0.13);   // (inside the letterbox: the subject a sixth above the middle)
           return c;
         }
         case 'limb': {
