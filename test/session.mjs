@@ -130,11 +130,36 @@ function pageHelpers(win, VRx) {
     return R.s;
   };
   // the stand height at (x, z) near y0: a solid block with two free above it (null: not loaded or none)
-  S.groundY = function (x, z, y0) {
+  // a-regie (R52-13): sky — only a stand under the open sky (no solid within 14 blocks above: never inside a house)
+  S.groundY = function (x, z, y0, sky) {
     const g = VR.game, w = g.world, T = VR.R.T, F = VR.F, X = Math.floor(x), Z = Math.floor(z);
     const solid = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
-    for (let y = Math.floor(y0) + 8; y > y0 - 24; y--) if (solid(w.getBlock(X, y, Z)) && !solid(w.getBlock(X, y + 1, Z)) && !solid(w.getBlock(X, y + 2, Z))) return y + 1;
+    for (let y = Math.floor(y0) + 8; y > y0 - 24; y--) if (solid(w.getBlock(X, y, Z)) && !solid(w.getBlock(X, y + 1, Z)) && !solid(w.getBlock(X, y + 2, Z))) {
+      if (sky) { let open = true; for (let k = 3; k < 16 && open; k++) if (solid(w.getBlock(X, y + k, Z))) open = false; if (!open) continue; }
+      return y + 1;
+    }
     return null;
+  };
+  S.solidAt = function (x, y, z) { const g = VR.game, T = VR.R.T, F = VR.F, b = g.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE)); };
+  // a-regie (R52-13): a wall ahead (two blocks high at 1.3 m: no auto-jump takes it) → the first free heading of ±0.6, ±1.2 rad
+  S.dodge = function (p) {
+    const y = p.pos[1], wallAt = (a, d) => { const x = p.pos[0] - Math.sin(a) * d, z = p.pos[2] - Math.cos(a) * d; return S.solidAt(x, y + 0.5, z) && S.solidAt(x, y + 1.5, z); };
+    if (!wallAt(p.yaw, 1.3)) return 0;
+    for (const da of [0.6, -0.6, 1.2, -1.2]) if (!wallAt(p.yaw + da, 1.3) && !wallAt(p.yaw + da, 2.6)) return da;
+    return 0;
+  };
+  // a-regie (R52-13): how much of the view a solid holds within 1.5 m of the eye (a 7 × 4 ray grid) — a frame from inside
+  // a box or against a wall
+  S.occ = function () {
+    const g = VR.game, c = g.cam; if (!c || !g.world) return 0;
+    const yaw = c.yaw, pit = c.pitch || 0, cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit), tv = Math.tan((c.fov || 1.2) / 2), th = tv * (g.renderer && g.renderer.W ? g.renderer.W / g.renderer.H : 16 / 9);
+    let hit = 0, n = 0;
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 7; i++) {
+      const u = (i / 6) * 2 - 1, v = (j / 3) * 2 - 1;
+      let dx = -sy * cp + cy * u * th + sy * sp * v * tv, dy = sp + cp * v * tv, dz = -cy * cp - sy * u * th + cy * sp * v * tv; const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l; n++;
+      for (let t = 0.25; t <= 1.5; t += 0.25) if (S.solidAt(c.x + dx * t, c.y + dy * t, c.z + dz * t)) { hit++; break; }
+    }
+    return hit / n;
   };
   S.set = function (mode) {
     S.mode = mode || { kind: 'idle' }; S.done = false; S.t = 0;
@@ -148,7 +173,9 @@ function pageHelpers(win, VRx) {
     if (g.wow && g.wow.active) { release(I); return; }                 // a wow moment holds the view: the player stands
     const s = S.progress(R, p.pos[0], p.pos[2]);
     if (s >= R.L - 1.2) { release(I); S.done = true; return; }
-    const tg = S.pointAt(R, s + 3.5), off = turnTo(p, tg[0], tg[1], dt, 3.2);
+    const tg = S.pointAt(R, s + 3.5);
+    let off = turnTo(p, tg[0], tg[1], dt, 3.2);
+    const dg = S.dodge(p); if (dg) { p.yaw += Math.max(-3.2 * dt, Math.min(3.2 * dt, dg)); off = Math.min(off, 0.5); st.dodges = (st.dodges | 0) + 1; }   // a-regie: round a wall, not into it
     p.pitch += (-0.06 - p.pitch) * Math.min(1, dt * 3);
     if (off > 1.1) I.keys.delete('KeyW'); else I.keys.add('KeyW');
     if (s > st.s0 + 0.5) { st.s0 = s; st.t0 = S.t; }
@@ -156,7 +183,8 @@ function pageHelpers(win, VRx) {
     if (st.jumpT > 0) { st.jumpT -= dt; if (st.jumpT <= 0) I.keys.delete('Space'); }
     else if (still > 1.5 && S.t - st.lastJump > 1.2) { I.keys.add('Space'); st.jumpT = 0.25; st.lastJump = S.t; S.stat.jumps++; }
     if (still > 5) {
-      const q = S.pointAt(R, s + 4), gy = S.groundY(q[0], q[1], p.pos[1]);
+      let q = S.pointAt(R, s + 4), gy = S.groundY(q[0], q[1], p.pos[1], true);   // a-regie: a hop lands under the open sky
+      for (let k = 8; gy === null && k <= 24; k += 4) { q = S.pointAt(R, s + k); gy = S.groundY(q[0], q[1], p.pos[1], true); }
       if (gy !== null) { p.pos[0] = q[0]; p.pos[1] = gy; p.pos[2] = q[1]; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } S.stat.hops++; S.log.push(['hop', +(+g.time).toFixed(1), Math.round(q[0]), Math.round(q[1])]); R.s = Math.min(R.L, s + 4); }
       st.s0 = R.s; st.t0 = S.t;
     }
@@ -249,9 +277,10 @@ function pageHelpers(win, VRx) {
   S.capture = function () {
     const g = VR.game, src = g.canvas || (typeof document !== 'undefined' ? document.getElementById('gl') : null); if (!src || !src.width) return false;
     const c = S.cv || (S.cv = document.createElement('canvas')); c.width = 480; c.height = 270;
-    try { c.getContext('2d').drawImage(src, 0, 0, 480, 270); S.pics.push({ t: g.time, url: c.toDataURL('image/jpeg', 0.74) }); return true; } catch (e) { S.log.push(['capture', String(e && e.message)]); return false; }
+    try { c.getContext('2d').drawImage(src, 0, 0, 480, 270); S.pics.push({ t: g.time, url: c.toDataURL('image/jpeg', 0.74), occ: +S.occ().toFixed(2) }); return true; } catch (e) { S.log.push(['capture', String(e && e.message)]); return false; }
   };
-  S.picsAt = function (ts) { return ts.map(t => { let best = null, bd = Infinity; for (const q of S.pics) { const d = Math.abs(q.t - t); if (d < bd) { bd = d; best = q; } } return best ? { t: best.t, url: best.url } : null; }); };
+  // (a-regie: a picture over 30 % occluded gives way to a clear one within 3 s; else it is marked)
+  S.picsAt = function (ts) { return ts.map(t => { let best = null, bd = Infinity; for (const q of S.pics) { const d = Math.abs(q.t - t) + (q.occ > 0.3 ? 3 : 0); if (d < bd) { bd = d; best = q; } } return best ? { t: best.t, url: best.url, occ: best.occ || 0 } : null; }); };
   // the world ahead: columns missing within r chunks, sections still to mesh within rm
   S.ready = function (r, rm) {
     const g = VR.game, w = g.world, p = g.player; if (!w || !p) return { miss: 99, dirty: 0 };
@@ -302,7 +331,7 @@ function chooseFrames(rec) {
 }
 function frameLabels(f, rec) {
   const s = f.sample || {};
-  const l1 = `${f.i} · ${mmss(f.t)} · ${PLACE_DE[s.place] !== undefined ? PLACE_DE[s.place] : s.place || '—'} · ${f.part}`;
+  const l1 = `${f.occ > 0.3 ? `⚠ verdeckt ${Math.round(f.occ * 100)} % · ` : ''}${f.i} · ${mmss(f.t)} · ${PLACE_DE[s.place] !== undefined ? PLACE_DE[s.place] : s.place || '—'} · ${f.part}`;
   const evs = f.events.slice().sort((p, q) => q.w - p.w || p.t - q.t).slice(0, 4).map(e => `${evName(e)} ${e.w}${e.inView ? '✓' : '✗'}`);
   const more = f.events.length > 4 ? ` +${f.events.length - 4}` : '';
   const env = [s.movers ? `${s.movers} Beweger` : '0 Beweger', s.landmark ? LM_DE[s.landmark] || s.landmark : '', s.sky ? SKY_DE[s.sky] || s.sky : ''].filter(Boolean).join(' · ');
@@ -532,8 +561,9 @@ async function session(type, setup, script) {
     const r = await play(t0, DUR, false); tNow = r.t; P.t1 = +tNow.toFixed(2); rec.parts.push(P);
   }
   await ev(() => window.__S.set({ kind: 'idle' }));
-  const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), error: L.error, stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice() }; }, [t0]);
+  const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), error: L.error, stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice(), regie: VR.Regie && VR.Regie.stats ? VR.Regie.stats(g) : null, acts: VR.RegieActs ? JSON.parse(JSON.stringify(VR.RegieActs.stats)) : null, foes: VR.Foes && VR.Foes.stats ? Object.assign({}, VR.Foes.stats) : null }; }, [t0]);
   rec.tod1 = Math.round(end.tod);
+  rec.regie = { stats: end.regie, acts: end.acts, foes: end.foes };   // a-regie: what the Regie started and why its own acts waited
   rec.played = +(end.t - t0).toFixed(2);
   rec.events = end.events.filter(e => e.t - t0 <= DUR + 1e-6).map(e => Object.assign({}, e, { t: +(e.t - t0).toFixed(3) }));
   rec.samples = end.samples.filter(s => s.t - t0 <= DUR + 1e-6).map(s => Object.assign({}, s, { t: +(s.t - t0).toFixed(3) }));
@@ -549,7 +579,7 @@ async function session(type, setup, script) {
   const frames = [];
   for (let k = 0; k < rec.frames.length; k++) {
     const f = rec.frames[k], q = pics[k], file = `${SHOTS}session_${type}_${String(f.i).padStart(2, '0')}.jpg`;
-    if (q && q.url) { fs.writeFileSync(file, Buffer.from(q.url.split(',')[1], 'base64')); f.file = file.replace(ROOT, ''); f.pic = +(q.t - t0).toFixed(2); }
+    if (q && q.url) { fs.writeFileSync(file, Buffer.from(q.url.split(',')[1], 'base64')); f.file = file.replace(ROOT, ''); f.pic = +(q.t - t0).toFixed(2); f.occ = q.occ; }
     frames.push(Object.assign({}, f, { file: q && q.url ? file : null }));
   }
   const gq = pics[pics.length - 1];
@@ -563,6 +593,9 @@ async function session(type, setup, script) {
   console.log(`  gaps: ${rec.gaps.map(g => `${Math.round(g.d)} s ${mmss(g.a)}–${mmss(g.b)} at ${JSON.stringify(g.places)} movers ${g.movers.toFixed(1)} lm ${JSON.stringify(g.landmarks)} sky ${g.sky.toFixed(2)} input ${JSON.stringify(Object.fromEntries(Object.entries(g.inputs).map(([k, v]) => [k, +v.toFixed(2)])))}`).join(' | ')}`);
   console.log(`  cost: ${JSON.stringify(rec.cost)} · run: ${JSON.stringify(Object.assign({}, rec.run, { walkerLog: rec.run.walkerLog.length }))} (${secs()})`);
   check(rec.played >= 290, `${type}: ${rec.played.toFixed(0)} s of play`);
+  console.log(`  regie: ${JSON.stringify(rec.regie)}`);
+  const occF = frames.filter(f => f.occ > 0.3);
+  check(occF.length === 0, `${type}: no sheet frame over 30 % occluded within 1.5 m of the eye (${occF.map(f => f.i + ': ' + Math.round(f.occ * 100) + ' %').join(', ') || 'none'})`);
   check(rec.samples.length >= rec.played * 0.95 - 2 && rec.events.length > 0, `${type}: ${rec.samples.length} samples and ${rec.events.length} events recorded`);
   check(fs.existsSync(`${SHOTS}session_${type}.json`) && !!sheet, `${type}: session_${type}.json and session_${type}_sheet.png written (${frames.filter(f => f.file).length} of 12 frames)`);
   check(rec.cost.errors === 0, `${type}: the log never failed (${rec.cost.errors} errors${rec.cost.error ? ': ' + rec.cost.error.split('\n')[0] : ''})`);
