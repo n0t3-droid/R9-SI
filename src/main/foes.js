@@ -812,7 +812,7 @@
     if (fk && fk.on && fk.on() && fk.show) fk.show(txt); else if (g.ui && g.ui.hint) g.ui.hint(txt, 4200);
     return true;
   };
-  // the first encounter: a Pulse Blaster if the player has none (it never harms people or animals)
+  // the first encounter: a Calm Beam if the player has none (it never harms people or animals)
   F.gift = function (g) {
     const p = g.player, inv = p && p.inv; if (!inv || !VR.itemDef || !VR.itemDef('laser_blaster')) return;
     const r0 = rec(); if (!r0 || (r0.foeSaid && r0.foeSaid.gift)) return;

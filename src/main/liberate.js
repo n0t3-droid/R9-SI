@@ -208,8 +208,11 @@
   };
   L.placeOf = (s) => ({ id: s.id, x: s.x, y: s.y, z: s.z });
   // the outposts' names: our own words, chosen by the place
-  L.NAMES = ['Nordwind', 'Kupferhang', 'Sternwacht', 'Morgenrot', 'Silbergrat', 'Funkenfeld', 'Weitblick', 'Glimmerhöhe', 'Abendtau', 'Wolkenrast', 'Lichtung', 'Steinbogen', 'Bernsteinkamm', 'Himmelstor', 'Westwacht', 'Taufeld'];
-  L.nameOf = (s) => L.NAMES[Math.floor(L.rng('name:' + s.id)() * L.NAMES.length)];
+  // (f-rules, review v0.51 R52-01: searched, in both languages — test/names.js lists each one) the slot order stays:
+  // an outpost keeps its slot (rng by its id; saves hold only the id), only the words changed
+  L.NAME_KEYS = ['nordwiese', 'kupferhang', 'sternwiese', 'fruehlicht', 'silbergrat', 'funkenfeld', 'weitblick', 'glimmerhoehe', 'abendtau', 'wolkenrast', 'lichtung', 'steinbogen', 'bernsteinkamm', 'himmelsau', 'westhain', 'taufeld'];
+  L.NAMES_DE = ['Nordwiese', 'Kupferhang', 'Sternwiese', 'Frühlicht', 'Silbergrat', 'Funkenfeld', 'Weitblick', 'Glimmerhöhe', 'Abendtau', 'Wolkenrast', 'Lichtung', 'Steinbogen', 'Bernsteinkamm', 'Himmelsau', 'Westhain', 'Taufeld'];
+  L.nameOf = (s) => { const i = Math.floor(L.rng('name:' + s.id)() * L.NAME_KEYS.length); return VR.I18N ? VR.I18N.tx('g.lib.n.' + L.NAME_KEYS[i], null, L.NAMES_DE[i]) : L.NAMES_DE[i]; };
   // the moment's beats (s from the start)
   L.TIMELINE = [{ t: 0, k: 'flicker' }, { t: 0.6, k: 'cyan' }, { t: 0.6, k: 'beam' }, { t: 0.75, k: 'ring' }, { t: 0.9, k: 'music' }, { t: 1.6, k: 'stand' }, { t: 2.2, k: 'funke' }, { t: 2.4, k: 'banner' }, { t: 6.2, k: 'end' }];
   // ---------------------------------------------------------------- a-foes2 · the land heals, the moment's camera (pure)

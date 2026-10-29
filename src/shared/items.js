@@ -67,7 +67,7 @@
   for (const m in ARM) SLOTS.forEach((s, i) => item(m + '_' + s, { cat: 'combat', stack: 1, armor: ARM[m][i], slot: i, mat: m, color: ARM[m][4], texKey: 'armor:' + s + ':' + m, dur: 100 + i * 20 }));
 
   // ---------------- Starforge gadgets (signature tech) ----------------
-  item('laser_blaster', { cat: 'tech', stack: 1, use: 'laser', dmg: 7, name: 'Pulse Blaster', energy: 1 });
+  item('laser_blaster', { cat: 'tech', stack: 1, use: 'laser', dmg: 7, name: 'Calm Beam', energy: 1 });
   item('mining_laser', { cat: 'tech', stack: 1, use: 'minelaser', name: 'Mining Laser', energy: 1 });
   item('builder_wand', { cat: 'tech', stack: 1, use: 'wand', name: 'Builder Wand' });
   item('jetpack', { cat: 'tech', stack: 1, slot: 1, armor: 2, jetpack: true, name: 'Jetpack' });
