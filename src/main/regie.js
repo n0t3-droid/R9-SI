@@ -107,6 +107,17 @@
   };
   // a-regie: a self-scheduling source (the pads' visitors, the traffic's passes) tells what it started after allow said yes
   R.note = function (g, w, kind, act) { const S = R.of(g); if (S) { S.sched.note(now(g), w || 2, kind || 'ambient', act); S.st.noted = (S.st.noted | 0) + 1; } };
+  // a-regie: is the screen busy — a weighted event seen or started within the spacing, a wow moment, an unseen vista
+  // within 40 m (its moment is coming)? A toast (codex.js) waits meanwhile (≤ HOLD s)
+  R.HOLD = 15;
+  R.busy = function (g) {
+    const S = R.of(g); if (!S) return false;
+    const t = now(g), q = S.sched; if (t - Math.max(q.last2, q.lastStart) < q.o.space || q.scene) return true;
+    if (g.wow && g.wow.active) return true;
+    const P = g.player && g.player.pos, WM = VR.WowMoment;
+    if (P && g.wow && g.wow.list) for (const v of g.wow.list.values()) { if (v.wow === false || Math.abs(v.x - P[0]) > 40 || Math.abs(v.z - P[2]) > 40) continue; if (Math.hypot(v.x - P[0], v.z - P[2]) < 40 && !(WM && WM.seen && WM.seen(g.meta, v.id))) return true; }
+    return false;
+  };
   R.inScene = (g, on) => { const S = R.of(g); if (S) S.sched.scene = !!on; };
   function bind(g) {
     const seed = ((g.meta && g.meta.seed) >>> 0) || 0x5eed, A = VR.Adventure;

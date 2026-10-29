@@ -116,6 +116,7 @@
       const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(text); else if (g.ui && g.ui.hint) g.ui.hint(text, 4000);
       if (g.audio && g.audio.play) { try { g.audio.play('ping', { vol: 0.5 }); } catch (e) { /* a sound */ } }
       try { card(this); } catch (e) { /* the card is a convenience: [V] and the journal work without it */ }
+      if (VR.EventLog) VR.EventLog.emit('story', 'offer:' + b.id, 2, null, 'story');   // a-regie: the offer is seen (Funke's line, the card) — not a beat (sessionstats counts beats without it)
       return true;
     }
     offerTick(dt) {

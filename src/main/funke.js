@@ -696,6 +696,7 @@ void main() {
       if (this.line && this.line.hint && !(o && o.hint)) this.unhide();
       this.line = { text, until: T0 + dur, hint: (o && o.hint) || null, picto: (o && o.picto) || null };
       F.last = { text, t: T0, hint: this.line.hint };
+      if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('social', 'funke', 1, null, 'funke');   // a-regie: a companion's line in the view (weight 1: no gap ends with it)
       if (this.out) this.out(text);
       this.blips(text);
       const el = bubble(); if (!el) return;

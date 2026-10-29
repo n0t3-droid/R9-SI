@@ -44,9 +44,11 @@
       this.t = 0; this.nightStart = null;
       this.seen = new Set();
     }
-    unlock(id, quiet) {
+    unlock(id, quiet, held) {
       if (this.found[id]) return false;
       const e = this.byId.get(id); if (!e) return false;
+      // a-regie: a find's toast waits while the screen is busy (regie.js Regie.busy — ≤ 15 s), so two things never stack
+      if (!quiet && !held && VR.Regie && VR.Regie.busy && VR.Regie.busy(this.g)) { const q = this.held || (this.held = []); if (!q.some(h => h.id === id)) q.push({ id, t: +(this.g.time || 0) }); return true; }
       if (VR.EventLog) VR.EventLog.found(id);   // e-log: a discovery, a wonder's quiet unlock too (eventlog.js)
       this.found[id] = Date.now();
       if (quiet) return true;
@@ -69,6 +71,7 @@
       if (!p || !w) return;
       this.t -= dt; if (this.t > 0) return;
       this.t = 1;
+      if (this.held && this.held.length) { const h = this.held[0]; if (!(VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) || (g.time || 0) - h.t >= ((VR.Regie && VR.Regie.HOLD) || 15)) { this.held.shift(); this.unlock(h.id, false, true); } }   // a-regie
       const x = Math.floor(p.pos[0]), y = Math.floor(p.pos[1]), z = Math.floor(p.pos[2]);
       const b = VR.BIOMES[w.biomeAt(x, z)];
       if (b) {
