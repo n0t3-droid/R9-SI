@@ -334,6 +334,9 @@
     const g = fl.g, a = A.ascOf(fl), st = a.st, S = UNI().home;
     if (fl.regime !== 'space' || a.jump || a.cruise || !S.body(to)) return false;
     C.ensureScene(g);
+    // (the engine's smoke the orbit left on the ship's frozen map spot — u-ascent's space regime reads the orbit's speed —
+    // would hang beside the ship all the way: the ribbons start afresh)
+    if (g && g.trails && g.trails.clear) g.trails.clear();
     const sys = S.state(st.t), pf = sys.b[st.frame];
     set3(_P, pf.r[0] + st.r[0], pf.r[1] + st.r[1], pf.r[2] + st.r[2]); set3(_V, pf.v[0] + st.v[0], pf.v[1] + st.v[1], pf.v[2] + st.v[2]);
     const from = st.frame === 'helia' ? S.dominant(_P, st.t) : st.frame;
@@ -596,11 +599,14 @@
     // (run 2: big round puffs thrown up like smoke; regolith in a vacuum flies flat and fast, in a thin sheet, and settles)
     const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 4 : 14) * k + 1);
     const gy = b.pos[1] - alt, col = DUST[g.dim] || _col;
+    // (the particles are lit by the sky's light, which an airless moon keeps up at night: the dust by the sun's height —
+    // run 3's plume shone white over Basalt's night side)
+    const E = g.env && g.env.E, sy = E && E.sunDir ? E.sunDir[1] : 1, lk = clamp(0.22 + 0.78 * clamp(sy * 3, 0, 1), 0.22, 1);
     const ring = 2 + alt * 0.2;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * 6.2832, r = ring * (0.5 + Math.random() * 0.7), x = b.pos[0] + Math.cos(a) * r, z = b.pos[2] + Math.sin(a) * r, sp = 12 + Math.random() * 14 * k;
       const sh = 0.85 + Math.random() * 0.3;
-      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh, col[1] * sh, col[2] * sh], drag: 0.6, grow: 1.2, collide: false });
+      P.spawn(x, gy + 0.2, z, Math.cos(a) * sp, 0.3 + Math.random() * 1.2 * k, Math.sin(a) * sp, { life: 0.8 + Math.random() * 0.9, size: 0.18 + Math.random() * 0.4 * k, grav: 0.8, col: [col[0] * sh * lk, col[1] * sh * lk, col[2] * sh * lk], drag: 0.6, grow: 1.2, collide: false });
     }
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));

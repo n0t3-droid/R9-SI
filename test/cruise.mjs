@@ -186,7 +186,7 @@ async function pickHour(P) {
   });
 }
 // frames rendered for real, each synced: their times (ms)
-const realFrames = (P, n) => P.ev((n) => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); out.push(+(performance.now() - t0).toFixed(1)); } window.__norender = true; return out; }, n);
+const realFrames = (P, n) => P.ev((n) => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const L = g.cruiseLand; out.push([+(performance.now() - t0).toFixed(1), L && !L.ok ? 1 : 0]); } window.__norender = true; return out; }, n);
 async function waitPlay(P, maxMs) { const t0 = Date.now(); for (;;) { await P.step(2); const s = await P.ev(() => VR.game.state); if (s === 'play') return true; if (Date.now() - t0 > maxMs) return false; await P.wait(150); } }
 const keep = (P, k) => P.ev((k) => { window[k] = window.__F; }, k);
 // the descent into the world below the orbit (V): the trip, the ship over the site, the frames while it streams, the
@@ -203,9 +203,11 @@ async function descent(P, body, tag, Rr) {
   check(ok && s.dim === body && !!s.land, `${body}: the trip with the ship, flying over the site (${s.dim}, ${s.land ? Math.round(s.land.alt) + ' m up' : 'not in the air'}) (${secs()})`);
   if (!s.land) return D;
   // the frames while the near columns stream in (rendered and synced; the first three are the upload's warm-up)
-  const fr = await realFrames(P, 40), ms = fr.slice(3), m = med(ms), mx = Math.max(...ms);
-  D.frames = { median: m, max: mx, all: fr };
-  console.log(`  ${body}: the descent's frames while it streams: median ${m} ms, max ${mx} ms (${secs()})`);
+  // (the frames while the site is still being surveyed — the streaming — against their own median: run 3's window mixed
+  // them with the settled ones after it, half as dear, and every streaming frame looked like a hitch)
+  const fr = await realFrames(P, 40), strm = fr.slice(3).filter(x => x[1]).map(x => x[0]), ms = strm.length >= 8 ? strm : fr.slice(3).map(x => x[0]), m = med(ms), mx = Math.max(...ms);
+  D.frames = { median: m, max: mx, streaming: strm.length, all: fr };
+  console.log(`  ${body}: the descent's frames while it streams (${strm.length} of ${fr.length - 3}): median ${m} ms, max ${mx} ms; all: ${fr.map(x => Math.round(x[0])).join(' ')} (${secs()})`);
   check(mx <= 2 * m, `${body}: no frame over twice the median while the descent streams (${mx} ≤ 2 × ${m} ms)`);
   // down to ~30 m (the hover while the site is surveyed on the way)
   let shot = false;
