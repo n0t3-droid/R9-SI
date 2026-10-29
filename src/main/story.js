@@ -276,8 +276,8 @@
           return lookAt(C, [W[0], W[1] - 0.6, W[2]], 58, base);
         }
         case 'eye': {
-          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 2.6 + rt[0] * 0.5, sc.surf + 1.1 - 0.4 * smooth(u), E2[2] - f[2] * 2.6 + rt[2] * 0.5];
-          return lookAt(C, E2, 40, base);
+          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 4.2 + rt[0] * 0.8, sc.surf + 1.6 - 0.5 * smooth(u), E2[2] - f[2] * 4.2 + rt[2] * 0.8];
+          return lookAt(C, [E2[0], E2[1] - 0.5, E2[2]], 42, base);   // (the eye on the upper third, its face and shoulders under it)
         }
         default: return null;
       }
@@ -504,7 +504,7 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
   }
 
   // ---------------------------------------------------------------- ch. 4 · the Eiswächter under the ice; Funke flickers awake
-  const WT = [0.3, 0.5, 0.82], EYE = [0.5, 2.6, 3.2], SKIP_P = { optic: 1, core: 1, whole: 1, shield: 1 };
+  const WT = [0.3, 0.5, 0.82], EYE = [0.35, 1.7, 2.1], SKIP_P = { optic: 1, core: 1, whole: 1, shield: 1 };
   let MB = null;
   P.drawWarden = function (g, r, E, cam) {
     const s = pl(g), sc = s && s.scene; if (!sc || sc.b.id !== 'c4.b2' || !g.entities || !VR.getVoxModel || !VR.mat4) return;
