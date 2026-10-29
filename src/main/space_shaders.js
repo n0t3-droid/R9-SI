@@ -56,12 +56,12 @@ const float TAU_M = 0.005;            // aerosol (Mie) zenith extinction, single
 const float KT_R = 70.7;              // the tangent column over the zenith column, √(2π/H)
 const float KT_M = 182.8;
 const vec3 AG_COL = vec3(0.32, 1.0, 0.5);   // the airglow's green (O 557.7 nm)
-// u-orbitlod · the aurora (REFERENCE §3): the oval round the pole at the Heartland's colatitude (~20–27°), on the night
+// u-orbitlod · the aurora (REFERENCE §3): the oval round the pole (colatitude ~11.5°, ±2°), on the night
 // side; curtains along it (rays across), drifting slowly. Returns the oval's strength at a body-frame direction
 float auroraAt(vec3 Nb, float t) {
   float th = acos(clamp(abs(Nb.y), 0.0, 1.0)), lam = atan(-Nb.z, Nb.x);
   float wob = 0.012 * sin(lam * 3.0 + t * 0.0021) + 0.008 * sin(lam * 7.0 - t * 0.0013);
-  float band = exp(-pow((th - 0.405 - wob) / 0.03, 2.0));
+  float band = exp(-pow((th - 0.2 - wob) / 0.035, 2.0));   // (the oval ~20 km round the pole: poleward of the Heartland, on its northern limb from orbit)
   float cur = vnoise3(vec3(lam * 26.0, t * 0.004, 1.3)) * 0.65 + vnoise3(vec3(lam * 90.0, t * 0.011, 4.1)) * 0.35;
   float surge = 0.55 + 0.45 * vnoise3(vec3(lam * 2.0, t * 0.0007, 9.0));
   return band * smoothstep(0.35, 0.8, cur) * surge;
@@ -209,10 +209,14 @@ void main() {
   vec3 L = u_sunB, Db = u_toBody * D;
   vec3 col = vec3(0.0); float alpha = 0.0;
 #ifdef PTILE
-  if (true) {
+  bool hitG = true;
+#else
+  bool hitG = q < 1.0 && Di.z > 0.0;
+#endif
+  if (hitG) {
+#ifdef PTILE
     vec3 N = normalize(v_nb);
 #else
-  if (q < 1.0 && Di.z > 0.0) {
     float sq = sqrt(1.0 - q * q);
     vec3 Ni = vec3(u_d * Di.z * Di.x, u_d * Di.z * Di.y, -u_d * s2) - Di * sq;
     vec3 N = normalize(u_toBody * (Ni.x * u_bu + Ni.y * u_bv + Ni.z * u_cdir));
@@ -260,12 +264,11 @@ void main() {
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
 #ifdef PTILE
-    vec3 Nl = normalize(v_nl);   // (the mesh's own relief)
-    if (false) {
+    vec3 Nl = normalize(v_nl); bool reliefP = false;   // (the mesh's own relief)
 #else
-    vec3 Nl = N;
-    if (pw > 0.0) {
+    vec3 Nl = N; bool reliefP = pw > 0.0;
 #endif
+    if (reliefP) {
       vec3 nN = vec3(-cos(th) * cos(lam), sin(th), cos(th) * sin(lam)), eN = vec3(-sin(lam), 0.0, -cos(lam));
       float dS = dot(grad, vec2(cos(ph), sin(ph))), dE = dot(grad, vec2(sin(ph), -cos(ph))) * th / max(sin(th), 1e-4);
       Nl = normalize(N + (dS * nN - dE * eN) * 2.2);
@@ -311,8 +314,8 @@ void main() {
       vec3 H = normalize(L - Db);
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
       // u-orbitlod · the sunglint: a mirror core (calm water) in a broad sheen whose roughness the wind varies (lanes)
-      float wind = 0.2 + 0.14 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0));
-      float glint = ggx(max(dot(N, H), 0.0), 0.06) * 0.22 + ggx(max(dot(N, H), 0.0), wind) * 0.78;
+      float wind = u_air.z > 0.5 ? 0.2 + 0.14 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)) : 0.22;
+      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.06) * 0.22 + ggx(max(dot(N, H), 0.0), wind) * 0.78 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
       float spec = glint * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
@@ -342,13 +345,13 @@ void main() {
     col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.6) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
     col += AG_COL * u_air.w * 0.06 * night;
     // u-orbitlod: the aurora's oval seen from above (night side): green curtains over the land, a pink lower fringe
-    float au = auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus));
+    float au = u_air.z > 0.5 && mus < 0.0 ? auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)) : 0.0;   // (from Low)
     col += (vec3(0.12, 1.0, 0.42) * 0.22 + vec3(0.5, 0.1, 0.3) * 0.04) * au * u_look.z;
     alpha = 1.0;
   } else if (Di.z > 0.0) {
     // the limb: the ray passes the planet at h radii up; the tangent column (white low down, blue above, black at the top)
     float h = q - 1.0;
-    if (h < ATOP * 3.4) {
+    if (h < ATOP * (u_air.z > 0.5 ? 3.4 : 1.1)) {   // (u-orbitlod: the aurora's heights from Low; Very Low the old rim)
       vec3 Pt = (u_d * Di.z * Di.x) * u_bu + (u_d * Di.z * Di.y) * u_bv + (-u_d * s2) * u_cdir;
       vec3 Ptb = normalize(u_toBody * Pt);
       float mus = dot(Ptb, L), c = dot(Db, L);
@@ -364,7 +367,7 @@ void main() {
       // u-orbitlod · the sunset's layers in the limb (REFERENCE §3): along the terminator the troposphere glows orange to
       // yellow with dark cloud layers in it, a white-pink stratosphere above, then the blue fading to black
       float tz = smoothstep(-0.07, 0.0, mus) * (1.0 - smoothstep(0.03, 0.16, mus));
-      if (tz > 0.0 && h < 0.012) {
+      if (tz > 0.0 && h < 0.012 && u_air.z > 0.5) {
         float cb = smoothstep(0.5, 0.72, vnoise3(Ptb * 700.0 + vec3(0.0, h * 2600.0, 0.0))) * (1.0 - smoothstep(0.0009, 0.0016, h));
         vec3 tro = vec3(1.0, 0.36, 0.07) * exp(-h / 0.0006) + vec3(1.0, 0.72, 0.3) * exp(-h / 0.0014) * 0.45;
         vec3 strat = vec3(0.92, 0.78, 0.82) * exp(-pow((h - 0.0042) / 0.0022, 2.0)) * 0.22;
@@ -372,8 +375,8 @@ void main() {
       }
       // u-orbitlod · the aurora over the limb (night side): green curtains 100–200 km up (their lower edge crisp, a pink
       // fringe below it), red tops fading out above 200 km
-      float au = auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus));
-      if (au > 0.001) {
+      float au = u_air.z > 0.5 ? auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus)) : 0.0;
+      if (au > 0.001 && u_air.z > 0.5) {
         float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.006);
         float red = smoothstep(0.024, 0.032, h) * exp(-max(h - 0.032, 0.0) / 0.009);
         float pink = exp(-pow((h - 0.0152) / 0.0007, 2.0));
