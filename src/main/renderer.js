@@ -1804,7 +1804,8 @@
       const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + R;
       if (key !== this.cloudKey) {
         this.cloudKey = key;
-        const inst = [];
+        const inst = this.cloudTmp || (this.cloudTmp = []);   // (e-perf2: kept — the step made ~0.2 MB of garbage a frame on Very Low)
+        inst.length = 0;
         const nz = VR.cloudNoise || (VR.cloudNoise = new VR.Simplex(9173));
         const thr = VR.Clouds ? VR.Clouds.boxThr(cov) : 0.72 - cov * 0.36;   // t-sky2: clear weather sparser (clouds.js)
         // cumulus: every run of cloud cells is a flat base slab; where the cloud noise peaks, narrower and
@@ -1835,15 +1836,18 @@
           }
         }
         // front-to-back so that (with depth writes on) each pixel blends about one cloud face, not dozens
-        const cxr = (cam.x + wind) / cell - ocx, czr = (cam.z + windZ) / cell - ocz, runs = [];
-        for (let i = 0; i < inst.length; i += 4) { const mx = inst[i] + inst[i + 2] * 0.5, d = (mx - cxr) ** 2 + (inst[i + 1] + 0.5 - czr) ** 2 + Math.floor(inst[i + 3] / 8) * 0.3; runs.push([d, inst[i], inst[i + 1], inst[i + 2], inst[i + 3]]); }
-        runs.sort((a, b) => a[0] - b[0]);
-        inst.length = 0; for (const r of runs) inst.push(r[1], r[2], r[3], r[4]);
+        // (e-perf2: the order sorted as indices by a kept key array — ties by place, as the stable sort of the arrays did —
+        // and written straight into a kept Float32Array: the same bytes, no array a run)
+        const cxr = (cam.x + wind) / cell - ocx, czr = (cam.z + windZ) / cell - ocz, n = inst.length >> 2;
+        if (!this.cloudKeyD || this.cloudKeyD.length < n) { const cap = Math.max(1024, n * 2); this.cloudKeyD = new Float64Array(cap); this.cloudOrd = new Uint32Array(cap); this.cloudData = new Float32Array(cap * 4); }
+        const kd = this.cloudKeyD, ord = this.cloudOrd.subarray(0, n), data = this.cloudData;
+        for (let r = 0; r < n; r++) { const i = r * 4, mx = inst[i] + inst[i + 2] * 0.5; kd[r] = (mx - cxr) ** 2 + (inst[i + 1] + 0.5 - czr) ** 2 + Math.floor(inst[i + 3] / 8) * 0.3; ord[r] = r; }
+        ord.sort((a, b) => kd[a] - kd[b] || a - b);
+        for (let j = 0; j < n; j++) { const i = ord[j] * 4, o = j * 4; data[o] = inst[i]; data[o + 1] = inst[i + 1]; data[o + 2] = inst[i + 2]; data[o + 3] = inst[i + 3]; }
         const gl = this.gl;
-        const data = new Float32Array(inst);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.cloudInst);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-        this.cloudCount = inst.length / 4;
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW, 0, n * 4);   // (WebGL 2: the first n × 4 floats)
+        this.cloudCount = n;
         this.cloudCell = cell; this.cloudBase = [ocx, ocz]; this.cloudR = R * cell;
       }
       return { cell, wind, windZ };

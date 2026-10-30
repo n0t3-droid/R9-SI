@@ -15,7 +15,7 @@ const check = (ok, what, info) => { console.log((ok ? 'OK   ' : 'FAIL ') + what 
 const mk = (q) => {
   const r = Object.create(V.Renderer.prototype);
   const out = [];
-  r.gl = { ARRAY_BUFFER: 1, DYNAMIC_DRAW: 2, bindBuffer() {}, bufferData: (t, d) => out.push(new Uint8Array(d.buffer.slice(0))) };
+  r.gl = { ARRAY_BUFFER: 1, DYNAMIC_DRAW: 2, bindBuffer() {}, bufferData: (t, d, u, off, len) => out.push(new Uint8Array(d.buffer, d.byteOffset + (off || 0) * 4, len !== undefined ? len * 4 : d.byteLength).slice()) };
   r.q = q; r.cloudInst = {}; r.out = out;
   return r;
 };

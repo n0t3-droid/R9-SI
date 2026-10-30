@@ -5,6 +5,8 @@
 //  b · the seam light (every preset; before only Ultra · Leicht's takt): in play a column's arrival seeds its seams, the
 //      spreading runs within World.seamMs a frame (seamStep) — the same light cell for cell as at once, no frame over the
 //      budget and a check; on the loading screen and with seamMs 0 at once, as before
+//  c · the cloud grid's step (renderer.updateClouds) without garbage: the order sorted as indices, the instances written into
+//      a kept Float32Array — the same bytes as v0.52.6 (pinned) over a flight of 80 steps with a cover change
 //   bash test/wt_run.sh perf2.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -97,6 +99,21 @@ console.log('b · the seam light a little a frame');
   check(r.queued > 0 && !r.loadPending, 'in play the seams wait for the frame; on the loading screen they spread at once', `${r.queued} arrivals queued`);
   check(r.maxCells === 256, 'the spreading in slices (a step ends at its budget, checked every 256 cells)', `${r.steps} steps, at most ${r.maxCells} cells`);
   check(r.diff === 0 && r.diffL === 0 && r.cells > 1e6 && r.held === 0, 'the same light cell for cell (in slices, on the loading screen, at once); no column left held', `${r.cells} cells, ${r.diff} / ${r.diffL} differ`);
+}
+
+console.log('c · the cloud grid without garbage');
+{
+  const pins = { 1: [72, 1669488, 'b798c200'], 2: [72, 2711120, '9ba06d7d'] };   // (v0.52.6's updateClouds, the same flight)
+  for (const q of [{ clouds: 1, horizon: 2 }, { clouds: 2, horizon: 4 }]) {
+    const r = Object.create(V.Renderer.prototype); let h = 2166136261 >>> 0, n = 0, tot = 0;
+    const datas = new Set();
+    r.gl = { ARRAY_BUFFER: 1, DYNAMIC_DRAW: 2, bindBuffer() {}, bufferData: (t, d, u, off, len) => { datas.add(d.buffer); const b = new Uint8Array(d.buffer, d.byteOffset + (off || 0) * 4, len !== undefined ? len * 4 : d.byteLength); for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } n++; tot += b.length; } };
+    r.q = q; r.cloudInst = {};
+    for (let i = 0; i < 80; i++) r.updateClouds({ cloudDrift: [i * 0.7, i * 0.2], time: i, cloudCover: i < 40 ? 0.45 : 0.62 }, { x: 8 + i * 9.5, y: 100, z: -3 - i * 4.1 });
+    const pin = pins[q.clouds], got = [n, tot, h.toString(16)];
+    check(JSON.stringify(got) === JSON.stringify(pin), `clouds ${q.clouds}: the same instance bytes as v0.52.6 over 80 steps`, got.join(' · '));
+    check(datas.size <= 2, `clouds ${q.clouds}: one kept array uploaded (grown at most once)`, datas.size + ' arrays for ' + n + ' grids');
+  }
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
