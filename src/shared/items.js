@@ -98,6 +98,17 @@
     if (t) return t.itemDef || (t.itemDef = { id, get name() { return t.o && t.o.vxModel && VR.dispName ? VR.dispName(t.display) : t.display; }, stack: t.o.stack || 64, block: t, cat: t.cat });
     return null;
   };
-  VR.itemName = (id) => { const d = VR.itemDef(id); return d ? d.name : id; };
+  // f-first (review v0.52 R53-02): a name as the player reads it, in the player's language — the tables' g.it.<id> first
+  // (the common blocks and items, written by hand), else the German of names_de.js (word by word) when the language is
+  // German; English keeps the data's own name. The worker has no tables: there it is the data's name.
+  const tab = (k) => { const I = VR.I18N, d = I && I.dict && I.dict[I.lang]; const s = d && d[k]; return typeof s === 'string' ? s : null; };
+  VR.itemName = (id) => {
+    const d = VR.itemDef(id); if (!d) return id;
+    const own = tab('g.it.' + id); if (own) return own;
+    const raw = d.block ? d.block.display : d.name;
+    return VR.dispName ? VR.dispName(raw) : d.name;
+  };
+  // a ship livery's name (starship.js / shipgen.js palettes) from the tables (g.pal.<key>), else its data name
+  VR.palName = (key, name) => tab('g.pal.' + key) || name;
   VR.maxStack = (id) => { const d = VR.itemDef(id); return d ? d.stack : 64; };
 })(VR);

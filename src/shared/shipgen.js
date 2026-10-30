@@ -48,8 +48,8 @@
   const S = (n, p) => { const t = R.byName[n]; if (!t) return 0; return p ? t.state(p) : t.defaultState; };
   const PALETTES = [
     { key: 'starforge', name: 'Sternglut', hull: 'hull_plating', hull2: 'hull_plating_gray', trim: 'hull_plating_dark', acc: 'hull_stripe_orange', acc2: 'hull_stripe_blue', glow: 'neon_cyan', glass: 'viewport', eng: 'hull_plating_dark' },
-    { key: 'nightwing', name: 'Nightwing', hull: 'hull_plating_dark', hull2: 'black_concrete', trim: 'gray_concrete', acc: 'magenta_concrete', acc2: 'purple_concrete', glow: 'neon_magenta', glass: 'purple_stained_glass', eng: 'black_concrete' },
-    { key: 'sunstrike', name: 'Sunstrike', hull: 'white_concrete', hull2: 'light_gray_concrete', trim: 'gray_concrete', acc: 'red_concrete', acc2: 'yellow_concrete', glow: 'neon_amber', glass: 'light_blue_stained_glass', eng: 'hull_plating_dark' },
+    { key: 'nightwing', name: 'Nightpoppy', hull: 'hull_plating_dark', hull2: 'black_concrete', trim: 'gray_concrete', acc: 'magenta_concrete', acc2: 'purple_concrete', glow: 'neon_magenta', glass: 'purple_stained_glass', eng: 'black_concrete' },
+    { key: 'sunstrike', name: 'Noonglow', hull: 'white_concrete', hull2: 'light_gray_concrete', trim: 'gray_concrete', acc: 'red_concrete', acc2: 'yellow_concrete', glow: 'neon_amber', glass: 'light_blue_stained_glass', eng: 'hull_plating_dark' },
     { key: 'verdant', name: 'Verdant Corps', hull: 'light_gray_concrete', hull2: 'hull_plating_gray', trim: 'green_concrete', acc: 'lime_concrete', acc2: 'green_concrete', glow: 'neon_lime', glass: 'viewport', eng: 'hull_plating_dark' },
     { key: 'royal', name: 'Royal Blue', hull: 'blue_concrete', hull2: 'light_blue_concrete', trim: 'hull_plating_dark', acc: 'yellow_concrete', acc2: 'white_concrete', glow: 'neon_white', glass: 'light_blue_stained_glass', eng: 'hull_plating_dark' },
     { key: 'hauler', name: 'Rust Hauler', hull: 'orange_terracotta', hull2: 'brown_concrete', trim: 'hull_plating_dark', acc: 'yellow_concrete', acc2: 'black_concrete', glow: 'neon_amber', glass: 'viewport', eng: 'gray_concrete' },

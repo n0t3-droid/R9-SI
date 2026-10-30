@@ -618,7 +618,7 @@
       const sel = $('#sy_paint');
       if (!sel.options.length) {
         sel.appendChild(el('option', '', esc(T('g.sy.designer')))); sel.options[0].value = '';
-        for (const p of VR.Starship.PAL) { const o = el('option', '', esc(p.name)); o.value = p.key; sel.appendChild(o); }
+        for (const p of VR.Starship.PAL) { const o = el('option', '', esc(VR.palName ? VR.palName(p.key, p.name) : p.name));   // (f-first: the livery's name from the tables o.value = p.key; sel.appendChild(o); }
         sel.onchange = () => { this.syPaint = sel.value || null; this.renderShipyard(); };
       }
       this.renderShipyard();
@@ -636,7 +636,7 @@
         if (req !== this.syReq || m.type !== 'starship') return;
         const md = m.meta;
         $('#sy_name').textContent = md.name;
-        $('#sy_stats').innerHTML = T('g.sy.stats', { label: esc(md.label), paint: esc(md.paletteName), l: md.length, w: md.width, h: md.height, engines: md.exhaust.length, guns: md.guns.length ? T('g.sy.guns', { n: md.guns.length }) : '', tris: Math.round(md.tris).toLocaleString(), speed: md.speed, seed: md.seed });
+        $('#sy_stats').innerHTML = T('g.sy.stats', { label: esc(md.label), paint: esc(VR.palName ? VR.palName(md.palette, md.paletteName) : md.paletteName), l: md.length, w: md.width, h: md.height, engines: md.exhaust.length, guns: md.guns.length ? T('g.sy.guns', { n: md.guns.length }) : '', tris: Math.round(md.tris).toLocaleString(), speed: md.speed, seed: md.seed });
         const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, cv.width, cv.height);
         if (m.preview) ctx.putImageData(new ImageData(new Uint8ClampedArray(m.preview.rgba.buffer), m.preview.w, m.preview.h), 0, 0);
       });

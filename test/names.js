@@ -71,6 +71,10 @@ const NAMES = [
   // f-stipple2 (the owner's note: „Starforge" is also the title of a 2014 voxel game)
   { de: 'Sternglut', en: 'Sternglut', role: 'tech', what: 'the tech category, the outposts\' maker, the classic shuttle\'s livery, the title\'s edition line (replaces „Starforge"; the keys stay starforge)', checked: '2026-10-29', by: 'f-stipple2', found: 'no game, brand or product of that name (searched „Sternglut" with game/Spiel/Marke; „Zenitwerk" near the Zenit camera maker and „Funkenwerk" near our own Funke were set aside)' },
   { de: 'Reiseantrieb', en: 'Cruise drive', role: 'drive', what: "u-cruise's drive", checked: '2026-10-29', by: 'f-rules', found: 'generic words' },
+  // f-first (review v0.52 R53-01): the ship liveries that were English-only and older than the list
+  { de: 'Nachtmohn', en: 'Nightpoppy', role: 'livery', what: 'a dark ship livery with magenta lights (replaces „Nightwing", a DC Comics superhero and trademark)', checked: '2026-10-30', by: 'f-first', found: 'no game, ship skin, brand or toy of either spelling (WebSearch „Nachtmohn" OR „Night Poppy" game ship skin brand; „Nightpoppy")' },
+  { de: 'Mittagsglanz', en: 'Noonglow', role: 'livery', what: 'a white ship livery with red and yellow stripes (replaces „Sunstrike": a trademark of a gaming company and a role-playing setting\'s name)', checked: '2026-10-30', by: 'f-first', found: 'no game or brand of either spelling (WebSearch „Mittagsglanz" OR „Nachtmohn" Spiel Marke; „Noonglow" game brand)' },
+  { de: 'Karminflotte', en: 'Carmine Fleet', role: 'livery', what: 'a red ship livery (replaces „Crimson Fleet", a pirate faction of a 2023 space game)', checked: '2026-10-30', by: 'f-first', found: 'no game or brand of either spelling (WebSearch „Carmine Fleet" OR „Karminflotte" game)' },
 ];
 // the words that went: never again in a table, an item name or a string the game writes
 const RETIRED = [
@@ -87,6 +91,10 @@ const RETIRED = [
   { word: 'Shadow Drone', re: /Shadow Drone|Shadow Wisp|Schattendrohne/, why: 'a trading card; ≈ „Shade Wisp"', now: 'Dusk Drone, Dusk Wisp, Dämmerdrohne' },
   // f-stipple2
   { word: 'Starforge', re: /Starforge/, why: 'the title of a 2014 voxel game (StarForge); the lower-case keys starforge stay', now: 'Sternglut' },
+  // f-first (review v0.52 R53-01)
+  { word: 'Nightwing', re: /Nightwing/, why: 'a DC Comics superhero and trademark (review R53-01); the lower-case palette key nightwing stays (saved ships)', now: 'Nachtmohn / Nightpoppy' },
+  { word: 'Sunstrike', re: /Sunstrike/, why: 'a registered games trademark and a role-playing setting\'s name; the key sunstrike stays', now: 'Mittagsglanz / Noonglow' },
+  { word: 'Crimson Fleet', re: /Crimson Fleet/, why: 'a pirate faction of a 2023 space game', now: 'Karminflotte / Carmine Fleet' },
 ];
 module.exports = { NAMES, RETIRED };
 if (require.main !== module && !process.env.NAMES_RUN) return;
@@ -171,6 +179,23 @@ console.log('4 · the outposts\' names: keys in both tables, each one listed');
   I.lang = 'de'; const same = ids.every((id, i) => L.nameOf({ id }) === de['g.lib.n.' + K[idx[i]]]); I.lang = was;
   check(same, 'the same outpost picks the same slot as before (rng by its id; saves keep only the id)');
   check(en['g.foe.name.sentry'] === 'Keeper' && /Ice Keeper/.test(en['story.c4.b2.3']) && VR.itemName('laser_blaster') === 'Calm Beam' && /Ruhestrahler/.test(de['g.foe.gift']), 'the Keeper, the Ice Keeper, the Calm Beam (id laser_blaster stays), the Ruhestrahler');
+}
+
+// ---------------------------------------------------------------- 5 · the ship liveries (f-first, R53-01)
+console.log('5 · the ship liveries: a name of the tables in each language, the invented ones listed');
+{
+  const pals = [];
+  for (const P of [VR.Starship && VR.Starship.PAL, VR.ShipGen && (VR.ShipGen.PALETTES || VR.ShipGen.PAL)]) if (Array.isArray(P)) for (const p of P) pals.push(p);
+  check(pals.length >= 9, pals.length + ' liveries read (starship.js' + (VR.ShipGen && (VR.ShipGen.PALETTES || VR.ShipGen.PAL) ? ', shipgen.js' : '') + ')');
+  const miss = pals.filter(p => typeof de['g.pal.' + p.key] !== 'string' || typeof en['g.pal.' + p.key] !== 'string');
+  check(!miss.length, 'every livery has g.pal.<key> in both tables' + (miss.length ? ': ' + miss.map(p => p.key).join(', ') : ''));
+  const I = VR.I18N, was = I.lang; I.lang = 'de'; const nDe = VR.palName('nightwing', 'x'); I.lang = 'en'; const nEn = VR.palName('nightwing', 'x'); I.lang = was;
+  check(nDe === 'Nachtmohn' && nEn === 'Nightpoppy', 'VR.palName speaks the player\'s language: „' + nDe + '" / "' + nEn + '"');
+  const inv = ['nightwing', 'sunstrike', 'crimson'].filter(k => !NAMES.some(n => n.role === 'livery' && n.de === de['g.pal.' + k] && n.en === en['g.pal.' + k]));
+  check(!inv.length, 'the invented livery names are listed with their search' + (inv.length ? ': ' + inv.join(', ') : ''));
+  const styles = []; for (const t of (VR.Forge && VR.Forge.types) || []) for (const st of t.styles || []) styles.push(st.name);
+  const bad = styles.filter(n => RETIRED.some(r => r.re.test(n)));
+  check(styles.length > 20 && !bad.length, 'no Forge style is named with a retired word (' + styles.length + ' styles)' + (bad.length ? ': ' + bad.join(', ') : ''));
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

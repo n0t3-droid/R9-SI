@@ -17,7 +17,7 @@ const I = VR.I18N;
 for (const f of ['lang_de.js', 'lang_en.js']) require(path.join(SRC, f));
 const de = I.dict.de || {}, en = I.dict.en || {};
 const SAME = ['Park', 'Tech', 'Japan', 'Deck', 'Sport', 'Pool', 'Hangar', 'Gangway', 'Shuttle', 'Interceptor', 'Gunship', 'Racer', 'Dropship', 'Helipad', 'Carport', 'Smart Home'];   // read alike in both languages
-const NAMES = ['Sternglut', 'Nightwing', 'Sunstrike', 'Rust Hauler', 'Arctic Survey'];   // the shuttle liveries (shipgen.js, starship.js): English names in both languages
+const NAMES = ['Sternglut', 'Rust Hauler', 'Arctic Survey'];   // the shuttle liveries (shipgen.js, starship.js): English names in both languages (f-first: Nachtmohn / Mittagsglanz have g.fgw.* entries)
 // the German words the game's own data shows: type names, parameter labels and choices, style names, Modern categories
 const words = new Set();
 for (const t of VR.Forge.types) {
