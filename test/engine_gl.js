@@ -48,6 +48,22 @@ const check = (ok, what, info) => { console.log((ok ? 'OK   ' : 'FAIL ') + what 
   V.GL.deferred = true; const broken = V.GL.program('void main(){}', 'BROKEN', 'broken'); V.GL.deferred = false;
   let msg = ''; try { void broken.u; } catch (e) { msg = e.message; }
   check(/Shader compile failed: broken\.fs: ERROR: 0:1: broken/.test(msg), 'a failed compile throws at the first use with its log', msg);
+  // GL.settle (renderer.render's start): with KHR_parallel_shader_compile only the finished ones, without it all at once;
+  // a failed one does not throw there but at its first use
+  for (const pr of [...V.GL.pending]) V.GL.pending.delete(pr);
+  V.GL.deferred = true;
+  const q1 = V.GL.program('void main(){}', 'void main(){} // DONE', 'q1'), q2 = V.GL.program('void main(){}', 'void main(){}', 'q2'), q3 = V.GL.program('void main(){}', 'BROKEN', 'q3');
+  V.GL.deferred = false;
+  V.GL.ext = { parallel: { COMPLETION_STATUS_KHR: 0x91b1 } };
+  const gp = gl.getProgramParameter; gl.getProgramParameter = (p, k) => (k === 0x91b1 ? p.sh.some(x => x.src.includes('DONE')) : gp(p, k));
+  let readied = V.GL.settle();
+  check(readied === 1 && q1.isReady && !q2.isReady && V.GL.pending.size === 2, 'settle with the extension: only the program the driver finished', readied + ' ready, ' + V.GL.pending.size + ' pending');
+  V.GL.ext = { parallel: null };
+  log.length = 0; readied = V.GL.settle();
+  check(V.GL.pending.size === 0 && q1.isReady && q2.isReady && !q3.isReady, 'settle without it: all at once, the broken one not ready', readied + ' settled');
+  let m3 = ''; try { void q3.p; } catch (e) { m3 = e.message; }
+  check(/Shader compile failed: q3\.fs/.test(m3), 'the broken one throws at its first use', m3);
+  gl.getProgramParameter = gp;
   console.error = quiet;
   // the renderer's batch: buildPrograms sets GL.deferred around its body and leaves it as it was
   const R = Object.create(V.Renderer.prototype); let during = null;

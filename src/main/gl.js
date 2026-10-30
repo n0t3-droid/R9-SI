@@ -14,6 +14,7 @@
       cbf: gl.getExtension('EXT_color_buffer_float'),
       cbhf: gl.getExtension('EXT_color_buffer_half_float'),
       floatLinear: gl.getExtension('OES_texture_float_linear'),
+      parallel: gl.getExtension('KHR_parallel_shader_compile'),   // (e-engine: GL.settle asks without waiting)
       timer: null,
     };
     GL.maxLayers = gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS);
@@ -67,10 +68,15 @@
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); gl.attachShader(p, s); return s; };
     const vs = sh(gl.VERTEX_SHADER, vsFull), fs = sh(gl.FRAGMENT_SHADER, fsFull);
     gl.linkProgram(p);
-    let u = null, hooks = null;
+    let u = null, hooks = null, err = null;
     const prog = { name, deferred: true };
     const ready = () => {
       if (u) return;
+      if (err) throw err;
+      GL.pending.delete(prog);
+      try { check(); } catch (e) { err = e; throw e; }
+    };
+    const check = () => {
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
         for (const [s, src, nm] of [[vs, vsFull, name + '.vs'], [fs, fsFull, name + '.fs']]) {
           if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
@@ -89,7 +95,21 @@
     Object.defineProperty(prog, 'p', { get() { ready(); return p; }, enumerable: true });
     Object.defineProperty(prog, 'u', { get() { ready(); return u; }, enumerable: true });
     prog.onReady = (f) => { if (u) f(prog); else (hooks || (hooks = [])).push(f); };
+    prog.settle = (ext) => { if (u || err) return true; if (ext && !gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR)) return false; try { ready(); } catch (e) { console.error(e); } return true; };
+    GL.pending.add(prog);
     return prog;
+  };
+  // the deferred programs not used yet: made ready before a frame draws (renderer.render → GL.settle), never between its
+  // draws — a status query in the middle of a frame waits for the draws before it (seconds on a software GPU: the first
+  // played frame waited 4.3 s so). With KHR_parallel_shader_compile only the finished ones (the query does not wait);
+  // without it all of them at once, one wait at the frame's start. A failed one throws at its first use, as before.
+  GL.pending = new Set();
+  GL.settle = function () {
+    if (!GL.pending.size) return 0;
+    const ext = GL.ext && GL.ext.parallel;
+    let n = 0;
+    for (const prog of [...GL.pending]) if (prog.settle(ext)) n++;
+    return n;
   };
   // run f(prog) once the program is ready (at once for a program made the old way)
   GL.onReady = function (prog, f) { if (prog && prog.onReady) prog.onReady(f); else f(prog); return prog; };

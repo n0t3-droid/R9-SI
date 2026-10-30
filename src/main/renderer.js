@@ -2162,6 +2162,7 @@
     render(F) {
       const gl = this.gl, E = F.env, world = F.world;
       const t0 = performance.now();
+      if (GL.pending && GL.pending.size) GL.settle();   // (e-engine: the deferred programs before the first draw, not between draws)
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
