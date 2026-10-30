@@ -154,7 +154,7 @@
   const colourOf = (g) => (s) => {
     const A = g.tex && g.tex.avgColor, layer = R.T.tex[s * 6 + 2] & 0xfff;
     if (!A) return [0.6, 0.6, 0.6];
-    return [Math.min(1, Math.pow(A[layer * 4], 1 / 2.2) * 1.1), Math.min(1, Math.pow(A[layer * 4 + 1], 1 / 2.2) * 1.1), Math.min(1, Math.pow(A[layer * 4 + 2], 1 / 2.2) * 1.1)];
+    return [Math.min(1, A[layer * 4] * 1.15), Math.min(1, A[layer * 4 + 1] * 1.15), Math.min(1, A[layer * 4 + 2] * 1.15)];   // (linear: the scene's own space before the tone curve)
   };
   const holdsWand = (g) => { const h = g.player && g.player.inv && g.player.inv.held, d = h ? VR.itemDef(h.id) : null; return !!(d && d.use === 'wand'); };
   Ren.prototype.drawStampGhost = function (g, F) {

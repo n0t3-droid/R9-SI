@@ -118,7 +118,7 @@
         for (const k of ORDER) { verts[v++] = faces[i] + q[k][0]; verts[v++] = faces[i + 1] + q[k][1]; verts[v++] = faces[i + 2] + q[k][2]; }
       }
       const n = v / 3 - start;
-      if (n) parts.push({ at: start, n, c: [g.rgb[0], g.rgb[1], g.rgb[2], 0.42] });
+      if (n) parts.push({ at: start, n, c: [g.rgb[0], g.rgb[1], g.rgb[2], 0.5] });
     }
     return { verts, parts, faces: nF };
   };
