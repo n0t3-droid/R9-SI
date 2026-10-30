@@ -111,6 +111,7 @@ const SETUP = () => {
     let proto = Object.getPrototypeOf(o);
     while (proto && proto !== Object.prototype && !seen.has(proto)) {
       seen.add(proto);
+      const P0 = proto;   // (this prototype, for its methods' closures: proto itself walks on — a timer must come off where it was put)
       for (const k of Object.getOwnPropertyNames(proto)) {
         if (k === 'constructor') continue;
         const d = Object.getOwnPropertyDescriptor(proto, k);
@@ -120,8 +121,8 @@ const SETUP = () => {
         const name = label + '.' + k;
         // (a method called more than 30 times between two frames loses its timer at once — _spread, _touch …: a timer there
         // would cost more than it tells, and it would cost the build that streams more)
-        const w = function () { const n = (calls.get(name) || 0) + 1; calls.set(name, n); if (n > 30) proto[k] = f; const t0 = performance.now(); try { return f.apply(this, arguments); } finally { acc.set(name, (acc.get(name) || 0) + performance.now() - t0); } };
-        w.__w = true; proto[k] = w; orig.push([proto, k, f, name]);
+        const w = function () { const n = (calls.get(name) || 0) + 1; calls.set(name, n); if (n > 30 && P0[k] === w) P0[k] = f; const t0 = performance.now(); try { return f.apply(this, arguments); } finally { acc.set(name, (acc.get(name) || 0) + performance.now() - t0); } };
+        w.__w = true; P0[k] = w; orig.push([P0, k, f, name]);
       }
       proto = Object.getPrototypeOf(proto);
     }
