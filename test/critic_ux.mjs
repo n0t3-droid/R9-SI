@@ -107,11 +107,12 @@ for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1
   await page.keyboard.press('Escape'); await wait(1000);
 }
 const offerCheck = async (tag) => {
-{ for (let i = 0; i < 3; i++) { const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => ''); if (!st || st === 'hud' || st === 'play') break; await ev(() => { const u = VR.game.ui; if (u.resume) u.resume(); else u.show(null); }).catch(() => {}); await wait(800); }
+{ for (let i = 0; i < 3; i++) { const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => ''); if (!st || st === 'hud' || st === 'play') break; if (i < 2) await page.keyboard.press('Escape'); else await ev(() => { const u = VR.game.ui; u.show(null); VR.game.input.captured = true; }).catch(() => {}); await wait(1000); }
+  OUT['screenAtOffer'] = await ev(() => VR.game.ui.screen).catch(() => '?');
   OUT['offer_' + tag] = await ev(() => { const S = VR.Story, P = VR.StoryPlay; if (!S || !P || !P.debug || !S.BEATS) return null; return P.debug.offer(S.BEATS[0].id); }).catch(() => null);
   await wait(1500); await shot(tag + '_offer');
   OUT['vPrompts_' + tag] = await ev(() => { const k = (VR.Binds && VR.Binds.label) ? VR.Binds.label('KeyV', VR.I18N.lang) : 'V', out = []; const re = new RegExp('\\[' + k + '\\]|\\b' + k + '$'); for (const e of document.querySelectorAll('#ctxprompt.on, #storycard, #funkebub')) { const rr = e.getBoundingClientRect(); if (!(rr.width > 0 && rr.height > 0)) continue; const cs = getComputedStyle(e); if (cs.display === 'none' || +cs.opacity < 0.2 || cs.visibility === 'hidden') continue; const t = e.textContent.trim(); if (re.test(t) || e.querySelector('kbd')) out.push((e.id || e.className) + ': ' + t.slice(0, 50)); } return out; }).catch(() => null);
-  check(!OUT['offer_' + tag] || (OUT['vPrompts_' + tag] && OUT['vPrompts_' + tag].length <= 1), tag + ': a story offer shows one V prompt: ' + JSON.stringify(OUT['vPrompts_' + tag])); }
+  check(!OUT['offer_' + tag] || (OUT['vPrompts_' + tag] && OUT['vPrompts_' + tag].length <= 1 && !OUT.screenAtOffer), tag + ': a story offer shows one V prompt (no menu open: ' + (OUT.screenAtOffer || 'none') + '): ' + JSON.stringify(OUT['vPrompts_' + tag])); }
 };
 // R53-05: a story offer shows one „V" prompt (the card), not three
 await offerCheck('15');
