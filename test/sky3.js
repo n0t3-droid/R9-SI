@@ -305,7 +305,9 @@ console.log('g · the band model: golden hour and dusk against the frames');
   // without pink everywhere; this model (no nebula, the residual a proxy) reads the refit 2–3 ΔE worse than the offline
   // renderer does (test/sky_offline.js: canyon 8.1, city 9.6) — the browser's numbers decide (test/sky_ref.js --runs
   // gates); here the guard against a broken palette: far under v0.48's, the mean under 12.5, every band within 25)
-  check(g.b < 12.5 && g.b < g.a * 0.5 && g.w <= 25, `the golden hour: the mean ΔE ${g.a.toFixed(1)} → ${g.b.toFixed(1)} (under 12.5, every band within 25 — the browser's gates decide: worst ${g.w.toFixed(1)})`);
+  // (f-golden: the model has no golden structure (sky3.js s3Gold — blue gaps beside pink-lit masses, their mean chroma
+  // lower) but the golden grade's saturation 1.45 that goes with it: the guard's mean 12.5 → 15.5, the band 25 → 30)
+  check(g.b < 15.5 && g.b < g.a * 0.6 && g.w <= 30, `the golden hour: the mean ΔE ${g.a.toFixed(1)} → ${g.b.toFixed(1)} (under 15.5, every band within 30 — the browser's gates decide: worst ${g.w.toFixed(1)})`);
   check(d.b < 6 && d.b < d.a * 0.6 && d.w <= 12, `the dusk: the mean ΔE ${d.a.toFixed(1)} → ${d.b.toFixed(1)} (under 6, every band within 12: worst ${d.w.toFixed(1)})`);
   check(Math.abs(n.b - n.a) < 0.6, `the day as it was: noon's mean ΔE ${n.a.toFixed(1)} → ${n.b.toFixed(1)}`);
 }

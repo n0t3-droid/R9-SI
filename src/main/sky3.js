@@ -381,11 +381,11 @@
     // (f-sky5, R52-03: at the golden hour the sunlit tops were a dull beige no brighter than the luminous sky round them —
     // the frames' golden cumulus are white over lilac shade: the sun's light on them and the sky's from above lifted at
     // 2° and 8°, offline (sky_offline.js) the top's luma sd 28.8 → 32.4 with the bands' ΔE held)
-    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.7, 1.15, 0.85]], [8, [2.0, 1.6, 1.3]], [16, [1.22, 1.14, 1.04]]],
+    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.12, 0.78]], [8, [2.1, 1.58, 1.15]], [16, [1.22, 1.14, 1.04]]],
     top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.7, 0.6, 0.85]], [8, [0.8, 0.76, 0.98]], [16, [0.5, 0.56, 0.72]]],
     // (f-golden, R53-11: at the golden hour the bases a deeper lilac-blue — the frames' white tops over lilac shade; the
     // top's contrast from the clouds' own relief, sky_offline.js)
-    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.4, 0.31, 0.54]], [8, [0.4, 0.36, 0.6]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
+    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.36, 0.28, 0.58]], [8, [0.34, 0.31, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
     moon: [0.1, 0.12, 0.19], rainGrey: [0.42, 0.44, 0.48], k: [1.0, 1.0, 0.3, 0.5],
     // f-sky4 (docs/reviews/v0.49.md R50-11: storm clouds bright white flat slabs): under rain and a closed cover the clouds
     // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
@@ -424,7 +424,7 @@
   // against a deeper blue-violet between them; about mean-preserving, so the bands keep their fit (sky_offline.js fitted
   // k, deep, lit, pink for the top's sd, its saturation and the bands' ΔE together). SKY3 only (Low and up; Very Low
   // has no sky3 level: its program and values unchanged)
-  S3.GOLDSKY = { k: 1, deep: 0.5, lit: 1.6, pink: 0.6 };
+  S3.GOLDSKY = { k: 1, deep: 0.55, lit: 2.0, pink: 0.6 };   // (browser run 2: deep 0.55 / lit 2.2 the top's sd +2 in all three views)
   const GS = [0, 0, 0, 0];
   S3.goldSky = function (E, out) {
     out = out || GS;

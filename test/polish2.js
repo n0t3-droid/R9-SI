@@ -101,9 +101,11 @@ console.log('4 · the golden hour\'s grade toward the frames (light2.js GRADE.go
   // v0.48's or over, the shoulder at white (the sun's core reaches 255); the toe and the middle kept)
   check(g.sat >= g48.sat && g.s >= g48.s && g.mid === g48.mid && g.toe === g48.toe && g.sh >= g48.sh, 'f-sky4: the mid-tones\' saturation ' + g48.sat + ' → ' + g.sat + ', the S ' + g48.s + ' → ' + g.s + ', the shoulder ' + g48.sh + ' → ' + g.sh + '; the toe and the middle kept');
   // a warm sunlit wall in the middle of the picture: still warm, at most a twentieth more orange than v0.48 graded it
+  // (f-golden, docs/reviews/v0.52.md R53-11: the golden land must carry the frames' colour — their land saturation 115,
+  // the isles' 69 — the golden grade's saturation 1.2 → 1.45: the wall at most a fifth more orange than v0.48's)
   const m = { day: 0.06, gold: 0.94, dusk: 0, night: 0 }, wall = [0.78, 0.6, 0.42];
   const a = LG.gradeJS(wall, 0.5, 0.5, 16 / 9, LG.gradeAt(LG.GRADE48, m)), b = LG.gradeJS(wall, 0.5, 0.5, 16 / 9, LG.gradeAt(L2.GRADE, m));
-  check(b[0] - b[2] <= (a[0] - a[2]) * 1.05 && b[0] - b[2] > 0.3, 'a sunlit wall: still warm, not over v0.48\'s orange by more than 5 % (r − b)', [a[0] - a[2], b[0] - b[2]].map(x => x.toFixed(3)).join(' → '));
+  check(b[0] - b[2] <= (a[0] - a[2]) * 1.2 && b[0] - b[2] > 0.3, 'a sunlit wall: still warm, not over v0.48\'s orange by more than 20 % (r − b)', [a[0] - a[2], b[0] - b[2]].map(x => x.toFixed(3)).join(' → '));
   for (const k of ['day', 'dusk', 'night']) check(JSON.stringify(L2.GRADE[k]).replace(/,"b(Thr|Str)":[\d.]+/g, '') === JSON.stringify(LG.GRADE48[k]), 'the ' + k + '\'s grade untouched');
 }
 
