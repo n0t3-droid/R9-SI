@@ -45150,12 +45150,19 @@ V.roleTitle=(role)=>V.T('g.role.'+role,null,ROLES[role]?ROLES[role].title:role);
 
 
 const T=()=>R.T;
-let passC=null,standC=null;
-function caches(){
-if(passC)return;
-const n=R.T.type.length;
-passC=new Uint8Array(n);standC=new Uint8Array(n);
-for(let s=0;s<n;s++){
+let passC=null,standC=null,cachedN=0;
+
+
+
+
+function caches(budgetMs){
+if(passC&&cachedN>=passC.length)return true;
+const n=passC?passC.length:R.T.type.length;
+if(!passC){passC=new Uint8Array(n);standC=new Uint8Array(n);cachedN=0;}
+const t0=budgetMs!==undefined?performance.now():0;
+for(;cachedN<n;cachedN++){
+if(budgetMs!==undefined&&performance.now()-t0>=budgetMs)return false;
+const s=cachedN;
 const fl=R.T.flags[s],t=R.types[R.T.type[s]];
 const kind=t&&t.o.kind;
 
@@ -45172,7 +45179,10 @@ let top=0;for(const bb of b)top=Math.max(top,bb[4]);
 standC[s]=b.length&&top<=1.01&&top>0.3?1:0;
 }else standC[s]=0;
 }
+return true;
 }
+V.warm=(budgetMs)=>caches(budgetMs);
+V.warmed=()=> !!passC&&cachedN>=passC.length;
 class Heap{
 constructor(){this.k=[];this.v=[];}
 push(key,pri){const k=this.k,v=this.v;k.push(key);v.push(pri);let i=k.length-1;while(i>0){const p=(i-1)>>1;if(v[p]<=v[i])break;[k[p],k[i]]=[k[i],k[p]];[v[p],v[i]]=[v[i],v[p]];i=p;}}
@@ -97505,6 +97515,7 @@ aniso:gl.getExtension('EXT_texture_filter_anisotropic'),
 cbf:gl.getExtension('EXT_color_buffer_float'),
 cbhf:gl.getExtension('EXT_color_buffer_half_float'),
 floatLinear:gl.getExtension('OES_texture_float_linear'),
+parallel:gl.getExtension('KHR_parallel_shader_compile'),
 timer:null,
 };
 GL.maxLayers=gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS);
@@ -97537,6 +97548,7 @@ return{ext:ext.join('\n'),body:body.join('\n')};
 const v=fix(vsSrc),f=fix(fsSrc);
 const vsFull='#version 300 es\n'+v.ext+'\n'+pre.replace('#version 300 es\n','')+v.body;
 const fsFull='#version 300 es\n'+f.ext+'\n'+pre.replace('#version 300 es\n','')+'#define FRAG 1\nprecision highp float;\nprecision highp int;\nprecision highp sampler2DArray;\nprecision highp sampler2D;\n'+f.body;
+if(GL.deferred)return GL.deferProgram(vsFull,fsFull,name);
 const p=gl.createProgram();
 gl.attachShader(p,GL.shader(gl.VERTEX_SHADER,vsFull,name+'.vs'));
 gl.attachShader(p,GL.shader(gl.FRAGMENT_SHADER,fsFull,name+'.fs'));
@@ -97547,6 +97559,61 @@ const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
 for(let i=0;i<n;i++){const info=gl.getActiveUniform(p,i);const nm=info.name.replace(/\[0\]$/,'');u[nm]=gl.getUniformLocation(p,info.name);}
 return{p,u,name};
 };
+
+
+
+
+
+GL.deferProgram=function(vsFull,fsFull,name){
+const gl=GL.gl,p=gl.createProgram();
+const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);gl.attachShader(p,s);return s;};
+const vs=sh(gl.VERTEX_SHADER,vsFull),fs=sh(gl.FRAGMENT_SHADER,fsFull);
+gl.linkProgram(p);
+let u=null,hooks=null,err=null;
+const prog={name,deferred:true};
+const ready=()=>{
+if(u)return;
+if(err)throw err;
+GL.pending.delete(prog);
+try{check();}catch(e){err=e;throw e;}
+};
+const check=()=>{
+if(!gl.getProgramParameter(p,gl.LINK_STATUS)){
+for(const[s,src,nm]of[[vs,vsFull,name+'.vs'],[fs,fsFull,name+'.fs']]){
+if(gl.getShaderParameter(s,gl.COMPILE_STATUS))continue;
+const log=gl.getShaderInfoLog(s);
+console.error('Shader compile error ('+nm+'):\n'+log+'\n'+src.split('\n').map((l,i)=>(i+1)+': '+l).join('\n'));
+throw new Error('Shader compile failed: '+nm+': '+log);
+}
+throw new Error('Link failed '+name+': '+gl.getProgramInfoLog(p));
+}
+u={};
+const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+for(let i=0;i<n;i++){const info=gl.getActiveUniform(p,i);const nm=info.name.replace(/\[0\]$/,'');u[nm]=gl.getUniformLocation(p,info.name);}
+prog.isReady=true;
+if(hooks){const h=hooks;hooks=null;for(const f of h)f(prog);}
+};
+Object.defineProperty(prog,'p',{get(){ready();return p;},enumerable:true});
+Object.defineProperty(prog,'u',{get(){ready();return u;},enumerable:true});
+prog.onReady=(f)=>{if(u)f(prog);else(hooks||(hooks=[])).push(f);};
+prog.settle=(ext)=>{if(u||err)return true;if(ext&& !gl.getProgramParameter(p,ext.COMPLETION_STATUS_KHR))return false;try{ready();}catch(e){console.error(e);}return true;};
+GL.pending.add(prog);
+return prog;
+};
+
+
+
+
+GL.pending=new Set();
+GL.settle=function(){
+if(!GL.pending.size)return 0;
+const ext=GL.ext&&GL.ext.parallel;
+let n=0;
+for(const prog of[...GL.pending])if(prog.settle(ext))n++;
+return n;
+};
+
+GL.onReady=function(prog,f){if(prog&&prog.onReady)prog.onReady(f);else f(prog);return prog;};
 GL.tex2D=function(w,h,internal,format,type,opts){
 const gl=GL.gl;opts=opts||{};
 const t=gl.createTexture();
@@ -107001,11 +107068,11 @@ const mx=gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
 for(const t of[this.texAlbedo,this.texMaterial].concat(this.texHiN?[this.texHiAlb,this.texHiMat]:[])){gl.bindTexture(gl.TEXTURE_2D_ARRAY,t);gl.texParameterf(gl.TEXTURE_2D_ARRAY,ext.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(mx,level));}
 }
 
-texHiArray(tex,which,srgb){
+texHiArray(tex,which,srgb,empty){
 const gl=this.gl,t=gl.createTexture(),lv=tex[which];
 gl.bindTexture(gl.TEXTURE_2D_ARRAY,t);
 gl.texStorage3D(gl.TEXTURE_2D_ARRAY,tex.levels,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,tex.size,tex.size,tex.layers);
-for(let i=0;i<tex.levels;i++){const n=tex.size>>i;gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,i,0,0,0,n,n,tex.layers,gl.RGBA,gl.UNSIGNED_BYTE,lv[i]);}
+if(!empty)for(let i=0;i<tex.levels;i++){const n=tex.size>>i;gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,i,0,0,0,n,n,tex.layers,gl.RGBA,gl.UNSIGNED_BYTE,lv[i]);}
 gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,tex.levels>1?gl.NEAREST_MIPMAP_LINEAR:gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);
@@ -107013,10 +107080,43 @@ gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
 return t;
 }
 
+texHiOk(tex){const R=VR.R;return!!(this.gl&&tex&&tex.type==='texhi'&&VR.TexHi&&R&&R.texNames&&R.texNames.length===this.layers&&this.texHiMap);}
 uploadTexHi(tex){
+if(!this.texHiOk(tex))return false;
+this.texHiTok=(this.texHiTok||0)+1;
+return this.applyTexHi(tex,this.texHiArray(tex,'albedo',true),this.texHiArray(tex,'material',false));
+}
+
+
+queueTexHi(tex,Q,done){
+if(!this.texHiOk(tex))return false;
+const gl=this.gl,R=this,tok=this.texHiTok=(this.texHiTok||0)+1,L=tex.layers,N=tex.size,lvls=[tex.albedo,tex.material];
+let made=null,a=0,lv=0,z=0,bytes=0;
+for(let l=0;l<tex.levels;l++)bytes+=2*(N>>l)*(N>>l)*4*L;
+const step=(max)=>{
+if(!made)made=[R.texHiArray(tex,'albedo',true,true),R.texHiArray(tex,'material',false,true)];
+let wrote=0;
+while(a<2){
+const n=N>>lv,per=n*n*4;
+let k=Math.min(L-z,Math.floor((max-wrote)/per));
+if(k<=0){if(wrote||max<per*0.25)break;k=1;}
+gl.bindTexture(gl.TEXTURE_2D_ARRAY,made[a]);
+gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,lv,0,0,z,n,n,k,gl.RGBA,gl.UNSIGNED_BYTE,lvls[a][lv],z*per);
+z+=k;wrote+=k*per;
+if(z>=L){z=0;lv++;if(lv>=tex.levels){lv=0;a++;}}
+}
+return wrote;
+};
+const commit=()=>{const m=made;made=null;if(R.applyTexHi(tex,m[0],m[1])&&done)done();};
+Q.push({prio: -1,x:0,z:0,bytes,alive:()=>R.texHiTok===tok,step,commit,
+abort:()=>{
+if(R.texHiTok===tok){while(a<2)step(Infinity);commit();return;}
+if(made){gl.deleteTexture(made[0]);gl.deleteTexture(made[1]);made=null;}
+}});
+return true;
+}
+applyTexHi(tex,alb,mat){
 const gl=this.gl,R=VR.R,HI=VR.TexHi;
-if(!gl|| !tex||tex.type!=='texhi'|| !HI|| !R|| !R.texNames||R.texNames.length!==this.layers|| !this.texHiMap)return false;
-const alb=this.texHiArray(tex,'albedo',true),mat=this.texHiArray(tex,'material',false);
 gl.deleteTexture(this.texHiAlb);gl.deleteTexture(this.texHiMat);
 this.texHiAlb=alb;this.texHiMat=mat;this.texHiN=tex.layers;
 const map=new Uint8Array((this.layers+3)& ~3);map.set(HI.map(R.texNames,tex.names));
@@ -107025,13 +107125,19 @@ this.texHiBytes=HI.bytes(tex.layers);
 if(this.anisoLevel)this.setAniso(this.anisoLevel);
 return true;
 }
+
 buildPrograms(){
+const G=VR.GL,was=G.deferred;
+G.deferred=true;
+try{this.buildProgramsNow();}finally{G.deferred=was;}
+}
+buildProgramsNow(){
 if(VR.Light2){VR.Light2.use(this.q);this.l2Key=VR.Light2.key?VR.Light2.key(this.q):'';if(VR.GL&& !VR.GL.defineHook)VR.GL.defineHook=VR.Light2.hook;}
 if(VR.Sky3){VR.Sky3.use(this.q);this.s3Key=VR.Sky3.key(this.q);}
 const md=this.multi?['MULTIDRAW']:[];
 const sh=(this.q.shadows?['SHADOWS']:[]).concat(this.q.hshadow?['HSHADOW']:[]).concat(this.q.lite?['LITE']:[]).concat(this.q.motion?['MOTION']:[]).concat(this.q.cloudShadow?['CLOUDSH']:[]);
 const P=this.P={};
-const bindUBO=(p)=>{if(this.multi){const gl=this.gl;const bi=gl.getUniformBlockIndex(p.p,'Origins');if(bi!==0xffffffff&&bi!== -1)gl.uniformBlockBinding(p.p,bi,0);}return p;};
+const bindUBO=(p)=>GL.onReady(p,(q)=>{if(this.multi){const gl=this.gl;const bi=gl.getUniformBlockIndex(q.p,'Origins');if(bi!==0xffffffff&&bi!== -1)gl.uniformBlockBinding(q.p,bi,0);}});
 
 const pb=VR.PBR?VR.PBR.defines(this.q):[];
 const th=this.q.texHi&& !this.q.lite?['TEXHI']:[];
@@ -107074,8 +107180,20 @@ const P=this.P;
 if(P.cutZ)return P.cutZ;
 const md=this.multi?['MULTIDRAW']:[],sh=(this.q.shadows?['SHADOWS']:[]).concat(this.q.hshadow?['HSHADOW']:[]).concat(this.q.lite?['LITE']:[]).concat(this.q.motion?['MOTION']:[]).concat(this.q.cloudShadow?['CLOUDSH']:[]);
 const p=GL.program(S.TERRAIN_VS,S.TERRAIN_FS,'terrainCutZ',[...md,...sh,'CUTOUT','FADE','ZINV','ZPRE',...(this.q.lite?[]:['SOFTFADE'])]);
-if(this.multi){const gl=this.gl,bi=gl.getUniformBlockIndex(p.p,'Origins');if(bi!==0xffffffff&&bi!== -1)gl.uniformBlockBinding(p.p,bi,0);}
+GL.onReady(p,(q)=>{if(this.multi){const gl=this.gl,bi=gl.getUniformBlockIndex(q.p,'Origins');if(bi!==0xffffffff&&bi!== -1)gl.uniformBlockBinding(q.p,bi,0);}});
 return(P.cutZ=p);
+}
+
+
+
+warmPrograms(){
+if(!this.P||this.warmedP===this.P)return;
+this.warmedP=this.P;
+const was=GL.deferred;GL.deferred=true;
+try{
+if(this.q.zPre)this.zProgram();
+if(!this.q.lite){this.propProgram(false);this.furnProgram(false);if(this.q.shadows){this.propProgram(true);this.furnProgram(true);}}
+}finally{GL.deferred=was;}
 }
 
 
@@ -108607,13 +108725,17 @@ const thr=VR.Clouds?VR.Clouds.boxThr(cov):0.72-cov*0.36;
 
 
 const push=(x0,z,len,yo,th)=>inst.push(x0,z,len,yo*8+Math.min(7.9,th));
+
+
+const CV=this.cloudV||(this.cloudV={v:new Float64Array(65536),gx:new Int32Array(65536).fill(-2147483648),gz:new Int32Array(65536)});
 for(let z= -R;z<=R;z++){
 let run=0,runStart=0,ex=0;
 for(let x= -R;x<=R+1;x++){
 let on=false,v=0;
 if(x<=R&&x*x+z*z<=R*R){
-const gx=ocx+x,gz=ocz+z;
-v=(nz.n2(gx*0.085,gz*0.085)*0.65+nz.n2(gx*0.27+50,gz*0.27)*0.35)*0.5+0.5;
+const gx=ocx+x,gz=ocz+z,ci=((gz&255)<<8)|(gx&255);
+if(CV.gx[ci]===gx&&CV.gz[ci]===gz)v=CV.v[ci];
+else{v=(nz.n2(gx*0.085,gz*0.085)*0.65+nz.n2(gx*0.27+50,gz*0.27)*0.35)*0.5+0.5;CV.v[ci]=v;CV.gx[ci]=gx;CV.gz[ci]=gz;}
 on=v>thr;
 }
 if(on){if(!run){runStart=x;ex=0;}run++;ex=Math.max(ex,v-thr);}
@@ -108973,6 +109095,7 @@ tex(unit,t,loc){const gl=this.gl;gl.activeTexture(gl.TEXTURE0+unit);gl.bindTextu
 render(F){
 const gl=this.gl,E=F.env,world=F.world;
 const t0=performance.now();
+if(GL.pending&&GL.pending.size)GL.settle();
 this.frameNo++;
 this.gpuTimerBegin();
 this.stats.draws=0;this.stats.tris=0;this.stats.guide=0;
@@ -110966,6 +111089,7 @@ const cb=this.cb.get(m.id);
 if(cb){this.cb.delete(m.id);try{cb(m);}catch(err){console.error(err);}}
 if(m.type==='error')console.error('Worker job failed:',m.msg);
 this.pump();
+if(this.onAnswer)this.onAnswer(m);
 }
 
 submit(msg,transfer,cb,prio){(msg.lane===1?this.queueFar:this.queue).push({msg,transfer,cb,prio:prio||0});this.queueDirty=true;}
@@ -111173,14 +111297,19 @@ nbFn(){return this._nb||(this._nb=(x,y,z,d)=>this.getBlock(x+VR.HF_DX[d],y,z+VR.
 
 
 
-update(px,py,pz,now){
+
+
+
+update(px,py,pz,now,off){
 this.frame++;
+if(!off){
 
 
 if(this.lastUpd!==undefined&&now>this.lastUpd)this.uploadQ.frame(now-this.lastUpd,now);
 this.lastUpd=now;
 this.stepFades(now);
 this.drainUploads(px,pz,now);
+}
 const pcx=Math.floor(px)>>4,pcz=Math.floor(pz)>>4;
 this.center=[pcx,pcz];
 const rd=this.renderDist,loadR=rd+1;
@@ -111203,7 +111332,7 @@ if(this.streamTakt&&VR.UL&&this.frame%15===0)this.reprio(pcx,Math.floor(py)>>4,p
 if(this.seamPending())this.seamStep(this.streamTakt&&this.streamMs!==undefined?this.streamMs*0.5:undefined);
 
 const want=[];
-if(this.frame&1)for(let dz= -loadR;dz<=loadR;dz++)for(let dx= -loadR;dx<=loadR;dx++){
+if(off||(this.frame&1))for(let dz= -loadR;dz<=loadR;dz++)for(let dx= -loadR;dx<=loadR;dx++){
 const d2=dx*dx+dz*dz;
 if(d2>(loadR+0.5)*(loadR+0.5))continue;
 const cx=lcx+dx,cz=lcz+dz,k=ckey(cx,cz);
@@ -111217,7 +111346,7 @@ const along=ahead?Math.max(0,ex*ux+ez*uz):0;
 want.push([ex*ex+ez*ez-along*along*0.5,cx,cz,k]);
 }
 if(want.length>1)want.sort((a,b)=>a[0]-b[0]);
-if(this.frame&1)this.lastWant=want.length;
+if(off||(this.frame&1))this.lastWant=want.length;
 const maxReq=Math.max(6,this.pool.workers.length*4);
 let inflight=this.pending.size;
 for(const[d2,cx,cz,k]of want){
@@ -126501,12 +126630,19 @@ V.roleTitle=(role)=>V.T('g.role.'+role,null,ROLES[role]?ROLES[role].title:role);
 
 
 const T=()=>R.T;
-let passC=null,standC=null;
-function caches(){
-if(passC)return;
-const n=R.T.type.length;
-passC=new Uint8Array(n);standC=new Uint8Array(n);
-for(let s=0;s<n;s++){
+let passC=null,standC=null,cachedN=0;
+
+
+
+
+function caches(budgetMs){
+if(passC&&cachedN>=passC.length)return true;
+const n=passC?passC.length:R.T.type.length;
+if(!passC){passC=new Uint8Array(n);standC=new Uint8Array(n);cachedN=0;}
+const t0=budgetMs!==undefined?performance.now():0;
+for(;cachedN<n;cachedN++){
+if(budgetMs!==undefined&&performance.now()-t0>=budgetMs)return false;
+const s=cachedN;
 const fl=R.T.flags[s],t=R.types[R.T.type[s]];
 const kind=t&&t.o.kind;
 
@@ -126523,7 +126659,10 @@ let top=0;for(const bb of b)top=Math.max(top,bb[4]);
 standC[s]=b.length&&top<=1.01&&top>0.3?1:0;
 }else standC[s]=0;
 }
+return true;
 }
+V.warm=(budgetMs)=>caches(budgetMs);
+V.warmed=()=> !!passC&&cachedN>=passC.length;
 class Heap{
 constructor(){this.k=[];this.v=[];}
 push(key,pri){const k=this.k,v=this.v;k.push(key);v.push(pri);let i=k.length-1;while(i>0){const p=(i-1)>>1;if(v[p]<=v[i])break;[k[p],k[i]]=[k[i],k[p]];[v[p],v[i]]=[v[i],v[p]];i=p;}}
@@ -143192,7 +143331,10 @@ const t0=performance.now(),key=VR.TexCache?VR.TexCache.key({hi:1,bevel:1}):null;
 const done=(tex,cached)=>{
 this.texHiBusy=false;
 if(!tex||tex.type!=='texhi'){this.texHiErr=(tex&&(tex.err||tex.msg))||'none';return;}
-if(r.uploadTexHi(tex)){this.texHiMs=Math.round(performance.now()-t0);this.texHiFromCache=cached;this.texHiForgeMs=tex.ms||0;}
+const fin=()=>{this.texHiBusy=false;this.texHiMs=Math.round(performance.now()-t0);this.texHiFromCache=cached;this.texHiForgeMs=tex.ms||0;};
+const Q=this.world&&this.world.uploadQ;
+if(r.queueTexHi&&Q&&Q.drain&&r.queueTexHi(tex,Q,fin)){this.texHiBusy=true;return;}
+if(r.uploadTexHi(tex))fin();
 };
 (key?VR.TexCache.get(key):Promise.resolve(null)).then((tex)=>{
 if(tex){done(tex,true);return;}
@@ -143304,6 +143446,9 @@ if(this.ui&&this.ui.studioNote)this.ui.studioNote();
 
 async boot(){
 this.bootT0=performance.now();
+
+
+this.pool=this.makePool();
 try{this.renderer=new VR.Renderer(this.canvas);}
 catch(e){this.fatal(T('g.fatal.webgl',{msg:e.message}));return;}
 
@@ -143349,10 +143494,7 @@ if(e.key&&VR.WorldStyle&&this.meta&& !this.meta.guest&&e.key===VR.WorldStyle.key
 
 if(VR.LiveLoop)VR.LiveLoop.onStorage(this,e);
 });
-const n=VR.poolSize(navigator.hardwareConcurrency||4,this.settings.preset);
-const src=document.getElementById('worker-src').textContent;
-this.pool=new VR.WorkerPool(src,n);
-this.pool.maxInflight=2;
+if(!this.pool)this.pool=this.makePool();
 this.titleSeed=0x7a3c21^(Math.floor(Math.random()*6)*0x1111);
 this.pool.broadcast({type:'init',seed:this.titleSeed,opts:{},custom:VR.CUSTOM});
 
@@ -143408,6 +143550,16 @@ const playId=(/[#&]play=([^&]+)/.exec(location.hash||'')||[])[1];
 if(playId){try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}this.playWorldId(decodeURIComponent(playId));}
 else this.startTitle();
 if(this.bootDone)this.bootDone();
+}
+
+
+makePool(){
+const n=VR.poolSize(navigator.hardwareConcurrency||4,this.settings.preset);
+const src=document.getElementById('worker-src').textContent;
+const pool=new VR.WorkerPool(src,n);
+pool.maxInflight=2;
+pool.onAnswer=()=>this.loadPump();
+return pool;
 }
 fatal(msg){
 document.getElementById('ui').innerHTML=`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>${T('g.fatal.title')}</h2><div>${msg}</div><div style="color:#93a4c4">${T('g.fatal.hint')}</div></div>`;
@@ -143541,6 +143693,7 @@ if(this.mp)this.world.listeners.push(this.mp);
 for(const c of this.world.cols.values())this.onColumnLoaded(c);
 this.state='loading';
 this.loadStart=performance.now();this.nearReadyAt=0;
+if(this.renderer&&this.renderer.warmPrograms)this.renderer.warmPrograms();
 }
 
 
@@ -144114,6 +144267,7 @@ this.renderer.render({cam:Object.assign({far:this.farFor(w)},c),world:w,env:E,ho
 }
 loadingFrame(dt){
 const p=this.player,w=this.world;
+if(VR.Folk&&VR.Folk.warm&& !VR.Folk.warmed())VR.Folk.warm(3);
 w.update(p.pos[0],p.pos[1],p.pos[2],performance.now());
 
 
@@ -144142,7 +144296,18 @@ this.ui.loading(T(near<0.5?'g.load.terrain':near<1?'g.load.meshes':'g.load.horiz
 const E=this.envFor(p.eyePos(),dt,LS&&this.arrivalPending?{freezeTime:true}:null);
 const lcam=LS?Object.assign(VR.First.loadCam(this),{far:this.farFor(w)}):{x:p.pos[0],y:p.pos[1]+p.eye,z:p.pos[2],yaw:p.yaw,pitch:p.pitch,fov:this.settings.fov*Math.PI/180,far:this.farFor(w)};
 if(this.horizon)this.horizon.update(lcam);
+this.loadCam=lcam;
+
+
+
+const tnow=performance.now();
+if(!LS|| !this.loadDrawAt||tnow-this.loadDrawAt>=(this.loadDrawGap||140)||tnow<this.loadDrawAt){
+this.loadDrawAt=tnow;this.loadDrawCost=tnow;
 this.renderer.render({cam:lcam,world:LS?null:w,env:E,horizon:LS?null:this.horizon});
+}else if(this.loadDrawCost){
+
+this.loadDrawGap=Math.min(20000,Math.max(140,(tnow-this.loadDrawCost)*3));this.loadDrawCost=0;
+}
 
 
 const early= !!(VR.NewLife&&VR.NewLife.loading(this));
@@ -144163,6 +144328,20 @@ if(this.player.mode==='zen')this.ui.chatLine(T('g.chat.zen'),'#b8ffcf');
 this.autosaveAt=performance.now()+60000;
 this.startPrewarm();
 }
+}
+
+
+
+loadPump(){
+if(this.state!=='loading'||this.pumpT|| !this.world)return;
+this.pumpT=setTimeout(()=>{
+this.pumpT=0;
+const w=this.world,p=this.player,now=performance.now();
+if(this.state!=='loading'|| !w|| !p||now-(this.pumpAt||0)<4||now-(w.lastUpd||0)<4)return;
+this.pumpAt=now;
+w.update(p.pos[0],p.pos[1],p.pos[2],now,true);
+if(this.horizon&&this.loadCam)this.horizon.update(this.loadCam);
+},0);
 }
 
 
