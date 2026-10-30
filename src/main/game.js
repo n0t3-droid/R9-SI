@@ -345,6 +345,9 @@
     // ---------------------------------------------------------------- boot
     async boot() {
       this.bootT0 = performance.now();   // (t-first: the start screen's first paint is measured from here)
+      // e-engine: the workers first — each parses the shared code (≈ 2 MB) on its own thread while this one builds the
+      // renderer and its programs and opens the store; the first job (the textures, the title's land) then finds them ready
+      this.pool = this.makePool();
       try { this.renderer = new VR.Renderer(this.canvas); }
       catch (e) { this.fatal(T('g.fatal.webgl', { msg: e.message })); return; }
       // the graphics context can be taken away (a driver reset, the GPU out of memory on a small machine, a tab
@@ -390,10 +393,7 @@
         // B1 „🎨 Aussehen": a block's look or a variant changed in the Studio (also the one over the game) — live, no reload
         if (VR.LiveLoop) VR.LiveLoop.onStorage(this, e);
       });
-      const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
-      const src = document.getElementById('worker-src').textContent;
-      this.pool = new VR.WorkerPool(src, n);
-      this.pool.maxInflight = 2;
+      if (!this.pool) this.pool = this.makePool();   // (e-engine: made at the start of boot)
       this.titleSeed = 0x7a3c21 ^ (Math.floor(Math.random() * 6) * 0x1111);
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
@@ -449,6 +449,16 @@
       if (playId) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* */ } this.playWorldId(decodeURIComponent(playId)); }
       else this.startTitle();
       if (this.bootDone) this.bootDone();   // (t-first: a ▶ pressed meanwhile goes on now)
+    }
+    // e-engine: the worker pool (sized by the cores and the preset); its answers keep the loading screen's streaming going
+    // between the frames (loadPump)
+    makePool() {
+      const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
+      const src = document.getElementById('worker-src').textContent;
+      const pool = new VR.WorkerPool(src, n);
+      pool.maxInflight = 2;
+      pool.onAnswer = () => this.loadPump();
+      return pool;
     }
     fatal(msg) {
       document.getElementById('ui').innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>${T('g.fatal.title')}</h2><div>${msg}</div><div style="color:#93a4c4">${T('g.fatal.hint')}</div></div>`;
@@ -1183,7 +1193,14 @@
       const E = this.envFor(p.eyePos(), dt, LS && this.arrivalPending ? { freezeTime: true } : null);
       const lcam = LS ? Object.assign(VR.First.loadCam(this), { far: this.farFor(w) }) : { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
       if (this.horizon) this.horizon.update(lcam);
-      this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
+      this.loadCam = lcam;   // (e-engine: loadPump asks for the far tiles from it)
+      // e-engine: behind the loading screen the sky alone stands still (the clock held): drawn ~7 times a second, not every
+      // frame — the GPU (on a weak PC the CPU's software renderer) is left to the workers; an arrival's white every frame
+      const tnow = performance.now();
+      if (!LS || this.arrival || !this.loadDrawAt || tnow - this.loadDrawAt >= 140 || tnow < this.loadDrawAt) {
+        this.loadDrawAt = tnow;
+        this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
+      }
       // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing); an arrival's
       // white rises over the loading screen before the world opens under it (first.js holdLoading)
       const early = !!(VR.NewLife && VR.NewLife.loading(this));   // u-home: a trip arrives as soon as the 5 × 5 round the arrival are in (the far ring fills in while you play)
@@ -1204,6 +1221,20 @@
         this.autosaveAt = performance.now() + 60000;
         this.startPrewarm();
       }
+    }
+    // e-engine: the loading screen's streaming between the frames — a worker's answer (WorkerPool.onAnswer) asks for the
+    // next columns, meshes and far tiles at once (World.update off), so a slow frame (a weak GPU drawing the sky, a software
+    // renderer) no longer paces the start: before, the column requests were topped up every other frame only
+    loadPump() {
+      if (this.state !== 'loading' || this.pumpT || !this.world) return;
+      this.pumpT = setTimeout(() => {
+        this.pumpT = 0;
+        const w = this.world, p = this.player, now = performance.now();
+        if (this.state !== 'loading' || !w || !p || now - (this.pumpAt || 0) < 4 || now - (w.lastUpd || 0) < 4) return;
+        this.pumpAt = now;
+        w.update(p.pos[0], p.pos[1], p.pos[2], now, true);
+        if (this.horizon && this.loadCam) this.horizon.update(this.loadCam);
+      }, 0);
     }
     // the lazy models (the Modern Living pack and the other generated blocks) are built in idle time, never in the first
     // 10 s of play (VM.prewarm: one per idle slice, largest first); hidden tabs stop it, and it resumes when shown again
