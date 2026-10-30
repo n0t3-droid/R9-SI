@@ -752,7 +752,7 @@ vec3 bsBodies(vec3 D, vec3 col, float px) {
     vec4 B = u_bsB[k];
     if (B.w <= 0.0) continue;
     float c = dot(D, B.xyz);
-    if (c <= 0.0) continue;
+    if (c <= 0.0 || c * c < 1.0 - 1.21 * B.w * B.w) continue;   // (u-fields2: a cone test first — the cross only near the disc)
     float q = length(cross(D, B.xyz)) / B.w;
     if (q > 1.08) continue;
     vec3 o = (D - B.xyz * c) / B.w;

@@ -298,8 +298,10 @@ async function runPreset(preset) {
           sky.sort((a, b) => b.dir[1] * b.deg - a.dir[1] * a.deg);
           // 45 m from the landing place toward the neighbour (the parked ship behind)
           await P.ev((d) => { const g = VR.game, p = g.player, gen = new VR.RubbleGen(0, g.dim, { bgen: { rubble: 2 } }), l = Math.hypot(d[0], d[2]) || 1; for (let r = 45; r > 5; r -= 5) { const x = Math.round(p.pos[0] + d[0] / l * r), z = Math.round(p.pos[2] + d[2] / l * r), y = gen.surfaceY(x, z); if (y > 0) { p.teleport(x + 0.5, y + 1.2, z + 0.5); return; } } }, sky[0].dir);
+          // Helia behind the eye (the neighbour's lit face toward us), low
+          await P.ev((d) => { const l = Math.hypot(d[0], d[2]) || 1, s = [-d[0] / l * 0.9, 0.42, -d[2] / l * 0.9], m = Math.hypot(...s); VR.Fields.sunFix = s.map(x => x / m); }, sky[0].dir);
           await P.settle(200);
-          const d = sky[0].dir, look = [d[0] * 0.92, d[1] * 0.92 - 0.12, d[2] * 0.92], l = Math.hypot(...look);
+          const d = sky[0].dir, look = [d[0], d[1] - 0.3, d[2]], l = Math.hypot(...look);
           await lookAlong(P, look.map(x => x / l)); await P.step(3); await P.settle(100); await P.step(2);
           await P.ev(() => { window.__Fh = window.__F; });
           Rr.hopPic = await picture(P, '__Fh', SH('hop_neighbour.png'), K);

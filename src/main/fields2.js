@@ -75,7 +75,14 @@
       if (dot(n, F2.axis()) < 0) n = n.map(x => -x);
       h0 = 0; rho0 = len(rel); e1 = unit(rel); rT = F2.topR(rel) + F2.CLOUD_H;
     }
-    c.entry = { kind, n, e1, e2: cross(n, e1), rho0, h0, rT, th: 0, s: 0, q0: Array.from(q) };
+    c.entry = { kind, n, e1, e2: cross(n, e1), rho0, h0, rT, th: 0, s: 0, q0: Array.from(q), thX: 0, k: 0 };
+    if (kind === 'clouds') {
+      // the day side: the way swung so the pass ends 65° before the subsolar point, flying into Helia's morning (the heads'
+      // shadows long) — the extra angle spread over the entry
+      const E = c.entry, hs = S.state(c.t).b.helia.r, sd = unit([hs[0] - q[0], hs[1] - q[1], hs[2] - q[2]]);
+      const ths = Math.atan2(dot(sd, E.e2), dot(sd, E.e1)), rm = (rho0 + rT) / 2, thN = Math.sqrt(A.mu / (rm * rm * rm)) * F2.ENTRY_S;
+      let x = ths - 65 * Math.PI / 180 - thN; x = ((x % TAU) + TAU + Math.PI) % TAU - Math.PI; E.thX = x;
+    }
     c.phase = 'entry'; c.s = 0;
     return c.entry;
   };
@@ -89,7 +96,7 @@
     c.t += h; c.total = (c.total || 0) + h; E.s += h; if (c.times) c.times.entry = (c.times.entry || 0) + h;
     const u = Math.min(1, E.s / F2.ENTRY_S), k = sstep(u), rho = E.rho0 + (E.rT - E.rho0) * k;
     const vc = Math.sqrt(A.mu / rho), dv = E.kind === 'ring' ? F2.RING_DV * k : 0;
-    E.th += (vc + dv) / rho * h;
+    E.th += (vc + dv) / rho * h + E.thX * (k - E.k); E.k = k;
     const rel = F2.entryRel(E, u), q = S.pos('amarant', c.t, _q);
     const Pn = [q[0] + rel[0], q[1] + rel[1], q[2] + rel[2]];
     for (let i = 0; i < 3; i++) { c.V[i] = (Pn[i] - c.P[i]) / h; c.P[i] = Pn[i]; }
@@ -264,6 +271,10 @@
     const e = c.end || {};
     if (e.goal) {
       C.blend = null;
+      // the ship level along the way, its up away from the giant
+      const st = a.st, nz = unit(st.v), up = unit(st.r);
+      for (let i = 0; i < 3; i++) A.slew(a.S, nz, up, Math.PI, Math.PI);
+      AM.ortho(a.S);
       if (e.goal === 'ring') SF.hint(fl, 'g.fields.ring', { tau: (Fd ? Fd.tauAt(F2.RING_R) : 1).toFixed(1) }, 5200);
       else SF.hint(fl, 'g.fields2.cloudsIn', null, 5200);
       F2.pass = { goal: e.goal, t0: performance.now() };
