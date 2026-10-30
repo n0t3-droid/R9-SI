@@ -376,7 +376,7 @@
       const g = this.g, SS = g.starships, st = this.st;
       let c = pad.crafts.get(q.m);
       if (!c) {
-        const arch = PL.arch(pad.seed, q.m), seed = PL.craftSeed(pad.seed, q.m);
+        const arch = pad.arch || PL.arch(pad.seed, q.m), seed = PL.craftSeed(pad.seed, q.m);   // (a-life: a ferry pad's own craft)
         c = { m: q.m, arch, d: SS.design(seed, arch, PL.PALS[q.m % 3]), inst: { d: null, pos: [0, 0, 0], yaw: 0, pitch: 0, roll: 0, gear: 0, hatch: { ramp: 0, door: 0, cdoor: 0 }, kneel: 0 }, tid: 'pl' + pad.key + ':' + q.m, crew: null, folk: [], drone: { pos: [0, 0, 0], yaw: 0 }, tick: 0, alpha: 0 };
         pad.crafts.set(q.m, c);
         for (const k of [...pad.crafts.keys()]) if (k < q.m - 2 || k > q.m + 2) pad.crafts.delete(k);

@@ -110,7 +110,7 @@ console.log('c · rgen 2');
 
 console.log('d · blocks, the shop, the codex, texts');
 {
-  const last = R.types.slice(-4).map(t => t.name).join(', ');
+  const last = R.types.filter(t => !/^(ferry_dock|grow_lamp)$/.test(t.name)).slice(-4).map(t => t.name).join(', ');   // (a-life: its two blocks after them)
   check(last === 'carbon_rubble, nickel_iron, ice_nodule, glowspar', 'the last blocks: ' + last);
   const gs = R.types[R.types.length - 1];
   check(R.T && R.T.light ? (R.T.light[R.S('glowspar')] | 0) > 0 || true : true, 'glowspar glows (light ' + JSON.stringify(gs.light || null) + ')');
