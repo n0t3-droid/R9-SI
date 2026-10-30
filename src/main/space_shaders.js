@@ -976,9 +976,9 @@ vec3 bsUmbrella(vec3 D, vec3 col) {
     float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
     if (J.w <= 0.0 || js <= 0.0) continue;
     float H = J.w;
-    vec3 V = J.xyz;
-    float dh = length(V.xz);
+    float dh = length(J.xz);
     if (dh < 1.0) continue;
+    vec3 V = vec3(J.x, min(J.y, -u_bsGround.w * dh), J.z);   // (the foot on the horizon's line at least — no strip of sky under a far plume)
     vec2 nr = V.xz / dh;
     float dn = dot(D.xz, nr);
     if (dn <= 1e-3) continue;
@@ -989,10 +989,14 @@ vec3 bsUmbrella(vec3 D, vec3 col) {
     if (y < -10.0 || y > 1.08 * H || u > Rg * 1.1) continue;
     float lit = smoothstep(-0.01, 0.01, u_bsSun.y + sqrt(2.0 * max(0.8 * H + V.y + u_bsJk.w, 0.0) / u_bsJk.z));
     float under = smoothstep(0.9 * Rg, 1.5 * Rg, dh);
-    float yc = u * (UC / US) - u * u / (4.0 * H * US * US), e = (yc - y) / H;   // (> 0 inside the canopy's edge)
-    float hk = smoothstep(0.0, 0.9 * H, y), fil = 0.85 + 0.15 * sin(atan(y, u + 1.0) * 46.0);
-    float shell = exp(-e * e / (e > 0.0 ? 0.0012 : 0.0003)) * (0.3 + 0.7 * hk) * fil;
-    float fill = smoothstep(0.0, 0.1, e) * (0.12 + 0.22 * hk) * (1.0 - smoothstep(0.92, 1.08, y / H));
+    // the edge: over the stem the envelope's dome (H at the axis, H cos²θ at the outer arc's top 0.34 H out), beyond it
+    // the outer arc falling to the ground — an umbrella; the rising branch of that arc lies inside the plume
+    float uA = 2.0 * H * US * UC, yc = u < uA ? H * (1.0 - US * US * (u / uA) * (u / uA)) : u * (UC / US) - u * u / (4.0 * H * US * US);
+    float e = (yc - y) / H;   // (> 0 inside the edge)
+    float hk = smoothstep(0.0, 0.9 * H, y), fil = 0.8 + 0.2 * sin(atan(y, u + 1.0) * 46.0);
+    float shell = exp(-e * e / (e > 0.0 ? 0.0008 : 0.0002)) * (0.25 + 0.75 * hk) * fil;
+    // (inside: the canopy's sheet thin, densest under its top, the falling curtains fainter toward the ground)
+    float fill = smoothstep(0.0, 0.06, e) * 0.07 * (0.3 + hk) * (u < uA ? 1.0 : 0.6) * (1.0 - smoothstep(0.92, 1.04, y / H));
     // the stem: the gas rising over the vent, widening as it climbs, thinning toward the top
     float ws = 0.016 * H + 18.0, w = ws * (1.0 + 1.2 * y / H);
     float stem = exp(-u * u / (w * w)) * (1.0 - 0.45 * y / H) * (1.0 - smoothstep(0.95, 1.06, y / H));

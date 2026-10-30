@@ -155,7 +155,7 @@
       ju: [K.shape || 0, 26, t % 1000, 0],
       // u-moons3: the Glutsee in the far ground (centre from the eye, its melt's height from the eye, radius) and its glow
       lake: BS.lake && id === 'zinn' ? [BS.lake.x - eye[0], BS.lake.z - eye[2], BS.lake.y - eye[1], BS.lake.R] : [0, 0, 0, 0],
-      lakeC: [1.0, 0.42, 0.09].map(v => v * (1.5 + 1.2 * night)),
+      lakeC: [1.0, 0.42, 0.09].map(v => v * (1.5 + 0.6 * night)),
     };
     // (u-orbit2: on the darkest nights the eye opens further — up to 1.7× — as it does under the stars alone)
     const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
@@ -255,7 +255,7 @@
     E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;
     if (E.storm) { E.storm[2] = 0; E.storm[3] = 0; } if (E.bolt) E.bolt[3] = 0;
     if (id === 'aqua') E.wind = 2.6;   // u-moons2: Aquamarin's swell taller than home's (the water's storm factor)
-    E.emissiveBoost = 0.45 + L.night * 1.1;
+    E.emissiveBoost = id === 'zinn' ? 0.3 + L.night * 0.45 : 0.45 + L.night * 1.1;   // (u-moons3: Zinnober's lava orange at night, not blown to white — the Glutsee fills the view)
     E.grade = [1, 1, 1];
     E.bloomThreshold = 1.25; E.bloomStrength = 0.08;
     // the eye adapts in a few seconds (slower into the dark)

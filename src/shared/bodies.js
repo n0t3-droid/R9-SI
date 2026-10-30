@@ -163,7 +163,7 @@
     landmark: { x: 60, z: -430, D: 260, depth: 22 },                    // the Glutsee: a lava lake 17 km real by the landing
     plume: { n: 6, every: [100, 140], dur: [40, 60], height: [5000, 6000], canopy: 1.15 },
     spawn: { x: 0, z: 0 },
-    sky: { parent: 'amarant', ground: [0.62, 0.55, 0.3] },
+    sky: { parent: 'amarant', ground: [0.6, 0.46, 0.2] },   // (u-moons3: the far ground the near plains' orange-yellow, was a pale beige)
   });
   // Ocker: Mars' kind (R§2.3, §5.4) — the plain at y 150 so the Rostschlucht fits (145 m = Valles' 9.3 km ÷ 64), barchans
   // at real size (4–9 m high), mesas, softened craters, the Ockerdom (240 m = 15 km real, 5.3 km north; the world top caps it — a stated

@@ -91,6 +91,7 @@ const setT = (A, t) => A.ev((t) => { const e = VR.game.env, k = Math.round(t * 2
 // the camera: flying in place at (x, y, z) looking at yaw / pitch (radians)
 const place = (A, x, y, z, yaw, pitch) => A.ev(([x, y, z, yaw, pitch]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = yaw; p.pitch = pitch; p.vel = [0, 0, 0]; }, [x, y, z, yaw, pitch]);
 const shot = async (A, name, frames = 6) => { await A.page.bringToFront(); await A.step(60, 33);
+  await A.ev(() => { const v = document.getElementById('travelVeil'); if (v && VR.game.state === 'play') { v.style.transition = 'none'; v.style.opacity = '0'; } });   // (u-moons3: the VL page's Zinnober picture of run 1 was the trip's veil, its fade stalled)
   const ok = await A.picture(SHOTS + name + '.png', frames);
   const info = await A.ev(() => { const B = VR.BodySky, c = B && B.cur, g = VR.game; return c ? { exposure: +g.env.E.exposure.toFixed(2), sunEl: +(c.light.sunEl * 57.3).toFixed(1), lightK: +c.light.lightK.toFixed(2), parEl: +(c.light.parEl * 57.3).toFixed(1), plumes: B.plumes.length, air: c.sky.airK[0], airTier: c.sky.airK[2], tau: +B.dustTau.toFixed(2), fov: g.settings.fov, pos: g.player.pos.map(v => Math.round(v)) } : null; });
   rec.pictures[name] = info; save(); check(ok, `test/shots/${name}.png ${JSON.stringify(info)}`); return ok; };
@@ -120,7 +121,7 @@ const wide = (A) => A.ev(() => { const g = VR.game; g.settings.renderDist = 12; 
 
 if (!ONLY || ONLY === 'zinn') {
   await setT(A, await findT(A, 'zinn', [0.5, 70, 0.5], 18, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 18° up, rising)
-  const s = await trip(A, 'zinn'); await wide(A); await A.settle(60, 4);
+  const s = await trip(A, 'zinn'); await wide(A); await A.settle(60, 4, 180);   // (u-moons3: up to 3 min — run 2's first Zinnober frame was taken with the lake not yet shown)
   await A.step(30, 33); await shot(A, 'zinn_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Zinnober');
   const Z = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}); const v = g.vents()[0]; return { v: { x: v.x, z: v.z, y: v.y }, G: { x: g.glut.x, z: g.glut.z, R: g.glut.R }, sp: g.findSpawn() }; });
@@ -144,7 +145,7 @@ if (!ONLY || ONLY === 'zinn') {
 }
 if (!ONLY || ONLY === 'ocker') {
   await setT(A, await findT(A, 'ocker', [0.5, 152, 0.5], 35, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 35° up, rising)
-  const s = await trip(A, 'ocker'); await wide(A); await A.settle(60, 4);
+  const s = await trip(A, 'ocker'); await wide(A); await A.settle(60, 4, 180);   // (u-moons3: up to 3 min — run 2's first Zinnober frame was taken with the lake not yet shown)
   await A.step(30, 33); await shot(A, 'ocker_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Ocker');
   await B2(A, 'storm', 0); await B2(A, 'front', 0);
@@ -185,7 +186,7 @@ if (!ONLY || ONLY === 'ocker') {
 }
 if (!ONLY || ONLY === 'aqua') {
   await setT(A, await findT(A, 'aqua', [0.5, 75, 0.5], 28, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 28° up, rising)
-  const s = await trip(A, 'aqua'); await wide(A); await A.settle(60, 4);
+  const s = await trip(A, 'aqua'); await wide(A); await A.settle(60, 4, 180);   // (u-moons3: up to 3 min — run 2's first Zinnober frame was taken with the lake not yet shown)
   await A.step(30, 33); await shot(A, 'aqua_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Aquamarin');
   const Q = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'aqua', {}); return { L: g.prof.landmark, sp: g.findSpawn() }; });
