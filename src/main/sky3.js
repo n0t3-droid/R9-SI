@@ -381,8 +381,8 @@
     // (f-sky5, R52-03: at the golden hour the sunlit tops were a dull beige no brighter than the luminous sky round them —
     // the frames' golden cumulus are white over lilac shade: the sun's light on them and the sky's from above lifted at
     // 2° and 8°, offline (sky_offline.js) the top's luma sd 28.8 → 32.4 with the bands' ΔE held)
-    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.12, 0.78]], [8, [2.1, 1.58, 1.15]], [16, [1.22, 1.14, 1.04]]],
-    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.7, 0.6, 0.85]], [8, [0.8, 0.76, 0.98]], [16, [0.5, 0.56, 0.72]]],
+    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.05, 0.66]], [8, [2.05, 1.42, 0.92]], [16, [1.22, 1.14, 1.04]]],   // (f-golden: the golden tops peach-gold, run 3: cream-white tops kept the canyon's sky saturation at 69)
+    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.66, 0.55, 0.88]], [8, [0.74, 0.68, 1.0]], [16, [0.5, 0.56, 0.72]]],
     // (f-golden, R53-11: at the golden hour the bases a deeper lilac-blue — the frames' white tops over lilac shade; the
     // top's contrast from the clouds' own relief, sky_offline.js)
     low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.36, 0.28, 0.58]], [8, [0.34, 0.31, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
@@ -398,15 +398,15 @@
   // deck gets weight — rolls and lumps of a warped noise, a charcoal base (base: of the clouds' light from below), rain
   // shafts hanging from it to the horizon (SKY3HI: Balanced and up), a lit edge low toward the sun where it can break
   // (by day, the cover not total). Its switch: cloudVol (Wolken mit Volumen) and the sky's level ≥ 1; Very Low has neither.
-  // (f-golden: the far puffs' 0.08 left ghost outlines in the deck — behind it now none (puff 0); the near scud, within
-  // `near` blocks of the eye, keeps `scud` of them: PUFF_FS fades from the one to the other between 0.6 · near and near)
-  S3.DECK = { from: 0.3, full: 0.75, puff: 0, scud: 0.3, near: 150, base: 0.55, shafts: 0.85, edge: 0.7 };
+  // (f-golden: the puffs' 0.08 left ghost outlines in the deck — now none (puff 0); browser run 3 kept 0.3 of them within
+  // 150 blocks as 'scud' and they read as charcoal cotton balls overhead: the deck's own scud (s3Deck) is the scud)
+  S3.DECK = { from: 0.3, full: 0.75, puff: 0, base: 0.55, shafts: 0.85, edge: 0.7 };
   S3.deck = function (E) {
     const q = S3.q || OFF, D = S3.DECK;
-    if (!(q.sky3 >= 1) || !q.cloudVol) return { on: 0, puff: 1, scud: 1, near: D.near, shafts: 0, edge: 0, base: [0, 0, 0] };
+    if (!(q.sky3 >= 1) || !q.cloudVol) return { on: 0, puff: 1, shafts: 0, edge: 0, base: [0, 0, 0] };
     const on = sstep(D.from, D.full, S3.stormK(E)), C = S3.cloudLight(E);
     const el = Math.asin(clamp(E.sunDir[1], -1, 1)) * 180 / Math.PI, dayK = sstep(-2, 6, el), cover = clamp(E.cloudCover || 0, 0, 1);
-    return { on, puff: 1 - (1 - D.puff) * on, scud: 1 - (1 - D.scud) * on, near: D.near, shafts: q.sky3 >= 2 ? D.shafts * on : 0, edge: D.edge * on * dayK * (1 - 0.6 * sstep(0.9, 1.0, cover)), base: C.low.map(v => v * D.base) };
+    return { on, puff: 1 - (1 - D.puff) * on, shafts: q.sky3 >= 2 ? D.shafts * on : 0, edge: D.edge * on * dayK * (1 - 0.6 * sstep(0.9, 1.0, cover)), base: C.low.map(v => v * D.base) };
   };
   // f-sky5 · the golden hour's cumulus: in clear weather at the golden hour a few more of them (the frames t1_07, t1_09:
   // big white clouds over the land) — the sprites' cover (renderer.updatePuffs) raised by add × the golden weight, under
@@ -515,7 +515,7 @@
     const Dk = S3.deck(E), deck = mix3(mix3(C.grey, C.top, 0.35), Dk.base, Dk.on * 0.6);   // (f-sky5: the storm's deck a charcoal)
     set4(u.u_s3Rain, deck[0], deck[1], deck[2], 0);
     set4(u.u_s3Deck2, over ? Dk.on : 0, over ? Dk.shafts : 0, over ? Dk.edge : 0, (E.time || 0) * 0.02);
-    set4(u.u_c3Deck, Dk.puff, Dk.on, S3.mistK(E), Dk.scud);   // (f-golden: w the near scud's share)
+    set4(u.u_c3Deck, Dk.puff, Dk.on, S3.mistK(E), 0);
     S3.goldSky(E, u.u_s3Gold);   // (f-golden: the golden sky's structure)
     const dr = E.cloudDrift, dx = dr ? dr[0] : (E.time || 0) * 0.9, dz = dr ? dr[1] : 0;
     set4(u.u_s3Drift, dx / 900, dz / 900, dx / 340, dz / 340);
@@ -526,7 +526,7 @@
     // the far banks (level 2): their cover, their drift (azimuth), the warmth of the sun's side; the ray fan round a low
     // sun through the cloud gaps (stronger the more cloud there is, none in the rain)
     const el = Y.el;
-    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - 0.95 * rain) : 0, dx / 2600, dz / 2600, 0);
+    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - sstep(0.1, 0.5, rain)) : 0, dx / 2600, dz / 2600, 0);   // (f-golden: none in the rain — run 3's storm kept one lit white bank low on its horizon)
     // the cumulus field beyond the sprites' window, in perspective on the cloud plane (y 210): the plane's height over the
     // eye and the eye in cloud space are the renderer's (sky3_gl.js sets x, y, z each frame); w the cover (level 2)
     u.u_s3Field[3] = lv >= 2 && over ? cover * (1 - 0.95 * rain) : 0;   // (in the rain the deck closes the sky: no far field, no banks)
@@ -865,7 +865,8 @@ vec3 s3Fan(vec3 dir) {
   // darker; far ones take the sky's horizon colour. Returns the colour and the coverage (a < 0: nothing)
   // the banks' share by the hour (R52-03: at the golden hour the isles drowned in their grey-lilac smear; the frames'
   // clouds under the isles are few and white — u_c3Deck.z)
-  S3.MISTK = { gold: 0.3 };   // (the third browser run: 0.55 → 0.3 lifted the canyon's land saturation 88 → 90, with the far air 98)
+  S3.MISTK = { gold: 0 };   // (f-golden, browser run 3: the banks lay as a veil over the isles' valley floor — without them the isles' land saturation 85.9 → 101.7; they come back as the sun climbs past ~10°)
+  // (f-sky5: 0.3 — its third browser run: 0.55 → 0.3 lifted the canyon's land saturation 88 → 90, with the far air 98)
   // (f-golden: and none in the rain — a white bank lay low on the storm's horizon; they melt into the deck with the puffs)
   S3.mistK = (E) => (1 - (1 - S3.MISTK.gold) * (E && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0)) * (1 - sstep(0.1, 0.5, clamp((E && E.rain) || 0, 0, 1)));
   S3.MIST_NEAR = [150, 340];   // (the browser runs: at 60–180 the sheet stayed — its bank 111 m off, 140 wide, its plane cutting the canyon at

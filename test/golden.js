@@ -6,14 +6,14 @@
 //      it is not drawn, over a deep floor (or unknown ground) it stays; all within the archipelago's reach
 //  c · the golden cumulus with volume: their shaded base a lilac clearly darker than the lit top (the frames' white over
 //      lilac shade), bluer than it
-//  d · the storm's leftovers: behind the closed deck the sprites' share 0 (only the near scud stays, within S3.DECK.near
-//      blocks), the isles' banks gone in the rain
+//  d · the storm's leftovers: under the closed deck the sprites' share 0 (the deck's own scud is the scud), the isles'
+//      banks gone in the rain, and the far banks over the horizon (u_s3Bank)
 //   bash test/wt_run.sh golden.js 300
 const V = require('./load_shared.js');
 global.window = global.window || {};
 global.performance = global.performance || { now: () => Date.now() };
 const SRC = __dirname + '/../src/';
-for (const f of ['light2', 'sky3', 'clouds']) require(SRC + 'main/' + f + '.js');
+for (const f of ['weather', 'skybodies', 'light2', 'sky3', 'clouds', 'env']) require(SRC + 'main/' + f + '.js');
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const S3 = V.Sky3, C = V.Clouds;
@@ -65,10 +65,17 @@ console.log('d · the storm\'s leftovers');
 {
   S3.use({ sky3: 2, cloudVol: true });
   const storm = S3.deck({ rain: 1, cloudCover: 0.95, sunDir: [0.3, 0.7, 0.6] }), fair = S3.deck({ rain: 0, cloudCover: 0.3, sunDir: [0.3, 0.7, 0.6] });
-  check(storm.puff === 0 && storm.near > 0 && storm.scud > 0, `behind the deck the sprites' share 0, the near scud within ${storm.near} blocks (${storm.scud})`);
+  check(storm.puff === 0, `under the deck the sprites' share 0 (${storm.puff}: their ghost outlines gone)`);
   check(fair.puff === 1, `fair weather: the sprites whole (${fair.puff})`);
   check(S3.mistK({ rain: 1, cloudCover: 0.95, sunDir: [0.3, 0.7, 0.6] }) === 0, 'the isles\' banks gone in the rain');
   check(S3.mistK({ rain: 0, cloudCover: 0.3, sunDir: [0.3, 0.7, 0.6] }) === 1, 'and there at noon in fair weather');
+  {
+    const env = new V.Env(); env.setTime(6000); env.wx.setSeed(4242); env.wx.force('regen');
+    S3.use({ sky3: 2, cloudVol: true, clouds: 2 });
+    let E; for (let i = 0; i < 3; i++) E = env.update(0.033, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 0, freezeTime: true, freezeWeather: true });
+    E.rain = 1; E.cloudCover = 0.95; S3.frame(E, env);
+    check(E.sky3.u.u_s3Bank[0] === 0, `the far banks over the horizon gone in the rain (${E.sky3.u.u_s3Bank[0]})`);
+  }
   S3.use({ sky3: 0, cloudVol: false });
   const vl = S3.deck({ rain: 1, cloudCover: 0.95, sunDir: [0.3, 0.7, 0.6] });
   check(vl.puff === 1 && vl.on === 0, 'Very Low: no deck, its sprites as they were');

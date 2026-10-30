@@ -2461,9 +2461,7 @@ void main() {
     // (the thick core opaque: a cumulus sprite's 0.92 let the moon and the bright stars through; a sprite faded on purpose — the
     // high ones by day, clouds.js HIGH — keeps its alpha)
     // (f-sky5, R52-04: in a storm the cumulus dissolve into the sky's deck — u_c3Deck.x of them left, the fog banks kept)
-    // (f-golden: behind the deck none of them (u_c3Deck.x 0: their ghost outlines read in it), the near scud keeps u_c3Deck.w —
-    // within S3.DECK.near (150) blocks of the eye, faded from 90)
-    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near * mix(mix(u_c3Deck.w, u_c3Deck.x, smoothstep(90.0, 150.0, v_dist)), 1.0, u_fogK * (1.0 - step(160.0, v_y3))));   // (the citadel's anchors, up at y 207, dissolve too)
+    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near * mix(u_c3Deck.x, 1.0, u_fogK * (1.0 - step(160.0, v_y3))));   // (the citadel's anchors, up at y 207, dissolve too)   // (the citadel's anchors, up at y 207, dissolve too)
     return;
   }
 #endif
