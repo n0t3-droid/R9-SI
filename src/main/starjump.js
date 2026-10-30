@@ -43,6 +43,13 @@
   // the Doppler factor of light seen at cos θ' (observer frame): √((1+β)/(1−β)) dead ahead
   SJ.doppler = (c, b) => 1 / ((1 / Math.sqrt(1 - b * b)) * (1 - b * c));
   SJ.colorT = (T, D) => T * D;
+  // ---- u-stars2: the bunching must read — the stars ahead brightened by D³ (the beamed flux; u-stars capped D² at 6)
+  // with a soft cap at 48, the galaxy's band and the nebula dimmed as β rises, a short tunnel of streaks only at the
+  // transit's peak (the shader mirrors these three)
+  SJ.boost = (D) => { const d3 = D * D * D; return d3 / (1 + d3 / 48); };
+  SJ.bandK = (b) => 1 - 0.85 * sstep(b / SJ.BETA);
+  SJ.tunnel = (j) => (j && j.phase === 'transit' ? Math.exp(-Math.pow((j.u - 0.5) / 0.14, 2)) * (j.u > 0.15 && j.u < 0.85 ? 1 : 0) : 0);
+  // ---- u-stars2 end
 
   // ---------------------------------------------------------------- vectors (doubles)
   const v3 = (x, y, z) => [x || 0, y || 0, z || 0];

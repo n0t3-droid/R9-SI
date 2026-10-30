@@ -160,7 +160,7 @@ console.log('6 · the Leuchtfeuer block');
   if (t) {
     // (t-hangar: the Hangar Hall's and the Gate Temple's pieces, voxhangar.js, come after it — appended later, so they
     // move no older id; everything after the Leuchtfeuer is theirs)
-    const after = R.types.filter(b => b.base > t.base), HANGAR = /^(vx_hangar_|vx_floor_hangar|vm_hangar_|temple_stone_dark|temple_pilaster_dark|temple_light_bar_dark|temple_slit_dark|amber_window_tall|gate_glow|sulfur_red$|so2_frost$|ocker_dust$|carbon_rubble$|nickel_iron$|ice_nodule$|glowspar$)/;   // (u-moons2: Zinnober's two after them; u-moons3: Ocker's dust)
+    const after = R.types.filter(b => b.base > t.base), HANGAR = /^(vx_hangar_|vx_floor_hangar|vm_hangar_|temple_stone_dark|temple_pilaster_dark|temple_light_bar_dark|temple_slit_dark|amber_window_tall|gate_glow|sulfur_red$|so2_frost$|ocker_dust$|carbon_rubble$|nickel_iron$|ice_nodule$|glowspar$|exo_crystal$|exo_moss$|exo_frond$|exo_glass$)/;   // (u-moons2: Zinnober's two after them; u-moons3: Ocker's dust; u-stars2: the exo blocks)
     check(after.every(b => HANGAR.test(b.name)) && Math.max(t.base + t.nstates, ...after.map(b => b.base + b.nstates)) === R.stateCount, 'appended after every other block: the last type but the later packs (states ' + t.base + '–' + (t.base + t.nstates - 1) + (after.length ? '; after it ' + after.length + ' t-hangar types' : '') + ')');
     const snap = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'test', 'id_snapshot.json'), 'utf8'));
     const end = snap.reduce((m, r) => Math.max(m, r[1] + r[2]), 0);
