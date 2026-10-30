@@ -79,11 +79,12 @@
       '#pause .panel.box { min-width: min(400px, 94vw) !important; max-height: 96vh; overflow: auto; }',
       '#pause .panel:not(.moreon) > #pmore { display: none; }',
       '#pause .panel.moreon > :not(h2):not(#pmore) { display: none !important; }',
-      '#pause .panel.moreon { min-width: min(760px, 96vw) !important; }',
+      '#pause .panel.moreon { min-width: min(940px, 96vw) !important; }',
       '#pause .pmorebtn { opacity: .95; }',
       '#pmore { display: flex; flex-direction: column; gap: 8px; }',
       '#pmore .pless { align-self: flex-start; min-width: 0; padding: 0 16px; }',
-      '#pmore .pmgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px 14px; align-items: start; }',
+      // (the rest keeps its own layout — e-ux's two columns on short screens; first run: a grid of its own squeezed rows of three)
+      '#pmore .pmgrid { display: flex; flex-direction: column; gap: 8px; }',
       '#pmore .pmgrid > * { margin: 0; }',
       // R53-08: the start screen's and the create dialog's small lines readable on the bright sky
       '.tile .sub2 { color: #d3ddef; font-size: calc(var(--st-fs) * 0.82); }',

@@ -61,16 +61,23 @@ await wait(2500); await shot('03_loading');
 const lt = await untilState('play', 300000); OUT.loadMs = lt >= 0 ? Date.now() - tc : -1;
 check(lt >= 0, 'into the world in ' + OUT.loadMs + ' ms');
 const tPlay = Date.now();
+// (the arrival's end measured in the page from here: a screenshot under SwiftShader can take longer than the arrival)
+await ev(() => { window.__arr = { end: VR.game.arrival ? -1 : 0 }; const t = performance.now(); const iv = setInterval(() => { if (!VR.game.arrival) { window.__arr.end = Math.round(performance.now() - t); clearInterval(iv); } }, 100); }).catch(() => {});
 await wait(1500); await shot('04_t0');
 // R53-06: the arrival is short on any machine (no key pressed here), then the HUD and W
-{ let arr = -1; while (Date.now() - tPlay < 20000) { if (await ev(() => !VR.game.arrival).catch(() => false)) { arr = Date.now() - tPlay; break; } await wait(250); } OUT.arrivalMs = arr;
+{ let arr = -1; while (Date.now() - tPlay < 20000) { const e = await ev(() => window.__arr ? window.__arr.end : -1).catch(() => -1); if (e >= 0) { arr = e; break; } await wait(250); } OUT.arrivalMs = arr;
   check(arr >= 0 && arr <= 9000, 'the arrival is over in ' + arr + ' ms (≤ 9 s, no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
 OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h); return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud } : null; }).catch(() => null);
 check(OUT.hud15 && OUT.hud15.vis !== 'hidden' && OUT.hud15.op > 0.5 && !OUT.hud15.hideHud, 'at 15 s the HUD is up: ' + JSON.stringify(OUT.hud15));
 const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
-await page.keyboard.down('KeyW'); await wait(6000); await page.keyboard.up('KeyW'); await shot('06_t25_walk');
-{ const p1 = await ev(() => VR.game.player.pos.slice()).catch(() => null); OUT.walked = p0 && p1 ? +Math.hypot(p1[0] - p0[0], p1[2] - p0[2]).toFixed(2) : -1; check(OUT.walked >= 2, 'W held 6 s right after: ' + OUT.walked + ' m (≥ 2)'); }
+// (W, then S: the spawn may face a bench or a parapet — a key that moves the player at all is the measure)
+await page.keyboard.down('KeyW'); await wait(4000); await page.keyboard.up('KeyW');
+const pW = await ev(() => VR.game.player.pos.slice()).catch(() => null);
+await page.keyboard.down('KeyS'); await wait(3000); await page.keyboard.up('KeyS'); await shot('06_t25_walk');
+{ const p1 = await ev(() => VR.game.player.pos.slice()).catch(() => null); const dW = p0 && pW ? Math.hypot(pW[0] - p0[0], pW[2] - p0[2]) : -1, dS = pW && p1 ? Math.hypot(p1[0] - pW[0], p1[2] - pW[2]) : -1;
+  OUT.walked = +Math.max(dW, dS).toFixed(2); OUT.walkedW = +dW.toFixed(2); OUT.walkedS = +dS.toFixed(2);
+  check(OUT.walked >= 2, 'W held 4 s, then S 3 s, right after: W ' + OUT.walkedW + ' m · S ' + OUT.walkedS + ' m (≥ 2 by one of them)'); }
 await page.mouse.move(640, 360); await page.mouse.move(900, 330, { steps: 10 }); await wait(15000); await shot('07_t45');
 await wait(15000); await shot('08_t60');
 OUT.hud = await ev(() => [...document.querySelectorAll('#hud *')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 50)).slice(0, 60)).catch(() => []);
@@ -100,10 +107,10 @@ for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1
   await page.keyboard.press('Escape'); await wait(1000);
 }
 const offerCheck = async (tag) => {
-{ const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => ''); if (st && st !== 'hud' && st !== 'play') { await page.keyboard.press('Escape'); await wait(800); }
+{ for (let i = 0; i < 3; i++) { const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => ''); if (!st || st === 'hud' || st === 'play') break; await ev(() => { const u = VR.game.ui; if (u.resume) u.resume(); else u.show(null); }).catch(() => {}); await wait(800); }
   OUT['offer_' + tag] = await ev(() => { const S = VR.Story, P = VR.StoryPlay; if (!S || !P || !P.debug || !S.BEATS) return null; return P.debug.offer(S.BEATS[0].id); }).catch(() => null);
   await wait(1500); await shot(tag + '_offer');
-  OUT['vPrompts_' + tag] = await ev(() => { const k = (VR.Binds && VR.Binds.label) ? VR.Binds.label('KeyV', VR.I18N.lang) : 'V', out = []; const re = new RegExp('\\[' + k + '\\]|\\b' + k + '$'); for (const e of document.querySelectorAll('#ctxprompt.on, #storycard, #funkebub')) { if (e.offsetParent === null) continue; const cs = getComputedStyle(e); if (+cs.opacity < 0.2 || cs.visibility === 'hidden') continue; const t = e.textContent.trim(); if (re.test(t) || e.querySelector('kbd')) out.push((e.id || e.className) + ': ' + t.slice(0, 50)); } return out; }).catch(() => null);
+  OUT['vPrompts_' + tag] = await ev(() => { const k = (VR.Binds && VR.Binds.label) ? VR.Binds.label('KeyV', VR.I18N.lang) : 'V', out = []; const re = new RegExp('\\[' + k + '\\]|\\b' + k + '$'); for (const e of document.querySelectorAll('#ctxprompt.on, #storycard, #funkebub')) { const rr = e.getBoundingClientRect(); if (!(rr.width > 0 && rr.height > 0)) continue; const cs = getComputedStyle(e); if (cs.display === 'none' || +cs.opacity < 0.2 || cs.visibility === 'hidden') continue; const t = e.textContent.trim(); if (re.test(t) || e.querySelector('kbd')) out.push((e.id || e.className) + ': ' + t.slice(0, 50)); } return out; }).catch(() => null);
   check(!OUT['offer_' + tag] || (OUT['vPrompts_' + tag] && OUT['vPrompts_' + tag].length <= 1), tag + ': a story offer shows one V prompt: ' + JSON.stringify(OUT['vPrompts_' + tag])); }
 };
 // R53-05: a story offer shows one „V" prompt (the card), not three
