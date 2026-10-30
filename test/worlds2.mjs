@@ -149,7 +149,7 @@ if (!ONLY || ONLY === 'ocker') {
   await A.step(30, 33); await shot(A, 'ocker_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Ocker');
   await B2(A, 'storm', 0); await B2(A, 'front', 0);
-  const O = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return { sp: g.findSpawn() }; });
+  const O = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return { sp: g.findSpawn(0, 1) }; });   // (u-moons3: on the plain — bgen 2 lands on the canyon's floor)
   const tNoon = await findT(A, 'ocker', [0.5, 152, 0.5], 0, 0, 0, 2400);
   // (on the Rostschlucht's floor by its north wall: 145 m of layered rock over you)
   const fl = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return g.canyonZ(0) - 0.6 * g.canyonHalf(0); });
@@ -220,7 +220,7 @@ if (!process.env.NO_VL && left() > 500) {
   const P = await openWorld(DIST, 'potato', 0);
   check(P.ok, `page VL (Very Low) is loaded (${secs()})`);
   await trip(P, 'ocker'); await P.settle(60, 4);
-  const sp = await P.ev(() => new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}).findSpawn());
+  const sp = await P.ev(() => new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}).findSpawn(0, 1));
   await P.ev(() => { VR.BodyLife2.force.storm = 0; VR.BodyLife2.force.front = 0; });
   const tSet = await findT(P, 'ocker', [0.5, 152, 0.5], 2, -1, 0, 2400);
   await setT(P, tSet); await place(P, sp[0], sp[1] + 1.62, sp[2], 0, 0); await P.step(20);

@@ -474,9 +474,9 @@
       this.nGap = new F(s ^ 0x305, 1, 1 / 120, 0.5); this.nRidge = new F(s ^ 0x306, 3, 1 / 160, 0.5);
       this.look = { x: P.landmark.x, z: P.landmark.z };
       this.sea = P.sea;
-      // u-moons3 (bgen 2): the landing on a reef ring of its own in open sea (180 m across), its lagoon toward Herzwelt
-      // (+z: the near side's Herzwelt stands 32° up there), the eye a little lowered to the water
-      if (this.bgen >= 2) { const Q = this.land2 = { x: 0, z: 92, R: 88, w: 22, ph: 3 }; this.land = { x: Q.x, z: Q.z - Q.R, look: Q, pitch: -0.08 }; }
+      // u-moons3 (bgen 2): the landing on a reef ring of its own in open sea (140 m across), its lagoon toward Herzwelt
+      // (+z: the near side's Herzwelt stands 32° up there), the eye lifted to it
+      if (this.bgen >= 2) { const Q = this.land2 = { x: 0, z: 72, R: 70, w: 16, ph: 3 }; this.land = { x: Q.x, z: Q.z - Q.R + 11, look: Q, pitch: 0.2 }; }   // (on the crest's inner beach, the water a few steps ahead, the far ring 130 m off, Herzwelt in the frame)
     }
     // the elevation field: its zero line is the coast (an island round the landing)
     elev(x, z) {

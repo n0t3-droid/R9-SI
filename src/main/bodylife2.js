@@ -116,6 +116,9 @@
       for (const d of dv.slice(0, 4)) {
         const dd = Math.hypot(d.x - p.pos[0], d.z - p.pos[2]);
         const y = w.isLoaded(Math.floor(d.x), Math.floor(d.z)) ? w.topAt(Math.floor(d.x), Math.floor(d.z)) + 1 : prof.level;
+        // (u-moons3: from the Rostschlucht's floor a devil on the plain 140 m up stands behind the wall — beyond the drawn
+        // land nothing hides it, so it is not drawn: no column floating over the canyon)
+        if (y - p.pos[1] > 30 && dd > ((w.renderDist | 0) || 8) * 16) continue;
         plumes.push({ x: d.x, y, z: d.z, top: d.top, k: d.k * (1 - 0.6 * Math.min(1, (S.tau - 0.6) / 3)) });
         if (dd < 1500 && d.k > 0.5) unlock('moon:devil');
         // grains round its foot
