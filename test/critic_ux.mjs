@@ -23,18 +23,24 @@ const ev = (fn, a) => page.evaluate(fn, a);
 const texts = () => ev(() => { const s = (VR.game && VR.game.ui && VR.game.ui.screen) || ''; const vis = [...document.querySelectorAll('#ui button, #ui h1, #ui h2, #ui h3, #ui label, #hint, #hud .tip, .toast, #ui .hint')].filter(e => e.offsetParent !== null && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)); return { screen: s, state: VR.game && VR.game.state, n: vis.length, vis: vis.slice(0, 40) }; }).catch(() => ({}));
 const shot = async (name) => { try { await page.screenshot({ path: SHOTS + 'critic_ux_' + name + '.png', timeout: 120000 }); } catch (e) { console.log('  (no shot ' + name + ')'); } const t = await texts(); OUT.steps.push({ name, ...t }); console.log('  · ' + name + ' ' + JSON.stringify(t).slice(0, 400)); };
 const untilState = async (st, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const s = await ev(() => VR.game && VR.game.state).catch(() => null); if (s === st) return Date.now() - t; await wait(400); } return -1; };
+// a player's click: the real one first; if Playwright cannot (covered, moving), what lies on top is logged and the click forced
+const click = async (sel, what) => { try { await page.click(sel, { timeout: 6000 }); return 'real'; } catch (e) {
+  const top = await ev((sel) => { const b = document.querySelector(sel); if (!b) return 'none'; const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return t ? (t.tagName + '#' + t.id + '.' + t.className + ' ' + (t === b || b.contains(t))) : 'null'; }, sel).catch(() => '?');
+  console.log('  (' + what + ': no real click — on top: ' + top + '; ' + e.message.split('\n')[0].slice(0, 120) + ')'); OUT['blocked_' + what] = top;
+  try { await page.click(sel, { timeout: 6000, force: true }); return 'force'; } catch (e2) { await ev((sel) => { const b = document.querySelector(sel); if (b) b.click(); }, sel).catch(() => {}); return 'js'; } } };
 const t0 = Date.now();
 await page.goto(DIST);
 check(await untilState('title', 240000) >= 0, 'the start screen');
 await wait(8000); await shot('01_title');
 // ＋ Neue Welt
-try { await page.click('#title [data-act="newworld"]', { timeout: 10000 }); } catch (e) { console.log('  (no newworld button: ' + e.message.split('\n')[0] + ')'); }
+OUT.newworld = await click('#title [data-act="newworld"]', 'newworld');
 await wait(1500); await shot('02_create');
 OUT.createFields = await ev(() => [...document.querySelectorAll('#create input, #create select, #create button, #create label')].filter(e => e.offsetParent !== null).map(e => (e.tagName + ':' + (e.id || '') + ':' + (e.textContent || e.value || '').trim().slice(0, 50)))).catch(() => []);
 console.log('  create: ' + JSON.stringify(OUT.createFields).slice(0, 900));
 await ev(() => { const s = document.getElementById('cw_seed'); if (s) { s.value = '4242'; s.dispatchEvent(new Event('input')); } }).catch(() => {});
 const tc = Date.now();
-try { await page.click('#create .btn.primary', { timeout: 10000 }); } catch (e) { console.log('  (no create button)'); }
+OUT.create = await click('#create .btn.primary', 'create');
+if (await ev(() => VR.game.state) === 'title' && await ev(() => VR.game.ui.screen) !== 'create') { console.log('  (still on the title: ▶ Losspielen)'); await click('#title .tile[data-tile="play"]', 'play'); }
 await wait(2500); await shot('03_loading');
 const lt = await untilState('play', 300000); OUT.loadMs = lt >= 0 ? Date.now() - tc : -1;
 check(lt >= 0, 'into the world in ' + OUT.loadMs + ' ms');
@@ -46,7 +52,7 @@ await wait(15000); await shot('08_t60');
 OUT.hud = await ev(() => [...document.querySelectorAll('#hud *')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 50)).slice(0, 60)).catch(() => []);
 console.log('  hud: ' + JSON.stringify(OUT.hud).slice(0, 900));
 await page.keyboard.press('Escape'); await wait(1500); await shot('09_pause');
-try { await page.click('#pause [data-act="settings"], [data-act="settings"]:visible', { timeout: 8000 }); } catch (e) { console.log('  (no settings button)'); }
+OUT.settings = await click('#pause [data-act="settings"]', 'settings');
 await wait(1500); await shot('10_settings');
 await page.keyboard.press('Escape'); await wait(800); await page.keyboard.press('Escape'); await wait(1000);
 for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1', '14_F1']]) {
