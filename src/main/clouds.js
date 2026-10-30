@@ -76,7 +76,18 @@
     return out;
   }
   // the fog banks round the Sky Isles' centre, world space (cells of FOG.cell blocks; about a third of them hold a bank)
-  function fogBanks(cam) {
+  // f-golden (R53-11: a bank lay as a white veil over the green land right of the isles): ground(x, z, y) — the highest
+  // solid block at or under y (−1 unknown: not loaded) — keeps a bank only over the void: none whose ground under its
+  // centre or its body (six points at 0.6 of its radius) lies within BANK_CLEAR blocks under it
+  const BANK_CLEAR = 24;
+  function overVoid(x, y, z, r, ground) {
+    for (let i = 0; i < 7; i++) {
+      const a = i * Math.PI / 3, d = i === 0 ? 0 : r * 0.6, gy = ground(x + Math.cos(a) * d, z + Math.sin(a) * d, y);
+      if (gy >= 0 && gy > y - BANK_CLEAR) return false;
+    }
+    return true;
+  }
+  function fogBanks(cam, ground) {
     const out = [];
     const reach = FOG.reach + 60;
     const g0 = Math.floor((FOG.x - reach) / FOG.cell), g1 = Math.floor((FOG.x + reach) / FOG.cell);
@@ -85,8 +96,9 @@
       const x = gx * FOG.cell + FOG.cell / 2 + (hash(gx, gz, 90) - 0.5) * 50, z = gz * FOG.cell + FOG.cell / 2 + (hash(gx, gz, 91) - 0.5) * 50;
       if (Math.hypot(x - FOG.x, z - FOG.z) > FOG.reach) continue;
       if (hash(gx, gz, 92) < 0.33) continue;
-      const r = 70 + hash(gx, gz, 93) * 60;
-      out.push([x, FOG.y0 + hash(gx, gz, 94) * (FOG.y1 - FOG.y0), z, r, 0.28 + 0.12 * hash(gx, gz, 95), 0.3 + 0.12 * hash(gx, gz, 96), Math.floor(hash(gx, gz, 97) * 4) % 4]);
+      const r = 70 + hash(gx, gz, 93) * 60, y = FOG.y0 + hash(gx, gz, 94) * (FOG.y1 - FOG.y0);
+      if (ground && !overVoid(x, y, z, r, ground)) continue;
+      out.push([x, y, z, r, 0.28 + 0.12 * hash(gx, gz, 95), 0.3 + 0.12 * hash(gx, gz, 96), Math.floor(hash(gx, gz, 97) * 4) % 4]);
     }
     return out;
   }
@@ -117,7 +129,7 @@
     const dist = (s) => (s[0] - cx) * (s[0] - cx) + (s[2] - cz) * (s[2] - cz);
     if (cu.length > MAX_CUMULUS) cu = cu.sort((a, b) => dist(a) - dist(b)).slice(0, MAX_CUMULUS);
     cu.sort((a, b) => dist(b) - dist(a));
-    const fog = fogBanks(cam).concat(anchors());
+    const fog = fogBanks(cam, opt && opt.ground).concat(anchors());   // (f-golden: opt.ground — the banks over the void only)
     const near = (s) => (s[0] - cam.x) * (s[0] - cam.x) + (s[2] - cam.z) * (s[2] - cam.z);
     fog.sort((a, b) => near(b) - near(a));
     return { cumulus: cu, fog };

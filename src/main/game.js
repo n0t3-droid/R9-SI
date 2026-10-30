@@ -1289,6 +1289,20 @@
         const r = this.renderer, C = VR.Clouds, on = !!this.settings.wxDrama && r && r.q && r.q.clouds >= 2 && this.dim === 'overworld' && C && C.valleyFog;
         const list = on ? C.valleyFog({ x: eye[0], z: eye[2] }, (x, z) => (w.isLoaded(x, z) ? w.topAt(x, z) : -1), this.env.timeOfDay, this.env.wx.kind === 'nebel' ? 1 : 0, VR.C.SEA) : [];
         if (r && (list.length || (r.valleyFog && r.valleyFog.length))) { r.valleyFog = list; r.valleyFogV = (r.valleyFogV | 0) + 1; }
+        // f-golden (R53-11): the isles' banks only over the void — the loaded land under them (clouds.js fogBanks' ground:
+        // the highest solid block at or under y, −1 not loaded); the sprites rebuilt when the set kept changes
+        if (r && r.q && r.q.clouds >= 2 && this.dim === 'overworld' && C && C.fogBanks) {
+          const gr = r.bankGround || (r.bankGround = (x, z, y) => {
+            x = Math.floor(x); z = Math.floor(z);
+            if (!w.isLoaded(x, z)) return -1;
+            const t = w.topAt(x, z);
+            if (t <= y) return t;
+            for (let yy = Math.floor(y); yy > y - 30; yy--) if (w.getBlock(x, yy, z)) return yy;   // (under an island: the floor below the bank)
+            return Math.floor(y) - 30;
+          });
+          let sig = 0; for (const b of C.fogBanks({ x: eye[0], z: eye[2] }, gr)) sig += b[0] * 7 + b[2];
+          if (sig !== r.bankSig) { r.bankSig = sig; r.valleyFogV = (r.valleyFogV | 0) + 1; }
+        }
       }
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);

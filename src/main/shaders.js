@@ -435,6 +435,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
   col += u_sunColor * (ts16 * ts16 * ts16 * ts8 * ts4) * u_skyStops.w * (1.0 - u_rain);   // the sun's halo, toSun^60 (t-sky: u_skyStops.w, tighter by day)
 #ifdef SKY3
   col = s3Layers(col, dir, h);   // t-sky3: the sun-side band (gold → peach → pink) and the earth's shadow with its belt (sky3.js)
+  col = s3Gold(col, dir);   // f-golden: the golden sky's structure (sky3.js S3.goldSky: 0 outside the golden hour)
 #endif
   if (dir.y + u_dip < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-(dir.y + u_dip) * 2.5, 0.0, 1.0));
   if (withSun) {
@@ -2460,7 +2461,9 @@ void main() {
     // (the thick core opaque: a cumulus sprite's 0.92 let the moon and the bright stars through; a sprite faded on purpose — the
     // high ones by day, clouds.js HIGH — keeps its alpha)
     // (f-sky5, R52-04: in a storm the cumulus dissolve into the sky's deck — u_c3Deck.x of them left, the fog banks kept)
-    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near * mix(u_c3Deck.x, 1.0, u_fogK * (1.0 - step(160.0, v_y3))));   // (the citadel's anchors, up at y 207, dissolve too)
+    // (f-golden: behind the deck none of them (u_c3Deck.x 0: their ghost outlines read in it), the near scud keeps u_c3Deck.w —
+    // within S3.DECK.near (150) blocks of the eye, faded from 90)
+    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near * mix(mix(u_c3Deck.w, u_c3Deck.x, smoothstep(90.0, 150.0, v_dist)), 1.0, u_fogK * (1.0 - step(160.0, v_y3))));   // (the citadel's anchors, up at y 207, dissolve too)
     return;
   }
 #endif

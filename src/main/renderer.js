@@ -1832,7 +1832,7 @@
       const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96) + ',' + (this.valleyFogV | 0);   // (t-motion: the valley fog's version)
       if (key === this.puffKey) return;
       this.puffKey = key;
-      const f = VR.Clouds.field(cam, wind, { cover: cov, windZ }), gl = this.gl;
+      const f = VR.Clouds.field(cam, wind, { cover: cov, windZ, ground: this.bankGround }), gl = this.gl;   // (f-golden: the isles' banks over the void only — game.js sets bankGround)
       let fogL = f.fog;
       if (this.valleyFog && this.valleyFog.length) { const d2 = (q) => (q[0] - cam.x) * (q[0] - cam.x) + (q[2] - cam.z) * (q[2] - cam.z); fogL = this.valleyFog.concat(f.fog).sort((a, b) => d2(b) - d2(a)); }   // (t-motion: the morning's banks in the valleys, game.js — far to near with the others)
       const lists = [VR.Clouds.pack(fogL), VR.Clouds.pack(f.cumulus)];
