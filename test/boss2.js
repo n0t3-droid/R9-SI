@@ -1,6 +1,6 @@
 // The boss fight as a cinematic experience (a-boss2; plan docs/superpowers/plans/2026-10-30-a-boss2.md). The pure part
 // of src/main/rpg_boss2.js, every rule a check:
-//   1. the arena: the same region the same arena; 8 pylons round the Kernfeuer (12–19 m), most broken, cables only between
+//   1. the arena: the same region the same arena; 8 pylons round the Kernfeuer (19–27 m), most broken, cables only between
 //      standing neighbours, 10 cracks of zigzag segments inside the ring; Very Low: 4 pylons, 6 cracks, no cables
 //   2. the telegraphs: the zone and the timing ring — the ring closes from the zone's edge to the strike (u 0 → 1)
 //   3. the searchlight sweeps slowly (≤ 0.6 rad/s) and aims at the player while the bolts are announced
@@ -24,11 +24,11 @@ console.log('1 · the arena');
   const a = B2.layout('3_-2'), b = B2.layout('3_-2'), c = B2.layout('4_1');
   check(JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(c), 'the same region, the same arena; another region another');
   const d = a.pylons.map(p => Math.hypot(p.x, p.z));
-  check(a.pylons.length === 8 && Math.min(...d) >= 12 && Math.max(...d) <= 19, '8 pylons at 12–19 m (' + d.map(v => v.toFixed(1)).join(' ') + ')');
+  check(a.pylons.length === 8 && Math.min(...d) >= 19 && Math.max(...d) <= 27, '8 pylons at 19–27 m (' + d.map(v => v.toFixed(1)).join(' ') + ')');
   const broken = a.pylons.filter(p => p.broken).length;
   check(broken >= 4 && broken <= 7, broken + ' of them broken');
   check(a.cables.length >= 2 && a.cables.every(k => !a.pylons[k.a].stump && !a.pylons[k.b].stump && (k.b === (k.a + 1) % 8)), a.cables.length + ' cables, only between standing neighbours');
-  check(a.cracks.length === 10 && a.cracks.every(k => k.segs.length >= 3 && k.segs.every(s => Math.hypot(s[2], s[3]) <= 15)), '10 cracks of ≥ 3 segments inside the ring');
+  check(a.cracks.length === 10 && a.cracks.every(k => k.segs.length >= 3 && k.segs.every(s => Math.hypot(s[2], s[3]) <= 18.5)), '10 cracks of ≥ 3 segments inside the ring');
   check(a.ped && Math.hypot(a.ped[0], a.ped[1]) >= 3 && Math.hypot(a.ped[0], a.ped[1]) <= 6, 'the pedestal 3–6 m from the obelisk');
   const lo = B2.layout('3_-2', true);
   check(lo.pylons.length === 4 && lo.cracks.length === 6 && lo.cables.length === 0, 'Very Low: 4 pylons, 6 cracks, no cables');

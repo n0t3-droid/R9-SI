@@ -233,6 +233,7 @@ try {
     pics.fin = await shot('rpg_boss_finish');
     await release();
     await wait(5600);
+    await ev(() => { if (VR.RPGBoss2 && VR.RPGBoss2.ped) VR.RPGBoss2.take(VR.game); });   // (a-boss2: the find waits on the pedestal)
     const bf = await ev(() => VR.RPGame.lastFind && VR.RPGame.lastFind.id.indexOf('b:') === 0 ? VR.RPGame.lastFind.r : -1);
     check(bf >= 3, 'the boss find: splendid or radiant (' + bf + ')');
   });

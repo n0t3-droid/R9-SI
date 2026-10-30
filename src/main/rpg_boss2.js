@@ -38,17 +38,17 @@
     for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)) % (i + 1); const t = kinds[i]; kinds[i] = kinds[j]; kinds[j] = t; }
     const r2 = (v) => Math.round(v * 100) / 100, pylons = [];
     for (let i = 0; i < 8; i++) {
-      const a = a0 + i * TAU / 8 + (rnd() - 0.5) * 0.25, d = 13 + rnd() * 5, k = kinds[i];
+      const a = a0 + i * TAU / 8 + (rnd() - 0.5) * 0.25, d = 20 + rnd() * 6, k = kinds[i];
       pylons.push({ x: r2(Math.cos(a) * d), z: r2(Math.sin(a) * d), a: r2(a), kind: k, broken: k !== 'whole', stump: k === 'stump', s: r2(0.9 + rnd() * 0.25), tilt: k === 'broken' ? r2((rnd() - 0.5) * 0.3) : 0, rot: r2(rnd() * TAU) });
     }
     const cables = [];
     for (let i = 0; i < 8; i++) { const j = (i + 1) % 8; if (!pylons[i].stump && !pylons[j].stump) cables.push({ a: i, b: j, sag: r2(1 + rnd() * 1.2) }); }
     const cracks = [];
     for (let i = 0; i < 10; i++) {
-      const a = a0 + (i + 0.5) * TAU / 10 + (rnd() - 0.5) * 0.3, r0 = 2.6 + rnd() * 1.2, len = 7 + rnd() * 3.5, n = 3 + (rnd() < 0.5 ? 1 : 0), segs = [];
+      const a = a0 + (i + 0.5) * TAU / 10 + (rnd() - 0.5) * 0.3, r0 = 2.6 + rnd() * 1.2, len = 9 + rnd() * 5.5, n = 3 + (rnd() < 0.5 ? 1 : 0), segs = [];
       let px = Math.cos(a) * r0, pz = Math.sin(a) * r0;
       for (let s = 1; s <= n; s++) {
-        const rr = Math.min(14, r0 + len * s / n), off = s === n ? 0 : (rnd() - 0.5) * 1.6, aa = a + off / rr;
+        const rr = Math.min(18, r0 + len * s / n), off = s === n ? 0 : (rnd() - 0.5) * 1.6, aa = a + off / rr;
         const qx = Math.cos(aa) * rr, qz = Math.sin(aa) * rr; segs.push([r2(px), r2(pz), r2(qx), r2(qz)]); px = qx; pz = qz;
       }
       cracks.push({ segs, w: r2(0.45 + rnd() * 0.25) });
@@ -68,7 +68,7 @@
   };
   // the searchlight: a slow sweep round the boss's facing, pointed down onto the land ahead
   B2.beamYaw = (t) => 0.9 * Math.sin(t * 0.35) + 0.35 * Math.sin(t * 0.13 + 1.1);
-  B2.beamPitch = (t) => -0.3 + 0.06 * Math.sin(t * 0.5);
+  B2.beamPitch = (t) => -0.42 + 0.06 * Math.sin(t * 0.5);
   // the heal wave's front (m from the arena) s seconds after the finish; a crack d m out heals once the front passed it
   B2.healFront = (s) => (s <= 0 ? 0 : 150 * (1 - Math.pow(1 - Math.min(1, s / 5), 2.2)));
   B2.crackHeal = (d, front) => (front < 0 ? 0 : clamp((front - d) / 6, 0, 1));
@@ -462,7 +462,7 @@
     A.crk = { v: new Float32Array(out), ranges, up: false };
     crackV = null;
   };
-  const RVc = [1, 0.12, 0.62], CYc = [0.25, 1, 1], GOc = [1, 0.75, 0.3], TEc = [1, 0.32, 0.08], RIc = [1, 0.9, 0.6], COL = [0, 0, 0];
+  const SCc = [0.3, 0.02, 0.2], SHc = [0.05, 0.3, 0.32], ZOc = [0.85, 0.05, 0.04], RVc = [1, 0.12, 0.62], CYc = [0.25, 1, 1], GOc = [1, 0.75, 0.3], TEc = [1, 0.32, 0.08], RIc = [1, 0.9, 0.6], COL = [0, 0, 0];
   let flat = null;   // {layer, k: [1/r, 1/g, 1/b]}
   const flatOf = (g) => {
     if (flat) return flat;
@@ -492,7 +492,8 @@
       gl.bindVertexArray(null);
     }
     const E = g.env || {}, day = 1 - 0.5 * Math.min(1, Math.max(0, E.night || 0));
-    const color = (c, a, k) => { gl.uniform4f(p.u.u_color, c[0] * fl.k[0] * k, c[1] * fl.k[1] * k, c[2] * fl.k[2] * k, a); B2.cost.decals++; };
+    let bm = -1;   // the blend: 1 adds light (rings, the beam), 0 lays a colour over the ground (zones, the cracks' scorch)
+    const color = (c, a, k, add) => { const m = add ? 1 : 0; if (m !== bm) { bm = m; if (m) gl.blendFunc(gl.SRC_ALPHA, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); } gl.uniform4f(p.u.u_color, c[0] * fl.k[0] * k, c[1] * fl.k[1] * k, c[2] * fl.k[2] * k, a); B2.cost.decals++; };
     gl.useProgram(p.p);
     gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj);
     gl.uniform1f(p.u.u_layer, fl.layer);
@@ -508,11 +509,10 @@
       const W = B2.wave && B2.wave.rid === A.rid ? B2.wave : null, fr = W ? B2.healFront(W.t) : -1, tt = A.clock || 0;
       for (const q of A.crk.ranges) {
         const hh = W ? B2.crackHeal(q.d, fr) : A.won ? 1 : 0, fade = W ? clamp(1 - (W.t - 2 - q.d / 30) / 4, 0, 1) : A.won ? 0 : 1;
-        if (hh >= 1 && fade <= 0) { mix3(COL, CYc, GOc, 0.6); color(COL, 0.16, 0.8 * day); gl.drawArrays(gl.TRIANGLES, q.core[0], q.core[1]); continue; }
-        const pul = 0.7 + 0.3 * Math.sin(tt * 2.6 + q.d * 0.8);
-        mix3(COL, RVc, CYc, hh); const k = (hh > 0 ? 1.6 * fade + 0.4 : pul) * day;
-        color(COL, 0.32, k); gl.drawArrays(gl.TRIANGLES, q.halo[0], q.halo[1]);
-        color(COL, 0.95, k * 2.2); gl.drawArrays(gl.TRIANGLES, q.core[0], q.core[1]);
+        if (hh >= 1 && fade <= 0) { mix3(COL, CYc, GOc, 0.6); color(COL, 0.3, 0.9 * day, true); gl.drawArrays(gl.TRIANGLES, q.core[0], q.core[1]); continue; }
+        const pul = 0.75 + 0.25 * Math.sin(tt * 2.6 + q.d * 0.8);
+        mix3(COL, SCc, SHc, hh); color(COL, 0.55 * (hh > 0 ? fade : 1), 1, false); gl.drawArrays(gl.TRIANGLES, q.halo[0], q.halo[1]);
+        mix3(COL, RVc, CYc, hh); color(COL, 0.95, (hh > 0 ? 1.8 * fade + 0.5 : 2.4 * pul) * day, false); gl.drawArrays(gl.TRIANGLES, q.core[0], q.core[1]);
       }
     }
     // the boss's telegraph and its beam (dynamic)
@@ -521,7 +521,6 @@
       D.n = 0; const m = C.m, b = C.b, w = g.world, ox = m.pos[0], oz = m.pos[2], oy = m.pos[1];
       const gy = (x, z) => (w.isLoaded(Math.floor(x), Math.floor(z)) ? topY(w, x, z) : oy) - oy + 0.08;
       const parts = B2.parts; parts.length = 0;
-      const mark = (c, a, k) => { parts.push(D.n, c, a, k); };
       if (b.st === 'tele' && !b.calm) {
         const S = B2.teleShape(b.att, C.tele), seg = lo(g) ? 20 : 32;
         if (S.kind === 'disc') {
@@ -530,8 +529,8 @@
             const a0 = i * TAU / seg, a1 = (i + 1) * TAU / seg, c0 = Math.cos(a0), s_0 = Math.sin(a0), c1 = Math.cos(a1), s_1 = Math.sin(a1);
             for (let k = 0; k < 3; k++) { const r0 = S.r * k / 3, r1 = S.r * (k + 1) / 3; quad(c0 * r0, gy(ox + c0 * r0, oz + s_0 * r0), s_0 * r0, c0 * r1, gy(ox + c0 * r1, oz + s_0 * r1), s_0 * r1, c1 * r1, gy(ox + c1 * r1, oz + s_1 * r1), s_1 * r1, c1 * r0, gy(ox + c1 * r0, oz + s_1 * r0), s_1 * r0); }
           }
-          parts.push(s0, TEc, S.a * 0.55, 1.4);
-          const ring = (rr, hw, c, a, k) => { const s1 = D.n; for (let i = 0; i < seg; i++) { const a0 = i * TAU / seg, a1 = (i + 1) * TAU / seg, c0 = Math.cos(a0), s_0 = Math.sin(a0), c1 = Math.cos(a1), s_1 = Math.sin(a1), ri = Math.max(0, rr - hw), ro = rr + hw; quad(c0 * ri, gy(ox + c0 * ri, oz + s_0 * ri), s_0 * ri, c0 * ro, gy(ox + c0 * ro, oz + s_0 * ro), s_0 * ro, c1 * ro, gy(ox + c1 * ro, oz + s_1 * ro), s_1 * ro, c1 * ri, gy(ox + c1 * ri, oz + s_1 * ri), s_1 * ri); } parts.push(s1, c, a, k); };
+          parts.push(s0, ZOc, 0.2 + S.a * 0.5, 1, 0);
+          const ring = (rr, hw, c, a, k) => { const s1 = D.n; for (let i = 0; i < seg; i++) { const a0 = i * TAU / seg, a1 = (i + 1) * TAU / seg, c0 = Math.cos(a0), s_0 = Math.sin(a0), c1 = Math.cos(a1), s_1 = Math.sin(a1), ri = Math.max(0, rr - hw), ro = rr + hw; quad(c0 * ri, gy(ox + c0 * ri, oz + s_0 * ri), s_0 * ri, c0 * ro, gy(ox + c0 * ro, oz + s_0 * ro), s_0 * ro, c1 * ro, gy(ox + c1 * ro, oz + s_1 * ro), s_1 * ro, c1 * ri, gy(ox + c1 * ri, oz + s_1 * ri), s_1 * ri); } parts.push(s1, c, a, k, 1); };
           ring(S.r, 0.22, TEc, 0.95, 3);
           ring(S.ring, 0.18, RIc, 0.9, 2.6);
         } else {
@@ -540,10 +539,10 @@
             const n = Math.max(2, Math.ceil(len / 1.2)), nx = -dirz * hw, nz = dirx * hw;
             const s0 = D.n;
             for (let i = 0; i < n; i++) { const d0 = 1.5 + (len - 1.5) * i / n, d1 = 1.5 + (len - 1.5) * (i + 1) / n; const ax = dirx * d0, az = dirz * d0, bx = dirx * d1, bz = dirz * d1; quad(ax + nx, gy(ox + ax + nx, oz + az + nz), az + nz, ax - nx, gy(ox + ax - nx, oz + az - nz), az - nz, bx - nx, gy(ox + bx - nx, oz + bz - nz), bz - nz, bx + nx, gy(ox + bx + nx, oz + bz + nz), bz + nz); }
-            parts.push(s0, TEc, 0.3, 1.3);
+            parts.push(s0, ZOc, 0.38, 1, 0);
             const s1 = D.n, fl2 = 1.5 + (len - 1.5) * fill, m2 = Math.max(1, Math.ceil((fl2 - 1.5) / 1.2));
             for (let i = 0; i < m2; i++) { const d0 = 1.5 + (fl2 - 1.5) * i / m2, d1 = 1.5 + (fl2 - 1.5) * (i + 1) / m2; const ax = dirx * d0, az = dirz * d0, bx = dirx * d1, bz = dirz * d1, h2 = 0.6; quad(ax + nx * h2, gy(ox + ax, oz + az) + 0.01, az + nz * h2, ax - nx * h2, gy(ox + ax, oz + az) + 0.01, az - nz * h2, bx - nx * h2, gy(ox + bx, oz + bz) + 0.01, bz - nz * h2, bx + nx * h2, gy(ox + bx, oz + bz) + 0.01, bz + nz * h2); }
-            parts.push(s1, RIc, 0.85, 2.4);
+            parts.push(s1, RIc, 0.85, 2.4, 1);
           };
           if (S.kind === 'band') lane(fx, fz, S.len, S.w / 2, S.fill);
           else { const pp = g.player.pos, base = Math.atan2(pp[0] - ox, pp[2] - oz), L2 = Math.min(30, Math.hypot(pp[0] - ox, pp[2] - oz) + 3); for (const s of [-S.spread, 0, S.spread]) lane(Math.sin(base + s), Math.cos(base + s), L2, S.w / 2, S.fill); }
@@ -554,29 +553,30 @@
         let yaw = m.yaw + B2.beamYaw(C.beamT || 0), pitch = B2.beamPitch(C.beamT || 0);
         if (b.st === 'tele' && b.att === 'fan' && !b.calm) { const pp = g.player.pos; yaw = Math.atan2(-(pp[0] - C.lp[0]), -(pp[2] - C.lp[2])); pitch = Math.atan2(pp[1] + 1 - C.lp[1], Math.hypot(pp[0] - C.lp[0], pp[2] - C.lp[2])); }
         const cp = Math.cos(pitch), dx = -Math.sin(yaw) * cp, dy = Math.sin(pitch), dz = -Math.cos(yaw) * cp;
-        if ((C.hitT = (C.hitT || 0) - 1) <= 0 || !C.hitL) { C.hitT = 8; let L3 = 46; for (let s = 2; s <= 46; s += 2) { const x = C.lp[0] + dx * s, y = C.lp[1] + dy * s, z = C.lp[2] + dz * s; if (w.isLoaded(Math.floor(x), Math.floor(z)) && y <= topY(w, x, z)) { L3 = s; break; } } C.hitL = L3; }
+        if ((C.hitT = (C.hitT || 0) - 1) <= 0 || !C.hitL) { C.hitT = 8; let L3 = 40; for (let s = 2; s <= 40; s += 2) { const x = C.lp[0] + dx * s, y = C.lp[1] + dy * s, z = C.lp[2] + dz * s; if (w.isLoaded(Math.floor(x), Math.floor(z)) && y <= topY(w, x, z)) { L3 = s; break; } } C.hitL = L3; }
         const Lb = C.hitL, bx = C.lp[0] - ox, by = C.lp[1] - oy, bz = C.lp[2] - oz;
         const sx = -dz, sz = dx, sl = Math.hypot(sx, sz) || 1, ux = sx / sl, uz = sz / sl;   // the side and the up of the beam
         const upx = -dx * dy, upy = cp * cp, upz = -dz * dy;   // (the beam's up: its direction crossed with its side)
-        const nseg = lo(g) ? 1 : 3;
-        for (let i = 0; i < nseg; i++) {
-          const u0 = i / nseg, u1 = (i + 1) / nseg, w0 = 0.35 + 1.6 * u0, w1 = 0.35 + 1.6 * u1;
+        const nseg = lo(g) ? 1 : 3, nlay = lo(g) ? 1 : 2;
+        for (let j = 0; j < nseg * nlay; j++) {
+          const i = j % nseg, lay = (j / nseg) | 0, wk = lay ? 2.6 : 1;
+          const u0 = i / nseg, u1 = (i + 1) / nseg, w0 = (0.18 + 0.7 * u0) * wk, w1 = (0.18 + 0.7 * u1) * wk;
           const ax = bx + dx * Lb * u0, ay = by + dy * Lb * u0, az = bz + dz * Lb * u0, ex = bx + dx * Lb * u1, ey = by + dy * Lb * u1, ez = bz + dz * Lb * u1;
           const s1 = D.n;
           quad(ax + ux * w0, ay, az + uz * w0, ax - ux * w0, ay, az - uz * w0, ex - ux * w1, ey, ez - uz * w1, ex + ux * w1, ey, ez + uz * w1);
           quad(ax + upx * w0, ay + upy * w0, az + upz * w0, ax - upx * w0, ay - upy * w0, az - upz * w0, ex - upx * w1, ey - upy * w1, ez - upz * w1, ex + upx * w1, ey + upy * w1, ez + upz * w1);
-          parts.push(s1, b.calm ? CYc : RVc, (0.34 - 0.09 * i) * (lo(g) ? 0.8 : 1), 1.5);
+          parts.push(s1, b.calm ? CYc : RVc, (lay ? 0.1 : 0.42) * (1 - 0.28 * i), lay ? 1.2 : 1.8, 1);
         }
-        if (Lb < 46) {   // the spot where it touches the land
+        if (Lb < 40) {   // the spot where it touches the land
           const hx = bx + dx * Lb, hz = bz + dz * Lb, s2 = D.n, n = 12, rr = 1.6 + Lb * 0.05;
           for (let i = 0; i < n; i++) { const a0 = i * TAU / n, a1 = (i + 1) * TAU / n; const x0 = hx + Math.cos(a0) * rr, z0 = hz + Math.sin(a0) * rr, x1 = hx + Math.cos(a1) * rr, z1 = hz + Math.sin(a1) * rr; putV(hx, gy(ox + hx, oz + hz), hz); putV(x0, gy(ox + x0, oz + z0), z0); putV(x1, gy(ox + x1, oz + z1), z1); }
-          parts.push(s2, b.calm ? CYc : RVc, 0.6, 2);
+          parts.push(s2, b.calm ? CYc : RVc, 0.5, 2, 1);
         }
       }
       if (D.n) {
         gl.bindVertexArray(B2.vao); gl.bindBuffer(gl.ARRAY_BUFFER, B2.vbo); gl.bufferSubData(gl.ARRAY_BUFFER, 0, DV, 0, D.n * 5);
         gl.uniform3f(p.u.u_offset, ox - cam.x, oy - cam.y, oz - cam.z);
-        for (let i = 0; i < parts.length; i += 4) { const a = parts[i], e = i + 4 < parts.length ? parts[i + 4] : D.n; if (e > a) { color(parts[i + 1], parts[i + 2], parts[i + 3] * day); gl.drawArrays(gl.TRIANGLES, a, e - a); } }
+        for (let i = 0; i < parts.length; i += 5) { const a = parts[i], e = i + 5 < parts.length ? parts[i + 5] : D.n; if (e > a) { color(parts[i + 1], parts[i + 2], parts[i + 3] * (parts[i + 4] ? day : 1), parts[i + 4]); gl.drawArrays(gl.TRIANGLES, a, e - a); } }
         B2.cost.verts = D.n;
       }
     }
@@ -672,7 +672,12 @@
       ctx.restore();
     }
     for (const q of sites) { const x = X(q.x), z = Z(q.z); if (q.name) lab(q.name, x + 11, z - 6, q.free ? '#c8fbff' : '#ead2ff'); }
-    for (const r of C.regions) { const [rx, rz] = r.id.split('_').map(Number), px = Math.max(6, X(rx * S) + 6), pz = Math.max(16, Z(rz * S) + 18); lab(RP.regionName(r) + ' · ' + r.pct + ' %', px, pz, r.boss === 'won' ? '#ffe08a' : '#e8f4ff'); }
+    // the regions' names at the foot of their visible tile, in the middle
+    for (const r of C.regions) {
+      const [rx, rz] = r.id.split('_').map(Number), ax = Math.max(0, X(rx * S)), bx = Math.min(W, X((rx + 1) * S)), bz = Math.min(H, Z((rz + 1) * S));
+      const txt = RP.regionName(r) + ' · ' + r.pct + ' %'; ctx.font = '700 11px sans-serif'; const tw = ctx.measureText(txt).width;
+      lab(txt, clamp((ax + bx) / 2 - tw / 2, 4, W - tw - 4), clamp(bz - 8, 14, H - 6), r.boss === 'won' ? '#ffe08a' : '#e8f4ff');
+    }
     if (ng) {
       const x = X(ng.x), z = Z(ng.z); ctx.save(); ctx.translate(x, z);
       ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 16; ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 19, 0, TAU); ctx.stroke();
