@@ -98597,7 +98597,9 @@ L2.MIST_GOLD=[0.42,0.49,0.8];
 
 
 
-L2.AIRGOLD={away:[0.2,0.29,0.55],side:[0.46,0.47,0.72],k:1.0};
+
+
+L2.AIRGOLD={away:[0.16,0.26,0.55],side:[0.3,0.38,0.66],k:1.0};
 L2.airGold=(t)=>{const A=L2.AIRGOLD,q=clamp(t,0,1);return[0,1,2].map(i=>A.away[i]+(A.side[i]-A.away[i])*q);};
 L2.airGoldK=(E)=>L2.moods(E.sunDir[1]).gold*(1-clamp(E.rain||0,0,1))*L2.AIRGOLD.k;
 L2.mistColor=function(E){
@@ -98638,7 +98640,10 @@ day:{toe:0.014,mid:0.5,s:0.3,sh:0.985,dark:[0.008,0.004,-0.012],light:[-0.008,0.
 
 
 
-gold:{toe:0.016,mid:0.5,s:0.32,sh:1.0,dark:[-0.03,0.0,0.06],light:[0.0527,0.0187,-0.0383],sat:1.2,vig:0.2,bThr:1.3,bStr:0.17},
+
+
+
+gold:{toe:0.016,mid:0.5,s:0.32,sh:1.0,dark:[-0.03,0.0,0.06],light:[0.0527,0.0187,-0.0383],sat:1.45,vig:0.2,bThr:1.3,bStr:0.17},
 dusk:{toe:0.022,mid:0.5,s:0.28,sh:0.975,dark:[0.01,-0.014,0.05],light:[0.065,0.018,-0.035],sat:1.15,vig:0.24,bThr:0.75,bStr:0.22},
 night:{toe:0.026,mid:0.48,s:0.25,sh:0.97,dark:[-0.026,0.016,0.042],light:[0.055,0.022,-0.028],sat:1.08,vig:0.28,bThr:0.62,bStr:0.25},
 };
@@ -99483,9 +99488,11 @@ const CL=S3.CLOUDLIGHT={
 
 
 
-sun:[[-9,[0,0,0]],[-5,[0.42,0.22,0.28]],[-1.5,[0.95,0.48,0.42]],[2,[1.7,1.15,0.85]],[8,[2.0,1.6,1.3]],[16,[1.22,1.14,1.04]]],
+sun:[[-9,[0,0,0]],[-5,[0.42,0.22,0.28]],[-1.5,[0.95,0.48,0.42]],[2,[1.75,1.12,0.78]],[8,[2.1,1.58,1.15]],[16,[1.22,1.14,1.04]]],
 top:[[-12,[0.05,0.06,0.11]],[-4,[0.28,0.25,0.42]],[2,[0.7,0.6,0.85]],[8,[0.8,0.76,0.98]],[16,[0.5,0.56,0.72]]],
-low:[[-12,[0.035,0.04,0.07]],[-4,[0.2,0.15,0.24]],[2,[0.5,0.4,0.55]],[8,[0.55,0.5,0.66]],[16,[0.39,0.37,0.5]]],
+
+
+low:[[-12,[0.035,0.04,0.07]],[-4,[0.2,0.15,0.24]],[2,[0.36,0.28,0.58]],[8,[0.34,0.31,0.66]],[16,[0.39,0.37,0.5]]],
 moon:[0.1,0.12,0.19],rainGrey:[0.42,0.44,0.48],k:[1.0,1.0,0.3,0.5],
 
 
@@ -99498,7 +99505,9 @@ storm:{top:1.45,low:0.75,base:0.06,fair:0.82,rag:0.09},
 
 
 
-S3.DECK={from:0.3,full:0.75,puff:0.08,base:0.55,shafts:0.85,edge:0.7};
+
+
+S3.DECK={from:0.3,full:0.75,puff:0,base:0.55,shafts:0.85,edge:0.7};
 S3.deck=function(E){
 const q=S3.q||OFF,D=S3.DECK;
 if(!(q.sky3>=1)|| !q.cloudVol)return{on:0,puff:1,shafts:0,edge:0,base:[0,0,0]};
@@ -99515,6 +99524,22 @@ const c=clamp(E.cloudCover||0,0,1),q=S3.q||OFF;
 if(!q.cloudVol|| !(q.sky3>=1)|| !E.sunDir)return c;
 const w=S3.weights(E.sunDir[1]).gold*S3.goldK(E.sunDir[1]);
 return Math.round((c+S3.GOLDCLOUD.add*w*(1-sstep(0.3,0.5,c))*(1-clamp(E.rain||0,0,1)))*20)/20;
+};
+
+
+
+
+
+
+S3.GOLDSKY={k:1,deep:0.55,lit:2.0,pink:0.6};
+const GS=[0,0,0,0];
+S3.goldSky=function(E,out){
+out=out||GS;
+const G=S3.GOLDSKY,q=S3.q||OFF;
+const w=(q.sky3|0)>=1&& !q.lite&&E.sunDir?S3.weights(E.sunDir[1]).gold*S3.goldK(E.sunDir[1]):0;
+const k=G.k*w*(1-sstep(0.05,0.4,clamp(E.rain||0,0,1)))*(1-sstep(0.55,0.9,clamp(E.cloudCover||0,0,1)));
+out[0]=k>1e-3?k:0;out[1]=G.deep;out[2]=G.lit;out[3]=G.pink;
+return out;
 };
 
 S3.stormK=(E)=>clamp(E.rain||0,0,1)*(0.55+0.45*sstep(0.45,0.9,clamp(E.cloudCover||0,0,1)));
@@ -99535,7 +99560,7 @@ return{sun,top,low,L,el,grey,storm:st};
 
 
 
-const U4=S3.U4=['u_s3Warm','u_s3Warm2','u_s3Reach','u_s3Glow','u_s3Shade','u_s3Belt','u_s3Sun','u_s3SunW','u_s3MoonA','u_s3MoonB','u_s3Night','u_s3Met','u_s3MetT','u_s3Neb','u_s3Rain','u_s3Drift','u_s3Aur','u_s3Bank','u_s3Fan','u_s3Cir','u_s3Field','u_c3K','u_c3Storm','u_s3Deck2','u_c3Deck'];
+const U4=S3.U4=['u_s3Warm','u_s3Warm2','u_s3Reach','u_s3Glow','u_s3Shade','u_s3Belt','u_s3Sun','u_s3SunW','u_s3MoonA','u_s3MoonB','u_s3Night','u_s3Met','u_s3MetT','u_s3Neb','u_s3Rain','u_s3Drift','u_s3Aur','u_s3Bank','u_s3Fan','u_s3Cir','u_s3Field','u_c3K','u_c3Storm','u_s3Deck2','u_c3Deck','u_s3Gold'];
 const U3=S3.U3=['u_c3Sun','u_c3Top','u_c3Low','u_c3Ld','u_c3Haze'];
 S3.state=function(){
 const u={};
@@ -99598,6 +99623,7 @@ const Dk=S3.deck(E),deck=mix3(mix3(C.grey,C.top,0.35),Dk.base,Dk.on*0.6);
 set4(u.u_s3Rain,deck[0],deck[1],deck[2],0);
 set4(u.u_s3Deck2,over?Dk.on:0,over?Dk.shafts:0,over?Dk.edge:0,(E.time||0)*0.02);
 set4(u.u_c3Deck,Dk.puff,Dk.on,S3.mistK(E),0);
+S3.goldSky(E,u.u_s3Gold);
 const dr=E.cloudDrift,dx=dr?dr[0]:(E.time||0)*0.9,dz=dr?dr[1]:0;
 set4(u.u_s3Drift,dx/900,dz/900,dx/340,dz/340);
 
@@ -99607,7 +99633,7 @@ set4(u.u_s3Aur,o.aurora,o.auroraSeed,(E.time||0)%10000,AUR.span);
 
 
 const el=Y.el;
-set4(u.u_s3Bank,lv>=2&&over?clamp(0.12+0.8*cover,0,0.95)*(1-0.95*rain):0,dx/2600,dz/2600,0);
+set4(u.u_s3Bank,lv>=2&&over?clamp(0.12+0.8*cover,0,0.95)*(1-sstep(0.1,0.5,rain)):0,dx/2600,dz/2600,0);
 
 
 u.u_s3Field[3]=lv>=2&&over?cover*(1-0.95*rain):0;
@@ -99732,6 +99758,31 @@ col += u_s3Belt.rgb * (exp(-bt * bt) * anti * u_s3Belt.w);
 }
 if (u_s3Neb.z > 0.001) col = s3Deck(col, dir);
 return col;
+}
+uniform vec4 u_s3Gold;
+
+
+vec3 s3Gold(vec3 col, vec3 dir) {
+if (u_s3Gold.x <= 0.0 || dir.y < 0.06) return col;
+float e = dir.y, win = smoothstep(0.2, 0.38, e) * (1.0 - smoothstep(0.7, 0.95, e));
+if (win <= 0.0) return col;
+vec2 q = dir.xz / (e + 0.3) * 2.0 + u_s3Drift.xy * 0.6;
+q = vec2(q.x * 0.8 + q.y * 0.2, q.y * 1.3 - q.x * 0.2);
+float n = vnoise(q) * 0.58 + vnoise(q * 2.3 + 5.3) * 0.29 + vnoise(q * 5.2 - 2.1) * 0.13;
+float eb = (e - 0.5) / 0.14;
+n += 0.09 * exp(-eb * eb) - 0.03;
+float lit = smoothstep(0.62, 0.7, n), gap = 1.0 - smoothstep(0.44, 0.58, n), core = smoothstep(0.64, 0.86, n);
+float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+vec2 sh = normalize(u_sunDir.xz + vec2(1e-5, 0.0)), dh = normalize(dir.xz + vec2(1e-5, 0.0));
+float toS = 0.5 + 0.5 * dot(sh, dh);
+
+
+vec3 tint = mix(vec3(1.45, 0.8, 1.0), vec3(1.32, 0.92, 0.68), toS * toS);
+vec3 litC = mix(col, tint * l, u_s3Gold.w) * (1.0 + u_s3Gold.z * (0.35 + 0.65 * core));
+vec3 deepC = mix(col, vec3(0.42, 0.78, 2.4) * l, u_s3Gold.w) * (1.0 - u_s3Gold.y);
+float k = u_s3Gold.x * win;
+col = mix(col, deepC, gap * k);
+return mix(col, litC, lit * k);
 }
 vec3 s3SunDisc(vec3 dir, float sd) {
 float e = 1.0 - sd, th = sqrt(2.0 * e), r = u_s3Sun.x;
@@ -99921,8 +99972,10 @@ return u_sunColor * (rays * fall * u_s3Fan.x);
 
 
 
-S3.MISTK={gold:0.3};
-S3.mistK=(E)=>1-(1-S3.MISTK.gold)*(E&&E.sunDir?S3.weights(E.sunDir[1]).gold*S3.goldK(E.sunDir[1]):0);
+S3.MISTK={gold:0};
+
+
+S3.mistK=(E)=>(1-(1-S3.MISTK.gold)*(E&&E.sunDir?S3.weights(E.sunDir[1]).gold*S3.goldK(E.sunDir[1]):0))*(1-sstep(0.1,0.5,clamp((E&&E.rain)||0,0,1)));
 S3.MIST_NEAR=[150,340];
 
 S3.mistNear=(d)=>sstep(S3.MIST_NEAR[0],S3.MIST_NEAR[1],d);
@@ -99955,8 +100008,13 @@ vec2 e = vec2(0.03);
 th = th * 0.4 + 0.15 * (texture(u_cloudTex, c3At(cell, uv + vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv - vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv + vec2(0.0, e.y))).r + texture(u_cloudTex, c3At(cell, uv - vec2(0.0, e.y))).r);
 float d = smoothstep(0.0, 0.22, th);
 if (d < 0.02) return vec4(0.0, 0.0, 0.0, -1.0);
-vec3 mc = mix(u_c3Low, u_c3Top, 0.6) + u_c3Sun * 0.35;
-return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist) * u_c3Deck.z);
+
+
+vec3 N = vec3(t.gb * 2.0 - 1.0, 0.0);
+N.z = sqrt(max(0.0, 1.0 - dot(N.xy, N.xy)));
+float up = smoothstep(0.3, 0.75, uv.y), ndl = clamp(dot(N, u_c3L) * 0.5 + 0.5, 0.0, 1.0);
+vec3 mc = mix(u_c3Low, u_c3Top, up) + u_c3Sun * ((0.2 + 0.5 * ndl) * (0.45 + 0.55 * up));
+return vec4(mix(mc, u_c3Haze, 0.25), d * c3MistNear(dist) * u_c3Deck.z);
 }
 float cov = smoothstep(0.0, 0.08, th);
 if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);
@@ -101601,6 +101659,7 @@ col = max(col, u_skyMid * (2.0 * aurK * aurK * u_skyDay.z * (1.0 - u_rain)));
 col += u_sunColor * (ts16 * ts16 * ts16 * ts8 * ts4) * u_skyStops.w * (1.0 - u_rain);
 #ifdef SKY3
 col = s3Layers(col, dir, h);
+col = s3Gold(col, dir);
 #endif
 if (dir.y + u_dip < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-(dir.y + u_dip) * 2.5, 0.0, 1.0));
 if (withSun) {
@@ -104734,7 +104793,18 @@ out.push([cx+Math.cos(a)*dd,y,cz+Math.sin(a)*dd,r,0.92,0.8+0.2*hash(gx,gz,70+k),
 return out;
 }
 
-function fogBanks(cam){
+
+
+
+const BANK_CLEAR=24;
+function overVoid(x,y,z,r,ground){
+for(let i=0;i<7;i++){
+const a=i*Math.PI/3,d=i===0?0:r*0.6,gy=ground(x+Math.cos(a)*d,z+Math.sin(a)*d,y);
+if(gy>=0&&gy>y-BANK_CLEAR)return false;
+}
+return true;
+}
+function fogBanks(cam,ground){
 const out=[];
 const reach=FOG.reach+60;
 const g0=Math.floor((FOG.x-reach)/FOG.cell),g1=Math.floor((FOG.x+reach)/FOG.cell);
@@ -104743,8 +104813,9 @@ for(let gz=h0;gz<=h1;gz++)for(let gx=g0;gx<=g1;gx++){
 const x=gx*FOG.cell+FOG.cell/2+(hash(gx,gz,90)-0.5)*50,z=gz*FOG.cell+FOG.cell/2+(hash(gx,gz,91)-0.5)*50;
 if(Math.hypot(x-FOG.x,z-FOG.z)>FOG.reach)continue;
 if(hash(gx,gz,92)<0.33)continue;
-const r=70+hash(gx,gz,93)*60;
-out.push([x,FOG.y0+hash(gx,gz,94)*(FOG.y1-FOG.y0),z,r,0.28+0.12*hash(gx,gz,95),0.3+0.12*hash(gx,gz,96),Math.floor(hash(gx,gz,97)*4)%4]);
+const r=70+hash(gx,gz,93)*60,y=FOG.y0+hash(gx,gz,94)*(FOG.y1-FOG.y0);
+if(ground&& !overVoid(x,y,z,r,ground))continue;
+out.push([x,y,z,r,0.28+0.12*hash(gx,gz,95),0.3+0.12*hash(gx,gz,96),Math.floor(hash(gx,gz,97)*4)%4]);
 }
 return out;
 }
@@ -104775,7 +104846,7 @@ for(const s of cumulusCell(gx,gz,cover))cu.push(s);
 const dist=(s)=>(s[0]-cx)*(s[0]-cx)+(s[2]-cz)*(s[2]-cz);
 if(cu.length>MAX_CUMULUS)cu=cu.sort((a,b)=>dist(a)-dist(b)).slice(0,MAX_CUMULUS);
 cu.sort((a,b)=>dist(b)-dist(a));
-const fog=fogBanks(cam).concat(anchors());
+const fog=fogBanks(cam,opt&&opt.ground).concat(anchors());
 const near=(s)=>(s[0]-cam.x)*(s[0]-cam.x)+(s[2]-cam.z)*(s[2]-cam.z);
 fog.sort((a,b)=>near(b)-near(a));
 return{cumulus:cu,fog};
@@ -109408,7 +109479,7 @@ const ocx=Math.floor((cam.x+wind)/cell),ocz=Math.floor((cam.z+windZ)/cell);
 const key=ocx+','+ocz+','+cov.toFixed(2)+','+Math.floor(cam.x/96)+','+Math.floor(cam.z/96)+','+(this.valleyFogV|0);
 if(key===this.puffKey)return;
 this.puffKey=key;
-const f=VR.Clouds.field(cam,wind,{cover:cov,windZ}),gl=this.gl;
+const f=VR.Clouds.field(cam,wind,{cover:cov,windZ,ground:this.bankGround}),gl=this.gl;
 let fogL=f.fog;
 if(this.valleyFog&&this.valleyFog.length){const d2=(q)=>(q[0]-cam.x)*(q[0]-cam.x)+(q[2]-cam.z)*(q[2]-cam.z);fogL=this.valleyFog.concat(f.fog).sort((a,b)=>d2(b)-d2(a));}
 const lists=[VR.Clouds.pack(fogL),VR.Clouds.pack(f.cumulus)];
@@ -145019,6 +145090,20 @@ this.valleyT=3;
 const r=this.renderer,C=VR.Clouds,on= !!this.settings.wxDrama&&r&&r.q&&r.q.clouds>=2&&this.dim==='overworld'&&C&&C.valleyFog;
 const list=on?C.valleyFog({x:eye[0],z:eye[2]},(x,z)=>(w.isLoaded(x,z)?w.topAt(x,z): -1),this.env.timeOfDay,this.env.wx.kind==='nebel'?1:0,VR.C.SEA):[];
 if(r&&(list.length||(r.valleyFog&&r.valleyFog.length))){r.valleyFog=list;r.valleyFogV=(r.valleyFogV|0)+1;}
+
+
+if(r&&r.q&&r.q.clouds>=2&&this.dim==='overworld'&&C&&C.fogBanks){
+const gr=r.bankGround||(r.bankGround=(x,z,y)=>{
+x=Math.floor(x);z=Math.floor(z);
+if(!w.isLoaded(x,z))return-1;
+const t=w.topAt(x,z);
+if(t<=y)return t;
+for(let yy=Math.floor(y);yy>y-30;yy--)if(w.getBlock(x,yy,z))return yy;
+return Math.floor(y)-30;
+});
+let sig=0;for(const b of C.fogBanks({x:eye[0],z:eye[2]},gr))sig+=b[0]*7+b[2];
+if(sig!==r.bankSig){r.bankSig=sig;r.valleyFogV=(r.valleyFogV|0)+1;}
+}
 }
 this.particles.update(dt,eye);
 if(this.renderer&&this.renderer.q&&this.renderer.q.lampGlow)this.particles.lampGlows(dt,eye,E.night||0);
