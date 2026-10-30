@@ -37,6 +37,8 @@ const NAMES = [
   { de: 'Bernstein', en: 'Amber', what: 'the hothouse planet', checked: '2026-10-22', by: 'f-names', found: 'an ordinary word' },
   { de: 'Cölestin', en: 'Celestine', what: 'the ice giant', checked: '2026-10-22', by: 'critic v0.49', found: 'a mineral word' },
   { de: 'Trümmerschwarm', en: 'Rubble Swarm', what: 'the swarm of rubble round Helia', checked: '2026-10-22', by: 'critic v0.49', found: 'no product or game of that name' },
+  { de: 'Turmgänger', en: 'Tower Walker', role: 'boss', what: 'the first boss: a four-legged worker machine with a lantern tower at a region\'s Kernfeuer (a-rpg)', checked: '2026-10-30', by: 'a-rpg', found: 'no game, toy or product of either name; „Walker" machines exist in several games (Sanctum, Deadlock) and a boss called „Tower" in The House of the Dead — other names; a descriptive word pair of ours' },
+  { de: 'Kernfeuer', en: 'Core Beacon', role: 'place', what: 'a region\'s central beacon the Turmgänger guards (a-rpg)', checked: '2026-10-30', by: 'a-rpg', found: 'no game, product or brand of that name (a user name on a games platform); „core beacon" a plain technical word pair' },
   { de: 'Funke', en: 'Funke', what: 'the companion drone (e-funke)', checked: '2026-10-22', by: 'f-names', found: 'no game companion of that name; an ordinary word (spark) and a surname; a German media group is called FUNKE (publishing, not games) — no action' },
   { de: 'Weißstadt', en: 'Weißstadt', what: 'the hall city (the code\'s name for it)', checked: '2026-10-22', by: 'f-names', found: 'only the Bavarian town Weißenstadt' },
   { de: 'Nova Haven', en: 'Nova Haven', what: 'the terraced city of the trailer', checked: '2026-10-22', by: 'f-names', found: 'no game place of that name' },
