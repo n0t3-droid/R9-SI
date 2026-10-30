@@ -3111,6 +3111,8 @@
     "g.stars2.land.glass": "Dunes of molten glass.",
     "g.stars2.ring": "A ring spans the sky.",
     "g.stars2.sun2": "Two suns — two shadows.",
+    "g.set.sun2": "Second sun with shadows",
+    "g.set.sun2.tip": "On worlds of binary stars the second sun casts light and shadows too (Low and up; costs a little performance).",
     // ---- u-stars2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

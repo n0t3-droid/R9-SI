@@ -175,6 +175,7 @@ uniform vec4 u_pt[2];     // the jump's two point stars: way, angular radius (0 
 uniform vec4 u_ptc[2];    // their colour (linear), T (K)
 uniform vec4 u_flood;     // the arrival's light: colour, strength
 uniform vec4 u_sky;       // the sky's tint at the limbs (R§7), -
+uniform vec4 u_tun;       // u-stars2: the tunnel of streaks (strength, time s), the band's dimming (1 … 0.15), -
 in vec3 v_dir;
 out vec4 o;
 const float TS[9] = float[9](2300.0, 3000.0, 4400.0, 5300.0, 5800.0, 6500.0, 7200.0, 10000.0, 40000.0);
@@ -203,7 +204,7 @@ vec3 starGrid(vec3 D, float N, float seed, float dens, float bright, float pxr, 
   float t = hash13(vec3(cell.yx, face + 9.0 + seed));
   float T = t < 0.12 ? 3100.0 : t < 0.34 ? 4500.0 : t < 0.66 ? 5600.0 : t < 0.88 ? 7500.0 : 14000.0;
   vec3 col = tcol(T * dop) / max(0.35, dot(tcol(T), vec3(0.2126, 0.7152, 0.0722)));
-  b *= clamp(dop * dop, 0.0, 6.0);
+  float d3 = dop * dop * dop; b *= d3 / (1.0 + d3 / 48.0);   // (u-stars2: D³ with a soft cap at 48 — SJ.boost; u-stars: D² ≤ 6)
   return col * b * exp(-px * px * 1.6 / (1.0 + 1.5 * b));
 }
 float fbm(vec3 p, int oct) { float s = 0.0, a = 0.5; for (int i = 0; i < 6; i++) { if (i >= oct) break; s += a * vnoise3(p); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s / (1.0 - pow(0.5, float(oct))); }
@@ -321,9 +322,22 @@ void main() {
   float gal = (thin * (0.45 + 0.9 * n1 * n1 + 0.35 * n2) * (0.55 + 1.6 * core) + wide * 0.18) * rift;
   vec3 gcol = mix(vec3(0.72, 0.78, 1.0), vec3(1.0, 0.84, 0.66), core);
   vec3 dt = tcol(5200.0 * dop) / tcol(5200.0);
-  col += gcol * dt * gal * 0.03 * clamp(dop * dop, 0.0, 6.0);
-  if (u_neb.x > 0.5) col += nebula(Dr, tier >= 2 ? 5 : 2, pxr / dop) * clamp(dop * dop, 0.0, 6.0) * dt;
+  col += gcol * dt * gal * 0.03 * clamp(dop * dop, 0.0, 6.0) * u_tun.z;   // (u-stars2: dimmed as β rises — SJ.bandK)
+  if (u_neb.x > 0.5) col += nebula(Dr, tier >= 2 ? 5 : 2, pxr / dop) * clamp(dop * dop, 0.0, 6.0) * dt * u_tun.z;
   col *= u_view.w;
+  // ---- u-stars2: the tunnel at the transit's peak — thin streaks round the way ahead, rushing outward, blue-white
+  if (u_tun.x > 0.001) {
+    vec3 ax = abs(u_V.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 e1 = normalize(cross(u_V, ax)), e2 = cross(u_V, e1);
+    float th = acos(clamp(c1, -1.0, 1.0)), az = atan(dot(D, e2), dot(D, e1)) * 57.29578 / 1.5, bin = floor(az), h = hash13(vec3(bin, 3.0, 7.0));
+    if (h > 0.45 && th > 0.02 && th < 1.3) {
+      float px = abs(fract(az) - 0.5) * 1.5 * 0.0174533 * sin(th) * pxr;
+      float s = fract(log(th) * 1.2 - u_tun.y * (0.9 + 0.8 * h) + h * 7.0);
+      float seg = smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.25, 0.55, s));
+      float fall = smoothstep(0.02, 0.08, th) * (1.0 - smoothstep(0.7, 1.3, th));
+      col += mix(vec3(0.6, 0.75, 1.0), vec3(1.0), h) * u_tun.x * seg * fall * exp(-px * px * 1.8) * (0.6 + 1.4 * fract(h * 13.0));
+    }
+  }
   // ---- the jump's point stars (the one left behind, the one ahead growing from a point)
   for (int k = 0; k < 2; k++) {
     if (u_pt[k].w <= 0.0) continue;
@@ -416,6 +430,7 @@ void main() {
     view: new Float32Array(4), jump: new Float32Array(4), V: new Float32Array(3), galN: new Float32Array(3), galC: new Float32Array(3),
     neb: new Float32Array(4), nebHot: new Float32Array(3), S: new Float32Array(8), Sc: new Float32Array(8), Sd: new Float32Array(8),
     n: 0, P: new Float32Array(48), C: new Float32Array(48), pt: new Float32Array(8), ptc: new Float32Array(8), flood: new Float32Array(4), sky: new Float32Array(4),
+    tun: new Float32Array([0, 0, 1, 0]),   // u-stars2
   };
   SJ.UF = UF;
   // the galaxy's plane (the same sky as Helia's, spacescene.js: our own)
@@ -431,7 +446,7 @@ void main() {
     f4('u_view', UF.view); f4('u_jump', UF.jump); f3('u_V', UF.V); f3('u_galN', UF.galN); f3('u_galC', UF.galC);
     f4('u_neb', UF.neb); f3('u_nebHot', UF.nebHot); f4('u_S', UF.S); f4('u_Sc', UF.Sc); f4('u_Sd', UF.Sd);
     if (u.u_n) gl.uniform1i(u.u_n, UF.n);
-    f4('u_P', UF.P); f4('u_C', UF.C); f4('u_pt', UF.pt); f4('u_ptc', UF.ptc); f4('u_flood', UF.flood); f4('u_sky', UF.sky);
+    f4('u_P', UF.P); f4('u_C', UF.C); f4('u_pt', UF.pt); f4('u_ptc', UF.ptc); f4('u_flood', UF.flood); f4('u_sky', UF.sky); f4('u_tun', UF.tun);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     r.stats.draws++; r.stats.tris += 1;
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
@@ -543,7 +558,7 @@ void main() {
     const pxr = (r ? r.H : 720) / ((g.settings.fov || 75) * Math.PI / 180);
     UF.view[0] = tier; UF.view[1] = pxr; UF.view[2] = g.time || 0; UF.view[3] = 1;
     UF.jump[0] = 0; UF.jump[1] = 1; UF.jump[2] = 0; UF.jump[3] = 0;
-    UF.pt[3] = 0; UF.pt[7] = 0; UF.flood[3] = 0;
+    UF.pt[3] = 0; UF.pt[7] = 0; UF.flood[3] = 0; UF.tun[0] = 0; UF.tun[2] = 1;   // (u-stars2)
     let sysK = 1, def = S.def;
     if (S.J) {
       S.js += dt;
@@ -555,6 +570,7 @@ void main() {
       const bv = S.fade ? 0 : j.beta;
       UF.jump[0] = bv; UF.jump[1] = 1 / Math.sqrt(1 - bv * bv); UF.jump[2] = S.fade ? 0 : j.band;
       UF.V.set(S.V);
+      UF.tun[0] = S.fade ? 0 : SJ.tunnel(j) * 1.4; UF.tun[1] = S.js; UF.tun[2] = S.fade ? 1 : SJ.bandK(bv);   // u-stars2: the tunnel only at the peak, the band dimmed
       if (S.fade) UF.jump[3] = j.phase === 'transit' ? 1 : j.phase === 'spin' ? sstep((j.u - 0.4) / 0.6) : 1 - sstep(j.u / 0.7);
       // the system left fades in the spin-up; the target's comes in with the arrival
       if (j.phase === 'arrive' && S.toDef && S.def !== S.toDef) { S.def = S.toDef; S.sys = S.to; S.focus = S.arr.focus; S.camRel = S.arr.rel; }
@@ -747,7 +763,12 @@ void main() {
       const moon = S.def.bodies.find(b => b.parent === S.focus.id); if (!moon) return false;
       const t = SJ.worldT(g); moon.phase = 0;
       const P = SJ.place(S.def, t), pF = P[S.focus.id], sDir = norm(sub(P[S.def.bodies[0].id], pF)), mDir = norm(sub(P[moon.id], pF));
-      const want = rotY(sDir, (deg || 18) * Math.PI / 180);
+      // u-stars2: the moon between its star and a lit point the camera sees (the shadow falls on the visible, lit disc —
+      // u-stars' fixed angle put it off the disc); deg turns that point a little round the disc
+      const R = S.focus.R / L64, am = moon.orbit.a / L64, cDir = norm(S.camRel);
+      const Qd = rotY(norm(add(mul(sDir, 0.55), mul(cDir, 0.45))), (deg || 0) * Math.PI / 180), Q = mul(Qd, R * 1.02), qs = dot(Q, sDir);
+      const sk = -qs + Math.sqrt(Math.max(0, qs * qs - dot(Q, Q) + am * am));
+      const want = norm(add(Q, mul(sDir, sk)));
       moon.phase = Math.atan2(want[2], want[0]) - Math.atan2(mDir[2], mDir[0]);
       return moon.id;
     },

@@ -174,6 +174,23 @@
       if (on && vis.includes(i) && !s.home) { X.strokeStyle = '#ffffffb0'; X.lineWidth = 1; X.beginPath(); X.arc(x, y, r + 3.5, 0, Math.PI * 2); X.stroke(); }
       X.globalAlpha = 1;
     }
+    // ---- u-stars2: the route (meta.stars.route — where you have been, in order) and the nearest system worth a jump
+    const RT = M.g && M.g.meta && M.g.meta.stars && Array.isArray(M.g.meta.stars.route) ? M.g.meta.stars.route : [];
+    if (RT.length > 1) {
+      X.strokeStyle = '#ffcf6acc'; X.lineWidth = 1.8; X.setLineDash([]); X.beginPath();
+      let on = false;
+      for (const i of RT) { if (!(P.z[i] >= 1)) { on = false; continue; } on ? X.lineTo(P.x[i], P.y[i]) : X.moveTo(P.x[i], P.y[i]); on = true; }
+      X.stroke();
+      X.fillStyle = '#ffcf6a'; for (const i of RT) if (P.z[i] >= 1) { X.beginPath(); X.arc(P.x[i], P.y[i], 2.4, 0, Math.PI * 2); X.fill(); }
+    }
+    const NX = VR.Exo ? VR.Exo.interesting(N, M.here, vis, range) : null;
+    M.next = NX;
+    if (NX && P.z[NX.idx] >= 1) {
+      const x = P.x[NX.idx], y = P.y[NX.idx], r = 11;
+      X.strokeStyle = '#ffd36a'; X.lineWidth = 2; X.beginPath(); X.moveTo(x, y - r); X.lineTo(x + r, y); X.lineTo(x, y + r); X.lineTo(x - r, y); X.closePath(); X.stroke();
+      X.setLineDash([2, 6]); X.strokeStyle = '#ffd36a88'; X.lineWidth = 1.2; X.beginPath(); X.moveTo(P.x[M.here], P.y[M.here]); X.lineTo(x, y); X.stroke(); X.setLineDash([]);
+    }
+    // ---- u-stars2 end
     // home, here, the selection, the hovered — and the names in reach
     X.font = '600 12px system-ui,sans-serif'; X.textBaseline = 'middle';
     const label = (i, col, txt) => { if (P.z[i] < 1) return; X.fillStyle = '#000a'; const w = X.measureText(txt).width; X.fillRect(P.x[i] + 9, P.y[i] - 8, w + 6, 16); X.fillStyle = col; X.fillText(txt, P.x[i] + 12, P.y[i]); };
@@ -188,7 +205,8 @@
       X.strokeStyle = '#fff'; X.lineWidth = 1.5; X.beginPath(); X.arc(P.x[i], P.y[i], 8, 0, Math.PI * 2); X.stroke();
       label(i, '#fff', N.list[i].name + ' · ' + fmt(d) + ' ' + T('g.stars.ly'));
     }
-    root.querySelector('#smWhere').textContent = T('g.stars.mapWhere', { name: N.list[M.here].name, n: near.length - 1, ly: range, all: N.list.length });
+    if (NX && P.z[NX.idx] >= 1) label(NX.idx, '#ffd36a', T('g.stars2.next', { name: NX.name, ly: fmt(NX.d), why: T('g.stars2.why.' + NX.why) }));   // u-stars2
+    root.querySelector('#smWhere').textContent = T('g.stars.mapWhere', { name: N.list[M.here].name, n: near.length - 1, ly: range, all: N.list.length }) + (RT.length > 1 ? ' · ' + T('g.stars2.route', { n: RT.length - 1 }) : '');   // (u-stars2: the route)
   }
 
   // ---------------------------------------------------------------- the card

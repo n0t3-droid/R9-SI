@@ -3111,6 +3111,8 @@
     "g.stars2.land.glass": "Dünen aus geschmolzenem Glas.",
     "g.stars2.ring": "Ein Ring spannt sich über den Himmel.",
     "g.stars2.sun2": "Zwei Sonnen — zwei Schatten.",
+    "g.set.sun2": "Zweite Sonne mit Schatten",
+    "g.set.sun2.tip": "Auf Welten von Doppelsternen wirft auch die zweite Sonne Licht und Schatten (ab Niedrig; kostet etwas Leistung).",
     // ---- u-stars2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
