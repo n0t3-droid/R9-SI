@@ -257,6 +257,15 @@
       return r;
     } catch (e) { console.warn('first2 open ground', e); return null; }
   };
+  // (f-hud) the settle under the arrival's white: the veil still thick, or the wow moment holding its composition (the
+  // eyes not on the screen) — the move is not seen; the swing back lands on the new place
+  F.underVeil = function (g) {
+    const A = g && g.arrival; if (!A) return false;
+    if (A.phase === 'veil') return A.veilNow() >= 0.5;
+    if (A.phase === 'full') return true;
+    if (A.phase === 'moment') { const W = g.wow, WM = VR.WowMoment; return !!(W && W.active && W.t <= (WM && WM.RISE !== undefined ? WM.RISE + WM.HOLD : 4)); }
+    return false;
+  };
   F.letGo = function () {
     const a = document.activeElement;
     if (a && a !== document.body && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(a.tagName) && a.blur) a.blur();
@@ -302,6 +311,7 @@
     const op = G.prototype.playFrame;
     G.prototype.playFrame = function (dt) {
       if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); this.f2t = 0; this.f2wait = 3; this.f2new = !!this.meta && !this.meta.player; }
+      if (this.f2wait > 0 && this.arrival && this.arrival.phase !== 'full' && F.underVeil(this)) { this.f2wait = 0; F.settle(this); }   // (f-hud: under the white)
       if (this.f2wait > 0 && !this.arrival && !(this.wow && this.wow.active) && !(this.ui && this.ui.screen) && --this.f2wait === 0) F.settle(this);
       { const n = performance.now(); this.f2gap = this.f2t && !(this.ui && this.ui.screen) ? (n - this.f2t) / 1000 : 0; this.f2t = n; }
       const r = op.apply(this, arguments);

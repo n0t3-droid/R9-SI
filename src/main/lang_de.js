@@ -3185,5 +3185,14 @@
     "g.set.spaceLife": "Leben zwischen den Welten",
     "g.set.spaceLife.tip": "Siedlungen auf den Monden, Fähren und Verkehr im All",
     // ---- a-life end
+    // ---- f-hud
+    "g.set.hitShake": "Bildschirmwackeln",
+    "g.set.hitShake.tip": "Ein kleiner Ruck, wenn du eine Maschine triffst.",
+    "g.hf.left": "Eine ist zur Ruhe gekommen! Noch {n} am Außenposten.",
+    "g.hf.left1": "Gut so! Nur noch eine Maschine.",
+    "g.hf.next": "Weiter geht's: der nächste gestörte Außenposten — {d} m {arrow}",
+    "g.hf.none": "Alle Außenposten hier leuchten wieder. Schau dich um — oder bau dir ein Zuhause!",
+    "g.hf.hidden": "HUD ausgeblendet — [{key}] zeigt es wieder.",
+    // ---- f-hud end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

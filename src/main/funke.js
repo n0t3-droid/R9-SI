@@ -46,6 +46,11 @@
   F.KIND_WAIT = { vista: 240, _: 600 };   // s before the same kind is told again unprompted (asked: any time)
   F.SCALE = 0.62;      // the drone's size (≈ 35 cm)
   F.SEAT_SCALE = 0.45; // on the dashboard (run 1: 0.55 filled the middle of the windscreen)
+  // f-hud (critic_ux_16: a cyan block and white planes filled the Abenteuer start): never drawn in the camera's face, nor
+  // in a camera that is not the player's eye (the wow moment's composition, the director's shots, the arrival's moment)
+  F.NEAR = 0.6;        // m from the camera: closer is not drawn
+  F.camNear = (dx, dy, dz) => dx * dx + dy * dy + dz * dz < F.NEAR * F.NEAR;
+  F.camHidden = (g) => !!(g && ((g.wow && g.wow.active) || (g.director && g.director.active) || (g.arrival && g.arrival.phase === 'moment')));
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
 
   // ---------------------------------------------------------------- the talking budget (pure)
@@ -495,7 +500,7 @@ void main() {
       const first = this.startT === null; if (first) this.startT = T;
       this.feel(T);
       if (this.buildFocus()) this.budget.build(T);
-      this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds());
+      this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds()) && !F.camHidden(g);   // (f-hud: no cinematic camera's foreground)
       // where it wants to be
       this.seat = g.flight || null;
       if (!this.seat) {
@@ -916,6 +921,7 @@ void main() {
       }
       const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.32 * OPTS.scale / F.SCALE;   // (the rotors' reach; run 1's 0.5 drew it beside the first-person eye, out of the view)
       if (!m4.boxInFrustum(r.planes, dx - R0, dy - R0, dz - R0, dx + R0, dy + R0, dz + R0)) return;   // not seen: nothing at all
+      if (!OPTS.baseMat && F.camNear(dx, dy, dz)) return;   // (f-hud: in the face — the spring caught up with the eye)
       const prog = ent.beginVox(r, E);
       if (prog.u.u_clipNear) gl.uniform1f(prog.u.u_clipNear, 0);
       POSE.rotor_l[1] = this.spin; POSE.rotor_r[1] = -this.spin;

@@ -3185,5 +3185,14 @@
     "g.set.spaceLife": "Life between the worlds",
     "g.set.spaceLife.tip": "Settlements on the moons, ferries and traffic in space",
     // ---- a-life end
+    // ---- f-hud
+    "g.set.hitShake": "Screen shake",
+    "g.set.hitShake.tip": "A small jolt when you hit a machine.",
+    "g.hf.left": "One is calm! {n} more at the outpost.",
+    "g.hf.left1": "Well done! Just one machine left.",
+    "g.hf.next": "On we go: the next disturbed outpost — {d} m {arrow}",
+    "g.hf.none": "Every outpost near here shines again. Look around — or build yourself a home!",
+    "g.hf.hidden": "HUD hidden — [{key}] brings it back.",
+    // ---- f-hud end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
