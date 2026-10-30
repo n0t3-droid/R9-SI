@@ -117,6 +117,26 @@
     return out;
   };
 
+  // ================================================================ the craft over a settlement (pure)
+  // a craft crossing the settlement's sky on the world clock: one every ~32 s (jittered), from the horizon past the plaza
+  // (35–90 m to its side, 35–65 m up) and away, climbing at both ends; a dropship, a freighter or a shuttle
+  Fe.PASS = { slot: 32, len: 1960 };
+  Fe.craftSeed = (seed, k) => (Math.floor(hh(seed, k, 0x3e1) * 4294967295) >>> 0);
+  Fe.passAt = function (seed, k) {
+    const r = (j) => hh(seed, k, j), a7 = r(7);
+    return { k, t0: k * Fe.PASS.slot + r(1) * Fe.PASS.slot * 0.5, a: r(2) * TAU, off: (r(3) < 0.5 ? -1 : 1) * (35 + r(4) * 55), alt: 35 + r(5) * 30, v: 38 + r(6) * 30, arch: a7 < 0.55 ? 'dropship' : a7 < 0.85 ? 'freighter' : 'shuttle' };
+  };
+  const smooth01 = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  Fe.passPos = function (P, t, cx, cy, cz, out) {
+    const Lh = Fe.PASS.len / 2, s = (t - P.t0) * P.v - Lh; if (t < P.t0 || s > Lh) return null;
+    const dx = Math.cos(P.a), dz = Math.sin(P.a), e = s / Lh;
+    out = out || {}; const p = out.pos || (out.pos = [0, 0, 0]);
+    p[0] = cx + dx * s - dz * P.off; p[2] = cz + dz * s + dx * P.off; p[1] = cy + P.alt + 90 * e * e;
+    out.yaw = Math.atan2(-dx, -dz); out.speed = P.v; out.roll = 0; out.pitch = 0; out.gear = 0;
+    out.fade = smooth01((1 - Math.abs(e)) / 0.08);
+    return out;
+  };
+
   // ================================================================ the settlement (pure)
   // the record: meta.life = {v: 1, sites: {basalt: {x, y, z, day0, id, home}}, docks: {overworld: {x, y, z}}, pre: {…}}
   Fe.NAMES = ['Kraterruh', 'Lichtmulde', 'Neuhafen', 'Sternbucht', 'Stillfeld', 'Glanzhang', 'Silbersenke', 'Frostbogen', 'Morgenkuppel', 'Weitsicht'];
@@ -314,6 +334,7 @@
       if (!this.on || !pl || !g.starships) { for (const p of this.pads.values()) { p.live = null; p.ground = null; } return; }
       const E = g.env && g.env.E, night = E ? E.night || 0 : 0;
       for (const pad of this.pads.values()) {
+        if (pad.kind === 'pass') continue;
         if (pad.shift && !pad.ride) { const k = Math.min(Math.abs(pad.shift), dt * 0.5); pad.shift += pad.shift > 0 ? -k : k; }
         const d = Math.hypot(pad.x - pl.pos[0], pad.z - pl.pos[2]);
         if (d > P0.VIS && !pad.ride) { pad.live = null; continue; }
@@ -323,6 +344,38 @@
         pad.live = list;
         for (const q of list) { this.craft(pad, q, dt, d, night); this.departs(pad, q); }
       }
+      this.passes(dt);
+    }
+    // the craft over the settlement (a pad of its own kind: PadLife's draw shows them)
+    passes(dt) {
+      const g = this.g, L = g.life, s = L && L.site, SS = g.starships;
+      let pad = this.pads.get('pass');
+      if (!s || !L.plan || Fe.MOONS.indexOf(g.dim) < 0 || !this.on || !SS) { if (pad) pad.live = null; return; }
+      if (!pad) { pad = { key: 'pass', kind: 'pass', seed: Fe.padSeed('pass', g.dim, wseedOf(g)), x: s.x, y: s.y, z: s.z, crafts: new Map(), live: [] }; this.pads.set('pass', pad); }
+      const t = this.clock, k1 = Math.floor(t / Fe.PASS.slot), list = pad.live || (pad.live = []), pl = g.player.pos, Tr = g.trails;
+      list.length = 0;
+      for (let k = k1 - 2; k <= k1; k++) {
+        const P = Fe.passAt(pad.seed, k);
+        let c = pad.crafts.get(k);
+        const q = Fe.passPos(P, t, s.x + 0.5, s.y + 1, s.z + 0.5, c ? c.q : null); if (!q) continue;
+        if (!c) {
+          c = { m: k, arch: P.arch, d: SS.design(Fe.craftSeed(pad.seed, k), P.arch, null), q, inst: { d: null, pos: [0, 0, 0], yaw: 0, pitch: 0, roll: 0, gear: 0, hatch: { ramp: 0, door: 0, cdoor: 0 }, kneel: 0 }, ev: { t: 0, pos: null, d: null, contrail: false, near: false, tag: null }, alpha: 0, dist: 1e9, tid: 'fp' + k, wp: [0, 0, 0] };
+          pad.crafts.set(k, c); for (const kk of [...pad.crafts.keys()]) if (kk < k - 3) pad.crafts.delete(kk);
+        }
+        if (!SS.designs.has(c.d.key)) c.d = SS.design(Fe.craftSeed(pad.seed, k), P.arch, null);
+        c.d.last = performance.now(); q.m = k; list.push(q);
+        const I = c.inst; I.d = c.d; I.pos[0] = q.pos[0]; I.pos[1] = q.pos[1]; I.pos[2] = q.pos[2]; I.yaw = q.yaw; I.pitch = 0; I.roll = 0; I.gear = 0;
+        const dist = Math.hypot(q.pos[0] - pl[0], q.pos[1] - pl[1], q.pos[2] - pl[2]); c.dist = dist;
+        c.alpha = q.fade * (1 - LK.smooth((dist - P0.FADE0) / (P0.FADE1 - P0.FADE0)));
+        this.st.crafts++; if (c.alpha > 0.5) this.st.visible++;
+        c.ev.pos = q.pos; c.ev.d = c.d; if (VR.EventLog && VR.EventLog.pass) VR.EventLog.pass(c.ev, dist);
+        const m = c.d.meta;
+        if (Tr && Tr.engine && m && this.tier >= 1 && dist < 600 && c.alpha > 0.1) for (let ei = 0; ei < Math.min(2, m.exhaust.length); ei++) {
+          const e = m.exhaust[ei], lo = c.lo || (c.lo = [0, 0, 0]); lo[0] = e[0]; lo[1] = e[1]; lo[2] = e[2] + 0.3; P0.toWorld(I.pos, I.yaw, lo, c.wp);
+          Tr.engine(c.tid + ei, c.wp, q.speed, { thrust: 0.8, size: e[3] * 1.3, col: [0.5, 0.85, 1], minor: ei > 0, smokeLife: 3 });
+        }
+      }
+      void dt;
     }
     // e-log: a ferry lifts off its pad (once per visit)
     departs(pad, q) {
@@ -396,8 +449,18 @@
         const was = L.vil.plan.lots.length; L.vil.plan.lots = L.plan.lots.slice(0, n);
         if (L.plan.lots.slice(was, n).some(l => l.neighbour) && g.ui && g.ui.toast) g.ui.toast('🏠 ' + T('g.fe.neighbours', { name: L.name }), '', null);
       }
+      if (L.fast && L.vil && L.vil.active && V.catchUp) V.catchUp(L.vil);
     }
+    if (L.fast && !L.q) L.fast = false;
   }
+  // the settlement `days` older at once (the tests; a Zeitraffer later): founded earlier, the prefabs due raised at once,
+  // the village's builders catching up on the time
+  Fe.age = function (g, days) {
+    const rec = recOf(g), L = g && g.life, s = rec && rec.sites[g.dim]; if (!s || !L) return false;
+    s.day0 = (s.day0 | 0) - (days | 0); L.fast = true; L.t = 0;
+    if (L.vil && g.villages) L.vil.st.lastSeen = (L.vil.st.lastSeen === undefined ? g.villages.worldTime() : L.vil.st.lastSeen) - days * 24000;
+    return true;
+  };
   // Herzwelt's ferry port: the flattest open place 34–60 m from the world's spawn (natural ground, nothing over it)
   const NATURAL = /grass|dirt|sand$|^stone$|gravel|snow|podzol|mud|clay|moss_block|terracotta|andesite|diorite|granite/;
   const BUILT = /brick|polished|smooth|cut_|chiseled|planks|slab|stairs|vx_|vm_|path|concrete|tile|paver/;
@@ -422,7 +485,7 @@
     const w = g.world, ops = Q.pf.ops, s = L.site, p = g.player.pos, R = R0();
     if (!loadedRound(w, s.x, s.z, 34)) return;
     const near = Math.hypot(p[0] - s.x, p[2] - s.z) < 160;
-    let n = Q.instant || !near ? 1e9 : Math.max(1, Math.round(dt * 24 + (Q.acc || 0))); Q.acc = Q.instant || !near ? 0 : (dt * 24 + (Q.acc || 0)) - n;
+    let n = Q.instant || L.fast || !near ? 1e9 : Math.max(1, Math.round(dt * 24 + (Q.acc || 0))); Q.acc = Q.instant || L.fast || !near ? 0 : (dt * 24 + (Q.acc || 0)) - n;
     if (Q.k === 0 && !Q.instant && near && VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('build', 'life_' + Q.pf.what, 2, [ops[0] + 0.5, ops[1] + 1, ops[2] + 0.5], 'ferries', 6);
     while (Q.k < ops.length && n > 0) {
       const x = ops[Q.k], y = ops[Q.k + 1], z = ops[Q.k + 2], v = ops[Q.k + 3]; Q.k += 4;
@@ -453,7 +516,7 @@
   Fe.board = function (g) {
     const L = g && g.life; if (!L || !L.actor) return [];
     const t = L.actor.clock, out = [];
-    for (const pad of L.actor.pads.values()) { const n = Fe.next(pad.route, g.dim, wseedOf(g), t + (pad.shift || 0), null); out.push({ pad, to: pad.to, parked: n.parked, dep: n.dep - t, land: n.land - t, m: n.m }); }
+    for (const pad of L.actor.pads.values()) { if (pad.kind !== 'ferry') continue; const n = Fe.next(pad.route, g.dim, wseedOf(g), t + (pad.shift || 0), null); out.push({ pad, to: pad.to, parked: n.parked, dep: n.dep - t, land: n.land - t, m: n.m }); }
     return out;
   };
   Fe.openPanel = function (g) {

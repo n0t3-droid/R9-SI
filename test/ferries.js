@@ -46,6 +46,10 @@ console.log('b · the traffic');
   check(maxL <= 16 && maxH <= 64 && maxH >= 12, `bounded: Very Low ≤ ${maxL}, High ≤ ${maxH} craft at once`);
   check(kinds.has('ferry') && kinds.has('freighter') && kinds.has('small'), 'ferries, freighters and small craft: ' + [...kinds].join(', '));
   check(Fe.ROUTES.every(r => routes.has(r.id)), 'every route has traffic');
+  // the craft over a settlement: one every ~32 s, passing 35–110 m from the plaza
+  let np = 0, dmin = 1e9, dmax = 0; const archs = new Set();
+  for (let k = 10; k < 10 + 120; k++) { const P = Fe.passAt(77, k); archs.add(P.arch); let best = 1e9; for (let t = P.t0; t < P.t0 + 70; t += 0.25) { const q = Fe.passPos(P, t, 0, 0, 0, null); if (!q) continue; best = Math.min(best, Math.hypot(q.pos[0], q.pos[1], q.pos[2])); } if (best < 1e9) { np++; dmin = Math.min(dmin, best); dmax = Math.max(dmax, best); } }
+  check(np === 120 && dmin >= 40 && dmax <= 115 && archs.size === 3, `the craft over the settlement: ${np} in an hour of slots (${(60 / Fe.PASS.slot).toFixed(1)} a minute), nearest ${dmin.toFixed(0)}–${dmax.toFixed(0)} m, ${[...archs].join(', ')}`);
   const o1 = JSON.stringify(Fe.traffic(1234.5, 9, 2, [])), o2 = JSON.stringify(Fe.traffic(1234.5, 9, 2, []));
   check(o1 === o2, 'pure: the same clock, the same craft');
   const A = [0, 0, 0], B = [1e9, 0, 0], p = [0, 0, 0];
