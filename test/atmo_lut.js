@@ -76,7 +76,7 @@ console.log('e · Very Low: three stops');
       worst = Math.max(worst, e);
     }
   }
-  check(worst < 0.5, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 12° off Helia; < 50 %: three colours are a sketch)`);
+  check(worst < 0.45, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 12° off Helia; < 45 %)`);
 }
 console.log('f · the cost');
 {

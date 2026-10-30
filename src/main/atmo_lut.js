@@ -235,7 +235,7 @@
   function difOf(a) {
     const tM = a.bMs.map((v, i) => (v + a.bMa[i]) * a.HM), tR = a.bR.map(v => v * a.HR), t = tM.map((v, i) => v + tR[i]);
     const om = a.bMs.map((v, i) => (v + a.bR[i] * a.HR / a.HM) / Math.max(1e-12, v + a.bMa[i] + a.bR[i] * a.HR / a.HM));
-    return { t, g: a.gM, om, w: 0.6 * ss01((Math.max(...tM) - 1) / 2) };
+    return { t, g: a.gM, om, w: 0.3 * ss01((Math.max(...tM) - 1) / 2) };
   }
 
   // ---------------------------------------------------------------- the context: the LUTs of one air
@@ -322,7 +322,7 @@
   // sun's azimuth
   function stops3(s, d, sunDir, o) {
     const el = Math.max(0, d[1]), hs = Math.hypot(sunDir[0], sunDir[2]) || 1, hd = Math.hypot(d[0], d[2]) || 1;
-    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 12) * (1 - Math.sqrt(el));
+    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 12) * Math.exp(-Math.max(0, el - 0.087) * 8);
     const k = Math.sqrt(el);
     for (let c = 0; c < 3; c++) o[c] = s.hor[c] + (s.zen[c] - s.hor[c]) * k + (s.sunHor[c] - s.hor[c]) * wS;
     return o;

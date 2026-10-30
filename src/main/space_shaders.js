@@ -920,7 +920,7 @@ vec3 bsAirSky(vec3 D) {
   if (u_bsAirK.z < 0.5) {
     float el = max(D.y, 0.0), k = sqrt(el);
     vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
-    float wS = pow(max(dot(hs, hd), 0.0), 12.0) * (1.0 - k);
+    float wS = pow(max(dot(hs, hd), 0.0), 12.0) * exp(-max(0.0, el - 0.087) * 8.0);
     return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
   }
   vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));

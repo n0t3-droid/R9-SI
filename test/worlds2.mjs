@@ -125,10 +125,10 @@ if (!ONLY || ONLY === 'zinn') {
   // a firing vent with Helia 12–30° up, the camera 10 km from it with Helia behind the plume
   const tp = await A.ev(([v]) => { const BS = VR.BodySky, P = VR.Bodies.profile('zinn'), vent = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}).vents()[0];
     for (let t = 200; t < 60000; t += 5) { const pl = VR.BodyLife2.plume(vent, t, P, 1.8); if (pl.k < 0.6 || pl.top < 0.9 * pl.H) continue; const L = BS.compute('zinn', [v.x, 70, v.z], t, { tier: 0 }).light; const h = Math.hypot(L.sunDir[0], L.sunDir[2]); if (h < 0.1) continue;
-      const cx = v.x - L.sunDir[0] / h * 8000, cz = v.z - L.sunDir[2] / h * 8000, Lc = BS.compute('zinn', [cx, 70, cz], t, { tier: 0 }).light; if (Lc.sunEl > 0.22 && Lc.sunEl < 0.5) return { t, cx, cz }; } return null; }, [Z.v]);
+      const cx = v.x - L.sunDir[0] / h * 17000, cz = v.z - L.sunDir[2] / h * 17000, Lc = BS.compute('zinn', [cx, 70, cz], t, { tier: 0 }).light; if (Lc.sunEl > 0.22 && Lc.sunEl < 0.5) return { t, cx, cz }; } return null; }, [Z.v]);
   if (tp) {
     const cx = tp.cx, cz = tp.cz, ux = Z.v.x - cx, uz = Z.v.z - cz;
-    await view(A, 'zinn', cx, cz, 40, yawTo(ux, uz), 0.28, tp.t, 120);
+    await view(A, 'zinn', cx, cz, 40, yawTo(ux, uz), 0.16, tp.t, 120);
     await shot(A, 'zinn_plume');
   } else check(false, 'a firing plume by day found');
   const tn = await findT(A, 'zinn', [Z.G.x, 70, Z.G.z], -40, -1);
@@ -186,7 +186,7 @@ if (!ONLY || ONLY === 'aqua') {
   const tDay = await findT(A, 'aqua', [0.5, 75, 0.5], 40, 1, 0, 8000);
   await A.ev(() => { const g = VR.game; g.settings.renderDist = 16; g.applySettings('renderDist'); });
   const ax = Q.L.x - Q.L.R - 70, az = Q.L.z + 40;
-  await setT(A, tDay); await place(A, ax, 63 + 62, az, yawTo(1, -0.15), -0.42); await A.settle(80, 4, 180);
+  await setT(A, tDay); await place(A, ax, 63 + 62, az, yawTo(1, -0.15), -0.42); await A.settle(120, 6, 420);
   await shot(A, 'aqua_atoll');
   const tLow = await findT(A, 'aqua', [0.5, 75, 0.5], 9, -1, 0, 8000);
   await setT(A, tLow); await A.step(10);
@@ -220,14 +220,6 @@ if (!process.env.NO_VL && left() > 500) {
   const sd = await P.ev(() => VR.BodySky.cur.light.sunDir);
   await place(P, sp[0], sp[1] + 3, sp[2], Math.atan2(-sd[0], -sd[2]), 0.07); await P.settle(30, 2, 60);
   await shot(P, 'ocker_sunset_blue_vl');
-  // the frame: the same view with the air's three stops and airless (BS.noAir)
-  const meas = (n) => P.ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let s = 0; for (let k = -3; k < n; k++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); if (k >= 0) s += performance.now() - t0; } window.__norender = true; return +(s / n).toFixed(2); }, n);
-  const air = [], noair = [];
-  for (let r = 0; r < 5; r++) { await P.ev(() => { VR.BodySky.noAir = false; }); air.push(await meas(12)); await P.ev(() => { VR.BodySky.noAir = true; }); noair.push(await meas(12)); }
-  await P.ev(() => { VR.BodySky.noAir = false; });
-  air.sort((a, b) => a - b); noair.sort((a, b) => a - b);
-  rec.vl = { air, noair, ratio: +(air[2] / noair[2]).toFixed(3) }; save();
-  check(rec.vl.ratio <= 1.03, `Very Low on Ocker: the frame with the air's three stops ${air[2]} ms against airless ${noair[2]} ms (×${rec.vl.ratio})`);
   await trip(P, 'zinn'); await P.settle(60, 4);
   const G = await P.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}); return { x: g.glut.x, z: g.glut.z, R: g.glut.R }; });
   const tn = await findT(P, 'zinn', [G.x, 70, G.z], -40, -1);
@@ -240,8 +232,18 @@ if (!process.env.NO_VL && left() > 500) {
   await setT(P, tD); await place(P, q[0], q[1] + 1.62, q[2], 0, 0); await P.step(20);
   const hz = await P.ev(() => VR.BodySky.cur.sky.hz.slice(0, 4));
   await place(P, q[0], q[1] + 1.62, q[2], Math.atan2(-hz[0], -hz[2]), Math.min(1.2, Math.asin(hz[1]) - 0.15)); await P.settle(30, 2, 60);
-  console.log('  (one Very Low frame on Aquamarin: ' + await meas(2) + ' ms)');
   await shot(P, 'aqua_herzwelt_vl');
+  // the frame (after the pictures: a page measured in a tight loop answered no screenshot after it in runs 1–3): the
+  // same view on Ocker with the air's three stops and airless (BS.noAir)
+  await trip(P, 'ocker'); await P.settle(40, 3);
+  await setT(P, tSet); await place(P, sp[0], sp[1] + 3, sp[2], Math.atan2(-sd[0], -sd[2]), 0.07); await P.settle(20, 2, 30);
+  const meas = (n) => P.ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let s = 0; for (let k = -3; k < n; k++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); if (k >= 0) s += performance.now() - t0; } window.__norender = true; return +(s / n).toFixed(2); }, n);
+  const air = [], noair = [];
+  for (let r = 0; r < 5; r++) { await P.ev(() => { VR.BodySky.noAir = false; }); air.push(await meas(12)); await P.ev(() => { VR.BodySky.noAir = true; }); noair.push(await meas(12)); }
+  await P.ev(() => { VR.BodySky.noAir = false; });
+  air.sort((a, b) => a - b); noair.sort((a, b) => a - b);
+  rec.vl = { air, noair, ratio: +(air[2] / noair[2]).toFixed(3) }; save();
+  check(rec.vl.ratio <= 1.03, `Very Low on Ocker: the frame with the air's three stops ${air[2]} ms against airless ${noair[2]} ms (×${rec.vl.ratio})`);
   const errs = P.logs.filter(l => l.startsWith('[pageerror]'));
   for (const l of P.logs.slice(0, 8)) console.log(l);
   check(errs.length === 0 && !P.logs.some(l => /shader|compile|link/i.test(l)), `page VL: no page error, every shader compiles (${errs.length})`);

@@ -156,7 +156,7 @@
     const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
     const xN = K.expoNight * clamp(0.05 / Math.max(nl, 0.004), 1, 1.7);
     let expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN;
-    if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 0.3;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
+    if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 0.08;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
     const exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));

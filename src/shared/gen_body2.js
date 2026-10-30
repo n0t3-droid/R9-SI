@@ -418,7 +418,7 @@
         let b;
         if (d < dust || (d === 0 && surf)) b = d === 0 && surf ? surf : T.redSand;
         else if (o.shield && y > 150) b = T.basalt;
-        else if (y < 70) b = T.basalt;
+        else if (y < 22) b = T.basalt;   // (the canyon's floor rock; above it the layers)
         else {
           // the layers: red sandstone, terracotta, sandstone, ochre rock — bands of 3–7 m that wander slowly
           const v = (y + this.nStr.n2(x, z) * 6) / 5.3, band = ((Math.floor(v) % 4) + 4) % 4;
