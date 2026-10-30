@@ -729,6 +729,7 @@ void main() {
       let X = left ? sx - 26 - bw : sx + 26, Y = sy - bh / 2;
       X = clamp(X, 10, W - bw - 10); Y = clamp(Y, 10, H - bh - 96);   // (e-ux: never over the bottom row — the hotbar, the hint line, the 🖐 button)
       if (X + bw > W - 200 && Y < 236) Y = 236;   // (… nor over the minimap and its compass line)
+      { const ks = VR.UX && VR.UX.stripBox; if (ks && X + bw > W - ks.w && Y + bh > H - ks.h) Y = Math.max(10, H - ks.h - bh - 8); }   // (… nor over the key-hint strip while it shows, ux.js)
       // (e-ux) never over the crosshair and its Aktion prompt: the bubble steps above them
       if (X < W / 2 + 160 && X + bw > W / 2 - 160 && Y < H / 2 + 66 && Y + bh > H / 2 - 14) Y = Math.max(10, H / 2 - 18 - bh);
       if (!this.bx || Math.abs(this.bx[0] - X) >= 1 || Math.abs(this.bx[1] - Y) >= 1 || this.bx[2] !== left) { this.bx = [X, Y, left]; el.style.transform = 'translate(' + (X | 0) + 'px,' + (Y | 0) + 'px)'; el.className = left ? 'l' : 'r'; }

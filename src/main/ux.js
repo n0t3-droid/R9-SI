@@ -128,6 +128,8 @@
     const pro = document.documentElement.classList.contains('pro'), mode = (g.settings && g.settings.hudMode) || 'auto';
     const show = list.length > 0 && (mode === 'always' || now - stripAt < SHOW_S * 1000 || (!pro && firstMin.active));
     el.classList.toggle('on', show);
+    // its box from the screen's bottom-right corner (Funke's bubble keeps out of it) — read at 4 Hz, only while it shows
+    if (show) { const r = el.getBoundingClientRect(); X.stripBox = { w: innerWidth - r.left + 8, h: innerHeight - r.top + 8 }; } else X.stripBox = null;
   }
 
   // ---- the first minute: move, look, V

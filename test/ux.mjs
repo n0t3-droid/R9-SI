@@ -74,7 +74,8 @@ async function tour(label, w, h, settings, full, card) {
   const pre = `ux_${TAG}_${label}_`;
   const shot = async (n) => { try { await page.screenshot({ path: SHOTS + pre + n + '.png', timeout: 120000 }); console.log('   shot ' + pre + n + ' (' + secs() + ')'); } catch (e) { console.log('   (no shot ' + n + ': ' + String(e.message).split('\n')[0] + ')'); } };
   const R = OUT[label] = {};
-  const hud = async (n) => { const o = await overlaps(page), t = await smallText(page); R[n] = { ...o, small: t }; console.log(`   ${n}: ${o.n} boxes, ${o.hits.length} overlaps, ${o.off.length} off-screen, smallest text ${t.min}px (${t.at})`); for (const x of o.hits.slice(0, 8)) console.log('     × ' + x); for (const x of o.off.slice(0, 4)) console.log('     ⇲ ' + x); return o; };
+  const hud = async (n) => { const o = await overlaps(page), t = await smallText(page);
+    for (let k = 0; k < 3; k++) { await wait(600); const o2 = await overlaps(page); for (const x of o2.hits) if (!o.hits.some(y => y.split(' (')[0] === x.split(' (')[0])) o.hits.push(x); for (const x of o2.off) if (o.off.indexOf(x) < 0) o.off.push(x); }   /* (Funke's bubble moves: four samples over 2 s) */ R[n] = { ...o, small: t }; console.log(`   ${n}: ${o.n} boxes, ${o.hits.length} overlaps, ${o.off.length} off-screen, smallest text ${t.min}px (${t.at})`); for (const x of o.hits.slice(0, 8)) console.log('     × ' + x); for (const x of o.off.slice(0, 4)) console.log('     ⇲ ' + x); return o; };
   await page.goto(URL0);
   for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await wait(4000);
