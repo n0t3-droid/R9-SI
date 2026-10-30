@@ -90,7 +90,7 @@
     for (const k of TILES) {
       const b = $(`#title .tile[data-tile="${k}"]`); if (!b) continue;
       const lbl = k === 'play' ? (ws === null ? '▶ …' : ws.length ? tl('play') : tl('first')) : tl(k);
-      $('.lbl', b).textContent = lbl;
+      $('.lbl', b).textContent = lbl.replace(/^[^\p{L}\p{N}\s]+\s+(?=\p{L})/u, '');   // (e-ux: the tile's picture is its icon — no second one in the word)
       $('.sub2', b).textContent = k === 'play' ? (last ? last.name : (ws && ws.length === 0 ? tx('start.myWorld', null, 'Meine Welt', 'My World') : '')) : k === 'bauen' ? tx('start.bauenSub', null, 'Häuser & Möbel setzen', 'Place houses & furniture') : k === 'erschaffen' ? tx('start.erschaffenSub', null, 'Haus · Fahrzeug · Figur …', 'House · vehicle · figure …') : tx('start.meinsSub', null, 'Favoriten · Designs · Welten', 'Favourites · designs · worlds');
       b.title = k === 'play' ? (last ? tx('start.playT', { n: last.name }, 'Weiter in „{n}“, wo du warst', 'Back into “{n}”, where you were') : tx('start.firstT', null, 'Macht deine erste Welt und bringt dich hinein', 'Makes your first world and takes you in')) : '';
       if (k === 'play') b.classList.toggle('pulse', !!(VR.Hints && VR.Hints.want('play')));
@@ -371,6 +371,7 @@
     const d = Math.hypot(p.pos[0] - hintState.lastPos[0], p.pos[2] - hintState.lastPos[2]);
     if (keys || d > 1.5) { H.done('move'); hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
     if (p.flying) H.done('fly');
+    if (VR.UX && VR.UX.ownsHints && VR.UX.ownsHints()) return;   // (e-ux: the first minute's three hints — move, look, V — come first, ux.js)
     const st = H.read();
     if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', hintOf('move')); return; }
     if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', hintOf('fly'));

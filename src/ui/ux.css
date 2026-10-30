@@ -1,0 +1,103 @@
+/* ============================================================================
+   e-ux · the shared components, built from the tokens (src/ui/tokens.css) — loaded last, so these win. One panel style,
+   one key cap, one pill for every text that floats over the world, readable sizes at 720p, the HUD and the menus
+   following the UI scale (--ux-scale, ⚙ Spiel · „Größe der Anzeige"). Plan docs/superpowers/plans/2026-10-30-e-ux.md.
+   ============================================================================ */
+
+/* ---- one panel, one button language ---- */
+.panel { background: var(--ux-panel); border-color: var(--ux-line); border-radius: var(--ux-r3); box-shadow: var(--ux-shadow); }
+.btn { border-radius: var(--ux-r2); border-color: var(--ux-line-strong); }
+.btn.primary { background: linear-gradient(180deg, #5ff5ff, #23c9dc); border-color: #8ff8ff; color: var(--ux-acc-ink); text-shadow: none; font-weight: 700; }
+.btn.primary:hover { box-shadow: 0 0 0 3px rgba(58, 240, 255, 0.35), 0 0 24px rgba(58, 240, 255, 0.35); }
+.box h2 { font-size: var(--ux-fs-xl); }
+.field label { font-size: var(--ux-fs-xs); color: var(--ux-ink-2); }
+.note { color: var(--ux-ink-2); }
+
+/* ---- the key cap (hints, the strip, the Aktion prompt) ---- */
+.ux-kbd, #keystrip kbd, #hints kbd {
+  display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px;
+  border: 1px solid var(--ux-line-strong); border-bottom-width: 3px; background: rgba(255, 255, 255, 0.1);
+  color: var(--ux-ink); font: 700 var(--ux-fs-xs) var(--ux-font); line-height: 1; white-space: nowrap;
+}
+
+/* ---- the HUD follows the UI scale (each cluster around its own anchor) ---- */
+#hotbar, #itemname, #stats, #air, #xpbar, #xplvl, #toasts, #modebadge, #mirrorchip, #petchip, #minimap, #compass, #hints, #keystrip,
+#vehiclehud, #advhud, #hint, #chatlog { zoom: var(--ux-scale); }   /* (not the bubble or the prompt under the crosshair: they are placed in screen pixels) */
+
+/* ---- text over the world sits on a pill (contrast on a bright sky) ---- */
+#compass { background: var(--ux-pill); border-radius: var(--ux-r2); padding: 3px 8px 4px; color: var(--ux-ink); font-size: var(--ux-fs-xs); line-height: 1.35; }
+#modebadge { font-size: var(--ux-fs-xs); letter-spacing: 1.2px; color: var(--ux-acc); background: var(--ux-pill); border-color: var(--ux-line); }
+#hint { background: var(--ux-pill); border: 1px solid var(--ux-line); border-radius: var(--ux-r2); color: var(--ux-ink); font-size: var(--ux-fs); padding: 8px 14px; text-shadow: none; }
+#hud > #ctxprompt { background: var(--ux-pill); border: 1px solid var(--ux-line); padding: 4px 12px 4px 5px; font-size: var(--ux-fs-s); border-radius: 999px; }
+#hud > #ctxprompt b { font-size: 0; color: transparent; margin-right: 2px; }
+#hud > #ctxprompt b::before { content: attr(data-key); display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--ux-acc); color: var(--ux-acc-ink); font: 700 var(--ux-fs-xs) var(--ux-font); vertical-align: middle; }
+#hud > #ctxprompt b:not([data-key])::before { content: none; }
+#hud > #ctxprompt b:not([data-key]) { font-size: inherit; color: #9affd8; }
+/* the quest ring and the Aktion prompt share the place under the crosshair: the ring steps down while the prompt shows */
+#hud:has(> #ctxprompt.on) > #qring { top: calc(50% + 64px); }
+
+/* ---- the key-hint strip: only what you can do now (src/main/ux.js) ---- */
+#keystrip { position: absolute; right: 18px; bottom: 86px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; opacity: 0; transition: opacity .45s ease; }
+#keystrip.on { opacity: 1; }
+#keystrip .ks { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 12px; border-radius: var(--ux-r2); background: var(--ux-pill); border: 1px solid var(--ux-line); color: var(--ux-ink); font: 600 var(--ux-fs-s) var(--ux-font); }
+#ui.touchon #keystrip, #hud.cockpit #keystrip { display: none; }
+@media (prefers-reduced-motion: reduce) { #keystrip { transition: none; } }
+
+/* ---- the first minute's hints: the picture carries the key, the line one short word ---- */
+#hints .hint { background: var(--ux-panel-2); border-color: var(--ux-line-strong); }
+#hints .picto { color: var(--ux-acc); }
+
+/* ---- the cockpit: its key line on a pill, the walking chips away ---- */
+#hud.cockpit #modebadge, #hud.cockpit #mirrorchip, #hud.cockpit #petchip, #hud.ux-ride #modebadge, #hud.ux-ride #mirrorchip, #hud.ux-ride #petchip { display: none; }
+#vehiclehud small { display: inline-block; max-width: min(860px, 86vw); margin-top: 6px; padding: 5px 12px; border-radius: var(--ux-r2); background: var(--ux-pill); color: var(--ux-ink); font-size: var(--ux-fs-xs); line-height: 1.5; white-space: normal; text-shadow: none; }
+#vehiclehud small b { color: var(--ux-acc); }
+
+/* ---- the loading screen: the words on a card, the counters a Profi detail ---- */
+#loading #loadmsg { font-size: var(--ux-fs-l) !important; color: var(--ux-ink); }
+#loading .tip { background: var(--ux-pill); border: 1px solid var(--ux-line); border-radius: var(--ux-r2); padding: 10px 16px; color: var(--ux-ink); font-size: var(--ux-fs); min-height: 0; }
+#loading .tip:empty { display: none; }
+#loading .ldetail { font-size: var(--ux-fs-xs); }
+html:not(.pro) #loading .ldetail { visibility: hidden; }
+
+/* ---- the start screen: one row of quiet secondary buttons under the tiles ---- */
+#title .tile.play { border-color: var(--ux-acc); box-shadow: 0 0 0 1px rgba(58, 240, 255, 0.35), 0 16px 50px rgba(0, 0, 0, 0.45); }
+#title .btn.kids { margin: 2px auto 0; min-width: 0; padding: 0 16px; font: 600 var(--st-fs) var(--ux-font); background: var(--ux-panel); border: 1px solid rgba(92, 240, 138, 0.55); border-radius: var(--ux-r2); }
+#title .sub .kids { border-color: rgba(92, 240, 138, 0.6); }
+#title .sub { flex-wrap: wrap; justify-content: center; }
+#title .studionote .btn.tiny { background: var(--ux-panel); border: 1px solid var(--ux-line-strong); }
+#title .foot .credit { color: var(--ux-ink-2); }
+
+/* ---- the pause menu: two columns when the screen is short, so nothing hides below the fold ---- */
+@media (min-width: 1000px) and (max-height: 900px) {
+  #pause .panel.box { min-width: min(1000px, 96vw); }
+  #pause .pgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 18px; row-gap: 8px; }
+  #pause .ptop { grid-column: 1; grid-row: 1 / span 2; }
+  #pause .pside { grid-column: 2; grid-row: 1; }
+  #pause .pbottom { grid-column: 2; grid-row: 2; align-self: end; }
+  #pause #mppanel .subtitle, #pause #zenpanel .subtitle { margin-top: 0; }
+}
+
+/* ---- the settings: header and Done stay, the rows scroll; search and ↺ Empfohlen; readable tips ---- */
+#settings .panel.box { display: flex; flex-direction: column; max-height: 92vh; overflow: hidden; }
+#settings #setbody { flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 6px; }
+#setbar { display: flex; gap: var(--ux-s2); margin: 0 0 var(--ux-s2); align-items: stretch; }
+#setsearch { flex: 1 1 auto; min-width: 0; min-height: 40px; font: 600 var(--ux-fs) var(--ux-font); color: var(--ux-ink); background: rgba(5, 9, 20, 0.85); border: 1px solid var(--ux-line-strong); border-radius: var(--ux-r2); padding: 0 12px; outline: none; }
+#setsearch:focus { border-color: var(--ux-acc); box-shadow: 0 0 0 2px var(--ux-acc-soft); }
+#setsearch::placeholder { color: #9aa8c2; }
+#setrec { min-height: 40px; white-space: nowrap; }
+#settabs.dim button:not(:hover) { opacity: 0.55; }
+.setgrouphead { font-family: var(--ux-display); font-size: var(--ux-fs-s); color: var(--ux-ink); margin: var(--ux-s4) 0 0; padding-bottom: 4px; border-bottom: 1px solid var(--ux-line); }
+.setnone { margin: var(--ux-s4) 0; font-size: var(--ux-fs); }
+.setip { font-size: var(--ux-fs-xs); color: var(--ux-ink-2); }
+.setsec h3 { font-size: var(--ux-fs-xs); }
+.setrow .sethead label, .setrow.sw .swl { font-size: var(--ux-fs); }
+.setrow .val { font-size: var(--ux-fs-xs); }
+.tabs button { font-size: var(--ux-fs-s); min-height: 40px; }
+.pvwrap { flex-direction: row; align-self: flex-start; gap: var(--ux-s3); margin: 0 0 var(--ux-s2); }
+.pv { width: 192px; max-width: 40vw; }
+.pvnote { font-size: var(--ux-fs-xs); }
+/* Fertig on the left, 📜 on the right of the same line (the panel no longer stretches them across) */
+#settings .panel.box { position: relative; }
+#settings .panel.box > [data-act="setback"] { align-self: flex-start; min-width: 180px; min-height: 44px; }
+#settings .panel.box > [data-legal] { position: absolute; right: 26px; bottom: 22px; width: auto; min-width: 0; min-height: 44px; }
+.cost { font-size: var(--ux-fs-xs); }

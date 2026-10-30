@@ -2698,5 +2698,27 @@
     'story.ctx.scan': 'Scan',
     'story.ctx.touch': 'Touch',
     // ---- a-story2 end
+    // ---- e-ux
+    'ux.k.up': "Up",
+    'ux.k.down': "Down",
+    'ux.k.fly': "Fly",
+    'ux.k.build': "Build",
+    'ux.k.inv': "Inventory",
+    'ux.k.journal': "Journal",
+    'ux.k.map': "Map",
+    'ux.k.veh': "Action",
+    'ux.h.move': "walk",
+    'ux.h.moveTouch': "🕹 drag on the left = walk",
+    'ux.h.look': "move the mouse = look around",
+    'ux.h.lookTouch': "drag on the right = look around",
+    'ux.h.v': "does the right thing: talk, get in, travel",
+    'ux.set.scale': "Display size",
+    'ux.set.scaleTip': "Makes bars, buttons and text in the game bigger or smaller (90–140 %).",
+    'ux.set.search': "🔎 Find a setting …",
+    'ux.set.rec': "↺ Recommended",
+    'ux.set.recTip': "Sets picture, display and size to what this computer is recommended.",
+    'ux.set.none': "Nothing found — try another word.",
+    'ux.set.recDone': "↺ Recommended: ",
+    // ---- e-ux end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

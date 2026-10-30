@@ -366,7 +366,7 @@
     if (!text) { d.pr.classList.remove('on'); return; }
     const i = text.indexOf('] ');
     d.pr.innerHTML = '';
-    const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); d.pr.appendChild(b);
+    const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); b.dataset.key = text.slice(1, i); d.pr.appendChild(b);   // (e-ux: data-key — the key cap without its brackets, ux.css)
     d.pr.appendChild(document.createTextNode(' ' + text.slice(i + 2)));
     d.pr.classList.add('on');
     void res;
