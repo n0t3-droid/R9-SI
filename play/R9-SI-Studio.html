@@ -12666,6 +12666,151 @@ model,light:(p)=>(p.frei?[3,7,8]:[5,1,6]),solid:true,opaque:false,hard:40,blast:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const VX=VR.VX,VM=VR.VM;
+if(!VX|| !VX._|| !VM|| !VR.BL)return;
+const H=VR.Hangar=VR.Hangar||{};
+const C=H.COL={
+navy:0x2D3C5A,navyD:0x1A2436,navyL:0x3E5274,frame:0x223048,rim:0x3AF0FF,rimL:0xC8FFFF,
+bg:0x123E78,bgL:0x1C5296,cyan:0x3AF0FF,cyanL:0x9AFBFF,cyanD:0x1A8AA8,amber:0xFF9A2A,red:0xFF4A4A,
+grey:0xC8D0DA,greyD:0x8C96A4,top:0x2E3440,keyR:0xFF4A4A,keyY:0xFFE04A,keyG:0x5AFF7A,keyB:0x4A8AFF,
+};
+const NAMES=H.NAMES=[];
+const def=(name,display,o)=>{VM.define(name,display,Object.assign({res:16,sound:'glass',hard:1,cat:'vtech',cats:['vtech']},o,{late:true,lazy:true}));NAMES.push(name);return name;};
+
+
+
+
+const frame=(b,M,W)=>{
+const w=W*16,h=64,cut=9;
+const fr=M.gloss(C.frame),back=M.matte(C.navyD),rim=M.light(C.rim),bg=M.light(C.bg);
+const inOct=(x,y,inset)=>{const X=Math.min(x-inset,w-inset-x),Y=Math.min(y-inset,h-inset-y);return X>=0&&Y>=0&&X+Y>=cut-inset*0.41;};
+for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+const cx=x+0.5,cy=y+0.5;
+if(!inOct(cx,cy,0))continue;
+b.set(x,y,13,back);b.set(x,y,14,back);b.set(x,y,15,back);
+if(!inOct(cx,cy,3)){b.set(x,y,11,fr);b.set(x,y,12,fr);b.set(x,y,10,fr);continue;}
+if(!inOct(cx,cy,4.5)){b.set(x,y,12,rim);b.set(x,y,11,rim);continue;}
+b.set(x,y,12,bg);
+}
+return{w,h,put:(x,y,m)=>{if(x>=0&&y>=0&&x<w&&y<h)b.set(x|0,y|0,12,m);}};
+};
+
+const ring=(P,cx,cy,r,t,m,a0,a1)=>{
+for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
+const dx=x+0.5-cx,dy=y+0.5-cy,d=Math.hypot(dx,dy);
+if(Math.abs(d-r)>t/2)continue;
+if(a0!==undefined){const a=(Math.atan2(dy,dx)+Math.PI*2)%(Math.PI*2);if(a<a0||a>a1)continue;}
+P(x,y,m);
+}
+};
+const disc=(P,cx,cy,r,m)=>{for(let y=Math.floor(cy-r);y<=cy+r;y++)for(let x=Math.floor(cx-r);x<=cx+r;x++)if(Math.hypot(x+0.5-cx,y+0.5-cy)<=r)P(x,y,m);};
+const rect=(P,x0,y0,x1,y1,m)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)P(x,y,m);};
+
+def('vm_hangar_screen','Hangar Screen · Radar',{
+size:[5,4,1],col:0x253350,light:[2,8,12],
+build(b,M){
+const F=frame(b,M,5),P=F.put,cy=M.light(C.cyan),cl=M.light(C.cyanL),cd=M.light(C.cyanD),am=M.light(C.amber),rd=M.light(C.red),bl=M.light(C.bgL);
+
+const X=30,Y=32;
+disc(P,X,Y,22,bl);
+ring(P,X,Y,22,2.2,cy);ring(P,X,Y,15,1.4,cl);ring(P,X,Y,8,1.4,cy);disc(P,X,Y,2.2,cl);
+for(let k= -21;k<=21;k++){if(Math.abs(k)>3){P(X+k,Y,cd);P(X,Y+k,cd);}}
+for(const[dx,dy]of[[26,0],[-26,0],[0,26],[0,-26]])rect(P,X+dx-(dx?1:1),Y+dy-(dy?1:1),X+dx+1,Y+dy+1,cy);
+ring(P,X,Y,18.5,5,cd,0.35,1.25);
+disc(P,X+9,Y+11,1.8,am);disc(P,X-12,Y-6,1.6,rd);
+
+rect(P,56,50,72,53,cy);
+for(let k=0;k<5;k++)rect(P,56,43-k*5,56+[14,10,12,8,13][k],45-k*5,k===2?am:cl);
+ring(P,64,12,6,1.6,cy);ring(P,64,12,6,1.8,am,4.2,6.2);disc(P,64,12,1.4,cl);
+},
+});
+def('vm_hangar_screen_b','Hangar Screen · Gauges',{
+size:[5,4,1],col:0x253350,light:[2,8,12],
+build(b,M){
+const F=frame(b,M,5),P=F.put,cy=M.light(C.cyan),cl=M.light(C.cyanL),cd=M.light(C.cyanD),am=M.light(C.amber),bl=M.light(C.bgL);
+
+const X=52,Y=32;
+disc(P,X,Y,18,bl);
+ring(P,X,Y,18,2.2,cy);ring(P,X,Y,12.5,1.4,cd);ring(P,X,Y,15,2.4,am,3.6,5.6);
+for(let k=0;k<12;k++){const a=k/12*Math.PI*2;rect(P,X+Math.cos(a)*9.5-0.5,Y+Math.sin(a)*9.5-0.5,X+Math.cos(a)*9.5+1,Y+Math.sin(a)*9.5+1,cl);}
+for(let t=0;t<8;t+=0.5)P(X+Math.cos(0.9)*t,Y+Math.sin(0.9)*t,am);
+disc(P,X,Y,2.4,cl);
+for(let k=0;k<5;k++)rect(P,9+k*5,10,12+k*5,10+[16,24,12,28,20][k],k===3?am:cy);
+for(let x=9;x<34;x++)P(x,48+Math.round(Math.sin(x*0.55)*3),cl);
+rect(P,9,55,30,57,cd);
+},
+});
+def('vm_hangar_console','Hangar Console',{
+size:[2,1,1],col:0xC8D0DA,light:[3,6,8],sound:'metal',hard:2,
+build(b,M){
+const body=M.gloss(C.grey),dark=M.gloss(C.top),trim=M.gloss(C.greyD),kick=M.light(C.cyan),scr=M.light(C.bgL),scrL=M.light(C.cyan);
+
+b.box(1,2,2,31,9,15,body);
+b.box(2,0,3,30,2,14,trim);b.box(2,0.5,2.5,30,1.5,3,kick);
+
+b.box(0,9,1,32,10,15,trim);
+b.box(1,10,1,31,11,6,dark);b.box(1,10,6,31,12,11,dark);b.box(1,10,11,31,13,15,dark);
+
+const KEYS=[C.keyR,C.keyY,C.keyG,C.cyan,C.keyB,C.amber];
+let k=0;
+for(const[y,z0]of[[11,2],[12,7]])for(let x=3;x+3<=30;x+=4){const c=KEYS[(k++ *7+(y===12?3:0))%KEYS.length];b.box(x,y,z0,x+3,y+0.5,z0+3,M.light(c));}
+
+b.box(4,13,11.5,28,13.5,14.5,scr);
+for(let x=6;x<26;x+=3)b.box(x,13.4,12.5+(x%2),x+2,13.6,13.5+(x%2),scrL);
+},
+});
+
+
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(()=>{
+const K=VM._K;if(!K)return;
+const G_=K.G,R=VR.R,T=R.tex,F=VR.F,def2=VR.BL.def,T_=VX.TECH;
+const grp={group:G_.TECH||G_.ARCH,cat:'vtech'};
+
+K.wall('vx_hangar_navy','Navy Hangar Wall · Light Strip',{bothSides:true,band:false,corner:0,pat:'techpanel',col:C.navy,col2:C.navyD,gloss:true,strip:12,glow:T_.cyan},Object.assign({sound:'metal',hard:2.5,light:[2,7,10]},grp));
+K.wall('vx_hangar_navy_amber','Navy Hangar Wall · Amber Strip',{bothSides:true,band:false,corner:0,pat:'techpanel',col:C.navy,col2:C.navyD,gloss:true,strip:12,glow:T_.amber},Object.assign({sound:'metal',hard:2.5,light:[9,5,1]},grp));
+const FL=(name,display,sp,o)=>K.add(name,display,Object.assign({kind:'floor',side:0x4A5462,sidePat:'techpanel',sideSpec:{col:0x4A5462,col2:0x2E3440}},sp),Object.assign({opaque:true,filter:15,sound:'metal',hard:2},grp,o||{}));
+FL('vx_floor_hangar','Hangar Tile Deck',{pat:'plaza',col:0x8D9AB2,col2:0x5A6472});
+FL('vx_floor_hangar_line','Hangar Light-Line',{pat:'line',family:'hangar',col:0x8D9AB2,col2:0x5A6472,glow:T_.cyan},{light:[0,7,9]});
+VM.registerLate(NAMES);
+
+
+
+const stone={cat:'build',group:G_.HEART,tool:'pick',needTool:true,sound:'stone',hard:2,blast:8};
+const sm=()=>T('temple_stone_dark_smooth'),side=(n)=>()=>{const s=sm();return{top:s,bottom:s,side:T(n)};};
+def2('temple_stone_dark',Object.assign({display:'Dark Temple Stone',tex:()=>T('temple_stone_dark')},stone));
+def2('temple_stone_dark_smooth',Object.assign({display:'Smooth Dark Temple Stone',tex:sm},stone));
+def2('temple_stone_dark_band',Object.assign({display:'Carved Dark Temple Band',tex:side('temple_stone_dark_band')},stone));
+def2('temple_pilaster_dark',Object.assign({display:'Dark Temple Pilaster',props:[VR.PROPS.AXIS],tex:(p,s)=>VR.axisTex(T('temple_pilaster_dark'),sm())(p,s)},stone));
+def2('temple_light_bar_dark',Object.assign({display:'Orange Light Bar · Dark Stone',tex:side('temple_light_bar_dark'),light:[11,5,1],flags:F.EMISSIVE},stone,{hard:1}));
+def2('temple_slit_dark',Object.assign({display:'Cyan Light Slit · Dark Stone',tex:side('temple_slit_dark'),light:[3,9,11],flags:F.EMISSIVE},stone,{hard:1}));
+def2('amber_window_tall',Object.assign({display:'Tall Amber Window',tex:()=>T('amber_window_tall'),light:[12,7,2],flags:F.EMISSIVE},stone,{hard:1,sound:'glass'}));
+
+def2('gate_glow',Object.assign({display:'Gate Glow',props:[['ring',4]],tex:(p)=>T('gate_glow_'+(p.ring|0)),layer:'trans',opaque:false,filter:0,light:[10,6,2],flags:F.SELFCULL|F.EMISSIVE,solid:false},stone,{hard:50,blast:500,sound:'glass'}));
+});
+})(VR);
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -12674,7 +12819,7 @@ const{AXIS,FACING4,FACING6}=VR.PROPS;
 const{slab,stairs,wall}=VR.FAM;
 const{box,quad,cross,rotY,rotX}=MD;
 G.REALM='Realm · Crystals & Rock';
-G.STAR='Starforge · Sci-fi';
+G.STAR='Sternglut · Sci-fi';
 VR.GROUP_ORDER.push(G.REALM,G.STAR);
 
 
@@ -12851,7 +12996,7 @@ const SLOTS=['helmet','chestplate','leggings','boots'];
 for(const m in ARM)SLOTS.forEach((s,i)=>item(m+'_'+s,{cat:'combat',stack:1,armor:ARM[m][i],slot:i,mat:m,color:ARM[m][4],texKey:'armor:'+s+':'+m,dur:100+i*20}));
 
 
-item('laser_blaster',{cat:'tech',stack:1,use:'laser',dmg:7,name:'Pulse Blaster',energy:1});
+item('laser_blaster',{cat:'tech',stack:1,use:'laser',dmg:7,name:'Calm Beam',energy:1});
 item('mining_laser',{cat:'tech',stack:1,use:'minelaser',name:'Mining Laser',energy:1});
 item('builder_wand',{cat:'tech',stack:1,use:'wand',name:'Builder Wand'});
 item('jetpack',{cat:'tech',stack:1,slot:1,armor:2,jetpack:true,name:'Jetpack'});
@@ -15544,7 +15689,7 @@ const E=0,HULL=1,HULL2=2,TRIM=3,ACC=4,GLASS=5,GLOW=6,ENG=7,AIR=8,FLOOR=9,GRATE=1
 
 const S=(n,p)=>{const t=R.byName[n];if(!t)return 0;return p?t.state(p):t.defaultState;};
 const PALETTES=[
-{key:'starforge',name:'Starforge',hull:'hull_plating',hull2:'hull_plating_gray',trim:'hull_plating_dark',acc:'hull_stripe_orange',acc2:'hull_stripe_blue',glow:'neon_cyan',glass:'viewport',eng:'hull_plating_dark'},
+{key:'starforge',name:'Sternglut',hull:'hull_plating',hull2:'hull_plating_gray',trim:'hull_plating_dark',acc:'hull_stripe_orange',acc2:'hull_stripe_blue',glow:'neon_cyan',glass:'viewport',eng:'hull_plating_dark'},
 {key:'nightwing',name:'Nightwing',hull:'hull_plating_dark',hull2:'black_concrete',trim:'gray_concrete',acc:'magenta_concrete',acc2:'purple_concrete',glow:'neon_magenta',glass:'purple_stained_glass',eng:'black_concrete'},
 {key:'sunstrike',name:'Sunstrike',hull:'white_concrete',hull2:'light_gray_concrete',trim:'gray_concrete',acc:'red_concrete',acc2:'yellow_concrete',glow:'neon_amber',glass:'light_blue_stained_glass',eng:'hull_plating_dark'},
 {key:'verdant',name:'Verdant Corps',hull:'light_gray_concrete',hull2:'hull_plating_gray',trim:'green_concrete',acc:'lime_concrete',acc2:'green_concrete',glow:'neon_lime',glass:'viewport',eng:'hull_plating_dark'},
@@ -16117,7 +16262,7 @@ const mul=(c,k)=>[Math.min(255,Math.round(c[0]*k)),Math.min(255,Math.round(c[1]*
 const hash=(a,b,c)=>{let h=(a*374761393+b*668265263+c*2147483647)|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;};
 
 const PAL=[
-{key:'starforge',name:'Starforge',hull:0xe9ecf1,hull2:0xc3c9d3,trim:0x3a3f4b,acc:0xf07a1e,acc2:0x2e7de0,glow:0x5af4ff,glass:0x1b3a66,eng:0x4a4f5a,core:0xffb45a},
+{key:'starforge',name:'Sternglut',hull:0xe9ecf1,hull2:0xc3c9d3,trim:0x3a3f4b,acc:0xf07a1e,acc2:0x2e7de0,glow:0x5af4ff,glass:0x1b3a66,eng:0x4a4f5a,core:0xffb45a},
 {key:'nightwing',name:'Nightwing',hull:0x2c2f3a,hull2:0x3d4150,trim:0x16181e,acc:0xe0409e,acc2:0x8a4bff,glow:0xff5ad8,glass:0x2a1446,eng:0x23252d,core:0xff6adf},
 {key:'sunstrike',name:'Sunstrike',hull:0xf2efe8,hull2:0xd9d3c7,trim:0x46403a,acc:0xd83b2b,acc2:0xf5c43a,glow:0xffc23a,glass:0x1d4f7a,eng:0x4d4843,core:0xffd27a},
 {key:'verdant',name:'Verdant Corps',hull:0xd8ddd2,hull2:0xaeb8a4,trim:0x2f4a2b,acc:0x6fd83a,acc2:0x2c8a4a,glow:0x9cff6a,glass:0x173d33,eng:0x3e4a3e,core:0xc8ff7a},
@@ -16137,6 +16282,9 @@ dropship:{label:'Dropship',code:'DM',res:4,weight:2},
 freighter:{label:'Freighter',code:'HX',res:3,weight:2},
 cruiser:{label:'Cruiser',code:'CR',res:3,weight:1},
 carrier:{label:'Carrier',code:'CV',res:2,weight:0},
+
+
+hero:{label:'Gate Craft',code:'GC',res:4,weight:0,hidden:true},
 };
 
 
@@ -16299,6 +16447,56 @@ for(const[x,z]of S.meta.gearParts)gear(G,S,x,z,cy-H*0.55);
 antenna(G,S,0.6,cy+H-0.1,z0+L*0.45,0.9);
 
 if(VR.ShipCabin)VR.ShipCabin.carve(G,S,{zb:S.meta.cockpit.zb,cfloor:S.meta.cockpit.floor,zT:z1-0.8,W,Hh:H,cy,side: -1,hull2:S.hull2,trim:S.trim},{pack,mul,GLASSF});
+};
+
+
+
+
+
+ARCHS.hero=(G,S,rng)=>{
+const L=21.5,z0= -L/2,z1=L/2,W=2.35,H=2.0,gearH=1.1,cy=gearH+H;
+const hullC=pack(S.hull),hull2=pack(S.hull2),acc=pack(S.acc),dark=pack(S.trim),glow=pack(S.glow,1),lamp=pack(S.core,1),face=pack(mul(S.trim,0.8));
+hull(G,z0,z1-2.0,(t)=>{
+const n=Math.min(1,t/0.22);
+return{w:W*(0.6+0.4*Math.pow(n,0.5)),h:H*(0.66+0.34*Math.pow(n,0.6)),cy:cy-(1-n)*0.25,p:4};
+},(x,y,z,t,P)=>{
+const ry=(y-P.cy)/P.h,rx=Math.abs(x)/P.w;
+if(t<0.05){
+for(const[lx,ly]of[[0.42,-0.28],[0.42,-0.62]])if(Math.hypot(rx-lx,ry-ly)<0.17)return lamp;
+return face;
+}
+if(ry< -0.6)return hull2;
+if(Math.abs(ry+0.18)<0.07&&t>0.08)return acc;
+if(Math.abs(ry+0.36)<0.05&&t>0.12&&t<0.9)return glow;
+if(ry>0.55&&rx<0.22&&t>0.3)return hull2;
+return hullC;
+});
+
+G.box(-0.4,0.4,cy+H-0.3,cy+H+0.35,z0+L*0.34,z1-3.2,(x,y)=>(y>cy+H+0.1&&Math.abs(x)<0.15?glow:hull2));
+antenna(G,S,-0.75,cy+H-0.15,z0+L*0.38,1.6);
+
+
+
+G.box(-W*0.7,W*0.7,gearH+0.3,cy+H*0.45,z1-2.3,z1-0.8,(x,y)=>(Math.abs(y-cy)<0.18?acc:hull2));
+G.box(-W*0.55,W*0.55,cy+H*0.45,cy+H*0.45+0.25,z1-1.1,z1-0.8,glow);
+engine(G,S,0,cy+0.95,0.5,z1+0.2,1.4);
+
+for(const sx of[-1,1]){
+const px=sx*(W+1.15),py=cy-0.35;
+cylZ(G,px,py,0.95,z0+L*0.45,z1-0.2,(x,y,z,dr)=>(z<z0+L*0.45+0.3?glow:Math.abs(z-(z0+L*0.68))<0.3?acc:dr>0.75?hull2:hullC));
+G.box(Math.min(sx*W*0.8,px),Math.max(sx*W*0.8,px),py-0.25,py+0.25,z0+L*0.55,z0+L*0.8,hull2);
+engine(G,S,px,py,0.72,z1+0.3,1.6);
+}
+
+const SPAN=3.2;
+wing(G,W+1.9,SPAN,(s)=>z0+L*0.47+s*1.05,(s)=>Math.max(1.5,L*0.34-s*1.2),()=>0.5,()=>cy-0.55,
+(x,y,z,s,u)=>(u<0.1?glow:s>0.86?acc:u>0.88?dark:(Math.floor(u*5)%2&&s>0.2?hull2:hullC)));
+
+for(const sx of[-1,1]){const tx=sx*(W+1.9+SPAN-0.15),zt=z0+L*0.47+SPAN*1.05;G.box(tx-0.13,tx+0.13,cy-0.5,cy+0.9,zt+0.2,zt+1.5,acc);}
+cockpitRoom(G,S,{zNose:z0+0.4,zf:z0+L*0.1,zb:z0+L*0.28,floor:cy-0.85,rim:cy+0.2,hw:1.15,seats:2});
+S.meta.gearParts=[[-1.1,z0+L*0.2],[1.1,z0+L*0.2],[-2.2,z0+L*0.66],[2.2,z0+L*0.66]];
+for(const[x,z]of S.meta.gearParts)gear(G,S,x,z,cy-H*0.6);
+void rng;
 };
 ARCHS.interceptor=(G,S,rng)=>{
 const L=rng.range(13,17),z0= -L/2,z1=L/2,W=rng.range(1.2,1.5),H=1.15,gearH=1.0,cy=gearH+H;
@@ -16615,7 +16813,7 @@ return{w:W,h:H,rgba:img};
 
 
 const Starship=VR.Starship={
-ARCH,PAL,archetypes:Object.keys(ARCH),
+ARCH,PAL,archetypes:Object.keys(ARCH).filter(k=> !ARCH[k].hidden),
 pickArch(rng,allow){
 const keys=(allow||Object.keys(ARCH)).filter(k=>ARCH[k]&&(allow||ARCH[k].weight>0));
 let tot=0;for(const k of keys)tot+=Math.max(0.2,ARCH[k].weight);
@@ -16627,8 +16825,8 @@ build(seed,arch,opts){
 opts=opts||{};
 const rng=new VR.RNG(((seed>>>0)^0x2545f491)>>>0);
 arch=arch&&ARCH[arch]?arch:this.pickArch(rng,opts.allow);
-const palOpts=arch==='shuttle'?[PAL[0],PAL[0],PAL[7]]:arch==='freighter'?[PAL[5],PAL[0],PAL[3],PAL[2]]:PAL;
-const pal=opts.palette?(PAL.find(p=>p.key===opts.palette)||PAL[0]):rng.pick(palOpts);
+const palOpts=arch==='hero'?[PAL[0]]:arch==='shuttle'?[PAL[0],PAL[0],PAL[7]]:arch==='freighter'?[PAL[5],PAL[0],PAL[3],PAL[2]]:PAL;
+const pal=arch==='hero'?PAL[0]:opts.palette?(PAL.find(p=>p.key===opts.palette)||PAL[0]):rng.pick(palOpts);
 const S={hull:rgb(pal.hull),hull2:rgb(pal.hull2),trim:rgb(pal.trim),acc:rgb(pal.acc),acc2:rgb(pal.acc2),glow:rgb(pal.glow),glass:rgb(pal.glass),eng:rgb(pal.eng),core:rgb(pal.core),meta:{exhaust:[],guns:[],eye:null,seat:null}};
 const R=ARCH[arch].res;
 const big=arch==='carrier',mid=arch==='cruiser'||arch==='freighter';
@@ -25312,18 +25510,40 @@ LANTERN:st('vx_lantern')||st('lantern'),
 };
 }
 
+function mats14(K){
+const has=(n)=> !!R.byName[n];
+if(!has('temple_stone_dark')|| !has('gate_glow')|| !has('vx_hangar_navy'))return null;
+return Object.assign({},K,{
+WALL:st('temple_stone_dark'),SMOOTH:st('temple_stone_dark_smooth'),BAND:st('temple_stone_dark_band'),PIL:st('temple_pilaster_dark',{axis:0}),
+BAR:st('temple_light_bar_dark'),SLIT:st('temple_slit_dark'),WIN:st('amber_window_tall'),
+GLOW:[0,1,2,3].map(k=>st('gate_glow',{ring:k})),
+NAVY:st('vx_hangar_navy'),NAVYA:st('vx_hangar_navy_amber'),FLOORH:st('vx_floor_hangar'),LINEH:st('vx_floor_hangar_line'),
+});
+}
+TEMPLE.mats14=()=>mats14(mats());
 
 
-function makeMat(K,v11){
+
+function makeMat(K,v11,v14){
 const fx=T.front,bx=T.back;
 
 const TIERS=[[22,bx,fx,Y+1,Y+20],[16,-30,14,Y+21,Y+34],[10,-22,8,Y+35,Y+44]];
 const CROWN=[3,-13,-7,Y+45,Y+50];
-const inHall=(x,y,z)=>{
+const HZ= -10;
+const inHall0=(x,y,z)=>{
 const ax=Math.abs(x);
 if(ax>10||z<bx+1||z>fx-1||y<Y+1||y>Y+15)return false;
 if(ax>6&&y>Y+11&&(ax-6)+(y-(Y+11))>4)return false;
 return true;
+};
+
+
+const inHall= !v14?inHall0:(x,y,z)=>{
+if(inHall0(x,y,z))return true;
+if(z<bx+1||z>fx-1||y<Y+1)return false;
+const ax=Math.abs(x),d=oct(x,z-HZ);
+if(y<=Y+15)return d<=12.5&& !(ax>8&&y>Y+12&&(ax-8)+(y-(Y+12))>4);
+return y<=Y+19&&d<=9-2*(y-(Y+16));
 };
 
 const shell=(x,y,z,hw,z0,z1,y0,y1,hasPortal)=>{
@@ -25348,11 +25568,31 @@ const ax=Math.abs(x),sx=x<0? -1:1;
 
 if(inHall(x,y,z))return 0;
 
+
+if(v14&&z>fx&&z<=fx+3&&ax<=12&&y>=Y+1&&y<=Y+19){
+const t=y-(Y+1),k=z-fx;
+const o=t<=12?OPEN[t]+k-1: -1;
+if(t<=12&&ax<=o)return 0;
+if(t<=13&&ax<=o+1+(t===13?3+k:0)&&(k===1||k===3))return K.BAR;
+if(y===Y+19)return K.BAR;
+if(ax===11&&k===3&&y>=Y+3&&y<=Y+16)return K.SLIT;
+if(ax===12||ax===11&&k===3)return K.PIL;
+if(k===3&&(y===Y+15||y===Y+16))return K.BAND;
+if(k===2&&t<=13&&ax<=o+1)return K.BAND;
+return K.SMOOTH;
+}
+
+if(v14&&y>=Y+1)for(let k=0;k<TIERS.length;k++){
+const[hw,,z1,y0,y1]=TIERS[k];
+if(z===z1+1&&ax<=hw&&y>=y0&&y<y1&&(((x+hw)%6)+6)%6===0&& !(k===0&&ax<=12))return(y-y0)%7===6?K.BAND:K.PIL;
+}
+
 if(z===fx&&ax<=9&&y>=Y+1&&y<=Y+16){
 const t=y-(Y+1);
 if(t<=12){
 const o=OPEN[t];
-if(ax<=o)return K.VEIL;
+
+if(ax<=o){if(!v14)return K.VEIL;const d=oct(x,(t-6)*1.0);return K.GLOW[d<1.6?0:d<3.2?1:d<4.8?2:3];}
 if(ax===o+1)return K.FRAME;
 if(ax===o+2)return K.BAND;
 if(ax===o+3)return K.BAR;
@@ -25367,7 +25607,21 @@ else if(t===9){if(ax<=3)return K.FRAME;if(ax===4)return K.BAR;}
 else if(t===10&&ax<=4)return K.BAR;
 }
 
-if(ax<=12&&z>bx&&z<fx&&y>=Y+1&&y<=Y+17){
+
+if(v14&&ax<=14&&z>bx&&z<fx&&y>=Y+1&&y<=Y+20){
+const hx=inHall(x-1,y,z)||inHall(x+1,y,z)||inHall(x,y,z-1)||inHall(x,y,z+1),dn=inHall(x,y-1,z);
+if(hx||dn||inHall(x,y+1,z)){
+if(y>=Y+16&&hx)return K.CYAN;
+if(y>=Y+15&&oct(x,z-HZ)<=10.5)return K.NAVY;
+if(dn&&y>=Y+15)return(z%4===0&&ax<=4)?K.HEX:K.NAVY;
+if(y>Y+12||(ax>=7&&y>Y+11))return((z+1)%4===0)?K.HEX:K.NAVY;
+if(y===Y+12)return K.NAVYA;
+if(dn)return K.NAVY;
+return(((z%6)+6)%6===0&&y>=Y+2&&y<=Y+11)?K.CYAN:K.NAVY;
+}
+}
+
+if(!v14&&ax<=12&&z>bx&&z<fx&&y>=Y+1&&y<=Y+17){
 const near=inHall(x-1,y,z)||inHall(x+1,y,z)||inHall(x,y-1,z)||inHall(x,y+1,z)||inHall(x,y,z-1)||inHall(x,y,z+1);
 if(near){
 if(y===Y+16||y===Y+17)return K.GRAY;
@@ -25483,7 +25737,10 @@ return-1;
 
 TEMPLE.buildSteps=function*(g){
 if(g._temple)return g._temple;
-const K=mats(),mat=makeMat(K,g.vgen>=11);
+
+
+const K14=g.vgen>=14?mats14(mats()):null,v14= !!K14;
+const K=K14||mats(),mat=makeMat(K,g.vgen>=11,v14);
 
 
 const v6=g.vgen>=6;
@@ -25500,6 +25757,7 @@ const colTop=(x,z)=>{
 const ax=Math.abs(x);
 let top=0;
 if(ax<=22&&z>=T.back&&z<=T.front)top=Y+56;
+if(v14&&ax<=22&&z>T.front&&z<=T.front+3)top=Y+40;
 if(ax>=22&&ax<=55&&z>= -28&&z<=15)top=Math.max(top,Y+31);
 if(oct(ax-50,z+24)<=6)top=Math.max(top,Y+90);
 if(oct(ax-24,z+37)<=5.5)top=Math.max(top,Y+76);
@@ -25530,8 +25788,48 @@ fill(x,z,maxY+1,Math.max(maxY+6,gy+3),AIR);
 }
 }
 yield;
-
 const HZ= -10;
+if(v14){
+
+
+
+const putM=(name,f,x0,y0,z0)=>{
+const m=VR.VM&&VR.VM.MODELS[name];if(!m)return;
+const fp=VR.VM.footprint(m,f);let mx=1e9,mz=1e9;for(const c of fp){mx=Math.min(mx,c[0]);mz=Math.min(mz,c[2]);}
+for(const[dx,dy,dz,i]of fp)put(x0+dx-mx,y0+dy,z0+dz-mz,st(name,{facing:f,part:i}));
+};
+for(let x= -12;x<=12;x++)for(let z=T.back+1;z<=T.front-1;z++){
+const d=oct(x,z-HZ),r=Math.round(d);
+if(Math.abs(x)>10&&d>12.5)continue;
+let s=K.FLOORH;
+if(Math.abs(x)<=1&&Math.abs(z-HZ)<=1)s=K.PAD;
+else if(r===5||r===8||r===11)s=K.LINEH;
+else if(Math.abs(x)===1&&(z>HZ+11||z<HZ-11))s=K.LINEH;
+put(x,Y,z,s);
+}
+for(let z=HZ+12;z<=T.front;z++)put(0,Y,z,K.DECK);
+for(let z=T.back;z<HZ-11;z++)put(0,Y,z,K.DECK);
+for(const sx of[-1,1]){
+const f=sx<0?1:3;
+for(let z= -4;z<=4;z+=2)putM('vm_hangar_console',f,sx*7,Y+1,z);
+for(let z= -4;z<=6;z+=2)put(sx*6,Y+1,z,K.STOOL);
+putM(sx<0?'vm_hangar_screen':'vm_hangar_screen_b',f,sx*10,Y+4,-2);
+putM(sx<0?'vm_hangar_screen_b':'vm_hangar_screen',f,sx*10,Y+4,3);
+putM(sx<0?'vm_hangar_screen_b':'vm_hangar_screen',f,sx*12,Y+4,-15);
+putM(sx<0?'vm_hangar_screen':'vm_hangar_screen_b',f,sx*12,Y+4,-9);
+for(let z= -36;z<= -30;z++)for(let y=Y+3;y<=Y+5;y++)put(sx*10,y,z,sx>0?K.HOLOA1:K.HOLOA3);
+for(let z= -28;z<= -24;z+=2)put(sx*10,Y+1,z,sx>0?K.LOCKER1:K.LOCKER3);
+for(let z= -38;z<=16;z+=6)if(oct(11,z-HZ)>12.5)put(sx*11,Y+10,z,K.PANELA);
+for(const dz of[-4,0,4])put(sx*13,Y+1,HZ+dz,K.PANELA);
+put(sx*8,Y+1,12,K.SOFA);put(sx*8,Y+1,13,K.SOFA);
+}
+put(0,Y+1,-30,K.HTABLE);
+for(const[dx,dz]of[[-2,0],[2,0],[0,-2],[0,2]])put(dx,Y+1,-30+dz,K.STOOLO);
+for(let x= -9;x<=9;x++)for(let z=HZ-12;z<=HZ+12;z++)if(Math.round(oct(x,z-HZ))===11&&(x+z)%2===0)put(x,Y+15,z,K.HEXLC);
+for(let x= -3;x<=3;x++)for(let z=HZ-3;z<=HZ+3;z++)if(Math.round(oct(x,z-HZ))===2)put(x,Y+19,z,K.HEXLC);
+for(let z=T.back+4;z<=T.front-4;z+=6){if(Math.abs(z-HZ)>12){put(0,Y+15,z,K.HEXL);put(-5,Y+15,z,K.HEXL);put(5,Y+15,z,K.HEXL);}}
+}else{
+
 for(let x= -10;x<=10;x++)for(let z=T.back+1;z<=T.front-1;z++){
 const d=oct(x,z-HZ);
 let s=K.HEXF;
@@ -25557,6 +25855,7 @@ for(const[dx,dz]of[[-2,0],[2,0],[0,-2],[0,2]])put(dx,Y+1,-30+dz,K.STOOLO);
 
 for(let x= -8;x<=8;x++)for(let z=HZ-8;z<=HZ+8;z++){if(Math.round(oct(x,z-HZ))===6)put(x,Y+15,z,K.HEXLC);}
 for(let z=T.back+4;z<=T.front-4;z+=6){if(Math.abs(z-HZ)>7){put(0,Y+15,z,K.HEXL);put(-5,Y+15,z,K.HEXL);put(5,Y+15,z,K.HEXL);}}
+}
 yield;
 
 
@@ -25585,6 +25884,7 @@ if(z===21)yield;
 const ax=Math.abs(x);
 if(ax>=24&&ax<=56&&z<=30)continue;
 if(ax>=23&&ax<=32&&z<=38)continue;
+if(v14&&ax<=22&&z<=T.front+3){put(x,Y,z,ax<=4?K.DECK:ax===5?K.LINE:K.FLAG);continue;}
 const gy=ground(x,z);
 if(gy<Y)fill(x,z,gy+1,Y-1,K.SMOOTH);
 let s=K.FLAG;
@@ -25705,6 +26005,7 @@ if(tp.base.pad.x>=x0&&tp.base.pad.x<x0+16&&tp.base.pad.z>=z0&&tp.base.pad.z<z0+1
 if(!out.spawns)out.spawns=[];
 const row=['starship',tp.base.pad.seed,tp.base.pad.x,tp.base.pad.y,tp.base.pad.z,tp.base.pad.dir];
 if(g.vgen>=6)row.push('hangar');
+if(g.vgen>=14&&R.byName.gate_glow)row.push('hero');
 out.spawns.push(row);
 }
 
@@ -30268,9 +30569,25 @@ S.fadeT=function(x,y,phase){return fr(S.ign(x,y)+(phase||0));};
 
 S.NEAR_COLS=2;S.GROW_MS=150;
 S.fadePlan=function(dcx,dcz,soft){
-if(Math.max(Math.abs(dcx),Math.abs(dcz))<=S.NEAR_COLS)return{fade:1,grow:true};
-return soft?{fade:0,grow:false}:{fade:1,grow:false};
+const d=Math.max(Math.abs(dcx),Math.abs(dcz));
+if(d<=S.NEAR_COLS)return{fade:1,grow:true};
+return soft?{fade:0,grow:false,ms:S.fadeMs(d)}:{fade:1,grow:false};
 };
+
+
+
+S.FAR_FADE_COLS=6;S.FAR_FADE_MS=180;S.SOFT_GAP_MS=55;
+S.fadeMs=function(dcheb){return dcheb>S.FAR_FADE_COLS?S.FAR_FADE_MS:S.FADE_MS;};
+S.softOk=function(gapMs){return!(gapMs>=S.SOFT_GAP_MS);};
+
+
+
+
+S.MIP_CALM=1.6;
+S.mipK=function(tsr,soft,scale,lite){if(lite)return 1;if(tsr&&soft)return Math.sqrt(Math.max(0.35,scale));return S.MIP_CALM;};
+
+
+S.lodCoverSoft=function(near,bilinear){const n=clamp01(near);return n>0.998?1:S.lodCover(n,bilinear);};
 S.growCurve=function(ms){const t=clamp01(ms/S.GROW_MS);return t*t*(3-2*t);};
 
 S.originW=function(fade,grow){return grow!==undefined&&grow<1?2+grow:fade;};
@@ -30606,6 +30923,13 @@ return n;
 F.bayerLevels=Array.from({length:16},(_,k)=>k/16);
 F.draws=function(t,nR,bR,nG,bG){
 const cR=Math.min(bR,nR),cG=Math.min(bG,nG);
+return{r0:t<nR,r1:t>=cR&&t<nG,r2:t>=Math.max(cR,cG)};
+};
+
+
+const cutN=(n,b)=>(n>0.998?1:Math.min(n,b));
+F.drawsSoft=function(t,nR,bR,nG,bG){
+const cR=cutN(nR,bR),cG=cutN(nG,bG);
 return{r0:t<nR,r1:t>=cR&&t<nG,r2:t>=Math.max(cR,cG)};
 };
 
@@ -37524,7 +37848,7 @@ return K.grid;
 
 const ARCHS=['shuttle','interceptor','gunship','racer','dropship','freighter','cruiser','carrier'];
 const ANAMES=['Shuttle','Interceptor','Gunship','Racer','Dropship','Frachter','Kreuzer','Träger'];
-const PAL=[['sf','starforge','Starforge'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
+const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
 const STATION=7;
 Forge.register({
 id:'shuttle',icon:'🚀',name:'Raumschiff',en:'Spaceship',level:true,sh:1,
@@ -38581,6 +38905,7 @@ const PHRASE={
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
+'Hangar Screen':'Hangar-Bildschirm','Radar':'Radaranzeige','Gauges':'Messanzeigen','Hangar Console':'Hangar-Konsole',
 'Arched Window':'Bogenfenster','Stained Glass':'Buntglas','Town Lamp':'Stadtlaterne','Striped Awning':'Streifenmarkise',
 'Shop Sign':'Ladenschild','Market Stall':'Marktstand','Town Fountain':'Stadtbrunnen','Gold Band':'Goldband','White Stone':'weißer Stein',
 'Blue':'Blau','Gold':'Gold','Rose':'Rosé','Amber':'Bernstein','Teal':'Petrol','Bread':'Brot','Cup':'Tasse','Book':'Buch','Flower':'Blume',
@@ -40150,6 +40475,79 @@ const CANON={c:0,e:0,w:0,t:0,h:0,H:70,A:3,river:0,mountain:0,ember:0,canyon:0,pr
 const COAST=[214,204,166],ICE=[206,220,236];
 
 
+
+
+
+
+
+
+
+
+const MAC=BT.MACRO={thr: -0.12,band:0.05,home:[1200,3000],bias:[0.34,14000,34000],river:0.011};
+let macS=null;
+const macCl={h:0,t:0,mountain:0},macA=[0,0,0],MACBC=[104,118,70];
+const macN=[0,0,0],macO={land:0.5,c:0,river:0};
+BT.macro=function(X,Z,seed,out){
+const o=out||macO;
+if(!macS||macS.seed!==seed)macS={seed,a:new VR.Simplex((seed^0xc0a57)>>>0),b:new VR.Simplex((seed^0x5eaf1)>>>0),r:new VR.Simplex((seed^0x41fe2)>>>0)};
+const d=Math.hypot(X,Z),k=ss(MAC.home[0],MAC.home[1],d);
+o.land=0.5;o.c=0;o.river=0;o.k=k;o.near=0;o.T=0.5;o.M=0.5;o.ridge=0;
+if(k<=0)return o;
+const sp=BT.toSphere(X,Z),N=BT.normal(sp[0],sp[1],macN),S=macS.a,S2=macS.b;
+const wx=S2.n3(N[0]*3.1,N[1]*3.1,N[2]*3.1)*0.08,wz=S2.n3(N[0]*3.1+7,N[1]*3.1,N[2]*3.1)*0.08;
+const x=N[0]+wx,y=N[1]+wz,z=N[2]-wx;
+let c=S.n3(x*2.3,y*2.3,z*2.3)*0.62+S.n3(x*6.8,y*6.8,z*6.8)*0.3+S.n3(x*19,y*19,z*19)*0.16;
+c+=MAC.bias[0]*(1-ss(MAC.bias[1],MAC.bias[2],d));
+o.c=c;
+o.land=0.5+(ss(MAC.thr-MAC.band,MAC.thr+MAC.band,c)-0.5)*k;
+if(c<MAC.thr-MAC.band-0.02)return o;
+
+
+const lat=Math.abs(y),mo=S2.n3(x*4.2+3,y*4.2,z*4.2)*0.5+S2.n3(x*13,y*13,z*13+5)*0.2;
+o.T=clamp(1.2-0.95*lat*lat*lat+wx*1.8,0,1);
+o.M=clamp(0.72+mo-0.9*clamp(c-MAC.thr-0.25,0,0.5)-0.35*Math.exp(-(((lat-0.42)/0.12)**2))+0.25*(1-ss(0,0.3,c-MAC.thr)),0,1);
+o.reg=ss(0.0,0.55,macS.r.n3(x*8.5+4,y*8.5+9,z*8.5));
+const rg=1-Math.abs(S2.n3(x*9+11,y*9,z*9));o.ridge=rg*rg*ss(MAC.thr+0.1,MAC.thr+0.4,c);
+
+
+const inl=ss(MAC.thr+MAC.band,MAC.thr+MAC.band+0.08,c)*k;
+o.near=0;
+if(inl>0){const rv=Math.abs(macS.r.n3(x*7.5+wz*3,y*7.5,z*7.5-wx*3));o.near=clamp(1-rv/(MAC.river*4),0,1)*inl;const wdt=MAC.river*inl*(0.5+0.5*(1-ss(MAC.thr+MAC.band,MAC.thr+0.6,c)))*ss(-0.05,0.3,S.n3(x*3.7+5,y*3.7,z*3.7+2));if(rv<wdt)o.river=1-rv/wdt;}
+return o;
+};
+
+BT.macroH=function(X,Z,h,seed,cc){
+const m=BT.macro(X,Z,seed);
+if(m.land<0.15)return Math.min(h,-(2+60*clamp((MAC.thr-MAC.band)-m.c,0,0.6)));
+if(m.river>0)return Math.min(h,-2*m.river);
+if(m.land>0.85&&h<0)return 1+12*clamp(m.c-MAC.thr,0,1);
+return h;
+};
+
+
+
+
+
+BT.people=function(m){
+if(!(m.k>0))return 0;
+const coast=Math.exp(-(((m.c-MAC.thr-MAC.band)/0.08)**2));
+const warm=ss(0.18,0.55,m.T),wet=ss(0.12,0.4,m.M);
+return clamp((0.04+1.0*Math.max(coast,m.near*0.9))*warm*wet*(1-0.8*m.ridge)*(0.15+1.6*(m.reg||0)),0,1)*m.k;
+};
+BT.town=function(N,P,seed){
+const M=VR.M,F=60,gx=N[0]*F,gy=N[1]*F,gz=N[2]*F,cx=Math.floor(gx),cy=Math.floor(gy),cz=Math.floor(gz);
+const hk=(cx*73856093)^(cy*19349663),h1=M.hashf2(hk,cz,seed^0x70e1);
+if(h1>P*2.3-0.06)return 0;
+const h2=M.hashf2(hk,cz,seed^0x51ce),h3=M.hashf2(hk,cz,seed^0x3c3),h4=M.hashf2(hk,cz,seed^0x9f1),h5=M.hashf2(hk,cz,seed^0x2d7);
+const sz=0.14+0.5*h2*h2*(0.3+P);
+const dx=gx-(cx+0.3+0.4*h3),dy=gy-(cy+0.3+0.4*h4),dz=gz-(cz+0.3+0.4*h5),d=Math.sqrt(dx*dx+dy*dy+dz*dz)/sz;
+if(d>=1)return 0;
+const q=1-d;
+return Math.min(255,(170+140*h2)*q*Math.sqrt(q));
+};
+
+
+
 function sampler(g){
 const LOD=VR.LOD,BI=VR.BIOMES,SEA=VR.C.SEA;
 const P=LOD&&LOD.palette?LOD.palette():null,lk={},cache=new Map();
@@ -40172,6 +40570,26 @@ const snow=[212,222,234];
 return function(X,Z,o){
 const cl=g.computeClimate(X,Z),y=Math.round(cl.H),bi=g.biomeFor(cl,y),c=land(bi,cl,X,Z,y);
 const cold=(c.temp-Math.max(0,y-90)*0.0025)<0.15;
+if(BT.ALB2&&BT.MACRO){
+
+
+const hm=BT.macroH(X,Z,cl.H-SEA,g.seed,cl.c),m=macO;
+if(hm>=0){
+BT.albedo(cl,hm,y>=SEA?c.t:MACBC,c.kd===6&&y>=SEA,o);o[3]=0;o[4]=0;
+o[5]=c.live&&hm>2&&y<=150&&cl.river<0.3&& !(cl.ember>0.45)?1:0;o[6]=BT.hcode(hm);
+
+
+const kc=0.95*ss(1500,6000,Math.hypot(X,Z))*m.k;
+if(kc>0){macCl.h=m.M*2-1;macCl.t=m.T*2-1;macCl.mountain=m.ridge*0.6;BT.albedo(macCl,hm+m.ridge*75,MACBC,false,macA);for(let q=0;q<3;q++)o[q]+=(macA[q]-o[q])*kc;if(kc>0.5)o[5]=hm>1&&hm<100&&m.ridge<0.5?1:0;}
+return o;
+}
+const ice=cold||c.frozen||(m.land<0.5&&c.temp<0.15);
+BT.albedo(cl,0,c.t,false,o);
+const t=ice?ICE:COAST,sk=ice?1:m.land<0.5?0.55:0.12;
+o[0]+=(t[0]-o[0])*sk;o[1]+=(t[1]-o[1])*sk;o[2]+=(t[2]-o[2])*sk;
+o[3]=1;o[4]=ice?1:0;o[5]=0;o[6]=BT.hcode(hm);
+return o;
+}
 if(BT.ALB2&&y>=SEA){BT.albedo(cl,y-SEA,c.t,c.kd===6,o);o[3]=0;o[4]=0;o[5]=c.live&&y>SEA+2&&y<=150&&cl.river<0.3&& !(cl.ember>0.45)?1:0;o[6]=BT.hcode(cl.H-SEA);return o;}
 if(y<SEA){
 const ice=cold||c.frozen;
@@ -40218,7 +40636,13 @@ const px=x+wx,py=y+wy,pz=z-wx*0.6;
 let v=0,amp=1,f=9.5,norm=0;
 for(let o=0;o<oct;o++){v+=S.n3(px*f,py*f,pz*f)*amp;norm+=amp;amp*=o<2?0.7:0.55;f*=2.07;}
 v/=norm;
-return ss(0.0,0.3,v+0.06*Math.cos(y*9.0));
+if(!BT.MACRO)return ss(0.0,0.3,v+0.06*Math.cos(y*9.0));
+
+
+
+const sys=Wx.n3(x*2.1+3.3,y*2.1,z*2.1)*0.75+Wy.n3(x*4.4,y*4.4+1.7,z*4.4)*0.25+0.05*Math.cos(y*9.0);
+const m=ss(-0.28,0.32,sys);
+return clamp(ss(-0.16,0.62,v+0.42*(m-0.42))*(0.25+0.75*m),0,1);
 };
 }
 const putA=(a,i,o)=>{a[i]=clamp(o[0],0,255);a[i+1]=clamp(o[1],0,255);a[i+2]=clamp(o[2],0,255);a[i+3]=o[3]*255;};
@@ -40231,7 +40655,7 @@ for(const L of HEART_LIGHTS){const d=Math.hypot(x-L[0],z-L[1]);const r=L[2]+step
 return v;
 }
 function herz(g,m,w,h,y0,y1,a,b){
-const S=sampler(g),CL=clouds(g.seed),o=[0,0,0,0,0,0,0],N=[0,0,0],M=VR.M,POP=new VR.Simplex((g.seed^0x9e0)>>>0);
+const S=sampler(g),CL=clouds(g.seed),o=[0,0,0,0,0,0,0],N=[0,0,0],M=VR.M,POP=new VR.Simplex((g.seed^0x9e0)>>>0),ROADW=new VR.Simplex((g.seed^0x40ad)>>>0);
 const oct=w>=1024?5:4;
 for(let j=y0;j<y1;j++){
 const th=(j+0.5)/h*Math.PI;
@@ -40246,7 +40670,11 @@ BT.normal(th,lam,N);
 
 
 let L=0;
-if(o[5]){const hsh=M.hashf2(i,j,g.seed^0x11657);if(hsh<0.19){const pl=0.1*(0.15+1.7*ss(-0.15,0.45,POP.n3(N[0]*7,N[1]*7,N[2]*7)));if(hsh<pl)L=60+(hsh/pl)*140;}}
+if(BT.MACRO&&macO.k>0){
+
+if(o[5]||macO.river>0){const P=BT.people(macO);if(P>0.02){L=BT.town(N,P,g.seed);if(!L&&P>0.3&&Math.abs(ROADW.n3(N[0]*16,N[1]*16,N[2]*16))<0.04&&M.hashf2(i,j,g.seed^0x40d)<0.15+0.45*P)L=26+50*P;}}
+L*=macO.k;
+}else if(o[5]){const hsh=M.hashf2(i,j,g.seed^0x11657);if(hsh<0.19){const pl=0.1*(0.15+1.7*ss(-0.15,0.45,POP.n3(N[0]*7,N[1]*7,N[2]*7)));if(hsh<pl)L=60+(hsh/pl)*140;}}
 if(Math.hypot(p[0],p[1])<1500)L=255;
 b[k]=L;b[k+1]=CL(N[0],N[1],N[2],oct)*255;b[k+2]=o[6];b[k+3]=o[4]*255;
 }
@@ -40304,7 +40732,11 @@ let L=0;
 for(const v of VR_){const dx=x-v[0],dz=z-v[1],r=v[2]*v[4]+step*0.4;if(dx*dx+dz*dz<r*r){const q=1-(dx*dx+dz*dz)/(r*r);L=Math.max(L,v[3]*q*Math.sqrt(q)*(0.55+0.45*M.hashf2(Math.floor(x/step),Math.floor(z/step),0x5e7)));}}
 if(Math.abs(x)<1400&&Math.abs(z)<1400)L=Math.max(L,heartLight(x,z,step));
 
-if(!L&&o[5]&&M.hashf2(Math.floor(x/160),Math.floor(z/160),g.seed^0x7a3)<0.07)L=30;
+
+let fs=0.07;
+if(BT.MACRO&&macO.k>0){const P=BT.people(macO),kf=ss(1500,6000,Math.hypot(x,z));L=Math.min(255,L*(1+kf*(Math.min(0.7,P*1.6)-0.3)));if(o[5]||macO.river>0)L=Math.max(L,BT.town(N,P,g.seed)*kf);fs=0.07*(1-kf*(1-clamp(P*1.5,0.1,1)));}
+
+if(!L&&o[5]&&M.hashf2(Math.floor(x/160),Math.floor(z/160),g.seed^0x7a3)<fs)L=30;
 
 
 if(!L&&o[5]&&BT.ALB2&&Math.abs(ROADS.n2(x/1400,z/1400))<step*0.00045)L=44;
@@ -40335,24 +40767,20 @@ a[k]=Math.round(r/n);a[k+1]=Math.round(gg/n);a[k+2]=Math.round(bb/n);
 }
 
 
-const ZONE=[238,226,204],ZONE2=[232,210,200],ZONE3=[244,236,220],BELT=[172,132,200],BELT2=[148,108,184],BELT3=[196,156,182],BELT4=[126,98,170],POLE=[122,118,166],JET=[92,80,150];
 
-const BANDS=[[66,POLE],[58,BELT4],[51,ZONE2],[45,BELT3],[38,ZONE],[32,BELT],[24,ZONE2],[9,BELT2],[-7,ZONE3],[-20,BELT],[-27,ZONE],[-33,BELT2],[-40,ZONE2],[-46,BELT3],[-53,ZONE],[-61,BELT4],[-90,POLE]];
+
+
+const ZONE=[232,216,206],ZONE2=[216,196,214],ZONE3=[204,190,216],BELT=[190,152,190],BELT2=[166,140,192],BELT4=[146,142,194],POLE=[120,118,172],JET=[98,88,152];
+
+const BANDS=[[62,POLE],[40,BELT2],[16,ZONE2],[-8,ZONE],[-30,BELT],[-46,ZONE3],[-64,BELT4],[-90,POLE]];
+const HW=3.5;
 function bandAt(lat){
-let prevEdge=90,prev=BANDS[0][1];
-for(let i=0;i<BANDS.length;i++){
-const[edge,col]=BANDS[i];
-if(lat>=edge){
+let i=0;while(i<BANDS.length-1&&lat<BANDS[i][0])i++;
+let c=BANDS[i][1];
 
-const up=i>0?ss(prevEdge-1.1,prevEdge+1.1,lat):0,dn=i<BANDS.length-1?1-ss(edge-1.1,edge+1.1,lat):0;
-let c=col;
-if(up>0)c=mix3(c,BANDS[i-1][1],up*0.5);
-if(dn>0&&i+1<BANDS.length)c=mix3(c,BANDS[i+1][1],dn*0.5);
+if(i>0){const e=BANDS[i-1][0],t=ss(e,e-HW,lat);c=mix3(BANDS[i-1][1],c,0.5+0.5*t);}
+if(i<BANDS.length-1){const e=BANDS[i][0],t=ss(e,e+HW,lat);c=mix3(BANDS[i+1][1],c,0.5+0.5*t);}
 return c;
-}
-prevEdge=edge;prev=col;
-}
-return prev;
 }
 function amarant(seed,w,h,y0,y1,a){
 const S=new VR.Simplex((seed^0xa3a2)>>>0),S2=new VR.Simplex((seed^0x51c7)>>>0),M=VR.M;
@@ -40365,7 +40793,7 @@ for(let i=0;i<w;i++){
 const lam=(i+0.5)/w*TAU-Math.PI;
 const px=cphi*Math.cos(lam),pz=cphi*Math.sin(lam);
 
-const turb=S.n3(px*2.6,sphi*26,pz*2.6)*1.5+S2.n3(px*7,sphi*70,pz*7)*0.6;
+const turb=S.n3(px*2.6,sphi*26,pz*2.6)*2.4+S2.n3(px*7,sphi*70,pz*7)*1.0;
 const latE=lat+turb;
 let c=bandAt(latE);
 
@@ -40374,7 +40802,7 @@ const belt=c[2]>c[1]+25?1:0.5;
 const k1=1+st*0.11*belt;
 c=[c[0]*k1,c[1]*k1,c[2]*k1];
 
-if(lat<9&&lat> -4){const f=S2.n3(px*9,sphi*22,pz*9);if(f>0.42)c=mix3(c,BELT4,ss(0.42,0.6,f)*ss(-4,7,lat)*0.7);}
+if(lat<16&&lat>2){const f=S2.n3(px*5,sphi*40,pz*5);if(f>0.4)c=mix3(c,BELT2,ss(0.4,0.75,f)*ss(2,8,lat)*(1-ss(10,16,lat))*0.35);}
 
 for(const ov of ovals){const dl=wrapPi(lam-ov[1])/D2R*cphi,dp=lat-ov[0];const q=(dl*dl)/(ov[2]*ov[2]*2.2)+(dp*dp)/(ov[2]*ov[2]*0.5);if(q<1)c=mix3(c,[248,244,238],(1-q)*0.85);}
 
@@ -40579,7 +41007,9 @@ const g=getGen?getGen('overworld'):null,SEA=(VR.C&&VR.C.SEA)||64;
 const H=new Float32Array(G*G);
 for(let j=0;j<G;j++)for(let i=0;i<G;i++){
 const X=x0+(i-1)*s,Z=z0+(j-1)*s;
-const h=g&&g.computeClimate?g.computeClimate(Math.round(X),Math.round(Z)).H-SEA:0;
+const cl=g&&g.computeClimate?g.computeClimate(Math.round(X),Math.round(Z)):null;
+let h=cl?cl.H-SEA:0;
+if(cl&&BT.macroH)h=BT.macroH(X,Z,h,g.seed,cl.c);
 H[j*G+i]=Math.max(0,h);
 }
 const P=new Float32Array(G*G*3),n3=[0,0,0];
@@ -42426,6 +42856,39 @@ return img;
 REC.asphalt_zebra=()=>{
 const img=REC.asphalt();
 for(let y=0;y<N;y++)for(let x=0;x<N;x++){const bar=(x%8)<5;if(bar){img.set(x,y,TX.scale(C(0xe8e8e2),0.85+hh(x,y,4123)*0.2),1);img.ro[y*N+x]=0.65;}}
+return img;
+};
+
+
+
+
+const darken=(img)=>{img.forEach((x,y,i)=>{if(img.em[i]>0.2)return;const j=i*4;img.c[j]*=0.5;img.c[j+1]*=0.53;img.c[j+2]*=0.6;});return img;};
+REC.temple_stone_dark=()=>darken(REC.temple_stone());
+REC.temple_stone_dark_smooth=()=>darken(REC.temple_stone_smooth());
+REC.temple_stone_dark_band=()=>darken(REC.temple_stone_band());
+REC.temple_pilaster_dark=()=>darken(REC.temple_pilaster());
+REC.temple_light_bar_dark=()=>darken(REC.temple_light_bar());
+REC.temple_slit_dark=()=>darken(REC.temple_slit());
+
+
+REC.amber_window_tall=()=>{
+const img=new TX.Img(),m=N>>4;
+img.forEach((x,y,i)=>{
+const e=Math.min(x,N-1-x);
+if(e<3*m){img.set(x,y,C(0x262c36),1);img.em[i]=0;img.ro[i]=0.7;img.h[i]=0.75;return;}
+if(Math.abs(x-(N-1)/2)<m){img.set(x,y,C(0x3a2a1c),1);img.em[i]=0.05;img.ro[i]=0.5;img.h[i]=0.62;return;}
+const t=y/(N-1),g=0.9+(TX.fbm(x,y,8,2,4141)-0.5)*0.18;
+img.set(x,y,TX.scale(TX.mix(C(0xffc24a),C(0xff7a1a),t),g),1);img.em[i]=0.95;img.ro[i]=0.1;img.h[i]=0.55;
+});
+return img;
+};
+
+
+
+const GLOW=[[0xfffff0,1.0],[0xfff6b8,0.97],[0xffe27a,0.95],[0xffbe48,0.95]];
+for(let k=0;k<4;k++)REC['gate_glow_'+k]=()=>{
+const img=new TX.Img();
+img.forEach((x,y,i)=>{const n=TX.fbm(x,y,8,2,4150+k);img.set(x,y,TX.scale(C(GLOW[k][0]),0.94+(n-0.5)*0.12),GLOW[k][1]);img.em[i]=1;img.ro[i]=0.1;});
 return img;
 };
 })(VR);
@@ -54527,6 +54990,151 @@ model,light:(p)=>(p.frei?[3,7,8]:[5,1,6]),solid:true,opaque:false,hard:40,blast:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const VX=VR.VX,VM=VR.VM;
+if(!VX|| !VX._|| !VM|| !VR.BL)return;
+const H=VR.Hangar=VR.Hangar||{};
+const C=H.COL={
+navy:0x2D3C5A,navyD:0x1A2436,navyL:0x3E5274,frame:0x223048,rim:0x3AF0FF,rimL:0xC8FFFF,
+bg:0x123E78,bgL:0x1C5296,cyan:0x3AF0FF,cyanL:0x9AFBFF,cyanD:0x1A8AA8,amber:0xFF9A2A,red:0xFF4A4A,
+grey:0xC8D0DA,greyD:0x8C96A4,top:0x2E3440,keyR:0xFF4A4A,keyY:0xFFE04A,keyG:0x5AFF7A,keyB:0x4A8AFF,
+};
+const NAMES=H.NAMES=[];
+const def=(name,display,o)=>{VM.define(name,display,Object.assign({res:16,sound:'glass',hard:1,cat:'vtech',cats:['vtech']},o,{late:true,lazy:true}));NAMES.push(name);return name;};
+
+
+
+
+const frame=(b,M,W)=>{
+const w=W*16,h=64,cut=9;
+const fr=M.gloss(C.frame),back=M.matte(C.navyD),rim=M.light(C.rim),bg=M.light(C.bg);
+const inOct=(x,y,inset)=>{const X=Math.min(x-inset,w-inset-x),Y=Math.min(y-inset,h-inset-y);return X>=0&&Y>=0&&X+Y>=cut-inset*0.41;};
+for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+const cx=x+0.5,cy=y+0.5;
+if(!inOct(cx,cy,0))continue;
+b.set(x,y,13,back);b.set(x,y,14,back);b.set(x,y,15,back);
+if(!inOct(cx,cy,3)){b.set(x,y,11,fr);b.set(x,y,12,fr);b.set(x,y,10,fr);continue;}
+if(!inOct(cx,cy,4.5)){b.set(x,y,12,rim);b.set(x,y,11,rim);continue;}
+b.set(x,y,12,bg);
+}
+return{w,h,put:(x,y,m)=>{if(x>=0&&y>=0&&x<w&&y<h)b.set(x|0,y|0,12,m);}};
+};
+
+const ring=(P,cx,cy,r,t,m,a0,a1)=>{
+for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
+const dx=x+0.5-cx,dy=y+0.5-cy,d=Math.hypot(dx,dy);
+if(Math.abs(d-r)>t/2)continue;
+if(a0!==undefined){const a=(Math.atan2(dy,dx)+Math.PI*2)%(Math.PI*2);if(a<a0||a>a1)continue;}
+P(x,y,m);
+}
+};
+const disc=(P,cx,cy,r,m)=>{for(let y=Math.floor(cy-r);y<=cy+r;y++)for(let x=Math.floor(cx-r);x<=cx+r;x++)if(Math.hypot(x+0.5-cx,y+0.5-cy)<=r)P(x,y,m);};
+const rect=(P,x0,y0,x1,y1,m)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)P(x,y,m);};
+
+def('vm_hangar_screen','Hangar Screen · Radar',{
+size:[5,4,1],col:0x253350,light:[2,8,12],
+build(b,M){
+const F=frame(b,M,5),P=F.put,cy=M.light(C.cyan),cl=M.light(C.cyanL),cd=M.light(C.cyanD),am=M.light(C.amber),rd=M.light(C.red),bl=M.light(C.bgL);
+
+const X=30,Y=32;
+disc(P,X,Y,22,bl);
+ring(P,X,Y,22,2.2,cy);ring(P,X,Y,15,1.4,cl);ring(P,X,Y,8,1.4,cy);disc(P,X,Y,2.2,cl);
+for(let k= -21;k<=21;k++){if(Math.abs(k)>3){P(X+k,Y,cd);P(X,Y+k,cd);}}
+for(const[dx,dy]of[[26,0],[-26,0],[0,26],[0,-26]])rect(P,X+dx-(dx?1:1),Y+dy-(dy?1:1),X+dx+1,Y+dy+1,cy);
+ring(P,X,Y,18.5,5,cd,0.35,1.25);
+disc(P,X+9,Y+11,1.8,am);disc(P,X-12,Y-6,1.6,rd);
+
+rect(P,56,50,72,53,cy);
+for(let k=0;k<5;k++)rect(P,56,43-k*5,56+[14,10,12,8,13][k],45-k*5,k===2?am:cl);
+ring(P,64,12,6,1.6,cy);ring(P,64,12,6,1.8,am,4.2,6.2);disc(P,64,12,1.4,cl);
+},
+});
+def('vm_hangar_screen_b','Hangar Screen · Gauges',{
+size:[5,4,1],col:0x253350,light:[2,8,12],
+build(b,M){
+const F=frame(b,M,5),P=F.put,cy=M.light(C.cyan),cl=M.light(C.cyanL),cd=M.light(C.cyanD),am=M.light(C.amber),bl=M.light(C.bgL);
+
+const X=52,Y=32;
+disc(P,X,Y,18,bl);
+ring(P,X,Y,18,2.2,cy);ring(P,X,Y,12.5,1.4,cd);ring(P,X,Y,15,2.4,am,3.6,5.6);
+for(let k=0;k<12;k++){const a=k/12*Math.PI*2;rect(P,X+Math.cos(a)*9.5-0.5,Y+Math.sin(a)*9.5-0.5,X+Math.cos(a)*9.5+1,Y+Math.sin(a)*9.5+1,cl);}
+for(let t=0;t<8;t+=0.5)P(X+Math.cos(0.9)*t,Y+Math.sin(0.9)*t,am);
+disc(P,X,Y,2.4,cl);
+for(let k=0;k<5;k++)rect(P,9+k*5,10,12+k*5,10+[16,24,12,28,20][k],k===3?am:cy);
+for(let x=9;x<34;x++)P(x,48+Math.round(Math.sin(x*0.55)*3),cl);
+rect(P,9,55,30,57,cd);
+},
+});
+def('vm_hangar_console','Hangar Console',{
+size:[2,1,1],col:0xC8D0DA,light:[3,6,8],sound:'metal',hard:2,
+build(b,M){
+const body=M.gloss(C.grey),dark=M.gloss(C.top),trim=M.gloss(C.greyD),kick=M.light(C.cyan),scr=M.light(C.bgL),scrL=M.light(C.cyan);
+
+b.box(1,2,2,31,9,15,body);
+b.box(2,0,3,30,2,14,trim);b.box(2,0.5,2.5,30,1.5,3,kick);
+
+b.box(0,9,1,32,10,15,trim);
+b.box(1,10,1,31,11,6,dark);b.box(1,10,6,31,12,11,dark);b.box(1,10,11,31,13,15,dark);
+
+const KEYS=[C.keyR,C.keyY,C.keyG,C.cyan,C.keyB,C.amber];
+let k=0;
+for(const[y,z0]of[[11,2],[12,7]])for(let x=3;x+3<=30;x+=4){const c=KEYS[(k++ *7+(y===12?3:0))%KEYS.length];b.box(x,y,z0,x+3,y+0.5,z0+3,M.light(c));}
+
+b.box(4,13,11.5,28,13.5,14.5,scr);
+for(let x=6;x<26;x+=3)b.box(x,13.4,12.5+(x%2),x+2,13.6,13.5+(x%2),scrL);
+},
+});
+
+
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(()=>{
+const K=VM._K;if(!K)return;
+const G_=K.G,R=VR.R,T=R.tex,F=VR.F,def2=VR.BL.def,T_=VX.TECH;
+const grp={group:G_.TECH||G_.ARCH,cat:'vtech'};
+
+K.wall('vx_hangar_navy','Navy Hangar Wall · Light Strip',{bothSides:true,band:false,corner:0,pat:'techpanel',col:C.navy,col2:C.navyD,gloss:true,strip:12,glow:T_.cyan},Object.assign({sound:'metal',hard:2.5,light:[2,7,10]},grp));
+K.wall('vx_hangar_navy_amber','Navy Hangar Wall · Amber Strip',{bothSides:true,band:false,corner:0,pat:'techpanel',col:C.navy,col2:C.navyD,gloss:true,strip:12,glow:T_.amber},Object.assign({sound:'metal',hard:2.5,light:[9,5,1]},grp));
+const FL=(name,display,sp,o)=>K.add(name,display,Object.assign({kind:'floor',side:0x4A5462,sidePat:'techpanel',sideSpec:{col:0x4A5462,col2:0x2E3440}},sp),Object.assign({opaque:true,filter:15,sound:'metal',hard:2},grp,o||{}));
+FL('vx_floor_hangar','Hangar Tile Deck',{pat:'plaza',col:0x8D9AB2,col2:0x5A6472});
+FL('vx_floor_hangar_line','Hangar Light-Line',{pat:'line',family:'hangar',col:0x8D9AB2,col2:0x5A6472,glow:T_.cyan},{light:[0,7,9]});
+VM.registerLate(NAMES);
+
+
+
+const stone={cat:'build',group:G_.HEART,tool:'pick',needTool:true,sound:'stone',hard:2,blast:8};
+const sm=()=>T('temple_stone_dark_smooth'),side=(n)=>()=>{const s=sm();return{top:s,bottom:s,side:T(n)};};
+def2('temple_stone_dark',Object.assign({display:'Dark Temple Stone',tex:()=>T('temple_stone_dark')},stone));
+def2('temple_stone_dark_smooth',Object.assign({display:'Smooth Dark Temple Stone',tex:sm},stone));
+def2('temple_stone_dark_band',Object.assign({display:'Carved Dark Temple Band',tex:side('temple_stone_dark_band')},stone));
+def2('temple_pilaster_dark',Object.assign({display:'Dark Temple Pilaster',props:[VR.PROPS.AXIS],tex:(p,s)=>VR.axisTex(T('temple_pilaster_dark'),sm())(p,s)},stone));
+def2('temple_light_bar_dark',Object.assign({display:'Orange Light Bar · Dark Stone',tex:side('temple_light_bar_dark'),light:[11,5,1],flags:F.EMISSIVE},stone,{hard:1}));
+def2('temple_slit_dark',Object.assign({display:'Cyan Light Slit · Dark Stone',tex:side('temple_slit_dark'),light:[3,9,11],flags:F.EMISSIVE},stone,{hard:1}));
+def2('amber_window_tall',Object.assign({display:'Tall Amber Window',tex:()=>T('amber_window_tall'),light:[12,7,2],flags:F.EMISSIVE},stone,{hard:1,sound:'glass'}));
+
+def2('gate_glow',Object.assign({display:'Gate Glow',props:[['ring',4]],tex:(p)=>T('gate_glow_'+(p.ring|0)),layer:'trans',opaque:false,filter:0,light:[10,6,2],flags:F.SELFCULL|F.EMISSIVE,solid:false},stone,{hard:50,blast:500,sound:'glass'}));
+});
+})(VR);
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -54535,7 +55143,7 @@ const{AXIS,FACING4,FACING6}=VR.PROPS;
 const{slab,stairs,wall}=VR.FAM;
 const{box,quad,cross,rotY,rotX}=MD;
 G.REALM='Realm · Crystals & Rock';
-G.STAR='Starforge · Sci-fi';
+G.STAR='Sternglut · Sci-fi';
 VR.GROUP_ORDER.push(G.REALM,G.STAR);
 
 
@@ -54712,7 +55320,7 @@ const SLOTS=['helmet','chestplate','leggings','boots'];
 for(const m in ARM)SLOTS.forEach((s,i)=>item(m+'_'+s,{cat:'combat',stack:1,armor:ARM[m][i],slot:i,mat:m,color:ARM[m][4],texKey:'armor:'+s+':'+m,dur:100+i*20}));
 
 
-item('laser_blaster',{cat:'tech',stack:1,use:'laser',dmg:7,name:'Pulse Blaster',energy:1});
+item('laser_blaster',{cat:'tech',stack:1,use:'laser',dmg:7,name:'Calm Beam',energy:1});
 item('mining_laser',{cat:'tech',stack:1,use:'minelaser',name:'Mining Laser',energy:1});
 item('builder_wand',{cat:'tech',stack:1,use:'wand',name:'Builder Wand'});
 item('jetpack',{cat:'tech',stack:1,slot:1,armor:2,jetpack:true,name:'Jetpack'});
@@ -59121,7 +59729,7 @@ return K.grid;
 
 const ARCHS=['shuttle','interceptor','gunship','racer','dropship','freighter','cruiser','carrier'];
 const ANAMES=['Shuttle','Interceptor','Gunship','Racer','Dropship','Frachter','Kreuzer','Träger'];
-const PAL=[['sf','starforge','Starforge'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
+const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
 const STATION=7;
 Forge.register({
 id:'shuttle',icon:'🚀',name:'Raumschiff',en:'Spaceship',level:true,sh:1,
@@ -60178,6 +60786,7 @@ const PHRASE={
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
+'Hangar Screen':'Hangar-Bildschirm','Radar':'Radaranzeige','Gauges':'Messanzeigen','Hangar Console':'Hangar-Konsole',
 'Arched Window':'Bogenfenster','Stained Glass':'Buntglas','Town Lamp':'Stadtlaterne','Striped Awning':'Streifenmarkise',
 'Shop Sign':'Ladenschild','Market Stall':'Marktstand','Town Fountain':'Stadtbrunnen','Gold Band':'Goldband','White Stone':'weißer Stein',
 'Blue':'Blau','Gold':'Gold','Rose':'Rosé','Amber':'Bernstein','Teal':'Petrol','Bread':'Brot','Cup':'Tasse','Book':'Buch','Flower':'Blume',
@@ -62104,7 +62713,7 @@ VR.I18N.add('en',{
 'Double-tap Space in Creative or Zen Builder to fly. Hold Ctrl or double-tap W to go faster.',
 'Zen Builder: no mobs, no damage, no hunger. Freeze time and weather from the pause menu.',
 'Dark rock needles rise over the lavender fields — their veins glimmer at night.',
-'Aether rivers are liquid energy: bottle them with a bucket for Starforge tech.',
+'Aether rivers are liquid energy: bottle them with a bucket for Sternglut tech.',
 'Middle-click a block to pick it into your hotbar.',
 'Press F2 for a screenshot, F1 to hide the HUD, F5 to change the camera.',
 'Press M for the world map and N to drop a waypoint.',
@@ -62152,23 +62761,23 @@ VR.I18N.add('en',{
 'g.zen.ghostOff':'Ghost off',
 'g.zen.tod':'Time of day',
 
-'g.foe.name.driller':'Drill Walker','g.foe.name.sentry':'Warden','g.foe.name.crane':'Crane Arm','g.foe.name.drone':'Shadow Drone','g.foe.name.wisp':'Shadow Wisp',
+'g.foe.name.driller':'Drill Walker','g.foe.name.sentry':'Keeper','g.foe.name.crane':'Crane Arm','g.foe.name.drone':'Dusk Drone','g.foe.name.wisp':'Dusk Wisp',
 'g.foe.hearts':'Hearts',
 'g.foe.funke.first':'Careful, a confused machine! When its eye lights up, something is coming — step aside.',
 'g.foe.funke.weak':'Its core glows through the vents — that is its weak spot.',
 'g.foe.funke.core':'Right on the core! Just there.',
 'g.foe.funke.calm':'You can calm it too: go close and press [{key}].',
-'g.foe.funke.drones':'Shadow drones! Their orbs are slow — just dodge them.',
+'g.foe.funke.drones':'Dusk drones! Their orbs are slow — just dodge them.',
 'g.foe.funke.wisps':'Shadow wisps … they do not like light at all. A lamp keeps them away.',
-'g.foe.funke.gift':'Here, a Pulse Blaster! It never hurts people or animals — it only puts confused machines to rest.',
+'g.foe.funke.gift':'Here, a Calm Beam! It never hurts people or animals — it only puts confused machines to rest.',
 'g.foe.funke.faint':'Whoops! I brought you somewhere safe.',
 'g.foe.funke.easier':'That was tricky. Shall I make it easier?',
 'g.foe.faint':'Fading out …','g.foe.wake.beacon':'You woke up at the beacon — everything is still there.','g.foe.wake.home':'You woke up at home — everything is still there.',
 'g.foe.easier.q':'Shall I make it easier?','g.foe.easier.yes':'Yes, easier','g.foe.easier.no':'No, thanks','g.foe.easier.done':'From now on: {band}.',
 'g.foe.pile':'{taler} are still lying where you got dizzy.','g.foe.pileBack':'Picked up {taler} again.',
-'g.foe.gift':'🎁 A Pulse Blaster from Funke','g.foe.leave':'The machines settle down and withdraw.',
+'g.foe.gift':'🎁 A Calm Beam from Funke','g.foe.leave':'The machines settle down and withdraw.',
 'g.lib.calm.hint':'[{key}] in the green arc','g.lib.calm.ok':'✓ Calmed — its eye glows green.','g.lib.calm.miss':'Once more … wait for the green arc.',
-'g.lib.ring':'Hold the beacon · {p} %','g.lib.ring.out':'Back into the circle! It waits for you.','g.lib.ring.wave':'Shadow drones incoming!','g.lib.ring.start':'Hold the circle round the beacon!',
+'g.lib.ring':'Hold the beacon · {p} %','g.lib.ring.out':'Back into the circle! It waits for you.','g.lib.ring.wave':'Dusk drones incoming!','g.lib.ring.start':'Hold the circle round the beacon!',
 'g.lib.puz.title':'Light Conduits','g.lib.puz.help':'Turn the conduits until the light flows from the crystal to the lamp.','g.lib.puz.later':'Later','g.lib.puz.done':'✦ The light flows!','g.lib.puz.hint':'🛠 Skill: {n} pieces already sit right.',
 'g.lib.freed.kick':'✦ FREED ✦','g.lib.freed.title':'Outpost {name}','g.lib.freed.sub':'{r}\nTrading post · landing pad · fast travel',
 'g.lib.funke.freed':'It shines again! Can you hear that? The whole outpost is singing!',
@@ -62176,6 +62785,8 @@ VR.I18N.add('en',{
 'g.lib.funke.helper':'Look, it stands up again — with a green eye. It wants to help you!',
 'g.lib.funke.ring':'Stay in the circle! Drones are coming — dodge their orbs.',
 'g.lib.funke.stoer':'First the machines here must come to rest — calm them with [{key}] or stop them.',
+
+'g.lib.n.nordwiese':'Northmeadow','g.lib.n.kupferhang':'Copperslope','g.lib.n.sternwiese':'Starmeadow','g.lib.n.fruehlicht':'Dawnlight','g.lib.n.silbergrat':'Silverridge','g.lib.n.funkenfeld':'Sparkfield','g.lib.n.weitblick':'Farview','g.lib.n.glimmerhoehe':'Glimmerheight','g.lib.n.abendtau':'Evendew','g.lib.n.wolkenrast':'Cloudperch','g.lib.n.lichtung':'Brightglade','g.lib.n.steinbogen':'Stonearch','g.lib.n.bernsteinkamm':'Ambercrest','g.lib.n.himmelsau':'Skymead','g.lib.n.westhain':'Westgrove','g.lib.n.taufeld':'Dewfield',
 'g.lib.trader':'Helper · trading post','g.lib.helper':'Helper','g.lib.site':'Outpost {name}',
 'g.lib.fast.title':'Fast travel','g.lib.fast.none':'Free a second beacon — then you can travel between them.','g.lib.fast.go':'⚡ To {name} · {d}','g.lib.fast.close':'Back',
 'g.lib.journal':'Beacons','g.lib.journal.none':'No beacon found yet.','g.lib.journal.freed':'Outpost {name} · freed on day {day}','g.lib.journal.stoer':'Outpost {name} · disturbed ({n} machines)',
@@ -62660,7 +63271,7 @@ VR.I18N.add('en',{
 'g.cat.nature':'Nature',
 'g.cat.func':'Functional',
 'g.cat.volt':'Volt & Mech',
-'g.cat.tech':'Starforge',
+'g.cat.tech':'Sternglut',
 'g.cat.tools':'Tools',
 'g.cat.combat':'Combat',
 'g.cat.food':'Food',
@@ -62716,8 +63327,8 @@ VR.I18N.add('en',{
 'g.codex.m.crystal':['Shard Find','Found a crystal shard.','Some creatures carry shards.'],
 'g.codex.m.aether':['Liquid Energy','Bottled aether in a bucket.','Blue rivers hum with power.'],
 'g.codex.m.star_core':['Meteor Hunter','Recovered a star core from a meteor crater.','Watch the night sky in Survival.'],
-'g.codex.m.outpost':['Outpost Explorer','Opened a crate at a Starforge outpost.','Find a landing pad with a tower.'],
-'g.codex.m.blaster':['Armed & Ready','Got hold of a Pulse Blaster.','Outposts and Starforge crafting.'],
+'g.codex.m.outpost':['Outpost Explorer','Opened a crate at a Sternglut outpost.','Find a landing pad with a tower.'],
+'g.codex.m.blaster':['Armed & Ready','Got hold of a Calm Beam.','Outposts and Sternglut crafting.'],
 'g.codex.m.jetpack':['Rocket Pack','Flew with a jetpack.','Wear it, jump, hold Space.'],
 'g.codex.m.bike':['Hover Time','Rode a hoverbike.','Outposts keep one parked nearby.'],
 'g.codex.m.ship':['Take the Helm','Flew a ship built from blocks.','Right-click a Ship Helm inside a hull.'],
@@ -62801,6 +63412,9 @@ VR.I18N.add('en',{
 'g.funke.wow.skyray':['{when} a cloud ray glides by!'],
 'g.funke.wow.convoy':['{when} a convoy flies over the land.'],
 'g.funke.wow.musician':['{when} someone plays music on the square.'],
+'g.funke.regie.call':['See that red-violet light out there? A beacon is disturbed — {d} from here. I\'ll show you the way!','Something red-violet glimmers on the horizon: a disturbed outpost, {d} away. Come on, I\'ll show you the way!'],
+'g.funke.regie.sight':['There it is: outpost {name}. See the red-violet flicker? Its machines are confused.','Outpost {name} — disturbed. Careful, its sentries patrol round the pad.'],
+'g.funke.regie.stray':['Up ahead, a stray! It got lost — it means no harm, it is looking for its beacon. Press [V] to calm it.','Look, a lost sentry. It is only confused — talk to it with [V] and it will calm down.'],
 'g.funke.wow.ship':['{when} a ship lands on the pad!'],
 'g.funke.wow.ship_temple':['{when} a ship lands at the Gate Temple!'],
 'g.funke.wow.festival':['Lantern festival in {name} tonight! You have to go.'],
@@ -64488,7 +65102,7 @@ VR.I18N.add('en',{
 'story.c4.b1.3':'Hi, this is Lumi from Nova Haven! Grandpa\'s notes say: a guardian sleeps under the ice of Opal.',
 'story.c4.b2.1':'Shh. Look into the ice. Down there … a guardian.',
 'story.c4.b2.2':'Its eye is still awake. It glows very faintly, as if it were dreaming.',
-'story.c4.b2.3':'The Ice Warden! Grandpa writes that it only wakes when Amarant swallows the sun.',
+'story.c4.b2.3':'The Ice Keeper! Grandpa writes that it only wakes when Amarant swallows the sun.',
 'story.c4.b2.4':'Then we wait for the eclipse. I\'ll count with you!',
 'story.c4.b3.1':'It\'s happening! Amarant is sliding in front of the sun!',
 'story.c4.b3.2':'Quick now! In the shadow the ice shows a pattern …',
@@ -64524,6 +65138,25 @@ VR.I18N.add('en',{
 'story.guest':'📖 New chapter at the host\'s: {title}',
 'g.set.storyOffer':'Story: Funke announces chapters',
 'g.set.storyOffer.tip':'When you have been calm for a while, Funke picks up a signal — [V] plays a short scene. Never while building or in a fight. Off: the chapters wait in the journal.',
+
+
+'story.act.c1.b1':'Take a good look at the view.',
+'story.act.c1.b2':'Scan the outpost with Funke: look at it and press [V].',
+'story.act.c1.b3':'Take a close look at the red flicker.',
+'story.act.c2.b1':'Touch the beacon: walk right up to it and press [V].',
+'story.act.c2.b2':'Turn round and look back at the light over the canyon.',
+'story.act.c2.b3':'Scan the sky with Funke: look up and press [V].',
+'story.act.c3.b1':'High up, look straight at the horizon — see how it bends?',
+'story.act.c3.b2':'Take a photo of the sky for Captain Jonte.',
+'story.act.c3.b3':'Touch the dust of Basalt: stand on the moon and press [V].',
+'story.act.c4.b1':'Scan the ice of Opal: look down and press [V].',
+'story.act.c4.b2':'Keep Amarant in view until the eclipse comes.',
+'story.act.c4.b3':'Photograph the eclipse!',
+'story.act.done':'Done! I\'ll write that in the journal.',
+'story.act.scanning':'Scanning … beep … beep … saved!',
+'story.act.j':'Little task',
+'story.ctx.scan':'Scan',
+'story.ctx.touch':'Touch',
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -64784,7 +65417,7 @@ VR.I18N.add('de',{
 'Im Kreativ- oder Zen-Modus zweimal Leertaste: fliegen. Strg halten oder zweimal W: schneller.',
 'Zen-Bauen: keine Monster, kein Schaden, kein Hunger. Zeit und Wetter hältst du im Pause-Menü an.',
 'Über den Lavendelfeldern ragen dunkle Felsnadeln auf — ihre Adern glimmen nachts.',
-'Ätherflüsse sind flüssige Energie: mit einem Eimer abfüllen, für die Starforge-Technik.',
+'Ätherflüsse sind flüssige Energie: mit einem Eimer abfüllen, für die Sternglut-Technik.',
 'Mittelklick auf einen Block holt ihn in deine Schnellleiste.',
 'F2 macht ein Foto, F1 blendet das HUD aus, F5 wechselt die Kamera.',
 'M öffnet die Weltkarte, N setzt einen Wegpunkt.',
@@ -64832,23 +65465,23 @@ VR.I18N.add('de',{
 'g.zen.ghostOff':'Geist aus',
 'g.zen.tod':'Tageszeit',
 
-'g.foe.name.driller':'Bohrläufer','g.foe.name.sentry':'Wächter','g.foe.name.crane':'Kranarm','g.foe.name.drone':'Schattendrohne','g.foe.name.wisp':'Schattenwesen',
+'g.foe.name.driller':'Bohrläufer','g.foe.name.sentry':'Wächter','g.foe.name.crane':'Kranarm','g.foe.name.drone':'Dämmerdrohne','g.foe.name.wisp':'Schattenwesen',
 'g.foe.hearts':'Herzen',
 'g.foe.funke.first':'Achtung, eine verwirrte Maschine! Wenn ihr Auge aufleuchtet, kommt gleich etwas — dann weich zur Seite aus.',
 'g.foe.funke.weak':'Ihr Kern glüht durch die Lüftung — dort ist sie verwundbar.',
 'g.foe.funke.core':'Volltreffer am Kern! Genau dort.',
 'g.foe.funke.calm':'Du kannst sie auch beruhigen: geh nah heran und drück [{key}].',
-'g.foe.funke.drones':'Schattendrohnen! Ihre Kugeln sind langsam — einfach ausweichen.',
+'g.foe.funke.drones':'Dämmerdrohnen! Ihre Kugeln sind langsam — einfach ausweichen.',
 'g.foe.funke.wisps':'Schattenwesen … Licht mögen sie gar nicht. Eine Lampe hält sie fern.',
-'g.foe.funke.gift':'Hier, ein Pulsblaster! Menschen und Tieren tut er nichts — nur verwirrte Maschinen kommen damit zur Ruhe.',
+'g.foe.funke.gift':'Hier, ein Ruhestrahler! Menschen und Tieren tut er nichts — nur verwirrte Maschinen kommen damit zur Ruhe.',
 'g.foe.funke.faint':'Hoppla! Ich hab dich in Sicherheit gebracht.',
 'g.foe.funke.easier':'Das war knifflig. Soll ich es leichter machen?',
 'g.foe.faint':'Ohnmacht …','g.foe.wake.beacon':'Du bist am Leuchtfeuer aufgewacht — alles ist noch da.','g.foe.wake.home':'Du bist zu Hause aufgewacht — alles ist noch da.',
 'g.foe.easier.q':'Soll ich es leichter machen?','g.foe.easier.yes':'Ja, leichter','g.foe.easier.no':'Nein, danke','g.foe.easier.done':'Ab jetzt: {band}.',
 'g.foe.pile':'{taler} liegen noch dort, wo dir schwindelig wurde.','g.foe.pileBack':'{taler} wieder eingesammelt.',
-'g.foe.gift':'🎁 Ein Pulsblaster von Funke','g.foe.leave':'Die Maschinen kommen zur Ruhe und ziehen sich zurück.',
+'g.foe.gift':'🎁 Ein Ruhestrahler von Funke','g.foe.leave':'Die Maschinen kommen zur Ruhe und ziehen sich zurück.',
 'g.lib.calm.hint':'[{key}] im grünen Bogen','g.lib.calm.ok':'✓ Beruhigt — ihr Auge leuchtet grün.','g.lib.calm.miss':'Noch einmal … warte auf den grünen Bogen.',
-'g.lib.ring':'Leuchtfeuer halten · {p} %','g.lib.ring.out':'Zurück in den Kreis! Er wartet auf dich.','g.lib.ring.wave':'Schattendrohnen im Anflug!','g.lib.ring.start':'Halte den Kreis um das Leuchtfeuer!',
+'g.lib.ring':'Leuchtfeuer halten · {p} %','g.lib.ring.out':'Zurück in den Kreis! Er wartet auf dich.','g.lib.ring.wave':'Dämmerdrohnen im Anflug!','g.lib.ring.start':'Halte den Kreis um das Leuchtfeuer!',
 'g.lib.puz.title':'Lichtleiter','g.lib.puz.help':'Dreh die Leitungen, bis das Licht vom Kristall bis zur Lampe fließt.','g.lib.puz.later':'Später','g.lib.puz.done':'✦ Das Licht fließt!','g.lib.puz.hint':'🛠 Geschick: {n} Teile sitzen schon richtig.',
 'g.lib.freed.kick':'✦ BEFREIT ✦','g.lib.freed.title':'Außenposten {name}','g.lib.freed.sub':'{r}\nHandelsposten · Landeplatz · Schnellreise',
 'g.lib.funke.freed':'Es leuchtet wieder! Hörst du das? Der ganze Außenposten singt!',
@@ -64856,6 +65489,8 @@ VR.I18N.add('de',{
 'g.lib.funke.helper':'Schau, sie steht wieder auf — mit grünem Auge. Sie möchte dir helfen!',
 'g.lib.funke.ring':'Bleib im Kreis! Gleich kommen Drohnen — weich ihren Kugeln aus.',
 'g.lib.funke.stoer':'Erst müssen die Maschinen hier zur Ruhe kommen — beruhige sie mit [{key}] oder halte sie auf.',
+
+'g.lib.n.nordwiese':'Nordwiese','g.lib.n.kupferhang':'Kupferhang','g.lib.n.sternwiese':'Sternwiese','g.lib.n.fruehlicht':'Frühlicht','g.lib.n.silbergrat':'Silbergrat','g.lib.n.funkenfeld':'Funkenfeld','g.lib.n.weitblick':'Weitblick','g.lib.n.glimmerhoehe':'Glimmerhöhe','g.lib.n.abendtau':'Abendtau','g.lib.n.wolkenrast':'Wolkenrast','g.lib.n.lichtung':'Lichtung','g.lib.n.steinbogen':'Steinbogen','g.lib.n.bernsteinkamm':'Bernsteinkamm','g.lib.n.himmelsau':'Himmelsau','g.lib.n.westhain':'Westhain','g.lib.n.taufeld':'Taufeld',
 'g.lib.trader':'Helfer · Handelsposten','g.lib.helper':'Helfer','g.lib.site':'Außenposten {name}',
 'g.lib.fast.title':'Schnellreise','g.lib.fast.none':'Befreie ein zweites Leuchtfeuer — dann kannst du zwischen ihnen reisen.','g.lib.fast.go':'⚡ Nach {name} · {d}','g.lib.fast.close':'Zurück',
 'g.lib.journal':'Leuchtfeuer','g.lib.journal.none':'Noch kein Leuchtfeuer gefunden.','g.lib.journal.freed':'Außenposten {name} · befreit an Tag {day}','g.lib.journal.stoer':'Außenposten {name} · gestört ({n} Maschinen)',
@@ -65340,7 +65975,7 @@ VR.I18N.add('de',{
 'g.cat.nature':'Natur',
 'g.cat.func':'Nützliches',
 'g.cat.volt':'Volt & Mechanik',
-'g.cat.tech':'Starforge',
+'g.cat.tech':'Sternglut',
 'g.cat.tools':'Werkzeuge',
 'g.cat.combat':'Kampf',
 'g.cat.food':'Essen',
@@ -65396,8 +66031,8 @@ VR.I18N.add('de',{
 'g.codex.m.crystal':['Scherbenfund','Eine Kristallscherbe gefunden.','Manche Tiere tragen Scherben bei sich.'],
 'g.codex.m.aether':['Flüssige Energie','Äther in einen Eimer gefüllt.','Blaue Flüsse summen vor Kraft.'],
 'g.codex.m.star_core':['Meteorjäger','Einen Sternkern aus einem Meteorkrater geholt.','Schau im Überleben nachts in den Himmel.'],
-'g.codex.m.outpost':['Außenposten erkundet','Eine Kiste an einem Starforge-Außenposten geöffnet.','Such einen Landeplatz mit Turm.'],
-'g.codex.m.blaster':['Bewaffnet & bereit','Einen Pulse Blaster in die Hand bekommen.','Außenposten und Starforge-Herstellung.'],
+'g.codex.m.outpost':['Außenposten erkundet','Eine Kiste an einem Sternglut-Außenposten geöffnet.','Such einen Landeplatz mit Turm.'],
+'g.codex.m.blaster':['Bewaffnet & bereit','Einen Ruhestrahler in die Hand bekommen.','Außenposten und Sternglut-Herstellung.'],
 'g.codex.m.jetpack':['Raketenrucksack','Mit einem Jetpack geflogen.','Anziehen, springen, Leertaste halten.'],
 'g.codex.m.bike':['Schwebezeit','Ein Hoverbike gefahren.','Bei Außenposten steht meist eins.'],
 'g.codex.m.ship':['Ans Steuer','Ein Schiff aus Blöcken geflogen.','Rechtsklick auf ein Ship Helm in einem Rumpf.'],
@@ -65481,6 +66116,9 @@ VR.I18N.add('de',{
 'g.funke.wow.skyray':['{when} gleitet ein Wolkenrochen vorbei!'],
 'g.funke.wow.convoy':['{when} fliegt ein Konvoi übers Land.'],
 'g.funke.wow.musician':['{when} spielt jemand Musik auf dem Platz.'],
+'g.funke.regie.call':['Siehst du das rotviolette Licht dort hinten? Ein Leuchtfeuer ist gestört — {d} von hier. Ich zeig dir den Weg!','Da glimmt etwas Rotviolettes am Horizont: ein gestörter Außenposten, {d} entfernt. Komm, ich zeig dir den Weg!'],
+'g.funke.regie.sight':['Da ist er: Außenposten {name}. Siehst du das rotviolette Flackern? Seine Maschinen sind durcheinander.','Außenposten {name} — gestört. Vorsichtig, seine Wächter patrouillieren um die Plattform.'],
+'g.funke.regie.stray':['Da vorn, ein Irrläufer! Der hat sich verirrt — er tut nichts, er sucht sein Leuchtfeuer. Mit [V] kannst du ihn beruhigen.','Schau, ein verirrter Wächter. Er ist nur durcheinander — sprich ihn mit [V] an, dann beruhigt er sich.'],
 'g.funke.wow.ship':['{when} landet ein Schiff auf der Landeplattform!'],
 'g.funke.wow.ship_temple':['{when} landet ein Schiff am Tor-Tempel!'],
 'g.funke.wow.festival':['Heute Abend ist Laternenfest in {name}! Da musst du hin.'],
@@ -67204,6 +67842,25 @@ VR.I18N.add('de',{
 'story.guest':'📖 Neues Kapitel beim Gastgeber: {title}',
 'g.set.storyOffer':'Geschichte: Funke meldet Kapitel',
 'g.set.storyOffer.tip':'Bist du eine Weile in Ruhe, meldet Funke ein Signal — [V] spielt eine kurze Szene. Nie beim Bauen oder in einem Kampf. Aus: die Kapitel warten im Tagebuch.',
+
+
+'story.act.c1.b1':'Schau dir den Ausblick in Ruhe an.',
+'story.act.c1.b2':'Scanne mit Funke den Außenposten: Schau hin und drück [V].',
+'story.act.c1.b3':'Schau dir das rote Flackern genau an.',
+'story.act.c2.b1':'Berühre das Leuchtfeuer: Geh ganz nah heran und drück [V].',
+'story.act.c2.b2':'Dreh dich um und schau zurück zum Licht über dem Canyon.',
+'story.act.c2.b3':'Scanne mit Funke den Himmel: Schau nach oben und drück [V].',
+'story.act.c3.b1':'Schau hoch oben geradeaus zum Horizont — siehst du, wie er sich biegt?',
+'story.act.c3.b2':'Mach ein Foto vom Himmel für Kapitän Jonte.',
+'story.act.c3.b3':'Berühre den Staub von Basalt: Steh auf dem Mond und drück [V].',
+'story.act.c4.b1':'Scanne das Eis von Opal: Schau nach unten und drück [V].',
+'story.act.c4.b2':'Behalte Amarant im Blick, bis die Finsternis kommt.',
+'story.act.c4.b3':'Fotografiere die Finsternis!',
+'story.act.done':'Geschafft! Das schreib ich ins Tagebuch.',
+'story.act.scanning':'Scanne … piep … piep … gespeichert!',
+'story.act.j':'Kleine Aufgabe',
+'story.ctx.scan':'Scannen',
+'story.ctx.touch':'Berühren',
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -70508,7 +71165,7 @@ const iconOf=(id)=>{if(!icons){const t=C.texInfo();if(!t|| !VR.Icons)return null
 const nameOf=(id)=>{const t=R.byName[id];return t?(t.display||id):(VR.ITEMS&&VR.ITEMS[id]?VR.ITEMS[id].name||id:id);};
 
 
-const PCATS=[['all','Alle'],['fav','★ Favoriten'],['recent','Zuletzt'],['modern','Modern & Vollton'],['build','Bauen'],['arch','Voxel Homes'],['vtech','Möbel & Technik'],['vlife','Leben'],['vshop','Markt'],['nature','Natur'],['func','Funktion'],['volt','Mechanik'],['tech','Starforge']];
+const PCATS=[['all','Alle'],['fav','★ Favoriten'],['recent','Zuletzt'],['modern','Modern & Vollton'],['build','Bauen'],['arch','Voxel Homes'],['vtech','Möbel & Technik'],['vlife','Leben'],['vshop','Markt'],['nature','Natur'],['func','Funktion'],['volt','Mechanik'],['tech','Sternglut']];
 PCATS.splice(4,0,['vmodern','✨ Modern Living']);
 let itemsByCat=null,itemSet=null;
 const FV=()=>VR.Favs;
@@ -70520,7 +71177,7 @@ itemsByCat={all:[]};
 for(const t of R.types){
 if(!t.cat||t.o.noItem||t.o.cutOf||t.name==='air')continue;
 if(t.o.kind==='model'&&t.has&&t.has('part')&& !VM.MODELS[t.name]&& !(VX.spec&&VX.spec(t.defaultState)))continue;
-let c=t.cat;if(t.group&& /Starforge|Realm/.test(t.group)&&t.group.indexOf('Starforge')>=0)c='tech';if(c==='creative')c='func';
+let c=t.cat;if(t.group&& /Sternglut|Realm/.test(t.group)&&t.group.indexOf('Sternglut')>=0)c='tech';if(c==='creative')c='func';
 (itemsByCat[c]||(itemsByCat[c]=[])).push(t.name);itemsByCat.all.push(t.name);
 }
 itemSet=new Set(itemsByCat.all);
