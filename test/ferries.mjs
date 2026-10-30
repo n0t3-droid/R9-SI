@@ -5,7 +5,8 @@
 //   2 · the dock: a ferry on its pad with its crew → ferry_dock.png; [V] → the panel → aboard: the chase view over the lift
 //       → ride_ferry.png; the trip to Herzwelt; Herzwelt's ferry port (herz_port.png when it found a place)
 //   3 · /raum herz: the traffic between the worlds → space_traffic.png; the star map's home card → trade_route.png
-//   4 · back to Basalt by ferry (the arrival shot → ride_arrive.png when Herzwelt has its port), then a 5-min watching
+//   4 · /dim opal: its settlement of ice-block halls → opal_village.png; the ferry Opal → Basalt (the arrival shot →
+//       ride_arrive.png), then a 5-min watching
 //       session at the plaza: the watcher turns toward the nearest moving craft (as a player does) — the event log's
 //       weighted events per minute (sessionstats.js) ≥ 2.0
 //   5 · the frame at the plaza: Very Low and High, the life on / off (ms, draws)
@@ -87,12 +88,15 @@ run.grown = st; console.log('  grown ' + JSON.stringify(st));
 check(st.pre >= 5 && st.built >= 5 && st.people >= 8, `three days later: ${st.pre} prefabs (greenhouses, lamps), ${st.built}/${st.lots} homes built, ${st.people} people`);
 await settle(20);
 const S = await ev(() => { const s = VR.game.life.site; return [s.x + 0.5, s.y + 1, s.z + 0.5]; });
-await ev((S) => { const p = VR.game.player; p.flying = true; p.teleport(S[0] - 34, S[1] + 26, S[2] + 52); }, S);
-await settle(20); await lookAt([S[0] + 2, S[1] + 1, S[2] - 2]); await step(20, 33);
+await ev((S) => { const p = VR.game.player; p.flying = true; p.teleport(S[0] - 26, S[1] + 15, S[2] + 40); VR.game.hideHud = true; }, S);
+await settle(20); await lookAt([S[0] + 2, S[1] + 1, S[2] - 4]);
+// (the hero shot: a moment with no craft crossing within 200 m of the eye)
+await ev(() => { const g = VR.game, A = g.life.actor, pad = A.pads.get('pass'), s = g.life.site, F = VR.Ferries; for (let k = 0; k < 40; k++) { let near = false; const t = A.clock; for (let j = Math.floor(t / F.PASS.slot) - 2; j <= Math.floor(t / F.PASS.slot); j++) { const q = F.passPos(F.passAt(pad.seed, j), t, s.x, s.y, s.z, null); if (q && Math.hypot(q.pos[0] - g.player.pos[0], q.pos[2] - g.player.pos[2]) < 200) near = true; } if (!near) break; A.clock += 9; } });
+await step(20, 33);
 const pv = await grab('moon_village.png', 6);
 await ev(() => VR.game.env.setTime(18500)); await step(10, 33);
 const pvn = await grab('moon_village_night.png', 6);
-await ev(() => VR.game.env.setTime(6000));
+await ev(() => { VR.game.env.setTime(6000); VR.game.hideHud = false; });
 sheet.push({ label: 'Basalt: eine Siedlung nach drei Tagen (Tag · Nacht)', imgs: [pv, pvn].filter(Boolean) });
 
 // ---------------------------------------------------------------- 2 · the dock, the ride
@@ -128,7 +132,7 @@ if (pad) {
   check(ok, 'the ferry brought us to Herzwelt');
   await settle(40);
   let hp = null; for (let i = 0; i < 20; i++) { await step(30, 33); hp = await ev(() => { const r = VR.game.meta.life.docks.overworld; return r ? { x: r.x, y: r.y, z: r.z, pre: (VR.game.meta.life.pre.overworld || []).length } : null; }); if (hp && hp.pre >= 1) break; }
-  run.herzPort = hp; console.log('  Herzwelt port ' + JSON.stringify(hp));
+  run.herzPort = hp; console.log('  Herzwelt port ' + JSON.stringify(hp) + ' ' + JSON.stringify(await ev(() => VR.Ferries.stats.herz || null)));
   if (hp) { await ev((h) => { const p = VR.game.player; p.flying = true; p.teleport(h.x - 18, h.y + 14, h.z + 26); }, hp); await settle(15); await lookAt([hp.x, hp.y + 2, hp.z]); await step(20, 33); const hpp = await grab('herz_port.png', 6); if (hpp) sheet.push({ label: 'Herzwelt: der Fährhafen (am Spawn gefunden)', imgs: [hpp] }); }
 }
 
@@ -149,14 +153,25 @@ if (want('space')) {
   sheet.push({ label: 'Im All: Fähren, Frachter, Kleinschiffe · Sternkarte: Handelsrouten', imgs: [ps, pt].filter(Boolean) });
 }
 
-// ---------------------------------------------------------------- 4 · back to Basalt by ferry, the watching session
+// ---------------------------------------------------------------- 4 · Opal (its halls), by ferry back to Basalt, the watching session
 let back = false;
-const hasPort = await ev(() => !!(VR.game.life && VR.game.life.plan && VR.game.dim === 'overworld'));
-if (hasPort) {
+if (await trip(() => { VR.Travel.go(VR.game, { dim: 'opal', via: 'cmd' }); }, 'opal')) {
+  await settle(30);
+  let so = null;
+  for (let i = 0; i < 40; i++) { await step(30, 33); so = await ev(() => { const L = VR.game.life; return { vil: !!(L && L.vil), pre: ((VR.game.meta.life.pre || {}).opal || []).length }; }); if (so.vil) break; await settle(3); }
+  await ev(() => VR.Ferries.age(VR.game, 3));
+  for (let i = 0; i < 30; i++) { await step(30, 33); so = await ev(() => { const L = VR.game.life; return { pre: VR.game.meta.life.pre.opal.length, built: L.vil ? (L.vil.st.built || []).length : -1, q: !!L.q }; }); if (so.pre >= 5 && !so.q && so.built >= 6) break; }
+  check(so.pre >= 5 && so.built >= 5, `Opal: a settlement of ice-block halls (${so.built} built, ${so.pre} prefabs)`);
+  const O = await ev(() => { const s = VR.game.life.site; return [s.x + 0.5, s.y + 1, s.z + 0.5]; });
+  await ev((O) => { const p = VR.game.player; p.flying = true; p.teleport(O[0] + 30, O[1] + 14, O[2] + 36); VR.game.hideHud = true; }, O);
+  await settle(20); await lookAt([O[0] - 2, O[1] + 1, O[2] - 4]); await step(20, 33);
+  const po = await grab('opal_village.png', 6);
+  await ev(() => { VR.game.hideHud = false; });
+  if (po) sheet.push({ label: 'Opal: Eisblock-Hallen, Gewächshaus, Anleger', imgs: [po] });
   await ev(() => { const L = VR.game.life, p = [...L.actor.pads.values()].find(q => q.kind === 'ferry' && q.to === 'basalt'); const c = VR.PadLife.visitAt(p.seed, L.actor.clock, null, p.o); L.actor.clock = c.T + 20 - (p.shift || 0); VR.Ferries.take(VR.game, p); });
   for (let i = 0; i < 500; i++) { await step(10, 33); const s = await ev(() => ({ st: VR.game.state, dim: VR.game.dim, busy: VR.Travel.busy(VR.game), arr: !!(VR.game.life && VR.game.life.arr) })); if (s.dim === 'basalt' && s.st === 'play' && !s.busy && s.arr) { back = true; break; } await wait(20); }
-  if (back) { await settle(10); for (let i = 0; i < 6; i++) await step(10, 33); const pa = await grab('ride_arrive.png', 4); if (pa) sheet.push({ label: 'Ankunft auf Basalt: die Fähre setzt auf', imgs: [pa] }); for (let i = 0; i < 10; i++) await step(10, 33); }
-  check(back, 'Herzwelt → Basalt by ferry, the arrival shot');
+  if (back) { for (let i = 0; i < 9; i++) await step(10, 33); const pa = await grab('ride_arrive.png', 4); if (pa) sheet.push({ label: 'Mit der Fähre von Opal: Ankunft auf Basalt', imgs: [pa] }); for (let i = 0; i < 10; i++) await step(10, 33); }
+  check(back, 'Opal → Basalt by ferry, the arrival shot over the pad');
 }
 if (!back) { await trip(() => { VR.Travel.go(VR.game, { dim: 'basalt', via: 'cmd' }); }, 'basalt'); await settle(30); }
 if (want('pilot')) {
@@ -181,14 +196,14 @@ if (want('pilot')) {
 
 // ---------------------------------------------------------------- 5 · the frame's cost at the plaza
 if (want('cost')) {
-  await ev((S) => { const p = VR.game.player; p.flying = false; p.teleport(S[0] + 1, S[1] + 0.2, S[2] + 6); }, S);
+  await ev((S) => { const g = VR.game, p = g.player; p.flying = false; p.teleport(S[0] + 1, S[1] + 0.2, S[2] + 6); if (g.ui && g.ui.screen && g.ui.show) g.ui.show(null); }, S);
   await settle(15); await lookAt([S[0] + 1, S[1] + 2, S[2] - 10]);
   const cost = {};
   for (const preset of ['potato', 'high']) {
     await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, preset);
     await settle(20);
     for (const life of [false, true, false, true]) {
-      const r = await ev(([life]) => { const g = VR.game; g.settings.spaceLife = life; window.__norender = false; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws }; }, [life]);
+      const r = await ev(([life]) => { const g = VR.game; g.settings.spaceLife = life; window.__norender = false; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws, tris: g.renderer.stats.tris, state: g.state, screen: g.ui && g.ui.screen }; }, [life]);
       const k = preset + (life ? '_on' : '_off'); (cost[k] || (cost[k] = [])).push(r);
     }
   }

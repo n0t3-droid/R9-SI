@@ -100,6 +100,25 @@
     });
     return out;
   };
+  // the craft in low orbits round the inhabited worlds (waiting for their slot, servicing, coming and going): per body
+  // 2 (Very Low) or 6, 4–30 km up, each on its own plane, a lap in 6–14 minutes → out [{body, kind, n, e1, e2, r (×R), th}]
+  Fe.ORBIT_AT = ['herz', 'basalt', 'opal', 'aqua'];
+  Fe.orbiters = function (t, wseed, tier, out) {
+    out = out || []; out.length = 0;
+    const per = (tier | 0) <= 0 ? 2 : 6;
+    Fe.ORBIT_AT.forEach((b, bi) => {
+      for (let i = 0; i < per; i++) {
+        const r = (j) => hh((wseed | 0) + bi * 977, i, j);
+        const z = r(1) * 2 - 1, a = r(2) * TAU, q = Math.sqrt(1 - z * z), n = [q * Math.cos(a), z, q * Math.sin(a)];
+        const ax = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], d0 = ax[0] * n[0] + ax[1] * n[1] + ax[2] * n[2];
+        let e1 = [ax[0] - n[0] * d0, ax[1] - n[1] * d0, ax[2] - n[2] * d0]; const l1 = Math.hypot(e1[0], e1[1], e1[2]); e1 = [e1[0] / l1, e1[1] / l1, e1[2] / l1];
+        const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]];
+        const lap = 360 + r(3) * 480, th = r(4) * TAU + TAU * t / lap;
+        out.push({ body: b, kind: r(5) < 0.3 ? 'freighter' : 'small', n: i, e1, e2, alt: 4000 + r(6) * 26000, th, seed: (Math.imul(bi + 11, 0x51ed27) ^ i) >>> 0 });
+      }
+    });
+    return out;
+  };
   // the cruise law along a route: a craft leaves A's surface H0 up, its distance to the nearer surface growing
   // exponentially to the half-way point, then the same down to B (U§5.5: speed ∝ the distance to the nearest surface);
   // lat (−1 … 1) its lane beside the line. pa, pb: the bodies' centres (m); ra, rb: their radii → out (m)
@@ -166,7 +185,7 @@
   }
   // the kits: the house of each world (Basalt domes, Opal ice-block halls; the Herzwelt terminal has no homes)
   Fe.KIT = {
-    basalt: { kit: 'dome', wall: 'vx_tech_white', glass: 'vx_dome_glass', floor: 'vx_tech_hex_white', fill: 'vx_tech_gray', bed: 'light_blue_bed', door: 'door_glass_white', paving: 'vx_floor_pad' },
+    basalt: { kit: 'dome', wall: 'vx_tech_white', band: 'hull_stripe_blue', glass: 'vx_dome_glass', floor: 'vx_tech_hex_white', fill: 'vx_tech_gray', bed: 'light_blue_bed', door: 'door_glass_white', paving: 'vx_floor_pad' },
     opal: { kit: 'ice', wall: 'packed_ice', glass: 'vx_dome_glass', roof: 'blue_ice', floor: 'vx_tech_hex_white', fill: 'packed_ice', bed: 'white_bed', door: 'door_glass_white', paving: 'vx_floor_pad' },
     overworld: { kit: 'terminal', wall: 'vx_tech_white', glass: 'vx_dome_glass', floor: 'vx_tech_hex_white', fill: 'vx_tech_gray', paving: 'vx_floor_pad' },
   };
@@ -189,7 +208,7 @@
     for (let dy = 0; dy <= 4; dy++) for (let dx = -5; dx <= 5; dx++) for (let dz = -5; dz <= 5; dz++) {
       const d = Math.sqrt(dx * dx + dz * dz + (dy * 1.15) * (dy * 1.15)); if (d > 4.5) continue;
       const y = F + 1 + dy, x = cx + dx, z = cz + dz;
-      if (d > 3.4) put(x, y, z, st(dy <= 1 ? K.wall : K.glass)); else put(x, y, z, 0);
+      if (d > 3.4) put(x, y, z, st(dy === 0 ? K.wall : dy === 1 ? K.band : K.glass)); else put(x, y, z, 0);
     }
     const dzd = 4 * s, fac = s > 0 ? 2 : 0;
     put(cx, F + 1, cz + dzd, st(K.door, { facing: fac, half: 0 })); put(cx, F + 2, cz + dzd, st(K.door, { facing: fac, half: 1 }));
@@ -467,13 +486,15 @@
   function herzSite(g) {
     const w = g.world, Tv = VR.Travel, sp = Tv && Tv.herzTarget ? Tv.herzTarget(g, true).pos : g.player.pos; if (!sp) return null;
     const R = R0(); let best = null, bs = 1e9;
-    for (let k = 0; k < 16; k++) {
-      const a = k / 16 * TAU, r = 34 + (k % 3) * 12, x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
-      if (!loadedRound(w, x, z, Fe.PADX + 6)) continue;
+    Fe.stats.herz = { tried: 0, loaded: 0 };
+    for (let k = 0; k < 64; k++) {
+      const a = (k + (k >> 4) * 0.5) / 16 * TAU, r = 34 + Math.floor(k / 16) * 28; Fe.stats.herz.tried++;
+      const x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
+      if (!loadedRound(w, x, z, Fe.PADX + 6)) continue; Fe.stats.herz.loaded++;
       const y0 = topAt(w, x, z, Math.round(sp[1])); let ok = true, sc = 0;
       for (let dx = -Fe.PADX - 4; dx <= Fe.PADX + 4 && ok; dx += 2) for (let dz = -4; dz <= 4 && ok; dz += 2) {
         const y = topAt(w, x + dx, z + dz, y0), n = R.types[R.T.type[w.getBlock(x + dx, y, z + dz)]], nm = n ? n.name : '';
-        if (Math.abs(y - y0) > 2 || !NATURAL.test(nm) || BUILT.test(nm)) ok = false; else sc += Math.abs(y - y0);
+        if (Math.abs(y - y0) > 3 || !NATURAL.test(nm) || BUILT.test(nm)) { ok = false; Fe.stats.herz.why = nm + ' ' + (y - y0); } else sc += Math.abs(y - y0);
       }
       if (ok && sc < bs) { bs = sc; best = { x, y: y0, z, day0: (g.env && g.env.day) | 0, id: 'life:overworld:' + (wseedOf(g) & 0xffff) }; }
     }
@@ -738,7 +759,27 @@ void main() {
       I[k + 7] = Math.min(90, speed * 0.5 / d * pxr + rpx * 2);
       I[k + 8] = KN[c.kind]; I[k + 9] = (c.seed % 997) / 997; I[k + 10] = vis * (c.kind === 'small' ? 0.8 : 1.2);
       I[k + 11] = sun ? clamp(0.5 + 0.5 * -(sx * sun[0] + sy * sun[1] + sz * sun[2]), 0, 1) : 0.5;
-      if (++n >= 64) break;
+      if (++n >= 48) break;
+    }
+    // the craft in orbit round the worlds
+    const ol = Fe.orbiters(t, wseedOf(g), tier, TR.orb || (TR.orb = []));
+    for (const c of ol) {
+      if (n >= 64) break;
+      const b = eph.bodies[c.body], B = VR.SpaceScene.BODIES[c.body]; if (!b || !B) continue;
+      const rr = B.R + c.alt, ct = Math.cos(c.th), sn = Math.sin(c.th);
+      for (let i = 0; i < 3; i++) TR.p[i] = b.p[i] + rr * (c.e1[i] * ct + c.e2[i] * sn);
+      rel[0] = TR.p[0] - cam[0]; rel[1] = TR.p[1] - cam[1]; rel[2] = TR.p[2] - cam[2];
+      const d = Math.hypot(rel[0], rel[1], rel[2]); if (d < 5 || d > 3e7) continue;
+      const vis = 1 - LK.smooth((d - 6e5) / 6e6); if (vis <= 0.01 || hidden(eph, cam, rel, d)) continue;
+      const vx = -c.e1[0] * sn + c.e2[0] * ct, vy = -c.e1[1] * sn + c.e2[1] * ct, vz = -c.e1[2] * sn + c.e2[2] * ct;
+      const sx = (rel[0] * ax[0][0] + rel[1] * ax[0][1] + rel[2] * ax[0][2]) / d, sy = (rel[0] * ax[1][0] + rel[1] * ax[1][1] + rel[2] * ax[1][2]) / d, sz = (rel[0] * ax[2][0] + rel[1] * ax[2][1] + rel[2] * ax[2][2]) / d;
+      const k = n * 12, rpx = Math.max(1.5, Math.min(24, SIZE[c.kind] / d * pxr * 0.5)), speed = TAU * rr / 600;
+      I[k] = sx * DF; I[k + 1] = sy * DF; I[k + 2] = sz * DF; I[k + 3] = rpx;
+      I[k + 4] = vx * ax[0][0] + vy * ax[0][1] + vz * ax[0][2]; I[k + 5] = vx * ax[1][0] + vy * ax[1][1] + vz * ax[1][2]; I[k + 6] = vx * ax[2][0] + vy * ax[2][1] + vz * ax[2][2];
+      I[k + 7] = Math.min(60, speed * 0.5 / d * pxr + rpx * 2);
+      I[k + 8] = KN[c.kind]; I[k + 9] = (c.seed % 997) / 997; I[k + 10] = vis * 1.1;
+      I[k + 11] = sun ? clamp(0.5 + 0.5 * -(sx * sun[0] + sy * sun[1] + sz * sun[2]), 0, 1) : 0.5;
+      n++;
     }
     TR.n = n; Fe.stats.space = n;
     if (n) fr.draws.push({ prog: 'fe_traffic', fn: drawTraffic, n });
@@ -773,27 +814,38 @@ void main() {
   // a small orrery of Helia's worlds where they are now (log radius), the routes as lines (ferries cyan, freight amber),
   // the craft on them as dots — the same craft as in space, at the same moment
   Fe.drawRoutes = function (cv, g) {
-    const U = VR.Universe; if (!cv || !U || !U.home) return false;
+    const U = VR.Universe; if (!cv || !U || !U.home || !U.home.by.amarant) return false;
     const X = cv.getContext('2d'), W = cv.width, H = cv.height, t = VR.StarJump ? VR.StarJump.worldT(g) : 0;
     X.fillStyle = '#050914'; X.fillRect(0, 0, W, H);
-    const pos = {}, P = (id) => { const v = U.home.pos(id, t); return [v[0], v[1]]; };
-    const ids = ['herz', 'aqua', 'amarant', 'opal', 'basalt', 'swarm'];
-    for (const id of ids) if (U.home.by[id]) pos[id] = P(id);
-    const all = Object.values(pos), rmax = Math.max(...all.map(v => Math.hypot(v[0], v[1]))) || 1, rmin = Math.min(...all.map(v => Math.hypot(v[0], v[1]) || rmax)) || 1;
-    const cx = W / 2, cy = H / 2 + 4, R = Math.min(W, H) / 2 - 18;
-    const toXY = (v) => { const r = Math.hypot(v[0], v[1]) || 1, rr = 18 + (Math.log(r / rmin) / Math.max(0.3, Math.log(rmax / rmin))) * (R - 18), a = Math.atan2(v[1], v[0]); return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.62]; };
-    // the moons beside their planet (a fixed small offset: the log scale would put them on it)
-    const xy = {};
-    for (const id of ids) { if (!pos[id]) continue; const b = U.home.by[id]; if (b.parent && b.parent !== 'helia' && pos[b.parent]) { const pp = toXY(pos[b.parent]), rel = U.home.rel(id, t); const a = Math.atan2(rel[1], rel[0]); xy[id] = [pp[0] + Math.cos(a) * 16, pp[1] + Math.sin(a) * 10]; } else xy[id] = toXY(pos[id]); }
-    X.fillStyle = '#fff2c0'; X.beginPath(); X.arc(cx, cy, 5, 0, TAU); X.fill();
+    // Amarant's family in the middle (its moons by their distance, log scale), Herzwelt's Aquamarin beside it; Helia and
+    // the swarm at the edge in their directions
+    const cx = W / 2, cy = H / 2 - 4, R = Math.min(W / 2, H / 2 / 0.62) - 22, xy = {};
+    const pA = U.home.pos('amarant', t), rel = (id) => { const v = U.home.pos(id, t); return [v[0] - pA[0], v[1] - pA[1]]; };
+    const moons = ['herz', 'opal', 'basalt'].filter(id => U.home.by[id]), ds = moons.map(id => Math.hypot(...rel(id)));
+    const dmin = Math.min(...ds), dmax = Math.max(...ds);
+    const place = (v, rr) => { const a = Math.atan2(v[1], v[0]); return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.62]; };
+    xy.amarant = [cx, cy];
+    moons.forEach((id, i) => { xy[id] = place(rel(id), 34 + (Math.log(ds[i] / dmin) / Math.max(0.3, Math.log(dmax / dmin))) * (R - 60)); });
+    if (U.home.by.aqua && xy.herz) { const v = U.home.rel('aqua', t), a = Math.atan2(v[1], v[0]); xy.aqua = [xy.herz[0] + Math.cos(a) * 16, xy.herz[1] + Math.sin(a) * 10]; }
+    const hel = rel('helia'); xy.helia = place(hel, R + 8);
+    if (U.home.by.swarm) xy.swarm = place(rel('swarm'), R - 6);
+    // Amarant's orbits
+    X.strokeStyle = '#7fd4ff22'; X.lineWidth = 1;
+    moons.forEach((id) => { const r = Math.hypot(xy[id][0] - cx, (xy[id][1] - cy) / 0.62); X.beginPath(); X.ellipse(cx, cy, r, r * 0.62, 0, 0, TAU); X.stroke(); });
     const at = (dim) => xy[Fe.BODY[dim]];
-    X.lineWidth = 1.5;
-    for (const r of Fe.ROUTES) { const a = at(r.a), b = at(r.b); if (!a || !b) continue; X.strokeStyle = r.ferry ? '#7fe8ffaa' : '#ffc27a77'; X.setLineDash(r.ferry ? [] : [4, 4]); X.beginPath(); X.moveTo(a[0], a[1]); X.lineTo(b[0], b[1]); X.stroke(); }
+    X.lineWidth = 1.6;
+    for (const r of Fe.ROUTES) { const a = at(r.a), b = at(r.b); if (!a || !b) continue; X.strokeStyle = r.ferry ? '#7fe8ffcc' : '#ffc27a88'; X.setLineDash(r.ferry ? [] : [5, 4]); X.beginPath(); X.moveTo(a[0], a[1]); X.lineTo(b[0], b[1]); X.stroke(); }
     X.setLineDash([]);
     const list = Fe.traffic(((g.env && g.env.day) || 0) * 1200 + ((g.env && g.env.ticks) || 0) / 20, wseedOf(g), 2, []);
-    for (const c of list) { const r = Fe.route(c.route), a = at(r.a), b = at(r.b); if (!a || !b) continue; const u = c.u; X.fillStyle = c.kind === 'ferry' ? '#9af4ff' : c.kind === 'freighter' ? '#ffcc88' : '#dfe6ff'; X.beginPath(); X.arc(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, c.kind === 'freighter' ? 2.4 : 1.7, 0, TAU); X.fill(); }
+    for (const c of list) { const r = Fe.route(c.route), a = at(r.a), b = at(r.b); if (!a || !b) continue; const u = c.u; X.fillStyle = c.kind === 'ferry' ? '#c8faff' : c.kind === 'freighter' ? '#ffcc88' : '#dfe6ff'; X.beginPath(); X.arc(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, c.kind === 'ferry' ? 2.6 : c.kind === 'freighter' ? 2.2 : 1.5, 0, TAU); X.fill(); }
     X.font = '11px sans-serif'; X.textAlign = 'center';
-    for (const id of ids) { const p = xy[id]; if (!p) continue; const b = U.home.by[id], nm = b && b.name ? (VR.I18N && VR.I18N.lang !== 'de' ? (b.name.en || b.name.de) : b.name.de) : id; X.fillStyle = id === 'amarant' ? '#e8c49a' : id === 'swarm' ? '#a99' : '#9affd8'; X.beginPath(); X.arc(p[0], p[1], id === 'amarant' ? 5 : 3.2, 0, TAU); X.fill(); X.fillStyle = '#cfe3ff'; X.fillText(nm, p[0], p[1] - 7); }
+    const nameOf = (id) => { const b = U.home.by[id]; return b && b.name ? (VR.I18N && VR.I18N.lang !== 'de' ? (b.name.en || b.name.de) : b.name.de) : id; };
+    for (const id of Object.keys(xy)) {
+      const p = xy[id], big = id === 'amarant' || id === 'helia';
+      X.fillStyle = id === 'helia' ? '#fff2c0' : id === 'amarant' ? '#e8c49a' : id === 'swarm' ? '#b9a9a0' : '#9affd8';
+      X.beginPath(); X.arc(p[0], p[1], big ? 5.5 : 3.4, 0, TAU); X.fill();
+      X.fillStyle = '#cfe3ff'; X.fillText(nameOf(id), p[0], p[1] + (id === 'aqua' ? 14 : -8));
+    }
     X.textAlign = 'left'; X.fillStyle = '#cfe3ffcc'; X.fillText(T('g.fe.legend', { n: list.length }), 8, H - 8);
     return true;
   };

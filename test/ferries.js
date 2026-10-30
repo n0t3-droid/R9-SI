@@ -50,6 +50,8 @@ console.log('b · the traffic');
   let np = 0, dmin = 1e9, dmax = 0; const archs = new Set();
   for (let k = 10; k < 10 + 120; k++) { const P = Fe.passAt(77, k); archs.add(P.arch); let best = 1e9; for (let t = P.t0; t < P.t0 + 70; t += 0.25) { const q = Fe.passPos(P, t, 0, 0, 0, null); if (!q) continue; best = Math.min(best, Math.hypot(q.pos[0], q.pos[1], q.pos[2])); } if (best < 1e9) { np++; dmin = Math.min(dmin, best); dmax = Math.max(dmax, best); } }
   check(np === 120 && dmin >= 40 && dmax <= 115 && archs.size === 3, `the craft over the settlement: ${np} in an hour of slots (${(60 / Fe.PASS.slot).toFixed(1)} a minute), nearest ${dmin.toFixed(0)}–${dmax.toFixed(0)} m, ${[...archs].join(', ')}`);
+  const ob = Fe.orbiters(500, 4242, 2, []), ob0 = Fe.orbiters(500, 4242, 0, []), ob2 = Fe.orbiters(560, 4242, 2, []);
+  check(ob.length === 24 && ob0.length === 8 && ob.every(c => c.alt >= 4000 && c.alt <= 30000 && Math.abs(c.e1[0] * c.e2[0] + c.e1[1] * c.e2[1] + c.e1[2] * c.e2[2]) < 1e-9) && ob2.every((c, i) => c.th > ob[i].th), `craft in orbit round ${Fe.ORBIT_AT.length} worlds: ${ob.length} (Very Low ${ob0.length}), 4–30 km up, moving`);
   const o1 = JSON.stringify(Fe.traffic(1234.5, 9, 2, [])), o2 = JSON.stringify(Fe.traffic(1234.5, 9, 2, []));
   check(o1 === o2, 'pure: the same clock, the same craft');
   const A = [0, 0, 0], B = [1e9, 0, 0], p = [0, 0, 0];
