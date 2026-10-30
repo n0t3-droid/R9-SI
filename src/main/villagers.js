@@ -339,7 +339,7 @@
     if (!passC) { passC = new Uint8Array(n); standC = new Uint8Array(n); cachedN = 0; }
     const t0 = budgetMs !== undefined ? performance.now() : 0;
     for (; cachedN < n; cachedN++) {
-      if (budgetMs !== undefined && (cachedN & 31) === 0 && performance.now() - t0 >= budgetMs) return false;
+      if (budgetMs !== undefined && performance.now() - t0 >= budgetMs) return false;   // (every state: one may build a model, up to 90 ms)
       const s = cachedN;
       const fl = R.T.flags[s], t = R.types[R.T.type[s]];
       const kind = t && t.o.kind;
