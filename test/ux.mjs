@@ -91,7 +91,7 @@ async function tour(label, w, h, settings, full, card) {
   await ev(() => { const b = document.querySelector('#create [data-act="docreate"]'); const n = document.getElementById('cw_seed'); if (n) n.value = '4242'; if (b) b.click(); else VR.game.createWorld({ name: 'UX', mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true, first: true }); });
   for (let i = 0; i < 40; i++) { await wait(250); if (await ev(() => VR.game.ui.screen === 'loading' || VR.game.state === 'play')) break; }
   await wait(1500); await shot('loading');
-  for (let i = 0; i < 300; i++) { await wait(1000); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.arrival)) break; }
+  for (let i = 0; i < 420; i++) { await wait(1000); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.arrival)) break; if (i > 150) await ev(() => { const a = VR.game.arrival; if (a && a.skip) a.skip(); }); }   // (SwiftShader at 1080p: the arrival's flight can take minutes — Esc's skip after 150 s)
   await wait(2500); await shot('first'); await hud('first');
   // the first minute: standing still → the hint for moving / looking
   await ev(() => { const g = VR.game; g.input.captured = true; });
