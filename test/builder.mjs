@@ -67,11 +67,12 @@ await ev(({ X, Y, Z }) => { for (let x = -3; x <= 3; x++) __t.set(X + x, Y, Z - 
 await settle(20);
 const place = async (fx, name, dx) => ev(({ X, Y, Z, fx, name, dx }) => {
   const g = VR.game; g.settings.buildFx = fx; if (g._bfCombo) g._bfCombo.reset();
-  __t.hold(name); const pitches = [], p0 = g.particles.count;
+  __t.hold(name); const pitches = [], BF = VR.BuildFx, ob = BF.burst; let bursts = 0; BF.burst = function () { bursts++; return ob.apply(this, arguments); };
   __t.steps(6);
   for (let k = 0; k < 3; k++) { __t.look([X + dx + k + 0.5, Y + 1, Z - 3.5]); __t.frame(); const a = g.audio; let pm = 0; const op = a.place.bind(a); a.place = function (s, at) { pm = this.pitchMul || 1; return op(s, at); }; __t.click(2); a.place = op; pitches.push(+pm.toFixed(3)); __t.steps(5); }
   __t.look([X + dx + 1.5, Y + 1.2, Z - 3.5]);
-  return { pitches, p0, parts: g.particles.count };
+  BF.burst = ob;
+  return { pitches, bursts, parts: g.particles.count };
 }, { X, Y, Z, fx, name, dx });
 let a0 = await place(false, 'oak_planks', -2);
 await settle(10);
@@ -84,7 +85,7 @@ pics.placeA = await shot('builder_place_after');
 check(JSON.stringify(a0.pitches) === '[1,1,1]', `Bau-Effekte aus: the old sound (${a0.pitches})`);
 check(JSON.stringify(a1.pitches) === '[1,1.125,1.25]', `on: three quick blocks climb (${a1.pitches})`);
 check(popN.pops >= 1, `the pop is drawn (${popN.pops})`);
-check(a1.parts - a1.p0 > a0.parts - a0.p0 + 10, `particles rise: off ${a0.p0} → ${a0.parts}, on ${a1.p0} → ${a1.parts}`);
+check(a0.bursts === 0 && a1.bursts === 3, `a burst of particles per block with the effects on (off ${a0.bursts}, on ${a1.bursts})`);
 const vl = await ev(() => { const g = VR.game, P = g.Game ? null : VR.Game.PRESETS; return { potato: P.potato.buildFx, low: P.low.buildFx, bal: P.balanced.buildFx }; });
 check(vl.potato === false && vl.low === true && vl.bal === true, `Very Low off, Low and Balanced on (${JSON.stringify(vl)})`);
 

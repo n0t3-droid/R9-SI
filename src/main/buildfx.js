@@ -53,7 +53,7 @@
       const a = rnd() * 6.283, cx = x + 0.5 + Math.cos(a) * 0.55, cz = z + 0.5 + Math.sin(a) * 0.55, ox = Math.cos(a), oz = Math.sin(a);
       const shade = 0.85 + rnd() * 0.3, col = [c[0] * shade, c[1] * shade, c[2] * shade];
       switch (R0.kind) {
-        case 'dust': case 'puff': P.spawn(cx, y + 0.05 + rnd() * 0.15, cz, ox * (1.2 + rnd() * 0.8), 0.35 + rnd() * 0.5, oz * (1.2 + rnd() * 0.8), { life: 0.55 + rnd() * 0.35, size: (R0.kind === 'puff' ? 0.16 : 0.13) + rnd() * 0.06, grav: -0.3, col, drag: 3, grow: R0.kind === 'puff' ? 0.55 : 0.35, collide: false, alpha: 0.7 }); break;
+        case 'dust': case 'puff': P.spawn(cx, y + 0.05 + rnd() * 0.15, cz, ox * (1.2 + rnd() * 0.8), 0.35 + rnd() * 0.5, oz * (1.2 + rnd() * 0.8), { life: 0.55 + rnd() * 0.35, size: (R0.kind === 'puff' ? 0.16 : 0.13) + rnd() * 0.06, grav: -0.3, col, drag: 3, grow: R0.kind === 'puff' ? 0.55 : 0.35, collide: false, alpha: 0.85 }); break;
         case 'chips': P.spawn(cx, y + 0.3 + rnd() * 0.6, cz, ox * (1 + rnd()), 2 + rnd() * 1.5, oz * (1 + rnd()), { life: 0.45 + rnd() * 0.25, size: 0.045 + rnd() * 0.03, grav: 14, col }); if (i % 2 === 0) P.spawn(cx, y + 0.05, cz, ox * 1.4, 0.4, oz * 1.4, { life: 0.5, size: 0.12 + rnd() * 0.05, grav: -0.3, col: [0.7, 0.66, 0.6], drag: 3, grow: 0.35, collide: false, alpha: 0.55 }); break;   // (and a little dust where it lands)
         case 'leaves': P.spawn(cx, y + 0.5 + rnd() * 0.5, cz, ox * 0.8, 1 + rnd() * 0.8, oz * 0.8, { life: 0.8 + rnd() * 0.4, size: 0.05 + rnd() * 0.025, grav: 2.5, col, drag: 1.8, collide: false }); break;
         case 'splash': P.spawn(cx, y + 0.9, cz, ox * 1.2, 2 + rnd() * 2, oz * 1.2, { life: 0.5 + rnd() * 0.3, size: 0.045, grav: 16, col }); break;
@@ -139,7 +139,7 @@
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     for (const q of L) {
       if (!q.on) continue;
-      const age = now - q.t, a = BF.popAlpha(age), flash = 1 + 0.6 * Math.max(0, 1 - age / (BF.POP_DUR * 0.7)), br = Math.max(0.16, (q.sky / 15) * day, q.blk / 15) * 0.92 * flash;   // (it lands with a flash of light that fades as it settles)
+      const age = now - q.t, a = BF.popAlpha(age), flash = 1 + 0.6 * Math.max(0, 1 - age / (BF.POP_DUR * 0.7)), br = Math.max(0.16, (q.sky / 15) * day, q.blk / 15) * 1.3 * flash;   // (1.3: the sunlit block's level in the scene — at 0.92 the pop read darker than the block, builder.mjs run 3)   // (it lands with a flash of light that fades as it settles)
       for (let f = 0; f < 6; f++) {
         gl.uniform1f(p.u.u_layer, R.T.tex[q.s * 6 + f] & 0xfff);
         const b = br * SHADE[f]; gl.uniform4f(p.u.u_color, b, b, b, a);
