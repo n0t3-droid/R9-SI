@@ -618,7 +618,7 @@
       const sel = $('#sy_paint');
       if (!sel.options.length) {
         sel.appendChild(el('option', '', esc(T('g.sy.designer')))); sel.options[0].value = '';
-        for (const p of VR.Starship.PAL) { const o = el('option', '', esc(VR.palName ? VR.palName(p.key, p.name) : p.name));   // (f-first: the livery's name from the tables o.value = p.key; sel.appendChild(o); }
+        for (const p of VR.Starship.PAL) { const o = el('option', '', esc(VR.palName ? VR.palName(p.key, p.name) : p.name)); o.value = p.key; sel.appendChild(o); }
         sel.onchange = () => { this.syPaint = sel.value || null; this.renderShipyard(); };
       }
       this.renderShipyard();
