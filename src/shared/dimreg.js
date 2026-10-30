@@ -25,26 +25,26 @@
       DIMS.set(id, d); CODES[id] = d.code | 0;
       return d;
     },
-    get(id) { return DIMS.get(id) || null; },
-    has(id) { return DIMS.has(id); },
+    get(id) { return DIMS.get(id) || (DimReg.resolve && DimReg.resolve(id)) || null; },   // u-stars: the worlds of other stars resolved on demand (galaxy.js)
+    has(id) { return DIMS.has(id) || !!(DimReg.resolve && DimReg.resolve(id)); },   // u-stars
     list() { return [...DIMS.keys()]; },
-    sky(id) { const d = DIMS.get(id); return d ? !!d.sky : false; },
-    code(id) { const d = DIMS.get(id); return d ? d.code | 0 : 0; },
-    g(id) { const d = DIMS.get(id); return d && d.g > 0 ? d.g : G_HOME; },
+    sky(id) { const d = DimReg.get(id); return d ? !!d.sky : false; },
+    code(id) { const d = DimReg.get(id); return d ? d.code | 0 : 0; },
+    g(id) { const d = DimReg.get(id); return d && d.g > 0 ? d.g : G_HOME; },
     // the player's gravity there: the genre's 30 at home, every world in its true ratio (spec §4.3)
     gravity(id) { return GRAV_HOME * (DimReg.g(id) / G_HOME); },
-    actorsHome(id) { const d = DIMS.get(id); return !!(d && d.actors === 'home'); },
-    horizon(id) { const d = DIMS.get(id); return !!(d && d.horizon); },
-    mp(id) { const d = DIMS.get(id); return d ? d.mp : 'none'; },
-    gen(id) { const d = DIMS.get(id); return d && d.gen ? d.gen : null; },
-    name(id) { const d = DIMS.get(id); return d && d.name ? d.name : ['g.dim.unknown', id, id]; },
+    actorsHome(id) { const d = DimReg.get(id); return !!(d && d.actors === 'home'); },
+    horizon(id) { const d = DimReg.get(id); return !!(d && d.horizon); },
+    mp(id) { const d = DimReg.get(id); return d ? d.mp : 'none'; },
+    gen(id) { const d = DimReg.get(id); return d && d.gen ? d.gen : null; },
+    name(id) { const d = DimReg.get(id); return d && d.name ? d.name : ['g.dim.unknown', id, id]; },
     // a save's home dim: a flat world lives on its flat land, every other on Herzwelt
     home(meta) { return meta && meta.type === 'flat' ? 'flat' : 'overworld'; },
     // the dim a save opens: the one it was left in when this build knows it, else home (a save of a newer build left on
     // a world this one does not have opens at home, never on a half-made world); every old save opens as before
     dimOf(meta) {
       const home = DimReg.home(meta), d = meta && meta.dim;
-      if (!d || d === 'overworld' || d === 'flat' || !DIMS.has(d)) return home;
+      if (!d || d === 'overworld' || d === 'flat' || !DimReg.has(d)) return home;   // u-stars: DimReg.has (resolves x.* dims)
       return d;
     },
     // where a save can travel: its home and every dim marked travel

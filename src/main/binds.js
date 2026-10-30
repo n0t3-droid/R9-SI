@@ -46,7 +46,8 @@
     { id: 'rot', group: 'act', names: ['KeyR'], def: ['KeyR', ''] },
     { id: 'undo', group: 'act', names: ['KeyZ'], def: ['KeyZ', ''] },
     { id: 'invent', group: 'act', names: ['KeyI'], def: ['KeyI', ''] },   // 💡 Erfinderwerkstatt (invent.js reads the binding)
-    { id: 'journal', group: 'act', names: ['KeyJ'], def: ['KeyJ', ''] },   // a-quests: 📖 the Tagebuch of the Abenteuer (quests.js reads the binding)
+    { id: 'journal', group: 'act', names: ['KeyJ'], def: ['KeyJ', ''] },
+    { id: 'starmap', group: 'act', names: ['KeyO'], def: ['KeyO', ''] },   // u-stars: 🌌 the star map (starmap.js, starjump.js read KeyO)   // a-quests: 📖 the Tagebuch of the Abenteuer (quests.js reads the binding)
     { id: 'hud', group: 'view', names: ['F1'], def: ['F1', ''] },
     { id: 'shot', group: 'view', names: ['F2'], def: ['F2', ''] },
     { id: 'debug', group: 'view', names: ['F3'], def: ['F3', ''] },

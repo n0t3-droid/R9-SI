@@ -362,6 +362,7 @@
     if (ui.screen === 'rpgchar' && (e.key === 'Escape' || e.code === 'KeyO')) { e.preventDefault(); e.stopImmediatePropagation(); RP.close(); return; }
     if (e.code !== 'KeyO' || e.repeat || ui.typing || g.state !== 'play' || ui.screen || (ui.blocking && ui.screen)) return;
     if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (g.flight) return;   // (in a ship O is the star map, u-stars; on foot the character)
     if (RP.open()) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 
