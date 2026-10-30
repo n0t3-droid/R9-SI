@@ -12940,6 +12940,41 @@ def0('exo_glass',{display:'Dune Glass',cat:'nature',group:G.SOIL,tex:()=>T('exo_
 
 
 
+
+
+
+
+(function(VR){
+'use strict';
+VR.BL=VR.BL||{};
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,MD=VR.MODEL,F=VR.F,def=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!MD|| !def||R.byName.ferry_dock)return;
+const EMIT=(VR.FFLAG&&VR.FFLAG.EMIT)||4;
+const dock=()=>MD.cat(
+MD.box([2,0,2,14,2,14],{top:T('hull:dark'),side:T('hazard'),bottom:T('hull:dark')}),
+MD.box([6.5,2,6.5,9.5,22,9.5],{side:T('hull:white'),top:T('hull:gray'),bottom:T('hull:gray')}),
+MD.box([3,13,7,13,19,9],{side:T('hull:gray'),top:T('hull:dark'),bottom:T('hull:dark')}),
+MD.withFlags(MD.box([3.5,14,6.6,12.5,18.5,7],T('neon:cyan'),{cull:false}),EMIT),
+MD.withFlags(MD.box([5.5,22,5.5,10.5,25,10.5],T('neon:cyan'),{cull:false}),EMIT));
+def('ferry_dock',{display:'Fähranleger',cat:'func',group:G.STAR||null,shape:'model',layer:'cutout',tex:T('hull:white'),
+model:dock,light:[3,7,8],solid:true,opaque:false,hard:6,blast:30,tool:'pick',sound:'metal',flags:F.INTERACT,kind:'ferry_dock'});
+const lamp=()=>MD.cat(
+MD.box([1,13,6,15,15,10],{side:T('hull:gray'),top:T('hull:gray'),bottom:T('hull:dark')}),
+MD.withFlags(MD.box([1.5,12,6.5,14.5,13,9.5],T('neon:magenta'),{cull:false}),EMIT),
+MD.box([7.5,15,7.5,8.5,16,8.5],T('hull:dark')));
+def('grow_lamp',{display:'Pflanzenlicht',cat:'func',group:G.STAR||null,shape:'model',layer:'cutout',tex:T('hull:gray'),
+model:lamp,light:[12,7,11],solid:false,opaque:false,hard:1,blast:2,tool:'pick',sound:'glass',kind:'grow_lamp'});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -57040,6 +57075,41 @@ def0('exo_glass',{display:'Dune Glass',cat:'nature',group:G.SOIL,tex:()=>T('exo_
 
 
 
+
+
+
+
+(function(VR){
+'use strict';
+VR.BL=VR.BL||{};
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,MD=VR.MODEL,F=VR.F,def=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!MD|| !def||R.byName.ferry_dock)return;
+const EMIT=(VR.FFLAG&&VR.FFLAG.EMIT)||4;
+const dock=()=>MD.cat(
+MD.box([2,0,2,14,2,14],{top:T('hull:dark'),side:T('hazard'),bottom:T('hull:dark')}),
+MD.box([6.5,2,6.5,9.5,22,9.5],{side:T('hull:white'),top:T('hull:gray'),bottom:T('hull:gray')}),
+MD.box([3,13,7,13,19,9],{side:T('hull:gray'),top:T('hull:dark'),bottom:T('hull:dark')}),
+MD.withFlags(MD.box([3.5,14,6.6,12.5,18.5,7],T('neon:cyan'),{cull:false}),EMIT),
+MD.withFlags(MD.box([5.5,22,5.5,10.5,25,10.5],T('neon:cyan'),{cull:false}),EMIT));
+def('ferry_dock',{display:'Fähranleger',cat:'func',group:G.STAR||null,shape:'model',layer:'cutout',tex:T('hull:white'),
+model:dock,light:[3,7,8],solid:true,opaque:false,hard:6,blast:30,tool:'pick',sound:'metal',flags:F.INTERACT,kind:'ferry_dock'});
+const lamp=()=>MD.cat(
+MD.box([1,13,6,15,15,10],{side:T('hull:gray'),top:T('hull:gray'),bottom:T('hull:dark')}),
+MD.withFlags(MD.box([1.5,12,6.5,14.5,13,9.5],T('neon:magenta'),{cull:false}),EMIT),
+MD.box([7.5,15,7.5,8.5,16,8.5],T('hull:dark')));
+def('grow_lamp',{display:'Pflanzenlicht',cat:'func',group:G.STAR||null,shape:'model',layer:'cutout',tex:T('hull:gray'),
+model:lamp,light:[12,7,11],solid:false,opaque:false,hard:1,blast:2,tool:'pick',sound:'glass',kind:'grow_lamp'});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -67574,6 +67644,30 @@ VR.I18N.add('en',{
 "g.set.sun2":"Second sun with shadows",
 "g.set.sun2.tip":"On worlds of binary stars the second sun casts light and shadows too (Low and up; costs a little performance).",
 
+
+"g.fe.founded":"A settlement is born: {name}",
+"g.fe.foundedSub":"The first settlers arrive by ferry — watch {name} grow",
+"g.fe.grows":"{name} grows: {what}",
+"g.fe.grows.greenhouse":"a greenhouse",
+"g.fe.grows.lamps":"lights along the paths",
+"g.fe.neighbours":"New neighbours move to {name}",
+"g.fe.title":"⛴ Ferry dock {name}",
+"g.fe.to":"Ferry to {to}",
+"g.fe.parked":"at the dock · leaves in {t}",
+"g.fe.next":"lands in {t}",
+"g.fe.board":"Board",
+"g.fe.close":"Close",
+"g.fe.wait":"⛴ The ferry to {to} lands in {t} — wait at the dock",
+"g.fe.aboard":"⛴ Aboard — ferry to {to}",
+"g.fe.welcome":"Welcome to {name}",
+"g.fe.none":"No ferry leaves from here yet",
+"g.fe.routes":"Trade routes",
+"g.fe.legend":"Ferries · freighters · small craft — {n} under way",
+"g.fe.terminal":"Heartworld ferry port",
+"g.ctx.ferry":"Take the ferry",
+"g.set.spaceLife":"Life between the worlds",
+"g.set.spaceLife.tip":"Settlements on the moons, ferries and traffic in space",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -70721,6 +70815,30 @@ VR.I18N.add('de',{
 "g.stars2.sun2":"Zwei Sonnen — zwei Schatten.",
 "g.set.sun2":"Zweite Sonne mit Schatten",
 "g.set.sun2.tip":"Auf Welten von Doppelsternen wirft auch die zweite Sonne Licht und Schatten (ab Niedrig; kostet etwas Leistung).",
+
+
+"g.fe.founded":"Eine Siedlung entsteht: {name}",
+"g.fe.foundedSub":"Die ersten Siedler kommen mit der Fähre — sieh zu, wie {name} wächst",
+"g.fe.grows":"{name} wächst: {what}",
+"g.fe.grows.greenhouse":"ein Gewächshaus",
+"g.fe.grows.lamps":"Lichter an den Wegen",
+"g.fe.neighbours":"Neue Nachbarn ziehen nach {name}",
+"g.fe.title":"⛴ Fähranleger {name}",
+"g.fe.to":"Fähre nach {to}",
+"g.fe.parked":"liegt am Anleger · legt in {t} ab",
+"g.fe.next":"landet in {t}",
+"g.fe.board":"Einsteigen",
+"g.fe.close":"Schließen",
+"g.fe.wait":"⛴ Die Fähre nach {to} landet in {t} — warte am Anleger",
+"g.fe.aboard":"⛴ An Bord — Fähre nach {to}",
+"g.fe.welcome":"Willkommen in {name}",
+"g.fe.none":"Von hier fährt noch keine Fähre",
+"g.fe.routes":"Handelsrouten",
+"g.fe.legend":"Fähren · Frachter · Kleinschiffe — {n} unterwegs",
+"g.fe.terminal":"Fährhafen Herzwelt",
+"g.ctx.ferry":"Fähre nehmen",
+"g.set.spaceLife":"Leben zwischen den Welten",
+"g.set.spaceLife.tip":"Siedlungen auf den Monden, Fähren und Verkehr im All",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
