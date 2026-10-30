@@ -69,7 +69,7 @@ const PROBE = (opt) => {
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) T.long.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true }); } catch (e) { /* no long tasks here */ }
   // WebGL: the time the main thread spends in the shader calls (the queries wait for the compiler), the GPU bytes
   const P = WebGL2RenderingContext.prototype;
-  const timed = (name, kind) => { const o = P[name]; if (!o) return; P[name] = function () { const t0 = now(); try { return o.apply(this, arguments); } finally { const d = now() - t0; T.gl.ms += d; if (T.t.play === undefined) T.gl.msLoad += d; if (kind) T.gl[kind]++; } }; };
+  const timed = (name, kind) => { const o = P[name]; if (!o) return; P[name] = function () { const t0 = now(); try { return o.apply(this, arguments); } finally { const d = now() - t0; T.gl.ms += d; if (T.t.play === undefined) T.gl.msLoad += d; else if (T.t.frame === undefined) { T.gl.msFirst = (T.gl.msFirst || 0) + d; if (kind === 'links') T.gl.linksFirst = (T.gl.linksFirst || 0) + 1; } if (kind) T.gl[kind]++; } }; };
   timed('compileShader', 'compiles'); timed('linkProgram', 'links'); timed('getShaderParameter', 'waits'); timed('getProgramParameter', 'waits');
   timed('getUniformBlockIndex'); timed('getActiveUniform'); timed('getUniformLocation'); timed('getShaderInfoLog'); timed('getProgramInfoLog'); timed('getAttribLocation');
   const bound = new Map(), bufB = new WeakMap(), texB = new WeakMap(), texBound = new Map();
@@ -86,7 +86,8 @@ const PROBE = (opt) => {
   wrap('deleteTexture', (x) => { if (x && texB.has(x)) { T.gpu.tex -= texB.get(x); texB.delete(x); } });
   // the workers: the first message, the handlers' main-thread time, the jobs' worker ms by type
   const W = window.Worker;
-  const timeH = (fn) => function (e) { const t0 = now(); try { return fn.call(this, e); } finally { const d = now() - t0; T.wk.hMs += d; T.wk.hMsAll += d; } };
+  T.wk.hBy = {};
+  const timeH = (fn) => function (e) { const t0 = now(); try { return fn.call(this, e); } finally { const d = now() - t0; T.wk.hMs += d; T.wk.hMsAll += d; const ty = (e && e.data && e.data.type) || '?'; const r = T.wk.hBy[ty] || (T.wk.hBy[ty] = [0, 0, 0]); r[0]++; r[1] += d; if (d > r[2]) r[2] = d; } };
   window.Worker = function (url, o) {
     const w = new W(url, o);
     T.wk.n++;
@@ -117,7 +118,7 @@ const PROBE = (opt) => {
         T.frames++;
         const st = window.VR.game.state;
         if (st === 'loading') { T.loadFrames++; T.loadFrameMs += now() - t0; }
-        if (st === 'play' && T.t.frame === undefined) { mark('frame'); try { T.heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null; } catch (e) { T.heap = null; } }
+        if (st === 'play' && T.t.frame === undefined) { T.firstRenderMs = now() - t0; mark('frame'); try { T.heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null; } catch (e) { T.heap = null; } }
         return out;
       };
     }
@@ -154,18 +155,18 @@ async function loadOnce(ctx, b, preset, kind, seedN) {
     await page.goto(urlOf(b), { waitUntil: 'commit', timeout: 120000 });
     for (;;) {
       await page.waitForTimeout(300);
-      res = await page.evaluate(() => { const T = window.__eb; if (!T) return null; const g = window.VR && VR.game; return { t: T.t, gl: T.gl, wk: { first: T.wk.first, n: T.wk.n, hMs: T.wk.hMsAll, types: T.wk.types }, long: T.long, err: T.err, heap: T.heap, loadFrames: T.loadFrames, loadFrameMs: T.loadFrameMs, texMs: g && g.texMs, texFromCache: g && !!g.texFromCache, loadStart: g && g.loadStart, nearAt: g && g.nearReadyAt, workers: g && g.pool && g.pool.workers ? g.pool.workers.length : null, preset: g && g.settings && g.settings.preset, rd: g && g.settings && g.settings.renderDist }; }).catch(() => null);
+      res = await page.evaluate(() => { const T = window.__eb; if (!T) return null; const g = window.VR && VR.game; return { t: T.t, gl: T.gl, firstRenderMs: T.firstRenderMs, wk: { first: T.wk.first, n: T.wk.n, hMs: T.wk.hMsAll, types: T.wk.types, hBy: T.wk.hBy }, long: T.long, err: T.err, heap: T.heap, loadFrames: T.loadFrames, loadFrameMs: T.loadFrameMs, texMs: g && g.texMs, texFromCache: g && !!g.texFromCache, loadStart: g && g.loadStart, nearAt: g && g.nearReadyAt, workers: g && g.pool && g.pool.workers ? g.pool.workers.length : null, preset: g && g.settings && g.settings.preset, rd: g && g.settings && g.settings.renderDist }; }).catch(() => null);
       if ((res && res.t.frame !== undefined) || Date.now() - t0 > LOAD_LIMIT) break;
     }
   } catch (e) { errs.push('harness: ' + String(e.message || e).slice(0, 200)); }
   await page.close().catch(() => {});
   const t = (res && res.t) || {};
-  const L = { b, preset, kind, round: seedN, ...t, glMsLoad: res && r0(res.gl.msLoad), links: res && res.gl.links, compiles: res && res.gl.compiles, wkFirst: res && r0(res.wk.first), workers: res && res.workers, handlersMs: res && r0(res.wk.hMs), texMs: res && res.texMs, texFromCache: res && res.texFromCache, heapMB: res && res.heap, loadFrames: res && res.loadFrames, loadFrameMs: res && r0(res.loadFrameMs),
+  const L = { b, preset, kind, round: seedN, ...t, glMsLoad: res && r0(res.gl.msLoad), glMsFirst: res && r0(res.gl.msFirst || 0), linksFirst: res && (res.gl.linksFirst || 0), firstRenderMs: res && r0(res.firstRenderMs), hBy: res && Object.fromEntries(Object.entries(res.wk.hBy || {}).map(([k, v]) => [k, [v[0], r0(v[1]), r0(v[2])]])), long: res && res.long, links: res && res.gl.links, compiles: res && res.gl.compiles, wkFirst: res && r0(res.wk.first), workers: res && res.workers, handlersMs: res && r0(res.wk.hMs), texMs: res && res.texMs, texFromCache: res && res.texFromCache, heapMB: res && res.heap, loadFrames: res && res.loadFrames, loadFrameMs: res && r0(res.loadFrameMs),
     longMs: res ? res.long.filter(l => l[0] < (t.frame || 1e9)).reduce((a, l) => a + l[1], 0) : null, longMax: res ? Math.max(0, ...res.long.filter(l => l[0] < (t.frame || 1e9)).map(l => l[1])) : null,
     jobs: res ? Object.fromEntries(Object.entries(res.wk.types).map(([k, v]) => [k, { n: v.loadN, ms: r0(v.loadMs) }])) : null, preset2: res && res.preset, rd: res && res.rd, err: errs.concat((res && res.err) || []) };
   for (const k of ['dcl', 'boot', 'textures', 'title', 'create', 'world', 'near', 'play', 'frame']) if (L[k] !== undefined) L[k] = r0(L[k]);
   const s = (x) => (Number.isFinite(x) ? (x / 1000).toFixed(1) : '–');
-  console.log(`  ${b.padEnd(6)} ${preset.padEnd(8)} ${kind} ${seedN}: scripts ${s(L.dcl)} · workers ${s(L.wkFirst)} · textures ${s(L.textures)} (${L.texFromCache ? 'cache' : 'forged'} ${s(L.texMs)}) · title ${s(L.title)} · world ${s(L.world)} · near ${s(L.near)} · play ${s(L.play)} · FRAME ${s(L.frame)} s | gl ${s(L.glMsLoad)} s (${L.links} links) · long ${s(L.longMs)} s (max ${L.longMax} ms) · handlers ${s(L.handlersMs)} s · ${L.workers} workers · ${L.preset2}/${L.rd}${L.err.length ? ' · ERR ' + L.err[0].slice(0, 140) : ''} (${secs()})`);
+  console.log(`  ${b.padEnd(6)} ${preset.padEnd(8)} ${kind} ${seedN}: scripts ${s(L.dcl)} · workers ${s(L.wkFirst)} · textures ${s(L.textures)} (${L.texFromCache ? 'cache' : 'forged'} ${s(L.texMs)}) · title ${s(L.title)} · world ${s(L.world)} · near ${s(L.near)} · play ${s(L.play)} · FRAME ${s(L.frame)} s | gl ${s(L.glMsLoad)} s (${L.links} links; play→frame ${s(L.glMsFirst)} s, ${L.linksFirst} links, render ${s(L.firstRenderMs)} s) · long ${s(L.longMs)} s (max ${L.longMax} ms) · handlers ${s(L.handlersMs)} s · ${L.workers} workers · ${L.preset2}/${L.rd}${L.err.length ? ' · ERR ' + L.err[0].slice(0, 140) : ''} (${secs()})`);
   return L;
 }
 if (PARTS.includes('load')) {
@@ -188,7 +189,7 @@ if (PARTS.includes('load')) {
   for (const key of Object.keys(rec.load)) {
     const L = rec.load[key], m = (kind, k) => med(L.filter(l => l.kind === kind).map(l => l[k]));
     const M = rec.loadMed[key] = {};
-    for (const kind of ['cold', 'warm']) for (const k of ['dcl', 'wkFirst', 'textures', 'title', 'world', 'near', 'play', 'frame', 'glMsLoad', 'longMs', 'handlersMs', 'texMs', 'loadFrameMs', 'loadFrames', 'heapMB']) M[kind + '_' + k] = m(kind, k);
+    for (const kind of ['cold', 'warm']) for (const k of ['dcl', 'wkFirst', 'textures', 'title', 'world', 'near', 'play', 'frame', 'glMsLoad', 'glMsFirst', 'firstRenderMs', 'longMs', 'handlersMs', 'texMs', 'loadFrameMs', 'loadFrames', 'heapMB']) M[kind + '_' + k] = m(kind, k);
     const s = (x) => (Number.isFinite(x) ? (x / 1000).toFixed(1) : '–');
     console.log(`  ${key.padEnd(16)} cold ${s(M.cold_frame)} · warm ${s(M.warm_frame)} | cold: textures ${s(M.cold_textures)} title ${s(M.cold_title)} world ${s(M.cold_world)} near ${s(M.cold_near)} play ${s(M.cold_play)} gl ${s(M.cold_glMsLoad)} long ${s(M.cold_longMs)} | warm: title ${s(M.warm_title)} world ${s(M.warm_world)} near ${s(M.warm_near)} gl ${s(M.warm_glMsLoad)}`);
     check(L.every(l => Number.isFinite(l.frame) && !l.err.some(e => !/^harness/.test(e))), `${key}: every load reached its first played frame without a page error` + (L.find(l => l.err.length) ? ': ' + L.find(l => l.err.length).err[0].slice(0, 160) : ''));

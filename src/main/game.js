@@ -592,6 +592,7 @@
       for (const c of this.world.cols.values()) this.onColumnLoaded(c);
       this.state = 'loading';
       this.loadStart = performance.now(); this.nearReadyAt = 0;
+      if (this.renderer && this.renderer.warmPrograms) this.renderer.warmPrograms();   // (e-engine: the first frame's programs compile while the world loads)
     }
     // ---------------------------------------------------------------- the world's style (v0.34)
     // rules "this block → that block" and a water colour for everything the game generates, set in the R9 Studio

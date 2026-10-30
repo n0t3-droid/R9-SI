@@ -218,8 +218,20 @@
       if (P.cutZ) return P.cutZ;
       const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // (t-motion: the colour pass's MOTION too — the same displaced fragments)
       const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE', ...(this.q.lite ? [] : ['SOFTFADE'])]);   // (f-stipple2: the colour pass's fade, growth and cut)
-      if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
+      GL.onReady(p, (q) => { if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(q.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(q.p, bi, 0); } });   // (e-engine: when ready)
       return (P.cutZ = p);
+    }
+    // e-engine: the programs the first frames of play compile on their first use (the depth prepass; the smooth props' and
+    // furniture's, never on Very Low's lite look) asked for while the world loads — compiled side by side with the loading
+    // (GL.deferred: checked at their first use, where they were made before), so the first frame does not wait for them
+    warmPrograms() {
+      if (!this.P || this.warmedP === this.P) return;
+      this.warmedP = this.P;
+      const was = GL.deferred; GL.deferred = true;
+      try {
+        if (this.q.zPre) this.zProgram();
+        if (!this.q.lite) { this.propProgram(false); this.furnProgram(false); if (this.q.shadows) { this.propProgram(true); this.furnProgram(true); } }
+      } finally { GL.deferred = was; }
     }
     // F10 · zPre: the cut-out layer's depth first (leaves, grass, flowers, fences: alpha-tested, so a GPU cannot reject their
     // hidden fragments before it shades them) with the colour writes off; render() then draws the layer with depth writes off
