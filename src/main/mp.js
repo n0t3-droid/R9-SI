@@ -684,7 +684,7 @@
       const p = ent.beginVox(r, E);
       const t = g.time;
       for (const a of this.remote.values()) {
-        if (!a.has || a.dead || a.veh) continue;
+        if (!a.has || a.dead || a.veh || a.away) continue;   // (a-konvoi: away — in another world)
         const dx = a.pos[0] - cam.x, dz = a.pos[2] - cam.z;
         const d2 = dx * dx + dz * dz; if (d2 > 160 * 160) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 2, a.pos[1] - cam.y - 1, dz - 2, dx + 2, a.pos[1] - cam.y + 3, dz + 2)) continue;
@@ -718,12 +718,14 @@
       const S = this.g.starships; if (!S || !this.remote.size) return null;
       const out = [];
       for (const a of this.remote.values()) {
-        const v = a.veh; if (!a.has || !v) { a.ship = null; continue; }
+        const v = a.veh; if (!a.has || !v || a.away) { a.ship = null; continue; }
         const d = S.design(v.s >>> 0, v.a || null, v.pa || null);
         if (!d || !d.meta || !d.gpu) continue;
         if (!a.ship || a.ship.d !== d) a.ship = { d, pos: null, yaw: 0, pitch: 0, roll: 0, vel: [0, 0, 0], gear: num(v.g, 1), ramp: num(v.r, 0), state: 'remote', rot: null };
         const sh = a.ship;
-        const tp = Array.isArray(v.p) ? [num(v.p[0], a.tp[0]), num(v.p[1], a.tp[1]), num(v.p[2], a.tp[2])] : a.tp;
+        const kp = a.sp && VR.Konvoi && VR.Konvoi.spacePose ? VR.Konvoi.spacePose(this.g, a) : null;   // a-konvoi: a ship in space, beside one's own
+        if (a.sp && !kp) { a.ship = null; continue; }
+        const tp = kp ? kp.pos : Array.isArray(v.p) ? [num(v.p[0], a.tp[0]), num(v.p[1], a.tp[1]), num(v.p[2], a.tp[2])] : a.tp;
         if (!sh.pos) sh.pos = tp.slice();
         for (let i = 0; i < 3; i++) sh.pos[i] += (tp[i] - sh.pos[i]) * 0.3;
         let dy = num(v.y, 0) - sh.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
@@ -733,6 +735,7 @@
         sh.lights = !!v.l; sh.thrust = Math.max(0, Math.min(1.45, num(v.t, 0.7))); sh.boost = !!v.b;
         // (the renderer swings a shuttle's ramp by its hatch state)
         if (d.meta.cabin) { const H = sh.hatch || (sh.hatch = { ramp: 0, rampOpen: false, door: 0, doorOpen: false, cdoor: 0, cdoorOpen: false, kneel: 0 }); H.ramp = sh.ramp; H.rampOpen = sh.ramp > 0.5; }
+        if (kp) { sh.pos = kp.pos.slice(); sh.yaw = kp.yaw; sh.pitch = kp.pitch; sh.roll = kp.roll; sh.gear = 0; sh.thrust = 1; sh.lights = true; a.pos = kp.pos.slice(); a.tp = a.pos.slice(); }   // a-konvoi
         S.rotOf(sh);
         const g = this.g, m = d.meta;
         // the lights on: strobes on the wingtips, about once a second
@@ -759,7 +762,7 @@
       const root = document.getElementById('hud'); if (!root) return;
       for (const a of this.remote.values()) {
         if (!a.tag) { a.tag = document.createElement('div'); a.tag.className = 'mptag'; root.appendChild(a.tag); }
-        const show = a.has && !a.dead && g.state === 'play' && !g.hideHud;
+        const show = a.has && !a.dead && !a.away && g.state === 'play' && !g.hideHud;
         const m = r.viewProj, px = a.pos[0] - cam.x, py = a.pos[1] + (a.veh ? 4.5 : 2.25) - cam.y, pz = a.pos[2] - cam.z;
         const X = m[0] * px + m[4] * py + m[8] * pz + m[12], Y = m[1] * px + m[5] * py + m[9] * pz + m[13], W = m[3] * px + m[7] * py + m[11] * pz + m[15];
         const dist = Math.hypot(px, pz);

@@ -78,7 +78,7 @@
     if (g.meta.guest) return 'g.travel.guest';
     if (Travel.busy(g)) return 'g.travel.busy';
     if (g.state !== 'play' || !g.world || !g.player || g.player.dead) return 'g.travel.notNow';
-    const mp = g.mp; if (mp && mp.isHost && mp.remote && mp.remote.size > 0) return 'g.travel.guests';   // (Konvoi — Mitreisen — is wave 4's)
+    const mp = g.mp; if (mp && mp.isHost && mp.remote && mp.remote.size > 0 && !VR.Konvoi) return 'g.travel.guests';   // (a-konvoi: the guests are asked „Mitreisen?“)
     const d = to && D.get(to);
     if (!d || (d.home && to !== D.home(g.meta))) return 'g.travel.unknown';
     if (to === g.dim) return 'g.travel.here';
@@ -162,7 +162,7 @@
     if (trip.via !== 'respawn' && finite(p.pos, 3)) (m.pos || (m.pos = {}))[from] = [r2(p.pos[0]), r2(p.pos[1]), r2(p.pos[2]), r3(p.yaw), r3(p.pitch)];
     if (from === D.home(m) && !finite(m.worldSpawn, 3) && finite(p.spawn, 3) && !p.spawnBed) m.worldSpawn = p.spawn.slice(0, 3);   // (as loadingFrame: the world's own spawn, never a bed)
     // a host without guests closes the room: hosting is from home only (mp.js:193); it opens again back home
-    if (g.mp && g.mp.isHost && g.mp.stopHosting) g.mp.stopHosting();
+    if (g.mp && g.mp.isHost && !(VR.Konvoi && VR.Konvoi.hostTravel && VR.Konvoi.hostTravel(g, trip, arrive)) && g.mp.stopHosting) g.mp.stopHosting();   // a-konvoi: with guests the room stays open and they are asked „Mitreisen?“
     // the save as it is now — both capture at once (IndexedDB clones on put): a crash mid-trip finds you where you were
     g.saveMeta(); if (g.world && g.world.saveAll) g.world.saveAll();
     // the trip in the save's memory: the ship's world and place, the world, the player's place there
