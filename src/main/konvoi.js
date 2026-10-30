@@ -35,7 +35,7 @@
   K.BEAT_COAST = 10;     // s: a coasting ship's conic, again
   K.FAR = 3000;          // m: a ship in space farther than this is not drawn (its tag in the roster)
   K.KBPS = 2048;         // bytes a second a guest may send (the acceptance)
-  K.FORM = (i) => { i = Math.max(0, i | 0); return [(i % 2 ? -1 : 1) * 40, i > 1 ? 12 : 0, 25 * (1 + (i >> 1))]; };   // east, up, south (behind) of the leader, in the trip's frame
+  K.FORM = (i) => { i = Math.max(0, i | 0); return [(i % 2 ? -1 : 1) * 40, i > 1 ? 20 : 0, 25 * (1 + (i >> 1))]; };   // east, up, south (behind) of the leader, in the trip's frame
 
   // ---------------------------------------------------------------- the messages (all checked on arrival)
   K.travelMsg = (dim, at, h, via) => ({ dim, at: fin3(at) ? [rd(at[0], 10), rd(at[1], 10), rd(at[2], 10)] : null, h: name(h) || null, via: word(via) || 'ship' });
