@@ -87,7 +87,7 @@ console.log('c · rgen 2');
   check(a1.o.nickel_iron === undefined && a1.o.glowspar === undefined && a1.o.ice_nodule === undefined, 'rgen 1: none of the new blocks (old worlds stay as they were)');
   check(a2.o.glowspar > 20 && f(a2, 'glowspar') < 0.01 && a2.o.ice_nodule > 20 && f(a2, 'ice_nodule') < 0.01 && a2.o.nickel_iron > 5 && f(a2, 'nickel_iron') < 0.002, `TS-01 (carbon): glowspar ${a2.o.glowspar}, ice nodules ${a2.o.ice_nodule}, nickel iron ${a2.o.nickel_iron} of ${a2.n} (rare)`);
   const kinds = Object.keys(a2.o).filter(k => a2.o[k] > 0.004 * a2.n);
-  check(f(a2, 'carbon_rubble') > 0.5 && (a2.o.regolith_dark || 0) > 50 && (a2.o.ice || 0) > (a1.o.ice || 0), `the ground: carbon ${(f(a2, 'carbon_rubble') * 100).toFixed(0)} %, ${kinds.length} kinds over 0.4 % (${kinds.join(', ')}); regolith ponds ${a2.o.regolith_dark || 0}; ice ${a2.o.ice || 0} (rgen 1: ${a1.o.ice || 0})`);
+  check(f(a2, 'carbon_rubble') > 0.5 && (a2.o.regolith_dark || 0) > 50 && (a2.o.ice || 0) + (a2.o.packed_ice || 0) > (a1.o.ice || 0) + (a1.o.packed_ice || 0), `the ground: carbon ${(f(a2, 'carbon_rubble') * 100).toFixed(0)} %, ${kinds.length} kinds over 0.4 % (${kinds.join(', ')}); regolith ponds ${a2.o.regolith_dark || 0}; ice ${a2.o.ice || 0} (rgen 1: ${a1.o.ice || 0})`);
   // the surface: what the top block is
   const top = {}; let nt = 0;
   for (let x = -g2.R; x < g2.R; x += 2) for (let z = -g2.R; z < g2.R; z += 2) { const y = g2.surfaceY(x, z); if (y < 0) continue; const g = g2.generate(Math.floor(x / 16), Math.floor(z / 16)), b = g.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; if (!b) continue; const k = nm(b); top[k] = (top[k] || 0) + 1; nt++; }

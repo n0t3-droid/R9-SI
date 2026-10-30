@@ -530,7 +530,7 @@ void main() {
         for (const b of sw) { const bp = toS(b.pS || (b.pS = b.p)); list.push({ b, d: Math.hypot(bp[0] - cs[0], bp[1] - cs[1], bp[2] - cs[2]) }); }
         list.sort((a, b2) => b2.d - a.d);
         const gg = VR.game, far = (gg && gg.space && gg.space.cam && gg.space.cam.far) || (gg && gg.cam && gg.cam.far) || 100;
-        fr.draws.push({ prog: 'fields_rocks', fn: drawRocks, list, k: { camRel: cs, axes: ax, k: Math.min(1, 0.85 * far / (dS + 30000)), sun: sunS, sunCol: mul(SS.SUN, 0.62) } });
+        fr.draws.push({ prog: 'fields_rocks', fn: drawRocks, list, k: { camRel: cs, axes: ax, k: Math.min(1, 0.85 * far / (dS + 30000)), sun: sunS, sunCol: mul(SS.SUN, gg && gg.space ? 0.62 : 2.2) } });   // (u-fields2: flown into, the eye adapted to the dark rubble — the /raum view keeps its own)
         // the gravel and dust drifting between: a lattice round the camera, no sheet
         fr.draws.push({ prog: 'fields_chunks', fn: drawChunks, n: 12 * 12 * 6, k: { er: toS([1, 0, 0]), et: toS([0, 0, 1]), en: toS([0, 1, 0]), cell: [7, 12, 6, 0.35], camCell: [Math.floor(cam[0] / 7) % 1048576, Math.floor(cam[2] / 7) % 1048576, Math.floor(cam[1] / 7) % 1048576 - 3], camIn: [cam[0] - Math.floor(cam[0] / 7) * 7, cam[2] - Math.floor(cam[2] / 7) * 7, cam[1] - Math.floor(cam[1] / 7) * 7 + 3 * 7 - 3 * 7], size: [0.04, 0.5, 2.6, 38], sheet: [0, 0, 0, eph.t % 10000], sun: sunS, sunCol: mul(SS.SUN, 0.62), plDir: [0, 1, 0], plCol: [0, 0, 0], tint: [0.12, 0.11, 0.1] } });
         F.stats.rocks = sw.length; F.stats.where = 'swarm'; F.stats.swarmD = Math.round(dS);

@@ -256,14 +256,18 @@
   };
   const finish0 = C.finish;
   C.finish = (fl, a, c) => {
+    // (the swarm has no frame of its own in the space scene: the end is kept in Helia's)
+    const sw = c.end && c.end.frame === 'swarm';
+    if (sw) { const S = UNI().home, b = S.state(c.end.t).b.swarm; for (let i = 0; i < 3; i++) { c.end.r[i] += b.r[i]; c.end.v[i] += b.v[i]; } c.end.frame = 'helia'; }
     finish0(fl, a, c);
+    if (sw) { C.blend = null; SF.hint(fl, 'g.fields2.land', null, 5200); return; }
     const e = c.end || {};
     if (e.goal) {
       C.blend = null;
       if (e.goal === 'ring') SF.hint(fl, 'g.fields.ring', { tau: (Fd ? Fd.tauAt(F2.RING_R) : 1).toFixed(1) }, 5200);
       else SF.hint(fl, 'g.fields2.cloudsIn', null, 5200);
       F2.pass = { goal: e.goal, t0: performance.now() };
-    } else if (e.frame === 'swarm') SF.hint(fl, 'g.fields2.land', null, 5200);
+    }
   };
   // G: the ring and the swarm by intent (the arm's two seconds as for a world)
   const toggle0 = SF.toggle;
@@ -360,7 +364,7 @@
       const r = rockSky0.call(this, E, env, d);
       const S = E.bodySky;
       if (!S || !S.B || !F2.isRock(d.id)) return r;
-      const k = rockK(d.id), t = VR.Universe ? VR.Universe.worldSeconds(env.day | 0, env.ticks) : 0, N = F2.neighbours(k, F2.spinH(k, t), 5);
+      const k = rockK(d.id), t = VR.Universe ? VR.Universe.worldSeconds(env.day | 0, env.ticks) : 0, N = F2.neighbours(k, F2.spinH(k, t), VR.BodySky && VR.BodySky.tier === 0 ? 2 : 5);   // (Very Low: the two biggest)
       const SUN = VR.SpaceScene ? VR.SpaceScene.SUN : [0.95, 0.96, 1];
       S.B.fill(0); if (S.Bc) S.Bc.fill(0);
       F2.sky = N;

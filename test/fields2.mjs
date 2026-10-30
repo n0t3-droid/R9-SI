@@ -243,13 +243,14 @@ async function runPreset(preset) {
         const v = await P.ev(() => VR.SpaceFlight.land(VR.game.flight));
         check(v, 'V round Amarant: down to the cloud tops');
         let s = await fly(P);
+        await P.step(6);
         let q = await f2(P);
         check(s.frame === 'amarant' && Math.abs(q.alt - 15000) < 400, `over the cloud tops: ${Math.round(q.alt)} m (${s.frame})`);
-        await P.ev(() => { const st = VR.game.flight.asc.st, l = Math.hypot(...st.r); for (let i = 0; i < 3; i++) st.v[i] -= st.r[i] / l * 260; });
+        await P.ev(() => { const st = VR.game.flight.asc.st, l = Math.hypot(...st.r); for (let i = 0; i < 3; i++) st.v[i] -= st.r[i] / l * 520; });
         let minAlt = 1e9, shot = false;
-        for (let i = 0; i < 400; i++) {
+        for (let i = 0; i < 700; i++) {
           await P.step(3); q = await f2(P); minAlt = Math.min(minAlt, q.alt);
-          if (!shot && q.alt < 4500) { await chase(P, 0.12, 0.35); await P.step(1); Rr.clouds = await shoot(P, 'cloudtops_pass.png', '__Fc'); shot = true; await chase(P, 0.1, 0); }
+          if (!shot && q.alt < 3500) { await chase(P, 0.12, 0.35); await P.step(1); Rr.clouds = await shoot(P, 'cloudtops_pass.png', '__Fc'); shot = true; await chase(P, 0.1, 0); }
           if (q.pulls > 0 && i > 40 && q.alt > 1200) break;
         }
         Rr.pull = { minAlt: Math.round(minAlt), pulls: q.pulls };
@@ -294,6 +295,10 @@ async function runPreset(preset) {
         Rr.sky = sky;
         check(sky.length >= 3, `the neighbours in ${dim}'s sky: ${sky.map(n => 'TS-' + (n.k + 1) + ' ' + n.deg + '°').join(', ')}`);
         if (sky.length) {
+          sky.sort((a, b) => b.dir[1] * b.deg - a.dir[1] * a.deg);
+          // 45 m from the landing place toward the neighbour (the parked ship behind)
+          await P.ev((d) => { const g = VR.game, p = g.player, gen = new VR.RubbleGen(0, g.dim, { bgen: { rubble: 2 } }), l = Math.hypot(d[0], d[2]) || 1; for (let r = 45; r > 5; r -= 5) { const x = Math.round(p.pos[0] + d[0] / l * r), z = Math.round(p.pos[2] + d[2] / l * r), y = gen.surfaceY(x, z); if (y > 0) { p.teleport(x + 0.5, y + 1.2, z + 0.5); return; } } }, sky[0].dir);
+          await P.settle(200);
           const d = sky[0].dir, look = [d[0] * 0.92, d[1] * 0.92 - 0.12, d[2] * 0.92], l = Math.hypot(...look);
           await lookAlong(P, look.map(x => x / l)); await P.step(3); await P.settle(100); await P.step(2);
           await P.ev(() => { window.__Fh = window.__F; });
@@ -329,11 +334,18 @@ async function runPreset(preset) {
       if (sky.length) await lookAlong(P, sky[0]);
       await P.step(4); await P.ev(() => { window.__Fv = window.__F; });
       const mv = await picture(P, '__Fv', SH('rubble_sky_vl.png'), K);
-      const c1 = await cost(P, '__Fv', 2, 6);
+      // (the two frames in turns, three rounds: the medians)
       await P.ev(() => { window.__noNb = VR.Fields2.neighbours; VR.Fields2.neighbours = () => []; });
       await P.step(4); await P.ev(() => { window.__Fv0 = window.__F; });
-      const c0 = await cost(P, '__Fv0', 2, 6);
       await P.ev(() => { VR.Fields2.neighbours = window.__noNb; });
+      await P.step(4); await P.ev(() => { window.__Fv = window.__F; });
+      const w1 = [], w0 = [], u1 = [];
+      for (let r = 0; r < 3; r++) {
+        await P.ev(() => { VR.Fields2.neighbours = window.__noNb; }); await P.step(2); await keep(P, '__Fv'); const a = await cost(P, '__Fv', 1, 4); w1.push(a.wallMs); u1.push(a.cpuMs);
+        await P.ev(() => { VR.Fields2.neighbours = () => []; }); await P.step(2); await keep(P, '__Fv0'); const b = await cost(P, '__Fv0', 1, 4); w0.push(b.wallMs);
+      }
+      await P.ev(() => { VR.Fields2.neighbours = window.__noNb; });
+      const c1 = { wallMs: med(w1), cpuMs: med(u1) }, c0 = { wallMs: med(w0) };
       Rr.rock = { wall: r1(c1.wallMs), cpu: r1(c1.cpuMs), wallOff: r1(c0.wallMs), draws: mv.draws };
       console.log(`  Very Low on TS-01: ${Rr.rock.wall} ms with the neighbours, ${Rr.rock.wallOff} ms without; the plaza ${Rr.plaza.wall} ms (${secs()})`);
       check(Rr.rock.wall <= Math.max(Rr.plaza.wall * 1.1, Rr.plaza.wall + 2), `Very Low: the rubble frame not dearer than the plaza (${Rr.rock.wall} vs ${Rr.plaza.wall} ms)`);

@@ -260,7 +260,7 @@
             if (!o.b && d <= 1) {
               const pv = this.nPat.n2(x, z), cr = this.craterAt(x, z);
               if (cr < 0.45) st = d === 0 ? T.pond : T.carbon;
-              else if (cr < 1.05 && pv < -0.25 && h1 < 0.5) st = T.ice;
+              else if (cr < 1.05 && pv < -0.25 && h1 < 0.5) st = T.packed;
               else if (pv > 0.42) st = h1 < 0.45 ? T.tuff : h1 < 0.7 ? T.gravel : T.carbon;
               else if (pv < -0.5 && h1 < 0.3) st = T.gravel;
             }
