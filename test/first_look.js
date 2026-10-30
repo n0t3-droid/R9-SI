@@ -11,6 +11,9 @@
 //   6. the title: the land shown only finished (or in its haze)
 // usage: bash test/wt_run.sh first_look.js 300 — prints ALL OK or FAILED n
 const path = require('path');
+require('./dom_stub.js');
+{ const ce = document.createElement.bind(document); document.createElement = (t) => { const e = ce(t); if (!e.style) e.style = {}; return e; }; }
+let CLOCK = 0; global.performance = { now: () => CLOCK };
 require('./load_shared.js');
 require('../src/main/i18n.js');
 require('../src/main/lang_en.js');
@@ -47,6 +50,38 @@ console.log('1 · item names in the player\'s language (R53-02)');
   console.log('    names_de.js: ' + eng + ' of ' + all.length + ' block names keep an English word (' + (share * 100).toFixed(1) + ' %)');
   check(share < 0.5, 'fewer than half of all block names keep an English word in German (' + (share * 100).toFixed(1) + ' %; v042: 77 %)');
   check(inLang('en', () => VR.itemName('egg_sky_ray')) === 'Cloud Ray Egg' && inLang('en', () => VR.itemName('laser_blaster')) === 'Calm Beam', 'English item names stay (Cloud Ray Egg, Calm Beam)');
+}
+
+console.log('3 · the arrival on the wall clock (R53-06)');
+{
+  for (const f of ['wowmoment.js', 'first.js']) require('../src/main/' + f);
+  const FI = VR.First;
+  const mkG = (wowOn) => {
+    const g = { input: { pressed: new Set(), keys: new Set(), mouse: { clicked: [] } }, settings: { wowMoments: wowOn }, hideHud: false, meta: {} };
+    // a stand-in for the wow moment's actor: RISE + HOLD + FALL = 4 s of its own clock, stop() ends it
+    g.wow = { active: null, t: 0, wait: 0, start(v) { this.active = v; this.t = 0; }, stop() { this.active = null; }, skip() { this.t = 2.6; }, update(dt) { if (!this.active) return; this.t += dt; if (this.t >= 4) this.active = null; } };
+    return g;
+  };
+  // a slow machine: 3 frames a second, the game's dt clamped to 0.1 (game.js)
+  const run = (wowOn, keyAt, hold) => {
+    const g = mkG(wowOn), A = new FI.Arrival(g, { vista: { id: 'v', wow: true, eye: [0, 0, 0], yaw: 0, pitch: 0, fov: 40 } });
+    g.arrival = A; CLOCK = 1000; A.begin(); const t0 = CLOCK;
+    let n = 0;
+    while (A.phase !== 'done' && n < 600) {
+      CLOCK += 333; n++;
+      const t = (CLOCK - t0) / 1000;
+      g.input.pressed.clear(); if (keyAt !== undefined && t >= keyAt && t < keyAt + 0.34) { g.input.pressed.add('KeyW'); }
+      if (hold !== undefined && t >= hold) g.input.keys.add('KeyW');
+      g.wow.update(0.1); A.update(0.1);
+    }
+    return { wall: (CLOCK - t0) / 1000, frames: n, done: A.phase === 'done', hud: g.hideHud };
+  };
+  const a = run(true), b = run(false), c = run(true, 1.0), d = run(true, undefined, 3.0);
+  check(a.done && a.wall <= FI.MAX_WALL + 0.4, 'at 3 fps with the wow moment: over after ' + a.wall.toFixed(1) + ' s of wall time (≤ ' + FI.MAX_WALL + ' s; v042: ' + ((FI.PRE + 4) / 0.1 / 3).toFixed(0) + ' s)');
+  check(b.done && b.wall <= FI.PRE + 0.4, 'without the moment: over after ' + b.wall.toFixed(1) + ' s (the veil\'s ' + FI.PRE + ' s)');
+  check(c.done && c.wall <= 1.0 + FI.SKIP + 0.8, 'a key at 1 s: over after ' + c.wall.toFixed(1) + ' s');
+  check(d.done && d.wall <= 3.0 + 0.7, 'W held from 3 s (in the moment): over after ' + d.wall.toFixed(1) + ' s');
+  check(!a.hud && !c.hud, 'the HUD is back after it (hideHud restored)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
