@@ -3117,5 +3117,24 @@
     "g.rpg.boss2.leg.travel": "Schnellreise",
     "g.rpg.boss2.leg.goal": "Nächstes Ziel",
     // ---- a-boss2 end
+    // ---- f-first2
+    "g.first2.outpost": "Außenposten {m} m",
+    "g.first2.advWelcome": "Abenteuer! Der erste Außenposten liegt {m} m vor dir — folge ⚔ oben am Bildschirm.",
+    "g.first2.advWelcome0": "Abenteuer! Erkunde die Gegend — ⚔ im Pausenmenü zeigt deinen Weg.",
+    "g.first2.hud": "ABENTEUER",
+    "g.first2.jTitle": "📖 Tagebuch",
+    "g.first2.jNote": "Das Tagebuch sammelt Aufträge in Abenteuer-Welten. Hier baust du frei — Esc → ⚔ Abenteuer schaltet es ein.",
+    "g.first2.oTitle": "🧭 Charakter",
+    "g.first2.oNote": "Charakter und Ausrüstung gibt es in Abenteuer-Welten. Esc → ⚔ Abenteuer schaltet es hier ein.",
+    "g.first2.simple": "Einfach",
+    "g.first2.all": "Alle Einstellungen …",
+    "g.first2.gfx": "Grafik",
+    "g.first2.gfxTip": "Links: schneller auf schwachen Rechnern. Rechts: schöner.",
+    "g.first2.bright": "Helligkeit",
+    "g.first2.brightTip": "Heller oder dunkler — für deinen Bildschirm.",
+    "g.first2.scale": "UI-Größe",
+    "g.first2.scaleTip": "Knöpfe und Schrift größer oder kleiner.",
+    "g.first2.back": "Einfach",
+    // ---- f-first2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -3117,5 +3117,24 @@
     "g.rpg.boss2.leg.travel": "Fast travel",
     "g.rpg.boss2.leg.goal": "Next goal",
     // ---- a-boss2 end
+    // ---- f-first2
+    "g.first2.outpost": "Outpost {m} m",
+    "g.first2.advWelcome": "Adventure! The first outpost lies {m} m ahead — follow ⚔ at the top of the screen.",
+    "g.first2.advWelcome0": "Adventure! Explore the land — ⚔ in the pause menu shows your way.",
+    "g.first2.hud": "ADVENTURE",
+    "g.first2.jTitle": "📖 Journal",
+    "g.first2.jNote": "The journal collects tasks in adventure worlds. Here you build freely — Esc → ⚔ Adventure turns it on.",
+    "g.first2.oTitle": "🧭 Character",
+    "g.first2.oNote": "Character and gear live in adventure worlds. Esc → ⚔ Adventure turns them on here.",
+    "g.first2.simple": "Simple",
+    "g.first2.all": "All settings …",
+    "g.first2.gfx": "Graphics",
+    "g.first2.gfxTip": "Left: faster on weak computers. Right: prettier.",
+    "g.first2.bright": "Brightness",
+    "g.first2.brightTip": "Lighter or darker — for your screen.",
+    "g.first2.scale": "UI size",
+    "g.first2.scaleTip": "Buttons and text bigger or smaller.",
+    "g.first2.back": "Simple",
+    // ---- f-first2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
