@@ -16,7 +16,7 @@
   const VARIANT = { slab: 1, stairs: 1, wall: 1, fence: 1, carpet: 1, pane: 1, gate: 1, gloss: 1, pillar: 1 };
 
   // ---- the search
-  PF.index = function (ids, namesOf) {
+  PF.index = function (ids, namesOf, boostOf) {   // (boostOf(id): points added — the picker prefers blocks to items of the same name)
     const out = new Array(ids.length);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i], hays = [];
@@ -26,7 +26,7 @@
       let len = 1e9; const words = [];
       for (const h of hays) { len = Math.min(len, h.length); for (const w of h.split(/[\s\-/]+/)) if (w) words.push(w); }
       const idw = id.split('_'); let variant = false; for (const w of idw) if (VARIANT[w]) variant = true;
-      out[i] = { id, words, hays: hays.map(h => h.replace(/ /g, '')), len, variant, first: hays[0] ? hays[0].split(' ')[0] : '' };
+      out[i] = { id, words, hays: hays.map(h => h.replace(/ /g, '')), boost: boostOf ? +boostOf(id) || 0 : 0, len, variant, first: hays[0] ? hays[0].split(' ')[0] : '' };
     }
     return out;
   };
@@ -53,14 +53,14 @@
       if (!sc) continue;
       if (e.first === toks[0]) sc += 8;   // the name begins with the first word: „Stein" before „Steinziegel"
       if (e.variant) sc -= 15;            // the plain block before its slab and stairs
-      sc -= e.len * 0.5;
+      sc += e.boost - e.len * 0.5;
       hits.push([sc, i]);
     }
     hits.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
     const out = []; for (let i = 0; i < hits.length && i < lim; i++) out.push(idx[hits[i][1]].id);
     return out;
   };
-  PF.search = (ids, q, namesOf, max) => PF.searchIndex(PF.index(ids, namesOf), q, max);
+  PF.search = (ids, q, namesOf, max, boostOf) => PF.searchIndex(PF.index(ids, namesOf, boostOf), q, max);
 
   // ---- the families (the words of the id; the order decides: oak leaves are a plant, a lantern of iron is a light)
   PF.FAMILIES = [

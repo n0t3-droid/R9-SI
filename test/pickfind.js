@@ -41,6 +41,7 @@ check(S('eichtrp')[0] === 'oak_stairs', `a loose subsequence still finds (${S('e
 check(S('xyzzy').length === 0, 'nothing for nonsense');
 check(S('').length === ids.length, 'an empty query lists everything');
 check(S('glas')[0] === 'glass', 'a word start: glas → Glas');
+check(PF.search(['brick', 'bricks'], 'ziegel', (id) => ['Ziegel'], 9, (id) => (id === 'bricks' ? 10 : 0))[0] === 'bricks', 'a boost: the block before the item of the same name');
 
 // (c) both languages
 check(S('lantern')[0] === 'lantern' && S('laterne')[0] === 'lantern', 'the English and the German name');

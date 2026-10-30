@@ -50,6 +50,7 @@ await ev(() => {
     click(b) { const i = g.input; i.mouse.down[b] = true; i.mouse.clicked[b] = true; T.frame(); i.mouse.down[b] = false; i.mouse.releasedBtn[b] = true; T.frame(); },
     key(code) { const i = g.input; i.pressed.add(code); i.keys.add(code); T.frame(); i.keys.delete(code); T.frame(); },
     set(x, y, z, name, props) { const t = VR.R.byName[name]; let s = t.defaultState; for (const k in props || {}) s = t.with(s, k, props[k]); g.world.setBlock(x, y, z, s, 4); },
+    pump(n) { const u = g.ui._palPump; if (!u) return; for (let i = 0; i < (n || 60); i++) { u.handle = 0; u.step(); } },
     count(x0, y0, z0, x1, y1, z1) { let n = 0; for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) if (g.world.getBlock(x, y, z)) n++; return n; },
   };
 });
@@ -67,7 +68,8 @@ await settle(20);
 const place = async (fx, name, dx) => ev(({ X, Y, Z, fx, name, dx }) => {
   const g = VR.game; g.settings.buildFx = fx; if (g._bfCombo) g._bfCombo.reset();
   __t.hold(name); const pitches = [];
-  for (let k = 0; k < 3; k++) { __t.look([X + dx + k + 0.5, Y + 1, Z - 3.5]); __t.frame(); const a = g.audio; let pm = 0; const op = a.place.bind(a); a.place = function (s, at) { pm = this.pitchMul || 1; return op(s, at); }; __t.click(2); a.place = op; pitches.push(+pm.toFixed(3)); }
+  __t.steps(6);
+  for (let k = 0; k < 3; k++) { __t.look([X + dx + k + 0.5, Y + 1, Z - 3.5]); __t.frame(); const a = g.audio; let pm = 0; const op = a.place.bind(a); a.place = function (s, at) { pm = this.pitchMul || 1; return op(s, at); }; __t.click(2); a.place = op; pitches.push(+pm.toFixed(3)); __t.steps(5); }
   __t.look([X + dx + 1.5, Y + 1.2, Z - 3.5]);
   return { pitches, parts: g.particles.count };
 }, { X, Y, Z, fx, name, dx });
@@ -77,7 +79,7 @@ await ev(() => __t.draw());
 pics.placeB = await shot('builder_place_before');
 const a1 = await place(true, 'oak_planks', 1);
 // the third block's pop in its middle: one frame drawn 2 frames (0.066 s) after the click
-const popN = await ev(() => { const g = VR.game; g._bfPops.forEach(q => { if (q.on) q.t = g.time - 0.05; }); __t.draw(); return { pops: g.renderer.stats.pops | 0, parts: g.particles.count }; });
+const popN = await ev(() => { const g = VR.game; g._bfPops.forEach(q => { if (q.on) q.t = g.time - 0.06; }); __t.draw(); return { pops: g.renderer.stats.pops | 0, parts: g.particles.count }; });
 pics.placeA = await shot('builder_place_after');
 check(JSON.stringify(a0.pitches) === '[1,1,1]', `Bau-Effekte aus: the old sound (${a0.pitches})`);
 check(JSON.stringify(a1.pitches) === '[1,1.125,1.25]', `on: three quick blocks climb (${a1.pitches})`);
@@ -93,13 +95,13 @@ await wait(400);
 const open2 = await ev(() => { const g = VR.game; g.ui.closeInventory(); g.ui.openInventory('creative'); return g.ui.pickMs; });
 check(open1.bar && open2 < 100, `the inventory opens with the search bar in ${open1.ms.toFixed(0)} ms, again in ${open2.toFixed(0)} ms (< 100)`);
 check(open1.recent >= 1, `the Zuletzt row shows the planks just placed (${open1.recent})`);
-await wait(1500);
+await ev(() => __t.pump(80));
 await ev(() => { document.querySelector('.pickbar').style.display = 'none'; });
 pics.pickB = await shot('builder_pick_before');
 await ev(() => { document.querySelector('.pickbar').style.display = ''; });
 await page.mouse.move(1200, 40);
 await page.keyboard.type('ziegel', { delay: 30 });
-await wait(1500);
+await ev(() => __t.pump(80));
 const found = await ev(() => ({ val: document.querySelector('.picksearch').value, first: [...document.querySelectorAll('#invpanel .palette .slot')].map(s => s.dataset.id).slice(0, 6), open: VR.game.ui.screen }));
 pics.pickA = await shot('builder_pick_after');
 check(found.val === 'ziegel' && found.open === 'inventory', `typing on the page fills the search, the inventory stays open (${JSON.stringify(found.val)})`);
@@ -125,7 +127,7 @@ await settle(30);
 const lib = await ev(() => ({ n: VR.Stamp.lib().length, clip: (() => { const c = VR.game.gadgets.wand.clip; return c && [c.sx, c.sy, c.sz]; })() }));
 check(lib.n >= 1 && JSON.stringify(lib.clip) === '[7,4,7]', `the copy is kept as a stamp (${JSON.stringify(lib)})`);
 // stand back, look at a free spot to the left of the house
-await ev(({ X, Y, Z, H }) => { __t.hold('builder_wand'); __t.stand(H.x0 - 4.5, Y + 6, H.z0 + 14.5); __t.look([H.x0 - 6.5, Y - 0.5, H.z0 + 2.5]); __t.frame(); }, { X, Y, Z, H });
+await ev(({ X, Y, Z, H }) => { __t.hold('builder_wand'); __t.stand(H.x0 - 7.5, Y + 5, H.z0 + 19.5); __t.look([H.x0 - 7.5, Y - 0.5, H.z0 + 4.5]); __t.frame(); }, { X, Y, Z, H });
 await settle(20);
 await ev(() => { VR.Renderer.prototype._sg = VR.Renderer.prototype.drawStampGhost; VR.Renderer.prototype.drawStampGhost = function () {}; __t.draw(); });
 pics.stampB = await shot('builder_stamp_before');
@@ -136,7 +138,7 @@ check(gh > 50, `the ghost is drawn (${gh} faces)`);
 const tr = await ev(() => { const W = VR.game.gadgets.wand; const c0 = W.clip; __t.key('KeyL'); const m = W.clip; __t.key('KeyR'); const r = W.clip; return { mirrored: m !== c0 && m.sx === c0.sx, turned: [r.sx, r.sz], from: [m.sx, m.sz] }; });
 check(tr.mirrored, 'L mirrors the stamp');
 await ev(() => { const W = VR.game.gadgets.wand, c = W.clip; W.clip = VR.Stamp.transform(c, 0, false); });
-const st = await ev(({ Y }) => { const g = VR.game, gad = g.gadgets, o = gad.pasteOrigin(), c = gad.wand.clip; const before = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); __t.key('KeyV'); const after = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); const want = VR.Stamp.count(c); __t.key('KeyZ'); const undone = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); return { before, after, want, undone, o }; }, base);
+const st = await ev(({ Y }) => { const g = VR.game, gad = g.gadgets, o = gad.pasteOrigin(), c = gad.wand.clip; if (!o) return { before: 0, after: 0, want: 1, undone: -1, o: null }; const before = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); __t.key('KeyV'); const after = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); const want = VR.Stamp.count(c); __t.key('KeyZ'); const undone = __t.count(o[0], o[1], o[2], o[0] + c.sx - 1, o[1] + c.sy - 1, o[2] + c.sz - 1); return { before, after, want, undone, o }; }, base);
 check(st.after - st.before >= st.want * 0.9 && st.undone === st.before, `V stamps the house (${st.before} → ${st.after}, ${st.want} in the stamp), Z takes it back (${st.undone})`);
 await ev(() => __t.key('KeyV'));
 await settle(30);
