@@ -307,7 +307,7 @@
       this.nEdge = new F(s ^ 0x207, 2, 1 / 55, 0.5);
       const W = P.dunes.wind; this.wind = { c: Math.cos(W), s: Math.sin(W) };
       this.look = { x: 0, z: 400 };   // (toward the canyon's rim, south)
-      // u-moons3 (bgen 2): the ground butterscotch (ocker_dust) with rust (red sand) and umber (terracotta) patches; the
+      // u-moons3 (bgen 2): the ground butterscotch (ocker_dust) with rust (red sand) and umber (coarse soil) patches; the
       // landing on the Rostschlucht's floor before its north wall, the eye lifted to the layered rock
       this.nRust = new F(s ^ 0x208, 2, 1 / 260, 0.5);
       { const zc = this.canyonZ(0), hw = this.canyonHalf(0); this.land = { x: 0, z: Math.round(zc - 0.6 * hw), look: { x: 0, z: -2000 }, pitch: 0.28 }; }
@@ -440,7 +440,7 @@
     fill(blocks, col, top, o, slope, hp, x, z, T) {
       const pn = this.nPatch.n2(x, z);
       let surf = T.redSand, dust = 2, dB = T.redSand;
-      if (this.bgen >= 2) { const rn = this.nRust.n2(x, z) + 0.15 * pn; dB = surf = rn > 0.28 ? T.redSand : rn < -0.34 ? T.terracotta : T.dust; }
+      if (this.bgen >= 2) { const rn = this.nRust.n2(x, z) + 0.15 * pn; dB = surf = rn > 0.28 ? T.redSand : rn < -0.34 ? T.coarse : T.dust; }   // (umber: coarse soil — terracotta's tile seams read as a pavement in run 3)
       if (o.dune) { surf = this.bgen >= 2 ? T.dust : T.redSand; dust = 4; if (this.bgen >= 2) dB = T.dust; }
       else if (o.wall || o.mesaWall || slope > 1.3) { surf = null; dust = 0; }
       else if (o.shield) { surf = slope > 0.5 || pn > 0.3 ? T.basalt : dB; dust = surf === T.basalt ? 0 : 1; }
@@ -548,7 +548,7 @@
       let surf, sub = T.sand, n = 3;
       if (o.stack) { surf = T.basalt; sub = T.basalt; }
       else if (o.atoll) { surf = hp < (this.bgen >= 2 ? 0.97 : 0.85) ? T.sand : T.gravel; }   // (u-moons3: bgen 2's beaches clean sand)
-      else if (o.lagoon) { surf = hp < 0.9 ? T.sand : T.clay; }
+      else if (o.lagoon) { surf = hp < (this.bgen >= 2 ? 0.98 : 0.9) ? T.sand : this.bgen >= 2 ? T.gravel : T.clay; }   // (u-moons3: bgen 2's inner beach no pale clay tiles)
       else if (top < sea - 6) { surf = hp < 0.6 ? T.sand : hp < 0.85 ? T.gravel : T.clay; }
       else if (slope > 1.0) { surf = T.basalt; sub = T.basalt; }
       else if (top <= sea + 2) surf = T.sand;
