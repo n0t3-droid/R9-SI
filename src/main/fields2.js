@@ -77,10 +77,10 @@
     }
     c.entry = { kind, n, e1, e2: cross(n, e1), rho0, h0, rT, th: 0, s: 0, q0: Array.from(q), thX: 0, k: 0 };
     if (kind === 'clouds') {
-      // the day side: the way swung so the pass ends 65° before the subsolar point, flying into Helia's morning (the heads'
-      // shadows long) — the extra angle spread over the entry
+      // the day side: the way swung so the pass ends 65° past the subsolar point, Helia low behind (the heads lit toward the
+      // eye, their shadows long ahead) — the extra angle spread over the entry
       const E = c.entry, hs = S.state(c.t).b.helia.r, sd = unit([hs[0] - q[0], hs[1] - q[1], hs[2] - q[2]]);
-      const ths = Math.atan2(dot(sd, E.e2), dot(sd, E.e1)), rm = (rho0 + rT) / 2, thN = Math.sqrt(A.mu / (rm * rm * rm)) * F2.ENTRY_S;
+      const ths = Math.atan2(dot(sd, E.e2), dot(sd, E.e1)) + 130 * Math.PI / 180, rm = (rho0 + rT) / 2, thN = Math.sqrt(A.mu / (rm * rm * rm)) * F2.ENTRY_S;
       let x = ths - 65 * Math.PI / 180 - thN; x = ((x % TAU) + TAU + Math.PI) % TAU - Math.PI; E.thX = x;
     }
     c.phase = 'entry'; c.s = 0;
@@ -380,7 +380,7 @@
       S.B.fill(0); if (S.Bc) S.Bc.fill(0);
       F2.sky = N;
       for (let i = 0; i < N.length; i++) {
-        const n = N[i], L = n.metal ? [0.15, 0.15, 0.16] : [0.085, 0.078, 0.07];
+        const n = N[i], L = n.metal ? [0.22, 0.22, 0.24] : [0.13, 0.12, 0.11];   // (the eye adapted to the dark ground: a shade over their albedo)
         S.B.set([n.dir[0], n.dir[1], n.dir[2], n.rad], i * 4);
         if (S.Bc) S.Bc.set([L[0] * SUN[0], L[1] * SUN[1], L[2] * SUN[2], -(1 + (n.k % 17))], i * 4);   // (w < 0: a rubble body — the shader's angular outline, seeded)
       }

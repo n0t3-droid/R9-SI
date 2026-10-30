@@ -270,13 +270,13 @@ float deck(vec2 p, float t, int n, float seed) {
 float tower(vec2 p) {
   vec2 cell = floor(p / 30000.0), f = p - (cell + 0.5) * 30000.0;
   vec3 hv = h3(vec3(cell, 7.0));
-  if (hv.x < 0.7) return 0.0;
+  if (hv.x < 0.6) return 0.0;
   vec2 c = (hv.yz - 0.5) * 9000.0;
   float rv = 3000.0 + 5000.0 * hv.y, ht = 3000.0 + 5000.0 * hv.z;
   float r = length(f - c) / rv;
   if (r >= 1.0) return 0.0;
-  float b = ht * pow(1.0 - r * r, 0.45) * (0.8 + 0.35 * vn2(p / 1700.0) + 0.12 * vn2(p / 600.0));
-  return min(b, ht * 0.92);
+  // rounded, lumpy (cauliflower turrets), no hard rim: the foot melts into the deck
+  return ht * pow(1.0 - r * r, 0.7) * (0.7 + 0.4 * vn2(p / 2600.0) + 0.18 * vn2(p / 900.0)) * smoothstep(1.0, 0.75, r);
 }
 // the ray's height over the deck at distance t (the sphere's curve)
 float rayH(float t, float Rc, float mu, float Rl) { return sqrt(Rc * Rc + t * t + 2.0 * Rc * t * mu) - Rl; }
@@ -321,7 +321,7 @@ void main() {
   // relief: the deck's slope toward Helia (Balanced and up)
   float rel = 0.0;
   if (u_geo.w > 1.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) * 700.0; rel = (deck(gA + sh, t, n - 2, 1.0) - fA) * 3.0; }
-  vec3 topC = band * (0.4 + 1.0 * fA) * vec3(1.06, 1.0, 1.02);
+  vec3 topC = band * (0.22 + 1.3 * fA) * vec3(1.06, 1.0, 1.02);   // (u-fields2: more of the deck's own contrast — 0.4 + 1.0 fA)
   float cover = smoothstep(0.34, 0.56, fA);
   vec3 deepC = band * vec3(0.62, 0.52, 0.66) * (0.35 + 0.6 * fB);
   // the top deck's shadow on the deep one (Low and up)
@@ -356,7 +356,7 @@ void main() {
       float df = max(dot(Nt, u_sunDir), 0.0), sh = 1.0;
       for (int j = 1; j <= 4; j++) { float s = float(j) * 900.0; if (tower(g + sunH * s) > H0 + s * tanE + 60.0) sh *= 0.55; }
       float ao = 0.55 + 0.45 * clamp(H0 / 6000.0, 0.0, 1.0);
-      vec3 tc = mix(band, vec3(1.0, 0.97, 0.92), 0.55) * (0.12 + 1.15 * df * sh) * ao;
+      vec3 tc = mix(band, vec3(1.0, 0.97, 0.92), 0.7) * (0.18 + 1.25 * df * sh) * ao;
       col = tc * u_sunCol * lit * rsh * 1.1;
       cover = 1.0;
     } else {
@@ -384,7 +384,7 @@ void main() {
   // the haze toward the horizon (the upper haze the flight is in), lit like the tops
   float hz = 1.0 - exp(-tHit / 260000.0);
   vec3 hazeC = bandC * vec3(0.95, 0.92, 1.05) * 1.2 * u_sunCol * (0.08 + 0.95 * litC) * exp(-alt / 7000.0) * 2.0 + vec3(0.02, 0.025, 0.04) * (1.0 - lit);
-  col = mix(col, hazeC, hz * 0.62);   // (u-fields2: less milky — 0.85 before)
+  col = mix(col, hazeC, hz * 0.5);   // (u-fields2: less milky — 0.85 before, then 0.62)
   o = vec4(col, 1.0);
 }`;
   // the swarm's bodies: an icosphere (level 2) bent into the body's shape (top, binary, potato), rough, near-black;

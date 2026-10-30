@@ -762,7 +762,7 @@ vec3 bsBodies(vec3 D, vec3 col, float px) {
       float sd = -u_bsBc[k].w;
       vec3 e1 = normalize(cross(B.xyz, abs(B.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), e2 = cross(B.xyz, e1);
       float an = atan(dot(o, e2), dot(o, e1)) + sd, sec = 6.2831853 / 7.0, fi = floor(an / sec), a2 = an - (fi + 0.5) * sec;
-      float lump = cos(sec * 0.5) / cos(a2) * (0.8 + 0.1 * sin(2.0 * an + sd * 1.7) + 0.07 * sin(3.0 * an + sd * 2.3));
+      float lump = cos(sec * 0.5) / cos(a2) * (0.9 + 0.08 * sin(2.0 * an + sd * 1.7) + 0.06 * sin(3.0 * an + sd * 2.3));
       q /= lump; o /= lump;
       if (q > 1.08) continue;
       float h1 = fract(sin(fi * 12.9898 + sd * 78.233) * 43758.5453), ca = cos((fi + 0.5) * sec - sd), sa = sin((fi + 0.5) * sec - sd);
