@@ -138,7 +138,7 @@ async function plaza(P, path) {
 const R0 = {};
 // ---------------------------------------------------------------- u-stars2
 const sj = (P) => P.ev(() => VR.StarJump.debug.state(VR.game));
-const keep = (P, name) => P.ev((n) => { window[n] = window.__F; return !!window.__F; }, name);
+const keep = (P, name) => P.ev((n) => { window[n] = window.__F; if (window.__F) window.__F.hand = null; return !!window.__F; }, name);   // (run 2: the held item hid the shadows)
 const shot = async (P, name, tag) => { await P.step(2); await keep(P, '__Fs'); const m = await picture(P, '__Fs', SH(name), K); rec.presets[tag].pics = rec.presets[tag].pics || {}; rec.presets[tag].pics[name] = m; console.log('  ' + name + ' ' + JSON.stringify(m)); return m; };
 // the systems the pictures need, from this seed's neighbourhood
 const choose = (P) => P.ev(() => {
@@ -221,13 +221,14 @@ async function stars2(P, tag) {
     else check(!st2.built, 'Very Low: no SUN2 program', JSON.stringify(R.sun2));
     if (b && tag === 'high') {
       // a pillar and a wall beside the player, the view down on their shadows
-      const at = await P.ev(() => { const g = VR.game, w = g.world, p = g.player, x = Math.floor(p.pos[0]) + 4, z = Math.floor(p.pos[2]); let y = 200; while (y > 20 && !w.getBlock(x, y, z)) y--; const S = VR.R.S('stone_bricks') || VR.R.S('stone'); for (let k = 1; k <= 5; k++) w.setBlock(x, y + k, z, S); for (let k = 1; k <= 3; k++) for (let dz = 2; dz <= 4; dz++) w.setBlock(x, y + k, z + dz, S); return [x, y, z]; });
+      const at = await P.ev(() => { const g = VR.game, w = g.world, p = g.player, x = Math.floor(p.pos[0]) + 4, z = Math.floor(p.pos[2]); let y = 200; while (y > 20 && !w.getBlock(x, y, z)) y--; const S = VR.R.S('stone_bricks') || VR.R.S('stone'); for (let k = 1; k <= 10; k++) w.setBlock(x, y + k, z, S); for (let k = 1; k <= 3; k++) for (let dz = 2; dz <= 4; dz++) w.setBlock(x, y + k, z + dz, S); return [x, y, z]; });
       await P.settle(120);
       const d = b.dir; const sy = yawOf([-d[0], 0, -d[2]]);
       // (run 1 stood on the shadows' side looking away: the pillar behind the eye — now on the suns' side, the shadows ahead)
       const hl = Math.hypot(d[0], d[2]) || 1;
-      await P.ev(([at, d, hl]) => { const g = VR.game, p = g.player; p.teleport(at[0] + 0.5 + d[0] / hl * 7, at[1] + 5, at[2] + 2.5 + d[2] / hl * 7); }, [at, d, hl]);
-      await look(P, sy, -0.55, 75);
+      // (run 2: from behind at 5 m the shadows were foreshortened — now from 15 m above the ground the shadows fall on)
+      await P.ev(([at, d, hl]) => { const g = VR.game, p = g.player; p.teleport(at[0] + 0.5 - d[0] / hl * 4, at[1] + 15, at[2] + 2.5 - d[2] / hl * 4); }, [at, d, hl]);
+      await look(P, sy, -1.15, 75);
       await P.step(6);
       await shot(P, 'binary_two_shadows.png', tag);
       const s2 = b.s2 || d, mid = [d[0] + s2[0], 0, d[2] + s2[2]];

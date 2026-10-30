@@ -53,10 +53,11 @@
       const x = r && typeof dim === 'string' && dim[0] === 'x' ? SJ.exoStar(dim) : null;
       if (!x || !x.pl) return r;
       const st = x.def.star, s = r.raw && r.raw.exo ? r.raw.exo : E.sky(x.def, x.pl, tt, SK), L = r.light;
-      // the star's colour harder than u-stars' 0.6 (the eye adapts less than that): a red dwarf's day peach, a hot
-      // star's harsh white — brighter, its shade darker and bluer
+      // the star's colour: a red dwarf's day peach — u-stars' 0.6 of its colour made the light 9 : 1 red over blue and
+      // a violet ground red (run 2 at 0.98: 39 : 1, everything red); the eye adapts further, to about 3 : 1 — a K star's
+      // orange a little warmer; a hot star's harsh white — brighter, its shade darker
       const tint = colOf(st.color), Hs = colOf('#dddeff');
-      const ex = st.T < 4200 ? 0.38 : st.T < 5200 ? 0.2 : 0;
+      const ex = st.T < 3900 ? -0.3 : st.T < 5200 ? 0.1 : 0;
       const kx = [0, 1, 2].map(i => Math.pow(tint[i] / Hs[i], ex));
       const hot = st.T >= 7500 ? 1 : 0;
       L.sunColor = L.sunColor.map((v, i) => v * kx[i] * (1 + 0.3 * hot));
@@ -85,7 +86,7 @@
       if (rg) {
         const ph = s.phi;
         r.sky.par = [0, -1, 0, 1.0005]; r.sky.pole = [0, Math.sin(ph), -Math.cos(ph), 1]; r.sky.parX = [1, 0, 0, 0]; r.sky.parK = [-1, 0, 0, s.ang];
-        r.sky.lum[0] = Math.min(1, r.sky.lum[0] * 1.6);
+        r.sky.lum[0] = Math.min(1, r.sky.lum[0] * 1.2);
       }
       r.exo2 = { sun2, ring: !!rg, sig: E.signature(x.def, x.pl), day: s.day, locked: s.locked, T: st.T, k2: s.k2, sep: s.sep };
       if (VR.game && dim === VR.game.dim) X2.cur = { dim, sun2, exo: r.exo2 };

@@ -27,11 +27,11 @@
     return K(img);
   };
   REC.exo_moss = () => {
-    const img = TX.natural([0x2a1236, 0x3b1a4c, 0x4f2462, 0x652f78], { period: 3, oct: 3, speck: 0.08, speckDark: true, seed: 9311, contrast: 1.05, rough: 0.97 });
-    img.forEach((x, y, i) => { const h = hh(x, y, 9312); if (h < 0.035) img.set(x, y, C(h < 0.012 ? 0xc04aa8 : 0x8a3c9c)); });   // tips catching the light
+    const img = TX.natural([0x2c1a4e, 0x3e2468, 0x553084, 0x6c3c9e], { period: 3, oct: 3, speck: 0.08, speckDark: true, seed: 9311, contrast: 1.05, rough: 0.97 });   // (run 2: redder violets read red in a red dwarf's light — bluer now)
+    img.forEach((x, y, i) => { const h = hh(x, y, 9312); if (h < 0.035) img.set(x, y, C(h < 0.012 ? 0xb46ae0 : 0x8448b8)); });   // tips catching the light
     return K(img);
   };
-  REC.exo_frond = () => TX.blades([0x24102e, 0x3e1a50, 0x5a2670, 0x7a368e, 0xa452b0], { count: 12, minH: 12, varH: 16, seed: 9321, thick: true, lean: 0.8 });
+  REC.exo_frond = () => TX.blades([0x24164a, 0x3a2268, 0x543088, 0x7040a8, 0x9a5ad0], { count: 12, minH: 12, varH: 16, seed: 9321, thick: true, lean: 0.8 });
   REC.exo_glass = () => {
     const img = TX.natural([0x1c2018, 0x283022, 0x343c2a, 0x45452e], { period: 4, oct: 3, speck: 0.07, speckDark: true, seed: 9331, contrast: 0.95, rough: 0.35 });
     img.forEach((x, y, i) => { const h = hh(x, y, 9332); if (h < 0.03) { img.set(x, y, C(h < 0.01 ? 0xe8f0d8 : 0x7a8a5a)); img.ro[i] = 0.08; } });   // glints of the fused grains
