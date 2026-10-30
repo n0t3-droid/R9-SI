@@ -7,8 +7,8 @@
 //   c · Ocker: the plains butterscotch (ocker_dust) with rust (red_sand) and darker patches — red_sand no longer the
 //       ground; the landing on the Rostschlucht's floor facing its north wall, the eye lifted
 //   d · Zinnober: the landing on the Glutsee's lip, facing the lava, the eye pitched down; the plains in ≥ 5 colours
-//   e · Very Low's three stops at Ocker's sunset: blue within 6° of Helia (b* ≥ 8 lower than 30° away), no column (25°
-//       over Helia no brighter than 1.3× the same height 90° away)
+//   e · Very Low's three stops at Ocker's sunset: blue within 6° of Helia (b* ≥ 8 lower than 30° away), the glow round Helia
+//       (25° over Helia ≥ 1.5× the sky 90° away, as the LUT's aureole) and bluer than the far sky
 //   bash test/wt_run.sh moons3.js 300
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -98,10 +98,11 @@ console.log('e · Very Low: Ocker\'s sunset');
   const s = A.fit3(C, 2, el), dir = (e, a) => [Math.cos(e * D) * Math.cos(a * D), Math.sin(e * D), Math.cos(e * D) * Math.sin(a * D)];
   const near = A.stops3(s, dir(4, 5), sun, [0, 0, 0]), far = A.stops3(s, dir(4, 30), sun, [0, 0, 0]);
   const bN = A.lab(near)[2], bF = A.lab(far)[2];
-  check(bF - bN >= 8, `blue round Helia: b* ${bN.toFixed(0)} within 6°, ${bF.toFixed(0)} 30° away (Δ ${(bF - bN).toFixed(0)} ≥ 8)`);
+  check(bF - bN >= 8 && bN < 0, `blue round Helia (b* < 0): b* ${bN.toFixed(0)} within 6°, ${bF.toFixed(0)} 30° away (Δ ${(bF - bN).toFixed(0)} ≥ 8)`);
   const lum = (v) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
   const up = A.stops3(s, dir(27, 0), sun, [0, 0, 0]), side = A.stops3(s, dir(27, 90), sun, [0, 0, 0]);
-  check(lum(up) <= 1.3 * lum(side), `no column: 25° over Helia ${lum(up).toFixed(4)} vs 90° away ${lum(side).toFixed(4)} (≤ 1.3×)`);
+  const lu = A.sample(C, dir(27, 0), sun, [0, 0, 0]), ls = A.sample(C, dir(27, 90), sun, [0, 0, 0]);
+  check(lum(up) >= 1.5 * lum(side) && A.lab(up)[2] < A.lab(far)[2], `the glow round Helia, not a column of grey: 25° over Helia ${(lum(up) / lum(side)).toFixed(1)}× the sky 90° away (the LUT ${(lum(lu) / lum(ls)).toFixed(1)}×; ≥ 1.5), bluer than the far sky (b* ${A.lab(up)[2].toFixed(0)})`);
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

@@ -73,6 +73,7 @@
     const BL = VR.BodyLife, BS = VR.BodySky, P = g.particles, p = g.player, w = g.world, prof = VR.Bodies.profile(id);
     const unlock = (k) => { if (g.codex) g.codex.unlock(k); };
     const big = tier === 0 ? 3 : 1;
+    if (id !== 'zinn' && BS && BS.lake) BS.lake = null;   // (u-moons3: the Glutsee's far glow on Zinnober only)
     if (id !== 'ocker' && BS && BS.dustTau !== 0.6) { BS.dustTau = 0.6; BS.front = 0; S.tau = 0.6; S.front = 0; }   // (Ocker's weather stays on Ocker)
     if (id === 'zinn') {
       const gen = BL.gen(g, 'zinn'), near = [];
@@ -86,6 +87,9 @@
       for (const n of near.slice(0, 4)) plumes.push({ x: n.v.x, y: n.v.y + 1, z: n.v.z, top: n.pl.top, k: n.pl.k });
       // the Glutsee: spatter over the open melt; its glow by night is the codex's page
       const G = gen.glut, dG = Math.hypot(G.x - p.pos[0], G.z - p.pos[2]);
+      // u-moons3: the Glutsee for the sky's far ground (bodysky.js → bsLake): its melt glows where the world's columns
+      // end — Very Low's 64 m see only its near shore
+      if (BS && (!BS.lake || BS.lake.g !== gen)) BS.lake = { g: gen, x: G.x, z: G.z, y: gen.heightAt(Math.floor(G.x), Math.floor(G.z)) + 1, R: G.R * 0.84 };
       if (dG < G.R + 40 && BS && BS.cur && BS.cur.light.lightK < 0.3) unlock('moon:lavalake');
       if (P && dG < G.R + 300) {
         const n = Math.floor((tier === 0 ? 3 : tier === 1 ? 7 : 12) * dt * 6 + Math.random());

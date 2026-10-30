@@ -696,6 +696,8 @@ uniform vec4 u_bsHzX;      // its spin (radians), its clouds' drift, 0, 0
 uniform vec4 u_bsJu;       // the plumes' shape: x 0 ice jets (Opal) · 1 umbrellas (Zinnober) · 2 dust devils (Ocker), y the devils' width (m), z the time (s), w 0
 // ---- end u-moons2
                            //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
+uniform vec4 u_bsLake;     // u-moons3: the Glutsee — its centre (x, z) from the eye, its melt's height from the eye, the melt's radius (0: none)
+uniform vec3 u_bsLakeC;    // its glow
 const float BS_D2R = 0.0174532925;
 const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e, c]) => `vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
 const vec3 BS_GN = vec3(${f3(GN)}), BS_GC = vec3(${f3(GC)});
@@ -919,8 +921,7 @@ vec3 bsFarGround(vec3 D, float px) {
 vec3 bsAirSky(vec3 D) {
   if (u_bsAirK.z < 0.5) {
     float el = max(D.y, 0.0), k = sqrt(el);
-    vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
-    float wS = pow(max(dot(hs, hd), 0.0), 12.0) * exp(-max(0.0, el - 0.087) * 8.0);
+    float wS = exp((dot(D, u_bsSun.xyz) - 1.0) * 20.0);   // (u-moons3: the aureole round Helia, blue at sunset — was a band up from the horizon, grey-white)
     return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
   }
   vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
@@ -1026,6 +1027,16 @@ vec3 bsDevils(vec3 D, vec3 col) {
   }
   return col;
 }
+// u-moons3 · the Glutsee where the world's columns end (Very Low's 64 m see only its near shore): the melt's glow under
+// drifting crust plates (7-m cells), one ray–plane cut
+vec3 bsLake(vec3 D, vec3 g) {
+  if (u_bsLake.w <= 0.0 || D.y >= -1e-4) return g;
+  vec2 q = D.xz * (u_bsLake.z / D.y) - u_bsLake.xy;
+  float r = length(q) / u_bsLake.w;
+  if (r > 1.0) return g;
+  float crust = step(0.62 - 0.4 * r, fract(sin(dot(floor(q / 7.0), vec2(12.9898, 78.233))) * 43758.5453));
+  return mix(u_bsLakeC * (1.0 - 0.8 * crust), g, smoothstep(0.9, 1.0, r));
+}
 // ---- end u-moons2
 vec3 bodySky(vec3 dir, bool withSun) {
   vec3 D = normalize(dir);
@@ -1040,7 +1051,7 @@ vec3 bodySky(vec3 dir, bool withSun) {
   col = u_bsJu.x > 1.5 ? bsDevils(D, col) : u_bsJu.x > 0.5 ? bsUmbrella(D, col) : bsPlumes(D, col);
   // the far ground below the true horizon (where the world's columns end): its lit colour, a one-pixel edge
   float gk = 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y);
-  if (gk > 0.0) col = mix(col, u_bsAirK.x > 0.5 ? mix(bsFarGround(D, px), bsAirSky(D), u_bsAirK.w) : bsFarGround(D, px), gk);
+  if (gk > 0.0) col = mix(col, u_bsAirK.x > 0.5 ? mix(bsFarGround(D, px), bsAirSky(D), u_bsAirK.w) : bsLake(D, bsFarGround(D, px)), gk);
   if (withSun) col += bsGlare(D) * (u_bsAirK.x > 0.5 ? bsAirTrans(u_bsSun.xyz) : vec3(1.0));
   return col;
 }

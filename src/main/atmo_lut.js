@@ -306,23 +306,26 @@
   }
   // Helia's light at the eye: the transmittance toward it (its disc's colour)
   function sunTrans(C, h, sunEl, o) { return trans(C, C.air.R + Math.max(h, 1), Math.sin(sunEl), o); }
-  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the horizon 12° beside Helia
+  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the aureole beside Helia
   function fit3(C, h, sunEl) {
-    const sun = [Math.cos(sunEl), Math.sin(sunEl), 0], o = { zen: [0, 0, 0], hor: [0, 0, 0], sunHor: [0, 0, 0] };
+    const sun = [Math.cos(sunEl), Math.sin(sunEl), 0], o = { zen: [0, 0, 0], hor: [0, 0, 0], sunHor: [0, 0, 0], band: [0, 0, 0] };
     const e5 = 5 * PI / 180;
     ray(C, h, [0, 1, 0], sun, o.zen, null, 16);
     ray(C, h, [-Math.cos(e5), Math.sin(e5), 0].map((v, i) => (i === 2 ? 0 : v)), sun, o.hor, null, 16);
     // (away from Helia: the azimuth opposite; at 90° from it the average of both sides)
     const side = [0, 0, 0]; ray(C, h, [0, Math.sin(e5), Math.cos(e5)], sun, side, null, 16);
     for (let c = 0; c < 3; c++) o.hor[c] = 0.5 * (o.hor[c] + side[c]);
-    const a12 = 12 * PI / 180; ray(C, h, [Math.cos(e5) * Math.cos(a12), Math.sin(e5), Math.cos(e5) * Math.sin(a12)], sun, o.sunHor, null, 16);   // (12° off Helia: the lobe, not its core)
+    // u-moons3: the lobe's colour 5° beside Helia and 3° over it (≥ 5° up) — its blue aureole at sunset; was 12° off at 5° up,
+    // where the dust's long path greys it: a grey-white glow on Very Low. The shader spreads it round Helia (exp(20·(cos − 1)))
+    const a12 = 12 * PI / 180; ray(C, h, [Math.cos(e5) * Math.cos(a12), Math.sin(e5), Math.cos(e5) * Math.sin(a12)], sun, o.band, null, 16);   // (the horizon 12° beside Helia: the ground's sky light and the haze's colour, as before)
+    const a5 = 5 * PI / 180, eS = Math.max(sunEl + 3 * PI / 180, e5); ray(C, h, [Math.cos(eS) * Math.cos(a5), Math.sin(eS), Math.cos(eS) * Math.sin(a5)], sun, o.sunHor, null, 16);
     return o;
   }
   // the 3-stop sky at a direction (the shader's own formula, for the test): el from the horizon, cph the cosine to the
   // sun's azimuth
   function stops3(s, d, sunDir, o) {
-    const el = Math.max(0, d[1]), hs = Math.hypot(sunDir[0], sunDir[2]) || 1, hd = Math.hypot(d[0], d[2]) || 1;
-    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 12) * Math.exp(-Math.max(0, el - 0.087) * 8);
+    const el = Math.max(0, d[1]);
+    const cs = (d[0] * sunDir[0] + d[1] * sunDir[1] + d[2] * sunDir[2]) / (Math.hypot(d[0], d[1], d[2]) * Math.hypot(sunDir[0], sunDir[1], sunDir[2]) || 1), wS = Math.exp((Math.min(cs, 1) - 1) * 20);   // (u-moons3: the aureole round Helia, as the LUT's — not a band up from the horizon)
     const k = Math.sqrt(el);
     for (let c = 0; c < 3; c++) o[c] = s.hor[c] + (s.zen[c] - s.hor[c]) * k + (s.sunHor[c] - s.hor[c]) * wS;
     return o;
