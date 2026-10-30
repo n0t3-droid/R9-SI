@@ -5,6 +5,7 @@ files.splice(files.indexOf('blocks4'), 0, 'foeblocks');   // a-foes: the Leuchtf
 files.splice(files.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar: the hall's and the temple's pieces (vgen 14), after the Leuchtfeuer
 files.splice(files.indexOf('blocks4'), 0, 'bodies2'); files.splice(files.indexOf('gen_body') + 1, 0, 'gen_body2');   // u-moons2: Zinnober's blocks (last), the three new kinds
 files.splice(files.indexOf('blocks4'), 0, 'fields_blocks'); files.splice(files.indexOf('gen_body2') + 1, 0, 'gen_rubble');   // u-fields: carbon_rubble (last), the rubble bodies
+files.push('galaxy');   // u-stars: the neighbourhood (VR.Galaxy), after universe
 const skip = (process.env.R9_SKIP || '').split(',');   // (test/land_v9_same.js: the shared code without some files)
 for (const f of files) { if (skip.includes(f)) continue; const p = __dirname + '/../src/shared/' + f + '.js'; if (require('fs').existsSync(p)) require(p); }
 module.exports=globalThis.VR;

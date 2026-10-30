@@ -31,7 +31,8 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.inde
 MAIN.splice(MAIN.indexOf('space_shaders'), 1); MAIN.splice(MAIN.indexOf('shaders'), 0, 'space_shaders'); MAIN.push('bodysky', 'bodylife');   // u-moons1: the space GLSL before shaders.js (its COMMON takes the airless sky from it), the moons' sky and life
 MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', 'hudfade');   // e-ctx: the travel camera, travel by intent, the Aktion key, the fading HUD (src/main/)
 MAIN.push('ascent', 'spaceflight', 'entry');   // u-ascent: the climb, space, the way down (after the space scene: they draw with it and wrap the play frame after it)
-MAIN.push('cruise');   // u-cruise: the Reiseantrieb between the worlds, the descent into a moon's world, the Konvoi (src/main/cruise.js)
+MAIN.push('cruise');
+SHARED.push('galaxy'); MAIN.push('starjump', 'starmap');   // u-stars: VR.Galaxy (src/shared/galaxy.js, after universe), the Sternensprung and the other systems (starjump.js), the star map (starmap.js)   // u-cruise: the Reiseantrieb between the worlds, the descent into a moon's world, the Konvoi (src/main/cruise.js)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels', 'foes', 'liberate');   // a-foes: the Leuchtfeuer (appended last, after the bodies' blocks), the foes' models, VR.Foes, VR.Liberate (after quests.js and ctx.js, whose parts they use)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar: the Hangar Hall's and the Gate Temple's pieces (vgen 14), the last blocks
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies2'); SHARED.splice(SHARED.indexOf('gen_body') + 1, 0, 'gen_body2'); MAIN.splice(MAIN.indexOf('bodysky'), 0, 'atmo_lut'); MAIN.push('bodylife2');   // u-moons2: Zinnober's blocks (after t-hangar's), the three new kinds, the air LUTs, their life
