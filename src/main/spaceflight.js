@@ -425,6 +425,7 @@ void main() {
     gl.bindVertexArray(r.emptyVAO);
     let n = 0;
     for (const d of fr.draws) {
+      if (d.fn) { if (L.bodies && L.bodies[0] > 0.5) { d.fn(r, d); n++; } continue; }   // u-fields: a draw of its own (fields.js)
       const lay = d.prog === 'bg' ? L.bg : d.prog === 'herz' ? L.herz : L.bodies;
       if (!lay || !(lay[0] > 0.001 || lay[1] > 0.001)) continue;
       if (L.strict) { let miss = false; for (const k in d.tex) if (!ST.tex[map[d.tex[k]]]) miss = true; if (miss) continue; }

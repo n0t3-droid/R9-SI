@@ -150,6 +150,7 @@
   }
   SS.view = function (name, eph, opt) {
     opt = opt || {};
+    if (VR.Fields && VR.Fields.view) { const fv = VR.Fields.view(name, eph, opt); if (fv) return fv; }   // u-fields: ring, cassini, ringschatten, wolken, schwarm
     const bs = eph.bodies, BTm = BT();
     if (name === 'herz') {
       // 3 km up and 6 km behind the player's place, looking the player's way: the place in the picture's lower middle,
@@ -352,6 +353,7 @@
         fr.draws.push({ prog: 'moon', full, u: Object.assign(base, { u_d: d / R, u_parB: parB, u_parCol: parCol, u_mk: L.mk, u_airCol: L.col, u_grain: [tier, R / 200] }), tex: { u_tex: id } });
       }
     }
+    if (VR.Fields && VR.Fields.frame) VR.Fields.frame(fr, eph, S, o);   // u-fields: the ring's chunks and sheet, the cloud tops, the swarm (fields.js)
     fr.sunVis = vis;
     if (vis > 0.01) {
       const bu = perp(Math.abs(sunS[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], sunS), bv = cross(sunS, bu);
@@ -458,6 +460,7 @@
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(r.emptyVAO);
     for (const d of fr.draws) {
+      if (d.fn) { d.fn(r, d); continue; }   // u-fields: a draw of its own (fields.js)
       const p = program(VR.SpaceShaders.progFor(d)); if (!p) continue;
       const tn = d.prog === 'herz' && VR.PlanetLODGL ? VR.PlanetLODGL.draw(r, d, fr.bodies.herz, null, null, map, (k) => ST.tex[k] || blank(gl)) : 0;   // u-orbitlod: the planet tiles first, the impostor at the far plane behind them
       gl.useProgram(p.p);
