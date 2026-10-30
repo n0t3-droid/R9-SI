@@ -2934,5 +2934,17 @@
     'g.stamp.none': '📐 No blueprint yet — set two corners (left / right click), then C',
     'g.stamp.saved': '📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, L mirrors',
     // ---- a-builder end
+    // ---- u-fields2
+    'g.fields2.ring': "Amaranth's ring",
+    'g.fields2.ringIn': "Cruise drive to the ring: first to Amaranth, then down into the ice sheet (~{s} s)",
+    'g.fields2.clouds': "Down to Amaranth's clouds: 15 km over the tops, 5.8 km/s",
+    'g.fields2.cloudsIn': "Above the clouds! Below 1 km the autopilot pulls up — G picks a new target.",
+    'g.fields2.swarmIn': "Course for the Rubble Swarm: 60 rocks within 30 km",
+    'g.fields2.land': "In the Rubble Swarm. Look at a rock and press V to land.",
+    'g.fields2.noRock': "No rock in sight — turn toward one and press V.",
+    'g.fields2.hop': "Hop to {name} ({km} km)",
+    'g.fields2.hopFar': "Look at a neighbouring rock in the sky, then G.",
+    'g.codex.m.spar': ["Rock Prospector", "Mine nickel iron, ice nodules or glowspar on a rock of the swarm — the Hangar buys them.", "Land in the Rubble Swarm and dig in the craters."],
+    // ---- u-fields2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

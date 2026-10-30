@@ -206,9 +206,11 @@
       if (!meta || meta.guest) return meta;
       const u = meta.universe || (meta.universe = { v: 1 }), b = u.bodies || (u.bodies = {});
       for (const id of Bodies.ids) { const e = b[id] || (b[id] = {}); if (!(e.bgen > 0)) e.bgen = BGEN; }
+      // u-fields2: the rubble bodies' generator (gen_rubble.js rgen) — a save that ever stood on a rock keeps rgen 1
+      if (!(u.rgen > 0)) { const was = [meta.dim].concat(Object.keys(meta.pos || {})).some(d => /^rock\./.test(String(d || ''))); u.rgen = was ? 1 : ((VR.Rubble && VR.Rubble.RGEN) || 2); }
       return meta;
     },
-    bgenOf(meta) { const b = meta && meta.universe && meta.universe.bodies, out = {}; for (const id of Bodies.ids) out[id] = b && b[id] && b[id].bgen > 0 ? b[id].bgen : BGEN; return out; },
+    bgenOf(meta) { const b = meta && meta.universe && meta.universe.bodies, out = {}; for (const id of Bodies.ids) out[id] = b && b[id] && b[id].bgen > 0 ? b[id].bgen : BGEN; const ug = meta && meta.universe && meta.universe.rgen; if (ug > 0) out.rubble = ug; return out; },   // (u-fields2: out.rubble)
   };
 
   // ---------------------------------------------------------------- the blocks of the bodies (appended late)

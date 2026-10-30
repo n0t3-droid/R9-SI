@@ -265,6 +265,21 @@ float deck(vec2 p, float t, int n, float seed) {
   vec2 wv = vec2(fbm(s * 0.5 + seed, 3), fbm(s * 0.5 + seed + 9.3, 3));
   return fbm(s + wv * 2.2, n);
 }
+// u-fields2: the towering convective heads — one 30-km cell in four holds a head 6–16 km across, 3–8 km over the deck,
+// cauliflower sides, a flattened top (the anvil's start); a height field over the deck (m)
+float tower(vec2 p) {
+  vec2 cell = floor(p / 30000.0), f = p - (cell + 0.5) * 30000.0;
+  vec3 hv = h3(vec3(cell, 7.0));
+  if (hv.x < 0.6) return 0.0;
+  vec2 c = (hv.yz - 0.5) * 9000.0;
+  float rv = 3000.0 + 5000.0 * hv.y, ht = 3000.0 + 5000.0 * hv.z;
+  float r = length(f - c) / rv;
+  if (r >= 1.0) return 0.0;
+  // rounded, lumpy (cauliflower turrets), no hard rim: the foot melts into the deck
+  return ht * pow(1.0 - r * r, 0.7) * (0.7 + 0.4 * vn2(p / 2600.0) + 0.18 * vn2(p / 900.0)) * smoothstep(1.0, 0.75, r);
+}
+// the ray's height over the deck at distance t (the sphere's curve)
+float rayH(float t, float Rc, float mu, float Rl) { return sqrt(Rc * Rc + t * t + 2.0 * Rc * t * mu) - Rl; }
 void main() {
   vec3 D = normalize(v_dir);
   float mu = dot(D, u_up), alt = u_geo.x, Rl = u_geo.y;
@@ -289,6 +304,9 @@ void main() {
   vec2 gA = vec2(dot(PA, u_east), dot(PA, u_north)) + u_off.xy, gB = vec2(dot(PB, u_east), dot(PB, u_north)) + u_off.xy;
   vec3 NA = normalize(u_camB + u_toBody * PA / Rl);
   vec3 band = texture(u_bands, eqUV(NA)).rgb;
+  // u-fields2: the belts darker and browner, the zones bright (the band's own contrast pushed)
+  float lb = dot(band, vec3(0.3, 0.55, 0.15)), lc = dot(bandC, vec3(0.3, 0.55, 0.15)) + 1e-3, zone = smoothstep(0.85, 1.12, lb / lc);
+  band *= mix(vec3(0.5, 0.42, 0.36), vec3(1.05), zone);
   int n = u_geo.w > 1.5 ? 6 : u_geo.w > 0.5 ? 5 : 4;
   float t = u_off.z;
   float fA = deck(gA, t, n, 1.0);
@@ -303,13 +321,51 @@ void main() {
   // relief: the deck's slope toward Helia (Balanced and up)
   float rel = 0.0;
   if (u_geo.w > 1.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) * 700.0; rel = (deck(gA + sh, t, n - 2, 1.0) - fA) * 3.0; }
-  vec3 topC = band * (0.4 + 1.0 * fA) * vec3(1.06, 1.0, 1.02);
+  vec3 topC = band * (0.22 + 1.3 * fA) * vec3(1.06, 1.0, 1.02);   // (u-fields2: more of the deck's own contrast — 0.4 + 1.0 fA)
   float cover = smoothstep(0.34, 0.56, fA);
   vec3 deepC = band * vec3(0.62, 0.52, 0.66) * (0.35 + 0.6 * fB);
   // the top deck's shadow on the deep one (Low and up)
   float shB = 1.0;
   if (u_geo.w > 0.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) / max(mus, 0.12) * u_geo.z; shB = 1.0 - 0.6 * smoothstep(0.34, 0.56, deck(gB + sh, t, 3, 1.0)); }
   vec3 col = mix(deepC * shB, topC * (1.0 + rel), cover) * u_sunCol * lit * rsh * 1.1;
+  // u-fields2: the towering heads (Low and up): marched from 8 km over the deck down to it, lit, self-shadowed, and their
+  // shadows thrown on the deck
+  float tHit = tA;
+  if (u_geo.w > 0.5) {
+    vec2 sunH = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)); float sl = length(sunH); sunH /= max(sl, 1e-4);
+    float tanE = mus / max(sl, 0.05);
+    float Hm = 8000.0, t0 = 0.0;
+    if (alt > Hm) { float Rm = Rl + Hm, dm = Rc * Rc * mu * mu - (Rc * Rc - Rm * Rm); t0 = dm > 0.0 ? -Rc * mu - sqrt(dm) : tA; }
+    int NS = u_geo.w > 1.5 ? 10 : 6;
+    float dt = (tA - t0) / float(NS), tp = t0, hit = -1.0;
+    for (int i = 1; i <= 10; i++) {
+      if (i > NS) break;
+      float tt = t0 + dt * float(i);
+      vec3 P = D * tt; vec2 g = vec2(dot(P, u_east), dot(P, u_north)) + u_off.xy;
+      if (tower(g) > rayH(tt, Rc, mu, Rl)) { hit = tt; break; }
+      tp = tt;
+    }
+    if (hit > 0.0) {
+      float lo = tp, hi = hit;
+      for (int j = 0; j < 4; j++) { float m = 0.5 * (lo + hi); vec3 P = D * m; vec2 g = vec2(dot(P, u_east), dot(P, u_north)) + u_off.xy; if (tower(g) > rayH(m, Rc, mu, Rl)) hi = m; else lo = m; }
+      tHit = hi;
+      vec3 P = D * hi; vec2 g = vec2(dot(P, u_east), dot(P, u_north)) + u_off.xy;
+      float H0 = tower(g), e = 350.0;
+      vec2 gr = vec2(tower(g + vec2(e, 0.0)) - H0, tower(g + vec2(0.0, e)) - H0) / e;
+      vec3 Nt = normalize(u_up - u_east * gr.x - u_north * gr.y);
+      float df = max(dot(Nt, u_sunDir), 0.0), sh = 1.0;
+      for (int j = 1; j <= 4; j++) { float s = float(j) * 900.0; if (tower(g + sunH * s) > H0 + s * tanE + 60.0) sh *= 0.55; }
+      float ao = 0.55 + 0.45 * clamp(H0 / 6000.0, 0.0, 1.0);
+      vec3 tc = mix(band, vec3(1.0, 0.97, 0.92), 0.7) * (0.18 + 1.25 * df * sh) * ao;
+      col = tc * u_sunCol * lit * rsh * 1.1;
+      cover = 1.0;
+    } else {
+      // the deck under a head's shadow
+      float shd = 1.0;
+      for (int j = 1; j <= 5; j++) { float s = float(j) * 2200.0; if (tower(gA + sunH * s) > s * tanE) { shd = 0.42; break; } }
+      col *= shd;
+    }
+  }
   // lightning deep down on the night side: a cell flashes now and then, the glow spread by the deck above
   if (u_off.w > 0.0) {
     float flash = 0.0;
@@ -326,9 +382,9 @@ void main() {
     col += vec3(0.75, 0.82, 1.0) * flash * (1.0 - 0.6 * cover) * 2.2;
   }
   // the haze toward the horizon (the upper haze the flight is in), lit like the tops
-  float hz = 1.0 - exp(-tA / 260000.0);
+  float hz = 1.0 - exp(-tHit / 260000.0);
   vec3 hazeC = bandC * vec3(0.95, 0.92, 1.05) * 1.2 * u_sunCol * (0.08 + 0.95 * litC) * exp(-alt / 7000.0) * 2.0 + vec3(0.02, 0.025, 0.04) * (1.0 - lit);
-  col = mix(col, hazeC, hz * 0.85);
+  col = mix(col, hazeC, hz * 0.5);   // (u-fields2: less milky — 0.85 before, then 0.62)
   o = vec4(col, 1.0);
 }`;
   // the swarm's bodies: an icosphere (level 2) bent into the body's shape (top, binary, potato), rough, near-black;
@@ -474,7 +530,7 @@ void main() {
         for (const b of sw) { const bp = toS(b.pS || (b.pS = b.p)); list.push({ b, d: Math.hypot(bp[0] - cs[0], bp[1] - cs[1], bp[2] - cs[2]) }); }
         list.sort((a, b2) => b2.d - a.d);
         const gg = VR.game, far = (gg && gg.space && gg.space.cam && gg.space.cam.far) || (gg && gg.cam && gg.cam.far) || 100;
-        fr.draws.push({ prog: 'fields_rocks', fn: drawRocks, list, k: { camRel: cs, axes: ax, k: Math.min(1, 0.85 * far / (dS + 30000)), sun: sunS, sunCol: mul(SS.SUN, 0.62) } });
+        fr.draws.push({ prog: 'fields_rocks', fn: drawRocks, list, k: { camRel: cs, axes: ax, k: Math.min(1, 0.85 * far / (dS + 30000)), sun: sunS, sunCol: mul(SS.SUN, gg && gg.space ? 0.62 : 2.2) } });   // (u-fields2: flown into, the eye adapted to the dark rubble — the /raum view keeps its own)
         // the gravel and dust drifting between: a lattice round the camera, no sheet
         fr.draws.push({ prog: 'fields_chunks', fn: drawChunks, n: 12 * 12 * 6, k: { er: toS([1, 0, 0]), et: toS([0, 0, 1]), en: toS([0, 1, 0]), cell: [7, 12, 6, 0.35], camCell: [Math.floor(cam[0] / 7) % 1048576, Math.floor(cam[2] / 7) % 1048576, Math.floor(cam[1] / 7) % 1048576 - 3], camIn: [cam[0] - Math.floor(cam[0] / 7) * 7, cam[2] - Math.floor(cam[2] / 7) * 7, cam[1] - Math.floor(cam[1] / 7) * 7 + 3 * 7 - 3 * 7], size: [0.04, 0.5, 2.6, 38], sheet: [0, 0, 0, eph.t % 10000], sun: sunS, sunCol: mul(SS.SUN, 0.62), plDir: [0, 1, 0], plCol: [0, 0, 0], tint: [0.12, 0.11, 0.1] } });
         F.stats.rocks = sw.length; F.stats.where = 'swarm'; F.stats.swarmD = Math.round(dS);

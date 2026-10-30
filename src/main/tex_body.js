@@ -53,5 +53,32 @@
     img.forEach((x, y, i) => { const h = hh(x, y, 9162), c = hh(x >> 2, y >> 2, 9163); if (h < 0.004) { img.set(x, y, C(0x9a948a)); img.ro[i] = 0.6; } else if (c > 0.82 && h > 0.35) img.set(x, y, C(c > 0.93 ? 0x5a534b : 0x4e4842)); });   // pale specks, clasts
     return K(img);
   };
+  // u-fields2: the ores of the rubble bodies — in the carbon rubble's dark matrix
+  REC.nickel_iron = () => {   // metal nodules: bright grey-steel blebs with a rusty rim, a glint
+    const img = TX.natural([0x2e2a27, 0x3a3531, 0x47413b, 0x544d45], { period: 5, oct: 3, speck: 0.08, speckDark: true, seed: 9171, contrast: 1.0, rough: 0.98 });
+    img.forEach((x, y, i) => { const c = hh(x >> 2, y >> 2, 9172), h = hh(x, y, 9173); if (c > 0.6) { img.set(x, y, C(h > 0.8 ? 0xd2d4d6 : h > 0.3 ? 0x9a9ea2 : 0x6e6a64)); img.ro[i] = 0.3; } else if (c > 0.55) img.set(x, y, C(0x7a4a2c)); });
+    return K(img);
+  };
+  REC.ice_nodule = () => {   // pale blue-white clasts of old ice, a little glint
+    const img = TX.natural([0x2e2a27, 0x3a3531, 0x47413b, 0x544d45], { period: 5, oct: 3, speck: 0.08, speckDark: true, seed: 9181, contrast: 1.0, rough: 0.98 });
+    img.forEach((x, y, i) => { const c = hh(x >> 2, y >> 2, 9182), h = hh(x, y, 9183); if (c > 0.58) { img.set(x, y, C(h > 0.7 ? 0xeef6fb : 0xbcd2e2)); img.ro[i] = 0.2; if (h > 0.93) img.em[i] = 0.15; } });
+    return K(img);
+  };
+  REC.glowspar = () => {   // Glimmspat (our own): teal-green spar blades that glow, dark matrix between
+    const img = TX.natural([0x1e2624, 0x26302d, 0x2e3a36, 0x35423e], { period: 4, oct: 2, speck: 0.06, speckDark: true, seed: 9191, contrast: 1.0, rough: 0.9 });
+    // five prisms: long, narrow, each lit along its length, a bright edge on one side (no grid: crystals, not circuitry)
+    const P = []; for (let k = 0; k < 5; k++) P.push({ x: hh(k, 1, 9194) * N, y: hh(k, 2, 9194) * N, a: 0.6 + hh(k, 3, 9194) * 1.2 + (k & 1) * 0.5, L: N * (0.3 + 0.25 * hh(k, 4, 9194)), w: N * (0.06 + 0.05 * hh(k, 5, 9194)) });
+    img.forEach((x, y, i) => {
+      for (const p of P) {
+        let dx = x + 0.5 - p.x, dy = y + 0.5 - p.y; dx -= Math.round(dx / N) * N; dy -= Math.round(dy / N) * N;
+        const u = dx * Math.cos(p.a) + dy * Math.sin(p.a), v = -dx * Math.sin(p.a) + dy * Math.cos(p.a);
+        if (Math.abs(u) > p.L || Math.abs(v) > p.w * (1 - 0.6 * Math.max(0, Math.abs(u) / p.L - 0.7) / 0.3)) continue;
+        const e = v / p.w, t = 0.5 + 0.5 * u / p.L, h = hh(x, y, 9192);
+        img.set(x, y, C(e > 0.55 ? 0xd8fff4 : e < -0.5 ? 0x1f7f6c : t > 0.6 ? 0x6ff0d0 : 0x3cc4a6)); img.ro[i] = 0.2; img.em[i] = e > 0.55 ? 0.95 : 0.45 + 0.3 * t * (0.7 + 0.3 * h);
+        break;
+      }
+    });
+    return K(img);
+  };
   void N;
 })(VR);

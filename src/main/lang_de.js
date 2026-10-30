@@ -2934,5 +2934,17 @@
     'g.stamp.none': '📐 Noch kein Bauplan — zwei Ecken setzen (Klick links / rechts), dann C',
     'g.stamp.saved': '📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, L spiegelt',
     // ---- a-builder end
+    // ---- u-fields2
+    'g.fields2.ring': "Amarants Ring",
+    'g.fields2.ringIn': "Reiseantrieb zum Ring: erst zu Amarant, dann hinab in die Eisschicht (~{s} s)",
+    'g.fields2.clouds': "Hinab zu Amarants Wolken: 15 km über den Gipfeln, 5,8 km/s",
+    'g.fields2.cloudsIn': "Über den Wolken! Unter 1 km zieht der Autopilot hoch — G sucht ein neues Ziel.",
+    'g.fields2.swarmIn': "Kurs auf den Trümmerschwarm: 60 Brocken in 30 km",
+    'g.fields2.land': "Im Trümmerschwarm. Sieh einen Brocken an und drück V zum Landen.",
+    'g.fields2.noRock': "Kein Brocken in Sicht — dreh dich zu einem und drück V.",
+    'g.fields2.hop': "Sprung zu {name} ({km} km)",
+    'g.fields2.hopFar': "Sieh einen Nachbarbrocken am Himmel an, dann G.",
+    'g.codex.m.spar': ["Brockenschürfer", "Nickeleisen, Eisknollen oder Glimmspat auf einem Brocken des Schwarms abbauen — der Hangar kauft sie.", "Lande im Trümmerschwarm und grab in den Kratern."],
+    // ---- u-fields2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

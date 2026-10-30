@@ -752,12 +752,24 @@ vec3 bsBodies(vec3 D, vec3 col, float px) {
     vec4 B = u_bsB[k];
     if (B.w <= 0.0) continue;
     float c = dot(D, B.xyz);
-    if (c <= 0.0) continue;
+    if (c <= 0.0 || c * c < 1.0 - 1.21 * B.w * B.w) continue;   // (u-fields2: a cone test first — the cross only near the disc)
     float q = length(cross(D, B.xyz)) / B.w;
     if (q > 1.08) continue;
     vec3 o = (D - B.xyz * c) / B.w;
+    // u-fields2: a rubble body (Bc.w < 0, the seed): the disc bent into an irregular polygon, its faces tilted
+    vec3 fN = vec3(0.0);
+    if (u_bsBc[k].w < 0.0) {
+      float sd = -u_bsBc[k].w;
+      vec3 e1 = normalize(cross(B.xyz, abs(B.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), e2 = cross(B.xyz, e1);
+      float an = atan(dot(o, e2), dot(o, e1)) + sd, sec = 6.2831853 / 7.0, fi = floor(an / sec), a2 = an - (fi + 0.5) * sec;
+      float lump = cos(sec * 0.5) / cos(a2) * (0.9 + 0.08 * sin(2.0 * an + sd * 1.7) + 0.06 * sin(3.0 * an + sd * 2.3));
+      q /= lump; o /= lump;
+      if (q > 1.08) continue;
+      float h1 = fract(sin(fi * 12.9898 + sd * 78.233) * 43758.5453), ca = cos((fi + 0.5) * sec - sd), sa = sin((fi + 0.5) * sec - sd);
+      fN = (e1 * ca + e2 * sa) * (0.25 + 0.35 * h1);
+    }
     float qq = min(q, 1.0);
-    vec3 N = o - B.xyz * sqrt(max(0.0, 1.0 - qq * qq));
+    vec3 N = normalize(o - B.xyz * sqrt(max(0.0, 1.0 - qq * qq)) + fN);
     vec3 bc = u_bsBc[k].rgb * (max(dot(N, u_bsSun.xyz), 0.0) + 0.003) * u_bsLum.y;
     col = mix(col, bc, 1.0 - smoothstep(1.0 - 1.5 * px / B.w, 1.0, q));
     if (u_bsBc[k].w > 0.0) col += vec3(0.35, 0.55, 1.0) * u_bsSunCol * u_bsBc[k].w * 0.06 * exp(-abs(q - 1.0) / 0.025) * smoothstep(-0.2, 0.4, dot(o, u_bsSun.xyz) / max(q, 1e-3));

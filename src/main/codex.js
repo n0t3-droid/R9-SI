@@ -14,9 +14,10 @@
     ['bike', 'hoverbike'], ['ship', 'helm'], ['orbit', 'viewport'], ['wand', 'builder_wand'], ['blueprint', 'blueprint_0'], ['drone', 'photo_drone'], ['shot', 'glass'],
     ['raid', 'turret'], ['kill', 'iron_sword'], ['deep', 'deepstone'], ['sky', 'white_wool'], ['night', 'lantern'], ['sleep', 'red_bed'], ['village', 'vx_lamppost'],
     ['villager', 'vx_bed_red'], ['quest', 'emerald'], ['home', 'vx_bed_blue'], ['festival', 'lantern'], ['autopilot', 'shuttle_beacon'],
+    ['spar', 'glowspar'],   // u-fields2: the rubble bodies' ores
   ];
   const CATS = { milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', moons: 'g.codex.cat.moons', inventions: 'g.codex.cat.inventions' };   // u-moons1: Monde
-  const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace' };
+  const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace', glowspar: 'spar', nickel_iron: 'spar', ice_nodule: 'spar' };
 
   class Codex {
     constructor(g, meta) {

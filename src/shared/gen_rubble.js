@@ -21,7 +21,7 @@
 (function (VR) {
   'use strict';
   const M = VR.M, TAU = Math.PI * 2;
-  const RGEN = 1;
+  const RGEN = 2;   // u-fields2: 2 — angular boulders, regolith variety, ice at the surface, the ores (rgen 1 kept for old saves)
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   // a small seeded stream (mulberry32)
   function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -68,7 +68,8 @@
     if (S_) return S_;
     const R = VR.R, s = (n) => (R.byName[n] ? R.S(n) : 0), G = VR.GEN.S();
     S_ = { air: 0, carbon: s('carbon_rubble') || s('gravel'), tuff: s('tuff'), gravel: G.gravel || s('gravel'), ice: s('ice'), packed: s('packed_ice'), blue: s('blue_ice'), snow: s('snow_block') || s('packed_ice'),
-      ironOre: s('iron_ore'), iron: s('iron_block'), basalt: s('basalt') };
+      ironOre: s('iron_ore'), iron: s('iron_block'), basalt: s('basalt'),
+      nickel: s('nickel_iron') || s('iron_ore'), nodule: s('ice_nodule') || s('ice'), spar: s('glowspar') || s('carbon_rubble'), pond: s('regolith_dark') || s('gravel') };
     return S_;
   }
   if (VR.BIOMES && VR.BIOME && VR.BIOME.rubble_body === undefined) {
@@ -82,7 +83,7 @@
     constructor(seed, id, opts) {
       opts = opts || {};
       const b = bodyOf(id) || {};
-      this.id = id; this.rgen = RGEN; this.kind = 'rubble';
+      this.id = id; this.rgen = opts.bgen && opts.bgen.rubble > 0 ? opts.bgen.rubble | 0 : RGEN; this.kind = 'rubble';
       this.shape = opts.shape || b.shape || 'potato';
       this.D = +(opts.D || b.D || 200);
       this.metal = !!(opts.metal !== undefined ? opts.metal : b.metal);
@@ -124,7 +125,34 @@
       this.pockets = [];
       const np = this.ice ? 10 : this.metal ? 16 : 7;
       for (let i = 0; i < np; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 0.7 * R, x = Math.cos(a) * d, z = Math.sin(a) * d; if (!this.inside(x, z)) continue; const top = this.shapeTop(x, z), bot = this.shapeBot(x, z); this.pockets.push({ x, z, y: bot + (top - bot) * (0.25 + 0.6 * r()), r: 3 + r() * Math.min(14, D * 0.05) }); }
+      if (this.rgen >= 2) this.v2();
     }
+  // u-fields2 (rgen 2): a second stream so rgen 1's draws stay as they were — the boulders' facets (half-spaces: a
+  // boulder is angular, half buried), the surface's patches, the glowspar clusters
+  v2() {
+    const r = rng(this.s ^ 0x2b2b2b), F = VR.Fractal, R = this.R;
+    for (const b of this.boulders) {
+      const pl = [], n = 5 + Math.floor(r() * 3), a0 = r() * TAU, H = b.r * b.sq;
+      // the top: a tilted face; the sides: steep faces round it
+      const ta = r() * TAU, tt = 0.1 + 0.25 * r();
+      pl.push([Math.cos(ta) * tt, Math.sin(ta) * tt, H * (0.75 + 0.2 * r())]);
+      for (let i = 0; i < n; i++) { const a = a0 + i * TAU / n + (r() - 0.5) * 0.9, sl = 1.6 + 1.6 * r(); pl.push([Math.cos(a) * sl, Math.sin(a) * sl, H * (1.7 + 0.6 * r())]); }
+      b.pl = pl; b.y2 = b.y - b.r * 0.42;
+    }
+    this.nPat = new F(this.s ^ 0x44, 2, 1 / 22, 0.5);
+    this.spar = [];
+    const ns = 3 + Math.floor(this.D / 120);
+    for (let i = 0, tries = 0; i < ns && tries < 60; tries++) {
+      // in crater floors first (the impacts dug them up), else anywhere on top
+      const c = this.craters[i % this.craters.length], a = r() * TAU, d = Math.sqrt(r()) * (c && i < this.craters.length ? c.r * 0.6 : 0.75 * R);
+      const x = (c && i < this.craters.length ? c.x : 0) + Math.cos(a) * d, z = (c && i < this.craters.length ? c.z : 0) + Math.sin(a) * d;
+      if (!this.inside(x, z)) continue;
+      const top = this.shapeTop(x, z);
+      this.spar.push({ x, z, y: top - (i === 0 ? 0.5 : 1 + 3 * r()), r: 1.6 + 1.6 * r() }); i++;
+    }
+  }
+  // the crater a column lies in: 0 outside, d² (0 the floor's middle … 1 the rim)
+  craterAt(x, z) { let best = 9; for (const c of this.craters) { const d2 = ((x - c.x) ** 2 + (z - c.z) ** 2) / (c.r * c.r); if (d2 < best) best = d2; } return best; }
     // the footprint's ρ² (0 at the centre, 1 at the rim) — the lobes' smallest
     rho2(x, z) {
       const u = x * this.c + z * this.sn, v = -x * this.sn + z * this.c;
@@ -161,7 +189,16 @@
     column(x, z, o) {
       let top = this.shapeTop(x, z), bot = this.shapeBot(x, z), bb = null;
       for (const b of this.boulders) {
-        const dx = x - b.x, dz = z - b.z, d2 = dx * dx + dz * dz; if (d2 >= b.r * b.r) continue;
+        const dx = x - b.x, dz = z - b.z, d2 = dx * dx + dz * dz;
+        if (b.pl) {   // rgen 2: the faces' lowest
+          if (d2 >= b.r * b.r * 2.2) continue;
+          let h = 1e9; for (const p of b.pl) { const q = p[2] - dx * p[0] - dz * p[1]; if (q < h) h = q; }
+          if (h <= 0) continue;
+          const t = b.y2 + h;
+          if (t > top) { if (top < 0) bot = b.y2 - h * 0.5; top = t; bb = b; }
+          continue;
+        }
+        if (d2 >= b.r * b.r) continue;
         const h = Math.sqrt(b.r * b.r - d2) * b.sq * (0.82 + 0.36 * (0.5 + 0.5 * this.nMid.n2(x * 1.7 + b.m * 97, z * 1.7))), t = b.y + h;   // (lumpy: a boulder is no ball)
         if (t > top) { if (top < 0) bot = b.y - h; top = t; bb = b; }
       }
@@ -199,7 +236,8 @@
       if (x0 > R || x0 + 16 < -R || z0 > R || z0 + 16 < -R) return out;
       // the pockets that reach into this chunk
       const P = this.pockets.filter(p => p.x + p.r > x0 && p.x - p.r < x0 + 16 && p.z + p.r > z0 && p.z - p.r < z0 + 16);
-      const o = {}, s = this.s ^ this.seed;
+      const o = {}, s = this.s ^ this.seed, v2 = this.rgen >= 2;
+      const SP = v2 ? this.spar.filter(p => p.x + p.r > x0 && p.x - p.r < x0 + 16 && p.z + p.r > z0 && p.z - p.r < z0 + 16) : null;
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const x = x0 + lx, z = z0 + lz;
         this.column(x, z, o); if (o.top < 0) continue;
@@ -216,7 +254,27 @@
             else if (hy < 0.05) st = T.tuff;
             else if (this.metal && hy > 0.86) st = hy > 0.97 ? T.iron : T.ironOre;
           }
+          if (v2 && !this.ice) {
+            // u-fields2: the ground less of a lump — pale patches (tuff, gravel), fine regolith ponds in the craters' floors,
+            // ice breaking out in their walls; the ores: nickel-iron, ice nodules
+            if (!o.b && d <= 1) {
+              const pv = this.nPat.n2(x, z), cr = this.craterAt(x, z);
+              if (cr < 0.45) st = d === 0 ? T.pond : T.carbon;
+              else if (cr < 1.05 && pv < -0.25 && h1 < 0.5) st = T.packed;
+              else if (pv > 0.42) st = h1 < 0.45 ? T.tuff : h1 < 0.7 ? T.gravel : T.carbon;
+              else if (pv < -0.5 && h1 < 0.3) st = T.gravel;
+            }
+            if (d >= 1 && hy > (this.metal ? 0.94 : 0.999) && hy < (this.metal ? 0.97 : 1)) st = T.nickel;
+            else if (!this.metal && d >= 1 && d < 10 && hy > 0.05 && hy < 0.058) st = T.nodule;
+            else if (d === 0 && h1 > 0.995) st = this.metal ? T.nickel : T.nodule;
+          }
           blocks[(y << 8) | col] = st;
+        }
+        // u-fields2: the glowspar clusters (rare; the first of a body breaks the surface)
+        if (SP) for (const p of SP) {
+          const dx = x - p.x, dz = z - p.z, d2 = p.r * p.r - dx * dx - dz * dz; if (d2 <= 0) continue;
+          const hh = Math.sqrt(d2), ya = Math.max(o.bot + 1, Math.ceil(p.y - hh)), yb = Math.min(o.top, Math.floor(p.y + hh));
+          for (let y = ya; y <= yb; y++) if (M.hashf3(x, y, z, s + 21) < 0.62) blocks[(y << 8) | col] = T.spar;
         }
         // pockets: water ice in a carbon body, blue ice in the moonlet, iron in a metal one (inside, never the skin)
         for (const p of P) {
