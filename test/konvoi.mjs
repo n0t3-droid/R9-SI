@@ -56,7 +56,10 @@ try {
   for (let i = 0; i < 30; i++) { if (await B.ev(() => VR.game.mp.hostList().length)) break; await A.step(5); await wait(400); }
   await B.ev(() => VR.game.mp.join(VR.game.mp.hostList()[0]));
   for (let i = 0; i < 200; i++) { await A.step(5); await B.step(10); if (await B.ev(() => VR.game.state) === 'play') break; await wait(150); }
-  await both(40);
+  await both(20);
+  // the first real frames compile the shaders (seconds of a busy page): done now, while nothing happens, then settled
+  await real(A, 2); await real(B, 2);
+  await both(60);
   const j = await B.ev(() => ({ state: VR.game.state, guest: !!(VR.game.meta && VR.game.meta.guest), dim: VR.game.dim, kv: !!VR.Konvoi }));
   check(j.state === 'play' && j.guest && j.kv, `the guest joins the host's world (${JSON.stringify(j)}) (${secs()})`);
   const adv = await A.ev(() => !!(VR.Adventure && VR.Adventure.on && VR.Adventure.on()));
@@ -76,9 +79,8 @@ try {
   await both(30);
   const freed = await A.ev((id) => VR.Liberate.free(VR.game, VR.Liberate.siteOf(id)), site.id);
   check(freed, 'the host frees the outpost (VR.Liberate.free)');
-  await real(B, 3);
   let gm = null;
-  for (let i = 0; i < 40; i++) { await both(5); gm = await B.ev(() => { const M = VR.Konvoi.S.moment; return M ? { id: M.id, t: +M.t.toFixed(2), r: M.r, ban: M.bannered } : null; }); if (gm && gm.t > 2.5) break; }
+  for (let i = 0; i < 40; i++) { await both(5); gm = await B.ev(() => { const M = VR.Konvoi && VR.Konvoi.S.moment; return M ? { id: M.id, t: +M.t.toFixed(2), r: M.r, ban: M.bannered } : null; }); if (gm && gm.t > 2.5) break; }
   rec.freed = gm;
   check(!!gm && gm.id === site.id, `the guest sees the moment (${JSON.stringify(gm)})`);
   await shot(B, 'freed_together.png');
