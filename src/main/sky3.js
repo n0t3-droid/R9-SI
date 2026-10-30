@@ -381,8 +381,8 @@
     // (f-sky5, R52-03: at the golden hour the sunlit tops were a dull beige no brighter than the luminous sky round them —
     // the frames' golden cumulus are white over lilac shade: the sun's light on them and the sky's from above lifted at
     // 2° and 8°, offline (sky_offline.js) the top's luma sd 28.8 → 32.4 with the bands' ΔE held)
-    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.05, 0.66]], [8, [2.05, 1.42, 0.92]], [16, [1.22, 1.14, 1.04]]],   // (f-golden: the golden tops peach-gold, run 3: cream-white tops kept the canyon's sky saturation at 69)
-    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.66, 0.55, 0.88]], [8, [0.74, 0.68, 1.0]], [16, [0.5, 0.56, 0.72]]],
+    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.12, 0.78]], [8, [2.1, 1.58, 1.15]], [16, [1.22, 1.14, 1.04]]],   // (f-golden: run 4 tried peach-gold tops (2.05, 1.42, 0.92): the canyon's sky 68.8 → 70.9 but its bands' ΔE 7.96 → 8.43 — the far cumulus field in the sky pass takes this light too)
+    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.7, 0.6, 0.85]], [8, [0.8, 0.76, 0.98]], [16, [0.5, 0.56, 0.72]]],
     // (f-golden, R53-11: at the golden hour the bases a deeper lilac-blue — the frames' white tops over lilac shade; the
     // top's contrast from the clouds' own relief, sky_offline.js)
     low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.36, 0.28, 0.58]], [8, [0.34, 0.31, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
