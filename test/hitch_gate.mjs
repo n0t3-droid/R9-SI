@@ -5,8 +5,8 @@
 //   flight (60 s of game time over the Heartland: north, a right turn, west, a left turn, north; 40 blocks over the land,
 //   20 blocks/s); a frame = g.loop + a one-pixel read; measured = the main thread's work a frame (the loop's JS + the
 //   worker answers' handlers since the frame before), as test/engine_bench.mjs measures it.
-//   per frame also the systems that took the time: the game's larger methods (called ≤ 20 times a frame — so the timers
-//   cost nothing measurable) timed inclusive, the handlers by message type, a heap drop (a GC) — both builds alike.
+//   per frame also the systems that took the time: the game's larger methods (one called > 30 times between two frames
+//   loses its timer at once — so the timers cost nothing measurable) timed inclusive, the handlers by message type, a heap drop (a GC) — both builds alike.
 // The checks (the release lane): the median ≤ the release's × (1 + TOL); hitches (frames over 2 × the release's median)
 // and p99 not worse than the release's × (1 − DOWN) (DOWN 0: not worse; e-perf2's acceptance ran DOWN=0.2); no page
 // errors; the end pictures alike (the same view after the flight). JSON: test/shots/hitch_gate_<TAG>.json (every frame).
@@ -118,7 +118,9 @@ const SETUP = () => {
         const f = d.value; let src = ''; try { src = Function.prototype.toString.call(f); } catch (e) { continue; }
         if (src.length < 300 || /^class\b/.test(src)) continue;
         const name = label + '.' + k;
-        const w = function () { const t0 = performance.now(); try { return f.apply(this, arguments); } finally { acc.set(name, (acc.get(name) || 0) + performance.now() - t0); calls.set(name, (calls.get(name) || 0) + 1); } };
+        // (a method called more than 30 times between two frames loses its timer at once — _spread, _touch …: a timer there
+        // would cost more than it tells, and it would cost the build that streams more)
+        const w = function () { const n = (calls.get(name) || 0) + 1; calls.set(name, n); if (n > 30) proto[k] = f; const t0 = performance.now(); try { return f.apply(this, arguments); } finally { acc.set(name, (acc.get(name) || 0) + performance.now() - t0); } };
         w.__w = true; proto[k] = w; orig.push([proto, k, f, name]);
       }
       proto = Object.getPrototypeOf(proto);
@@ -128,8 +130,7 @@ const SETUP = () => {
   for (const k of Object.keys(g)) { const o = g[k]; if (o && typeof o === 'object' && !Array.isArray(o) && !(o instanceof Node) && !ArrayBuffer.isView(o) && Object.getPrototypeOf(o) !== Object.prototype) { try { wrapObj(o, k); } catch (e) { /* skip */ } } }
   if (g.horizon && g.horizon.far) wrapObj(g.horizon.far, 'far');
   if (g.world && g.world.uploadQ) wrapObj(g.world.uploadQ, 'uploadQ');
-  // those called more than 20 times a frame lose their timer (a timer there would cost more than it tells)
-  window.__prune = (frames) => { let n = 0; for (const [proto, k, f, name] of T.orig) { if ((T.calls.get(name) || 0) > 20 * frames) { proto[k] = f; n++; } } const kept = T.orig.length - n; T.acc.clear(); T.calls.clear(); return kept; };
+  window.__kept = () => T.orig.filter(([proto, k, f]) => proto[k] !== f).length;
   const mem = () => (performance.memory ? performance.memory.usedJSHeapSize : 0);
   window.__frame = (dtS, rec) => {
     const gg = VR.game, gl = gg.renderer.gl;
@@ -138,6 +139,7 @@ const SETUP = () => {
     const m0 = mem(), t0 = performance.now(); gg.loop(t0); const t1 = performance.now(), m1 = mem();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, window.__px);
     const t2 = performance.now();
+    T.calls.clear();
     if (!rec) { T.acc.clear(); return null; }
     const top = [...T.acc.entries()].filter(e => e[1] >= 1 && !/\.(loop|frame|playFrame)$/.test(e[0])).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => [k, Math.round(v * 10) / 10]);
     const hTop = Object.entries(hBy).filter(e => e[1] >= 1).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => ['h:' + k, Math.round(v * 10) / 10]);
@@ -190,16 +192,15 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   const dt = +(ENV['DT_' + preset] || DT);
   const settleS = [];
   for (const P of Ps) { await P.ev((c) => window.__place(...c), path[0]); settleS.push(await settle(P, 600)); }
-  // ten frames at the start: the timers of the methods called more than 20 times a frame are taken off
   const kept = [];
-  for (const P of Ps) { for (let i = 0; i < 10; i++) await P.ev(() => window.__frame(0.05, false)); kept.push(await P.ev(() => window.__prune(10))); }
-  for (const P of Ps) await P.ev(() => window.__frame(0.05, false));
+  for (const P of Ps) { for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.05, false)); }
   const fr = Ps.map(() => []);
   for (let i = 0; i < path.length; i++) {
     const order = (i + round) % 2 ? [1, 0] : [0, 1];
     for (const j of order) { await Ps[j].ev((c) => window.__place(...c), path[i]); fr[j].push(await Ps[j].ev((d) => window.__frame(d, true), dt)); }
     if (i % 50 === 49) console.log(`    ${preset} round ${round + 1}: frame ${i + 1}/${path.length} (${secs()})`);
   }
+  for (const P of Ps) kept.push(await P.ev(() => window.__kept()));
   // the end: both settle at the last spot, the same view photographed (the pictures alike)
   const shots = [];
   if (round === 0) for (const P of Ps) {
