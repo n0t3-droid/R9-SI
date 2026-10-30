@@ -262,6 +262,12 @@ function pageHelpers(win, VRx) {
     if (M.kind === 'walk') { walk(g, p, I, dt); return; }
     if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
     if (M.kind === 'intent') { intent(g, p, I, dt); return; }   // e-ctx
+    if (M.kind === 'showcase') {   // a-builder: the builder shows the house off — the photo mode's circle round it at the golden hour, a picture
+      release(I);
+      if (!S.sc) { const b = S.B && S.B.site && S.B.site.box, c = b ? [(b[0] + b[3]) / 2 + 0.5, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 + 0.5] : null; S.sc = { ok: !!(VR.Showcase && VR.Showcase.start(g, { centre: c, golden: true })), c }; S.log.push(['showcase', S.sc.ok, c && c.map(Math.round)]); if (!S.sc.ok) { S.done = true; S.sc = null; } return; }
+      if (S.t >= (M.sec || 30)) { VR.Showcase.stop(g); S.sc = null; S.done = true; }
+      return;
+    }
     release(I);
   };
   // n frames of 1/30 s, the last one drawn and captured when asked
@@ -633,6 +639,7 @@ try {
     { name: 'meadow', de: 'Zur Flusswiese', mode: { kind: 'walk', route: ROUTES.builderA }, max: 200 },
     { name: 'bauhand', de: 'Bauhand: Bungalow', mode: { kind: 'bauhand', ding: 'h:6', name: 'Bungalow', target: [M.x, M.y, M.z] }, max: 80 },
     funkePart,
+    { name: 'showcase', de: 'Schaufenster: Rundflug zur goldenen Stunde', need: () => !!(window.VR && VR.Showcase && VR.Showcase.start), why: 'VR.Showcase fehlt (a-builder)', mode: { kind: 'showcase', sec: 30 }, max: 32 },   // a-builder
     { name: 'walkon', de: 'Weiter: Feldweg, Brücke', mode: { kind: 'walk', route: ROUTES.builderB }, max: DUR },
   ]);
   if (!ONLY || ONLY.includes('walk')) recs.walk = await session('walk', { tod: 9200, at: [10.5, 81, 60.5], yaw: 0, notes }, [
