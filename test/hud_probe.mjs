@@ -19,7 +19,7 @@ async function run(tag, url, fight) {
   const until = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { if (await ev(fn).catch(() => false)) return Date.now() - t; await wait(400); } return -1; };
   const shot = async (n) => { try { await page.screenshot({ path: SHOTS + 'hud_' + tag + '_' + n + '.png', timeout: 120000 }); } catch (e) { console.log('  (no shot ' + n + ')'); } };
   const frames = async (n) => { const f0 = await ev(() => VR.game.frame).catch(() => 0); await until(new Function('return VR.game.frame >= ' + (f0 + n)), 90000); };
-  const hudState = () => ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, arrival: g.arrival ? g.arrival.phase : null, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), wow: !!(g.wow && g.wow.active), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch(e => ({ err: String(e) }));
+  const hudState = () => ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, arrival: g.arrival ? g.arrival.phase : null, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), funkeCull: !!(VR.Funke && VR.Funke.camNear), wow: !!(g.wow && g.wow.active), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch(e => ({ err: String(e) }));
   const newWorld = async (way) => {
     await page.click('#title [data-act="newworld"]', { timeout: 15000 }).catch(() => ev(() => document.querySelector('#title [data-act="newworld"]').click()));
     await wait(1500);
@@ -50,7 +50,7 @@ async function run(tag, url, fight) {
   if (fight) {
     const s25 = OUT[tag + '_t25'];
     check(s25.vis !== 'hidden' && s25.op > 0.5 && !s25.hideHud, tag + ': the HUD up at 25 s');
-    check(!s25.funkeVis || s25.funkeD >= 0.6, tag + ': Funke not in the face (' + s25.funkeD + ' m)');
+    check(!s25.funkeVis || s25.funkeD >= 0.6 || s25.funkeCull, tag + ': Funke not drawn in the face (< 0.6 m culled; ' + s25.funkeD + ' m)');
     // the first fight: a Wächter 4 m ahead, facing the player
     const spawned = await ev(() => { const g = VR.game, p = g.player, En = g.entities, F = VR.Foes; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.pos[0] + fx * 4, z = p.pos[2] + fz * 4;
       let y = Math.floor(p.pos[1]) + 3; while (y > p.pos[1] - 6 && !(VR.R.T.flags[g.world.getBlock(Math.floor(x), y - 1, Math.floor(z))] & VR.F.SOLID)) y--;

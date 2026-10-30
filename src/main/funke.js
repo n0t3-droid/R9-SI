@@ -50,6 +50,8 @@
   // in a camera that is not the player's eye (the wow moment's composition, the director's shots, the arrival's moment)
   F.NEAR = 0.6;        // m from the camera: closer is not drawn
   F.camNear = (dx, dy, dz) => dx * dx + dy * dy + dz * dz < F.NEAR * F.NEAR;
+  F.SPARK_NEAR = 2.5;  // m: the arrival sparkle only this far from the camera (critic_ux_16: the pale balls in the face)
+  F.sparkOk = (dx, dy, dz) => dx * dx + dy * dy + dz * dz >= F.SPARK_NEAR * F.SPARK_NEAR;
   F.camHidden = (g) => !!(g && ((g.wow && g.wow.active) || (g.director && g.director.active) || (g.arrival && g.arrival.phase === 'moment')));
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
 
@@ -583,6 +585,7 @@ void main() {
     }
     sparkle() {
       const P = this.g.particles, p = this.pos; if (!P || !P.spawn) return;
+      { const c = this.g.cam; if (c && !F.sparkOk(p[0] - c.x, p[1] - c.y, p[2] - c.z)) return; }   // (f-hud: its 14 sparks at the eye were the big pale balls in the face)
       PO.col = [0.45, 0.95, 1];
       for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; P.spawn(p[0], p[1], p[2], Math.cos(a) * 2.2, (i % 3 - 1) * 0.8, Math.sin(a) * 2.2, PO); }
     }

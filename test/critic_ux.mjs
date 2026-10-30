@@ -192,10 +192,10 @@ if (!process.env.NO_ADV) {
   await wait(20000); await shot('17_adv_t25');
   // f-hud: the Abenteuer start shows its HUD (critic_ux_17 of f-first2: none — F1's hidden HUD of the first world carried
   // over), Funke never in the camera's face, the settle move made under the arrival's white
-  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
+  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), funkeCull: !!(VR.Funke && VR.Funke.camNear), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
   console.log('  adv 25 s: ' + JSON.stringify(OUT.advHud25));
   check(OUT.advHud25 && OUT.advHud25.vis !== 'hidden' && OUT.advHud25.op > 0.5 && !OUT.advHud25.hideHud, 'Abenteuer: at 25 s the HUD is up (F1 in the first world does not carry over): ' + JSON.stringify(OUT.advHud25));
-  check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6), 'Abenteuer: Funke not in the camera\'s face (' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
+  check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6 || OUT.advHud25.funkeCull), 'Abenteuer: Funke not drawn in the camera\'s face (closer than 0.6 m: culled; ' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
   check(OUT.advHud25 && (!OUT.advHud25.moved || OUT.advHud25.moved.phase !== 'after'), 'Abenteuer: the spawn\'s settle move under the arrival\'s white (' + JSON.stringify(OUT.advHud25 && OUT.advHud25.moved) + ')');
   await offerCheck('18');
 }

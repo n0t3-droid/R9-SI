@@ -35,6 +35,7 @@ console.log('a · a new world: the HUD up');
 console.log('b · Funke not in the face');
 {
   check(FK && FK.camNear && FK.camNear(0.3, 0, 0.2) && !FK.camNear(0.78, -0.1, 0.3) && !FK.camNear(1.4, 0, 0.6), 'closer than ' + (FK && FK.NEAR) + ' m to the camera: not drawn; at the shoulder (0.85 m) and peeking (1.5 m): drawn');
+  check(FK && FK.sparkOk && !FK.sparkOk(0.1, 0, 0) && !FK.sparkOk(0.8, -0.2, 0.3) && FK.sparkOk(4, 0, 0), 'its sparkle (14 glowing sparks) never at the eye (0.1 m) nor the shoulder: only ≥ ' + (FK && FK.SPARK_NEAR) + ' m away');
   check(FK && FK.camHidden && FK.camHidden({ wow: { active: {} } }) && FK.camHidden({ director: { active: true } }) && FK.camHidden({ arrival: { holds: () => false, phase: 'moment' } }) && !FK.camHidden({}), 'a wow moment\'s, the director\'s camera and the arrival\'s moment: Funke out of the picture; walking: in');
 }
 
