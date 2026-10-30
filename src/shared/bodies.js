@@ -21,7 +21,7 @@
 (function (VR) {
   'use strict';
   const L = 64;                                     // U§3: real-equivalent lengths = 64 × game lengths
-  const BGEN = 1;                                   // the bodies' generator version (gen_body.js); test/body_same.js pins it
+  const BGEN = 2;                                   // the bodies' generator version (gen_body.js); test/body_same.js pins it (u-moons3: 2 — Zinnober, Ocker, Aquamarin made over; bgen 1 as pinned)
   const walk = (g) => 30 * g / 9.81;                // the walking gravity (U§4.3): the genre's 30 at home, every world in its ratio
 
   // ---------------------------------------------------------------- morphology (R§5.2)

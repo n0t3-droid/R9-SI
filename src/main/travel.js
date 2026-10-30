@@ -138,7 +138,7 @@
     const q = Travel.posOf(g.meta, to);
     if (q) return { pos: q.slice(0, 3), yaw: q[3], pitch: q[4] };
     const s = await spawnOf(g, to);
-    return { pos: [s[0], s[1] + 0.2, s[2]], yaw: Number.isFinite(s[3]) ? s[3] : yaw, pitch: 0 };
+    return { pos: [s[0], s[1] + 0.2, s[2]], yaw: Number.isFinite(s[3]) ? s[3] : yaw, pitch: Number.isFinite(s[4]) ? s[4] : 0 };   // (u-moons3: a world's landing may lift or lower the eye to its view)
   }
   // a world's own spawn, from a worker (the generators live there); near [0, 0] for the ones that search round a point
   function spawnOf(g, dim) {

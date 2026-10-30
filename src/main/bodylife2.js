@@ -28,6 +28,9 @@
   // climbs (v0²/2g), stands while the vent fires, fades as the last grains fall back
   B2.plume = function (vent, t, prof, gReal) {
     const P = prof.plume, per = P.every[0] + (P.every[1] - P.every[0]) * hash(vent.seed, 1);
+    // u-moons3: a steady vent (bgen 2's first, in the landing's view — Io's great plumes stand for months) breathes
+    // between 0.93 and 1 of its height over minutes, never quiet
+    if (vent.steady) { const H = P.height[0] + (P.height[1] - P.height[0]) * hash(vent.seed, 3); return { top: H * (0.965 + 0.035 * Math.sin(t / 97 + vent.seed % 7)), k: 1, firing: true, H, up: 0 }; }
     let k = Math.floor(t / per), start = k * per + 0.25 * per * hash(vent.seed, k + 7);
     if (t < start) { k--; start = k * per + 0.25 * per * hash(vent.seed, k + 7); }
     const dur = P.dur[0] + (P.dur[1] - P.dur[0]) * hash(vent.seed, k + 911), H = P.height[0] + (P.height[1] - P.height[0]) * hash(vent.seed, k + 3);
@@ -70,6 +73,7 @@
     const BL = VR.BodyLife, BS = VR.BodySky, P = g.particles, p = g.player, w = g.world, prof = VR.Bodies.profile(id);
     const unlock = (k) => { if (g.codex) g.codex.unlock(k); };
     const big = tier === 0 ? 3 : 1;
+    if (id !== 'zinn' && BS && BS.lake) BS.lake = null;   // (u-moons3: the Glutsee's far glow on Zinnober only)
     if (id !== 'ocker' && BS && BS.dustTau !== 0.6) { BS.dustTau = 0.6; BS.front = 0; S.tau = 0.6; S.front = 0; }   // (Ocker's weather stays on Ocker)
     if (id === 'zinn') {
       const gen = BL.gen(g, 'zinn'), near = [];
@@ -83,6 +87,9 @@
       for (const n of near.slice(0, 4)) plumes.push({ x: n.v.x, y: n.v.y + 1, z: n.v.z, top: n.pl.top, k: n.pl.k });
       // the Glutsee: spatter over the open melt; its glow by night is the codex's page
       const G = gen.glut, dG = Math.hypot(G.x - p.pos[0], G.z - p.pos[2]);
+      // u-moons3: the Glutsee for the sky's far ground (bodysky.js → bsLake): its melt glows where the world's columns
+      // end — Very Low's 64 m see only its near shore
+      if (BS && (!BS.lake || BS.lake.g !== gen)) BS.lake = { g: gen, x: G.x, z: G.z, y: gen.heightAt(Math.floor(G.x), Math.floor(G.z)) + 1, R: G.R * 0.84 };
       if (dG < G.R + 40 && BS && BS.cur && BS.cur.light.lightK < 0.3) unlock('moon:lavalake');
       if (P && dG < G.R + 300) {
         const n = Math.floor((tier === 0 ? 3 : tier === 1 ? 7 : 12) * dt * 6 + Math.random());
@@ -109,6 +116,9 @@
       for (const d of dv.slice(0, 4)) {
         const dd = Math.hypot(d.x - p.pos[0], d.z - p.pos[2]);
         const y = w.isLoaded(Math.floor(d.x), Math.floor(d.z)) ? w.topAt(Math.floor(d.x), Math.floor(d.z)) + 1 : prof.level;
+        // (u-moons3: from the Rostschlucht's floor a devil on the plain 140 m up stands behind the wall — beyond the drawn
+        // land nothing hides it, so it is not drawn: no column floating over the canyon)
+        if (y - p.pos[1] > 30 && dd > ((w.renderDist | 0) || 8) * 16) continue;
         plumes.push({ x: d.x, y, z: d.z, top: d.top, k: d.k * (1 - 0.6 * Math.min(1, (S.tau - 0.6) / 3)) });
         if (dd < 1500 && d.k > 0.5) unlock('moon:devil');
         // grains round its foot

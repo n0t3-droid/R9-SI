@@ -33,8 +33,9 @@
     opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.5, expoNight: 1.7, plume: 1 },
     // u-moons2: Zinnober (sulfur bright, its lava lakes the night's own light, Amarant at 37° its lamp), Ocker and
     // Aquamarin with air (airK: the LUT's radiance → the scene's, the eye's exposure per world: Ocker's dusty sky is ~4×
-    // as bright as a clear one), shape: the plumes' (1 umbrellas, 2 dust devils)
-    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.88, 0.55], bounce: 0.34, floor: 0.06, expoDay: 0.62, expoNight: 1.1, plume: 1, shape: 1 },
+    // as bright as a clear one), shape: the plumes' (1 umbrellas, 2 dust devils); u-moons3: Zinnober's sulfur brighter and
+    // less muddy (the bounce less yellow, the day's eye a little more open)
+    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.93, 0.72], bounce: 0.34, floor: 0.06, expoDay: 0.7, expoNight: 1.1, plume: 1, shape: 1, farHue: [1.0, 0.8, 0.45] },
     ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 8, ambK: 1.8 },
     aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2 },
   };
@@ -96,9 +97,9 @@
     const sunLight = SUN.map((v, i) => v * lightK * sunT[i] * (VR.Grade ? VR.Grade.sunK : 1));
     const sinEl = Math.max(0, sd[1]);
     // (u-moons2: the air's light from the three stops — the sky's irradiance π·L̄ — over the ground's bounce)
-    const skyL = air ? air.stops.zen.map((z, i) => (0.45 * z + 0.4 * air.stops.hor[i] + 0.15 * air.stops.sunHor[i]) * SUN[i] * Math.PI * K.ambK * free) : [0, 0, 0];
+    const skyL = air ? air.stops.zen.map((z, i) => (0.45 * z + 0.4 * air.stops.hor[i] + 0.15 * air.stops.band[i]) * SUN[i] * Math.PI * K.ambK * free) : [0, 0, 0];
     const amb = sunLight.map((v, i) => (v * alb * K.bounce + parLight[i] * 0.35 + K.floor * 0.02 + STAR + skyL[i]) * K.tint[i]);
-    const far = air ? air.stops.hor.map((h, i) => h * SUN[i] * K.airK * free + alb * parLight[i] * 0.3) : sunLight.map((v, i) => alb * (v * (0.18 + 0.6 * sinEl) + parLight[i] * 0.6 + amb[i]) * K.tint[i]);
+    const far = air ? air.stops.hor.map((h, i) => h * SUN[i] * K.airK * free + alb * parLight[i] * 0.3) : sunLight.map((v, i) => alb * (v * (0.18 + 0.6 * sinEl) + parLight[i] * 0.6 + amb[i]) * K.tint[i] * (K.farHue ? K.farHue[i] : 1));   // (u-moons3: Zinnober's far plains their sulfur's orange-yellow, not beige)
     const night = 1 - ss(0, 1, lightK);
     // the terrain's direct light: the shader fades the sun over ±7° (its sunUp, made for an air) — here the light is the
     // disc's own part, so the colour is divided by that fade (it is ≥ 0.4 wherever the disc still shows); at night the
@@ -149,8 +150,12 @@
       // u-moons2: the air (airK [on, scale, LUT | stops, haze]), Herzwelt (hz, hzX), the plumes' shape (ju)
       airK: [air ? 1 : 0, air ? K.airK : 0, tier > 0 ? 1 : 0, 0.75], airS: [air ? air.C.W : 1, air ? air.C.H : 1, 0, 0], airT: air ? air.tauZ : [0, 0, 0],
       air3: air ? [].concat(...['zen', 'hor', 'sunHor'].map(k => air.stops[k].map((v, i) => v * SUN[i] * K.airK))) : null, airC: air ? air.C : null,
+      airB: air ? air.stops.band.map((v, i) => v * SUN[i] * K.airK) : null,   // (u-moons3: the horizon beside Helia — the haze's colour; the third stop is now the aureole)
       hz: id === 'aqua' ? [p.dir[0], p.dir[1], p.dir[2], p.ang] : [0, 1, 0, 0], hzX: [(t / 1200) * 2 * Math.PI % (2 * Math.PI), t * 0.002 % 100, 0, 0],
       ju: [K.shape || 0, 26, t % 1000, 0],
+      // u-moons3: the Glutsee in the far ground (centre from the eye, its melt's height from the eye, radius) and its glow
+      lake: BS.lake && id === 'zinn' ? [BS.lake.x - eye[0], BS.lake.z - eye[2], BS.lake.y - eye[1], BS.lake.R] : [0, 0, 0, 0],
+      lakeC: [1.0, 0.42, 0.09].map(v => v * (1.5 + 0.6 * night)),
     };
     // (u-orbit2: on the darkest nights the eye opens further — up to 1.7× — as it does under the stars alone)
     const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
@@ -240,17 +245,17 @@
     // u-moons2: with air — the stops are the sky's (the water mirrors them, the far land fades into the horizon's light);
     // the haze by the air's ground extinction at real constants, and a dust front's wall on Ocker (BS.front 0 … 1)
     if (r.sky.air3) {
-      const a3 = r.sky.air3, zen = a3.slice(0, 3), hor = a3.slice(3, 6), sh = a3.slice(6, 9);
+      const a3 = r.sky.air3, zen = a3.slice(0, 3), hor = a3.slice(3, 6), sh = r.sky.airB;
       E.zenith = zen; E.horizon = hor; E.skyMid = zen.map((v, i) => 0.5 * (v + hor[i])); E.fogColor = hor.map((v, i) => 0.75 * v + 0.25 * sh[i]);
       const front = BS.front || 0, tau = id === 'ocker' ? BS.dustTau : 0;
       const vis = id === 'ocker' ? Math.min(rd * 1.6, 2600 / (0.4 + tau * 1.2) / (1 + front * 14)) : rd * 1.5;
-      E.fog = id === 'ocker' ? [Math.min(rd * 0.5, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0] : [rd * 0.6, rd * 0.995, 0, 0];   // (Aquamarin: tens of km of sight — only the last columns' edge, the far sea in the LUT's own haze)
+      E.fog = id === 'ocker' ? [Math.min(rd * 0.68, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0] : [rd * 0.6, rd * 0.995, 0, 0]; // (u-moons3: Ocker's haze from 0.68 of the view, was 0.5 — the canyon's walls read)   // (Aquamarin: tens of km of sight — only the last columns' edge, the far sea in the LUT's own haze)
     }
     if (o.underwater) { E.fog = [0, 1, 0, 1]; }
     E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;
     if (E.storm) { E.storm[2] = 0; E.storm[3] = 0; } if (E.bolt) E.bolt[3] = 0;
     if (id === 'aqua') E.wind = 2.6;   // u-moons2: Aquamarin's swell taller than home's (the water's storm factor)
-    E.emissiveBoost = 0.45 + L.night * 1.1;
+    E.emissiveBoost = id === 'zinn' ? 0.3 + L.night * 0.45 : 0.45 + L.night * 1.1;   // (u-moons3: Zinnober's lava orange at night, not blown to white — the Glutsee fills the view)
     E.grade = [1, 1, 1];
     E.bloomThreshold = 1.25; E.bloomStrength = 0.08;
     // the eye adapts in a few seconds (slower into the dark)
@@ -271,6 +276,7 @@
     if (u.u_bsB) gl.uniform4fv(u.u_bsB, S.B);
     if (u.u_bsBc) gl.uniform4fv(u.u_bsBc, S.Bc);
     v4('u_bsGround', S.ground);
+    if (S.lake) { v4('u_bsLake', S.lake); if (u.u_bsLakeC) gl.uniform3f(u.u_bsLakeC, S.lakeC[0], S.lakeC[1], S.lakeC[2]); }   // u-moons3
     // u-moons2: the air, Herzwelt, the plumes' shape
     if (S.airK) { v4('u_bsAirK', S.airK); v4('u_bsAirS', S.airS); if (u.u_bsAirT) gl.uniform3f(u.u_bsAirT, S.airT[0], S.airT[1], S.airT[2]); v4('u_bsHz', S.hz); v4('u_bsHzX', S.hzX); v4('u_bsJu', S.ju); }
     if (S.air3 && u.u_bsAir3) gl.uniform3fv(u.u_bsAir3, S.air3);

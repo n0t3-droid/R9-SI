@@ -23,7 +23,7 @@ for (const [id, g] of [['zinn', 1.80], ['ocker', 3.72], ['aqua', 2.01]]) {
   check(d && d.code === 5 && Math.abs(d.g - g) < 1e-9 && d.travel && !V.DimReg.actorsHome(id) && d.body === id, `${id}: u_dim 5, g ${g}, travel, no village life`);
 }
 const meta = V.Bodies.stamp({ seed: 1 });
-check(['basalt', 'opal', 'zinn', 'ocker', 'aqua'].every(k => meta.universe.bodies[k].bgen === 1), 'a save is stamped bgen 1 for all five bodies');
+check(['basalt', 'opal', 'zinn', 'ocker', 'aqua'].every(k => meta.universe.bodies[k].bgen === V.Bodies.BGEN), 'a save is stamped the current bgen for all five bodies (u-moons3: 2)');
 check(V.DimReg.air === undefined || true, '(the air dims: ocker and aqua carry air)') ;
 check(V.DimReg.get('ocker').air === 'ocker' && V.DimReg.get('aqua').air === 'aqua' && !V.DimReg.get('zinn').air, 'Ocker and Aquamarin carry their air (atmo_lut.js), Zinnober none');
 
@@ -52,7 +52,7 @@ console.log('b · Zinnober');
 
 console.log('c · Ocker');
 {
-  const g = new V.BodyGen(SEED, 'ocker');
+  const g = new V.BodyGen(SEED, 'ocker', { bgen: { ocker: 1 } });
   check(g.constructor.name === 'Dust', 'new BodyGen(…, "ocker") is the dust kind');
   const zc = g.canyonZ(0), floor = g.heightAt(0, Math.round(zc)), plain = g.heightAt(0, 0);
   let rimZ = 0; for (let z = 0; z < zc; z += 4) { const o = g.col(0, z, {}, g.feats(0, z, 0, z)); if (o.canyon) { rimZ = z; break; } }
@@ -72,7 +72,7 @@ console.log('c · Ocker');
 
 console.log('d · Aquamarin');
 {
-  const g = new V.BodyGen(SEED, 'aqua');
+  const g = new V.BodyGen(SEED, 'aqua', { bgen: { aqua: 1 } });
   check(g.constructor.name === 'Ocean', 'new BodyGen(…, "aqua") is the ocean kind');
   const sp = g.findSpawn();
   check(sp[1] >= 64 && sp[1] < 90, `the landing on dry ground: ${sp.map(v => v.toFixed(1)).join(', ')}`);
@@ -96,7 +96,7 @@ console.log('e · the column time and the blocks');
   const time = (g) => { for (let k = 0; k < 3; k++) g.generate(50 + k, 7); const t0 = performance.now(); for (let k = 0; k < 12; k++) g.generate(k % 4 + 10, (k >> 2) - 20); return (performance.now() - t0) / 12; };
   const to = time(og), tz = time(new V.BodyGen(SEED, 'zinn')), tk = time(new V.BodyGen(SEED, 'ocker')), ta = time(new V.BodyGen(SEED, 'aqua'));
   check(Math.max(tz, tk, ta) <= to, `a chunk: Zinnober ${tz.toFixed(1)} ms, Ocker ${tk.toFixed(1)} ms, Aquamarin ${ta.toFixed(1)} ms ≤ the overworld's ${to.toFixed(1)} ms`);
-  const last = R.types.slice(-2).map(t => t.name).join(', ');
+  const last = R.types.slice(-3, -1).map(t => t.name).join(', ');   // (u-moons3: ocker_dust after them)
   check(last === 'sulfur_red, so2_frost', `the last two blocks: ${last}`);
 }
 console.log('f · the skies and the life (bodysky.js, atmo_lut.js, bodylife2.js)');
@@ -117,7 +117,7 @@ console.log('f · the skies and the life (bodysky.js, atmo_lut.js, bodylife2.js)
   check(o1.light.sunColor[1] > 4 * o2.light.sunColor[1] && o2.light.ambSky[1] < o1.light.ambSky[1], `Ocker: Helia's light ${o1.light.sunColor[1].toFixed(2)} by day, ${o2.light.sunColor[1].toFixed(2)} in a storm (τ 4.5) — the day turns to dusk`);
   check(lab[2] > 15, `Ocker's horizon by day butterscotch (b* ${lab[2].toFixed(0)}), Very Low's three stops ${sk.map(v => v.toFixed(2)).join(' ')}`);
   // the life: Zinnober's plumes 5–6 km every ~2 min; Ocker's devils ~1 a minute; its storms to τ 4.5
-  const zg = new V.BodyGen(SEED, 'zinn'), prof = V.Bodies.profile('zinn');
+  const zg = new V.BodyGen(SEED, 'zinn', { bgen: { zinn: 1 } }), prof = V.Bodies.profile('zinn');
   let tops = [], fires = 0;
   for (let t = 0; t < 3600; t += 5) { const pl = B2.plume(zg.vents()[0], t, prof, 1.8); if (pl.firing) fires++; if (pl.k > 0.9) tops.push(pl.top); }
   const Hmax = Math.max(...tops);

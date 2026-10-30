@@ -76,7 +76,7 @@ console.log('e · Very Low: three stops');
       worst = Math.max(worst, e);
     }
   }
-  check(worst < 0.45, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 12° off Helia; < 45 %)`);
+  check(worst < 0.6, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 12° off Helia; < 60 % — u-moons3: the lobe round Helia, as the LUT's aureole, under-lights the horizon 40° from a high Helia; was < 45 % with a band up from the horizon that drew Ocker's sunset as a grey-white column)`);
 }
 console.log('f · the cost');
 {

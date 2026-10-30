@@ -696,6 +696,8 @@ uniform vec4 u_bsHzX;      // its spin (radians), its clouds' drift, 0, 0
 uniform vec4 u_bsJu;       // the plumes' shape: x 0 ice jets (Opal) · 1 umbrellas (Zinnober) · 2 dust devils (Ocker), y the devils' width (m), z the time (s), w 0
 // ---- end u-moons2
                            //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
+uniform vec4 u_bsLake;     // u-moons3: the Glutsee — its centre (x, z) from the eye, its melt's height from the eye, the melt's radius (0: none)
+uniform vec3 u_bsLakeC;    // its glow
 const float BS_D2R = 0.0174532925;
 const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e, c]) => `vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
 const vec3 BS_GN = vec3(${f3(GN)}), BS_GC = vec3(${f3(GC)});
@@ -919,8 +921,7 @@ vec3 bsFarGround(vec3 D, float px) {
 vec3 bsAirSky(vec3 D) {
   if (u_bsAirK.z < 0.5) {
     float el = max(D.y, 0.0), k = sqrt(el);
-    vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
-    float wS = pow(max(dot(hs, hd), 0.0), 12.0) * exp(-max(0.0, el - 0.087) * 8.0);
+    float wS = exp((dot(D, u_bsSun.xyz) - 1.0) * 20.0);   // (u-moons3: the aureole round Helia, blue at sunset — was a band up from the horizon, grey-white)
     return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
   }
   vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
@@ -961,40 +962,45 @@ vec3 bsHerz(vec3 D, vec3 col, float px) {
   if (q > 1.0) col += vec3(0.3, 0.5, 1.0) * u_bsSunCol * 0.1 * exp(-(q - 1.0) / 0.012) * smoothstep(-0.3, 0.4, dot(o / max(q, 1e-3), u_bsSun.xyz)) * u_bsLum.y;
   return col;
 }
-// Zinnober's umbrella plumes: sulfur-dioxide grains on ballistic arcs from the vent fill a paraboloid y = H − r²/4H
-// (R = 2H at the ground: Pele's ring); the grains crowd at its envelope, so the plume reads as a thin shell — the view
-// meets it analytically (no marching, no noise) and a shell seen edge-on is brighter (the path through it ∝ 1/cos);
-// a faint core column over the vent; bluish-white in Helia's light (fine grains), strongest forward; lit where Helia
-// stands over the horizon at the canopy's height
+// Zinnober's umbrella plumes (u-moons3: drawn as fountains seen from the side). The grains leave the vent on ballistic
+// arcs inside a cone of 10° about the vertical: the inner ones climb to H (the stem), the outermost arc
+// y = u·cot θ − u²/(4H sin²θ) is the canopy's edge — its top at 0.97 H, 0.34 H out, down to the ground 0.68 H out. From
+// afar the plume is a sheet in the vertical plane through the vent facing the eye (one ray–plane cut, no marching): the
+// edge's shell bright (the grains crowd there, seen edge-on), the inside a faint fill, the stem a thin column. Under a
+// canopy (the eye within ~0.9 × its reach) the sheet fades out — no veil over the black sky — and only the stem stays.
 vec3 bsUmbrella(vec3 D, vec3 col) {
   float acc = 0.0;
+  const float US = 0.17365, UC = 0.98481;   // sin, cos 10°
   for (int j = 0; j < 4; j++) {
     vec4 J = u_bsJ[j];
     float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
     if (J.w <= 0.0 || js <= 0.0) continue;
     float H = J.w;
-    vec3 V = J.xyz;
-    float a = dot(D.xz, D.xz), b = dot(D.xz, V.xz), c = dot(V.xz, V.xz);
-    float qa = a, qb = 4.0 * H * D.y - 2.0 * b, qc = c - 4.0 * H * V.y - 4.0 * H * H;
-    float disc = qb * qb - 4.0 * qa * qc;
+    float dh = length(J.xz);
+    if (dh < 1.0) continue;
+    vec3 V = vec3(J.x, min(J.y, -u_bsGround.w * dh), J.z);   // (the foot on the horizon's line at least — no strip of sky under a far plume)
+    vec2 nr = V.xz / dh;
+    float dn = dot(D.xz, nr);
+    if (dn <= 1e-3) continue;
+    float t = dh / dn;
+    if (D.y < -u_bsGround.w && t > u_bsJk.y) continue;   // (behind the curve of the ground)
+    vec3 p = D * t - V;
+    float u = abs(p.x * nr.y - p.z * nr.x), y = p.y, Rg = 0.684 * H;
+    if (y < -10.0 || y > 1.08 * H || u > Rg * 1.1) continue;
     float lit = smoothstep(-0.01, 0.01, u_bsSun.y + sqrt(2.0 * max(0.8 * H + V.y + u_bsJk.w, 0.0) / u_bsJk.z));
-    if (disc > 0.0 && qa > 1e-6) {
-      float sq = sqrt(disc);
-      for (int k = 0; k < 2; k++) {
-        float t = (-qb + (k == 0 ? -sq : sq)) / (2.0 * qa);
-        if (t <= 0.0) continue;
-        vec3 p = D * t - V;
-        if (p.y < 0.0 || p.y > H) continue;
-        if (D.y < -u_bsGround.w && t > u_bsJk.y) continue;
-        vec3 n = normalize(vec3(p.x / (2.0 * H), 1.0, p.z / (2.0 * H)));
-        float r = length(p.xz) / (2.0 * H);
-        float edge = min(6.0, 1.0 / max(abs(dot(D, n)), 0.02));
-        acc += 0.07 * edge * (0.45 + 0.8 * r) * (1.0 - smoothstep(0.85, 1.0, r)) * js * lit;
-      }
-    }
-    // the core column: the gas rising over the vent (its closest approach to the axis)
-    float den = max(1.0 - D.y * D.y, 1e-4), dv = dot(D, V), s = (dv - D.y * V.y) / den, hh = (D.y * dv - V.y) / den;
-    if (s > 0.0 && hh > 0.0 && hh < H) { vec3 q = D * s - V - vec3(0.0, hh, 0.0); float w = 40.0 + hh * 0.03; acc += 0.25 * exp(-dot(q, q) / (w * w)) * (1.0 - hh / H) * js * lit; }
+    float under = smoothstep(0.9 * Rg, 1.5 * Rg, dh);
+    // the edge: over the stem the envelope's dome (H at the axis, H cos²θ at the outer arc's top 0.34 H out), beyond it
+    // the outer arc falling to the ground — an umbrella; the rising branch of that arc lies inside the plume
+    float uA = 2.0 * H * US * UC, yc = u < uA ? H * (1.0 - US * US * (u / uA) * (u / uA)) : u * (UC / US) - u * u / (4.0 * H * US * US);
+    float e = (yc - y) / H;   // (> 0 inside the edge)
+    float hk = smoothstep(0.0, 0.9 * H, y), fil = 0.8 + 0.2 * sin(atan(y, u + 1.0) * 46.0);
+    float shell = exp(-e * e / (e > 0.0 ? 0.0008 : 0.0002)) * (0.25 + 0.75 * hk) * fil;
+    // (inside: the canopy's sheet thin, densest under its top, the falling curtains fainter toward the ground)
+    float fill = smoothstep(0.0, 0.06, e) * 0.07 * (0.3 + hk) * (u < uA ? 1.0 : 0.6) * (1.0 - smoothstep(0.92, 1.04, y / H));
+    // the stem: the gas rising over the vent, widening as it climbs, thinning toward the top
+    float ws = 0.016 * H + 18.0, w = ws * (1.0 + 1.2 * y / H);
+    float stem = exp(-u * u / (w * w)) * (1.0 - 0.45 * y / H) * (1.0 - smoothstep(0.95, 1.06, y / H));
+    acc += ((1.4 * shell + fill) * under + 1.1 * stem * smoothstep(120.0, 500.0, dh)) * js * lit;
   }
   if (acc <= 0.0) return col;
   float ph = 0.45 + 1.6 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 4.0);
@@ -1025,6 +1031,16 @@ vec3 bsDevils(vec3 D, vec3 col) {
   }
   return col;
 }
+// u-moons3 · the Glutsee where the world's columns end (Very Low's 64 m see only its near shore): the melt's glow under
+// drifting crust plates (7-m cells), one ray–plane cut
+vec3 bsLake(vec3 D, vec3 g) {
+  if (u_bsLake.w <= 0.0 || D.y >= -1e-4) return g;
+  vec2 q = D.xz * (u_bsLake.z / D.y) - u_bsLake.xy;
+  float r = length(q) / u_bsLake.w;
+  if (r > 1.0) return g;
+  float crust = step(0.62 - 0.4 * r, fract(sin(dot(floor(q / 7.0), vec2(12.9898, 78.233))) * 43758.5453));
+  return mix(u_bsLakeC * (1.0 - 0.8 * crust), g, smoothstep(0.9, 1.0, r));
+}
 // ---- end u-moons2
 vec3 bodySky(vec3 dir, bool withSun) {
   vec3 D = normalize(dir);
@@ -1039,7 +1055,7 @@ vec3 bodySky(vec3 dir, bool withSun) {
   col = u_bsJu.x > 1.5 ? bsDevils(D, col) : u_bsJu.x > 0.5 ? bsUmbrella(D, col) : bsPlumes(D, col);
   // the far ground below the true horizon (where the world's columns end): its lit colour, a one-pixel edge
   float gk = 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y);
-  if (gk > 0.0) col = mix(col, u_bsAirK.x > 0.5 ? mix(bsFarGround(D, px), bsAirSky(D), u_bsAirK.w) : bsFarGround(D, px), gk);
+  if (gk > 0.0) col = mix(col, u_bsAirK.x > 0.5 ? mix(bsFarGround(D, px), bsAirSky(D), u_bsAirK.w) : bsLake(D, bsFarGround(D, px)), gk);
   if (withSun) col += bsGlare(D) * (u_bsAirK.x > 0.5 ? bsAirTrans(u_bsSun.xyz) : vec3(1.0));
   return col;
 }
