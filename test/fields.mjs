@@ -232,7 +232,7 @@ async function runPreset(preset) {
         }
         for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
         return got;
-      }, [L[0], L[1], L[2], L[3]]);
+      }, [L[0], L[1], L[2], L[3] + Math.PI]);
       await P.ev(() => { window.__Fm = window.__F; });
       m = await picture(P, '__Fm', SHOTS + 'rubble_mine.png', K);
       check(!m.err && (mine.carbon_rubble || 0) > 4, `rubble_mine: broken ${JSON.stringify(mine)}, test/shots/rubble_mine.png`);

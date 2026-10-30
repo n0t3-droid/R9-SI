@@ -214,12 +214,19 @@ void main() {
   // the sheet's face seen from outside it: chunks as a grain (cells of 1.6 m, lit on Helia's side), fading with distance
   if (abs(h) > H) {
     float te = (sign(h) * H - h) / dn;
-    vec2 q = vec2(u_cam.y + dr * te, u_arc.x + dt * te) / 1.6;
-    vec2 ci = floor(q), f = fract(q);
-    vec3 hc = h3(vec3(ci, 3.0));
-    float dd = length(f - 0.2 - 0.6 * hc.xy) / (0.28 + 0.22 * hc.z);
-    float px = length(fwidth(q));
-    float grain = mix(1.0, (dd < 1.0 ? 0.7 + 0.8 * sqrt(1.0 - dd * dd) : 0.25), 1.0 - smoothstep(0.15, 0.6, px));
+    vec2 q0 = vec2(u_cam.y + dr * te, u_arc.x + dt * te);
+    float grain = 1.0;
+    for (int j = 0; j < 2; j++) {
+      float cs = j == 0 ? 0.9 : 2.7;
+      vec2 q = q0 / cs + float(j) * 17.3, ci = floor(q), f = fract(q);
+      vec3 hc = h3(vec3(ci, 3.0 + float(j)));
+      vec2 o2 = f - 0.25 - 0.5 * hc.xy;
+      float dd = length(o2 * vec2(1.0, 0.7 + 0.6 * hc.z)) / (0.34 + 0.18 * hc.z);
+      float lit = 0.5 + 0.5 * dot(normalize(o2 + 1e-4), normalize(vec2(dot(u_sunDir, u_er), dot(u_sunDir, u_et)) + 1e-4));
+      float px = length(fwidth(q));
+      float gj = dd < 1.0 ? 0.62 + 0.55 * hc.z * sqrt(1.0 - dd * dd) + 0.25 * (lit - 0.5) : 0.5 + 0.2 * hc.z;
+      grain *= mix(1.0, gj, (1.0 - smoothstep(0.12, 0.5, px)) * (j == 0 ? 0.7 : 0.45));
+    }
     acc *= grain;
   }
   // single chunks far off catching Helia (stable with the view: a hash on the direction)
@@ -296,20 +303,26 @@ void main() {
   // relief: the deck's slope toward Helia (Balanced and up)
   float rel = 0.0;
   if (u_geo.w > 1.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) * 700.0; rel = (deck(gA + sh, t, n - 2, 1.0) - fA) * 3.0; }
-  vec3 topC = band * (0.62 + 0.75 * fA) * vec3(1.06, 1.0, 1.02);
+  vec3 topC = band * (0.4 + 1.0 * fA) * vec3(1.06, 1.0, 1.02);
   float cover = smoothstep(0.34, 0.56, fA);
   vec3 deepC = band * vec3(0.62, 0.52, 0.66) * (0.35 + 0.6 * fB);
   // the top deck's shadow on the deep one (Low and up)
   float shB = 1.0;
   if (u_geo.w > 0.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) / max(mus, 0.12) * u_geo.z; shB = 1.0 - 0.6 * smoothstep(0.34, 0.56, deck(gB + sh, t, 3, 1.0)); }
-  vec3 col = mix(deepC * shB, topC * (1.0 + rel), cover) * u_sunCol * lit * rsh * 1.45;
+  vec3 col = mix(deepC * shB, topC * (1.0 + rel), cover) * u_sunCol * lit * rsh * 1.1;
   // lightning deep down on the night side: a cell flashes now and then, the glow spread by the deck above
   if (u_off.w > 0.0) {
-    vec2 lc = floor(gB / 22000.0); float ph = u_off.z * 0.9 + hash12(lc) * 7.0, fl = floor(ph);
-    float on = step(0.93, hash12(lc + fl * 1.37)), fr = fract(ph);
-    vec2 cc = (lc + 0.2 + 0.6 * vec2(hash12(lc + 3.1 + fl), hash12(lc + 5.7 + fl))) * 22000.0;
-    float dd = length(gB - cc) / 7000.0;
-    float flash = on * exp(-fr * 6.0) * (0.6 + 0.4 * sin(fr * 60.0)) * exp(-dd * dd) * u_off.w;
+    float flash = 0.0;
+    vec2 l0 = floor(gB / 22000.0);
+    for (int j = 0; j < 9; j++) {
+      vec2 lc = l0 + vec2(float(j % 3 - 1), float(j / 3 - 1));
+      float ph = u_off.z * 0.9 + hash12(lc) * 7.0, fl = floor(ph);
+      float on = step(0.9, hash12(lc + fl * 1.37)), fr = fract(ph);
+      vec2 cc = (lc + 0.2 + 0.6 * vec2(hash12(lc + 3.1 + fl), hash12(lc + 5.7 + fl))) * 22000.0;
+      float dd = length(gB - cc) / 6000.0;
+      flash += on * (0.35 + exp(-fr * 4.0)) * exp(-dd * dd) * (0.7 + 0.6 * fB);
+    }
+    flash *= u_off.w;
     col += vec3(0.75, 0.82, 1.0) * flash * (1.0 - 0.6 * cover) * 2.2;
   }
   // the haze toward the horizon (the upper haze the flight is in), lit like the tops
@@ -361,6 +374,7 @@ float vn(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
 void main() {
   vec3 N = normalize(cross(dFdx(v_p), dFdy(v_p)));
   if (dot(N, v_p) > 0.0) N = -N;
+  N = normalize(N + normalize(v_n0) * 0.9);
   vec3 V = normalize(-v_p);
   float m0 = max(dot(N, u_sunDir), 0.0), m = max(dot(N, V), 0.02);
   float ls = m0 / (m0 + m) * 2.0;                              // Lommel–Seeliger: dark dust has no limb darkening
