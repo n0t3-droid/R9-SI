@@ -26,7 +26,7 @@
   const THEMES = {
     // Heimat — the warm main theme: a rising sixth, a step back, the long sigh; I IV I vi | I vi IV-V I
     home: {
-      bpm: 84, mode: 'major', minorMode: 'dorian', len: 8,
+      bpm: 84, mode: 'major', minorMode: 'dorian', len: 8, arc: [0.72, 0.78, 0.86, 0.8, 0.9, 1, 1, 0.84],
       chords: '0:4 | 3:4 | 0:4 | 5:4 | 0:4 | 5:4 | 3:2 4:2 | 0:4',
       layers: [
         { id: 'pad', kind: 'chord', inst: 'pad', oct: -12, gain: 0.05, lv: 0, pri: 2 },
@@ -41,7 +41,7 @@
     },
     // Weite — the space theme: slow, lydian (the raised fourth: I and II major side by side), bells over a pad
     space: {
-      bpm: 58, mode: 'lydian', len: 8,
+      bpm: 58, mode: 'lydian', len: 8, arc: [0.7, 0.75, 0.82, 0.8, 0.95, 1, 0.9, 0.78],
       chords: '0:4 | 1:4 | 0:4 | 1:4 | 5:4 | 1:4 | 4:4 | 0:4',
       layers: [
         { id: 'pad', kind: 'chord', inst: 'pad', oct: -12, gain: 0.05, lv: 0, pri: 2 },
@@ -53,7 +53,7 @@
     },
     // Aufbruch — the adventure motif: a dorian call (root, fifth held, the climb to the octave), a driving ostinato
     adventure: {
-      bpm: 116, mode: 'dorian', len: 8,
+      bpm: 116, mode: 'dorian', len: 8, arc: [0.85, 0.88, 0.92, 0.9, 0.95, 1, 1, 0.95],
       chords: '0:4 | 3:4 | 6:4 | 0:4 | 0:4 | 3:4 | 6:2 4:2 | 0:4',
       layers: [
         { id: 'osti', kind: 'osti', inst: 'strings', oct: -12, gain: 0.045, lv: 0, pri: 2, pat: [0, 0, 4, 0, 2, 0, 4, 2] },
@@ -68,7 +68,7 @@
     },
     // Staunen — the wonder sting: vi → II → I in lydian, a bell climb through two octaves, the top held
     wonder: {
-      bpm: 88, mode: 'lydian', len: 3, sting: true,
+      bpm: 88, mode: 'lydian', len: 3, sting: true, arc: [0.6, 0.85, 1],
       chords: '5:4 | 1:4 | 0:4',
       layers: [
         { id: 'str', kind: 'chord', inst: 'strings', oct: -12, gain: 0.04, lv: 0, pri: 2 },
@@ -82,7 +82,7 @@
       bpm: 132, mode: 'major', len: 2, sting: true,
       chords: '0:4 | 0:4',
       layers: [
-        { id: 'mel', kind: 'line', inst: 'pluck', oct: 12, gain: 0.06, lv: 0, pri: 3, notes: '4:.5 7:.5 9:.5 8:.5 7 11 | 9:.5 11:.5 14:2 r' },
+        { id: 'mel', kind: 'line', inst: 'pluck', oct: 12, gain: 0.085, lv: 0, pri: 3, notes: '4:.5 7:.5 9:.5 8:.5 7 11 | 9:.5 11:.5 14:2 r' },
         { id: 'bell', kind: 'line', inst: 'bell', oct: 12, gain: 0.03, lv: 0, pri: 1, notes: 'r:4 | r 14:3' },
         { id: 'pad', kind: 'chord', inst: 'pad', oct: -12, gain: 0.03, lv: 0, pri: 1 },
       ],
@@ -162,6 +162,12 @@
       else if (L.kind === 'arp') for (let b = 0; b < total; b += 0.5) { const c = chordAt(b), k = Math.round(b * 2) % 4; push(b, 0.9, degMidi(key.root, key.mode, c.degs[0] + [0, 2, 4, 2][k]) + (L.oct || 0)); }
       else if (L.kind === 'osti') for (let b = 0; b < total; b += 0.5) { const c = chordAt(b), k = Math.round(b * 2) % 8; push(b, 0.45, degMidi(key.root, key.mode, c.degs[0] + L.pat[k]) + (L.oct || 0)); }
       else if (L.kind === 'drum') for (let b = 0; b < total; b += 0.5) { const k = Math.round(b * 2) % 8; if (L.hits[k] === 'x') push(b, 0.4, 0); }
+    }
+    // the phrase breathes (arc: a gain per bar), and the last chord rings out past the cue's end (the fade does the rest)
+    const end = total * B;
+    for (const e of out) {
+      if (th.arc) e.gain *= th.arc[Math.min(th.arc.length - 1, Math.floor(e.t / (4 * B) + 1e-6))];
+      if (e.t + e.dur >= end - 1e-6 && e.midi && e.inst !== 'pluck') e.dur += 1.6 * B;
     }
     out.sort((a, b) => a.t - b.t || b.pri - a.pri);
     return out;

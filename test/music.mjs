@@ -77,14 +77,22 @@ try {
   await ev(`VR.game.createWorld({name:'Musik',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
   for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   await ev(() => VR.game.audio.resume());
-  await wait(3000);
+  // the frames are driven by the test (the page's own loop stops, the renderer is skipped, as in sound.mjs)
+  const frames = (n) => ev((n) => {
+    const g = VR.game;
+    if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; }
+    window.requestAnimationFrame = () => 0; window.__norender = true;
+    for (let i = 0; i < n; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
+    return n;
+  }, n);
+  for (let k = 0; k < 6; k++) { await frames(20); await wait(250); }
   const st = await ev(() => { const a = VR.game.audio; return { has: !!a.score, log: a.score ? a.score.log.map(l => l.id + ':' + l.variant) : [], notes: a.noteCount, clock: a.ctx ? a.ctx.currentTime : -1, mood: a.music.mood, vox: a.vox ? a.vox.gain.value : -1 }; });
   console.log('  info  in play: cues ' + st.log.join(', ') + ' · ' + st.notes + ' notes · clock ' + st.clock.toFixed(1) + ' s · mood ' + st.mood);
   check(st.has && st.log.length >= 1, 'the director runs in the game (' + (st.log[0] || 'no cue') + ')');
   if (st.clock > 1) check(st.notes > 0, 'notes go out on the audio clock (' + st.notes + ')'); else console.log('  skip  the audio clock does not run here');
   check(Math.abs(st.vox - 0.8) < 1e-6, 'the Stimmen bus at its default 80 %');
   const cue = await ev(() => VR.game.audio.cue('wonder'));
-  await wait(2500);
+  for (let k = 0; k < 10; k++) { await frames(10); await wait(250); }
   const st2 = await ev(() => VR.game.audio.score.log.map(l => l.id));
   check(cue && st2.includes('wonder'), 'a vista cues Staunen in play (' + st2.join(', ') + ')');
   // the settings' Klang page

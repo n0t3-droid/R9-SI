@@ -34,13 +34,13 @@
     let n = 0, end;
     switch (ev.inst) {
       case 'pad': {
-        end = t + d + 0.4; env(g, t, Math.min(0.6, d * 0.3), G, Math.min(1.2, d * 0.4), end);
+        const rel = Math.min(0.9, d * 0.3); end = t + d + rel * 0.8; env(g, t, Math.min(0.5, d * 0.25), G, rel, end);   // (it releases over the next chord's swell: no dip at the bar line)
         const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.min(2400, f * 3 + 300); lp.Q.value = 0.5; lp.connect(g);
         for (const det of lo ? [0] : [-7, 7]) { osc(c, 'triangle', f, t, end, det).connect(lp); n++; }
         break;
       }
       case 'strings': {
-        end = t + d + 0.25; env(g, t, Math.min(0.18, d * 0.35), G, Math.min(0.5, d * 0.4), end);
+        const rel = Math.min(0.6, d * 0.35); end = t + d + rel * 0.7; env(g, t, Math.min(0.18, d * 0.35), G, rel, end);
         const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
         lp.frequency.setValueAtTime(f * 2.2, t); lp.frequency.linearRampToValueAtTime(Math.min(5000, f * 4), t + Math.min(0.4, d)); lp.connect(g);
         for (const det of lo ? [0] : [-9, 8]) { osc(c, 'sawtooth', f, t, end, det).connect(lp); n++; }
