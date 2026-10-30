@@ -291,7 +291,9 @@ async function shoot(V, preset) {
   if (VARIANTS && preset === 'high' && V.hour === 'golden' && V.measure !== false) for (const [vt, VV] of Object.entries(VARIANTS)) {
     await ev((VV) => {
       const S3 = VR.Sky3, L2 = VR.Light2;
-      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold, fog: L2.FOG || null, air: L2.AIRGOLD || null, ap: L2.AP ? L2.AP.gold : null, gc: S3.GOLDCLOUD ? S3.GOLDCLOUD.add : null, mist: S3.MISTK ? S3.MISTK.gold : null });
+      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold, fog: L2.FOG || null, air: L2.AIRGOLD || null, ap: L2.AP ? L2.AP.gold : null, gc: S3.GOLDCLOUD ? S3.GOLDCLOUD.add : null, mist: S3.MISTK ? S3.MISTK.gold : null, gs: S3.GOLDSKY ? Object.assign({}, S3.GOLDSKY) : null, cl: S3.CLOUDLIGHT ? JSON.stringify(S3.CLOUDLIGHT.low) : null });
+      if (VV.goldsky && S3.GOLDSKY) Object.assign(S3.GOLDSKY, VV.goldsky);   // (f-golden: the golden sky's structure)
+      if (VV.low && S3.CLOUDLIGHT) S3.CLOUDLIGHT.low = VV.low;   // (f-golden: the golden cumulus' shade)
       if (VV.mist !== undefined && S3.MISTK) S3.MISTK.gold = VV.mist;
       // (f-sky5: the golden far air, the aerial perspective's share, the golden cumulus' extra cover)
       if (VV.air && L2.AIRGOLD) Object.assign(L2.AIRGOLD, VV.air);
@@ -311,7 +313,7 @@ async function shoot(V, preset) {
     await page.screenshot({ path: TMP + 'sky3probe_' + vn + '.png', timeout: 240000 });
     await draw(false);
     const vm = await measure(vn, vgeo, hr[1]);
-    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); if (k.fog && L2.FOG) for (const f of Object.keys(k.fog)) L2.FOG[f] = k.fog[f]; if (k.air) Object.assign(L2.AIRGOLD, k.air); if (k.ap !== null && L2.AP) L2.AP.gold = k.ap; if (k.gc !== null && S3.GOLDCLOUD) S3.GOLDCLOUD.add = k.gc; if (k.mist !== null && S3.MISTK) S3.MISTK.gold = k.mist; });
+    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); if (k.fog && L2.FOG) for (const f of Object.keys(k.fog)) L2.FOG[f] = k.fog[f]; if (k.air) Object.assign(L2.AIRGOLD, k.air); if (k.ap !== null && L2.AP) L2.AP.gold = k.ap; if (k.gc !== null && S3.GOLDCLOUD) S3.GOLDCLOUD.add = k.gc; if (k.mist !== null && S3.MISTK) S3.MISTK.gold = k.mist; if (k.gs) Object.assign(S3.GOLDSKY, k.gs); if (k.cl) S3.CLOUDLIGHT.low = JSON.parse(k.cl); });
     const vd = compare(vm.curve, ref.targets[hr[1]]);
     results.push({ name: vn, view: V.name + '+' + vt, variant: vt, place: V.place, hour: V.hour, kind: hr[1], preset, ...vm, dE: vd });
     console.log(`   variant ${vt}: ΔE ${vd.map(v => (v === null ? '—' : v.toFixed(1))).join(' ')}  mean ${mean(vd)} · L* ${vm.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' ')} · structure sd ${vm.structure.sd} sat ${vm.structure.sat} land ${vm.structure.land}${vm.disc ? ` · disc ${vm.disc.width}°` : ''}`);

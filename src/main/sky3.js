@@ -381,9 +381,11 @@
     // (f-sky5, R52-03: at the golden hour the sunlit tops were a dull beige no brighter than the luminous sky round them —
     // the frames' golden cumulus are white over lilac shade: the sun's light on them and the sky's from above lifted at
     // 2° and 8°, offline (sky_offline.js) the top's luma sd 28.8 → 32.4 with the bands' ΔE held)
-    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.7, 1.15, 0.85]], [8, [2.0, 1.6, 1.3]], [16, [1.22, 1.14, 1.04]]],
+    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.75, 1.12, 0.78]], [8, [2.1, 1.58, 1.15]], [16, [1.22, 1.14, 1.04]]],   // (f-golden: run 4 tried peach-gold tops (2.05, 1.42, 0.92): the canyon's sky 68.8 → 70.9 but its bands' ΔE 7.96 → 8.43 — the far cumulus field in the sky pass takes this light too)
     top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.7, 0.6, 0.85]], [8, [0.8, 0.76, 0.98]], [16, [0.5, 0.56, 0.72]]],
-    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.5, 0.4, 0.55]], [8, [0.55, 0.5, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
+    // (f-golden, R53-11: at the golden hour the bases a deeper lilac-blue — the frames' white tops over lilac shade; the
+    // top's contrast from the clouds' own relief, sky_offline.js)
+    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.36, 0.28, 0.58]], [8, [0.34, 0.31, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
     moon: [0.1, 0.12, 0.19], rainGrey: [0.42, 0.44, 0.48], k: [1.0, 1.0, 0.3, 0.5],
     // f-sky4 (docs/reviews/v0.49.md R50-11: storm clouds bright white flat slabs): under rain and a closed cover the clouds
     // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
@@ -396,7 +398,9 @@
   // deck gets weight — rolls and lumps of a warped noise, a charcoal base (base: of the clouds' light from below), rain
   // shafts hanging from it to the horizon (SKY3HI: Balanced and up), a lit edge low toward the sun where it can break
   // (by day, the cover not total). Its switch: cloudVol (Wolken mit Volumen) and the sky's level ≥ 1; Very Low has neither.
-  S3.DECK = { from: 0.3, full: 0.75, puff: 0.08, base: 0.55, shafts: 0.85, edge: 0.7 };
+  // (f-golden: the puffs' 0.08 left ghost outlines in the deck — now none (puff 0); browser run 3 kept 0.3 of them within
+  // 150 blocks as 'scud' and they read as charcoal cotton balls overhead: the deck's own scud (s3Deck) is the scud)
+  S3.DECK = { from: 0.3, full: 0.75, puff: 0, base: 0.55, shafts: 0.85, edge: 0.7 };
   S3.deck = function (E) {
     const q = S3.q || OFF, D = S3.DECK;
     if (!(q.sky3 >= 1) || !q.cloudVol) return { on: 0, puff: 1, shafts: 0, edge: 0, base: [0, 0, 0] };
@@ -413,6 +417,22 @@
     if (!q.cloudVol || !(q.sky3 >= 1) || !E.sunDir) return c;
     const w = S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]);
     return Math.round((c + S3.GOLDCLOUD.add * w * (1 - sstep(0.3, 0.5, c)) * (1 - clamp(E.rain || 0, 0, 1))) * 20) / 20;
+  };
+  // f-golden (docs/reviews/v0.52.md R53-11: the golden sky's top flat — its luma sd 28–36 against the frames' 49, a pastel
+  // lilac middle with nothing deep and little bright) · the golden sky's structure: at the golden hour in clear weather a
+  // large slow field over the upper sky — lit pink-gold masses of high cloud (the frames' lit stratus, band 4's pink)
+  // against a deeper blue-violet between them; about mean-preserving, so the bands keep their fit (sky_offline.js fitted
+  // k, deep, lit, pink for the top's sd, its saturation and the bands' ΔE together). SKY3 only (Low and up; Very Low
+  // has no sky3 level: its program and values unchanged)
+  S3.GOLDSKY = { k: 1, deep: 0.55, lit: 2.0, pink: 0.6 };   // (browser run 2: deep 0.55 / lit 2.2 the top's sd +2 in all three views)
+  const GS = [0, 0, 0, 0];
+  S3.goldSky = function (E, out) {
+    out = out || GS;
+    const G = S3.GOLDSKY, q = S3.q || OFF;
+    const w = (q.sky3 | 0) >= 1 && !q.lite && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0;
+    const k = G.k * w * (1 - sstep(0.05, 0.4, clamp(E.rain || 0, 0, 1))) * (1 - sstep(0.55, 0.9, clamp(E.cloudCover || 0, 0, 1)));
+    out[0] = k > 1e-3 ? k : 0; out[1] = G.deep; out[2] = G.lit; out[3] = G.pink;
+    return out;
   };
   // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
   S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));
@@ -433,7 +453,7 @@
   // env: the Env (its day, ticks, weather seed); E: its frame. E.sky3 holds the schedules' state and the uniforms (o.u:
   // name → Float32Array, filled in place: no allocation per frame for them); nothing of E's own values changes (with the
   // sky's level on env.js takes the palette of the golden hour and the dusk from S3.palette)
-  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3SunW', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K', 'u_c3Storm', 'u_s3Deck2', 'u_c3Deck'];
+  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3SunW', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K', 'u_c3Storm', 'u_s3Deck2', 'u_c3Deck', 'u_s3Gold'];
   const U3 = S3.U3 = ['u_c3Sun', 'u_c3Top', 'u_c3Low', 'u_c3Ld', 'u_c3Haze'];
   S3.state = function () {
     const u = {};
@@ -496,6 +516,7 @@
     set4(u.u_s3Rain, deck[0], deck[1], deck[2], 0);
     set4(u.u_s3Deck2, over ? Dk.on : 0, over ? Dk.shafts : 0, over ? Dk.edge : 0, (E.time || 0) * 0.02);
     set4(u.u_c3Deck, Dk.puff, Dk.on, S3.mistK(E), 0);
+    S3.goldSky(E, u.u_s3Gold);   // (f-golden: the golden sky's structure)
     const dr = E.cloudDrift, dx = dr ? dr[0] : (E.time || 0) * 0.9, dz = dr ? dr[1] : 0;
     set4(u.u_s3Drift, dx / 900, dz / 900, dx / 340, dz / 340);
     // the aurora (level 2): its strength, its curtains' seed, the time, its span round north
@@ -505,7 +526,7 @@
     // the far banks (level 2): their cover, their drift (azimuth), the warmth of the sun's side; the ray fan round a low
     // sun through the cloud gaps (stronger the more cloud there is, none in the rain)
     const el = Y.el;
-    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - 0.95 * rain) : 0, dx / 2600, dz / 2600, 0);
+    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - sstep(0.1, 0.5, rain)) : 0, dx / 2600, dz / 2600, 0);   // (f-golden: none in the rain — run 3's storm kept one lit white bank low on its horizon)
     // the cumulus field beyond the sprites' window, in perspective on the cloud plane (y 210): the plane's height over the
     // eye and the eye in cloud space are the renderer's (sky3_gl.js sets x, y, z each frame); w the cover (level 2)
     u.u_s3Field[3] = lv >= 2 && over ? cover * (1 - 0.95 * rain) : 0;   // (in the rain the deck closes the sky: no far field, no banks)
@@ -630,6 +651,31 @@ vec3 s3Layers(vec3 col, vec3 dir, float h) {
   }
   if (u_s3Neb.z > 0.001) col = s3Deck(col, dir);
   return col;
+}
+uniform vec4 u_s3Gold;     // f-golden: the golden sky's structure — x its strength (0: none), y the gaps' depth, z the masses' light, w their pink
+// f-golden · the golden sky's structure (S3.goldSky): lit pink-gold masses of high cloud over the upper sky against a
+// deeper blue-violet between them (a slow field of three value-noise taps, drifting with the high wind)
+vec3 s3Gold(vec3 col, vec3 dir) {
+  if (u_s3Gold.x <= 0.0 || dir.y < 0.06) return col;
+  float e = dir.y, win = smoothstep(0.2, 0.38, e) * (1.0 - smoothstep(0.7, 0.95, e));
+  if (win <= 0.0) return col;
+  vec2 q = dir.xz / (e + 0.3) * 2.0 + u_s3Drift.xy * 0.6;
+  q = vec2(q.x * 0.8 + q.y * 0.2, q.y * 1.3 - q.x * 0.2);   // (a little drawn out along a slant: banks, not blobs)
+  float n = vnoise(q) * 0.58 + vnoise(q * 2.3 + 5.3) * 0.29 + vnoise(q * 5.2 - 2.1) * 0.13;
+  float eb = (e - 0.5) / 0.14;
+  n += 0.09 * exp(-eb * eb) - 0.03;   // (the masses gather round 30° up — the frames' pink band there — the gaps above and below)
+  float lit = smoothstep(0.62, 0.7, n), gap = 1.0 - smoothstep(0.44, 0.58, n), core = smoothstep(0.64, 0.86, n);
+  float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  vec2 sh = normalize(u_sunDir.xz + vec2(1e-5, 0.0)), dh = normalize(dir.xz + vec2(1e-5, 0.0));
+  float toS = 0.5 + 0.5 * dot(sh, dh);
+  // (the masses a pink-white, peach toward the sun; the gaps a blue-violet — both of the sky's own luma, so their mix keeps
+  // the bands' pale lilac mean while each pixel has colour: the frames' saturated blue between pink-lit cloud)
+  vec3 tint = mix(vec3(1.45, 0.8, 1.0), vec3(1.32, 0.92, 0.68), toS * toS);
+  vec3 litC = mix(col, tint * l, u_s3Gold.w) * (1.0 + u_s3Gold.z * (0.35 + 0.65 * core));   // (brighter toward the mass's core: relief, not a flat cut-out)
+  vec3 deepC = mix(col, vec3(0.42, 0.78, 2.4) * l, u_s3Gold.w) * (1.0 - u_s3Gold.y);
+  float k = u_s3Gold.x * win;
+  col = mix(col, deepC, gap * k);
+  return mix(col, litC, lit * k);
 }
 vec3 s3SunDisc(vec3 dir, float sd) {
   float e = 1.0 - sd, th = sqrt(2.0 * e), r = u_s3Sun.x;
@@ -819,8 +865,10 @@ vec3 s3Fan(vec3 dir) {
   // darker; far ones take the sky's horizon colour. Returns the colour and the coverage (a < 0: nothing)
   // the banks' share by the hour (R52-03: at the golden hour the isles drowned in their grey-lilac smear; the frames'
   // clouds under the isles are few and white — u_c3Deck.z)
-  S3.MISTK = { gold: 0.3 };   // (the third browser run: 0.55 → 0.3 lifted the canyon's land saturation 88 → 90, with the far air 98)
-  S3.mistK = (E) => 1 - (1 - S3.MISTK.gold) * (E && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0);
+  S3.MISTK = { gold: 0 };   // (f-golden, browser run 3: the banks lay as a veil over the isles' valley floor — without them the isles' land saturation 85.9 → 101.7; they come back as the sun climbs past ~10°)
+  // (f-sky5: 0.3 — its third browser run: 0.55 → 0.3 lifted the canyon's land saturation 88 → 90, with the far air 98)
+  // (f-golden: and none in the rain — a white bank lay low on the storm's horizon; they melt into the deck with the puffs)
+  S3.mistK = (E) => (1 - (1 - S3.MISTK.gold) * (E && E.sunDir ? S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) : 0)) * (1 - sstep(0.1, 0.5, clamp((E && E.rain) || 0, 0, 1)));
   S3.MIST_NEAR = [150, 340];   // (the browser runs: at 60–180 the sheet stayed — its bank 111 m off, 140 wide, its plane cutting the canyon at
   // the canyon floor; at 120–280 the next one, 186 m off, still lay over the right third (DIAG: gone without the sprites))
   S3.mistNear = (d) => sstep(S3.MIST_NEAR[0], S3.MIST_NEAR[1], d);
@@ -853,8 +901,13 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
     th = th * 0.4 + 0.15 * (texture(u_cloudTex, c3At(cell, uv + vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv - vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv + vec2(0.0, e.y))).r + texture(u_cloudTex, c3At(cell, uv - vec2(0.0, e.y))).r);
     float d = smoothstep(0.0, 0.22, th);
     if (d < 0.02) return vec4(0.0, 0.0, 0.0, -1.0);
-    vec3 mc = mix(u_c3Low, u_c3Top, 0.6) + u_c3Sun * 0.35;
-    return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist) * u_c3Deck.z);
+    // (f-golden, R53-11: the banks under the isles were grey smears in the haze's flat light — now lit as cumulus: the top
+    // and the faces toward the sun in its light, the base in the lilac shade, less of the haze over them)
+    vec3 N = vec3(t.gb * 2.0 - 1.0, 0.0);
+    N.z = sqrt(max(0.0, 1.0 - dot(N.xy, N.xy)));
+    float up = smoothstep(0.3, 0.75, uv.y), ndl = clamp(dot(N, u_c3L) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 mc = mix(u_c3Low, u_c3Top, up) + u_c3Sun * ((0.2 + 0.5 * ndl) * (0.45 + 0.55 * up));
+    return vec4(mix(mc, u_c3Haze, 0.25), d * c3MistNear(dist) * u_c3Deck.z);
   }
   float cov = smoothstep(0.0, 0.08, th);
   if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);
