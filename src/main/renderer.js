@@ -1010,7 +1010,7 @@
       // is read meanwhile) and swapped in whole — the same mask as one built at once (clouds.js shadowRows); the first at once
       const job = this.csJob, bud = C.shadowRows ? (this.csBudget === undefined ? 1 : this.csBudget) : 0;   // (csBudget 0: at once, as before)
       if (job || !at || Math.abs(at[0] - cx) > S.move || Math.abs(at[1] - cz) > S.move || at[2] !== cov) {
-        if (!at || !bud) C.shadowMask(cx, cz, cov, this.csBuf);
+        if (!at || !bud || Math.abs(at[0] - cx) > N * S.texel * 0.4 || Math.abs(at[1] - cz) > N * S.texel * 0.4) { this.csJob = null; C.shadowMask(cx, cz, cov, this.csBuf); }   // (a jump past the old mask — a teleport, a trip: at once)
         else {
           const J = job || (this.csJob = { cx, cz, cov, j: 0, acc: (this.csAcc || (this.csAcc = new Float32Array(N * N))).fill(0), memo: new Map(), buf: this.csBuf2 || (this.csBuf2 = new Uint8Array(N * N)) });
           const t0 = performance.now();
