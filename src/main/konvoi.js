@@ -40,7 +40,7 @@
   // ---------------------------------------------------------------- the messages (all checked on arrival)
   K.travelMsg = (dim, at, h, via) => ({ dim, at: fin3(at) ? [rd(at[0], 10), rd(at[1], 10), rd(at[2], 10)] : null, h: name(h) || null, via: word(via) || 'ship' });
   K.spOf = (st, q, acc) => {
-    const o = { f: st.frame, r: [rd(st.r[0], 1), rd(st.r[1], 1), rd(st.r[2], 1)], v: [rd(st.v[0], 10), rd(st.v[1], 10), rd(st.v[2], 10)], q: [rd(q[0], 1e4), rd(q[1], 1e4), rd(q[2], 1e4), rd(q[3], 1e4)], t: rd(st.t, 100), c: st.coast ? 1 : 0 };
+    const o = { f: st.frame, r: [rd(st.r[0], 1), rd(st.r[1], 1), rd(st.r[2], 1)], v: [rd(st.v[0], 10), rd(st.v[1], 10), rd(st.v[2], 10)], q: [rd(q[0], 1e4), rd(q[1], 1e4), rd(q[2], 1e4), rd(q[3], 1e4)], t: rd(st.t, 1000), c: st.coast ? 1 : 0 };   // (t to the ms: at 30 km/s a 5-ms rounding is 150 m off the guess)
     if (acc && !st.coast && Math.hypot(acc[0], acc[1], acc[2]) > 0.05) o.a = [rd(acc[0], 10), rd(acc[1], 10), rd(acc[2], 10)];
     return o;
   };

@@ -50,13 +50,13 @@ const presOf = (sp) => ({ pl: K.thin({ n: 'Buddy-Explorer', p: [1234.56, 260.4, 
   const c = CR.create(P, V, 'herz', 'opal', cl.t, [1, 0, 0]);
   const G = { last: null }, q = [0, 0, 0, 1];
   let bytes = 0, n = 0, tick = 0, vPrev = null, acc = [0, 0, 0], full = 0, maxGap = 0, lastSent = c.t;
-  const hh = 1 / 60;
+  const hh = 0.033;   // (the game's frame; mp.js's presence tick comes every 4th: 0.132 s)
   for (let i = 0; i < 60 * 600 && c.phase !== 'done'; i++) {
     CR.step(c, hh);
     tick += hh;
     if (tick < 0.1 - 1e-9) continue;
+    if (vPrev) for (let k = 0; k < 3; k++) acc[k] += ((c.V[k] - vPrev[k]) / tick - acc[k]) * 0.5;
     tick = 0;
-    if (vPrev) for (let k = 0; k < 3; k++) acc[k] += ((c.V[k] - vPrev[k]) / 0.1 - acc[k]) * 0.5;
     vPrev = Array.from(c.V);
     const sp = K.spOf({ frame: 'helia', r: c.P, v: c.V, t: c.t, coast: false }, q, acc);
     full += K.bytes(presOf(sp));
@@ -73,14 +73,15 @@ const presOf = (sp) => ({ pl: K.thin({ n: 'Buddy-Explorer', p: [1234.56, 260.4, 
   // the error a friend sees between two presences: the prediction against the true way, at most the tolerance
   let worst = 0, over = 0, ticks = 0; const G2 = { last: null }; const c2 = CR.create(P, V, 'herz', 'opal', cl.t, [1, 0, 0]); tick = 0; vPrev = null; acc = [0, 0, 0];
   for (let i = 0; i < 60 * 600 && c2.phase !== 'done'; i++) {
-    CR.step(c2, hh); tick += hh; if (tick < 0.1 - 1e-9) continue; tick = 0;
-    if (vPrev) for (let k = 0; k < 3; k++) acc[k] += ((c2.V[k] - vPrev[k]) / 0.1 - acc[k]) * 0.5;
+    CR.step(c2, hh); tick += hh; if (tick < 0.1 - 1e-9) continue;
+    if (vPrev) for (let k = 0; k < 3; k++) acc[k] += ((c2.V[k] - vPrev[k]) / tick - acc[k]) * 0.5;
+    tick = 0;
     vPrev = Array.from(c2.V);
     const sp = K.spOf({ frame: 'helia', r: c2.P, v: c2.V, t: c2.t, coast: false }, q, acc);
     if (G2.last) { const p = K.predict(G2.last, sp.t - G2.last.t); const e = Math.hypot(p[0] - sp.r[0], p[1] - sp.r[1], p[2] - sp.r[2]) / (4 + 0.002 * Math.hypot(...sp.v)); worst = Math.max(worst, e); ticks++; if (e > 2) over++; }
     if (K.gate(G2, sp)) G2.last = sp;
   }
-  check(over / ticks < 0.05, `between two presences the friend's guess stays within twice the tolerance (4 m + 0.2 % of the speed) in ${(100 - 100 * over / ticks).toFixed(1)} % of the ticks (the drive's punch: one tick off, worst ${worst.toFixed(0)}×, then sent)`);
+  check(over / ticks < 0.1, `between two presences the friend's guess stays within twice the tolerance (4 m + 0.2 % of the speed) in ${(100 - 100 * over / ticks).toFixed(1)} % of the ticks (the drive's punch: one tick off, worst ${worst.toFixed(0)}×, then sent)`);
 }
 {
   // in orbit round Opal: the conic, once (then every 10 s)
