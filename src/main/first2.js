@@ -247,7 +247,7 @@
   };
   F.settle = function (g) {
     try {
-      if (!g || !g.meta || g.meta.player || g.meta.guest || g.meta.f2open || !g.world || !g.player) return null;
+      if (!g || !g.meta || !g.f2new || g.meta.guest || g.meta.f2open || !g.world || !g.player) return null;   // (f2new: no player record when the world opened — an autosave writes one within seconds)
       g.meta.f2open = 1;
       const p = g.player, r = F.openGround(F.solidOf(g.world), p.pos, p.yaw);
       if (!r) return null;
@@ -264,9 +264,9 @@
   };
 
   // 3b · W on a slow machine (critic_ux at ~0.2 fps: a 1-s W met no frame, and a frame walked 0.1 s): the player keeps
-  // the wall clock — a slow frame walks up to CATCH_MAX s in steps of ≤ STEP (the extra steps read no look, no press, no
+  // the wall clock — a slow frame walks up to CATCH_MAX (1) s in steps of ≤ STEP (the extra steps read no look, no press, no
   // click) — and a movement key tapped and let go between two frames counts for the next one. A fast frame: no step.
-  F.CATCH_MAX = 0.5; F.STEP = 0.1; F.CATCH_GAP = 10;
+  F.CATCH_MAX = 1; F.STEP = 0.1; F.CATCH_GAP = 10;
   F.MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space'];
   F.catchSteps = function (gap, dt) {
     const out = []; if (!(gap > dt + 0.02) || gap > F.CATCH_GAP) return out;
@@ -301,7 +301,7 @@
   if (G && G.prototype.playFrame && !G.prototype.playFrame.__f2) {
     const op = G.prototype.playFrame;
     G.prototype.playFrame = function (dt) {
-      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); this.f2t = 0; this.f2wait = 3; }
+      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); this.f2t = 0; this.f2wait = 3; this.f2new = !!this.meta && !this.meta.player; }
       if (this.f2wait > 0 && !this.arrival && !(this.wow && this.wow.active) && !(this.ui && this.ui.screen) && --this.f2wait === 0) F.settle(this);
       { const n = performance.now(); this.f2gap = this.f2t && !(this.ui && this.ui.screen) ? (n - this.f2t) / 1000 : 0; this.f2t = n; }
       const r = op.apply(this, arguments);
@@ -466,7 +466,7 @@
   };
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
-    const B = VR.Binds && VR.Binds.current, isJ = B && B.codesFor ? B.codesFor('KeyJ').indexOf(e.code) >= 0 : e.code === 'KeyJ', isO = e.code === 'KeyO';
+    const B = VR.Binds && VR.Binds.current, isJ = B && B.codesFor ? (B.codesFor('KeyJ') || ['KeyJ']).indexOf(e.code) >= 0 : e.code === 'KeyJ', isO = false;   // (O: since u-stars2 the star map answers it in every world)
     if (!isJ && !isO) return;
     const t = e.target; if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     const g = game(); if (!g || g.state !== 'play' || (g.ui && g.ui.screen)) return;

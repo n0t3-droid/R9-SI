@@ -74,6 +74,13 @@ console.log('b · open ground');
   check(!!r3 && Number.isFinite(r3.yaw) && Math.abs(Math.abs(r3.yaw) - Math.PI / 2) < 1e-9 && F.wayLen(cliff, r3.pos[0], r3.pos[2], r3.pos[1], r3.yaw) >= F.WAY, 'a cliff ahead: turned 90° along the ridge (' + (r3 ? JSON.stringify(r3) : 'none') + ')');
 }
 
+  // settle on a game: a new world (no player record when it opened) still moves after an autosave wrote one
+  { const R = V.R, st = R.byName.stone.defaultState, wl = R.byName.stone_brick_wall.defaultState;
+    const w = { getBlock: (x, y, z) => (y <= 63 ? st : (y === 64 && (z === -6 && Math.abs(x) <= 3 || Math.abs(x) === 3 && z <= 0 && z >= -6)) ? wl : 0) };
+    const pl = { pos: [0.5, 64, 0.5], yaw: 0, teleport(x, y, z) { this.pos = [x, y, z]; } };
+    const g = { meta: { player: { pos: [0, 0, 0] } }, f2new: true, world: w, player: pl };
+    const r = F.settle(g), g2 = { meta: { player: {} }, f2new: false, world: w, player: { pos: [0.5, 64, 0.5], yaw: 0, teleport() { throw 1; } } };
+    check(!!r && pl.pos[0] !== 0.5 && F.settle(g2) === null, 'settle: a new world moves even with an autosaved player record (' + JSON.stringify(pl.pos) + '); a reopened world stays'); }
 console.log('c · the Abenteuer start');
 {
   const known = (id) => !!((V.R && V.R.byName && V.R.byName[id]) || (V.ITEMS && V.ITEMS[id]));
@@ -114,11 +121,11 @@ console.log('e · ⚙ Einfach, the texts');
   check(missing === 0, 'every f-first2 text in both tables (' + F.KEYS.length + ')');
 }
 
-console.log('f · W on a slow machine: the player keeps the wall clock (≤ 0.5 s a frame) and a tap between two frames counts');
+console.log('f · W on a slow machine: the player keeps the wall clock (≤ 1 s a frame) and a tap between two frames counts');
 {
   check(F.catchSteps && F.catchSteps(0.016, 0.016).length === 0 && F.catchSteps(0.1, 0.1).length === 0, 'a fast frame: no extra step (Very Low unchanged)');
   const s6 = F.catchSteps(6, 0.1), sum = s6.reduce((a, b) => a + b, 0.1);
-  check(s6.length === 4 && Math.abs(sum - F.CATCH_MAX) < 1e-9 && s6.every((x) => x <= 0.1 + 1e-9), 'a 6-s frame: ' + s6.length + ' extra steps, ' + sum.toFixed(2) + ' s of walking (before 0.10)');
+  check(s6.length === 9 && Math.abs(sum - F.CATCH_MAX) < 1e-9 && s6.every((x) => x <= 0.1 + 1e-9), 'a 6-s frame: ' + s6.length + ' extra steps, ' + sum.toFixed(2) + ' s of walking (before 0.10)');
   check(F.catchSteps(30, 0.1).length === 0, 'a stall over ' + F.CATCH_GAP + ' s (a pause, a load) is not walked');
   // a fake player and input: the extra steps see no mouse look, no click, no key press twice
   const inp = { keys: new Set(), pressed: new Set(['KeyW']), doubleTap: new Set(), mouse: { dx: 30, dy: 4, wheel: 0, clicked: [true, false, false] } };

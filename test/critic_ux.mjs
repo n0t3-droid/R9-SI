@@ -143,9 +143,12 @@ for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1
   const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => '');
   if (st && st !== 'hud' && st !== 'play') { await page.keyboard.press('Escape'); await wait(800); }
   await untilClosed();
-  const toasts0 = await ev(() => document.querySelectorAll('#toasts .toast').length).catch(() => 0);
+  // (f-first2: a toast lives ~4.7 s and a SwiftShader screenshot can take longer — every toast added since the key is counted)
+  await ev(() => { window.__toastN = 0; window.__toastT = ''; const box = document.getElementById('toasts'); if (window.__toastMO) window.__toastMO.disconnect(); if (box) { window.__toastMO = new MutationObserver((ms) => { for (const m of ms) for (const nd of m.addedNodes) { window.__toastN++; window.__toastT = (nd.textContent || '').trim().slice(0, 60); } }); window.__toastMO.observe(box, { childList: true }); } }).catch(() => {});
+  const toasts0 = 0;
   await page.keyboard.press(k); await wait(1500); await shot(n);
-  if (k === 'KeyJ' || k === 'KeyO') { const a = await ev((t0) => ({ screen: VR.game.ui.screen || '', toast: document.querySelectorAll('#toasts .toast').length > t0, text: [...document.querySelectorAll('#toasts .toast')].map(e => e.textContent.trim().slice(0, 60)).slice(-1)[0] || '' }), toasts0).catch(() => null); OUT['key_' + k] = a;
+  if (k === 'KeyO') { const t = Date.now(); while (Date.now() - t < 60000 && !(await ev(() => !!(VR.StarMap && VR.StarMap.isOpen()) || !!VR.game.ui.screen).catch(() => true))) await wait(300); }   // (O is read in the next frame: the star map, u-stars2)
+  if (k === 'KeyJ' || k === 'KeyO') { const a = await ev(() => ({ screen: VR.game.ui.screen || (VR.StarMap && VR.StarMap.isOpen() ? 'starmap' : ''), toast: window.__toastN > 0, text: window.__toastT || '' })).catch(() => null); OUT['key_' + k] = a;
     check(a && (a.screen || a.toast), k + ' answers: ' + JSON.stringify(a)); }
   await page.keyboard.press('Escape'); await wait(1000);
 }
