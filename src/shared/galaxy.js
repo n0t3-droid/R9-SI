@@ -126,6 +126,8 @@
     }
     return 'S-' + Math.floor(r() * 1e6);
   }
+  // the four nebulae's names, hand-picked and looked up (test/names.js: no game, book or brand of that name found)
+  const NEB_NAMES = [{ de: 'Rosenschleier', en: 'Rose Veil' }, { de: 'Glutwiege', en: 'Ember Cradle' }, { de: 'Türkisherz', en: 'Turquoise Heart' }, { de: 'Lichtwiege', en: 'Light Cradle' }];
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
 
   // ---------------------------------------------------------------- the neighbourhood
@@ -166,7 +168,7 @@
     for (let k = 0; k < 400 && nebs.length < 4; k++) {
       const s = list[1 + Math.floor(nr() * (list.length - 1))], dh = Math.hypot(s.p[0], s.p[1], s.p[2]);
       if (dh < 45 || nebs.some(n => Math.hypot(n.c[0] - s.p[0], n.c[1] - s.p[1], n.c[2] - s.p[2]) < 90)) continue;
-      nebs.push({ id: nebs.length, c: s.p.slice(), seed: hash(seed, k, 0x4e3b, 7), r: 0 });
+      nebs.push({ id: nebs.length, c: s.p.slice(), seed: hash(seed, k, 0x4e3b, 7), r: 0, name: NEB_NAMES[nebs.length] });
     }
     const want = Math.round(list.length * 0.04), ds = [];
     for (const s of list) { if (s.home) continue; let best = 1e9, bi = -1; for (const n of nebs) { const d = Math.hypot(n.c[0] - s.p[0], n.c[1] - s.p[1], n.c[2] - s.p[2]); if (d < best) { best = d; bi = n.id; } } ds.push([best, bi, s]); }
@@ -289,7 +291,7 @@
   if (VR.DimReg) VR.DimReg.resolve = resolveDim;
 
   const Galaxy = VR.Galaxy = {
-    AU, LY_AU, DISC_R, DISC_H, COUNT: 1508, RANGE: 30, KINDS, BLOCK,
+    AU, LY_AU, DISC_R, DISC_H, COUNT: 1508, RANGE: 30, KINDS, BLOCK, NEB_NAMES,
     build, systemsNear, system, showpiece, dist, colorOf, skyTint, lin, mainSeq, dimOf, resolveDim, blocked, nameOf, rng, hash,
     cur: null,
   };

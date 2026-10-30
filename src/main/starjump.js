@@ -9,7 +9,7 @@
 //     ionised rims, newborn stars; `nebulaTrue` shows how faint it really is), the star(s) at their true colour and size,
 //     the planets and moons as analytic spheres lit by one or two stars, each casting a shadow from each (binaries: two
 //     shadows), red-dwarf flares. Arrival in orbit round the most interesting body; V lands (VR.Travel to its dim: an
-//     existing world kind under this star's light), Y the star map, 🏠 Heimkehr jumps home from anywhere.
+//     existing world kind under this star's light), O the star map, 🏠 Heimkehr jumps home from anywhere.
 //   · the landed world: VR.Universe.localSky / VR.BodySky.compute wrapped for the x.* dims — the kind's own sky with
 //     this star's colour, size and the R§7 sky tint, no Helia family overhead.
 // Cost: nothing unless a jump or another system is on screen; then one full-screen pass (Very Low: one star grid, the
@@ -620,7 +620,7 @@ void main() {
       else if (!ui.screen) {
         if (i.hit('KeyT') || i.hit('Enter')) ui.openChat(''); else if (i.hit('Slash')) ui.openChat('/');
         if (i.hit('F2') && g.screenshot) g.screenshot();
-        if (i.hit('KeyY') && VR.StarMap) VR.StarMap.open(g);
+        if (i.hit('KeyO') && VR.StarMap) VR.StarMap.open(g);
         if (i.hit('KeyV') && !S.J) SJ.land(g);
         if (i.hit('Tab') && !S.J) SJ.nextFocus(g, 1);
         if (i.hit('KeyH') && !S.J) SJ.jump(g, 0);

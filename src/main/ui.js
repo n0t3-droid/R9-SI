@@ -380,6 +380,7 @@
       this.show('pause');
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
       if (VR.LiveLoop) VR.LiveLoop.pauseMenu(this);   // ✏️ Aussehen ändern — what the crosshair pointed at (B1)
+      if (VR.StarMap) VR.StarMap.pauseMenu(this);   // u-stars: 🌌 Sternkarte (starmap.js)
       if (VR.NewLife) VR.NewLife.pauseMenu(this);   // u-home: 🏠 Zuhause (<Welt>) · 🌍 Herzwelt when you live elsewhere; 📍 „Hier wohne ich" off the home's world
       this.buildZenPanel();
       this.buildMpPanel();
