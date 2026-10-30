@@ -1124,7 +1124,7 @@
       const au = g.audio, t = au.ctx.currentTime;
       const base = a.kid ? 620 : a.elder ? 260 : 360 + (a.p.seed % 7) * 30;
       const n = 2 + (a.p.seed % 3);
-      for (let k = 0; k < n; k++) au.tone(base * (1 + ((a.p.seed >> k) & 3) * 0.12), 0.035, 0.07, 'triangle', false, t + k * 0.075);
+      for (let k = 0; k < n; k++) au.tone(base * (1 + ((a.p.seed >> k) & 3) * 0.12), 0.035, 0.07, 'triangle', false, t + k * 0.075, au.vox);   // (e-music: the Stimmen bus)
     }
 
     // -------------------------------------------------- talk panel

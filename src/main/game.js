@@ -64,7 +64,7 @@
   // block on its own like the original game)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'seamless', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, volVoice: 0.8, calmMusic: false, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'seamless', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
   // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
   const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
   const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
@@ -211,7 +211,7 @@
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
-      if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
+      if (this.audio) { this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient, voice: S.volVoice === undefined ? 0.8 : S.volVoice, calm: !!S.calmMusic }); if (this.audio.setLowEnd) this.audio.setLowEnd(S.preset === 'potato' || (S.preset === 'custom' && !S.shadows && !S.particles)); }   // (e-music: Stimmen, Ruhige Musik, Very Low)
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
@@ -367,6 +367,7 @@
       }, false);
       this.input = new VR.Input(this.canvas);
       this.audio = new VR.Audio();
+      if (this.audio.attachUi && typeof document !== 'undefined') this.audio.attachUi(document);   // e-music: one click voice for every button
       this.env = new VR.Env();
       this.ambience = VR.Ambience ? new VR.Ambience(this.audio) : null;
       this.env.wx.onThunder = (d) => { if (this.ambience) this.ambience.thunder(d); };

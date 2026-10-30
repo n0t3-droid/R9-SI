@@ -263,7 +263,8 @@
     if (trip && (trip.via === 'home' || trip.via === 'herz' || trip.via === 'spawn' || trip.via === 'respawn')) { try { Travel.faceHome(g, trip); } catch (e) { console.warn('travel: facing', e); } }   // f-arrival (R50-06)
     trip.tPlay = now();
     Travel.last = { from: trip.from, to: trip.to, via: trip.via, veilMs: Math.round(trip.tSwitch - trip.t0), loadMs: Math.round(trip.tPlay - trip.tSwitch), totalMs: Math.round(trip.tPlay - trip.t0), face: trip.face || null };   // (f-arrival: face — Heimkehr's view out)
-    if (VR.NewLife) VR.NewLife.arrived(g, trip);   // u-home: the far lane back, the trip's phases, Heimkehr's ships to the home pad
+    if (VR.NewLife) VR.NewLife.arrived(g, trip);
+    if (g.audio && g.audio.cue) g.audio.cue('wonder');   // e-music: a new place, the Staunen sting   // u-home: the far lane back, the trip's phases, Heimkehr's ships to the home pad
     if (VR.Cruise && VR.Cruise.arrived) VR.Cruise.arrived(g, trip);   // u-cruise: a trip by ship arrives in the air over the site
     S.trip = null; S.armed = false;   // (arrived in a gate: it waits until you have stepped out)
     veilHide();
