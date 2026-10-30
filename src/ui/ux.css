@@ -62,6 +62,8 @@ html:not(.pro) #loading .ldetail { visibility: hidden; }
 /* ---- the start screen: one row of quiet secondary buttons under the tiles ---- */
 #title .tile.play { border-color: var(--ux-acc); box-shadow: 0 0 0 1px rgba(58, 240, 255, 0.35), 0 16px 50px rgba(0, 0, 0, 0.45); }
 #title .btn.kids { margin: 2px auto 0; min-width: 0; padding: 0 16px; font: 600 var(--st-fs) var(--ux-font); background: var(--ux-panel); border: 1px solid rgba(92, 240, 138, 0.55); border-radius: var(--ux-r2); }
+#title .sub .kids { border-color: rgba(92, 240, 138, 0.6); }
+#title .sub { flex-wrap: wrap; justify-content: center; }
 #title .studionote .btn.tiny { background: var(--ux-panel); border: 1px solid var(--ux-line-strong); }
 #title .foot .credit { color: var(--ux-ink-2); }
 

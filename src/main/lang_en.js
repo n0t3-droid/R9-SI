@@ -2699,9 +2699,9 @@
     'story.ctx.touch': 'Touch',
     // ---- a-story2 end
     // ---- e-ux
-    'ux.k.up': "up",
-    'ux.k.down': "down",
-    'ux.k.fly': "fly",
+    'ux.k.up': "Up",
+    'ux.k.down': "Down",
+    'ux.k.fly': "Fly",
     'ux.k.build': "Build",
     'ux.k.inv': "Inventory",
     'ux.k.journal': "Journal",

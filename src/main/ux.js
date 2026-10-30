@@ -38,8 +38,8 @@
     l = l === 'en' ? 'en' : 'de';
     if (!s || s.menu || s.touch || s.mode !== 'foot') return [];
     const out = [], add = (id, name, k, de, en, keyText) => { if (out.length < X.STRIP_MAX) out.push({ id, key: keyText || keyOf(name, l, binds), text: W(k, de, en, l) }); };
-    if (s.flying) { add('up', 'Space', 'ux.k.up', 'hoch', 'up'); add('down', 'ShiftLeft', 'ux.k.down', 'runter', 'down'); }
-    else if (s.canFly) add('fly', 'Space', 'ux.k.fly', 'fliegen', 'fly', keyOf('Space', l, binds) + ' 2×');
+    if (s.flying) { add('up', 'Space', 'ux.k.up', 'Hoch', 'Up'); add('down', 'ShiftLeft', 'ux.k.down', 'Runter', 'Down'); }
+    else if (s.canFly) add('fly', 'Space', 'ux.k.fly', 'Fliegen', 'Fly', keyOf('Space', l, binds) + ' 2×');
     add('inv', 'KeyE', s.creative ? 'ux.k.build' : 'ux.k.inv', s.creative ? 'Bauen' : 'Inventar', s.creative ? 'Build' : 'Inventory');
     if (s.quests) add('journal', 'KeyJ', 'ux.k.journal', 'Tagebuch', 'Journal');
     add('map', 'KeyM', 'ux.k.map', 'Karte', 'Map');
@@ -185,6 +185,19 @@
 
   // ---- the settings: a search over every group and ⚙ Empfohlen
   const UI = VR.UI;
+  // ---- the start screen: 🧸 Kindersicher joins „Andere Welt · ＋ Neue Welt" — one quiet row under the tiles
+  if (UI && UI.prototype.build && !UI.prototype.build.__ux) {
+    const ob = UI.prototype.build;
+    UI.prototype.build = function () {
+      const r = ob.apply(this, arguments);
+      try {
+        const k = document.querySelector('#title .kids'), sub = document.querySelector('#title .sub');
+        if (k && sub && k.parentNode !== sub) { k.classList.remove('btn'); k.classList.add('lnk'); sub.insertBefore(k, sub.firstChild); const d = document.createElement('span'); d.className = 'dot'; d.setAttribute('aria-hidden', 'true'); d.textContent = '·'; k.after(d); }
+      } catch (e) { /* the start screen as it was */ }
+      return r;
+    };
+    UI.prototype.build.__ux = true;
+  }
   X.settingsQuery = '';
   if (UI && UI.prototype.showSettings && !UI.prototype.showSettings.__ux) {
     const os = UI.prototype.showSettings;

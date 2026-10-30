@@ -80,7 +80,7 @@ async function tour(label, w, h, settings, full, card) {
   await wait(4000);
   await shot('start'); R.startText = await smallText(page);
   if (TAG === 'after') {
-    const tk = await ev(() => { const s = getComputedStyle(document.documentElement); return ['--ux-acc', '--ux-panel', '--ux-r', '--ux-s3', '--ux-fs', '--ux-scale'].map(k => s.getPropertyValue(k).trim()); });
+    const tk = await ev(() => { const s = getComputedStyle(document.documentElement); return ['--ux-acc', '--ux-panel', '--ux-r2', '--ux-s3', '--ux-fs', '--ux-scale'].map(k => s.getPropertyValue(k).trim()); });
     check(tk.every(v => v), 'the design tokens are on :root (' + tk.join(' · ') + ')');
   }
   // ＋ Neue Welt: the create form (the three cards of „Wie willst du spielen?")

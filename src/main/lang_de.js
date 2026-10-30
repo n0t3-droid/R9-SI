@@ -2699,9 +2699,9 @@
     'story.ctx.touch': 'Berühren',
     // ---- a-story2 end
     // ---- e-ux
-    'ux.k.up': "hoch",
-    'ux.k.down': "runter",
-    'ux.k.fly': "fliegen",
+    'ux.k.up': "Hoch",
+    'ux.k.down': "Runter",
+    'ux.k.fly': "Fliegen",
     'ux.k.build': "Bauen",
     'ux.k.inv': "Inventar",
     'ux.k.journal': "Tagebuch",
