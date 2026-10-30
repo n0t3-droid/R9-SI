@@ -238,7 +238,7 @@
       shard(-3, 24, 4, -0.2, 0.5, 6, 1); shard(2, 22, 4, 0.25, 0.5, 6, 2);
       // the back: a mantle of ice plates, wider toward the hem
       for (let y = 4; y <= 29; y++) { const hw = Math.round(6 + (29 - y) * 0.1); box(-hw, y, 4, hw - 1, y, 5, (x, yy, z) => ((x + y) % 5 === 0 ? ICE[4] : facet(x, y, z, side(x) + 1))); }
-      box(-3, 33, -4, 2, 37, -4, (x, y, z) => (y === 37 || x === -3 || x === 2 ? facet(x, y, z, 3) : ICE[5]));
+      box(-3, 33, -4, 2, 37, -4, (x, y, z) => (y === 37 || x === -3 || x === 2 ? facet(x, y, z, 3) : 0x10284a));   // (the face: dark, the eye in it)
       box(-1, 40, -2, 0, 41, 4, (x, y, z) => facet(x, y, z, 1)); box(-1, 42, -1, 0, 42, 2, ICE[0]); box(-1, 39, 4, 0, 39, 5, ICE[2]);
       box(-5, 34, -2, -5, 37, 1, ICE[1]); box(4, 34, -2, 4, 37, 1, ICE[3]);   // (the helm's cheek plates)
       const optic = new Grid(4, 4, 1, 2, 2, 0); optic.ell(2, 2, 0.5, 2, 2, 0.8, LENS, { emis: 1 });

@@ -331,7 +331,7 @@
         }
         case 'eye': {
           const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 6.2 + rt[0] * 1.0, sc.surf + 1.9 - 0.4 * smooth(u), E2[2] - f[2] * 6.2 + rt[2] * 1.0];
-          return lookAt(C, [E2[0], E2[1] - 0.6, E2[2]], 32, base);   // (the eye on the upper third, its face and shoulders under it)
+          return lookAt(C, [E2[0], E2[1] - 0.7, E2[2]], 36, base);   // (the eye on the upper third, its face and shoulders under it)
         }
         default: return null;
       }
@@ -631,7 +631,9 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     const H = (md.def.h || 2.7) * 16 * k, wake = P.wardenWake(sc);
     MB = wardenM(W, cam, yaw, k * 1.06, -H * 0.03); part(md.parts.whole, MB, [0.7 + 0.5 * wake, 1.6 + 0.6 * wake, 2.0 + 0.5 * wake], 0.42);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
-    MB = wardenM(W, cam, yaw, k); part(md.parts.whole, MB, [0.5, 0.7, 0.95], 1);   // (a deeper blue: it stands in the ice's depth)
+    gl.uniform1f(p.u.u_sky, 0.62); gl.uniform3f(p.u.u_blockLight, 0.12, 0.2, 0.3);   // (less light down there: its facets read, its face stays dark)
+    MB = wardenM(W, cam, yaw, k); part(md.parts.whole, MB, [0.48, 0.66, 0.95], 1);   // (a deeper blue: it stands in the ice's depth)
+    gl.uniform1f(p.u.u_sky, 1); gl.uniform3f(p.u.u_blockLight, 0.35, 0.5, 0.6);
     gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
     // 4 · the ice over it: the veil and the cracks (they lie over the figure — it is under the ice)
     part(mw.parts.veil, flat(WIN_S), [1, 1, 1], 0.12);
@@ -641,8 +643,8 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     if (!sc.eyePos) sc.eyePos = [W[0] + x * Math.cos(a) + z * Math.sin(a), W[1] + y, W[2] - x * Math.sin(a) + z * Math.cos(a)];
     const pulse = 0.5 + 0.5 * Math.sin(sc.t * 2.2), lv = 0.22 + wake * (0.75 + 0.25 * pulse), opt = md.parts.optic;
     const eyeM = (sz) => { const M = wardenM(W, cam, yaw, k); m4.translate(M, M, L[0], L[1], L[2] - 0.2); m4.scale(M, M, sz, sz, 1); return M; };
-    part(opt, eyeM(1), [0.45 * lv + 0.1, 1.9 * lv + 0.15, 2.3 * lv + 0.2], 1);
-    if (wake > 0.05) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE); part(opt, eyeM(2.6), [0.3, 1.2, 1.5], 0.35 * wake * (0.7 + 0.3 * pulse)); part(opt, eyeM(4.5), [0.2, 0.8, 1.0], 0.16 * wake); }
+    part(opt, eyeM(1), [0.2 * lv + 0.05, 1.25 * lv + 0.1, 1.7 * lv + 0.14], 1);   // (a saturated cyan, not white)
+    if (wake > 0.05) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE); part(opt, eyeM(2.2), [0.1, 0.9, 1.3], 0.45 * wake * (0.7 + 0.3 * pulse)); part(opt, eyeM(4.2), [0.05, 0.6, 0.9], 0.2 * wake); }
     gl.depthRange(0, 1); gl.uniform1f(p.u.u_alpha, 1); gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_noFog, 0);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
     gl.bindVertexArray(null);
