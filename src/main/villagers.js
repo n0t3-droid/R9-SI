@@ -329,12 +329,19 @@
   // Node = feet cell. Walkable when the two cells above the ground are free (doors & gates count as free)
   // and the cell below can be stood on. Moves: 8-way (no corner cutting), step up 1, drop up to 3.
   const T = () => R.T;
-  let passC = null, standC = null;
-  function caches() {
-    if (passC) return;
-    const n = R.T.type.length;
-    passC = new Uint8Array(n); standC = new Uint8Array(n);
-    for (let s = 0; s < n; s++) {
+  let passC = null, standC = null, cachedN = 0;
+  // e-engine: the tables of every block state (30 000: a collision shape each) took 0.25–3 s at the first path of a
+  // session — a frame of play. They are built a slice at a time while the world loads (V.warm, game.loadingFrame); a path
+  // asked for before they are done finishes them at once, as before (not in play: a state may build a model, 40–90 ms —
+  // the engine bench's Balanced flight counted more hitches with slices in play)
+  function caches(budgetMs) {
+    if (passC && cachedN >= passC.length) return true;
+    const n = passC ? passC.length : R.T.type.length;
+    if (!passC) { passC = new Uint8Array(n); standC = new Uint8Array(n); cachedN = 0; }
+    const t0 = budgetMs !== undefined ? performance.now() : 0;
+    for (; cachedN < n; cachedN++) {
+      if (budgetMs !== undefined && performance.now() - t0 >= budgetMs) return false;   // (every state: one may build a model, up to 90 ms)
+      const s = cachedN;
       const fl = R.T.flags[s], t = R.types[R.T.type[s]];
       const kind = t && t.o.kind;
       // pass: 1 free, 2 door/gate (openable), 3 water (slow), 0 blocked
@@ -351,7 +358,10 @@
         standC[s] = b.length && top <= 1.01 && top > 0.3 ? 1 : 0;
       } else standC[s] = 0;
     }
+    return true;
   }
+  V.warm = (budgetMs) => caches(budgetMs);
+  V.warmed = () => !!passC && cachedN >= passC.length;
   class Heap {
     constructor() { this.k = []; this.v = []; }
     push(key, pri) { const k = this.k, v = this.v; k.push(key); v.push(pri); let i = k.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (v[p] <= v[i]) break; [k[p], k[i]] = [k[i], k[p]]; [v[p], v[i]] = [v[i], v[p]]; i = p; } }

@@ -139,11 +139,11 @@
       for (const t of [this.texAlbedo, this.texMaterial].concat(this.texHiN ? [this.texHiAlb, this.texHiMat] : [])) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
     }
     // t-material · hero textures: one array of the 64 × 64 set (or the one-texel stand-in), filtered as the block textures
-    texHiArray(tex, which, srgb) {
+    texHiArray(tex, which, srgb, empty) {
       const gl = this.gl, t = gl.createTexture(), lv = tex[which];
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
       gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
-      for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
+      if (!empty) for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, tex.levels > 1 ? gl.NEAREST_MIPMAP_LINEAR : gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -151,10 +151,43 @@
       return t;
     }
     // the 64 × 64 set from the worker or the cache: its arrays replace the stand-in, the table names each hero's layer
+    texHiOk(tex) { const R = VR.R; return !!(this.gl && tex && tex.type === 'texhi' && VR.TexHi && R && R.texNames && R.texNames.length === this.layers && this.texHiMap); }
     uploadTexHi(tex) {
+      if (!this.texHiOk(tex)) return false;
+      this.texHiTok = (this.texHiTok || 0) + 1;   // (e-engine: a queued set still on its way is dropped)
+      return this.applyTexHi(tex, this.texHiArray(tex, 'albedo', true), this.texHiArray(tex, 'material', false));
+    }
+    // e-engine: the set through the world's upload queue in parts (as queueTextures: ~9 MB in one call held the page —
+    // seconds behind a busy GPU process here, a hitch on a GPU that shares the system memory), swapped in when complete
+    queueTexHi(tex, Q, done) {
+      if (!this.texHiOk(tex)) return false;
+      const gl = this.gl, R = this, tok = this.texHiTok = (this.texHiTok || 0) + 1, L = tex.layers, N = tex.size, lvls = [tex.albedo, tex.material];
+      let made = null, a = 0, lv = 0, z = 0, bytes = 0;
+      for (let l = 0; l < tex.levels; l++) bytes += 2 * (N >> l) * (N >> l) * 4 * L;
+      const step = (max) => {
+        if (!made) made = [R.texHiArray(tex, 'albedo', true, true), R.texHiArray(tex, 'material', false, true)];
+        let wrote = 0;
+        while (a < 2) {
+          const n = N >> lv, per = n * n * 4;
+          let k = Math.min(L - z, Math.floor((max - wrote) / per));
+          if (k <= 0) { if (wrote || max < per * 0.25) break; k = 1; }   // (one layer at least)
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, made[a]);
+          gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, lv, 0, 0, z, n, n, k, gl.RGBA, gl.UNSIGNED_BYTE, lvls[a][lv], z * per);
+          z += k; wrote += k * per;
+          if (z >= L) { z = 0; lv++; if (lv >= tex.levels) { lv = 0; a++; } }
+        }
+        return wrote;
+      };
+      const commit = () => { const m = made; made = null; if (R.applyTexHi(tex, m[0], m[1]) && done) done(); };
+      Q.push({ prio: -1, x: 0, z: 0, bytes, alive: () => R.texHiTok === tok, step, commit,
+        abort: () => {
+          if (R.texHiTok === tok) { while (a < 2) step(Infinity); commit(); return; }   // (not replaced: finished at once)
+          if (made) { gl.deleteTexture(made[0]); gl.deleteTexture(made[1]); made = null; }
+        } });
+      return true;
+    }
+    applyTexHi(tex, alb, mat) {
       const gl = this.gl, R = VR.R, HI = VR.TexHi;
-      if (!gl || !tex || tex.type !== 'texhi' || !HI || !R || !R.texNames || R.texNames.length !== this.layers || !this.texHiMap) return false;
-      const alb = this.texHiArray(tex, 'albedo', true), mat = this.texHiArray(tex, 'material', false);
       gl.deleteTexture(this.texHiAlb); gl.deleteTexture(this.texHiMat);
       this.texHiAlb = alb; this.texHiMat = mat; this.texHiN = tex.layers;
       const map = new Uint8Array((this.layers + 3) & ~3); map.set(HI.map(R.texNames, tex.names));
@@ -163,13 +196,19 @@
       if (this.anisoLevel) this.setAniso(this.anisoLevel);
       return true;
     }
+    // e-engine: the batch is compiled without waiting for each program (GL.deferred: its status at its first use)
     buildPrograms() {
+      const G = VR.GL, was = G.deferred;
+      G.deferred = true;
+      try { this.buildProgramsNow(); } finally { G.deferred = was; }
+    }
+    buildProgramsNow() {
       if (VR.Light2) { VR.Light2.use(this.q); this.l2Key = VR.Light2.key ? VR.Light2.key(this.q) : ''; if (VR.GL && !VR.GL.defineHook) VR.GL.defineHook = VR.Light2.hook; }   // (t-light2: its switches are defines, light2.js)
       if (VR.Sky3) { VR.Sky3.use(this.q); this.s3Key = VR.Sky3.key(this.q); }   // (t-sky3: the sky's switches are defines too, sky3.js — its hook follows the light's)
       const md = this.multi ? ['MULTIDRAW'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs) · MOTION (t-motion): the wind in everything (wind.js; off on Very Low) · CLOUDSH (t-motion): the clouds' shadows (Balanced+)
       const P = this.P = {};
-      const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
+      const bindUBO = (p) => GL.onReady(p, (q) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(q.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(q.p, bi, 0); } });   // (e-engine: when the program is ready)
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
       const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)
@@ -212,8 +251,20 @@
       if (P.cutZ) return P.cutZ;
       const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // (t-motion: the colour pass's MOTION too — the same displaced fragments)
       const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE', ...(this.q.lite ? [] : ['SOFTFADE'])]);   // (f-stipple2: the colour pass's fade, growth and cut)
-      if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
+      GL.onReady(p, (q) => { if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(q.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(q.p, bi, 0); } });   // (e-engine: when ready)
       return (P.cutZ = p);
+    }
+    // e-engine: the programs the first frames of play compile on their first use (the depth prepass; the smooth props' and
+    // furniture's, never on Very Low's lite look) asked for while the world loads — compiled side by side with the loading
+    // (GL.deferred: checked at their first use, where they were made before), so the first frame does not wait for them
+    warmPrograms() {
+      if (!this.P || this.warmedP === this.P) return;
+      this.warmedP = this.P;
+      const was = GL.deferred; GL.deferred = true;
+      try {
+        if (this.q.zPre) this.zProgram();
+        if (!this.q.lite) { this.propProgram(false); this.furnProgram(false); if (this.q.shadows) { this.propProgram(true); this.furnProgram(true); } }
+      } finally { GL.deferred = was; }
     }
     // F10 · zPre: the cut-out layer's depth first (leaves, grass, flowers, fences: alpha-tested, so a GPU cannot reject their
     // hidden fragments before it shades them) with the colour writes off; render() then draws the layer with depth writes off
@@ -1745,13 +1796,17 @@
         // cumulus: every run of cloud cells is a flat base slab; where the cloud noise peaks, narrower and
         // taller boxes stack on top of it (instance w = yOffset·8 + thickness, in cells of 4 blocks)
         const push = (x0, z, len, yo, th) => inst.push(x0, z, len, yo * 8 + Math.min(7.9, th));
+        // e-engine: the cells' noise kept by their place (256 × 256, wider than the grid): a step of the camera by one cell
+        // computes one new row, not the whole grid again (it was a 20–27 ms frame every ~0.6 s of flight here)
+        const CV = this.cloudV || (this.cloudV = { v: new Float64Array(65536), gx: new Int32Array(65536).fill(-2147483648), gz: new Int32Array(65536) });
         for (let z = -R; z <= R; z++) {
           let run = 0, runStart = 0, ex = 0;
           for (let x = -R; x <= R + 1; x++) {
             let on = false, v = 0;
             if (x <= R && x * x + z * z <= R * R) {
-              const gx = ocx + x, gz = ocz + z;
-              v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5;
+              const gx = ocx + x, gz = ocz + z, ci = ((gz & 255) << 8) | (gx & 255);
+              if (CV.gx[ci] === gx && CV.gz[ci] === gz) v = CV.v[ci];
+              else { v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5; CV.v[ci] = v; CV.gx[ci] = gx; CV.gz[ci] = gz; }
               on = v > thr;
             }
             if (on) { if (!run) { runStart = x; ex = 0; } run++; ex = Math.max(ex, v - thr); }
@@ -2111,6 +2166,7 @@
     render(F) {
       const gl = this.gl, E = F.env, world = F.world;
       const t0 = performance.now();
+      if (GL.pending && GL.pending.size) GL.settle();   // (e-engine: the deferred programs before the first draw, not between draws)
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;

@@ -87,6 +87,7 @@
       if (cb) { this.cb.delete(m.id); try { cb(m); } catch (err) { console.error(err); } }
       if (m.type === 'error') console.error('Worker job failed:', m.msg);
       this.pump();
+      if (this.onAnswer) this.onAnswer(m);   // (e-engine: game.loadPump)
     }
     // job: {msg, transfer, cb, prio}; msg.lane = 1 puts it on the far lane
     submit(msg, transfer, cb, prio) { (msg.lane === 1 ? this.queueFar : this.queue).push({ msg, transfer, cb, prio: prio || 0 }); this.queueDirty = true; }
@@ -294,14 +295,19 @@
     // The loading centre runs ahead of a moving player (up to half the radius, in the direction of travel), so a
     // flight finds its terrain ready in front and lets go of it behind; the priority of a request is its distance,
     // discounted for columns ahead. Requests that drift out of range are cancelled before a worker touches them.
-    update(px, py, pz, now) {
+    // e-engine · off: a call between the frames (game.loadPump: the loading screen's streaming fed as the workers answer,
+    // not only once a frame) — the arrivals, the requests and the mesh jobs; the uploads, the fades and the frame clock
+    // stay with the frames
+    update(px, py, pz, now, off) {
       this.frame++;
+      if (!off) {
       // F10: the interval since the last update is the frame the last uploads shared: the scheduler's frame factor, its
       // adaptive scale and the hitch meter learn from it
       if (this.lastUpd !== undefined && now > this.lastUpd) this.uploadQ.frame(now - this.lastUpd, now);
       this.lastUpd = now;
       this.stepFades(now);
       this.drainUploads(px, pz, now);
+      }
       const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       this.center = [pcx, pcz];
       const rd = this.renderDist, loadR = rd + 1;
@@ -324,7 +330,7 @@
       if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
-      if (this.frame & 1) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
+      if (off || (this.frame & 1)) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
         const d2 = dx * dx + dz * dz;
         if (d2 > (loadR + 0.5) * (loadR + 0.5)) continue;
         const cx = lcx + dx, cz = lcz + dz, k = ckey(cx, cz);
@@ -338,7 +344,7 @@
         want.push([ex * ex + ez * ez - along * along * 0.5, cx, cz, k]);
       }
       if (want.length > 1) want.sort((a, b) => a[0] - b[0]);
-      if (this.frame & 1) this.lastWant = want.length;
+      if (off || (this.frame & 1)) this.lastWant = want.length;
       const maxReq = Math.max(6, this.pool.workers.length * 4);
       let inflight = this.pending.size;
       for (const [d2, cx, cz, k] of want) {
