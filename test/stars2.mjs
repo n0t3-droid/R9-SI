@@ -147,7 +147,7 @@ const choose = (P) => P.ev(() => {
   const k = L.filter(s => s.cls === 'K' && !s.bin && s.neb < 0).sort((a, b) => d0(a) - d0(b))[0];
   const from = G.systemsNear(N, k.p, 30).find(q => q.idx !== k.idx && q.idx !== 0 && q.s.neb < 0);
   const binSpace = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.2 && b.landable && d.bodies.some(m => m.parent === b.id));
-  const binLand = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'basalt' || b.base === 'opal') && !E.ring(d, b) && E.sky(d, b, 0).k2 > 0.25);
+  const binLand = pick((s, d, b) => s.cls !== 'D' && s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'basalt' || b.base === 'opal') && !E.ring(d, b) && E.sky(d, b, 0).k2 > 0.25);
   const violet = pick((s, d, b) => E.signature(d, b) === 'violet' && b.base === 'aqua');
   const ringed = pick((s, d, b) => b.landable && E.ring(d, b) && (b.base === 'basalt' || b.base === 'opal') && !s.bin);
   const crystal = pick((s, d, b) => E.signature(d, b) === 'crystal' && s.cls !== 'D' && !s.bin);
