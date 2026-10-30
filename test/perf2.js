@@ -92,6 +92,7 @@ console.log('b · the seam light a little a frame');
     return { queued, steps, maxCells, diff, diffL, cells, held: bud.seamHold ? bud.seamHold.size : 0, loadPending: load.seamPending() };
   };
   check(mkW('play').seamMs > 0 && mkW('play').seamMs <= 3 && mkW('loading').seamBudget() === undefined && mkW('play', 0).seamBudget() === undefined, 'the budget: 2 ms a frame in play; the loading screen and seamMs 0 at once', mkW('play').seamMs + ' ms');
+  { const w = mkW('play'); w.frameDt = 1 / 60; const a = w.seamBudget(); w.frameDt = 0.05; const b = w.seamBudget(); w.frameDt = 0.5; const c = w.seamBudget(); check(a === 2 && Math.abs(b - 6) < 1e-9 && c === 12 && !w.streamTakt && w.SEAM_HOLD === 20, 'a share of the frame: 2 ms at 60 frames a second, 6 ms at 20, at most 12; a column waits ≤ 20 frames', [a, b, c].join(' / ') + ' ms'); }
   const r = run(1e-6);
   check(r.queued > 0 && !r.loadPending, 'in play the seams wait for the frame; on the loading screen they spread at once', `${r.queued} arrivals queued`);
   check(r.maxCells === 256, 'the spreading in slices (a step ends at its budget, checked every 256 cells)', `${r.steps} steps, at most ${r.maxCells} cells`);
