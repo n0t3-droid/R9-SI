@@ -7,6 +7,7 @@ files.splice(files.indexOf('blocks4'), 0, 'bodies2'); files.splice(files.indexOf
 files.splice(files.indexOf('blocks4'), 0, 'fields_blocks'); files.splice(files.indexOf('gen_body2') + 1, 0, 'gen_rubble');   // u-fields: carbon_rubble (last), the rubble bodies
 files.push('galaxy');   // u-stars: the neighbourhood (VR.Galaxy), after universe
 files.splice(files.indexOf('blocks4'), 0, 'exo_blocks'); files.push('exoworld');   // u-stars2: the exo blocks (last), VR.Exo
+files.splice(files.indexOf('blocks4'), 0, 'lifeblocks');   // a-life: the ferry dock and the grow lamp (the last blocks, after u-stars2's exo blocks)
 const skip = (process.env.R9_SKIP || '').split(',');   // (test/land_v9_same.js: the shared code without some files)
 for (const f of files) { if (skip.includes(f)) continue; const p = __dirname + '/../src/shared/' + f + '.js'; if (require('fs').existsSync(p)) require(p); }
 module.exports=globalThis.VR;

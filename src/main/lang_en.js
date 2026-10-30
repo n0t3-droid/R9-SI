@@ -3142,5 +3142,29 @@
     "g.set.sun2": "Second sun with shadows",
     "g.set.sun2.tip": "On worlds of binary stars the second sun casts light and shadows too (Low and up; costs a little performance).",
     // ---- u-stars2 end
+    // ---- a-life: the moons' settlements, the ferries, the traffic between the worlds (ferries.js)
+    "g.fe.founded": "A settlement is born: {name}",
+    "g.fe.foundedSub": "The first settlers arrive by ferry — watch {name} grow",
+    "g.fe.grows": "{name} grows: {what}",
+    "g.fe.grows.greenhouse": "a greenhouse",
+    "g.fe.grows.lamps": "lights along the paths",
+    "g.fe.neighbours": "New neighbours move to {name}",
+    "g.fe.title": "⛴ Ferry dock {name}",
+    "g.fe.to": "Ferry to {to}",
+    "g.fe.parked": "at the dock · leaves in {t}",
+    "g.fe.next": "lands in {t}",
+    "g.fe.board": "Board",
+    "g.fe.close": "Close",
+    "g.fe.wait": "⛴ The ferry to {to} lands in {t} — wait at the dock",
+    "g.fe.aboard": "⛴ Aboard — ferry to {to}",
+    "g.fe.welcome": "Welcome to {name}",
+    "g.fe.none": "No ferry leaves from here yet",
+    "g.fe.routes": "Trade routes",
+    "g.fe.legend": "Ferries · freighters · small craft — {n} under way",
+    "g.fe.terminal": "Heartworld ferry port",
+    "g.ctx.ferry": "Take the ferry",
+    "g.set.spaceLife": "Life between the worlds",
+    "g.set.spaceLife.tip": "Settlements on the moons, ferries and traffic in space",
+    // ---- a-life end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -93,10 +93,10 @@ console.log('(c) the save\'s xgen and the landscapes');
 
 console.log('(d) the blocks, the texts, the jump');
 {
-  const last = R.types.slice(-4).map(t => t.name).join(', ');
+  const LT = R.types.filter(t => !/^(ferry_dock|grow_lamp)$/.test(t.name)), last = LT.slice(-4).map(t => t.name).join(', ');   // (a-life: its two blocks after them)
   check(last === 'exo_crystal, exo_moss, exo_frond, exo_glass', 'the four exo blocks are the last', last);
   const gs = R.types.find(t => t.name === 'glowspar');
-  check(R.types.indexOf(gs) === R.types.length - 5, 'right after glowspar (u-fields2)');
+  check(LT.indexOf(gs) === LT.length - 5, 'right after glowspar (u-fields2)');
   const fs = require('fs'), de = fs.readFileSync(__dirname + '/../src/shared/names_de.js', 'utf8');
   check(/'Frost Prism': 'Frostprisma'/.test(de) && /'Violet Moss': 'Violettmoos'/.test(de) && /'Violet Frond': 'Violettwedel'/.test(de) && /'Dune Glass': 'Dünenglas'/.test(de), 'German names of the four');
   require(__dirname + '/../src/main/i18n.js'); require(__dirname + '/../src/main/lang_de.js'); require(__dirname + '/../src/main/lang_en.js');

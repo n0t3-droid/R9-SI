@@ -57,6 +57,7 @@
     'g.ctx.sit': ['Hinsetzen', 'Sit down'],
     'g.ctx.travel': ['Reise {to} · {d}', 'Travel {to} · {d}'],
     'g.ctx.funke': ['Funke fragen', 'Ask Funke'],
+    'g.ctx.ferry': ['Fähre nehmen', 'Take the ferry'],   // a-life
     'g.ctx.home': ['Heimkehr …', 'Going home …'],
     'g.ctx.toPlace': ['nach {name}', 'to {name}'],
     'g.ctx.toWonder': ['zum Wunder {name}', 'to the wonder {name}'],
@@ -88,6 +89,7 @@
     chest: ['g.ctx.chest', 'use', '🧰'], bed: ['g.ctx.sleep', 'use', '🛏'], ship: ['g.ctx.board', 'board', '🚀'], vehicle: ['g.ctx.board', 'board', '🛵'],
     beacon: ['g.ctx.fast', 'beacon', '⚡'], machine: ['g.ctx.calm', 'calm', '🕊'], shop: ['g.ctx.shop', 'shop', '🛒'], portal: ['g.ctx.portal', 'portal', '🌀'],
     bench: ['g.ctx.view', 'vista', '🌄'], pet: ['g.ctx.pet', 'pet', '🐾'], seat: ['g.ctx.sit', 'use', '🪑'],
+    ferry: ['g.ctx.ferry', 'ferry', '⛴'],   // a-life: the dock of a settlement's ferries (ferries.js)
   };
   // ---------------------------------------------------------------- the resolver (pure)
   C.resolve = function (c) {
@@ -317,7 +319,7 @@
         Tv.go(g, { dim: Tv.gateTarget(g.dim, P.dims[i], g.meta), via: 'gate' });
         return true;
       }
-      case 'beacon': case 'calm': case 'shop': if (n && typeof n.act === 'function') { n.act(g); return true; } return false;
+      case 'beacon': case 'calm': case 'shop': case 'ferry': if (n && typeof n.act === 'function') { n.act(g); return true; } return false;
       case 'story': if (VR.Story && typeof VR.Story.watch === 'function') { VR.Story.watch(g); return true; } return false;
       case 'travel': return !!(VR.Intent && VR.Intent.start && VR.Intent.start(g, res.target));
       case 'funke': if (VR.Funke && VR.Funke.ask) { VR.Funke.ask(g); return true; } return false;

@@ -3142,5 +3142,29 @@
     "g.set.sun2": "Zweite Sonne mit Schatten",
     "g.set.sun2.tip": "Auf Welten von Doppelsternen wirft auch die zweite Sonne Licht und Schatten (ab Niedrig; kostet etwas Leistung).",
     // ---- u-stars2 end
+    // ---- a-life: the moons' settlements, the ferries, the traffic between the worlds (ferries.js)
+    "g.fe.founded": "Eine Siedlung entsteht: {name}",
+    "g.fe.foundedSub": "Die ersten Siedler kommen mit der Fähre — sieh zu, wie {name} wächst",
+    "g.fe.grows": "{name} wächst: {what}",
+    "g.fe.grows.greenhouse": "ein Gewächshaus",
+    "g.fe.grows.lamps": "Lichter an den Wegen",
+    "g.fe.neighbours": "Neue Nachbarn ziehen nach {name}",
+    "g.fe.title": "⛴ Fähranleger {name}",
+    "g.fe.to": "Fähre nach {to}",
+    "g.fe.parked": "liegt am Anleger · legt in {t} ab",
+    "g.fe.next": "landet in {t}",
+    "g.fe.board": "Einsteigen",
+    "g.fe.close": "Schließen",
+    "g.fe.wait": "⛴ Die Fähre nach {to} landet in {t} — warte am Anleger",
+    "g.fe.aboard": "⛴ An Bord — Fähre nach {to}",
+    "g.fe.welcome": "Willkommen in {name}",
+    "g.fe.none": "Von hier fährt noch keine Fähre",
+    "g.fe.routes": "Handelsrouten",
+    "g.fe.legend": "Fähren · Frachter · Kleinschiffe — {n} unterwegs",
+    "g.fe.terminal": "Fährhafen Herzwelt",
+    "g.ctx.ferry": "Fähre nehmen",
+    "g.set.spaceLife": "Leben zwischen den Welten",
+    "g.set.spaceLife.tip": "Siedlungen auf den Monden, Fähren und Verkehr im All",
+    // ---- a-life end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

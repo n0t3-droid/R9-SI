@@ -230,6 +230,7 @@
       }
       h += '</div>';
     }
+    if (here && s.home && VR.Ferries && VR.Ferries.drawRoutes) h += `<div style="margin-top:8px;font-weight:600">${esc(T('g.fe.routes'))}</div><canvas id="smOrr" data-routes="1" width="286" height="190" style="margin-top:4px;width:286px;height:190px;background:#050914;border-radius:8px"></canvas>`;   // a-life: Helia's trade routes
     if (here && !s.home) h += `<canvas id="smOrr" width="286" height="190" style="margin-top:8px;width:286px;height:190px;background:#050914;border-radius:8px"></canvas>`;
     if (!here) {
       const ok = !why && (d <= range || i === 0);
@@ -244,6 +245,7 @@
   }
   // the live orrery of the system you are in (log radius, the worlds where they are now)
   function drawOrrery() {
+    if (orr && orr.dataset && orr.dataset.routes && VR.Ferries) { VR.Ferries.drawRoutes(orr, M.g); return; }   // a-life
     const g = M.g, S = g.stars; if (!orr || !S || !S.def) return;
     const X = orr.getContext('2d'), W = orr.width, H = orr.height, def = S.def, P = SJ().place(def, SJ().worldT(g));
     X.fillStyle = '#050914'; X.fillRect(0, 0, W, H);

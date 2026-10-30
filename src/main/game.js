@@ -1365,7 +1365,8 @@
       if (VR.Intent) { const ic = VR.Intent.cam(this, cam); if (ic) cam = ic; }   // e-ctx: the travel camera on foot (directorcam.js)
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
-      if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }   // a-foes2: the freeing's swing over the land and back (any key: back now)
+      if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }
+      if (VR.Ferries && VR.Ferries.camOn) { const fc = VR.Ferries.cam(this, cam); if (fc) cam = fc; }   // a-life: the ferry ride's chase view (ferries.js)   // a-foes2: the freeing's swing over the land and back (any key: back now)
       if (VR.StoryPlay && VR.StoryPlay.holds(this)) { const sc = VR.StoryPlay.cam(this, cam); if (sc) cam = sc; }   // a-story: the scene's shots (story.js)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
       if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }   // e-funke: the photo from Funke's spot
