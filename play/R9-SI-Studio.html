@@ -12880,6 +12880,25 @@ def0('ocker_dust',{display:'Ochre Dust',cat:'nature',group:G.SOIL,tex:()=>T('ock
 
 
 
+
+
+(function(VR){
+'use strict';
+if(!VR.BL||(VR.R&&VR.R.T))return;
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!def0||R.byName.carbon_rubble|| !R.byName.ocker_dust)return;
+def0('carbon_rubble',{display:'Carbon Rubble',cat:'nature',group:G.SOIL,tex:()=>T('carbon_rubble'),hard:0.7,blast:0.8,tool:'shovel',sound:'gravel',smooth:true,flags:VR.F.RANDROT});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -33177,6 +33196,257 @@ VR.BodyGenKinds={volcanic:Volcanic,dust:Dust,ocean:Ocean};
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const M=VR.M,TAU=Math.PI*2;
+const RGEN=1;
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+
+function rng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+
+
+const SWARM_SEED=0x7a5c41;
+let SW=null;
+function swarm(){
+if(SW)return SW;
+const r=rng(SWARM_SEED),out=[];
+
+const fixed=[{D:480,shape:'top',metal:false},{D:360,shape:'binary',metal:false},{D:260,shape:'potato',metal:true}];
+let tries=0;
+while(out.length<60&&tries++ <20000){
+const k=out.length,f=fixed[k];
+
+const sp=k<3?0.18:1;
+const p=[(r()*2-1)*15000*sp,(r()*2-1)*3000*sp,(r()*2-1)*15000*sp];
+let ok=true;
+for(const b of out)if(Math.hypot(b.p[0]-p[0],b.p[1]-p[1],b.p[2]-p[2])<1200){ok=false;break;}
+if(!ok)continue;
+const u=r();
+const D=f?f.D:40*Math.pow(1-u*(1-Math.pow(40/600,2)),-0.5);
+const us=r(),shape=f?f.shape:us<0.25?'top':us<0.39?'binary':'potato';
+const metal=f?f.metal:r()<0.125;
+const spinH=D>200?2.2+r()*10:0.08+r()*8;
+out.push({k,id:'rock.'+k,p:p.map(v=>Math.round(v)),D:Math.round(D*10)/10,shape,metal,spinH:Math.round(spinH*100)/100,seed:(SWARM_SEED+k*7919)>>>0,axis:[r()*2-1,r()*2-1,r()*2-1]});
+}
+SW={bodies:out,field:30000,compression:1e5};
+return SW;
+}
+
+const MOONLET={k:'m',id:'rock.m',D:300,shape:'potato',metal:false,ice:true,spinH:14,seed:0x3a0011};
+function bodyOf(id){
+if(id==='rock.m')return MOONLET;
+const k= +String(id).slice(5);
+const S=swarm();
+return Number.isInteger(k)&&S.bodies[k]?S.bodies[k]:null;
+}
+
+
+let S_=null;
+function S(){
+if(S_)return S_;
+const R=VR.R,s=(n)=>(R.byName[n]?R.S(n):0),G=VR.GEN.S();
+S_={air:0,carbon:s('carbon_rubble')||s('gravel'),tuff:s('tuff'),gravel:G.gravel||s('gravel'),ice:s('ice'),packed:s('packed_ice'),blue:s('blue_ice'),snow:s('snow_block')||s('packed_ice'),
+ironOre:s('iron_ore'),iron:s('iron_block'),basalt:s('basalt')};
+return S_;
+}
+if(VR.BIOMES&&VR.BIOME&&VR.BIOME.rubble_body===undefined){
+const add=(key,name,col)=>{const e={id:VR.BIOMES.length,key,name,temp:0.5,down:0,grass:col,foliage:col,water:0x3F76E4,sky:0,fog:null,precip:'none',moon:'rock'};VR.BIOMES.push(e);VR.BIOME[key]=e.id;};
+add('rubble_body','Rubble Body',0x3a3632);add('rubble_ice','Ice Moonlet',0xd8e2ea);
+}
+
+
+class RubbleGen{
+
+constructor(seed,id,opts){
+opts=opts||{};
+const b=bodyOf(id)||{};
+this.id=id;this.rgen=RGEN;this.kind='rubble';
+this.shape=opts.shape||b.shape||'potato';
+this.D= +(opts.D||b.D||200);
+this.metal= !!(opts.metal!==undefined?opts.metal:b.metal);
+this.ice= !!(opts.ice!==undefined?opts.ice:b.ice);
+
+this.s=((b.seed||0x51ab)^((opts.k||0)*2654435761))>>>0;
+this.seed=seed>>>0;
+const r=rng(this.s),D=this.D,R=D/2;
+this.R=R;
+
+this.ht=Math.min(0.1*D,60);this.hb=Math.min(0.22*D,120);
+this.yMid=Math.round(12+this.hb);
+
+const turn=r()*TAU;
+if(this.shape==='binary')this.lobes=[{x: -0.38*R,z:0,a:0.62*R,b:0.56*R},{x:0.52*R,z:0.08*R,a:0.46*R,b:0.42*R}];
+else if(this.shape==='potato')this.lobes=[{x:0,z:0,a:R,b:R*(0.62+0.14*r())}];
+else this.lobes=[{x:0,z:0,a:R,b:R*0.96}];
+this.c=Math.cos(turn);this.sn=Math.sin(turn);
+const F=VR.Fractal;
+this.nLow=new F(this.s^0x11,2,1/Math.max(30,D*0.35),0.5);
+this.nMid=new F(this.s^0x22,2,1/16,0.5);
+this.nRim=new F(this.s^0x33,2,1/Math.max(20,D*0.2),0.5);
+
+this.craters=[];
+const nc=3+Math.floor(D/90);
+for(let i=0;i<nc;i++){const a=r()*TAU,d=Math.sqrt(r())*0.7*R,cd=D*(0.06+0.2*Math.pow(r(),2));this.craters.push({x:Math.cos(a)*d,z:Math.sin(a)*d,r:cd/2,depth:cd*0.11});}
+this.boulders=[];
+const nb=14+Math.floor(D/9);
+for(let i=0,tries=0;i<nb&&tries<400;i++,tries++){
+const big=this.boulders.length===0,a=r()*TAU,d=(big?0.15+0.35*r():Math.sqrt(r())*0.92)*R;
+const x=Math.cos(a)*d,z=Math.sin(a)*d;
+
+const rad=big?D*(0.115+0.07*r())/2:Math.max(1.5,D*0.045*Math.pow(r(),2.2));
+if(this.rho2(x,z)>(big?0.5:0.95)){if(big)i--;continue;}
+const base=this.shapeTop(x,z);
+this.boulders.push({x,z,r:rad,y:base+rad*0.3,sq:0.75+0.2*r(),m:r()});
+}
+
+this.pockets=[];
+const np=this.ice?10:this.metal?16:7;
+for(let i=0;i<np;i++){const a=r()*TAU,d=Math.sqrt(r())*0.7*R,x=Math.cos(a)*d,z=Math.sin(a)*d;if(!this.inside(x,z))continue;const top=this.shapeTop(x,z),bot=this.shapeBot(x,z);this.pockets.push({x,z,y:bot+(top-bot)*(0.25+0.6*r()),r:3+r()*Math.min(14,D*0.05)});}
+}
+
+rho2(x,z){
+const u=x*this.c+z*this.sn,v= -x*this.sn+z*this.c;
+let best=9;
+for(const L of this.lobes){const du=(u-L.x)/L.a,dv=(v-L.z)/L.b,q=du*du+dv*dv;if(q<best)best=q;}
+
+return best*(1+0.12*this.nRim.n2(x,z));
+}
+inside(x,z){return this.rho2(x,z)<1;}
+
+lobeK(x,z){
+if(this.shape!=='binary')return 1;
+const u=x*this.c+z*this.sn,v= -x*this.sn+z*this.c,L=this.lobes,q0=((u-L[0].x)/L[0].a)**2+((v-L[0].z)/L[0].b)**2,q1=((u-L[1].x)/L[1].a)**2+((v-L[1].z)/L[1].b)**2;
+const w0=Math.max(0,1-q0),w1=Math.max(0,1-q1);
+return(w0*1+w1*0.78)/Math.max(1e-6,w0+w1);
+}
+
+shapeTop(x,z){
+const q=this.rho2(x,z);if(q>=1)return-1;
+const k=this.lobeK(x,z),w=1-q;
+let h=this.ht*k*Math.pow(w,0.9)*(this.shape==='binary'?0.45:this.shape==='potato'?0.4:0.8);
+if(this.shape==='top')h+=this.D*0.022*Math.exp(-(((Math.sqrt(q)-0.86)/0.08)**2));
+
+h+= -this.hb*0.35*(1-Math.pow(w,0.25))*0.5;
+h+=this.nLow.n2(x,z)*this.D*0.016*Math.pow(w,0.3)+this.nMid.n2(x,z)*0.3;
+for(const c of this.craters){const d2=((x-c.x)**2+(z-c.z)**2)/(c.r*c.r);if(d2<1.6)h+=d2<1? -c.depth*(1-d2):c.depth*0.25*(1.6-d2)/0.6;}
+return this.yMid+h;
+}
+shapeBot(x,z){
+const q=this.rho2(x,z);if(q>=1)return 999;
+return this.yMid-this.hb*this.lobeK(x,z)*Math.pow(1-q,0.6)-1;
+}
+
+column(x,z,o){
+let top=this.shapeTop(x,z),bot=this.shapeBot(x,z),bb=null;
+for(const b of this.boulders){
+const dx=x-b.x,dz=z-b.z,d2=dx*dx+dz*dz;if(d2>=b.r*b.r)continue;
+const h=Math.sqrt(b.r*b.r-d2)*b.sq*(0.82+0.36*(0.5+0.5*this.nMid.n2(x*1.7+b.m*97,z*1.7))),t=b.y+h;
+if(t>top){if(top<0)bot=b.y-h;top=t;bb=b;}
+}
+o.topF=top;o.top=top<0? -1:Math.min(250,Math.floor(top));o.bot=Math.max(2,Math.floor(bot));o.b=bb;
+return o;
+}
+topF(x,z){const o=this.column(x,z,this._o||(this._o={}));return o.top<0? -1:o.topF;}
+surfaceY(x,z){const o=this.column(x,z,this._o||(this._o={}));return o.top;}
+bottomY(x,z){const o=this.column(x,z,this._o||(this._o={}));return o.top<0? -1:o.bot;}
+heightAt(x,z){return this.surfaceY(Math.floor(x),Math.floor(z));}
+climateAt(x,z){const h=this.surfaceY(Math.floor(x),Math.floor(z));return{bio:this.ice?'rubble_ice':'rubble_body',h,lava:false,water:false};}
+biomeFor(cl){const B=VR.BIOME;return B&&B[cl.bio]!==undefined?B[cl.bio]:0;}
+biomeAt(x,z){return this.biomeFor(this.climateAt(x,z));}
+tints(){const g=VR.rgb565(60,56,52),w=VR.rgb565(30,60,90);return{grass:new Uint16Array(256).fill(g),foliage:new Uint16Array(256).fill(g),water:new Uint16Array(256).fill(w)};}
+
+findSpawn(){
+const big=this.boulders[0]||{x:this.R,z:0};
+for(let rr=0;rr<this.R*0.8;rr+=3)for(let a=0;a<(rr?12:1);a++){
+const x=Math.round(Math.cos(a/12*TAU)*rr-big.x*0.35),z=Math.round(Math.sin(a/12*TAU)*rr-big.z*0.35);
+const h=this.surfaceY(x,z);if(h<0)continue;
+let flat=true;
+for(const[dx,dz]of[[2,0],[-2,0],[0,2],[0,-2]]){const q=this.surfaceY(x+dx,z+dz);if(q<0||Math.abs(q-h)>1){flat=false;break;}}
+if(!flat)continue;
+return[x+0.5,h+1,z+0.5,Math.atan2(-(big.x-x),-(big.z-z)),-0.12];
+}
+return[0.5,Math.max(this.surfaceY(0,0),this.yMid)+1,0.5,0];
+}
+
+generate(cx,cz){
+const T=S(),blocks=new Uint16Array(65536),biome=new Uint8Array(256),x0=cx*16,z0=cz*16;
+const bid=this.biomeFor({bio:this.ice?'rubble_ice':'rubble_body'});
+biome.fill(bid);
+const out={blocks,biome,caveBiome:new Int8Array(256).fill(-1),tints:this.tints(),chests:[],spawns:[]};
+const R=this.R*1.25+4;
+if(x0>R||x0+16< -R||z0>R||z0+16< -R)return out;
+
+const P=this.pockets.filter(p=>p.x+p.r>x0&&p.x-p.r<x0+16&&p.z+p.r>z0&&p.z-p.r<z0+16);
+const o={},s=this.s^this.seed;
+for(let lz=0;lz<16;lz++)for(let lx=0;lx<16;lx++){
+const x=x0+lx,z=z0+lz;
+this.column(x,z,o);if(o.top<0)continue;
+const col=lz*16+lx,h1=M.hashf2(x,z,s+3);
+const bm=o.b?o.b.m: -1;
+for(let y=o.bot;y<=o.top;y++){
+const d=o.top-y,hy=M.hashf3(x,y,z,s);
+let st;
+if(this.ice)st=d===0?(h1<0.18?T.carbon:T.snow):d<3?T.packed:hy<0.12?T.blue:T.packed;
+else{
+st=T.carbon;
+if(o.b&&y>o.top-2*o.b.r)st=bm<0.12?T.tuff:bm<0.2&&this.metal?T.iron:T.carbon;
+else if(d===0)st=h1<0.02?T.gravel:h1<0.03?T.tuff:(this.metal&&h1>0.9?T.ironOre:T.carbon);
+else if(hy<0.05)st=T.tuff;
+else if(this.metal&&hy>0.86)st=hy>0.97?T.iron:T.ironOre;
+}
+blocks[(y<<8)|col]=st;
+}
+
+for(const p of P){
+const dx=x-p.x,dz=z-p.z,d2=p.r*p.r-dx*dx-dz*dz;if(d2<=0)continue;
+const hh=Math.sqrt(d2)*0.7,ya=Math.max(o.bot+1,Math.ceil(p.y-hh)),yb=Math.min(o.top-2,Math.floor(p.y+hh));
+for(let y=ya;y<=yb;y++)blocks[(y<<8)|col]=this.metal?T.iron:this.ice?T.blue:(M.hashf3(x,y,z,s+9)<0.5?T.ice:T.packed);
+}
+}
+return out;
+}
+}
+VR.RubbleGen=RubbleGen;
+VR.BodyGenKinds=VR.BodyGenKinds||{};
+VR.BodyGenKinds.rubble=RubbleGen;
+VR.Rubble={RGEN,swarm,bodyOf,MOONLET,G_BOOTS:0.35};
+
+
+if(VR.DimReg&& !VR.DimReg.has('rock.0')){
+const D=VR.DimReg,sw=swarm().bodies;
+
+const gReal=(Dm)=>6.674e-11*1190*4/3*Math.PI*(Dm/2);
+const tag=(k)=>'TS-'+String(k+1).padStart(2,'0');
+for(const b of sw){
+D.add(b.id,{sky:true,code:5,g:VR.Rubble.G_BOOTS,gReal:gReal(b.D),rock:true,travel:false,mp:'convoy',gen:(seed,opts)=>new RubbleGen(seed,b.id,opts),
+name:['g.dim.rock.'+b.k,'Brocken '+tag(b.k),'Rock '+tag(b.k)],veil:['#ecebe8','#6e6a66','#08080b']});
+}
+D.add('rock.m',{sky:true,code:5,g:VR.Rubble.G_BOOTS,gReal:gReal(300)*0.5,rock:true,ring:true,travel:false,mp:'convoy',gen:(seed,opts)=>new RubbleGen(seed,'rock.m',opts),
+name:['g.dim.rock.m','Spaltmond','Gap Moon'],veil:['#ffffff','#d8e6f4','#0c1424']});
+}
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R;
@@ -43932,6 +44202,13 @@ return K(img);
 REC.ocker_dust=()=>{
 const img=TX.natural([0x8e6236,0xa77745,0xbb8c55,0xc99d66],{period:6,oct:3,speck:0.08,speckDark:true,speck2:0.03,seed:9151,contrast:0.85,rough:0.95});
 img.forEach((x,y,i)=>{const h=hh(x,y,9152);if(h<0.025)img.set(x,y,C(0xa4512a));else if(h>0.985)img.set(x,y,C(0x5e4636));});
+return K(img);
+};
+
+
+REC.carbon_rubble=()=>{
+const img=TX.natural([0x2e2a27,0x3a3531,0x47413b,0x544d45],{period:5,oct:3,speck:0.1,speckDark:true,speck2:0.03,seed:9161,contrast:1.0,rough:0.98});
+img.forEach((x,y,i)=>{const h=hh(x,y,9162),c=hh(x>>2,y>>2,9163);if(h<0.004){img.set(x,y,C(0x9a948a));img.ro[i]=0.6;}else if(c>0.82&&h>0.35)img.set(x,y,C(c>0.93?0x5a534b:0x4e4842));});
 return K(img);
 };
 void N;
@@ -55949,6 +56226,25 @@ def0('ocker_dust',{display:'Ochre Dust',cat:'nature',group:G.SOIL,tex:()=>T('ock
 
 
 
+
+
+(function(VR){
+'use strict';
+if(!VR.BL||(VR.R&&VR.R.T))return;
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!def0||R.byName.carbon_rubble|| !R.byName.ocker_dust)return;
+def0('carbon_rubble',{display:'Carbon Rubble',cat:'nature',group:G.SOIL,tex:()=>T('carbon_rubble'),hard:0.7,blast:0.8,tool:'shovel',sound:'gravel',smooth:true,flags:VR.F.RANDROT});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -66211,6 +66507,25 @@ VR.I18N.add('en',{
 'g.pause.less':"‹ Back",
 'story.offer.card':"I'm picking up a signal …",
 
+
+'g.fields.codex':'Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction).',
+'g.fields.boots.on':'Anchor boots on: 0.35 m/s² pull you to the ground (a jump carries you 39 m high)',
+'g.fields.boots.off':'Anchor boots off: almost nothing pulls here — a jump carries you away!',
+'g.fields.drift':'You are drifting away! B turns the anchor boots back on.',
+'g.fields.tow':'Funke tows you back to the rock.',
+'g.fields.hello':'Welcome to {name}: {d} m of rubble, hardly any gravity. The anchor boots hold you — B switches them.',
+'g.fields.hello.m':'Welcome to the Gap Moon: 300 m of ice in the ring\'s gap. B switches the anchor boots.',
+'g.fields.ring':'In the ring: ice chunks of 0.3 to 4 m, the sheet only 10 m thick (τ {tau})',
+'g.fields.pull':'Too low! The hull glows — the autopilot pulls up.',
+'g.space.place.ring':'inside the ring',
+'g.space.place.cassini':'over the Cassini Division',
+'g.space.place.ringschatten':'Amaranth with the ring\'s shadow',
+'g.space.place.wolken':'flying over Amaranth\'s clouds',
+'g.space.place.schwarm':'in the Rubble Swarm',
+'g.set.fields':'Ring chunks & cloud decks',
+'g.set.fields.tip':'The ice chunks in the ring, the cloud decks over Amaranth and the rocks of the swarm. Off: the ring as a sheet only.',
+'g.codex.fields':['The Rubble Swarm','Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction). On the small rocks almost nothing pulls: the anchor boots pull with 0.35 m/s², a jump carries you 39 m high and lasts 17 seconds. Without them a hop is enough to drift away.','Land on a rock and jump.'],
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -69088,6 +69403,25 @@ VR.I18N.add('de',{
 'g.pause.more':"⋯ Mehr",
 'g.pause.less':"‹ Zurück",
 'story.offer.card':"Ich empfange ein Signal …",
+
+
+'g.fields.codex':'Echte Gürtel sind leer — dieser Schwarm ist 100.000-mal dichter, eine frisch zerbrochene Familie (Fiktion).',
+'g.fields.boots.on':'Ankerstiefel an: 0,35 m/s² ziehen dich zum Boden (ein Sprung trägt dich 39 m hoch)',
+'g.fields.boots.off':'Ankerstiefel aus: hier zieht fast nichts — ein Sprung trägt dich davon!',
+'g.fields.drift':'Du treibst davon! B schaltet die Ankerstiefel wieder an.',
+'g.fields.tow':'Funke holt dich zurück auf den Brocken.',
+'g.fields.hello':'Willkommen auf {name}: {d} m Schutt, kaum Schwerkraft. Die Ankerstiefel halten dich — B schaltet sie.',
+'g.fields.hello.m':'Willkommen auf dem Spaltmond: 300 m Eis in der Lücke des Rings. B schaltet die Ankerstiefel.',
+'g.fields.ring':'Im Ring: Eisbrocken von 0,3 bis 4 m, die Schicht nur 10 m dick (τ {tau})',
+'g.fields.pull':'Zu tief! Die Hülle glüht — der Autopilot zieht hoch.',
+'g.space.place.ring':'mitten im Ring',
+'g.space.place.cassini':'über der Cassini-Teilung',
+'g.space.place.ringschatten':'Amarant mit dem Schatten des Rings',
+'g.space.place.wolken':'Flug über Amarants Wolken',
+'g.space.place.schwarm':'im Trümmerschwarm',
+'g.set.fields':'Ringbrocken & Wolkendecken',
+'g.set.fields.tip':'Die Eisbrocken im Ring, die Wolkendecken über Amarant und die Brocken des Schwarms. Aus: nur der Ring als Fläche.',
+'g.codex.fields':['Der Trümmerschwarm','Echte Gürtel sind leer — dieser Schwarm ist 100.000-mal dichter, eine frisch zerbrochene Familie (Fiktion). Auf den kleinen Brocken zieht fast nichts: Die Ankerstiefel ziehen mit 0,35 m/s², ein Sprung trägt dich 39 m hoch und dauert 17 Sekunden. Ohne sie reicht ein Hüpfer, um davonzutreiben.','Lande auf einem Brocken und spring.'],
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
