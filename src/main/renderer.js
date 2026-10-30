@@ -1000,19 +1000,33 @@
       const C = VR.Clouds, on = this.q.cloudShadow && this.q.clouds >= 2 && E.dimId === 0 && C && C.shadowMask;
       if (!on) { if (this.csM) this.csM[3] = 0; return; }
       const gl = this.gl, S = C.SHADOW, N = S.n, dr = E.cloudDrift, wx = dr ? dr[0] : E.time * 0.9, wz = dr ? dr[1] : 0;
-      const cx = cam.x + wx, cz = cam.z + wz, cov = Math.round(E.cloudCover * 20) / 20;
+      let cx = cam.x + wx, cz = cam.z + wz, cov = Math.round(E.cloudCover * 20) / 20;
       if (!this.csTex) {
         this.csTex = GL.tex2D(N, N, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: new Uint8Array(N * N).fill(255), filter: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE });
         this.csBuf = new Uint8Array(N * N); this.csAt = null; this.csM = [0, 0, 0, 0];
       }
       const at = this.csAt;
-      if (!at || Math.abs(at[0] - cx) > S.move || Math.abs(at[1] - cz) > S.move || at[2] !== cov) {
-        C.shadowMask(cx, cz, cov, this.csBuf);
+      // e-perf2: a new mask is built in slices of rows (csBudget ms a frame; the old one, still good for 500 blocks round,
+      // is read meanwhile) and swapped in whole — the same mask as one built at once (clouds.js shadowRows); the first at once
+      const job = this.csJob, bud = C.shadowRows ? (this.csBudget === undefined ? 1 : this.csBudget) : 0;   // (csBudget 0: at once, as before)
+      if (job || !at || Math.abs(at[0] - cx) > S.move || Math.abs(at[1] - cz) > S.move || at[2] !== cov) {
+        if (!at || !bud) C.shadowMask(cx, cz, cov, this.csBuf);
+        else {
+          const J = job || (this.csJob = { cx, cz, cov, j: 0, acc: (this.csAcc || (this.csAcc = new Float32Array(N * N))).fill(0), memo: new Map(), buf: this.csBuf2 || (this.csBuf2 = new Uint8Array(N * N)) });
+          const t0 = performance.now();
+          do { const j1 = Math.min(N, J.j + 8); C.shadowRows(J.cx, J.cz, J.cov, J.buf, J.acc, J.j, j1, J.memo); J.j = j1; } while (J.j < N && performance.now() - t0 < bud);
+          if (J.j < N) return this.csUniforms(E, wx, wz);
+          this.csJob = null; this.csBuf2 = this.csBuf; this.csBuf = J.buf; cx = J.cx; cz = J.cz; cov = J.cov;
+        }
         gl.bindTexture(gl.TEXTURE_2D, this.csTex); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
         gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RED, gl.UNSIGNED_BYTE, this.csBuf);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
         this.csAt = [cx, cz, cov]; this.stats.csBuilds = (this.stats.csBuilds | 0) + 1;
       }
+      this.csUniforms(E, wx, wz);
+    }
+    csUniforms(E, wx, wz) {
+      const C = VR.Clouds, S = C.SHADOW, N = S.n;
       const half = N * S.texel / 2;
       this.csM[0] = this.csAt[0] - half - wx; this.csM[1] = this.csAt[1] - half - wz; this.csM[2] = 1 / (N * S.texel);
       this.csM[3] = C.shadowStrength(E.sunDir[1], E.cloudCover);

@@ -156,15 +156,25 @@
   // space or the cover changed; the drift moves it in between (a uniform)
   const SHADOW = { n: 128, texel: 8, move: 64, body: 0.85, dens: 0.9 };
   function shadowMask(cx, cz, cover, out) {
+    const N = SHADOW.n, o = out || new Uint8Array(N * N);
+    shadowRows(cx, cz, cover, o, new Float32Array(N * N), 0, N, null);
+    return o;
+  }
+  // e-perf2 · rows jA … jB−1 of the mask (acc: the build's Float32Array(n²), zero at its start; memo: a Map kept over the
+  // build's slices — each cell's sprites made once). Every texel takes the same sprites in the same order as the whole
+  // mask (the cells in the same order, clipped to the rows): a mask built in slices is byte-identical to one built at once
+  function shadowRows(cx, cz, cover, o, acc, jA, jB, memo) {
     const N = SHADOW.n, T = SHADOW.texel, half = N * T / 2, x0 = cx - half, z0 = cz - half;
-    const o = out || new Uint8Array(N * N), acc = new Float32Array(N * N);
     const g0 = Math.floor((x0 - CELL) / CELL), g1 = Math.floor((x0 + N * T + CELL) / CELL), h0 = Math.floor((z0 - CELL) / CELL), h1 = Math.floor((z0 + N * T + CELL) / CELL);
-    for (let gz = h0; gz <= h1; gz++) for (let gx = g0; gx <= g1; gx++) {
-      if (!cellOn(gx, gz, cover)) continue;
-      for (const sp of cumulusCell(gx, gz, cover)) {
+    const hA = Math.max(h0, Math.floor((z0 + jA * T) / CELL) - 3), hB = Math.min(h1, Math.floor((z0 + jB * T) / CELL) + 3);   // (a cell's sprites reach < 2 cells)
+    for (let gz = hA; gz <= hB; gz++) for (let gx = g0; gx <= g1; gx++) {
+      let sps = memo ? memo.get(gz * 65536 + gx) : undefined;
+      if (sps === undefined) { sps = cellOn(gx, gz, cover) ? cumulusCell(gx, gz, cover) : null; if (memo) memo.set(gz * 65536 + gx, sps); }
+      if (!sps) continue;
+      for (const sp of sps) {
         const R = sp[3] * SHADOW.body, a = sp[4] * SHADOW.dens;
         const i0 = Math.max(0, Math.floor((sp[0] - R - x0) / T)), i1 = Math.min(N - 1, Math.ceil((sp[0] + R - x0) / T));
-        const j0 = Math.max(0, Math.floor((sp[2] - R - z0) / T)), j1 = Math.min(N - 1, Math.ceil((sp[2] + R - z0) / T));
+        const j0 = Math.max(jA, Math.floor((sp[2] - R - z0) / T)), j1 = Math.min(jB - 1, Math.ceil((sp[2] + R - z0) / T));
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
           const d = Math.hypot(x0 + (i + 0.5) * T - sp[0], z0 + (j + 0.5) * T - sp[2]) / R;
           if (d >= 1) continue;
@@ -173,7 +183,7 @@
         }
       }
     }
-    for (let q = 0; q < N * N; q++) o[q] = Math.round(255 * (1 - acc[q]));
+    for (let q = jA * N; q < jB * N; q++) o[q] = Math.round(255 * (1 - acc[q]));
     return o;
   }
   // the shadows' strength: the sun up, fading as the sky closes over (an overcast sky has no shadow of its own)
@@ -222,5 +232,5 @@
     return out;
   }
 
-  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, BOX_HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas, VALLEY, morningFog, valleyFog, SHADOW, shadowMask, shadowStrength };
+  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, BOX_HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas, VALLEY, morningFog, valleyFog, SHADOW, shadowMask, shadowRows, shadowStrength };
 })(VR);
