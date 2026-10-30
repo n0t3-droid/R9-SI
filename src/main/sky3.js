@@ -424,7 +424,7 @@
   // against a deeper blue-violet between them; about mean-preserving, so the bands keep their fit (sky_offline.js fitted
   // k, deep, lit, pink for the top's sd, its saturation and the bands' ΔE together). SKY3 only (Low and up; Very Low
   // has no sky3 level: its program and values unchanged)
-  S3.GOLDSKY = { k: 1, deep: 0.42, lit: 0.55, pink: 0.6 };
+  S3.GOLDSKY = { k: 1, deep: 0.5, lit: 1.6, pink: 0.6 };
   const GS = [0, 0, 0, 0];
   S3.goldSky = function (E, out) {
     out = out || GS;
@@ -657,18 +657,22 @@ uniform vec4 u_s3Gold;     // f-golden: the golden sky's structure — x its str
 // deeper blue-violet between them (a slow field of three value-noise taps, drifting with the high wind)
 vec3 s3Gold(vec3 col, vec3 dir) {
   if (u_s3Gold.x <= 0.0 || dir.y < 0.06) return col;
-  float e = dir.y, win = smoothstep(0.06, 0.26, e) * (1.0 - smoothstep(0.7, 0.95, e));
+  float e = dir.y, win = smoothstep(0.2, 0.38, e) * (1.0 - smoothstep(0.7, 0.95, e));
   if (win <= 0.0) return col;
-  vec2 q = dir.xz / (e + 0.35) * 1.25 + u_s3Drift.xy * 0.6;
-  q = vec2(q.x * 0.55 + q.y * 0.25, q.y * 1.6 - q.x * 0.3);   // (drawn out along a slant: banks, not blobs)
+  vec2 q = dir.xz / (e + 0.3) * 2.0 + u_s3Drift.xy * 0.6;
+  q = vec2(q.x * 0.8 + q.y * 0.2, q.y * 1.3 - q.x * 0.2);   // (a little drawn out along a slant: banks, not blobs)
   float n = vnoise(q) * 0.58 + vnoise(q * 2.3 + 5.3) * 0.29 + vnoise(q * 5.2 - 2.1) * 0.13;
-  float lit = smoothstep(0.5, 0.74, n), gap = 1.0 - smoothstep(0.26, 0.5, n);
+  float eb = (e - 0.5) / 0.14;
+  n += 0.09 * exp(-eb * eb) - 0.03;   // (the masses gather round 30° up — the frames' pink band there — the gaps above and below)
+  float lit = smoothstep(0.62, 0.7, n), gap = 1.0 - smoothstep(0.44, 0.58, n), core = smoothstep(0.64, 0.86, n);
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
   vec2 sh = normalize(u_sunDir.xz + vec2(1e-5, 0.0)), dh = normalize(dir.xz + vec2(1e-5, 0.0));
   float toS = 0.5 + 0.5 * dot(sh, dh);
-  vec3 tint = mix(vec3(1.0, 0.62, 0.78), vec3(1.0, 0.74, 0.5), toS * toS);   // (pink overhead and away, gold toward the sun)
-  vec3 litC = col * (1.0 + u_s3Gold.z) + tint * (l * u_s3Gold.z * u_s3Gold.w);
-  vec3 deepC = col * vec3(1.0 - u_s3Gold.y, 1.0 - u_s3Gold.y * 1.05, 1.0 - u_s3Gold.y * 0.45);   // (deeper and bluer: the frames' blue-violet)
+  // (the masses a pink-white, peach toward the sun; the gaps a blue-violet — both of the sky's own luma, so their mix keeps
+  // the bands' pale lilac mean while each pixel has colour: the frames' saturated blue between pink-lit cloud)
+  vec3 tint = mix(vec3(1.45, 0.8, 1.0), vec3(1.32, 0.92, 0.68), toS * toS);
+  vec3 litC = mix(col, tint * l, u_s3Gold.w) * (1.0 + u_s3Gold.z * (0.35 + 0.65 * core));   // (brighter toward the mass's core: relief, not a flat cut-out)
+  vec3 deepC = mix(col, vec3(0.42, 0.78, 2.4) * l, u_s3Gold.w) * (1.0 - u_s3Gold.y);
   float k = u_s3Gold.x * win;
   col = mix(col, deepC, gap * k);
   return mix(col, litC, lit * k);
@@ -896,8 +900,13 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
     th = th * 0.4 + 0.15 * (texture(u_cloudTex, c3At(cell, uv + vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv - vec2(e.x, 0.0))).r + texture(u_cloudTex, c3At(cell, uv + vec2(0.0, e.y))).r + texture(u_cloudTex, c3At(cell, uv - vec2(0.0, e.y))).r);
     float d = smoothstep(0.0, 0.22, th);
     if (d < 0.02) return vec4(0.0, 0.0, 0.0, -1.0);
-    vec3 mc = mix(u_c3Low, u_c3Top, 0.6) + u_c3Sun * 0.35;
-    return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist) * u_c3Deck.z);
+    // (f-golden, R53-11: the banks under the isles were grey smears in the haze's flat light — now lit as cumulus: the top
+    // and the faces toward the sun in its light, the base in the lilac shade, less of the haze over them)
+    vec3 N = vec3(t.gb * 2.0 - 1.0, 0.0);
+    N.z = sqrt(max(0.0, 1.0 - dot(N.xy, N.xy)));
+    float up = smoothstep(0.3, 0.75, uv.y), ndl = clamp(dot(N, u_c3L) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 mc = mix(u_c3Low, u_c3Top, up) + u_c3Sun * ((0.2 + 0.5 * ndl) * (0.45 + 0.55 * up));
+    return vec4(mix(mc, u_c3Haze, 0.25), d * c3MistNear(dist) * u_c3Deck.z);
   }
   float cov = smoothstep(0.0, 0.08, th);
   if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);

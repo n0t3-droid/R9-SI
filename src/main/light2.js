@@ -282,7 +282,10 @@
     // saturation 115 in the frames, 69 in v0.49's lake; refitted together with the sky (sky3.js PAL.gold): the saturation
     // 1.2, the S back to 0.32, the shoulder at white (the sun's core and the trailer's whites reach 255), the bloom's
     // threshold over the sky (1.3: at 0.9 the whole bright horizon bloomed into a veil))
-    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 1.0, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.2, vig: 0.2, bThr: 1.3, bStr: 0.17 },
+    // (f-golden, R53-11: with the golden sky's structure (sky3.js S3.goldSky: blue gaps beside pink-lit masses — their mean
+    // chroma lower than a flat lilac's) the mid-tones' saturation 1.2 → 1.35 keeps the bands' fit and gives the isles' land
+    // and the sky their colour: sky_offline.js canyon/city sat 73/71 → 75/72, ΔE 7.0/8.2)
+    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 1.0, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.35, vig: 0.2, bThr: 1.3, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
     night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };
