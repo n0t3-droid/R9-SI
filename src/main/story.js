@@ -644,7 +644,7 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     const pulse = 0.5 + 0.5 * Math.sin(sc.t * 2.2), lv = 0.22 + wake * (0.75 + 0.25 * pulse), opt = md.parts.optic;
     const eyeM = (sz) => { const M = wardenM(W, cam, yaw, k); m4.translate(M, M, L[0], L[1], L[2] - 0.2); m4.scale(M, M, sz, sz, 1); return M; };
     part(opt, eyeM(1), [0.2 * lv + 0.05, 1.25 * lv + 0.1, 1.7 * lv + 0.14], 1);   // (a saturated cyan, not white)
-    if (wake > 0.05) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE); part(opt, eyeM(1.45), [0.1, 0.9, 1.3], 0.4 * wake * (0.7 + 0.3 * pulse)); part(opt, eyeM(1.9), [0.05, 0.6, 0.9], 0.14 * wake);   // (a small halo: run 3's 2.2× / 4.2× covered the face) }
+    if (wake > 0.05) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE); part(opt, eyeM(1.45), [0.1, 0.9, 1.3], 0.4 * wake * (0.7 + 0.3 * pulse)); part(opt, eyeM(1.9), [0.05, 0.6, 0.9], 0.14 * wake); }   // (a small halo: run 3's 2.2× / 4.2× covered the face)
     gl.depthRange(0, 1); gl.uniform1f(p.u.u_alpha, 1); gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_noFog, 0);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
     gl.bindVertexArray(null);
