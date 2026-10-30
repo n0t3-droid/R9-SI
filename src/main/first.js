@@ -142,6 +142,12 @@
     return { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: (S.fov || 75) * Math.PI / 180 };
   };
   const anyKey = (I) => !!I && (I.pressed.size > 0 || (I.mouse && I.mouse.clicked && I.mouse.clicked.some(Boolean)) || (I.padPressed && I.padPressed.size > 0) || (I.tPressed && I.tPressed.size > 0));
+  // f-first (review v0.52 R53-06: on a slow machine the arrival ran on frames — 0.1 s of it a frame at 3 fps, half a
+  // minute of white): it runs on the wall clock (a frame counts at most WALL_STEP s), any key — or a key still held,
+  // W included — ends it in every phase, and MAX_WALL seconds after its start it is over whatever the frame rate
+  FI.MAX_WALL = 7; FI.WALL_STEP = 0.5;
+  const heldKey = (I) => !!I && ((I.keys && I.keys.size > 0) || (I.padDown && I.padDown.size > 0) || (I.tDown && I.tDown.size > 0));
+  const wallNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
   class Arrival {
     // o: {vista (the record of the wow moment to play, or null), sun: [x, y] of the sun on the screen (0..1, y down) or null}
     // phases: in (the white rising over the loading screen) → full → veil (the picture through the thinning white) →
@@ -151,10 +157,12 @@
     veilNow() { return this.phase === 'in' ? FI.whiteIn(this.t) : this.phase === 'full' ? 1 : this.phase === 'veil' ? FI.veil(this.t) : this.phase === 'out' ? this.from * (1 - clamp01(this.k / FI.SKIP)) : 0; }
     // over the loading screen: the white rises (game.js loadingFrame holds the world back meanwhile — FI.holdLoading)
     rise() { this.phase = 'in'; this.t = 0; this.ui(); this.paint(); }
-    stepIn(dt) { this.t += dt; if (this.t >= FI.IN) { this.phase = 'full'; this.t = 0; } this.paint(); return this.phase === 'in'; }
+    // the frame's step on the wall clock: never less than the game's dt, at most WALL_STEP (a stall is not a skip)
+    wallDt(dt) { const n = wallNow(), w = this.lastW ? (n - this.lastW) / 1000 : dt; this.lastW = n; return Math.min(FI.WALL_STEP, Math.max(dt, w)); }
+    stepIn(dt) { dt = this.wallDt(dt); this.t += dt; if (this.t >= FI.IN) { this.phase = 'full'; this.t = 0; } this.paint(); return this.phase === 'in'; }
     begin() {
       const g = this.g, v = this.v;
-      this.phase = 'veil'; this.t = 0; this.first = true;
+      this.phase = 'veil'; this.t = 0; this.first = true; this.t0w = wallNow(); this.lastW = this.t0w;
       const hud = document.getElementById('hud'); if (hud) { hud.style.transition = 'none'; hud.style.opacity = '0'; }
       if (!this.saved) { this.saved = { hideHud: g.hideHud }; g.hideHud = true; }   // (the hand, the block outline, the minimap)
       // the moment from the first frame: its camera at the composition, the clock held at the rise's end while the white
@@ -192,27 +200,34 @@
     }
     update(dt) {
       const g = this.g, WM = VR.WowMoment;
+      const d = this.wallDt(dt);
+      // (f-first) over at the latest MAX_WALL seconds after it began; a key in the moment ends the moment too
+      if (this.t0w && (wallNow() - this.t0w) / 1000 > FI.MAX_WALL) { this.end(); return; }
+      if (this.phase === 'moment' && !this.first && (anyKey(g.input) || heldKey(g.input))) { this.end(); return; }
       if (this.phase === 'veil') {
-        this.t += dt;
-        if (anyKey(g.input) && !this.first) { this.skip(); return; }
+        this.t += d;
+        if ((anyKey(g.input) || heldKey(g.input)) && !this.first) { this.skip(); return; }
         this.first = false;
         if (this.on && g.wow && g.wow.active === this.v) g.wow.t = WM.RISE;   // (the picture holds while the white thins)
         if (this.t >= FI.PRE) { this.phase = 'moment'; this.t = 0; if (!(this.on && g.wow && g.wow.active)) { this.finish(); return; } }
         this.paint();
       } else if (this.phase === 'out') {
-        this.k += dt; this.paint();
+        this.k += d; this.paint();
         if (this.k >= FI.SKIP) { if (this.on && g.wow && g.wow.active) { this.phase = 'moment'; this.t = FI.FLARE + FI.PRE; this.paint(); } else this.finish(); }
       } else if (this.phase === 'moment') {
-        this.t += dt; this.paint();
+        this.t += d; this.paint();
+        if (this.on && g.wow && g.wow.active && d > dt) g.wow.t += d - dt;   // (f-first: the moment on the wall clock too — wow.update gave it dt)
         if (!(g.wow && g.wow.active)) this.finish();
       }
     }
+    // (f-first) the end now: the moment stopped (the view back at the eyes), the white gone, the HUD in
+    end() { const g = this.g; if (g.wow && g.wow.active && g.wow.stop) { try { g.wow.stop(); } catch (e) { /* the moment */ } } this.finish(); }
     // a key while the white is there: it goes in SKIP seconds, the camera turns back to the eyes from where it is
     skip() {
       const g = this.g;
       if (this.phase !== 'veil') return;
       this.from = FI.veil(this.t); this.k = 0; this.phase = 'out';
-      if (this.on && g.wow && g.wow.active) g.wow.skip();
+      if (this.on && g.wow && g.wow.active) { if (g.wow.stop) g.wow.stop(); else g.wow.skip(); }   // (f-first: a key ends it — the eyes under the going white, no swing back)
       this.paint();
     }
     restore() {
@@ -255,7 +270,18 @@
     if (!FI.want(g, meta)) return null;
     meta.vistaStart = 2;   // (decided: the next start of this world is an ordinary one)
     const v = FI.pick(await FI.vistas(g, dim));
-    if (!v || g.meta !== meta) return null;
+    if (g.meta !== meta) return null;
+    // f-first (R53-09): an Abenteuer world starts 200–300 m from its first outpost, facing it, in the morning
+    if (FI.advWorld(meta)) {
+      const r = await FI.outpostStart(g, dim, v ? FI.feet(v) : [0, 0, 0]);
+      if (r && r.pos && g.meta === meta) {
+        g.env.setTime(FI.ADV_TOD); meta.time = FI.ADV_TOD;
+        meta.clearUntil = FI.clearUntil(g.env.day | 0); g.env.wx.clearUntil = meta.clearUntil;
+        meta.advStart = { out: r.out, d: r.d };
+        return { pos: r.pos, yaw: r.yaw, pitch: -0.06 };
+      }
+    }
+    if (!v) return null;
     // (the arrival's camera faces the landmark's middle: the feet face it too, at the walk's own pitch)
     const A = FI.arrivalOf(v), sp = { pos: FI.feet(v), yaw: A.yaw, pitch: v.pitch, vista: A }, tod = FI.clock(A.yaw);
     g.env.setTime(tod); meta.time = tod;
@@ -264,6 +290,16 @@
     g.arrivalPending = { vista: A };
     return sp;
   };
+  // f-first (R53-09): a world made with Spielweg „Abenteuer" (adventure.js marks it when the world is there — before
+  // that its create choice waits in pendingCreate) starts near its first outpost in the morning: the sun 7.4° up in the
+  // east (t-light2's golden mirror), nine minutes of day ahead instead of one
+  FI.ADV_TOD = FI.GOLD_AM;
+  FI.advWorld = (meta) => !!(meta && meta.adventure && meta.adventure.on) || !!(VR.Adventure && VR.Adventure.pendingCreate && Date.now() - VR.Adventure.pendingCreate.at < 120000);
+  FI.outpostStart = (g, dim, ref) => new Promise((res) => {
+    let done = false; const fin = (v) => { if (!done) { done = true; res(v); } };
+    setTimeout(() => fin(null), 20000);
+    try { g.pool.direct(0, { type: 'outpostStart', dim, x: Math.floor(ref[0]), z: Math.floor(ref[2]) }, null, (m) => fin(m && m.type === 'outpostStart' ? m.r : null)); } catch (e) { fin(null); }
+  });
   // a world's start: its first day's clear sky again after a reload on that day
   FI.onLoad = function (g, meta) { if (meta && meta.clearUntil > 0 && g.env && g.env.wx) g.env.wx.clearUntil = meta.clearUntil; };
   // the loading screen's last moments (game.js loadingFrame, the world ready): an arrival's white rises over it first —

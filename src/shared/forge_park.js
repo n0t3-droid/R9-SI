@@ -86,7 +86,7 @@
   // of hull stairs up to the ship's hatch (g, so you walk aboard), beacons and lamps (m). Five liveries.
   const ARCHS = ['shuttle', 'interceptor', 'gunship', 'racer', 'dropship', 'freighter', 'cruiser', 'carrier'];
   const ANAMES = ['Shuttle', 'Interceptor', 'Gunship', 'Racer', 'Dropship', 'Frachter', 'Kreuzer', 'Träger'];
-  const PAL = [['sf', 'starforge', 'Sternglut'], ['nw', 'nightwing', 'Nightwing'], ['ss', 'sunstrike', 'Sunstrike'], ['rh', 'hauler', 'Rust Hauler'], ['as', 'arctic', 'Arctic Survey']];
+  const PAL = [['sf', 'starforge', 'Sternglut'], ['nw', 'nightwing', 'Nachtmohn'], ['ss', 'sunstrike', 'Mittagsglanz'], ['rh', 'hauler', 'Rust Hauler'], ['as', 'arctic', 'Arctic Survey']];
   const STATION = 7;   // the ground station's strip beside the pad
   Forge.register({
     id: 'shuttle', icon: '🚀', name: 'Raumschiff', en: 'Spaceship', level: true, sh: 1,

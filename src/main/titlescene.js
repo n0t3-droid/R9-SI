@@ -22,6 +22,7 @@
   TS.SEED = 4242;
   TS.HZ_MAX = 3;                // the horizon level at most (3 km)
   TS.REVEAL = 2.5;              // seconds: the land out of the haze
+  TS.HAZE = 0.3;                // f-first: how far the land comes out of the haze while it is not finished
   TS.genOpts = () => ({ vgen: 11, noLand: true, noCrystal: true });
   TS.mode = (S) => (S && (S.preset === 'potato' || S.lite) ? 'still' : 'drift');
   TS.due = (acc) => acc >= 1 / TS.FPS - 1e-4;
@@ -77,8 +78,11 @@
       if (hz && w) { if (hz.farOn && hz.farOn()) hz.setFar(0); if (hz.level > TS.HZ_MAX) hz.setLevel(TS.HZ_MAX); }
       // the upload queue and the workers keep going every frame (no column requests: w.update is never called)
       if (w) { if (w.lastUpd !== undefined && now > w.lastUpd) w.uploadQ.frame(now - w.lastUpd, now); w.lastUpd = now; w.drainUploads(this.cam.x, this.cam.z, now); g.pool.pump(); }
-      if (!this.landAt && (this.landReady() || now - this.t0 > 12000)) this.landAt = now;
-      if (this.landAt) this.reveal = Math.min(1, (now - this.landAt) / 1000 / TS.REVEAL);
+      // (f-first, review v0.52 R53-03: after 12 s the half-built land came out anyway — flat grey slabs under the menu;
+      // now it comes out only finished, and until then a slow machine sees it as a silhouette in the golden haze)
+      if (!this.landAt && this.landReady()) this.landAt = now;
+      if (this.landAt) this.reveal = Math.max(this.reveal, Math.min(1, (now - this.landAt) / 1000 / TS.REVEAL));
+      else if (now - this.t0 > 12000) this.reveal = Math.min(TS.HAZE, (now - this.t0 - 12000) / 1000 / TS.REVEAL * TS.HAZE);
       if (!TS.due(this.acc) && !sized) return;   // (30 fps: the frame between keeps the last picture; the horizon asks again at the next)
       this.acc = 0;
       this.draw(this.t % TS.LOOP);

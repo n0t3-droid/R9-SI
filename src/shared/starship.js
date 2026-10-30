@@ -19,14 +19,14 @@
 
   const PAL = [
     { key: 'starforge', name: 'Sternglut', hull: 0xe9ecf1, hull2: 0xc3c9d3, trim: 0x3a3f4b, acc: 0xf07a1e, acc2: 0x2e7de0, glow: 0x5af4ff, glass: 0x1b3a66, eng: 0x4a4f5a, core: 0xffb45a },
-    { key: 'nightwing', name: 'Nightwing', hull: 0x2c2f3a, hull2: 0x3d4150, trim: 0x16181e, acc: 0xe0409e, acc2: 0x8a4bff, glow: 0xff5ad8, glass: 0x2a1446, eng: 0x23252d, core: 0xff6adf },
-    { key: 'sunstrike', name: 'Sunstrike', hull: 0xf2efe8, hull2: 0xd9d3c7, trim: 0x46403a, acc: 0xd83b2b, acc2: 0xf5c43a, glow: 0xffc23a, glass: 0x1d4f7a, eng: 0x4d4843, core: 0xffd27a },
+    { key: 'nightwing', name: 'Nightpoppy', hull: 0x2c2f3a, hull2: 0x3d4150, trim: 0x16181e, acc: 0xe0409e, acc2: 0x8a4bff, glow: 0xff5ad8, glass: 0x2a1446, eng: 0x23252d, core: 0xff6adf },
+    { key: 'sunstrike', name: 'Noonglow', hull: 0xf2efe8, hull2: 0xd9d3c7, trim: 0x46403a, acc: 0xd83b2b, acc2: 0xf5c43a, glow: 0xffc23a, glass: 0x1d4f7a, eng: 0x4d4843, core: 0xffd27a },
     { key: 'verdant', name: 'Verdant Corps', hull: 0xd8ddd2, hull2: 0xaeb8a4, trim: 0x2f4a2b, acc: 0x6fd83a, acc2: 0x2c8a4a, glow: 0x9cff6a, glass: 0x173d33, eng: 0x3e4a3e, core: 0xc8ff7a },
     { key: 'royal', name: 'Royal Blue', hull: 0x2f5ad8, hull2: 0x5c86ec, trim: 0x1e2a4a, acc: 0xf5d03a, acc2: 0xffffff, glow: 0xfff3a8, glass: 0x10244a, eng: 0x2a3148, core: 0xfff0a0 },
     { key: 'hauler', name: 'Rust Hauler', hull: 0xb8683a, hull2: 0x8f5433, trim: 0x3a2f28, acc: 0xf2c230, acc2: 0x2b2b2b, glow: 0xffa13a, glass: 0x1f3440, eng: 0x4b4541, core: 0xffa850 },
     { key: 'prism', name: 'Prism Guild', hull: 0xf4f1fb, hull2: 0xd8cff0, trim: 0x4b2f78, acc: 0xa35cff, acc2: 0xff5ad8, glow: 0x9f7bff, glass: 0x2a1450, eng: 0x3b3150, core: 0xc9a2ff },
     { key: 'arctic', name: 'Arctic Survey', hull: 0xf5f8fb, hull2: 0xcfdbe6, trim: 0x2f4f63, acc: 0x2bb3e0, acc2: 0xff7a3a, glow: 0x7ef1ff, glass: 0x123a52, eng: 0x3d4b57, core: 0x9ef8ff },
-    { key: 'crimson', name: 'Crimson Fleet', hull: 0xb3262b, hull2: 0x8c1e22, trim: 0x2a1718, acc: 0xf2f2f2, acc2: 0xf2a33a, glow: 0xff5a4a, glass: 0x2a0f12, eng: 0x3a2a2b, core: 0xff8a5a },
+    { key: 'crimson', name: 'Carmine Fleet', hull: 0xb3262b, hull2: 0x8c1e22, trim: 0x2a1718, acc: 0xf2f2f2, acc2: 0xf2a33a, glow: 0xff5a4a, glass: 0x2a0f12, eng: 0x3a2a2b, core: 0xff8a5a },
   ];
   const NAMES = ['Kestrel', 'Starling', 'Halcyon', 'Vesper', 'Corvid', 'Tern', 'Lumen', 'Solace', 'Wayfarer', 'Drift', 'Ember', 'Nimbus', 'Quill', 'Harrier', 'Aurel', 'Sable', 'Vanta', 'Cinder', 'Zephyr', 'Lyra', 'Orrin', 'Juno', 'Talon', 'Mistral', 'Borealis', 'Solstice', 'Rook', 'Gale', 'Aster', 'Pike', 'Marlin', 'Osprey', 'Wren', 'Kite', 'Swift', 'Petrel', 'Heron', 'Lark', 'Fulmar', 'Comet', 'Meridian', 'Halo', 'Tempest', 'Nova', 'Umbra', 'Pioneer', 'Bramble', 'Saffron', 'Cobalt', 'Tidewater'];
   const ARCH = {
