@@ -636,6 +636,24 @@
     }
     return best;
   };
+  // f-first (review v0.52 R53-09: the adventurer's first outpost was 774 m away): an Abenteuer world's start — a place
+  // 200–300 m from the outpost nearest to (x, z), on dry, even ground, on the side of (x, z) where it can be, facing the
+  // outpost. Read-only: it asks the climate and the surface, nothing generated changes (no vgen). → {pos, out, yaw, d} | null
+  OG.outpostApproach = function (x, z) {
+    const o = this.nearestOutpost(x, z); if (!o) return null;
+    const base = Math.atan2(z - o.z, x - o.x);
+    for (const D of [240, 220, 260, 200, 280]) for (const da of [0, 0.3, -0.3, 0.6, -0.6, 0.9, -0.9, 1.3, -1.3, 1.8, -1.8, 2.4, -2.4, Math.PI]) {
+      const px = Math.round(o.x + Math.cos(base + da) * D), pz = Math.round(o.z + Math.sin(base + da) * D);
+      const y = this.surfaceY(px, pz); if (!(y > SEA + 1 && y < 140)) continue;
+      const b = B[this.biomeFor(this.climateAt(px, pz), y)]; if (!b || b.ocean || b.river) continue;
+      let even = true;
+      for (const [dx, dz] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) if (Math.abs(this.surfaceY(px + dx, pz + dz) - y) > 2) { even = false; break; }
+      if (!even) continue;
+      const yaw = Math.atan2(-(o.x - px), -(o.z - pz));   // (forward is (−sin yaw, −cos yaw): the outpost ahead)
+      return { pos: [px + 0.5, y + 1, pz + 0.5], out: [o.x, o.y, o.z], yaw, d: Math.round(Math.hypot(o.x - px, o.z - pz)) };
+    }
+    return null;
+  };
   function structures(g, w, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16;
     const ci = Math.floor(x0 / OUT_CELL), cj = Math.floor(z0 / OUT_CELL);

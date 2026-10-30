@@ -270,7 +270,18 @@
     if (!FI.want(g, meta)) return null;
     meta.vistaStart = 2;   // (decided: the next start of this world is an ordinary one)
     const v = FI.pick(await FI.vistas(g, dim));
-    if (!v || g.meta !== meta) return null;
+    if (g.meta !== meta) return null;
+    // f-first (R53-09): an Abenteuer world starts 200–300 m from its first outpost, facing it, in the morning
+    if (FI.advWorld(meta)) {
+      const r = await FI.outpostStart(g, dim, v ? FI.feet(v) : [0, 0, 0]);
+      if (r && r.pos && g.meta === meta) {
+        g.env.setTime(FI.ADV_TOD); meta.time = FI.ADV_TOD;
+        meta.clearUntil = FI.clearUntil(g.env.day | 0); g.env.wx.clearUntil = meta.clearUntil;
+        meta.advStart = { out: r.out, d: r.d };
+        return { pos: r.pos, yaw: r.yaw, pitch: -0.06 };
+      }
+    }
+    if (!v) return null;
     // (the arrival's camera faces the landmark's middle: the feet face it too, at the walk's own pitch)
     const A = FI.arrivalOf(v), sp = { pos: FI.feet(v), yaw: A.yaw, pitch: v.pitch, vista: A }, tod = FI.clock(A.yaw);
     g.env.setTime(tod); meta.time = tod;
@@ -279,6 +290,16 @@
     g.arrivalPending = { vista: A };
     return sp;
   };
+  // f-first (R53-09): a world made with Spielweg „Abenteuer" (adventure.js marks it when the world is there — before
+  // that its create choice waits in pendingCreate) starts near its first outpost in the morning: the sun 7.4° up in the
+  // east (t-light2's golden mirror), nine minutes of day ahead instead of one
+  FI.ADV_TOD = FI.GOLD_AM;
+  FI.advWorld = (meta) => !!(meta && meta.adventure && meta.adventure.on) || !!(VR.Adventure && VR.Adventure.pendingCreate && Date.now() - VR.Adventure.pendingCreate.at < 120000);
+  FI.outpostStart = (g, dim, ref) => new Promise((res) => {
+    let done = false; const fin = (v) => { if (!done) { done = true; res(v); } };
+    setTimeout(() => fin(null), 20000);
+    try { g.pool.direct(0, { type: 'outpostStart', dim, x: Math.floor(ref[0]), z: Math.floor(ref[2]) }, null, (m) => fin(m && m.type === 'outpostStart' ? m.r : null)); } catch (e) { fin(null); }
+  });
   // a world's start: its first day's clear sky again after a reload on that day
   FI.onLoad = function (g, meta) { if (meta && meta.clearUntil > 0 && g.env && g.env.wx) g.env.wx.clearUntil = meta.clearUntil; };
   // the loading screen's last moments (game.js loadingFrame, the world ready): an arrival's white rises over it first —

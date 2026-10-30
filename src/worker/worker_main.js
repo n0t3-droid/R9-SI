@@ -317,6 +317,9 @@
         const r = VR.PlanetLOD.job(m, getGen), tr = r.transfer; delete r.transfer; post(r, tr);
       } else if (m.type === 'bodytex') {   // u-space0: a body's texture rows for the space scene (src/shared/bodytex.js)
         const r = VR.BodyTex.job(m, getGen), tr = r.transfer; delete r.transfer; post(r, tr);
+      } else if (m.type === 'outpostStart') {   // f-first: an Abenteuer world's start near its first outpost (gen_realm.js, read-only)
+        const g = getGen(m.dim);
+        post({ type: 'outpostStart', id: m.id, r: g.outpostApproach ? g.outpostApproach(m.x, m.z) : null });
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;

@@ -14,7 +14,7 @@ const path = require('path');
 require('./dom_stub.js');
 { const ce = document.createElement.bind(document); document.createElement = (t) => { const e = ce(t); if (!e.style) e.style = {}; return e; }; }
 let CLOCK = 0; global.performance = { now: () => CLOCK };
-require('./load_shared.js');
+const V = require('./load_shared.js');
 require('../src/main/i18n.js');
 require('../src/main/lang_en.js');
 require('../src/main/lang_de.js');
@@ -101,6 +101,27 @@ console.log('2 · one prompt per key; 4 · the pause menu\'s five (R53-05, R53-0
   check(!/\{key\}|\[/.test(de['story.offer.card'] + en['story.offer.card']), 'Funke\'s offer beside the card names no key: „' + de['story.offer.card'] + '"');
   const fs = require('fs'), story = fs.readFileSync(path.join(__dirname, '..', 'src/main/story.js'), 'utf8'), ctx = fs.readFileSync(path.join(__dirname, '..', 'src/main/ctx.js'), 'utf8');
   check(/cardText \|\| text/.test(story) && /VR\.FirstLook\.keyFree\(g\)/.test(ctx), 'story.js speaks the line without the key, ctx.js asks keyFree before its prompt');
+}
+
+console.log('5 · an Abenteuer world starts near its first outpost, in the morning (R53-09)');
+{
+  const t0 = Date.now(), rows = [];
+  for (const seed of [4242, 12345, 777, 99, 2026]) {
+    const g = V.makeGen('overworld', seed, { vgen: 14 });
+    const sp = g.findSpawn(), r = g.outpostApproach(sp[0], sp[2]);
+    const far = g.nearestOutpost(sp[0], sp[2]);
+    const near = r ? g.nearestOutpost(r.pos[0], r.pos[2]) : null;
+    const dn = near ? Math.hypot(near.x - r.pos[0], near.z - r.pos[2]) : -1;
+    const fwd = r ? [-Math.sin(r.yaw), -Math.cos(r.yaw)] : [0, 0], to = r ? [r.out[0] - r.pos[0], r.out[2] - r.pos[2]] : [0, 0];
+    const cos = r ? (fwd[0] * to[0] + fwd[1] * to[1]) / (Math.hypot(to[0], to[1]) || 1) : 0;
+    rows.push({ seed, from: far ? Math.round(Math.hypot(far.x - sp[0], far.z - sp[2])) : -1, d: r ? r.d : -1, dn: Math.round(dn), cos: +cos.toFixed(3) });
+  }
+  console.log('    ' + rows.map(r => 'seed ' + r.seed + ': the generator\'s spawn ' + r.from + ' m → start ' + r.dn + ' m').join(' · ') + ' (' + (Date.now() - t0) + ' ms)');
+  check(rows.every(r => r.d >= 200 && r.d <= 300 && r.dn >= 0 && r.dn <= 300), 'every seed: the start 200–300 m from an outpost, and no nearer one is farther (' + rows.map(r => r.dn).join(', ') + ' m)');
+  check(rows.every(r => r.cos > 0.999), 'the start faces the outpost');
+  const FI = VR.First;
+  check(FI.ADV_TOD === FI.GOLD_AM && (12000 - FI.ADV_TOD) / 20 / 60 >= 5, 'the morning: tick ' + FI.ADV_TOD + ' — ' + ((12000 - FI.ADV_TOD) / 20 / 60).toFixed(1) + ' minutes of day ahead (the evening golden hour: ' + ((12000 - FI.GOLD) / 20 / 60).toFixed(1) + ')');
+  check(FI.advWorld({ adventure: { on: true } }) && !FI.advWorld({}) , 'an Abenteuer world is known by its record (or its create choice)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
