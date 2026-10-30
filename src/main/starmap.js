@@ -215,7 +215,7 @@
     if (here && !s.home) h += `<canvas id="smOrr" width="286" height="190" style="margin-top:8px;width:286px;height:190px;background:#050914;border-radius:8px"></canvas>`;
     if (!here) {
       const ok = !why && (d <= range || i === 0);
-      h += `<button class="btn primary" id="smJump" style="margin-top:10px;width:100%" ${ok ? '' : 'disabled'}>🚀 ${esc(T(i === 0 ? 'g.stars.jumpHome' : 'g.stars.jump'))}</button>`;
+      h += `<button class="btn primary" id="smJump" style="margin-top:10px;width:100%;${ok ? '' : 'opacity:.4;filter:grayscale(1);cursor:not-allowed'}" ${ok ? '' : 'disabled'}>🚀 ${esc(T(i === 0 ? 'g.stars.jumpHome' : 'g.stars.jump'))}</button>`;
       if (!ok) h += `<div style="margin-top:6px;opacity:.8;font-size:12px">${esc(T(why || 'g.stars.range', { ly: fmt(d), max: range }))}</div>`;
     }
     card.innerHTML = h; card.style.display = 'block';

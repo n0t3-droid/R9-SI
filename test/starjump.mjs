@@ -184,11 +184,11 @@ async function stars(P, tag) {
   }
   if (tag !== 'high') return;
   if (want('binary') && C.bin) {
-    await P.ev(([i, f]) => { const g = VR.game; VR.StarJump.enter(g, i, { quiet: true, focus: f, phaseDeg: 70, dist: 4 }); VR.StarJump.debug.alignMoon(g, 14); VR.StarJump.debug.look(g, 'focus', 1); }, [C.bin, C.binFocus]);
+    await P.ev(([i, f]) => { const g = VR.game; VR.StarJump.enter(g, i, { quiet: true, focus: f, phaseDeg: 70, dist: 4 }); VR.StarJump.debug.alignMoon(g, -7); VR.StarJump.debug.look(g, 'focus', 1); }, [C.bin, C.binFocus]);
     await shot(P, 'binary_two_shadows.png', tag);
   }
   if (want('nebula')) {
-    await P.ev((i) => { const g = VR.game; g.settings.nebulaTrue = false; VR.StarJump.enter(g, i, { quiet: true, phaseDeg: 140, dist: 7 }); const S = g.stars; S.yaw += 2.4; S.pitch = 0.25; }, C.neb);
+    await P.ev((i) => { const g = VR.game; g.settings.nebulaTrue = false; VR.StarJump.enter(g, i, { quiet: true, phaseDeg: 140, dist: 7 }); const S = g.stars; S.yaw += 0.9; S.pitch = 0.3; }, C.neb);
     await shot(P, 'nebula_inside.png', tag);
     await P.ev(() => { VR.game.settings.nebulaTrue = true; });
     await shot(P, 'nebula_truecolour.png', tag);

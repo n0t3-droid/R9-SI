@@ -204,14 +204,14 @@ float fbm(vec3 p, int oct) { float s = 0.0, a = 0.5; for (int i = 0; i < 6; i++)
 vec3 nebula(vec3 D, int oct, float pxr) {
   float sd = u_neb.z;
   float n = fbm(D * 1.7 + sd, oct), m = fbm(D * 3.3 + sd * 1.7 + 5.0, oct);
-  float walls = smoothstep(0.38, 0.72, n);
+  float walls = smoothstep(0.46, 0.78, n);
   float hot = max(dot(D, u_nebHot), 0.0);
-  float core = pow(hot, 5.0) * smoothstep(0.3, 0.65, m) * (0.5 + walls);
+  float core = pow(hot, 2.5) * smoothstep(0.35, 0.7, m) * (0.4 + walls);
   float lane = smoothstep(0.5, 0.64, m);
   float rim = smoothstep(0.44, 0.5, m) * (1.0 - smoothstep(0.5, 0.56, m)) * (0.35 + 0.65 * hot) * walls;
   vec3 ha = vec3(1.0, 0.12, 0.26), o3 = vec3(0.06, 0.8, 0.7);
-  vec3 c = ha * (0.06 + 0.42 * walls * walls + 0.12 * n) + o3 * core * 1.1 + vec3(1.0, 0.45, 0.42) * rim * 1.4;
-  c *= 1.0 - 0.88 * lane * (1.0 - 0.6 * core);
+  vec3 c = ha * (0.012 + 0.2 * walls * walls + 0.03 * n * n) + o3 * core * 0.55 + vec3(1.0, 0.5, 0.45) * rim * 0.5;
+  c *= 1.0 - 0.94 * lane * (1.0 - 0.5 * core);
   // newborn stars: red points in the dense gas
   c += starGrid(D, 90.0, 41.0 + sd, 0.35 * walls, 0.6, pxr, 0.55) * walls;
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -572,7 +572,7 @@ void main() {
     UF.neb[0] = inNeb ? 1 : 0;
     if (inNeb) {
       const nb = S.N.nebs[sysRec.neb], tr = !!g.settings.nebulaTrue;
-      UF.neb[1] = (tr ? 0.05 : 1) * sysK; UF.neb[2] = (nb.seed % 997) / 37; UF.neb[3] = tr ? 0.55 : 1.15;
+      UF.neb[1] = (tr ? 0.05 : 1) * sysK; UF.neb[2] = (nb.seed % 997) / 37; UF.neb[3] = tr ? 0.5 : 0.85;
     }
     // the system's bodies round the camera (units: the focus' radius)
     UF.S[3] = 0; UF.S[7] = 0; UF.n = 0; UF.sky[0] = UF.sky[1] = UF.sky[2] = 0;
@@ -697,7 +697,7 @@ void main() {
       const r = base.call(this, dim, eye, tt, o);
       const x = r && SJ.exoStar(dim);
       if (!x) return r;
-      const star = x.def.star, tint = colOf(star.color), Hs = colOf('#dddeff'), k = [tint[0] / Hs[0], tint[1] / Hs[1], tint[2] / Hs[2]];
+      const star = x.def.star, tint = colOf(star.color), Hs = colOf('#dddeff'), k = [0, 1, 2].map(i => Math.pow(tint[i] / Hs[i], 0.6));   // (the eye adapts part of the way, R§7)
       const g = VR.game, S = g && g.stars, fl = S && S.flareLand ? S.flareLand : 0;
       const m = (a) => a ? a.map((v, i) => v * k[i % 3] * (1 + fl)) : a;
       r.light.sunColor = m(r.light.sunColor); r.light.ambSky = m(r.light.ambSky); r.light.far = m(r.light.far);
@@ -710,6 +710,7 @@ void main() {
       const st = G().skyTint(star.T), sh = G().skyTint(6550), sk = st.map((v, i) => Math.pow(v / sh[i], 2.2));
       if (r.sky.air3) r.sky.air3 = r.sky.air3.map((v, i) => v * sk[i % 3] * k[i % 3]);
       if (r.sky.airB) r.sky.airB = r.sky.airB.map((v, i) => v * sk[i % 3] * k[i % 3]);
+      if (r.sky.airK) r.sky.airK = [r.sky.airK[0], r.sky.airK[1], 0, r.sky.airK[3]];   // (the three stops, tinted, not Helia's LUT)
       r.exo = { sys: x.e.sys, T: star.T, ang };
       return r;
     };

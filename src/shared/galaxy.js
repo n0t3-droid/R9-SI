@@ -112,7 +112,7 @@
     'ferelden', 'narnia', 'mordor', 'gondor', 'rohan', 'westeros', 'essos', 'hogwarts', 'pern', 'dune', 'riverworld', 'ringworld',
     'tralfamadore', 'gor', 'barsoom', 'perelandra', 'malacandra', 'solaria', 'aurora', 'helicon', 'anacreon', 'kalgan', 'siwenna',
     'lusitania', 'shakespeare', 'hyperion', 'lv', 'origae', 'paradise', 'abydos', 'chulak', 'dakara', 'tollana', 'atlantis', 'ego',
-    'xandar', 'sakaar', 'titan', 'vormir', 'zenn', 'oa', 'apokolips', 'rann', 'thanagar', 'tamaran', 'daxam', 'hala', 'nidavellir'];
+    'athena', 'zeus', 'apollo', 'hera', 'odin', 'thor', 'freya', 'loki', 'xandar', 'sakaar', 'titan', 'vormir', 'zenn', 'oa', 'apokolips', 'rann', 'thanagar', 'tamaran', 'daxam', 'hala', 'nidavellir'];
   const blocked = (n) => { const l = n.toLowerCase(); for (const b of BLOCK) if (l === b || (b.length >= 5 && l.indexOf(b) >= 0)) return true; return false; };
   function nameOf(r, used) {
     for (let k = 0; k < 40; k++) {
