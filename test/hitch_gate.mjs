@@ -216,13 +216,18 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   // how far each kept up: the columns round the player shown when the flight ends (a build that streams more works more)
   const shown = [];
   for (const P of Ps) shown.push(await P.ev(() => { const w = VR.game.world, p = VR.game.player, cx = Math.floor(p.pos[0]) >> 4, cz = Math.floor(p.pos[2]) >> 4, rd = w.renderDist; let n = 0; for (const c of w.cols.values()) { const dx = c.cx - cx, dz = c.cz - cz; if (dx * dx + dz * dz <= (rd + 0.5) * (rd + 0.5) && c.shownAt >= 0) n++; } return n; }));
-  // the end: both settle at the last spot, the same view photographed (the pictures alike)
+  // the end: both back at the start, low over the land (the flight's end is fog over half-loaded land), settled, the same
+  // view photographed (the pictures alike)
   const shots = [];
-  if (round === 0) for (const P of Ps) {
-    await settle(P, 300);
-    await P.ev((c) => window.__place(...c), path[path.length - 1]);
-    for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.0, false));
-    const f = `${SHOTS}hitch_gate_${preset}_${P.b.id}.png`; await P.page.screenshot({ path: f, timeout: 900000 }); shots.push(f);
+  if (round === 0) {
+    const [x0, , z0] = path[0];
+    const view = await Ps[0].ev(([x, z]) => { const g = VR.game, gen = VR.makeGen ? VR.makeGen('overworld', g.world.seed, g.world.genOpts) : null; const y = gen && gen.surfaceY ? gen.surfaceY(Math.floor(x), Math.floor(z)) : 70; return [x, y + 14, z, 0.6, -0.22]; }, [x0, z0]);
+    for (const P of Ps) { await P.ev((c) => window.__place(...c), view); await settle(P, 420); }
+    for (const P of Ps) {
+      await P.ev((c) => window.__place(...c), view);
+      for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.0, false));
+      const f = `${SHOTS}hitch_gate_${preset}_${P.b.id}.png`; await P.page.screenshot({ path: f, timeout: 900000 }); shots.push(f);
+    }
   }
   const bMed = med(fr[0].map(f => f[0]));
   const run = { round, preset, settleS, kept, shots, allocs, builds: {} };
