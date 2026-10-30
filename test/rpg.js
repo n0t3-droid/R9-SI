@@ -183,9 +183,14 @@ console.log('6 · the loot burst, the fanfare, the texts');
   const main = SRC + 'main/rpg.js';
   if (fs.existsSync(main)) {
     const txt = fs.readFileSync(main, 'utf8') + (fs.existsSync(SRC + 'main/rpg_boss.js') ? fs.readFileSync(SRC + 'main/rpg_boss.js', 'utf8') : '');
-    const keys = new Set((txt.match(/'g\.rpg\.[a-zA-Z0-9_.]+'/g) || []).map(s => s.slice(1, -1)));
+    const keys = new Set((txt.match(/'g\.rpg\.[a-zA-Z0-9_.]+'/g) || []).map(s => s.slice(1, -1)).filter(k => !k.endsWith('.')));
+    for (const s of B.SLOTS) { keys.add('g.rpg.slot.' + s); for (const v of B.variants[s]) keys.add('g.rpg.it.' + v); }
+    for (const r of B.RAR) keys.add('g.rpg.rar.' + r);
+    for (const k of B.PERKS) { keys.add('g.rpg.pk.' + k); keys.add('g.rpg.sum.' + k); }
+    for (const a of Object.keys(B.boss.tele)) keys.add('g.rpg.boss.warn.' + a);
     const de = fs.readFileSync(SRC + 'main/lang_de.js', 'utf8'), en = fs.readFileSync(SRC + 'main/lang_en.js', 'utf8');
-    const miss = [...keys].filter(k => de.indexOf("'" + k + "'") < 0 || en.indexOf("'" + k + "'") < 0);
+    const has = (src, k) => src.indexOf("'" + k + "'") >= 0 || src.indexOf('"' + k + '"') >= 0;
+    const miss = [...keys].filter(k => !has(de, k) || !has(en, k));
     check(keys.size >= 20 && !miss.length, keys.size + ' texts in both tables' + (miss.length ? ' — missing: ' + miss.slice(0, 6).join(', ') : ''));
   } else check(false, 'src/main/rpg.js missing');
 }
