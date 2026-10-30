@@ -96,7 +96,7 @@
   H.stats = { hits: 0, pops: 0, lines: 0 };
   if (G && G.prototype.startWorld && !G.prototype.startWorld.__hf) {
     const os = G.prototype.startWorld;
-    G.prototype.startWorld = function () { H.fresh(this); this.hf = null; H.pend = []; return os.apply(this, arguments); };
+    G.prototype.startWorld = function () { H.fresh(this); this.hf = null; H.pend = []; H.freedAt = null; H.freedT = 0; if (VR.First2) VR.First2.moved = null; return os.apply(this, arguments); };
     G.prototype.startWorld.__hf = true;
   }
   // the clank: a struck plate — a noise tick and three inharmonic partials, the pitch walking

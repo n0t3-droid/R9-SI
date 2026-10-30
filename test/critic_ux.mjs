@@ -115,15 +115,18 @@ OUT.itemNamesData = await ev(() => { const inv = VR.game.player.inv; return inv.
 // (v0.53 review) the first three minutes as a new player spends them: walking about, looking round; what is on screen
 // and which hints the HUD gives at 2 and 3 minutes
 OUT.hints3 = [];
+const WALK_HOLDS = 6;
 for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
-  while (Date.now() - tPlay < tEnd - 6000) { await holdFor('KeyW', 3000, 2); await page.mouse.move(640 + (Math.random() * 400 - 200), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(1500); }
+  // (f-hud: the walk counted in W holds, not wall time — under SwiftShader the wall clock ran out with 17 m walked: six holds of
+  //  W (3 s and 2 frames each) a sample, small alternating looks so the way keeps a heading, a jump after each)
+  for (let i = 0; i < WALK_HOLDS; i++) { await holdFor('KeyW', 3000, 2); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
 OUT.hand180 = await handProbe();
 check(OUT.hand180 && (!OUT.hand180.block || OUT.hand180.cover <= 0.03), 'at 180 s the held block covers ≤ 3 %: ' + JSON.stringify(OUT.hand180));
 { const last = OUT.hints3[OUT.hints3.length - 1], sp = await ev(() => VR.game.player.spawn).catch(() => null); OUT.away180 = last && last.pos && sp ? Math.round(Math.hypot(last.pos[0] - sp[0], last.pos[2] - sp[2])) : -1;
-  check(OUT.away180 >= 20, 'at 3 minutes the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
+  check(OUT.away180 >= 20, 'after ' + (OUT.wHolds || 0) + ' W holds (3 minutes) the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
 console.log('  first 3 min: ' + JSON.stringify(OUT.hints3).slice(0, 1200));
 await page.keyboard.press('Escape'); await wait(1500); await shot('09_pause');
 // R53-04: the pause menu fits 720 px, few buttons at its top level
@@ -187,6 +190,13 @@ if (!process.env.NO_ADV) {
   check(ok && OUT.adv && OUT.adv.adv && OUT.adv.d >= 0 && OUT.adv.d <= 320, 'Abenteuer: the nearest outpost ' + (OUT.adv && OUT.adv.d) + ' m from the spawn (≤ 320)');
   check(light >= 5, 'Abenteuer: ' + OUT.advLightMin + ' minutes of day light ahead (≥ 5)');
   await wait(20000); await shot('17_adv_t25');
+  // f-hud: the Abenteuer start shows its HUD (critic_ux_17 of f-first2: none — F1's hidden HUD of the first world carried
+  // over), Funke never in the camera's face, the settle move made under the arrival's white
+  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
+  console.log('  adv 25 s: ' + JSON.stringify(OUT.advHud25));
+  check(OUT.advHud25 && OUT.advHud25.vis !== 'hidden' && OUT.advHud25.op > 0.5 && !OUT.advHud25.hideHud, 'Abenteuer: at 25 s the HUD is up (F1 in the first world does not carry over): ' + JSON.stringify(OUT.advHud25));
+  check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6), 'Abenteuer: Funke not in the camera\'s face (' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
+  check(OUT.advHud25 && (!OUT.advHud25.moved || OUT.advHud25.moved.phase !== 'after'), 'Abenteuer: the spawn\'s settle move under the arrival\'s white (' + JSON.stringify(OUT.advHud25 && OUT.advHud25.moved) + ')');
   await offerCheck('18');
 }
 OUT.errors = errs; OUT.ms = Date.now() - t0;

@@ -311,7 +311,7 @@
     const op = G.prototype.playFrame;
     G.prototype.playFrame = function (dt) {
       if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); this.f2t = 0; this.f2wait = 3; this.f2new = !!this.meta && !this.meta.player; }
-      if (this.f2wait > 0 && this.arrival && this.arrival.phase !== 'full' && F.underVeil(this)) { this.f2wait = 0; F.settle(this); }   // (f-hud: under the white)
+      if (this.f2wait > 0 && this.arrival && this.arrival.phase !== 'full' && F.underVeil(this)) { this.f2wait = 0; const r = F.settle(this); if (r) r.phase = this.arrival.phase; }   // (f-hud: under the white)
       if (this.f2wait > 0 && !this.arrival && !(this.wow && this.wow.active) && !(this.ui && this.ui.screen) && --this.f2wait === 0) F.settle(this);
       { const n = performance.now(); this.f2gap = this.f2t && !(this.ui && this.ui.screen) ? (n - this.f2t) / 1000 : 0; this.f2t = n; }
       const r = op.apply(this, arguments);
