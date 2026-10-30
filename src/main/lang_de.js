@@ -3093,5 +3093,29 @@
     "ctl.starmap": "Sternkarte",
     "g.dim.exo": "Welt eines fernen Sterns",
     // ---- u-stars end
-});
+    // ---- a-boss2 (src/main/rpg_boss2.js)
+    "g.rpg.boss2.kick": "Wächter des Kernfeuers · {region}",
+    "g.rpg.boss2.sub": "Weich seinen Angriffen aus — triff, was golden glüht",
+    "g.rpg.boss2.subCalm": "Er ist verwirrt — beruhige ihn mit V im grünen Bogen",
+    "g.rpg.boss2.hint1": "Achte auf den Boden: Wo er rot leuchtet, schlägt er gleich zu. Der helle Ring zeigt, wie viel Zeit dir bleibt. Danach glühen seine Knie golden — da triffst du doppelt!",
+    "g.rpg.boss2.hint2": "Phase 2: Sein Schild hält alles ab. Bring erst die drei Drohnen zur Ruhe — dann öffnet sich der Kern in seiner Brust. Triff ihn von vorn!",
+    "g.rpg.boss2.hint3": "Letzte Phase: Er wird schneller, aber sein Kern bleibt länger offen. Ruhig bleiben — ausweichen, dann zuschlagen!",
+    "g.rpg.boss2.hint1c": "Er ist nur verwirrt. Drück V, wenn die Nadel im grünen Bogen steht — dreimal pro Phase.",
+    "g.rpg.boss2.hint2c": "Gut so! Er wird schon ruhiger. Noch einmal drei sanfte Ringe.",
+    "g.rpg.boss2.hint3c": "Fast geschafft — sein Licht wird schon wärmer. Die letzten drei Ringe!",
+    "g.rpg.boss2.ped": "Auf dem Sockel am Kernfeuer leuchtet etwas — geh hin und nimm es!",
+    "g.rpg.boss2.pedTaken": "Ein strahlender Fund — der Lohn des Kernfeuers!",
+    "g.rpg.boss2.wonSub": "dein Fund wartet auf dem Sockel",
+    "g.rpg.boss2.next": "Nächstes Ziel",
+    "g.rpg.boss2.nextBoss": "Das Kernfeuer — sein Wächter wartet · {d} m",
+    "g.rpg.boss2.nextOut": "Außenposten {name} befreien · {d} m",
+    "g.rpg.boss2.nextNone": "Erkunde die Welt — neue Außenposten warten",
+    "g.rpg.boss2.leg.out": "Außenposten",
+    "g.rpg.boss2.leg.free": "befreit",
+    "g.rpg.boss2.leg.boss": "Kernfeuer",
+    "g.rpg.boss2.leg.shop": "Dorf mit Läden",
+    "g.rpg.boss2.leg.travel": "Schnellreise",
+    "g.rpg.boss2.leg.goal": "Nächstes Ziel",
+    // ---- a-boss2 end
+  });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

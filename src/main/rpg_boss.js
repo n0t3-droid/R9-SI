@@ -29,7 +29,8 @@
   const game = () => VR.game || null;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-  const TAU = Math.PI * 2, BB = R.BAL.boss, SC = 2.8;
+  const TAU = Math.PI * 2, BB = R.BAL.boss;
+  const B2on = () => !!(VR.RPGBoss2 && !VR.RPGBoss2.off), scNow = () => (B2on() ? 3.5 : 2.8);   // a-boss2: drawn ×1.25
   const BS = VR.RPGBoss = { cur: null, cost: { frames: 0, ms: 0, draws: 0, sparks: 0 }, healT: -1, healAt: null, note: {}, hintEl: null };
   BS.KEYS = ['g.rpg.boss.name', 'g.rpg.boss.awake', 'g.rpg.boss.phase', 'g.rpg.boss.shield', 'g.rpg.boss.warn.stomp', 'g.rpg.boss.warn.slam', 'g.rpg.boss.warn.fan', 'g.rpg.boss.weak', 'g.rpg.boss.calm', 'g.rpg.boss.calmOk', 'g.rpg.boss.calmMiss', 'g.rpg.boss.won.kick', 'g.rpg.boss.won.title', 'g.rpg.boss.won.sub', 'g.rpg.boss.hint', 'g.rpg.boss.ready', 'g.rpg.boss.funke'];
 
@@ -39,7 +40,9 @@
     const WH = 0xe6dfd2, WH2 = 0xcfc5b4, OR = 0xe2702c, OR2 = 0xb4521c, GR = 0x5b616a, GR2 = 0x3a3f47, DK = 0x24272d, RU = 0x95603c, LENS = 0xf6f2ff;
     const wz = (b, x, y, z) => { const h = ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0; return h % 19 === 0 ? RU : h % 6 === 0 ? WH2 : b; };
     const leg = () => part(5, 20, 5, [2, 19, 2], (g) => { g.box(0, 10, 0, 4, 19, 4, GR); g.box(0, 2, 0, 4, 9, 4, (x, y, z) => (y === 6 ? OR : wz(WH, x, y, z))); g.box(-0, 0, -1, 4, 1, 5, DK); });
-    M.rpg_walker = () => ({
+    // a-boss2: rpg_walker2 — the same machine with its glowing parts emissive (readable from 60 m), a mast on the tower and
+    // a bigger lantern on top of it (src/main/rpg_boss2.js draws it ×1.25; VR.RPGBoss2.off draws the first one)
+    const walker = (v2) => () => ({
       h: 5.4, w: 1.6, parts: {
         hull: part(24, 14, 24, [12, 0, 12], (g) => {
           g.ell(12, 7, 12, 11.6, 6.8, 11.6, (x, y, z) => (y <= 2 ? GR2 : y === 7 && ((x + z) & 3) !== 0 ? OR : y < 6 ? OR2 : wz(WH, x, y, z)), { shade: 0.08 });
@@ -50,17 +53,20 @@
           g.box(1, 0, 1, 8, 9, 8, (x, y, z) => (y % 4 === 3 ? OR : wz(WH, x, y, z)), { shade: 0.06 });
           g.box(0, 10, 0, 9, 11, 9, GR2);
         }),
-        lantern: part(6, 6, 6, [3, 0, 3], (g) => { g.ell(3, 3, 3, 2.8, 3, 2.8, LENS); }),
-        visor: part(12, 2, 1, [6, 1, 0], (g) => { g.box(0, 0, 0, 11, 1, 0, LENS); }),
-        core: part(8, 6, 1, [4, 3, 0], (g) => { g.ell(4, 3, 0.5, 3.8, 2.9, 1, LENS); }),
+        lantern: v2 ? part(10, 10, 10, [5, 0, 5], (g) => { g.ell(5, 5, 5, 4.6, 5, 4.6, LENS, { emis: 1 }); }) : part(6, 6, 6, [3, 0, 3], (g) => { g.ell(3, 3, 3, 2.8, 3, 2.8, LENS); }),
+        visor: part(12, 2, 1, [6, 1, 0], (g) => { g.box(0, 0, 0, 11, 1, 0, LENS, v2 ? { emis: 1 } : undefined); }),
+        core: part(8, 6, 1, [4, 3, 0], (g) => { g.ell(4, 3, 0.5, 3.8, 2.9, 1, LENS, v2 ? { emis: 1 } : undefined); }),
+        mast: v2 ? part(7, 24, 7, [3, 0, 3], (g) => { for (const [x, z] of [[1, 1], [5, 1], [1, 5], [5, 5]]) g.box(x, 0, z, x, 21 - (x + z) / 2, z, GR2); for (let y = 2; y < 20; y += 4) { g.box(1, y, 1, 5, y, 1, GR); g.box(1, y, 5, 5, y, 5, GR); g.box(1, y, 1, 1, y, 5, GR); g.box(5, y, 1, 5, y, 5, GR); } g.box(2, 20, 2, 4, 23, 4, OR); }) : null,
         hatch: part(5, 7, 1, [0, 3, 0], (g) => { g.box(0, 0, 0, 4, 6, 0, (x, y) => (y === 3 ? OR : WH)); }),
         // the stomp's warning: a glowing ring on the ground (6 blocks at ×2.8), drawn growing while it warns
         ring: part(70, 1, 70, [35, 0, 35], (g) => { for (let x = 0; x < 70; x++) for (let z = 0; z < 70; z++) { const d = Math.hypot(x - 34.5, z - 34.5); if (d >= 31.5 && d <= 34.5) g.set(x, 0, z, LENS, 1); } }),
-        knee: part(7, 4, 7, [3, 2, 3], (g) => { g.ell(3, 2, 3, 3.4, 2.1, 3.4, LENS); }),
+        knee: part(7, 4, 7, [3, 2, 3], (g) => { g.ell(3, 2, 3, 3.4, 2.1, 3.4, LENS, v2 ? { emis: 1 } : undefined); }),
         leg_fl: leg(), leg_fr: leg(), leg_bl: leg(), leg_br: leg(),
       },
-      layout: { ring: [0, 0, 0], hull: [0, 18, 0], tower: [0, 31, 3], lantern: [0, 43, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
+      layout: { ring: [0, 0, 0], hull: [0, 18, 0], tower: [0, 31, 3], lantern: v2 ? [0, 66, 3] : [0, 43, 3], mast: [0, 42, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
     });
+    M.rpg_walker = walker(false); M.rpg_walker2 = walker(true);
+    for (const k of ['rpg_walker', 'rpg_walker2']) { const f = M[k]; M[k] = () => { const d = f(); for (const n in d.parts) if (!d.parts[n]) delete d.parts[n]; return d; }; }
   }
   // the mob kind (not enumerable: the codex's creature pages stay as they are)
   VR.MOBS = VR.MOBS || {};
@@ -179,7 +185,7 @@
       if (P) for (let i = 0; i < 18; i++) { const d = 2 + i * (BB.slamR - 2) / 18; P.spark(m.pos[0] + fx * d, m.pos[1] + 0.3, m.pos[2] + fz * d, [1, 0.6, 0.3], 3, 3, 1); }
       if (g.audio && g.audio.play) g.audio.play('thump', { vol: 0.9 });
     } else if (att === 'fan') {
-      const o = [m.pos[0] - Math.sin(m.yaw) * 2.6, m.pos[1] + 26 / 16 * SC, m.pos[2] - Math.cos(m.yaw) * 2.6], base = Math.atan2(p.pos[0] - o[0], p.pos[2] - o[2]);
+      const o = [m.pos[0] - Math.sin(m.yaw) * 2.6, m.pos[1] + 26 / 16 * scNow(), m.pos[2] - Math.cos(m.yaw) * 2.6], base = Math.atan2(p.pos[0] - o[0], p.pos[2] - o[2]);
       const tY = p.pos[1] + 1 - o[1], hd = Math.hypot(p.pos[0] - o[0], p.pos[2] - o[2]) || 1, v = 9;
       for (const s of [-0.3, 0, 0.3]) { const a = base + s; F.bolts.push({ pos: o.slice(), vel: [Math.sin(a) * v, tY / hd * v, Math.cos(a) * v], dmg: BB.dmg.fan, k: 'sentry', owner: -7, t: 0 }); }
       if (g.audio && g.audio.play) g.audio.play('laser');
@@ -191,7 +197,7 @@
     const b = C.b, P = g.particles, k = VR.RPGame && VR.RPGame.mods() ? VR.RPGame.mods().dmg : 1;
     let zone = 'body';
     if (from) {
-      const hy = from[1] - m.pos[1], dx = from[0] - m.pos[0], dz = from[2] - m.pos[2], l = Math.hypot(dx, dz) || 1, front = (dx / l) * -Math.sin(m.yaw) + (dz / l) * -Math.cos(m.yaw);
+      const hy = (from[1] - m.pos[1]) * 2.8 / scNow(), dx = from[0] - m.pos[0], dz = from[2] - m.pos[2], l = Math.hypot(dx, dz) || 1, front = (dx / l) * -Math.sin(m.yaw) + (dz / l) * -Math.cos(m.yaw);
       zone = b.ph === 1 ? (hy < 3.4 ? 'weak' : 'body') : (front > 0.35 && hy > 2.6 && hy < 6.2 ? 'weak' : 'body');
     }
     const shielded = b.shield, d = b.hit(dmg * k, zone);
@@ -215,7 +221,7 @@
       const u = C.tele, n = lo ? 12 : 22;
       if (b.att === 'stomp') { const rr = BB.stompR * (0.35 + 0.65 * u); for (let i = 0; i < n * 1.5; i++) { const a = i * TAU / (n * 1.5) + u; P.spawn(m.pos[0] + Math.cos(a) * rr, (C.ringY || m.pos[1]) + 0.2, m.pos[2] + Math.sin(a) * rr, 0, 0.9, 0, { life: 0.3, size: 0.32, grav: 0, col: [1, 0.3 + 0.35 * u, 0.12], emis: 1, collide: false }); } }
       else if (b.att === 'slam') { const fx = -Math.sin(m.yaw), fz = -Math.cos(m.yaw); for (let i = 0; i < n * 0.6; i++) { const d = 2 + i * (BB.slamR - 2) / (n * 0.6); for (const s of [-1.6, 1.6]) P.spawn(m.pos[0] + fx * d + fz * s, m.pos[1] + 0.15, m.pos[2] + fz * d - fx * s, 0, 0.4, 0, { life: 0.22, size: 0.14, grav: 0, col: [1, 0.45, 0.2], emis: 1, collide: false }); } }
-      else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 26 / 16 * SC, m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
+      else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 26 / 16 * scNow(), m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
       BS.cost.sparks += n;
     }
     if (b.shield) { for (let i = 0; i < (lo ? 6 : 14); i++) { const a = Math.random() * TAU, e = Math.random() * Math.PI * 0.5; P.spawn(m.pos[0] + Math.cos(a) * Math.cos(e) * 4.2, m.pos[1] + 0.5 + Math.sin(e) * 5, m.pos[2] + Math.sin(a) * Math.cos(e) * 4.2, 0, 0, 0, { life: 0.3, size: 0.12, grav: 0, col: [0.45, 0.75, 1], emis: 1, collide: false }); } }
@@ -311,7 +317,7 @@
   const LP = [0, 0, 0];
   BS.draw = function (En, r, p, m, cam) {
     const C = BS.cur; if (!C || C.m !== m || !mat4) return;
-    const gl = r.gl, model = VR.getVoxModel(gl, 'rpg_walker'); if (!model) return;
+    const gl = r.gl, v2 = B2on(), SC = scNow(), model = VR.getVoxModel(gl, v2 ? 'rpg_walker2' : 'rpg_walker'); if (!model) return;
     const b = C.b, light = En.lightAt(m.pos[0], m.pos[1] + 3, m.pos[2]);
     gl.uniform1f(p.u.u_sky, light.sky); gl.uniform3f(p.u.u_blockLight, light.bl[0], light.bl[1], light.bl[2]);
     if (p.u.u_sunShadow) gl.uniform1f(p.u.u_sunShadow, 0);
@@ -321,7 +327,7 @@
     const B = MB; B.set(ID);
     mat4.translate(B, B, m.pos[0] - cam.x, m.pos[1] - cam.y - (1 - rise) * 5.5 - sink * 1.6 + lift - C.kneel * 0.5, m.pos[2] - cam.z);
     mat4.rotY(B, B, m.yaw);
-    if (C.kneel > 0.01) mat4.rotX(B, B, -0.16 * C.kneel);
+    if (C.kneel > 0.01) mat4.rotX(B, B, -0.16 * C.kneel - (v2 && C.won ? 0.2 * C.kneel : 0));   // (a-boss2: it bows when the region heals)
     if (b.st === 'tele' && b.att === 'fan') mat4.rotX(B, B, 0.08 * C.tele);
     mat4.scale(B, B, SC / 16, SC / 16, SC / 16);
     const fl = m.hitT > 0 ? (m.hitT -= 0.016, 0.6) : 0;
@@ -337,6 +343,7 @@
     for (const [lx, lz] of [[-9, -8], [9, -8], [-9, 8], [9, 8]]) { LP[0] = lx; LP[1] = 12; LP[2] = lz; part(r, p, model, 'knee', B, LP, 0, 0, 0, knees, 0); }
     part(r, p, model, 'hull', B, null, 0, 0, 0, ONE, fl);
     part(r, p, model, 'tower', B, null, 0, 0, 0, ONE, fl);
+    if (v2) { part(r, p, model, 'mast', B, null, 0, 0, 0, ONE, fl); if (VR.RPGBoss2.lantern) VR.RPGBoss2.lantern(C, m, SC); }
     part(r, p, model, 'visor', B, null, 0, 0, 0, TN, 0);
     const coreOpen = b.ph >= 2 && !b.calm ? C.open : 0;
     part(r, p, model, 'core', B, null, 0, 0, 0, b.ph >= 2 && !b.calm ? TK : TN, 0);
@@ -345,7 +352,7 @@
     LP[0] = 0 + 4 * coreOpen; part(r, p, model, 'hatch', B, LP, 0, 0, 0, ONE, fl);
     const lant = healed ? [1.8, 1.5, 0.6] : b.calm ? [0.9 + 0.4 * pul, 0.5, 1.2] : TN;
     part(r, p, model, 'lantern', B, null, 0, now() / 900, 0, lant, 0);
-    if (b.st === 'tele' && b.att === 'stomp' && model.parts.ring) {
+    if (!v2 && b.st === 'tele' && b.att === 'stomp' && model.parts.ring) {   // (a-boss2: the ground's decal instead)
       const k = 0.35 + 0.65 * C.tele, t = MR; t.set(ID);
       mat4.translate(t, t, m.pos[0] - cam.x, (C.ringY || m.pos[1]) - cam.y + 0.06, m.pos[2] - cam.z); mat4.scale(t, t, SC / 16 * k, SC / 16, SC / 16 * k);
       RC[0] = 1.8; RC[1] = 0.45 + 0.5 * C.tele; RC[2] = 0.2;

@@ -3093,5 +3093,29 @@
     "ctl.starmap": "Star map",
     "g.dim.exo": "World of a distant star",
     // ---- u-stars end
-});
+    // ---- a-boss2 (src/main/rpg_boss2.js)
+    "g.rpg.boss2.kick": "Guardian of the Core Beacon · {region}",
+    "g.rpg.boss2.sub": "Dodge its attacks — strike what glows gold",
+    "g.rpg.boss2.subCalm": "It is confused — calm it with V in the green arc",
+    "g.rpg.boss2.hint1": "Watch the ground: where it glows red, a strike is coming. The bright ring shows how much time you have. Afterwards its knees glow gold — hits count double there!",
+    "g.rpg.boss2.hint2": "Phase 2: its shield stops everything. Calm the three drones first — then the core in its chest opens. Hit it from the front!",
+    "g.rpg.boss2.hint3": "Last phase: it gets quicker, but its core stays open longer. Stay calm — dodge, then strike!",
+    "g.rpg.boss2.hint1c": "It is only confused. Press V when the needle is in the green arc — three times a phase.",
+    "g.rpg.boss2.hint2c": "Well done! It is calming down. Three more gentle rings.",
+    "g.rpg.boss2.hint3c": "Almost there — its light is getting warmer. The last three rings!",
+    "g.rpg.boss2.ped": "Something glows on the pedestal by the Core Beacon — go and take it!",
+    "g.rpg.boss2.pedTaken": "A radiant find — the Core Beacon's reward!",
+    "g.rpg.boss2.wonSub": "your find waits on the pedestal",
+    "g.rpg.boss2.next": "Next goal",
+    "g.rpg.boss2.nextBoss": "The Core Beacon — its guardian waits · {d} m",
+    "g.rpg.boss2.nextOut": "Free the outpost {name} · {d} m",
+    "g.rpg.boss2.nextNone": "Explore the world — new outposts are waiting",
+    "g.rpg.boss2.leg.out": "Outpost",
+    "g.rpg.boss2.leg.free": "freed",
+    "g.rpg.boss2.leg.boss": "Core Beacon",
+    "g.rpg.boss2.leg.shop": "Village with shops",
+    "g.rpg.boss2.leg.travel": "Fast travel",
+    "g.rpg.boss2.leg.goal": "Next goal",
+    // ---- a-boss2 end
+  });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
