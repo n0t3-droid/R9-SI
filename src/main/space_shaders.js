@@ -277,7 +277,12 @@ void main() {
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
     // its grain below the texel (fields, woods, rock) from tier 1
     alb = mix(vec3(dot(alb, vec3(0.2126, 0.7152, 0.0722))), alb, AIRZ > 0.5 ? 1.05 : 1.14);   // (u-orbitlod: 0.9 — bodytex's one albedo is muted already; u-orbit2: Very Low, without the grain below the texel, keeps its biomes' colour a step fuller — a constant there, no cost)
+    // u-orbit3: the land's contrast as orbital photographs show it — the dark woods and fields darker, the bright dry
+    // land and the rock a little brighter (R52-10's pale beige carpet), the snow not past white
+    float lA = dot(alb, vec3(0.2126, 0.7152, 0.0722));
+    alb *= min(0.45 + 1.7 * lA, 1.15);
     if (u_air.z > 0.5) alb *= 1.0 + detailN(N, 700.0) * 0.34 + detailN(N, 2600.0) * 0.22;
+    if (u_air.z > 1.5) alb *= 1.0 + detailN(N, 8000.0) * 0.24;   // u-orbit3: High, the near tiles' ground under the 50-m texels (~12-m fields and copses; faded out where a cell is under a pixel)
     // the relief's normal: the plane's slope turned onto the sphere (south along the chart's radius, east across it; ×2.2)
 #ifdef PTILE
     vec3 Nl = normalize(v_nl); bool reliefP = false;   // (the mesh's own relief)
@@ -301,7 +306,7 @@ void main() {
       if (pw > 0.0) { vec2 toP = normalize(u_chart.xy - xz), eastP = vec2(-toP.y, toP.x); vec3 nN = vec3(-cos(th) * cos(lam), sin(th), cos(th) * sin(lam)), eN = vec3(-sin(lam), 0.0, -cos(lam)); cS = mix(cS, texture(u_patB, puv + (toP * dot(Lt, nN) + eastP * dot(Lt, eN)) * 400.0 * u_patch.z).g, pw); }
       puff = clamp((cl - cS) * 3.0, -0.6, 0.6);
     }
-    cl = smoothstep(0.08, 0.95, cl) * u_look.w;
+    cl = smoothstep(0.26, 0.8, cl) * u_look.w;   // (u-orbit3: 0.08–0.95 → 0.26–0.8 — the thin veil over the land gone, the systems with edges)
     // the peaks keep the sun a little past the terminator (their height dips the horizon)
     vec3 Ts = sunTrans(max(hOf(hc), 0.0) / u_chart.w, mus);
     float day = smoothstep(-0.02, 0.07, mus);
@@ -346,7 +351,11 @@ void main() {
     vec3 Tv = exp(-tv), Tvc = exp(-tv * 0.4);
     float cv = dot(Db, L);
     vec3 haze = (1.0 - exp(-TAU_R * airmass(muv))) * SCAT_R * phaseR(cv) * sunTrans(HR, mus) + (1.0 - exp(-TAU_M * airmass(muv))) * 0.9 * phaseM(cv) * sunTrans(HM, mus);
-    haze *= u_sunCol * u_look.y * 0.19;   // (u-orbit2: 0.3 → 0.19 — the land read milky from 3 km, R52-10; u-orbitlod's self-review item 3)   // (the phase's 1/4π against a Lambert surface's 1/π, a little more for the light scattered twice)
+    // u-orbit3: a layer's single scattering seen from above grows with the path through it, μs / (μs + μv) of the
+    // column's: near the nadir under a low sun almost none, toward the limb (μv → 0) all of it — R52-10's milky veil;
+    // and the eye's: the veil is seen against the ground only where it is long (the airmass past 1, exponential)
+    float msh = max(mus, 0.0) + 0.02, amv = airmass(muv);
+    haze *= u_sunCol * u_look.y * 0.25 * msh / (msh + muv) * (0.06 + 0.94 * (1.0 - exp(-(amv - 1.0) * 0.12)));   // (u-orbit2: 0.3 → 0.19; u-orbit3: 0.25 with the path's share)   // (the phase's 1/4π against a Lambert surface's 1/π, a little more for the light scattered twice)
     col = mix(ground * Tv, cloudCol * Tvc, cl) + haze;
     // the night: the villages' lights (points within the texel), Amarant's light, the airglow seen from above
     float night = 1.0 - smoothstep(-0.1, 0.04, mus);
@@ -361,7 +370,7 @@ void main() {
       col += lc * (lights * pts * 1.6 + lights * lights * 0.1) * u_look.x * night * Tv * (1.0 - 0.85 * cl);
     }
     col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.6) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
-    col += AG_COL * u_air.w * 0.06 * night;
+    col += AG_COL * u_air.w * 0.02 * night;   // (u-orbit3: 0.06 → 0.02 — the night ground read a green-grey floor at the eye's 3.7×; a faint sheen, the towns pop)
     // u-orbitlod: the aurora's oval seen from above (night side): green curtains over the land, a pink lower fringe
     if (u_air.z > 0.5 && mus < 0.0) { float au = auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)); col += (vec3(0.12, 1.0, 0.42) * 0.3 + vec3(0.5, 0.1, 0.3) * 0.05) * au * u_look.z * Tv; }   // (from Low)
     alpha = 1.0;
