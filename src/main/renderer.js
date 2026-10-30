@@ -929,6 +929,7 @@
       if (u.u_pulseB) gl.uniform1f(u.u_pulseB, this.texLayer('vx_tech_dark_strip'));
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
+      if (u.u_lavaTint) gl.uniform1f(u.u_lavaTint, VR.Polish && VR.Polish.off && VR.Polish.off.lava ? 0 : 1);   // f-polish: the worlds' melt
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
       // t-motion · Wetter-Drama (env.js E.storm / E.bolt) and the snow cover (E.snowCover)
       if (u.u_storm) { const st = E.storm || [1, 0, 0, 0]; gl.uniform4f(u.u_storm, st[0], st[1], st[2], st[3]); }

@@ -120,7 +120,23 @@
       const n = v / 3 - start;
       if (n) parts.push({ at: start, n, c: [g.rgb[0], g.rgb[1], g.rgb[2], 0.5] });
     }
-    return { verts, parts, faces: nF };
+    // f-polish: the stamp's edges — every face edge where the surface folds (no coplanar exposed face goes on across
+    // it): a box's twelve, a window's rim; as line pairs (lines: x, y, z per end), one draw
+    const seen = new Set(), ev = [];
+    for (let i = 0; i < faces.length && ev.length < 120000; i += 5) {
+      const x = faces[i], y = faces[i + 1], z = faces[i + 2], F = FACES[faces[i + 3]], q = F[3];
+      const cx = (q[0][0] + q[2][0]) / 2, cy = (q[0][1] + q[2][1]) / 2, cz = (q[0][2] + q[2][2]) / 2;
+      for (let k = 0; k < 4; k++) {
+        const a = q[k], b = q[(k + 1) & 3];
+        const ex = Math.round((a[0] + b[0]) - 2 * cx), ey = Math.round((a[1] + b[1]) - 2 * cy), ez = Math.round((a[2] + b[2]) - 2 * cz);
+        if (at(x + ex, y + ey, z + ez) && !at(x + ex + F[0], y + ey + F[1], z + ez + F[2])) continue;   // the face goes on flat
+        const ax = x + a[0], ay = y + a[1], az = z + a[2], bx = x + b[0], by = y + b[1], bz = z + b[2];
+        const k1 = ax + ',' + ay + ',' + az, k2 = bx + ',' + by + ',' + bz, key = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+        if (seen.has(key)) continue; seen.add(key);
+        ev.push(ax, ay, az, bx, by, bz);
+      }
+    }
+    return { verts, parts, faces: nF, lines: new Float32Array(ev) };
   };
 
   // ---- the library

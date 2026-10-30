@@ -878,6 +878,9 @@ in vec4 v_shadow;
 uniform ivec3 u_camInt;
 uniform vec3 u_camFrac;
 uniform float u_emissiveBoost;
+#ifdef LIGHT2
+uniform float u_lavaTint;   // f-polish: 1 the worlds' melt deep orange
+#endif
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
@@ -1423,6 +1426,15 @@ void main() {
     float n1 = vnoise(p * 1.7 + vec2(u_time * 0.25, u_time * 0.18));
     float n2 = vnoise(p * 4.0 - vec2(u_time * 0.4, -u_time * 0.2));
     col = alb.rgb * (1.6 + n1 * 1.2 + n2 * 0.6) * vec3(1.0, 0.85, 0.7);
+#ifdef LIGHT2
+    // f-polish: a world's melt (u_dim 5) deep orange with bright cracks — the texture's own colour went yellow-white
+    // through the bloom and the tone curve (Low and up; Very Low draws the base's)
+    if (u_dim == 5 && u_lavaTint > 0.5) {
+      float hb = clamp(n1 * 0.65 + n2 * 0.35, 0.0, 1.0), ck = smoothstep(0.72, 0.92, n2) * (0.6 + 0.4 * n1);
+      vec3 melt = mix(vec3(0.42, 0.05, 0.01), vec3(1.25, 0.32, 0.04), smoothstep(0.2, 0.75, hb));
+      col = (melt + vec3(1.6, 0.75, 0.18) * ck) * (0.7 + 0.3 * dot(alb.rgb, vec3(0.333)));
+    }
+#endif
   }
   float dist = length(v_rel);
   col = applyFog(col, v_rel, dist);

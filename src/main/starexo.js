@@ -15,6 +15,9 @@
 (function (VR) {
   'use strict';
   const SJ = VR.StarJump, E = VR.Exo, U = VR.Universe, G = VR.Galaxy;
+  // f-polish: a day with air no longer blown out — the eye adapts to the star's sky: the exposure capped so the sky's
+  // mean (zenith and horizon, exposed) is about 0.4 before the tone curve, never below half the base's (pure: node)
+  VR.ExoDayExpo = (expo, skyLum) => (skyLum > 0 ? expo * Math.min(1, Math.max(0.5, 0.4 / (skyLum * expo))) : expo);
   if (!SJ || !SJ.page || !E || !U) return;
   const X2 = VR.StarExo = { cur: null };
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
@@ -64,6 +67,13 @@
       L.ambSky = L.ambSky.map((v, i) => v * kx[i] * (1 - 0.25 * hot));
       L.far = L.far.map((v, i) => v * kx[i]);
       r.sky.sunCol = r.sky.sunCol.map((v, i) => v * kx[i]);
+      // f-polish: the air's stops in the star's colour too (a red dwarf's sky deeper peach), the eye adapted to them
+      if (r.sky.air3 && !(VR.Polish && VR.Polish.off && VR.Polish.off.exo)) {
+        const a3 = r.sky.air3; for (let i = 0; i < a3.length; i++) a3[i] *= kx[i % 3];
+        if (r.sky.airB) r.sky.airB = r.sky.airB.map((v, i) => v * kx[i % 3]);
+        const Ls = 0.5 * (lumOf([a3[0], a3[1], a3[2]]) + lumOf([a3[3], a3[4], a3[5]]));
+        r.expo = VR.ExoDayExpo(r.expo, Ls); r.exoLs = Ls;
+      }
       // the companion: a second sun (close pair) or a brilliant point (wide pair)
       const S2 = r.sky.sun2 = SUN2U, C2 = r.sky.sun2c = SUN2C;   // (kept arrays: no allocation per frame)
       let sun2 = null;
