@@ -30,6 +30,7 @@
   S.REMINDS = 3;        // reminders at most, then the beat waits silently in the journal
   S.CARD = 25;          // s the offer's card stays (untaken: Später)
   S.WHO = ['funke', 'ilka', 'oskar', 'selma', 'jonte', 'lumi'];
+  S.MOODS = ['neutral', 'happy', 'surprised', 'worried'];   // a-story2: the portraits' faces (story_art.js)
   S.NOT = ['building', 'fight', 'menu', 'studio', 'landing', 'scene', 'guest'];
 
   // ---------------------------------------------------------------- the twelve chapters (words: story.c<n>.*)
@@ -37,49 +38,49 @@
   for (let n = 1; n <= 12; n++) S.CHAPTERS.push({ n, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: n <= 4 });
 
   // ---------------------------------------------------------------- the beats of chapters 1–4
-  const L = (ch, n, who) => who.map((w, i) => ({ who: w, key: 'story.c' + ch + '.b' + n + '.' + (i + 1) }));
+  const L = (ch, n, who) => who.map((w, i) => { const q = w.split(':'); return { who: q[0], key: 'story.c' + ch + '.b' + n + '.' + (i + 1), mood: q[1] || 'neutral' }; });   // a-story2: 'who:mood' (the portrait's face)
   const B = (ch, n, o) => Object.assign({ id: 'c' + ch + '.b' + n, ch, n }, o, { scene: Object.assign({ music: 'warm' }, o.scene, { lines: L(ch, n, o.who) }), who: undefined });
   S.BEATS = [
     // 1 · Funke — the drone flickers awake on a console; the first vista at the golden hour
     B(1, 1, { when: { after: null, place: ['hangar'], anyAfter: 240, adv: false },
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 5 }, { cam: 'shoulder', target: 'funke', dur: 5 }, { cam: 'wide', target: 'player', dur: 5 }], music: 'warm' },
-      who: ['funke', 'funke', 'ilka', 'funke'], task: { kind: 'follow', target: 'vista' }, reward: { xp: 30 } }),
+      who: ['funke:surprised', 'funke:worried', 'ilka:happy', 'funke:happy'], task: { kind: 'follow', target: 'vista' }, reward: { xp: 30 }, act: { kind: 'look', target: 'vista', max: 450, cone: 14, hold: 1.5 } }),
     B(1, 2, { when: { after: 'c1.b1', place: ['plaza', 'street', 'hills', 'isles', 'water', 'wild'], adv: false },   // (by day the land, by night its dark hills: the lines fit both)
       scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'orbit', target: 'player', dur: 6 }, { cam: 'shoulder', target: 'vista', dur: 5 }], music: 'wide' },
-      who: ['funke', 'ilka', 'funke'], task: { kind: 'go', target: 'outpost' }, reward: { xp: 40 } }),
+      who: ['funke', 'ilka:worried', 'funke:happy'], task: { kind: 'go', target: 'outpost' }, reward: { xp: 40 }, act: { kind: 'scan', target: 'outpost', max: 800, cone: 20 } }),
     B(1, 3, { when: { after: 'c1.b2', adv: true, near: { outpost: 700 } },
       scene: { shots: [{ cam: 'shoulder', target: 'outpost', dur: 6 }, { cam: 'wide', target: 'outpost', dur: 6 }], music: 'tense' },
-      who: ['oskar', 'oskar', 'funke'], task: { kind: 'go', target: 'outpost' }, reward: { xp: 40 } }),
+      who: ['oskar', 'oskar:worried', 'funke'], task: { kind: 'go', target: 'outpost' }, reward: { xp: 40 }, act: { kind: 'look', target: 'beacon', max: 200, cone: 12, hold: 1.5 } }),
     // 2 · Das stille Leuchtfeuer — the first beacon turns cyan, a light ring sweeps the canyon
     B(2, 1, { when: { after: 'c1.b3', adv: true, near: { outpost: 140 } },
       scene: { shots: [{ cam: 'close', target: 'beacon', dur: 5 }, { cam: 'orbit', target: 'beacon', dur: 6 }, { cam: 'shoulder', target: 'beacon', dur: 4 }], music: 'tense' },
-      who: ['funke', 'funke', 'funke'], task: { kind: 'free', target: 'outpost' }, reward: { xp: 50 } }),
+      who: ['funke:worried', 'funke', 'funke'], task: { kind: 'free', target: 'outpost' }, reward: { xp: 50 }, act: { kind: 'touch', target: 'beacon', max: 4.5 } }),
     B(2, 2, { when: { after: 'c2.b1', adv: true, freed: 1 },
       scene: { shots: [{ cam: 'wide', target: 'beacon', dur: 6 }, { cam: 'orbit', target: 'beacon', dur: 6 }, { cam: 'close', target: 'funke', dur: 4 }], music: 'rise' },
-      who: ['funke', 'oskar', 'oskar', 'funke'], task: { kind: 'go', target: 'home' }, reward: { xp: 80 } }),
+      who: ['funke:happy', 'oskar:surprised', 'oskar:happy', 'funke:happy'], task: { kind: 'go', target: 'home' }, reward: { xp: 80 }, act: { kind: 'look', target: 'beam', max: 1200, cone: 14, hold: 1.5 } }),
     B(2, 3, { when: { after: 'c2.b2', adv: true },
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 5 }, { cam: 'up', target: 'sky', dur: 6 }], music: 'warm' },
-      who: ['selma', 'selma', 'funke'], task: { kind: 'climb', target: 'sky' }, reward: { xp: 40 } }),
+      who: ['selma:happy', 'selma', 'funke:surprised'], task: { kind: 'climb', target: 'sky' }, reward: { xp: 40 }, act: { kind: 'scan', target: 'sky', pitch: 35 } }),
     // 3 · Über den Wolken — the world curves away; the station's beacon blinks red over the limb
     B(3, 1, { when: { after: 'c2.b3', adv: true, high: 600 },
       scene: { shots: [{ cam: 'limb', target: 'horizon', dur: 7 }, { cam: 'shoulder', target: 'horizon', dur: 5 }], music: 'wide' },
-      who: ['jonte', 'funke', 'jonte'], task: { kind: 'climb', target: 'orbit' }, reward: { xp: 60 } }),
+      who: ['jonte', 'funke:surprised', 'jonte:happy'], task: { kind: 'climb', target: 'orbit' }, reward: { xp: 60 }, act: { kind: 'look', target: 'horizon', high: 400, level: 10, hold: 2 } }),
     B(3, 2, { when: { after: 'c3.b1', adv: true, orbit: true },
       scene: { shots: [{ cam: 'limb', target: 'station', dur: 8 }, { cam: 'close', target: 'station', dur: 6 }], music: 'wide' },
-      who: ['funke', 'funke', 'jonte'], task: { kind: 'go', target: 'station' }, reward: { xp: 100 } }),
+      who: ['funke:surprised', 'funke:worried', 'jonte:happy'], task: { kind: 'go', target: 'station' }, reward: { xp: 100 }, act: { kind: 'photo', target: 'sky', pitch: 15 } }),
     B(3, 3, { when: { after: 'c3.b2', adv: true, dim: ['overworld', 'basalt', 'opal'] },
       scene: { shots: [{ cam: 'up', target: 'amarant', dur: 7 }, { cam: 'close', target: 'funke', dur: 5 }], music: 'warm' },
-      who: ['jonte', 'jonte', 'funke'], task: { kind: 'travel', target: 'basalt' }, reward: { xp: 60 } }),
+      who: ['jonte', 'jonte:worried', 'funke:happy'], task: { kind: 'travel', target: 'basalt' }, reward: { xp: 60 }, act: { kind: 'touch', target: 'ground', dim: ['basalt'], ground: true } }),
     // 4 · Die Monde von Amarant — geysers fire round the Eiswächter; Amarant swallows the sun
     B(4, 1, { when: { after: 'c3.b3', adv: true, dim: ['basalt', 'opal'] },
       scene: { shots: [{ cam: 'wide', target: 'player', dur: 6 }, { cam: 'up', target: 'amarant', dur: 6 }], music: 'wide' },
-      who: ['funke', 'funke', 'lumi'], task: { kind: 'travel', target: 'opal' }, reward: { xp: 80 } }),
+      who: ['funke:worried', 'funke', 'lumi:happy'], task: { kind: 'travel', target: 'opal' }, reward: { xp: 80 }, act: { kind: 'scan', target: 'ice', dim: ['opal'], below: -30 } }),
     B(4, 2, { when: { after: 'c4.b1', adv: true, dim: ['opal'] },
       scene: { shots: [{ cam: 'ice', target: 'warden', dur: 7 }, { cam: 'eye', target: 'warden', dur: 5 }, { cam: 'shoulder', target: 'warden', dur: 4 }], music: 'tense' },
-      who: ['funke', 'funke', 'lumi', 'funke'], task: { kind: 'wait', target: 'eclipse' }, reward: { xp: 100 } }),
+      who: ['funke:worried', 'funke:surprised', 'lumi:surprised', 'funke:happy'], task: { kind: 'wait', target: 'eclipse' }, reward: { xp: 100 }, act: { kind: 'look', target: 'amarant', dim: ['basalt', 'opal'], cone: 16, hold: 2 } }),
     B(4, 3, { when: { after: 'c4.b2', adv: true, dim: ['basalt', 'opal'], eclipse: 0.5 },
       scene: { shots: [{ cam: 'up', target: 'amarant', dur: 8 }, { cam: 'wide', target: 'player', dur: 6 }], music: 'rise' },
-      who: ['funke', 'lumi', 'lumi', 'funke'], task: { kind: 'next', target: 'c5' }, reward: { xp: 150 } }),
+      who: ['funke:surprised', 'lumi:surprised', 'lumi:happy', 'funke:happy'], task: { kind: 'next', target: 'c5' }, reward: { xp: 150 }, act: { kind: 'photo', target: 'eclipse', dim: ['basalt', 'opal'], eclipse: 0.5 } }),
   ];
   for (const b of S.BEATS) delete b.who;
   S.byId = (id) => S.BEATS.find(b => b.id === id) || null;
@@ -94,7 +95,7 @@
   };
 
   // ---------------------------------------------------------------- the record (meta.story)
-  S.fresh = () => ({ v: 1, beats: {}, later: {} });
+  S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {} });   // (a-story2: acts — the deeds done, {id: 1})
   S.load = function (m) {
     const r = S.fresh();
     if (!m || typeof m !== 'object') return r;
@@ -103,6 +104,8 @@
     const lt = m.later && typeof m.later === 'object' ? m.later : {};
     // (the play clock starts at 0 in every session: a postponed beat is due again after a load, its count kept)
     for (const id of Object.keys(lt)) { const q = lt[id]; if (!S.byId(id) || !q || r.beats[id]) continue; const n = Math.max(0, Math.min(S.REMINDS + 1, q.n | 0)); r.later[id] = { n, at: 0, silent: n > S.REMINDS }; }
+    const ac = m.acts && typeof m.acts === 'object' ? m.acts : {};
+    for (const id of Object.keys(ac)) if (S.byId(id) && ac[id] === 1) r.acts[id] = 1;
     return r;
   };
   S.isDone = (rec, id) => !!(rec && rec.beats && rec.beats[id]);
@@ -166,6 +169,41 @@
     return { len, lines: out };
   };
   S.shotAt = function (b, t) { let s = 0; for (let i = 0; i < b.scene.shots.length; i++) { const q = b.scene.shots[i]; if (t < s + q.dur || i === b.scene.shots.length - 1) return { i, shot: q, u: Math.max(0, Math.min(1, (t - s) / q.dur)) }; s += q.dur; } return null; };
+
+  // ---------------------------------------------------------------- a-story2 · the deeds between the beats (pure)
+  // One small deed a beat (b.act): look (hold the view on it), scan (Funke scans it: [V] while aimed), touch ([V] within
+  // reach), photo (a picture taken while it holds). Never needed for the next beat — the journal records them (☐ / ✓).
+  // a: {ang (° from the view to the target), dist (m), pitch (° up), high (m over the sea), orbit, dim, eclipse, ground
+  // (on the ground), press ([V] now), photo (a picture now)} → 'ok' | 'armed' (waits for V / the picture) | the reason.
+  S.ACT_KINDS = ['look', 'scan', 'touch', 'photo'];
+  S.actCheck = function (act, a) {
+    if (!act) return 'none';
+    a = a || {};
+    if (act.dim && act.dim.indexOf(a.dim || 'overworld') < 0) return 'dim';
+    if (act.high && !((a.high || 0) >= act.high) && !a.orbit) return 'high';
+    if (act.eclipse && !((a.eclipse || 0) >= act.eclipse)) return 'eclipse';
+    if (act.ground && !a.ground) return 'ground';
+    if (act.cone && !Number.isFinite(a.ang)) return 'none';
+    if (act.max && !(a.dist <= act.max)) return 'far';
+    if (act.cone && !(a.ang <= act.cone)) return 'ang';
+    if (act.pitch !== undefined && !(a.pitch >= act.pitch)) return 'pitch';
+    if (act.below !== undefined && !(a.pitch <= act.below)) return 'pitch';
+    if (act.level !== undefined && !(Math.abs(a.pitch) <= act.level)) return 'pitch';
+    if (act.kind === 'look') return 'ok';
+    if (act.kind === 'photo') return a.photo ? 'ok' : 'armed';
+    return a.press ? 'ok' : 'armed';
+  };
+  // one step of the deed's watch: a look holds act.hold s unbroken; the others are done the moment they check 'ok'
+  S.actStep = function (st, act, a, dt) {
+    const r = S.actCheck(act, a); st.last = r;
+    if (act.kind !== 'look') return r === 'ok';
+    st.hold = r === 'ok' ? (st.hold || 0) + (dt || 0) : 0;
+    return st.hold >= (act.hold || 1) - 1e-9;
+  };
+  S.actDone = (rec, id) => !!(rec && rec.acts && rec.acts[id]);
+  S.markAct = function (rec, id) { if (!S.byId(id)) return false; (rec.acts || (rec.acts = {}))[id] = 1; return true; };
+  // the deed open now: the last seen beat's, while not done (an older one missed stays ☐ in the journal)
+  S.openAct = function (rec) { for (let i = S.BEATS.length - 1; i >= 0; i--) { const b = S.BEATS[i]; if (!S.isDone(rec, b.id)) continue; return b.act && !S.actDone(rec, b.id) ? b : null; } return null; };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = S;
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

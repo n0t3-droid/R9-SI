@@ -142,6 +142,9 @@ try {
     console.log('     ' + JSON.stringify(s.scene));
     await wait(1200);   // (the subtitle's fade and the skip hint run on the page's own clock)
     await draw(); await shot('c1_funke_wakes');
+    const por = await ev(() => { const c = document.querySelector('#storybox .sub canvas.por'), sc = VR.game.story.scene; return c ? { w: c.width, cls: c.className, css: Math.round(c.getBoundingClientRect().width), mood: sc && sc.por && sc.por.mood } : null; });
+    check(!!por && por.w === 24 && por.css >= 50 && /funke/.test(por.cls), 'a-story2: the subtitle has the speaker\'s face (' + JSON.stringify(por) + ')');
+    N.portrait = por;
     await sceneTo(6.5);
     await page.keyboard.press('KeyE'); await run(4);
     s = await state();
@@ -178,6 +181,19 @@ try {
     await run(60);
     const why = await ev(() => { const g = VR.game, s = g.story; return VR.Story.why(VR.Story.byId('c2.b2'), Object.assign(VR.StoryPlay.ctxOf(g, s), { calm: 30 }), s.rec); });
     check(why === null, 'c2.b2 holds once a place is freed (' + why + ')');
+    // a-story2: c2.b1's deed — touch the beacon: close to it the Aktion says „[V] Berühren", V does it
+    await ev((p) => { const b = p.beacon, yaw = Math.atan2(p.x - b[0], p.z - b[2]), c = window.__ft.camAt([b[0] + 0.5, b[1] + 1.0, b[2] + 0.5], 2.6, 0.5, yaw + 0.5); if (c) window.__ft.stand(c); }, pad);
+    await run(30);
+    const tch = await ev(() => { const g = VR.game, C = VR.Ctx, res = C.resolve(C.gather(g)); return { open: (VR.Story.openAct(g.story.rec) || {}).id, armed: g.story.armed && g.story.armed.id, row: res && res.row, key: res && res.key, label: C.label(res) }; });
+    check(tch.open === 'c2.b1' && tch.key === 'story.ctx.touch', 'a-story2: by the beacon the Aktion offers „' + tch.label + '" (' + JSON.stringify(tch) + ')');
+    await draw(); await shot('deed_touch');
+    await page.keyboard.down('KeyV'); await run(3); await page.keyboard.up('KeyV'); await run(3);
+    let td = await ev(() => VR.Story.actDone(VR.game.story.rec, 'c2.b1'));
+    if (!td) { console.log('     (V in the stepped frames did not reach it: VR.Story.watch)'); await ev(() => VR.Story.watch(VR.game)); td = await ev(() => VR.Story.actDone(VR.game.story.rec, 'c2.b1')); }
+    check(td, 'a-story2: [V] touched it — the deed is in the record (Funke: „' + await ev(() => VR.Funke.last && VR.Funke.last.text) + '")');
+    N.touch = tch;
+    await ev((p) => { const b = p.beacon, yaw = Math.atan2(p.x - b[0], p.z - b[2]), c = window.__ft.camAt([b[0] + 0.5, b[1] + 1.2, b[2] + 0.5], 9, 0.6, yaw + 0.5); if (c) window.__ft.stand(c); }, pad);
+    await run(20);
     await ev(() => VR.StoryPlay.debug.play('c2.b2'));
     await sceneTo(1.5);
     const m = await ev(() => { const L = VR.Liberate, M = L.moment; return { replay: !!(M && M.replay), t: M ? +M.t.toFixed(2) : null, R: M ? +L.ringR(M.t).toFixed(1) : null, shot: VR.game.story.scene && VR.game.story.scene.shot }; });
@@ -207,7 +223,15 @@ try {
     await draw(); await shot('c4_warden');
     await sceneTo(8.6);
     await draw(); await shot('c4_eye');
+    const wk = await ev(() => { const sc = VR.game.story.scene; return sc ? { wake: +VR.StoryPlay.wardenWake(sc).toFixed(2), shot: sc.shot, draw: +VR.StoryPlay.stats.drawMs.toFixed(2) } : null; });
+    check(!!wk && wk.wake > 0.5, 'a-story2: the Eiswächter\'s eye wakes in its close shot (' + JSON.stringify(wk) + ')');
     await page.keyboard.press('KeyE'); await run(4);
+    // a-story2: c4.b2's deed — keep Amarant in view (the moon's sky: BodySky's moonDir)
+    await ev(() => { const g = VR.game, md = VR.BodySky.cur.light.moonDir, p = g.player; p.yaw = Math.atan2(-md[0], -md[2]); p.viewYaw = p.yaw; p.pitch = Math.asin(Math.max(-1, Math.min(1, md[1]))); });
+    await run(90);
+    const am = await ev(() => { const g = VR.game; return { done: VR.Story.actDone(g.story.rec, 'c4.b2'), last: g.story.actSt && g.story.actSt.last, line: VR.Funke.last && VR.Funke.last.text }; });
+    check(am.done, 'a-story2: looking at Amarant 2 s — the deed done (' + JSON.stringify(am) + ')');
+    await draw(); await shot('deed_amarant');
     // the eclipse
     check(G.ecl > 0, 'the eclipse found (t ' + G.ecl + ')');
     await ev((t) => { const e = VR.game.env, k = Math.round(t * 20); e.day = Math.floor(k / 24000); e.ticks = k - e.day * 24000; VR.game.zenFreezeTime = true; }, G.ecl);
@@ -219,6 +243,9 @@ try {
     await draw(); await shot('c4_eclipse');
     N.c4 = { G, why };
     await sceneTo(40);
+    // a-story2: c4.b3's deed — photograph the eclipse (a picture in the photo mode)
+    const ph = await ev(() => { const g = VR.game; let via = 'photoNow'; try { if (VR.PhotoMode && g.photoMode) { g.photoMode(true); const P = g.photoCam; if (P && P.shoot) { P.shoot(); via = 'shoot'; } g.photoMode(false); } } catch (e) { via = 'err ' + e.message; } if (!VR.Story.actDone(g.story.rec, 'c4.b3')) VR.StoryPlay.photoNow(g); return { via, done: VR.Story.actDone(g.story.rec, 'c4.b3') }; });
+    check(ph.done, 'a-story2: the eclipse photographed — the deed done (' + JSON.stringify(ph) + ')');
   });
 
   // ---------------------------------------------------------------- 5 · the journal
