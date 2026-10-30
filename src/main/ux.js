@@ -117,7 +117,9 @@
   };
   function stripTick(g, now) {
     const el = stripEl(); if (!el) return;
-    const list = g.state === 'play' && g.player ? X.strip(X.state(g), lang()) : [];
+    const st = g.state === 'play' && g.player ? X.state(g) : null, list = st ? X.strip(st, lang()) : [];
+    const ride = !!st && (st.mode === 'vehicle' || st.mode === 'cockpit'), hud = el.parentNode;
+    if (hud && hud.classList.contains('ux-ride') !== ride) hud.classList.toggle('ux-ride', ride);   // (the walking chips step away in a vehicle, ux.css)
     const sig = list.map(e => e.id + e.key + e.text).join('|');
     if (sig !== stripSig) {
       stripSig = sig; stripAt = now; el.innerHTML = '';

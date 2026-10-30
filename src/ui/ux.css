@@ -48,7 +48,7 @@
 #hints .picto { color: var(--ux-acc); }
 
 /* ---- the cockpit: its key line on a pill, the walking chips away ---- */
-#hud.cockpit #modebadge, #hud.cockpit #mirrorchip, #hud.cockpit #petchip { display: none; }
+#hud.cockpit #modebadge, #hud.cockpit #mirrorchip, #hud.cockpit #petchip, #hud.ux-ride #modebadge, #hud.ux-ride #mirrorchip, #hud.ux-ride #petchip { display: none; }
 #vehiclehud small { display: inline-block; max-width: min(860px, 86vw); margin-top: 6px; padding: 5px 12px; border-radius: var(--ux-r2); background: var(--ux-pill); color: var(--ux-ink); font-size: var(--ux-fs-xs); line-height: 1.5; white-space: normal; text-shadow: none; }
 #vehiclehud small b { color: var(--ux-acc); }
 
@@ -100,3 +100,4 @@ html:not(.pro) #loading .ldetail { visibility: hidden; }
 #settings .panel.box { position: relative; }
 #settings .panel.box > [data-act="setback"] { align-self: flex-start; min-width: 180px; min-height: 44px; }
 #settings .panel.box > [data-legal] { position: absolute; right: 26px; bottom: 22px; width: auto; min-width: 0; min-height: 44px; }
+.cost { font-size: var(--ux-fs-xs); }
