@@ -43,6 +43,11 @@ const click = async (sel, what) => { try { await page.click(sel, { timeout: 6000
   console.log('  (' + what + ': no real click — on top: ' + top + '; ' + e.message.split('\n')[0].slice(0, 120) + ')'); OUT['blocked_' + what] = top;
   try { await page.click(sel, { timeout: 6000, force: true }); return 'force'; } catch (e2) { await ev((sel) => { const b = document.querySelector(sel); if (b) b.click(); }, sel).catch(() => {}); return 'js'; } } };
 const t0 = Date.now();
+// (f-first2) a key held at least ms of wall time AND n game frames (under SwiftShader a frame can take seconds; cap 90 s)
+const holdFor = async (key, ms, n) => { const f0 = await ev(() => VR.game.frame).catch(() => 0), t = Date.now(); await page.keyboard.down(key); await wait(ms);
+  while (Date.now() - t < 90000) { const f = await ev(() => VR.game.frame).catch(() => f0 + n); if (f - f0 >= n) break; await wait(200); } await page.keyboard.up(key); };
+// (f-first2) Esc and keys are read in the next frame: wait until the screen is closed (cap 60 s)
+const untilClosed = async () => { const t = Date.now(); while (Date.now() - t < 60000) { const s = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => null); if (!s || s === 'hud' || s === 'play') return true; await wait(300); } return false; };
 await page.goto(DIST);
 check(await untilState('title', 240000) >= 0, 'the start screen');
 await wait(8000); await shot('01_title');
@@ -85,11 +90,11 @@ await page.keyboard.down('KeyW'); await wait(1000);
 { let fw = 0; while (Date.now() - tW0 < 60000) { fw = await ev(() => VR.game.frame).catch(() => 0); if (fw - fW0 >= 3) break; await wait(200); } OUT.wFirst = { ms: Date.now() - tW0, frames: fw - fW0 }; }
 const pW1 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 console.log('  W first second: ' + JSON.stringify(OUT.wFirst) + ' fps ' + await ev(() => +(VR.game.fps || 0).toFixed(2)).catch(() => -1));
-await wait(3000); await page.keyboard.up('KeyW');
+{ const f1 = await ev(() => VR.game.frame).catch(() => 0), t1 = Date.now(); await wait(3000); while (Date.now() - t1 < 90000 && (await ev(() => VR.game.frame).catch(() => f1 + 3)) - f1 < 3) await wait(200); } await page.keyboard.up('KeyW');
 OUT.walkedW1 = p0 && pW1 ? +Math.hypot(pW1[0] - p0[0], pW1[2] - p0[2]).toFixed(2) : -1;
 check(OUT.walkedW1 >= 0.5, 'W moves the player within its first second: ' + OUT.walkedW1 + ' m (≥ 0.5)');
 const pW = await ev(() => VR.game.player.pos.slice()).catch(() => null);
-await page.keyboard.down('KeyS'); await wait(3000); await page.keyboard.up('KeyS'); await shot('06_t25_walk');
+await holdFor('KeyS', 3000, 3); await shot('06_t25_walk');
 { const p1 = await ev(() => VR.game.player.pos.slice()).catch(() => null); const dW = p0 && pW ? Math.hypot(pW[0] - p0[0], pW[2] - p0[2]) : -1, dS = pW && p1 ? Math.hypot(p1[0] - pW[0], p1[2] - pW[2]) : -1;
   OUT.walked = +Math.max(dW, dS).toFixed(2); OUT.walkedW = +dW.toFixed(2); OUT.walkedS = +dS.toFixed(2);
   check(OUT.walked >= 2, 'W held 4 s, then S 3 s, right after: W ' + OUT.walkedW + ' m · S ' + OUT.walkedS + ' m (≥ 2 by one of them)'); }
@@ -111,7 +116,7 @@ OUT.itemNamesData = await ev(() => { const inv = VR.game.player.inv; return inv.
 // and which hints the HUD gives at 2 and 3 minutes
 OUT.hints3 = [];
 for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
-  while (Date.now() - tPlay < tEnd - 6000) { await page.keyboard.down('KeyW'); await wait(3000); await page.keyboard.up('KeyW'); await page.mouse.move(640 + (Math.random() * 400 - 200), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(1500); }
+  while (Date.now() - tPlay < tEnd - 6000) { await holdFor('KeyW', 3000, 2); await page.mouse.move(640 + (Math.random() * 400 - 200), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(1500); }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
@@ -137,6 +142,7 @@ await page.keyboard.press('Escape'); await wait(800); await page.keyboard.press(
 for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1', '14_F1'], ['KeyO', '14b_O']]) {
   const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => '');
   if (st && st !== 'hud' && st !== 'play') { await page.keyboard.press('Escape'); await wait(800); }
+  await untilClosed();
   const toasts0 = await ev(() => document.querySelectorAll('#toasts .toast').length).catch(() => 0);
   await page.keyboard.press(k); await wait(1500); await shot(n);
   if (k === 'KeyJ' || k === 'KeyO') { const a = await ev((t0) => ({ screen: VR.game.ui.screen || '', toast: document.querySelectorAll('#toasts .toast').length > t0, text: [...document.querySelectorAll('#toasts .toast')].map(e => e.textContent.trim().slice(0, 60)).slice(-1)[0] || '' }), toasts0).catch(() => null); OUT['key_' + k] = a;

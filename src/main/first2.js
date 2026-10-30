@@ -93,7 +93,7 @@
   // ---------------------------------------------------------------- 3 · open ground
   // solid(x, y, z) → bool. A place to stand: two blocks of air on a solid one. The way ahead along yaw (forward
   // (−sin, −cos)): each metre's ground at most one block up (auto step-up takes it) and at most DROP down.
-  F.WAY = 8; F.DROP = 5; F.SEARCH = 12;
+  F.WAY = 12; F.DROP = 5; F.SEARCH = 12;
   F.groundAt = function (solid, x, z, y0) {
     for (let y = y0 + 1; y >= y0 - F.DROP; y--) if (!solid(x, y, z) && !solid(x, y + 1, z) && solid(x, y - 1, z)) return y;
     return null;
@@ -126,8 +126,22 @@
         if (L > here + 2 && (!best || L > best.way)) best = { pos: [x + 0.5, y, z + 0.5], way: L, r };
       }
     }
-    return best;
+    // (f-first2 restart: the vista spur on a cliff's edge — nothing ahead within reach) the nearest place with a free way
+    // nearest the view's direction, the player turned to it
+    for (let r = 0; r <= F.SEARCH; r++) {
+      const n = r ? Math.max(8, Math.round(r * 6)) : 1;
+      for (let k = 0; k < n; k++) {
+        const a = k / n * Math.PI * 2, x = px + Math.round(Math.cos(a) * r), z = pz + Math.round(Math.sin(a) * r);
+        const y = r ? F.groundAt(solid, x, z, py + 1) : py;
+        if (y === null || Math.abs(y - py) > 1) continue;
+        for (const d of F.TURNS) if (F.wayLen(solid, x + 0.5, z + 0.5, y, yaw + d) >= F.WAY) return { pos: [x + 0.5, y, z + 0.5], way: F.WAY, r, yaw: yaw + d };
+      }
+    }
+    return best;   // (no full way anywhere near: the longest one facing the view)
   };
+  F.TURNS = [Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
+  // a wall, a fence, a pane: one block that collides 1.5 high — no step (the cell above it counts as solid)
+  F.solidTall = (solid, tall) => (x, y, z) => solid(x, y, z) || tall(x, y - 1, z);
 
   // ---------------------------------------------------------------- 4 · the swarm's end: near a lit rock
   F.SWARM_GAP = 800;   // m off the rock's surface, on its sunlit side
@@ -225,14 +239,19 @@
   };
 
   // 3 · the spawn on open ground (a new world's first start, when the land is there) and no form field holding the keys
-  F.solidOf = (w) => { const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : (VR.FLAGS && VR.FLAGS.SOLID); return (x, y, z) => !!(T[w.getBlock(x, y, z)] & S); };
+  F.solidOf = (w) => {
+    const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : (VR.FLAGS && VR.FLAGS.SOLID), SH = VR.SHAPE || {}, shp = R.T.shape;
+    const solid = (x, y, z) => !!(T[w.getBlock(x, y, z)] & S);
+    const tall = (x, y, z) => { const b = w.getBlock(x, y, z); if (!(T[b] & S) || !shp) return false; const h = shp[b]; return h === SH.FENCE || h === SH.WALL || h === SH.PANE; };
+    return F.solidTall(solid, tall);
+  };
   F.settle = function (g) {
     try {
       if (!g || !g.meta || g.meta.player || g.meta.guest || g.meta.f2open || !g.world || !g.player) return null;
       g.meta.f2open = 1;
       const p = g.player, r = F.openGround(F.solidOf(g.world), p.pos, p.yaw);
       if (!r) return null;
-      p.teleport(r.pos[0], r.pos[1], r.pos[2]); p.spawn = r.pos.slice();
+      p.teleport(r.pos[0], r.pos[1], r.pos[2]); p.spawn = r.pos.slice(); if (Number.isFinite(r.yaw)) p.yaw = r.yaw;
       if (Array.isArray(g.meta.worldSpawn)) g.meta.worldSpawn = r.pos.slice();
       F.moved = r;
       return r;
@@ -282,7 +301,8 @@
   if (G && G.prototype.playFrame && !G.prototype.playFrame.__f2) {
     const op = G.prototype.playFrame;
     G.prototype.playFrame = function (dt) {
-      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); F.settle(this); this.f2t = 0; }
+      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); this.f2t = 0; this.f2wait = 3; }
+      if (this.f2wait > 0 && !this.arrival && !(this.wow && this.wow.active) && !(this.ui && this.ui.screen) && --this.f2wait === 0) F.settle(this);
       { const n = performance.now(); this.f2gap = this.f2t && !(this.ui && this.ui.screen) ? (n - this.f2t) / 1000 : 0; this.f2t = n; }
       const r = op.apply(this, arguments);
       try { F.pointFrame(this, dt); } catch (e) { /* the pointer waits */ }

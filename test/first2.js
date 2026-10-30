@@ -61,6 +61,17 @@ console.log('b · open ground');
   for (let x = -2; x <= 2; x++) { set3.add(k(x, 64, -4)); set3.add(k(x, 65, -4)); }
   check(F.wayLen(solid3, 0.5, 0.5, 64, 0) === 3, 'a two-block wall stops the way (' + F.wayLen(solid3, 0.5, 0.5, 64, 0) + ' m)');
   check(F.openGround((x, y) => y <= 63, [0.5, 64, 0.5], 1.3) === null, 'an open spawn stays where it is');
+  // the real vista spur (gen_vista.js, seed 4242): ONE block of wall (stone_brick_wall, 1.5 high to collide) — no step
+  const wall1 = (x, y, z) => y <= 63 || (y === 64 && z === -6 && Math.abs(x) <= 3) || (y === 64 && Math.abs(x) === 3 && z <= 0 && z >= -6);
+  const tall1 = (x, y, z) => y === 64 && ((z === -6 && Math.abs(x) <= 3) || (Math.abs(x) === 3 && z <= 0 && z >= -6));
+  const sT = F.solidTall(wall1, tall1);
+  check(F.wayLen(wall1, 0.5, 0.5, 64, 0) === F.WAY && F.wayLen(sT, 0.5, 0.5, 64, 0) === 5, 'a one-block wall (1.5 high) is no step: the way ends at it (' + F.wayLen(sT, 0.5, 0.5, 64, 0) + ' m; read as a step: ' + F.wayLen(wall1, 0.5, 0.5, 64, 0) + ')');
+  const r2 = F.openGround(sT, [0.5, 64, 0.5], 0);
+  check(!!r2 && F.wayLen(sT, r2.pos[0], r2.pos[2], r2.pos[1], r2.yaw === undefined ? 0 : r2.yaw) >= F.WAY, 'the spur: a place with ' + F.WAY + ' m of free way found (' + JSON.stringify(r2) + ')');
+  // a ridge 11 wide (cliffs ahead and behind): nothing ahead within reach → the nearest place with a free way, turned to it (along the ridge)
+  const cliff = (x, y, z) => (z > -6 && z < 6 ? y <= 63 : y <= 40);
+  const r3 = F.openGround(cliff, [0.5, 64, 0.5], 0);
+  check(!!r3 && Number.isFinite(r3.yaw) && Math.abs(Math.abs(r3.yaw) - Math.PI / 2) < 1e-9 && F.wayLen(cliff, r3.pos[0], r3.pos[2], r3.pos[1], r3.yaw) >= F.WAY, 'a cliff ahead: turned 90° along the ridge (' + (r3 ? JSON.stringify(r3) : 'none') + ')');
 }
 
 console.log('c · the Abenteuer start');
