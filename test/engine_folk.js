@@ -1,7 +1,7 @@
 // e-engine (docs/superpowers/plans/2026-10-30-e-engine.md) · the villagers' path tables (villagers.js caches: walkable and
 // standable for every block state — 30 000 collision shapes) were built at the first path of a session: the flight's
 // worst frame (a 300 ms frame of play, villages.goTo, in the engine bench's profile). Now a slice at a time while the
-// world loads and in play (VR.Folk.warm(ms)).
+// world loads (VR.Folk.warm(ms), game.loadingFrame).
 //  1. built in 3 ms slices: the same tables as built at once (every state)
 //  2. no slice much over its budget (the longest ≤ 40 ms: one state's shape can be a model built, on a loaded machine)
 //  3. a path asked for halfway finishes them at once and is the same path
