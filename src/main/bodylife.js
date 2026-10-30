@@ -59,12 +59,13 @@
     const D = VR.DimReg && VR.DimReg.get(g.dim), id = D && D.body;
     if (!id || !g.player || !g.world) {
       if (BL.vacuum) { BL.vacuum = false; suitOff(g); }
+      BL.thin = false;   // u-moons2
       if (VR.BodySky && VR.BodySky.plumes.length) VR.BodySky.plumes = [];
       S.id = null;
       return;
     }
     const p = g.player, w = g.world, prof = VR.Bodies.profile(id), grav = VR.DimReg.gravity(g.dim);
-    BL.vacuum = true;
+    BL.vacuum = !prof.air || id === 'ocker'; BL.thin = id === 'ocker';   // u-moons2: Aquamarin's air carries sound; Ocker's 6 mbar barely
     const t = VR.Universe.worldSeconds(g.env.day | 0, g.env.ticks);
     if (S.id !== id) {   // arrived
       S.id = id; S.landY = null; S.wasGround = true; S.impactSlot = Math.floor(t / 180); S.parUp = null;
@@ -76,11 +77,14 @@
     if (BS) { BS.eye[0] = eye[0]; BS.eye[1] = eye[1]; BS.eye[2] = eye[2]; BS.groundY = w.isLoaded(Math.floor(p.pos[0]), Math.floor(p.pos[2])) ? w.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1 : null; }
     const tier = (g.settings && Number.isFinite(g.settings.particles)) ? g.settings.particles | 0 : 2;
     const lightK = BS && BS.cur ? BS.cur.light.lightK : 1, amb = E && E.ambSky ? E.ambSky : [0.1, 0.1, 0.1];
-    const lit = (alb) => [alb[0] * (2.8 * lightK * 0.75 + amb[0] * 1.5 + 0.02), alb[1] * (2.85 * lightK * 0.75 + amb[1] * 1.5 + 0.02), alb[2] * (3.0 * lightK * 0.75 + amb[2] * 1.5 + 0.025)];
+    // (u-moons2: with air, Helia's light as it reaches the ground — through a storm it is a glimmer)
+    const sc = prof.air && E && E.sunColor && lightK > 0 ? E.sunColor : [2.8 * lightK, 2.85 * lightK, 3.0 * lightK];
+    const lit = (alb) => [alb[0] * (sc[0] * 0.75 + amb[0] * 1.5 + 0.02), alb[1] * (sc[1] * 0.75 + amb[1] * 1.5 + 0.02), alb[2] * (sc[2] * 0.75 + amb[2] * 1.5 + 0.025)];
     // ---- the landing's dust and the sprint's puffs, in vacuum arcs
     const P = g.particles;
     const dustCol = () => {
       if (id === 'opal') return [0.85, 0.9, 0.98];
+      if (id === 'zinn' || id === 'ocker' || id === 'aqua') return id === 'zinn' ? [0.6, 0.52, 0.28] : id === 'ocker' ? [0.42, 0.26, 0.15] : [0.62, 0.58, 0.48];   // u-moons2
       const b = VR.BIOMES[w.biomeAt(Math.floor(p.pos[0]), Math.floor(p.pos[2]))];
       return b && b.key === 'basalt_mare' ? [0.075, 0.073, 0.07] : [0.26, 0.25, 0.235];
     };
@@ -139,6 +143,7 @@
       }
       if (BS && BS.cur && BS.cur.light.eclipse > 0.5) unlock(g, 'moon:eclipse');
     }
+    if (VR.BodyLife2) VR.BodyLife2.update(g, dt, eye, E, id, t, plumes, tier, lit);   // u-moons2: Zinnober's plumes, Ocker's devils and storms, Aquamarin's nights
     if (BS) BS.plumes = plumes;
     // the ground's tremble near a firing vent: a small dip of the eye now and then (presence.js's landing dip)
     if (S.shake > 0 && Math.random() < dt * 6) { p.dipAmp = Math.max(p.dipAmp || 0, 0.02 * S.shake); p.dipT = 0; }

@@ -60,4 +60,9 @@
   // u-moons1: the first bodies one can stand on (src/shared/bodies.js, gen_body.js) — airless (u_dim 5), their own g, no village life
   DimReg.add('basalt', { sky: true, code: 5, g: 1.62, travel: true, mp: 'convoy', body: 'basalt', gen: (seed, opts) => new VR.BodyGen(seed, 'basalt', opts), name: ['g.dim.basalt', 'Basalt', 'Basalt'], veil: ['#f1efe9', '#9b9892', '#0c0c11'] });
   DimReg.add('opal', { sky: true, code: 5, g: 0.49, travel: true, mp: 'convoy', body: 'opal', gen: (seed, opts) => new VR.BodyGen(seed, 'opal', opts), name: ['g.dim.opal', 'Opal', 'Opal'], veil: ['#ffffff', '#cfe4f6', '#0f1a2e'] });
+  // u-moons2: the three worlds of wave 5 (gen_body2.js) — Zinnober airless, Ocker and Aquamarin with air (bodysky.js
+  // draws their skies from atmo_lut.js); the ids universe.js and spaceflight.js use, so the cruise reaches them and V lands
+  DimReg.add('zinn', { sky: true, code: 5, g: 1.80, travel: true, mp: 'convoy', body: 'zinn', gen: (seed, opts) => new VR.BodyGen(seed, 'zinn', opts), name: ['g.dim.zinn', 'Zinnober', 'Cinnabar'], veil: ['#fff6c8', '#e8b030', '#2a1006'] });
+  DimReg.add('ocker', { sky: true, code: 5, g: 3.72, travel: true, mp: 'convoy', body: 'ocker', air: 'ocker', gen: (seed, opts) => new VR.BodyGen(seed, 'ocker', opts), name: ['g.dim.ocker', 'Ocker', 'Ochre'], veil: ['#ffe8c8', '#c87a40', '#2a140a'] });
+  DimReg.add('aqua', { sky: true, code: 5, g: 2.01, travel: true, mp: 'convoy', body: 'aqua', air: 'aqua', gen: (seed, opts) => new VR.BodyGen(seed, 'aqua', opts), name: ['g.dim.aqua', 'Aquamarin', 'Aquamarine'], veil: ['#f0fffc', '#5cd6c8', '#0a2a30'] });
 })(VR);

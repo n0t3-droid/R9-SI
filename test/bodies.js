@@ -62,7 +62,7 @@ const SEED = 4242;
 // ================================================================ a · the profiles
 console.log('a · the profiles');
 const PB = B.profile('basalt'), PO = B.profile('opal');
-check(PB && PO && B.ids.join() === 'basalt,opal', 'two bodies: basalt, opal', B.ids.join());
+check(PB && PO && B.ids.join() === 'basalt,opal,zinn,ocker,aqua', 'five bodies: basalt, opal (u-moons1), zinn, ocker, aqua (u-moons2)', B.ids.join());
 check(PB.kind === 'airless' && PO.kind === 'ice', 'kinds: Basalt airless (cratered), Opal ice');
 check(Math.abs(PB.R - U.home.by.basalt.R) < 1 && Math.abs(PO.R - U.home.by.opal.R) < 1, 'radii from VR.Universe: Basalt ' + (PB.R / 1000).toFixed(2) + ' km, Opal ' + (PO.R / 1000).toFixed(2) + ' km (game)');
 check(PB.g === 1.62 && PO.g === 0.49, 'g: Basalt 1.62, Opal 0.49 (U§2.1)');
@@ -89,7 +89,7 @@ check(V.makeGen('basalt', SEED, {}) instanceof BG && V.makeGen('opal', SEED, {})
   check(meta.universe && meta.universe.bodies && meta.universe.bodies.basalt.bgen === 1 && meta.universe.bodies.opal.bgen === 1, 'stamp: a save gets bgen 1 for each body');
   meta.universe.bodies.opal.bgen = 0.5; B.stamp(meta);
   check(meta.universe.bodies.opal.bgen === 0.5, 'stamp keeps what a save has (old worlds keep their moons)');
-  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 1, opal: 0.5 }), 'bgenOf → the genOpts table', JSON.stringify(B.bgenOf(meta)));
+  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 1, opal: 0.5, zinn: 1, ocker: 1, aqua: 1 }), 'bgenOf → the genOpts table', JSON.stringify(B.bgenOf(meta)));
   check(new BG(SEED, 'opal', { bgen: { opal: 1 } }).bgen === 1 && new BG(SEED, 'basalt', {}).bgen === B.BGEN, 'a generator takes its bgen from the options, else the current');
 }
 
