@@ -163,13 +163,19 @@
       if (this.anisoLevel) this.setAniso(this.anisoLevel);
       return true;
     }
+    // e-engine: the batch is compiled without waiting for each program (GL.deferred: its status at its first use)
     buildPrograms() {
+      const G = VR.GL, was = G.deferred;
+      G.deferred = true;
+      try { this.buildProgramsNow(); } finally { G.deferred = was; }
+    }
+    buildProgramsNow() {
       if (VR.Light2) { VR.Light2.use(this.q); this.l2Key = VR.Light2.key ? VR.Light2.key(this.q) : ''; if (VR.GL && !VR.GL.defineHook) VR.GL.defineHook = VR.Light2.hook; }   // (t-light2: its switches are defines, light2.js)
       if (VR.Sky3) { VR.Sky3.use(this.q); this.s3Key = VR.Sky3.key(this.q); }   // (t-sky3: the sky's switches are defines too, sky3.js — its hook follows the light's)
       const md = this.multi ? ['MULTIDRAW'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs) · MOTION (t-motion): the wind in everything (wind.js; off on Very Low) · CLOUDSH (t-motion): the clouds' shadows (Balanced+)
       const P = this.P = {};
-      const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
+      const bindUBO = (p) => GL.onReady(p, (q) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(q.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(q.p, bi, 0); } });   // (e-engine: when the program is ready)
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
       const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)

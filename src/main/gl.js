@@ -46,6 +46,7 @@
     const v = fix(vsSrc), f = fix(fsSrc);
     const vsFull = '#version 300 es\n' + v.ext + '\n' + pre.replace('#version 300 es\n', '') + v.body;
     const fsFull = '#version 300 es\n' + f.ext + '\n' + pre.replace('#version 300 es\n', '') + '#define FRAG 1\nprecision highp float;\nprecision highp int;\nprecision highp sampler2DArray;\nprecision highp sampler2D;\n' + f.body;
+    if (GL.deferred) return GL.deferProgram(vsFull, fsFull, name);   // (e-engine: a batch of programs, checked at first use)
     const p = gl.createProgram();
     gl.attachShader(p, GL.shader(gl.VERTEX_SHADER, vsFull, name + '.vs'));
     gl.attachShader(p, GL.shader(gl.FRAGMENT_SHADER, fsFull, name + '.fs'));
@@ -56,6 +57,42 @@
     for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const nm = info.name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, info.name); }
     return { p, u, name };
   };
+  // e-engine · the programs of a batch (renderer.buildPrograms: GL.deferred = true) are compiled and linked without asking
+  // for their status: every status query waits for the compiler, so asking after each program made the page wait for
+  // each compile in turn (≈ 1 s of the start on the main thread here; on a PC whose driver compiles in parallel — ANGLE
+  // does — the batch now compiles side by side while the page goes on). The status, the uniforms and the ready hooks
+  // (GL.onReady) come at the program's first use: its .p or .u. A failed compile throws there with the same message.
+  GL.deferProgram = function (vsFull, fsFull, name) {
+    const gl = GL.gl, p = gl.createProgram();
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); gl.attachShader(p, s); return s; };
+    const vs = sh(gl.VERTEX_SHADER, vsFull), fs = sh(gl.FRAGMENT_SHADER, fsFull);
+    gl.linkProgram(p);
+    let u = null, hooks = null;
+    const prog = { name, deferred: true };
+    const ready = () => {
+      if (u) return;
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+        for (const [s, src, nm] of [[vs, vsFull, name + '.vs'], [fs, fsFull, name + '.fs']]) {
+          if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
+          const log = gl.getShaderInfoLog(s);
+          console.error('Shader compile error (' + nm + '):\n' + log + '\n' + src.split('\n').map((l, i) => (i + 1) + ': ' + l).join('\n'));
+          throw new Error('Shader compile failed: ' + nm + ': ' + log);
+        }
+        throw new Error('Link failed ' + name + ': ' + gl.getProgramInfoLog(p));
+      }
+      u = {};
+      const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+      for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const nm = info.name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, info.name); }
+      prog.isReady = true;
+      if (hooks) { const h = hooks; hooks = null; for (const f of h) f(prog); }
+    };
+    Object.defineProperty(prog, 'p', { get() { ready(); return p; }, enumerable: true });
+    Object.defineProperty(prog, 'u', { get() { ready(); return u; }, enumerable: true });
+    prog.onReady = (f) => { if (u) f(prog); else (hooks || (hooks = [])).push(f); };
+    return prog;
+  };
+  // run f(prog) once the program is ready (at once for a program made the old way)
+  GL.onReady = function (prog, f) { if (prog && prog.onReady) prog.onReady(f); else f(prog); return prog; };
   GL.tex2D = function (w, h, internal, format, type, opts) {
     const gl = GL.gl; opts = opts || {};
     const t = gl.createTexture();
