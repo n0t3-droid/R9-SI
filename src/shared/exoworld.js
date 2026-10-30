@@ -66,14 +66,19 @@
     if (p1) { out.th1 = Math.atan2(p1[1] - pp[1], p1[0] - pp[0]); out.d1 = Math.hypot(p1[0] - pp[0], p1[1] - pp[1]); }
     return out;
   }
-  // the local frame at latitude φ (x east, y up, z south): a star at hour angle H (equator of the sky: declination 0)
-  const dirAt = (H, phi, o) => { o[0] = -Math.sin(H); o[1] = Math.cos(phi) * Math.cos(H); o[2] = Math.sin(phi) * Math.cos(H); return o; };
+  // the local frame at latitude φ (x east, y up, z south): a star at hour angle H and declination δ (the season: the
+  // world's tilt — a ringed world's ring is lit on the face we see only when δ ≠ 0, so its season is summer)
+  const dirAt = (H, phi, o, dl) => {
+    const sd = Math.sin(dl || 0), cd = Math.cos(dl || 0);
+    o[0] = -cd * Math.sin(H); o[1] = Math.sin(phi) * sd + Math.cos(phi) * cd * Math.cos(H); o[2] = Math.sin(phi) * cd * Math.cos(H) - Math.cos(phi) * sd; return o;
+  };
   Exo.dirAt = dirAt;
   // the landing's latitude and the day's start (per world, hashed); locked worlds keep their sun at 24–38°
   Exo.place = (def, pl) => {
     const k = pIndex(def, pl), rg = Exo.ring(def, pl);
     const phi = rg ? rg.lat : (15 + 30 * h01(sysKey(def), k, 0x51a7, 1)) * D2R;
-    return { phi, w0: h01(sysKey(def), k, 0x51a7, 2) * 2 * Math.PI, elLock: (24 + 14 * h01(sysKey(def), k, 0x51a7, 3)) * D2R };
+    const dl = rg ? (14 + 10 * h01(sysKey(def), k, 0x51a7, 4)) * D2R : (h01(sysKey(def), k, 0x51a7, 4) - 0.5) * 36 * D2R;
+    return { phi, dl, w0: h01(sysKey(def), k, 0x51a7, 2) * 2 * Math.PI, elLock: (24 + 14 * h01(sysKey(def), k, 0x51a7, 3)) * D2R };
   };
   Exo.locked = (pl) => !!(pl.locked || (pl.spin && pl.spin.locked) || !(pl.spin && pl.spin.T > 0));
   Exo.dayLength = (pl) => (Exo.locked(pl) ? Infinity : pl.spin.T);
@@ -81,14 +86,15 @@
     out = out || { sun: [0, 1, 0], sun2: [0, 1, 0] };
     const A = starAngles(def, pl, t), P = Exo.place(def, pl), lk = Exo.locked(pl);
     // the hour angle: the world's turn minus the star's angle (a solar day); a locked world: the sun stands where it stands
-    const H0 = lk ? Math.acos(clamp(Math.sin(P.elLock) / Math.cos(P.phi), -1, 1)) * (h01(def.idx | 0, 3, 5, 7) < 0.5 ? -1 : 1) : P.w0 + 2 * Math.PI * t / pl.spin.T - A.th0;
-    dirAt(H0, P.phi, out.sun);
+    // (a locked world: the hour angle where the sun stands at elLock — sin el = sin φ sin δ + cos φ cos δ cos H)
+    const H0 = lk ? Math.acos(clamp((Math.sin(P.elLock) - Math.sin(P.phi) * Math.sin(P.dl)) / (Math.cos(P.phi) * Math.cos(P.dl)), -1, 1)) * (h01(def.idx | 0, 3, 5, 7) < 0.5 ? -1 : 1) : P.w0 + 2 * Math.PI * t / pl.spin.T - A.th0;
+    dirAt(H0, P.phi, out.sun, P.dl);
     out.ang = Math.min(0.3, def.star.R * 6.957e8 / Math.max(A.d0, 1));
-    out.day = Exo.dayLength(pl); out.locked = lk; out.phi = P.phi;
+    out.day = Exo.dayLength(pl); out.locked = lk; out.phi = P.phi; out.dl = P.dl;
     out.has2 = !!A.s1;
     if (A.s1) {
       // the companion: the same sky, its hour angle by its true angle from the world; its light share L₂/L₁ (d₁/d₂)²
-      dirAt(H0 + (A.th0 - A.th1), P.phi, out.sun2);
+      dirAt(H0 + (A.th0 - A.th1), P.phi, out.sun2, P.dl);
       const L1 = def.star.L, L2 = def.star2.L;
       out.k2 = clamp(L2 / L1 * Math.pow(A.d0 / Math.max(A.d1, 1), 2), 0, 4);
       out.ang2 = Math.min(0.3, A.s1.R / Math.max(A.d1, 1));

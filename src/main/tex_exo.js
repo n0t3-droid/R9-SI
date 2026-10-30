@@ -11,15 +11,16 @@
   if (!REC || !TX) return;
   const K = TX.chunky;
   REC.exo_crystal = () => {
-    const img = TX.natural([0x2a3346, 0x323d55, 0x3b4862, 0x46546f], { period: 4, oct: 2, speck: 0.05, speckDark: true, seed: 9301, contrast: 1.0, rough: 0.85 });
-    const P = []; for (let k = 0; k < 6; k++) P.push({ x: hh(k, 1, 9304) * N, y: hh(k, 2, 9304) * N, a: 1.2 + (hh(k, 3, 9304) - 0.5) * 0.9, L: N * (0.3 + 0.3 * hh(k, 4, 9304)), w: N * (0.07 + 0.06 * hh(k, 5, 9304)) });
+    // (run 1: a dark matrix with crossing prisms read as a dappled hide — now pale ice between upright prisms)
+    const img = TX.natural([0x8fa6c8, 0x9fb5d6, 0xafc3e0, 0xc0d2ea], { period: 5, oct: 2, speck: 0.03, seed: 9301, contrast: 0.7, rough: 0.3 });
+    const P = []; for (let k = 0; k < 6; k++) P.push({ x: hh(k, 1, 9304) * N, y: hh(k, 2, 9304) * N, a: Math.PI / 2 + (hh(k, 3, 9304) - 0.5) * 0.35, L: N * (0.35 + 0.3 * hh(k, 4, 9304)), w: N * (0.06 + 0.05 * hh(k, 5, 9304)) });
     img.forEach((x, y, i) => {
       for (const p of P) {
         let dx = x + 0.5 - p.x, dy = y + 0.5 - p.y; dx -= Math.round(dx / N) * N; dy -= Math.round(dy / N) * N;
         const u = dx * Math.cos(p.a) + dy * Math.sin(p.a), v = -dx * Math.sin(p.a) + dy * Math.cos(p.a);
         if (Math.abs(u) > p.L || Math.abs(v) > p.w * (1 - 0.7 * Math.max(0, Math.abs(u) / p.L - 0.6) / 0.4)) continue;
         const e = v / p.w, t = 0.5 + 0.5 * u / p.L;
-        img.set(x, y, C(e > 0.5 ? 0xf4fbff : e < -0.5 ? 0x5a78b8 : t > 0.55 ? 0xc6dcff : 0x95b4ee)); img.ro[i] = 0.12; img.em[i] = e > 0.5 ? 0.8 : 0.3 + 0.25 * t;
+        img.set(x, y, C(e > 0.5 ? 0xf6fbff : e < -0.55 ? 0x7c96c8 : t > 0.55 ? 0xdbe9ff : 0xc0d6f6)); img.ro[i] = 0.1; img.em[i] = e > 0.5 ? 0.6 : 0.15 + 0.2 * t;
         break;
       }
     });

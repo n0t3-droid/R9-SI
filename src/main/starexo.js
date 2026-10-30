@@ -43,7 +43,7 @@
   X2.sky = SK;
 
   // ---------------------------------------------------------------- the light and the sky's uniforms
-  const SUN = [2.85, 2.9, 3.05];
+  const SUN = [2.85, 2.9, 3.05], SUN2U = new Float32Array(4), SUN2C = new Float32Array(4);
   const wrapBS = () => {
     const BS = VR.BodySky; if (!BS || BS.stars2Wrapped) return;
     BS.stars2Wrapped = true;
@@ -64,7 +64,7 @@
       L.far = L.far.map((v, i) => v * kx[i]);
       r.sky.sunCol = r.sky.sunCol.map((v, i) => v * kx[i]);
       // the companion: a second sun (close pair) or a brilliant point (wide pair)
-      const S2 = r.sky.sun2 || (r.sky.sun2 = new Float32Array(4)), C2 = r.sky.sun2c || (r.sky.sun2c = new Float32Array(4));
+      const S2 = r.sky.sun2 = SUN2U, C2 = r.sky.sun2c = SUN2C;   // (kept arrays: no allocation per frame)
       let sun2 = null;
       if (s.has2) {
         const c2 = colOf(s.color2), d = s.sun2;

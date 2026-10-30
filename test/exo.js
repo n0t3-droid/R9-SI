@@ -47,7 +47,9 @@ console.log('(a) rings, signatures, the landed sky');
   check(sw.has2 && sw.k2 < 0.01 && sw.ang2 < 0.002, 'a wide pair: the companion a brilliant point, its light a trace', f2(sw.k2 * 1000) + ' ‰');
   // the sky's frame: the pole is perpendicular to every sun
   const P = [0, Math.sin(s0.phi), -Math.cos(s0.phi)];
-  check(Math.abs(P[1] * s0.sun[1] + P[2] * s0.sun[2]) < 1e-9 && Math.abs(P[1] * s0.sun2[1] + P[2] * s0.sun2[2]) < 1e-9, 'the suns on the sky\'s equator (declination 0)');
+  check(Math.abs(P[1] * s0.sun[1] + P[2] * s0.sun[2] - Math.sin(s0.dl)) < 1e-9 && Math.abs(P[1] * s0.sun2[1] + P[2] * s0.sun2[2] - Math.sin(s0.dl)) < 1e-9, 'both suns at the season\'s declination', deg(s0.dl));
+  const [dr, pr] = find((d, b) => b.landable && E.ring(d, b)), sr = E.sky(dr, pr, 0);
+  check(sr.dl > 0.2, 'a ringed world: summer — its ring\'s face toward us lit', deg(sr.dl));
 }
 
 console.log('(b) the nearest interesting unvisited system');

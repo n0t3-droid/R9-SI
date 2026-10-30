@@ -147,7 +147,7 @@ const choose = (P) => P.ev(() => {
   const k = L.filter(s => s.cls === 'K' && !s.bin && s.neb < 0).sort((a, b) => d0(a) - d0(b))[0];
   const from = G.systemsNear(N, k.p, 30).find(q => q.idx !== k.idx && q.idx !== 0 && q.s.neb < 0);
   const binSpace = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.2 && b.landable && d.bodies.some(m => m.parent === b.id));
-  const binLand = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'ocker' || b.base === 'basalt') && !E.ring(d, b));
+  const binLand = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'basalt' || b.base === 'opal') && !E.ring(d, b) && E.sky(d, b, 0).k2 > 0.25);
   const violet = pick((s, d, b) => E.signature(d, b) === 'violet' && b.base === 'aqua');
   const ringed = pick((s, d, b) => b.landable && E.ring(d, b) && (b.base === 'basalt' || b.base === 'opal') && !s.bin);
   const crystal = pick((s, d, b) => E.signature(d, b) === 'crystal' && s.cls !== 'D' && !s.bin);
@@ -195,7 +195,7 @@ async function stars2(P, tag) {
     const J = await P.ev(() => VR.game.stars.J);
     await P.step(Math.round((J.spin + J.transit * 0.5) / 0.033) - 4);
     const tun = await P.ev(() => Array.from(VR.StarJump.UF.tun));
-    check(tun[0] > 1 && tun[2] < 0.3, 'at the peak: the tunnel on, the band dimmed', JSON.stringify(tun.map(v => +v.toFixed(2))));
+    check(tun[0] > 0.5 && tun[2] < 0.3, 'at the peak: the tunnel on, the band dimmed', JSON.stringify(tun.map(v => +v.toFixed(2))));
     await shot(P, 'jump_transit.png', tag);
     for (let n = 0; n < 400; n++) { s = await sj(P); if (!s.jumping) break; await P.step(5); }
     check(s.on && s.sys === C.k, 'arrived', s.sys);
@@ -206,7 +206,7 @@ async function stars2(P, tag) {
     await shot(P, 'binary_space_shadow.png', tag);
   }
   // the first visit: the codex page and the XP
-  const first = await P.ev(() => { const g = VR.game, A = VR.Adventure; return { codex: !!(g.codex && g.codex.found && g.codex.found['m:stars']), xp: A && A.rec && A.rec.me ? Object.keys(A.rec.me.once || {}).filter(k => /^system:x/.test(k)).length : -1, route: (g.meta.stars.route || []).length, lines: (window.__lines || []).filter(l => /Erstbesuch/.test(l)).length }; });
+  const first = await P.ev(() => { const g = VR.game, A = VR.Adventure; return { codex: !!(g.codex && g.codex.found && g.codex.found['m:stars']), xp: A && A.rec && A.rec.me ? Object.keys(A.rec.me.once || {}).filter(k => /^system:x/.test(k)).length : -1, route: ((g.meta.stars && g.meta.stars.route) || []).length, lines: (window.__lines || []).filter(l => /Erstbesuch/.test(l)).length }; });
   R.first = first; console.log('  first visit ' + JSON.stringify(first));
   if (tag === 'high') check(first.codex && first.route >= 2, 'the first visit: the codex page „Fremde Sonne", the route grows', JSON.stringify(first));
   // the binary world: two suns, two shadows
@@ -214,18 +214,20 @@ async function stars2(P, tag) {
     const b = await daySet(P, 0.42, 0.75, true);
     console.log('  the suns ' + JSON.stringify(b));
     const st = await P.ev(() => ({ built: !!VR.StarExo.built, cur: VR.StarExo.cur && VR.StarExo.cur.sun2 ? VR.StarExo.cur.sun2.map(v => +v.toFixed(3)) : null, hs: !!VR.game.renderer.q.hshadow, lite: !!VR.game.renderer.q.lite }));
-    await P.step(4);
+    await P.step(4); await keep(P, '__Fb'); await picture(P, '__Fb', SH('_tmp_b.png'), 1);   // (the program is rebuilt in a drawn frame)
     const st2 = await P.ev(() => ({ built: !!VR.StarExo.built }));
     R.sun2 = Object.assign(st, st2);
-    if (tag === 'high') check(st2.built && !!st.cur, 'High: the second sun lights the ground (SUN2)', JSON.stringify(st));
-    else check(!st2.built, 'Very Low: no SUN2 program', JSON.stringify(st));
+    if (tag === 'high') check(st2.built && !!st.cur, 'High: the second sun lights the ground (SUN2)', JSON.stringify(R.sun2));
+    else check(!st2.built, 'Very Low: no SUN2 program', JSON.stringify(R.sun2));
     if (b && tag === 'high') {
       // a pillar and a wall beside the player, the view down on their shadows
       const at = await P.ev(() => { const g = VR.game, w = g.world, p = g.player, x = Math.floor(p.pos[0]) + 4, z = Math.floor(p.pos[2]); let y = 200; while (y > 20 && !w.getBlock(x, y, z)) y--; const S = VR.R.S('stone_bricks') || VR.R.S('stone'); for (let k = 1; k <= 5; k++) w.setBlock(x, y + k, z, S); for (let k = 1; k <= 3; k++) for (let dz = 2; dz <= 4; dz++) w.setBlock(x, y + k, z + dz, S); return [x, y, z]; });
       await P.settle(120);
       const d = b.dir; const sy = yawOf([-d[0], 0, -d[2]]);
-      await P.ev(([at, d]) => { const g = VR.game, p = g.player; p.teleport(at[0] + 0.5 - d[0] * 9, at[1] + 4, at[2] + 2.5 - d[2] * 9); }, [at, d]);
-      await look(P, sy, -0.42, 75);
+      // (run 1 stood on the shadows' side looking away: the pillar behind the eye — now on the suns' side, the shadows ahead)
+      const hl = Math.hypot(d[0], d[2]) || 1;
+      await P.ev(([at, d, hl]) => { const g = VR.game, p = g.player; p.teleport(at[0] + 0.5 + d[0] / hl * 7, at[1] + 5, at[2] + 2.5 + d[2] / hl * 7); }, [at, d, hl]);
+      await look(P, sy, -0.55, 75);
       await P.step(6);
       await shot(P, 'binary_two_shadows.png', tag);
       const s2 = b.s2 || d, mid = [d[0] + s2[0], 0, d[2] + s2[2]];
@@ -248,7 +250,7 @@ async function stars2(P, tag) {
   }
   if (tag !== 'high') return;
   if (want('violet') && C.violet && await land(P, C.violet)) {
-    const b = await daySet(P, 0.3, 0.55);
+    const b = await daySet(P, 0.3, 0.7);
     console.log('  the red dwarf ' + JSON.stringify(b));
     const n = await P.ev(() => { const g = VR.game, w = g.world, p = g.player, M = VR.R.S('exo_moss'), F = VR.R.S('exo_frond'); let m = 0, f = 0; for (let dx = -20; dx <= 20; dx++) for (let dz = -20; dz <= 20; dz++) for (let y = 40; y < 140; y++) { const s = w.getBlock(Math.floor(p.pos[0]) + dx, y, Math.floor(p.pos[2]) + dz); if (s === M) m++; else if (s === F) f++; } return { m, f }; });
     check(n.m > 50 && n.f > 5, 'violet moss and fronds round the landing', JSON.stringify(n));

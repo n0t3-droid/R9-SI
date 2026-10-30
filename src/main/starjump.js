@@ -330,12 +330,12 @@ void main() {
     vec3 ax = abs(u_V.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 e1 = normalize(cross(u_V, ax)), e2 = cross(u_V, e1);
     float th = acos(clamp(c1, -1.0, 1.0)), az = atan(dot(D, e2), dot(D, e1)) * 57.29578 / 1.5, bin = floor(az), h = hash13(vec3(bin, 3.0, 7.0));
-    if (h > 0.45 && th > 0.02 && th < 1.3) {
+    if (h > 0.8 && th > 0.03 && th < 1.1) {   // (run 1: 55 % of the bins at full strength read as a wall of white lines — now a sparse few, faint)
       float px = abs(fract(az) - 0.5) * 1.5 * 0.0174533 * sin(th) * pxr;
       float s = fract(log(th) * 1.2 - u_tun.y * (0.9 + 0.8 * h) + h * 7.0);
-      float seg = smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.25, 0.55, s));
-      float fall = smoothstep(0.02, 0.08, th) * (1.0 - smoothstep(0.7, 1.3, th));
-      col += mix(vec3(0.6, 0.75, 1.0), vec3(1.0), h) * u_tun.x * seg * fall * exp(-px * px * 1.8) * (0.6 + 1.4 * fract(h * 13.0));
+      float seg = smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(0.12, 0.3, s));
+      float fall = smoothstep(0.03, 0.12, th) * (1.0 - smoothstep(0.5, 1.1, th));
+      col += mix(vec3(0.45, 0.6, 1.0), vec3(0.85, 0.9, 1.0), fract(h * 7.0)) * u_tun.x * seg * fall * exp(-px * px * 3.0) * (0.3 + 0.7 * fract(h * 13.0));
     }
   }
   // ---- the jump's point stars (the one left behind, the one ahead growing from a point)
@@ -570,7 +570,7 @@ void main() {
       const bv = S.fade ? 0 : j.beta;
       UF.jump[0] = bv; UF.jump[1] = 1 / Math.sqrt(1 - bv * bv); UF.jump[2] = S.fade ? 0 : j.band;
       UF.V.set(S.V);
-      UF.tun[0] = S.fade ? 0 : SJ.tunnel(j) * 1.4; UF.tun[1] = S.js; UF.tun[2] = S.fade ? 1 : SJ.bandK(bv);   // u-stars2: the tunnel only at the peak, the band dimmed
+      UF.tun[0] = S.fade ? 0 : SJ.tunnel(j) * 0.8; UF.tun[1] = S.js; UF.tun[2] = S.fade ? 1 : SJ.bandK(bv);   // u-stars2: the tunnel only at the peak, the band dimmed
       if (S.fade) UF.jump[3] = j.phase === 'transit' ? 1 : j.phase === 'spin' ? sstep((j.u - 0.4) / 0.6) : 1 - sstep(j.u / 0.7);
       // the system left fades in the spin-up; the target's comes in with the arrival
       if (j.phase === 'arrive' && S.toDef && S.def !== S.toDef) { S.def = S.toDef; S.sys = S.to; S.focus = S.arr.focus; S.camRel = S.arr.rel; }
@@ -614,7 +614,10 @@ void main() {
       });
       if (inNeb) { const h = norm(sub(P[s0.id], cam)); UF.nebHot.set(norm([h[0] + 0.6, h[1] + 0.5, h[2] - 0.3])); }
       let n = 0;
-      for (const b of def.bodies) {
+      // u-stars2: the focus and its moons first — a system of 8 planets and their moons has more than 12 bodies, and
+      // u-stars' list order dropped the focus' moon (binary_two_shadows.png showed no shadow)
+      if (S._ordF !== f || S._ordD !== def) { S._ordF = f; S._ordD = def; S._ord = def.bodies.filter(b => b === f || b.parent === f.id).concat(def.bodies.filter(b => b !== f && b.parent !== f.id)); }
+      for (const b of S._ord) {
         if (b.kind === 'star' || n >= 12) continue;
         const rel = sub(P[b.id], cam), R = b.R / L64;
         UF.P[n * 4] = rel[0] * U; UF.P[n * 4 + 1] = rel[1] * U; UF.P[n * 4 + 2] = rel[2] * U; UF.P[n * 4 + 3] = R * U;
