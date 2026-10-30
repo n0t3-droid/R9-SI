@@ -124,7 +124,7 @@
   const OUTRO = {
     home: { chords: '3:2 0:2', lines: { mel: '5 4 7:2', str: '5:2 4:2', bell: 'r:2 7:2' }, tail: 3.2 },
     space: { chords: '1:2 0:2', lines: { mel: '9 8 7:2' }, tail: 3.8 },
-    adventure: { chords: '6:2 0:2', lines: { mel: '6 5:.5 4:.5 7:2' }, tail: 2.8 },
+    adventure: { chords: '6:2 0:2', lines: { mel: '6 5:.5 4:.5 7:2' }, tail: 3.4 },
   };
   const STING_TAIL = 2.8, WANDER_TAIL = 3.2;
   // e-music2 · the forms: A (the theme), B (its second half), told in a seeded order; no seed: the plain A
