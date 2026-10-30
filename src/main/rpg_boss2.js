@@ -205,7 +205,7 @@
   };
   B2.entrance = function (g, C) {
     const L = VR.Liberate, calm = C.b.calm;
-    B2.entr = { t: 0, C, cam: false };
+    B2.entr = { t: 0, C, cam: false, tOff: 0 };
     if (L && L.camOk && L.camOk(g) && !L.moment) {
       const c = B2.compose(g, C.m);
       if (c) { L.mcam = { t: 0, e: 0, skipped: false, first: true, a: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }, b: c, o: {}, hud: !!g.hideHud, boss2: true }; g.hideHud = true; const hud = hasDoc && document.getElementById('hud'); if (hud) hud.style.visibility = 'hidden'; B2.entr.cam = true; }
@@ -230,7 +230,12 @@
     const reg = C.reg && VR.RPGame && VR.RPGame.regionName ? VR.RPGame.regionName(C.reg) : '';
     el.innerHTML = `<div class="kick">${esc(T('g.rpg.boss2.kick', { region: reg }))}</div><div class="big">${esc(T('g.rpg.boss.name'))}</div><div class="line"></div><div class="sub">${esc(T(C.b.calm ? 'g.rpg.boss2.subCalm' : 'g.rpg.boss2.sub'))}</div>`;
     el.className = ''; void el.offsetWidth; el.className = 'on';
-    clearTimeout(B2.titT); B2.titT = setTimeout(() => { el.className = 'off'; B2.titT = setTimeout(() => { el.className = ''; }, 1000); }, 5200);
+  };
+  // (the banner leaves on the game's clock: 5.2 s after it came, 1 s to fade)
+  B2.titleStep = function (E, dt) {
+    if (E.tOff >= 2) return; E.t += dt;
+    const el = hasDoc && document.getElementById('rpgintro'); if (!el) return;
+    if (E.t > 5.2 && !E.tOff) { E.tOff = 1; el.className = 'off'; } else if (E.t > 6.2 && E.tOff === 1) { E.tOff = 2; el.className = ''; }
   };
   // the intro's clock waits for the camera; the weak points glint; the beam's clock
   { const o = BS.ai; BS.ai = function (En, m, dt) {
@@ -239,6 +244,7 @@
       const L = VR.Liberate, camOn = !!(L && L.mcam && L.mcam.boss2);
       if (!camOn) B2.entr.cam = false;
       if (camOn && C.b.st === 'intro') C.b.t = Math.min(C.b.t, BB.intro - 1.4);
+      B2.titleStep(B2.entr, dt);
     }
     const r = o.apply(this, arguments);
     if (on() && C && C.m === m) try { B2.bossFx(En.game, C, dt); } catch (e) { warn(e); }
@@ -287,6 +293,7 @@
       const A = B2.arena, x = A ? A.x : C.m.pos[0], z = A ? A.z : C.m.pos[2];
       B2.wave = { rid: C.rid, x, z, t: 0, pass: -1, gl: 0 };
       if (A) A.heal = 0;
+      if (A && A.ys) { const s = st(); if (s) { s.seen['ped:' + A.rid] = 1; if (VR.RPGame.save) VR.RPGame.save(); } B2.pedOn(g, A, 'b:' + C.rid); }
       const near = g.entities.mobs.filter(q => q.foe && !q.foe.gone && !q.foe.helper && Math.hypot(q.pos[0] - x, q.pos[2] - z) < 90);
       if (near.length && F.leaveAll) F.leaveAll(near, F.W);
       const sb = hasDoc && document.querySelector('#rpgwon .sub');
@@ -296,10 +303,7 @@
   }; }
   // the boss's find waits on the pedestal (VR.RPGame.find wrapped for the 'b:' seeds while an arena stands)
   if (VR.RPGame) { const o = VR.RPGame.find; B2.findOrig = o; VR.RPGame.find = function (seed, src, slot) {
-    if (on() && src === 'boss' && typeof seed === 'string' && seed.indexOf('b:') === 0 && B2.arena && B2.arena.ys && !B2.taking) {
-      const s = st(); if (s) { s.seen['ped:' + B2.arena.rid] = 1; if (VR.RPGame.save) VR.RPGame.save(); }
-      B2.pedOn(game(), B2.arena, seed); return null;
-    }
+    if (src === 'boss' && B2.ped && B2.ped.seed === seed && !B2.taking) return null;   // (it waits on the pedestal)
     return o.apply(this, arguments);
   }; }
   B2.pedOn = function (g, A, seed) {
