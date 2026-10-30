@@ -115,5 +115,23 @@
     };
     UI.prototype.pause.__first = true;
   }
+  // the world opens with the focus still in the create dialog's name field (Enter creates, or a click beside the
+  // button): input.js ignores keys aimed at a text field — W did nothing (review R53-06, critic_ux's 0 m). Going to the
+  // HUD gives the focus back to the page.
+  FL.unfocus = function () {
+    if (!hasDoc) return false;
+    const a = document.activeElement;
+    if (a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName || '') && a.id !== 'chatin' && a.blur) { a.blur(); return true; }
+    return false;
+  };
+  if (UI && UI.prototype && UI.prototype.show && !UI.prototype.show.__first) {
+    const os = UI.prototype.show;
+    UI.prototype.show = function (name) {
+      const r = os.apply(this, arguments);
+      if (name === null || name === undefined) { try { FL.unfocus(); } catch (e) { /* the focus */ } }
+      return r;
+    };
+    UI.prototype.show.__first = true;
+  }
   if (hasDoc) FL.css();
 })(VR);

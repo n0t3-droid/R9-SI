@@ -68,7 +68,7 @@ await wait(1500); await shot('04_t0');
 { let arr = -1; while (Date.now() - tPlay < 20000) { const e = await ev(() => window.__arr ? window.__arr.end : -1).catch(() => -1); if (e >= 0) { arr = e; break; } await wait(250); } OUT.arrivalMs = arr;
   check(arr >= 0 && arr <= 9000, 'the arrival is over in ' + arr + ' ms (≤ 9 s, no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
-OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h); return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud } : null; }).catch(() => null);
+OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h), A = VR.game.arrival, a = document.activeElement; return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud, arrival: A ? { phase: A.phase, holds: A.holds(), t: +(A.t || 0).toFixed(2) } : null, wow: !!(VR.game.wow && VR.game.wow.active), focus: a ? a.tagName + '#' + a.id : '', captured: !!VR.game.input.captured, poll: window.__arr || null } : null; }).catch(() => null);
 check(OUT.hud15 && OUT.hud15.vis !== 'hidden' && OUT.hud15.op > 0.5 && !OUT.hud15.hideHud, 'at 15 s the HUD is up: ' + JSON.stringify(OUT.hud15));
 const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 // (W, then S: the spawn may face a bench or a parapet — a key that moves the player at all is the measure)
