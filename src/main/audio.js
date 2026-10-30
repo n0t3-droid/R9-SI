@@ -225,7 +225,7 @@
       const dest = this.inlet(at, end);
       if (!dest) return null;
       const R0 = K.RECIPES[fam][which];
-      return this.recipe(R0, k, K.pitchFactor(Math.random()), K.timbre(Math.random()) ? 1.12 : 0.9, t, dest, mode);
+      return this.recipe(R0, k, K.pitchFactor(Math.random()) * (this.pitchMul || 1), K.timbre(Math.random()) ? 1.12 : 0.9, t, dest, mode);   // (a-builder: pitchMul — a quick run of placements climbs, buildfx.js)
     }
     familyOf(state) { const t = R.types[R.T.type[state]]; return t ? K.familyOf(t.name, t.o && t.o.sound) : 'stone'; }
     // footsteps: o = {speed, crouch, sprint}. The player's own steps, so no place (they are heard from the body)

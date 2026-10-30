@@ -2318,6 +2318,7 @@
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
       if (F.guide) this.drawGuide(F.guide);
       if (F.crack) this.drawCrack(F.crack);
+      if (this.popFx) this.popFx(F);   // a-builder: a placed block's pop, the stamp's ghost (buildfx.js)
       if (this.l2Vol) this.l2Vol(F, E);   // (t-light2: the light in the air, from this depth before the hand clears it — light2_gl.js)
       // first-person hand (separate depth range)
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
