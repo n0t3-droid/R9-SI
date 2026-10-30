@@ -16,7 +16,7 @@
 //   the finish    it kneels and sinks, steam and plates; the lantern turns gold, a flash and a ring of light, the music
 //                 swells with a rising chord, the land's tint clears (VR.Liberate.applyMood); the banner, XP and Taler
 //                 (VR.Adv 'boss'), a boss find (splendid or radiant); the region healed (its tribute ×2, gold on the map)
-// Cost 🟡 only within 120 m of a ready Kernfeuer: one mob, ≤ 11 draws, the telegraph's sparks only while it warns
+// Cost 🟡 only within 120 m of a ready Kernfeuer: one mob, ≤ 16 draws, the telegraph's sparks only while it warns
 // (halved on Very Low); nothing else anywhere.
 // ============================================================================
 (function (VR) {
