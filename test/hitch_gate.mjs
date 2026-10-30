@@ -194,6 +194,9 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   for (const P of Ps) { await P.ev((c) => window.__place(...c), path[0]); settleS.push(await settle(P, 600)); }
   const kept = [];
   for (const P of Ps) { for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.05, false)); }
+  // the first round: the sampled allocations of both (by function, self) — where the garbage of a frame comes from
+  const cdps = [];
+  if (round === 0) for (const P of Ps) { const c = await P.ctx.newCDPSession(P.page); await c.send('HeapProfiler.enable'); await c.send('HeapProfiler.startSampling', { samplingInterval: 32768 }); cdps.push(c); }
   const fr = Ps.map(() => []);
   for (let i = 0; i < path.length; i++) {
     const order = (i + round) % 2 ? [1, 0] : [0, 1];
@@ -201,6 +204,15 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
     if (i % 50 === 49) console.log(`    ${preset} round ${round + 1}: frame ${i + 1}/${path.length} (${secs()})`);
   }
   for (const P of Ps) kept.push(await P.ev(() => window.__kept()));
+  const allocs = [];
+  for (const c of cdps) {
+    const { profile } = await c.send('HeapProfiler.stopSampling');
+    const al = new Map();
+    const walk = (n) => { const cf = n.callFrame, k = `${cf.functionName || '(anon)'}:${cf.lineNumber + 1}`; al.set(k, (al.get(k) || 0) + n.selfSize); for (const ch of n.children || []) walk(ch); };
+    walk(profile.head);
+    const tot = [...al.values()].reduce((a, b) => a + b, 0);
+    allocs.push({ MB: +(tot / 1048576).toFixed(1), top: [...al.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => [k, +(v / 1048576).toFixed(1)]) });
+  }
   // how far each kept up: the columns round the player shown when the flight ends (a build that streams more works more)
   const shown = [];
   for (const P of Ps) shown.push(await P.ev(() => { const w = VR.game.world, p = VR.game.player, cx = Math.floor(p.pos[0]) >> 4, cz = Math.floor(p.pos[2]) >> 4, rd = w.renderDist; let n = 0; for (const c of w.cols.values()) { const dx = c.cx - cx, dz = c.cz - cz; if (dx * dx + dz * dz <= (rd + 0.5) * (rd + 0.5) && c.shownAt >= 0) n++; } return n; }));
@@ -213,7 +225,7 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
     const f = `${SHOTS}hitch_gate_${preset}_${P.b.id}.png`; await P.page.screenshot({ path: f, timeout: 900000 }); shots.push(f);
   }
   const bMed = med(fr[0].map(f => f[0]));
-  const run = { round, preset, settleS, kept, shots, builds: {} };
+  const run = { round, preset, settleS, kept, shots, allocs, builds: {} };
   for (let j = 0; j < 2; j++) {
     const main = fr[j].map(f => f[0]), m = med(main);
     run.builds[Ps[j].b.id] = { med: r1(m), p99: r1(pct(main, 0.99)), p95: r1(pct(main, 0.95)), max: r1(Math.max(...main)), hitches: main.filter(x => x > 2 * bMed).length, hitchesOwn: main.filter(x => x > 2 * m).length,
@@ -223,6 +235,7 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   rec.runs.push(run); save();
   const s = (id) => { const o = run.builds[id]; return `median ${o.med} · p95 ${o.p95} · p99 ${o.p99} · max ${o.max} · hitches ${o.hitches} (own ${o.hitchesOwn}) · gc ${o.gcFrames} · columns arrived ${o.cols}, shown at the end ${o.shown}`; };
   console.log(`RUN ${preset} round ${round + 1} (settled ${settleS.join('/')} s, timers ${kept.join('/')}):\n  base ${s('base')}\n  head ${s('head')}  (${secs()})`);
+  for (let j = 0; j < allocs.length; j++) console.log(`  allocated ${BUILDS[j].id}: ${allocs[j].MB} MB in the flight — ` + allocs[j].top.slice(0, 10).map(x => x[0] + ' ' + x[1]).join(' · '));
   // the worst frames of each, with what took them
   for (const id of ['base', 'head']) {
     const w = run.builds[id].fr.map((f, i) => [i, ...f]).sort((a, b) => b[1] - a[1]).slice(0, 6);
