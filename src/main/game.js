@@ -1198,12 +1198,16 @@
       const lcam = LS ? Object.assign(VR.First.loadCam(this), { far: this.farFor(w) }) : { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
       if (this.horizon) this.horizon.update(lcam);
       this.loadCam = lcam;   // (e-engine: loadPump asks for the far tiles from it)
-      // e-engine: behind the loading screen the sky alone stands still (the clock held): drawn ~7 times a second, not every
-      // frame — the GPU (on a weak PC the CPU's software renderer) is left to the workers; an arrival's white every frame
+      // e-engine: behind the loading screen the sky alone stands still (the clock held; an arrival's white is a page layer
+      // over it): drawn ~7 times a second, not every frame, and never more than a quarter of the time when one drawing
+      // costs more (a weak GPU, a software renderer: seconds a sky) — the GPU and the CPU are left to the streaming
       const tnow = performance.now();
-      if (!LS || this.arrival || !this.loadDrawAt || tnow - this.loadDrawAt >= 140 || tnow < this.loadDrawAt) {
-        this.loadDrawAt = tnow;
+      if (!LS || !this.loadDrawAt || tnow - this.loadDrawAt >= (this.loadDrawGap || 140) || tnow < this.loadDrawAt) {
+        this.loadDrawAt = tnow; this.loadDrawCost = tnow;
         this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
+      } else if (this.loadDrawCost) {
+        // (the first frame after a drawing comes when the GPU has finished it: its cost)
+        this.loadDrawGap = Math.min(20000, Math.max(140, (tnow - this.loadDrawCost) * 3)); this.loadDrawCost = 0;
       }
       // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing); an arrival's
       // white rises over the loading screen before the world opens under it (first.js holdLoading)
