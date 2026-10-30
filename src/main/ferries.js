@@ -707,7 +707,7 @@ void main() {
   vec3 col = hull * core * 0.9 + eng * (core * 0.6 + streak * 0.8) + nav * blink * core * 1.4;
   o = vec4(col * v_k.z, 0.0);
 }`;
-  const TR = { list: [], inst: new Float32Array(64 * 12), n: 0, p: [0, 0, 0], p2: [0, 0, 0], prog: undefined, vao: null, ib: null, vp: null };
+  const TR = { rel: [0, 0, 0], near: [0, 0, 0, 1e12], list: [], inst: new Float32Array(64 * 12), n: 0, p: [0, 0, 0], p2: [0, 0, 0], prog: undefined, vao: null, ib: null, vp: null };
   function trafficProg() {
     if (TR.prog !== undefined) return TR.prog;
     try { TR.prog = VR.GL.program(TVS, TFS, 'ferries.traffic', []); } catch (e) { console.error('ferries shader failed: ' + (e && e.message)); TR.prog = null; }
@@ -743,7 +743,7 @@ void main() {
     const list = Fe.traffic(t, wseedOf(g), tier, TR.list), cam = fr.pos, ax = fr.axes, pxr = (o.H || 720) / fr.fov;
     const far = (g.space && g.space.cam && g.space.cam.far) || (g.cam && g.cam.far) || 100, DF = far * 0.5, I = TR.inst;
     const sun = fr.sunS; let n = 0;
-    const rel = [0, 0, 0];
+    const rel = TR.rel, NR = TR.near; NR[3] = 1e12;
     for (const c of list) {
       const r = Fe.route(c.route), A = bodyAt(eph, r.a), B = bodyAt(eph, r.b); if (!A || !B) continue;
       Fe.along(A.p, A.R, B.p, B.R, c.u, c.lat, TR.p); Fe.along(A.p, A.R, B.p, B.R, Math.min(1, c.u + 0.001), c.lat, TR.p2);
@@ -753,8 +753,9 @@ void main() {
       let vx = TR.p2[0] - TR.p[0], vy = TR.p2[1] - TR.p[1], vz = TR.p2[2] - TR.p[2]; const vl = Math.hypot(vx, vy, vz) || 1;
       const speed = vl / (0.001 * Fe.TRIP[c.kind]); vx /= vl; vy /= vl; vz /= vl; if (c.dir < 0) { vx = -vx; vy = -vy; vz = -vz; }
       const sx = (rel[0] * ax[0][0] + rel[1] * ax[0][1] + rel[2] * ax[0][2]) / d, sy = (rel[0] * ax[1][0] + rel[1] * ax[1][1] + rel[2] * ax[1][2]) / d, sz = (rel[0] * ax[2][0] + rel[1] * ax[2][1] + rel[2] * ax[2][2]) / d;
-      const k = n * 12, rpx = Math.max(1.5, Math.min(24, SIZE[c.kind] / d * pxr * 0.5));
+      const k = n * 12, rpx = Math.max(2, Math.min(24, SIZE[c.kind] / d * pxr * 0.5));
       I[k] = sx * DF; I[k + 1] = sy * DF; I[k + 2] = sz * DF; I[k + 3] = rpx;
+      if (d < NR[3]) { NR[0] = sx; NR[1] = sy; NR[2] = sz; NR[3] = d; }
       I[k + 4] = vx * ax[0][0] + vy * ax[0][1] + vz * ax[0][2]; I[k + 5] = vx * ax[1][0] + vy * ax[1][1] + vz * ax[1][2]; I[k + 6] = vx * ax[2][0] + vy * ax[2][1] + vz * ax[2][2];
       I[k + 7] = Math.min(90, speed * 0.5 / d * pxr + rpx * 2);
       I[k + 8] = KN[c.kind]; I[k + 9] = (c.seed % 997) / 997; I[k + 10] = vis * (c.kind === 'small' ? 0.8 : 1.2);
@@ -773,15 +774,16 @@ void main() {
       const vis = 1 - LK.smooth((d - 6e5) / 6e6); if (vis <= 0.01 || hidden(eph, cam, rel, d)) continue;
       const vx = -c.e1[0] * sn + c.e2[0] * ct, vy = -c.e1[1] * sn + c.e2[1] * ct, vz = -c.e1[2] * sn + c.e2[2] * ct;
       const sx = (rel[0] * ax[0][0] + rel[1] * ax[0][1] + rel[2] * ax[0][2]) / d, sy = (rel[0] * ax[1][0] + rel[1] * ax[1][1] + rel[2] * ax[1][2]) / d, sz = (rel[0] * ax[2][0] + rel[1] * ax[2][1] + rel[2] * ax[2][2]) / d;
-      const k = n * 12, rpx = Math.max(1.5, Math.min(24, SIZE[c.kind] / d * pxr * 0.5)), speed = TAU * rr / 600;
+      const k = n * 12, rpx = Math.max(2, Math.min(24, SIZE[c.kind] / d * pxr * 0.5)), speed = TAU * rr / 600;
       I[k] = sx * DF; I[k + 1] = sy * DF; I[k + 2] = sz * DF; I[k + 3] = rpx;
+      if (d < NR[3]) { NR[0] = sx; NR[1] = sy; NR[2] = sz; NR[3] = d; }
       I[k + 4] = vx * ax[0][0] + vy * ax[0][1] + vz * ax[0][2]; I[k + 5] = vx * ax[1][0] + vy * ax[1][1] + vz * ax[1][2]; I[k + 6] = vx * ax[2][0] + vy * ax[2][1] + vz * ax[2][2];
       I[k + 7] = Math.min(60, speed * 0.5 / d * pxr + rpx * 2);
       I[k + 8] = KN[c.kind]; I[k + 9] = (c.seed % 997) / 997; I[k + 10] = vis * 1.1;
       I[k + 11] = sun ? clamp(0.5 + 0.5 * -(sx * sun[0] + sy * sun[1] + sz * sun[2]), 0, 1) : 0.5;
       n++;
     }
-    TR.n = n; Fe.stats.space = n;
+    TR.n = n; Fe.stats.space = n; Fe.stats.near = NR[3] < 1e12 ? NR : null;   // (the nearest craft drawn: its direction in the scene's axes, its distance)
     if (n) fr.draws.push({ prog: 'fe_traffic', fn: drawTraffic, n });
     Fe.stats.spaceMs = performance.now() - t0;
   }

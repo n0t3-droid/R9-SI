@@ -144,6 +144,27 @@ if (want('space')) {
   for (let i = 0; i < 400; i++) { await step(3, 33); sv = await ev(() => { const g = VR.game, need = VR.SpaceScene.cur_need || []; return g.space ? { ready: g.space.ready, frames: g.space.frames, done: need.filter(s => s.done).length, need: need.length } : { closed: true }; }); if (sv.closed || (sv.ready && sv.done === sv.need && sv.frames >= 3)) break; if (Date.now() - tv > 150000) break; await wait(60); }
   console.log('  space view ' + JSON.stringify(sv) + ' after ' + ((Date.now() - tv) / 1000).toFixed(0) + ' s');
   await step(10, 33);
+  // look where the nearest craft is (as a player turning the view would): yaw/pitch as the player's lookDir
+  const aim = await ev(() => {
+    const g = VR.game, S = g.space, r = g.renderer; if (!S) return null;
+    const conv = [(x, z) => Math.atan2(-x, -z), (x, z) => Math.atan2(x, z), (x, z) => Math.atan2(x, -z), (x, z) => Math.atan2(-x, z)];
+    let best = null;
+    for (let ci = 0; ci < conv.length; ci++) {
+      for (let it = 0; it < 2; it++) {
+        const n = VR.Ferries.stats.near; if (!n) return null;
+        S.yaw = conv[ci](n[0], n[2]); S.pitch = Math.max(-1.4, Math.min(1.4, Math.atan2(n[1], Math.hypot(n[0], n[2]))));
+        window.__norender = true; g.last = performance.now() - 33; g.loop(performance.now());
+      }
+      const n = VR.Ferries.stats.near, M = r.viewProj; if (!n || !M) continue;
+      const P = [n[0] * 50, n[1] * 50, n[2] * 50], cx = M[0] * P[0] + M[4] * P[1] + M[8] * P[2] + M[12], cy = M[1] * P[0] + M[5] * P[1] + M[9] * P[2] + M[13], cw = M[3] * P[0] + M[7] * P[1] + M[11] * P[2] + M[15];
+      const q = cw > 0 ? Math.max(Math.abs(cx / cw), Math.abs(cy / cw)) : 9;
+      if (!best || q < best.q) best = { ci, q: +q.toFixed(2), yaw: S.yaw, pitch: S.pitch, km: +(n[3] / 1000).toFixed(1) };
+    }
+    if (best) { S.yaw = best.yaw; S.pitch = best.pitch; }
+    return best;
+  });
+  console.log('  aim ' + JSON.stringify(aim));
+  await step(10, 33);
   const sp = await ev(() => Object.assign({}, VR.Ferries.stats));
   run.space = sp; console.log('  space ' + JSON.stringify(sp));
   const ps = await grab('space_traffic.png', 4);
