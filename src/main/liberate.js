@@ -721,6 +721,7 @@
       }
       case 'music': {
         if (au && au.swell) au.swell(g.env ? g.env.day | 0 : 0, 0.9);
+        if (au && au.cue) au.cue('freeing');   // e-music: after the swell, the Heimat theme bright
         if (au && au.ctx && au.tone) { const t = au.ctx.currentTime; [392, 494, 587, 784, 988].forEach((f, i) => { au.tone(f, 0.09, 2.6 - i * 0.2, 'sine', true, t + i * 0.16); au.tone(f * 2.01, 0.025, 1.6, 'sine', true, t + i * 0.16 + 0.01); }); }
         break;
       }

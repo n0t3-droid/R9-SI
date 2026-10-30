@@ -592,7 +592,7 @@ void main() {
       if (this.line || this.busy() || !this.budget.can(T, false)) return;
       // the greeting (once per browser), then the first-time help (Einfach), then the next wow
       const st = F.store();
-      if (!st.hello && !MEM.hello && T - this.startT >= 6) { if (this.say('hello', null, false)) { MEM.hello = true; st.hello = Date.now(); F.save(st); } return; }
+      if (!st.hello && !MEM.hello && T - this.startT >= 6) { if (this.say('hello', null, false)) { if (this.g.audio && this.g.audio.cue) this.g.audio.cue('funke'); MEM.hello = true; st.hello = Date.now(); F.save(st); } return; }
       if (this.einfach() && this.helpTick(st)) return;
       if (T - this.wowAt >= 5) {
         this.wowAt = T;
@@ -739,8 +739,8 @@ void main() {
       const au = this.g.audio; if (!au || !au.ctx || !au.tone) return;
       let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
       const t = au.ctx.currentTime, PEN = [0, 2, 4, 7, 9, 12], n = clamp(Math.round(text.length / 16), 3, 6);
-      for (let k = 0; k < n; k++) au.tone(784 * Math.pow(2, PEN[(h >>> (k * 3)) % 6] / 12), 0.026, 0.065, 'triangle', false, t + k * 0.072);
-      au.tone(1568, 0.014, 0.11, 'sine', false, t + n * 0.072);
+      for (let k = 0; k < n; k++) au.tone(784 * Math.pow(2, PEN[(h >>> (k * 3)) % 6] / 12), 0.026, 0.065, 'triangle', false, t + k * 0.072, au.vox);   // (e-music: the Stimmen bus)
+      au.tone(1568, 0.014, 0.11, 'sine', false, t + n * 0.072, au.vox);
     }
     // a 🧭 hint of the game shown as Funke's line (Einfach, not muted, not building)
     relayHint(id, o) {
@@ -755,6 +755,7 @@ void main() {
     // ---- asking (e-ctx's V with nothing else): the way, the next wow, a scan, a photo — again within 8 s: the next one
     ask() {
       const g = this.g, T0 = g.time || 0; if (!this.on()) return false;
+      if (g.audio && g.audio.cue) g.audio.cue('funke');   // e-music: his leitmotif (at most every three minutes, score.js)
       const strong = this.target(true), list = [];
       if (strong) list.push('way');
       if (F.pickWow(this.wowCands(), this.said, 'ask')) list.push('wow');

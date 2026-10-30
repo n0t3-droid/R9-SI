@@ -190,7 +190,7 @@
       const beam = bp.beam ? (() => { const b2 = ROT[J.L.r](bp.beam[0], bp.beam[2]); return [J.L.ox + b2[0] + 0.5, F0 + bp.beam[1] + 0.5, J.L.oz + b2[1] + 0.5]; })() : null;
       if (beam) this.st[J.site.key].beam = beam;
       this.rise = { J, bp, up, at: 0, k: 0, steps, y0, rows, t: 0, defer, w, col: GLOW[J.site.type] || [1, 0.9, 0.6], n: list.length, flushY: y0, flushT: 0 };
-      if (g.audio) g.audio.play('wonder');
+      if (g.audio) { g.audio.play('wonder'); if (g.audio.cue) g.audio.cue('wonder'); }   // (e-music: the Staunen sting)
       if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.wonder.rising'), '#ffe7a6');
     }
     tickRise(dt) {

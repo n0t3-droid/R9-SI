@@ -726,6 +726,10 @@
     'g.set.volSfx.tip': 'Steps, clicks, breaking and placing.',
     'g.set.volMusic.tip': 'The quiet music in the background.',
     'g.set.volAmbient.tip': 'Birds, wind, water and weather.',
+    'g.set.volVoice': 'Voices',   // e-music
+    'g.set.volVoice.tip': 'Funke\'s chirps and the villagers\' chatter.',
+    'g.set.calmMusic': 'Calm music',
+    'g.set.calmMusic.tip': 'Longer silence between pieces, no drums, softer in a fight.',
     'g.set.wx': 'Weather',
     'g.set.wx.tip': 'How often rain, fog and storms come.',
     'g.set.wx.normal': 'Normal',

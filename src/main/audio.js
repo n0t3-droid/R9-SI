@@ -265,8 +265,18 @@
       const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
       o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + 0.004);
     }
+    // e-music · the UI clicks made consistent: every button of the game's panels clicks the same (one listener on the
+    // document, in the capture phase); a click within 40 ms of another is dropped (code that clicks on its own stays one)
+    attachUi(doc) {
+      if (this.uiOn || !doc || !doc.addEventListener) return; this.uiOn = true;
+      doc.addEventListener('pointerdown', (e) => {
+        const el = e.target && e.target.closest ? e.target.closest('button, [role="button"], .btn, input[type="checkbox"], input[type="range"], select') : null;
+        if (el && this.ctx && !el.disabled) this.play('click');
+      }, true);
+    }
     ui(name, t) {
       const U = K.UI[name], p = U.peak, out = this.sfx;
+      if (name === 'click') { const now = this.ctx.currentTime; if (now - (this.lastClick === undefined ? -1 : this.lastClick) < 0.04) return; this.lastClick = now; }
       if (name === 'click') this.uiTone(1560, p, U.dur, 'sine', t, out);
       else if (name === 'pling') { this.uiTone(1760, p, U.dur, 'sine', t, out); this.uiTone(2637, p * 0.4, 0.05, 'sine', t, out); }
       else if (name === 'bonk') this.uiTone(196, p, U.dur, 'triangle', t, out, 150);

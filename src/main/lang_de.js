@@ -726,6 +726,10 @@
     'g.set.volSfx.tip': 'Schritte, Klicks, Abbauen und Setzen.',
     'g.set.volMusic.tip': 'Die leise Musik im Hintergrund.',
     'g.set.volAmbient.tip': 'Vögel, Wind, Wasser und Wetter.',
+    'g.set.volVoice': 'Stimmen',   // e-music
+    'g.set.volVoice.tip': 'Funkes Piepsen und das Plaudern der Dorfleute.',
+    'g.set.calmMusic': 'Ruhige Musik',
+    'g.set.calmMusic.tip': 'Längere Stille zwischen den Stücken, keine Trommeln, leiser im Kampf.',
     'g.set.wx': 'Wetter',
     'g.set.wx.tip': 'Wie oft Regen, Nebel und Gewitter kommen.',
     'g.set.wx.normal': 'Normal',
