@@ -1,0 +1,70 @@
+/* ============================================================================
+   e-ux · the design tokens — the ONE place for the game's colours, radii, spacing and type scale (plan
+   docs/superpowers/plans/2026-10-30-e-ux.md; test/ux.js checks them). Loaded after every other stylesheet of the game:
+   the older variables (style.css --panel …, start.css --st-* …) are aliases of these, so the HUD, the start screen and
+   the menus speak one palette. --ux-scale is the UI scale (⚙ Spiel · „Größe der Anzeige", 90–140 %, src/main/ux.js).
+   Text colours reach 4.5:1 on --ux-panel-solid (the darkest a panel gets behind its text).
+   ============================================================================ */
+:root {
+  /* colour */
+  --ux-bg: #05070e;
+  --ux-panel: rgba(10, 14, 28, 0.86);
+  --ux-panel-2: rgba(16, 22, 42, 0.92);
+  --ux-panel-solid: #0c1122;
+  --ux-pill: rgba(6, 9, 20, 0.72);
+  --ux-line: rgba(140, 200, 255, 0.24);
+  --ux-line-strong: rgba(140, 210, 255, 0.5);
+  --ux-ink: #eef4ff;
+  --ux-ink-2: #aebbd4;
+  --ux-acc: #3af0ff;
+  --ux-acc-ink: #04121a;
+  --ux-acc-soft: rgba(58, 240, 255, 0.18);
+  --ux-acc2: #ff4ad8;
+  --ux-good: #5cf08a;
+  --ux-warn: #ffb347;
+  --ux-bad: #ff6b7a;
+  --ux-gold: #ffd166;
+  /* radius */
+  --ux-r1: 8px;
+  --ux-r2: 12px;
+  --ux-r3: 18px;
+  /* spacing (4-px scale) */
+  --ux-s1: 4px;
+  --ux-s2: 8px;
+  --ux-s3: 12px;
+  --ux-s4: 16px;
+  --ux-s5: 24px;
+  /* type */
+  --ux-scale: 1;
+  --ux-font: 'Rajdhani', 'Sora', 'Segoe UI', system-ui, sans-serif;
+  --ux-display: 'Orbitron', 'Rajdhani', 'Segoe UI', sans-serif;
+  --ux-fs-xs: calc(13px * var(--ux-scale));
+  --ux-fs-s: calc(14px * var(--ux-scale));
+  --ux-fs: calc(16px * var(--ux-scale));
+  --ux-fs-l: calc(20px * var(--ux-scale));
+  --ux-fs-xl: calc(26px * var(--ux-scale));
+  /* depth */
+  --ux-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ux-ring: 0 0 0 3px var(--ux-acc);
+  /* the older names: one palette (style.css, start.css) */
+  --panel: var(--ux-panel);
+  --panel2: var(--ux-panel-2);
+  --line: var(--ux-line);
+  --line2: var(--ux-line-strong);
+  --text: var(--ux-ink);
+  --muted: var(--ux-ink-2);
+  --accent: var(--ux-acc);
+  --accent2: var(--ux-acc2);
+  --gold: var(--ux-gold);
+  --good: var(--ux-good);
+  --bad: var(--ux-bad);
+  --font: var(--ux-font);
+  --display: var(--ux-display);
+  --st-acc: var(--ux-acc);
+  --st-ink: var(--ux-ink);
+  --st-mute: var(--ux-ink-2);
+  --st-bg: var(--ux-panel);
+  --st-bg2: var(--ux-panel-2);
+  --st-line: var(--ux-line);
+  --st-font: var(--ux-font);
+}

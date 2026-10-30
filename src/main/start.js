@@ -371,6 +371,7 @@
     const d = Math.hypot(p.pos[0] - hintState.lastPos[0], p.pos[2] - hintState.lastPos[2]);
     if (keys || d > 1.5) { H.done('move'); hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
     if (p.flying) H.done('fly');
+    if (VR.UX && VR.UX.ownsHints && VR.UX.ownsHints()) return;   // (e-ux: the first minute's three hints — move, look, V — come first, ux.js)
     const st = H.read();
     if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', hintOf('move')); return; }
     if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', hintOf('fly'));

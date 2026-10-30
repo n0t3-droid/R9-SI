@@ -36,6 +36,7 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels',
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar: the Hangar Hall's and the Gate Temple's pieces (vgen 14), the last blocks
 MAIN.push('../shared/story', 'regie', 'story_art', 'story');   // (a-story2: story_art — the speakers' faces, the Eiswächter's model; before the player)
 MAIN.push('regie_acts');   // a-regie: the Regie's own acts — the adventurer's first encounter (after foes, liberate, funke and the Regie)   // a-story: the book (src/shared/story.js — pure, main thread only), die Regie, the story's player (after funke, quests, liberate, ctx and the space scene, whose parts it uses)
+MAIN.push('ux');   // e-ux: VR.UX (src/main/ux.js) — the UI scale, the key-hint strip, the first minute's hints, the settings' search; last: it wraps ui.js and game.js
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
@@ -67,6 +68,8 @@ window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.
 `;
 const uiCss = ['start', 'bauhand', 'wizard', 'controls', 'invent'].filter(f => exists('src/ui/' + f + '.css')).map(f => read('src/ui/' + f + '.css')).join('\n');   // (W1 + W2 + F5: both pages)
 const css = read('src/ui/style.css') + '\n' + uiCss;
+// e-ux: the design tokens (the one palette, the aliases of the older variables) and the shared components, last: they win
+const uxCss = ['tokens', 'ux'].filter(f => exists('src/ui/' + f + '.css')).map(f => read('src/ui/' + f + '.css')).join('\n');
 const guard = (s) => s.replace(/<\/script/gi, '<\\/script');
 const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embedded (OFL): no request to Google's servers leaves the player's browser
 // 📜 Rechtliches — Impressum, Datenschutz, Credits, Hinweis: one overlay with its styles for the game and the Studio
@@ -76,7 +79,7 @@ const body = `<div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"><
 <script type="text/js-worker" id="worker-src">${guard(workerSrc)}</script>
 ${legal}
 <script>${guard(mainSrc)}</script>`;
-const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>R9-SI</title>${fonts}<style>${css}</style>`;
+const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>R9-SI</title>${fonts}<style>${css}\n${uxCss}</style>`;
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 // (f-build, R50-09) the player pages go out without comments and indentation — src/build/strip.js, test/strip.js — and
 // every stripped script must parse, or the build stops. dist/index.debug.html is the game with its source text: the same
@@ -105,7 +108,7 @@ putPage('index.debug.html', gamePage);
 writePage('index.html', gamePage);
 // the published page can't hand out files: drop the direct-download branch there (screenshots still show in an overlay)
 const bodyArtifact = body.replace(/\/\*DL\*\/[\s\S]*?\/\*\/DL\*\//g, '');
-writePage('artifact.html', `<title>R9-SI</title>${fonts}<style>${css}</style>\n${bodyArtifact}\n`);
+writePage('artifact.html', `<title>R9-SI</title>${fonts}<style>${css}\n${uxCss}</style>\n${bodyArtifact}\n`);
 // ---- the Model Studio: the live catalogue + editor page. Main thread: registry, model language, furniture and facade
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.

@@ -2698,5 +2698,28 @@
     'story.ctx.scan': 'Scannen',
     'story.ctx.touch': 'Berühren',
     // ---- a-story2 end
+    // ---- e-ux
+    'ux.k.up': "hoch",
+    'ux.k.down': "runter",
+    'ux.k.fly': "fliegen",
+    'ux.k.build': "Bauen",
+    'ux.k.inv': "Inventar",
+    'ux.k.journal': "Tagebuch",
+    'ux.k.map': "Karte",
+    'ux.k.veh': "Aktion",
+    'ux.h.move': "laufen",
+    'ux.h.moveTouch': "🕹 links ziehen = laufen",
+    'ux.h.look': "Maus bewegen = umschauen",
+    'ux.h.lookTouch': "rechts ziehen = umschauen",
+    'ux.h.v': "tut das Passende: reden, einsteigen, reisen",
+    'ux.noJournal': "📖 Das Tagebuch gibt es in Abenteuer-Welten (＋ Neue Welt · „Abenteuer\").",
+    'ux.set.scale': "Größe der Anzeige",
+    'ux.set.scaleTip': "Macht Leisten, Knöpfe und Schrift im Spiel größer oder kleiner (90–140 %).",
+    'ux.set.search': "🔎 Einstellung suchen …",
+    'ux.set.rec': "↺ Empfohlen",
+    'ux.set.recTip': "Stellt Bild, Anzeige und Größe so ein, wie es für diesen Rechner empfohlen ist.",
+    'ux.set.none': "Nichts gefunden — versuch ein anderes Wort.",
+    'ux.set.recDone': "↺ Empfohlen: ",
+    // ---- e-ux end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
