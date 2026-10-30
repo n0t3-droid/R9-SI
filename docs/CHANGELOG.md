@@ -108,6 +108,32 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🏛 A new Hangar and Gate Temple, ⛈ real storms, 🌅 clear golden land, 🎭 faces in the story, 🌕 true moon landings (v0.52)
+**🏛 The Hangar Hall and the Gate Temple, rebuilt after the trailer** (new worlds, `vgen` 14; old worlds keep theirs).
+The temple is dark blue-grey stone with tall warm windows, a stepped gatehouse and a gate that glows in concentric orange
+octagon rings. Inside, a navy hall with cyan light strips, an amber band, a stepped ceiling of four cyan rings over the
+pad, eight round-icon screens, ten consoles with coloured keys and a new white hero craft.
+
+**⛈ Weather and sky.** Rain now comes under one continuous storm deck with rolls, a ragged base, rain shafts and a lit
+edge toward the sun (balloons land first). The golden hour's land is clear and colourful — the white sheet over the
+canyon is gone — and Amarant wears six soft bands instead of candy stripes.
+
+**🎭 The story with faces.** Every speaker has a small voxel portrait that blinks and talks, in four moods. The
+Eiswächter under Opal's ice is an 8-m crystal guardian of its own under a clear ice window. Each chapter adds a small deed
+(look, scan with Funke, touch, photograph) that the journal ticks off.
+
+**🌕 Landing on the moons, Herzwelt from orbit.** Opal and Basalt are landed under a black sky with stars and Amarant,
+Opal's plume is bright ice crystals, Basalt's night is lit by starlight; entering Herzwelt the plasma wraps the nose.
+From orbit: continents, seas and rivers, cloud systems, crisp land with haze only toward the limb, towns clustered on
+coasts at night, folded aurora curtains.
+
+**🧭 Never boring.** Adventurers are called to the nearest disturbed outpost within the first minute and meet a lost
+Wächter to calm; nothing repeats within 90 s; the freeing's shot no longer looks through the shuttle.
+
+**🔧 Review fixes.** Outposts got new, gentle names in both languages (one shared a historical war operation's name), a
+few item and foe names changed, „Starforge" is now **Sternglut** (a game of that name exists); Very Low in orbit is
+back to v0.50's cost; walking shows no screen-door on Balanced.
+
 ### ✦ Outposts to free, 🌕 flying to the moons yourself, 📖 the story begins, 🛰 Herzwelt from orbit, 🌅 colour at the golden hour (v0.51)
 **✦ Outposts to free** (Abenteuer with Begegnungen; builders never meet a foe, Kindersicher frees by puzzle alone). A
 disturbed outpost burns a red-violet Leuchtfeuer and its land wears a faint red-violet cast. Its machines — the
