@@ -1796,13 +1796,17 @@
         // cumulus: every run of cloud cells is a flat base slab; where the cloud noise peaks, narrower and
         // taller boxes stack on top of it (instance w = yOffset·8 + thickness, in cells of 4 blocks)
         const push = (x0, z, len, yo, th) => inst.push(x0, z, len, yo * 8 + Math.min(7.9, th));
+        // e-engine: the cells' noise kept by their place (256 × 256, wider than the grid): a step of the camera by one cell
+        // computes one new row, not the whole grid again (it was a 20–27 ms frame every ~0.6 s of flight here)
+        const CV = this.cloudV || (this.cloudV = { v: new Float64Array(65536), gx: new Int32Array(65536).fill(-2147483648), gz: new Int32Array(65536) });
         for (let z = -R; z <= R; z++) {
           let run = 0, runStart = 0, ex = 0;
           for (let x = -R; x <= R + 1; x++) {
             let on = false, v = 0;
             if (x <= R && x * x + z * z <= R * R) {
-              const gx = ocx + x, gz = ocz + z;
-              v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5;
+              const gx = ocx + x, gz = ocz + z, ci = ((gz & 255) << 8) | (gx & 255);
+              if (CV.gx[ci] === gx && CV.gz[ci] === gz) v = CV.v[ci];
+              else { v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5; CV.v[ci] = v; CV.gx[ci] = gx; CV.gz[ci] = gz; }
               on = v > thr;
             }
             if (on) { if (!run) { runStart = x; ex = 0; } run++; ex = Math.max(ex, v - thr); }
