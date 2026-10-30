@@ -2453,6 +2453,8 @@
     'g.codex.moon.storm': ['A dust storm', 'When the dust grows thick, the day turns to dusk. On Mars such storms sometimes wrap the whole planet.', 'Live through a storm on Ochre.'],
     'g.codex.moon.atoll': ['An atoll', 'A drowned crater: only its rim rises from the sea as a ring, inside lies a shallow turquoise lagoon.', 'Stand on an atoll on Aquamarine.'],
     'g.codex.moon.herzwelt': ['Heartworld in the sky', 'From Aquamarine, Heartworld is 23 degrees wide – almost fifty times the size of our Moon. It goes through its phases and turns, clouds drift across it.', 'Look up on Aquamarine.'],
+    'g.set.airSky': 'Skies with air',
+    'g.set.airSky.tip': 'On Ochre and Aquamarine: the sky from the light scattered in their air (blue sunset, dust storms). Off: three colours, as on Very Low – the fastest.',
     // e-ctx · the Aktion key, travel by intent, the travel camera, the fading HUD (src/main/ctx.js, intent.js, directorcam.js, hudfade.js)
     'g.ctx.paste': 'Paste',
     'g.ctx.getOut': 'Get out',

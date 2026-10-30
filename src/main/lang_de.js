@@ -2453,6 +2453,8 @@
     'g.codex.moon.storm': ['Ein Staubsturm', 'Wenn der Staub dicht wird, wird der Tag zur Dämmerung. Auf dem Mars hüllen solche Stürme manchmal den ganzen Planeten ein.', 'Erlebe auf Ocker einen Sturm.'],
     'g.codex.moon.atoll': ['Ein Atoll', 'Ein ertrunkener Krater: Nur sein Rand ragt als Ring aus dem Meer, innen liegt eine flache, türkise Lagune.', 'Stehe auf Aquamarin auf einem Atoll.'],
     'g.codex.moon.herzwelt': ['Herzwelt am Himmel', 'Von Aquamarin aus ist Herzwelt 23 Grad groß – fast fünfzigmal so groß wie der Mond bei uns. Sie wechselt ihre Phasen und dreht sich, Wolken ziehen über sie.', 'Sieh auf Aquamarin nach oben.'],
+    'g.set.airSky': 'Himmel mit Luft',
+    'g.set.airSky.tip': 'Auf Ocker und Aquamarin: der Himmel aus der Streuung des Lichts in ihrer Luft (blauer Sonnenuntergang, Staubstürme). Aus: drei Farben, wie auf „Sehr niedrig“ – am schnellsten.',
     // e-ctx · die Aktion, Reisen per Absicht, die Reisekamera, das HUD, das ausblendet (src/main/ctx.js, intent.js, directorcam.js, hudfade.js)
     'g.ctx.paste': 'Einfügen',
     'g.ctx.getOut': 'Aussteigen',

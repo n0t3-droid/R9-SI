@@ -72,7 +72,7 @@
     const sd = sky.sun.dir, sAng = sky.sun.ang, sEl = Math.asin(Math.max(-1, Math.min(1, sd[1])));
     // u-moons2: a world with air — its LUTs (atmo_lut.js; the game hands them in, a test gets them made), Helia's light
     // through the air, the air's own light; the horizon softened over the air's refraction-free ±1.5°
-    const air = prof.air && VR.AtmoLUT ? (o.air || BS.airFor(id, Math.max(1, eye[1] - groundY), sEl)) : null;
+    const air = prof.air && VR.AtmoLUT && !BS.noAir ? (o.air || BS.airFor(id, Math.max(1, eye[1] - groundY), sEl)) : null;   // (BS.noAir: the tests' airless comparison)
     const above = air ? ss(-dip - 0.026, -dip + sAng, sEl) : ss(-dip - sAng, -dip + sAng, sEl), free = 1 - (sky.eclipse || 0), lightK = above * free;
     // Amarant
     // (u-moons2: over Aquamarin the parent is Herzwelt; Amarant is drawn as the giant with its own direction)
@@ -169,6 +169,7 @@
   // when it moved ≥ 0.15. → {C, stops, sunT, tauZ}
   BS.dustTau = 0.6;
   BS.airState = null;
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'airSky', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.airSky', tip: 'g.set.airSky.tip', cost: 'low', def: true });
   const airOf = (id) => (id === 'ocker' ? VR.AtmoLUT.ocker(Math.round(BS.dustTau / 0.15) * 0.15) : VR.AtmoLUT.AIRS[id]);
   BS.airFor = function (id, h, sEl, tier) {
     const A = VR.AtmoLUT, D2 = Math.PI / 180;
@@ -217,7 +218,8 @@
     BS.want = true;
     const U = VR.Universe, t = U.worldSeconds(env.day | 0, env.ticks);
     BS.t = t;
-    const prof = VR.Bodies.profile(id), tierN = BS.tier === undefined ? 2 : BS.tier;
+    // (u-moons2: the switch „Himmel mit Luft" off → the three stops on every preset, Very Low's sky)
+    const prof = VR.Bodies.profile(id), st0 = VR.game && VR.game.settings, tierN = st0 && st0.airSky === false ? 0 : BS.tier === undefined ? 2 : BS.tier;
     // (u-moons2: the air's LUTs advanced a slice — Helia's elevation from the sky of this moment)
     let airS = null;
     if (prof && prof.air && VR.AtmoLUT) { const ls = U.localSky(o.dim, BS.eye, t, BS._sky0 || undefined); BS._sky0 = ls; airS = BS.airFor(id, Math.max(1, BS.eye[1] - (Number.isFinite(BS.groundY) ? BS.groundY : prof.level)), Math.asin(Math.max(-1, Math.min(1, ls.sun.dir[1]))), tierN); }
