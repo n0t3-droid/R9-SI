@@ -266,11 +266,12 @@ if (PARTS.includes('flight')) {
     for (const b of order) {
       const br = await launch();
       const P = await openWorld(br, b, preset, 960, 540);
-      const path = await pathFor(P, FRAMES, DT, SPEED);
+      const fN = +(ENV['FRAMES_' + preset] || FRAMES), dtN = +(ENV['DT_' + preset] || DT);   // (FRAMES_balanced=150 DT_balanced=0.4: the same 60 s in fewer software frames)
+      const path = await pathFor(P, fN, dtN, SPEED);
       await P.ev((c) => window.__place(...c), path[0]);
       const settleS = await settle(P, 600);
       const fr = [];
-      for (let i = 0; i < path.length; i++) { await P.ev((c) => window.__place(...c), path[i]); fr.push(await P.ev((dt) => window.__frame(dt), DT)); }
+      for (let i = 0; i < path.length; i++) { await P.ev((c) => window.__place(...c), path[i]); fr.push(await P.ev((dt) => window.__frame(dt), dtN)); }
       const main = fr.map(f => f.js + f.hand), tot = fr.map(f => f.ms + f.hand), js = fr.map(f => f.js);
       const mM = med(main), mT = med(tot);
       const alloc = fr.map(f => f.allocKB).filter(x => x >= 0);
