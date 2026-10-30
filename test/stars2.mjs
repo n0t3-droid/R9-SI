@@ -138,7 +138,7 @@ async function plaza(P, path) {
 const R0 = {};
 // ---------------------------------------------------------------- u-stars2
 const sj = (P) => P.ev(() => VR.StarJump.debug.state(VR.game));
-const keep = (P, name) => P.ev((n) => { window[n] = window.__F; if (window.__F) window.__F.hand = null; return !!window.__F; }, name);   // (run 2: the held item hid the shadows)
+const keep = (P, name) => P.ev((n) => { window[n] = window.__F; if (window.__F) { window.__F.hand = null; window.__F.drawHand = null; } return !!window.__F; }, name);   // (run 2: the held item hid the shadows)
 const shot = async (P, name, tag) => { await P.step(2); await keep(P, '__Fs'); const m = await picture(P, '__Fs', SH(name), K); rec.presets[tag].pics = rec.presets[tag].pics || {}; rec.presets[tag].pics[name] = m; console.log('  ' + name + ' ' + JSON.stringify(m)); return m; };
 // the systems the pictures need, from this seed's neighbourhood
 const choose = (P) => P.ev(() => {
@@ -147,7 +147,7 @@ const choose = (P) => P.ev(() => {
   const k = L.filter(s => s.cls === 'K' && !s.bin && s.neb < 0).sort((a, b) => d0(a) - d0(b))[0];
   const from = G.systemsNear(N, k.p, 30).find(q => q.idx !== k.idx && q.idx !== 0 && q.s.neb < 0);
   const binSpace = pick((s, d, b) => s.bin && s.bin.close && s.bin.L / s.L > 0.2 && b.landable && d.bodies.some(m => m.parent === b.id));
-  const binLand = pick((s, d, b) => s.cls !== 'D' && s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'basalt' || b.base === 'opal') && !E.ring(d, b) && E.sky(d, b, 0).k2 > 0.25);
+  const binLand = pick((s, d, b) => s.cls !== 'D' && s.bin && s.bin.close && s.bin.L / s.L > 0.3 && b.landable && (b.base === 'basalt' || b.base === 'opal') && !E.ring(d, b) && E.sky(d, b, 0).k2 > 0.4 && E.sky(d, b, 0).sep > 0.28);   // (run 3: 7° apart the two shadows overlapped — now ≥ 16°)
   const violet = pick((s, d, b) => E.signature(d, b) === 'violet' && b.base === 'aqua');
   const ringed = pick((s, d, b) => b.landable && E.ring(d, b) && (b.base === 'basalt' || b.base === 'opal') && !s.bin);
   const crystal = pick((s, d, b) => E.signature(d, b) === 'crystal' && s.cls !== 'D' && !s.bin);
@@ -174,7 +174,7 @@ const daySet = (P, el0, el1, both) => P.ev(([el0, el1, both]) => {
   for (let day = 1; day < 9; day++) for (let tk = 0; tk < 24000; tk += 150) {
     const r = VR.BodySky.compute(g.dim, eye, U.worldSeconds(day, tk), {}); if (!r) continue;
     const y = r.light.sunDir[1], el = Math.asin(Math.max(-1, Math.min(1, y))), s2 = r.exo2 && r.exo2.sun2;
-    if (el < el0 || el > el1 || (both && !(s2 && s2[1] > Math.sin(el0 * 0.8)))) continue;
+    if (el < el0 || el > el1 || (both && !(s2 && s2[1] > 0.15))) continue;
     const sc = Math.abs(el - (el0 + el1) / 2); if (!best || sc < best.sc) best = { day, tk, sc, el: +(el * 57.3).toFixed(1), dir: r.light.sunDir.map(v => +v.toFixed(3)), s2: s2 ? s2.map(v => +v.toFixed(3)) : null, exo: r.exo2, col: r.sky.sunCol.map(v => +v.toFixed(3)), sunC: r.light.sunColor.map(v => +v.toFixed(3)) };
     if (best && best.sc < 0.02) break;
   }

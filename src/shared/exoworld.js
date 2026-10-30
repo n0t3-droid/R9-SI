@@ -164,7 +164,9 @@
       if (h01(i, j, s, 11) > 0.4) continue;
       const cx = (i + 0.2 + 0.6 * h01(i, j, s, 12)) * CELL, cz = (j + 0.2 + 0.6 * h01(i, j, s, 13)) * CELL, R = 2.2 + 3.2 * h01(i, j, s, 14);
       const d = Math.hypot(x + 0.5 - cx, z + 0.5 - cz); if (d >= R) continue;
-      const k = 1 - d / R, H = Math.round(Math.pow(k, 1.3) * (3 + 7 * h01(i, j, s, 15)) + (h01(x, z, s, 16) < 0.35 ? 1 : 0) - (h01(x, z, s, 17) < 0.2 ? 1 : 0));
+      // (run 3: smooth cones read as stepped ice pyramids — now separate prisms: two of three columns, each its own height)
+      if (h01(x, z, s, 17) < 0.36) continue;
+      const k = 1 - d / R, H = Math.round(Math.pow(k, 0.8) * (3 + 7 * h01(i, j, s, 15)) * (0.35 + 0.65 * h01(x, z, s, 16)));
       if (H > best) best = H;
     }
     if (!best && h01(x, z, s, 18) < 0.006) best = 1 + (h01(x, z, s, 19) < 0.4 ? 1 : 0);
