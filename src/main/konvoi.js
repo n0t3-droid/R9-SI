@@ -144,9 +144,13 @@
   K.dimOk = (d) => !!(word(d) && VR.DimReg && VR.DimReg.get && VR.DimReg.get(d));
 
   // ---- the bytes this page hands the transport (presence and messages): the measure of ≤ 2 KB/s
-  const count = (o) => { S0.sent.bytes += K.bytes(o); S0.sent.n++; };
+  const count = (o, topic) => { const b = K.bytes(o), by = S0.sent.by || (S0.sent.by = {}); S0.sent.bytes += b; S0.sent.n++; by[topic] = (by[topic] || 0) + b; };
   K.rate = () => { const s = S0.sent, dt = (performance.now() - s.t0) / 1000; return { bytes: s.bytes, n: s.n, s: dt, bps: dt > 0 ? s.bytes / dt : 0 }; };
-  K.rateReset = () => { S0.sent = { bytes: 0, n: 0, t0: performance.now() }; };
+  K.rateReset = () => { S0.sent = { bytes: 0, n: 0, t0: performance.now(), by: {} }; };
+  // the host between two worlds: its page may be busy loading for longer than the transport's 4 s — a guest waits up to
+  // 45 s after the host's trip message before it calls the host lost (K.update looks again)
+  K.PATIENT = 45000;
+  K.patient = (mp) => { if (!S0.travelAt || performance.now() - S0.travelAt > K.PATIENT) return false; S0.lostCheck = mp; return true; };
 
   // ---- the session's plumbing: two topics more, the world on every message of one world
   wrap(MPp, 'subscribe', function (f0, room) {
@@ -161,7 +165,7 @@
   });
   const tagD = function (f0, topic, data) {
     if (K.DTOP[topic] && data && typeof data === 'object' && this.g) data = Object.assign({ d: this.g.dim || 'overworld' }, data);
-    if (this.room && data) count({ topic, data });
+    if (this.room && data) count({ topic, data }, topic);
     return f0.call(this, topic, data);
   };
   wrap(MPp, 'send', tagD);
@@ -233,7 +237,7 @@
     if (!this.room || !g.player || !a || fl.regime !== 'space' || !VR.Cruise || !VR.Cruise.spOf) {
       S0.G.last = null; S0.vPrev = null;
       const before = this.lastPres, r = f0.call(this, force);
-      if (this.lastPres !== before && this.lastPres) S0.sent.bytes += this.lastPres.length + 48, S0.sent.n++;   // (the presence's wrapper ≈ 48 bytes)
+      if (this.lastPres !== before && this.lastPres) { const by = S0.sent.by || (S0.sent.by = {}); S0.sent.bytes += this.lastPres.length + 48; S0.sent.n++; by.pres = (by.pres || 0) + this.lastPres.length + 48; }   // (the presence's wrapper ≈ 48 bytes)
       return r;
     }
     // under way: the acceleration from the last two states (the cruise's speed law makes it smooth)
@@ -251,7 +255,7 @@
     const pl = K.thin({ n: this.myName(), p: g.player.pos, v, lk }, sp);
     const pres = { pl, role: this.role === 'host' ? 'host' : 'guest', ss: this.session };
     const s = JSON.stringify(pl); if (!force && s === this.lastPres) return;
-    this.lastPres = s; count(pres);
+    this.lastPres = s; count(pres, 'pres');
     this.room.presence(pres).catch(() => { });
   });
   wrap(MPp, 'peersChanged', function (f0, ch) {
@@ -330,7 +334,7 @@
   // ---- Mitreisen: the guest's side
   K.onTravel = (mp, m, d) => {
     if (mp.role !== 'client' || m.peer !== mp.hostPeer) return;
-    S0.travel = d; S0.hostDim = d.dim;
+    S0.travel = d; S0.hostDim = d.dim; S0.travelAt = performance.now();
     const g = mp.g;
     if (d.dim === g.dim) return;
     if (S0.landWait) return;   // (the descent beside the host: the switch when it is down)
@@ -629,6 +633,13 @@
     K.install(); K.installAdv();
     if (S0.ask && (S0.ask.t += dt) > K.ASK_S) K.answer(false);
     if (this.role === 'client') {
+      // the host lost while it travelled (mp.js's grace timer waited): back, or gone after K.PATIENT
+      if (S0.lostCheck === this && (S0.lostT = (S0.lostT || 0) - dt) <= 0) {
+        S0.lostT = 1;
+        const back = this.room && this.room.peers().some(q => q.peer === this.hostPeer && q.presence && q.presence.ss === this.session);
+        if (back) S0.lostCheck = null;
+        else if (!K.patient(this)) { S0.lostCheck = null; this.clearSession(); if (g.state === 'play' || g.state === 'loading') g.leaveGuestWorld(T('g.mp.hostClosed')); return; }
+      }
       // the descent beside the host is down: into its world when its trip is known
       const LW = S0.landWait;
       if (LW && typeof LW === 'object' && S0.travel && S0.travel.dim === LW.dim) { S0.landWait = null; setTimeout(() => K.follow(this, true), 0); }   // (after this frame: the world is changed between two frames)
@@ -646,7 +657,7 @@
   });
   wrap(MPp, 'clearSession', function (f0) {
     f0.call(this);
-    S0.ask = null; S0.along = null; S0.form = null; S0.followers.clear(); S0.travel = null; S0.hostDim = null; S0.landWait = null; S0.ride = null; S0.arrived = true; S0.rehost = false; S0.wantMods.clear(); S0.moment = null; S0.G.last = null;
+    S0.ask = null; S0.along = null; S0.form = null; S0.followers.clear(); S0.travel = null; S0.hostDim = null; S0.landWait = null; S0.ride = null; S0.arrived = true; S0.rehost = false; S0.wantMods.clear(); S0.moment = null; S0.G.last = null; S0.travelAt = 0; S0.lostCheck = null;
     card(null); K.stayCard(null); wheelClose(false);
     const el = document.getElementById('kvroster'); if (el) el.style.display = 'none';
   });

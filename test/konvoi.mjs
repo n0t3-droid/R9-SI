@@ -38,7 +38,10 @@ async function mk(tag) {
 const A = await mk('host'), B = await mk('guest');
 const both = async (n, dtms = 33) => { for (let i = 0; i < n; i += 5) { await A.step(Math.min(5, n - i), dtms); await B.step(Math.min(5, n - i), dtms); await wait(5); } };
 // a real frame drawn, then the screen (the HUD's roster, cards and banner with it)
-const shot = async (P, name) => { await P.ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.loop(performance.now() + 1); g.renderer.gl.finish(); window.__norender = true; }); await wait(120); await P.page.screenshot({ path: SHOTS + name, timeout: 120000 }); console.log('  shot ' + name + ' (' + secs() + ')'); };
+const shot = async (P, name) => { await calm(P); await P.ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.loop(performance.now() + 1); g.renderer.gl.finish(); window.__norender = true; }); await wait(120); await P.page.screenshot({ path: SHOTS + name, timeout: 120000 }); console.log('  shot ' + name + ' (' + secs() + ')'); };
+// real frames (the friends' ships are asked for and built while drawing: in the stepped frames nothing is drawn)
+const real = async (P, n) => { for (let i = 0; i < n; i++) { await P.ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; }); await wait(250); } };
+const calm = (P) => P.ev(() => { for (const el of document.querySelectorAll('#hud *, #app > div')) { if (el.children.length < 6 && /tut das Passende|Bauhand —|setz etwas/.test(el.textContent || '') && el.offsetHeight < 200) el.style.display = 'none'; } });
 const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight; if (!fl) return; fl.view = v; VR.game.camMode = v === 0 ? 0 : 1; fl.headPitch = hp; fl.headYaw = hy || 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; }, [v, hp, hy]);
 const crs = (P) => P.ev(() => { const g = VR.game, fl = g.flight, a = fl && fl.asc, c = a && a.cruise, L = g.cruiseLand; return { state: g.state, dim: g.dim, regime: fl ? fl.regime || 'air' : null, frame: a ? a.st.frame : null, phase: c ? c.phase || c.kind : null, dist: c && c.dist, total: c && c.total, fl: fl ? fl.state : null, land: L ? Math.round(L.alt) : null }; });
 
@@ -68,11 +71,12 @@ try {
     return { id: s.id, b: s.beacon };
   });
   // the guest beside the host, both looking at the beacon
-  await B.ev((b) => { const g = VR.game, h = g.mp.players()[0], p = g.player; p.flying = true; p.teleport(h.pos[0] - 6, b[1] + 3, h.pos[2] + 10); p.yaw = Math.atan2(-(b[0] - p.pos[0]), -(b[2] - p.pos[2])); p.pitch = -0.2; }, site.b);
-  await A.ev((b) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(p.pos[0], b[1] + 2, p.pos[2]); p.yaw = Math.atan2(-(b[0] - p.pos[0]), -(b[2] - p.pos[2])); }, site.b);
+  await B.ev((b) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(b[0] - 7, b[1] + 6, b[2] + 17); p.yaw = Math.atan2(-(b[0] - p.pos[0]), -(b[2] - p.pos[2])); p.pitch = -0.22; }, site.b);
+  await A.ev((b) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(b[0] + 6, b[1] + 2, b[2] + 12); p.yaw = Math.atan2(-(b[0] - p.pos[0]), -(b[2] - p.pos[2])); }, site.b);
   await both(30);
   const freed = await A.ev((id) => VR.Liberate.free(VR.game, VR.Liberate.siteOf(id)), site.id);
   check(freed, 'the host frees the outpost (VR.Liberate.free)');
+  await real(B, 3);
   let gm = null;
   for (let i = 0; i < 40; i++) { await both(5); gm = await B.ev(() => { const M = VR.Konvoi.S.moment; return M ? { id: M.id, t: +M.t.toFixed(2), r: M.r, ban: M.bannered } : null; }); if (gm && gm.t > 2.5) break; }
   rec.freed = gm;
@@ -117,6 +121,7 @@ try {
     await both(5); s = await crs(A); sb = await crs(B);
     if (!pic && sb.phase === 'cruise' && sb.dist < 0.55 * D0) {
       await view(B, 1, 0.12, 0.45); await view(A, 1, 0.12, -0.45); await B.step(1); await A.step(1);
+      await real(B, 4); await real(A, 4);
       const seen = await B.ev(() => { const a = [...VR.game.mp.remote.values()][0]; return { ship: !!(a && a.ship), pos: a && a.ship && a.ship.pos.map(Math.round), me: VR.game.flight.b.pos.map(Math.round), away: a && a.away, d: a && a.d }; });
       rec.konvoiSeen = seen; console.log('  the host as the guest sees it: ' + JSON.stringify(seen));
       check(seen.ship && !seen.away, 'the guest draws the host\'s ship beside its own in the cruise');
@@ -124,10 +129,11 @@ try {
       await view(B, 1, 0.1, 0); await view(A, 1, 0.1, 0);
     }
   }
-  const bw = await B.ev(() => ({ bytes: VR.Konvoi.S.sent.bytes - window.__kvB0, simS: VR.game.flight.asc.st.t - window.__kvT0, n: VR.Konvoi.S.sent.n }));
+  const bw = await B.ev(() => ({ bytes: VR.Konvoi.S.sent.bytes - window.__kvB0, simS: VR.game.flight.asc.st.t - window.__kvT0, n: VR.Konvoi.S.sent.n, by: VR.Konvoi.S.sent.by }));
   bw.bps = Math.round(bw.bytes / Math.max(1, bw.simS));
   rec.bandwidth = bw;
-  console.log(`  the guest sent ${bw.bytes} B in ${bw.simS.toFixed(1)} s of the cruise (${bw.n} sends): ${bw.bps} B/s (${secs()})`);
+  bw.presBps = Math.round(((bw.by && bw.by.pres) || 0) / Math.max(1, bw.simS));
+  console.log(`  the guest sent ${bw.bytes} B in ${bw.simS.toFixed(1)} s of the cruise (${bw.n} sends): ${bw.bps} B/s, the space presence ${bw.presBps} B/s; by topic ${JSON.stringify(bw.by)} (${secs()})`);
   check(bw.simS > 10 && bw.bps <= 2048, `a guest in the Konvoi sends ≤ 2 KB/s (${bw.bps} B/s)`);
   check(s.frame === 'opal' && sb.frame === 'opal', `both arrive in orbit round Opal (${s.frame}, ${sb.frame})`);
   save();
@@ -150,7 +156,7 @@ try {
   check(mods.role === 'client' && mods.see === 1 && !mods.away[0], 'still in the session on Opal, the host seen there');
   // the guest looks at the host's ship
   await B.ev(() => { const g = VR.game, a = [...g.mp.remote.values()][0], fl = g.flight; if (!a || !fl) return; const sp = a.ship && a.ship.pos || a.pos; const dx = sp[0] - fl.b.pos[0], dz = sp[2] - fl.b.pos[2]; fl.view = 1; g.camMode = 1; fl.headYaw = Math.atan2(-dx, -dz) - fl.b.heading; fl.headPitch = 0.18; fl.chaseYaw = null; fl.recenter = false; fl.mouseIdle = 0; });
-  await both(30);
+  await both(30); await real(B, 4);
   await shot(B, 'landed_together.png'); await shot(A, 'landed_host.png');
   save();
 

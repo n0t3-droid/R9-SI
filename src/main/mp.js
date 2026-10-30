@@ -580,6 +580,7 @@
           this.hostGone = null;
           const back = this.room && this.room.peers().some(q => q.peer === this.hostPeer && q.presence && q.presence.ss === this.session);
           if (back || !this.isClient) return;
+          if (VR.Konvoi && VR.Konvoi.patient && VR.Konvoi.patient(this)) return;   // a-konvoi: the host is between two worlds (its page busy loading): waited for a while longer
           this.clearSession();
           if (g.state === 'play' || g.state === 'loading') g.leaveGuestWorld('Lost the connection to the host.');
         }, 6000);
