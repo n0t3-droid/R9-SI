@@ -59,10 +59,10 @@ const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignor
 
 // ---------------------------------------------------------------- in the page before the game: the preset, the world, the handlers' time
 const PROBE = (opt) => {
-  const T = window.__hg = { hMs: 0, hBy: {}, err: [] };
+  const T = window.__hg = { hMs: 0, hBy: {}, err: [], genN: 0 };
   try { localStorage.setItem('r9si.settings', opt.settings); } catch (e) { T.err.push(e.message); }
   const W0 = window.Worker, now = () => performance.now();
-  const timeH = (fn) => function (e) { const t0 = now(); try { return fn.call(this, e); } finally { const d = now() - t0; T.hMs += d; const ty = (e && e.data && e.data.type) || '?'; T.hBy[ty] = (T.hBy[ty] || 0) + d; } };
+  const timeH = (fn) => function (e) { const t0 = now(); try { return fn.call(this, e); } finally { const d = now() - t0; T.hMs += d; const ty = (e && e.data && e.data.type) || '?'; T.hBy[ty] = (T.hBy[ty] || 0) + d; if (ty === 'gen') T.genN++; } };
   window.Worker = function (url, o) {
     const w = new W0(url, o), oAdd = w.addEventListener.bind(w);
     w.addEventListener = (ty, fn, o2) => oAdd(ty, ty === 'message' && typeof fn === 'function' ? timeH(fn) : fn, o2);
@@ -134,7 +134,7 @@ const SETUP = () => {
   const mem = () => (performance.memory ? performance.memory.usedJSHeapSize : 0);
   window.__frame = (dtS, rec) => {
     const gg = VR.game, gl = gg.renderer.gl;
-    const hand = T.hMs, hBy = T.hBy; T.hMs = 0; T.hBy = {};
+    const hand = T.hMs, hBy = T.hBy, genN = T.genN; T.hMs = 0; T.hBy = {}; T.genN = 0;
     gg.last = performance.now() - dtS * 1000;
     const m0 = mem(), t0 = performance.now(); gg.loop(t0); const t1 = performance.now(), m1 = mem();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, window.__px);
@@ -144,7 +144,7 @@ const SETUP = () => {
     const top = [...T.acc.entries()].filter(e => e[1] >= 1 && !/\.(loop|frame|playFrame)$/.test(e[0])).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => [k, Math.round(v * 10) / 10]);
     const hTop = Object.entries(hBy).filter(e => e[1] >= 1).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => ['h:' + k, Math.round(v * 10) / 10]);
     T.acc.clear();
-    return [t1 - t0 + hand, t1 - t0, hand, t2 - t0, m1 >= m0 ? Math.round((m1 - m0) / 1024) : -1, top.concat(hTop)];
+    return [t1 - t0 + hand, t1 - t0, hand, t2 - t0, m1 >= m0 ? Math.round((m1 - m0) / 1024) : -1, top.concat(hTop), genN];
   };
   window.__tick = () => { const gg = VR.game, p2 = gg.player, now = performance.now(); gg.world.update(p2.pos[0], p2.pos[1], p2.pos[2], now); if (gg.horizon) gg.horizon.update({ x: p2.pos[0], y: p2.pos[1] + p2.eye, z: p2.pos[2], yaw: p2.yaw, pitch: p2.pitch, fov: 1.3, far: gg.farFor ? gg.farFor(gg.world) : 512 }); };
   window.__quiet = () => { const gg = VR.game, h = gg.horizon, w = gg.world; return gg.pool.busy === 0 && w.pending.size === 0 && (!h || !h.inflight) && (!w.uploadQ || !w.uploadQ.size); };
@@ -201,6 +201,9 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
     if (i % 50 === 49) console.log(`    ${preset} round ${round + 1}: frame ${i + 1}/${path.length} (${secs()})`);
   }
   for (const P of Ps) kept.push(await P.ev(() => window.__kept()));
+  // how far each kept up: the columns round the player shown when the flight ends (a build that streams more works more)
+  const shown = [];
+  for (const P of Ps) shown.push(await P.ev(() => { const w = VR.game.world, p = VR.game.player, cx = Math.floor(p.pos[0]) >> 4, cz = Math.floor(p.pos[2]) >> 4, rd = w.renderDist; let n = 0; for (const c of w.cols.values()) { const dx = c.cx - cx, dz = c.cz - cz; if (dx * dx + dz * dz <= (rd + 0.5) * (rd + 0.5) && c.shownAt >= 0) n++; } return n; }));
   // the end: both settle at the last spot, the same view photographed (the pictures alike)
   const shots = [];
   if (round === 0) for (const P of Ps) {
@@ -214,11 +217,11 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   for (let j = 0; j < 2; j++) {
     const main = fr[j].map(f => f[0]), m = med(main);
     run.builds[Ps[j].b.id] = { med: r1(m), p99: r1(pct(main, 0.99)), p95: r1(pct(main, 0.95)), max: r1(Math.max(...main)), hitches: main.filter(x => x > 2 * bMed).length, hitchesOwn: main.filter(x => x > 2 * m).length,
-      jsMed: r1(med(fr[j].map(f => f[1]))), handMed: r1(med(fr[j].map(f => f[2]))), gcFrames: fr[j].filter(f => f[4] < 0).length, errs: Ps[j].errs.length, fr: fr[j].map(f => [r1(f[0]), r1(f[1]), r1(f[2]), r1(f[3]), f[4], f[5]]) };
+      jsMed: r1(med(fr[j].map(f => f[1]))), handMed: r1(med(fr[j].map(f => f[2]))), gcFrames: fr[j].filter(f => f[4] < 0).length, errs: Ps[j].errs.length, cols: fr[j].reduce((a, f) => a + f[6], 0), shown: shown[j], fr: fr[j].map(f => [r1(f[0]), r1(f[1]), r1(f[2]), r1(f[3]), f[4], f[5], f[6]]) };
     errsAll.push(...Ps[j].errs.map(e => Ps[j].b.id + ': ' + e));
   }
   rec.runs.push(run); save();
-  const s = (id) => { const o = run.builds[id]; return `median ${o.med} · p95 ${o.p95} · p99 ${o.p99} · max ${o.max} · hitches ${o.hitches} (own ${o.hitchesOwn}) · gc ${o.gcFrames}`; };
+  const s = (id) => { const o = run.builds[id]; return `median ${o.med} · p95 ${o.p95} · p99 ${o.p99} · max ${o.max} · hitches ${o.hitches} (own ${o.hitchesOwn}) · gc ${o.gcFrames} · columns arrived ${o.cols}, shown at the end ${o.shown}`; };
   console.log(`RUN ${preset} round ${round + 1} (settled ${settleS.join('/')} s, timers ${kept.join('/')}):\n  base ${s('base')}\n  head ${s('head')}  (${secs()})`);
   // the worst frames of each, with what took them
   for (const id of ['base', 'head']) {
