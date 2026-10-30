@@ -67,7 +67,7 @@ check(PB.kind === 'airless' && PO.kind === 'ice', 'kinds: Basalt airless (crater
 check(Math.abs(PB.R - U.home.by.basalt.R) < 1 && Math.abs(PO.R - U.home.by.opal.R) < 1, 'radii from VR.Universe: Basalt ' + (PB.R / 1000).toFixed(2) + ' km, Opal ' + (PO.R / 1000).toFixed(2) + ' km (game)');
 check(PB.g === 1.62 && PO.g === 0.49, 'g: Basalt 1.62, Opal 0.49 (U§2.1)');
 check(Math.abs(PB.walk - 30 * 1.62 / 9.81) < 1e-9 && Math.abs(PO.walk - 30 * 0.49 / 9.81) < 1e-9, 'the walking gravity 30·g/9.81 (U§4.3)', PB.walk.toFixed(3) + ' · ' + PO.walk.toFixed(3));
-check(B.BGEN === 1 && PB.bgen === 1 && PO.bgen === 1, 'bgen 1 for both');
+check(B.BGEN === 2 && PB.bgen === B.BGEN && PO.bgen === B.BGEN, 'the current bgen for both (u-moons3: 2 — Basalt and Opal the same at 1 and 2)');
 check(D.has('basalt') && D.has('opal') && D.code('basalt') === 5 && D.code('opal') === 5 && D.sky('basalt') && D.sky('opal'), 'DimReg: basalt and opal, u_dim 5 (airless body), light from above');
 check(D.g('basalt') === 1.62 && D.g('opal') === 0.49 && !D.actorsHome('basalt') && !D.actorsHome('opal'), 'DimReg: their g, no village life (actors none)');
 check(D.get('basalt').travel && D.get('opal').travel && D.travelable({}).includes('basalt') && D.travelable({}).includes('opal'), '/dim reaches both (travel)');
@@ -86,10 +86,10 @@ check(V.makeGen('basalt', SEED, {}) instanceof BG && V.makeGen('opal', SEED, {})
 {
   const meta = {};
   B.stamp(meta);
-  check(meta.universe && meta.universe.bodies && meta.universe.bodies.basalt.bgen === 1 && meta.universe.bodies.opal.bgen === 1, 'stamp: a save gets bgen 1 for each body');
+  check(meta.universe && meta.universe.bodies && meta.universe.bodies.basalt.bgen === B.BGEN && meta.universe.bodies.opal.bgen === B.BGEN, 'stamp: a save gets the current bgen for each body');
   meta.universe.bodies.opal.bgen = 0.5; B.stamp(meta);
   check(meta.universe.bodies.opal.bgen === 0.5, 'stamp keeps what a save has (old worlds keep their moons)');
-  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 1, opal: 0.5, zinn: 1, ocker: 1, aqua: 1 }), 'bgenOf → the genOpts table', JSON.stringify(B.bgenOf(meta)));
+  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 2, opal: 0.5, zinn: 2, ocker: 2, aqua: 2 }), 'bgenOf → the genOpts table', JSON.stringify(B.bgenOf(meta)));
   check(new BG(SEED, 'opal', { bgen: { opal: 1 } }).bgen === 1 && new BG(SEED, 'basalt', {}).bgen === B.BGEN, 'a generator takes its bgen from the options, else the current');
 }
 

@@ -120,6 +120,7 @@ const wide = (A) => A.ev(() => { const g = VR.game; g.settings.renderDist = 12; 
 
 if (!ONLY || ONLY === 'zinn') {
   const s = await trip(A, 'zinn'); await wide(A); await A.settle(60, 4);
+  await A.step(30, 33); await shot(A, 'zinn_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Zinnober');
   const Z = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}); const v = g.vents()[0]; return { v: { x: v.x, z: v.z, y: v.y }, G: { x: g.glut.x, z: g.glut.z, R: g.glut.R }, sp: g.findSpawn() }; });
   // a firing vent with Helia 12–30° up, the camera 10 km from it with Helia behind the plume
@@ -142,6 +143,7 @@ if (!ONLY || ONLY === 'zinn') {
 }
 if (!ONLY || ONLY === 'ocker') {
   const s = await trip(A, 'ocker'); await wide(A); await A.settle(60, 4);
+  await A.step(30, 33); await shot(A, 'ocker_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Ocker');
   await B2(A, 'storm', 0); await B2(A, 'front', 0);
   const O = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return { sp: g.findSpawn() }; });
@@ -181,6 +183,7 @@ if (!ONLY || ONLY === 'ocker') {
 }
 if (!ONLY || ONLY === 'aqua') {
   const s = await trip(A, 'aqua'); await wide(A); await A.settle(60, 4);
+  await A.step(30, 33); await shot(A, 'aqua_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Aquamarin');
   const Q = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'aqua', {}); return { L: g.prof.landmark, sp: g.findSpawn() }; });
   const tDay = await findT(A, 'aqua', [0.5, 75, 0.5], 40, 1, 0, 8000);

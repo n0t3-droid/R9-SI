@@ -33,7 +33,7 @@
       bedrock: G.bedrock, basalt: s('basalt'), smoothBasalt: G.smoothbasalt, obsidian: s('obsidian'), lava: s('lava'), tuff: s('tuff'),
       sulfur: s('sulfur'), sulfurRed: s('sulfur_red'), frost: s('so2_frost'), orange: s('orange_terracotta'), fuming: s('fuming_sulfur'),
       redSand: s('red_sand'), ochre: s('ochre_rock'), terracotta: s('terracotta'), sandstone: s('sandstone'), redSandstone: s('red_sandstone'),
-      coarse: s('coarse_dirt'), gravel: G.gravel, sand: s('sand'), clay: s('clay'), water: s('water'), andesite: s('andesite'),
+      coarse: s('coarse_dirt'), gravel: G.gravel, dust: s('ocker_dust'), sand: s('sand'), clay: s('clay'), water: s('water'), andesite: s('andesite'),
     };
     return S_;
   }
@@ -71,6 +71,20 @@
     // a standable, flat, dry spot near (x, z) — and the way to look (toward the kind's landmark)
     findSpawn(x, z) {
       x = Number.isFinite(x) ? x : this.prof.spawn.x; z = Number.isFinite(z) ? z : this.prof.spawn.z;
+      // u-moons3 (bgen 2): the landing faces the world's best view — this.land {x, z, look, pitch} (asked for the
+      // profile's spawn: the travel's own search); bgen 1 lands where it did
+      const LD = this.bgen >= 2 && this.land && x === this.prof.spawn.x && z === this.prof.spawn.z ? this.land : null;
+      if (LD) {
+        for (let r = 0; r < 120; r += 2) for (let a = 0; a < (r ? 12 : 1); a++) {
+          const px = Math.round(LD.x + Math.cos(a / 12 * TAU) * r), pz = Math.round(LD.z + Math.sin(a / 12 * TAU) * r);
+          const F = this.feats(px - 4, pz - 4, px + 4, pz + 4), o = this.col(px, pz, {}, F), h0 = o.h;
+          if (!this.okSpawn(o)) continue;
+          let flat = true;
+          for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) { const q = this.col(px + dx, pz + dz, {}, F); if (Math.abs(q.h - h0) > 1.2 || !this.okSpawn(q)) { flat = false; break; } }
+          if (!flat) continue;
+          return [px + 0.5, Math.floor(h0) + 1, pz + 0.5, Math.atan2(-(LD.look.x - px), -(LD.look.z - pz)), LD.pitch];
+        }
+      }
       for (let r = 0; r < 900; r += 6) for (let a = 0; a < (r ? 16 : 1); a++) {
         const px = Math.round(x + Math.cos(a / 16 * TAU) * r), pz = Math.round(z + Math.sin(a / 16 * TAU) * r);
         const F = this.feats(px - 4, pz - 4, px + 4, pz + 4), o = this.col(px, pz, {}, F), h0 = o.h;
@@ -133,10 +147,15 @@
       this.glut = { x: L.x, z: L.z, R: L.D / 2, depth: L.depth, lake: true, h: 0x61a7, rot: 0.6, flows: [] };
       this.glut.flows = this.flowsOf(this.glut, 0x5eed);
       this.look = this.glut;
+      // u-moons3 (bgen 2): the landing on the Glutsee's lip on the side of the old landing, the eye lowered to the lava
+      { const G = this.glut, dl = Math.hypot(P.spawn.x - G.x, P.spawn.z - G.z) || 1; this.land = { x: G.x + (P.spawn.x - G.x) / dl * G.R * 1.1, z: G.z + (P.spawn.z - G.z) / dl * G.R * 1.1, look: G, pitch: -0.3 }; }
       // the six active vents (the plumes, bodylife2.js): one 2.2 km north-east in sight of the landing, the rest 1.5–6 km
       const V = [], rng = new VR.RNG(s ^ 0x7e47);
-      V.push({ x: 1500, z: -1700 });
-      for (let k = 1; k < P.plume.n; k++) { const a = rng.next() * TAU, r = 1500 + 4500 * rng.next(); V.push({ x: Math.round(Math.cos(a) * r), z: Math.round(Math.sin(a) * r) }); }
+      // (u-moons3, bgen 2: the vents 7–16 km off — a plume is seen from the side, a fountain with its umbrella, not from
+      // under its canopy — the first 11.6 km north-north-east, beside the Glutsee in the landing's view)
+      const far2 = this.bgen >= 2;
+      V.push(far2 ? { x: 3200, z: -11400 } : { x: 1500, z: -1700 });
+      for (let k = 1; k < P.plume.n; k++) { const a = rng.next() * TAU, r = far2 ? 7000 + 9000 * rng.next() : 1500 + 4500 * rng.next(); V.push({ x: Math.round(Math.cos(a) * r), z: Math.round(Math.sin(a) * r) }); }
       this.ventList = V.map((v, k) => ({ x: v.x + 0.5, z: v.z + 0.5, y: 0, k, id: k, seed: M.hash2(k, 31, s + 91), ring: 300 + 120 * M.hashf2(k, 3, s) }));
       // a mountain block in sight of the landing (west-north-west) — Io's are tilted crustal blocks, not volcanoes
       this.landMtn = { x: -1500, z: -900, r: 640, h: 205, ph1: 0.7, ph2: 2.1, tx: 0.8, tz: -0.6 };
@@ -244,6 +263,18 @@
       o.h = Math.min(250, h);
       return o;
     }
+    // the plains: four colours by a slow field, patches at 160 m, a speckle — u-moons3 (bgen 2): six, brighter and more
+    // varied — white SO₂ frost, yellow sulfur, the yellow-green of fresh sulfur, orange, red, and dark silicate spots
+    // (Io's plains: the frost bright, the sulfur in every shade from its quench, the dark spots warm lava under crust)
+    plainsBlock(x, z, o, hp) {
+      const T = S(), v = this.nCol.n2(x, z) + 0.12 * this.nCol2.n2(x, z) + (hp - 0.5) * 0.05;
+      if (this.bgen < 2) return v > 0.3 ? T.frost : v > -0.08 ? T.sulfur : v > -0.22 ? T.orange : T.sulfurRed;
+      const w = this.nCol2.n2(z * 1.7 + 311, x * 1.7) + (hp - 0.5) * 0.1;   // (a second field across the first: patches inside the zones)
+      if (v > 0.26) return w > 0.35 ? T.sulfur : T.frost;
+      if (v > 0.02) return w > 0.3 ? T.frost : w < -0.32 ? T.fuming : T.sulfur;
+      if (v > -0.16) return w > 0.25 ? T.sulfur : w < -0.38 ? T.sulfurRed : T.orange;
+      return w > 0.4 ? T.basalt : w > 0.1 ? T.orange : T.sulfurRed;
+    }
     fill(blocks, col, top, o, slope, hp, x, z, T) {
       let surf, sub = T.tuff, deep = T.basalt, n = 3;
       if (o.lava) surf = o.crust ? (hp < 0.6 ? T.obsidian : T.basalt) : T.lava;
@@ -256,9 +287,7 @@
       else if (o.ring) surf = hp < 0.85 ? T.sulfurRed : T.orange;
       else if (o.frost) surf = hp < 0.8 ? T.frost : T.sulfur;
       else {
-        // the plains: four colours by a slow field, patches at 160 m, a speckle
-        const v = this.nCol.n2(x, z) + 0.12 * this.nCol2.n2(x, z) + (hp - 0.5) * 0.05;
-        surf = v > 0.3 ? T.frost : v > -0.08 ? T.sulfur : v > -0.22 ? T.orange : T.sulfurRed;
+        surf = this.plainsBlock(x, z, o, hp);
         sub = T.sulfur;
       }
       for (let y = 1; y <= top; y++) { const d = top - y; blocks[(y << 8) | col] = d === 0 ? surf : d < n ? sub : y < 40 ? deep : (o.mtn ? T.tuff : deep); }
@@ -277,6 +306,10 @@
       this.nEdge = new F(s ^ 0x207, 2, 1 / 55, 0.5);
       const W = P.dunes.wind; this.wind = { c: Math.cos(W), s: Math.sin(W) };
       this.look = { x: 0, z: 400 };   // (toward the canyon's rim, south)
+      // u-moons3 (bgen 2): the ground butterscotch (ocker_dust) with rust (red sand) and umber (terracotta) patches; the
+      // landing on the Rostschlucht's floor before its north wall, the eye lifted to the layered rock
+      this.nRust = new F(s ^ 0x208, 2, 1 / 260, 0.5);
+      { const zc = this.canyonZ(0), hw = this.canyonHalf(0); this.land = { x: 0, z: Math.round(zc - 0.6 * hw), look: { x: 0, z: -2000 }, pitch: 0.28 }; }
     }
     // the canyon's centre line and half width at x
     canyonZ(x) { const C = this.prof.canyon; return C.z0 + 120 * Math.sin(x / 1500 + 0.4) + 40 * Math.sin(x / 430 + 1.1); }
@@ -405,18 +438,19 @@
     }
     fill(blocks, col, top, o, slope, hp, x, z, T) {
       const pn = this.nPatch.n2(x, z);
-      let surf = T.redSand, dust = 2;
-      if (o.dune) { surf = T.redSand; dust = 4; }
+      let surf = T.redSand, dust = 2, dB = T.redSand;
+      if (this.bgen >= 2) { const rn = this.nRust.n2(x, z) + 0.15 * pn; dB = surf = rn > 0.28 ? T.redSand : rn < -0.34 ? T.terracotta : T.dust; }
+      if (o.dune) { surf = this.bgen >= 2 ? T.dust : T.redSand; dust = 4; if (this.bgen >= 2) dB = T.dust; }
       else if (o.wall || o.mesaWall || slope > 1.3) { surf = null; dust = 0; }
-      else if (o.shield) { surf = slope > 0.5 || pn > 0.3 ? T.basalt : T.redSand; dust = surf === T.basalt ? 0 : 1; }
-      else if (o.canyon) { surf = pn > 0.35 ? T.gravel : T.redSand; }
+      else if (o.shield) { surf = slope > 0.5 || pn > 0.3 ? T.basalt : dB; dust = surf === T.basalt ? 0 : 1; }
+      else if (o.canyon) { surf = pn > 0.35 ? T.gravel : dB; }
       else if (o.track) surf = T.coarse;
       else if (pn > 0.42) { surf = T.ochre; dust = 0; }
       else if (pn < -0.45) surf = T.gravel;
       for (let y = 1; y <= top; y++) {
         const d = top - y;
         let b;
-        if (d < dust || (d === 0 && surf)) b = d === 0 && surf ? surf : T.redSand;
+        if (d < dust || (d === 0 && surf)) b = d === 0 && surf ? surf : dB;
         else if (o.shield && y > 150) b = T.basalt;
         else if (y < 22) b = T.basalt;   // (the canyon's floor rock; above it the layers)
         else {
@@ -439,11 +473,16 @@
       this.nGap = new F(s ^ 0x305, 1, 1 / 120, 0.5); this.nRidge = new F(s ^ 0x306, 3, 1 / 160, 0.5);
       this.look = { x: P.landmark.x, z: P.landmark.z };
       this.sea = P.sea;
+      // u-moons3 (bgen 2): the landing on a reef ring of its own in open sea (180 m across), its lagoon toward Herzwelt
+      // (+z: the near side's Herzwelt stands 32° up there), the eye a little lowered to the water
+      if (this.bgen >= 2) { const Q = this.land2 = { x: 0, z: 92, R: 88, w: 22, ph: 3 }; this.land = { x: Q.x, z: Q.z - Q.R, look: Q, pitch: -0.08 }; }
     }
     // the elevation field: its zero line is the coast (an island round the landing)
     elev(x, z) {
       const r = Math.hypot(x, z), L = this.prof.landmark, rl = Math.hypot(x - L.x, z - L.z);
       // (the landing's island; the landmark atoll in open sea, whatever the seed)
+      const Q = this.land2;
+      if (Q) { const rq = Math.hypot(x - Q.x, z - Q.z); return this.nArch.n2(x, z) * 0.55 + this.nIsl.n2(x, z) * 0.75 - this.prof.islands.thr * 0.62 - 0.6 * (1 - ss(L.R + 80, L.R + 320, rl)) - 0.7 * (1 - ss(Q.R + 60, Q.R + 260, rq)); }   // (bgen 2: the landing's ring in open sea)
       return this.nArch.n2(x, z) * 0.55 + this.nIsl.n2(x, z) * 0.75 - this.prof.islands.thr * 0.62 + 0.5 * (1 - ss(60, 300, r)) - 0.6 * (1 - ss(L.R + 80, L.R + 320, rl));
     }
     atoll(i, j) {
@@ -459,6 +498,8 @@
       for (let k = 0; k < c.length; k += 2) { const a = this.atoll(c[k], c[k + 1]); if (a && !(a.x + a.R + 140 < x0 || a.x - a.R - 140 > x1 || a.z + a.R + 140 < z0 || a.z - a.R - 140 > z1)) f.at.push(a); }
       const L = P.landmark, A = this._lm || (this._lm = { x: L.x, z: L.z, R: L.R, w: 20, ph: 7 });
       if (!(A.x + A.R + 140 < x0 || A.x - A.R - 140 > x1 || A.z + A.R + 140 < z0 || A.z - A.R - 140 > z1)) f.at.push(A);
+      const Q = this.land2;
+      if (Q && !(Q.x + Q.R + 140 < x0 || Q.x - Q.R - 140 > x1 || Q.z + Q.R + 140 < z0 || Q.z - Q.R - 140 > z1)) f.at.push(Q);
       return f;
     }
     col(x, z, o, F) {
@@ -474,7 +515,15 @@
         const r = Math.hypot(x - a.x, z - a.z); if (r > a.R + 140) continue;
         const d = (r - a.R) / a.w;
         let ha;
-        if (d < -1) ha = sea - 3 - 4 * ss(-1, -6, d) + this.nFine.n2(z, x) * 0.8;   // (the lagoon: 3–7 m)
+        if (this.bgen >= 2) {
+          // u-moons3: a smooth reef ring — a sand crest 2.5–3 m over the sea all round, the beach down into the lagoon
+          // over ~40 m (0.6–6 m deep), the outer slope a smooth fall to the floor; no passes cut through
+          const dl = (r - (a.R - a.w)) / 40;   // (0 at the crest's inner foot, −1 forty metres into the lagoon)
+          if (d < -1) ha = sea + 0.6 - 6.4 * ss(0, -1, dl) + this.nFine.n2(z, x) * 0.5 * ss(0, -1, dl);
+          else if (d < 1) ha = sea + 0.6 + 2.3 * (1 - d * d) * (0.85 + 0.15 * this.nFine.n2(x, z));
+          else ha = sea + 0.6 - 34.6 * ss(1, 1 + 120 / a.w, d);
+        }
+        else if (d < -1) ha = sea - 3 - 4 * ss(-1, -6, d) + this.nFine.n2(z, x) * 0.8;   // (the lagoon: 3–7 m)
         else if (d < 1) { const gap = this.nGap.n2(Math.atan2(z - a.z, x - a.x) * a.R, a.ph * 1000) > 0.38; ha = gap ? sea - 2 : sea + 0.6 + 2.6 * (1 - d * d) * (0.7 + 0.3 * this.nFine.n2(x, z)); }
         else ha = sea - 2 - (32) * ss(1, 1 + 120 / a.w, d);
         if (r < a.R + a.w) { h = e > 0.05 ? Math.max(h, ha) : ha; if (d < -1) o.lagoon = 1; else o.atoll = 1; }

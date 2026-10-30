@@ -40,5 +40,11 @@
     return K(img);
   };
   // ---- end u-moons2
+  // u-moons3: Ocker's dust — butterscotch with rust and umber grains, a fine drift pattern
+  REC.ocker_dust = () => {
+    const img = TX.natural([0x8e6236, 0xa77745, 0xbb8c55, 0xc99d66], { period: 6, oct: 3, speck: 0.08, speckDark: true, speck2: 0.03, seed: 9151, contrast: 0.85, rough: 0.95 });
+    img.forEach((x, y, i) => { const h = hh(x, y, 9152); if (h < 0.025) img.set(x, y, C(0xa4512a)); else if (h > 0.985) img.set(x, y, C(0x5e4636)); });   // rust and dark grains
+    return K(img);
+  };
   void N;
 })(VR);
