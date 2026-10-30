@@ -298,8 +298,7 @@
   K.hostTravel = (g, trip, arrive) => {
     const mp = g.mp; if (!K.guests(mp) || !trip || !arrive) return false;
     mp.flush(true);
-    mp.savePending();
-    mp.pending.clear(); mp.modKeys.clear(); mp.diffQ = []; mp.out.clear();
+    mp.modKeys.clear(); mp.diffQ = [];   // (the pending edits stay: travel.js's saveMeta right after keeps them for this world)
     S0.rehost = true; S0.wantMods = new Set();
     mp.emitNow('travel', K.travelMsg(trip.to, arrive.pos, mp.myName(), trip.via));
     return true;
@@ -335,7 +334,7 @@
     const g = mp.g;
     if (d.dim === g.dim) return;
     if (S0.landWait) return;   // (the descent beside the host: the switch when it is down)
-    if (S0.along) { K.follow(mp, false); return; }
+    if (S0.along) { setTimeout(() => K.follow(mp, false), 0); return; }
     K.ask(mp, 'travel', d);
   };
   K.onMsg = (mp, m, d) => {
@@ -428,7 +427,7 @@
     try { if (S) S.shutdown(); if (g.gadgets && g.gadgets.shutdown) g.gadgets.shutdown(); } catch (e) { console.warn(e); }
     const at = d.at || (mp.lastWel && mp.lastWel.spawn) || [0.5, 100, 0.5];
     const o = K.FORM(slot);
-    const wel = Object.assign({}, mp.lastWel || {}, { dim: d.dim, spawn: [at[0] + o[0] * 0.15, at[1], at[2] + 6, 0, 0] });
+    const wel = Object.assign({}, mp.lastWel || {}, { dim: d.dim, spawn: S0.ride ? [at[0] + o[0], at[1], at[2] + o[2], 0, 0] : [at[0] + 1.2, at[1], at[2] + 0.6, 0, 0] });   // (by ship: the formation's place, the two ships side by side)
     mp.lastWel = wel;
     g.startGuestWorld(wel, mp);
     return true;
@@ -632,9 +631,9 @@
     if (this.role === 'client') {
       // the descent beside the host is down: into its world when its trip is known
       const LW = S0.landWait;
-      if (LW && typeof LW === 'object' && S0.travel && S0.travel.dim === LW.dim) { S0.landWait = null; K.follow(this, true); }
+      if (LW && typeof LW === 'object' && S0.travel && S0.travel.dim === LW.dim) { S0.landWait = null; setTimeout(() => K.follow(this, true), 0); }   // (after this frame: the world is changed between two frames)
       if (!S0.arrived && g.state === 'play' && g.world) {
-        S0.arrived = true;
+        S0.arrived = true; S0.along = null;   // (Ja holds for one trip)
         this.send('konvoi', { k: 'arrived', d: g.dim });
         for (const c of g.world.cols.values()) if (c.ready) this.requested.delete(c.key);
       }
