@@ -6,7 +6,7 @@
 // the time is given back when the mode ends, as before). The picture is the photo mode's own PNG (F2, Enter, a click).
 // A circle started is a moment in the event log (build/showcase, weight 2).
 // VR.Showcase (pure): GOLDEN · SPEED · orbitCam(c, r, a, h) → {x, y, z, yaw, pitch}; the game: start(g, {centre,
-// golden}) · stop(g) (the scripted sessions use them).
+// golden, r, h}) · stop(g) (the scripted sessions use them).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -23,7 +23,7 @@
   if (!PM || !PM.Photo || typeof document === 'undefined') return;
   const P = PM.Photo.prototype, R = VR.R, F = VR.F;
   const solid = (w, x, y, z) => { const s = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(s && (R.T.flags[s] & F.SOLID)); };
-  SC.startOrbit = function (pc, centre) {
+  SC.startOrbit = function (pc, centre, o) {   // (o: {r, h} — a radius and height of its own, e.g. from a building's box)
     const g = pc.g, s = pc.s, w = g.world; if (!s || !w) return false;
     let c = centre;
     if (!c) {
@@ -32,9 +32,8 @@
       if (!c) c = [s.x + f[0] * 16, s.y + f[1] * 16, s.z + f[2] * 16];
     }
     const r = Math.max(6, Math.min(120, Math.hypot(s.x - c[0], s.z - c[2])));
-    pc.orbit = { c: c.slice(), r, a: Math.atan2(s.x - c[0], s.z - c[2]), h: Math.max(1.5, Math.min(60, s.y - c[1])), w: SC.SPEED };
+    pc.orbit = { c: c.slice(), r: o && o.r > 0 ? o.r : r, a: Math.atan2(s.x - c[0], s.z - c[2]), h: o && o.h > 0 ? o.h : Math.max(1.5, Math.min(60, s.y - c[1])), w: SC.SPEED, n: 0 };
     PM.note(tx('g.show.orbit', null, '🔄 Rundflug — W / S näher · weiter · Leertaste / Umschalt Höhe · A / D Richtung · G goldene Stunde · O aus', '🔄 Orbit — W / S nearer · farther · Space / Shift height · A / D direction · G golden hour · O off'), 4500);
-    if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('build', 'showcase', 2, c, 'showcase', Math.max(3, r * 0.3));
     return true;
   };
   SC.golden = function (pc) {
@@ -65,6 +64,8 @@
     let q = SC.orbitCam(o.c, o.r, o.a, o.h);
     for (let k = 0; k < 24 && solid(this.g.world, q.x, q.y, q.z); k++) { o.h += 0.5; q = SC.orbitCam(o.c, o.r, o.a, o.h); }   // (never inside a wall: up over it)
     s.x = q.x; s.y = q.y; s.z = q.z; s.yaw = q.yaw; s.pitch = q.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0;
+    // the moment in the event log once the camera is on its circle (the second frame: the first one's camera is already drawn)
+    if (++o.n === 2 && VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('build', 'showcase', 2, o.c, 'showcase', Math.max(3, o.r * 0.3));
   };
   // the scripted sessions: the photo mode, the circle round a centre, the golden hour
   SC.start = function (g, o) {
@@ -72,7 +73,7 @@
     if (!g.photoCam || !g.photoCam.on) g.photoMode(true);
     const pc = g.photoCam; if (!pc || !pc.on) return false;
     pc.first = false;
-    SC.startOrbit(pc, o.centre || null);
+    SC.startOrbit(pc, o.centre || null, o);
     if (o.golden) SC.golden(pc);
     return true;
   };

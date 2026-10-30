@@ -264,7 +264,7 @@ function pageHelpers(win, VRx) {
     if (M.kind === 'intent') { intent(g, p, I, dt); return; }   // e-ctx
     if (M.kind === 'showcase') {   // a-builder: the builder shows the house off — the photo mode's circle round it at the golden hour, a picture
       release(I);
-      if (!S.sc) { const b = S.B && S.B.site && S.B.site.box, c = b ? [(b[0] + b[3]) / 2 + 0.5, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 + 0.5] : null; S.sc = { ok: !!(VR.Showcase && VR.Showcase.start(g, { centre: c, golden: true })), c }; S.log.push(['showcase', S.sc.ok, c && c.map(Math.round)]); if (!S.sc.ok) { S.done = true; S.sc = null; } return; }
+      if (!S.sc) { const b = S.B && S.B.site && S.B.site.box, c = b ? [(b[0] + b[3]) / 2 + 0.5, b[1] + 1.5, (b[2] + b[5]) / 2 + 0.5] : null, r = b ? Math.hypot(b[3] - b[0], b[5] - b[2]) / 2 + 7 : 0, h = b ? b[4] - b[1] + 4 : 0; S.sc = { ok: !!(VR.Showcase && VR.Showcase.start(g, { centre: c, golden: true, r, h })), c }; S.log.push(['showcase', S.sc.ok, c && c.map(Math.round)]); if (!S.sc.ok) { S.done = true; S.sc = null; } return; }
       if (S.t >= (M.sec || 30)) { VR.Showcase.stop(g); S.sc = null; S.done = true; }
       return;
     }
