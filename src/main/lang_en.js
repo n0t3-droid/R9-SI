@@ -2927,12 +2927,12 @@
     'g.show.noTime': '🌅 The time of day belongs to everyone here',
     'g.show.orbit': '🔄 Orbit — W / S nearer · farther · Space / Shift height · A / D direction · G golden hour · O off',
     'g.stamp.full': '📐 Copied — the browser storage is full, the blueprint lasts until you close',
-    'g.stamp.keys': '📐 V stamps · R turns · T mirrors · N next blueprint · Z undo',
+    'g.stamp.keys': '📐 V stamps · R turns · L mirrors · U next blueprint · Z undo',
     'g.stamp.mirrored': '📐 Mirrored',
     'g.stamp.name': 'Blueprint {sx} × {sy} × {sz}',
     'g.stamp.next': '📐 Blueprint {i} / {n}: {name}',
     'g.stamp.none': '📐 No blueprint yet — set two corners (left / right click), then C',
-    'g.stamp.saved': '📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, T mirrors',
+    'g.stamp.saved': '📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, L mirrors',
     // ---- a-builder end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -11,7 +11,7 @@
 //      placed or picked); Profi adds the ★ row, eight material chips and sixteen colour dots. Its open time is measured
 //      (ui.pickMs).
 //  3 · Bauplan-Stempel: the wand's copy (C) is kept as a stamp in this browser (VR.Stamp, ≤ 12); holding the wand shows
-//      the stamp as a translucent ghost in its own colours where V would put it; R turns, T mirrors, N takes the next
+//      the stamp as a translucent ghost in its own colours where V would put it; R turns, L mirrors, U takes the next
 //      saved one, V stamps, Z undoes. The newest saved stamp is in the wand when a world starts.
 // VR.BuildFx (pure): POP_DUR · MAX_POPS · popScale(t) · popAlpha(t) · Combo · PENTA · FX · enabled(settings).
 // ============================================================================
@@ -96,7 +96,7 @@
   BF.pop = function (g, x, y, z, s) {
     const L = g._bfPops || (g._bfPops = Array.from({ length: BF.MAX_POPS }, () => ({ on: false, x: 0, y: 0, z: 0, s: 0, t: 0, sky: 15, blk: 0 })));
     let q = L[0]; for (const p of L) { if (!p.on) { q = p; break; } if (p.t < q.t) q = p; }
-    q.on = true; q.x = x; q.y = y; q.z = z; q.s = s; q.t = performance.now() / 1000;
+    q.on = true; q.x = x; q.y = y; q.z = z; q.s = s; q.t = +g.time || 0;   // (the play clock: a slow frame shows the pop's middle, not its end)
     let sky = 0, blk = 0;   // the light around it (the cell itself is solid now)
     const w = g.world;
     for (let f = 0; f < 6; f++) { const v = w.getLight(x + VR.DX[f], y + VR.DY[f], z + VR.DZ[f]); sky = Math.max(sky, v >>> 12); blk = Math.max(blk, (v >> 8) & 15, (v >> 4) & 15, v & 15); }
@@ -116,7 +116,7 @@
     if (g.gadgets && g.gadgets.wand && g.gadgets.wand.clip) this.drawStampGhost(g, F);
   };
   Ren.prototype.drawPops = function (g, F) {
-    const now = performance.now() / 1000, L = g._bfPops, gl = this.gl, p = this.P.decal, cam = this.cam;
+    const now = +g.time || 0, L = g._bfPops, gl = this.gl, p = this.P.decal, cam = this.cam;
     let n = 0, bx = 0, by = 0, bz = 0;
     for (const q of L) {
       if (!q.on) continue;
@@ -189,7 +189,7 @@
   if (Gad && VR.Stamp) {
     const ST = VR.Stamp;
     const sizeOf = (c) => ({ sx: c.sx, sy: c.sy, sz: c.sz });
-    const keysHint = (g) => g.ui && g.ui.hint(tx('g.stamp.keys', null, '📐 V stempelt · R dreht · T spiegelt · N nächster Bauplan · Z zurück', '📐 V stamps · R turns · T mirrors · N next blueprint · Z undo'), 4200);
+    const keysHint = (g) => g.ui && g.ui.hint(tx('g.stamp.keys', null, '📐 V stempelt · R dreht · L spiegelt · U nächster Bauplan · Z zurück', '📐 V stamps · R turns · L mirrors · U next blueprint · Z undo'), 4200);
     const oCopy = Gad.prototype.wandCopy;
     Gad.prototype.wandCopy = function () {
       const before = this.wand.clip;
@@ -197,7 +197,7 @@
       const c = this.wand.clip; if (!c || c === before) return;
       const ok = ST.save({ name: tx('g.stamp.name', sizeOf(c), 'Bauplan {sx} × {sy} × {sz}', 'Blueprint {sx} × {sy} × {sz}'), code: ST.encode(c), at: Date.now() });
       this.wand.libI = 0;
-      this.g.ui.hint(ok ? tx('g.stamp.saved', sizeOf(c), '📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, T spiegelt', '📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, T mirrors') : tx('g.stamp.full', null, '📐 Kopiert — der Browserspeicher ist voll, der Bauplan gilt nur bis zum Schließen', '📐 Copied — the browser storage is full, the blueprint lasts until you close'), 4200);
+      this.g.ui.hint(ok ? tx('g.stamp.saved', sizeOf(c), '📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, L spiegelt', '📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, L mirrors') : tx('g.stamp.full', null, '📐 Kopiert — der Browserspeicher ist voll, der Bauplan gilt nur bis zum Schließen', '📐 Copied — the browser storage is full, the blueprint lasts until you close'), 4200);
     };
     const oInput = Gad.prototype.wandInput;
     Gad.prototype.wandInput = function (input, p, lmb, rmb) {
@@ -208,8 +208,8 @@
         if (c) { W.clip = c; W.libI = 0; }
       }
       if (!(g.ui && g.ui.typing) && !lmb && !rmb) {
-        if (input.hit('KeyT') && W.clip) { W.clip = ST.transform(W.clip, 0, true); g.ui.hint(tx('g.stamp.mirrored', null, '📐 Gespiegelt', '📐 Mirrored'), 1200); }
-        else if (input.hit('KeyN')) {
+        if (input.hit('KeyL') && W.clip) { W.clip = ST.transform(W.clip, 0, true); g.ui.hint(tx('g.stamp.mirrored', null, '📐 Gespiegelt', '📐 Mirrored'), 1200); }
+        else if (input.hit('KeyU')) {
           const L = ST.lib();
           if (!L.length) g.ui.hint(tx('g.stamp.none', null, '📐 Noch kein Bauplan — zwei Ecken setzen (Klick links / rechts), dann C', '📐 No blueprint yet — set two corners (left / right click), then C'), 3000);
           else { W.libI = ((W.libI | 0) + 1) % L.length; const c = ST.decode(L[W.libI].code); if (c) { W.clip = c; g.ui.hint(tx('g.stamp.next', { i: W.libI + 1, n: L.length, name: L[W.libI].name }, '📐 Bauplan {i} / {n}: {name}', '📐 Blueprint {i} / {n}: {name}'), 2200); } }

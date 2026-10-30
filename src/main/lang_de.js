@@ -2927,12 +2927,12 @@
     'g.show.noTime': '🌅 Die Uhrzeit gehört hier der ganzen Runde',
     'g.show.orbit': '🔄 Rundflug — W / S näher · weiter · Leertaste / Umschalt Höhe · A / D Richtung · G goldene Stunde · O aus',
     'g.stamp.full': '📐 Kopiert — der Browserspeicher ist voll, der Bauplan gilt nur bis zum Schließen',
-    'g.stamp.keys': '📐 V stempelt · R dreht · T spiegelt · N nächster Bauplan · Z zurück',
+    'g.stamp.keys': '📐 V stempelt · R dreht · L spiegelt · U nächster Bauplan · Z zurück',
     'g.stamp.mirrored': '📐 Gespiegelt',
     'g.stamp.name': 'Bauplan {sx} × {sy} × {sz}',
     'g.stamp.next': '📐 Bauplan {i} / {n}: {name}',
     'g.stamp.none': '📐 Noch kein Bauplan — zwei Ecken setzen (Klick links / rechts), dann C',
-    'g.stamp.saved': '📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, T spiegelt',
+    'g.stamp.saved': '📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, L spiegelt',
     // ---- a-builder end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
