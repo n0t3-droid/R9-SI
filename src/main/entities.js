@@ -703,6 +703,7 @@
       const g = this.game, pl = g.player, gl = r.gl;
       if (g.cockpit && g.cockpit.active()) { g.cockpit.draw(r, E, cam); return; }
       if (pl.dead || g.ui.screen === 'inventory' || (g.gadgets && g.gadgets.riding)) return;
+      if (VR.First2 && VR.First2.cine(g)) return;   // (f-first2: no hand in a cinematic scene)
       const aspect = r.W / r.H;
       const proj = mat4.perspective(mat4.create(), 70 * Math.PI / 180, aspect, 0.02, 10);
       const vp = mat4.mul(mat4.create(), proj, r.view);
@@ -749,9 +750,11 @@
       const L = mat4.create(); L.set(inv);
       if (mesh.block) {
         // a block rests on top of the glove (smaller than before so the hand stays visible)
-        mat4.translate(L, L, fist[0] - 0.035, fist[1] + 0.115, fist[2] - 0.06);
-        mat4.rotY(L, L, 0.78 - sw * 0.35); mat4.rotX(L, L, -0.18 - sw * 0.5);
-        mat4.scale(L, L, 0.235, 0.235, 0.235);
+        // (f-first2, R54-01: VR.First2.HAND — smaller and lower, ≤ 3 % of the frame; test/first2.js)
+        const HB = (VR.First2 && VR.First2.HAND) || { off: [-0.035, 0.115, -0.06], ry: 0.78, rx: -0.18, s: 0.235 };
+        mat4.translate(L, L, fist[0] + HB.off[0], fist[1] + HB.off[1], fist[2] + HB.off[2]);
+        mat4.rotY(L, L, HB.ry - sw * 0.35); mat4.rotX(L, L, HB.rx - sw * 0.5);
+        mat4.scale(L, L, HB.s, HB.s, HB.s);
       } else {
         mat4.translate(L, L, fist[0] - 0.03, fist[1] + 0.1, fist[2] - 0.02);
         mat4.rotY(L, L, -1.35); mat4.rotZ(L, L, def && def.tool ? 0.62 : 0.25); mat4.rotX(L, L, -sw * 1.1);

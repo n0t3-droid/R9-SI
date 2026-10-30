@@ -179,7 +179,9 @@
         const s = this.time * 0.31 + f.ph;
         f.x += (Math.sin(s) * 0.35 + f.wx) * dt; f.z += (Math.cos(s * 1.1) * 0.35 + f.wz) * dt; f.y += Math.sin(this.time * 0.7 + f.ph) * 0.12 * dt;
         const b = Math.pow(Math.max(0, Math.sin(this.time * f.fr + f.ph)), 5);   // a glow that swells and dies away
-        if (b > 0.04) { this.drawn.firefly++; spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.10 + 0.05 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
+        const nx = f.x - eye[0], ny = f.y - eye[1], nz = f.z - eye[2];
+        if (b > 0.04 && nx * nx + ny * ny + nz * nz > 9) { this.drawn.firefly++;   // (f-first2: never a glow ball in the face — none within 3 m of the eye)
+          spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.10 + 0.05 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
       }
 
       // ---- butterflies over the flowers by day (agents: they wander around a flower); t-wild's swarm takes over from them

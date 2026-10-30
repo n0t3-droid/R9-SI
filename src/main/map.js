@@ -62,7 +62,7 @@
       // progressive refresh: 16 rows per frame
       if (this.row >= MS) { this.row = 0; this.pending = [Math.floor(p.pos[0]) - MS / 2, Math.floor(p.pos[2]) - MS / 2]; }
       const [x0, z0] = this.pending, d = this.img.data, col = [0, 0, 0, 0], nb = [0, 0, 0, 0];
-      for (let k = 0; k < 16 && this.row < MS; k++, this.row++) {
+      for (let k = 0, kn = this.snap ? 16 : MS; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
         const z = z0 + this.row;
         for (let i = 0; i < MS; i++) {
           const x = x0 + i, o = (this.row * MS + i) * 4;
