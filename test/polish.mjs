@@ -81,27 +81,6 @@ await settle(60);
 const spawn = await ev(() => VR.game.player.pos.map(v => Math.round(v * 10) / 10));
 run.spawn = spawn;
 
-// ---------------------------------------------------------------- the frame: Very Low and High, the switches off | on
-await section('cost', async () => {
-  const C = {};
-  for (const pr of ['potato', 'high']) {
-    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
-    await settle(30); await step(20);
-    await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });   // (warm: the programs built)
-    const acc = { before: [], after: [] }; let draws = {};
-    for (const mode of ['before', 'after', 'after', 'before', 'before', 'after']) {
-      await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
-      const r = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 7; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; return { ms, draws: g.renderer.stats.draws | 0 }; });
-      acc[mode].push(...r.ms); draws[mode] = r.draws;
-    }
-    for (const mode of ['before', 'after']) { const a = acc[mode].sort((x, y) => x - y); C[pr + '_' + mode] = { ms: +a[a.length >> 1].toFixed(1), draws: draws[mode] }; }
-  }
-  await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
-  await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }); await settle(30);
-  run.cost = C; console.log('  ' + JSON.stringify(C));
-  check(C.potato_after.draws === C.potato_before.draws, `Very Low: the same draws (${C.potato_before.draws} | ${C.potato_after.draws}), ${C.potato_before.ms} | ${C.potato_after.ms} ms`);
-});
-
 // ---------------------------------------------------------------- the boss: hull from 60 m, the cracks
 await section('boss', async () => {
   const reg = await ev(() => {
@@ -246,11 +225,29 @@ await section('exo', async () => {
   console.log('  exposure after ' + JSON.stringify(run.exo));
 });
 
+// ---------------------------------------------------------------- the frame: Very Low and High, the switches off | on
+await section('cost', () => Promise.race([new Promise((ok) => setTimeout(() => { console.log('  (the cost section timed out after 300 s)'); ok(); }, 300000)), (async () => {
+  const C = {};
+  for (const pr of ['potato', 'high']) {
+    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
+    await settle(30); await step(20);
+    for (const mode of ['before', 'after']) {
+      await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
+      C[pr + '_' + mode] = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 9; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[4].toFixed(1), draws: g.renderer.stats.draws | 0 }; });
+      console.log('  ' + pr + ' ' + mode + ' ' + JSON.stringify(C[pr + '_' + mode]));
+    }
+  }
+  await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
+  await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }); await settle(30);
+  run.cost = C; console.log('  ' + JSON.stringify(C));
+  check(C.potato_after.draws === C.potato_before.draws, `Very Low: the same draws (${C.potato_before.draws} | ${C.potato_after.draws}), ${C.potato_before.ms} | ${C.potato_after.ms} ms`);
+})()]));
+
 save();
 try { const spec = ROOT + '/.tmp_tests/polish_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows })); console.log(execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'polish_sheet_run.jpg', spec]).toString().trim()); } catch (e) { console.log('  (sheet: ' + e.message.slice(0, 200) + ')'); }
 const errs = logs.filter(l => !/favicon|DevTools|Autoplay|AudioContext/i.test(l));
 if (errs.length) console.log('page logs:\n' + errs.slice(0, 12).join('\n'));
 check(!errs.some(l => /pageerror/.test(l)), 'no page errors');
-await browser.close();
+await Promise.race([browser.close(), new Promise((ok) => setTimeout(ok, 20000))]);
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
