@@ -2872,5 +2872,24 @@
     'g.pause.less': "‹ Back",
     'story.offer.card': "I'm picking up a signal …",
     // ---- f-first end
+    // ---- u-fields
+    'g.fields.codex': 'Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction).',
+    'g.fields.boots.on': 'Anchor boots on: 0.35 m/s² pull you to the ground (a jump carries you 39 m high)',
+    'g.fields.boots.off': 'Anchor boots off: almost nothing pulls here — a jump carries you away!',
+    'g.fields.drift': 'You are drifting away! B turns the anchor boots back on.',
+    'g.fields.tow': 'Funke tows you back to the rock.',
+    'g.fields.hello': 'Welcome to {name}: {d} m of rubble, hardly any gravity. The anchor boots hold you — B switches them.',
+    'g.fields.hello.m': 'Welcome to the Gap Moon: 300 m of ice in the ring\'s gap. B switches the anchor boots.',
+    'g.fields.ring': 'In the ring: ice chunks of 0.3 to 4 m, the sheet only 10 m thick (τ {tau})',
+    'g.fields.pull': 'Too low! The hull glows — the autopilot pulls up.',
+    'g.space.place.ring': 'inside the ring',
+    'g.space.place.cassini': 'over the Cassini Division',
+    'g.space.place.ringschatten': 'Amaranth with the ring\'s shadow',
+    'g.space.place.wolken': 'flying over Amaranth\'s clouds',
+    'g.space.place.schwarm': 'in the Rubble Swarm',
+    'g.set.fields': 'Ring chunks & cloud decks',
+    'g.set.fields.tip': 'The ice chunks in the ring, the cloud decks over Amaranth and the rocks of the swarm. Off: the ring as a sheet only.',
+    'g.codex.fields': ['The Rubble Swarm', 'Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction). On the small rocks almost nothing pulls: the anchor boots pull with 0.35 m/s², a jump carries you 39 m high and lasts 17 seconds. Without them a hop is enough to drift away.', 'Land on a rock and jump.'],
+    // ---- u-fields end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

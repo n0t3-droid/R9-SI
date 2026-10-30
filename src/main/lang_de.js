@@ -2872,5 +2872,24 @@
     'g.pause.less': "‹ Zurück",
     'story.offer.card': "Ich empfange ein Signal …",
     // ---- f-first end
+    // ---- u-fields
+    'g.fields.codex': 'Echte Gürtel sind leer — dieser Schwarm ist 100.000-mal dichter, eine frisch zerbrochene Familie (Fiktion).',
+    'g.fields.boots.on': 'Ankerstiefel an: 0,35 m/s² ziehen dich zum Boden (ein Sprung trägt dich 39 m hoch)',
+    'g.fields.boots.off': 'Ankerstiefel aus: hier zieht fast nichts — ein Sprung trägt dich davon!',
+    'g.fields.drift': 'Du treibst davon! B schaltet die Ankerstiefel wieder an.',
+    'g.fields.tow': 'Funke holt dich zurück auf den Brocken.',
+    'g.fields.hello': 'Willkommen auf {name}: {d} m Schutt, kaum Schwerkraft. Die Ankerstiefel halten dich — B schaltet sie.',
+    'g.fields.hello.m': 'Willkommen auf dem Spaltmond: 300 m Eis in der Lücke des Rings. B schaltet die Ankerstiefel.',
+    'g.fields.ring': 'Im Ring: Eisbrocken von 0,3 bis 4 m, die Schicht nur 10 m dick (τ {tau})',
+    'g.fields.pull': 'Zu tief! Die Hülle glüht — der Autopilot zieht hoch.',
+    'g.space.place.ring': 'mitten im Ring',
+    'g.space.place.cassini': 'über der Cassini-Teilung',
+    'g.space.place.ringschatten': 'Amarant mit dem Schatten des Rings',
+    'g.space.place.wolken': 'Flug über Amarants Wolken',
+    'g.space.place.schwarm': 'im Trümmerschwarm',
+    'g.set.fields': 'Ringbrocken & Wolkendecken',
+    'g.set.fields.tip': 'Die Eisbrocken im Ring, die Wolkendecken über Amarant und die Brocken des Schwarms. Aus: nur der Ring als Fläche.',
+    'g.codex.fields': ['Der Trümmerschwarm', 'Echte Gürtel sind leer — dieser Schwarm ist 100.000-mal dichter, eine frisch zerbrochene Familie (Fiktion). Auf den kleinen Brocken zieht fast nichts: Die Ankerstiefel ziehen mit 0,35 m/s², ein Sprung trägt dich 39 m hoch und dauert 17 Sekunden. Ohne sie reicht ein Hüpfer, um davonzutreiben.', 'Lande auf einem Brocken und spring.'],
+    // ---- u-fields end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
