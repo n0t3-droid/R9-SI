@@ -1258,7 +1258,6 @@
       if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.prewarm) this.prewarm.start(); if (this.iconWarm) this.iconWarm.start(); } }); }
     }
     playFrame(dt) {
-      if (VR.Folk && VR.Folk.warm && !VR.Folk.warmed()) VR.Folk.warm(1.5);   // (e-engine: the rest of the villagers' path tables, a slice a frame)
       const g = this, p = this.player, w = this.world, input = this.input;
       this.time += dt;
       if (VR.LiveLoop) VR.LiveLoop.tick(this);   // a look changed: the sections that show it are meshed again, a few a frame

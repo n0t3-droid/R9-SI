@@ -331,8 +331,9 @@
   const T = () => R.T;
   let passC = null, standC = null, cachedN = 0;
   // e-engine: the tables of every block state (30 000: a collision shape each) took 0.25–3 s at the first path of a
-  // session — a frame of play. They are built a slice at a time while the world loads (V.warm, game.loadingFrame) and in
-  // play until done; a path asked for before that finishes them at once, as before
+  // session — a frame of play. They are built a slice at a time while the world loads (V.warm, game.loadingFrame); a path
+  // asked for before they are done finishes them at once, as before (not in play: a state may build a model, 40–90 ms —
+  // the engine bench's Balanced flight counted more hitches with slices in play)
   function caches(budgetMs) {
     if (passC && cachedN >= passC.length) return true;
     const n = passC ? passC.length : R.T.type.length;
