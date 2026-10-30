@@ -548,8 +548,8 @@
     // ---------------- e-music · the adaptive score: the director looks four times a second (score.js), the cue's notes are
     // scheduled half a second ahead on the audio clock (scoresynth.js), within the voice cap; per frame only a compare
     musCap() { return this.lowEnd ? 10 : 28; }
-    musVoices() {
-      const now = this.ctx ? this.ctx.currentTime : 0, E = this.mvEnd, N = this.mvN; let k = 0, sum = 0;
+    musVoices(at) {
+      const now = at !== undefined ? at : this.ctx ? this.ctx.currentTime : 0, E = this.mvEnd, N = this.mvN; let k = 0, sum = 0;
       for (let i = 0; i < E.length; i++) if (E[i] > now) { E[k] = E[i]; N[k] = N[i]; sum += N[i]; k++; }
       E.length = k; N.length = k; return sum;
     }
@@ -575,20 +575,23 @@
         if (x.festival && now + 0.2 >= M.next) this.festivalBar(now);
       }
       const r = this.run; if (!r) return;
-      // the notes due in the next half second (usually none: one compare)
-      const evs = r.evs, cap = this.musCap(), SY = VR.ScoreSynth;
-      while (r.i < evs.length && r.t0 + evs[r.i].t < now + 0.5) {
+      this.pump(r, now, now + 0.5);   // the notes due in the next half second (usually none: one compare)
+      // a village: the soft tick on the beat while a calm cue plays
+      if (M.village && r.id !== 'adventure' && now < r.stopAt && now >= r.t0 && now + 0.1 >= this.tickNext) { const tt = Math.max(now + 0.05, this.tickNext); this.tick(tt, 0.03); this.count('tick'); this.tickNext = tt + 0.56; }
+      if (r.i >= r.evs.length && now > r.stopAt + 2) this.run = null;
+    }
+    // schedules the run's notes that start before `until` (Infinity: the whole cue at once — test/music.mjs's offline render)
+    pump(r, now, until) {
+      const evs = r.evs, cap = this.musCap(), SY = VR.ScoreSynth, c = this.ctx;
+      while (r.i < evs.length && r.t0 + evs[r.i].t < until) {
         const e = evs[r.i++], t = Math.max(now + 0.01, r.t0 + e.t);
         if (t >= r.stopAt) { r.i = evs.length; break; }
-        const v = SY.voicesOf(e.inst, this.lowEnd), live = this.musVoices();
+        const v = SY.voicesOf(e.inst, this.lowEnd), live = this.musVoices(t);
         if (live + v > cap || (e.pri < 2 && live + v > cap * 0.75)) continue;   // full: the ornaments go first
         if (e.midi) { const i = this.noteCount & 511; this.noteLog[i] = e.midi; this.noteCount++; }
         const out = SY.note(c, r.bus, e, t, { lowEnd: this.lowEnd, rev: this.lowEnd ? null : this.musRev });
         this.mvEnd.push(out.end); this.mvN.push(v);
       }
-      // a village: the soft tick on the beat while a calm cue plays
-      if (M.village && r.id !== 'adventure' && now < r.stopAt && now >= r.t0 && now + 0.1 >= this.tickNext) { const tt = Math.max(now + 0.05, this.tickNext); this.tick(tt, 0.03); this.count('tick'); this.tickNext = tt + 0.56; }
-      if (r.i >= evs.length && now > r.stopAt + 2) this.run = null;
     }
     startCue(a) {
       const c = this.ctx, SC = VR.Score, D = this.score;
