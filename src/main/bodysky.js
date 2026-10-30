@@ -35,7 +35,7 @@
     // Aquamarin with air (airK: the LUT's radiance → the scene's, the eye's exposure per world: Ocker's dusty sky is ~4×
     // as bright as a clear one), shape: the plumes' (1 umbrellas, 2 dust devils); u-moons3: Zinnober's sulfur brighter and
     // less muddy (the bounce less yellow, the day's eye a little more open)
-    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.93, 0.72], bounce: 0.34, floor: 0.06, expoDay: 0.7, expoNight: 1.1, plume: 1, shape: 1 },
+    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.93, 0.72], bounce: 0.34, floor: 0.06, expoDay: 0.7, expoNight: 1.1, plume: 1, shape: 1, farHue: [1.0, 0.8, 0.45] },
     ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 8, ambK: 1.8 },
     aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2 },
   };
@@ -99,7 +99,7 @@
     // (u-moons2: the air's light from the three stops — the sky's irradiance π·L̄ — over the ground's bounce)
     const skyL = air ? air.stops.zen.map((z, i) => (0.45 * z + 0.4 * air.stops.hor[i] + 0.15 * air.stops.band[i]) * SUN[i] * Math.PI * K.ambK * free) : [0, 0, 0];
     const amb = sunLight.map((v, i) => (v * alb * K.bounce + parLight[i] * 0.35 + K.floor * 0.02 + STAR + skyL[i]) * K.tint[i]);
-    const far = air ? air.stops.hor.map((h, i) => h * SUN[i] * K.airK * free + alb * parLight[i] * 0.3) : sunLight.map((v, i) => alb * (v * (0.18 + 0.6 * sinEl) + parLight[i] * 0.6 + amb[i]) * K.tint[i]);
+    const far = air ? air.stops.hor.map((h, i) => h * SUN[i] * K.airK * free + alb * parLight[i] * 0.3) : sunLight.map((v, i) => alb * (v * (0.18 + 0.6 * sinEl) + parLight[i] * 0.6 + amb[i]) * K.tint[i] * (K.farHue ? K.farHue[i] : 1));   // (u-moons3: Zinnober's far plains their sulfur's orange-yellow, not beige)
     const night = 1 - ss(0, 1, lightK);
     // the terrain's direct light: the shader fades the sun over ±7° (its sunUp, made for an air) — here the light is the
     // disc's own part, so the colour is divided by that fade (it is ≥ 0.4 wherever the disc still shows); at night the

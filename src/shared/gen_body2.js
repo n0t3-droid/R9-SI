@@ -147,8 +147,8 @@
       this.glut = { x: L.x, z: L.z, R: L.D / 2, depth: L.depth, lake: true, h: 0x61a7, rot: 0.6, flows: [] };
       this.glut.flows = this.flowsOf(this.glut, 0x5eed);
       this.look = this.glut;
-      // u-moons3 (bgen 2): the landing on the Glutsee's lip on the side of the old landing, the eye lowered a little (the lava below, the steady plume over the far shore)
-      { const G = this.glut, dl = Math.hypot(P.spawn.x - G.x, P.spawn.z - G.z) || 1; this.land = { x: G.x + (P.spawn.x - G.x) / dl * G.R * 1.1, z: G.z + (P.spawn.z - G.z) / dl * G.R * 1.1, look: G, pitch: -0.12 }; }
+      // u-moons3 (bgen 2): the landing on the Glutsee's lip on the side of the old landing, at the wall's edge, the eye lowered (the whole lake below, the steady plume over the far shore)
+      { const G = this.glut, dl = Math.hypot(P.spawn.x - G.x, P.spawn.z - G.z) || 1; this.land = { x: G.x + (P.spawn.x - G.x) / dl * (G.R + 2), z: G.z + (P.spawn.z - G.z) / dl * (G.R + 2), look: G, pitch: -0.2 }; }
       // the six active vents (the plumes, bodylife2.js): one 2.2 km north-east in sight of the landing, the rest 1.5–6 km
       const V = [], rng = new VR.RNG(s ^ 0x7e47);
       // (u-moons3, bgen 2: the vents 7–16 km off — a plume is seen from the side, a fountain with its umbrella, not from
