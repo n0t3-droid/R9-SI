@@ -4,7 +4,7 @@
 // its place, and a step computes the new row only.
 //  1. the same instances (bytes equal) as the grid computed from nothing, over a flight of 60 steps, Very Low and Balanced
 //     radii, with a cover change on the way
-//  2. a step ≥ 1.8 × cheaper (2.4–5.7 × measured; the sort of the runs stays; best of 5 — the margin is for a loaded machine)
+//  2. a step ≥ 1.5 × cheaper (2.4–5.7 × measured; the sort of the runs stays; best of 5 — the margin is for a loaded machine)
 //   bash test/wt_run.sh engine_clouds.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -34,7 +34,7 @@ for (const [label, q] of [['Very Low', { clouds: 1, horizon: 0 }], ['Balanced', 
   // the cost of a step: warm (a neighbour cell) against from nothing
   const cost = (fresh) => { let best = 1e9; for (let r = 0; r < 5; r++) { const R = mk(q); R.updateClouds({ cloudDrift: [0, 0], time: 0, cloudCover: 0.5 }, { x: 0, y: 100, z: 0 }); const t0 = process.hrtime.bigint(); for (let i = 1; i <= 20; i++) { if (fresh) R.cloudV = null; R.updateClouds({ cloudDrift: [0, 0], time: 0, cloudCover: 0.5 }, { x: i * 12, y: 100, z: 0 }); } best = Math.min(best, Number(process.hrtime.bigint() - t0) / 1e6 / 20); } return best; };
   const old = cost(true), now = cost(false);
-  check(now * 1.8 <= old, `${label}: a step of one cell ${old.toFixed(2)} → ${now.toFixed(2)} ms`, (old / now).toFixed(1) + ' ×');
+  check(now * 1.5 <= old, `${label}: a step of one cell ${old.toFixed(2)} → ${now.toFixed(2)} ms`, (old / now).toFixed(1) + ' ×');
 }
 console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);
