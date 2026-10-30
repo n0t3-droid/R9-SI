@@ -189,7 +189,7 @@ async function runPreset(preset) {
     if (want('clouds')) {
       await shotRaum(P, R, 'cloudtops', 'wolken', null, (S) => S.decks === 2);
       // the night side: the flyover a quarter turn on (the lightning)
-      await shotRaum(P, R, 'cloudtops_night', 'wolken', { wolkenDL: Math.PI * 0.62 }, null);
+      await shotRaum(P, R, 'cloudtops_night', 'wolken', { wolkenDL: -1.05 }, null);
       await P.ev(() => { VR.Fields.wolkenDL = 0; });
     }
     if (want('swarm')) await shotRaum(P, R, 'swarm', 'schwarm', null, (S) => S.rocks === 60);
@@ -225,8 +225,8 @@ async function runPreset(preset) {
       // rubble_mine: blocks broken by hand in front of the player (the existing breaking: drops and dust)
       const mine = await P.ev(([x, y, z, yaw]) => {
         const g = VR.game, p = g.player, w = g.world, fx = -Math.sin(yaw), fz = -Math.cos(yaw), got = {};
-        p.flying = true; p.noclip = true; p.teleport(x + Math.sin(yaw) * 3, y + 2.6, z + Math.cos(yaw) * 3); p.yaw = p.viewYaw = yaw; p.pitch = -0.62;
-        for (let d = 2; d <= 5; d++) for (let s = -1; s <= 1; s++) for (let dy = 0; dy <= 2; dy++) {
+        p.flying = true; p.noclip = true; p.teleport(x + Math.sin(yaw) * 2, y + 5, z + Math.cos(yaw) * 2); p.yaw = p.viewYaw = yaw; p.pitch = -0.95;
+        for (let d = 2; d <= 6; d++) for (let s = -2; s <= 2; s++) for (let dy = 0; dy <= 2; dy++) {
           const bx = Math.floor(x + fx * d - fz * s), bz = Math.floor(z + fz * d + fx * s), by = Math.floor(y) - 1 - dy, st = w.getBlock(bx, by, bz);
           if (!st) continue; const nm = VR.R.types[VR.R.T.type[st]].name; got[nm] = (got[nm] || 0) + 1; p.breakBlock(bx, by, bz, st, false, true);
         }

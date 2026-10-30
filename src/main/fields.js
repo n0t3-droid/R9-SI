@@ -154,7 +154,7 @@ void main() {
   float dl = max(dot(N, L), 0.0);
   float sp = pow(max(dot(reflect(-V, N), L), 0.0), 24.0) * 0.35;
   vec3 col = alb * u_sunCol * (dl * v_sunT + 0.03) + u_sunCol * sp * v_sunT + alb * u_plCol * max(dot(N, u_plDir) * 0.7 + 0.3, 0.0);
-  col += vec3(0.35, 0.6, 1.0) * v_glow * v_glow * 0.12;
+  col += vec3(0.35, 0.6, 1.0) * v_glow * v_glow * 0.03;
   o = vec4(col, 1.0);
 }`;
   const FULL_VS = `
@@ -319,7 +319,7 @@ void main() {
   o = vec4(col, 1.0);
 }`;
   // the swarm's bodies: an icosphere (level 2) bent into the body's shape (top, binary, potato), rough, near-black;
-  // drawn far → near (the CPU sorts 60 of them), back faces culled
+  // drawn far → near (the CPU sorts 60 of them), back faces culled; an icosphere of level 3 (1,280 faces)
   const ROCK_VS = `
 uniform mat4 u_viewProj;
 uniform vec3 u_camRel;           // the camera relative to the swarm's centre (m, scene axes)
@@ -341,7 +341,7 @@ void main() {
   else if (sh < 1.5) { p = vec3(u.x * 1.55, u.y * 0.85, u.z * 0.85); float neck = exp(-pow((u.x - 0.15) * 3.0, 2.0)); p.yz *= 1.0 - 0.38 * neck; p.x += u.x > 0.15 ? 0.1 : -0.05; p *= u.x > 0.15 ? 0.82 : 1.0; }
   else p = u * vec3(1.0, 0.62 + 0.25 * h.x, 0.72 + 0.2 * h.y);
   float sd = a_shape.y;
-  p *= 1.0 + 0.16 * (vn3(u * 2.2 + sd) - 0.5) + 0.07 * (vn3(u * 6.0 + sd * 1.7) - 0.5) + 0.03 * (vn3(u * 15.0 + sd) - 0.5);
+  p *= 1.0 + 0.12 * (vn3(u * 2.2 + sd) - 0.5) + 0.07 * (vn3(u * 6.0 + sd * 1.7) - 0.5) + 0.03 * (vn3(u * 15.0 + sd) - 0.5);
   vec3 ax = normalize(h * 2.0 - 1.0 + vec3(0.001));
   mat3 R = rotAxis(ax, u_time * a_shape.z + h.z * 6.283);
   vec3 P = (a_body.xyz - u_camRel + R * p * a_body.w * 0.5) * u_k;
@@ -512,7 +512,7 @@ void main() {
     const t = (1 + Math.sqrt(5)) / 2;
     let V = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map(norm);
     let Fc = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-    for (let l = 0; l < 2; l++) {
+    for (let l = 0; l < 3; l++) {
       const mid = {}, F2 = [];
       const m = (a, b) => { const key = a < b ? a + '_' + b : b + '_' + a; if (mid[key] === undefined) { mid[key] = V.length; V.push(norm(add(V[a], V[b]))); } return mid[key]; };
       for (const [a, b, c] of Fc) { const ab = m(a, b), bc = m(b, c), ca = m(c, a); F2.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
@@ -575,7 +575,7 @@ void main() {
       const rho = 1.70 * RA, o = onRing(rho, sunTh + 1.55 - 0.4 * since / rho);
       const h = opt.h !== undefined ? opt.h : 7 - Math.min(14, since * 0.25);
       const pos = add(o.p, mul(n, h));
-      const toA = norm(sub(A.p, pos)), fwd = norm(add(add(mul(o.et, -0.3), mul(toA, 0.8)), mul(n, 0.3)));
+      const toA = norm(sub(A.p, pos)), fwd = norm(add(add(mul(o.et, -0.3), mul(toA, 0.8)), mul(n, h > 10 ? -0.55 : 0.3)));
       return { name, pos, fwd, up: perp(n, fwd), fov: 70 * D2R, nadir: null, body: null, ref: 'amarant' };
     }
     if (name === 'cassini') {
@@ -594,7 +594,7 @@ void main() {
     }
     if (name === 'wolken') {
       // 15 km over the cloud tops in the southern belt, flying east at 5.7 km/s with Helia low ahead: the ring overhead
-      const lat = -14 * D2R, Rp = BD.amarant.Rp, Rl = RA * Rp / Math.sqrt(Rp * Rp * Math.cos(lat) ** 2 + RA * RA * Math.sin(lat) ** 2);
+      const lat = (F.wolkenDL ? -14 : 14) * D2R, Rp = BD.amarant.Rp, Rl = RA * Rp / Math.sqrt(Rp * Rp * Math.cos(lat) ** 2 + RA * RA * Math.sin(lat) ** 2);
       const lon0 = (opt.lon0 !== undefined ? opt.lon0 : sunTh - 1.25 + (F.wolkenDL || 0)), lon = lon0 + F.FLY_V * since / (Rl * Math.cos(lat));
       const eq = add(mul(e1, Math.cos(lon)), mul(e2, Math.sin(lon))), up = norm(add(mul(eq, Math.cos(lat)), mul(n, Math.sin(lat))));
       const pos = add(A.p, mul(up, Rl + F.FLY_H)), east = norm(cross(n, up));

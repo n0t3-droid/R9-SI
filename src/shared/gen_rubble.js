@@ -162,7 +162,7 @@
       let top = this.shapeTop(x, z), bot = this.shapeBot(x, z), bb = null;
       for (const b of this.boulders) {
         const dx = x - b.x, dz = z - b.z, d2 = dx * dx + dz * dz; if (d2 >= b.r * b.r) continue;
-        const h = Math.sqrt(b.r * b.r - d2) * b.sq, t = b.y + h;
+        const h = Math.sqrt(b.r * b.r - d2) * b.sq * (0.82 + 0.36 * (0.5 + 0.5 * this.nMid.n2(x * 1.7 + b.m * 97, z * 1.7))), t = b.y + h;   // (lumpy: a boulder is no ball)
         if (t > top) { if (top < 0) bot = b.y - h; top = t; bb = b; }
       }
       o.topF = top; o.top = top < 0 ? -1 : Math.min(250, Math.floor(top)); o.bot = Math.max(2, Math.floor(bot)); o.b = bb;
