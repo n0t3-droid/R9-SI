@@ -618,4 +618,93 @@ void main() {
       return origStep.call(this, g, dt);
     };
   }
+
+  // ---------------------------------------------------------------- a rubble world: the boots, drifting, the tow back
+  F.isRock = (dim) => { const d = VR.DimReg && VR.DimReg.get(dim); return !!(d && d.rock); };
+  const RS = F.rock = { dim: null, boots: true, spawn: null, said: false, driftSaid: false, jumpTop: 0, jumpY0: null, lastJump: 0 };
+  F.setBoots = function (g, on) {
+    const p = g.player; RS.boots = !!on;
+    if (p) p.grav = on ? F.bootsGame() : VR.DimReg.gravity(g.dim) * F.offShare(g.dim);
+    if (g.ui && g.ui.hint) g.ui.hint(T(on ? 'g.fields.boots.on' : 'g.fields.boots.off'), 3200);
+    if (g.audio && g.audio.play) g.audio.play('click');
+  };
+  F.tick = function (g, dt) {
+    const p = g.player; if (!p || !p.pos) return;
+    if (!F.isRock(g.dim)) { RS.dim = null; return; }
+    if (RS.dim !== g.dim || RS.p !== p) {
+      RS.dim = g.dim; RS.p = p; RS.boots = true; RS.said = false; RS.driftSaid = false; RS.jumpTop = 0;
+      const gen = new VR.RubbleGen(0, g.dim); RS.spawn = gen.findSpawn(); RS.D = gen.D;
+      p.grav = F.bootsGame();
+    }
+    if (!RS.said && g.ui && g.ui.toast && g.world && g.world.cols && g.world.cols.size > 4) {
+      RS.said = true;
+      const nm = VR.Travel ? VR.Travel.dimName(g.dim) : g.dim;
+      g.ui.toast(T('g.moon.hello', { name: nm }), g.dim === 'rock.m' ? T('g.fields.hello.m') : T('g.fields.hello', { name: nm, d: Math.round(RS.D) }));
+      if (g.dim !== 'rock.m' && g.ui.chatLine) g.ui.chatLine(T('g.fields.codex'), '#cfe6ff');
+    }
+    const i = g.input, ui = g.ui;
+    if (i && ui && !ui.typing && !ui.screen && i.hit && i.hit('KeyB')) F.setBoots(g, !RS.boots);
+    // the jump's top (the test reads it: 39 ± 2 m with the boots)
+    if (p.onGround) { RS.jumpY0 = p.pos[1]; RS.cur = 0; }
+    else if (RS.jumpY0 !== null) { RS.cur = Math.max(RS.cur || 0, p.pos[1] - RS.jumpY0); RS.jumpTop = Math.max(RS.jumpTop, RS.cur); }
+    // drifting off: a word when the player floats away, Funke's tow from 400 m (or below the body)
+    const sp = RS.spawn, away = sp ? Math.hypot(p.pos[0] - sp[0], p.pos[1] - sp[1], p.pos[2] - sp[2]) : 0;
+    if (!RS.boots && !p.onGround && away > 60 && !RS.driftSaid) { RS.driftSaid = true; if (ui && ui.hint) ui.hint(T('g.fields.drift'), 4200); }
+    if (sp && (away > 400 || p.pos[1] < -24)) {
+      p.teleport(sp[0], sp[1] + 1, sp[2]); RS.driftSaid = false;
+      if (!RS.boots) F.setBoots(g, true);
+      if (ui && ui.hint) ui.hint(T('g.fields.tow'), 3600);
+    }
+  };
+  const origPlay = G.prototype.playFrame;
+  G.prototype.playFrame = function (dt) { if (this.dim && this.dim.charCodeAt(0) === 114 && !this.space) F.tick(this, dt); return origPlay.call(this, dt); };   // ('r': only the rock dims pay)
+  // the light of a rubble world (bodysky.js has no body for it): an airless body's sky made for Basalt (or Opal for the
+  // ring's moonlet, Amarant overhead), then Helia turned by the body's own spin, the other worlds put away, black all round
+  const BSm = VR.BodySky;
+  if (BSm && BSm.env) {
+    const origEnv = BSm.env, oo = {};
+    BSm.env = function (E, env, o, dt) {
+      const d = VR.DimReg.get(o && o.dim);
+      if (!d || !d.rock) return origEnv.call(this, E, env, o, dt);
+      for (const k in oo) delete oo[k];
+      Object.assign(oo, o); oo.dim = d.ring ? 'opal' : 'basalt';
+      const r = origEnv.call(this, E, env, oo, dt);
+      F.rockSky(E, env, d);
+      return r;
+    };
+  }
+  F.rockSky = function (E, env, d) {
+    const U = VR.Universe, t = U ? U.worldSeconds(env.day | 0, env.ticks) : 0, b = VR.Rubble.bodyOf(d.id) || { spinH: 6, seed: 1 };
+    const P = Math.max(600, b.spinH * 3600 / 8), H = TAU * t / P + (b.seed % 628) / 100;
+    const sd = norm([Math.cos(H), 0.28 + 0.85 * Math.sin(H), 0.4]);
+    if (F.sunFix) { sd[0] = F.sunFix[0]; sd[1] = F.sunFix[1]; sd[2] = F.sunFix[2]; }
+    const SUN = VR.SpaceScene ? VR.SpaceScene.SUN : [0.95, 0.96, 1];
+    const lightK = sstep(-0.03, 0.03, sd[1]), up = sstep(-0.12, 0.12, sd[1]), k = (d.ring ? 1 : 0.78) * lightK / Math.max(up, 0.05);
+    if (!d.ring) {
+      E.sunDir = lightK > 0.002 ? sd : [0, -1, 0]; E.sunColor = SUN.map(v => v * k);
+      E.night = 1 - lightK;
+      E.ambSky = SUN.map(v => v * (lightK * 0.012 + 0.0035));
+      E.moonColor = [0, 0, 0];
+    }
+    E.zenith = [0, 0, 0]; E.horizon = [0, 0, 0]; E.skyMid = [0, 0, 0]; E.fogColor = [0, 0, 0];
+    const S = E.bodySky;
+    if (S) {
+      if (!d.ring) { S.sun = [sd[0], sd[1], sd[2], S.sun[3] * 0.56]; S.par = [S.par[0], S.par[1], S.par[2], 1e9]; if (S.B) S.B.fill(0); }
+      S.ground = [0, 0, 0, 1];
+    }
+  };
+  // /dim brocken 1 … 60 · /dim spaltmond · /dim rock.12 — the small bodies (not in /dim's list: 61 of them)
+  if (VR.Travel && VR.Travel.command) {
+    const origCmd = VR.Travel.command;
+    VR.Travel.command = function (g, a) {
+      const w = String((a || []).join(' ')).trim().toLowerCase();
+      let id = null;
+      const m = /^(?:brocken|rock|ts-?)\s*0*(\d+)$/.exec(w);
+      if (m && +m[1] >= 1 && +m[1] <= 60) id = 'rock.' + (+m[1] - 1);
+      else if (/^rock\.(\d+|m)$/.test(w) && VR.DimReg.has(w)) id = w;
+      else if (w === 'spaltmond' || w === 'gap moon' || w === 'gapmoon') id = 'rock.m';
+      if (id) { VR.Travel.go(g, { dim: id, via: 'cmd' }); return true; }
+      return origCmd.apply(this, arguments);
+    };
+  }
 })(VR);
