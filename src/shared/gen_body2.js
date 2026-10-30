@@ -147,8 +147,8 @@
       this.glut = { x: L.x, z: L.z, R: L.D / 2, depth: L.depth, lake: true, h: 0x61a7, rot: 0.6, flows: [] };
       this.glut.flows = this.flowsOf(this.glut, 0x5eed);
       this.look = this.glut;
-      // u-moons3 (bgen 2): the landing on the Glutsee's lip on the side of the old landing, the eye lowered to the lava
-      { const G = this.glut, dl = Math.hypot(P.spawn.x - G.x, P.spawn.z - G.z) || 1; this.land = { x: G.x + (P.spawn.x - G.x) / dl * G.R * 1.1, z: G.z + (P.spawn.z - G.z) / dl * G.R * 1.1, look: G, pitch: -0.3 }; }
+      // u-moons3 (bgen 2): the landing on the Glutsee's lip on the side of the old landing, the eye lowered a little (the lava below, the steady plume over the far shore)
+      { const G = this.glut, dl = Math.hypot(P.spawn.x - G.x, P.spawn.z - G.z) || 1; this.land = { x: G.x + (P.spawn.x - G.x) / dl * G.R * 1.1, z: G.z + (P.spawn.z - G.z) / dl * G.R * 1.1, look: G, pitch: -0.12 }; }
       // the six active vents (the plumes, bodylife2.js): one 2.2 km north-east in sight of the landing, the rest 1.5–6 km
       const V = [], rng = new VR.RNG(s ^ 0x7e47);
       // (u-moons3, bgen 2: the vents 7–16 km off — a plume is seen from the side, a fountain with its umbrella, not from
@@ -156,7 +156,7 @@
       const far2 = this.bgen >= 2;
       V.push(far2 ? { x: 3200, z: -11400 } : { x: 1500, z: -1700 });
       for (let k = 1; k < P.plume.n; k++) { const a = rng.next() * TAU, r = far2 ? 7000 + 9000 * rng.next() : 1500 + 4500 * rng.next(); V.push({ x: Math.round(Math.cos(a) * r), z: Math.round(Math.sin(a) * r) }); }
-      this.ventList = V.map((v, k) => ({ x: v.x + 0.5, z: v.z + 0.5, y: 0, k, id: k, seed: M.hash2(k, 31, s + 91), ring: 300 + 120 * M.hashf2(k, 3, s) }));
+      this.ventList = V.map((v, k) => ({ x: v.x + 0.5, z: v.z + 0.5, y: 0, k, id: k, seed: M.hash2(k, 31, s + 91), ring: 300 + 120 * M.hashf2(k, 3, s), steady: far2 && k === 0 }));
       // a mountain block in sight of the landing (west-north-west) — Io's are tilted crustal blocks, not volcanoes
       this.landMtn = { x: -1500, z: -900, r: 640, h: 205, ph1: 0.7, ph2: 2.1, tx: 0.8, tz: -0.6 };
       for (const v of this.ventList) v.y = Math.floor(this.heightAt(Math.floor(v.x), Math.floor(v.z)));
@@ -267,24 +267,25 @@
     // varied — white SO₂ frost, yellow sulfur, the yellow-green of fresh sulfur, orange, red, and dark silicate spots
     // (Io's plains: the frost bright, the sulfur in every shade from its quench, the dark spots warm lava under crust)
     plainsBlock(x, z, o, hp) {
-      const T = S(), v = this.nCol.n2(x, z) + 0.12 * this.nCol2.n2(x, z) + (hp - 0.5) * 0.05;
+      const T = S(), OR = T.redSand, v = this.nCol.n2(x, z) + 0.12 * this.nCol2.n2(x, z) + (hp - 0.5) * 0.05;
       if (this.bgen < 2) return v > 0.3 ? T.frost : v > -0.08 ? T.sulfur : v > -0.22 ? T.orange : T.sulfurRed;
       const w = this.nCol2.n2(z * 1.7 + 311, x * 1.7) + (hp - 0.5) * 0.1;   // (a second field across the first: patches inside the zones)
       if (v > 0.26) return w > 0.35 ? T.sulfur : T.frost;
       if (v > 0.02) return w > 0.3 ? T.frost : w < -0.32 ? T.fuming : T.sulfur;
-      if (v > -0.16) return w > 0.25 ? T.sulfur : w < -0.38 ? T.sulfurRed : T.orange;
-      return w > 0.4 ? T.basalt : w > 0.1 ? T.orange : T.sulfurRed;
+      if (v > -0.16) return w > 0.25 ? T.sulfur : w < -0.38 ? T.sulfurRed : OR;
+      return w > 0.4 ? T.basalt : w > 0.1 ? OR : T.sulfurRed;
     }
     fill(blocks, col, top, o, slope, hp, x, z, T) {
       let surf, sub = T.tuff, deep = T.basalt, n = 3;
+      const OR = this.bgen >= 2 ? T.redSand : T.orange;   // (u-moons3: bgen 2's orange a natural sand, not the tiles of orange terracotta)
       if (o.lava) surf = o.crust ? (hp < 0.6 ? T.obsidian : T.basalt) : T.lava;
       else if (o.vent === 2) surf = T.obsidian;
       else if (o.vent) surf = hp < 0.5 ? T.basalt : T.fuming;
       else if (o.floor) surf = hp < 0.55 ? T.obsidian : (hp < 0.8 ? T.basalt : T.sulfurRed);
-      else if (o.wall) surf = slope > 0.9 ? T.basalt : (hp < 0.5 ? T.sulfurRed : T.orange);
+      else if (o.wall) surf = slope > 0.9 ? T.basalt : (hp < 0.5 ? T.sulfurRed : OR);
       else if (o.flow) surf = o.head && hp < 0.3 ? T.lava : (hp < 0.6 ? T.basalt : T.obsidian);
       else if (o.mtn) { surf = slope > 1.1 ? (hp < 0.5 ? T.basalt : T.tuff) : o.mtnTop ? (hp < 0.75 ? T.frost : T.sulfur) : T.sulfur; sub = T.tuff; }
-      else if (o.ring) surf = hp < 0.85 ? T.sulfurRed : T.orange;
+      else if (o.ring) surf = hp < 0.85 ? T.sulfurRed : OR;
       else if (o.frost) surf = hp < 0.8 ? T.frost : T.sulfur;
       else {
         surf = this.plainsBlock(x, z, o, hp);
@@ -452,7 +453,7 @@
         let b;
         if (d < dust || (d === 0 && surf)) b = d === 0 && surf ? surf : dB;
         else if (o.shield && y > 150) b = T.basalt;
-        else if (y < 22) b = T.basalt;   // (the canyon's floor rock; above it the layers)
+        else if (y < (this.bgen >= 2 ? 6 : 22)) b = T.basalt;   // (the canyon's floor rock; above it the layers — u-moons3, bgen 2: the talus at the wall's foot layered too, not dark basalt lumps)
         else {
           // the layers: red sandstone, terracotta, sandstone, ochre rock — bands of 3–7 m that wander slowly
           const v = (y + this.nStr.n2(x, z) * 6) / 5.3, band = ((Math.floor(v) % 4) + 4) % 4;
@@ -546,11 +547,12 @@
       const sea = this.sea;
       let surf, sub = T.sand, n = 3;
       if (o.stack) { surf = T.basalt; sub = T.basalt; }
-      else if (o.atoll) { surf = hp < 0.85 ? T.sand : T.gravel; }
+      else if (o.atoll) { surf = hp < (this.bgen >= 2 ? 0.97 : 0.85) ? T.sand : T.gravel; }   // (u-moons3: bgen 2's beaches clean sand)
       else if (o.lagoon) { surf = hp < 0.9 ? T.sand : T.clay; }
       else if (top < sea - 6) { surf = hp < 0.6 ? T.sand : hp < 0.85 ? T.gravel : T.clay; }
       else if (slope > 1.0) { surf = T.basalt; sub = T.basalt; }
       else if (top <= sea + 2) surf = T.sand;
+      else if (this.bgen >= 2) surf = slope > 0.55 ? (hp < 0.5 ? T.gravel : T.basalt) : (hp < 0.55 ? T.sand : hp < 0.85 ? T.coarse : T.gravel);   // (u-moons3: the islands' tops sand, soil and gravel — the clay's pale tiles read as a pavement)
       else surf = slope > 0.55 ? T.gravel : (hp < 0.75 ? T.clay : T.gravel);
       for (let y = 1; y <= top; y++) { const d = top - y; blocks[(y << 8) | col] = d === 0 ? surf : d < n ? sub : T.basalt; }
       for (let y = top + 1; y <= sea; y++) blocks[(y << 8) | col] = T.water;

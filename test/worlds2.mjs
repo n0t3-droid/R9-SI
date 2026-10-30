@@ -119,6 +119,7 @@ const B2 = (A, k, v) => A.ev(([k, v]) => { VR.BodyLife2.force[k] = v; if (v === 
 const wide = (A) => A.ev(() => { const g = VR.game; g.settings.renderDist = 12; g.applySettings('renderDist'); });
 
 if (!ONLY || ONLY === 'zinn') {
+  await setT(A, await findT(A, 'zinn', [0.5, 70, 0.5], 18, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 18° up, rising)
   const s = await trip(A, 'zinn'); await wide(A); await A.settle(60, 4);
   await A.step(30, 33); await shot(A, 'zinn_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Zinnober');
@@ -142,6 +143,7 @@ if (!ONLY || ONLY === 'zinn') {
   await shot(A, 'zinn_amarant37');
 }
 if (!ONLY || ONLY === 'ocker') {
+  await setT(A, await findT(A, 'ocker', [0.5, 152, 0.5], 35, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 35° up, rising)
   const s = await trip(A, 'ocker'); await wide(A); await A.settle(60, 4);
   await A.step(30, 33); await shot(A, 'ocker_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Ocker');
@@ -182,6 +184,7 @@ if (!ONLY || ONLY === 'ocker') {
   check(rec.lut.balanced.ms <= 1 && rec.lut.high.ms <= 1.2 && rec.lut.low.ms < 0.2, `the LUTs a frame in the page: Balanced ${rec.lut.balanced.ms} ms, High ${rec.lut.high.ms} ms, Low (frozen) ${rec.lut.low.ms} ms`);
 }
 if (!ONLY || ONLY === 'aqua') {
+  await setT(A, await findT(A, 'aqua', [0.5, 75, 0.5], 28, 1, 0, 9000));   // (u-moons3: the arrival by day — Helia 28° up, rising)
   const s = await trip(A, 'aqua'); await wide(A); await A.settle(60, 4);
   await A.step(30, 33); await shot(A, 'aqua_arrival');   // (u-moons3: the first frame on arrival — the landing faces the best view)
   check(s && s.arrived, 'with /dim to Aquamarin');

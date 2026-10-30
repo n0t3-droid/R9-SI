@@ -244,7 +244,7 @@
       E.zenith = zen; E.horizon = hor; E.skyMid = zen.map((v, i) => 0.5 * (v + hor[i])); E.fogColor = hor.map((v, i) => 0.75 * v + 0.25 * sh[i]);
       const front = BS.front || 0, tau = id === 'ocker' ? BS.dustTau : 0;
       const vis = id === 'ocker' ? Math.min(rd * 1.6, 2600 / (0.4 + tau * 1.2) / (1 + front * 14)) : rd * 1.5;
-      E.fog = id === 'ocker' ? [Math.min(rd * 0.5, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0] : [rd * 0.6, rd * 0.995, 0, 0];   // (Aquamarin: tens of km of sight — only the last columns' edge, the far sea in the LUT's own haze)
+      E.fog = id === 'ocker' ? [Math.min(rd * 0.68, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0] : [rd * 0.6, rd * 0.995, 0, 0]; // (u-moons3: Ocker's haze from 0.68 of the view, was 0.5 — the canyon's walls read)   // (Aquamarin: tens of km of sight — only the last columns' edge, the far sea in the LUT's own haze)
     }
     if (o.underwater) { E.fog = [0, 1, 0, 1]; }
     E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;

@@ -81,6 +81,10 @@ console.log('d · Zinnober');
   const g = new V.BodyGen(SEED, 'zinn', { bgen: { zinn: 2 } }), G = g.glut;
   const sp = g.findSpawn(0, 0), d = Math.hypot(sp[0] - G.x, sp[2] - G.z);
   check(d - G.R * 0.84 < 70 && d > G.R * 0.9 && ang(sp[3] - yawTo(G.x - sp[0], G.z - sp[2])) < 0.3 && sp[4] < -0.1, `the landing on the Glutsee's lip: ${(d - G.R * 0.84).toFixed(0)} m from the lava, facing it, pitched ${(sp[4] || 0).toFixed(2)}`);
+  const v0 = g.vents()[0], d0 = Math.hypot(v0.x - sp[0], v0.z - sp[2]), a0 = ang(yawTo(v0.x - sp[0], v0.z - sp[2]) - sp[3]);
+  let on = 0; for (let t = 0; t < 3600; t += 7) if (V.BodyLife2.plume(v0, t, g.prof, 1.8).k > 0.9) on++;
+  check(d0 > 7000 && a0 < 0.6 && on === Math.ceil(3600 / 7), `the steady plume ${(d0 / 1000).toFixed(1)} km off, ${(a0 / D).toFixed(0)}° beside the view, standing all the time (${on})`);
+  check(g.vents().slice(1).every(v => Math.hypot(v.x, v.z) > 6900), 'the other vents 7–16 km off (no canopy over the landing)');
   const cnt = {}; let n = 0;
   for (let k = 0; k < 4000; k++) { const x = -3000 + (k % 63) * 97, z = -3000 + Math.floor(k / 63) * 97, o = g.col(x, z, {}, g.feats(x, z, x, z)); if (o.mtn || o.lava || o.floor || o.wall || o.vent || o.ring || o.frost || o.flow) continue; const b = g.plainsBlock(x, z, o, 0.5); cnt[b] = (cnt[b] || 0) + 1; n++; }
   const kinds = Object.keys(cnt).filter(k => cnt[k] / n > 0.04).map(k => R.types[R.T.type[+k]].name);

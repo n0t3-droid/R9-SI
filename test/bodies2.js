@@ -117,7 +117,7 @@ console.log('f · the skies and the life (bodysky.js, atmo_lut.js, bodylife2.js)
   check(o1.light.sunColor[1] > 4 * o2.light.sunColor[1] && o2.light.ambSky[1] < o1.light.ambSky[1], `Ocker: Helia's light ${o1.light.sunColor[1].toFixed(2)} by day, ${o2.light.sunColor[1].toFixed(2)} in a storm (τ 4.5) — the day turns to dusk`);
   check(lab[2] > 15, `Ocker's horizon by day butterscotch (b* ${lab[2].toFixed(0)}), Very Low's three stops ${sk.map(v => v.toFixed(2)).join(' ')}`);
   // the life: Zinnober's plumes 5–6 km every ~2 min; Ocker's devils ~1 a minute; its storms to τ 4.5
-  const zg = new V.BodyGen(SEED, 'zinn'), prof = V.Bodies.profile('zinn');
+  const zg = new V.BodyGen(SEED, 'zinn', { bgen: { zinn: 1 } }), prof = V.Bodies.profile('zinn');
   let tops = [], fires = 0;
   for (let t = 0; t < 3600; t += 5) { const pl = B2.plume(zg.vents()[0], t, prof, 1.8); if (pl.firing) fires++; if (pl.k > 0.9) tops.push(pl.top); }
   const Hmax = Math.max(...tops);

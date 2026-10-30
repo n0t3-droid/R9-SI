@@ -28,6 +28,9 @@
   // climbs (v0²/2g), stands while the vent fires, fades as the last grains fall back
   B2.plume = function (vent, t, prof, gReal) {
     const P = prof.plume, per = P.every[0] + (P.every[1] - P.every[0]) * hash(vent.seed, 1);
+    // u-moons3: a steady vent (bgen 2's first, in the landing's view — Io's great plumes stand for months) breathes
+    // between 0.93 and 1 of its height over minutes, never quiet
+    if (vent.steady) { const H = P.height[0] + (P.height[1] - P.height[0]) * hash(vent.seed, 3); return { top: H * (0.965 + 0.035 * Math.sin(t / 97 + vent.seed % 7)), k: 1, firing: true, H, up: 0 }; }
     let k = Math.floor(t / per), start = k * per + 0.25 * per * hash(vent.seed, k + 7);
     if (t < start) { k--; start = k * per + 0.25 * per * hash(vent.seed, k + 7); }
     const dur = P.dur[0] + (P.dur[1] - P.dur[0]) * hash(vent.seed, k + 911), H = P.height[0] + (P.height[1] - P.height[0]) * hash(vent.seed, k + 3);
