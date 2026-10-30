@@ -116,5 +116,17 @@ console.log('c · the cloud grid without garbage');
   }
 }
 
-console.log(fails ? 'FAILED ' + fails : 'ALL OK');
-process.exit(fails ? 1 : 0);
+// the garbage: 600 steps of a flight, the collections counted (v0.52.6: 30 here — the arrays of every run, the store of
+// the instance array let go and grown again, a heap number from the sort's comparator every call)
+(async () => {
+  const r = Object.create(V.Renderer.prototype);
+  r.gl = { ARRAY_BUFFER: 1, DYNAMIC_DRAW: 2, bindBuffer() {}, bufferData() {} }; r.q = { clouds: 1, horizon: 2 }; r.cloudInst = {};
+  for (let i = 0; i < 50; i++) r.updateClouds({ cloudDrift: [0, 0], time: 0, cloudCover: 0.5 }, { x: 0, y: 100, z: -i * 12 });
+  const { PerformanceObserver } = require('perf_hooks');
+  let gcs = 0; const ob = new PerformanceObserver((l) => { gcs += l.getEntries().length; }); ob.observe({ entryTypes: ['gc'] });
+  for (let i = 50; i < 650; i++) r.updateClouds({ cloudDrift: [0, 0], time: 0, cloudCover: 0.5 }, { x: 0, y: 100, z: -i * 12 });
+  await new Promise((res) => setTimeout(res, 50)); ob.disconnect();
+  check(gcs <= 4, 'the cloud grid: 600 steps with (almost) no garbage', gcs + ' collections (v0.52.6: 30)');
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
+})();
