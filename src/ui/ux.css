@@ -96,3 +96,7 @@ html:not(.pro) #loading .ldetail { visibility: hidden; }
 .pvwrap { flex-direction: row; align-self: flex-start; gap: var(--ux-s3); margin: 0 0 var(--ux-s2); }
 .pv { width: 192px; max-width: 40vw; }
 .pvnote { font-size: var(--ux-fs-xs); }
+/* Fertig on the left, 📜 on the right of the same line (the panel no longer stretches them across) */
+#settings .panel.box { position: relative; }
+#settings .panel.box > [data-act="setback"] { align-self: flex-start; min-width: 180px; min-height: 44px; }
+#settings .panel.box > [data-legal] { position: absolute; right: 26px; bottom: 22px; width: auto; min-width: 0; min-height: 44px; }
