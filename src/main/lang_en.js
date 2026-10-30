@@ -3136,5 +3136,26 @@
     "g.first2.scaleTip": "Buttons and text bigger or smaller.",
     "g.first2.back": "Simple",
     // ---- f-first2 end
-  });
+    // ---- u-stars2
+    "g.codex.m.stars": ["Alien Sun", "Reach the system of another star for the first time.", "Jump with the star jump (star map, O) to a star in range."],
+    "g.stars2.first": "First visit: {name} — a new codex entry.",
+    "g.stars2.why.binary": "binary star",
+    "g.stars2.why.nebula": "inside a nebula",
+    "g.stars2.why.hot": "hot star",
+    "g.stars2.why.dwarf": "white dwarf",
+    "g.stars2.why.ring": "ringed world",
+    "g.stars2.why.sig.crystal": "crystal fields",
+    "g.stars2.why.sig.violet": "violet life",
+    "g.stars2.why.sig.glass": "glass dunes",
+    "g.stars2.next": "★ Next target: {name} · {ly} ly · {why}",
+    "g.stars2.route": "Your route: {n} jumps",
+    "g.stars2.land.crystal": "Crystal fields under a hot star.",
+    "g.stars2.land.violet": "Violet life in a red dwarf's light.",
+    "g.stars2.land.glass": "Dunes of molten glass.",
+    "g.stars2.ring": "A ring spans the sky.",
+    "g.stars2.sun2": "Two suns — two shadows.",
+    "g.set.sun2": "Second sun with shadows",
+    "g.set.sun2.tip": "On worlds of binary stars the second sun casts light and shadows too (Low and up; costs a little performance).",
+    // ---- u-stars2 end
+});
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

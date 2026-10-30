@@ -96,7 +96,7 @@ console.log('e · the column time and the blocks');
   const time = (g) => { for (let k = 0; k < 3; k++) g.generate(50 + k, 7); const t0 = performance.now(); for (let k = 0; k < 12; k++) g.generate(k % 4 + 10, (k >> 2) - 20); return (performance.now() - t0) / 12; };
   const to = time(og), tz = time(new V.BodyGen(SEED, 'zinn')), tk = time(new V.BodyGen(SEED, 'ocker')), ta = time(new V.BodyGen(SEED, 'aqua'));
   check(Math.max(tz, tk, ta) <= to, `a chunk: Zinnober ${tz.toFixed(1)} ms, Ocker ${tk.toFixed(1)} ms, Aquamarin ${ta.toFixed(1)} ms ≤ the overworld's ${to.toFixed(1)} ms`);
-  const last = R.types.filter(t => !/^(ocker_dust|carbon_rubble|nickel_iron|ice_nodule|glowspar)$/.test(t.name)).slice(-2).map(t => t.name).join(', ');   // (u-moons3: ocker_dust after them; u-fields: carbon_rubble)
+  const last = R.types.filter(t => !/^(ocker_dust|carbon_rubble|nickel_iron|ice_nodule|glowspar|exo_crystal|exo_moss|exo_frond|exo_glass)$/.test(t.name)).slice(-2).map(t => t.name).join(', ');   // (u-moons3: ocker_dust after them; u-fields: carbon_rubble)
   check(last === 'sulfur_red, so2_frost', `the last two blocks: ${last}`);
 }
 console.log('f · the skies and the life (bodysky.js, atmo_lut.js, bodylife2.js)');

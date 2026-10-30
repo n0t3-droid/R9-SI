@@ -698,6 +698,8 @@ uniform vec4 u_bsJu;       // the plumes' shape: x 0 ice jets (Opal) · 1 umbrel
                            //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
 uniform vec4 u_bsLake;     // u-moons3: the Glutsee — its centre (x, z) from the eye, its melt's height from the eye, the melt's radius (0: none)
 uniform vec3 u_bsLakeC;    // its glow
+uniform vec4 u_bsSun2;     // u-stars2: the companion of a pair — unit direction, angular radius (0: none)
+uniform vec4 u_bsSun2C;    // its disc's radiance (rgb, linear), its glare's strength
 const float BS_D2R = 0.0174532925;
 const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e, c]) => `vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
 const vec3 BS_GN = vec3(${f3(GN)}), BS_GC = vec3(${f3(GC)});
@@ -744,6 +746,15 @@ vec3 bsGlare(vec3 D) {
   float core = fade / (1.0 + z * z);
   float halo = (0.08 * exp(-a / 0.03) + 0.008 * exp(-a / 0.12) + 0.0015 * exp(-a / 0.45)) * fade;   // (no air: only the eye's own scatter)
   return u_bsSunCol * u_bsSunK.y * (core * 0.5 + halo);
+}
+// u-stars2 · the companion: a disc (a close pair: a second sun) or a brilliant point (a wide pair), its glare, its colour
+vec3 bsSun2(vec3 D) {
+  if (u_bsSun2.w <= 0.0) return vec3(0.0);
+  float c = dot(D, u_bsSun2.xyz); if (c <= 0.9) return vec3(0.0);
+  float a = length(cross(D, u_bsSun2.xyz)), q = a / u_bsSun2.w;
+  vec3 col = q < 1.25 ? u_bsSun2C.rgb * (0.42 + 0.58 * sqrt(max(0.0, 1.0 - q * q))) * (1.0 - smoothstep(0.92, 1.25, q)) : vec3(0.0);
+  float z = a / (u_bsSun2.w * 1.6);
+  return col + u_bsSun2C.rgb * (1.0 / 60.0) * u_bsSun2C.w * (0.5 / (1.0 + z * z) + 0.08 * exp(-a / 0.03) + 0.008 * exp(-a / 0.12)) * (1.0 - smoothstep(0.2, 0.43, a));
 }
 // the other worlds: small spheres lit by Helia (the parallax of the light is nothing at these distances), a thin limb
 // where they have air
@@ -820,7 +831,7 @@ vec3 bsAmarant(vec3 D, vec3 col, float px) {
   vec3 Os = O + P * (dot(O, P) * k1), Ds = D + P * (dot(D, P) * k1);
   float a = dot(Ds, Ds), b = dot(Os, Ds), c = dot(Os, Os) - 1.0, h = b * b - a * c;
   float rc = sqrt(max(c + 1.0 - b * b / a, 0.0));                    // the ray's closest approach (stretched radii)
-  float cover = b < 0.0 ? clamp(0.5 - (rc - 1.0) / (dist * px * 1.2), 0.0, 1.0) : 0.0;   // the limb's pixel coverage (in front of the eye only)
+  float cover = b < 0.0 && dist > 1.05 ? clamp(0.5 - (rc - 1.0) / (dist * px * 1.2), 0.0, 1.0) : 0.0;   // the limb's pixel coverage (in front of the eye only)
   float tP = cover > 0.0 ? (-b - sqrt(max(h, 0.0))) / a : -1.0;
   float dp = dot(D, P), tR = abs(dp) > 1e-7 ? -dot(O, P) / dp : -1.0;
   vec3 X = O + D * tR;
@@ -856,7 +867,7 @@ vec3 bsAmarant(vec3 D, vec3 col, float px) {
     pc += alb * u_bsParK.z * (1.0 - smoothstep(-0.1, 0.1, mus));   // the night side in the ring's light
     col = mix(col, pc * u_bsLum.x, cover);
   }
-  if (rc > 1.0 && rc < 1.04) {
+  if (rc > 1.0 && rc < 1.04 && dist > 1.05) {   // (u-stars2: not from the surface)
     // over the limb: the haze above the cloud tops on Helia's side; against the light a thin bright rim (the eclipse)
     vec3 Pc = Os - Ds * (b / a), Nc = normalize(Pc + P * (dot(Pc, P) * (f - 1.0)));
     float hh = rc - 1.0, side = smoothstep(-0.15, 0.3, dot(Nc, L));
@@ -1059,7 +1070,7 @@ vec3 bodySky(vec3 dir, bool withSun) {
   float px = max(length(fwidth(D)), 1e-5);
   vec3 F = u_bsInert * D;
   vec3 col = (bsStars(F) + bsGalaxy(F)) * u_bsSunK.z * (u_bsAirK.x > 0.5 ? 1.0 - u_bsAirS.z : 1.0);
-  if (withSun) col += bsSunDisc(D);
+  if (withSun) col += bsSunDisc(D) + bsSun2(D);   // (u-stars2: the companion)
   col = bsBodies(D, col, px);
   col = bsAmarant(D, col, px);
   col = bsHerz(D, col, px);                                   // (u-moons2: Herzwelt over Aquamarin)

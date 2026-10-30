@@ -89,7 +89,7 @@ check(V.makeGen('basalt', SEED, {}) instanceof BG && V.makeGen('opal', SEED, {})
   check(meta.universe && meta.universe.bodies && meta.universe.bodies.basalt.bgen === B.BGEN && meta.universe.bodies.opal.bgen === B.BGEN, 'stamp: a save gets the current bgen for each body');
   meta.universe.bodies.opal.bgen = 0.5; B.stamp(meta);
   check(meta.universe.bodies.opal.bgen === 0.5, 'stamp keeps what a save has (old worlds keep their moons)');
-  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 2, opal: 0.5, zinn: 2, ocker: 2, aqua: 2, rubble: 2 }), 'bgenOf → the genOpts table (u-fields2: + the rubble bodies\' rgen)', JSON.stringify(B.bgenOf(meta)));
+  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 2, opal: 0.5, zinn: 2, ocker: 2, aqua: 2, rubble: 2, exo: 2 }), 'bgenOf → the genOpts table (u-fields2: + the rubble bodies\' rgen)', JSON.stringify(B.bgenOf(meta)));
   check(new BG(SEED, 'opal', { bgen: { opal: 1 } }).bgen === 1 && new BG(SEED, 'basalt', {}).bgen === B.BGEN, 'a generator takes its bgen from the options, else the current');
 }
 
