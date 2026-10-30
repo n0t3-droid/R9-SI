@@ -608,8 +608,9 @@
     const g = game(), s = RP.st(), sites = RP.sites(), C = R.conquest(sites, s), W = cv.width, H = cv.height, S = R.BAL.REGION;
     const pp = g && g.player ? g.player.pos : [0, 0, 0], vils = g && g.villages && g.villages.sites ? g.villages.sites : [];
     let x0 = pp[0], x1 = pp[0], z0 = pp[2], z1 = pp[2];
-    for (const q of sites) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); }
-    const span = Math.max(600, x1 - x0, z1 - z0) * 1.3, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, k = W / span;
+    // the frame: the player and the places within 800 m (farther ones sit on the edge, dimmed) — the near land readable
+    for (const q of sites) { if (Math.max(Math.abs(q.x - pp[0]), Math.abs(q.z - pp[2])) > 800) continue; x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); }
+    const span = Math.max(420, x1 - x0, z1 - z0) * 1.3, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, k = W / span;
     const X = (x) => W / 2 + (x - cx) * k, Z = (z) => H / 2 + (z - cz) * k;
     const bg = ctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, W * 0.75); bg.addColorStop(0, '#1b2a3c'); bg.addColorStop(1, '#0a111d');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
@@ -646,10 +647,22 @@
     // the next goal: a dashed line from the player, a double ring
     const ng = B2.nextGoal(C, sites, pp);
     if (ng) { ctx.strokeStyle = 'rgba(255,226,122,.7)'; ctx.lineWidth = 2; ctx.setLineDash([10, 7]); ctx.beginPath(); ctx.moveTo(X(pp[0]), Z(pp[2])); ctx.lineTo(X(ng.x), Z(ng.z)); ctx.stroke(); ctx.setLineDash([]); }
-    const lab = (txt, x, y, c) => { ctx.font = '700 11px sans-serif'; const tw = ctx.measureText(txt).width; ctx.fillStyle = 'rgba(6,10,22,.72)'; ctx.fillRect(x - 3, y - 11, tw + 6, 15); ctx.fillStyle = c; ctx.fillText(txt, x, y); };
+    // the labels: placed in order of importance, never over one another (else on the other side, else left out)
+    const placed = [], cand = [];
+    const fits = (x, y, w) => { if (x < 2 || y - 12 < 2 || x + w > W - 2 || y + 4 > H - 2) return false; for (const q of placed) if (x - 3 < q[2] && x + w + 3 > q[0] && y - 11 < q[3] && y + 4 > q[1]) return false; return true; };
+    const lab = (txt, x, y, c, alt) => {
+      ctx.font = '700 11px sans-serif'; const tw = ctx.measureText(txt).width;
+      let px = x, py = y;
+      if (!fits(px, py, tw)) { if (alt && fits(alt[0] - tw, alt[1], tw)) { px = alt[0] - tw; py = alt[1]; } else return false; }
+      placed.push([px - 3, py - 11, px + tw + 3, py + 4]);
+      ctx.fillStyle = 'rgba(6,10,22,.72)'; ctx.fillRect(px - 3, py - 11, tw + 6, 15); ctx.fillStyle = c; ctx.fillText(txt, px, py); return true;
+    };
     for (const ic of B2.mapIcons(C, sites, vils)) {
-      const x = X(ic.x), z = Z(ic.z); if (x < -20 || z < -20 || x > W + 20 || z > H + 20) continue;
-      ctx.save(); ctx.translate(x, z);
+      let x = X(ic.x), z = Z(ic.z); const out = x < 10 || z < 10 || x > W - 10 || z > H - 10;
+      if (out) { x = clamp(x, 10, W - 10); z = clamp(z, 10, H - 10); }
+      if (!out && ic.name && (ic.kind === 'outpost' || ic.kind === 'shop')) cand.push([ic.kind === 'shop' ? 3 : 2, ic.name, x + 12, z + 4, ic.kind === 'shop' ? '#ffe8b0' : ic.free ? '#c8fbff' : '#ead2ff', [x - 12, z + 4]]);
+      if (!out && ic.kind === 'boss') cand.push([1, T('g.rpg.map.core'), x + 16, z + 4, ic.won ? '#ffe08a' : '#ffc0de', [x - 16, z + 4]]);
+      ctx.save(); ctx.translate(x, z); if (out) { ctx.globalAlpha = 0.5; ctx.scale(0.75, 0.75); }
       if (ic.kind === 'outpost') {
         const c = ic.free ? '#7ff6ff' : '#c06bff'; ctx.shadowColor = c; ctx.shadowBlur = 10;
         ctx.fillStyle = shade(ic.free ? [20, 60, 70] : [50, 20, 70], 1); ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(8, 0); ctx.lineTo(0, 11); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill();
@@ -660,30 +673,29 @@
       } else if (ic.kind === 'shop') {
         ctx.shadowColor = '#ffd76a'; ctx.shadowBlur = 8; ctx.fillStyle = '#ffd76a'; ctx.beginPath(); ctx.moveTo(-7, -1); ctx.lineTo(0, -8); ctx.lineTo(7, -1); ctx.closePath(); ctx.fill(); ctx.fillRect(-5.5, -1, 11, 8);
         ctx.shadowBlur = 0; ctx.fillStyle = '#5a3a10'; ctx.beginPath(); ctx.arc(0, 3, 2.6, 0, TAU); ctx.fill();
-        if (ic.name) lab(ic.name, 10, 4, '#ffe8b0');
       } else if (ic.kind === 'boss') {
         const c = ic.won ? '#ffd76a' : '#ff5ea8';
         ctx.shadowColor = c; ctx.shadowBlur = 18; ctx.fillStyle = ic.won ? '#4a3a10' : '#3a0f2a';
         ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.PI / 6; ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 13); } ctx.closePath(); ctx.fill();
         ctx.shadowBlur = 0; ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.stroke();
         ctx.fillStyle = c; ctx.fillRect(-7, -3, 14, 4); ctx.fillRect(-1.5, -10, 3, 6); ctx.beginPath(); ctx.arc(0, 5, 2.5, 0, TAU); ctx.fill();
-        lab(T('g.rpg.map.core'), 16, 4, ic.won ? '#ffe08a' : '#ffc0de');
       }
       ctx.restore();
-    }
-    for (const q of sites) { const x = X(q.x), z = Z(q.z); if (q.name) lab(q.name, x + 11, z - 6, q.free ? '#c8fbff' : '#ead2ff'); }
-    // the regions' names at the foot of their visible tile, in the middle
-    for (const r of C.regions) {
-      const [rx, rz] = r.id.split('_').map(Number), ax = Math.max(0, X(rx * S)), bx = Math.min(W, X((rx + 1) * S)), bz = Math.min(H, Z((rz + 1) * S));
-      const txt = RP.regionName(r) + ' · ' + r.pct + ' %'; ctx.font = '700 11px sans-serif'; const tw = ctx.measureText(txt).width;
-      lab(txt, clamp((ax + bx) / 2 - tw / 2, 4, W - tw - 4), clamp(bz - 8, 14, H - 6), r.boss === 'won' ? '#ffe08a' : '#e8f4ff');
     }
     if (ng) {
       const x = X(ng.x), z = Z(ng.z); ctx.save(); ctx.translate(x, z);
       ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 16; ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 19, 0, TAU); ctx.stroke();
       ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 25, 0, TAU); ctx.stroke(); ctx.shadowBlur = 0;
       for (let i = 0; i < 4; i++) { const a = i * TAU / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 27, Math.sin(a) * 27); ctx.lineTo(Math.cos(a) * 34, Math.sin(a) * 34); ctx.stroke(); }
-      ctx.restore(); lab(T('g.rpg.boss2.leg.goal'), x - 20, z - 30, '#ffe27a');
+      ctx.restore(); lab(T('g.rpg.boss2.leg.goal'), x - 30, z - 32, '#ffe27a', [x + 30, z + 44]);
+    }
+    for (const c of cand.sort((a, b) => a[0] - b[0])) lab(c[1], c[2], c[3], c[4], c[5]);
+    // the regions' names at the foot of their visible tile, in the middle
+    for (const r of C.regions) {
+      const [rx, rz] = r.id.split('_').map(Number), ax = Math.max(0, X(rx * S)), bx = Math.min(W, X((rx + 1) * S)), bz = Math.min(H, Z((rz + 1) * S));
+      if (bx - ax < 40 || bz < 30 || Z(rz * S) > H - 20) continue;
+      const txt = RP.regionName(r) + ' · ' + r.pct + ' %'; ctx.font = '700 11px sans-serif'; const tw = ctx.measureText(txt).width;
+      lab(txt, clamp((ax + bx) / 2 - tw / 2, 4, W - tw - 4), clamp(bz - 8, 14, H - 6), r.boss === 'won' ? '#ffe08a' : '#e8f4ff', [clamp((ax + bx) / 2 + tw / 2, tw + 4, W - 4), clamp(Math.max(0, Z(rz * S)) + 18, 14, H - 6)]);
     }
     const yaw = g && g.player ? g.player.yaw : 0, px = X(pp[0]), pz = Z(pp[2]);
     ctx.save(); ctx.translate(px, pz); ctx.rotate(-yaw + Math.PI); ctx.shadowColor = '#000'; ctx.shadowBlur = 6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(8, 9); ctx.lineTo(0, 4); ctx.lineTo(-8, 9); ctx.closePath(); ctx.fill(); ctx.restore();
