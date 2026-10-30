@@ -335,7 +335,7 @@
     findTemple() {
       const w = this.g.world, R = VR.R; if (!w || !R || !R.byName.portal_veil || this.pads.has('apron')) return;
       const b = w.getBlock(0, 81, 20);
-      if (b && R.T.type[b] === R.byName.portal_veil.id) this.pads.set('apron', PL.apron((this.g.meta && this.g.meta.seed) | 0));
+      if (b && (R.T.type[b] === R.byName.portal_veil.id || (R.byName.gate_glow && R.T.type[b] === R.byName.gate_glow.id))) this.pads.set('apron', PL.apron((this.g.meta && this.g.meta.seed) | 0));   // (vgen 14: the gate's glow)
     }
     // the pads with a parked world ship (outposts, tech villages): their crew does its rounds; visitors while it is gone
     scanShips() {

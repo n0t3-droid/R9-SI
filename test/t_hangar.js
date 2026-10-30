@@ -75,5 +75,19 @@ console.log('the hero craft');
   ok(!SS.archetypes.includes('hero') && SS.pickArch(new V.RNG(7)) !== 'hero', 'not offered in the shipyard, never picked at random (the temple\'s own)');
   ok(SS.build(0x5e7a11, 'hero', {}).meta.palette === 'starforge', 'white and orange, whatever palette is asked');
 }
+console.log('the hero craft flies the gate loop (hangarflight.js)');
+{
+  const fs = require('fs'), path = require('path');
+  new Function('VR', fs.readFileSync(path.join(__dirname, '../src/main/hangarflight.js'), 'utf8'))(VR);
+  const HF = VR.HangarFlight, glow = R.byName.gate_glow.state({ ring: 0 });
+  const archs = [];
+  const meta = { exhaust: [[0, 3, 11, 0.7]], length: 22, width: 15, height: 8, bounds: [-7.5, 0, -11, 7.5, 8, 11] };
+  const home = { hangar: true, state: 'parked', pos: [0, 81, -10], hidden: false, d: { arch: 'hero' }, hitbox: () => [-7.5, 81.3, -21, 7.5, 89, 1] };
+  const SS = { ships: [home], pilot: null, designs: new Map(), design(seed, arch, pal) { archs.push(arch); const d = { key: seed + ':' + arch + ':' + pal, arch, meta, gpu: { hull: {}, glass: {} } }; this.designs.set(d.key, d); return d; }, begin: () => ({ u: {} }), drawOne: () => {}, end: () => {}, lightAt: () => ({ sky: 1, bl: [0, 0, 0] }) };
+  const g = { state: 'play', dim: 'overworld', settings: { anim: true }, player: { pos: [0.5, 81, 0] }, world: { getBlock: (x, y, z) => (x === 0 && y === 81 && z === 20 ? glow : 0) }, starships: SS, trails: { engine: () => {} }, particles: { spawn: () => {} } };
+  const a = new HF.Actor(g); for (let t = 0; t < 6; t += 1 / 30) a.update(1 / 30);
+  ok(a.active && home.hidden, 'a vgen-14 gate (its glow at the mouth) starts the loop, the parked craft is one of the two');
+  ok(archs.length === 2 && archs.includes('hero') && archs.includes('shuttle'), `the hangar's own flies as the hero craft, the visitor as a shuttle, each built once (${archs.join(', ')})`);
+}
 console.log(bad ? `FAILED ${bad}` : 'ALL OK');
 process.exitCode = bad ? 1 : 0;
