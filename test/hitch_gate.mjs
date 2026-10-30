@@ -222,7 +222,10 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   if (round === 0) {
     const [x0, , z0] = path[0];
     const view = await Ps[0].ev(([x, z]) => { const g = VR.game, gen = VR.makeGen ? VR.makeGen('overworld', g.world.seed, g.world.genOpts) : null; const y = gen && gen.surfaceY ? gen.surfaceY(Math.floor(x), Math.floor(z)) : 70; return [x, y + 14, z, 0.6, -0.22]; }, [x0, z0]);
-    for (const P of Ps) { await P.ev((c) => window.__place(...c), view); await settle(P, 420); }
+    // (the clock again: something on the way may have let it go — run 1's Balanced views were dawn | noon)
+    for (const P of Ps) { await P.ev((c) => { const g = VR.game; g.env.setTime(6000); g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.setMode) g.env.wx.setMode('off'); window.__place(...c); }, view); await settle(P, 420); }
+    const clocks = []; for (const P of Ps) clocks.push(await P.ev(() => { const g = VR.game; g.env.setTime(6000); return [Math.round(g.env.ticks || 0), !!g.zenFreezeTime]; }));
+    console.log('  the views\' clocks: ' + JSON.stringify(clocks));
     for (const P of Ps) {
       await P.ev((c) => window.__place(...c), view);
       for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.0, false));
