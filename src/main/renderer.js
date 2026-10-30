@@ -139,11 +139,11 @@
       for (const t of [this.texAlbedo, this.texMaterial].concat(this.texHiN ? [this.texHiAlb, this.texHiMat] : [])) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
     }
     // t-material · hero textures: one array of the 64 × 64 set (or the one-texel stand-in), filtered as the block textures
-    texHiArray(tex, which, srgb) {
+    texHiArray(tex, which, srgb, empty) {
       const gl = this.gl, t = gl.createTexture(), lv = tex[which];
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
       gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
-      for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
+      if (!empty) for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, tex.levels > 1 ? gl.NEAREST_MIPMAP_LINEAR : gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -151,10 +151,43 @@
       return t;
     }
     // the 64 × 64 set from the worker or the cache: its arrays replace the stand-in, the table names each hero's layer
+    texHiOk(tex) { const R = VR.R; return !!(this.gl && tex && tex.type === 'texhi' && VR.TexHi && R && R.texNames && R.texNames.length === this.layers && this.texHiMap); }
     uploadTexHi(tex) {
+      if (!this.texHiOk(tex)) return false;
+      this.texHiTok = (this.texHiTok || 0) + 1;   // (e-engine: a queued set still on its way is dropped)
+      return this.applyTexHi(tex, this.texHiArray(tex, 'albedo', true), this.texHiArray(tex, 'material', false));
+    }
+    // e-engine: the set through the world's upload queue in parts (as queueTextures: ~9 MB in one call held the page —
+    // seconds behind a busy GPU process here, a hitch on a GPU that shares the system memory), swapped in when complete
+    queueTexHi(tex, Q, done) {
+      if (!this.texHiOk(tex)) return false;
+      const gl = this.gl, R = this, tok = this.texHiTok = (this.texHiTok || 0) + 1, L = tex.layers, N = tex.size, lvls = [tex.albedo, tex.material];
+      let made = null, a = 0, lv = 0, z = 0, bytes = 0;
+      for (let l = 0; l < tex.levels; l++) bytes += 2 * (N >> l) * (N >> l) * 4 * L;
+      const step = (max) => {
+        if (!made) made = [R.texHiArray(tex, 'albedo', true, true), R.texHiArray(tex, 'material', false, true)];
+        let wrote = 0;
+        while (a < 2) {
+          const n = N >> lv, per = n * n * 4;
+          let k = Math.min(L - z, Math.floor((max - wrote) / per));
+          if (k <= 0) { if (wrote || max < per * 0.25) break; k = 1; }   // (one layer at least)
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, made[a]);
+          gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, lv, 0, 0, z, n, n, k, gl.RGBA, gl.UNSIGNED_BYTE, lvls[a][lv], z * per);
+          z += k; wrote += k * per;
+          if (z >= L) { z = 0; lv++; if (lv >= tex.levels) { lv = 0; a++; } }
+        }
+        return wrote;
+      };
+      const commit = () => { const m = made; made = null; if (R.applyTexHi(tex, m[0], m[1]) && done) done(); };
+      Q.push({ prio: -1, x: 0, z: 0, bytes, alive: () => R.texHiTok === tok, step, commit,
+        abort: () => {
+          if (R.texHiTok === tok) { while (a < 2) step(Infinity); commit(); return; }   // (not replaced: finished at once)
+          if (made) { gl.deleteTexture(made[0]); gl.deleteTexture(made[1]); made = null; }
+        } });
+      return true;
+    }
+    applyTexHi(tex, alb, mat) {
       const gl = this.gl, R = VR.R, HI = VR.TexHi;
-      if (!gl || !tex || tex.type !== 'texhi' || !HI || !R || !R.texNames || R.texNames.length !== this.layers || !this.texHiMap) return false;
-      const alb = this.texHiArray(tex, 'albedo', true), mat = this.texHiArray(tex, 'material', false);
       gl.deleteTexture(this.texHiAlb); gl.deleteTexture(this.texHiMat);
       this.texHiAlb = alb; this.texHiMat = mat; this.texHiN = tex.layers;
       const map = new Uint8Array((this.layers + 3) & ~3); map.set(HI.map(R.texNames, tex.names));

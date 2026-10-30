@@ -233,7 +233,10 @@
       const done = (tex, cached) => {
         this.texHiBusy = false;
         if (!tex || tex.type !== 'texhi') { this.texHiErr = (tex && (tex.err || tex.msg)) || 'none'; return; }
-        if (r.uploadTexHi(tex)) { this.texHiMs = Math.round(performance.now() - t0); this.texHiFromCache = cached; this.texHiForgeMs = tex.ms || 0; }
+        const fin = () => { this.texHiBusy = false; this.texHiMs = Math.round(performance.now() - t0); this.texHiFromCache = cached; this.texHiForgeMs = tex.ms || 0; };
+        const Q = this.world && this.world.uploadQ;   // (e-engine: in parts through the world's upload queue, as the block textures)
+        if (r.queueTexHi && Q && Q.drain && r.queueTexHi(tex, Q, fin)) { this.texHiBusy = true; return; }   // (busy until it is up)
+        if (r.uploadTexHi(tex)) fin();
       };
       (key ? VR.TexCache.get(key) : Promise.resolve(null)).then((tex) => {
         if (tex) { done(tex, true); return; }
