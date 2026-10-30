@@ -189,14 +189,13 @@ async function runPreset(preset) {
     if (want('clouds')) {
       await shotRaum(P, R, 'cloudtops', 'wolken', null, (S) => S.decks === 2);
       // the night side: the flyover a quarter turn on (the lightning)
-      await P.ev(() => { VR.Fields.timeK = 1; });
-      await shotRaum(P, R, 'cloudtops_night', 'wolken', null, null);
-      await P.ev(() => { VR.Fields.timeK = 0; });
+      await shotRaum(P, R, 'cloudtops_night', 'wolken', { wolkenDL: Math.PI * 0.62 }, null);
+      await P.ev(() => { VR.Fields.wolkenDL = 0; });
     }
     if (want('swarm')) await shotRaum(P, R, 'swarm', 'schwarm', null, (S) => S.rocks === 60);
     if (want('rubble')) {
       // a rubble body: /dim brocken 1 (the big spinning top), the landing, the jump, mining, drifting off
-      await P.ev(() => { VR.Fields.sunFix = [0.62, 0.42, 0.45]; VR.game.chat('/dim brocken 1'); });
+      await P.ev(() => { VR.game.chat('/dim brocken 1'); });
       let s = null;
       for (let i = 0; i < 900; i++) { await P.step(10); s = await P.ev(() => ({ dim: VR.game.dim, state: VR.game.state })); if (s.dim === 'rock.0' && s.state === 'play') break; await P.wait(20); }
       check(s && s.dim === 'rock.0', `the trip to Brocken TS-01 (${JSON.stringify(s)}, ${secs()})`);
@@ -204,7 +203,9 @@ async function runPreset(preset) {
       const sp = await P.ev(() => { const g = VR.game, p = g.player, gen = new VR.RubbleGen(0, 'rock.0'), s = gen.findSpawn(); return { s, grav: p.grav, D: gen.D, big: gen.boulders[0] }; });
       // rubble_land: a few metres up behind the landing, looking over the body to its largest boulder
       const L = sp.s;
-      await P.pose(L[0] + Math.sin(L[3]) * 9, L[1] + 5, L[2] + Math.cos(L[3]) * 9, L[3], -0.2, 70);
+      // Helia low from the camera's left-behind (a raking light over the rubble)
+      await P.ev((yaw) => { const a = yaw + 2.3; VR.Fields.sunFix = [-Math.sin(a) * 0.86, 0.38, -Math.cos(a) * 0.86]; }, L[3]);
+      await P.pose(L[0] + Math.sin(L[3]) * 34, L[1] + 24, L[2] + Math.cos(L[3]) * 34, L[3], -0.42, 70);
       await P.settle(200); await P.step(6);
       await P.ev(() => { window.__Fl = window.__F; });
       let m = await picture(P, '__Fl', SHOTS + 'rubble_land.png', K);
@@ -224,8 +225,8 @@ async function runPreset(preset) {
       // rubble_mine: blocks broken by hand in front of the player (the existing breaking: drops and dust)
       const mine = await P.ev(([x, y, z, yaw]) => {
         const g = VR.game, p = g.player, w = g.world, fx = -Math.sin(yaw), fz = -Math.cos(yaw), got = {};
-        p.flying = true; p.noclip = true; p.teleport(x, y + 1.5, z); p.yaw = p.viewYaw = yaw; p.pitch = -0.55;
-        for (let d = 2; d <= 4; d++) for (let s = -1; s <= 1; s++) for (let dy = 0; dy <= 1; dy++) {
+        p.flying = true; p.noclip = true; p.teleport(x + Math.sin(yaw) * 3, y + 2.6, z + Math.cos(yaw) * 3); p.yaw = p.viewYaw = yaw; p.pitch = -0.62;
+        for (let d = 2; d <= 5; d++) for (let s = -1; s <= 1; s++) for (let dy = 0; dy <= 2; dy++) {
           const bx = Math.floor(x + fx * d - fz * s), bz = Math.floor(z + fz * d + fx * s), by = Math.floor(y) - 1 - dy, st = w.getBlock(bx, by, bz);
           if (!st) continue; const nm = VR.R.types[VR.R.T.type[st]].name; got[nm] = (got[nm] || 0) + 1; p.breakBlock(bx, by, bz, st, false, true);
         }

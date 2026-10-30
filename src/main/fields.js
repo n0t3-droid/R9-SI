@@ -121,7 +121,7 @@ void main() {
   if (u_sheet.x > 0.0) { w = clamp(-u_sheet.x + (cid.z + k.y) * c, -u_sheet.x + d * 0.3, u_sheet.x - d * 0.3); rel.z = w - u_camIn.z; }
   else { rel.z = (float(iw - NW / 2) + k.y) * c - u_camIn.z; w = 0.0; }
   float dist = length(rel);
-  float sc = d * 0.5 * smoothstep(u_size.w, u_size.w * 0.78, dist);
+  float sc = d * 0.5 * smoothstep(u_size.w, u_size.w * 0.78, u_sheet.x > 0.0 ? length(rel.xy) : dist);
   if (sc <= 0.0) return;
   // the shield: a chunk that comes within 3 m is pushed off its bubble (and lights it a moment)
   v_glow = 0.0;
@@ -133,7 +133,7 @@ void main() {
   vec3 lv = rotAxis(ax, u_sheet.w * (0.05 + 0.4 * k.z) + h.z * 6.283) * (cn * bump * vec3(1.0, 0.75 + 0.4 * k.x, 0.8 + 0.3 * k.y));
   vec3 P = u_er * rel.x + u_et * rel.y + u_en * rel.z + lv * sc;
   v_p = P;
-  v_alb = vec3(0.93, 0.9, 0.86) * (0.75 + 0.4 * h.z) + vec3(0.04, 0.02, -0.02) * k.x;
+  v_alb = vec3(0.66, 0.64, 0.61) * (0.6 + 0.55 * h.z) + vec3(0.05, 0.02, -0.03) * k.x;
   // Helia's light inside the sheet: through the ice between the chunk and the lit face
   float Ln = u_sheet.y;
   v_sunT = u_sheet.x > 0.0 ? exp(-u_sheet.z * max(0.0, (sign(Ln) * u_sheet.x - w) / max(abs(Ln), 0.05))) : 1.0;
@@ -153,8 +153,8 @@ void main() {
   vec3 alb = v_alb * u_tint;
   float dl = max(dot(N, L), 0.0);
   float sp = pow(max(dot(reflect(-V, N), L), 0.0), 24.0) * 0.35;
-  vec3 col = alb * u_sunCol * (dl * v_sunT + 0.06) + u_sunCol * sp * v_sunT + alb * u_plCol * max(dot(N, u_plDir) * 0.7 + 0.3, 0.0);
-  col += vec3(0.35, 0.6, 1.0) * v_glow * 0.6;
+  vec3 col = alb * u_sunCol * (dl * v_sunT + 0.03) + u_sunCol * sp * v_sunT + alb * u_plCol * max(dot(N, u_plDir) * 0.7 + 0.3, 0.0);
+  col += vec3(0.35, 0.6, 1.0) * v_glow * v_glow * 0.12;
   o = vec4(col, 1.0);
 }`;
   const FULL_VS = `
@@ -173,6 +173,8 @@ uniform vec3 u_er, u_et, u_en;
 uniform vec4 u_cam;          // height over the middle, radius (m), the march's start (m), steps
 uniform vec4 u_ringK;        // r0, r1 (m), half thickness, -
 uniform vec3 u_sunDir, u_sunCol, u_plCol;
+uniform vec4 u_pl;           // the planet's centre (scene, m) and radius
+uniform vec2 u_arc;          // the camera's place along the orbit and its radius mod 64 m (the grain's frame)
 uniform sampler2D u_ring;
 ${HASH}
 in vec3 v_dir;
@@ -183,8 +185,9 @@ void main() {
   float ta, tb;
   if (abs(dn) < 1e-5) { if (abs(h) >= H) discard; ta = 0.0; tb = 1e6; }
   else { float t1 = (-H - h) / dn, t2 = (H - h) / dn; ta = max(min(t1, t2), 0.0); tb = max(t1, t2); }
-  ta = max(ta, u_cam.z); tb = min(tb, ta + 400000.0);
+  ta = max(ta, u_cam.z); tb = min(tb, ta + 4000000.0);
   if (tb <= ta) discard;
+  { vec3 c = u_pl.xyz; float b = dot(c, D), hh = b * b - dot(c, c) + u_pl.w * u_pl.w; if (hh > 0.0 && b - sqrt(hh) > 0.0 && b - sqrt(hh) < ta) discard; }
   float Ln = dot(u_sunDir, u_en), cph = dot(D, u_sunDir);
   float phase = 0.55 + 0.9 * exp(-(1.0 - cph) * 6.0) + 0.5 * exp(-(1.0 + cph) * 10.0);
   int N = int(u_cam.w);
@@ -207,6 +210,17 @@ void main() {
     acc += Tr * (1.0 - a) * Sc; Tr *= a;
     t0 = t1;
     if (Tr < 0.01) break;
+  }
+  // the sheet's face seen from outside it: chunks as a grain (cells of 1.6 m, lit on Helia's side), fading with distance
+  if (abs(h) > H) {
+    float te = (sign(h) * H - h) / dn;
+    vec2 q = vec2(u_cam.y + dr * te, u_arc.x + dt * te) / 1.6;
+    vec2 ci = floor(q), f = fract(q);
+    vec3 hc = h3(vec3(ci, 3.0));
+    float dd = length(f - 0.2 - 0.6 * hc.xy) / (0.28 + 0.22 * hc.z);
+    float px = length(fwidth(q));
+    float grain = mix(1.0, (dd < 1.0 ? 0.7 + 0.8 * sqrt(1.0 - dd * dd) : 0.25), 1.0 - smoothstep(0.15, 0.6, px));
+    acc *= grain;
   }
   // single chunks far off catching Helia (stable with the view: a hash on the direction)
   float gl = step(0.9985, hash13(floor(D * 1400.0))) * (1.0 - Tr) * 2.5;
@@ -247,11 +261,20 @@ float deck(vec2 p, float t, int n, float seed) {
 void main() {
   vec3 D = normalize(v_dir);
   float mu = dot(D, u_up), alt = u_geo.x, Rl = u_geo.y;
-  if (mu >= 0.0) discard;
   float Rc = Rl + alt;
-  // the top deck (the cloud tops) and the deep deck (u_geo.z below)
   float c0 = alt * (2.0 * Rl + alt), dsc0 = Rc * Rc * mu * mu - c0;
-  if (dsc0 < 0.0) discard;
+  vec3 bandC = texture(u_bands, eqUV(normalize(u_camB))).rgb;
+  float litC = smoothstep(-0.1, 0.25, dot(u_up, u_sunDir));
+  if (mu >= 0.0 || dsc0 < 0.0) {
+    // above the deck's horizon: the upper haze the flight is in — bright on the horizon, gone 25° up (it covers the
+    // giant's own limb shell, made for a view from afar)
+    if (mu > 0.45) discard;
+    float ht = mu < 0.0 ? Rc * sqrt(1.0 - mu * mu) - Rl : alt + Rc * mu * 0.0;
+    float g = exp(-max(ht, 0.0) / 7000.0) * (mu < 0.0 ? 1.0 : exp(-mu * 9.0));
+    vec3 hc = bandC * vec3(0.95, 0.92, 1.05) * u_sunCol * (0.08 + 0.95 * litC) * g * 1.2 + vec3(0.03, 0.035, 0.06) * g * (1.0 - litC);
+    o = vec4(hc, 1.0);
+    return;
+  }
   float tA = c0 / (-Rc * mu + sqrt(dsc0));
   float dB = alt + u_geo.z, RB = Rl - u_geo.z, cB = dB * (2.0 * RB + dB), dscB = Rc * Rc * mu * mu - cB;
   float tB = dscB > 0.0 ? cB / (-Rc * mu + sqrt(dscB)) : tA * 1.2;
@@ -279,7 +302,7 @@ void main() {
   // the top deck's shadow on the deep one (Low and up)
   float shB = 1.0;
   if (u_geo.w > 0.5) { vec2 sh = vec2(dot(u_sunDir, u_east), dot(u_sunDir, u_north)) / max(mus, 0.12) * u_geo.z; shB = 1.0 - 0.6 * smoothstep(0.34, 0.56, deck(gB + sh, t, 3, 1.0)); }
-  vec3 col = mix(deepC * shB, topC * (1.0 + rel), cover) * u_sunCol * lit * rsh;
+  vec3 col = mix(deepC * shB, topC * (1.0 + rel), cover) * u_sunCol * lit * rsh * 1.45;
   // lightning deep down on the night side: a cell flashes now and then, the glow spread by the deck above
   if (u_off.w > 0.0) {
     vec2 lc = floor(gB / 22000.0); float ph = u_off.z * 0.9 + hash12(lc) * 7.0, fl = floor(ph);
@@ -291,10 +314,9 @@ void main() {
   }
   // the haze toward the horizon (the upper haze the flight is in), lit like the tops
   float hz = 1.0 - exp(-tA / 260000.0);
-  vec3 hazeC = band * vec3(1.0, 0.95, 1.05) * 0.85 * u_sunCol * lit * rsh + vec3(0.02, 0.025, 0.04) * (1.0 - lit);
+  vec3 hazeC = bandC * vec3(0.95, 0.92, 1.05) * 1.2 * u_sunCol * (0.08 + 0.95 * litC) * exp(-alt / 7000.0) * 2.0 + vec3(0.02, 0.025, 0.04) * (1.0 - lit);
   col = mix(col, hazeC, hz * 0.85);
-  float edge = smoothstep(0.0, 0.004, -mu);
-  o = vec4(col * edge, edge);
+  o = vec4(col, 1.0);
 }`;
   // the swarm's bodies: an icosphere (level 2) bent into the body's shape (top, binary, potato), rough, near-black;
   // drawn far → near (the CPU sorts 60 of them), back faces culled
@@ -334,13 +356,15 @@ in vec3 v_n0;
 in float v_metal;
 out vec4 o;
 float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+float vn(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hash13(i), hash13(i + vec3(1, 0, 0)), f.x), mix(hash13(i + vec3(0, 1, 0)), hash13(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(hash13(i + vec3(0, 0, 1)), hash13(i + vec3(1, 0, 1)), f.x), mix(hash13(i + vec3(0, 1, 1)), hash13(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
 void main() {
   vec3 N = normalize(cross(dFdx(v_p), dFdy(v_p)));
   if (dot(N, v_p) > 0.0) N = -N;
   vec3 V = normalize(-v_p);
   float m0 = max(dot(N, u_sunDir), 0.0), m = max(dot(N, V), 0.02);
   float ls = m0 / (m0 + m) * 2.0;                              // Lommel–Seeliger: dark dust has no limb darkening
-  float spots = 0.75 + 0.5 * hash13(floor(v_n0 * 24.0));
+  float spots = 0.7 + 0.35 * vn(v_n0 * 7.0) + 0.25 * vn(v_n0 * 23.0);
   vec3 alb = vec3(u_alb) * vec3(1.08, 1.0, 0.92) * spots;
   if (v_metal > 0.5) alb = mix(alb, vec3(0.16, 0.15, 0.14), 0.6);
   vec3 col = alb * u_sunCol * ls * 1.6 + alb * 0.02;
@@ -387,10 +411,13 @@ void main() {
     const toA = norm(mul(rel, -1)), angA = Math.asin(Math.min(1, RA / dA)), phA = (1 + dot(norm(sub(bs.helia.p, A.p)), mul(toA, -1))) / 2;
     const plCol = mul(SS.SUN, 0.45 * phA * Math.min(1, angA * angA * 3));
     // ---- the ring: the sheet within 1.5 km, the chunks within 60 m
-    if (rR > RING.r0 && rR < RING.r1 && Math.abs(h) < 1500) {
+    if (rR > RING.r0 - 0.02 && rR < RING.r1 + 0.02 && Math.abs(h) < 60000) {
       const tau = F.tauAt(rR), er = norm(inpl), en = n, et = cross(en, er);
       const sunCol = mul(SS.SUN, shadow);
-      fr.draws.push({ prog: 'fields_slab', fn: drawSlab, k: { er: toS(er), et: toS(et), en: toS(en), cam: [h, rho, Math.abs(h) < 60 ? F.radius(tier, tau) * 0.92 : 0, [6, 8, 10, 12][Math.min(3, tier)]], ringK: [RING.r0 * RA, RING.r1 * RA, F.H / 2, 0], sun: sunS, sunCol, plCol } });
+      const e1s = perp([1, 0, 0], en), e2s = cross(en, e1s), ths = Math.atan2(dot(inpl, e2s), dot(inpl, e1s)), Oms = Math.sqrt(BD.amarant.mu / (rho * rho * rho));
+      let phs = (ths - Oms * eph.t) % TAU; if (phs < -Math.PI) phs += TAU; if (phs > Math.PI) phs -= TAU;
+      if (Math.abs(h) > 60) { const ri = fr.draws.findIndex(d => d.prog === 'ring'); if (ri >= 0) fr.draws.splice(ri, 1); }   // (the annulus is a plane through the eye this near: the sheet takes over)
+      fr.draws.push({ prog: 'fields_slab', fn: drawSlab, k: { er: toS(er), et: toS(et), en: toS(en), cam: [h, rho, Math.abs(h) < 60 ? F.radius(tier, tau) * 0.92 : 0, [6, 8, 10, 12][Math.min(3, tier)]], ringK: [RING.r0 * RA, RING.r1 * RA, F.H / 2, 0], sun: sunS, sunCol, plCol, pl: toS(sub(A.p, cam)).concat([RA * 0.97]), arc: [(phs * rho) % 4096, 0] } });
       F.stats.steps = [6, 8, 10, 12][Math.min(3, tier)];
       if (Math.abs(h) < 60 && tau > 0.005) {
         // the lattice co-orbits: along the orbit the arc length minus the local Kepler motion (the chunks hang round a
@@ -460,7 +487,7 @@ void main() {
     const k = d.k, t = texOf('ring'); if (!t) return;
     begin(gl, p, r);
     setU(gl, p, 'u_er', k.er); setU(gl, p, 'u_et', k.et); setU(gl, p, 'u_en', k.en); setU(gl, p, 'u_cam', k.cam); setU(gl, p, 'u_ringK', k.ringK);
-    setU(gl, p, 'u_sunDir', k.sun); setU(gl, p, 'u_sunCol', k.sunCol); setU(gl, p, 'u_plCol', k.plCol);
+    setU(gl, p, 'u_sunDir', k.sun); setU(gl, p, 'u_sunCol', k.sunCol); setU(gl, p, 'u_plCol', k.plCol); setU(gl, p, 'u_pl', k.pl); if (p.u.u_arc) gl.uniform2f(p.u.u_arc, k.arc[0], k.arc[1]);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(p.u.u_ring, 0);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.DEPTH_TEST);
     gl.bindVertexArray(r.emptyVAO); gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -545,7 +572,7 @@ void main() {
     if (name === 'ring') {
       // in the B ring, 1.5 m over the sheet's middle (in the ice), drifting 0.4 m/s along the orbit and slowly down through
       // it: the giant above, Helia low over the sheet
-      const rho = 1.70 * RA, o = onRing(rho, sunTh + 0.9 - 0.4 * since / rho);
+      const rho = 1.70 * RA, o = onRing(rho, sunTh + 1.55 - 0.4 * since / rho);
       const h = opt.h !== undefined ? opt.h : 7 - Math.min(14, since * 0.25);
       const pos = add(o.p, mul(n, h));
       const toA = norm(sub(A.p, pos)), fwd = norm(add(add(mul(o.et, -0.3), mul(toA, 0.8)), mul(n, 0.3)));
@@ -568,7 +595,7 @@ void main() {
     if (name === 'wolken') {
       // 15 km over the cloud tops in the southern belt, flying east at 5.7 km/s with Helia low ahead: the ring overhead
       const lat = -14 * D2R, Rp = BD.amarant.Rp, Rl = RA * Rp / Math.sqrt(Rp * Rp * Math.cos(lat) ** 2 + RA * RA * Math.sin(lat) ** 2);
-      const lon0 = (opt.lon0 !== undefined ? opt.lon0 : sunTh - 1.25), lon = lon0 + F.FLY_V * since / (Rl * Math.cos(lat));
+      const lon0 = (opt.lon0 !== undefined ? opt.lon0 : sunTh - 1.25 + (F.wolkenDL || 0)), lon = lon0 + F.FLY_V * since / (Rl * Math.cos(lat));
       const eq = add(mul(e1, Math.cos(lon)), mul(e2, Math.sin(lon))), up = norm(add(mul(eq, Math.cos(lat)), mul(n, Math.sin(lat))));
       const pos = add(A.p, mul(up, Rl + F.FLY_H)), east = norm(cross(n, up));
       const fwd = norm(add(mul(east, Math.cos(8 * D2R)), mul(up, -Math.sin(8 * D2R))));
@@ -579,9 +606,9 @@ void main() {
       const SC = F.swarmCentre(eph); if (!SC) return null;
       const b = F.swarm().bodies[0], bp = add(SC, b.p), s = norm(sub(bs.helia.p, bp));
       const side = perp(cross(s, [0, 1, 0]), s);
-      const off = norm(add(add(mul(s, 0.55), mul(side, 0.8)), [0, 0.18, 0]));
-      const pos = add(bp, mul(off, 1500 - since * 3));
-      const fwd = norm(add(sub(bp, pos), mul(side, -900)));
+      const off = norm(add(add(mul(s, 0.25), mul(side, 0.95)), [0, 0.2, 0]));
+      const pos = add(bp, mul(off, 950 - since * 3));
+      const fwd = norm(add(sub(bp, pos), mul(side, -420)));
       return { name, pos, fwd, up: perp([0, 1, 0], fwd), fov: 64 * D2R, nadir: null, body: null, ref: 'amarant', swarm: true };
     }
     return null;
@@ -679,13 +706,14 @@ void main() {
     const sd = norm([Math.cos(H), 0.28 + 0.85 * Math.sin(H), 0.4]);
     if (F.sunFix) { sd[0] = F.sunFix[0]; sd[1] = F.sunFix[1]; sd[2] = F.sunFix[2]; }
     const SUN = VR.SpaceScene ? VR.SpaceScene.SUN : [0.95, 0.96, 1];
-    const lightK = sstep(-0.03, 0.03, sd[1]), up = sstep(-0.12, 0.12, sd[1]), k = (d.ring ? 1 : 0.78) * lightK / Math.max(up, 0.05);
+    const lightK = sstep(-0.03, 0.03, sd[1]), up = sstep(-0.12, 0.12, sd[1]), k = (d.ring ? 1 : 1.1) * lightK / Math.max(up, 0.05);
     if (!d.ring) {
       E.sunDir = lightK > 0.002 ? sd : [0, -1, 0]; E.sunColor = SUN.map(v => v * k);
       E.night = 1 - lightK;
       E.ambSky = SUN.map(v => v * (lightK * 0.012 + 0.0035));
       E.moonColor = [0, 0, 0];
     }
+    if (!d.ring && E.exposure) E.exposure *= 1.25;
     E.zenith = [0, 0, 0]; E.horizon = [0, 0, 0]; E.skyMid = [0, 0, 0]; E.fogColor = [0, 0, 0];
     const S = E.bodySky;
     if (S) {

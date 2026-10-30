@@ -212,7 +212,7 @@
           else {
             st = T.carbon;
             if (o.b && y > o.top - 2 * o.b.r) st = bm < 0.12 ? T.tuff : bm < 0.2 && this.metal ? T.iron : T.carbon;   // a boulder: carbon, a few pale (tuff), iron ones on metal bodies
-            else if (d === 0) st = h1 < 0.07 ? T.gravel : h1 < 0.1 ? T.tuff : (this.metal && h1 > 0.9 ? T.ironOre : T.carbon);
+            else if (d === 0) st = h1 < 0.02 ? T.gravel : h1 < 0.03 ? T.tuff : (this.metal && h1 > 0.9 ? T.ironOre : T.carbon);
             else if (hy < 0.05) st = T.tuff;
             else if (this.metal && hy > 0.86) st = hy > 0.97 ? T.iron : T.ironOre;
           }
