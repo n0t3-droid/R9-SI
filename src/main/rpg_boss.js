@@ -143,7 +143,11 @@
   };
   BS.event = function (g, En, C, e) {
     const m = C.m, b = C.b, au = g.audio, P = g.particles;
-    if (e.startsWith('tele:')) { BS.warn(T('g.rpg.boss.warn.' + b.att)); if (au && au.ctx && au.tone) { const t = au.ctx.currentTime; [196, 247, 294, 370].forEach((f, i) => au.tone(f, 0.05, 0.3, 'sawtooth', false, t + i * (R.teleOf(b.att, b.band) / 5))); } return; }
+    if (e.startsWith('tele:')) {
+      // the ring lies on the highest ground round the boss (it may stand in a dip): eight looks, once a warning
+      C.ringY = m.pos[1]; const w = g.world;
+      if (w && w.topAt) for (let i = 0; i < 8; i++) { const a = i * TAU / 8, x = Math.floor(m.pos[0] + Math.cos(a) * BB.stompR * 0.8), z = Math.floor(m.pos[2] + Math.sin(a) * BB.stompR * 0.8); if (w.isLoaded(x, z)) C.ringY = Math.max(C.ringY, Math.min(m.pos[1] + 2, w.topAt(x, z) + 1)); }
+      BS.warn(T('g.rpg.boss.warn.' + b.att)); if (au && au.ctx && au.tone) { const t = au.ctx.currentTime; [196, 247, 294, 370].forEach((f, i) => au.tone(f, 0.05, 0.3, 'sawtooth', false, t + i * (R.teleOf(b.att, b.band) / 5))); } return; }
     if (e.startsWith('strike:')) { BS.strike(g, C, b.att); return; }
     if (e === 'recover') { if (!C.said.weak) { C.said.weak = 1; BS.say(g, T('g.rpg.boss.weak')); } BS.warn(''); return; }
     if (e === 'fight') { BS.say(g, T(b.calm ? 'g.rpg.boss.calm' : 'g.rpg.boss.funke')); return; }
@@ -209,7 +213,7 @@
     if (C.rise < 1) { for (let i = 0; i < (lo ? 3 : 6); i++) { const a = Math.random() * TAU, r = 1.5 + Math.random() * 2.5; P.spawn(m.pos[0] + Math.cos(a) * r, m.pos[1] + 0.2, m.pos[2] + Math.sin(a) * r, 0, 1.5 + Math.random(), 0, { life: 1.2, size: 0.3, grav: -0.2, col: [0.6, 0.55, 0.5], drag: 1, collide: false }); } BS.cost.sparks += 6; }
     if (b.st === 'tele') {
       const u = C.tele, n = lo ? 12 : 22;
-      if (b.att === 'stomp') { const rr = BB.stompR * (0.35 + 0.65 * u); for (let i = 0; i < n * 1.5; i++) { const a = i * TAU / (n * 1.5) + u; P.spawn(m.pos[0] + Math.cos(a) * rr, m.pos[1] + 0.2, m.pos[2] + Math.sin(a) * rr, 0, 0.9, 0, { life: 0.3, size: 0.32, grav: 0, col: [1, 0.3 + 0.35 * u, 0.12], emis: 1, collide: false }); } }
+      if (b.att === 'stomp') { const rr = BB.stompR * (0.35 + 0.65 * u); for (let i = 0; i < n * 1.5; i++) { const a = i * TAU / (n * 1.5) + u; P.spawn(m.pos[0] + Math.cos(a) * rr, (C.ringY || m.pos[1]) + 0.2, m.pos[2] + Math.sin(a) * rr, 0, 0.9, 0, { life: 0.3, size: 0.32, grav: 0, col: [1, 0.3 + 0.35 * u, 0.12], emis: 1, collide: false }); } }
       else if (b.att === 'slam') { const fx = -Math.sin(m.yaw), fz = -Math.cos(m.yaw); for (let i = 0; i < n * 0.6; i++) { const d = 2 + i * (BB.slamR - 2) / (n * 0.6); for (const s of [-1.6, 1.6]) P.spawn(m.pos[0] + fx * d + fz * s, m.pos[1] + 0.15, m.pos[2] + fz * d - fx * s, 0, 0.4, 0, { life: 0.22, size: 0.14, grav: 0, col: [1, 0.45, 0.2], emis: 1, collide: false }); } }
       else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 26 / 16 * SC, m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
       BS.cost.sparks += n;
@@ -343,7 +347,7 @@
     part(r, p, model, 'lantern', B, null, 0, now() / 900, 0, lant, 0);
     if (b.st === 'tele' && b.att === 'stomp' && model.parts.ring) {
       const k = 0.35 + 0.65 * C.tele, t = MR; t.set(ID);
-      mat4.translate(t, t, m.pos[0] - cam.x, m.pos[1] - cam.y + 0.08, m.pos[2] - cam.z); mat4.scale(t, t, SC / 16 * k, SC / 16, SC / 16 * k);
+      mat4.translate(t, t, m.pos[0] - cam.x, (C.ringY || m.pos[1]) - cam.y + 0.06, m.pos[2] - cam.z); mat4.scale(t, t, SC / 16 * k, SC / 16, SC / 16 * k);
       RC[0] = 1.8; RC[1] = 0.45 + 0.5 * C.tele; RC[2] = 0.2;
       part(r, p, model, 'ring', t, LP0, 0, 0, 0, RC, 0);
     }
