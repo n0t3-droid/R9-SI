@@ -46,5 +46,12 @@
     img.forEach((x, y, i) => { const h = hh(x, y, 9152); if (h < 0.025) img.set(x, y, C(0xa4512a)); else if (h > 0.985) img.set(x, y, C(0x5e4636)); });   // rust and dark grains
     return K(img);
   };
+  // u-fields: the rubble bodies' carbon rubble — near-black brownish grey (albedo ~0.04, R§1.7), angular clasts a shade
+  // lighter, rare pale inclusions (the bright specks of primitive meteorites)
+  REC.carbon_rubble = () => {
+    const img = TX.natural([0x262321, 0x302c29, 0x3b3632, 0x47413b], { period: 5, oct: 3, speck: 0.1, speckDark: true, speck2: 0.03, seed: 9161, contrast: 1.0, rough: 0.98 });
+    img.forEach((x, y, i) => { const h = hh(x, y, 9162), c = hh(x >> 2, y >> 2, 9163); if (h < 0.012) { img.set(x, y, C(0xa8a296)); img.ro[i] = 0.6; } else if (c > 0.82 && h > 0.35) img.set(x, y, C(c > 0.93 ? 0x5a534b : 0x4e4842)); });   // pale specks, clasts
+    return K(img);
+  };
   void N;
 })(VR);
