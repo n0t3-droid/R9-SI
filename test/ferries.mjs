@@ -139,7 +139,11 @@ if (pad) {
 // ---------------------------------------------------------------- 3 · space and the star map
 if (want('space')) {
   await ev(() => { const g = VR.game; g.raumCommand('herz'); });
-  for (let i = 0; i < 30; i++) { await step(10, 33); await wait(200); }
+  // the view is shown once the worker has baked what it asked for (spacescene.js: ready, ≤ 45 s): wait for it
+  let sv = null; const tv = Date.now();
+  for (let i = 0; i < 400; i++) { await step(3, 33); sv = await ev(() => { const g = VR.game, need = VR.SpaceScene.cur_need || []; return g.space ? { ready: g.space.ready, frames: g.space.frames, done: need.filter(s => s.done).length, need: need.length } : { closed: true }; }); if (sv.closed || (sv.ready && sv.done === sv.need && sv.frames >= 3)) break; if (Date.now() - tv > 150000) break; await wait(60); }
+  console.log('  space view ' + JSON.stringify(sv) + ' after ' + ((Date.now() - tv) / 1000).toFixed(0) + ' s');
+  await step(10, 33);
   const sp = await ev(() => Object.assign({}, VR.Ferries.stats));
   run.space = sp; console.log('  space ' + JSON.stringify(sp));
   const ps = await grab('space_traffic.png', 4);
