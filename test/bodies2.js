@@ -99,5 +99,35 @@ console.log('e · the column time and the blocks');
   const last = R.types.slice(-2).map(t => t.name).join(', ');
   check(last === 'sulfur_red, so2_frost', `the last two blocks: ${last}`);
 }
+console.log('f · the skies and the life (bodysky.js, atmo_lut.js, bodylife2.js)');
+{
+  for (const f of ['klang', 'atmo_lut', 'bodysky', 'bodylife', 'bodylife2', 'i18n', 'lang_en', 'lang_de']) require('../src/main/' + f + '.js');
+  const BS = V.BodySky, B2 = V.BodyLife2, D2 = 180 / Math.PI;
+  // the parent's size: Amarant 37.2° over Zinnober, Herzwelt 22.9° over Aquamarin (U§2.1)
+  const z = BS.compute('zinn', [0.5, 66, 0.5], 100, { tier: 2 }), a = BS.compute('aqua', [0.5, 75, 0.5], 100, { tier: 2 });
+  const zA = 2 * Math.asin(1 / z.sky.par[3]) * D2, aH = 2 * a.sky.hz[3] * D2;
+  check(Math.abs(zA - 37.2) < 0.6 && !z.sky.airK[0], `Zinnober: Amarant ${zA.toFixed(1)}° wide (37.2°), no air`);
+  check(Math.abs(aH - 22.9) < 1.0 && a.sky.airK[0] === 1 && a.sky.par[3] > 1, `Aquamarin: Herzwelt ${aH.toFixed(1)}° wide (22.9° at the sub-Herzwelt point; the landing lies off it) and Amarant behind it, its air on`);
+  // Ocker's light by day and in a storm: Helia's light through τ 0.6 and τ 4.5
+  let tN = 0; for (let t = 0; t < 2400; t += 20) { const r = BS.compute('ocker', [0.5, 152, 0.5], t, {}); if (r.light.sunEl > 0.9) { tN = t; break; } }
+  BS.airState = null; BS.dustTau = 0.6; const o1 = BS.compute('ocker', [0.5, 152, 0.5], tN, { tier: 0 });
+  BS.airState = null; BS.dustTau = 4.5; const o2 = BS.compute('ocker', [0.5, 152, 0.5], tN, { tier: 0 });
+  BS.airState = null; BS.dustTau = 0.6;
+  const sk = o1.sky.air3, lab = V.AtmoLUT.lab(sk.slice(3, 6));
+  check(o1.light.sunColor[1] > 4 * o2.light.sunColor[1] && o2.light.ambSky[1] < o1.light.ambSky[1], `Ocker: Helia's light ${o1.light.sunColor[1].toFixed(2)} by day, ${o2.light.sunColor[1].toFixed(2)} in a storm (τ 4.5) — the day turns to dusk`);
+  check(lab[2] > 15, `Ocker's horizon by day butterscotch (b* ${lab[2].toFixed(0)}), Very Low's three stops ${sk.map(v => v.toFixed(2)).join(' ')}`);
+  // the life: Zinnober's plumes 5–6 km every ~2 min; Ocker's devils ~1 a minute; its storms to τ 4.5
+  const zg = new V.BodyGen(SEED, 'zinn'), prof = V.Bodies.profile('zinn');
+  let tops = [], fires = 0;
+  for (let t = 0; t < 3600; t += 5) { const pl = B2.plume(zg.vents()[0], t, prof, 1.8); if (pl.firing) fires++; if (pl.k > 0.9) tops.push(pl.top); }
+  const Hmax = Math.max(...tops);
+  check(Hmax >= 5000 && Hmax <= 6000 && fires * 5 / 3600 > 0.25 && fires * 5 / 3600 < 0.6, `Zinnober's vent: plumes up to ${(Hmax / 1000).toFixed(2)} km, firing ${(fires * 5 / 36).toFixed(0)} % of the time (every 100–140 s for 40–60 s)`);
+  const po = V.Bodies.profile('ocker'); let n = 0, seen = new Set();
+  for (let t = 0; t < 1800; t += 5) for (const d of B2.devils(t, 0, 0, po)) if (Math.hypot(d.x, d.z) < 1300 && d.k > 0.5) seen.add(d.slot);
+  n = seen.size;
+  check(n >= 20 && n <= 32, `Ocker: ${n} dust devils in view in 30 min (~1 a minute)`);
+  let tmax = 0; for (let t = 0; t < 15000; t += 10) tmax = Math.max(tmax, B2.storm(t, po).tau);
+  check(tmax > 4.4, `Ocker's storms reach τ ${tmax.toFixed(2)} within ~4 h of play`);
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

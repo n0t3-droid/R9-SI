@@ -137,7 +137,7 @@
         const want = this.cave ? CAVE_SEND : indoors ? ROOM_SEND : 0;
         if (want !== this.roomT) { this.roomT = want; this.room.gain.setTargetAtTime(want, t, 0.25); }
       }
-      const mu = L.underwater ? 900 : VR.BodyLife && VR.BodyLife.vacuum ? 700 : 20000;   // u-moons1: in vacuum the world is heard only through the suit (bodylife.js)
+      const mu = L.underwater ? 900 : VR.BodyLife && VR.BodyLife.vacuum ? (VR.BodyLife.thin ? 2500 : 700) : 20000;   // (u-moons2: thin)   // u-moons1: in vacuum the world is heard only through the suit (bodylife.js)
       if (mu !== this.muT) { this.muT = mu; this.sfxMuffle.frequency.setTargetAtTime(mu, t, 0.2); }
     }
     // where a sound is heard from: the pan (90 % of the side), the distance gain (half at 6 blocks, silent past HEAR)
@@ -145,11 +145,13 @@
     spatial(at) {
       const L = this.L, dx = at[0] - L.x, dy = at[1] - L.y, dz = at[2] - L.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > (VR.BodyLife && VR.BodyLife.vacuum ? 4 : HEAR)) return null;   // u-moons1: no air carries a sound — only what touches you
+      const thin = VR.BodyLife && VR.BodyLife.thin;   // u-moons2: Ocker's 6 mbar — heard to 24 blocks, the high tones gone within 8 (R§2.3)
+      if (d > (thin ? 24 : VR.BodyLife && VR.BodyLife.vacuum ? 4 : HEAR)) return null;   // u-moons1: no air carries a sound — only what touches you
       const rx = Math.cos(L.yaw), rz = -Math.sin(L.yaw), hl = Math.sqrt(dx * dx + dz * dz) || 1;
       const pan = clamp((dx * rx + dz * rz) / hl, -1, 1) * 0.9;
       let occ = 0;
       if (L.w) occ = clamp((L.sky - ((L.w.getLight(Math.floor(at[0]), Math.floor(at[1]), Math.floor(at[2])) >>> 12))) / 10, 0, 1);
+      if (thin) occ = Math.max(occ, Math.min(1, d / 8));   // u-moons2
       return { pan, gain: 1 / (1 + d / 6), occ };
     }
     // a slot for a world voice until it ends; past MAX_VOICES the new one is dropped

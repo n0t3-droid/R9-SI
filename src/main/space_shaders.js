@@ -685,6 +685,16 @@ uniform vec4 u_bsJs;       // their strengths (1 while the vent fires, fading as
 uniform vec4 u_bsJk;       // x the plumes' brightness, y the horizon's distance (blocks), z the moon's radius (blocks), w the eye over the ground
 uniform vec3 u_bsEye;      // u-orbit2: the eye (blocks) — the far ground's texture stands on the ground
 uniform vec2 u_bsLum;      // x Amarant's and its ring's brightness, y the other worlds' — the eye's exposure undone for them, so they read
+// ---- u-moons2: the skies with air (atmo_lut.js via bodysky.js), Herzwelt over Aquamarin, the plumes' shapes
+uniform vec4 u_bsAirK;     // x air (0 | 1), y the sky's scale (Helia × the LUT's units × the eye's), z 0 three stops (Very Low) | 1 the LUT, w the haze below the horizon
+uniform sampler2D u_bsAir; // the sky-view LUT (φ from Helia's azimuth, √-mapped; Hillaire's elevation), rgb radiance
+uniform vec4 u_bsAirS;     // its size (W, H), the stars' and the worlds' dimming by day (0 … 1), 0
+uniform vec3 u_bsAirT;     // the air's zenith optical depth (rgb): the view's transmittance exp(−τ / μ)
+uniform vec3 u_bsAir3[3];  // Very Low: the zenith, the horizon away from Helia, the horizon under Helia (scaled)
+uniform vec4 u_bsHz;       // Herzwelt: its unit direction, its angular radius (0: not in this sky)
+uniform vec4 u_bsHzX;      // its spin (radians), its clouds' drift, 0, 0
+uniform vec4 u_bsJu;       // the plumes' shape: x 0 ice jets (Opal) · 1 umbrellas (Zinnober) · 2 dust devils (Ocker), y the devils' width (m), z the time (s), w 0
+// ---- end u-moons2
                            //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
 const float BS_D2R = 0.0174532925;
 const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e, c]) => `vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
@@ -904,19 +914,123 @@ vec3 bsFarGround(vec3 D, float px) {
   }
   return g * (1.0 + v * 0.75);
 }
+// ---- u-moons2 · the air: the in-scattered light from the sky-view LUT (High … Low) or three stops (Very Low), and the
+// view's transmittance (the stars, Helia's disc, the worlds behind the air)
+vec3 bsAirSky(vec3 D) {
+  if (u_bsAirK.z < 0.5) {
+    float el = max(D.y, 0.0), k = sqrt(el);
+    vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
+    float wS = pow(max(dot(hs, hd), 0.0), 3.0) * (1.0 - k);
+    return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
+  }
+  vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
+  float ph = acos(clamp(dot(hs, hd), -1.0, 1.0)), u = sqrt(ph / 3.14159265);
+  float el = asin(clamp(D.y, -1.0, 1.0)), l = sign(el) * sqrt(abs(el) / 1.5707963);
+  vec2 uv = vec2((u * (u_bsAirS.x - 1.0) + 0.5) / u_bsAirS.x, 0.5 + 0.5 * l);
+  return texture(u_bsAir, uv).rgb * u_bsAirK.y;
+}
+vec3 bsAirTrans(vec3 D) { return exp(-u_bsAirT / max(D.y + 0.035, 0.035)); }
+// Herzwelt over Aquamarin: oceans, continents, clouds and the polar ice (our own noise, not its map), lit by Helia
+// with a soft terminator, its air a blue rim brightest against the light; the night side dark (no lights: no one there)
+vec3 bsHerz(vec3 D, vec3 col, float px) {
+  if (u_bsHz.w <= 0.0) return col;
+  vec3 C = u_bsHz.xyz; float c = dot(D, C);
+  if (c <= 0.0) return col;
+  float q = length(cross(D, C)) / u_bsHz.w;
+  if (q > 1.06) return col;
+  vec3 o = (D - C * c) / u_bsHz.w; float qq = min(q, 1.0);
+  vec3 N = o - C * sqrt(max(0.0, 1.0 - qq * qq));
+  float mus = dot(N, u_bsSun.xyz);
+  // its own frame: spun about the local up (its pole stands near the zenith's plane: a stated simplification)
+  float cs = cos(u_bsHzX.x), sn = sin(u_bsHzX.x);
+  vec3 P = vec3(cs * N.x - sn * N.z, N.y, sn * N.x + cs * N.z);
+  float land = vnoise3(P * 2.2 + 3.1) * 0.65 + vnoise3(P * 5.5 + 7.0) * 0.35;
+  float lat = abs(N.y);
+  vec3 alb = land > 0.56 ? mix(vec3(0.16, 0.2, 0.09), vec3(0.34, 0.28, 0.17), smoothstep(0.6, 0.75, land)) : vec3(0.02, 0.06, 0.13);
+  alb = mix(alb, vec3(0.8), smoothstep(0.82, 0.9, lat));
+  float cl = vnoise3(P * 6.0 + vec3(u_bsHzX.y, 0.0, 0.0)) * 0.6 + vnoise3(P * 14.0 + 2.0) * 0.4;
+  alb = mix(alb, vec3(0.85), smoothstep(0.52, 0.68, cl) * 0.9);
+  float lit = smoothstep(-0.06, 0.12, mus) * (0.35 + 0.65 * max(mus, 0.0));
+  vec3 hc = alb * u_bsSunCol * lit * u_bsLum.y * 1.6;
+  hc += vec3(0.25, 0.45, 1.0) * u_bsSunCol * 0.18 * pow(qq, 6.0) * smoothstep(-0.2, 0.3, mus) * u_bsLum.y;
+  col = mix(col, hc, 1.0 - smoothstep(1.0 - 1.5 * px / u_bsHz.w, 1.0, q));
+  // the air's rim beyond the limb
+  if (q > 1.0) col += vec3(0.3, 0.5, 1.0) * u_bsSunCol * 0.1 * exp(-(q - 1.0) / 0.012) * smoothstep(-0.3, 0.4, dot(o / max(q, 1e-3), u_bsSun.xyz)) * u_bsLum.y;
+  return col;
+}
+// Zinnober's umbrella plumes: sulfur-dioxide grains on ballistic arcs from the vent fill a paraboloid y = H − r²/4H
+// (R = 2H at the ground: Pele's ring), brightest in the caustic near its envelope, a faint core column; bluish-white
+// in Helia's light, strongest forward; 10 steps through the volume, only where the view meets its bounding cylinder
+vec3 bsUmbrella(vec3 D, vec3 col) {
+  float acc = 0.0;
+  for (int j = 0; j < 4; j++) {
+    vec4 J = u_bsJ[j];
+    float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
+    if (J.w <= 0.0 || js <= 0.0) continue;
+    float H = J.w, Rc = 2.0 * H;
+    // the view against the cylinder r ≤ Rc about the vent's axis, 0 ≤ y ≤ H
+    vec2 o2 = -J.xz, d2 = D.xz;
+    float a = dot(d2, d2), b = dot(o2, d2), c = dot(o2, o2) - Rc * Rc, h = b * b - a * c;
+    if (h <= 0.0 || a < 1e-8) continue;
+    float sh = sqrt(h), t0 = max((-b - sh) / a, 0.0), t1 = (-b + sh) / a;
+    if (t1 <= t0) continue;
+    if (D.y < -u_bsGround.w && t0 > u_bsJk.y) continue;
+    float dt = (t1 - t0) / 10.0, sum = 0.0;
+    for (int k = 0; k < 10; k++) {
+      float t = t0 + (float(k) + 0.5) * dt;
+      vec3 p = D * t - J.xyz;
+      if (p.y < 0.0 || p.y > H) continue;
+      float r = length(p.xz), ys = H - r * r / (4.0 * H);
+      if (ys < 0.0) continue;
+      float e = (p.y - ys) / (0.07 * H);
+      sum += (exp(-e * e) * 1.0 + (p.y < ys ? 0.12 : 0.0) + exp(-r * r / (0.0016 * H * H)) * 0.6 * (p.y < ys ? 1.0 : 0.0)) * dt;
+    }
+    acc += sum / H * 0.55 * js;
+  }
+  if (acc <= 0.0) return col;
+  float ph = 0.35 + 1.8 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 4.0);
+  return col + vec3(0.72, 0.84, 1.0) * u_bsSunCol * ph * (1.0 - exp(-acc)) * u_bsJk.x * 0.6;
+}
+// Ocker's dust devils: a narrow twisting column (u_bsJu.y wide at the foot, widening upward), dense at the foot,
+// thinning upward; the dust's colour lit by Helia and the sky, blended over the view (it hides what is behind)
+vec3 bsDevils(vec3 D, vec3 col) {
+  for (int j = 0; j < 4; j++) {
+    vec4 J = u_bsJ[j];
+    float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
+    if (J.w <= 0.0 || js <= 0.0) continue;
+    vec3 V = J.xyz;
+    float den = max(1.0 - D.y * D.y, 1e-4), dv = dot(D, V);
+    float s = (dv - D.y * V.y) / den, hh = (D.y * dv - V.y) / den;
+    if (s <= 0.0 || hh < 0.0 || hh > J.w) continue;
+    float wob = 0.35 * u_bsJu.y * (1.0 + hh / 120.0);
+    vec3 axis = vec3(sin(hh * 0.012 + u_bsJu.z * 0.7 + float(j)) * wob, hh, cos(hh * 0.009 + u_bsJu.z * 0.5 + float(j) * 2.0) * wob);
+    vec3 q = D * s - V - axis;
+    float w = u_bsJu.y * 0.5 * (1.0 + hh / 250.0), r2 = dot(q, q) / (w * w);
+    if (r2 > 4.0) continue;
+    float dens = exp(-r2 * 1.2) * exp(-hh / (0.35 * J.w)) * (1.0 - smoothstep(0.75 * J.w, J.w, hh)) * js;
+    float fil = 0.75 + 0.5 * vnoise3(vec3(atan(q.z, q.x) * 2.0 + hh * 0.02 - u_bsJu.z * 2.0, hh * 0.03, float(j)));
+    float al = clamp(dens * fil * 0.85, 0.0, 0.92);
+    vec3 dust = u_bsGround.rgb * (1.1 + 0.6 * max(u_bsSun.y, 0.0));
+    col = mix(col, dust, al);
+  }
+  return col;
+}
+// ---- end u-moons2
 vec3 bodySky(vec3 dir, bool withSun) {
   vec3 D = normalize(dir);
   float px = max(length(fwidth(D)), 1e-5);
   vec3 F = u_bsInert * D;
-  vec3 col = (bsStars(F) + bsGalaxy(F)) * u_bsSunK.z;
+  vec3 col = (bsStars(F) + bsGalaxy(F)) * u_bsSunK.z * (u_bsAirK.x > 0.5 ? 1.0 - u_bsAirS.z : 1.0);
   if (withSun) col += bsSunDisc(D);
   col = bsBodies(D, col, px);
   col = bsAmarant(D, col, px);
-  col = bsPlumes(D, col);
+  col = bsHerz(D, col, px);                                   // (u-moons2: Herzwelt over Aquamarin)
+  if (u_bsAirK.x > 0.5) col = col * bsAirTrans(D) + bsAirSky(D);   // (u-moons2: the air in front of it all)
+  col = u_bsJu.x > 1.5 ? bsDevils(D, col) : u_bsJu.x > 0.5 ? bsUmbrella(D, col) : bsPlumes(D, col);
   // the far ground below the true horizon (where the world's columns end): its lit colour, a one-pixel edge
   float gk = 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y);
-  if (gk > 0.0) col = mix(col, bsFarGround(D, px), gk);
-  if (withSun) col += bsGlare(D);
+  if (gk > 0.0) col = mix(col, u_bsAirK.x > 0.5 ? mix(bsFarGround(D, px), bsAirSky(D), u_bsAirK.w) : bsFarGround(D, px), gk);
+  if (withSun) col += bsGlare(D) * (u_bsAirK.x > 0.5 ? bsAirTrans(u_bsSun.xyz) : vec3(1.0));
   return col;
 }
 vec3 skyColor(vec3 dir, bool withSun) { return u_dim == 5 ? bodySky(dir, withSun) : skyColorHome(dir, withSun); }
