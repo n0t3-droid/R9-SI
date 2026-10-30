@@ -400,7 +400,7 @@
     g.ctxRow = res.row;
     // the prompt's words only when the resolution changed (10 Hz at most): no binding or language lookups in between
     if (res !== textRes) { textRes = res; const B = VR.Binds, code = B && B.current ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV'; text = C.text(res, code); }
-    show(text, res);
+    show(VR.FirstLook && !VR.FirstLook.keyFree(g) ? '' : text, res);   // (f-first R53-05: a story card owns V while it stands)
     touchIcon(res);
     // V: on foot a tap is the action and a hold the Heimkehr ring; a tool or a vehicle has V to itself
     const ringOk = res.row >= 3;

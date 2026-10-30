@@ -2826,6 +2826,9 @@
     'g.it.bedrock': "Bedrock",
     'g.it.obsidian': "Obsidian",
     'g.it.basalt': "Basalt",
+    'g.pause.more': "⋯ More",
+    'g.pause.less': "‹ Back",
+    'story.offer.card': "I'm picking up a signal …",
     // ---- f-first end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -2826,6 +2826,9 @@
     'g.it.bedrock': "Grundgestein",
     'g.it.obsidian': "Obsidian",
     'g.it.basalt': "Basalt",
+    'g.pause.more': "⋯ Mehr",
+    'g.pause.less': "‹ Zurück",
+    'story.offer.card': "Ich empfange ein Signal …",
     // ---- f-first end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

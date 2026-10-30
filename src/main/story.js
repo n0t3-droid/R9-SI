@@ -164,7 +164,8 @@
       const q = this.rec.later[b.id], again = !!(q && q.n > 0);
       this.offer = { b, t: 0 }; this.want = null; P.stats.offers++;
       const text = T(again ? 'story.remind' : 'story.offer', { key: keyLabel() });
-      const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(text); else if (g.ui && g.ui.hint) g.ui.hint(text, 4000);
+      const cardText = VR.FirstLook && hasDoc ? T('story.offer.card') : null;   // (f-first R53-05: the card shows the key — Funke's line names none)
+      const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(cardText || text); else if (g.ui && g.ui.hint) g.ui.hint(cardText || text, 4000);
       if (g.audio && g.audio.play) { try { g.audio.play('ping', { vol: 0.5 }); } catch (e) { /* a sound */ } }
       try { card(this); } catch (e) { /* the card is a convenience: [V] and the journal work without it */ }
       if (VR.EventLog) VR.EventLog.emit('story', b.id, 2, null, 'offer');   // a-regie: the offer is seen (Funke's line, the card) — not a beat (sessionstats counts beats without src 'offer'); taken at once, it and its beat are one moment

@@ -84,5 +84,24 @@ console.log('3 · the arrival on the wall clock (R53-06)');
   check(!a.hud && !c.hud, 'the HUD is back after it (hideHud restored)');
 }
 
+console.log('2 · one prompt per key; 4 · the pause menu\'s five (R53-05, R53-04)');
+{
+  global.VR.UI = global.VR.UI || null;
+  require('../src/main/firstlook.js');
+  const FL = VR.FirstLook, S = VR.Story = VR.Story || {};
+  const had = S.offer; let offer = null; S.offer = () => offer;
+  const g = {};
+  check(FL.keyFree(g) === true, 'no card: the Aktion\'s prompt may name V');
+  offer = { id: 'c1.b1' };
+  check(FL.keyFree(g) === false, 'a card stands: the prompt waits (the card owns V)');
+  S.offer = had;
+  const sel = FL.PRIMARY.map(s => s[0]);
+  check(FL.PRIMARY.length === 5 && sel[0].includes('resume') && sel[3].includes('settings') && sel[4].includes('quit') && FL.PRIMARY[1].join().includes('journal') && FL.PRIMARY[1].join().includes('codex'), 'the pause menu\'s top: five slots — ' + FL.PRIMARY.map(s => s.map(x => x.replace(/\[data-act="|"\]/g, '')).join('/')).join(' · '));
+  check(typeof de['g.pause.more'] === 'string' && typeof en['g.pause.more'] === 'string' && de['g.pause.less'] && en['g.pause.less'], '„' + de['g.pause.more'] + '" / „' + de['g.pause.less'] + '" in both tables');
+  check(!/\{key\}|\[/.test(de['story.offer.card'] + en['story.offer.card']), 'Funke\'s offer beside the card names no key: „' + de['story.offer.card'] + '"');
+  const fs = require('fs'), story = fs.readFileSync(path.join(__dirname, '..', 'src/main/story.js'), 'utf8'), ctx = fs.readFileSync(path.join(__dirname, '..', 'src/main/ctx.js'), 'utf8');
+  check(/cardText \|\| text/.test(story) && /VR\.FirstLook\.keyFree\(g\)/.test(ctx), 'story.js speaks the line without the key, ctx.js asks keyFree before its prompt');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
