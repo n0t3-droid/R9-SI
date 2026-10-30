@@ -141,6 +141,10 @@ console.log('g · the worlds\' melt');
   const before = s.lastIndexOf('#ifdef LIGHT2', i), endif = s.lastIndexOf('#endif', i);
   check(i > 0 && before > endif, 'the melt\'s tint behind LIGHT2 (Low and up)');
   check(/u_lavaTint/.test(fs.readFileSync(SRC + 'main/renderer.js', 'utf8')), 'the renderer sets it (VR.Polish.off.lava: the base\'s)');
+  const ld = s.indexOf('u_dim == 5 && u_lavaTint', i + 10), ldB = s.lastIndexOf('#ifdef LIGHT2', ld), ldE = s.lastIndexOf('#endif', ld);
+  check(ld > 0 && ldB > ldE, 'the far tiles\' melt too (LOD_FS, behind LIGHT2)');
+  const bsrc = fs.readFileSync(SRC + 'main/bodysky.js', 'utf8'), lc = bsrc.match(/lakeC: (.*)\n/);
+  check(!!lc && /Polish\.off\.lava/.test(lc[1]) && /\[1\.0, 0\.24, 0\.03\]/.test(lc[1]), 'the sky\'s far Glutsee deep orange (G/R 0.24, was 0.42)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

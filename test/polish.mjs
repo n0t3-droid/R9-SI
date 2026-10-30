@@ -108,10 +108,14 @@ await section('boss', async () => {
   // from 60 m on the side the player came from, a little above
   const P60 = await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, m = VR.RPGBoss.cur.m, cx = A ? A.x : m.pos[0] - 9, cz = A ? A.z : m.pos[2]; let dx = m.pos[0] - cx, dz = m.pos[2] - cz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; const ax = -dz, az = dx, x = m.pos[0] + (dx * 0.5 + ax * 0.87) * 60, z = m.pos[2] + (dz * 0.5 + az * 0.87) * 60; window.__bossAt = { p: m.pos.slice(), yaw: m.yaw }; return { x, z, y: Math.max(g.world.topAt(Math.floor(x), Math.floor(z)) + 3, m.pos[1] + 6), t: [m.pos[0], m.pos[1] + 4, m.pos[2]] }; });
   await ev(() => { const p = VR.game.player; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; });
+  // (only the boss: the drones and the helpers out of the picture; a 38° view so 60 m reads)
+  await ev(() => { const g = VR.game, b = VR.RPGBoss.cur.m; for (let i = g.entities.mobs.length - 1; i >= 0; i--) if (g.entities.mobs[i] !== b) g.entities.mobs.splice(i, 1); window.__fov0 = g.settings.fov; g.settings.fov = 38; });
   await pair('Turmgänger aus 60 m: dunkler Unterrumpf, glühender Rand (vorher | nachher)', 'hull', ['hull'], async () => {
+    await ev(() => { const g = VR.game, b = VR.RPGBoss.cur.m; for (let i = g.entities.mobs.length - 1; i >= 0; i--) if (g.entities.mobs[i] !== b) g.entities.mobs.splice(i, 1); });
     await tp(P60.x, P60.y, P60.z); await aim(P60.t); await step(2);
     await ev(() => { const B = VR.RPGBoss.cur, a = window.__bossAt; if (B && a) { B.m.pos[0] = a.p[0]; B.m.pos[1] = a.p[1]; B.m.pos[2] = a.p[2]; B.m.yaw = a.yaw; } });
   }, 1);
+  await ev(() => { VR.game.settings.fov = window.__fov0 || 75; });
   // the cracks from 13 m above, 9 m off the obelisk
   const pc = await ev(() => { const A = VR.RPGBoss2.arena; return { x: A.x + 2, z: A.z + 12, y: A.y + 13, t: [A.x - 1, A.y, A.z - 2] }; });
   // a one-block step across half the ring (the arena's ground was flat here; a-boss2's pictures had hills)
@@ -167,7 +171,7 @@ await section('port', async () => {
   run.port = q; console.log('  ' + JSON.stringify(q));
   check(!!q.ours, 'our search finds a place for the port ' + JSON.stringify(q.ours && { x: q.ours.x, y: q.ours.y, z: q.ours.z, how: q.stats.found }));
   if (!q.ours) return;
-  const s = q.ours, cam = [s.x - 26, s.y + 30, s.z + 40], tgt = [s.x, s.y + 2, s.z];
+  const s = q.ours, ux = s.x - spawn[0], uz = s.z - spawn[2], ul = Math.hypot(ux, uz) || 1, cam = [s.x + ux / ul * 42, s.y + 24, s.z + uz / ul * 42], tgt = [s.x - ux / ul * 6, s.y + 1, s.z - uz / ul * 6];
   await ev(() => { const p = VR.game.player; p.noclip = true; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; });
   await off(['port'], true); await tp(...cam); await settle(30); await aim(tgt); await step(2);
   const b = await grab('polish_port_before.png', 3);
