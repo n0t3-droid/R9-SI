@@ -150,6 +150,51 @@
     sky: { parent: 'amarant', ground: [0.86, 0.88, 0.92] },
   });
 
+  // ---- u-moons2: the three worlds of wave 5 (gen_body2.js builds them; plan docs/superpowers/plans/2026-10-30-u-moons2.md)
+  // Zinnober: Io's kind (R§5.5) — paterae 6–27 km real (90–420 m), a quarter with lava lakes, flows, sulfur plains in four
+  // colours, crustal mountain blocks 8–17 km real (125–265 m; the world top caps the highest), umbrella plumes 300–400 km
+  // real (5–6 km) from six active vents, one every ~2 min; locked, Amarant 37.2° fixed high in the south-west; 1.61 h a day
+  def('zinn', {
+    kind: 'volcanic', ice: false, g: 1.80, R: 28437.5, level: 64, day: 5796, albedo: 0.6,
+    name: { de: 'Zinnober', en: 'Cinnabar' },
+    craters: { A: 0.0004, highland: 1, young: 0, boulders: 0 },        // (Io: no impact crater seen — the surface is young)
+    paterae: { cell: 900, p: 0.55, D: [90, 420], depth: [12, 34], lake: 0.25 },
+    mountains: { cell: 3200, p: 0.32, h: [125, 265], r: [260, 820] },
+    landmark: { x: 60, z: -430, D: 260, depth: 22 },                    // the Glutsee: a lava lake 17 km real by the landing
+    plume: { n: 6, every: [100, 140], dur: [40, 60], height: [5000, 6000], canopy: 1.15 },
+    spawn: { x: 0, z: 0 },
+    sky: { parent: 'amarant', ground: [0.62, 0.55, 0.3] },
+  });
+  // Ocker: Mars' kind (R§2.3, §5.4) — the plain at y 150 so the Rostschlucht fits (145 m = Valles' 9.3 km ÷ 64), barchans
+  // at real size (4–9 m high), mesas, softened craters, the Ockerdom (240 m = 15 km real, 5.3 km north; the world top caps it — a stated
+  // compression), dust devils with dark tracks; 6 mbar CO₂ and dust (atmo_lut.js); 40 min a day
+  def('ocker', {
+    kind: 'dust', ice: false, g: 3.72, R: 52968.75, level: 150, day: 2400, albedo: 0.25, air: true,
+    name: { de: 'Ocker', en: 'Ochre' },
+    craters: { A: 0.0093, highland: 1, young: 0, boulders: 0 },
+    dunes: { cell: 170, L: [60, 160], hk: 0.06, wind: 0.35 },
+    mesas: { cell: 1500, p: 0.42, r: [70, 260], h: [25, 55] },
+    canyon: { z0: 1150, half: 700, depth: 145 },
+    shield: { x: 500, z: -5300, R: 4300, h: 240, scarp: 60, caldera: 1250 },
+    devils: { every: 60, w: [16, 40], h: [300, 800], tracks: { cell: 520, w: [5, 12] } },
+    storm: { tauClear: 0.5, tauStorm: 4.5 },
+    spawn: { x: 0, z: 0 },
+    sky: { parent: 'amarant', ground: [0.5, 0.3, 0.17] },
+  });
+  // Aquamarin: the ocean moon — the sea at y 63, archipelagos, drowned-crater atolls (ring islands round lagoons), sea
+  // stacks; 0.5 bar, 2.4× Earth's air column; locked to Herzwelt (22.9° overhead); 2.21 h a day
+  def('aqua', {
+    kind: 'ocean', ice: false, g: 2.01, R: 37500, level: 63, day: 7956, albedo: 0.1, air: true, sea: 63,
+    name: { de: 'Aquamarin', en: 'Aquamarine' },
+    craters: { A: 0.0004, highland: 1, young: 0, boulders: 0 },
+    atolls: { cell: 1700, p: 0.55, R: [110, 380] },
+    landmark: { x: 520, z: -260, R: 230 },                              // an atoll in sight of the landing
+    islands: { scale: 900, thr: 0.3 },
+    spawn: { x: 0, z: 0 },
+    sky: { parent: 'herz', ground: [0.06, 0.14, 0.18] },
+  });
+  // ---- end u-moons2
+
   const Bodies = VR.Bodies = {
     BGEN, L, ids: Object.keys(PROFILES), SLOPE, D0, OCT,
     // (the radius from VR.Universe once it is there: universe.js loads after this file)

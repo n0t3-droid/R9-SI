@@ -28,5 +28,17 @@
     img.forEach((x, y, i) => { if (hh(x, y, 9123) < 0.015) img.em[i] = 0.18; });   // a glint of ice
     return K(img);
   };
+  // ---- u-moons2: Zinnober's two (bodies2.js) — red sulfur, grainy and crusted; SO₂ frost, white with a faint blue-grey
+  REC.sulfur_red = () => {
+    const img = TX.natural([0x8a2a18, 0xa63a20, 0xbc4a26, 0xcf6232], { period: 5, oct: 3, speck: 0.06, speckDark: true, seed: 9131, contrast: 1.0, rough: 0.9 });
+    img.forEach((x, y, i) => { if (hh(x, y, 9132) < 0.02) img.set(x, y, C(0xd9852f)); });   // flecks relaxing to orange
+    return K(img);
+  };
+  REC.so2_frost = () => {
+    const img = TX.natural([0xc9cbc6, 0xd8dad4, 0xe6e7e0, 0xf2f2ea], { period: 5, oct: 3, speck: 0.03, seed: 9141, contrast: 0.8, rough: 0.7 });
+    img.forEach((x, y, i) => { if (hh(x, y, 9142) < 0.015) { img.set(x, y, C(0xe8d27a)); } });   // a few sulfur grains in the frost
+    return K(img);
+  };
+  // ---- end u-moons2
   void N;
 })(VR);

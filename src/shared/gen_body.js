@@ -24,7 +24,7 @@
   const M = VR.M, B = VR.Bodies;
   const ss = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const TAU = Math.PI * 2;
-  const ID_SEED = { basalt: 0xba5a17, opal: 0x0a1c3e };
+  const ID_SEED = { basalt: 0xba5a17, opal: 0x0a1c3e, zinn: 0x217b0b, ocker: 0x0c4e12, aqua: 0x0a9a3a };   // (u-moons2: the last three)
   let S_ = null;
   // the states, resolved once the registry is complete
   function S() {
@@ -62,6 +62,8 @@
       this.id = id; this.prof = B.profile(id);
       if (!this.prof) throw new Error('BodyGen: no such body ' + id);
       this.kind = this.prof.kind; this.ice = !!this.prof.ice;
+      // u-moons2: the kinds of gen_body2.js (volcanic, dust, ocean) are subclasses — `new BodyGen(…)` hands one back
+      if (new.target === BodyGen && VR.BodyGenKinds && VR.BodyGenKinds[this.kind]) return new VR.BodyGenKinds[this.kind](seed, id, opts);
       const bg = opts && opts.bgen && opts.bgen[id];
       this.bgen = bg > 0 ? bg : B.BGEN;
       const s = (this.seed ^ ID_SEED[id]) >>> 0, F = VR.Fractal;
@@ -83,7 +85,7 @@
         const L = P.landmark;
         this.landmark = this.makeCrater(L.x, L.z, L.D, L.age, -1, 0x1a2b);
         this.landmark.mare = 1; this.landmark.landmark = true;
-      } else {
+      } else if (this.kind === 'ice') {   // (u-moons2: the other kinds set themselves up in gen_body2.js)
         this.nBase = new F(s ^ 0x11, 3, 1 / 700, 0.5);
         this.nFine = new F(s ^ 0x12, 2, 1 / 90, 0.5);
         this.nLin = [0, 1, 2].map(j => new F(s ^ (0x21 + j), 2, 1, 0.5));
