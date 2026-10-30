@@ -42,7 +42,11 @@
   class Audio {
     constructor() {
       this.ctx = null; this.enabled = true;
-      this.vol = { master: 0.8, sfx: 0.9, music: 0.45, ambient: 0.6 };
+      this.vol = { master: 0.8, sfx: 0.9, music: 0.45, ambient: 0.6, voice: 0.8 };
+      // e-music: the adaptive score (score.js's director on the audio clock, scoresynth.js's voices); Very Low: fewer voices,
+      // no reverb on the music (setLowEnd)
+      this.score = VR.Score ? new VR.Score.Director({ seed: 1 }) : null; this.scoreDay = -1; this.run = null; this.lowEnd = false;
+      this.mvEnd = []; this.mvN = []; this.sc = {}; this.wanders = 0; this.tickNext = 0;
       this.loops = {};
       this.music = { next: 0, bar: 0, chord: 0, mood: 'day', intensity: 0, scan: 0, hostile: false, village: false, duckT: 1, planDay: -1, plan: null, rng: null };
       this.L = { x: 0, y: 0, z: 0, yaw: 0, sky: 15, underwater: false, w: null };
@@ -69,7 +73,10 @@
       this.worldIn.connect(this.room);
       this.amb = c.createGain(); this.amb.gain.value = this.vol.ambient; this.amb.connect(this.master);
       this.mus = c.createGain(); this.mus.gain.value = this.vol.music; this.mus.connect(this.master);
-      this.musDuck = c.createGain(); this.musDuck.gain.value = 1; this.musDuck.connect(this.mus);   // a hostile mob ducks it
+      this.musTalk = c.createGain(); this.musTalk.gain.value = 1; this.musTalk.connect(this.mus);   // e-music: dialogue ducks all the music
+      this.musDuck = c.createGain(); this.musDuck.gain.value = 1; this.musDuck.connect(this.musTalk);   // a hostile mob ducks the calm layers
+      this.musAct = c.createGain(); this.musAct.gain.value = 1; this.musAct.connect(this.musTalk);   // e-music: the fight's music (not ducked by the mob)
+      this.vox = c.createGain(); this.vox.gain.value = this.vol.voice; this.vox.connect(this.master);   // e-music: Stimmen (Funke, the villagers)
       // one convolver at a time: the room's impulse, or the cave's while the send is muted (swapped in listen)
       this.irRoom = impulse(c, 1.3, 0.9, false, 0.004, 0x51ed1);
       this.irCave = impulse(c, 2.6, 2.4, true, 0.03, 0xca7e);
@@ -83,7 +90,13 @@
       if (c.state === 'suspended') c.resume();
     }
     resume() { if (!this.ctx) this.init(); else if (this.ctx.state === 'suspended') this.ctx.resume(); }
-    setVolumes(v) { Object.assign(this.vol, v); if (!this.ctx) return; this.master.gain.value = this.vol.master; this.sfx.gain.value = this.vol.sfx; this.mus.gain.value = this.vol.music; this.amb.gain.value = this.vol.ambient; }
+    setVolumes(v) {
+      Object.assign(this.vol, v); if (v && v.calm !== undefined && this.score) this.score.calm = !!v.calm;   // e-music: Ruhige Musik
+      if (!this.ctx) return; this.master.gain.value = this.vol.master; this.sfx.gain.value = this.vol.sfx; this.mus.gain.value = this.vol.music; this.amb.gain.value = this.vol.ambient;
+      if (this.vox) this.vox.gain.value = this.vol.voice === undefined ? 0.8 : this.vol.voice;
+    }
+    // e-music · Very Low: the music sends nothing into the convolver, and plays fewer voices (musCap)
+    setLowEnd(on) { this.lowEnd = !!on; if (!this.ctx || !this.musRev) return; this.musRev.disconnect(); if (!this.lowEnd && this.rev) this.musRev.connect(this.rev); }
     count(name) { this.counts[name] = (this.counts[name] | 0) + 1; }
     prune() { const live = this.live, now = this.ctx ? this.ctx.currentTime : 0; let k = 0; for (let i = 0; i < live.length; i++) if (live[i] > now) live[k++] = live[i]; live.length = k; return k; }
     stats() { return { voices: this.prune(), counts: this.counts, notes: this.noteCount }; }
@@ -97,7 +110,7 @@
       const c = this.ctx;
       if (this.rev) { this.room.disconnect(); this.musRev.disconnect(); this.rev.disconnect(); }
       this.rev = c.createConvolver(); this.rev.buffer = buf;
-      this.room.connect(this.rev); this.musRev.connect(this.rev); this.rev.connect(this.revGain);
+      this.room.connect(this.rev); if (!this.lowEnd) this.musRev.connect(this.rev); this.rev.connect(this.revGain);
     }
     brass(f, t, dur, gain) {
       const c = this.ctx; if (!c) return;
@@ -422,6 +435,7 @@
     }
     updateMusic(dt, s) {
       if (!this.ctx || this.vol.music <= 0 || s.enabled === false) return;
+      if (this.score) return this.scoreMusic(dt, s);   // e-music: the adaptive score
       const c = this.ctx, now = c.currentTime, M = this.music;
       // four times a second: is a hostile mob near (the music ducks), is a villager near (the tick)
       M.scan -= dt;
@@ -465,6 +479,7 @@
         else this.calmNote(n.midi, n.kind, n.dur, t0 + n.t, n.gain);
       }
       M.next = Math.max(M.next || 0, t0 + 4 * L + 0.4);
+      if (this.score) this.score.event('hold', c.currentTime, t0 + 4 * L + 0.4);   // e-music: the score waits for the swell
       return notes.length;
     }
     // one scheduled note of the calm layer: logged (for the tests), then played into the ducked music bus
@@ -519,6 +534,60 @@
       flt.connect(g); g.connect(this.musDuck);
     }
     pluck(f, t, dur, gain, type) { this.tone(f, gain, dur, type || 'triangle', false, t, this.musDuck); }
+
+    // ---------------- e-music · the adaptive score: the director looks four times a second (score.js), the cue's notes are
+    // scheduled half a second ahead on the audio clock (scoresynth.js), within the voice cap; per frame only a compare
+    musCap() { return this.lowEnd ? 10 : 28; }
+    musVoices() {
+      const now = this.ctx ? this.ctx.currentTime : 0, E = this.mvEnd, N = this.mvN; let k = 0, sum = 0;
+      for (let i = 0; i < E.length; i++) if (E[i] > now) { E[k] = E[i]; N[k] = N[i]; sum += N[i]; k++; }
+      E.length = k; N.length = k; return sum;
+    }
+    // a moment from the game: 'wonder' (a vista, a first visit), 'funke' (he arrives), 'freeing' (an outpost freed)
+    cue(name) { if (!this.ctx || !this.score || this.vol.music <= 0) return false; return this.score.event(name, this.ctx.currentTime, this.ctx.currentTime + 4.2); }
+    scoreMusic(dt, s) {
+      const c = this.ctx, now = c.currentTime, M = this.music, D = this.score, SC = VR.Score;
+      M.scan -= dt;
+      if (M.scan <= 0) {
+        M.scan = 0.25; M.hostile = this.hostileNear(s.mobs); M.village = this.villageNear(s.agents);
+        const day = s.day | 0;
+        if (this.scoreDay !== day) { this.scoreDay = day; M.plan = K.musicPlan(day); if (D.log.length === 0) D.reseed(K.seedOf(day) ^ 0x5c0e); }
+        const x = SC.gather(s.g || VR.game, s, this.sc);
+        x.hostile = M.hostile; if (s.dialogue) x.dialogue = true; if (s.boss) x.boss = s.boss; if (s.outpost) x.outpost = true;
+        const act = D.step(now, x);
+        M.mood = x.festival ? 'festival' : D.cue ? D.cue.id : 'quiet';
+        if (act && act.type === 'start') this.startCue(act);
+        else if (act && act.type === 'fade' && this.run) { const r = this.run; r.bus.gain.setTargetAtTime(0.0001, now, act.len / 4); r.stopAt = now + act.len; }
+        const duck = (M.hostile || s.danger) ? 0.25 : 1;
+        if (duck !== M.duckT) { M.duckT = duck; this.musDuck.gain.setTargetAtTime(duck, now, duck < 1 ? 0.6 : 2.5); }
+        const talk = x.dialogue ? 0.35 : 1;
+        if (talk !== M.talkT) { M.talkT = talk; this.musTalk.gain.setTargetAtTime(talk, now, talk < 1 ? 0.15 : 0.8); }
+        if (x.festival && now + 0.2 >= M.next) this.festivalBar(now);
+      }
+      const r = this.run; if (!r) return;
+      // the notes due in the next half second (usually none: one compare)
+      const evs = r.evs, cap = this.musCap(), SY = VR.ScoreSynth;
+      while (r.i < evs.length && r.t0 + evs[r.i].t < now + 0.5) {
+        const e = evs[r.i++], t = Math.max(now + 0.01, r.t0 + e.t);
+        if (t >= r.stopAt) { r.i = evs.length; break; }
+        const v = SY.voicesOf(e.inst, this.lowEnd), live = this.musVoices();
+        if (live + v > cap || (e.pri < 2 && live + v > cap * 0.75)) continue;   // full: the ornaments go first
+        if (e.midi) { const i = this.noteCount & 511; this.noteLog[i] = e.midi; this.noteCount++; }
+        const out = SY.note(c, r.bus, e, t, { lowEnd: this.lowEnd, rev: this.lowEnd ? null : this.musRev });
+        this.mvEnd.push(out.end); this.mvN.push(v);
+      }
+      // a village: the soft tick on the beat while a calm cue plays
+      if (M.village && r.id !== 'adventure' && now < r.stopAt && now >= r.t0 && now + 0.1 >= this.tickNext) { const tt = Math.max(now + 0.05, this.tickNext); this.tick(tt, 0.03); this.count('tick'); this.tickNext = tt + 0.56; }
+      if (r.i >= evs.length && now > r.stopAt + 2) this.run = null;
+    }
+    startCue(a) {
+      const c = this.ctx, SC = VR.Score, D = this.score;
+      if (this.run) { this.run.bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.3); this.run.stopAt = Math.min(this.run.stopAt, c.currentTime); }
+      const bus = c.createGain(); bus.gain.value = 1; bus.connect(a.id === 'adventure' ? this.musAct : this.musDuck);
+      const evs = SC.events(a.id, { plan: this.music.plan || K.musicPlan(0), lv: a.lv, variant: a.variant, calm: D.calm, lowEnd: this.lowEnd, seed: (K.seedOf(this.scoreDay) ^ (0x51ed + 977 * this.wanders++)) >>> 0 });
+      this.run = { id: a.id, evs, i: 0, t0: a.at, stopAt: a.at + a.dur + 0.01, bus };
+      this.count('cue_' + a.id);
+    }
     kick(t, gain) { const c = this.ctx; const o = c.createOscillator(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.15); const g = c.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25); o.connect(g); g.connect(this.musDuck); o.start(t); o.stop(t + 0.3); }
   }
   VR.Audio = Audio;
