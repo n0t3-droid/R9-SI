@@ -523,6 +523,7 @@ void main() {
       drawTranslucent: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'trans'); if (g.trails) g.trails.draw(r2, E2); } });
     if (g.cockpit) g.cockpit.updateHud(dt);
     if (g.audio && g.audio.listen) g.audio.listen(eye, p.yaw, null, false);
+    if (g.ambience) g.ambience.update(dt, { space: true });   // e-music2: space is silent but for the cockpit's hum (ambience.js 'cabin')
     if (g.audio && g.audio.updateMusic) g.audio.updateMusic(dt, { night: 1, cave: false, danger: false, space: true, festival: false, enabled: true, day: g.env.day, mobs: null, agents: null });
     ui.updateHUD();
     if (g.settings.showFps) ui.fps(T('g.hud.fps', { n: Math.round(g.fps || 0) }));
