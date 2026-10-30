@@ -125,7 +125,7 @@ if (!ONLY || ONLY === 'zinn') {
   // a firing vent with Helia 12–30° up, the camera 10 km from it with Helia behind the plume
   const tp = await A.ev(([v]) => { const BS = VR.BodySky, P = VR.Bodies.profile('zinn'), vent = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}).vents()[0];
     for (let t = 200; t < 60000; t += 5) { const pl = VR.BodyLife2.plume(vent, t, P, 1.8); if (pl.k < 0.6 || pl.top < 0.9 * pl.H) continue; const L = BS.compute('zinn', [v.x, 70, v.z], t, { tier: 0 }).light; const h = Math.hypot(L.sunDir[0], L.sunDir[2]); if (h < 0.1) continue;
-      const cx = v.x - L.sunDir[0] / h * 17000, cz = v.z - L.sunDir[2] / h * 17000, Lc = BS.compute('zinn', [cx, 70, cz], t, { tier: 0 }).light; if (Lc.sunEl > 0.22 && Lc.sunEl < 0.5) return { t, cx, cz }; } return null; }, [Z.v]);
+      const cx = v.x + L.sunDir[2] / h * 17000, cz = v.z - L.sunDir[0] / h * 17000,   /* (17 km off, Helia to the side: run 4 found no moment with Helia behind the plume that far) */ Lc = BS.compute('zinn', [cx, 70, cz], t, { tier: 0 }).light; if (Lc.sunEl > 0.2 && Lc.sunEl < 0.6) return { t, cx, cz }; } return null; }, [Z.v]);
   if (tp) {
     const cx = tp.cx, cz = tp.cz, ux = Z.v.x - cx, uz = Z.v.z - cz;
     await view(A, 'zinn', cx, cz, 40, yawTo(ux, uz), 0.16, tp.t, 120);
