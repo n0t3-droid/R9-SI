@@ -211,9 +211,31 @@
       o0 += T0 * S0 * (1 - st0) / e0; o1 += T1 * S1 * (1 - st1) / e1; o2 += T2 * S2 * (1 - st2) / e2;
       T0 *= st0; T1 *= st1; T2 *= st2;
     }
+    // the thick dust's diffuse light (a two-stream floor): where τ > 1 the second order of Ψ_ms falls short of the
+    // light that many forward scatterings carry down (Mars at τ 4.5 still gets ~5 % of a clear day, mostly diffuse);
+    // the field's source J ≈ E_dif / π (Eddington: E_dif = μ₀ / (1 + ¾ τ (1 − g)) · e^(−2τ(1 − ω)) − the direct part),
+    // seen along the view as J (1 − e^(−τ_view)); faded in over τ 1 … 3, so a clear sky keeps its own light
+    const D = C.dif;
+    if (D && D.w > 0) {
+      const mu0 = sun[1];
+      if (mu0 > -0.1) {
+        const m0 = Math.max(mu0, 0.02) * ss01((mu0 + 0.1) / 0.2);
+        o0 += D.w * difJ(D.t[0], D.g[0], D.om[0], m0) * (1 - T0);
+        o1 += D.w * difJ(D.t[1], D.g[1], D.om[1], m0) * (1 - T1);
+        o2 += D.w * difJ(D.t[2], D.g[2], D.om[2], m0) * (1 - T2);
+      }
+    }
     out[0] = o0; out[1] = o1; out[2] = o2;
     if (tv) { tv[0] = T0; tv[1] = T1; tv[2] = T2; }
     return out;
+  }
+  const ss01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+  function difJ(tau, g, om, m0) { const tot = m0 / (1 + 0.75 * tau * (1 - g)) * Math.exp(-2 * tau * (1 - om)), dir = m0 * Math.exp(-tau / m0); return Math.max(0, tot - dir) / Math.PI; }
+  // the column's numbers for the floor: τ (Mie + Rayleigh) per channel, the mean g and ω of the dust, the fade-in
+  function difOf(a) {
+    const tM = a.bMs.map((v, i) => (v + a.bMa[i]) * a.HM), tR = a.bR.map(v => v * a.HR), t = tM.map((v, i) => v + tR[i]);
+    const om = a.bMs.map((v, i) => (v + a.bR[i] * a.HR / a.HM) / Math.max(1e-12, v + a.bMa[i] + a.bR[i] * a.HR / a.HM));
+    return { t, g: a.gM, om, w: 0.6 * ss01((Math.max(...tM) - 1) / 2) };
   }
 
   // ---------------------------------------------------------------- the context: the LUTs of one air
@@ -221,12 +243,12 @@
   function context(air, opts) {
     const W = (opts && opts.W) || 48, H = (opts && opts.H) || 24;
     const C = { air, W, H, T: null, MS: null, sky: new Float32Array(W * H * 4), row: 0, done: false, h: 0, sun: [0, 1, 0], sunEl: PI / 2, stamp: 0, builds: 0 };
-    C.T = buildT(air); C.MS = buildMS(C);
+    C.T = buildT(air); C.MS = buildMS(C); C.dif = difOf(air);
     return C;
   }
   // a new air for the same context (the dust's τ changed): the two small LUTs again, the sky-view from the top
   // (at once — the tests, the first frame on a world)
-  function setAir(C, air) { if (C.air.key === air.key) return C; C.air = air; C.T = buildT(air); C.MS = buildMS(C); C.row = 0; C.done = false; C.next = null; return C; }
+  function setAir(C, air) { if (C.air.key === air.key) return C; C.air = air; C.T = buildT(air); C.MS = buildMS(C); C.dif = difOf(air); C.row = 0; C.done = false; C.next = null; return C; }
   // staged: the new air's T and Ψ_ms built a few rows a frame inside update's budget, then swapped in (a storm's τ
   // ramps over minutes: no frame pays the ~50 ms of a whole rebuild)
   function stageAir(C, air) { if (C.air.key === air.key || (C.next && C.next.air.key === air.key)) return C; C.next = { air, T: new Float32Array(TW * TH * 3), MS: new Float32Array(MW * MH * 3), jT: 0, jM: 0 }; return C; }
@@ -235,7 +257,7 @@
     while (N.jT < TH) { buildT(N.air, N.T, N.jT, N.jT + 1); N.jT++; if (now() > until) return false; }
     const tmp = { air: N.air, T: N.T, MS: N.MS };
     while (N.jM < MH * MW) { const j = (N.jM / MW) | 0, i = N.jM % MW; buildMS(tmp, N.MS, j, j + 1, i, i + 1); N.jM++; if (now() > until) return false; }
-    C.air = N.air; C.T = N.T; C.MS = N.MS; C.next = null; C.row = 0;
+    C.air = N.air; C.T = N.T; C.MS = N.MS; C.dif = difOf(N.air); C.next = null; C.row = 0;
     return true;
   }
   // the sky-view's (u, v) ↔ a direction: φ from the sun's azimuth (u = √(φ/π)), θ the elevation (v non-linear)
@@ -253,13 +275,15 @@
   function update(C, h, sunEl, nRows, budget) {
     const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()), until = budget > 0 ? now() + budget : Infinity;
     if (C.next && !stepNext(C, until)) return false;
-    if (C.row === 0) { C.h = h; C.sunEl = sunEl; C.sun = [Math.cos(sunEl), Math.sin(sunEl), 0]; }
+    if (C.row === 0 && !C.col) { C.h = h; C.sunEl = sunEl; C.sun = [Math.cos(sunEl), Math.sin(sunEl), 0]; }
     const W = C.W, H = C.H, end = Math.min(H, C.row + (nRows || H));
-    for (let j = C.row; j < end; j++) for (let i = 0; i < W; i++) {
+    for (let j = C.row; j < end; j++) for (let i = j === C.row ? (C.col || 0) : 0; i < W; i++) {
       dirOf(i / (W - 1), (j + 0.5) / H, C.sunEl, _d);
       ray(C, C.h, _d, C.sun, _o, null);
       const k = (j * W + i) * 4;
       C.sky[k] = _o[0]; C.sky[k + 1] = _o[1]; C.sky[k + 2] = _o[2]; C.sky[k + 3] = 1;
+      if ((i & 15) === 15 && i < W - 1 && now() > until) { C.row = j; C.col = i + 1; return false; }   // (a slice may end inside a row: High's rows are long)
+      if (i === W - 1) C.col = 0;
       if (i === W - 1 && now() > until) { C.row = j + 1; if (C.row >= H) break; return false; }
     }
     C.row = end;
@@ -282,7 +306,7 @@
   }
   // Helia's light at the eye: the transmittance toward it (its disc's colour)
   function sunTrans(C, h, sunEl, o) { return trans(C, C.air.R + Math.max(h, 1), Math.sin(sunEl), o); }
-  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the horizon 25° beside Helia
+  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the horizon 12° beside Helia
   function fit3(C, h, sunEl) {
     const sun = [Math.cos(sunEl), Math.sin(sunEl), 0], o = { zen: [0, 0, 0], hor: [0, 0, 0], sunHor: [0, 0, 0] };
     const e5 = 5 * PI / 180;
@@ -291,14 +315,14 @@
     // (away from Helia: the azimuth opposite; at 90° from it the average of both sides)
     const side = [0, 0, 0]; ray(C, h, [0, Math.sin(e5), Math.cos(e5)], sun, side, null, 16);
     for (let c = 0; c < 3; c++) o.hor[c] = 0.5 * (o.hor[c] + side[c]);
-    const a25 = 25 * PI / 180; ray(C, h, [Math.cos(e5) * Math.cos(a25), Math.sin(e5), Math.cos(e5) * Math.sin(a25)], sun, o.sunHor, null, 16);   // (25° off Helia: the lobe's skirt, not its core)
+    const a12 = 12 * PI / 180; ray(C, h, [Math.cos(e5) * Math.cos(a12), Math.sin(e5), Math.cos(e5) * Math.sin(a12)], sun, o.sunHor, null, 16);   // (12° off Helia: the lobe, not its core)
     return o;
   }
   // the 3-stop sky at a direction (the shader's own formula, for the test): el from the horizon, cph the cosine to the
   // sun's azimuth
   function stops3(s, d, sunDir, o) {
     const el = Math.max(0, d[1]), hs = Math.hypot(sunDir[0], sunDir[2]) || 1, hd = Math.hypot(d[0], d[2]) || 1;
-    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 4) * (1 - Math.sqrt(el));
+    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 12) * (1 - Math.sqrt(el));
     const k = Math.sqrt(el);
     for (let c = 0; c < 3; c++) o[c] = s.hor[c] + (s.zen[c] - s.hor[c]) * k + (s.sunHor[c] - s.hor[c]) * wS;
     return o;

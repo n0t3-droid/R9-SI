@@ -920,7 +920,7 @@ vec3 bsAirSky(vec3 D) {
   if (u_bsAirK.z < 0.5) {
     float el = max(D.y, 0.0), k = sqrt(el);
     vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
-    float wS = pow(max(dot(hs, hd), 0.0), 4.0) * (1.0 - k);
+    float wS = pow(max(dot(hs, hd), 0.0), 12.0) * (1.0 - k);
     return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
   }
   vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
@@ -962,39 +962,43 @@ vec3 bsHerz(vec3 D, vec3 col, float px) {
   return col;
 }
 // Zinnober's umbrella plumes: sulfur-dioxide grains on ballistic arcs from the vent fill a paraboloid y = H − r²/4H
-// (R = 2H at the ground: Pele's ring), brightest in the caustic near its envelope, a faint core column; bluish-white
-// in Helia's light, strongest forward; 10 steps through the volume, only where the view meets its bounding cylinder
+// (R = 2H at the ground: Pele's ring); the grains crowd at its envelope, so the plume reads as a thin shell — the view
+// meets it analytically (no marching, no noise) and a shell seen edge-on is brighter (the path through it ∝ 1/cos);
+// a faint core column over the vent; bluish-white in Helia's light (fine grains), strongest forward; lit where Helia
+// stands over the horizon at the canopy's height
 vec3 bsUmbrella(vec3 D, vec3 col) {
   float acc = 0.0;
   for (int j = 0; j < 4; j++) {
     vec4 J = u_bsJ[j];
     float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
     if (J.w <= 0.0 || js <= 0.0) continue;
-    float H = J.w, Rc = 2.0 * H;
-    // the view against the cylinder r ≤ Rc about the vent's axis, 0 ≤ y ≤ H
-    vec2 o2 = -J.xz, d2 = D.xz;
-    float a = dot(d2, d2), b = dot(o2, d2), c = dot(o2, o2) - Rc * Rc, h = b * b - a * c;
-    if (h <= 0.0 || a < 1e-8) continue;
-    float sh = sqrt(h), t0 = max((-b - sh) / a, 0.0), t1 = (-b + sh) / a;
-    if (t1 <= t0) continue;
-    if (D.y < -u_bsGround.w && t0 > u_bsJk.y) continue;
-    float dt = (t1 - t0) / 10.0, sum = 0.0, jit = hash13(D * 917.0 + float(j));   // (the steps jittered per pixel: no bands)
-    for (int k = 0; k < 10; k++) {
-      float t = t0 + (float(k) + jit) * dt;
-      vec3 p = D * t - J.xyz;
-      if (p.y < 0.0 || p.y > H) continue;
-      float r = length(p.xz), ys = H - r * r / (4.0 * H);
-      if (ys < 0.0) continue;
-      float e = (p.y - ys) / (0.07 * H);
-      sum += (exp(-e * e) + (p.y < ys ? 0.02 + 0.5 * exp(-r * r / (0.0016 * H * H)) : 0.0)) * dt;
+    float H = J.w;
+    vec3 V = J.xyz;
+    float a = dot(D.xz, D.xz), b = dot(D.xz, V.xz), c = dot(V.xz, V.xz);
+    float qa = a, qb = 4.0 * H * D.y - 2.0 * b, qc = c - 4.0 * H * V.y - 4.0 * H * H;
+    float disc = qb * qb - 4.0 * qa * qc;
+    float lit = smoothstep(-0.01, 0.01, u_bsSun.y + sqrt(2.0 * max(0.8 * H + V.y + u_bsJk.w, 0.0) / u_bsJk.z));
+    if (disc > 0.0 && qa > 1e-6) {
+      float sq = sqrt(disc);
+      for (int k = 0; k < 2; k++) {
+        float t = (-qb + (k == 0 ? -sq : sq)) / (2.0 * qa);
+        if (t <= 0.0) continue;
+        vec3 p = D * t - V;
+        if (p.y < 0.0 || p.y > H) continue;
+        if (D.y < -u_bsGround.w && t > u_bsJk.y) continue;
+        vec3 n = normalize(vec3(p.x / (2.0 * H), 1.0, p.z / (2.0 * H)));
+        float r = length(p.xz) / (2.0 * H);
+        float edge = min(6.0, 1.0 / max(abs(dot(D, n)), 0.02));
+        acc += 0.07 * edge * (0.45 + 0.8 * r) * (1.0 - smoothstep(0.85, 1.0, r)) * js * lit;
+      }
     }
-    // (lit where Helia stands over the horizon at the canopy's height — dark at night, the tops keep the light longest)
-    float lit = smoothstep(-0.01, 0.01, u_bsSun.y + sqrt(2.0 * max(0.8 * H + J.y + u_bsJk.w, 0.0) / u_bsJk.z));
-    acc += sum / H * 0.35 * js * lit;
+    // the core column: the gas rising over the vent (its closest approach to the axis)
+    float den = max(1.0 - D.y * D.y, 1e-4), dv = dot(D, V), s = (dv - D.y * V.y) / den, hh = (D.y * dv - V.y) / den;
+    if (s > 0.0 && hh > 0.0 && hh < H) { vec3 q = D * s - V - vec3(0.0, hh, 0.0); float w = 40.0 + hh * 0.03; acc += 0.25 * exp(-dot(q, q) / (w * w)) * (1.0 - hh / H) * js * lit; }
   }
   if (acc <= 0.0) return col;
-  float ph = 0.35 + 1.8 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 4.0);
-  return col + vec3(0.72, 0.84, 1.0) * u_bsSunCol * ph * (1.0 - exp(-acc)) * u_bsJk.x * 0.14;
+  float ph = 0.45 + 1.6 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 4.0);
+  return col + vec3(0.72, 0.84, 1.0) * u_bsSunCol * ph * (1.0 - exp(-acc)) * u_bsJk.x * 0.45;
 }
 // Ocker's dust devils: a narrow twisting column (u_bsJu.y wide at the foot, widening upward), dense at the foot,
 // thinning upward; the dust's colour lit by Helia and the sky, blended over the view (it hides what is behind)
@@ -1014,7 +1018,7 @@ vec3 bsDevils(vec3 D, vec3 col) {
     if (r2 > 4.0) continue;
     float dens = exp(-r2 * 1.2) * exp(-hh / (0.35 * J.w)) * (1.0 - smoothstep(0.75 * J.w, J.w, hh)) * js;
     float fil = 0.7 + 0.6 * vnoise3(vec3(hh * 0.025 - u_bsJu.z * 1.5, sqrt(r2) * 1.3, float(j) * 3.1));
-    float al = clamp(dens * fil * 0.8, 0.0, 0.9);
+    float al = clamp(dens * fil * 1.0, 0.0, 0.9);
     // (the dust's own colour — redder and darker than the bright air behind it — lit more on Helia's side)
     vec3 dust = u_bsGround.rgb * vec3(0.9, 0.68, 0.5) * (0.75 + 0.35 * max(dot(normalize(vec3(q.x, 0.0, q.z) + 1e-4), u_bsSun.xyz), 0.0));
     col = mix(col, dust, al);

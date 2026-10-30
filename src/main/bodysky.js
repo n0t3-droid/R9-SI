@@ -34,8 +34,8 @@
     // u-moons2: Zinnober (sulfur bright, its lava lakes the night's own light, Amarant at 37° its lamp), Ocker and
     // Aquamarin with air (airK: the LUT's radiance → the scene's, the eye's exposure per world: Ocker's dusty sky is ~4×
     // as bright as a clear one), shape: the plumes' (1 umbrellas, 2 dust devils)
-    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.55, tint: [1.0, 0.98, 0.9], bounce: 0.34, floor: 0.06, expoDay: 0.62, expoNight: 1.1, plume: 1, shape: 1 },
-    ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 6.5, ambK: 2.2 },
+    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.88, 0.55], bounce: 0.34, floor: 0.06, expoDay: 0.62, expoNight: 1.1, plume: 1, shape: 1 },
+    ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 8, ambK: 1.8 },
     aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2 },
   };
   BS.KIND = KIND; BS.SUN = SUN;
@@ -156,7 +156,7 @@
     const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
     const xN = K.expoNight * clamp(0.05 / Math.max(nl, 0.004), 1, 1.7);
     let expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN;
-    if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 1.6;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
+    if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 0.3;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
     const exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));
@@ -186,8 +186,8 @@
     }
     const C = st.C, air = airOf(id);
     if (air.key !== C.air.key) { if (tier > 0) A.stageAir(C, air); else A.setAir(C, air); st.stops = null; }
-    if (tier === 1) { if (Math.abs(sEl - st.el) >= 1.5 * D2 || C.next) { if (!C.next) st.el = sEl; A.update(C, hA, st.el, C.H, 0.6); } }
-    else if (tier >= 2) { if (C.row === 0) st.el = sEl; A.update(C, hA, st.el, C.H, 0.6); }
+    if (tier === 1) { if (Math.abs(sEl - st.el) >= 1.5 * D2 || C.next) { if (!C.next) st.el = sEl; A.update(C, hA, st.el, C.H, 0.45); } }
+    else if (tier >= 2) { if (C.row === 0) st.el = sEl; A.update(C, hA, st.el, C.H, 0.45); }
     if (!st.stops || Math.abs(sEl - st.elS) >= 0.25 * D2 || Math.abs(hA - st.h) > 30) {
       st.elS = sEl; st.h = hA;
       st.stops = A.fit3(C, hA, sEl);
@@ -244,7 +244,7 @@
       E.zenith = zen; E.horizon = hor; E.skyMid = zen.map((v, i) => 0.5 * (v + hor[i])); E.fogColor = hor.map((v, i) => 0.75 * v + 0.25 * sh[i]);
       const front = BS.front || 0, tau = id === 'ocker' ? BS.dustTau : 0;
       const vis = id === 'ocker' ? Math.min(rd * 1.6, 2600 / (0.4 + tau * 1.2) / (1 + front * 14)) : rd * 1.5;
-      E.fog = [Math.min(rd * 0.5, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0];
+      E.fog = id === 'ocker' ? [Math.min(rd * 0.5, vis * 0.15), Math.min(rd * 0.995, vis), 0, 0] : [rd * 0.6, rd * 0.995, 0, 0];   // (Aquamarin: tens of km of sight — only the last columns' edge, the far sea in the LUT's own haze)
     }
     if (o.underwater) { E.fog = [0, 1, 0, 1]; }
     E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;

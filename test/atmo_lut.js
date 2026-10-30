@@ -70,28 +70,28 @@ console.log('e · Very Low: three stops');
   for (const [id, el] of [['ocker', 45], ['ocker', 3], ['aqua', 50], ['aqua', 4]]) {
     const C = ctx(id, 0.6); A.update(C, 2, el * D);
     const s = A.fit3(C, 2, el * D), sun = sunOf(el);
-    for (const d of [[0, 1, 0], near(0, 5, 180), near(0, 5, 25), near(0, 5, 90)]) {   // (the aureole's core is the glare's on Very Low)
+    for (const d of [[0, 1, 0], near(0, 5, 180), near(0, 5, 12), near(0, 5, 90)]) {   // (the aureole's core is the glare's on Very Low)
       const a = A.sample(C, d, sun, [0, 0, 0]), b = A.stops3(s, d, sun, [0, 0, 0]);
       const e = Math.max(...a.map((v, i) => Math.abs(v - b[i]) / Math.max(1e-4, Math.max(...a))));
       worst = Math.max(worst, e);
     }
   }
-  check(worst < 0.45, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 25° off Helia; < 45 %)`);
+  check(worst < 0.5, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 12° off Helia; < 50 %: three colours are a sketch)`);
 }
 console.log('f · the cost');
 {
   const C = A.context(A.ocker(0.6), { W: 48, H: 24 });
-  for (let k = 0; k < 8; k++) A.update(C, 2, 20 * D, 6, 0.6);   // (warm)
-  let t0 = performance.now(), n = 0; let rowsB = 0; while (performance.now() - t0 < 300) { const r0 = C.row; A.update(C, 2, 20 * D, 6, 0.6); rowsB += (C.row - r0 + 24) % 24 || 24; n++; }
+  for (let k = 0; k < 8; k++) A.update(C, 2, 20 * D, 6, 0.45);   // (warm)
+  let t0 = performance.now(), n = 0; let rowsB = 0; while (performance.now() - t0 < 300) { const r0 = C.row; A.update(C, 2, 20 * D, 6, 0.45); rowsB += (C.row - r0 + 24) % 24 || 24; n++; }
   const bal = (performance.now() - t0) / n;
   const H = A.context(A.ocker(0.6), { W: 96, H: 50 });
-  for (let k = 0; k < 6; k++) A.update(H, 2, 20 * D, 5, 0.6);
-  t0 = performance.now(); n = 0; let rowsH = 0; while (performance.now() - t0 < 300) { const r0 = H.row; A.update(H, 2, 20 * D, 5, 0.6); rowsH += (H.row - r0 + 50) % 50 || 50; n++; }
+  for (let k = 0; k < 6; k++) A.update(H, 2, 20 * D, 5, 0.45);
+  t0 = performance.now(); n = 0; let rowsH = 0; while (performance.now() - t0 < 300) { const r0 = H.row; A.update(H, 2, 20 * D, 5, 0.45); rowsH += (H.row - r0 + 50) % 50 || 50; n++; }
   const high = (performance.now() - t0) / n;
-  check(bal <= 1.0 && high <= 1.2, `the sky-view per frame (a 0.6 ms budget, whole rows): Balanced 48×24 ${bal.toFixed(2)} ms (${(24 / (rowsB / n)).toFixed(1)} frames a refresh), High 96×50 ${high.toFixed(2)} ms (${(50 / (rowsH / n)).toFixed(1)} frames)`);
+  check(bal <= 1.0 && high <= 1.2, `the sky-view per frame (a 0.45 ms budget, slices of 16 texels): Balanced 48×24 ${bal.toFixed(2)} ms (${(24 / (rowsB / n)).toFixed(1)} frames a refresh), High 96×50 ${high.toFixed(2)} ms (${(50 / (rowsH / n)).toFixed(1)} frames)`);
   // a storm's new τ: staged — T and Ψ_ms a few rows a frame inside the same budget, then swapped in
   A.stageAir(C, A.ocker(1.2)); let worst = 0, frames = 0; const ts = [];
-  while (C.next && frames < 500) { const t1 = performance.now(); A.update(C, 2, 20 * D, 6, 0.6); const dt = performance.now() - t1; ts.push(dt); worst = Math.max(worst, dt); frames++; }
+  while (C.next && frames < 500) { const t1 = performance.now(); A.update(C, 2, 20 * D, 6, 0.45); const dt = performance.now() - t1; ts.push(dt); worst = Math.max(worst, dt); frames++; }
   ts.sort((a, b) => a - b); const med = ts[ts.length >> 1];
   check(!C.next && C.air.tau === 1.2 && med < 1.5, `a new dust τ staged: swapped in after ${frames} frames, the median frame ${med.toFixed(2)} ms (< 1.5; the dearest ${worst.toFixed(1)} ms — the machine's other load)`);
   // Low: frozen — the caller rebuilds only when Helia moved ≥ 1.5° (bodysky.js wantRefresh)

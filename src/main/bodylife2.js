@@ -120,7 +120,7 @@
       // the storm's streaks past the eye
       if (P && S.front + Math.max(0, S.tau - 1.5) / 3 > 0.2) {
         const n = Math.floor((tier === 0 ? 6 : 24) * dt * 4 * Math.min(1.5, S.front + S.tau / 4.5) + Math.random()), col = lit([0.55, 0.36, 0.22]);
-        for (let k = 0; k < n; k++) P.spawn(p.pos[0] - 14 + Math.random() * 4, p.pos[1] - 1 + Math.random() * 5, p.pos[2] + (Math.random() - 0.5) * 24, 10 + Math.random() * 6, (Math.random() - 0.5), (Math.random() - 0.5) * 2, { life: 2.4, size: (0.05 + Math.random() * 0.1) * big, grav: 0, drag: 0.001, col, emis: 0.001, force: true, collide: false, fade: true });
+        for (let k = 0; k < n; k++) P.spawn(p.pos[0] - 22 + Math.random() * 6, p.pos[1] - 1 + Math.random() * 5, p.pos[2] + (Math.random() - 0.5) * 30, 12 + Math.random() * 6, (Math.random() - 0.5), (Math.random() - 0.5) * 2, { life: 3.2, size: (0.025 + Math.random() * 0.04) * big, grav: 0, drag: 0.001, col, emis: 0.001, force: true, collide: false, fade: true });
       }
     } else if (id === 'aqua') {
       if ((S.hzT = (S.hzT || 0) + dt) > 4) unlock('moon:herzwelt');

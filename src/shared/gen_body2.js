@@ -281,16 +281,16 @@
     // the canyon's centre line and half width at x
     canyonZ(x) { const C = this.prof.canyon; return C.z0 + 120 * Math.sin(x / 1500 + 0.4) + 40 * Math.sin(x / 430 + 1.1); }
     canyonHalf(x) { return this.prof.canyon.half * (1 + 0.2 * Math.sin(x / 2300 + 2.0)); }
-    // the drop into the canyon at (x, z): a flat floor (45 % of the width), walls with two benches, gullies (noise on q)
+    // the drop into the canyon at (x, z): a flat floor (62 % of the width), walls with two benches, gullies (noise on q)
     canyonDrop(x, z, o) {
       const C = this.prof.canyon, zc = this.canyonZ(x), hw = this.canyonHalf(x), d = Math.abs(z - zc);
       if (d > hw * 1.1) return 0;
       const q = d / hw + 0.05 * this.nGul.n2(x, z) + 0.03 * this.nGul.n2(z * 3, x * 3);
       if (q >= 1) return 0;
       let f;
-      if (q < 0.45) f = 1;
+      if (q < 0.62) f = 1;
       else {
-        const u = (q - 0.45) / 0.55;   // 0 at the floor's edge … 1 at the rim
+        const u = (q - 0.62) / 0.38;   // 0 at the floor's edge … 1 at the rim (the wall ~270 m across, its cliffs steep)
         // the wall: a talus slope (0 … 0.3), a cliff, a bench at ⅓, a cliff, a bench at ⅔, the rim's cliff
         const steps = [[0, 1], [0.3, 0.82], [0.42, 0.6], [0.55, 0.56], [0.68, 0.3], [0.8, 0.26], [0.92, 0.04], [1, 0]];
         let k = 0; while (k < steps.length - 2 && u > steps[k + 1][0]) k++;
