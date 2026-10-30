@@ -525,6 +525,7 @@
     // switch the ship stays in the space regime (in the air regime at its map spot 3 km up it would climb into space again)
     c.phase = 'wait'; a.cruiseThr = 0.3;
     C.landing = { dim: c.dim, body: c.body, t0: performance.now() };
+    if (g.meta && g.meta.guest) { if (VR.Konvoi && VR.Konvoi.guestLand) VR.Konvoi.guestLand(g, c); return; }   // a-konvoi: a guest in the Konvoi goes down with the host (its world from the host's trip)
     let p0 = null;
     try { p0 = VR.Travel.go(g, { dim: c.dim, via: 'ship' }); } catch (e) { console.warn(e); }
     const back = () => { if (a.cruise !== c) return; a.cruise = null; a.cruiseThr = 0; fl.auto = null; st.r.set(c.r0); st.v.set(c.v0); st.coast = true; UNI().verletInit(st, UNI().home.body(st.frame).mu); SF.hint(fl, 'g.asc.noLand', { name: SF.nameOf(c.body) }); };

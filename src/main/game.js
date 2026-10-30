@@ -745,8 +745,8 @@
       this.guestStyle = wel.style && typeof wel.style === 'object' ? wel.style : null;
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
       this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
-      const dim = meta.type === 'flat' ? 'flat' : 'overworld';
-      this.dim = dim;
+      const dim = wel.dim && wel.dim !== 'overworld' && VR.Konvoi && VR.Konvoi.dimOk && VR.Konvoi.dimOk(wel.dim) ? wel.dim : meta.type === 'flat' ? 'flat' : 'overworld';   // a-konvoi: the host's world (Mitreisen)
+      meta.dim = dim; this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
       this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);

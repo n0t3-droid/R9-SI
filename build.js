@@ -38,7 +38,8 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies2'); SHARED.splice(SHARED.ind
 MAIN.push('../shared/story', 'regie', 'story_art', 'story');   // (a-story2: story_art — the speakers' faces, the Eiswächter's model; before the player)
 MAIN.push('regie_acts');   // a-regie: the Regie's own acts — the adventurer's first encounter (after foes, liberate, funke and the Regie)   // a-story: the book (src/shared/story.js — pure, main thread only), die Regie, the story's player (after funke, quests, liberate, ctx and the space scene, whose parts it uses)
 MAIN.push('ux');   // e-ux: VR.UX (src/main/ux.js) — the UI scale, the key-hint strip, the first minute's hints, the settings' search; last: it wraps ui.js and game.js
-MAIN.push('firstlook');   // f-first: VR.FirstLook (src/main/firstlook.js) — the pause menu in two steps, one prompt per key, readable start texts (after ux: it wraps ui.js's pause last)
+MAIN.push('firstlook');
+MAIN.push('konvoi');   // a-konvoi: VR.Konvoi (src/main/konvoi.js) — Mitreisen, the world on the wire, together in the Abenteuer, the roster and the emote wheel (last: it wraps mp.js, cruise.js, liberate.js and story.js)   // f-first: VR.FirstLook (src/main/firstlook.js) — the pause menu in two steps, one prompt per key, readable start texts (after ux: it wraps ui.js's pause last)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
