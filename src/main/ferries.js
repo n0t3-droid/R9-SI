@@ -515,6 +515,7 @@
   // Herzwelt's ferry port: the flattest open place 34–60 m from the world's spawn (natural ground, nothing over it)
   const NATURAL = /grass|dirt|sand$|^stone$|gravel|snow|podzol|mud|clay|moss_block|terracotta|andesite|diorite|granite/;
   const BUILT = /brick|polished|smooth|cut_|chiseled|planks|slab|stairs|vx_|vm_|path|concrete|tile|paver/;
+  Fe.herzSiteOf = (g) => herzSite(g);   // f-polish: the tests ask where the port would go (nothing founded)
   function herzSite(g) {
     const w = g.world, Tv = VR.Travel, sp = Tv && Tv.herzTarget ? Tv.herzTarget(g, true).pos : g.player.pos; if (!sp) return null;
     const R = R0(), y0 = Math.round(sp[1]);

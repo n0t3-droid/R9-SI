@@ -1,293 +1,245 @@
-// t-polish (docs/superpowers/plans/2026-10-08-t-polish.md): the four polish items in one browser run, one world (seed 53,
-// a new world: vgen 10), one page of this checkout's build:
-//  1 the nebula's filaments — the sky at noon over the canyon, the city and the isles (trailer_skycurve.mjs's cameras,
-//    the planets pinned, the shader's clock pinned at 80 s): the top band's fine structure (test/sky_ref.js hfOf) ≥ 60 %
-//    of the day frames', and t-sky2's checks kept (every band within ΔE 12, the stars and the chroma); the sky pass on
-//    High and on Very Low against v0.46's sky shader (2c103e8's SKY_FS compiled in the same page, rounds in turns);
-//  2 the windmill — farm_c's mill on High, two pictures 1.5 s apart: its sails turn;
-//  3 the hall from inside — Very Low at P1 (t-town's camera): the frame, the triangles, and where they go (the horizon,
-//    the people) in rounds in turns (item 3 is written up, not built: for the record);
-//  4 the cart — the Weißstadt's street at noon (P1) and Nova Haven's avenue (t-beauty's street_3): not forced, a cart
-//    within 40 s of the arrival, the picture when it is seen in the view's middle third.
-// Pictures: test/shots/polish_sky_<place>.png, polish_mill_a/b.png, polish_cart.png, polish_cart_nova.png,
-// polish_p1_potato.png; numbers in .tmp_tests/polish.json.
-// usage: nohup bash test/wt_run.sh polish.mjs 3600 > .tmp_tests/polish.log 2>&1 &   ONLY=sky,mill,cart,p1,bench
-// regress: skip  (a showcase with one world and the sky bench; the gates are test/polish_mill.js, life_director.js,
-// sky_ref.js and trailer_skycurve.mjs)
+// f-polish in the browser (docs/superpowers/plans/2026-10-31-f-polish.md): every loose end before | after in one page —
+// the base's look by VR.Polish.off[key] = true, then ours. A new default world (seed 4242, creative, Friedlich), 960 × 540,
+// de-DE, High.
+//   boss   the Kernfeuer's boss from 60 m (hull) and the arena's cracks from above (cracks)  → polish_hull_*, polish_cracks_*
+//   build  a little house copied with the wand: the stamp's ghost (ghost); three blocks' pops 0.05 s old (pop)
+//   port   Herzwelt's ferry port: where a-life's search found nothing, ours a site → the port founded (port)
+//   lava   /dim zinn: the Glutsee's shore at night (lava)
+//   exo    a world of another star with air, by day (exo)
+//   cost   the frame at the spawn on Very Low and High, every switch off | on (ms, draws)
+//   → test/shots/polish_*_{before,after}.png, .tmp_tests/polish_run.json, test/shots/polish_sheet_run.jpg
+//   nohup bash test/wt_run.sh polish.mjs 3600 > .tmp_tests/polish.log 2>&1 &      ONLY=boss,build,port,lava,exo,cost
+// regress: skip  (a showcase with pictures; the gate is test/polish.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
-import fs from 'node:fs';
-import vm from 'node:vm';
-import { execFileSync } from 'node:child_process';
-import SR from '/home/dev/vr/test/sky_ref.js';
-const { load, curveOf, bandRows, compare, NB, REF, starsOf, chromaOf, hfOf } = SR;
-
-const ROOT = '/home/dev/vr', DIST = process.env.DIST || ROOT + '/dist/index.html', SEED = process.env.SEED || '53';
-const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, on = (k) => !ONLY || ONLY.includes(k);
-const ref = JSON.parse(fs.readFileSync(REF, 'utf8')), dayT = ref.targets.day;
-// v0.46's sky shader (the base of the sky pass's A/B): its shaders.js evaluated with a bare VR
-let BASE_SKY = null;
-try { const src = execFileSync('git', ['-C', ROOT, 'show', '2c103e8:src/main/shaders.js'], { maxBuffer: 1 << 26 }).toString(); const ctx = { VR: {} }; vm.runInNewContext(src, ctx); BASE_SKY = { vs: ctx.VR.SHADERS.FS_VS, fs: ctx.VR.SHADERS.SKY_FS }; } catch (e) { console.log('no base sky shader: ' + String(e.message).split('\n')[0]); }
-
+import fs from 'fs';
+import { execFileSync } from 'child_process';
+const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
+const DIST = process.env.DIST || 'file://' + ROOT + '/dist/index.html';
+const SHOTS = ROOT + '/test/shots/';
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, want = (s) => !ONLY || ONLY.includes(s);
+const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
+let fails = 0;
+const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg + ' (' + secs() + ')'); };
+const run = {};
+const save = () => { try { fs.writeFileSync(ROOT + '/.tmp_tests/polish_run.json', JSON.stringify(run, null, 1)); } catch (e) { /* a convenience */ } };
+fs.mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctxB = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-const page = await ctxB.newPage();
+const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
+const page = await ctx.newPage();
 const logs = [];
-page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 600)}`); });
+page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 400)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
+await page.goto(DIST);
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
-let fails = 0;
-const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
-const out = { sky: [], bench: {}, mill: null, cart: [], p1: null };
-const save = () => fs.writeFileSync(ROOT + '/.tmp_tests/polish.json', JSON.stringify(out, null, 1));
-// the game loop by hand: dt per step, nothing drawn (the camera still set up, so the frustum is right)
-const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(2); } };
-// the land round the eye built: every column within the view distance (less half a column) generated, meshed, uploaded,
-// twice in a row; nothing pending (at most `ms`)
-const settle = async (ms = 240000) => {
-  const t0 = Date.now(); let calm = 0, s = null;
-  for (let i = 0; Date.now() - t0 < ms; i++) {
-    await step(10);
-    s = await ev(() => { const g = VR.game, w = g.world, p = g.player.pos, pcx = Math.floor(p[0]) >> 4, pcz = Math.floor(p[2]) >> 4, rd = w.renderDist, r2 = (rd - 0.5) * (rd - 0.5); let dirty = 0, miss = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > r2) continue; const c = w.col(pcx + dx, pcz + dz); if (!c) { miss++; continue; } for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; } return { miss, dirty, up: w.uploadQ ? w.uploadQ.size : 0, busy: g.pool.busy, lod: g.horizon ? g.horizon.inflight || 0 : 0 }; });
-    if (!s.miss && !s.dirty && !s.up) { if (++calm >= 2 && i > 3) break; } else calm = 0;
-    await wait(60);
+const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { if (VR.Foes) VR.Foes.hp = 20; g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(3); } };
+const settle = async (max = 50) => {
+  let s = null;
+  for (let i = 0; i < max; i++) {
+    await step(20, 16);
+    s = await ev(() => { const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state }; const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0 }; });
+    if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && i > 2) break;
+    await wait(30);
   }
-  return Object.assign({ s: Math.round((Date.now() - t0) / 1000) }, s);
+  return s;
 };
-const shotPath = (name) => `${ROOT}/test/shots/${name}.png`;
-// frames drawn, then the screenshot; probe: the sky painted magenta (the god rays off); clock: the shader's clock pinned
-const draw = (probe, clock) => ev(([probe, clock]) => {
-  const g = VR.game, R = g.renderer;
-  if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hint,#hints{display:none !important}'; document.head.appendChild(st); }
-  R.skyProbe = !!probe;
-  const G = VR.Grade || {}; const rays = G.rays; if (probe) G.rays = 0;
-  if (clock !== null && clock !== undefined) g.env.anim = clock;
-  window.__norender = false;
-  for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
-  R.gl.finish(); window.__norender = true;
-  R.skyProbe = false; if (probe) G.rays = rays;
-}, [probe, clock]);
-const shoot = async (name) => { for (let t = 1; ; t++) { try { await page.screenshot({ path: shotPath(name), timeout: 240000 }); break; } catch (e) { console.log(`  screenshot ${name} try ${t}: ${String(e.message).split('\n')[0]}`); if (t >= 2) break; await wait(3000); } } return fs.existsSync(shotPath(name)); };
-const teleport = (x, y, z, yaw, pitch, fov, tod) => ev(([x, y, z, yaw, pitch, fov, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; p.vel = [0, 0, 0]; if (fov) g.settings.fov = fov; if (tod !== null) g.env.setTime(tod); }, [x, y, z, yaw, pitch, fov, tod]);
-const aimAt = (feet, at, eye = 1.62) => { const dx = at[0] - feet[0], dz = at[2] - feet[2]; return [Math.atan2(-dx, -dz), Math.atan2(at[1] - (feet[1] + eye), Math.hypot(dx, dz))]; };
-const groundY = (x, z, y0) => ev(([x, z, y0]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = y0; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 70; }, [x, z, y0]);
-
-// ------------------------------------------------------------ the world
-for (let attempt = 1; ; attempt++) { try { await page.goto('file://' + DIST, { waitUntil: 'domcontentloaded', timeout: 180000 }); break; } catch (e) { if (attempt >= 2) throw e; console.log('goto failed once, again'); } }
-for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => typeof VR !== 'undefined' && !!VR.game && VR.game.state === 'title').catch(() => false)) break; }
-await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); });
-await ev(`VR.game.createWorld({name:'Politur',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
-for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
-check(await ev(() => VR.game.state) === 'play', 'the world is loaded');
-await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } });
-console.log('world', JSON.stringify(await ev(() => ({ vgen: VR.game.meta.vgen, seed: VR.game.meta.seed }))));
-
-// ------------------------------------------------------------ 1 the sky at noon: the filaments
-const PITCH = 12 * Math.PI / 180, W = 640, H = 360;
-const azOf = (yaw) => Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
-const matVec = (m, v) => [0, 1, 2, 3].map(i => m[i] * v[0] + m[4 + i] * v[1] + m[8 + i] * v[2] + m[12 + i] * v[3]);
-const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
-const normv = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-// a picture and its sky probe measured as trailer_skycurve.mjs measures (the sun's 30° cone and the bodies left out)
-async function measureSky(name, geo) {
-  const img = await load(shotPath(name), W, H), pr = await load(ROOT + '/.tmp_tests/skyprobe_' + name + '.png', W, H);
-  const sky = new Uint8Array(W * H), mask = new Uint8Array(W * H);
-  const bodies = [[geo.sun, 30 * Math.PI / 180], [geo.giant, geo.rg * 2.6], [geo.blue, geo.rb * 1.6], ...geo.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8])];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const p = (y * W + x) * 3, R = pr.d[p], G = pr.d[p + 1], B = pr.d[p + 2];
-    if (!(R > 140 && B > 140 && G < 0.55 * Math.min(R, B))) continue;
-    sky[y * W + x] = 1;
-    const c = matVec(geo.inv, [(x + 0.5) / W * 2 - 1, 1 - (y + 0.5) / H * 2, 1, 1]);
-    const dir = normv([c[0] / c[3], c[1] / c[3], c[2] / c[3]]);
-    let ok = true; for (const [d, r] of bodies) if (ang(dir, d) < r) { ok = false; break; }
-    if (ok) mask[y * W + x] = 1;
-  }
-  const f = (H / 2) / Math.tan(36 * Math.PI / 180), y0 = Math.round(H / 2 + f * Math.tan(PITCH)), lows = [];
-  for (let x = 0; x < W; x++) { let low = -1; for (let y = 0; y < Math.min(H, y0 + 40); y++) if (sky[y * W + x]) low = y; if (low > 5) lows.push(low + 1); }
-  lows.sort((a, b) => a - b);
-  const Hl = lows.length > W * 0.2 ? lows[Math.floor(lows.length * 0.8)] : y0;
-  const inMask = (x, y) => x >= 0 && y >= 0 && x < W && y < H && mask[y * W + x] === 1;
-  const curve = curveOf(img, Hl, inMask);
-  const stars = [NB - 3, NB - 2, NB - 1].map(k => { const [a, b] = bandRows(Hl, k); return starsOf(img, a, b, inMask); });
-  const chroma = chromaOf(img, 0, bandRows(Hl, NB - 3)[1], inMask);
-  const hf = (() => { const [a, b] = bandRows(Hl, NB - 1); return hfOf(img, a, b, inMask); })();
-  return { H: Hl, curve, stars, chroma, hf, dE: compare(curve, dayT) };
-}
-const geoOf = () => ev(() => { const g = VR.game, R = g.renderer, E = g.env.E, B = E.bodies; return { inv: Array.from(R.invVPNJ || R.invViewProj), sun: E.sunDir, giant: E.planetDir, blue: E.planet2Dir, rg: B ? B.radius.giant : 0.122, rb: B ? B.radius.blue : 0.085, moons: B ? B.moons : [] }; });
-if (on('sky')) {
-  const PLACES = [{ name: 'canyon', cam: [250, 150, 380], yaw: 1.36 }, { name: 'city', cam: [0, 100, -90], yaw: -0.35 }, { name: 'isles', cam: [565, 195, 190], yaw: 1.36 }];
-  for (const P of PLACES) {
-    try {
-      await ev(([cam, yaw, pitch, pins]) => { const g = VR.game, p = g.player; g.env.setTime(6000); g.env.planetsOverride = pins; p.flying = true; p.noclip = true; p.teleport(cam[0], cam[1] - p.eye, cam[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = 72; }, [P.cam, P.yaw, PITCH, { az: azOf(P.yaw - 30 * Math.PI / 180), el: 24, az2: azOf(P.yaw + 30 * Math.PI / 180), el2: 36 }]);
-      const st = await settle(180000);
-      await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; });
-      await step(6);
-      const name = 'polish_sky_' + P.name;
-      await draw(false, 80); await shoot(name);
-      const geo = await geoOf();
-      await draw(true, 80); await page.screenshot({ path: ROOT + '/.tmp_tests/skyprobe_' + name + '.png', timeout: 240000 });
-      const m = await measureSky(name, geo);
-      out.sky.push(Object.assign({ place: P.name, settle: st }, m)); save();
-      console.log(`sky ${P.name} noon (settled ${st.s} s): fine ${m.hf} (frames ${dayT.hf})  stars ${m.stars.join(' ')}  chroma ${m.chroma ? m.chroma.mean + ' / ' + m.chroma.var : '—'}  ΔE ${m.dE.map(v => (v === null ? '—' : v.toFixed(0))).join(' ')}`);
-      check(m.hf !== null && m.hf >= 0.6 * dayT.hf, `${P.name} noon: the top band's fine structure ${m.hf} ≥ 60 % of the frames' ${dayT.hf} (the nebula's filaments; v0.46 in t-sky2's run 3: canyon 112, city 57, isles 106)`);
-      const bad = m.dE.filter((v, k) => v !== null && m.curve[k].n >= 100 && v > 12);
-      check(!bad.length && m.stars[2] !== null && m.stars[2] >= 0.6 * dayT.stars[2] && m.chroma && m.chroma.mean >= 0.7 * dayT.chroma.mean && m.chroma.var >= 0.7 * dayT.chroma.var, `${P.name} noon: t-sky2's sky kept — every band within ΔE 12 (${m.dE.map(v => (v === null ? '—' : v.toFixed(0))).join(' ')}), the top band's stars ${m.stars[2]}, the chroma ${m.chroma ? m.chroma.mean : '—'} (variance ${m.chroma ? m.chroma.var : '—'})`);
-    } catch (e) { check(false, `sky ${P.name}: ${String(e.message || e).slice(0, 200)}`); }
-  }
-}
-
-// ------------------------------------------------------------ the sky pass: this build's against v0.46's, in pairs
-// the sky drawn alone into the scene target, the GPU waited for with a one-pixel read after every draw; v0.46's program
-// and this build's in the same page and state, in pairs, the order turning pair by pair (ABBA); the verdict the median of
-// the pairs' ratios (a load spike moves a pair, not it). On High a quarter of the pixels (half the width and height: the
-// view's ray comes from v_uv, so it is the same view, the per-pixel cost; run 1 drew the full 1280 × 720, 3.5 s a draw
-// on this shared machine, and blocks of 12 draws a side swung 0.68–1.26 with the load)
-const SKYBENCH = ([pairs, cam, yaw, pitch, tod, base, div]) => {
-  const g = VR.game, R = g.renderer, gl = R.gl;
-  if (!window.__baseSky || window.__baseSky.lite !== !!R.q.lite) window.__baseSky = { lite: !!R.q.lite, p: VR.GL.program(base.vs, base.fs, 'sky_base', R.q.lite ? ['LITE'] : []) };
-  g.env.setTime(tod); g.env.anim = 80;
-  const E = g.env.update(0, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 4, horizon: 0, freezeTime: true, freezeWeather: true });
-  R.setupCamera({ x: cam[0], y: cam[1], z: cam[2], yaw, pitch, fov: 72 * Math.PI / 180 });
-  const w = Math.round(R.w / div), h = Math.round(R.h / div);
-  const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); const px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
-  const once = (p) => {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, R.sceneFB); gl.viewport(0, 0, w, h);
-    gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-    gl.useProgram(p.p); R.common(p, E);
-    if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, 0);
-    gl.uniformMatrix4fv(p.u.u_invViewProj, false, R.invViewProj);
-    if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, R.q.clouds >= 2 ? 1 : 0);
-    R.fs(p);
-  };
-  const time = (p) => { const t0 = performance.now(); once(p); sync(); return performance.now() - t0; };
-  const A = window.__baseSky.p, B = R.P.sky;
-  sync(); time(A); time(B);   // (warm: the programs' first draws)
-  const r = [];
-  for (let i = 0; i < pairs; i++) { let a, b; if (i & 1) { b = time(B); a = time(A); } else { a = time(A); b = time(B); } r.push([a, b]); }
-  return { r, w, h, lite: !!R.q.lite };
+// one frame drawn and read back in the same task (keep: the pops' and the ghost's state as set)
+const grab = async (name, frames = 3, keep) => {
+  const url = await ev(([frames, keep]) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { if (keep) window.__keep && window.__keep(); g.last = performance.now() - (keep ? 1 : 33); g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; } catch (e) { window.__norender = true; return 'ERR ' + e.message; } }, [frames, !!keep]);
+  if (url && url.length > 2000) { fs.writeFileSync(SHOTS + name, Buffer.from(url.split(',')[1], 'base64')); console.log('  📷 ' + name); return SHOTS + name; }
+  console.log('  !! no picture ' + name + ' ' + String(url).slice(0, 120)); return null;
 };
-const bench = async (label, calls, args) => {
-  let r = [], w = 0, h = 0, lite = false; for (let i = 0; i < calls; i++) { const x = await ev(SKYBENCH, args); r = r.concat(x.r); w = x.w; h = x.h; lite = x.lite; }
-  const q = (v, f) => { const s = [...v].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * f))]; };
-  const rat = r.map(x => x[1] / x[0]);
-  const res = { size: w + 'x' + h, lite, pairs: r.length, base: +q(r.map(x => x[0]), 0.5).toFixed(1), now: +q(r.map(x => x[1]), 0.5).toFixed(1), ratio: +q(rat, 0.5).toFixed(3), q25: +q(rat, 0.25).toFixed(3), q75: +q(rat, 0.75).toFixed(3) };
-  out.bench[label] = res; save();
-  console.log(`sky pass ${label}: ${JSON.stringify(res)}`);
-  return res;
-};
-if (on('bench') && BASE_SKY) {
-  try {
-    const hi = await bench('high_canyon_noon', 3, [12, [250, 150, 380], 1.36, PITCH, 6000, BASE_SKY, 2]);
-    check(hi.ratio <= 1.05, `High: the sky pass with the filaments ${hi.now} ms against v0.46's ${hi.base} ms (${hi.size} of the preset's twice that; the median of ${hi.pairs} pairs' ratios ${hi.ratio} ≤ 1.05, quartiles ${hi.q25}–${hi.q75})`);
-    const up = await bench('high_canyon_noon_up', 2, [12, [250, 150, 380], 1.36, 0.9, 6000, BASE_SKY, 2]);
-    console.log(`  (looking up into the nebula: ${up.ratio}, quartiles ${up.q25}–${up.q75})`);
-  } catch (e) { check(false, 'the High sky bench: ' + String(e.message || e).slice(0, 200)); }
-}
-
-// ------------------------------------------------------------ 2 the windmill (farm_c): the sails turn
-if (on('mill')) {
-  try {
-    await teleport(206.5, 92, -60, 0, 0, 70, 6000);
-    let st = await settle(180000); await step(40);
-    const mill = await ev(() => { const L = VR.game.entities.land; if (!L) return null; let best = null; for (const m of L.mills.values()) { const d = Math.hypot(m.x - 206, m.z + 43); if (!best || d < best.d) best = { d, x: m.x, y: m.y, z: m.z, f: m.f, state: m.state }; } return best; });
-    console.log('mill', JSON.stringify(mill), 'settled', st.s, 's');
-    if (mill) {
-      const D4 = [[0, -1], [1, 0], [0, 1], [-1, 0]][mill.f];
-      const feet = [mill.x + 0.5 + D4[0] * 15 + D4[1] * 4, mill.y - 1, mill.z + 0.5 + D4[1] * 15 - D4[0] * 4], at = [mill.x + 0.5, mill.y + 0.5, mill.z + 0.5];
-      const [yaw, pitch] = aimAt(feet, at);
-      await teleport(feet[0], feet[1], feet[2], yaw, pitch, 70, 6000);
-      st = await settle(120000); await step(10);
-      const a0 = await ev(() => { const L = VR.game.entities.land; const m = [...L.mills.values()].sort((p, q) => Math.hypot(p.x - 206, p.z + 43) - Math.hypot(q.x - 206, q.z + 43))[0]; return { ang: m.ang, w: m.w, state: m.state }; });
-      await draw(false, null); await shoot('polish_mill_a');
-      await step(45);   // 1.5 s
-      const a1 = await ev(() => { const L = VR.game.entities.land; const m = [...L.mills.values()].sort((p, q) => Math.hypot(p.x - 206, p.z + 43) - Math.hypot(q.x - 206, q.z + 43))[0]; return { ang: m.ang, w: m.w, state: m.state, wind: VR.game.env.E.wind }; });
-      await draw(false, null); await shoot('polish_mill_b');
-      let turned = a1.ang - a0.ang; if (turned < 0) turned += Math.PI * 2;
-      // the pictures differ round the hub (the sails moved)
-      const A = await load(shotPath('polish_mill_a'), W, H), B = await load(shotPath('polish_mill_b'), W, H);
-      let diff = 0, n = 0; for (let y = 60; y < 300; y++) for (let x = 180; x < 460; x++) { const p = (y * W + x) * 3; n++; if (Math.abs(A.d[p] - B.d[p]) + Math.abs(A.d[p + 1] - B.d[p + 1]) + Math.abs(A.d[p + 2] - B.d[p + 2]) > 30) diff++; }
-      out.mill = { mill, a0, a1, turned, diffShare: +(diff / n).toFixed(3) }; save();
-      check(a0.state === 1 && turned > 0.6 && diff / n > 0.01, `farm_c's mill (${mill.x}, ${mill.y}, ${mill.z}, facing ${mill.f}): its sails turn — ${turned.toFixed(2)} rad in 1.5 s at wind ${a1.wind} (${a1.w.toFixed(2)} rad/s), ${(diff / n * 100).toFixed(1)} % of the pixels round the hub changed between polish_mill_a and _b`);
-    } else check(false, 'farm_c\'s mill was not absorbed');
-  } catch (e) { check(false, 'the windmill: ' + String(e.message || e).slice(0, 200)); }
-}
-
-// ------------------------------------------------------------ 4 the cart: not forced, within 40 s, in the frame
-const HALL = { cx: -944, cz: -296, F: 73 };
-if (on('cart')) {
-  const SC = [
-    { name: 'polish_cart', what: 'the Weißstadt\'s street', feet: [HALL.cx - 24.5, HALL.F + 1, HALL.cz - 0.5], at: [HALL.cx + 40, HALL.F + 9, HALL.cz - 0.5], fov: 66 },
-    { name: 'polish_cart_nova', what: 'Nova Haven\'s avenue', feet: [1.5, null, -62.5], at: [1, 83, -100], fov: 70 },
-  ];
-  for (const sc of SC) {
-    try {
-      try { fs.unlinkSync(shotPath(sc.name)); } catch (e) { /* (no picture of an earlier run) */ }
-      await teleport(sc.feet[0], 140, sc.feet[2], 0, 0, sc.fov, 6000); await settle(120000);
-      const feet = sc.feet.slice(); if (feet[1] === null) feet[1] = (await groundY(feet[0], feet[2], 140)) + 1;
-      const [yaw, pitch] = aimAt(feet, sc.at);
-      await teleport(feet[0], feet[1], feet[2], yaw, pitch, sc.fov, 6000);
-      const st = await settle(180000);
-      // (the villages known here: the director's place needs them)
-      for (let i = 0; i < 40 && !(await ev(() => { const g = VR.game, p = g.player.pos; return [...g.villages.known.values()].some(v => Math.hypot(v.plan.x - p[0], v.plan.z - p[2]) < 300); })); i++) await step(30);
-      // the arrival: from here the director runs as in play (a frame every 33 ms of game time)
-      await ev(() => { const L = VR.game.lifeDirector; if (L) L.events.length = 0; });
-      // (the picture when the cart is in the view's middle third and seen — nothing solid between the eye and its upper
-      // half, the director's own test: run 2 shot it at the frame's edge, behind a shop front and a palm)
-      let t = 0, ev0 = null, inView = null;
-      for (; t < 45; t += 0.5) {
-        await step(15);
-        const s = await ev(() => { const g = VR.game, L = g.lifeDirector, R = g.renderer; const e = L && L.events.find(x => x.kind === 'cart'); if (!e || !e.pos || !e.age) return { place: L && L.st.place, cart: !!e }; const c = R.viewProj, x = e.pos[0] - R.cam.x, y = e.pos[1] + 0.8 - R.cam.y, z = e.pos[2] - R.cam.z; const cx = c[0] * x + c[4] * y + c[8] * z + c[12], cy = c[1] * x + c[5] * y + c[9] * z + c[13], cw = c[3] * x + c[7] * y + c[11] * z + c[15]; return { place: L.st.place, cart: true, age: e.age, sx: cw > 0 ? cx / cw : 9, sy: cw > 0 ? cy / cw : 9, d: Math.hypot(x, z), seen: L.seen ? L.seen([e.pos[0], e.pos[1] - 0.45, e.pos[2]], 1.2) : true }; });
-        if (s.cart && !ev0) ev0 = { t, place: s.place };
-        if (s.cart && s.seen && Math.abs(s.sx) < 0.3 && Math.abs(s.sy) < 0.8) { inView = Object.assign({ t }, s); break; }
-        if (ev0 && t - ev0.t > 16) break;
-      }
-      if (inView) { await draw(false, null); await shoot(sc.name); }
-      out.cart.push({ name: sc.name, settle: st, started: ev0, inView }); save();
-      check(!!ev0 && ev0.t <= 40 && !!inView && fs.existsSync(shotPath(sc.name)), `${sc.what} at noon (place ${ev0 ? ev0.place : '—'}): a cart ${ev0 ? 'started ' + ev0.t.toFixed(1) + ' s after the arrival' : 'never came'}${inView ? `, seen in the view's middle third ${(inView.t - ev0.t).toFixed(1)} s later (${inView.d.toFixed(0)} m, at ${inView.sx.toFixed(2)}, ${inView.sy.toFixed(2)}): test/shots/${sc.name}.png` : ', never seen in the middle of the view'}`);
-    } catch (e) { check(false, `${sc.what}: ${String(e.message || e).slice(0, 200)}`); }
+const off = (keys, v) => ev(([keys, v]) => { const P = VR.Polish || (VR.Polish = { off: {} }); for (const k of keys) P.off[k] = v; }, [keys, v]);
+const aim = (t) => ev((t) => { const p = VR.game.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = t[0] - e[0], dy = t[1] - e[1], dz = t[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, t);
+const tp = (x, y, z) => ev(([x, y, z]) => { const p = VR.game.player; p.flying = true; p.teleport(x, y, z); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, [x, y, z]);
+const rows = [];
+const pair = async (label, name, keys, setup, frames = 3, keepFn) => {
+  const r = {};
+  for (const mode of ['before', 'after']) {
+    await off(keys, mode === 'before');
+    if (setup) await setup(mode);
+    r[mode] = await grab(`polish_${name}_${mode}.png`, frames, keepFn);
   }
-}
+  await off(keys, false);
+  if (r.before && r.after) rows.push({ label, imgs: [r.before, r.after] });
+  return r;
+};
+const section = async (tag, fn) => { if (!want(tag)) return; console.log('— ' + tag + ' (' + secs() + ')'); try { await fn(); } catch (e) { fails++; console.log('  ✗ section ' + tag + ' stopped: ' + (e.stack || e.message).slice(0, 900)); } save(); };
 
-// ------------------------------------------------------------ Very Low: the sky pass, and P1 (item 3, for the record)
-await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-if (on('bench') && BASE_SKY) {
-  try {
-    const lo = await bench('potato_canyon_dusk', 3, [12, [250, 150, 380], 1.36, PITCH, 13000, BASE_SKY, 1]);
-    check(lo.ratio <= 1.05, `Very Low: the sky pass ${lo.now} ms against v0.46's ${lo.base} ms (${lo.size}, LITE ${lo.lite}; the median of ${lo.pairs} pairs' ratios ${lo.ratio} ≤ 1.05, quartiles ${lo.q25}–${lo.q75} — the same shader: the filaments are not in it)`);
-  } catch (e) { check(false, 'the Very Low sky bench: ' + String(e.message || e).slice(0, 200)); }
-}
-if (on('p1')) {
-  try {
-    const feet = [HALL.cx - 24.5, HALL.F + 1, HALL.cz - 0.5], at = [HALL.cx + 40, HALL.F + 9, HALL.cz - 0.5], [yaw, pitch] = aimAt(feet, at);
-    await teleport(feet[0], feet[1], feet[2], yaw, pitch, 66, 8000);
-    const st = await settle(240000); await step(120);
-    await draw(false, null); await shoot('polish_p1_potato');
-    // rounds of N frames in turns: as it is · without the horizon · without the people (the villagers and the crowd)
-    const N = 8, R = { all: [], noHorizon: [], noPeople: [] };
-    let parts = null;
-    // (7 rounds; the best and the median of each: run 2's rounds 3–5 took seconds a frame, the shared machine stalled)
-    for (let k = 0; k < 7; k++) for (const mode of ['all', 'noHorizon', 'noPeople']) {
-      const r = await ev(([n, mode]) => new Promise((ok) => {
-        const g = VR.game, gl = g.renderer.gl, H = g.horizon, V = g.villages, C = VR.Crowd;
-        const hd = H && H.draw, vd = V && V.draw, cd = C && C.draw;
-        if (mode === 'noHorizon' && H) H.draw = () => {};
-        if (mode === 'noPeople') { if (V) V.draw = () => {}; if (C) C.draw = () => {}; }
-        window.__norender = false; let i = -2, sum = 0, tris = 0, draws = 0, ht = 0;
-        const f = () => { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (i >= 0) { sum += dt; tris += g.renderer.stats.tris; draws += g.renderer.stats.draws; ht += H && H.stats ? H.stats.tris || 0 : 0; } if (++i < n) setTimeout(f, 0); else { window.__norender = true; if (H) H.draw = hd; if (V) V.draw = vd; if (C) C.draw = cd; ok({ ms: sum / n, tris: Math.round(tris / n), draws: Math.round(draws / n), horizonTris: Math.round(ht / n), people: V ? V.agents.filter(a => a.drawn).length : 0 }); } };
-        f();
-      }), [N, mode]);
-      R[mode].push(r.ms); if (mode === 'all') parts = r;
+for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => typeof VR !== 'undefined' && !!VR.game && VR.game.state === 'title')) break; }
+await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); if (VR.Hints) for (const h of ['play', 'move', 'fly']) VR.Hints.done(h); });
+await ev(`VR.game.createWorld({name:'Feinschliff',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:false})`);
+for (let i = 0; i < 200; i++) { await wait(500); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)) break; }
+check(await ev(() => VR.game.state) === 'play', 'the world is open');
+await ev(() => {
+  const g = VR.game; window.requestAnimationFrame = () => 0;
+  g.zenFreezeWeather = true; g.zenFreezeTime = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0;
+  const st = document.createElement('style'); st.textContent = '#hints,#lockhint,#toasts,.toast,#uxkeys,#ctxprompt,#ctxring,#advup,#rpgfind,#funkebub{display:none !important}'; document.head.appendChild(st);
+  g.hideHud = false;
+});
+await settle(60);
+const spawn = await ev(() => VR.game.player.pos.map(v => Math.round(v * 10) / 10));
+run.spawn = spawn;
+
+// ---------------------------------------------------------------- the boss: hull from 60 m, the cracks
+await section('boss', async () => {
+  const reg = await ev(() => {
+    const g = VR.game, A = VR.Adventure; A.setOn(true); A.setEnc('normal');
+    const rec = A.rec, R = VR.RPG, S = R.BAL.REGION, p = g.player.pos;
+    const rx = Math.floor(p[0] / S) * S, rz = Math.floor(p[2] / S) * S, cl = (v, a) => Math.min(a + S - 60, Math.max(a + 60, v));
+    rec.sites = rec.sites || {}; rec.freed = rec.freed || {};
+    const put = (id, dx, dz, free) => { const x = Math.round(cl(p[0] + dx, rx)), z = Math.round(cl(p[2] + dz, rz)); if (free) rec.freed[id] = { day: 1, as: 'trade', x, y: 70, z, b: null, t: Date.now() }; else rec.sites[id] = { x, y: 70, z, dir: 0, n: 3, res: 0, cal: 0, st: 'stoer', day: null, t: 0 }; };
+    put('t_f1', 150, 40, true); put('t_f2', -110, 150, true); put('t_k1', 260, -220, false); put('t_k2', -330, -160, false);
+    const C = R.conquest(VR.RPGame.sites(), VR.RPGame.st()), r = C.regions.find(q => q.boss === 'ready');
+    return r ? { id: r.id, core: r.core } : null;
+  });
+  check(!!reg, 'a Kernfeuer waits ' + JSON.stringify(reg)); if (!reg) return;
+  const c = reg.core;
+  await ev((c) => { const p = VR.game.player; p.flying = true; p.safeTeleport(c[0] + 0.5, 140, c[1] + 40.5); }, c);
+  for (let i = 0; i < 120; i++) { await step(10); await wait(150); if (await ev((c) => VR.game.world.isLoaded(c[0], c[1]) && VR.game.world.isLoaded(c[0], c[1] + 40) && VR.game.world.isLoaded(c[0] + 20, c[1] - 20) && !VR.game.player.hold, c)) break; }
+  await ev((c) => { const g = VR.game, p = g.player, y = g.world.topAt(c[0], c[1] + 30) + 1; p.flying = false; p.teleport(c[0] + 0.5, y, c[1] + 30.5); g.env.setTime(5200); }, c);
+  let arena = false; for (let i = 0; i < 40 && !arena; i++) { await step(5); arena = await ev(() => !!(VR.RPGBoss2.arena && VR.RPGBoss2.arena.ys && VR.RPGBoss2.arena.crk)); }
+  check(arena, 'the arena stands (its ground read, the cracks laid)');
+  await ev(() => VR.RPGBoss.look());
+  let up = false; for (let i = 0; i < 40 && !up; i++) { await step(5); up = await ev(() => !!VR.RPGBoss.cur); }
+  check(up, 'the boss rises');
+  await step(200);   // (the entrance's camera hands back)
+  await settle(20);
+  // from 60 m on the side the player came from, a little above
+  const P60 = await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, m = VR.RPGBoss.cur.m, cx = A ? A.x : m.pos[0], cz = A ? A.z : m.pos[2], x = cx + 0.5, z = cz + 60; return { x, z, y: Math.max(g.world.topAt(Math.floor(x), Math.floor(z)) + 3, m.pos[1] + 9), t: [m.pos[0], m.pos[1] + 5, m.pos[2]] }; });
+  await pair('Turmgänger aus 60 m: dunkler Unterrumpf, glühender Rand (vorher | nachher)', 'hull', ['hull'], async () => {
+    await ev(() => { const B = VR.RPGBoss.cur; if (B) { B.m.vel && (B.m.vel[0] = B.m.vel[2] = 0); } });
+    await tp(P60.x, P60.y, P60.z); await aim(P60.t); await step(2);
+  });
+  // the cracks from 13 m above, 9 m off the obelisk
+  const pc = await ev(() => { const A = VR.RPGBoss2.arena; return { x: A.x + 2, z: A.z + 12, y: A.y + 13, t: [A.x - 1, A.y, A.z - 2] }; });
+  await pair('Risse im Boden: keine Streifen mehr über Stufen (vorher | nachher)', 'cracks', ['cracks'], async () => {
+    await ev(() => { VR.RPGBoss2.buildCracks(VR.game, VR.RPGBoss2.arena); });
+    await tp(pc.x, pc.y, pc.z); await aim(pc.t); await step(2);
+  });
+  run.boss = await ev(() => ({ cracks: VR.RPGBoss2.arena && VR.RPGBoss2.arena.crk && VR.RPGBoss2.arena.crk.v.length / 30 }));
+  await ev(() => { if (VR.RPGBoss.cur) VR.RPGBoss.drop(VR.game); VR.Adventure.setOn(false); });
+});
+
+// ---------------------------------------------------------------- building: the ghost's edges, the pop's rim
+await section('build', async () => {
+  await tp(spawn[0], spawn[1] + 2, spawn[2]); await settle(30);
+  const base = await ev(() => { const g = VR.game, w = g.world, p = g.player, X = Math.floor(p.pos[0]) + 4, Z = Math.floor(p.pos[2]) - 6; let y = 200; while (y > 1 && !(VR.R.T.flags[w.getBlock(X, y - 1, Z)] & VR.F.SOLID)) y--; return { X, Y: y + 6, Z }; });
+  // a little house on a stone floor in the air (clear of the trees): planks, glass, a slab roof
+  const H = { x0: base.X, z0: base.Z, Y: base.Y };
+  await ev((H) => {
+    const g = VR.game, set = (x, y, z, n, pr) => { const t = VR.R.byName[n]; let s = t.defaultState; for (const k in pr || {}) s = t.with(s, k, pr[k]); g.world.setBlock(x, y, z, s, 4); };
+    for (let x = -1; x < 6; x++) for (let z = -1; z < 6; z++) set(H.x0 + x, H.Y - 1, H.z0 + z, 'stone_bricks');
+    for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) for (let y = 0; y < 3; y++) if (x === 0 || x === 4 || z === 0 || z === 4) set(H.x0 + x, H.Y + y, H.z0 + z, y === 1 && (x === 2 || z === 2) ? 'glass' : 'oak_planks');
+    for (let x = -1; x < 6; x++) for (let z = -1; z < 6; z++) set(H.x0 + x, H.Y + 3, H.z0 + z, 'oak_slab');
+    const gad = g.gadgets; gad.wand.a = [H.x0 - 1, H.Y - 1, H.z0 - 1]; gad.wand.b = [H.x0 + 5, H.Y + 3, H.z0 + 5]; gad.wandCopy();
+    const p = g.player; p.inv.slots[p.inv.sel] = { id: 'builder_wand', n: 1 }; p.inv.changed = true;
+  }, H);
+  await settle(30);
+  // look at a free spot beside the house (the ghost goes where V would stamp)
+  await tp(H.x0 - 9.5, H.Y + 6, H.z0 + 14.5); await aim([H.x0 - 9.5, H.Y - 1, H.z0 + 2.5]); await step(3); await settle(20);
+  const gh = await pair('Bauplan-Geist: Kanten als Linien (vorher | nachher)', 'ghost', ['ghost'], async () => { await step(2); });
+  const st = await ev(() => ({ ghost: VR.game.renderer.stats.ghost | 0, edges: VR.game.renderer.stats.ghostEdges | 0, clip: (() => { const c = VR.game.gadgets.wand.clip; return c && [c.sx, c.sy, c.sz]; })() }));
+  run.ghost = st; check(st.ghost > 50 && st.edges > 20, 'the ghost drawn with its edges ' + JSON.stringify(st));
+  await ev(() => { const p = VR.game.player; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; VR.game.gadgets.wand.clip = null; });
+  // three pops on the floor's edge, 0.05 s old, the camera 3.5 m off
+  const pb = { x: H.x0 + 1, y: H.Y + 4, z: H.z0 + 7 };
+  await ev((pb) => { const g = VR.game, set = (x, y, z, n) => g.world.setBlock(x, y, z, VR.R.byName[n].defaultState, 4); for (let x = -2; x < 5; x++) set(pb.x + x, pb.y - 1, pb.z, 'stone_bricks'); }, pb);
+  await tp(pb.x + 1.5, pb.y + 0.6, pb.z + 4.2); await aim([pb.x + 1.5, pb.y + 0.3, pb.z + 0.5]); await settle(20);
+  await ev((pb) => { window.__keep = () => { const g = VR.game; for (const q of g._bfPops || []) if (q.on) q.t = g.time - 0.05; }; }, pb);
+  await pair('Setzen: heller Rand am Pop (vorher | nachher)', 'pop', ['pop'], async () => {
+    await ev((pb) => { const g = VR.game, s = VR.R.byName.oak_planks.defaultState; for (let k = 0; k < 3; k++) { g.world.setBlock(pb.x + k, pb.y, pb.z, s, 4); VR.BuildFx.pop(g, pb.x + k, pb.y, pb.z, s); } }, pb);
+    await step(1, 1);
+  }, 1, true);
+  run.pop = await ev(() => ({ pops: VR.game.renderer.stats.pops | 0, rims: VR.game.renderer.stats.popRims | 0 }));
+  check(run.pop.rims >= 1, 'the pop\'s rim drawn ' + JSON.stringify(run.pop));
+  await ev(() => { window.__keep = null; });
+});
+
+// ---------------------------------------------------------------- Herzwelt's ferry port
+await section('port', async () => {
+  await tp(spawn[0], spawn[1] + 2, spawn[2]); await settle(40);
+  const q = await ev(() => { const g = VR.game, Fe = VR.Ferries; VR.Polish.off.port = true; const a = Fe.herzSiteOf(g), sa = Object.assign({}, Fe.stats.herz); VR.Polish.off.port = false; const b = Fe.herzSiteOf(g); return { base: a, baseStats: sa, ours: b, stats: Object.assign({}, Fe.stats.herz) }; });
+  run.port = q; console.log('  ' + JSON.stringify(q));
+  check(!!q.ours, 'our search finds a place for the port ' + JSON.stringify(q.ours && { x: q.ours.x, y: q.ours.y, z: q.ours.z, how: q.stats.found }));
+  if (!q.ours) return;
+  const s = q.ours, cam = [s.x - 20, s.y + 16, s.z + 30], tgt = [s.x, s.y + 2, s.z];
+  await off(['port'], true); await tp(...cam); await settle(30); await aim(tgt); await step(2);
+  const b = await grab('polish_port_before.png', 3);
+  // a moon visited (the port waits for that), then a second of the life's tick: the port founded and its day-0 prefab
+  await off(['port'], false);
+  await ev(() => { const g = VR.game, m = g.meta; m.life = m.life || { v: 1, sites: {}, docks: {}, pre: {} }; m.life.sites = m.life.sites || {}; if (!Object.keys(m.life.sites).length) m.life.sites.basalt = { x: 0, y: 70, z: 0, day0: 0, id: 'life:basalt:test' }; });
+  let hp = null; for (let i = 0; i < 40; i++) { await step(30, 33); hp = await ev(() => { const r = VR.game.meta.life.docks.overworld; return r ? { x: r.x, y: r.y, z: r.z, pre: (VR.game.meta.life.pre.overworld || []).length } : null; }); if (hp && hp.pre >= 1) break; }
+  run.portFounded = hp; check(!!hp && hp.pre >= 1, 'the port founded, its first part built ' + JSON.stringify(hp));
+  await ev(() => { if (VR.Ferries.age) VR.Ferries.age(VR.game, 3); }); for (let i = 0; i < 10; i++) await step(30, 33);
+  await settle(30); await tp(...cam); await aim(tgt); await step(2);
+  const a = await grab('polish_port_after.png', 3);
+  if (b && a) rows.push({ label: 'Herzwelt: der Fährhafen am Spawn (vorher keiner gefunden | nachher)', imgs: [b, a] });
+});
+
+// ---------------------------------------------------------------- Zinnober's Glutsee at night
+await section('lava', async () => {
+  await ev(() => { window.__lt = VR.Travel.last; VR.Travel.go(VR.game, { dim: 'zinn', via: 'cmd' }); });
+  let s = null; for (let i = 0; i < 600; i++) { await step(10, 33); s = await ev(() => { const g = VR.game, L = VR.Travel.last; return { st: g.state, dim: g.dim, ok: !!(L && L !== window.__lt && L.to === 'zinn') }; }); if (s.ok && s.st === 'play') break; await wait(20); }
+  check(s && s.dim === 'zinn', 'on Zinnober ' + JSON.stringify(s)); if (!s || s.dim !== 'zinn') return;
+  const Z = await ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}); return { x: g.glut.x, z: g.glut.z, R: g.glut.R }; });
+  const tn = await ev(([x, z]) => { const BS = VR.BodySky; let best = 0, bv = 1e9, prev = null; for (let t = 10; t < 9000; t += 10) { const v = BS.compute('zinn', [x, 70, z], t, { tier: 0 }).light.sunEl * 57.3; if (prev !== null && v < prev && Math.abs(v + 40) < bv) { bv = Math.abs(v + 40); best = t; } prev = v; } return best; }, [Z.x, Z.z]);
+  const y = await ev(([x, z]) => new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}).surfaceY(Math.floor(x), Math.floor(z)), [Z.x + Z.R + 22, Z.z + 18]);
+  await ev((t) => { const e = VR.game.env, k = Math.round(t * 20); e.day = Math.floor(k / 24000); e.ticks = k - e.day * 24000; }, tn);
+  await ev(([x, y, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = Math.atan2(1, 0.15); p.pitch = -0.3; p.vel = [0, 0, 0]; }, [Z.x + Z.R + 22.5, y + 15, Z.z + 18.5]);
+  await settle(60); await step(60);
+  await pair('Zinnober nachts: die Glut tief orange statt gelbweiß (vorher | nachher)', 'lava', ['lava'], async () => { await step(30); });
+  run.lava = { t: tn, at: [Z.x + Z.R + 22, y, Z.z + 18] };
+});
+
+// ---------------------------------------------------------------- a world of another star, by day
+await section('exo', async () => {
+  const w = await ev(() => {
+    const g = VR.game, G = VR.Galaxy, E = VR.Exo, N = VR.StarJump.hood(g), L = N.list, d0 = (s) => Math.hypot(...s.p);
+    const pick = (fn) => { const out = []; for (const s of L) { if (s.home) continue; const d = G.system(N, s.idx); for (const b of d.bodies) if (b.planet && fn(s, d, b)) out.push({ idx: s.idx, f: b.id, dim: b.dim, base: b.base, d: d0(s), T: s.T, sig: E.signature(d, b) }); } out.sort((a, b) => a.d - b.d); return out[0] || null; };
+    return pick((s, d, b) => E.signature(d, b) === 'violet' && b.base === 'aqua') || pick((s, d, b) => b.landable && b.base === 'aqua' && s.T < 3900) || pick((s, d, b) => b.landable && b.base === 'aqua');
+  });
+  run.exoWorld = w; check(!!w, 'a world with air under another star ' + JSON.stringify(w)); if (!w) return;
+  const ok = await ev(([i, f]) => { const g = VR.game; VR.StarJump.enter(g, i, { quiet: true, focus: f }); return VR.StarJump.land(g); }, [w.idx, w.f]);
+  let d = null; for (let i = 0; i < 200; i++) { await step(10, 33); d = await ev(() => ({ dim: VR.game.dim, st: VR.game.state, trip: !!(VR.game.travel && VR.game.travel.trip) })); if (d.st === 'play' && d.dim === w.dim && !d.trip) break; await wait(100); }
+  check(d && d.dim === w.dim, 'landed on ' + w.dim + ' ' + JSON.stringify({ ok, d })); if (!d || d.dim !== w.dim) return;
+  await settle(80);
+  const b = await ev(() => {
+    const g = VR.game, U = VR.Universe, p = g.player, eye = [p.pos[0], p.pos[1] + 1.6, p.pos[2]]; let best = null;
+    for (let day = 1; day < 9; day++) for (let tk = 0; tk < 24000; tk += 150) { const r = VR.BodySky.compute(g.dim, eye, U.worldSeconds(day, tk), {}); if (!r) continue; const el = Math.asin(Math.max(-1, Math.min(1, r.light.sunDir[1]))); if (el < 0.3 || el > 0.7) continue; const sc = Math.abs(el - 0.5); if (!best || sc < best.sc) best = { day, tk, sc, dir: r.light.sunDir }; if (best.sc < 0.02) break; }
+    if (best) { g.env.day = best.day; g.env.setTime(best.tk); const p2 = g.player; p2.yaw = p2.viewYaw = Math.atan2(-best.dir[0], -best.dir[2]) + 0.6; p2.pitch = -0.12; p2.flying = true; }
+    return best;
+  });
+  check(!!b, 'a day found ' + JSON.stringify(b && { day: b.day, tk: b.tk }));
+  await pair('Welt eines Roten Zwergs am Tag: Belichtung nach dem Himmel des Sterns (vorher | nachher)', 'exo', ['exo'], async () => { await step(240, 33); });
+  run.exo = await ev(() => ({ expo: +VR.game.env.E.exposure.toFixed(3) }));
+  console.log('  exposure after ' + JSON.stringify(run.exo));
+});
+
+// ---------------------------------------------------------------- the frame: Very Low and High, the switches off | on
+await section('cost', async () => {
+  const back = await ev(() => VR.game.dim);
+  if (back !== 'overworld') { await ev(() => { const g = VR.game; if (g.stars && g.stars.on && VR.StarJump.leave) VR.StarJump.leave(g); g.goHome ? g.goHome() : VR.Travel.go(g, { dim: 'overworld', via: 'cmd' }); }); for (let i = 0; i < 300; i++) { await step(10); const s = await ev(() => ({ d: VR.game.dim, st: VR.game.state })); if (s.d === 'overworld' && s.st === 'play') break; await wait(30); } }
+  await tp(spawn[0], spawn[1] + 2, spawn[2]); await settle(40);
+  const C = {};
+  for (const pr of ['potato', 'high']) {
+    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
+    await settle(30); await step(20);
+    for (const mode of ['before', 'after']) {
+      await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
+      C[pr + '_' + mode] = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 9; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[4].toFixed(1), draws: g.renderer.stats.draws | 0 }; });
     }
-    const med = (v) => { const s = [...v].sort((a, b) => a - b); return +s[s.length >> 1].toFixed(2); }, best = (v) => +Math.min(...v).toFixed(2);
-    out.p1 = { settle: st, ms: med(R.all), best: best(R.all), noHorizon: med(R.noHorizon), noHorizonBest: best(R.noHorizon), noPeople: med(R.noPeople), noPeopleBest: best(R.noPeople), rounds: R, last: parts }; save();
-    console.log(`very low at P1: ${JSON.stringify(out.p1)}`);
-    check(out.p1.ms > 0, `Very Low at P1 (for the record; item 3 written up, not built): ${out.p1.best} ms a frame at best, ${out.p1.ms} the median (${parts.tris} triangles, of them the horizon ${parts.horizonTris}; ${parts.draws} draws; ${parts.people} people drawn) — without the horizon ${out.p1.noHorizonBest} / ${out.p1.noHorizon} ms, without the people ${out.p1.noPeopleBest} / ${out.p1.noPeople} ms`);
-  } catch (e) { check(false, 'Very Low at P1: ' + String(e.message || e).slice(0, 200)); }
-}
-const errs = logs.filter(l => /pageerror/.test(l));
-console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
-check(errs.length === 0, `no page error (${errs.length})`);
+  }
+  await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
+  run.cost = C; console.log('  ' + JSON.stringify(C));
+  check(C.potato_after.draws === C.potato_before.draws, `Very Low: the same draws (${C.potato_before.draws} | ${C.potato_after.draws}), ${C.potato_before.ms} | ${C.potato_after.ms} ms`);
+});
+
 save();
+try { const spec = ROOT + '/.tmp_tests/polish_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows })); console.log(execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'polish_sheet_run.jpg', spec]).toString().trim()); } catch (e) { console.log('  (sheet: ' + e.message.slice(0, 200) + ')'); }
+const errs = logs.filter(l => !/favicon|DevTools|Autoplay|AudioContext/i.test(l));
+if (errs.length) console.log('page logs:\n' + errs.slice(0, 12).join('\n'));
+check(!errs.some(l => /pageerror/.test(l)), 'no page errors');
 await browser.close();
-console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
