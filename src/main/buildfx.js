@@ -115,6 +115,7 @@
   const EDGES = [[0, 0, 0, 1, 0, 0], [0, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1], [0, 1, 1, 1, 1, 1], [0, 0, 0, 0, 1, 0], [1, 0, 0, 1, 1, 0], [0, 0, 1, 0, 1, 1], [1, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 1], [1, 0, 0, 1, 0, 1], [0, 1, 0, 0, 1, 1], [1, 1, 0, 1, 1, 1]];
   const rimBuf = new Float32Array(BF.MAX_POPS * 24 * 3);
   BF.RIM_DUR = 0.16;   // s: the pop's rim, bright, fading
+  const THICK = [[0, 0, 0], [0.018, 0.018, 0], [0, 0.018, 0.018]];
   Ren.prototype.bfLines = function (data, nFloats, ver) {
     const gl = this.gl;
     if (!this.bfLineVBO) {
@@ -182,7 +183,7 @@
         gl.useProgram(pl.p); gl.uniformMatrix4fv(pl.u.u_viewProj, false, this.viewProj); gl.uniform3f(pl.u.u_offset, bx - cam.x, by - cam.y, bz - cam.z);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.depthMask(false);
         gl.uniform4f(pl.u.u_color, 1.0 * (1 + day), 0.95 * (1 + day), 0.8 * (1 + day), 0.9 * k);
-        gl.drawArrays(gl.LINES, 0, m * 2);
+        for (const d of THICK) { gl.uniform3f(pl.u.u_offset, bx - cam.x + d[0], by - cam.y + d[1], bz - cam.z + d[2]); gl.drawArrays(gl.LINES, 0, m * 2); }   // (three passes a hair apart: a 2–3 px line where GL draws 1)
         gl.depthMask(true); gl.disable(gl.BLEND); gl.bindVertexArray(null);
         this.stats.popRims = m / 12;
       }
@@ -223,8 +224,8 @@
     // f-polish: the stamp's edges as bright lines (one draw) — the ghost's shape reads, not one flat tint
     if (G2.lines && G2.lines.length && !POff('ghost')) {
       this.bfLines(G2.lines, G2.lines.length, 'g' + G2.ver);
-      gl.uniform4f(p.u.u_color, 1.0, 0.97, 0.85, 0.75 + 0.2 * pulse);
-      gl.drawArrays(gl.LINES, 0, G2.lines.length / 3);
+      gl.uniform4f(p.u.u_color, 1.0, 0.98, 0.88, 0.8 + 0.2 * pulse);
+      for (const d of THICK) { gl.uniform3f(p.u.u_offset, o[0] - cam.x + d[0], o[1] - cam.y + d[1], o[2] - cam.z + d[2]); gl.drawArrays(gl.LINES, 0, G2.lines.length / 3); }
       this.stats.ghostEdges = G2.lines.length / 6;
     }
     gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);

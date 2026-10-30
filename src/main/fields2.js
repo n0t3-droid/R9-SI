@@ -278,9 +278,9 @@
     if (sw) {
       const S = UNI().home, b = S.state(c.end.t).b.swarm;
       if (!(VR.Polish && VR.Polish.off && VR.Polish.off.swarm)) {   // f-polish: end by the biggest body's lit side
-        const bl = Math.hypot(b.r[0], b.r[1], b.r[2]) || 1; se = F2.swarmEnd(c.end.r, [-b.r[0] / bl, -b.r[1] / bl, -b.r[2] / bl]);
+        const bl = Math.hypot(b.r[0], b.r[1], b.r[2]) || 1, old = [c.end.r[0], c.end.r[1], c.end.r[2]]; se = F2.swarmEnd(c.end.r, [-b.r[0] / bl, -b.r[1] / bl, -b.r[2] / bl]); se.old = old;
         for (let i = 0; i < 3; i++) c.end.r[i] = se.r[i];
-        F2.stats = F2.stats || {}; F2.stats.swarmEnd = { k: se.k, d: Math.round(se.d) };
+        F2.stats = F2.stats || {}; F2.stats.swarmEnd = { k: se.k, d: Math.round(se.d), old: se.old };   // (old: u-fields2's end off the swarm's centre — the tests' before)
       }
       for (let i = 0; i < 3; i++) { c.end.r[i] += b.r[i]; c.end.v[i] += b.v[i]; } c.end.frame = 'helia';
     }

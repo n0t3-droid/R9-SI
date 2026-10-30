@@ -18,6 +18,7 @@
   // f-polish: a day with air no longer blown out — the eye adapts to the star's sky: the exposure capped so the sky's
   // mean (zenith and horizon, exposed) is about 0.4 before the tone curve, never below half the base's (pure: node)
   VR.ExoDayExpo = (expo, skyLum) => (skyLum > 0 ? expo * Math.min(1, Math.max(0.5, 0.4 / (skyLum * expo))) : expo);
+  VR.ExoSkyK = (T) => Math.min(1.15, Math.max(0.35, Math.pow((T || 5800) / 5800, 1.5)));
   if (!SJ || !SJ.page || !E || !U) return;
   const X2 = VR.StarExo = { cur: null };
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
@@ -69,8 +70,12 @@
       r.sky.sunCol = r.sky.sunCol.map((v, i) => v * kx[i]);
       // f-polish: the air's stops in the star's colour too (a red dwarf's sky deeper peach), the eye adapted to them
       if (r.sky.air3 && !(VR.Polish && VR.Polish.off && VR.Polish.off.exo)) {
-        const a3 = r.sky.air3; for (let i = 0; i < a3.length; i++) a3[i] *= kx[i % 3];
-        if (r.sky.airB) r.sky.airB = r.sky.airB.map((v, i) => v * kx[i % 3]);
+        // (a cool star's light holds little blue: its air scatters less of it — the sky dimmer against the sunlit ground,
+        // about (T / 5800 K)^1.5 by the λ⁻⁴ weighting of a black body's spectrum; a hot star's a little brighter)
+        const rk = VR.ExoSkyK(st.T);
+        if (r.sky.airK) r.sky.airK[1] *= rk;
+        const a3 = r.sky.air3; for (let i = 0; i < a3.length; i++) a3[i] *= kx[i % 3] * rk;
+        if (r.sky.airB) r.sky.airB = r.sky.airB.map((v, i) => v * kx[i % 3] * rk);
         const Ls = 0.5 * (lumOf([a3[0], a3[1], a3[2]]) + lumOf([a3[3], a3[4], a3[5]]));
         r.expo = VR.ExoDayExpo(r.expo, Ls); r.exoLs = Ls;
       }

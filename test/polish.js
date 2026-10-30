@@ -97,6 +97,8 @@ console.log('d · an exo day\'s exposure');
     check(Math.abs(e2 - 0.5) < 1e-6, `a blinding one: never below half the base (${e2.toFixed(2)})`);
     check(e3 === 1.2 && X(1, 0) === 1, 'a dim sky and no air: untouched');
   }
+  { const src0 = fs.readFileSync(SRC + 'main/starexo.js', 'utf8'), m = src0.match(/VR\.ExoSkyK = (.*);\n/); const K = V.ExoSkyK || (m && eval(m[1]));
+    check(K && Math.abs(K(5800) - 1) < 1e-9 && K(2977) < 0.45 && K(2977) >= 0.35 && K(9000) <= 1.15, `a cool star's air scatters less: the sky ×${K && K(2977).toFixed(2)} under a 2977-K red dwarf, ×${K && K(9000).toFixed(2)} under a 9000-K star`); }
   const src = fs.readFileSync(SRC + 'main/starexo.js', 'utf8');
   check(/air3\[i\] \*= kx|a3\[i\] \*= kx\[i % 3\]/.test(src) && /Polish\.off\.exo/.test(src), 'the air\'s stops in the star\'s colour, behind the switch');
 }

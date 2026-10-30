@@ -106,13 +106,17 @@ await section('boss', async () => {
   await step(200);   // (the entrance's camera hands back)
   await settle(20);
   // from 60 m on the side the player came from, a little above
-  const P60 = await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, m = VR.RPGBoss.cur.m, cx = A ? A.x : m.pos[0], cz = A ? A.z : m.pos[2], x = cx + 0.5, z = cz + 60; return { x, z, y: Math.max(g.world.topAt(Math.floor(x), Math.floor(z)) + 3, m.pos[1] + 9), t: [m.pos[0], m.pos[1] + 5, m.pos[2]] }; });
+  const P60 = await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, m = VR.RPGBoss.cur.m, cx = A ? A.x : m.pos[0] - 9, cz = A ? A.z : m.pos[2]; let dx = m.pos[0] - cx, dz = m.pos[2] - cz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; const ax = -dz, az = dx, x = m.pos[0] + (dx * 0.5 + ax * 0.87) * 60, z = m.pos[2] + (dz * 0.5 + az * 0.87) * 60; window.__bossAt = { p: m.pos.slice(), yaw: m.yaw }; return { x, z, y: Math.max(g.world.topAt(Math.floor(x), Math.floor(z)) + 3, m.pos[1] + 6), t: [m.pos[0], m.pos[1] + 4, m.pos[2]] }; });
+  await ev(() => { const p = VR.game.player; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; });
   await pair('Turmgänger aus 60 m: dunkler Unterrumpf, glühender Rand (vorher | nachher)', 'hull', ['hull'], async () => {
-    await ev(() => { const B = VR.RPGBoss.cur; if (B) { B.m.vel && (B.m.vel[0] = B.m.vel[2] = 0); } });
     await tp(P60.x, P60.y, P60.z); await aim(P60.t); await step(2);
-  });
+    await ev(() => { const B = VR.RPGBoss.cur, a = window.__bossAt; if (B && a) { B.m.pos[0] = a.p[0]; B.m.pos[1] = a.p[1]; B.m.pos[2] = a.p[2]; B.m.yaw = a.yaw; } });
+  }, 1);
   // the cracks from 13 m above, 9 m off the obelisk
   const pc = await ev(() => { const A = VR.RPGBoss2.arena; return { x: A.x + 2, z: A.z + 12, y: A.y + 13, t: [A.x - 1, A.y, A.z - 2] }; });
+  // a one-block step across half the ring (the arena's ground was flat here; a-boss2's pictures had hills)
+  await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, w = g.world, gs = VR.R.byName.grass_block.defaultState; for (let x = Math.floor(A.x) - 12; x <= Math.floor(A.x) + 12; x++) for (let z = Math.floor(A.z) + 2; z <= Math.floor(A.z) + 12; z++) { const d = Math.hypot(x + 0.5 - A.x, z + 0.5 - A.z); if (d < 5.5 || d > 12 || ((x + z) & 7) === 0 && d > 9) continue; const t = w.topAt(x, z); w.setBlock(x, t + 1, z, gs, 4); } });
+  await settle(20);
   await pair('Risse im Boden: keine Streifen mehr über Stufen (vorher | nachher)', 'cracks', ['cracks'], async () => {
     await ev(() => { VR.RPGBoss2.buildCracks(VR.game, VR.RPGBoss2.arena); });
     await tp(pc.x, pc.y, pc.z); await aim(pc.t); await step(2);
@@ -137,7 +141,7 @@ await section('build', async () => {
   }, H);
   await settle(30);
   // look at a free spot beside the house (the ghost goes where V would stamp)
-  await tp(H.x0 - 9.5, H.Y + 6, H.z0 + 14.5); await aim([H.x0 - 9.5, H.Y - 1, H.z0 + 2.5]); await step(3); await settle(20);
+  await tp(H.x0 - 8.5, H.Y + 4, H.z0 + 10.5); await aim([H.x0 - 8.5, H.Y - 1, H.z0 + 2.5]); await step(3); await settle(20);
   const gh = await pair('Bauplan-Geist: Kanten als Linien (vorher | nachher)', 'ghost', ['ghost'], async () => { await step(2); });
   const st = await ev(() => ({ ghost: VR.game.renderer.stats.ghost | 0, edges: VR.game.renderer.stats.ghostEdges | 0, clip: (() => { const c = VR.game.gadgets.wand.clip; return c && [c.sx, c.sy, c.sz]; })() }));
   run.ghost = st; check(st.ghost > 50 && st.edges > 20, 'the ghost drawn with its edges ' + JSON.stringify(st));
@@ -163,7 +167,8 @@ await section('port', async () => {
   run.port = q; console.log('  ' + JSON.stringify(q));
   check(!!q.ours, 'our search finds a place for the port ' + JSON.stringify(q.ours && { x: q.ours.x, y: q.ours.y, z: q.ours.z, how: q.stats.found }));
   if (!q.ours) return;
-  const s = q.ours, cam = [s.x - 20, s.y + 16, s.z + 30], tgt = [s.x, s.y + 2, s.z];
+  const s = q.ours, cam = [s.x - 26, s.y + 30, s.z + 40], tgt = [s.x, s.y + 2, s.z];
+  await ev(() => { const p = VR.game.player; p.noclip = true; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; });
   await off(['port'], true); await tp(...cam); await settle(30); await aim(tgt); await step(2);
   const b = await grab('polish_port_before.png', 3);
   // a moon visited (the port waits for that), then a second of the life's tick: the port founded and its day-0 prefab
@@ -225,10 +230,14 @@ await section('cost', async () => {
   for (const pr of ['potato', 'high']) {
     await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
     await settle(30); await step(20);
-    for (const mode of ['before', 'after']) {
+    await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });   // (warm: the programs built)
+    const acc = { before: [], after: [] }; let draws = {};
+    for (const mode of ['before', 'after', 'after', 'before', 'before', 'after']) {
       await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
-      C[pr + '_' + mode] = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 9; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[4].toFixed(1), draws: g.renderer.stats.draws | 0 }; });
+      const r = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 7; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; return { ms, draws: g.renderer.stats.draws | 0 }; });
+      acc[mode].push(...r.ms); draws[mode] = r.draws;
     }
+    for (const mode of ['before', 'after']) { const a = acc[mode].sort((x, y) => x - y); C[pr + '_' + mode] = { ms: +a[a.length >> 1].toFixed(1), draws: draws[mode] }; }
   }
   await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
   run.cost = C; console.log('  ' + JSON.stringify(C));
