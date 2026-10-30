@@ -45,7 +45,7 @@
       this.vol = { master: 0.8, sfx: 0.9, music: 0.45, ambient: 0.6, voice: 0.8 };
       // e-music: the adaptive score (score.js's director on the audio clock, scoresynth.js's voices); Very Low: fewer voices,
       // no reverb on the music (setLowEnd)
-      this.score = VR.Score ? new VR.Score.Director({ seed: 1 }) : null; this.scoreDay = -1; this.run = null; this.lowEnd = false;
+      this.score = VR.Score ? new VR.Score.Director({ seed: 1 }) : null; this.scoreDay = -1; this.run = null; this.lowEnd = false; this.tier = 1;   // (e-music2: tier 0 Very Low … 3 High: setTier)
       this.mvEnd = []; this.mvN = []; this.sc = {}; this.wanders = 0; this.tickNext = 0;
       this.loops = {};
       this.music = { next: 0, bar: 0, chord: 0, mood: 'day', intensity: 0, scan: 0, hostile: false, village: false, duckT: 1, planDay: -1, plan: null, rng: null };
@@ -87,6 +87,7 @@
       const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), nd = nb.getChannelData(0);
       for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
       this.noise = nb;
+      this.buildTier();   // e-music2: the music's room (Balanced+) and chorus (High)
       if (c.state === 'suspended') c.resume();
     }
     resume() { if (!this.ctx) this.init(); else if (this.ctx.state === 'suspended') this.ctx.resume(); }
@@ -97,6 +98,37 @@
     }
     // e-music · Very Low: the music sends nothing into the convolver, and plays fewer voices (musCap)
     setLowEnd(on) { this.lowEnd = !!on; if (!this.ctx || !this.musRev) return; this.musRev.disconnect(); if (!this.lowEnd && this.rev) this.musRev.connect(this.rev); }
+    // e-music2 · the music's cost tier (game.js: Very Low 0, Low 1, Balanced 2, High / Ultra 3). Balanced+: a soft room —
+    // four feedback combs (delays of 31 … 47 ms, the feedback lowpassed so the tail darkens), not a convolver; High: a
+    // chorus (one delay swept by a slow LFO) on strings and pads, and each cue's shared vibrato LFO (startCue)
+    setTier(n) { n = Math.max(0, Math.min(3, n | 0)); const was = this.tier; this.tier = n; this.setLowEnd(n === 0); if (this.ctx && was !== n) this.buildTier(); }
+    buildTier() {
+      const c = this.ctx; if (!c || !c.createDelay) return;
+      if (this.tier >= 2 && !this.roomIn) {
+        this.roomIn = c.createGain(); this.roomIn.gain.value = 1;
+        this.roomOut = c.createGain(); this.roomOut.gain.value = 0.2; this.roomOut.connect(this.musTalk);
+        this.combs = [];
+        for (const [dt, fb] of [[0.0311, 0.76], [0.0367, 0.74], [0.0413, 0.72], [0.0471, 0.7]]) {
+          const dl = c.createDelay(0.1); dl.delayTime.value = dt;
+          const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400; lp.Q.value = 0.3;
+          const g = c.createGain(); g.gain.value = fb;
+          this.roomIn.connect(dl); dl.connect(lp); lp.connect(g); g.connect(dl); dl.connect(this.roomOut);
+          this.combs.push(dl, lp, g);
+        }
+      } else if (this.tier < 2 && this.roomIn) {
+        this.roomIn.disconnect(); this.roomOut.disconnect(); for (const x of this.combs) x.disconnect(); this.roomIn = this.roomOut = null; this.combs = null;
+      }
+      if (this.tier >= 3 && !this.choIn) {
+        this.choIn = c.createGain(); this.choIn.gain.value = 1;
+        const dl = c.createDelay(0.05); dl.delayTime.value = 0.017;
+        const lfo = c.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.63;
+        const dep = c.createGain(); dep.gain.value = 0.0035; lfo.connect(dep); dep.connect(dl.delayTime); lfo.start();
+        const out = c.createGain(); out.gain.value = 0.45; this.choIn.connect(dl); dl.connect(out); out.connect(this.musTalk);
+        this.cho = [dl, lfo, dep, out];
+      } else if (this.tier < 3 && this.choIn) {
+        this.choIn.disconnect(); for (const x of this.cho) { x.disconnect(); if (x.stop) x.stop(); } this.choIn = null; this.cho = null;
+      }
+    }
     count(name) { this.counts[name] = (this.counts[name] | 0) + 1; }
     prune() { const live = this.live, now = this.ctx ? this.ctx.currentTime : 0; let k = 0; for (let i = 0; i < live.length; i++) if (live[i] > now) live[k++] = live[i]; live.length = k; return k; }
     stats() { return { voices: this.prune(), counts: this.counts, notes: this.noteCount }; }
@@ -547,7 +579,7 @@
 
     // ---------------- e-music · the adaptive score: the director looks four times a second (score.js), the cue's notes are
     // scheduled half a second ahead on the audio clock (scoresynth.js), within the voice cap; per frame only a compare
-    musCap() { return this.lowEnd ? 10 : 28; }
+    musCap() { return this.lowEnd ? 10 : this.tier >= 3 ? 36 : 28; }   // (e-music2: High 36 — the warm third layer)
     musVoices(at) {
       const now = at !== undefined ? at : this.ctx ? this.ctx.currentTime : 0, E = this.mvEnd, N = this.mvN; let k = 0, sum = 0;
       for (let i = 0; i < E.length; i++) if (E[i] > now) { E[k] = E[i]; N[k] = N[i]; sum += N[i]; k++; }
@@ -563,11 +595,11 @@
         const day = s.day | 0;
         if (this.scoreDay !== day) { this.scoreDay = day; M.plan = K.musicPlan(day); if (D.log.length === 0) D.reseed(K.seedOf(day) ^ 0x5c0e); }
         const x = SC.gather(s.g || VR.game, s, this.sc);
-        x.hostile = M.hostile; if (s.dialogue) x.dialogue = true; if (s.boss) x.boss = s.boss; if (s.outpost) x.outpost = true;
+        x.hostile = M.hostile; if (s.colour !== undefined) x.colour = s.colour; if (s.dialogue) x.dialogue = true; if (s.boss) x.boss = s.boss; if (s.outpost) x.outpost = true;
         const act = D.step(now, x);
         M.mood = x.festival ? 'festival' : D.cue ? D.cue.id : 'quiet';
         if (act && act.type === 'start') this.startCue(act);
-        else if (act && act.type === 'fade' && this.run) { const r = this.run; r.bus.gain.setTargetAtTime(0.0001, now, act.len / 4); r.stopAt = now + act.len; }
+        else if (act && act.type === 'fade' && this.run) { const r = this.run; r.bus.gain.setTargetAtTime(0.0001, now, act.len / 4); if (r.wet) r.wet.gain.setTargetAtTime(0.0001, now, act.len / 4); r.stopAt = now + act.len; }
         const duck = (M.hostile || s.danger) ? 0.25 : 1;
         if (duck !== M.duckT) { M.duckT = duck; this.musDuck.gain.setTargetAtTime(duck, now, duck < 1 ? 0.6 : 2.5); }
         const talk = x.dialogue ? 0.35 : 1;
@@ -586,19 +618,25 @@
       while (r.i < evs.length && r.t0 + evs[r.i].t < until) {
         const e = evs[r.i++], t = Math.max(now + 0.01, r.t0 + e.t);
         if (t >= r.stopAt) { r.i = evs.length; break; }
-        const v = SY.voicesOf(e.inst, this.lowEnd), live = this.musVoices(t);
+        const v = SY.voicesOf(e.inst, this.lowEnd, this.tier), live = this.musVoices(t);
         if (live + v > cap || (e.pri < 2 && live + v > cap * 0.75)) continue;   // full: the ornaments go first
         if (e.midi) { const i = this.noteCount & 511; this.noteLog[i] = e.midi; this.noteCount++; }
-        const out = SY.note(c, r.bus, e, t, { lowEnd: this.lowEnd, rev: this.lowEnd ? null : this.musRev });
+        const out = SY.note(c, r.bus, e, t, { lowEnd: this.lowEnd, rev: this.lowEnd ? null : this.musRev, tier: this.tier, lfo: r.lfo, chorus: r.cho, room: r.wet });
         this.mvEnd.push(out.end); this.mvN.push(v);
       }
     }
     startCue(a) {
       const c = this.ctx, SC = VR.Score, D = this.score;
-      if (this.run) { this.run.bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.3); this.run.stopAt = Math.min(this.run.stopAt, c.currentTime); }
+      if (this.run) { this.run.bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.3); if (this.run.wet) this.run.wet.gain.setTargetAtTime(0.0001, c.currentTime, 0.3); this.run.stopAt = Math.min(this.run.stopAt, c.currentTime); }
       const bus = c.createGain(); bus.gain.value = 1; bus.connect(a.id === 'adventure' ? this.musAct : this.musDuck);
-      const evs = SC.events(a.id, { plan: this.music.plan || K.musicPlan(0), lv: a.lv, variant: a.variant, calm: D.calm, lowEnd: this.lowEnd, seed: (K.seedOf(this.scoreDay) ^ (0x51ed + 977 * this.wanders++)) >>> 0 });
-      this.run = { id: a.id, evs, i: 0, t0: a.at, stopAt: a.at + a.dur + 0.01, bus };
+      // e-music2: the director's seed (the form, the variation) and the place's colour; the cue's sends (the room, the
+      // chorus) and its vibrato LFO by tier; a moon is airless: the room dry
+      const seed = a.seed !== undefined ? a.seed >>> 0 : (K.seedOf(this.scoreDay) ^ (0x51ed + 977 * this.wanders++)) >>> 0;
+      const evs = SC.events(a.id, { plan: this.music.plan || K.musicPlan(0), lv: a.lv, variant: a.variant, calm: D.calm, lowEnd: this.lowEnd, seed, colour: a.colour || '' });
+      let wet = null, lfo = null;
+      if (this.roomIn) { wet = c.createGain(); wet.gain.value = 1; wet.connect(this.roomIn); this.roomOut.gain.setTargetAtTime(a.colour === 'moon' ? 0.0001 : 0.2, c.currentTime, 0.4); }
+      if (this.tier >= 3 && !this.lowEnd) { const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 5.1; lfo = c.createGain(); lfo.gain.value = 7; o.connect(lfo); o.start(a.at); o.stop(a.at + a.dur + 6); }   // ±7 cents
+      this.run = { id: a.id, evs, i: 0, t0: a.at, stopAt: a.at + a.dur + 0.01, bus, wet, lfo, cho: this.choIn || null };
       this.count('cue_' + a.id);
     }
     kick(t, gain) { const c = this.ctx; const o = c.createOscillator(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.15); const g = c.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25); o.connect(g); g.connect(this.musDuck); o.start(t); o.stop(t + 0.3); }
