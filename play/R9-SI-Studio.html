@@ -13093,7 +13093,18 @@ const t=R.byName[id];
 if(t)return t.itemDef||(t.itemDef={id,get name(){return t.o&&t.o.vxModel&&VR.dispName?VR.dispName(t.display):t.display;},stack:t.o.stack||64,block:t,cat:t.cat});
 return null;
 };
-VR.itemName=(id)=>{const d=VR.itemDef(id);return d?d.name:id;};
+
+
+
+const tab=(k)=>{const I=VR.I18N,d=I&&I.dict&&I.dict[I.lang];const s=d&&d[k];return typeof s==='string'?s:null;};
+VR.itemName=(id)=>{
+const d=VR.itemDef(id);if(!d)return id;
+const own=tab('g.it.'+id);if(own)return own;
+const raw=d.block?d.block.display:d.name;
+return VR.dispName?VR.dispName(raw):d.name;
+};
+
+VR.palName=(key,name)=>tab('g.pal.'+key)||name;
 VR.maxStack=(id)=>{const d=VR.itemDef(id);return d?d.stack:64;};
 })(VR);
 
@@ -15493,6 +15504,24 @@ if(d<bd){bd=d;best=s;}
 }
 return best;
 };
+
+
+
+OG.outpostApproach=function(x,z){
+const o=this.nearestOutpost(x,z);if(!o)return null;
+const base=Math.atan2(z-o.z,x-o.x);
+for(const D of[240,220,260,200,280])for(const da of[0,0.3,-0.3,0.6,-0.6,0.9,-0.9,1.3,-1.3,1.8,-1.8,2.4,-2.4,Math.PI]){
+const px=Math.round(o.x+Math.cos(base+da)*D),pz=Math.round(o.z+Math.sin(base+da)*D);
+const y=this.surfaceY(px,pz);if(!(y>SEA+1&&y<140))continue;
+const b=B[this.biomeFor(this.climateAt(px,pz),y)];if(!b||b.ocean||b.river)continue;
+let even=true;
+for(const[dx,dz]of[[3,0],[-3,0],[0,3],[0,-3]])if(Math.abs(this.surfaceY(px+dx,pz+dz)-y)>2){even=false;break;}
+if(!even)continue;
+const yaw=Math.atan2(-(o.x-px),-(o.z-pz));
+return{pos:[px+0.5,y+1,pz+0.5],out:[o.x,o.y,o.z],yaw,d:Math.round(Math.hypot(o.x-px,o.z-pz))};
+}
+return null;
+};
 function structures(g,w,cx,cz,out){
 const x0=cx*16,z0=cz*16;
 const ci=Math.floor(x0/OUT_CELL),cj=Math.floor(z0/OUT_CELL);
@@ -15756,8 +15785,8 @@ const E=0,HULL=1,HULL2=2,TRIM=3,ACC=4,GLASS=5,GLOW=6,ENG=7,AIR=8,FLOOR=9,GRATE=1
 const S=(n,p)=>{const t=R.byName[n];if(!t)return 0;return p?t.state(p):t.defaultState;};
 const PALETTES=[
 {key:'starforge',name:'Sternglut',hull:'hull_plating',hull2:'hull_plating_gray',trim:'hull_plating_dark',acc:'hull_stripe_orange',acc2:'hull_stripe_blue',glow:'neon_cyan',glass:'viewport',eng:'hull_plating_dark'},
-{key:'nightwing',name:'Nightwing',hull:'hull_plating_dark',hull2:'black_concrete',trim:'gray_concrete',acc:'magenta_concrete',acc2:'purple_concrete',glow:'neon_magenta',glass:'purple_stained_glass',eng:'black_concrete'},
-{key:'sunstrike',name:'Sunstrike',hull:'white_concrete',hull2:'light_gray_concrete',trim:'gray_concrete',acc:'red_concrete',acc2:'yellow_concrete',glow:'neon_amber',glass:'light_blue_stained_glass',eng:'hull_plating_dark'},
+{key:'nightwing',name:'Nightpoppy',hull:'hull_plating_dark',hull2:'black_concrete',trim:'gray_concrete',acc:'magenta_concrete',acc2:'purple_concrete',glow:'neon_magenta',glass:'purple_stained_glass',eng:'black_concrete'},
+{key:'sunstrike',name:'Noonglow',hull:'white_concrete',hull2:'light_gray_concrete',trim:'gray_concrete',acc:'red_concrete',acc2:'yellow_concrete',glow:'neon_amber',glass:'light_blue_stained_glass',eng:'hull_plating_dark'},
 {key:'verdant',name:'Verdant Corps',hull:'light_gray_concrete',hull2:'hull_plating_gray',trim:'green_concrete',acc:'lime_concrete',acc2:'green_concrete',glow:'neon_lime',glass:'viewport',eng:'hull_plating_dark'},
 {key:'royal',name:'Royal Blue',hull:'blue_concrete',hull2:'light_blue_concrete',trim:'hull_plating_dark',acc:'yellow_concrete',acc2:'white_concrete',glow:'neon_white',glass:'light_blue_stained_glass',eng:'hull_plating_dark'},
 {key:'hauler',name:'Rust Hauler',hull:'orange_terracotta',hull2:'brown_concrete',trim:'hull_plating_dark',acc:'yellow_concrete',acc2:'black_concrete',glow:'neon_amber',glass:'viewport',eng:'gray_concrete'},
@@ -16329,14 +16358,14 @@ const hash=(a,b,c)=>{let h=(a*374761393+b*668265263+c*2147483647)|0;h=Math.imul(
 
 const PAL=[
 {key:'starforge',name:'Sternglut',hull:0xe9ecf1,hull2:0xc3c9d3,trim:0x3a3f4b,acc:0xf07a1e,acc2:0x2e7de0,glow:0x5af4ff,glass:0x1b3a66,eng:0x4a4f5a,core:0xffb45a},
-{key:'nightwing',name:'Nightwing',hull:0x2c2f3a,hull2:0x3d4150,trim:0x16181e,acc:0xe0409e,acc2:0x8a4bff,glow:0xff5ad8,glass:0x2a1446,eng:0x23252d,core:0xff6adf},
-{key:'sunstrike',name:'Sunstrike',hull:0xf2efe8,hull2:0xd9d3c7,trim:0x46403a,acc:0xd83b2b,acc2:0xf5c43a,glow:0xffc23a,glass:0x1d4f7a,eng:0x4d4843,core:0xffd27a},
+{key:'nightwing',name:'Nightpoppy',hull:0x2c2f3a,hull2:0x3d4150,trim:0x16181e,acc:0xe0409e,acc2:0x8a4bff,glow:0xff5ad8,glass:0x2a1446,eng:0x23252d,core:0xff6adf},
+{key:'sunstrike',name:'Noonglow',hull:0xf2efe8,hull2:0xd9d3c7,trim:0x46403a,acc:0xd83b2b,acc2:0xf5c43a,glow:0xffc23a,glass:0x1d4f7a,eng:0x4d4843,core:0xffd27a},
 {key:'verdant',name:'Verdant Corps',hull:0xd8ddd2,hull2:0xaeb8a4,trim:0x2f4a2b,acc:0x6fd83a,acc2:0x2c8a4a,glow:0x9cff6a,glass:0x173d33,eng:0x3e4a3e,core:0xc8ff7a},
 {key:'royal',name:'Royal Blue',hull:0x2f5ad8,hull2:0x5c86ec,trim:0x1e2a4a,acc:0xf5d03a,acc2:0xffffff,glow:0xfff3a8,glass:0x10244a,eng:0x2a3148,core:0xfff0a0},
 {key:'hauler',name:'Rust Hauler',hull:0xb8683a,hull2:0x8f5433,trim:0x3a2f28,acc:0xf2c230,acc2:0x2b2b2b,glow:0xffa13a,glass:0x1f3440,eng:0x4b4541,core:0xffa850},
 {key:'prism',name:'Prism Guild',hull:0xf4f1fb,hull2:0xd8cff0,trim:0x4b2f78,acc:0xa35cff,acc2:0xff5ad8,glow:0x9f7bff,glass:0x2a1450,eng:0x3b3150,core:0xc9a2ff},
 {key:'arctic',name:'Arctic Survey',hull:0xf5f8fb,hull2:0xcfdbe6,trim:0x2f4f63,acc:0x2bb3e0,acc2:0xff7a3a,glow:0x7ef1ff,glass:0x123a52,eng:0x3d4b57,core:0x9ef8ff},
-{key:'crimson',name:'Crimson Fleet',hull:0xb3262b,hull2:0x8c1e22,trim:0x2a1718,acc:0xf2f2f2,acc2:0xf2a33a,glow:0xff5a4a,glass:0x2a0f12,eng:0x3a2a2b,core:0xff8a5a},
+{key:'crimson',name:'Carmine Fleet',hull:0xb3262b,hull2:0x8c1e22,trim:0x2a1718,acc:0xf2f2f2,acc2:0xf2a33a,glow:0xff5a4a,glass:0x2a0f12,eng:0x3a2a2b,core:0xff8a5a},
 ];
 const NAMES=['Kestrel','Starling','Halcyon','Vesper','Corvid','Tern','Lumen','Solace','Wayfarer','Drift','Ember','Nimbus','Quill','Harrier','Aurel','Sable','Vanta','Cinder','Zephyr','Lyra','Orrin','Juno','Talon','Mistral','Borealis','Solstice','Rook','Gale','Aster','Pike','Marlin','Osprey','Wren','Kite','Swift','Petrel','Heron','Lark','Fulmar','Comet','Meridian','Halo','Tempest','Nova','Umbra','Pioneer','Bramble','Saffron','Cobalt','Tidewater'];
 const ARCH={
@@ -38435,7 +38464,7 @@ return K.grid;
 
 const ARCHS=['shuttle','interceptor','gunship','racer','dropship','freighter','cruiser','carrier'];
 const ANAMES=['Shuttle','Interceptor','Gunship','Racer','Dropship','Frachter','Kreuzer','Träger'];
-const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
+const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nachtmohn'],['ss','sunstrike','Mittagsglanz'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
 const STATION=7;
 Forge.register({
 id:'shuttle',icon:'🚀',name:'Raumschiff',en:'Spaceship',level:true,sh:1,
@@ -39638,6 +39667,60 @@ const WORD={
 'bentwood':'Bugholz','bullet':'Zylinder','outdoor':'Außen','cabinet':'Schrank','bowl':'Schale','cube':'Würfel','sunburst':'Sonnenstrahl',
 'tray':'Tablett','trio':'Trio','arm':'Armlehne','slats':'Lamellen','oval':'oval','grid':'Gitter','boxwood':'Buchsbaum',
 };
+
+
+const WORD_BLOCKS={
+'fehlende':'Fehlende','variante':'Variante','vollton':'Vollton','kantig':'kantig','slab':'Stufe','stairs':'Treppe','block':'Block','blue':'blau',
+'brick':'Ziegel','bricks':'Ziegel','gloss':'glänzend','polished':'poliert','dark':'dunkel','coral':'Koralle','stained':'gefärbt','gray':'grau',
+'grey':'grau','fence':'Zaun','deepstone':'Tiefenstein','orange':'orange','yellow':'gelb','stripped':'entrindet','pink':'rosa','teal':'petrol',
+'log':'Stamm','sandstone':'Sandstein','carpet':'Teppich','lime':'hellgrün','magenta':'magenta','crate':'Kiste','pale':'blass','cyan':'cyan',
+'ore':'Erz','pane':'Scheibe','crystal':'Kristall','gate':'Tor','pressure':'Druck','plate':'Platte','mangrove':'Mangrove','poplar':'Pappel',
+'crimson':'karmesin','smooth':'glatt','scoria':'Schlacke','copper':'Kupfer','brown':'braun','purple':'lila','powder':'Pulver','candle':'Kerze',
+'pocket':'Tasche','spruce':'Fichte','cherry':'Kirsche','bamboo':'Bambus','ember':'Glut','glazed':'glasiert','dead':'abgestorben','stucco':'Stuck',
+'trapdoor':'Falltür','button':'Knopf','birch':'Birke','jungle':'Dschungel','acacia':'Akazie','planks':'Bretter','chiseled':'gemeißelt','tuff':'Tuff',
+'sulfur':'Schwefel','leaves':'Laub','frame':'Rahmen','cinnabar':'Zinnober','duskrock':'Dämmerfels','tech':'Technik','ridge':'First','tile':'Fliese',
+'tiles':'Fliesen','temple':'Tempel','violet':'violett','hull':'Rumpf','granite':'Granit','tidestone':'Gezeitenstein','quartz':'Quarz','ochre':'ocker',
+'sapling':'Setzling','iron':'Eisen','torch':'Fackel','ice':'Eis','strip':'Streifen','cobblestone':'Bruchstein','mossy':'bemoost','flower':'Blume',
+'amber':'Bernstein','plaster':'Putz','cozy':'gemütlich','diorite':'Diorit','andesite':'Andesit','mud':'Schlamm','resin':'Harz','cut':'geschnitten',
+'gold':'Gold','emerald':'Smaragd','dirt':'Erde','bush':'Busch','moss':'Moos','bubble':'Blasen','horn':'Horn','slate':'Schiefer',
+'hangar':'Hangar','amethyst':'Amethyst','cluster':'Büschel','brain':'Hirn','asphalt':'Asphalt','plaza':'Platz','siding':'Verkleidung','shuttered':'mit Läden',
+'cracked':'rissig','voidstone':'Leerenstein','roots':'Wurzeln','tulip':'Tulpe','echo':'Echo','bookshelf':'Bücherregal','volt':'Volt','spire':'Turmspitze',
+'trim':'Zierleiste','sky':'Himmel','lavender':'Lavendel','low':'niedrig','hip':'Walm','tree':'Baum','plum':'Pflaume','car':'Auto',
+'stalk':'Stängel','hyphae':'Hyphen','cobbled':'gepflastert','spirit':'Geist','glowing':'leuchtend','fern':'Farn','azalea':'Azalee','azure':'azur',
+'pumpkin':'Kürbis','carved':'geschnitzt','stem':'Stiel','snow':'Schnee','chest':'Truhe','stacked':'gestapelt','ledgestone':'Riemchen','clinker':'Klinker',
+'bossed':'bossiert','paver':'Pflasterstein','pavers':'Pflastersteine','porcelain':'Porzellan','micro-cement':'Mikrozement','plating':'Panzerung','holo':'Holo','timber':'Fachwerk',
+'deck':'Deck','street':'Straße','awning':'Markise','crown':'Krone','panorama':'Panorama','pure':'rein','mid':'mittel','deep':'tief',
+'beige':'beige','caramel':'karamell','chocolate':'schokobraun','signal':'Signal','carmine':'karmin','dusty':'staubig','apricot':'aprikose','lemon':'zitrone',
+'forest':'Wald','pigeon':'taubenblau','cobalt':'kobalt','petrol':'petrol','turquoise':'türkis','mosaic':'Mosaik','abyssal':'abyssal','basalt':'Basalt',
+'coal':'Kohle','diamond':'Diamant','lapis':'Lapis','lazuli':'Lazuli','obsidian':'Obsidian','verdant':'grün','path':'Pfad','gravel':'Kies',
+'raw':'roh','bud':'Knospe','vines':'Ranken','glow':'Leucht','pad':'Platte','void':'Leere','anvil':'Amboss','beacon':'Leuchtfeuer',
+'piston':'Kolben','rail':'Schiene','band':'Band','slit':'Schlitz','portal':'Portal','cladding':'Verkleidung','cornice':'Gesims','roofing':'Dachdeckung',
+'natural':'natur','wooden':'Holz','shingle':'Schindel','railing':'Geländer','trunk':'Stamm','supermarket':'Supermarkt','packed':'gepresst','grate':'Gitter',
+'weeping':'Trauer','bars':'Gitterstäbe','chain':'Kette','rod':'Stab','sea':'See','hardened':'gehärtet','coarse':'grob','mycelium':'Myzel',
+'podzol':'Podsol','rooted':'durchwurzelt','clay':'Ton','gloom':'Düster','soil':'Boden','dripstone':'Tropfstein','small':'klein','large':'groß',
+'short':'kurz','dry':'trocken','flowering':'blühend','dripleaf':'Tropfblatt','royal':'königlich','heart':'Herz','dandelion':'Löwenzahn','lily':'Lilie',
+'blossom':'Blüte','berry':'Beere','starfruit':'Sternfrucht','melon':'Melone','hay':'Heu','bale':'Ballen','fungus':'Pilz','kelp':'Seetang',
+'seagrass':'Seegras','furnace':'Ofen','barrel':'Fass','beehive':'Bienenstock','campfire':'Lagerfeuer','sponge':'Schwamm','buried':'vergraben','weighted':'beschwert',
+'detector':'Melder','pilaster':'Pilaster','zebra':'Zebra','crossing':'Streifen','dash':'Strich','slat':'Latte','decking':'Terrassendielen','wide':'breit',
+'balustrade':'Balustrade','rock':'Fels','landing':'Lande','viewport':'Sichtfenster','dish':'Schüssel','butter':'Butter','prism':'Prisma','thatch':'Reet',
+'floorboards':'Dielen','beam':'Balken','chimney':'Schornstein','picket':'Latten','rustic':'rustikal','control':'Steuer','ceiling':'Decke','desk':'Pult',
+'tropical':'tropisch','fruit':'Obst','vegetable':'Gemüse','dairy':'Molkerei','hedge':'Hecke','urn':'Urne','flush':'bündig','regolith':'Regolith',
+'emberrock':'Glutfels','duskite':'Dämmerit','gilded':'vergoldet','reinforced':'verstärkt','tinted':'getönt','pearl':'Perle','sunstone':'Sonnenstein','tide':'Gezeiten',
+'farmland':'Ackerboden','bedrock':'Grundgestein','magma':'Magma','calcite':'Calcit','pointed':'spitz','spike':'Stachel','relic':'Relikt','budding':'knospend',
+'medium':'mittel','shrub':'Strauch','firefly':'Glühwürmchen','litter':'Streu','shoot':'Trieb','big':'groß','muddy':'schlammig','clump':'Büschel',
+'orchid':'Orchidee','cornflower':'Kornblume','golden':'golden','daisy':'Gänseblümchen','poppy':'Mohn','window':'Fenster','door':'Tür','lamp':'Lampe',
+'light':'Licht','wall':'Mauer','glass':'Glas','stone':'Stein','sand':'Sand','grass':'Gras','wool':'Wolle','concrete':'Beton',
+'terracotta':'Terrakotta','green':'grün','red':'rot','black':'schwarz','oak':'Eiche','leaf':'Blatt','roof':'Dach','floor':'Boden',
+'panel':'Paneel','pillar':'Säule','column':'Säule','arch':'Bogen','water':'Wasser','lava':'Lava','metal':'Metall','steel':'Stahl',
+'marble':'Marmor','wood':'Holz','bench':'Bank','table':'Tisch','chair':'Stuhl','bed':'Bett','ladder':'Leiter','lantern':'Laterne',
+'mushroom':'Pilz','cactus':'Kaktus','vine':'Ranke','rose':'Rose','sunflower':'Sonnenblume','reed':'Schilf','reeds':'Schilf','sugar':'Zucker',
+'cane':'Rohr','wheat':'Weizen','carrot':'Karotte','potato':'Kartoffel','stalagmite':'Stalagmit','pebble':'Kiesel','pebbles':'Kiesel','boulder':'Felsbrocken',
+'shell':'Muschel','light-line':'Lichtlinie','post':'Pfosten','lamppost':'Laternenpfahl','black-frame':'schwarzer Rahmen','white-frame':'weißer Rahmen','aether-veined':'äthergeädert','fuming':'rauchend',
+'mirelight':'Moorlicht','lilacite':'Lilazit','voltite':'Voltit','conduit':'Leitung','propagule':'Keimling','allium':'Lauch','bluet':'Blauauge','oxeye':'Margerite',
+'torchflower':'Fackelblume','valley':'Tal','jack':'Kürbis',"o'lantern":'Laterne','wart':'Warze','(white':'(weiße','ceiling)':'Decke)','(warm)':'(warm)',
+'glowstone':'Leuchtstein',
+};
+for(const k in WORD_BLOCKS)if(!(k in WORD))WORD[k]=WORD_BLOCKS[k];
 
 const KEEP= /^(&|[\d.,]+|[\d.,]+"|[\d.,]+[a-zA-Z]{0,3}|×)$/;
 const seg=(s,report)=>{
@@ -45054,6 +45137,9 @@ post(r,r.ops?[r.ops.buffer]:[]);
 const r=VR.PlanetLOD.job(m,getGen),tr=r.transfer;delete r.transfer;post(r,tr);
 }else if(m.type==='bodytex'){
 const r=VR.BodyTex.job(m,getGen),tr=r.transfer;delete r.transfer;post(r,tr);
+}else if(m.type==='outpostStart'){
+const g=getGen(m.dim);
+post({type:'outpostStart',id:m.id,r:g.outpostApproach?g.outpostApproach(m.x,m.z):null});
 }else if(m.type==='locate'){
 const g=getGen(m.dim);
 let found=null;
@@ -56016,7 +56102,18 @@ const t=R.byName[id];
 if(t)return t.itemDef||(t.itemDef={id,get name(){return t.o&&t.o.vxModel&&VR.dispName?VR.dispName(t.display):t.display;},stack:t.o.stack||64,block:t,cat:t.cat});
 return null;
 };
-VR.itemName=(id)=>{const d=VR.itemDef(id);return d?d.name:id;};
+
+
+
+const tab=(k)=>{const I=VR.I18N,d=I&&I.dict&&I.dict[I.lang];const s=d&&d[k];return typeof s==='string'?s:null;};
+VR.itemName=(id)=>{
+const d=VR.itemDef(id);if(!d)return id;
+const own=tab('g.it.'+id);if(own)return own;
+const raw=d.block?d.block.display:d.name;
+return VR.dispName?VR.dispName(raw):d.name;
+};
+
+VR.palName=(key,name)=>tab('g.pal.'+key)||name;
 VR.maxStack=(id)=>{const d=VR.itemDef(id);return d?d.stack:64;};
 })(VR);
 
@@ -60394,7 +60491,7 @@ return K.grid;
 
 const ARCHS=['shuttle','interceptor','gunship','racer','dropship','freighter','cruiser','carrier'];
 const ANAMES=['Shuttle','Interceptor','Gunship','Racer','Dropship','Frachter','Kreuzer','Träger'];
-const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nightwing'],['ss','sunstrike','Sunstrike'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
+const PAL=[['sf','starforge','Sternglut'],['nw','nightwing','Nachtmohn'],['ss','sunstrike','Mittagsglanz'],['rh','hauler','Rust Hauler'],['as','arctic','Arctic Survey']];
 const STATION=7;
 Forge.register({
 id:'shuttle',icon:'🚀',name:'Raumschiff',en:'Spaceship',level:true,sh:1,
@@ -61597,6 +61694,60 @@ const WORD={
 'bentwood':'Bugholz','bullet':'Zylinder','outdoor':'Außen','cabinet':'Schrank','bowl':'Schale','cube':'Würfel','sunburst':'Sonnenstrahl',
 'tray':'Tablett','trio':'Trio','arm':'Armlehne','slats':'Lamellen','oval':'oval','grid':'Gitter','boxwood':'Buchsbaum',
 };
+
+
+const WORD_BLOCKS={
+'fehlende':'Fehlende','variante':'Variante','vollton':'Vollton','kantig':'kantig','slab':'Stufe','stairs':'Treppe','block':'Block','blue':'blau',
+'brick':'Ziegel','bricks':'Ziegel','gloss':'glänzend','polished':'poliert','dark':'dunkel','coral':'Koralle','stained':'gefärbt','gray':'grau',
+'grey':'grau','fence':'Zaun','deepstone':'Tiefenstein','orange':'orange','yellow':'gelb','stripped':'entrindet','pink':'rosa','teal':'petrol',
+'log':'Stamm','sandstone':'Sandstein','carpet':'Teppich','lime':'hellgrün','magenta':'magenta','crate':'Kiste','pale':'blass','cyan':'cyan',
+'ore':'Erz','pane':'Scheibe','crystal':'Kristall','gate':'Tor','pressure':'Druck','plate':'Platte','mangrove':'Mangrove','poplar':'Pappel',
+'crimson':'karmesin','smooth':'glatt','scoria':'Schlacke','copper':'Kupfer','brown':'braun','purple':'lila','powder':'Pulver','candle':'Kerze',
+'pocket':'Tasche','spruce':'Fichte','cherry':'Kirsche','bamboo':'Bambus','ember':'Glut','glazed':'glasiert','dead':'abgestorben','stucco':'Stuck',
+'trapdoor':'Falltür','button':'Knopf','birch':'Birke','jungle':'Dschungel','acacia':'Akazie','planks':'Bretter','chiseled':'gemeißelt','tuff':'Tuff',
+'sulfur':'Schwefel','leaves':'Laub','frame':'Rahmen','cinnabar':'Zinnober','duskrock':'Dämmerfels','tech':'Technik','ridge':'First','tile':'Fliese',
+'tiles':'Fliesen','temple':'Tempel','violet':'violett','hull':'Rumpf','granite':'Granit','tidestone':'Gezeitenstein','quartz':'Quarz','ochre':'ocker',
+'sapling':'Setzling','iron':'Eisen','torch':'Fackel','ice':'Eis','strip':'Streifen','cobblestone':'Bruchstein','mossy':'bemoost','flower':'Blume',
+'amber':'Bernstein','plaster':'Putz','cozy':'gemütlich','diorite':'Diorit','andesite':'Andesit','mud':'Schlamm','resin':'Harz','cut':'geschnitten',
+'gold':'Gold','emerald':'Smaragd','dirt':'Erde','bush':'Busch','moss':'Moos','bubble':'Blasen','horn':'Horn','slate':'Schiefer',
+'hangar':'Hangar','amethyst':'Amethyst','cluster':'Büschel','brain':'Hirn','asphalt':'Asphalt','plaza':'Platz','siding':'Verkleidung','shuttered':'mit Läden',
+'cracked':'rissig','voidstone':'Leerenstein','roots':'Wurzeln','tulip':'Tulpe','echo':'Echo','bookshelf':'Bücherregal','volt':'Volt','spire':'Turmspitze',
+'trim':'Zierleiste','sky':'Himmel','lavender':'Lavendel','low':'niedrig','hip':'Walm','tree':'Baum','plum':'Pflaume','car':'Auto',
+'stalk':'Stängel','hyphae':'Hyphen','cobbled':'gepflastert','spirit':'Geist','glowing':'leuchtend','fern':'Farn','azalea':'Azalee','azure':'azur',
+'pumpkin':'Kürbis','carved':'geschnitzt','stem':'Stiel','snow':'Schnee','chest':'Truhe','stacked':'gestapelt','ledgestone':'Riemchen','clinker':'Klinker',
+'bossed':'bossiert','paver':'Pflasterstein','pavers':'Pflastersteine','porcelain':'Porzellan','micro-cement':'Mikrozement','plating':'Panzerung','holo':'Holo','timber':'Fachwerk',
+'deck':'Deck','street':'Straße','awning':'Markise','crown':'Krone','panorama':'Panorama','pure':'rein','mid':'mittel','deep':'tief',
+'beige':'beige','caramel':'karamell','chocolate':'schokobraun','signal':'Signal','carmine':'karmin','dusty':'staubig','apricot':'aprikose','lemon':'zitrone',
+'forest':'Wald','pigeon':'taubenblau','cobalt':'kobalt','petrol':'petrol','turquoise':'türkis','mosaic':'Mosaik','abyssal':'abyssal','basalt':'Basalt',
+'coal':'Kohle','diamond':'Diamant','lapis':'Lapis','lazuli':'Lazuli','obsidian':'Obsidian','verdant':'grün','path':'Pfad','gravel':'Kies',
+'raw':'roh','bud':'Knospe','vines':'Ranken','glow':'Leucht','pad':'Platte','void':'Leere','anvil':'Amboss','beacon':'Leuchtfeuer',
+'piston':'Kolben','rail':'Schiene','band':'Band','slit':'Schlitz','portal':'Portal','cladding':'Verkleidung','cornice':'Gesims','roofing':'Dachdeckung',
+'natural':'natur','wooden':'Holz','shingle':'Schindel','railing':'Geländer','trunk':'Stamm','supermarket':'Supermarkt','packed':'gepresst','grate':'Gitter',
+'weeping':'Trauer','bars':'Gitterstäbe','chain':'Kette','rod':'Stab','sea':'See','hardened':'gehärtet','coarse':'grob','mycelium':'Myzel',
+'podzol':'Podsol','rooted':'durchwurzelt','clay':'Ton','gloom':'Düster','soil':'Boden','dripstone':'Tropfstein','small':'klein','large':'groß',
+'short':'kurz','dry':'trocken','flowering':'blühend','dripleaf':'Tropfblatt','royal':'königlich','heart':'Herz','dandelion':'Löwenzahn','lily':'Lilie',
+'blossom':'Blüte','berry':'Beere','starfruit':'Sternfrucht','melon':'Melone','hay':'Heu','bale':'Ballen','fungus':'Pilz','kelp':'Seetang',
+'seagrass':'Seegras','furnace':'Ofen','barrel':'Fass','beehive':'Bienenstock','campfire':'Lagerfeuer','sponge':'Schwamm','buried':'vergraben','weighted':'beschwert',
+'detector':'Melder','pilaster':'Pilaster','zebra':'Zebra','crossing':'Streifen','dash':'Strich','slat':'Latte','decking':'Terrassendielen','wide':'breit',
+'balustrade':'Balustrade','rock':'Fels','landing':'Lande','viewport':'Sichtfenster','dish':'Schüssel','butter':'Butter','prism':'Prisma','thatch':'Reet',
+'floorboards':'Dielen','beam':'Balken','chimney':'Schornstein','picket':'Latten','rustic':'rustikal','control':'Steuer','ceiling':'Decke','desk':'Pult',
+'tropical':'tropisch','fruit':'Obst','vegetable':'Gemüse','dairy':'Molkerei','hedge':'Hecke','urn':'Urne','flush':'bündig','regolith':'Regolith',
+'emberrock':'Glutfels','duskite':'Dämmerit','gilded':'vergoldet','reinforced':'verstärkt','tinted':'getönt','pearl':'Perle','sunstone':'Sonnenstein','tide':'Gezeiten',
+'farmland':'Ackerboden','bedrock':'Grundgestein','magma':'Magma','calcite':'Calcit','pointed':'spitz','spike':'Stachel','relic':'Relikt','budding':'knospend',
+'medium':'mittel','shrub':'Strauch','firefly':'Glühwürmchen','litter':'Streu','shoot':'Trieb','big':'groß','muddy':'schlammig','clump':'Büschel',
+'orchid':'Orchidee','cornflower':'Kornblume','golden':'golden','daisy':'Gänseblümchen','poppy':'Mohn','window':'Fenster','door':'Tür','lamp':'Lampe',
+'light':'Licht','wall':'Mauer','glass':'Glas','stone':'Stein','sand':'Sand','grass':'Gras','wool':'Wolle','concrete':'Beton',
+'terracotta':'Terrakotta','green':'grün','red':'rot','black':'schwarz','oak':'Eiche','leaf':'Blatt','roof':'Dach','floor':'Boden',
+'panel':'Paneel','pillar':'Säule','column':'Säule','arch':'Bogen','water':'Wasser','lava':'Lava','metal':'Metall','steel':'Stahl',
+'marble':'Marmor','wood':'Holz','bench':'Bank','table':'Tisch','chair':'Stuhl','bed':'Bett','ladder':'Leiter','lantern':'Laterne',
+'mushroom':'Pilz','cactus':'Kaktus','vine':'Ranke','rose':'Rose','sunflower':'Sonnenblume','reed':'Schilf','reeds':'Schilf','sugar':'Zucker',
+'cane':'Rohr','wheat':'Weizen','carrot':'Karotte','potato':'Kartoffel','stalagmite':'Stalagmit','pebble':'Kiesel','pebbles':'Kiesel','boulder':'Felsbrocken',
+'shell':'Muschel','light-line':'Lichtlinie','post':'Pfosten','lamppost':'Laternenpfahl','black-frame':'schwarzer Rahmen','white-frame':'weißer Rahmen','aether-veined':'äthergeädert','fuming':'rauchend',
+'mirelight':'Moorlicht','lilacite':'Lilazit','voltite':'Voltit','conduit':'Leitung','propagule':'Keimling','allium':'Lauch','bluet':'Blauauge','oxeye':'Margerite',
+'torchflower':'Fackelblume','valley':'Tal','jack':'Kürbis',"o'lantern":'Laterne','wart':'Warze','(white':'(weiße','ceiling)':'Decke)','(warm)':'(warm)',
+'glowstone':'Leuchtstein',
+};
+for(const k in WORD_BLOCKS)if(!(k in WORD))WORD[k]=WORD_BLOCKS[k];
 
 const KEEP= /^(&|[\d.,]+|[\d.,]+"|[\d.,]+[a-zA-Z]{0,3}|×)$/;
 const seg=(s,report)=>{
@@ -65864,6 +66015,116 @@ VR.I18N.add('en',{
 'ux.set.none':"Nothing found — try another word.",
 'ux.set.recDone':"↺ Recommended: ",
 
+
+'g.pal.starforge':"Sternglut",
+'g.pal.nightwing':"Nightpoppy",
+'g.pal.sunstrike':"Noonglow",
+'g.pal.verdant':"Verdant Corps",
+'g.pal.royal':"Royal Blue",
+'g.pal.hauler':"Rust Hauler",
+'g.pal.prism':"Prism Guild",
+'g.pal.arctic':"Arctic Survey",
+'g.pal.crimson':"Carmine Fleet",
+'g.fgw.nachtmohn':"Nightpoppy",
+'g.fgw.mittagsglanz':"Noonglow",
+'g.it.grass_block':"Grass Block",
+'g.it.dirt':"Dirt",
+'g.it.stone':"Stone",
+'g.it.cobblestone':"Cobblestone",
+'g.it.sand':"Sand",
+'g.it.gravel':"Gravel",
+'g.it.clay':"Clay",
+'g.it.snow_block':"Snow Block",
+'g.it.ice':"Ice",
+'g.it.oak_log':"Oak Log",
+'g.it.oak_planks':"Oak Planks",
+'g.it.oak_leaves':"Oak Leaves",
+'g.it.birch_log':"Birch Log",
+'g.it.birch_planks':"Birch Planks",
+'g.it.birch_leaves':"Birch Leaves",
+'g.it.spruce_log':"Spruce Log",
+'g.it.spruce_planks':"Spruce Planks",
+'g.it.spruce_leaves':"Spruce Leaves",
+'g.it.cherry_leaves':"Cherry Leaves",
+'g.it.cherry_log':"Cherry Log",
+'g.it.cherry_planks':"Cherry Planks",
+'g.it.glass':"Glass",
+'g.it.stone_bricks':"Stone Bricks",
+'g.it.bricks':"Bricks",
+'g.it.quartz_block':"Block of Quartz",
+'g.it.sandstone':"Sandstone",
+'g.it.terracotta':"Terracotta",
+'g.it.moss_block':"Moss Block",
+'g.it.torch':"Torch",
+'g.it.lantern':"Lantern",
+'g.it.bookshelf':"Bookshelf",
+'g.it.ladder':"Ladder",
+'g.it.crafting_table':"Crafting Table",
+'g.it.furnace':"Furnace",
+'g.it.chest':"Chest",
+'g.it.white_wool':"White Wool",
+'g.it.white_concrete':"White Concrete",
+'g.it.gray_concrete':"Gray Concrete",
+'g.it.black_concrete':"Black Concrete",
+'g.it.light_gray_concrete':"Light Gray Concrete",
+'g.it.oak_door':"Oak Door",
+'g.it.oak_fence':"Oak Fence",
+'g.it.oak_stairs':"Oak Stairs",
+'g.it.oak_slab':"Oak Slab",
+'g.it.stone_slab':"Stone Slab",
+'g.it.stone_stairs':"Stone Stairs",
+'g.it.cobblestone_stairs':"Cobblestone Stairs",
+'g.it.stone_brick_stairs':"Stone Brick Stairs",
+'g.it.tech_panel':"Tech Panel",
+'g.it.hull_plating':"Hull Plating",
+'g.it.neon_cyan':"Neon Cyan",
+'g.it.neon_magenta':"Neon Magenta",
+'g.it.azure_crystal_cluster':"Azure Crystal Cluster",
+'g.it.violet_crystal_block':"Violet Crystal Block",
+'g.it.landing_pad':"Landing Pad",
+'g.it.shuttle_beacon':"Shuttle Beacon",
+'g.it.vx_lamppost':"Street Lamp",
+'g.it.builder_wand':"Builder Wand",
+'g.it.hoverbike':"Hoverbike",
+'g.it.jetpack':"Jetpack",
+'g.it.laser_blaster':"Calm Beam",
+'g.it.water_bucket':"Water Bucket",
+'g.it.bucket':"Bucket",
+'g.it.apple':"Apple",
+'g.it.bread':"Bread",
+'g.it.wooden_axe':"Wooden Axe",
+'g.it.wooden_pickaxe':"Wooden Pickaxe",
+'g.it.wooden_sword':"Wooden Sword",
+'g.it.wooden_shovel':"Wooden Shovel",
+'g.it.stone_axe':"Stone Axe",
+'g.it.stone_pickaxe':"Stone Pickaxe",
+'g.it.stone_sword':"Stone Sword",
+'g.it.stone_shovel':"Stone Shovel",
+'g.it.iron_pickaxe':"Iron Pickaxe",
+'g.it.iron_axe':"Iron Axe",
+'g.it.iron_sword':"Iron Sword",
+'g.it.iron_shovel':"Iron Shovel",
+'g.it.stick':"Stick",
+'g.it.coal':"Coal",
+'g.it.charcoal':"Charcoal",
+'g.it.iron_ingot':"Iron Ingot",
+'g.it.gold_ingot':"Gold Ingot",
+'g.it.copper_ingot':"Copper Ingot",
+'g.it.diamond':"Diamond",
+'g.it.raw_iron':"Raw Iron",
+'g.it.coal_ore':"Coal Ore",
+'g.it.iron_ore':"Iron Ore",
+'g.it.gold_ore':"Gold Ore",
+'g.it.copper_ore':"Copper Ore",
+'g.it.water':"Water",
+'g.it.lava':"Lava",
+'g.it.bedrock':"Bedrock",
+'g.it.obsidian':"Obsidian",
+'g.it.basalt':"Basalt",
+'g.pause.more':"⋯ More",
+'g.pause.less':"‹ Back",
+'story.offer.card':"I'm picking up a signal …",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -68608,6 +68869,116 @@ VR.I18N.add('de',{
 'ux.set.recTip':"Stellt Bild, Anzeige und Größe so ein, wie es für diesen Rechner empfohlen ist.",
 'ux.set.none':"Nichts gefunden — versuch ein anderes Wort.",
 'ux.set.recDone':"↺ Empfohlen: ",
+
+
+'g.pal.starforge':"Sternglut",
+'g.pal.nightwing':"Nachtmohn",
+'g.pal.sunstrike':"Mittagsglanz",
+'g.pal.verdant':"Grünkorps",
+'g.pal.royal':"Königsblau",
+'g.pal.hauler':"Rostfrachter",
+'g.pal.prism':"Prismengilde",
+'g.pal.arctic':"Polarvermessung",
+'g.pal.crimson':"Karminflotte",
+'g.fgw.nachtmohn':"Nachtmohn",
+'g.fgw.mittagsglanz':"Mittagsglanz",
+'g.it.grass_block':"Grasblock",
+'g.it.dirt':"Erde",
+'g.it.stone':"Stein",
+'g.it.cobblestone':"Bruchstein",
+'g.it.sand':"Sand",
+'g.it.gravel':"Kies",
+'g.it.clay':"Ton",
+'g.it.snow_block':"Schneeblock",
+'g.it.ice':"Eis",
+'g.it.oak_log':"Eichenstamm",
+'g.it.oak_planks':"Eichenbretter",
+'g.it.oak_leaves':"Eichenlaub",
+'g.it.birch_log':"Birkenstamm",
+'g.it.birch_planks':"Birkenbretter",
+'g.it.birch_leaves':"Birkenlaub",
+'g.it.spruce_log':"Fichtenstamm",
+'g.it.spruce_planks':"Fichtenbretter",
+'g.it.spruce_leaves':"Fichtennadeln",
+'g.it.cherry_leaves':"Kirschblüten",
+'g.it.cherry_log':"Kirschstamm",
+'g.it.cherry_planks':"Kirschbretter",
+'g.it.glass':"Glas",
+'g.it.stone_bricks':"Steinziegel",
+'g.it.bricks':"Ziegel",
+'g.it.quartz_block':"Quarzblock",
+'g.it.sandstone':"Sandstein",
+'g.it.terracotta':"Terrakotta",
+'g.it.moss_block':"Moosblock",
+'g.it.torch':"Fackel",
+'g.it.lantern':"Laterne",
+'g.it.bookshelf':"Bücherregal",
+'g.it.ladder':"Leiter",
+'g.it.crafting_table':"Werkbank",
+'g.it.furnace':"Ofen",
+'g.it.chest':"Truhe",
+'g.it.white_wool':"Weiße Wolle",
+'g.it.white_concrete':"Weißer Beton",
+'g.it.gray_concrete':"Grauer Beton",
+'g.it.black_concrete':"Schwarzer Beton",
+'g.it.light_gray_concrete':"Hellgrauer Beton",
+'g.it.oak_door':"Eichentür",
+'g.it.oak_fence':"Eichenzaun",
+'g.it.oak_stairs':"Eichentreppe",
+'g.it.oak_slab':"Eichenstufe",
+'g.it.stone_slab':"Steinstufe",
+'g.it.stone_stairs':"Steintreppe",
+'g.it.cobblestone_stairs':"Bruchsteintreppe",
+'g.it.stone_brick_stairs':"Steinziegeltreppe",
+'g.it.tech_panel':"Technikpaneel",
+'g.it.hull_plating':"Rumpfplatte",
+'g.it.neon_cyan':"Neon Cyan",
+'g.it.neon_magenta':"Neon Magenta",
+'g.it.azure_crystal_cluster':"Azurkristall-Büschel",
+'g.it.violet_crystal_block':"Violetter Kristallblock",
+'g.it.landing_pad':"Landeplatz",
+'g.it.shuttle_beacon':"Shuttle-Leuchtfeuer",
+'g.it.vx_lamppost':"Straßenlaterne",
+'g.it.builder_wand':"Baustab",
+'g.it.hoverbike':"Schwebebike",
+'g.it.jetpack':"Rucksackdüse",
+'g.it.laser_blaster':"Ruhestrahler",
+'g.it.water_bucket':"Wassereimer",
+'g.it.bucket':"Eimer",
+'g.it.apple':"Apfel",
+'g.it.bread':"Brot",
+'g.it.wooden_axe':"Holzaxt",
+'g.it.wooden_pickaxe':"Holzspitzhacke",
+'g.it.wooden_sword':"Holzschwert",
+'g.it.wooden_shovel':"Holzschaufel",
+'g.it.stone_axe':"Steinaxt",
+'g.it.stone_pickaxe':"Steinspitzhacke",
+'g.it.stone_sword':"Steinschwert",
+'g.it.stone_shovel':"Steinschaufel",
+'g.it.iron_pickaxe':"Eisenspitzhacke",
+'g.it.iron_axe':"Eisenaxt",
+'g.it.iron_sword':"Eisenschwert",
+'g.it.iron_shovel':"Eisenschaufel",
+'g.it.stick':"Stock",
+'g.it.coal':"Kohle",
+'g.it.charcoal':"Holzkohle",
+'g.it.iron_ingot':"Eisenbarren",
+'g.it.gold_ingot':"Goldbarren",
+'g.it.copper_ingot':"Kupferbarren",
+'g.it.diamond':"Diamant",
+'g.it.raw_iron':"Roheisen",
+'g.it.coal_ore':"Kohleerz",
+'g.it.iron_ore':"Eisenerz",
+'g.it.gold_ore':"Golderz",
+'g.it.copper_ore':"Kupfererz",
+'g.it.water':"Wasser",
+'g.it.lava':"Lava",
+'g.it.bedrock':"Grundgestein",
+'g.it.obsidian':"Obsidian",
+'g.it.basalt':"Basalt",
+'g.pause.more':"⋯ Mehr",
+'g.pause.less':"‹ Zurück",
+'story.offer.card':"Ich empfange ein Signal …",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
