@@ -111,8 +111,8 @@ console.log('e · dims, block, cloud tops, texts');
   check(gen && gen.constructor.name === 'RubbleGen' && gen.D === F.swarm().bodies[12].D, `its generator: the swarm's body 12 (D ${gen && gen.D.toFixed(0)} m, ${gen && gen.shape})`);
   const gm = D.gen('rock.m')(4242, {});
   check(gm && gm.ice && Math.abs(gm.D - 300) < 1, 'rock.m: the ring\'s moonlet, 300 m of ice');
-  const last = R.types[R.types.length - 1].name;
-  check(last === 'glowspar' && R.types[R.types.length - 4].name === 'carbon_rubble', 'the last block: ' + last + ' (u-fields2: its three ores after carbon_rubble)');
+  const last = R.types.filter(t => !/^exo_/.test(t.name)).pop().name;   // (u-stars2: the exo blocks after it)
+  check(last === 'glowspar' && R.types[R.types.indexOf(R.byName.glowspar) - 3].name === 'carbon_rubble', 'the last block: ' + last + ' (u-fields2: its three ores after carbon_rubble)');
   check(F.pullUp(900) && !F.pullUp(1500), 'the cloud tops\' floor: pull up below 1 km');
   const I = V.I18N, miss = [];
   for (const k of F.KEYS) for (const L of ['de', 'en']) if (typeof I.dict[L][k] !== 'string' && !Array.isArray(I.dict[L][k])) miss.push(L + ':' + k);
