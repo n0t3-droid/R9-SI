@@ -12654,9 +12654,11 @@ stamp(meta){
 if(!meta||meta.guest)return meta;
 const u=meta.universe||(meta.universe={v:1}),b=u.bodies||(u.bodies={});
 for(const id of Bodies.ids){const e=b[id]||(b[id]={});if(!(e.bgen>0))e.bgen=BGEN;}
+
+if(!(u.rgen>0)){const was=[meta.dim].concat(Object.keys(meta.pos||{})).some(d=> /^rock\./.test(String(d||'')));u.rgen=was?1:((VR.Rubble&&VR.Rubble.RGEN)||2);}
 return meta;
 },
-bgenOf(meta){const b=meta&&meta.universe&&meta.universe.bodies,out={};for(const id of Bodies.ids)out[id]=b&&b[id]&&b[id].bgen>0?b[id].bgen:BGEN;return out;},
+bgenOf(meta){const b=meta&&meta.universe&&meta.universe.bodies,out={};for(const id of Bodies.ids)out[id]=b&&b[id]&&b[id].bgen>0?b[id].bgen:BGEN;const ug=meta&&meta.universe&&meta.universe.rgen;if(ug>0)out.rubble=ug;return out;},
 };
 
 
@@ -12890,6 +12892,17 @@ VR.BL.late.push(function(){
 const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
 if(!def0||R.byName.carbon_rubble|| !R.byName.ocker_dust)return;
 def0('carbon_rubble',{display:'Carbon Rubble',cat:'nature',group:G.SOIL,tex:()=>T('carbon_rubble'),hard:0.7,blast:0.8,tool:'shovel',sound:'gravel',smooth:true,flags:VR.F.RANDROT});
+});
+
+
+
+
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!def0||R.byName.nickel_iron|| !R.byName.carbon_rubble)return;
+def0('nickel_iron',{display:'Nickel Iron',cat:'nature',group:G.ORE,tex:()=>T('nickel_iron'),hard:3,blast:3,tool:'pick',sound:'stone',flags:VR.F.RANDROT});
+def0('ice_nodule',{display:'Ice Nodule',cat:'nature',group:G.ORE,tex:()=>T('ice_nodule'),hard:1.5,blast:1.5,tool:'pick',sound:'stone',flags:VR.F.RANDROT});
+def0('glowspar',{display:'Glowspar',cat:'nature',group:G.ORE,tex:()=>T('glowspar'),hard:2,blast:2,tool:'pick',sound:'amethyst',light:[2,9,8],flags:VR.F.RANDROT});
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -33214,7 +33227,7 @@ VR.BodyGenKinds={volcanic:Volcanic,dust:Dust,ocean:Ocean};
 (function(VR){
 'use strict';
 const M=VR.M,TAU=Math.PI*2;
-const RGEN=1;
+const RGEN=2;
 const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
 
 function rng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
@@ -33261,7 +33274,8 @@ function S(){
 if(S_)return S_;
 const R=VR.R,s=(n)=>(R.byName[n]?R.S(n):0),G=VR.GEN.S();
 S_={air:0,carbon:s('carbon_rubble')||s('gravel'),tuff:s('tuff'),gravel:G.gravel||s('gravel'),ice:s('ice'),packed:s('packed_ice'),blue:s('blue_ice'),snow:s('snow_block')||s('packed_ice'),
-ironOre:s('iron_ore'),iron:s('iron_block'),basalt:s('basalt')};
+ironOre:s('iron_ore'),iron:s('iron_block'),basalt:s('basalt'),
+nickel:s('nickel_iron')||s('iron_ore'),nodule:s('ice_nodule')||s('ice'),spar:s('glowspar')||s('carbon_rubble'),pond:s('regolith_dark')||s('gravel')};
 return S_;
 }
 if(VR.BIOMES&&VR.BIOME&&VR.BIOME.rubble_body===undefined){
@@ -33275,7 +33289,7 @@ class RubbleGen{
 constructor(seed,id,opts){
 opts=opts||{};
 const b=bodyOf(id)||{};
-this.id=id;this.rgen=RGEN;this.kind='rubble';
+this.id=id;this.rgen=opts.bgen&&opts.bgen.rubble>0?opts.bgen.rubble|0:RGEN;this.kind='rubble';
 this.shape=opts.shape||b.shape||'potato';
 this.D= +(opts.D||b.D||200);
 this.metal= !!(opts.metal!==undefined?opts.metal:b.metal);
@@ -33317,7 +33331,34 @@ this.boulders.push({x,z,r:rad,y:base+rad*0.3,sq:0.75+0.2*r(),m:r()});
 this.pockets=[];
 const np=this.ice?10:this.metal?16:7;
 for(let i=0;i<np;i++){const a=r()*TAU,d=Math.sqrt(r())*0.7*R,x=Math.cos(a)*d,z=Math.sin(a)*d;if(!this.inside(x,z))continue;const top=this.shapeTop(x,z),bot=this.shapeBot(x,z);this.pockets.push({x,z,y:bot+(top-bot)*(0.25+0.6*r()),r:3+r()*Math.min(14,D*0.05)});}
+if(this.rgen>=2)this.v2();
 }
+
+
+v2(){
+const r=rng(this.s^0x2b2b2b),F=VR.Fractal,R=this.R;
+for(const b of this.boulders){
+const pl=[],n=5+Math.floor(r()*3),a0=r()*TAU,H=b.r*b.sq;
+
+const ta=r()*TAU,tt=0.1+0.25*r();
+pl.push([Math.cos(ta)*tt,Math.sin(ta)*tt,H*(0.75+0.2*r())]);
+for(let i=0;i<n;i++){const a=a0+i*TAU/n+(r()-0.5)*0.9,sl=1.6+1.6*r();pl.push([Math.cos(a)*sl,Math.sin(a)*sl,H*(1.7+0.6*r())]);}
+b.pl=pl;b.y2=b.y-b.r*0.42;
+}
+this.nPat=new F(this.s^0x44,2,1/22,0.5);
+this.spar=[];
+const ns=3+Math.floor(this.D/120);
+for(let i=0,tries=0;i<ns&&tries<60;tries++){
+
+const c=this.craters[i%this.craters.length],a=r()*TAU,d=Math.sqrt(r())*(c&&i<this.craters.length?c.r*0.6:0.75*R);
+const x=(c&&i<this.craters.length?c.x:0)+Math.cos(a)*d,z=(c&&i<this.craters.length?c.z:0)+Math.sin(a)*d;
+if(!this.inside(x,z))continue;
+const top=this.shapeTop(x,z);
+this.spar.push({x,z,y:top-(i===0?0.5:1+3*r()),r:1.6+1.6*r()});i++;
+}
+}
+
+craterAt(x,z){let best=9;for(const c of this.craters){const d2=((x-c.x)**2+(z-c.z)**2)/(c.r*c.r);if(d2<best)best=d2;}return best;}
 
 rho2(x,z){
 const u=x*this.c+z*this.sn,v= -x*this.sn+z*this.c;
@@ -33354,7 +33395,16 @@ return this.yMid-this.hb*this.lobeK(x,z)*Math.pow(1-q,0.6)-1;
 column(x,z,o){
 let top=this.shapeTop(x,z),bot=this.shapeBot(x,z),bb=null;
 for(const b of this.boulders){
-const dx=x-b.x,dz=z-b.z,d2=dx*dx+dz*dz;if(d2>=b.r*b.r)continue;
+const dx=x-b.x,dz=z-b.z,d2=dx*dx+dz*dz;
+if(b.pl){
+if(d2>=b.r*b.r*2.2)continue;
+let h=1e9;for(const p of b.pl){const q=p[2]-dx*p[0]-dz*p[1];if(q<h)h=q;}
+if(h<=0)continue;
+const t=b.y2+h;
+if(t>top){if(top<0)bot=b.y2-h*0.5;top=t;bb=b;}
+continue;
+}
+if(d2>=b.r*b.r)continue;
 const h=Math.sqrt(b.r*b.r-d2)*b.sq*(0.82+0.36*(0.5+0.5*this.nMid.n2(x*1.7+b.m*97,z*1.7))),t=b.y+h;
 if(t>top){if(top<0)bot=b.y-h;top=t;bb=b;}
 }
@@ -33392,7 +33442,8 @@ const R=this.R*1.25+4;
 if(x0>R||x0+16< -R||z0>R||z0+16< -R)return out;
 
 const P=this.pockets.filter(p=>p.x+p.r>x0&&p.x-p.r<x0+16&&p.z+p.r>z0&&p.z-p.r<z0+16);
-const o={},s=this.s^this.seed;
+const o={},s=this.s^this.seed,v2=this.rgen>=2;
+const SP=v2?this.spar.filter(p=>p.x+p.r>x0&&p.x-p.r<x0+16&&p.z+p.r>z0&&p.z-p.r<z0+16):null;
 for(let lz=0;lz<16;lz++)for(let lx=0;lx<16;lx++){
 const x=x0+lx,z=z0+lz;
 this.column(x,z,o);if(o.top<0)continue;
@@ -33409,7 +33460,27 @@ else if(d===0)st=h1<0.02?T.gravel:h1<0.03?T.tuff:(this.metal&&h1>0.9?T.ironOre:T
 else if(hy<0.05)st=T.tuff;
 else if(this.metal&&hy>0.86)st=hy>0.97?T.iron:T.ironOre;
 }
+if(v2&& !this.ice){
+
+
+if(!o.b&&d<=1){
+const pv=this.nPat.n2(x,z),cr=this.craterAt(x,z);
+if(cr<0.45)st=d===0?T.pond:T.carbon;
+else if(cr<1.05&&pv< -0.25&&h1<0.5)st=T.packed;
+else if(pv>0.42)st=h1<0.45?T.tuff:h1<0.7?T.gravel:T.carbon;
+else if(pv< -0.5&&h1<0.3)st=T.gravel;
+}
+if(d>=1&&hy>(this.metal?0.94:0.999)&&hy<(this.metal?0.97:1))st=T.nickel;
+else if(!this.metal&&d>=1&&d<10&&hy>0.05&&hy<0.058)st=T.nodule;
+else if(d===0&&h1>0.995)st=this.metal?T.nickel:T.nodule;
+}
 blocks[(y<<8)|col]=st;
+}
+
+if(SP)for(const p of SP){
+const dx=x-p.x,dz=z-p.z,d2=p.r*p.r-dx*dx-dz*dz;if(d2<=0)continue;
+const hh=Math.sqrt(d2),ya=Math.max(o.bot+1,Math.ceil(p.y-hh)),yb=Math.min(o.top,Math.floor(p.y+hh));
+for(let y=ya;y<=yb;y++)if(M.hashf3(x,y,z,s+21)<0.62)blocks[(y<<8)|col]=T.spar;
 }
 
 for(const p of P){
@@ -39842,6 +39913,7 @@ return Object.assign(K.grid,{meta:meta(K,{door:cx,m:{name:'Mondtempel',heart:[cx
 'use strict';
 
 const PHRASE={
+'Nickel Iron':'Nickeleisen','Ice Nodule':'Eisknolle','Glowspar':'Glimmspat',
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
@@ -44209,6 +44281,33 @@ return K(img);
 REC.carbon_rubble=()=>{
 const img=TX.natural([0x2e2a27,0x3a3531,0x47413b,0x544d45],{period:5,oct:3,speck:0.1,speckDark:true,speck2:0.03,seed:9161,contrast:1.0,rough:0.98});
 img.forEach((x,y,i)=>{const h=hh(x,y,9162),c=hh(x>>2,y>>2,9163);if(h<0.004){img.set(x,y,C(0x9a948a));img.ro[i]=0.6;}else if(c>0.82&&h>0.35)img.set(x,y,C(c>0.93?0x5a534b:0x4e4842));});
+return K(img);
+};
+
+REC.nickel_iron=()=>{
+const img=TX.natural([0x2e2a27,0x3a3531,0x47413b,0x544d45],{period:5,oct:3,speck:0.08,speckDark:true,seed:9171,contrast:1.0,rough:0.98});
+img.forEach((x,y,i)=>{const c=hh(x>>2,y>>2,9172),h=hh(x,y,9173);if(c>0.6){img.set(x,y,C(h>0.8?0xd2d4d6:h>0.3?0x9a9ea2:0x6e6a64));img.ro[i]=0.3;}else if(c>0.55)img.set(x,y,C(0x7a4a2c));});
+return K(img);
+};
+REC.ice_nodule=()=>{
+const img=TX.natural([0x2e2a27,0x3a3531,0x47413b,0x544d45],{period:5,oct:3,speck:0.08,speckDark:true,seed:9181,contrast:1.0,rough:0.98});
+img.forEach((x,y,i)=>{const c=hh(x>>2,y>>2,9182),h=hh(x,y,9183);if(c>0.58){img.set(x,y,C(h>0.7?0xeef6fb:0xbcd2e2));img.ro[i]=0.2;if(h>0.93)img.em[i]=0.15;}});
+return K(img);
+};
+REC.glowspar=()=>{
+const img=TX.natural([0x1e2624,0x26302d,0x2e3a36,0x35423e],{period:4,oct:2,speck:0.06,speckDark:true,seed:9191,contrast:1.0,rough:0.9});
+
+const P=[];for(let k=0;k<5;k++)P.push({x:hh(k,1,9194)*N,y:hh(k,2,9194)*N,a:0.6+hh(k,3,9194)*1.2+(k&1)*0.5,L:N*(0.3+0.25*hh(k,4,9194)),w:N*(0.06+0.05*hh(k,5,9194))});
+img.forEach((x,y,i)=>{
+for(const p of P){
+let dx=x+0.5-p.x,dy=y+0.5-p.y;dx-=Math.round(dx/N)*N;dy-=Math.round(dy/N)*N;
+const u=dx*Math.cos(p.a)+dy*Math.sin(p.a),v= -dx*Math.sin(p.a)+dy*Math.cos(p.a);
+if(Math.abs(u)>p.L||Math.abs(v)>p.w*(1-0.6*Math.max(0,Math.abs(u)/p.L-0.7)/0.3))continue;
+const e=v/p.w,t=0.5+0.5*u/p.L,h=hh(x,y,9192);
+img.set(x,y,C(e>0.55?0xd8fff4:e< -0.5?0x1f7f6c:t>0.6?0x6ff0d0:0x3cc4a6));img.ro[i]=0.2;img.em[i]=e>0.55?0.95:0.45+0.3*t*(0.7+0.3*h);
+break;
+}
+});
 return K(img);
 };
 void N;
@@ -56000,9 +56099,11 @@ stamp(meta){
 if(!meta||meta.guest)return meta;
 const u=meta.universe||(meta.universe={v:1}),b=u.bodies||(u.bodies={});
 for(const id of Bodies.ids){const e=b[id]||(b[id]={});if(!(e.bgen>0))e.bgen=BGEN;}
+
+if(!(u.rgen>0)){const was=[meta.dim].concat(Object.keys(meta.pos||{})).some(d=> /^rock\./.test(String(d||'')));u.rgen=was?1:((VR.Rubble&&VR.Rubble.RGEN)||2);}
 return meta;
 },
-bgenOf(meta){const b=meta&&meta.universe&&meta.universe.bodies,out={};for(const id of Bodies.ids)out[id]=b&&b[id]&&b[id].bgen>0?b[id].bgen:BGEN;return out;},
+bgenOf(meta){const b=meta&&meta.universe&&meta.universe.bodies,out={};for(const id of Bodies.ids)out[id]=b&&b[id]&&b[id].bgen>0?b[id].bgen:BGEN;const ug=meta&&meta.universe&&meta.universe.rgen;if(ug>0)out.rubble=ug;return out;},
 };
 
 
@@ -56236,6 +56337,17 @@ VR.BL.late.push(function(){
 const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
 if(!def0||R.byName.carbon_rubble|| !R.byName.ocker_dust)return;
 def0('carbon_rubble',{display:'Carbon Rubble',cat:'nature',group:G.SOIL,tex:()=>T('carbon_rubble'),hard:0.7,blast:0.8,tool:'shovel',sound:'gravel',smooth:true,flags:VR.F.RANDROT});
+});
+
+
+
+
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{};
+if(!def0||R.byName.nickel_iron|| !R.byName.carbon_rubble)return;
+def0('nickel_iron',{display:'Nickel Iron',cat:'nature',group:G.ORE,tex:()=>T('nickel_iron'),hard:3,blast:3,tool:'pick',sound:'stone',flags:VR.F.RANDROT});
+def0('ice_nodule',{display:'Ice Nodule',cat:'nature',group:G.ORE,tex:()=>T('ice_nodule'),hard:1.5,blast:1.5,tool:'pick',sound:'stone',flags:VR.F.RANDROT});
+def0('glowspar',{display:'Glowspar',cat:'nature',group:G.ORE,tex:()=>T('glowspar'),hard:2,blast:2,tool:'pick',sound:'amethyst',light:[2,9,8],flags:VR.F.RANDROT});
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -61904,6 +62016,7 @@ return Object.assign(K.grid,{meta:meta(K,{door:cx,m:{name:'Mondtempel',heart:[cx
 'use strict';
 
 const PHRASE={
+'Nickel Iron':'Nickeleisen','Ice Nodule':'Eisknolle','Glowspar':'Glimmspat',
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
@@ -66526,6 +66639,61 @@ VR.I18N.add('en',{
 'g.set.fields.tip':'The ice chunks in the ring, the cloud decks over Amaranth and the rocks of the swarm. Off: the ring as a sheet only.',
 'g.codex.fields':['The Rubble Swarm','Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction). On the small rocks almost nothing pulls: the anchor boots pull with 0.35 m/s², a jump carries you 39 m high and lasts 17 seconds. Without them a hop is enough to drift away.','Land on a rock and jump.'],
 
+
+'g.pick.col.black':'Black',
+'g.pick.col.blue':'Blue',
+'g.pick.col.brown':'Brown',
+'g.pick.col.cyan':'Cyan',
+'g.pick.col.gray':'Grey',
+'g.pick.col.green':'Green',
+'g.pick.col.light_blue':'Light blue',
+'g.pick.col.light_gray':'Light grey',
+'g.pick.col.lime':'Lime',
+'g.pick.col.magenta':'Magenta',
+'g.pick.col.orange':'Orange',
+'g.pick.col.pink':'Pink',
+'g.pick.col.purple':'Purple',
+'g.pick.col.red':'Red',
+'g.pick.col.white':'White',
+'g.pick.col.yellow':'Yellow',
+'g.pick.fam.brick':'Brick',
+'g.pick.fam.glass':'Glass',
+'g.pick.fam.ground':'Ground',
+'g.pick.fam.light':'Light',
+'g.pick.fam.metal':'Metal',
+'g.pick.fam.plant':'Plants',
+'g.pick.fam.stone':'Stone',
+'g.pick.fam.wood':'Wood',
+'g.pick.favs':'★ Favourites',
+'g.pick.inHand':'✋ {name} in your hand',
+'g.pick.ph':'🔍 Find a block — just start typing: wood, brick, glass, lantern…',
+'g.pick.recent':'🕘 Recent',
+'g.set.buildFx':'Building effects',
+'g.set.buildFx.tip':'A placed block pops in, with dust, chips or a sparkle by its material; quick building climbs in pitch.',
+'g.show.golden':'🌅 Golden hour — [ ] moves the time',
+'g.show.more':' · O: orbit · G: golden hour',
+'g.show.noTime':'🌅 The time of day belongs to everyone here',
+'g.show.orbit':'🔄 Orbit — W / S nearer · farther · Space / Shift height · A / D direction · G golden hour · O off',
+'g.stamp.full':'📐 Copied — the browser storage is full, the blueprint lasts until you close',
+'g.stamp.keys':'📐 V stamps · R turns · L mirrors · U next blueprint · Z undo',
+'g.stamp.mirrored':'📐 Mirrored',
+'g.stamp.name':'Blueprint {sx} × {sy} × {sz}',
+'g.stamp.next':'📐 Blueprint {i} / {n}: {name}',
+'g.stamp.none':'📐 No blueprint yet — set two corners (left / right click), then C',
+'g.stamp.saved':'📐 Kept as a blueprint ({sx} × {sy} × {sz}) — V stamps it anywhere, R turns, L mirrors',
+
+
+'g.fields2.ring':"Amaranth's ring",
+'g.fields2.ringIn':"Cruise drive to the ring: first to Amaranth, then down into the ice sheet (~{s} s)",
+'g.fields2.clouds':"Down to Amaranth's clouds: 15 km over the tops, 5.8 km/s",
+'g.fields2.cloudsIn':"Above the clouds! Below 1 km the autopilot pulls up — G picks a new target.",
+'g.fields2.swarmIn':"Course for the Rubble Swarm: 60 rocks within 30 km",
+'g.fields2.land':"In the Rubble Swarm. Look at a rock and press V to land.",
+'g.fields2.noRock':"No rock in sight — turn toward one and press V.",
+'g.fields2.hop':"Hop to {name} ({km} km)",
+'g.fields2.hopFar':"Look at a neighbouring rock in the sky, then G.",
+'g.codex.m.spar':["Rock Prospector","Mine nickel iron, ice nodules or glowspar on a rock of the swarm — the Hangar buys them.","Land in the Rubble Swarm and dig in the craters."],
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -69422,6 +69590,61 @@ VR.I18N.add('de',{
 'g.set.fields':'Ringbrocken & Wolkendecken',
 'g.set.fields.tip':'Die Eisbrocken im Ring, die Wolkendecken über Amarant und die Brocken des Schwarms. Aus: nur der Ring als Fläche.',
 'g.codex.fields':['Der Trümmerschwarm','Echte Gürtel sind leer — dieser Schwarm ist 100.000-mal dichter, eine frisch zerbrochene Familie (Fiktion). Auf den kleinen Brocken zieht fast nichts: Die Ankerstiefel ziehen mit 0,35 m/s², ein Sprung trägt dich 39 m hoch und dauert 17 Sekunden. Ohne sie reicht ein Hüpfer, um davonzutreiben.','Lande auf einem Brocken und spring.'],
+
+
+'g.pick.col.black':'Schwarz',
+'g.pick.col.blue':'Blau',
+'g.pick.col.brown':'Braun',
+'g.pick.col.cyan':'Türkis',
+'g.pick.col.gray':'Grau',
+'g.pick.col.green':'Grün',
+'g.pick.col.light_blue':'Hellblau',
+'g.pick.col.light_gray':'Hellgrau',
+'g.pick.col.lime':'Hellgrün',
+'g.pick.col.magenta':'Magenta',
+'g.pick.col.orange':'Orange',
+'g.pick.col.pink':'Rosa',
+'g.pick.col.purple':'Lila',
+'g.pick.col.red':'Rot',
+'g.pick.col.white':'Weiß',
+'g.pick.col.yellow':'Gelb',
+'g.pick.fam.brick':'Ziegel',
+'g.pick.fam.glass':'Glas',
+'g.pick.fam.ground':'Boden',
+'g.pick.fam.light':'Licht',
+'g.pick.fam.metal':'Metall',
+'g.pick.fam.plant':'Pflanzen',
+'g.pick.fam.stone':'Stein',
+'g.pick.fam.wood':'Holz',
+'g.pick.favs':'★ Favoriten',
+'g.pick.inHand':'✋ {name} in der Hand',
+'g.pick.ph':'🔍 Block suchen — einfach lostippen: Holz, Ziegel, Glas, Laterne …',
+'g.pick.recent':'🕘 Zuletzt',
+'g.set.buildFx':'Bau-Effekte',
+'g.set.buildFx.tip':'Ein gesetzter Block springt kurz hinein, mit Staub, Spänen oder Funkeln je nach Material; schnelles Bauen klingt aufsteigend.',
+'g.show.golden':'🌅 Goldene Stunde — [ ] verschiebt die Zeit',
+'g.show.more':' · O: Rundflug · G: goldene Stunde',
+'g.show.noTime':'🌅 Die Uhrzeit gehört hier der ganzen Runde',
+'g.show.orbit':'🔄 Rundflug — W / S näher · weiter · Leertaste / Umschalt Höhe · A / D Richtung · G goldene Stunde · O aus',
+'g.stamp.full':'📐 Kopiert — der Browserspeicher ist voll, der Bauplan gilt nur bis zum Schließen',
+'g.stamp.keys':'📐 V stempelt · R dreht · L spiegelt · U nächster Bauplan · Z zurück',
+'g.stamp.mirrored':'📐 Gespiegelt',
+'g.stamp.name':'Bauplan {sx} × {sy} × {sz}',
+'g.stamp.next':'📐 Bauplan {i} / {n}: {name}',
+'g.stamp.none':'📐 Noch kein Bauplan — zwei Ecken setzen (Klick links / rechts), dann C',
+'g.stamp.saved':'📐 Als Bauplan gemerkt ({sx} × {sy} × {sz}) — V stempelt ihn überall, R dreht, L spiegelt',
+
+
+'g.fields2.ring':"Amarants Ring",
+'g.fields2.ringIn':"Reiseantrieb zum Ring: erst zu Amarant, dann hinab in die Eisschicht (~{s} s)",
+'g.fields2.clouds':"Hinab zu Amarants Wolken: 15 km über den Gipfeln, 5,8 km/s",
+'g.fields2.cloudsIn':"Über den Wolken! Unter 1 km zieht der Autopilot hoch — G sucht ein neues Ziel.",
+'g.fields2.swarmIn':"Kurs auf den Trümmerschwarm: 60 Brocken in 30 km",
+'g.fields2.land':"Im Trümmerschwarm. Sieh einen Brocken an und drück V zum Landen.",
+'g.fields2.noRock':"Kein Brocken in Sicht — dreh dich zu einem und drück V.",
+'g.fields2.hop':"Sprung zu {name} ({km} km)",
+'g.fields2.hopFar':"Sieh einen Nachbarbrocken am Himmel an, dann G.",
+'g.codex.m.spar':["Brockenschürfer","Nickeleisen, Eisknollen oder Glimmspat auf einem Brocken des Schwarms abbauen — der Hangar kauft sie.","Lande im Trümmerschwarm und grab in den Kratern."],
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
