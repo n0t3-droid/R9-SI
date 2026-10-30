@@ -231,7 +231,7 @@
       sc.tg.amarant = md && md[1] > -0.05 ? [eye[0] + md[0] * 200, eye[1] + md[1] * 200, eye[2] + md[2] * 200] : ahead(80, 70);
       // the Eiswächter: 8 m ahead, standing frozen in the ice — its head 1.6 m under the surface — and facing the player
       const wx = eye[0] + fwd[0] * 8, wz = eye[2] + fwd[2] * 8, wy = top(wx, wz, eye[1] - 1.6);
-      sc.tg.warden = [wx, wy - 1.6 - P.WARDEN_H * P.WARDEN_SCALE, wz]; sc.wardenYaw = yaw + Math.PI + 0.3; sc.surf = wy;   // (a-story2: its own model, facing the player, a little turned)
+      sc.tg.warden = [wx, wy - 1.6 - P.WARDEN_H * P.WARDEN_SCALE, wz]; sc.wardenYaw = Math.atan2(fwd[0] + fwd[2] * 0.6, fwd[2] - fwd[0] * 0.6); sc.surf = wy;   // (a-story2: its own model, facing the player, a little turned)
     }
     target(sc, name) {
       const g = this.g, p = g.player;
@@ -326,12 +326,12 @@
         }
         case 'ice': {
           // from the surface in front of its face, looking down through the ice; a slow crane down
-          const W = this.target(sc, 'warden'), C = [W[0] - f[0] * 6.4 + rt[0] * 1.6, sc.surf + 4.4 - 1.2 * smooth(u), W[2] - f[2] * 6.4 + rt[2] * 1.6];   // (a-story2: higher and further back — the window, not the ice's grain, before the lens)
-          return lookAt(C, [W[0], W[1] - 0.9, W[2]], 56, base);
+          const W = this.target(sc, 'warden'), C = [W[0] - f[0] * 7 + rt[0] * 6, sc.surf + 3.4 - 0.8 * smooth(u), W[2] - f[2] * 7 + rt[2] * 6];   // (from the side of the player — never through the player standing on the ice)   // (a-story2: higher and further back — the window, not the ice's grain, before the lens)
+          return lookAt(C, [W[0], W[1] - 1.2, W[2]], 54, base);
         }
         case 'eye': {
-          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 3.6 + rt[0] * 0.9, sc.surf + 2.5 - 0.5 * smooth(u), E2[2] - f[2] * 3.6 + rt[2] * 0.9];
-          return lookAt(C, [E2[0], E2[1] - 0.45, E2[2]], 44, base);   // (the eye on the upper third, its face and shoulders under it)
+          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 6.2 + rt[0] * 1.0, sc.surf + 1.9 - 0.4 * smooth(u), E2[2] - f[2] * 6.2 + rt[2] * 1.0];
+          return lookAt(C, [E2[0], E2[1] - 0.6, E2[2]], 32, base);   // (the eye on the upper third, its face and shoulders under it)
         }
         default: return null;
       }
@@ -406,7 +406,7 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
 #storybox .sub { position: absolute; left: 50%; bottom: 13.5%; transform: translateX(-50%); max-width: min(78%, 900px); text-align: center; color: #fff;
   font: 600 clamp(15px, 2.1vw, 24px)/1.35 system-ui, sans-serif; text-shadow: 0 2px 6px rgba(0, 0, 0, .9), 0 0 2px #000; opacity: 0; transition: opacity .25s; }
 #storybox .sub { display: flex; align-items: center; gap: 14px; text-align: left; }
-#storybox .sub .por { flex: 0 0 auto; width: clamp(54px, 6.2vw, 84px); height: clamp(54px, 6.2vw, 84px); image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 14px; border: 3px solid #8fe4ff; background: radial-gradient(circle at 35% 30%, rgba(143, 228, 255, .55), rgba(20, 40, 70, .9)); box-shadow: 0 4px 14px rgba(0, 0, 0, .55); }
+#storybox .sub .por { flex: 0 0 auto; width: clamp(60px, 7.2vw, 96px); height: clamp(60px, 7.2vw, 96px); image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 14px; border: 3px solid #8fe4ff; background: radial-gradient(circle at 35% 30%, rgba(143, 228, 255, .55), rgba(20, 40, 70, .9)); box-shadow: 0 4px 14px rgba(0, 0, 0, .55); }
 #storybox .sub .por.ilka { border-color: #ffc37a; background: radial-gradient(circle at 35% 30%, rgba(255, 195, 122, .6), rgba(70, 40, 20, .92)); } #storybox .sub .por.oskar { border-color: #ffe08a; background: radial-gradient(circle at 35% 30%, rgba(255, 224, 138, .55), rgba(60, 50, 20, .92)); }
 #storybox .sub .por.selma { border-color: #b9f2a0; background: radial-gradient(circle at 35% 30%, rgba(185, 242, 160, .55), rgba(30, 60, 30, .92)); } #storybox .sub .por.jonte { border-color: #a8c8ff; background: radial-gradient(circle at 35% 30%, rgba(168, 200, 255, .55), rgba(25, 35, 70, .92)); }
 #storybox .sub .por.lumi { border-color: #ffb0d8; background: radial-gradient(circle at 35% 30%, rgba(255, 176, 216, .6), rgba(70, 30, 55, .92)); }
@@ -607,10 +607,10 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
   //       opaque, its depth squeezed to the front of the range (it shows through the ice, yet sorts its own faces); 4 · the
   //       ice's veil and a few white cracks over it; 5 · the eye — dark while it dreams, waking in its close shot.
   // Drawn only in c4.b2 (nothing outside the scene).
-  const WIN_S = 0.3;   // m a voxel of the window (R 24 → a disc of 7.2 m)
+  const WIN_S = 0.31, CRACK_S = 0.125, WIN_OFF = 3.5;   // m a voxel of the window (R 24 → a disc of 7.4 m), of the cracks (R 60), the window's middle toward the camera (m)
   let MB = null;
   const wardenM = (W, cam, yaw, s, dy) => { const m4 = VR.mat4; MB.fill(0); MB[0] = MB[5] = MB[10] = MB[15] = 1; m4.translate(MB, MB, W[0] - cam.x, W[1] - cam.y + (dy || 0), W[2] - cam.z); m4.rotY(MB, MB, yaw); m4.scale(MB, MB, s, s, s); return MB; };
-  P.wardenWake = function (sc) { const at = S.shotAt(sc.b, sc.t); if (!at) return 0; const shots = sc.b.scene.shots; return at.shot.cam === 'eye' ? smooth((at.u - 0.15) / 0.5) : at.i > shots.findIndex(q => q.cam === 'eye') && shots.some(q => q.cam === 'eye') ? 1 : 0; };
+  P.wardenWake = function (sc) { const at = S.shotAt(sc.b, sc.t); if (!at) return 0; const shots = sc.b.scene.shots; return at.shot.cam === 'eye' ? smooth((at.u - 0.05) / 0.3) : at.i > shots.findIndex(q => q.cam === 'eye') && shots.some(q => q.cam === 'eye') ? 1 : 0; };
   P.drawWarden = function (g, r, E, cam) {
     const s = pl(g), sc = s && s.scene; if (!sc || sc.b.id !== 'c4.b2' || !g.entities || !VR.getVoxModel || !VR.mat4) return;
     const t0 = performance.now(), gl = r.gl, md = VR.getVoxModel(gl, 'story_warden'), mw = VR.getVoxModel(gl, 'story_icewin'); if (!md || !md.parts || !mw) return;
@@ -622,18 +622,20 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     gl.uniform1f(p.u.u_flash, 0); gl.uniform1f(p.u.u_noFog, 1);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     // 1 · the window on the surface (over the figure's middle)
-    const flat = () => { MB.fill(0); MB[0] = MB[5] = MB[10] = MB[15] = 1; m4.translate(MB, MB, W[0] - cam.x, sc.surf + 0.035 - cam.y, W[2] - cam.z); m4.scale(MB, MB, WIN_S, 0.02, WIN_S); return MB; };
-    part(mw.parts.win, flat(), [1.05, 1.05, 1.08], 0.86);
+    // (its middle 3.5 m toward the camera's side: the line from the lens down to the figure crosses the ice there)
+    const f = sc.fwd || [0, 0, -1], wd = [(-f[0] * 7 - f[2] * 6) / 9.22, (-f[2] * 7 + f[0] * 6) / 9.22];   // (toward the ice shot's camera: −7 f + 6 rt)
+    const flat = (sz) => { MB.fill(0); MB[0] = MB[5] = MB[10] = MB[15] = 1; m4.translate(MB, MB, W[0] + wd[0] * WIN_OFF - cam.x, sc.surf + 0.035 - cam.y, W[2] + wd[1] * WIN_OFF - cam.z); m4.scale(MB, MB, sz, 0.02, sz); return MB; };
+    part(mw.parts.win, flat(WIN_S), [1.0, 1.0, 1.05], 0.88);
     // 2 · the rim, 3 · the figure: in front of the ice (the depth range squeezed to its front), its own faces sorted
     gl.depthRange(0, 0.02); gl.disable(gl.DEPTH_TEST);
     const H = (md.def.h || 2.7) * 16 * k, wake = P.wardenWake(sc);
-    MB = wardenM(W, cam, yaw, k * 1.05, -H * 0.025); part(md.parts.whole, MB, [0.55 + 0.5 * wake, 1.4 + 0.6 * wake, 1.9 + 0.5 * wake], 0.3);
+    MB = wardenM(W, cam, yaw, k * 1.06, -H * 0.03); part(md.parts.whole, MB, [0.7 + 0.5 * wake, 1.6 + 0.6 * wake, 2.0 + 0.5 * wake], 0.42);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
-    MB = wardenM(W, cam, yaw, k); part(md.parts.whole, MB, [0.82, 0.95, 1.08], 1);
+    MB = wardenM(W, cam, yaw, k); part(md.parts.whole, MB, [0.5, 0.7, 0.95], 1);   // (a deeper blue: it stands in the ice's depth)
     gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
     // 4 · the ice over it: the veil and the cracks (they lie over the figure — it is under the ice)
-    part(mw.parts.veil, flat(), [1, 1, 1], 0.2);
-    part(mw.parts.cracks, flat(), [1.25, 1.3, 1.35], 0.62);
+    part(mw.parts.veil, flat(WIN_S), [1, 1, 1], 0.12);
+    part(mw.parts.cracks, flat(CRACK_S), [1.2, 1.25, 1.3], 0.5);
     // 5 · the eye: its place for the close shot, its glow (a dim dream, then awake: a slow pulse and a halo)
     const L = md.def.layout.optic || [0, 35, -4.6], a = yaw, x = L[0] * k, y = L[1] * k, z = L[2] * k;
     if (!sc.eyePos) sc.eyePos = [W[0] + x * Math.cos(a) + z * Math.sin(a), W[1] + y, W[2] - x * Math.sin(a) + z * Math.cos(a)];

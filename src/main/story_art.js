@@ -250,14 +250,15 @@
       const disc = (col) => { const g = new Grid(D, 1, D, R, 0, R); for (let z = 0; z < D; z++) for (let x = 0; x < D; x++) { const d = Math.hypot(x - R, z - R) / R; if (d > 1) continue; const c = col(d, x - R, z - R); if (c !== null) g.set(x, 0, z, c); } return g; };
       const win = disc((d) => (d < 0.42 ? 0x1f5682 : d < 0.6 ? 0x2f6c9a : d < 0.74 ? 0x5d97c4 : d < 0.87 ? 0x9cc8e6 : 0xd7ecf8));
       const veil = disc((d) => (d < 0.87 ? 0xcfe8f7 : null));
-      // the cracks: a few walks out from near the middle, seeded (the same every time)
-      const cr = new Set(); let s = 77;
+      // the cracks: thin (their own finer disc, R 60 — story.js draws it at 1/8 m a voxel), a few walks round the figure
+      // (from 0.35 R outward, never across its middle), seeded (the same every time)
+      const RC = 60, DC = 2 * RC + 1, cg = new Grid(DC, 1, DC, RC, 0, RC); let s = 77;
       const rnd = () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return (s >>> 8) / 16777216; };
-      for (let k = 0; k < 5; k++) {
-        let a = k * 1.3 + rnd(), x = Math.cos(a) * 4, z = Math.sin(a) * 4;
-        for (let i = 0; i < 26; i++) { a += (rnd() - 0.5) * 0.9; x += Math.cos(a); z += Math.sin(a); if (Math.hypot(x, z) > R - 2) break; cr.add(Math.round(x) + ',' + Math.round(z)); if (rnd() < 0.12) { const b = a + (rnd() < 0.5 ? 1 : -1) * 0.9; cr.add(Math.round(x + Math.cos(b) * 1.5) + ',' + Math.round(z + Math.sin(b) * 1.5)); } }
+      for (let k = 0; k < 7; k++) {
+        let a = k * 0.9 + rnd() * 0.6, rr = RC * (0.36 + 0.2 * rnd()), x = Math.cos(a) * rr, z = Math.sin(a) * rr, h = a + (rnd() - 0.5) * 1.2;
+        for (let i = 0; i < 70; i++) { h += (rnd() - 0.5) * 0.7; x += Math.cos(h); z += Math.sin(h); const d = Math.hypot(x, z); if (d > RC - 2 || d < RC * 0.3) break; cg.set(Math.round(x) + RC, 0, Math.round(z) + RC, 0xf4fbff); if (rnd() < 0.08) { const b = h + (rnd() < 0.5 ? 1 : -1) * 0.8; for (let q = 1; q < 6; q++) cg.set(Math.round(x + Math.cos(b) * q) + RC, 0, Math.round(z + Math.sin(b) * q) + RC, 0xe6f4ff); } }
       }
-      const cracks = disc((d, x, z) => (cr.has(x + ',' + z) ? 0xf4fbff : null));
+      const cracks = cg;
       return { parts: { win: { grid: win, pivot: [0, 0, 0] }, veil: { grid: veil, pivot: [0, 0, 0] }, cracks: { grid: cracks, pivot: [0, 0, 0] } }, layout: { win: [0, 0, 0], veil: [0, 0, 0], cracks: [0, 0, 0] } };
     };
   }
