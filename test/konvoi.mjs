@@ -41,7 +41,7 @@ const both = async (n, dtms = 33) => { for (let i = 0; i < n; i += 5) { await A.
 const shot = async (P, name) => { await calm(P); await P.ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.loop(performance.now() + 1); g.renderer.gl.finish(); window.__norender = true; }); await wait(120); await P.page.screenshot({ path: SHOTS + name, timeout: 120000 }); console.log('  shot ' + name + ' (' + secs() + ')'); };
 // real frames (the friends' ships are asked for and built while drawing: in the stepped frames nothing is drawn)
 const real = async (P, n) => { for (let i = 0; i < n; i++) { await P.ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; }); await wait(250); } };
-const calm = (P) => P.ev(() => { for (const el of document.querySelectorAll('#hud *, #app > div')) { if (el.children.length < 6 && /tut das Passende|Bauhand —|setz etwas/.test(el.textContent || '') && el.offsetHeight < 200) el.style.display = 'none'; } });
+const calm = (P) => P.ev(() => { let best = null; for (const el of document.querySelectorAll('body *')) { if (/tut das Passende|setz etwas in deine/.test(el.textContent || '') && el.offsetHeight > 30 && el.offsetHeight < 140 && el.offsetWidth < 700) best = el; } if (best) { let e = best; while (e.parentElement && e.parentElement.offsetHeight < 140 && e.parentElement.offsetWidth < 700) e = e.parentElement; e.style.visibility = 'hidden'; } });
 const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight; if (!fl) return; fl.view = v; VR.game.camMode = v === 0 ? 0 : 1; fl.headPitch = hp; fl.headYaw = hy || 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; }, [v, hp, hy]);
 const crs = (P) => P.ev(() => { const g = VR.game, fl = g.flight, a = fl && fl.asc, c = a && a.cruise, L = g.cruiseLand; return { state: g.state, dim: g.dim, regime: fl ? fl.regime || 'air' : null, frame: a ? a.st.frame : null, phase: c ? c.phase || c.kind : null, dist: c && c.dist, total: c && c.total, fl: fl ? fl.state : null, land: L ? Math.round(L.alt) : null }; });
 
@@ -154,9 +154,13 @@ try {
   const mods = await B.ev(() => ({ mods: VR.game.mp.modKeys.size, role: VR.game.mp.role, see: VR.game.mp.players().length, away: [...VR.game.mp.remote.values()].map(a => a.away) }));
   console.log('  the guest on Opal: ' + JSON.stringify(mods));
   check(mods.role === 'client' && mods.see === 1 && !mods.away[0], 'still in the session on Opal, the host seen there');
-  // the guest looks at the host's ship
-  await B.ev(() => { const g = VR.game, a = [...g.mp.remote.values()][0], fl = g.flight; if (!a || !fl) return; const sp = a.ship && a.ship.pos || a.pos; const dx = sp[0] - fl.b.pos[0], dz = sp[2] - fl.b.pos[2]; fl.view = 1; g.camMode = 1; fl.headYaw = Math.atan2(-dx, -dz) - fl.b.heading; fl.headPitch = 0.18; fl.chaseYaw = null; fl.recenter = false; fl.mouseIdle = 0; });
-  await both(30); await real(B, 4);
+  // both out on the ice: the guest a few steps from the host, the host's ship beyond; the host waves (the emote wheel)
+  for (const P of [A, B]) await P.ev(() => { const g = VR.game; if (g.starships && g.starships.pilot) g.starships.exit(); g.camMode = 0; });
+  await both(20);
+  await B.ev(() => { const g = VR.game, a = [...g.mp.remote.values()][0], p = g.player; if (!a) return; const sp = a.ship && a.ship.pos ? a.ship.pos : [a.pos[0] + 10, a.pos[1], a.pos[2]]; let dx = a.pos[0] - sp[0], dz = a.pos[2] - sp[2]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; p.flying = false; p.safeTeleport(a.pos[0] + dx * 9 - dz * 3, a.pos[1] + 0.5, a.pos[2] + dz * 9 + dx * 3); p.yaw = Math.atan2(-(a.pos[0] - p.pos[0]), -(a.pos[2] - p.pos[2])); p.pitch = 0.05; });
+  await both(30);
+  await A.ev(() => { const g = VR.game, q = g.mp.players()[0], p = g.player; if (q) p.yaw = Math.atan2(-(q.pos[0] - p.pos[0]), -(q.pos[2] - p.pos[2])); return VR.Konvoi.emote('wave'); });
+  await both(6); await real(B, 4);
   await shot(B, 'landed_together.png'); await shot(A, 'landed_host.png');
   save();
 

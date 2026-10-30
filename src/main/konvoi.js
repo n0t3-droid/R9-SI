@@ -259,7 +259,12 @@
     this.room.presence(pres).catch(() => { });
   });
   wrap(MPp, 'peersChanged', function (f0, ch) {
-    f0.call(this, ch);
+    // (a friend's page busy loading the new world drops out of the transport for a few seconds: no „gegangen / beigetreten"
+    // lines while the Konvoi travels)
+    const ui = this.g.ui, quiet = ui && ui.chatLine && S0.tripAt && performance.now() - S0.tripAt < K.PATIENT;
+    const cl = quiet ? ui.chatLine : null;
+    if (quiet) ui.chatLine = () => { };
+    try { f0.call(this, ch); } finally { if (quiet) ui.chatLine = cl; }
     if (!this.session) return;
     const g = this.g, me = myD(g);
     for (const p of ch.peers) {
@@ -303,7 +308,7 @@
     const mp = g.mp; if (!K.guests(mp) || !trip || !arrive) return false;
     mp.flush(true);
     mp.modKeys.clear(); mp.diffQ = [];   // (the pending edits stay: travel.js's saveMeta right after keeps them for this world)
-    S0.rehost = true; S0.wantMods = new Set();
+    S0.rehost = true; S0.wantMods = new Set(); S0.tripAt = performance.now();
     mp.emitNow('travel', K.travelMsg(trip.to, arrive.pos, mp.myName(), trip.via));
     return true;
   };
@@ -334,7 +339,7 @@
   // ---- Mitreisen: the guest's side
   K.onTravel = (mp, m, d) => {
     if (mp.role !== 'client' || m.peer !== mp.hostPeer) return;
-    S0.travel = d; S0.hostDim = d.dim; S0.travelAt = performance.now();
+    S0.travel = d; S0.hostDim = d.dim; S0.travelAt = S0.tripAt = performance.now();
     const g = mp.g;
     if (d.dim === g.dim) return;
     if (S0.landWait) return;   // (the descent beside the host: the switch when it is down)
@@ -527,7 +532,7 @@
     if (document.getElementById('kvcss')) return;
     const st = document.createElement('style'); st.id = 'kvcss';
     st.textContent = '#kvroster{position:absolute;top:118px;right:12px;z-index:6;font:600 12px/1.45 system-ui,sans-serif;color:#e8f2ff;background:rgba(8,14,26,.55);border:1px solid rgba(140,190,255,.25);border-radius:8px;padding:5px 9px;pointer-events:none;max-width:260px}#kvroster b{color:#9fd4ff;font-weight:700}#kvroster .o{opacity:.62}' +
-      '.kvcard{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:30;background:rgba(10,18,34,.92);border:1px solid rgba(150,210,255,.5);border-radius:12px;padding:12px 16px;color:#eef6ff;font:600 15px/1.4 system-ui,sans-serif;text-align:center;box-shadow:0 8px 28px rgba(0,0,0,.45);max-width:520px}.kvcard.low{top:auto;bottom:120px}.kvcard button{margin:10px 6px 0;padding:6px 16px;border-radius:8px;border:1px solid rgba(160,220,255,.6);background:rgba(60,120,200,.35);color:#fff;font:700 14px system-ui,sans-serif;cursor:pointer}' +
+      '.kvcard{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:30;background:rgba(10,18,34,.92);border:1px solid rgba(150,210,255,.5);border-radius:12px;padding:12px 16px;color:#eef6ff;font:600 15px/1.4 system-ui,sans-serif;text-align:center;box-shadow:0 8px 28px rgba(0,0,0,.45);max-width:520px}.kvcard.low{top:10%}.kvcard button{margin:10px 6px 0;padding:6px 16px;border-radius:8px;border:1px solid rgba(160,220,255,.6);background:rgba(60,120,200,.35);color:#fff;font:700 14px system-ui,sans-serif;cursor:pointer}' +
       '#kvwheel{position:absolute;left:50%;top:50%;width:220px;height:220px;margin:-110px 0 0 -110px;z-index:25;pointer-events:none}#kvwheel div{position:absolute;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;background:rgba(10,18,34,.75);border:2px solid rgba(150,210,255,.35);color:#fff;font:600 12px system-ui,sans-serif;text-align:center;padding-top:10px;box-sizing:border-box}#kvwheel div span{display:block;font-size:26px;line-height:30px}#kvwheel div.on{border-color:#ffd98a;background:rgba(80,60,10,.8)}' +
       '.kvemo{position:absolute;z-index:7;font:600 13px system-ui,sans-serif;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none;text-align:center;transform:translate(-50%,-100%)}.kvemo span{display:block;font-size:30px;line-height:34px}';
     document.head.appendChild(st);
