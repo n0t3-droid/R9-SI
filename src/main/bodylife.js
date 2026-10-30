@@ -77,7 +77,9 @@
     if (BS) { BS.eye[0] = eye[0]; BS.eye[1] = eye[1]; BS.eye[2] = eye[2]; BS.groundY = w.isLoaded(Math.floor(p.pos[0]), Math.floor(p.pos[2])) ? w.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1 : null; }
     const tier = (g.settings && Number.isFinite(g.settings.particles)) ? g.settings.particles | 0 : 2;
     const lightK = BS && BS.cur ? BS.cur.light.lightK : 1, amb = E && E.ambSky ? E.ambSky : [0.1, 0.1, 0.1];
-    const lit = (alb) => [alb[0] * (2.8 * lightK * 0.75 + amb[0] * 1.5 + 0.02), alb[1] * (2.85 * lightK * 0.75 + amb[1] * 1.5 + 0.02), alb[2] * (3.0 * lightK * 0.75 + amb[2] * 1.5 + 0.025)];
+    // (u-moons2: with air, Helia's light as it reaches the ground — through a storm it is a glimmer)
+    const sc = prof.air && E && E.sunColor && lightK > 0 ? E.sunColor : [2.8 * lightK, 2.85 * lightK, 3.0 * lightK];
+    const lit = (alb) => [alb[0] * (sc[0] * 0.75 + amb[0] * 1.5 + 0.02), alb[1] * (sc[1] * 0.75 + amb[1] * 1.5 + 0.02), alb[2] * (sc[2] * 0.75 + amb[2] * 1.5 + 0.025)];
     // ---- the landing's dust and the sprint's puffs, in vacuum arcs
     const P = g.particles;
     const dustCol = () => {

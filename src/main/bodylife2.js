@@ -70,6 +70,7 @@
     const BL = VR.BodyLife, BS = VR.BodySky, P = g.particles, p = g.player, w = g.world, prof = VR.Bodies.profile(id);
     const unlock = (k) => { if (g.codex) g.codex.unlock(k); };
     const big = tier === 0 ? 3 : 1;
+    if (id !== 'ocker' && BS && BS.dustTau !== 0.6) { BS.dustTau = 0.6; BS.front = 0; S.tau = 0.6; S.front = 0; }   // (Ocker's weather stays on Ocker)
     if (id === 'zinn') {
       const gen = BL.gen(g, 'zinn'), near = [];
       for (const v of gen.vents()) {

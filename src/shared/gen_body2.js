@@ -398,7 +398,7 @@
       if (!o.dune && !o.wall && !o.mesa && !o.canyon && this.tracksAt(x, z, F)) o.track = 1;
       // the soft cap under the world top (the shield): above 210 the height approaches 250 and never reaches it
       if (h > 210) h = 210 + 40 * (1 - Math.exp(-(h - 210) / 40));
-      o.rock = !o.dune && !o.wall && M.hashf2(Math.floor(x), Math.floor(z), this.s + 801) < 0.004 ? 1 : 0;
+      o.rock = !o.dune && !o.wall && M.hashf2(Math.floor(x), Math.floor(z), this.s + 801) < 0.0025 ? 1 : 0;
       o.bio = o.canyon ? 'ocker_canyon' : o.shield ? 'ocker_shield' : o.mesa || o.mesaWall ? 'ocker_mesa' : o.dune ? 'ocker_dunes' : 'ocker_plains';
       o.h = h;
       return o;

@@ -32,6 +32,8 @@ const NAMES = [
   { de: 'Opal', en: 'Opal', what: 'the ice moon', checked: '2026-10-22', by: 'f-names', found: 'a mineral word (a game\'s „Opal" item is the mineral too)' },
   { de: 'Basalt', en: 'Basalt', what: 'the cratered moon', checked: '2026-10-22', by: 'f-names', found: 'a rock word' },
   { de: 'Ocker', en: 'Ochre', what: 'the dust moon', checked: '2026-10-22', by: 'f-names', found: 'a pigment word' },
+  { de: 'Glutsee', en: 'Glow Lake', what: 'Zinnober\'s lava lake by the landing (u-moons2)', checked: '2026-10-30', by: 'u-moons2', found: 'no game, product or brand of either name; a seasonal Fortnite area was called „The Glow" (another name) — a descriptive word pair' },
+  { de: 'Rostschlucht', en: 'Rust Gorge', what: 'Ocker\'s canyon (u-moons2)', checked: '2026-10-30', by: 'u-moons2', found: 'no game or product of either name; „Rust" is a survival game\'s title and a town (a plain word here, as in the colour of iron oxide)' },
   { de: 'Bernstein', en: 'Amber', what: 'the hothouse planet', checked: '2026-10-22', by: 'f-names', found: 'an ordinary word' },
   { de: 'Cölestin', en: 'Celestine', what: 'the ice giant', checked: '2026-10-22', by: 'critic v0.49', found: 'a mineral word' },
   { de: 'Trümmerschwarm', en: 'Rubble Swarm', what: 'the swarm of rubble round Helia', checked: '2026-10-22', by: 'critic v0.49', found: 'no product or game of that name' },

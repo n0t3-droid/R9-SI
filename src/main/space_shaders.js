@@ -920,13 +920,15 @@ vec3 bsAirSky(vec3 D) {
   if (u_bsAirK.z < 0.5) {
     float el = max(D.y, 0.0), k = sqrt(el);
     vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
-    float wS = pow(max(dot(hs, hd), 0.0), 3.0) * (1.0 - k);
+    float wS = pow(max(dot(hs, hd), 0.0), 4.0) * (1.0 - k);
     return (u_bsAir3[1] + (u_bsAir3[0] - u_bsAir3[1]) * k + (u_bsAir3[2] - u_bsAir3[1]) * wS) * (D.y < 0.0 ? 1.0 - 0.5 * min(1.0, -D.y * 4.0) : 1.0);
   }
   vec2 hs = normalize(u_bsSun.xz + vec2(1e-5, 0.0)), hd = normalize(D.xz + vec2(1e-5, 0.0));
   float ph = acos(clamp(dot(hs, hd), -1.0, 1.0)), u = sqrt(ph / 3.14159265);
-  float el = asin(clamp(D.y, -1.0, 1.0)), l = sign(el) * sqrt(abs(el) / 1.5707963);
-  vec2 uv = vec2((u * (u_bsAirS.x - 1.0) + 0.5) / u_bsAirS.x, 0.5 + 0.5 * l);
+  // (below the horizon the far land's air: the horizon's own texel row — a ray from the eye into the near ground is short
+  // and dark, which drew a black band along the horizon)
+  float el = asin(clamp(D.y, 0.0, 1.0)), l = sqrt(el / 1.5707963);
+  vec2 uv = vec2((u * (u_bsAirS.x - 1.0) + 0.5) / u_bsAirS.x, max(0.5 + 0.5 * l, 0.5 + 0.5 / u_bsAirS.y));
   return texture(u_bsAir, uv).rgb * u_bsAirK.y;
 }
 vec3 bsAirTrans(vec3 D) { return exp(-u_bsAirT / max(D.y + 0.035, 0.035)); }
@@ -944,14 +946,15 @@ vec3 bsHerz(vec3 D, vec3 col, float px) {
   // its own frame: spun about the local up (its pole stands near the zenith's plane: a stated simplification)
   float cs = cos(u_bsHzX.x), sn = sin(u_bsHzX.x);
   vec3 P = vec3(cs * N.x - sn * N.z, N.y, sn * N.x + cs * N.z);
-  float land = vnoise3(P * 2.2 + 3.1) * 0.65 + vnoise3(P * 5.5 + 7.0) * 0.35;
+  float land = vnoise3(P * 2.2 + 3.1) * 0.6 + vnoise3(P * 5.5 + 7.0) * 0.28 + vnoise3(P * 13.0 + 1.0) * 0.12;
   float lat = abs(N.y);
-  vec3 alb = land > 0.56 ? mix(vec3(0.16, 0.2, 0.09), vec3(0.34, 0.28, 0.17), smoothstep(0.6, 0.75, land)) : vec3(0.02, 0.06, 0.13);
-  alb = mix(alb, vec3(0.8), smoothstep(0.82, 0.9, lat));
-  float cl = vnoise3(P * 6.0 + vec3(u_bsHzX.y, 0.0, 0.0)) * 0.6 + vnoise3(P * 14.0 + 2.0) * 0.4;
-  alb = mix(alb, vec3(0.85), smoothstep(0.52, 0.68, cl) * 0.9);
+  vec3 alb = land > 0.57 ? mix(vec3(0.07, 0.1, 0.04), vec3(0.26, 0.2, 0.12), smoothstep(0.6, 0.78, land)) : mix(vec3(0.004, 0.018, 0.05), vec3(0.01, 0.05, 0.08), smoothstep(0.5, 0.57, land));
+  alb = mix(alb, vec3(0.75), smoothstep(0.84, 0.92, lat));
+  // the clouds: bands of weather by latitude, streaks along them, a finer grain (thin over the deserts)
+  float cl = vnoise3(vec3(P.x * 5.0, P.y * 11.0, P.z * 5.0) + vec3(u_bsHzX.y, 0.0, 0.0)) * 0.55 + vnoise3(P * 17.0 + 2.0) * 0.3 + 0.15 * sin(N.y * 9.0);
+  alb = mix(alb, vec3(0.8), smoothstep(0.5, 0.72, cl) * 0.85);
   float lit = smoothstep(-0.06, 0.12, mus) * (0.35 + 0.65 * max(mus, 0.0));
-  vec3 hc = alb * u_bsSunCol * lit * u_bsLum.y * 1.6;
+  vec3 hc = alb * u_bsSunCol * lit * u_bsLum.y * 2.2;
   hc += vec3(0.25, 0.45, 1.0) * u_bsSunCol * 0.18 * pow(qq, 6.0) * smoothstep(-0.2, 0.3, mus) * u_bsLum.y;
   col = mix(col, hc, 1.0 - smoothstep(1.0 - 1.5 * px / u_bsHz.w, 1.0, q));
   // the air's rim beyond the limb
@@ -975,21 +978,23 @@ vec3 bsUmbrella(vec3 D, vec3 col) {
     float sh = sqrt(h), t0 = max((-b - sh) / a, 0.0), t1 = (-b + sh) / a;
     if (t1 <= t0) continue;
     if (D.y < -u_bsGround.w && t0 > u_bsJk.y) continue;
-    float dt = (t1 - t0) / 10.0, sum = 0.0;
+    float dt = (t1 - t0) / 10.0, sum = 0.0, jit = hash13(D * 917.0 + float(j));   // (the steps jittered per pixel: no bands)
     for (int k = 0; k < 10; k++) {
-      float t = t0 + (float(k) + 0.5) * dt;
+      float t = t0 + (float(k) + jit) * dt;
       vec3 p = D * t - J.xyz;
       if (p.y < 0.0 || p.y > H) continue;
       float r = length(p.xz), ys = H - r * r / (4.0 * H);
       if (ys < 0.0) continue;
       float e = (p.y - ys) / (0.07 * H);
-      sum += (exp(-e * e) * 1.0 + (p.y < ys ? 0.12 : 0.0) + exp(-r * r / (0.0016 * H * H)) * 0.6 * (p.y < ys ? 1.0 : 0.0)) * dt;
+      sum += (exp(-e * e) + (p.y < ys ? 0.02 + 0.5 * exp(-r * r / (0.0016 * H * H)) : 0.0)) * dt;
     }
-    acc += sum / H * 0.55 * js;
+    // (lit where Helia stands over the horizon at the canopy's height — dark at night, the tops keep the light longest)
+    float lit = smoothstep(-0.01, 0.01, u_bsSun.y + sqrt(2.0 * max(0.8 * H + J.y + u_bsJk.w, 0.0) / u_bsJk.z));
+    acc += sum / H * 0.35 * js * lit;
   }
   if (acc <= 0.0) return col;
   float ph = 0.35 + 1.8 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 4.0);
-  return col + vec3(0.72, 0.84, 1.0) * u_bsSunCol * ph * (1.0 - exp(-acc)) * u_bsJk.x * 0.6;
+  return col + vec3(0.72, 0.84, 1.0) * u_bsSunCol * ph * (1.0 - exp(-acc)) * u_bsJk.x * 0.14;
 }
 // Ocker's dust devils: a narrow twisting column (u_bsJu.y wide at the foot, widening upward), dense at the foot,
 // thinning upward; the dust's colour lit by Helia and the sky, blended over the view (it hides what is behind)
@@ -1005,12 +1010,13 @@ vec3 bsDevils(vec3 D, vec3 col) {
     float wob = 0.35 * u_bsJu.y * (1.0 + hh / 120.0);
     vec3 axis = vec3(sin(hh * 0.012 + u_bsJu.z * 0.7 + float(j)) * wob, hh, cos(hh * 0.009 + u_bsJu.z * 0.5 + float(j) * 2.0) * wob);
     vec3 q = D * s - V - axis;
-    float w = u_bsJu.y * 0.5 * (1.0 + hh / 250.0), r2 = dot(q, q) / (w * w);
+    float w = u_bsJu.y * 0.5 * (1.0 + hh / 160.0), r2 = dot(q, q) / (w * w);
     if (r2 > 4.0) continue;
     float dens = exp(-r2 * 1.2) * exp(-hh / (0.35 * J.w)) * (1.0 - smoothstep(0.75 * J.w, J.w, hh)) * js;
-    float fil = 0.75 + 0.5 * vnoise3(vec3(atan(q.z, q.x) * 2.0 + hh * 0.02 - u_bsJu.z * 2.0, hh * 0.03, float(j)));
-    float al = clamp(dens * fil * 0.85, 0.0, 0.92);
-    vec3 dust = u_bsGround.rgb * (1.1 + 0.6 * max(u_bsSun.y, 0.0));
+    float fil = 0.7 + 0.6 * vnoise3(vec3(hh * 0.025 - u_bsJu.z * 1.5, sqrt(r2) * 1.3, float(j) * 3.1));
+    float al = clamp(dens * fil * 0.8, 0.0, 0.9);
+    // (the dust's own colour — redder and darker than the bright air behind it — lit more on Helia's side)
+    vec3 dust = u_bsGround.rgb * vec3(0.9, 0.68, 0.5) * (0.75 + 0.35 * max(dot(normalize(vec3(q.x, 0.0, q.z) + 1e-4), u_bsSun.xyz), 0.0));
     col = mix(col, dust, al);
   }
   return col;

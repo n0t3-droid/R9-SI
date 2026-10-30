@@ -52,7 +52,7 @@ const scenes2 = [
   ['Aquamarin · the landing', 'aqua', [[0, 0]]],
   ['Aquamarin · the atoll\'s ring and lagoon', 'aqua', [[46, -16], [32, -16]]],
 ];
-const EXPECT2 = 'a99d1be3';   // u-moons2: bgen 1 of Zinnober, Ocker, Aquamarin (before it ships)
+const EXPECT2 = '9f942741';   // u-moons2: bgen 1 of Zinnober, Ocker, Aquamarin (before it ships: run 1's tuning — Ocker's rocks rarer; was a99d1be3)
 let h2 = 2166136261 >>> 0;
 for (const [name, id, cols] of scenes2) {
   const g = new V.BodyGen(SEED, id, { bgen: { [id]: 1 } });

@@ -42,8 +42,8 @@
     const kH = 9.81 / 2.01, kD = 0.5;
     AIRS.aqua = make({ id: 'aqua', R: 2400e3, top: 2400e3 + 8 * 8000 * kH, bR: EARTH_R.map(v => v * kD), HR: 8000 * kH, bMs: [1, 1, 1].map(() => EARTH_MS * kD * 1.3), bMa: [1, 1, 1].map(() => EARTH_MA * kD * 1.3), HM: 1200 * kH, gM: [0.76, 0.76, 0.76], alb: [0.08, 0.1, 0.12] });
   }
-  // Ocker: the dust's τ (the weather) → its extinction at the ground τ / H; ω (0.97, 0.91, 0.62), g (0.62, 0.67, 0.77)
-  const OCK = { HD: 11600, w: [0.97, 0.91, 0.62], g: [0.62, 0.67, 0.77], R: 3390e3 };
+  // Ocker: the dust's τ (the weather) → its extinction at the ground τ / H; ω (0.97, 0.875, 0.62), g (0.62, 0.67, 0.77)
+  const OCK = { HD: 11600, w: [0.97, 0.875, 0.62], g: [0.62, 0.67, 0.77], R: 3390e3 };
   function ocker(tau) {
     tau = clamp(tau === undefined ? 0.6 : tau, 0.05, 6);
     const e = tau / OCK.HD;
@@ -270,8 +270,8 @@
   function sample(C, d, sunDir, o) {
     const hs = Math.hypot(sunDir[0], sunDir[2]) || 1, hd = Math.hypot(d[0], d[2]) || 1;
     const cph = clamp((d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), -1, 1), ph = Math.acos(cph);
-    const el = Math.asin(clamp(d[1], -1, 1)), l = Math.sign(el) * Math.sqrt(Math.abs(el) / (PI / 2));
-    const u = Math.sqrt(ph / PI), v = 0.5 + 0.5 * l;
+    const el = Math.asin(clamp(d[1], 0, 1)), l = Math.sqrt(el / (PI / 2));   // (below the horizon: the horizon's row, as the shader)
+    const u = Math.sqrt(ph / PI), v = Math.max(0.5 + 0.5 * l, 0.5 + 0.5 / C.H);
     const W = C.W, H = C.H, x = clamp(u, 0, 1) * (W - 1), y = clamp(v * H - 0.5, 0, H - 1);
     const i = Math.min(W - 2, Math.floor(x)), j = Math.min(H - 2, Math.floor(y)), fx = x - i, fy = y - j, S = C.sky;
     for (let c = 0; c < 3; c++) {
@@ -282,7 +282,7 @@
   }
   // Helia's light at the eye: the transmittance toward it (its disc's colour)
   function sunTrans(C, h, sunEl, o) { return trans(C, C.air.R + Math.max(h, 1), Math.sin(sunEl), o); }
-  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the horizon under Helia
+  // Very Low: three stops from the same model — the zenith, the horizon (5° up) away from Helia, the horizon 25° beside Helia
   function fit3(C, h, sunEl) {
     const sun = [Math.cos(sunEl), Math.sin(sunEl), 0], o = { zen: [0, 0, 0], hor: [0, 0, 0], sunHor: [0, 0, 0] };
     const e5 = 5 * PI / 180;
@@ -291,14 +291,14 @@
     // (away from Helia: the azimuth opposite; at 90° from it the average of both sides)
     const side = [0, 0, 0]; ray(C, h, [0, Math.sin(e5), Math.cos(e5)], sun, side, null, 16);
     for (let c = 0; c < 3; c++) o.hor[c] = 0.5 * (o.hor[c] + side[c]);
-    ray(C, h, [Math.cos(e5), Math.sin(e5), 0], sun, o.sunHor, null, 16);
+    const a25 = 25 * PI / 180; ray(C, h, [Math.cos(e5) * Math.cos(a25), Math.sin(e5), Math.cos(e5) * Math.sin(a25)], sun, o.sunHor, null, 16);   // (25° off Helia: the lobe's skirt, not its core)
     return o;
   }
   // the 3-stop sky at a direction (the shader's own formula, for the test): el from the horizon, cph the cosine to the
   // sun's azimuth
   function stops3(s, d, sunDir, o) {
     const el = Math.max(0, d[1]), hs = Math.hypot(sunDir[0], sunDir[2]) || 1, hd = Math.hypot(d[0], d[2]) || 1;
-    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 3) * (1 - Math.sqrt(el));
+    const cph = (d[0] * sunDir[0] + d[2] * sunDir[2]) / (hs * hd), wS = Math.pow(Math.max(0, cph), 4) * (1 - Math.sqrt(el));
     const k = Math.sqrt(el);
     for (let c = 0; c < 3; c++) o[c] = s.hor[c] + (s.zen[c] - s.hor[c]) * k + (s.sunHor[c] - s.hor[c]) * wS;
     return o;

@@ -34,8 +34,8 @@
     // u-moons2: Zinnober (sulfur bright, its lava lakes the night's own light, Amarant at 37° its lamp), Ocker and
     // Aquamarin with air (airK: the LUT's radiance → the scene's, the eye's exposure per world: Ocker's dusty sky is ~4×
     // as bright as a clear one), shape: the plumes' (1 umbrellas, 2 dust devils)
-    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.55, tint: [1.0, 0.98, 0.9], bounce: 0.34, floor: 0.06, expoDay: 0.62, expoNight: 2.4, plume: 1, shape: 1 },
-    ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 9, ambK: 2.6 },
+    zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.55, tint: [1.0, 0.98, 0.9], bounce: 0.34, floor: 0.06, expoDay: 0.62, expoNight: 1.1, plume: 1, shape: 1 },
+    ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 6.5, ambK: 2.2 },
     aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2 },
   };
   BS.KIND = KIND; BS.SUN = SUN;
@@ -80,7 +80,7 @@
     const pAng = pG.ang, distR = 1 / Math.sin(Math.max(pAng, 1e-6)), pEl = Math.asin(Math.max(-1, Math.min(1, p.dir[1])));
     const pAbove = ss(-dip - p.ang, -dip + p.ang, pEl);
     // its light on the night side: its lit part × its solid angle (π·ang²) × its albedo 0.5 / π, × 4 (readable nights)
-    const parK = 0.5 * (p.phase || 0) * p.ang * p.ang * 4 * pAbove * (id === 'aqua' ? 0.6 : 1);   // (Herzwelt's albedo 0.3)
+    const parK = 0.5 * (p.phase || 0) * p.ang * p.ang * (id === 'zinn' ? 1.2 : 4) * pAbove * (id === 'aqua' ? 0.6 : 1);   // (Herzwelt's albedo 0.3; u-moons2: Amarant at 37° needs no ×4 — its true light is a twentieth of Helia's)
     // u-orbit2 (R52-09: Basalt's night near black): the other worlds' shine — each lit part × its solid angle × its
     // albedo, × 4 as Amarant's — and the starlight with the galaxy's band (a floor: no moonless night is quite black)
     let othK = 0;
@@ -155,7 +155,9 @@
     // (u-orbit2: on the darkest nights the eye opens further — up to 1.7× — as it does under the stars alone)
     const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
     const xN = K.expoNight * clamp(0.05 / Math.max(nl, 0.004), 1, 1.7);
-    const expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN, exE = o.expo > 0 ? o.expo : expo;
+    let expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN;
+    if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 1.6;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
+    const exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));
     if (air) skyU.airS[2] = Math.min(1, (0.2126 * skyU.air3[0] + 0.7152 * skyU.air3[1] + 0.0722 * skyU.air3[2]) * exE * 6);   // (u-moons2: the stars fade as the air brightens)

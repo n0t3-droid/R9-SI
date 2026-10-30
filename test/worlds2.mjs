@@ -96,9 +96,10 @@ const shot = async (A, name, frames = 6) => { await A.page.bringToFront(); await
   rec.pictures[name] = info; save(); check(ok, `test/shots/${name}.png ${JSON.stringify(info)}`); return ok; };
 // the moment the sun stands at el (degrees) on the way up (dir 1) or down (−1) — or the extreme (dir 0: the highest)
 const findT = (A, dim, eye, el, dir, from = 0, span = 9000) => A.ev(([dim, eye, el, dir, from, span]) => {
-  const BS = VR.BodySky, f = (t) => BS.compute(dim, eye, t, { tier: 0 }).light.sunEl * 57.2958;
-  let best = from, bv = 1e9, prev = f(from);
-  for (let t = from + 10; t < from + span; t += 10) { const v = f(t), up = v > prev; prev = v; if (dir === 0) { if (-v < bv) { bv = -v; best = t; } continue; } if ((dir > 0) !== up) continue; const d = Math.abs(v - el); if (d < bv) { bv = d; best = t; } }
+  // (by day never inside an eclipse: Aquamarin's near side sees Herzwelt cover Helia every orbit at noon)
+  const BS = VR.BodySky, f = (t) => { const L = BS.compute(dim, eye, t, { tier: 0 }).light; return [L.sunEl * 57.2958, L.eclipse]; };
+  let best = from, bv = 1e9, prev = f(from)[0];
+  for (let t = from + 10; t < from + span; t += 10) { const [v, ec] = f(t), up = v > prev; prev = v; if (el > 0 && ec > 0.02) continue; if (dir === 0) { if (-v < bv) { bv = -v; best = t; } continue; } if ((dir > 0) !== up) continue; const d = Math.abs(v - el); if (d < bv) { bv = d; best = t; } }
   return best;
 }, [dim, eye, el, dir, from, span]);
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
@@ -123,7 +124,7 @@ if (!ONLY || ONLY === 'zinn') {
   const Z = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}); const v = g.vents()[0]; return { v: { x: v.x, z: v.z, y: v.y }, G: { x: g.glut.x, z: g.glut.z, R: g.glut.R }, sp: g.findSpawn() }; });
   // a firing vent with Helia 12–30° up, the camera 10 km from it with Helia behind the plume
   const tp = await A.ev(([v]) => { const BS = VR.BodySky, P = VR.Bodies.profile('zinn'), vent = new VR.BodyGen(VR.game.meta.seed >>> 0, 'zinn', {}).vents()[0];
-    for (let t = 200; t < 40000; t += 5) { const pl = VR.BodyLife2.plume(vent, t, P, 1.8); if (pl.k < 0.95 || pl.top < 0.97 * pl.H) continue; const L = BS.compute('zinn', [v.x, 70, v.z], t, { tier: 0 }).light; if (L.sunEl > 0.2 && L.sunEl < 0.5) return { t, sun: L.sunDir }; } return null; }, [Z.v]);
+    for (let t = 200; t < 40000; t += 5) { const pl = VR.BodyLife2.plume(vent, t, P, 1.8); if (pl.k < 0.6 || pl.top < 0.9 * pl.H) continue; const L = BS.compute('zinn', [v.x, 70, v.z], t, { tier: 0 }).light; if (L.sunEl > 0.2 && L.sunEl < 0.5) return { t, sun: L.sunDir }; } return null; }, [Z.v]);
   if (tp) {
     const h = Math.hypot(tp.sun[0], tp.sun[2]), ux = tp.sun[0] / h, uz = tp.sun[2] / h, cx = Z.v.x - ux * 10000, cz = Z.v.z - uz * 10000;
     await view(A, 'zinn', cx, cz, 40, yawTo(ux, uz), 0.2, tp.t, 120);
@@ -142,9 +143,11 @@ if (!ONLY || ONLY === 'ocker') {
   const s = await trip(A, 'ocker'); await wide(A); await A.settle(60, 4);
   check(s && s.arrived, 'with /dim to Ocker');
   await B2(A, 'storm', 0); await B2(A, 'front', 0);
-  const O = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); let rim = 400; for (let z = 0; z < 1200; z += 4) { if (g.col(0, z, {}, g.feats(0, z, 0, z)).canyon) { rim = z; break; } } return { rim, sp: g.findSpawn() }; });
+  const O = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return { sp: g.findSpawn() }; });
   const tNoon = await findT(A, 'ocker', [0.5, 152, 0.5], 0, 0, 0, 2400);
-  await view(A, 'ocker', 0, O.rim - 14, 18, Math.PI, -0.2, tNoon, 120);
+  // (on the Rostschlucht's floor by its north wall: 145 m of layered rock over you)
+  const fl = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'ocker', {}); return g.canyonZ(0) - 0.4 * g.canyonHalf(0); });
+  await view(A, 'ocker', 0, fl, 3, 0, 0.32, tNoon, 120);
   await shot(A, 'ocker_noon');
   const tSet = await findT(A, 'ocker', [0.5, 152, 0.5], 2, -1, 0, 2400);
   await setT(A, tSet); await place(A, O.sp[0], O.sp[1] + 1.62, O.sp[2], 0, 0); await A.settle(20, 2, 30);
@@ -169,6 +172,7 @@ if (!ONLY || ONLY === 'ocker') {
   await place(A, O.sp[0], O.sp[1] + 2.5, O.sp[2], yawTo(-px, -pz), 0.02); await A.step(300, 33); await A.settle(30, 2, 60);
   await shot(A, 'ocker_storm');
   await B2(A, 'storm', undefined); await B2(A, 'front', undefined);
+  await A.ev(() => { VR.BodySky.dustTau = 0.6; VR.BodyLife2.state.tau = 0.6; });
   // the LUTs' CPU time a frame in the page: Balanced (48 × 24) and High (96 × 50), 0.6 ms budget a frame
   rec.lut = await A.ev(() => { const BS = VR.BodySky, out = {}; for (const [k, tier] of [['balanced', 2], ['high', 3], ['low', 1]]) { BS.airState = null; BS.airFor('ocker', 2, 0.3, tier); let s = 0, n = 0, mx = 0; for (let i = 0; i < 120; i++) { const t0 = performance.now(); BS.airFor('ocker', 2, 0.3 + i * 0.0004, tier); const d = performance.now() - t0; s += d; n++; mx = Math.max(mx, d); } out[k] = { ms: +(s / n).toFixed(3), max: +mx.toFixed(2) }; } BS.airState = null; return out; });
   save();

@@ -70,13 +70,13 @@ console.log('e · Very Low: three stops');
   for (const [id, el] of [['ocker', 45], ['ocker', 3], ['aqua', 50], ['aqua', 4]]) {
     const C = ctx(id, 0.6); A.update(C, 2, el * D);
     const s = A.fit3(C, 2, el * D), sun = sunOf(el);
-    for (const d of [[0, 1, 0], near(0, 5, 180), near(0, 5, 0), near(0, 5, 90)]) {
+    for (const d of [[0, 1, 0], near(0, 5, 180), near(0, 5, 25), near(0, 5, 90)]) {   // (the aureole's core is the glare's on Very Low)
       const a = A.sample(C, d, sun, [0, 0, 0]), b = A.stops3(s, d, sun, [0, 0, 0]);
       const e = Math.max(...a.map((v, i) => Math.abs(v - b[i]) / Math.max(1e-4, Math.max(...a))));
       worst = Math.max(worst, e);
     }
   }
-  check(worst < 0.45, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and the three horizons (< 45 %)`);
+  check(worst < 0.45, `the 3-stop sky within ${(worst * 100).toFixed(0)} % of the LUT's brightest channel at the zenith and three horizons (away, beside, 25° off Helia; < 45 %)`);
 }
 console.log('f · the cost');
 {
