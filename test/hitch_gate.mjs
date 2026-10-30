@@ -196,7 +196,7 @@ for (let round = 0; round < ROUNDS; round++) for (const preset of PRESETS) {
   for (const P of Ps) { for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.05, false)); }
   // the first round: the sampled allocations of both (by function, self) — where the garbage of a frame comes from
   const cdps = [];
-  if (round === 0) for (const P of Ps) { const c = await P.ctx.newCDPSession(P.page); await c.send('HeapProfiler.enable'); await c.send('HeapProfiler.startSampling', { samplingInterval: 32768 }); cdps.push(c); }
+  if (round === 0) for (const P of Ps) { const c = await P.ctx.newCDPSession(P.page); await c.send('HeapProfiler.enable'); await c.send('HeapProfiler.startSampling', { samplingInterval: 32768, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); cdps.push(c); }
   const fr = Ps.map(() => []);
   for (let i = 0; i < path.length; i++) {
     const order = (i + round) % 2 ? [1, 0] : [0, 1];
