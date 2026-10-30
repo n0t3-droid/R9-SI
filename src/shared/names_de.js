@@ -15,6 +15,7 @@
   // whole segments (case-sensitive, as the data writes them)
   const PHRASE = {
     'Nickel Iron': 'Nickeleisen', 'Ice Nodule': 'Eisknolle', 'Glowspar': 'Glimmspat',   // u-fields2: the rubble bodies' ores
+    'Frost Prism': 'Frostprisma', 'Violet Moss': 'Violettmoos', 'Violet Frond': 'Violettwedel', 'Dune Glass': 'Dünenglas',   // u-stars2: the worlds of other stars
     'Palm Crown': 'Palmenkrone', 'Round Tree Small': 'Rundbaum klein', 'Round Tree Large': 'Rundbaum groß', 'Grass Tuft': 'Grasbüschel',
     'Flower Cluster': 'Blumenbüschel', 'Blossom Bush': 'Blütenbusch', 'Rice Row Crop': 'Reisreihen-Feld',
     'Glass Stair Tread': 'Glas-Treppenstufe', 'Light Pad': 'Lichtsockel', 'Nova Window': 'Nova-Fenster', 'Orange Frame': 'oranger Rahmen',

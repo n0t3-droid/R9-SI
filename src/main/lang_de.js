@@ -3117,6 +3117,27 @@
     "g.rpg.boss2.leg.travel": "Schnellreise",
     "g.rpg.boss2.leg.goal": "Nächstes Ziel",
     // ---- a-boss2 end
+    // ---- u-stars2
+    "g.codex.m.stars": ["Fremde Sonne", "Ein System eines anderen Sterns zum ersten Mal erreichen.", "Spring mit dem Sternensprung (Sternkarte, O) zu einem Stern in Reichweite."],
+    "g.stars2.first": "Erstbesuch: {name} — ein neuer Eintrag im Kodex.",
+    "g.stars2.why.binary": "Doppelstern",
+    "g.stars2.why.nebula": "im Nebel",
+    "g.stars2.why.hot": "heißer Stern",
+    "g.stars2.why.dwarf": "Weißer Zwerg",
+    "g.stars2.why.ring": "Welt mit Ring",
+    "g.stars2.why.sig.crystal": "Kristallfelder",
+    "g.stars2.why.sig.violet": "violettes Leben",
+    "g.stars2.why.sig.glass": "Glasdünen",
+    "g.stars2.next": "★ Nächstes Ziel: {name} · {ly} Lj · {why}",
+    "g.stars2.route": "Deine Route: {n} Sprünge",
+    "g.stars2.land.crystal": "Kristallfelder unter einem heißen Stern.",
+    "g.stars2.land.violet": "Violettes Leben im Licht eines Roten Zwergs.",
+    "g.stars2.land.glass": "Dünen aus geschmolzenem Glas.",
+    "g.stars2.ring": "Ein Ring spannt sich über den Himmel.",
+    "g.stars2.sun2": "Zwei Sonnen — zwei Schatten.",
+    "g.set.sun2": "Zweite Sonne mit Schatten",
+    "g.set.sun2.tip": "Auf Welten von Doppelsternen wirft auch die zweite Sonne Licht und Schatten (ab Niedrig; kostet etwas Leistung).",
+    // ---- u-stars2 end
     // ---- a-life: the moons' settlements, the ferries, the traffic between the worlds (ferries.js)
     "g.fe.founded": "Eine Siedlung entsteht: {name}",
     "g.fe.foundedSub": "Die ersten Siedler kommen mit der Fähre — sieh zu, wie {name} wächst",
@@ -3141,5 +3162,5 @@
     "g.set.spaceLife": "Leben zwischen den Welten",
     "g.set.spaceLife.tip": "Siedlungen auf den Monden, Fähren und Verkehr im All",
     // ---- a-life end
-  });
+});
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

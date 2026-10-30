@@ -89,6 +89,15 @@ OUT.itemNamesData = await ev(() => { const inv = VR.game.player.inv; return inv.
 { const EN = /\b(Block|Grass|Stone|Planks|Log|Glass|Dirt|Sand|Oak|Birch|Spruce|Brick|Bricks|Wool|Slab|Stairs|Torch|Lamp|Cobblestone|Wood|Leaves|Door|Fence|Pickaxe|Shovel|Axe|Sword|Bread|Apple)\b/;
   const all = OUT.itemNames.concat(OUT.itemNamesData).filter(Boolean), en = all.filter(n => EN.test(n));
   check(all.length > 0 && !en.length, 'the HUD\'s item names are German (' + all.length + ': ' + all.slice(0, 9).join(' · ') + ')' + (en.length ? ' — English: ' + en.join(', ') : '')); }
+// (v0.53 review) the first three minutes as a new player spends them: walking about, looking round; what is on screen
+// and which hints the HUD gives at 2 and 3 minutes
+OUT.hints3 = [];
+for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
+  while (Date.now() - tPlay < tEnd - 6000) { await page.keyboard.down('KeyW'); await wait(3000); await page.keyboard.up('KeyW'); await page.mouse.move(640 + (Math.random() * 400 - 200), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(1500); }
+  await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
+  OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
+}
+console.log('  first 3 min: ' + JSON.stringify(OUT.hints3).slice(0, 1200));
 await page.keyboard.press('Escape'); await wait(1500); await shot('09_pause');
 // R53-04: the pause menu fits 720 px, few buttons at its top level
 OUT.pause = await ev(() => { const p = document.querySelector('#pause > .panel'); if (!p) return null; const r = p.getBoundingClientRect(); const vis = [...p.querySelectorAll('button')].filter(b => b.offsetParent !== null && b.getBoundingClientRect().height > 0); return { bottom: Math.round(r.bottom), top: Math.round(r.top), n: vis.length, labels: vis.map(b => b.textContent.trim().slice(0, 24)) }; }).catch(() => null);
@@ -100,7 +109,7 @@ check(OUT.pause && OUT.pause.bottom <= 720 && OUT.pause.top >= 0 && OUT.pause.n 
 OUT.settings = await click('#pause [data-act="settings"]', 'settings');
 await wait(1500); await shot('10_settings');
 await page.keyboard.press('Escape'); await wait(800); await page.keyboard.press('Escape'); await wait(1000);
-for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1', '14_F1']]) {
+for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1', '14_F1'], ['KeyO', '14b_O']]) {
   const st = await ev(() => VR.game.ui && VR.game.ui.screen).catch(() => '');
   if (st && st !== 'hud' && st !== 'play') { await page.keyboard.press('Escape'); await wait(800); }
   await page.keyboard.press(k); await wait(1500); await shot(n);

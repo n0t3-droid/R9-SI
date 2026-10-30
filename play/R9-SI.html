@@ -12338,6 +12338,34 @@ def0('glowspar',{display:'Glowspar',cat:'nature',group:G.ORE,tex:()=>T('glowspar
 
 
 
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+if(!VR.BL||(VR.R&&VR.R.T))return;
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{},MD=VR.MODEL;
+if(!def0||R.byName.exo_crystal|| !R.byName.glowspar)return;
+def0('exo_crystal',{display:'Frost Prism',cat:'nature',group:G.ORE,tex:()=>T('exo_crystal'),hard:1.5,blast:1.5,tool:'pick',sound:'amethyst',light:[5,7,9],flags:VR.F.RANDROT});
+def0('exo_moss',{display:'Violet Moss',cat:'nature',group:G.SOIL,tex:()=>T('exo_moss'),hard:0.6,blast:0.6,tool:'shovel',sound:'grass',flags:VR.F.RANDROT});
+const fr=()=>T('exo_frond');
+def0('exo_frond',{display:'Violet Frond',cat:'nature',group:G.PLANT,shape:'model',layer:'cutout',hard:0,blast:0,sound:'plant',solid:false,tex:fr,model:()=>MD.cross(fr(),{flags:VR.FFLAG.WAVE}),flags:VR.F.PLANT,jitter:true});
+def0('exo_glass',{display:'Dune Glass',cat:'nature',group:G.SOIL,tex:()=>T('exo_glass'),hard:0.6,blast:0.6,tool:'shovel',sound:'sand',smooth:true,flags:VR.F.RANDROT});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -39340,6 +39368,7 @@ return Object.assign(K.grid,{meta:meta(K,{door:cx,m:{name:'Mondtempel',heart:[cx
 
 const PHRASE={
 'Nickel Iron':'Nickeleisen','Ice Nodule':'Eisknolle','Glowspar':'Glimmspat',
+'Frost Prism':'Frostprisma','Violet Moss':'Violettmoos','Violet Frond':'Violettwedel','Dune Glass':'Dünenglas',
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
@@ -41840,6 +41869,289 @@ cur:null,
 };
 })((typeof globalThis!=='undefined'?globalThis:self).VR||((typeof globalThis!=='undefined'?globalThis:self).VR={}));
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const Exo=VR.Exo={XGEN:2};
+const AU=1.495978707e11,MU_SUN=1.32712440018e20,D2R=Math.PI/180;
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+
+const h01=(a,b,c,d)=>{
+let h=Math.imul((a|0)^0x2c1b3c6d,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b);
+h=Math.imul(h^(h>>>15)^Math.imul((c|0)^0x1b873593,0xcc9e2d51),0x27d4eb2f)^Math.imul((d|0)+0x165667b1,0x9e3779b1);
+h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;
+return(h>>>0)/4294967296;
+};
+Exo.h01=h01;
+const pIndex=(def,pl)=> +String(pl.id).slice(String(def.id).length+1).split('m')[0]||0;
+const sysKey=(def)=>(def.idx|0)*7+Math.round((def.p?def.p[0]:0)*1000);
+
+
+Exo.ring=function(def,pl){
+if(!def|| !pl|| !pl.planet)return null;
+const k=pIndex(def,pl),u=h01(sysKey(def),k,0x7a19,1);
+const giant=pl.kind==='giant'||pl.kind==='icegiant';
+if(u>=(giant?0.45:pl.landable?0.22:0))return null;
+return{lat:(20+30*h01(sysKey(def),k,0x7a19,2))*D2R,tilt:h01(sysKey(def),k,0x7a19,3)*25*D2R};
+};
+
+
+Exo.signature=function(def,pl){
+if(!def|| !pl|| !pl.landable)return null;
+const T=def.star.T,b=pl.base;
+if(T>=7500)return'crystal';
+if(T<3900&&(b==='aqua'||b==='ocker'))return'violet';
+if((b==='ocker'||b==='zinn')&&(pl.Teq|0)>380)return'glass';
+return null;
+};
+
+
+
+function starAngles(def,pl,t){
+const bs=def.bodies,s0=bs[0],s1=bs.find(b=>b.kind==='star'&&b.parent);
+const close= !!(def.star2&&def.star2.close);
+const M1=s0.mu,M2=s1?s1.mu:0;
+let p0=[0,0],p1=null;
+if(s1){
+const a=s1.orbit.a,n=8*Math.sqrt((M1+M2)/(a*a*a)),th=s1.orbit.M0*D2R+n*t;
+p0=[-a*M2/(M1+M2)*Math.cos(th),-a*M2/(M1+M2)*Math.sin(th)];
+p1=[a*M1/(M1+M2)*Math.cos(th),a*M1/(M1+M2)*Math.sin(th)];
+}
+const muC=close?M1+M2:M1,cen=close?[0,0]:p0;
+const a=pl.orbit.a,n=8*Math.sqrt(muC/(a*a*a)),th=pl.orbit.M0*D2R+n*t;
+const pp=[cen[0]+a*Math.cos(th),cen[1]+a*Math.sin(th)];
+const d0=Math.hypot(p0[0]-pp[0],p0[1]-pp[1]);
+const out={th0:Math.atan2(p0[1]-pp[1],p0[0]-pp[0]),d0,th1:0,d1:0,s1};
+if(p1){out.th1=Math.atan2(p1[1]-pp[1],p1[0]-pp[0]);out.d1=Math.hypot(p1[0]-pp[0],p1[1]-pp[1]);}
+return out;
+}
+
+
+const dirAt=(H,phi,o,dl)=>{
+const sd=Math.sin(dl||0),cd=Math.cos(dl||0);
+o[0]= -cd*Math.sin(H);o[1]=Math.sin(phi)*sd+Math.cos(phi)*cd*Math.cos(H);o[2]=Math.sin(phi)*cd*Math.cos(H)-Math.cos(phi)*sd;return o;
+};
+Exo.dirAt=dirAt;
+
+Exo.place=(def,pl)=>{
+const k=pIndex(def,pl),rg=Exo.ring(def,pl);
+const phi=rg?rg.lat:(15+30*h01(sysKey(def),k,0x51a7,1))*D2R;
+const dl=rg?(14+10*h01(sysKey(def),k,0x51a7,4))*D2R:(h01(sysKey(def),k,0x51a7,4)-0.5)*36*D2R;
+return{phi,dl,w0:h01(sysKey(def),k,0x51a7,2)*2*Math.PI,elLock:(24+14*h01(sysKey(def),k,0x51a7,3))*D2R};
+};
+Exo.locked=(pl)=> !!(pl.locked||(pl.spin&&pl.spin.locked)|| !(pl.spin&&pl.spin.T>0));
+Exo.dayLength=(pl)=>(Exo.locked(pl)?Infinity:pl.spin.T);
+Exo.sky=function(def,pl,t,out){
+out=out||{sun:[0,1,0],sun2:[0,1,0]};
+const A=starAngles(def,pl,t),P=Exo.place(def,pl),lk=Exo.locked(pl);
+
+
+const H0=lk?Math.acos(clamp((Math.sin(P.elLock)-Math.sin(P.phi)*Math.sin(P.dl))/(Math.cos(P.phi)*Math.cos(P.dl)),-1,1))*(h01(def.idx|0,3,5,7)<0.5? -1:1):P.w0+2*Math.PI*t/pl.spin.T-A.th0;
+dirAt(H0,P.phi,out.sun,P.dl);
+out.ang=Math.min(0.3,def.star.R*6.957e8/Math.max(A.d0,1));
+out.day=Exo.dayLength(pl);out.locked=lk;out.phi=P.phi;out.dl=P.dl;
+out.has2= !!A.s1;
+if(A.s1){
+
+dirAt(H0+(A.th0-A.th1),P.phi,out.sun2,P.dl);
+const L1=def.star.L,L2=def.star2.L;
+out.k2=clamp(L2/L1*Math.pow(A.d0/Math.max(A.d1,1),2),0,4);
+out.ang2=Math.min(0.3,A.s1.R/Math.max(A.d1,1));
+out.sep=Math.acos(clamp(out.sun[0]*out.sun2[0]+out.sun[1]*out.sun2[1]+out.sun[2]*out.sun2[2],-1,1));
+out.T2=def.star2.T;out.color2=def.star2.color;
+}else{out.k2=0;out.ang2=0;out.sep=0;}
+return out;
+};
+
+
+Exo.why=function(N,idx){
+const s=N.list[idx];if(!s||s.home)return null;
+if(s.neb>=0)return'nebula';
+if(s.bin&&s.bin.close)return'binary';
+if(s.cls==='O'||s.cls==='B'||s.cls==='A')return'hot';
+if(s.cls==='D')return'dwarf';
+const G=VR.Galaxy,def=G&&G.system(N,idx);if(!def)return null;
+for(const b of def.bodies)if(b.planet&&b.landable&&Exo.signature(def,b))return'sig.'+Exo.signature(def,b);
+for(const b of def.bodies)if(b.planet&&Exo.ring(def,b))return'ring';
+if(s.bin)return'binary';
+return null;
+};
+Exo.interesting=function(N,from,visited,range){
+const G=VR.Galaxy,here=N.list[from||0];if(!G|| !here)return null;
+const v=new Set(visited||[]);
+for(const q of G.systemsNear(N,here.p,range||G.RANGE)){
+if(q.idx===(from||0)||q.idx===0||v.has(q.idx))continue;
+const why=Exo.why(N,q.idx);
+if(why)return{idx:q.idx,d:q.d,why,name:q.s.name};
+}
+return null;
+};
+
+
+const B=VR.Bodies;
+if(B&&B.stamp&& !B.stamp.__exo){
+const st0=B.stamp,bg0=B.bgenOf;
+B.stamp=function(meta){
+const m=st0.apply(this,arguments);
+if(m&& !m.guest&&m.universe&& !(m.universe.xgen>0)){
+const was=[m.dim].concat(Object.keys(m.pos||{})).some(d=> /^x\./.test(String(d||'')));
+m.universe.xgen=was?1:Exo.XGEN;
+}
+return m;
+};
+B.bgenOf=function(meta){const o=bg0.apply(this,arguments),x=meta&&meta.universe&&meta.universe.xgen;o.exo=x>0?x:Exo.XGEN;return o;};
+B.stamp.__exo=true;
+}
+
+
+
+
+const vnoise=(x,z,sc,s)=>{
+const fx=x/sc,fz=z/sc,ix=Math.floor(fx),iz=Math.floor(fz),u=fx-ix,v=fz-iz;
+const a=h01(ix,iz,s,1),b=h01(ix+1,iz,s,1),c=h01(ix,iz+1,s,1),d=h01(ix+1,iz+1,s,1);
+const su=u*u*(3-2*u),sv=v*v*(3-2*v);
+return a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;
+};
+Exo.vnoise=vnoise;
+const CELL=14;
+
+function crystalH(x,z,s){
+let best=0;
+const ci=Math.floor(x/CELL),cj=Math.floor(z/CELL);
+for(let dj= -1;dj<=1;dj++)for(let di= -1;di<=1;di++){
+const i=ci+di,j=cj+dj;
+if(h01(i,j,s,11)>0.4)continue;
+const cx=(i+0.2+0.6*h01(i,j,s,12))*CELL,cz=(j+0.2+0.6*h01(i,j,s,13))*CELL,R=2.2+3.2*h01(i,j,s,14);
+const d=Math.hypot(x+0.5-cx,z+0.5-cz);if(d>=R)continue;
+
+if(h01(x,z,s,17)<0.36)continue;
+const k=1-d/R,H=Math.round(Math.pow(k,0.8)*(3+7*h01(i,j,s,15))*(0.35+0.65*h01(x,z,s,16)));
+if(H>best)best=H;
+}
+if(!best&&h01(x,z,s,18)<0.006)best=1+(h01(x,z,s,19)<0.4?1:0);
+return best;
+}
+
+function duneH(x,z,s){
+const a=h01(s,3,9,1)*Math.PI,ca=Math.cos(a),sa=Math.sin(a);
+const m=vnoise(x,z,70,s^0x91);
+if(m<0.38)return 0;
+const w=(x*ca+z*sa)/11+2.2*vnoise(x,z,37,s^0x92);
+const r=0.5+0.5*Math.sin(w*Math.PI);
+return Math.floor(Math.pow(r,1.6)*4.6*clamp((m-0.38)/0.18,0,1));
+}
+Exo.decoH=(sig,x,z,s)=>(sig==='crystal'?crystalH(x,z,s):sig==='glass'?duneH(x,z,s):0);
+let IDS=null;
+function ids(){
+if(IDS)return IDS;
+const R=VR.R;if(!R|| !R.byName)return null;
+const S=(n)=>(R.byName[n]?R.S(n):0);
+const ok=new Uint8Array(R.stateCount+1);
+for(const t of R.types){
+const bad=t.solid===false|| /water|lava|ice|snow|frost|bedrock|glass|crystal/.test(t.name);
+for(let k=0;k<t.nstates;k++)ok[t.base+k]=bad?0:1;
+}
+IDS={crystal:S('exo_crystal'),moss:S('exo_moss'),frond:S('exo_frond'),glass:S('exo_glass'),ok};
+if(!IDS.crystal){IDS=null;return null;}
+return IDS;
+}
+Exo.decoChunk=function(blocks,cx,cz,sig,s){
+const I=ids();if(!I|| !sig)return 0;
+let n=0;
+for(let lz=0;lz<16;lz++)for(let lx=0;lx<16;lx++){
+const col=lz*16+lx,x=cx*16+lx,z=cz*16+lz;
+let y=250;while(y>1&& !blocks[(y<<8)|col])y--;
+const top=blocks[(y<<8)|col];
+if(!I.ok[top]||y>240)continue;
+if(sig==='crystal'){
+const H=crystalH(x,z,s);
+for(let k=1;k<=H;k++)blocks[((y+k)<<8)|col]=I.crystal;
+n+=H;
+}else if(sig==='glass'){
+const m=vnoise(x,z,70,s^0x91);if(m<0.33)continue;
+const H=duneH(x,z,s);
+blocks[(y<<8)|col]=I.glass;
+for(let k=1;k<=H;k++)blocks[((y+k)<<8)|col]=I.glass;
+n+=H+1;
+}else if(sig==='violet'){
+const c=vnoise(x,z,13,s^0x71)*0.7+vnoise(x,z,4,s^0x72)*0.3;
+if(c<0.36)continue;
+blocks[(y<<8)|col]=I.moss;n++;
+const f=h01(x,z,s,31);
+if(f<0.16*clamp((c-0.36)/0.2,0.3,1)){blocks[((y+1)<<8)|col]=I.frond;n++;if(f<0.035&&c>0.5){blocks[((y+2)<<8)|col]=I.frond;n++;}}
+}
+}
+return n;
+};
+
+const SIGC=new Map();
+Exo.sigOf=function(seed,sys,p){
+const key=seed+':'+sys+':'+p;if(SIGC.has(key))return SIGC.get(key);
+const G=VR.Galaxy;let sig=null;
+try{const N=G.build((seed>>>0)||0x5eed),def=G.system(N,sys),pl=def&&def.bodies.find(b=>b.id===def.id+'p'+p);sig=pl?Exo.signature(def,pl):null;}catch(e){sig=null;}
+SIGC.set(key,sig);return sig;
+};
+Exo.decorate=function(gen,sig,s){
+if(!gen|| !sig||gen.__exo)return gen;
+const g0=gen.generate.bind(gen),sp0=gen.findSpawn&&gen.findSpawn.bind(gen),sy0=gen.surfaceY&&gen.surfaceY.bind(gen);
+gen.generate=function(cx,cz){const r=g0(cx,cz);if(r&&r.blocks)Exo.decoChunk(r.blocks,cx,cz,sig,s);return r;};
+if(sy0&&sig==='glass')gen.surfaceY=(x,z)=>sy0(x,z)+duneH(x,z,s);
+if(sp0)gen.findSpawn=function(x,z){
+const r=sp0(x,z);if(!r)return r;
+if(sig==='crystal'){
+
+let bx=Math.floor(r[0]),bz=Math.floor(r[2]);
+if(crystalH(bx,bz,s)){
+outer:for(let rr=1;rr<24;rr++)for(let k=0;k<8*rr;k++){
+const a=k/(8*rr)*2*Math.PI,xx=Math.round(bx+rr*Math.cos(a)),zz=Math.round(bz+rr*Math.sin(a));
+if(!crystalH(xx,zz,s)&& !crystalH(xx+1,zz,s)&& !crystalH(xx,zz+1,s)){bx=xx;bz=zz;break outer;}
+}
+const y=sy0?sy0(bx,bz)+1:r[1];
+return[bx+0.5,y,bz+0.5,r[3]||0];
+}
+return r;
+}
+if(sig==='glass')return[r[0],r[1]+duneH(Math.floor(r[0]),Math.floor(r[2]),s)+1,r[2],r[3]||0];
+if(sig==='violet')return[r[0],r[1]+2,r[2],r[3]||0];
+return r;
+};
+gen.__exo=sig;
+return gen;
+};
+
+if(VR.DimReg&&VR.DimReg.resolve&& !VR.DimReg.resolve.__exo){
+const res0=VR.DimReg.resolve;
+VR.DimReg.resolve=function(id){
+const d=res0.apply(this,arguments);
+if(d&&d.exo&& !d.gen.__exo){
+const g0=d.gen,e=d.exo;
+d.gen=function(seed,opts){
+const gen=g0(seed,opts),xg=opts&&opts.bgen&&opts.bgen.exo;
+if(!(xg>=2))return gen;
+const sig=Exo.sigOf(seed,e.sys,e.p);
+return sig?Exo.decorate(gen,sig,(Math.imul((seed>>>0)^0x3c6e,31)+e.sys*131+e.p)|0):gen;
+};
+d.gen.__exo=true;
+}
+return d;
+};
+VR.DimReg.resolve.__exo=true;
+}
+})((typeof globalThis!=='undefined'?globalThis:self).VR||((typeof globalThis!=='undefined'?globalThis:self).VR={}));
+
 VR.TEX_MODS=function(VR){
 
 
@@ -44035,6 +44347,49 @@ img.set(x,y,C(e>0.55?0xd8fff4:e< -0.5?0x1f7f6c:t>0.6?0x6ff0d0:0x3cc4a6));img.ro[
 break;
 }
 });
+return K(img);
+};
+void N;
+})(VR);
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const TX=VR.TX,REC=VR.TEXREC,C=TX&&TX.C,hh=TX&&TX.hash,N=(TX&&TX.N)||32;
+if(!REC|| !TX)return;
+const K=TX.chunky;
+REC.exo_crystal=()=>{
+
+const img=TX.natural([0x8fa6c8,0x9fb5d6,0xafc3e0,0xc0d2ea],{period:5,oct:2,speck:0.03,seed:9301,contrast:0.7,rough:0.3});
+const P=[];for(let k=0;k<6;k++)P.push({x:hh(k,1,9304)*N,y:hh(k,2,9304)*N,a:Math.PI/2+(hh(k,3,9304)-0.5)*0.35,L:N*(0.35+0.3*hh(k,4,9304)),w:N*(0.06+0.05*hh(k,5,9304))});
+img.forEach((x,y,i)=>{
+for(const p of P){
+let dx=x+0.5-p.x,dy=y+0.5-p.y;dx-=Math.round(dx/N)*N;dy-=Math.round(dy/N)*N;
+const u=dx*Math.cos(p.a)+dy*Math.sin(p.a),v= -dx*Math.sin(p.a)+dy*Math.cos(p.a);
+if(Math.abs(u)>p.L||Math.abs(v)>p.w*(1-0.7*Math.max(0,Math.abs(u)/p.L-0.6)/0.4))continue;
+const e=v/p.w,t=0.5+0.5*u/p.L;
+img.set(x,y,C(e>0.5?0xf6fbff:e< -0.55?0x7c96c8:t>0.55?0xdbe9ff:0xc0d6f6));img.ro[i]=0.1;img.em[i]=e>0.5?0.6:0.15+0.2*t;
+break;
+}
+});
+return K(img);
+};
+REC.exo_moss=()=>{
+const img=TX.natural([0x2c1a4e,0x3e2468,0x553084,0x6c3c9e],{period:3,oct:3,speck:0.08,speckDark:true,seed:9311,contrast:1.05,rough:0.97});
+img.forEach((x,y,i)=>{const h=hh(x,y,9312);if(h<0.035)img.set(x,y,C(h<0.012?0xb46ae0:0x8448b8));});
+return K(img);
+};
+REC.exo_frond=()=>TX.blades([0x24164a,0x3a2268,0x543088,0x7040a8,0x9a5ad0],{count:12,minH:12,varH:16,seed:9321,thick:true,lean:0.8});
+REC.exo_glass=()=>{
+const img=TX.natural([0x1c2018,0x283022,0x343c2a,0x45452e],{period:4,oct:3,speck:0.07,speckDark:true,seed:9331,contrast:0.95,rough:0.35});
+img.forEach((x,y,i)=>{const h=hh(x,y,9332);if(h<0.03){img.set(x,y,C(h<0.01?0xe8f0d8:0x7a8a5a));img.ro[i]=0.08;}});
 return K(img);
 };
 void N;
@@ -59395,6 +59750,34 @@ def0('glowspar',{display:'Glowspar',cat:'nature',group:G.ORE,tex:()=>T('glowspar
 
 
 
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+if(!VR.BL||(VR.R&&VR.R.T))return;
+VR.BL.late=VR.BL.late||[];
+VR.BL.late.push(function(){
+const R=VR.R,T=R.tex,def0=VR.BL.def||R.def,G=VR.BL.G||{},MD=VR.MODEL;
+if(!def0||R.byName.exo_crystal|| !R.byName.glowspar)return;
+def0('exo_crystal',{display:'Frost Prism',cat:'nature',group:G.ORE,tex:()=>T('exo_crystal'),hard:1.5,blast:1.5,tool:'pick',sound:'amethyst',light:[5,7,9],flags:VR.F.RANDROT});
+def0('exo_moss',{display:'Violet Moss',cat:'nature',group:G.SOIL,tex:()=>T('exo_moss'),hard:0.6,blast:0.6,tool:'shovel',sound:'grass',flags:VR.F.RANDROT});
+const fr=()=>T('exo_frond');
+def0('exo_frond',{display:'Violet Frond',cat:'nature',group:G.PLANT,shape:'model',layer:'cutout',hard:0,blast:0,sound:'plant',solid:false,tex:fr,model:()=>MD.cross(fr(),{flags:VR.FFLAG.WAVE}),flags:VR.F.PLANT,jitter:true});
+def0('exo_glass',{display:'Dune Glass',cat:'nature',group:G.SOIL,tex:()=>T('exo_glass'),hard:0.6,blast:0.6,tool:'shovel',sound:'sand',smooth:true,flags:VR.F.RANDROT});
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,T=R.tex,TA=R.texAnim,MD=VR.MODEL,F=VR.F,ROT=R.ROT,FF=VR.FFLAG;
@@ -86397,6 +86780,7 @@ return Object.assign(K.grid,{meta:meta(K,{door:cx,m:{name:'Mondtempel',heart:[cx
 
 const PHRASE={
 'Nickel Iron':'Nickeleisen','Ice Nodule':'Eisknolle','Glowspar':'Glimmspat',
+'Frost Prism':'Frostprisma','Violet Moss':'Violettmoos','Violet Frond':'Violettwedel','Dune Glass':'Dünenglas',
 'Palm Crown':'Palmenkrone','Round Tree Small':'Rundbaum klein','Round Tree Large':'Rundbaum groß','Grass Tuft':'Grasbüschel',
 'Flower Cluster':'Blumenbüschel','Blossom Bush':'Blütenbusch','Rice Row Crop':'Reisreihen-Feld',
 'Glass Stair Tread':'Glas-Treppenstufe','Light Pad':'Lichtsockel','Nova Window':'Nova-Fenster','Orange Frame':'oranger Rahmen',
@@ -88902,6 +89286,289 @@ cur:null,
 
 
 
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const Exo=VR.Exo={XGEN:2};
+const AU=1.495978707e11,MU_SUN=1.32712440018e20,D2R=Math.PI/180;
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+
+const h01=(a,b,c,d)=>{
+let h=Math.imul((a|0)^0x2c1b3c6d,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b);
+h=Math.imul(h^(h>>>15)^Math.imul((c|0)^0x1b873593,0xcc9e2d51),0x27d4eb2f)^Math.imul((d|0)+0x165667b1,0x9e3779b1);
+h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;
+return(h>>>0)/4294967296;
+};
+Exo.h01=h01;
+const pIndex=(def,pl)=> +String(pl.id).slice(String(def.id).length+1).split('m')[0]||0;
+const sysKey=(def)=>(def.idx|0)*7+Math.round((def.p?def.p[0]:0)*1000);
+
+
+Exo.ring=function(def,pl){
+if(!def|| !pl|| !pl.planet)return null;
+const k=pIndex(def,pl),u=h01(sysKey(def),k,0x7a19,1);
+const giant=pl.kind==='giant'||pl.kind==='icegiant';
+if(u>=(giant?0.45:pl.landable?0.22:0))return null;
+return{lat:(20+30*h01(sysKey(def),k,0x7a19,2))*D2R,tilt:h01(sysKey(def),k,0x7a19,3)*25*D2R};
+};
+
+
+Exo.signature=function(def,pl){
+if(!def|| !pl|| !pl.landable)return null;
+const T=def.star.T,b=pl.base;
+if(T>=7500)return'crystal';
+if(T<3900&&(b==='aqua'||b==='ocker'))return'violet';
+if((b==='ocker'||b==='zinn')&&(pl.Teq|0)>380)return'glass';
+return null;
+};
+
+
+
+function starAngles(def,pl,t){
+const bs=def.bodies,s0=bs[0],s1=bs.find(b=>b.kind==='star'&&b.parent);
+const close= !!(def.star2&&def.star2.close);
+const M1=s0.mu,M2=s1?s1.mu:0;
+let p0=[0,0],p1=null;
+if(s1){
+const a=s1.orbit.a,n=8*Math.sqrt((M1+M2)/(a*a*a)),th=s1.orbit.M0*D2R+n*t;
+p0=[-a*M2/(M1+M2)*Math.cos(th),-a*M2/(M1+M2)*Math.sin(th)];
+p1=[a*M1/(M1+M2)*Math.cos(th),a*M1/(M1+M2)*Math.sin(th)];
+}
+const muC=close?M1+M2:M1,cen=close?[0,0]:p0;
+const a=pl.orbit.a,n=8*Math.sqrt(muC/(a*a*a)),th=pl.orbit.M0*D2R+n*t;
+const pp=[cen[0]+a*Math.cos(th),cen[1]+a*Math.sin(th)];
+const d0=Math.hypot(p0[0]-pp[0],p0[1]-pp[1]);
+const out={th0:Math.atan2(p0[1]-pp[1],p0[0]-pp[0]),d0,th1:0,d1:0,s1};
+if(p1){out.th1=Math.atan2(p1[1]-pp[1],p1[0]-pp[0]);out.d1=Math.hypot(p1[0]-pp[0],p1[1]-pp[1]);}
+return out;
+}
+
+
+const dirAt=(H,phi,o,dl)=>{
+const sd=Math.sin(dl||0),cd=Math.cos(dl||0);
+o[0]= -cd*Math.sin(H);o[1]=Math.sin(phi)*sd+Math.cos(phi)*cd*Math.cos(H);o[2]=Math.sin(phi)*cd*Math.cos(H)-Math.cos(phi)*sd;return o;
+};
+Exo.dirAt=dirAt;
+
+Exo.place=(def,pl)=>{
+const k=pIndex(def,pl),rg=Exo.ring(def,pl);
+const phi=rg?rg.lat:(15+30*h01(sysKey(def),k,0x51a7,1))*D2R;
+const dl=rg?(14+10*h01(sysKey(def),k,0x51a7,4))*D2R:(h01(sysKey(def),k,0x51a7,4)-0.5)*36*D2R;
+return{phi,dl,w0:h01(sysKey(def),k,0x51a7,2)*2*Math.PI,elLock:(24+14*h01(sysKey(def),k,0x51a7,3))*D2R};
+};
+Exo.locked=(pl)=> !!(pl.locked||(pl.spin&&pl.spin.locked)|| !(pl.spin&&pl.spin.T>0));
+Exo.dayLength=(pl)=>(Exo.locked(pl)?Infinity:pl.spin.T);
+Exo.sky=function(def,pl,t,out){
+out=out||{sun:[0,1,0],sun2:[0,1,0]};
+const A=starAngles(def,pl,t),P=Exo.place(def,pl),lk=Exo.locked(pl);
+
+
+const H0=lk?Math.acos(clamp((Math.sin(P.elLock)-Math.sin(P.phi)*Math.sin(P.dl))/(Math.cos(P.phi)*Math.cos(P.dl)),-1,1))*(h01(def.idx|0,3,5,7)<0.5? -1:1):P.w0+2*Math.PI*t/pl.spin.T-A.th0;
+dirAt(H0,P.phi,out.sun,P.dl);
+out.ang=Math.min(0.3,def.star.R*6.957e8/Math.max(A.d0,1));
+out.day=Exo.dayLength(pl);out.locked=lk;out.phi=P.phi;out.dl=P.dl;
+out.has2= !!A.s1;
+if(A.s1){
+
+dirAt(H0+(A.th0-A.th1),P.phi,out.sun2,P.dl);
+const L1=def.star.L,L2=def.star2.L;
+out.k2=clamp(L2/L1*Math.pow(A.d0/Math.max(A.d1,1),2),0,4);
+out.ang2=Math.min(0.3,A.s1.R/Math.max(A.d1,1));
+out.sep=Math.acos(clamp(out.sun[0]*out.sun2[0]+out.sun[1]*out.sun2[1]+out.sun[2]*out.sun2[2],-1,1));
+out.T2=def.star2.T;out.color2=def.star2.color;
+}else{out.k2=0;out.ang2=0;out.sep=0;}
+return out;
+};
+
+
+Exo.why=function(N,idx){
+const s=N.list[idx];if(!s||s.home)return null;
+if(s.neb>=0)return'nebula';
+if(s.bin&&s.bin.close)return'binary';
+if(s.cls==='O'||s.cls==='B'||s.cls==='A')return'hot';
+if(s.cls==='D')return'dwarf';
+const G=VR.Galaxy,def=G&&G.system(N,idx);if(!def)return null;
+for(const b of def.bodies)if(b.planet&&b.landable&&Exo.signature(def,b))return'sig.'+Exo.signature(def,b);
+for(const b of def.bodies)if(b.planet&&Exo.ring(def,b))return'ring';
+if(s.bin)return'binary';
+return null;
+};
+Exo.interesting=function(N,from,visited,range){
+const G=VR.Galaxy,here=N.list[from||0];if(!G|| !here)return null;
+const v=new Set(visited||[]);
+for(const q of G.systemsNear(N,here.p,range||G.RANGE)){
+if(q.idx===(from||0)||q.idx===0||v.has(q.idx))continue;
+const why=Exo.why(N,q.idx);
+if(why)return{idx:q.idx,d:q.d,why,name:q.s.name};
+}
+return null;
+};
+
+
+const B=VR.Bodies;
+if(B&&B.stamp&& !B.stamp.__exo){
+const st0=B.stamp,bg0=B.bgenOf;
+B.stamp=function(meta){
+const m=st0.apply(this,arguments);
+if(m&& !m.guest&&m.universe&& !(m.universe.xgen>0)){
+const was=[m.dim].concat(Object.keys(m.pos||{})).some(d=> /^x\./.test(String(d||'')));
+m.universe.xgen=was?1:Exo.XGEN;
+}
+return m;
+};
+B.bgenOf=function(meta){const o=bg0.apply(this,arguments),x=meta&&meta.universe&&meta.universe.xgen;o.exo=x>0?x:Exo.XGEN;return o;};
+B.stamp.__exo=true;
+}
+
+
+
+
+const vnoise=(x,z,sc,s)=>{
+const fx=x/sc,fz=z/sc,ix=Math.floor(fx),iz=Math.floor(fz),u=fx-ix,v=fz-iz;
+const a=h01(ix,iz,s,1),b=h01(ix+1,iz,s,1),c=h01(ix,iz+1,s,1),d=h01(ix+1,iz+1,s,1);
+const su=u*u*(3-2*u),sv=v*v*(3-2*v);
+return a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;
+};
+Exo.vnoise=vnoise;
+const CELL=14;
+
+function crystalH(x,z,s){
+let best=0;
+const ci=Math.floor(x/CELL),cj=Math.floor(z/CELL);
+for(let dj= -1;dj<=1;dj++)for(let di= -1;di<=1;di++){
+const i=ci+di,j=cj+dj;
+if(h01(i,j,s,11)>0.4)continue;
+const cx=(i+0.2+0.6*h01(i,j,s,12))*CELL,cz=(j+0.2+0.6*h01(i,j,s,13))*CELL,R=2.2+3.2*h01(i,j,s,14);
+const d=Math.hypot(x+0.5-cx,z+0.5-cz);if(d>=R)continue;
+
+if(h01(x,z,s,17)<0.36)continue;
+const k=1-d/R,H=Math.round(Math.pow(k,0.8)*(3+7*h01(i,j,s,15))*(0.35+0.65*h01(x,z,s,16)));
+if(H>best)best=H;
+}
+if(!best&&h01(x,z,s,18)<0.006)best=1+(h01(x,z,s,19)<0.4?1:0);
+return best;
+}
+
+function duneH(x,z,s){
+const a=h01(s,3,9,1)*Math.PI,ca=Math.cos(a),sa=Math.sin(a);
+const m=vnoise(x,z,70,s^0x91);
+if(m<0.38)return 0;
+const w=(x*ca+z*sa)/11+2.2*vnoise(x,z,37,s^0x92);
+const r=0.5+0.5*Math.sin(w*Math.PI);
+return Math.floor(Math.pow(r,1.6)*4.6*clamp((m-0.38)/0.18,0,1));
+}
+Exo.decoH=(sig,x,z,s)=>(sig==='crystal'?crystalH(x,z,s):sig==='glass'?duneH(x,z,s):0);
+let IDS=null;
+function ids(){
+if(IDS)return IDS;
+const R=VR.R;if(!R|| !R.byName)return null;
+const S=(n)=>(R.byName[n]?R.S(n):0);
+const ok=new Uint8Array(R.stateCount+1);
+for(const t of R.types){
+const bad=t.solid===false|| /water|lava|ice|snow|frost|bedrock|glass|crystal/.test(t.name);
+for(let k=0;k<t.nstates;k++)ok[t.base+k]=bad?0:1;
+}
+IDS={crystal:S('exo_crystal'),moss:S('exo_moss'),frond:S('exo_frond'),glass:S('exo_glass'),ok};
+if(!IDS.crystal){IDS=null;return null;}
+return IDS;
+}
+Exo.decoChunk=function(blocks,cx,cz,sig,s){
+const I=ids();if(!I|| !sig)return 0;
+let n=0;
+for(let lz=0;lz<16;lz++)for(let lx=0;lx<16;lx++){
+const col=lz*16+lx,x=cx*16+lx,z=cz*16+lz;
+let y=250;while(y>1&& !blocks[(y<<8)|col])y--;
+const top=blocks[(y<<8)|col];
+if(!I.ok[top]||y>240)continue;
+if(sig==='crystal'){
+const H=crystalH(x,z,s);
+for(let k=1;k<=H;k++)blocks[((y+k)<<8)|col]=I.crystal;
+n+=H;
+}else if(sig==='glass'){
+const m=vnoise(x,z,70,s^0x91);if(m<0.33)continue;
+const H=duneH(x,z,s);
+blocks[(y<<8)|col]=I.glass;
+for(let k=1;k<=H;k++)blocks[((y+k)<<8)|col]=I.glass;
+n+=H+1;
+}else if(sig==='violet'){
+const c=vnoise(x,z,13,s^0x71)*0.7+vnoise(x,z,4,s^0x72)*0.3;
+if(c<0.36)continue;
+blocks[(y<<8)|col]=I.moss;n++;
+const f=h01(x,z,s,31);
+if(f<0.16*clamp((c-0.36)/0.2,0.3,1)){blocks[((y+1)<<8)|col]=I.frond;n++;if(f<0.035&&c>0.5){blocks[((y+2)<<8)|col]=I.frond;n++;}}
+}
+}
+return n;
+};
+
+const SIGC=new Map();
+Exo.sigOf=function(seed,sys,p){
+const key=seed+':'+sys+':'+p;if(SIGC.has(key))return SIGC.get(key);
+const G=VR.Galaxy;let sig=null;
+try{const N=G.build((seed>>>0)||0x5eed),def=G.system(N,sys),pl=def&&def.bodies.find(b=>b.id===def.id+'p'+p);sig=pl?Exo.signature(def,pl):null;}catch(e){sig=null;}
+SIGC.set(key,sig);return sig;
+};
+Exo.decorate=function(gen,sig,s){
+if(!gen|| !sig||gen.__exo)return gen;
+const g0=gen.generate.bind(gen),sp0=gen.findSpawn&&gen.findSpawn.bind(gen),sy0=gen.surfaceY&&gen.surfaceY.bind(gen);
+gen.generate=function(cx,cz){const r=g0(cx,cz);if(r&&r.blocks)Exo.decoChunk(r.blocks,cx,cz,sig,s);return r;};
+if(sy0&&sig==='glass')gen.surfaceY=(x,z)=>sy0(x,z)+duneH(x,z,s);
+if(sp0)gen.findSpawn=function(x,z){
+const r=sp0(x,z);if(!r)return r;
+if(sig==='crystal'){
+
+let bx=Math.floor(r[0]),bz=Math.floor(r[2]);
+if(crystalH(bx,bz,s)){
+outer:for(let rr=1;rr<24;rr++)for(let k=0;k<8*rr;k++){
+const a=k/(8*rr)*2*Math.PI,xx=Math.round(bx+rr*Math.cos(a)),zz=Math.round(bz+rr*Math.sin(a));
+if(!crystalH(xx,zz,s)&& !crystalH(xx+1,zz,s)&& !crystalH(xx,zz+1,s)){bx=xx;bz=zz;break outer;}
+}
+const y=sy0?sy0(bx,bz)+1:r[1];
+return[bx+0.5,y,bz+0.5,r[3]||0];
+}
+return r;
+}
+if(sig==='glass')return[r[0],r[1]+duneH(Math.floor(r[0]),Math.floor(r[2]),s)+1,r[2],r[3]||0];
+if(sig==='violet')return[r[0],r[1]+2,r[2],r[3]||0];
+return r;
+};
+gen.__exo=sig;
+return gen;
+};
+
+if(VR.DimReg&&VR.DimReg.resolve&& !VR.DimReg.resolve.__exo){
+const res0=VR.DimReg.resolve;
+VR.DimReg.resolve=function(id){
+const d=res0.apply(this,arguments);
+if(d&&d.exo&& !d.gen.__exo){
+const g0=d.gen,e=d.exo;
+d.gen=function(seed,opts){
+const gen=g0(seed,opts),xg=opts&&opts.bgen&&opts.bgen.exo;
+if(!(xg>=2))return gen;
+const sig=Exo.sigOf(seed,e.sys,e.p);
+return sig?Exo.decorate(gen,sig,(Math.imul((seed>>>0)^0x3c6e,31)+e.sys*131+e.p)|0):gen;
+};
+d.gen.__exo=true;
+}
+return d;
+};
+VR.DimReg.resolve.__exo=true;
+}
+})((typeof globalThis!=='undefined'?globalThis:self).VR||((typeof globalThis!=='undefined'?globalThis:self).VR={}));
+
+
+
+
+
+
 (function(VR){
 'use strict';
 
@@ -91101,6 +91768,49 @@ void N;
 
 
 
+
+
+
+(function(VR){
+'use strict';
+const TX=VR.TX,REC=VR.TEXREC,C=TX&&TX.C,hh=TX&&TX.hash,N=(TX&&TX.N)||32;
+if(!REC|| !TX)return;
+const K=TX.chunky;
+REC.exo_crystal=()=>{
+
+const img=TX.natural([0x8fa6c8,0x9fb5d6,0xafc3e0,0xc0d2ea],{period:5,oct:2,speck:0.03,seed:9301,contrast:0.7,rough:0.3});
+const P=[];for(let k=0;k<6;k++)P.push({x:hh(k,1,9304)*N,y:hh(k,2,9304)*N,a:Math.PI/2+(hh(k,3,9304)-0.5)*0.35,L:N*(0.35+0.3*hh(k,4,9304)),w:N*(0.06+0.05*hh(k,5,9304))});
+img.forEach((x,y,i)=>{
+for(const p of P){
+let dx=x+0.5-p.x,dy=y+0.5-p.y;dx-=Math.round(dx/N)*N;dy-=Math.round(dy/N)*N;
+const u=dx*Math.cos(p.a)+dy*Math.sin(p.a),v= -dx*Math.sin(p.a)+dy*Math.cos(p.a);
+if(Math.abs(u)>p.L||Math.abs(v)>p.w*(1-0.7*Math.max(0,Math.abs(u)/p.L-0.6)/0.4))continue;
+const e=v/p.w,t=0.5+0.5*u/p.L;
+img.set(x,y,C(e>0.5?0xf6fbff:e< -0.55?0x7c96c8:t>0.55?0xdbe9ff:0xc0d6f6));img.ro[i]=0.1;img.em[i]=e>0.5?0.6:0.15+0.2*t;
+break;
+}
+});
+return K(img);
+};
+REC.exo_moss=()=>{
+const img=TX.natural([0x2c1a4e,0x3e2468,0x553084,0x6c3c9e],{period:3,oct:3,speck:0.08,speckDark:true,seed:9311,contrast:1.05,rough:0.97});
+img.forEach((x,y,i)=>{const h=hh(x,y,9312);if(h<0.035)img.set(x,y,C(h<0.012?0xb46ae0:0x8448b8));});
+return K(img);
+};
+REC.exo_frond=()=>TX.blades([0x24164a,0x3a2268,0x543088,0x7040a8,0x9a5ad0],{count:12,minH:12,varH:16,seed:9321,thick:true,lean:0.8});
+REC.exo_glass=()=>{
+const img=TX.natural([0x1c2018,0x283022,0x343c2a,0x45452e],{period:4,oct:3,speck:0.07,speckDark:true,seed:9331,contrast:0.95,rough:0.35});
+img.forEach((x,y,i)=>{const h=hh(x,y,9332);if(h<0.03){img.set(x,y,C(h<0.01?0xe8f0d8:0x7a8a5a));img.ro[i]=0.08;}});
+return K(img);
+};
+void N;
+})(VR);
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const TX=VR.TX,N=TX.N,C=TX.C,REC=VR.TEXREC,PRE=VR.TEXPRE,hh=TX.hash;
@@ -91729,7 +92439,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="3916a1bd823c7799";
+VR.TEX_SRC_HASH="e1ec5cad79dc4f52";
 
 
 
@@ -94968,6 +95678,27 @@ VR.I18N.add('en',{
 "g.rpg.boss2.leg.travel":"Fast travel",
 "g.rpg.boss2.leg.goal":"Next goal",
 
+
+"g.codex.m.stars":["Alien Sun","Reach the system of another star for the first time.","Jump with the star jump (star map, O) to a star in range."],
+"g.stars2.first":"First visit: {name} — a new codex entry.",
+"g.stars2.why.binary":"binary star",
+"g.stars2.why.nebula":"inside a nebula",
+"g.stars2.why.hot":"hot star",
+"g.stars2.why.dwarf":"white dwarf",
+"g.stars2.why.ring":"ringed world",
+"g.stars2.why.sig.crystal":"crystal fields",
+"g.stars2.why.sig.violet":"violet life",
+"g.stars2.why.sig.glass":"glass dunes",
+"g.stars2.next":"★ Next target: {name} · {ly} ly · {why}",
+"g.stars2.route":"Your route: {n} jumps",
+"g.stars2.land.crystal":"Crystal fields under a hot star.",
+"g.stars2.land.violet":"Violet life in a red dwarf's light.",
+"g.stars2.land.glass":"Dunes of molten glass.",
+"g.stars2.ring":"A ring spans the sky.",
+"g.stars2.sun2":"Two suns — two shadows.",
+"g.set.sun2":"Second sun with shadows",
+"g.set.sun2.tip":"On worlds of binary stars the second sun casts light and shadows too (Low and up; costs a little performance).",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -98090,6 +98821,27 @@ VR.I18N.add('de',{
 "g.rpg.boss2.leg.shop":"Dorf mit Läden",
 "g.rpg.boss2.leg.travel":"Schnellreise",
 "g.rpg.boss2.leg.goal":"Nächstes Ziel",
+
+
+"g.codex.m.stars":["Fremde Sonne","Ein System eines anderen Sterns zum ersten Mal erreichen.","Spring mit dem Sternensprung (Sternkarte, O) zu einem Stern in Reichweite."],
+"g.stars2.first":"Erstbesuch: {name} — ein neuer Eintrag im Kodex.",
+"g.stars2.why.binary":"Doppelstern",
+"g.stars2.why.nebula":"im Nebel",
+"g.stars2.why.hot":"heißer Stern",
+"g.stars2.why.dwarf":"Weißer Zwerg",
+"g.stars2.why.ring":"Welt mit Ring",
+"g.stars2.why.sig.crystal":"Kristallfelder",
+"g.stars2.why.sig.violet":"violettes Leben",
+"g.stars2.why.sig.glass":"Glasdünen",
+"g.stars2.next":"★ Nächstes Ziel: {name} · {ly} Lj · {why}",
+"g.stars2.route":"Deine Route: {n} Sprünge",
+"g.stars2.land.crystal":"Kristallfelder unter einem heißen Stern.",
+"g.stars2.land.violet":"Violettes Leben im Licht eines Roten Zwergs.",
+"g.stars2.land.glass":"Dünen aus geschmolzenem Glas.",
+"g.stars2.ring":"Ein Ring spannt sich über den Himmel.",
+"g.stars2.sun2":"Zwei Sonnen — zwei Schatten.",
+"g.set.sun2":"Zweite Sonne mit Schatten",
+"g.set.sun2.tip":"Auf Welten von Doppelsternen wirft auch die zweite Sonne Licht und Schatten (ab Niedrig; kostet etwas Leistung).",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -102102,6 +102854,8 @@ uniform vec4 u_bsJu;
 
 uniform vec4 u_bsLake;
 uniform vec3 u_bsLakeC;
+uniform vec4 u_bsSun2;
+uniform vec4 u_bsSun2C;
 const float BS_D2R = 0.0174532925;
 const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e,c])=>`vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
 const vec3 BS_GN = vec3(${f3(GN)}), BS_GC = vec3(${f3(GC)});
@@ -102148,6 +102902,15 @@ float a = length(cross(D, u_bsSun.xyz)), fade = 1.0 - smoothstep(0.2, 0.43, a), 
 float core = fade / (1.0 + z * z);
 float halo = (0.08 * exp(-a / 0.03) + 0.008 * exp(-a / 0.12) + 0.0015 * exp(-a / 0.45)) * fade;
 return u_bsSunCol * u_bsSunK.y * (core * 0.5 + halo);
+}
+
+vec3 bsSun2(vec3 D) {
+if (u_bsSun2.w <= 0.0) return vec3(0.0);
+float c = dot(D, u_bsSun2.xyz); if (c <= 0.9) return vec3(0.0);
+float a = length(cross(D, u_bsSun2.xyz)), q = a / u_bsSun2.w;
+vec3 col = q < 1.25 ? u_bsSun2C.rgb * (0.42 + 0.58 * sqrt(max(0.0, 1.0 - q * q))) * (1.0 - smoothstep(0.92, 1.25, q)) : vec3(0.0);
+float z = a / (u_bsSun2.w * 1.6);
+return col + u_bsSun2C.rgb * (1.0 / 60.0) * u_bsSun2C.w * (0.5 / (1.0 + z * z) + 0.08 * exp(-a / 0.03) + 0.008 * exp(-a / 0.12)) * (1.0 - smoothstep(0.2, 0.43, a));
 }
 
 
@@ -102224,7 +102987,7 @@ vec3 O = -C * dist;
 vec3 Os = O + P * (dot(O, P) * k1), Ds = D + P * (dot(D, P) * k1);
 float a = dot(Ds, Ds), b = dot(Os, Ds), c = dot(Os, Os) - 1.0, h = b * b - a * c;
 float rc = sqrt(max(c + 1.0 - b * b / a, 0.0));
-float cover = b < 0.0 ? clamp(0.5 - (rc - 1.0) / (dist * px * 1.2), 0.0, 1.0) : 0.0;
+float cover = b < 0.0 && dist > 1.05 ? clamp(0.5 - (rc - 1.0) / (dist * px * 1.2), 0.0, 1.0) : 0.0;
 float tP = cover > 0.0 ? (-b - sqrt(max(h, 0.0))) / a : -1.0;
 float dp = dot(D, P), tR = abs(dp) > 1e-7 ? -dot(O, P) / dp : -1.0;
 vec3 X = O + D * tR;
@@ -102260,7 +103023,7 @@ vec3 pc = alb * u_bsSunCol * lit * tr + vec3(0.08, 0.08, 0.16) * u_bsSunCol * po
 pc += alb * u_bsParK.z * (1.0 - smoothstep(-0.1, 0.1, mus));
 col = mix(col, pc * u_bsLum.x, cover);
 }
-if (rc > 1.0 && rc < 1.04) {
+if (rc > 1.0 && rc < 1.04 && dist > 1.05) {
 
 vec3 Pc = Os - Ds * (b / a), Nc = normalize(Pc + P * (dot(Pc, P) * (f - 1.0)));
 float hh = rc - 1.0, side = smoothstep(-0.15, 0.3, dot(Nc, L));
@@ -102463,7 +103226,7 @@ vec3 D = normalize(dir);
 float px = max(length(fwidth(D)), 1e-5);
 vec3 F = u_bsInert * D;
 vec3 col = (bsStars(F) + bsGalaxy(F)) * u_bsSunK.z * (u_bsAirK.x > 0.5 ? 1.0 - u_bsAirS.z : 1.0);
-if (withSun) col += bsSunDisc(D);
+if (withSun) col += bsSunDisc(D) + bsSun2(D);
 col = bsBodies(D, col, px);
 col = bsAmarant(D, col, px);
 col = bsHerz(D, col, px);
@@ -103148,6 +103911,10 @@ ${VR.SpaceShaders&&VR.SpaceShaders.bodySky?VR.SpaceShaders.bodySky():''}
 
 uniform highp sampler2D u_hmap;
 uniform vec4 u_hsh;
+#ifdef SUN2
+uniform vec4 u_sun2D;
+uniform vec4 u_sun2C;
+#endif
 float hShadow(vec3 lp, vec3 n, vec3 L) {
 if (L.y < 0.02) return 1.0;
 vec3 p = lp + n * 0.07;
@@ -103774,6 +104541,10 @@ float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 
 sh *= cloudShadow(v_localPos + vec3(u_camInt));
 #endif
 vec3 direct = lc * ndl * sh * outdoors;
+#if defined(SUN2) && defined(HSHADOW)
+
+if (u_sun2D.w > 0.0 && !noshade) direct += u_sun2C.rgb * max(dot(n, u_sun2D.xyz), 0.0) * hShadow(v_localPos, N, u_sun2D.xyz) * outdoors;
+#endif
 vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
 #ifdef LIGHT2
 
@@ -134083,6 +134854,7 @@ const MILESTONES=[
 ['raid','turret'],['kill','iron_sword'],['deep','deepstone'],['sky','white_wool'],['night','lantern'],['sleep','red_bed'],['village','vx_lamppost'],
 ['villager','vx_bed_red'],['quest','emerald'],['home','vx_bed_blue'],['festival','lantern'],['autopilot','shuttle_beacon'],
 ['spar','glowspar'],
+['stars','exo_crystal'],
 ];
 const CATS={milestones:'g.codex.cat.milestones',wonders:'g.codex.cat.wonders',creatures:'g.codex.cat.creatures',realm:'g.codex.cat.realm',overworld:'g.codex.cat.overworld',caves:'g.codex.cat.caves',forge:'g.codex.cat.forge',hollow:'g.codex.cat.hollow',drift:'g.codex.cat.drift',moons:'g.codex.cat.moons',inventions:'g.codex.cat.inventions'};
 const INV_TRIGGERS={oak_log:'log',birch_log:'log',spruce_log:'log',jungle_log:'log',acacia_log:'log',dark_oak_log:'log',cherry_log:'log',mangrove_log:'log',cobblestone:'stone',iron_ingot:'iron',diamond:'diamond',crystal_shard_violet:'crystal',crystal_shard_azure:'crystal',crystal_shard_verdant:'crystal',crystal_shard_rose:'crystal',crystal_shard_amber:'crystal',aether_bucket:'aether',star_core:'star_core',laser_blaster:'blaster',crafting_table:'table',torch:'torch',furnace:'furnace',glowspar:'spar',nickel_iron:'spar',ice_nodule:'spar'};
@@ -157242,6 +158014,13 @@ SJ.doppler=(c,b)=>1/((1/Math.sqrt(1-b*b))*(1-b*c));
 SJ.colorT=(T,D)=>T*D;
 
 
+
+SJ.boost=(D)=>{const d3=D*D*D;return d3/(1+d3/48);};
+SJ.bandK=(b)=>1-0.85*sstep(b/SJ.BETA);
+SJ.tunnel=(j)=>(j&&j.phase==='transit'?Math.exp(-Math.pow((j.u-0.5)/0.14,2))*(j.u>0.15&&j.u<0.85?1:0):0);
+
+
+
 const v3=(x,y,z)=>[x||0,y||0,z||0];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
@@ -157365,6 +158144,7 @@ uniform vec4 u_pt[2];
 uniform vec4 u_ptc[2];
 uniform vec4 u_flood;
 uniform vec4 u_sky;
+uniform vec4 u_tun;
 in vec3 v_dir;
 out vec4 o;
 const float TS[9] = float[9](2300.0, 3000.0, 4400.0, 5300.0, 5800.0, 6500.0, 7200.0, 10000.0, 40000.0);
@@ -157393,7 +158173,7 @@ float b = bright * min(0.002 * pow(max(hash13(vec3(cell, face + seed * 3.0)), 1e
 float t = hash13(vec3(cell.yx, face + 9.0 + seed));
 float T = t < 0.12 ? 3100.0 : t < 0.34 ? 4500.0 : t < 0.66 ? 5600.0 : t < 0.88 ? 7500.0 : 14000.0;
 vec3 col = tcol(T * dop) / max(0.35, dot(tcol(T), vec3(0.2126, 0.7152, 0.0722)));
-b *= clamp(dop * dop, 0.0, 6.0);
+float d3 = dop * dop * dop; b *= d3 / (1.0 + d3 / 48.0);
 return col * b * exp(-px * px * 1.6 / (1.0 + 1.5 * b));
 }
 float fbm(vec3 p, int oct) { float s = 0.0, a = 0.5; for (int i = 0; i < 6; i++) { if (i >= oct) break; s += a * vnoise3(p); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s / (1.0 - pow(0.5, float(oct))); }
@@ -157511,9 +158291,22 @@ float rift = 1.0 - 0.75 * exp(-b * b / 0.0009) * smoothstep(0.2, 0.9, along) * s
 float gal = (thin * (0.45 + 0.9 * n1 * n1 + 0.35 * n2) * (0.55 + 1.6 * core) + wide * 0.18) * rift;
 vec3 gcol = mix(vec3(0.72, 0.78, 1.0), vec3(1.0, 0.84, 0.66), core);
 vec3 dt = tcol(5200.0 * dop) / tcol(5200.0);
-col += gcol * dt * gal * 0.03 * clamp(dop * dop, 0.0, 6.0);
-if (u_neb.x > 0.5) col += nebula(Dr, tier >= 2 ? 5 : 2, pxr / dop) * clamp(dop * dop, 0.0, 6.0) * dt;
+col += gcol * dt * gal * 0.03 * clamp(dop * dop, 0.0, 6.0) * u_tun.z;
+if (u_neb.x > 0.5) col += nebula(Dr, tier >= 2 ? 5 : 2, pxr / dop) * clamp(dop * dop, 0.0, 6.0) * dt * u_tun.z;
 col *= u_view.w;
+
+if (u_tun.x > 0.001) {
+vec3 ax = abs(u_V.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+vec3 e1 = normalize(cross(u_V, ax)), e2 = cross(u_V, e1);
+float th = acos(clamp(c1, -1.0, 1.0)), az = atan(dot(D, e2), dot(D, e1)) * 57.29578 / 1.5, bin = floor(az), h = hash13(vec3(bin, 3.0, 7.0));
+if (h > 0.8 && th > 0.03 && th < 1.1) {
+float px = abs(fract(az) - 0.5) * 1.5 * 0.0174533 * sin(th) * pxr;
+float s = fract(log(th) * 1.2 - u_tun.y * (0.9 + 0.8 * h) + h * 7.0);
+float seg = smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(0.12, 0.3, s));
+float fall = smoothstep(0.03, 0.12, th) * (1.0 - smoothstep(0.5, 1.1, th));
+col += mix(vec3(0.45, 0.6, 1.0), vec3(0.85, 0.9, 1.0), fract(h * 7.0)) * u_tun.x * seg * fall * exp(-px * px * 3.0) * (0.3 + 0.7 * fract(h * 13.0));
+}
+}
 
 for (int k = 0; k < 2; k++) {
 if (u_pt[k].w <= 0.0) continue;
@@ -157606,6 +158399,7 @@ const UF={
 view:new Float32Array(4),jump:new Float32Array(4),V:new Float32Array(3),galN:new Float32Array(3),galC:new Float32Array(3),
 neb:new Float32Array(4),nebHot:new Float32Array(3),S:new Float32Array(8),Sc:new Float32Array(8),Sd:new Float32Array(8),
 n:0,P:new Float32Array(48),C:new Float32Array(48),pt:new Float32Array(8),ptc:new Float32Array(8),flood:new Float32Array(4),sky:new Float32Array(4),
+tun:new Float32Array([0,0,1,0]),
 };
 SJ.UF=UF;
 
@@ -157621,7 +158415,7 @@ const f4=(k,a)=>{if(u[k])gl.uniform4fv(u[k],a);},f3=(k,a)=>{if(u[k])gl.uniform3f
 f4('u_view',UF.view);f4('u_jump',UF.jump);f3('u_V',UF.V);f3('u_galN',UF.galN);f3('u_galC',UF.galC);
 f4('u_neb',UF.neb);f3('u_nebHot',UF.nebHot);f4('u_S',UF.S);f4('u_Sc',UF.Sc);f4('u_Sd',UF.Sd);
 if(u.u_n)gl.uniform1i(u.u_n,UF.n);
-f4('u_P',UF.P);f4('u_C',UF.C);f4('u_pt',UF.pt);f4('u_ptc',UF.ptc);f4('u_flood',UF.flood);f4('u_sky',UF.sky);
+f4('u_P',UF.P);f4('u_C',UF.C);f4('u_pt',UF.pt);f4('u_ptc',UF.ptc);f4('u_flood',UF.flood);f4('u_sky',UF.sky);f4('u_tun',UF.tun);
 gl.drawArrays(gl.TRIANGLES,0,3);
 r.stats.draws++;r.stats.tris+=1;
 gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
@@ -157733,7 +158527,7 @@ const S=g.stars,r=g.renderer,tier=SJ.tier(g),t=SJ.worldT(g);
 const pxr=(r?r.H:720)/((g.settings.fov||75)*Math.PI/180);
 UF.view[0]=tier;UF.view[1]=pxr;UF.view[2]=g.time||0;UF.view[3]=1;
 UF.jump[0]=0;UF.jump[1]=1;UF.jump[2]=0;UF.jump[3]=0;
-UF.pt[3]=0;UF.pt[7]=0;UF.flood[3]=0;
+UF.pt[3]=0;UF.pt[7]=0;UF.flood[3]=0;UF.tun[0]=0;UF.tun[2]=1;
 let sysK=1,def=S.def;
 if(S.J){
 S.js+=dt;
@@ -157745,6 +158539,7 @@ if(!S.mouseTook){S.yaw=S.yaw0+dy*k;S.pitch=S.pitch0+(yp.pitch-S.pitch0)*k;}
 const bv=S.fade?0:j.beta;
 UF.jump[0]=bv;UF.jump[1]=1/Math.sqrt(1-bv*bv);UF.jump[2]=S.fade?0:j.band;
 UF.V.set(S.V);
+UF.tun[0]=S.fade?0:SJ.tunnel(j)*0.8;UF.tun[1]=S.js;UF.tun[2]=S.fade?1:SJ.bandK(bv);
 if(S.fade)UF.jump[3]=j.phase==='transit'?1:j.phase==='spin'?sstep((j.u-0.4)/0.6):1-sstep(j.u/0.7);
 
 if(j.phase==='arrive'&&S.toDef&&S.def!==S.toDef){S.def=S.toDef;S.sys=S.to;S.focus=S.arr.focus;S.camRel=S.arr.rel;}
@@ -157788,7 +158583,10 @@ UF.Sd[k*4]=60*sysK;UF.Sd[k*4+1]=k===0?S.flare||0:0;UF.Sd[k*4+2]=clamp(0.6*Math.s
 });
 if(inNeb){const h=norm(sub(P[s0.id],cam));UF.nebHot.set(norm([h[0]+0.6,h[1]+0.5,h[2]-0.3]));}
 let n=0;
-for(const b of def.bodies){
+
+
+if(S._ordF!==f||S._ordD!==def){S._ordF=f;S._ordD=def;S._ord=def.bodies.filter(b=>b===f||b.parent===f.id).concat(def.bodies.filter(b=>b!==f&&b.parent!==f.id));}
+for(const b of S._ord){
 if(b.kind==='star'||n>=12)continue;
 const rel=sub(P[b.id],cam),R=b.R/L64;
 UF.P[n*4]=rel[0]*U;UF.P[n*4+1]=rel[1]*U;UF.P[n*4+2]=rel[2]*U;UF.P[n*4+3]=R*U;
@@ -157937,7 +158735,12 @@ const S=g.stars;if(!S|| !S.def)return false;
 const moon=S.def.bodies.find(b=>b.parent===S.focus.id);if(!moon)return false;
 const t=SJ.worldT(g);moon.phase=0;
 const P=SJ.place(S.def,t),pF=P[S.focus.id],sDir=norm(sub(P[S.def.bodies[0].id],pF)),mDir=norm(sub(P[moon.id],pF));
-const want=rotY(sDir,(deg||18)*Math.PI/180);
+
+
+const R=S.focus.R/L64,am=moon.orbit.a/L64,cDir=norm(S.camRel);
+const Qd=rotY(norm(add(mul(sDir,0.55),mul(cDir,0.45))),(deg||0)*Math.PI/180),Q=mul(Qd,R*1.02),qs=dot(Q,sDir);
+const sk= -qs+Math.sqrt(Math.max(0,qs*qs-dot(Q,Q)+am*am));
+const want=norm(add(Q,mul(sDir,sk)));
 moon.phase=Math.atan2(want[2],want[0])-Math.atan2(mDir[2],mDir[0]);
 return moon.id;
 },
@@ -158123,6 +158926,23 @@ if(on&&vis.includes(i)&& !s.home){X.strokeStyle='#ffffffb0';X.lineWidth=1;X.begi
 X.globalAlpha=1;
 }
 
+const RT=M.g&&M.g.meta&&M.g.meta.stars&&Array.isArray(M.g.meta.stars.route)?M.g.meta.stars.route:[];
+if(RT.length>1){
+X.strokeStyle='#ffcf6acc';X.lineWidth=1.8;X.setLineDash([]);X.beginPath();
+let on=false;
+for(const i of RT){if(!(P.z[i]>=1)){on=false;continue;}on?X.lineTo(P.x[i],P.y[i]):X.moveTo(P.x[i],P.y[i]);on=true;}
+X.stroke();
+X.fillStyle='#ffcf6a';for(const i of RT)if(P.z[i]>=1){X.beginPath();X.arc(P.x[i],P.y[i],2.4,0,Math.PI*2);X.fill();}
+}
+const NX=VR.Exo?VR.Exo.interesting(N,M.here,vis,range):null;
+M.next=NX;
+if(NX&&P.z[NX.idx]>=1){
+const x=P.x[NX.idx],y=P.y[NX.idx],r=11;
+X.strokeStyle='#ffd36a';X.lineWidth=2;X.beginPath();X.moveTo(x,y-r);X.lineTo(x+r,y);X.lineTo(x,y+r);X.lineTo(x-r,y);X.closePath();X.stroke();
+X.setLineDash([2,6]);X.strokeStyle='#ffd36a88';X.lineWidth=1.2;X.beginPath();X.moveTo(P.x[M.here],P.y[M.here]);X.lineTo(x,y);X.stroke();X.setLineDash([]);
+}
+
+
 X.font='600 12px system-ui,sans-serif';X.textBaseline='middle';
 const label=(i,col,txt)=>{if(P.z[i]<1)return;X.fillStyle='#000a';const w=X.measureText(txt).width;X.fillRect(P.x[i]+9,P.y[i]-8,w+6,16);X.fillStyle=col;X.fillText(txt,P.x[i]+12,P.y[i]);};
 const near=G().systemsNear(N,N.list[M.here].p,range);
@@ -158136,7 +158956,8 @@ X.setLineDash([5,5]);X.strokeStyle=ok?'#7fd4ffaa':'#ff9a7a88';X.lineWidth=1.2;X.
 X.strokeStyle='#fff';X.lineWidth=1.5;X.beginPath();X.arc(P.x[i],P.y[i],8,0,Math.PI*2);X.stroke();
 label(i,'#fff',N.list[i].name+' · '+fmt(d)+' '+T('g.stars.ly'));
 }
-root.querySelector('#smWhere').textContent=T('g.stars.mapWhere',{name:N.list[M.here].name,n:near.length-1,ly:range,all:N.list.length});
+if(NX&&P.z[NX.idx]>=1)label(NX.idx,'#ffd36a',T('g.stars2.next',{name:NX.name,ly:fmt(NX.d),why:T('g.stars2.why.'+NX.why)}));
+root.querySelector('#smWhere').textContent=T('g.stars.mapWhere',{name:N.list[M.here].name,n:near.length-1,ly:range,all:N.list.length})+(RT.length>1?' · '+T('g.stars2.route',{n:RT.length-1}):'');
 }
 
 
@@ -162043,6 +162864,189 @@ if(i&&ui&& !ui.typing&& !ui.screen&& !(this.starships&&this.starships.pilot)&&i.
 return play0.call(this,dt);
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const SJ=VR.StarJump,E=VR.Exo,U=VR.Universe,G=VR.Galaxy;
+if(!SJ|| !SJ.page|| !E|| !U)return;
+const X2=VR.StarExo={cur:null};
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+const ss=(a,b,x)=>{let t=(x-a)/(b-a);t=t<0?0:t>1?1:t;return t*t*(3-2*t);};
+const lumOf=(c)=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+const colOf=(hex)=>{const c=G.lin(hex),l=lumOf(c)||1;return[c[0]/l,c[1]/l,c[2]/l];};
+
+
+const FAKE={id:'_exo',dir:[0,-1,0],ang:1e-6,phase:0,pole:[0,1,0]},NOB=[];
+const OUT={sun:{dir:[0,1,0],ang:0.005,el:0},bodies:NOB,parent:FAKE,eclipse:0,_byId:null};
+let IN=undefined;
+const SK={sun:[0,1,0],sun2:[0,1,0]};
+const base=U.localSky;
+U.localSky=function(dim,pos,t,out){
+const x=typeof dim==='string'&&dim[0]==='x'?SJ.exoStar(dim):null;
+if(!x|| !x.pl)return base.call(this,dim,pos,t,out);
+IN=base.call(this,dim,pos,t,IN);
+if(!IN)return null;
+const s=E.sky(x.def,x.pl,t,SK);
+const o=out&&out.exo?out:OUT;
+o.sun.dir[0]=s.sun[0];o.sun.dir[1]=s.sun[1];o.sun.dir[2]=s.sun[2];o.sun.ang=s.ang;o.sun.el=Math.asin(clamp(s.sun[1],-1,1));
+o.bodies=NOB;o.parent=FAKE;o.eclipse=0;o._byId=null;o.dim=dim;o.lat=IN.lat;o.lon=IN.lon;o.exo=s;
+return o;
+};
+X2.sky=SK;
+
+
+const SUN=[2.85,2.9,3.05],SUN2U=new Float32Array(4),SUN2C=new Float32Array(4);
+const wrapBS=()=>{
+const BS=VR.BodySky;if(!BS||BS.stars2Wrapped)return;
+BS.stars2Wrapped=true;
+const base2=BS.compute;
+BS.compute=function(dim,eye,tt,o){
+const r=base2.call(this,dim,eye,tt,o);
+const x=r&&typeof dim==='string'&&dim[0]==='x'?SJ.exoStar(dim):null;
+if(!x|| !x.pl)return r;
+const st=x.def.star,s=r.raw&&r.raw.exo?r.raw.exo:E.sky(x.def,x.pl,tt,SK),L=r.light;
+
+
+
+const tint=colOf(st.color),Hs=colOf('#dddeff');
+const ex=st.T<3900? -0.3:st.T<5200?0.1:0;
+const kx=[0,1,2].map(i=>Math.pow(tint[i]/Hs[i],ex));
+const hot=st.T>=7500?1:0;
+L.sunColor=L.sunColor.map((v,i)=>v*kx[i]*(1+0.3*hot));
+L.ambSky=L.ambSky.map((v,i)=>v*kx[i]*(1-0.25*hot));
+L.far=L.far.map((v,i)=>v*kx[i]);
+r.sky.sunCol=r.sky.sunCol.map((v,i)=>v*kx[i]);
+
+const S2=r.sky.sun2=SUN2U,C2=r.sky.sun2c=SUN2C;
+let sun2=null;
+if(s.has2){
+const c2=colOf(s.color2),d=s.sun2;
+S2[0]=d[0];S2[1]=d[1];S2[2]=d[2];S2[3]=Math.max(s.ang2,0.0012);
+const rad=60*clamp(Math.pow(s.T2/st.T,2),0.15,2);
+C2[0]=c2[0]*rad;C2[1]=c2[1]*rad;C2[2]=c2[2]*rad;C2[3]=clamp(Math.sqrt(s.k2)*0.9,0.03,1.2);
+
+const up=ss(-0.03,0.06,d[1]);
+if(s.k2>0.02&&up>0){
+const c1=tint,sc=Hs.map((h,i)=>Math.pow(c2[i]/h,0.6)/Math.pow(c1[i]/h,0.6));
+sun2=[d[0],d[1],d[2],up,SUN[0]*s.k2*sc[0]*up,SUN[1]*s.k2*sc[1]*up,SUN[2]*s.k2*sc[2]*up];
+L.ambSky=L.ambSky.map((v,i)=>v+sun2[4+i]*0.035);
+}
+}else{S2[3]=0;C2[3]=0;}
+
+
+const rg=E.ring(x.def,x.pl);
+if(rg){
+const ph=s.phi;
+r.sky.par=[0,-1,0,1.0005];r.sky.pole=[0,Math.sin(ph),-Math.cos(ph),1];r.sky.parX=[1,0,0,0];r.sky.parK=[-1,0,0,s.ang];
+r.sky.lum[0]=Math.min(1,r.sky.lum[0]*1.2);
+}
+r.exo2={sun2,ring: !!rg,sig:E.signature(x.def,x.pl),day:s.day,locked:s.locked,T:st.T,k2:s.k2,sep:s.sep};
+if(VR.game&&dim===VR.game.dim)X2.cur={dim,sun2,exo:r.exo2};
+return r;
+};
+
+const un0=BS.uniforms;
+const Z4=new Float32Array(4);
+BS.uniforms=function(gl,u,S){
+un0.apply(this,arguments);
+if(u.u_bsSun2)gl.uniform4fv(u.u_bsSun2,(S&&S.sun2)||Z4);
+if(u.u_bsSun2C)gl.uniform4fv(u.u_bsSun2C,(S&&S.sun2c)||Z4);
+};
+};
+wrapBS();
+
+
+X2.want=(r)=>{
+const g=VR.game,c=X2.cur;
+return!!(g&&c&&c.sun2&&g.dim===c.dim&&r&&r.q&&r.q.hshadow&& !r.q.lite&&(!g.settings||g.settings.sun2!==false));
+};
+if(VR.GL&& !VR.GL.__stars2){
+const prev=VR.GL.defineHook||null;
+VR.GL.defineHook=(name,defines)=>{
+const d=prev?prev(name,defines):(defines||[]);
+if((name==='terrain'||name==='terrainCut')&&X2.built)return d.concat(['SUN2']);
+return d;
+};
+VR.GL.__stars2=true;
+}
+const Rn=VR.Renderer;
+if(Rn&& !Rn.prototype.__stars2){
+const render0=Rn.prototype.render;
+Rn.prototype.render=function(F){
+const w=X2.want(this);
+if(w!== !!X2.built){X2.built=w;this.buildPrograms();}
+return render0.call(this,F);
+};
+const common0=Rn.prototype.common;
+Rn.prototype.common=function(p,Ev){
+common0.call(this,p,Ev);
+if(p.u.u_sun2D){
+const s=X2.cur&&X2.cur.sun2;
+if(s){this.gl.uniform4f(p.u.u_sun2D,s[0],s[1],s[2],s[3]);this.gl.uniform4f(p.u.u_sun2C,s[4],s[5],s[6],0);}
+else{this.gl.uniform4f(p.u.u_sun2D,0,-1,0,0);this.gl.uniform4f(p.u.u_sun2C,0,0,0,0);}
+}
+};
+Rn.prototype.__stars2=true;
+}
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'sun2',g:'img',sec:'show',t:'switch',lab:'g.set.sun2',tip:'g.set.sun2.tip',cost:'low',def:true});
+
+
+const route=(g)=>{const m=g.meta;if(!m.stars)m.stars={v:[]};if(!Array.isArray(m.stars.route))m.stars.route=[];return m.stars.route;};
+X2.route=route;
+X2.push=(g,idx)=>{const r=route(g);if(r[r.length-1]!==idx)r.push(idx);if(r.length>64)r.splice(0,r.length-64);};
+const enter0=SJ.enter;
+SJ.enter=function(g,idx,o){
+const first= !!(g&&g.meta&& !(SJ.visited(g).includes(idx)));
+const ok=enter0.apply(this,arguments);
+if(!ok)return ok;
+if(!route(g).length)X2.push(g,0);
+X2.push(g,idx);
+if(first&& !(g.meta&&g.meta.guest)){
+const S=g.stars,nm=S&&S.def?SJ.nameOf(S.def.name):'';
+if(g.codex&&g.codex.event)g.codex.event('stars');
+if(VR.Adventure&&VR.Adventure.award)VR.Adventure.award('system',{id:'x'+idx});
+if(g.ui&&g.ui.chatLine&& !(o&&o.quiet))g.ui.chatLine(T('g.stars2.first',{name:nm}),'#ffe08a');
+X2.lastFirst=idx;
+}
+return ok;
+};
+const jump0=SJ.jump;
+SJ.jump=function(g,idx){const ok=jump0.apply(this,arguments);if(ok&&idx===0)X2.push(g,0);return ok;};
+
+const go0=VR.Travel&&VR.Travel.go;
+X2.said='';
+X2.landLine=function(g){
+const x=g&&g.dim&&g.dim[0]==='x'?SJ.exoStar(g.dim):null;if(!x|| !x.pl||X2.said===g.dim)return;
+X2.said=g.dim;
+const sig=(g.meta.universe&&g.meta.universe.xgen>=2)?E.signature(x.def,x.pl):null,out=[];
+if(sig)out.push(T('g.stars2.land.'+sig));
+if(E.ring(x.def,x.pl))out.push(T('g.stars2.ring'));
+if(x.def.star2&&x.def.star2.close)out.push(T('g.stars2.sun2'));
+if(out.length&&g.ui&&g.ui.chatLine)g.ui.chatLine(out.join(' '),'#c9b8ff');
+};
+void go0;
+const pf0=VR.Game.prototype.playFrame;
+VR.Game.prototype.playFrame=function(dt){
+if(this.dim&&this.dim[0]==='x'&&X2.said!==this.dim&&this.state==='play'&&this.player)X2.landLine(this);
+return pf0.call(this,dt);
+};
+})(VR);
 
 
 

@@ -37,6 +37,7 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels',
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar: the Hangar Hall's and the Gate Temple's pieces (vgen 14), the last blocks
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies2'); SHARED.splice(SHARED.indexOf('gen_body') + 1, 0, 'gen_body2'); MAIN.splice(MAIN.indexOf('bodysky'), 0, 'atmo_lut'); MAIN.push('bodylife2');   // u-moons2: Zinnober's blocks (after t-hangar's), the three new kinds, the air LUTs, their life
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'fields_blocks'); SHARED.splice(SHARED.indexOf('gen_body2') + 1, 0, 'gen_rubble'); MAIN.push('fields'); MAIN.push('fields2');   // u-fields: carbon_rubble (after ocker_dust), the rubble bodies and their dims, VR.Fields (the ring, the cloud tops, the swarm, the boots)
+SHARED.splice(SHARED.indexOf('blocks4'), 0, 'exo_blocks'); SHARED.push('exoworld'); TEX.splice(TEX.indexOf('tex_body') + 1, 0, 'tex_exo'); MAIN.push('starexo');   // u-stars2: the exo blocks (after u-fields' glowspar), VR.Exo (after galaxy), their textures, the landed sky of other stars
 MAIN.push('../shared/story', 'regie', 'story_art', 'story');   // (a-story2: story_art — the speakers' faces, the Eiswächter's model; before the player)
 MAIN.push('regie_acts');   // a-regie: the Regie's own acts — the adventurer's first encounter (after foes, liberate, funke and the Regie)   // a-story: the book (src/shared/story.js — pure, main thread only), die Regie, the story's player (after funke, quests, liberate, ctx and the space scene, whose parts it uses)
 MAIN.push('ux');   // e-ux: VR.UX (src/main/ux.js) — the UI scale, the key-hint strip, the first minute's hints, the settings' search; last: it wraps ui.js and game.js
@@ -45,7 +46,7 @@ MAIN.push('konvoi');
 MAIN.splice(MAIN.indexOf('ui'), 0, 'pickfind', 'stamp'); MAIN.push('buildfx', 'showcase');   // a-builder: the picker's search, the stamps (pure), then the placement's pop, the picker, the stamp ghost (wraps player, ui, gadgets, game) and the showcase (wraps photomode)   // a-konvoi: VR.Konvoi (src/main/konvoi.js) — Mitreisen, the world on the wire, together in the Abenteuer, the roster and the emote wheel (last: it wraps mp.js, cruise.js, liberate.js and story.js)   // f-first: VR.FirstLook (src/main/firstlook.js) — the pause menu in two steps, one prompt per key, readable start texts (after ux: it wraps ui.js's pause last)
 MAIN.push('../shared/rpg', 'rpg', 'rpg_boss');
 MAIN.push('rpg_boss2');   // a-boss2: the boss fight as a cinematic experience (src/main/rpg_boss2.js: the arena, the entrance, the decals, the wave, the pedestal, the map) — after rpg_boss: it wraps it   // a-rpg: VR.RPG (src/shared/rpg.js — pure, main thread only), the character screen, gear, the conquest map and the loot burst (src/main/rpg.js), Der Turmgänger (src/main/rpg_boss.js) — last: they wrap adventure.js, foes.js and liberate.js
-SHARED.splice(SHARED.indexOf('blocks4'), 0, 'lifeblocks'); MAIN.push('ferries');   // a-life: the ferry dock and the grow lamp (the last blocks, after u-fields'), VR.Ferries (src/main/ferries.js: the moons' settlements, the ferries, the traffic between the worlds — after padlife, ctx, the space scene, the star map and liberate)
+SHARED.splice(SHARED.indexOf('blocks4'), 0, 'lifeblocks'); MAIN.push('ferries');   // a-life: the ferry dock and the grow lamp (the last blocks, after u-stars2's exo blocks), VR.Ferries (src/main/ferries.js: the moons' settlements, the ferries, the traffic between the worlds — after padlife, ctx, the space scene, the star map and liberate)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
@@ -127,7 +128,8 @@ STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'foeblocks');   // a-foes:
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar (after the Leuchtfeuer)
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'bodies2');   // u-moons2 (after t-hangar's pieces)
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'fields_blocks');   // u-fields (after u-moons2's)
-STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'lifeblocks');   // a-life (after u-fields')
+STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'exo_blocks');   // u-stars2 (after u-fields')
+STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'lifeblocks');   // a-life (after u-stars2's exo blocks)
 const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']) + '\n' + uiShared;   // (uiShared: the language module and its tables — the choice is shared with the game)
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');

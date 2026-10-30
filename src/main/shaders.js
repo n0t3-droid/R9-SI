@@ -651,6 +651,10 @@ ${/* u-moons1: the sky over an airless body (space_shaders.js, BODYSKY only; a J
 // Costs a few texel fetches per sunlit pixel and no extra geometry pass — shadows for every PC.
 uniform highp sampler2D u_hmap;
 uniform vec4 u_hsh;   // x: how far rays march, y: highest top loaded, z: softness, w: unused
+#ifdef SUN2
+uniform vec4 u_sun2D;   // u-stars2: the companion of a pair (starexo.js) — unit direction, its part over the horizon
+uniform vec4 u_sun2C;   // its light (rgb)
+#endif
 float hShadow(vec3 lp, vec3 n, vec3 L) {
   if (L.y < 0.02) return 1.0;
   vec3 p = lp + n * 0.07;
@@ -1277,6 +1281,10 @@ void main() {
   sh *= cloudShadow(v_localPos + vec3(u_camInt));   // t-motion: cloud shadow (t-light2 multiplies it into its sun term)
 #endif
   vec3 direct = lc * ndl * sh * outdoors;
+#if defined(SUN2) && defined(HSHADOW)
+  // u-stars2: the second sun of a binary world — its own light and its own heightmap shadow (two shadows)
+  if (u_sun2D.w > 0.0 && !noshade) direct += u_sun2C.rgb * max(dot(n, u_sun2D.xyz), 0.0) * hShadow(v_localPos, N, u_sun2D.xyz) * outdoors;
+#endif
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
 #ifdef LIGHT2
   // t-light2: the sky's light from above, the ground's bounce from below (the shade cool, its underside warm)
