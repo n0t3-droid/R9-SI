@@ -102,4 +102,21 @@ console.log('e · ⚙ Einfach, the texts');
   const D = V.I18N.dict; let missing = 0; for (const kk of F.KEYS) if (!(D.de && D.de[kk]) || !(D.en && D.en[kk])) missing++;
   check(missing === 0, 'every f-first2 text in both tables (' + F.KEYS.length + ')');
 }
+
+console.log('f · W on a slow machine: the player keeps the wall clock (≤ 0.5 s a frame) and a tap between two frames counts');
+{
+  check(F.catchSteps && F.catchSteps(0.016, 0.016).length === 0 && F.catchSteps(0.1, 0.1).length === 0, 'a fast frame: no extra step (Very Low unchanged)');
+  const s6 = F.catchSteps(6, 0.1), sum = s6.reduce((a, b) => a + b, 0.1);
+  check(s6.length === 4 && Math.abs(sum - F.CATCH_MAX) < 1e-9 && s6.every((x) => x <= 0.1 + 1e-9), 'a 6-s frame: ' + s6.length + ' extra steps, ' + sum.toFixed(2) + ' s of walking (before 0.10)');
+  check(F.catchSteps(30, 0.1).length === 0, 'a stall over ' + F.CATCH_GAP + ' s (a pause, a load) is not walked');
+  // a fake player and input: the extra steps see no mouse look, no click, no key press twice
+  const inp = { keys: new Set(), pressed: new Set(['KeyW']), doubleTap: new Set(), mouse: { dx: 30, dy: 4, wheel: 0, clicked: [true, false, false] } };
+  const seen = [];
+  const pl = { game: { f2gap: 0.35 }, update(dt, I) { seen.push({ dt, w: I.keys.has('KeyW'), dx: I.mouse.dx, hit: I.pressed.size, clk: I.mouse.clicked[0] }); } };
+  F.stepPlayer(pl, pl.update, 0.1, inp);
+  const ex = seen.slice(1);
+  check(seen.length === 4 && seen[0].dx === 30 && seen[0].hit === 1 && seen[0].clk, 'the frame\'s own step reads the mouse, the press and the click (' + seen.length + ' steps)');
+  check(ex.every((e) => e.dx === 0 && e.hit === 0 && !e.clk && e.w), 'the extra steps: no look, no press, no click — W still held');
+  check(inp.mouse.dx === 30 && inp.pressed.has('KeyW') && inp.mouse.clicked[0] && !inp.keys.has('KeyW'), 'the input given back as it was (W tapped and let go between the frames: not held after)');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

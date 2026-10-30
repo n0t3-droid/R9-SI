@@ -244,11 +244,46 @@
     const c = document.getElementById('gl'); if (c && c.focus) { try { if (!c.hasAttribute('tabindex')) c.setAttribute('tabindex', '-1'); c.focus({ preventScroll: true }); } catch (e) { /* no focus */ } }
   };
 
+  // 3b · W on a slow machine (critic_ux at ~0.2 fps: a 1-s W met no frame, and a frame walked 0.1 s): the player keeps
+  // the wall clock — a slow frame walks up to CATCH_MAX s in steps of ≤ STEP (the extra steps read no look, no press, no
+  // click) — and a movement key tapped and let go between two frames counts for the next one. A fast frame: no step.
+  F.CATCH_MAX = 0.5; F.STEP = 0.1; F.CATCH_GAP = 10;
+  F.MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space'];
+  F.catchSteps = function (gap, dt) {
+    const out = []; if (!(gap > dt + 0.02) || gap > F.CATCH_GAP) return out;
+    let rest = Math.min(gap, F.CATCH_MAX) - dt;
+    while (rest > 1e-6) { const s = Math.min(F.STEP, rest); out.push(s); rest -= s; }
+    return out;
+  };
+  F.stepPlayer = function (pl, upd, dt, I) {
+    const added = [];
+    if (I && I.keys && I.pressed) for (const k of F.MOVE_KEYS) if (I.pressed.has(k) && !I.keys.has(k)) { I.keys.add(k); added.push(k); }
+    try {
+      const r = upd.call(pl, dt, I);
+      const steps = F.catchSteps(pl.game && pl.game.f2gap || 0, dt);
+      if (steps.length && I && I.mouse) {
+        const m = I.mouse, sv = { dx: m.dx, dy: m.dy, wheel: m.wheel, clicked: m.clicked, pressed: I.pressed, dbl: I.doubleTap, pp: I.padPressed, tp: I.tPressed };
+        m.dx = 0; m.dy = 0; m.wheel = 0; m.clicked = [false, false, false]; I.pressed = new Set(); I.doubleTap = new Set();
+        if (sv.pp) I.padPressed = new Set(); if (sv.tp) I.tPressed = new Set();
+        try { for (const s of steps) upd.call(pl, s, I); }
+        finally { m.dx = sv.dx; m.dy = sv.dy; m.wheel = sv.wheel; m.clicked = sv.clicked; I.pressed = sv.pressed; I.doubleTap = sv.dbl; if (sv.pp) I.padPressed = sv.pp; if (sv.tp) I.tPressed = sv.tp; }
+      }
+      return r;
+    } finally { for (const k of added) I.keys.delete(k); }
+  };
+  const P = VR.Player;
+  if (P && P.prototype.update && !P.prototype.update.__f2) {
+    const ou = P.prototype.update;
+    P.prototype.update = function (dt, input) { return F.stepPlayer(this, ou, dt, input); };
+    P.prototype.update.__f2 = true;
+  }
+
   // the frame hook: the play state's first frame (settle, let go), the pointer
   if (G && G.prototype.playFrame && !G.prototype.playFrame.__f2) {
     const op = G.prototype.playFrame;
     G.prototype.playFrame = function (dt) {
-      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); F.settle(this); }
+      if (this.f2meta !== this.meta) { this.f2meta = this.meta; F.letGo(); F.settle(this); this.f2t = 0; }
+      { const n = performance.now(); this.f2gap = this.f2t && !(this.ui && this.ui.screen) ? (n - this.f2t) / 1000 : 0; this.f2t = n; }
       const r = op.apply(this, arguments);
       try { F.pointFrame(this, dt); } catch (e) { /* the pointer waits */ }
       return r;
