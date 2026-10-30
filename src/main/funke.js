@@ -425,7 +425,7 @@ void main() {
     if (!document.getElementById('funkecss')) {
       const st = document.createElement('style'); st.id = 'funkecss';
       st.textContent = '#funkebub{position:absolute;left:0;top:0;max-width:min(330px,70vw);padding:6px 13px 8px;border-radius:15px;background:rgba(248,252,255,0.96);color:#16222e;font:600 15px/1.28 var(--font,sans-serif);box-shadow:0 5px 18px rgba(0,0,0,.30),0 0 0 2px rgba(70,232,255,.85),0 0 22px rgba(70,232,255,.45);pointer-events:none;display:none;z-index:28;will-change:transform}'
-        + '#funkebub b{display:block;font:700 10px/1.4 var(--display,sans-serif);letter-spacing:.12em;color:#0a9fc0;text-transform:uppercase}'
+        + '#funkebub b{display:block;font:700 12px/1.3 var(--display,sans-serif);letter-spacing:.12em;color:#0a9fc0;text-transform:uppercase}'
         + '#funkebub .pic{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle}#funkebub kbd{display:inline-block;min-width:16px;padding:0 4px;border:1px solid #9fb2c2;border-bottom-width:2px;border-radius:4px;font:700 11px/16px var(--font,sans-serif);text-align:center;background:#fff;color:#223}'
         + '#funkebub .x{pointer-events:auto;margin-left:8px;border:0;background:none;color:#7a8a99;font:700 13px sans-serif;cursor:pointer}'
         + '#funkebub:after{content:"";position:absolute;top:50%;margin-top:-7px;border:7px solid transparent}#funkebub.l:after{right:-13px;border-left-color:rgba(248,252,255,.96)}#funkebub.r:after{left:-13px;border-right-color:rgba(248,252,255,.96)}'
@@ -728,6 +728,8 @@ void main() {
       const bw = el.offsetWidth || 240, bh = el.offsetHeight || 50;
       let X = left ? sx - 26 - bw : sx + 26, Y = sy - bh / 2;
       X = clamp(X, 10, W - bw - 10); Y = clamp(Y, 10, H - bh - 10);
+      // (e-ux) never over the crosshair and its Aktion prompt: the bubble steps above them
+      if (X < W / 2 + 160 && X + bw > W / 2 - 160 && Y < H / 2 + 66 && Y + bh > H / 2 - 14) Y = Math.max(10, H / 2 - 18 - bh);
       if (!this.bx || Math.abs(this.bx[0] - X) >= 1 || Math.abs(this.bx[1] - Y) >= 1 || this.bx[2] !== left) { this.bx = [X, Y, left]; el.style.transform = 'translate(' + (X | 0) + 'px,' + (Y | 0) + 'px)'; el.className = left ? 'l' : 'r'; }
     }
     // Funke's voice: pentatonic blips from the line's hash, higher than the villagers'

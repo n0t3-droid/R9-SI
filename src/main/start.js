@@ -90,7 +90,7 @@
     for (const k of TILES) {
       const b = $(`#title .tile[data-tile="${k}"]`); if (!b) continue;
       const lbl = k === 'play' ? (ws === null ? '▶ …' : ws.length ? tl('play') : tl('first')) : tl(k);
-      $('.lbl', b).textContent = lbl;
+      $('.lbl', b).textContent = lbl.replace(/^[^\p{L}\p{N}\s]+\s+(?=\p{L})/u, '');   // (e-ux: the tile's picture is its icon — no second one in the word)
       $('.sub2', b).textContent = k === 'play' ? (last ? last.name : (ws && ws.length === 0 ? tx('start.myWorld', null, 'Meine Welt', 'My World') : '')) : k === 'bauen' ? tx('start.bauenSub', null, 'Häuser & Möbel setzen', 'Place houses & furniture') : k === 'erschaffen' ? tx('start.erschaffenSub', null, 'Haus · Fahrzeug · Figur …', 'House · vehicle · figure …') : tx('start.meinsSub', null, 'Favoriten · Designs · Welten', 'Favourites · designs · worlds');
       b.title = k === 'play' ? (last ? tx('start.playT', { n: last.name }, 'Weiter in „{n}“, wo du warst', 'Back into “{n}”, where you were') : tx('start.firstT', null, 'Macht deine erste Welt und bringt dich hinein', 'Makes your first world and takes you in')) : '';
       if (k === 'play') b.classList.toggle('pulse', !!(VR.Hints && VR.Hints.want('play')));

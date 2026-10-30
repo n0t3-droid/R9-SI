@@ -62,7 +62,7 @@ const smallText = (page) => page.evaluate(() => {
   return { min, at, n };
 });
 
-async function tour(label, w, h, settings, full) {
+async function tour(label, w, h, settings, full, card) {
   console.log(`${label} · ${w}×${h} — ${secs()}`);
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'de-DE' });
   await ctx.addInitScript((s) => { try { if (!localStorage.getItem('r9si.lang')) localStorage.setItem('r9si.lang', 'de'); if (!localStorage.getItem('r9si.settings')) localStorage.setItem('r9si.settings', JSON.stringify(s)); } catch (e) { /* */ } }, settings);
@@ -87,6 +87,7 @@ async function tour(label, w, h, settings, full) {
   await ev(() => VR.game.ui.act('newworld'));
   await wait(1200); await shot('create'); R.createText = await smallText(page);
   // the loading screen: the create button, then a picture as soon as #loading shows
+  if (card) { await ev((c) => { const b = document.querySelector('#cw_way [data-v="' + c + '"]'); if (b) b.click(); }, card); await wait(500); await shot('create_' + card); }
   await ev(() => { const b = document.querySelector('#create [data-act="docreate"]'); const n = document.getElementById('cw_seed'); if (n) n.value = '4242'; if (b) b.click(); else VR.game.createWorld({ name: 'UX', mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true, first: true }); });
   for (let i = 0; i < 40; i++) { await wait(250); if (await ev(() => VR.game.ui.screen === 'loading' || VR.game.state === 'play')) break; }
   await wait(1500); await shot('loading');
@@ -105,18 +106,22 @@ async function tour(label, w, h, settings, full) {
   }
   // the pause menu, the settings, their search
   await ev(() => VR.game.ui.pause()); await wait(900); await shot('pause'); R.pauseText = await smallText(page);
+  if (TAG === 'after') {
+    const pf = await ev(() => { const p = document.querySelector('#pause .panel').getBoundingClientRect(), bad = []; for (const b of document.querySelectorAll('#pause button')) { const r = b.getBoundingClientRect(); if (!r.width) continue; if (b.scrollWidth > b.clientWidth + 1 || r.bottom > innerHeight || r.top < 0) bad.push(b.textContent.trim().slice(0, 24)); } return { fit: p.top >= 0 && p.bottom <= innerHeight && p.right <= innerWidth, bad }; });
+    check(pf.fit && !pf.bad.length, `${label}: the pause menu fits the screen, every button's words show in full (${pf.bad.join(' · ') || 'all'})`);
+  }
   await ev(() => VR.game.ui.act('settings')); await wait(1200); await shot('settings'); R.setText = await smallText(page);
   if (full) {
     await ev(() => { const s = document.querySelector('#settings input[type=search], #settings .setsearch input, #setsearch'); if (s) { s.value = 'Schatten'; s.dispatchEvent(new Event('input', { bubbles: true })); } });
     await wait(900); await shot('settings_search');
   }
   if (TAG === 'after') {
-    const sc = await ev(async () => { const g = VR.game; const base = document.getElementById('hotbar').getBoundingClientRect().height; VR.UX.setScale(1.3); await new Promise(r => setTimeout(r, 300)); const big = document.getElementById('hotbar').getBoundingClientRect().height; VR.UX.setScale(1); return { base, big }; });
-    check(sc.big > sc.base * 1.15, `the UI scale reaches the HUD (hotbar ${sc.base.toFixed(0)} → ${sc.big.toFixed(0)} px at 130 %)`);
+    const sc = await ev(async () => { const hb = document.getElementById('hotbar'), r0 = hb.getBoundingClientRect(); VR.UX.setScale(1.3); await new Promise(r => setTimeout(r, 300)); const r1 = hb.getBoundingClientRect(); VR.UX.setScale(1); return { base: r0.height, big: r1.height, cx: r1.left + r1.width / 2, bottom: r1.bottom, W: innerWidth, H: innerHeight }; });
+    check(sc.big > sc.base * 1.15 && Math.abs(sc.cx - sc.W / 2) < 6 && sc.bottom <= sc.H, `the UI scale reaches the HUD (hotbar ${sc.base.toFixed(0)} → ${sc.big.toFixed(0)} px at 130 %, centre ${sc.cx.toFixed(0)} of ${sc.W}, bottom ${sc.bottom.toFixed(0)})`);
   }
   await ev(() => VR.game.ui.resume()); await wait(500);
   // the journal (J)
-  await ev(() => { if (VR.Quests && VR.Quests.journal) VR.Quests.journal(); }); await wait(1200); await shot('journal'); R.jText = await smallText(page);
+  await page.keyboard.press('KeyJ'); await wait(1200); await shot('journal'); R.jText = await smallText(page);
   await ev(() => { if (VR.Quests && VR.Quests.closeJournal) VR.Quests.closeJournal(); VR.game.ui.resume(); }); await wait(500);
   if (full) {
     // the photo mode
@@ -137,10 +142,10 @@ async function tour(label, w, h, settings, full) {
 }
 
 for (const r of RES) {
-  if (r === '720') await tour('bal720', 1280, 720, BAL, true);
+  if (r === '720') await tour('bal720', 1280, 720, BAL, true, process.env.CARD720 || '');
   if (r === '1080') await tour('bal1080', 1920, 1080, BAL, false);
 }
-if (process.env.VL !== '0') await tour('vl720', 1280, 720, POTATO, false);
+if (process.env.VL !== '0') await tour('vl720', 1280, 720, POTATO, false, TAG === 'after' ? 'gentle' : '');   // (after: the gentle Abenteuer — the ring, the Taler, the journal)
 fs.writeFileSync(SHOTS + 'ux_' + TAG + '.json', JSON.stringify(OUT, null, 1));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
