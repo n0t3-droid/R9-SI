@@ -81,6 +81,27 @@ await settle(60);
 const spawn = await ev(() => VR.game.player.pos.map(v => Math.round(v * 10) / 10));
 run.spawn = spawn;
 
+// ---------------------------------------------------------------- the frame: Very Low and High, the switches off | on
+await section('cost', async () => {
+  const C = {};
+  for (const pr of ['potato', 'high']) {
+    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
+    await settle(30); await step(20);
+    await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });   // (warm: the programs built)
+    const acc = { before: [], after: [] }; let draws = {};
+    for (const mode of ['before', 'after', 'after', 'before', 'before', 'after']) {
+      await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
+      const r = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 7; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; return { ms, draws: g.renderer.stats.draws | 0 }; });
+      acc[mode].push(...r.ms); draws[mode] = r.draws;
+    }
+    for (const mode of ['before', 'after']) { const a = acc[mode].sort((x, y) => x - y); C[pr + '_' + mode] = { ms: +a[a.length >> 1].toFixed(1), draws: draws[mode] }; }
+  }
+  await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
+  await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }); await settle(30);
+  run.cost = C; console.log('  ' + JSON.stringify(C));
+  check(C.potato_after.draws === C.potato_before.draws, `Very Low: the same draws (${C.potato_before.draws} | ${C.potato_after.draws}), ${C.potato_before.ms} | ${C.potato_after.ms} ms`);
+});
+
 // ---------------------------------------------------------------- the boss: hull from 60 m, the cracks
 await section('boss', async () => {
   const reg = await ev(() => {
@@ -223,29 +244,6 @@ await section('exo', async () => {
   await pair('Welt eines Roten Zwergs am Tag: Belichtung nach dem Himmel des Sterns (vorher | nachher)', 'exo', ['exo'], async () => { await step(240, 33); });
   run.exo = await ev(() => ({ expo: +VR.game.env.E.exposure.toFixed(3) }));
   console.log('  exposure after ' + JSON.stringify(run.exo));
-});
-
-// ---------------------------------------------------------------- the frame: Very Low and High, the switches off | on
-await section('cost', async () => {
-  const back = await ev(() => VR.game.dim);
-  if (back !== 'overworld') { await ev(() => { const g = VR.game; if (g.stars && g.stars.on && VR.StarJump.leave) VR.StarJump.leave(g); g.goHome ? g.goHome() : VR.Travel.go(g, { dim: 'overworld', via: 'cmd' }); }); for (let i = 0; i < 300; i++) { await step(10); const s = await ev(() => ({ d: VR.game.dim, st: VR.game.state })); if (s.d === 'overworld' && s.st === 'play') break; await wait(30); } }
-  await tp(spawn[0], spawn[1] + 2, spawn[2]); await settle(40);
-  const C = {};
-  for (const pr of ['potato', 'high']) {
-    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.tsr = false; g.settings.renderDist = 6; g.applySettings('*'); }, pr);
-    await settle(30); await step(20);
-    await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });   // (warm: the programs built)
-    const acc = { before: [], after: [] }; let draws = {};
-    for (const mode of ['before', 'after', 'after', 'before', 'before', 'after']) {
-      await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], mode === 'before');
-      const r = await ev(() => { const g = VR.game, gl = g.renderer.gl, ms = []; window.__norender = false; for (let i = 0; i < 7; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); gl.finish(); ms.push(performance.now() - t0); } window.__norender = true; return { ms, draws: g.renderer.stats.draws | 0 }; });
-      acc[mode].push(...r.ms); draws[mode] = r.draws;
-    }
-    for (const mode of ['before', 'after']) { const a = acc[mode].sort((x, y) => x - y); C[pr + '_' + mode] = { ms: +a[a.length >> 1].toFixed(1), draws: draws[mode] }; }
-  }
-  await off(['port', 'hull', 'cracks', 'lava', 'exo', 'ghost', 'pop', 'swarm'], false);
-  run.cost = C; console.log('  ' + JSON.stringify(C));
-  check(C.potato_after.draws === C.potato_before.draws, `Very Low: the same draws (${C.potato_before.draws} | ${C.potato_after.draws}), ${C.potato_before.ms} | ${C.potato_after.ms} ms`);
 });
 
 save();
