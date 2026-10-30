@@ -182,6 +182,9 @@
   class World {
     constructor(game, o) {
       this.game = game;
+      // e-perf2: in play a column's seam light spreads within this many ms a frame (seamStep; 0: at once, as before) —
+      // a seam was a 10–35 ms answer handler (the engine bench's flights); the takt (Ultra · Leicht) keeps its own budget
+      this.seamMs = 2;
       if (game.vents) game.vents.reset();   // a new world brings its own vents (vents.js)
       this.dim = o.dim || 'overworld';
       this.seed = o.seed >>> 0;
@@ -327,7 +330,7 @@
       // (at least one a frame); the queued jobs follow the player
       if (this.arrivals && this.arrivals.length) this.integrate(pcx, pcz, lcx, lcz, this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
       if (this.streamTakt && VR.UL && this.frame % 15 === 0) this.reprio(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, ux, uz, ahead);
-      if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
+      if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : this.seamBudget());
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
       if (off || (this.frame & 1)) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
@@ -435,7 +438,7 @@
       if (m.be) for (const [k2, v] of m.be) c.blockEntities.set(k2, v);
       if (m.chests && m.chests.length) for (const ch of m.chests) c.blockEntities.set(((ch[1] << 8) | ((ch[2] & 15) << 4) | (ch[0] & 15)), { type: 'chest', loot: ch[3] || 'dungeon', items: null });
       // seam light with ready neighbors (F9 · in the takt: the seeds now, the spreading a little a frame — seamStep)
-      if (this.streamTakt) this.seamQueue(c);
+      if (this.streamTakt || this.seamBudget() !== undefined) this.seamQueue(c);
       else { this.seamLight(c); this.flushChanged(); }
       for (const s of c.sec) { s.dirty = true; s.ver++; }
       // neighbor border sections need remesh
@@ -520,6 +523,9 @@
     // spreading seam wait to be meshed (seamHold), so no section is meshed twice; when the queue is empty the touched
     // sections are marked and the hold is lifted. A block edit finishes the spreading first (updateLight).
     seamPending() { return (this.sqT || 0) > (this.sqH || 0); }
+    // e-perf2: the seams' ms a frame outside the takt — in play only (the loading screen spreads them at once, as before);
+    // seamMs at 60 frames a second, more in a longer frame (frameDt, the game's dt: a share of the frame, ≤ 6 ×)
+    seamBudget() { return this.seamMs > 0 && this.game && this.game.state === 'play' ? this.seamMs * Math.min(6, Math.max(1, (this.frameDt || 0) * 60)) : undefined; }
     seamQueue(c) {
       let q = this.sq || (this.sq = new Int32Array(1 << 15)), qt = this.sqT || 0;
       if (!this.sqT) this.sqH = 0;
@@ -554,7 +560,7 @@
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const k = ckey(c.cx + dx, c.cz + dz); if (!hold.has(k)) hold.set(k, this.frame); }
       if (!this.seamPending()) this.seamDone();
     }
-    get SEAM_HOLD() { return 8; }
+    get SEAM_HOLD() { return this.streamTakt ? 8 : 20; }   // (e-perf2: outside the takt a seam may take a few more frames of 2 ms — a column at the edge of the view waits a third of a second at most rather than being meshed twice)
     // when its hold runs out (a burst of arrivals keeps the queue busy) the column takes the marks the spreading has left
     // on it so far, once: it is meshed with them, and the flush at the end of the spreading marks it again only if it was
     // touched after that (before: every touched section once more). It is not held again until the spreading is done.

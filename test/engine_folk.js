@@ -4,7 +4,8 @@
 // world loads (VR.Folk.warm(ms), game.loadingFrame).
 //  1. built in 3 ms slices: the same tables as built at once (every state)
 //  2. no slice much over its budget (the longest ≤ 40 ms: one state's shape can be a model built, on a loaded machine)
-//  3. a path asked for halfway finishes them at once and is the same path
+//  3. a path asked for halfway is the same path, and it builds only the states it meets (e-perf2: before, it finished the
+//     30 000 at once — run 1 of e-perf2's gate still found a 100–120 ms villages.goTo on Very Low)
 //   bash test/wt_run.sh engine_folk.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -33,6 +34,10 @@ F = fresh();
 if (F.warm) F.warm(0.2);
 const half = F.warmed ? !F.warmed() : false;
 const p1 = JSON.stringify(F.findPath(w, [0, 64, 0], [12, 64, 9], { max: 1800, partial: true }).path);
-check(half && p1 === p0 && F.warmed(), 'a path asked for halfway: the tables finished, the same path');
+check(half && p1 === p0 && !F.warmed(), 'a path asked for halfway: the same path, the tables not finished at once (only the states it met)');
+// a fresh one: a path alone, in a world of three states
+F = fresh();
+t0 = performance.now(); const p2 = JSON.stringify(F.findPath(w, [0, 64, 0], [12, 64, 9], { max: 1800, partial: true }).path); const tPath = performance.now() - t0;
+check(p2 === p0 && !F.warmed(), 'the first path of a session (no warming): the same path, without building every state\'s table', `${tPath.toFixed(1)} ms, at once ${tFull.toFixed(0)} ms`);
 console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

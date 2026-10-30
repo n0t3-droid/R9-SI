@@ -334,29 +334,40 @@
   // session — a frame of play. They are built a slice at a time while the world loads (V.warm, game.loadingFrame); a path
   // asked for before they are done finishes them at once, as before (not in play: a state may build a model, 40–90 ms —
   // the engine bench's Balanced flight counted more hitches with slices in play)
+  // e-perf2: and a path builds only the states it meets (255 = not yet known; fill), never the 30 000 at once — run 1 of
+  // e-perf2's gate still found a 100–120 ms villages.goTo when the loading screen had not finished them
+  function alloc() {
+    if (passC) return;
+    const n = R.T.type.length;
+    passC = new Uint8Array(n).fill(255); standC = new Uint8Array(n).fill(255); cachedN = 0;
+  }
+  function fill(s) {
+    const fl = R.T.flags[s], t = R.types[R.T.type[s]];
+    const kind = t && t.o.kind;
+    // pass: 1 free, 2 door/gate (openable), 3 water (slow), 0 blocked
+    if (!s) passC[s] = 1;
+    else if (fl & F.LAVA) passC[s] = 0;
+    else if (fl & F.FLUID) passC[s] = 3;
+    else if (kind === 'door' || kind === 'gate') passC[s] = 2;
+    else if (!(fl & F.SOLID)) passC[s] = (fl & F.PLANT) && t && /wheat|carrot|potato|beetroot|melon_stem|pumpkin_stem|berry/.test(t.name) ? 4 : 1;
+    else { const b = PH.collision(s); passC[s] = b.length === 0 ? 1 : 0; }
+    // stand: solid top (not fences / walls / 1.5-tall collisions)
+    if (s && (fl & F.SOLID) && !(fl & F.FLUID) && kind !== 'door' && kind !== 'gate' && kind !== 'fence' && kind !== 'wall') {
+      const b = PH.collision(s);
+      let top = 0; for (const bb of b) top = Math.max(top, bb[4]);
+      standC[s] = b.length && top <= 1.01 && top > 0.3 ? 1 : 0;
+    } else standC[s] = 0;
+  }
+  // one state's entries (s past the tables — a block registered later — as before: undefined)
+  const passOf = (s) => { const v = passC[s]; if (v !== 255) return v; fill(s); return passC[s]; };
+  const standOf = (s) => { const v = standC[s]; if (v !== 255) return v; fill(s); return standC[s]; };
   function caches(budgetMs) {
-    if (passC && cachedN >= passC.length) return true;
-    const n = passC ? passC.length : R.T.type.length;
-    if (!passC) { passC = new Uint8Array(n); standC = new Uint8Array(n); cachedN = 0; }
+    alloc();
+    const n = passC.length;
     const t0 = budgetMs !== undefined ? performance.now() : 0;
     for (; cachedN < n; cachedN++) {
       if (budgetMs !== undefined && performance.now() - t0 >= budgetMs) return false;   // (every state: one may build a model, up to 90 ms)
-      const s = cachedN;
-      const fl = R.T.flags[s], t = R.types[R.T.type[s]];
-      const kind = t && t.o.kind;
-      // pass: 1 free, 2 door/gate (openable), 3 water (slow), 0 blocked
-      if (!s) passC[s] = 1;
-      else if (fl & F.LAVA) passC[s] = 0;
-      else if (fl & F.FLUID) passC[s] = 3;
-      else if (kind === 'door' || kind === 'gate') passC[s] = 2;
-      else if (!(fl & F.SOLID)) passC[s] = (fl & F.PLANT) && t && /wheat|carrot|potato|beetroot|melon_stem|pumpkin_stem|berry/.test(t.name) ? 4 : 1;
-      else { const b = PH.collision(s); passC[s] = b.length === 0 ? 1 : 0; }
-      // stand: solid top (not fences / walls / 1.5-tall collisions)
-      if (s && (fl & F.SOLID) && !(fl & F.FLUID) && kind !== 'door' && kind !== 'gate' && kind !== 'fence' && kind !== 'wall') {
-        const b = PH.collision(s);
-        let top = 0; for (const bb of b) top = Math.max(top, bb[4]);
-        standC[s] = b.length && top <= 1.01 && top > 0.3 ? 1 : 0;
-      } else standC[s] = 0;
+      if (passC[cachedN] === 255) fill(cachedN);
     }
     return true;
   }
@@ -371,13 +382,13 @@
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
   // world: {getBlock}, from/to: [x,y,z] integer feet cells. opts: {max, kid, avoidCrops, near (stop within d)}
   V.findPath = function (w, from, to, opts) {
-    caches();
+    alloc();
     opts = opts || {};
     const max = opts.max || 2600, tall = opts.kid ? 1 : 2, near = opts.near || 0;
     const ox = from[0] - 1024, oz = from[2] - 1024;
     const key = (x, y, z) => ((x - ox) * 2048 + (z - oz)) * 256 + y;
-    const P = (x, y, z) => passC[w.getBlock(x, y, z)];
-    const Sd = (x, y, z) => standC[w.getBlock(x, y, z)];
+    const P = (x, y, z) => passOf(w.getBlock(x, y, z));
+    const Sd = (x, y, z) => standOf(w.getBlock(x, y, z));
     const free = (x, y, z) => { const a = P(x, y, z); if (!a) return 0; if (tall > 1 && !P(x, y + 1, z)) return 0; return a; };
     const cost = new Map(), came = new Map(), open = new Heap();
     const h = (x, y, z) => Math.abs(x - to[0]) + Math.abs(z - to[2]) + Math.abs(y - to[1]) * 1.2;
@@ -425,6 +436,6 @@
     if (!roadSet) { roadSet = new Uint8Array(R.T.type.length); for (const n of ['dirt_path', 'coarse_dirt', 'vx_floor_stone', 'stone_bricks', 'polished_andesite', 'cobblestone', 'mossy_cobblestone', 'smooth_sandstone', 'cut_sandstone', 'vx_floor_marble', 'vx_floor_checker', 'vx_floor_tile', 'packed_ice', 'landing_pad', 'vx_floor_plaza', 'vx_floor_plaza_line']) { const t = R.byName[n]; if (t) for (let s2 = t.base; s2 < t.base + t.nstates; s2++) roadSet[s2] = 1; } }
     return roadSet[s] === 1;
   };
-  V.passable = (s) => { caches(); return passC[s]; };
-  V.standable = (s) => { caches(); return standC[s]; };
+  V.passable = (s) => { alloc(); return passOf(s); };
+  V.standable = (s) => { alloc(); return standOf(s); };
 })(VR);
