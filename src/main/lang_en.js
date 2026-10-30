@@ -2891,5 +2891,17 @@
     'g.set.fields.tip': 'The ice chunks in the ring, the cloud decks over Amaranth and the rocks of the swarm. Off: the ring as a sheet only.',
     'g.codex.fields': ['The Rubble Swarm', 'Real belts are empty — this swarm is 100,000 times denser, a freshly broken family (fiction). On the small rocks almost nothing pulls: the anchor boots pull with 0.35 m/s², a jump carries you 39 m high and lasts 17 seconds. Without them a hop is enough to drift away.', 'Land on a rock and jump.'],
     // ---- u-fields end
+    // ---- u-fields2
+    'g.fields2.ring': "Amaranth's ring",
+    'g.fields2.ringIn': "Cruise drive to the ring: first to Amaranth, then down into the ice sheet (~{s} s)",
+    'g.fields2.clouds': "Down to Amaranth's clouds: 15 km over the tops, 5.8 km/s",
+    'g.fields2.cloudsIn': "Above the clouds! Below 1 km the autopilot pulls up — G picks a new target.",
+    'g.fields2.swarmIn': "Course for the Rubble Swarm: 60 rocks within 30 km",
+    'g.fields2.land': "In the Rubble Swarm. Look at a rock and press V to land.",
+    'g.fields2.noRock': "No rock in sight — turn toward one and press V.",
+    'g.fields2.hop': "Hop to {name} ({km} km)",
+    'g.fields2.hopFar': "Look at a neighbouring rock in the sky, then G.",
+    'g.codex.m.spar': ["Rock Prospector", "Mine nickel iron, ice nodules or glowspar on a rock of the swarm — the Hangar buys them.", "Land in the Rubble Swarm and dig in the craters."],
+    // ---- u-fields2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
