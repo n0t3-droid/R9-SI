@@ -231,36 +231,49 @@ for (const pl of PLACES) {
 }
 save();
 
-// /raum herz on this build against its own plaza (space0.mjs's view: day 2, noon, toward Helia)
+// (v0.53 review) the orbit (/raum herz) on both builds, alternated between them like the places; the ring (/raum ring, inside
+// the sheet, fixH 2 as fields.mjs) on this build against its own plaza (no ring before v0.53); per-round ratios kept
 const A0 = A, B0 = B;
+const enterRaum = async (A, cmd, key, setup) => {
+  await A.ev(([cmd, setup]) => { const g = VR.game, p = g.player, SS = VR.SpaceScene, BT = VR.BodyTex; g.env.day = 2; g.env.ticks = 6000; if (setup && VR.Fields) Object.assign(VR.Fields, setup); if (cmd === 'herz' && SS && BT) { const sp = BT.toSphere(p.pos[0], p.pos[2]), e = SS.ephemeris(SS.worldTime(2, 6000), {}), s = SS.localSun(e, sp[0], sp[1]); p.yaw = p.viewYaw = SS.yawFor(s.az - 0.3, p.pos[0], p.pos[2]); } g.chat('/raum ' + cmd); }, [cmd, setup || null]);
+  const t1 = Date.now(); let st = null;
+  for (let i = 0; i < 600; i++) {
+    await A.step(3);
+    st = await A.ev(() => { const g = VR.game, SS = VR.SpaceScene, need = (SS && SS.cur_need) || []; return g.space ? { ready: g.space.ready, frames: g.space.frames, done: need.filter(s => s.done).length, need: need.length } : { closed: true }; });
+    if (st.closed || (st.ready && st.done === st.need && st.frames >= 3)) break;
+    if (Date.now() - t1 > 300000) break;
+    await A.wait(40);
+  }
+  await A.ev((key) => { window[key] = window.__F; }, key);
+  const m = await picture(A, key, SHOTS + `${PFX}_${key.replace('__F_', '')}_${TAG[A.tag]}.png`, 2);
+  const fs0 = await A.ev(() => VR.Fields && VR.Fields.stats ? { chunks: VR.Fields.stats.chunks } : null).catch(() => null);
+  await A.ev(() => { if (VR.game.space) VR.game.chat('/raum aus'); }).catch(() => {});
+  for (let i = 0; i < 40; i++) { await A.step(2); if (!(await A.ev(() => !!VR.game.space))) break; }
+  return { st, shownS: r1((Date.now() - t1) / 1000), draws: m.draws, err: m.err, fields: fs0 };
+};
+const ratioMed = (a, b) => r3(med(a.map((x, i) => x / b[i])));
 rec.spaceBy = {};
-if (!process.env.NO_SPACE) for (const A of [A0, B0]) {
+if (!process.env.NO_SPACE) {
   try {
-    await A.ev(() => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); const ui = VR.game.ui, cl = ui.chatLine.bind(ui); window.__lines = []; ui.chatLine = (t, c) => { window.__lines.push(String(t)); return cl(t, c); }; });
-    await A.ev(() => { const g = VR.game, p = g.player, SS = VR.SpaceScene, BT = VR.BodyTex; g.env.day = 2; g.env.ticks = 6000; if (SS && BT) { const sp = BT.toSphere(p.pos[0], p.pos[2]), e = SS.ephemeris(SS.worldTime(2, 6000), {}), s = SS.localSun(e, sp[0], sp[1]); p.yaw = p.viewYaw = SS.yawFor(s.az - 0.3, p.pos[0], p.pos[2]); } g.chat('/raum herz'); });
-    const t1 = Date.now(); let st = null;
-    for (let i = 0; i < 600; i++) {
-      await A.step(3);
-      st = await A.ev(() => { const g = VR.game, SS = VR.SpaceScene, need = (SS && SS.cur_need) || []; return g.space ? { ready: g.space.ready, frames: g.space.frames, done: need.filter(s => s.done).length, need: need.length } : { closed: true }; });
-      if (st.closed || (st.ready && st.done === st.need && st.frames >= 3)) break;
-      if (Date.now() - t1 > 300000) break;
-      await A.wait(40);
-    }
-    await A.ev(() => { window.__F_space = window.__F; });
-    const m = await picture(A, '__F_space', SHOTS + `${PFX}_space_herz_${TAG[A.tag]}.png`, 2);
-    const cp = [], cs = [], wp = [], ws = [];
+    const sa = await enterRaum(A0, 'herz', '__F_orbit'), sb = await enterRaum(B0, 'herz', '__F_orbit');
+    const ring = await enterRaum(A0, 'ring', '__F_ring', { fixH: 2 });
+    console.log(`  orbit shown: cur ${JSON.stringify(sa)} · prev ${JSON.stringify(sb)} · ring ${JSON.stringify(ring)} (${secs()})`);
+    const O = { cur: [], prev: [], curCpu: [], prevCpu: [], ring: [], ringCpu: [], plz: [], plzCpu: [] };
     for (let rd = 0; rd < ROUNDS; rd++) {
-      const order = rd % 2 ? ['__F_space', '__F_plaza'] : ['__F_plaza', '__F_space'];
-      for (const key of order) { const c = await cost(A, key, 2, N); if (key === '__F_space') { cs.push(c.cpuMs); ws.push(c.wallMs); } else { cp.push(c.cpuMs); wp.push(c.wallMs); } }
+      const order = rd % 2 ? [B0, A0] : [A0, B0];
+      for (const P of order) { const c = await cost(P, '__F_orbit', 2, N); O[P.tag].push(c.wallMs); O[P.tag + 'Cpu'].push(c.cpuMs); }
+      const ko = rd % 2 ? ['__F_ring', '__F_plaza'] : ['__F_plaza', '__F_ring'];
+      for (const k of ko) { const c = await cost(A0, k, 2, N); if (k === '__F_ring') { O.ring.push(c.wallMs); O.ringCpu.push(c.cpuMs); } else { O.plz.push(c.wallMs); O.plzCpu.push(c.cpuMs); } }
+      console.log(`  round ${rd + 1}: orbit ${r1(O.cur[rd])}/${r1(O.prev[rd])} ms · ring ${r1(O.ring[rd])} / plaza ${r1(O.plz[rd])} ms (${secs()})`);
     }
-    rec.space = rec.spaceBy[A.tag] = { shownS: r1((Date.now() - t1) / 1000), state: st, draws: m.draws, err: m.err, spaceMs: r1(med(ws)), plazaMs: r1(med(wp)), spaceCpu: r1(med(cs)), plazaCpu: r1(med(cp)), prevPlazaMs: rec.places.plaza ? rec.places.plaza.prevMs : null };
-    console.log(`  ${A.tag} space (/raum herz): ${rec.space.spaceMs} ms (CPU ${rec.space.spaceCpu}) against this build's plaza ${rec.space.plazaMs} ms (CPU ${rec.space.plazaCpu}); ${m.draws} draws; shown after ${rec.space.shownS} s`);
-    check(st && st.ready && rec.space.spaceMs <= rec.space.plazaMs, `Very Low: the space frame is not dearer than the plaza (${rec.space.spaceMs} ≤ ${rec.space.plazaMs} ms)`);
-    await A.ev(() => { if (VR.game.space) VR.game.chat('/raum'); }).catch(() => {});
-  } catch (e) { check(false, 'space: ' + String(e.stack || e.message || e).slice(0, 300)); }
-  save();
+    rec.orbit = { curMs: r1(med(O.cur)), prevMs: r1(med(O.prev)), ratio: r3(med(O.cur) / med(O.prev)), ratioRounds: ratioMed(O.cur, O.prev), ratioCpu: ratioMed(O.curCpu, O.prevCpu), draws: [sa.draws, sb.draws], rounds: { cur: O.cur.map(r1), prev: O.prev.map(r1) } };
+    rec.ring = { ringMs: r1(med(O.ring)), plazaMs: r1(med(O.plz)), ratioRounds: ratioMed(O.ring, O.plz), ratioCpu: ratioMed(O.ringCpu, O.plzCpu), draws: ring.draws, chunks: ring.fields };
+    console.log(`  orbit: ${JSON.stringify(rec.orbit)}`); console.log(`  ring: ${JSON.stringify(rec.ring)}`);
+    check(rec.orbit.ratioRounds <= 1.03, `orbit: Very Low not slower than ${TAG.prev} (median of round ratios ×${rec.orbit.ratioRounds}, CPU ×${rec.orbit.ratioCpu})`);
+    check(rec.ring.ratioRounds <= 1.0, `ring: Very Low not dearer than this build's plaza (×${rec.ring.ratioRounds}, CPU ×${rec.ring.ratioCpu})`);
+  } catch (e) { check(false, 'orbit/ring: ' + String(e.stack || e.message || e).slice(0, 300)); }
 }
-if (rec.spaceBy.cur && rec.spaceBy.prev) { rec.space = rec.spaceBy.cur; rec.space.ratio = r3(rec.spaceBy.cur.spaceMs / rec.spaceBy.prev.spaceMs); rec.space.ratioCpu = r3(rec.spaceBy.cur.spaceCpu / rec.spaceBy.prev.spaceCpu); console.log(`  space: ${TAG.cur} ${rec.spaceBy.cur.spaceMs} ms (CPU ${rec.spaceBy.cur.spaceCpu}) · ${TAG.prev} ${rec.spaceBy.prev.spaceMs} ms (CPU ${rec.spaceBy.prev.spaceCpu}) → ×${rec.space.ratio} (CPU ×${rec.space.ratioCpu})`); }
+for (const pl of PLACES) { const w = W[pl.id]; if (rec.places[pl.id] && w.cur.length === w.prev.length) { rec.places[pl.id].ratioRounds = ratioMed(w.cur, w.prev); rec.places[pl.id].ratioRoundsCpu = ratioMed(w.curCpu, w.prevCpu); console.log(`  ${pl.id}: median of round ratios ×${rec.places[pl.id].ratioRounds} (CPU ×${rec.places[pl.id].ratioRoundsCpu})`); } }
 save();
 for (const P of [A, B]) { const e = errsOf(P); check(e.length === 0, `${P.tag}: no page error (${e.length})` + (e.length ? ': ' + e[0].slice(0, 300) : '')); }
 await A.ctx.close().catch(() => {}); await B.ctx.close().catch(() => {});
