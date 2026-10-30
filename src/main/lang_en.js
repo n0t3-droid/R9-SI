@@ -2712,7 +2712,6 @@
     'ux.h.look': "move the mouse = look around",
     'ux.h.lookTouch': "drag on the right = look around",
     'ux.h.v': "does the right thing: talk, get in, travel",
-    'ux.noJournal': "📖 The journal lives in adventure worlds (＋ New world · “Adventure”).",
     'ux.set.scale': "Display size",
     'ux.set.scaleTip': "Makes bars, buttons and text in the game bigger or smaller (90–140 %).",
     'ux.set.search': "🔎 Find a setting …",

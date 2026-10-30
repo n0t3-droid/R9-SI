@@ -2712,7 +2712,6 @@
     'ux.h.look': "Maus bewegen = umschauen",
     'ux.h.lookTouch': "rechts ziehen = umschauen",
     'ux.h.v': "tut das Passende: reden, einsteigen, reisen",
-    'ux.noJournal': "📖 Das Tagebuch gibt es in Abenteuer-Welten (＋ Neue Welt · „Abenteuer\").",
     'ux.set.scale': "Größe der Anzeige",
     'ux.set.scaleTip': "Macht Leisten, Knöpfe und Schrift im Spiel größer oder kleiner (90–140 %).",
     'ux.set.search': "🔎 Einstellung suchen …",

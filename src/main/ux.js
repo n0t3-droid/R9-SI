@@ -8,7 +8,7 @@
 //     it comes when what you can do changes and steps back after a while (the HUD whispers)
 //   · the first minute: three gentle hints, one after the other — move, look, V (the Aktion) — each after a quiet
 //     moment, through VR.Hints (one line at a time, ✕ hides it, a done one never comes back)
-//   · ⚙ Empfohlen and a search in the settings; J in a world without the Abenteuer says where the journal is
+//   · ⚙ Empfohlen and a search in the settings
 // Pure (node, test/ux.js): strip(s, lang, binds) · onboard(st) · recommend(m) · match(q, text) · clampScale(v)
 // Cost 🟢 on every preset: nothing in the game loop — one 4 Hz timer reads a few flags and writes the DOM on change.
 // ============================================================================
@@ -173,15 +173,6 @@
   };
   setInterval(X.tick, 250);
   if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { stripSig = ''; const H = VR.Hints, id = H && H.current(); if (id && X.ONBOARD.indexOf(id) >= 0 && H.retext) H.retext(hintOf(id).text); });
-
-  // ---- J without the Abenteuer: say where the journal is (nothing happened before)
-  window.addEventListener('keydown', (e) => {
-    const g = game(); if (!g || !g.ui || g.state !== 'play' || g.ui.screen || g.ui.typing || e.repeat) return;
-    const B = VR.Binds && VR.Binds.current, codes = B ? B.codesFor('KeyJ') : null;
-    if (!(codes ? codes.indexOf(e.code) >= 0 : e.code === 'KeyJ')) return;
-    let on = true; try { on = !!(VR.Quests && VR.Quests.on && VR.Quests.on()); } catch (err) { on = true; }
-    if (!on && g.ui.hint) g.ui.hint(tx('ux.noJournal', null, '📖 Das Tagebuch gibt es in Abenteuer-Welten (＋ Neue Welt · „Abenteuer").', '📖 The journal lives in adventure worlds (＋ New world · “Adventure”).'), 3600);
-  }, false);
 
   // ---- the settings: a search over every group and ⚙ Empfohlen
   const UI = VR.UI;
