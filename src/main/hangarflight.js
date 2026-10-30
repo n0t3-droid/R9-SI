@@ -281,8 +281,8 @@
     // the Gate Temple stands here: its portal veil fills the mouth's foot (any world whose Heartland was generated)
     templeHere() {
       const w = this.g.world, R = VR.R; if (!w || !R) return false;
-      const b = w.getBlock(0, DECK, MOUTH), t = R.byName.portal_veil;
-      return !!(b && t && R.T.type[b] === t.id);
+      const b = w.getBlock(0, DECK, MOUTH), t = R.byName.portal_veil, t14 = R.byName.gate_glow;   // (vgen 14: the gate's glow)
+      return !!(b && ((t && R.T.type[b] === t.id) || (t14 && R.T.type[b] === t14.id)));
     }
     want() {
       const g = this.g, pl = g.player;
@@ -297,6 +297,8 @@
       for (const s of SS.ships) if (s.hangar && s !== SS.pilot && s.state === 'parked' && Math.abs(s.pos[0]) < 3 && Math.abs(s.pos[2] - PADZ) < 3 && Math.abs(s.pos[1] - DECK) < 2) return s;
       return null;
     }
+    // the pad's parked craft is the hero craft (a vgen-14 world: gen_temple.js 'hero')
+    heroArch() { const h = this.hidden || this.homeShip(); return !!(h && h.d && h.d.arch === 'hero'); }
     // another ship stands on the pad (an older world's pad ship, a player's ship): the two land on the apron
     padTaken(home) {
       const SS = this.g.starships; if (!SS) return false;
@@ -332,7 +334,9 @@
       const outs = this.outs || (this.outs = this.crafts.map(C => C.q)), list = HF.sched(this.clock, this.cache, outs, this.spot, this.list || (this.list = [])), pl = g.player.pos;
       for (const s of list) {
         const C = this.crafts[s.c];
-        if (!C.d || !SS.designs.has(C.d.key)) { C.d = SS.design(HF.SEEDS[C.c], 'shuttle', HF.PALS[C.c]); C.inst.d = C.d; }
+        // (vgen 14, t-hangar: the hangar's own craft flies as the hero craft its pad holds)
+        const arch = C.c === 0 && this.heroArch() ? 'hero' : 'shuttle';
+        if (!C.d || !SS.designs.has(C.d.key) || C.arch !== arch) { C.arch = arch; C.d = SS.design(HF.SEEDS[C.c], arch, HF.PALS[C.c]); C.inst.d = C.d; }
         C.d.last = performance.now();
         const I = C.inst, k = C.snap ? 1 : 1 - Math.exp(-dt * 5); C.snap = false;
         I.pos[0] = s.pos[0]; I.pos[1] = s.pos[1]; I.pos[2] = s.pos[2]; I.gear = s.gear;

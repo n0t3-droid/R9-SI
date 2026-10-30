@@ -45,11 +45,19 @@ let h13 = 2166136261 >>> 0;
 { for (const [seed, cols] of [[53, [[18, -12], [16, -11], [13, -10], [11, -8]]], [4242, [[-40, -2], [-24, 7]]]]) { const g13 = V.makeGen('overworld', seed, { vgen: 13 }); for (const [cx, cz] of cols) { const c = g13.generate(cx, cz); h13 = fnv(h13, c.blocks); if (c.biome) h13 = fnv(h13, c.biome); } } }
 const hex13 = h13.toString(16).padStart(8, '0');
 console.log(`     vgen 13 · seed 53's arrival cone and seed 4242's woods: 6 columns, hash ${hex13}`);
-if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex), '· EXPECT12 =', JSON.stringify(hex12), '· EXPECT13 =', JSON.stringify(hex13)); process.exit(0); }
-const ok = hex === EXPECT, ok12 = hex12 === EXPECT12, ok13 = hex13 === EXPECT13;
+// vgen 14 (t-hangar: the Gate Temple's dark stone, gatehouse and gate glow, the Hangar Hall's bay, coffer, navy lining,
+// screens and consoles) has its own pin: six chunks of seed 4242's temple — and the same six chunks of a vgen-13 world
+// pinned beside it (the temple as v0.51 built it: c9f35c0a, recorded from the base build before t-hangar)
+const T14 = [[0, -1], [0, 1], [-1, 0], [0, -3], [3, 0], [-2, -2]], EXPECT14 = 'a081e5c3', EXPECT13T = 'c9f35c0a';
+const pinT = (vg) => { let h = 2166136261 >>> 0; const g = V.makeGen('overworld', 4242, { vgen: vg }); for (const [cx, cz] of T14) h = fnv(h, g.generate(cx, cz).blocks); return h.toString(16).padStart(8, '0'); };
+const hex14 = pinT(14), hex13T = pinT(13);
+console.log(`     vgen 14 · seed 4242's Gate Temple and Hangar Hall: 6 columns, hash ${hex14} (vgen 13 there: ${hex13T})`);
+if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex), '· EXPECT12 =', JSON.stringify(hex12), '· EXPECT13 =', JSON.stringify(hex13), '· EXPECT14 =', JSON.stringify(hex14)); process.exit(0); }
+const ok = hex === EXPECT, ok12 = hex12 === EXPECT12, ok13 = hex13 === EXPECT13 && hex13T === EXPECT13T, ok14 = hex14 === EXPECT14;
 console.log(ok ? '  ✓ the generated terrain is the same as before' : `  ✗ the terrain changed (expected ${EXPECT})`);
 console.log(ok12 ? '  ✓ vgen 12\'s hall city is as pinned' : `  ✗ vgen 12's hall city changed (expected ${EXPECT12})`);
-console.log(ok13 ? '  ✓ vgen 13\'s arrival cone and woods are as pinned' : `  ✗ vgen 13's arrival cone and woods changed (expected ${EXPECT13})`);
-const nf = (ok ? 0 : 1) + (ok12 ? 0 : 1) + (ok13 ? 0 : 1);
+console.log(ok13 ? '  ✓ vgen 13\'s arrival cone and woods are as pinned (and its temple as v0.51 built it)' : `  ✗ vgen 13's arrival cone, woods or temple changed (expected ${EXPECT13}, ${EXPECT13T})`);
+console.log(ok14 ? '  ✓ vgen 14\'s Gate Temple and Hangar Hall are as pinned' : `  ✗ vgen 14's temple changed (expected ${EXPECT14})`);
+const nf = (ok ? 0 : 1) + (ok12 ? 0 : 1) + (ok13 ? 0 : 1) + (ok14 ? 0 : 1);
 console.log(nf ? 'FAILED ' + nf : 'ALL OK');
 process.exit(nf ? 1 : 0);

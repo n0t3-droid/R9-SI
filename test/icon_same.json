@@ -406,5 +406,8 @@
 "vm_town_word_sweets":["1f4936ed","a26c8a29"],
 "vm_town_word_tailor":["ea419a4f","edaf464d"],
 "vm_town_word_tea":["597d9435","6c3bbb1b"],
-"vm_town_word_workshop":["fd752ad7","71979d3a"]
+"vm_town_word_workshop":["fd752ad7","71979d3a"],
+"vm_hangar_console":["2f60dc4a","5cc1549d"],
+"vm_hangar_screen":["8a24d612","40bce6a6"],
+"vm_hangar_screen_b":["87f86754","aad61c65"]
 }

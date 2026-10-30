@@ -51,19 +51,41 @@
       LANTERN: st('vx_lantern') || st('lantern'),   // (vgen 9: the terraces' lanterns)
     };
   }
+  // ---- t-hangar (vgen 14): the dark stone set over the slate one, and the hall's own pieces (src/shared/voxhangar.js)
+  function mats14(K) {
+    const has = (n) => !!R.byName[n];
+    if (!has('temple_stone_dark') || !has('gate_glow') || !has('vx_hangar_navy')) return null;
+    return Object.assign({}, K, {
+      WALL: st('temple_stone_dark'), SMOOTH: st('temple_stone_dark_smooth'), BAND: st('temple_stone_dark_band'), PIL: st('temple_pilaster_dark', { axis: 0 }),
+      BAR: st('temple_light_bar_dark'), SLIT: st('temple_slit_dark'), WIN: st('amber_window_tall'),
+      GLOW: [0, 1, 2, 3].map(k => st('gate_glow', { ring: k })),
+      NAVY: st('vx_hangar_navy'), NAVYA: st('vx_hangar_navy_amber'), FLOORH: st('vx_floor_hangar'), LINEH: st('vx_floor_hangar_line'),
+    });
+  }
+  TEMPLE.mats14 = () => mats14(mats());
 
   // ---------------------------------------------------------------- the material of one cell
   // returns -1 for "not part of the temple", 0 for air, else a block state
-  function makeMat(K, v11) {
+  function makeMat(K, v11, v14) {
     const fx = T.front, bx = T.back;
     // tiers: [x half-width, z0, z1, y0, y1]
     const TIERS = [[22, bx, fx, Y + 1, Y + 20], [16, -30, 14, Y + 21, Y + 34], [10, -22, 8, Y + 35, Y + 44]];
     const CROWN = [3, -13, -7, Y + 45, Y + 50];
-    const inHall = (x, y, z) => {
+    const HZ = -10;
+    const inHall0 = (x, y, z) => {
       const ax = Math.abs(x);
       if (ax > 10 || z < bx + 1 || z > fx - 1 || y < Y + 1 || y > Y + 15) return false;
       if (ax > 6 && y > Y + 11 && (ax - 6) + (y - (Y + 11)) > 4) return false;
       return true;
+    };
+    // vgen 14 (t-hangar): round the pad the hall opens into an octagonal bay (12.5 from the pad's centre, its upper
+    // corners chamfered less), and over it a stepped octagonal coffer rises four more blocks (radii 9, 7, 5, 3)
+    const inHall = !v14 ? inHall0 : (x, y, z) => {
+      if (inHall0(x, y, z)) return true;
+      if (z < bx + 1 || z > fx - 1 || y < Y + 1) return false;
+      const ax = Math.abs(x), d = oct(x, z - HZ);
+      if (y <= Y + 15) return d <= 12.5 && !(ax > 8 && y > Y + 12 && (ax - 8) + (y - (Y + 12)) > 4);
+      return y <= Y + 19 && d <= 9 - 2 * (y - (Y + 16));
     };
     // face pattern of a tier shell block: which face it is on and its column index along that face
     const shell = (x, y, z, hw, z0, z1, y0, y1, hasPortal) => {
@@ -87,12 +109,32 @@
       const ax = Math.abs(x), sx = x < 0 ? -1 : 1;
       // ---- the Hangar Hall cavity
       if (inHall(x, y, z)) return 0;
+      // ---- vgen 14: the gatehouse — three blocks of dark stone stepped out round the portal, its reveal widening by a
+      // block per step toward the plaza, an orange light ring hugging the gate, a light-bar cornice on top
+      if (v14 && z > fx && z <= fx + 3 && ax <= 12 && y >= Y + 1 && y <= Y + 19) {
+        const t = y - (Y + 1), k = z - fx;                               // k 1 (at the gate) … 3 (the plaza face)
+        const o = t <= 12 ? OPEN[t] + k - 1 : -1;
+        if (t <= 12 && ax <= o) return 0;                                // the opening
+        if (t <= 13 && ax <= o + 1 + (t === 13 ? 3 + k : 0) && (k === 1 || k === 3)) return K.BAR;   // light rings at the gate and round the mouth
+        if (y === Y + 19) return K.BAR;                                  // the cornice
+        if (ax === 11 && k === 3 && y >= Y + 3 && y <= Y + 16) return K.SLIT;   // cyan slits flanking the gate
+        if (ax === 12 || ax === 11 && k === 3) return K.PIL;            // the gatehouse's corner pilasters
+        if (k === 3 && (y === Y + 15 || y === Y + 16)) return K.BAND;    // a carved band over the gate
+        if (k === 2 && t <= 13 && ax <= o + 1) return K.BAND;            // the reveal's middle step
+        return K.SMOOTH;
+      }
+      // ---- vgen 14: the pilasters of the central block stand out of its front face by a block (depth, shadow lines)
+      if (v14 && y >= Y + 1) for (let k = 0; k < TIERS.length; k++) {
+        const [hw, , z1, y0, y1] = TIERS[k];
+        if (z === z1 + 1 && ax <= hw && y >= y0 && y < y1 && (((x + hw) % 6) + 6) % 6 === 0 && !(k === 0 && ax <= 12)) return (y - y0) % 7 === 6 ? K.BAND : K.PIL;
+      }
       // ---- portal (front face z = fx) and back door (z = bx)
       if (z === fx && ax <= 9 && y >= Y + 1 && y <= Y + 16) {
         const t = y - (Y + 1);
         if (t <= 12) {
           const o = OPEN[t];
-          if (ax <= o) return K.VEIL;
+          // (vgen 14: the gate's glow in concentric octagons round the gate's middle, white-gold to deep orange)
+          if (ax <= o) { if (!v14) return K.VEIL; const d = oct(x, (t - 6) * 1.0); return K.GLOW[d < 1.6 ? 0 : d < 3.2 ? 1 : d < 4.8 ? 2 : 3]; }
           if (ax === o + 1) return K.FRAME;
           if (ax === o + 2) return K.BAND;
           if (ax === o + 3) return K.BAR;
@@ -106,8 +148,22 @@
         else if (t === 9) { if (ax <= 3) return K.FRAME; if (ax === 4) return K.BAR; }
         else if (t === 10 && ax <= 4) return K.BAR;
       }
+      // ---- vgen 14: the lining is navy — panels with vertical cyan light strips every 6 blocks, an amber band at the
+      // chamfers' foot, cyan light plates on the chamfers; the coffer's risers are rings of cyan light
+      if (v14 && ax <= 14 && z > bx && z < fx && y >= Y + 1 && y <= Y + 20) {
+        const hx = inHall(x - 1, y, z) || inHall(x + 1, y, z) || inHall(x, y, z - 1) || inHall(x, y, z + 1), dn = inHall(x, y - 1, z);
+        if (hx || dn || inHall(x, y + 1, z)) {
+          if (y >= Y + 16 && hx) return K.CYAN;                             // the coffer's risers: rings of light
+          if (y >= Y + 15 && oct(x, z - HZ) <= 10.5) return K.NAVY;          // the coffer's plates
+          if (dn && y >= Y + 15) return (z % 4 === 0 && ax <= 4) ? K.HEX : K.NAVY;   // the ceiling, light plates down the axis
+          if (y > Y + 12 || (ax >= 7 && y > Y + 11)) return ((z + 1) % 4 === 0) ? K.HEX : K.NAVY;   // the chamfers
+          if (y === Y + 12) return K.NAVYA;                                  // the amber band
+          if (dn) return K.NAVY;
+          return (((z % 6) + 6) % 6 === 0 && y >= Y + 2 && y <= Y + 11) ? K.CYAN : K.NAVY;   // the walls with light strips
+        }
+      }
       // ---- hall lining: the blocks around the cavity are hangar panels
-      if (ax <= 12 && z > bx && z < fx && y >= Y + 1 && y <= Y + 17) {
+      if (!v14 && ax <= 12 && z > bx && z < fx && y >= Y + 1 && y <= Y + 17) {
         const near = inHall(x - 1, y, z) || inHall(x + 1, y, z) || inHall(x, y - 1, z) || inHall(x, y + 1, z) || inHall(x, y, z - 1) || inHall(x, y, z + 1);
         if (near) {
           if (y === Y + 16 || y === Y + 17) return K.GRAY;                  // ceiling
@@ -223,7 +279,10 @@
   // build it in slices (TEMPLE.advance, worker_main.js). TEMPLE.build runs it to the end, once per generator.
   TEMPLE.buildSteps = function* (g) {
     if (g._temple) return g._temple;
-    const K = mats(), mat = makeMat(K, g.vgen >= 11);
+    // vgen 14 (t-hangar): the dark stone set, the gatehouse, the hall's bay and coffer, the navy lining (mats14 is null
+    // in a build without voxhangar.js's blocks: then the world keeps the older look)
+    const K14 = g.vgen >= 14 ? mats14(mats()) : null, v14 = !!K14;
+    const K = K14 || mats(), mat = makeMat(K, g.vgen >= 11, v14);
     // vgen 6 (the trailer's Gate Temple: landing-strip lights, the 7-high hex corridor). Older worlds keep the temple they
     // were made with (AGENTS.md: old worlds' generated chunks stay identical), so their terrain is the HEAD one.
     const v6 = g.vgen >= 6;
@@ -240,6 +299,7 @@
       const ax = Math.abs(x);
       let top = 0;
       if (ax <= 22 && z >= T.back && z <= T.front) top = Y + 56;
+      if (v14 && ax <= 22 && z > T.front && z <= T.front + 3) top = Y + 40;   // the gatehouse, the pilasters
       if (ax >= 22 && ax <= 55 && z >= -28 && z <= 15) top = Math.max(top, Y + 31);
       if (oct(ax - 50, z + 24) <= 6) top = Math.max(top, Y + 90);
       if (oct(ax - 24, z + 37) <= 5.5) top = Math.max(top, Y + 76);
@@ -270,33 +330,74 @@
       }
     }
     yield;
-    // ---- hall floor, pad ring, light lines, furniture
     const HZ = -10; // pad centre z
-    for (let x = -10; x <= 10; x++) for (let z = T.back + 1; z <= T.front - 1; z++) {
-      const d = oct(x, z - HZ);
-      let s = K.HEXF;
-      if (Math.abs(x) <= 1 && Math.abs(z - HZ) <= 1) s = K.PAD;
-      else if (Math.abs(Math.round(d) - 5) === 0 || Math.abs(Math.round(d) - 8) === 0) s = K.LINE;
-      else if (Math.abs(x) === 1 && (z > HZ + 8 || z < HZ - 8)) s = K.LINE;   // guide lines to both doors
-      put(x, Y, z, s);
+    if (v14) {
+      // ---- vgen 14 (t-hangar): the tile deck with three concentric octagon light lines round the pad (r 5, 8, 11),
+      // guide lines to both doors; console rows of VX16 desks, framed round-icon screens over them and in the bay,
+      // hex lights round the coffer and in its crown, amber skirting lights in the bay
+      const putM = (name, f, x0, y0, z0) => {
+        const m = VR.VM && VR.VM.MODELS[name]; if (!m) return;
+        const fp = VR.VM.footprint(m, f); let mx = 1e9, mz = 1e9; for (const c of fp) { mx = Math.min(mx, c[0]); mz = Math.min(mz, c[2]); }
+        for (const [dx, dy, dz, i] of fp) put(x0 + dx - mx, y0 + dy, z0 + dz - mz, st(name, { facing: f, part: i }));
+      };
+      for (let x = -12; x <= 12; x++) for (let z = T.back + 1; z <= T.front - 1; z++) {
+        const d = oct(x, z - HZ), r = Math.round(d);
+        if (Math.abs(x) > 10 && d > 12.5) continue;
+        let s = K.FLOORH;
+        if (Math.abs(x) <= 1 && Math.abs(z - HZ) <= 1) s = K.PAD;
+        else if (r === 5 || r === 8 || r === 11) s = K.LINEH;
+        else if (Math.abs(x) === 1 && (z > HZ + 11 || z < HZ - 11)) s = K.LINEH;
+        put(x, Y, z, s);
+      }
+      for (let z = HZ + 12; z <= T.front; z++) put(0, Y, z, K.DECK);
+      for (let z = T.back; z < HZ - 11; z++) put(0, Y, z, K.DECK);
+      for (const sx of [-1, 1]) {
+        const f = sx < 0 ? 1 : 3;   // (facing 1: the model's front looks +x — on the west side toward the hall's axis)
+        for (let z = -4; z <= 4; z += 2) putM('vm_hangar_console', f, sx * 7, Y + 1, z);
+        for (let z = -4; z <= 6; z += 2) put(sx * 6, Y + 1, z, K.STOOL);
+        putM(sx < 0 ? 'vm_hangar_screen' : 'vm_hangar_screen_b', f, sx * 10, Y + 4, -2);
+        putM(sx < 0 ? 'vm_hangar_screen_b' : 'vm_hangar_screen', f, sx * 10, Y + 4, 3);
+        putM(sx < 0 ? 'vm_hangar_screen_b' : 'vm_hangar_screen', f, sx * 12, Y + 4, -15);
+        putM(sx < 0 ? 'vm_hangar_screen' : 'vm_hangar_screen_b', f, sx * 12, Y + 4, -9);
+        for (let z = -36; z <= -30; z++) for (let y = Y + 3; y <= Y + 5; y++) put(sx * 10, y, z, sx > 0 ? K.HOLOA1 : K.HOLOA3);
+        for (let z = -28; z <= -24; z += 2) put(sx * 10, Y + 1, z, sx > 0 ? K.LOCKER1 : K.LOCKER3);
+        for (let z = -38; z <= 16; z += 6) if (oct(11, z - HZ) > 12.5) put(sx * 11, Y + 10, z, K.PANELA);   // amber accents in the nave walls
+        for (const dz of [-4, 0, 4]) put(sx * 13, Y + 1, HZ + dz, K.PANELA);                            // amber skirting lights in the bay
+        put(sx * 8, Y + 1, 12, K.SOFA); put(sx * 8, Y + 1, 13, K.SOFA);
+      }
+      put(0, Y + 1, -30, K.HTABLE);
+      for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(dx, Y + 1, -30 + dz, K.STOOLO);
+      for (let x = -9; x <= 9; x++) for (let z = HZ - 12; z <= HZ + 12; z++) if (Math.round(oct(x, z - HZ)) === 11 && (x + z) % 2 === 0) put(x, Y + 15, z, K.HEXLC);
+      for (let x = -3; x <= 3; x++) for (let z = HZ - 3; z <= HZ + 3; z++) if (Math.round(oct(x, z - HZ)) === 2) put(x, Y + 19, z, K.HEXLC);
+      for (let z = T.back + 4; z <= T.front - 4; z += 6) { if (Math.abs(z - HZ) > 12) { put(0, Y + 15, z, K.HEXL); put(-5, Y + 15, z, K.HEXL); put(5, Y + 15, z, K.HEXL); } }
+    } else {
+      // ---- hall floor, pad ring, light lines, furniture
+      for (let x = -10; x <= 10; x++) for (let z = T.back + 1; z <= T.front - 1; z++) {
+        const d = oct(x, z - HZ);
+        let s = K.HEXF;
+        if (Math.abs(x) <= 1 && Math.abs(z - HZ) <= 1) s = K.PAD;
+        else if (Math.abs(Math.round(d) - 5) === 0 || Math.abs(Math.round(d) - 8) === 0) s = K.LINE;
+        else if (Math.abs(x) === 1 && (z > HZ + 8 || z < HZ - 8)) s = K.LINE;   // guide lines to both doors
+        put(x, Y, z, s);
+      }
+      for (let z = HZ + 9; z <= T.front; z++) put(0, Y, z, K.DECK);
+      for (let z = T.back; z < HZ - 8; z++) put(0, Y, z, K.DECK);
+      // consoles (facing the wall behind them) with stools, big holo screens above
+      for (const sx of [-1, 1]) {
+        const wallX = sx * 10, conX = sx * 7, stoolX = sx * 6;
+        for (let z = -4; z <= 6; z++) { put(conX, Y + 1, z, sx > 0 ? K.CON1 : K.CON3); if (z % 2 === 0) put(stoolX, Y + 1, z, K.STOOL); }
+        for (let z = -6; z <= 8; z++) for (let y = Y + 4; y <= Y + 8; y++) put(wallX, y, z, sx > 0 ? K.HOLO1 : K.HOLO3);
+        for (let z = -36; z <= -30; z++) for (let y = Y + 3; y <= Y + 5; y++) put(wallX, y, z, sx > 0 ? K.HOLOA1 : K.HOLOA3);
+        for (let z = -28; z <= -14; z += 2) put(wallX, Y + 1, z, sx > 0 ? K.LOCKER1 : K.LOCKER3);
+        for (let z = -38; z <= 16; z += 6) put(sx * 11, Y + 10, z, K.PANELA);   // amber accent lights in the walls
+        put(sx * 8, Y + 1, 12, K.SOFA); put(sx * 8, Y + 1, 13, K.SOFA);
+      }
+      put(0, Y + 1, -30, K.HTABLE);
+      for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(dx, Y + 1, -30 + dz, K.STOOLO);
+      // ceiling lights: an octagon ring over the pad, a row down the axis
+      for (let x = -8; x <= 8; x++) for (let z = HZ - 8; z <= HZ + 8; z++) { if (Math.round(oct(x, z - HZ)) === 6) put(x, Y + 15, z, K.HEXLC); }
+      for (let z = T.back + 4; z <= T.front - 4; z += 6) { if (Math.abs(z - HZ) > 7) { put(0, Y + 15, z, K.HEXL); put(-5, Y + 15, z, K.HEXL); put(5, Y + 15, z, K.HEXL); } }
     }
-    for (let z = HZ + 9; z <= T.front; z++) put(0, Y, z, K.DECK);
-    for (let z = T.back; z < HZ - 8; z++) put(0, Y, z, K.DECK);
-    // consoles (facing the wall behind them) with stools, big holo screens above
-    for (const sx of [-1, 1]) {
-      const wallX = sx * 10, conX = sx * 7, stoolX = sx * 6;
-      for (let z = -4; z <= 6; z++) { put(conX, Y + 1, z, sx > 0 ? K.CON1 : K.CON3); if (z % 2 === 0) put(stoolX, Y + 1, z, K.STOOL); }
-      for (let z = -6; z <= 8; z++) for (let y = Y + 4; y <= Y + 8; y++) put(wallX, y, z, sx > 0 ? K.HOLO1 : K.HOLO3);
-      for (let z = -36; z <= -30; z++) for (let y = Y + 3; y <= Y + 5; y++) put(wallX, y, z, sx > 0 ? K.HOLOA1 : K.HOLOA3);
-      for (let z = -28; z <= -14; z += 2) put(wallX, Y + 1, z, sx > 0 ? K.LOCKER1 : K.LOCKER3);
-      for (let z = -38; z <= 16; z += 6) put(sx * 11, Y + 10, z, K.PANELA);   // amber accent lights in the walls
-      put(sx * 8, Y + 1, 12, K.SOFA); put(sx * 8, Y + 1, 13, K.SOFA);
-    }
-    put(0, Y + 1, -30, K.HTABLE);
-    for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(dx, Y + 1, -30 + dz, K.STOOLO);
-    // ceiling lights: an octagon ring over the pad, a row down the axis
-    for (let x = -8; x <= 8; x++) for (let z = HZ - 8; z <= HZ + 8; z++) { if (Math.round(oct(x, z - HZ)) === 6) put(x, Y + 15, z, K.HEXLC); }
-    for (let z = T.back + 4; z <= T.front - 4; z += 6) { if (Math.abs(z - HZ) > 7) { put(0, Y + 15, z, K.HEXL); put(-5, Y + 15, z, K.HEXL); put(5, Y + 15, z, K.HEXL); } }
     yield;
     // ---- outside: the path to the city from the back door
     // a corridor 7 wide and 7 high from the back door to the city (TRAILER.md shot E, t1_21): hex panels down both sides,
@@ -325,6 +426,7 @@
       const ax = Math.abs(x);
       if (ax >= 24 && ax <= 56 && z <= 30) continue;                     // terraces
       if (ax >= 23 && ax <= 32 && z <= 38) continue;                     // stairs
+      if (v14 && ax <= 22 && z <= T.front + 3) { put(x, Y, z, ax <= 4 ? K.DECK : ax === 5 ? K.LINE : K.FLAG); continue; }   // (vgen 14: the gatehouse stands here)
       const gy = ground(x, z);
       if (gy < Y) fill(x, z, gy + 1, Y - 1, K.SMOOTH);
       let s = K.FLAG;
@@ -445,6 +547,7 @@
       if (!out.spawns) out.spawns = [];
       const row = ['starship', tp.base.pad.seed, tp.base.pad.x, tp.base.pad.y, tp.base.pad.z, tp.base.pad.dir];
       if (g.vgen >= 6) row.push('hangar');   // vgen 6: a parked shuttle that burns its thrusters (starships.js hangarFx)
+      if (g.vgen >= 14 && R.byName.gate_glow) row.push('hero');   // vgen 14 (t-hangar): the hero craft (shipgen.js ARCH.hero)
       out.spawns.push(row);
     }
     // the Hangar Hall's crew (vgen 6): spawned with the chunk they stand in
