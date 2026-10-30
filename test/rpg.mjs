@@ -73,7 +73,21 @@ try {
       won: () => !!VR.RPGBoss.cur && VR.RPGBoss.cur.b.st === 'won',
     };
     // the shots' camera: in front of the boss and a little aside, two blocks over the ground; the Helfer out of the frame
-    window.__cam = (d, side, up) => { const m = VR.RPGBoss.cur.m, p = g.player, a = m.yaw + side, cx = m.pos[0] - Math.sin(a) * d, cz = m.pos[2] - Math.cos(a) * d; for (let i = g.entities.mobs.length - 1; i >= 0; i--) { const f = g.entities.mobs[i].foe; if (f && (f.mine || f.helper)) g.entities.mobs.splice(i, 1); } p.flying = true; p.teleport(cx, g.world.topAt(Math.floor(cx), Math.floor(cz)) + up, cz); p.vel[0] = p.vel[1] = p.vel[2] = 0; window.__aim([m.pos[0], m.pos[1] + 3.2, m.pos[2]]); };
+    window.__cam = (d, side, up) => {
+      const m = VR.RPGBoss.cur.m, p = g.player, t = [m.pos[0], m.pos[1] + 3.4, m.pos[2]];
+      for (let i = g.entities.mobs.length - 1; i >= 0; i--) { const f = g.entities.mobs[i].foe; if (f && (f.mine || f.helper)) g.entities.mobs.splice(i, 1); }
+      const air = (x, y, z) => { const b = g.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !b || !(VR.R.T.flags[b] & VR.F.SOLID); };
+      let best = null;
+      for (let k = 0; k < 24 && !best; k++) {
+        const a = m.yaw + side + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, cx = m.pos[0] - Math.sin(a) * d, cz = m.pos[2] - Math.cos(a) * d;
+        const cy = Math.max(g.world.topAt(Math.floor(cx), Math.floor(cz)) + up, t[1] - 1);
+        let ok = air(cx, cy, cz) && air(cx, cy + 1.62, cz);
+        for (let s2 = 1; s2 < 24 && ok; s2++) { const u = s2 / 24; if (u > 0.8) break; if (!air(cx + (t[0] - cx) * u, cy + 1.62 + (t[1] - cy - 1.62) * u, cz + (t[2] - cz) * u)) ok = false; }
+        if (ok) best = [cx, cy, cz];
+      }
+      if (!best) { const a = m.yaw + side; best = [m.pos[0] - Math.sin(a) * d, m.pos[1] + 6, m.pos[2] - Math.cos(a) * d]; }
+      p.flying = true; p.teleport(best[0], best[1], best[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; window.__aim(t);
+    };
     window.__aim = (t) => { const p = g.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = t[0] - e[0], dy = t[1] - e[1], dz = t[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); };
   });
 
@@ -188,7 +202,7 @@ try {
     check(t.hit, 'a stomp telegraphed (the ring on the ground, the warning)');
     N.teleMin = await ev(() => VR.RPG.teleOf('stomp', VR.RPGBoss.cur.b.band));
     // the camera: back and up, the boss and its ring in view (the player stands still: the simulation is held)
-    await ev(() => window.__cam(16, 0.55, 2.2));
+    await ev(() => window.__cam(12, 0.5, 2));
     await ev(() => { const C = VR.RPGBoss.cur; C.fxT = 0; VR.RPGBoss.fx(VR.game, C, 0.1, 10); VR.RPGBoss.bar(true); });
     await draw(); await draw();
     await hold(500);
@@ -208,7 +222,7 @@ try {
     await ev(() => { const b = VR.RPGBoss.cur.b; b.shield = false; b.ph = 3; b.st = 'recover'; b.hp = 1; b.hit(10, 'weak'); });
     const w = await run(260, 33, 'won');
     check(w.hit, 'it powers down and the region heals');
-    await ev(() => window.__cam(17, 0.5, 2.5));
+    await ev(() => window.__cam(14, 0.45, 2));
     await run(20);
     const r = await ev(() => { const st = VR.RPGame.st(), C = VR.RPGBoss.cur; return { won: !!st.won[C.rid], healed: !!st.healed[C.rid], xp: VR.Adventure.rec.me.xp, t: VR.Adventure.rec.me.taler, ban: (document.querySelector('#rpgwon .big') || {}).textContent }; });
     check(r.won && r.healed && r.xp > a0.xp + 500 && r.t > a0.t + 700, 'the boss reward and the healed region (' + JSON.stringify({ dxp: r.xp - a0.xp, dt: r.t - a0.t }) + ')');
@@ -227,6 +241,7 @@ try {
   await section('6', async () => {
     console.log('6 · the loot burst');
     await ev(() => { document.querySelectorAll('.rpgcoin,.rpgplus').forEach(e => e.remove()); const w = document.getElementById('rpgwon'); if (w) w.className = ''; const f = document.getElementById('rpgfind'); if (f) f.className = ''; });
+    await ev(() => { if (VR.RPGBoss.cur) window.__cam(13, -0.4, 2); }); await draw();
     const n = await ev(() => VR.RPGame.burst(640, 0));
     check(n >= 20, 'a burst of ' + n + ' coins');
     await hold(650);

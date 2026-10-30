@@ -54,10 +54,12 @@
         visor: part(12, 2, 1, [6, 1, 0], (g) => { g.box(0, 0, 0, 11, 1, 0, LENS); }),
         core: part(8, 6, 1, [4, 3, 0], (g) => { g.ell(4, 3, 0.5, 3.8, 2.9, 1, LENS); }),
         hatch: part(5, 7, 1, [0, 3, 0], (g) => { g.box(0, 0, 0, 4, 6, 0, (x, y) => (y === 3 ? OR : WH)); }),
+        // the stomp's warning: a glowing ring on the ground (6 blocks at ×2.8), drawn growing while it warns
+        ring: part(70, 1, 70, [35, 0, 35], (g) => { for (let x = 0; x < 70; x++) for (let z = 0; z < 70; z++) { const d = Math.hypot(x - 34.5, z - 34.5); if (d >= 31.5 && d <= 34.5) g.set(x, 0, z, LENS, 1); } }),
         knee: part(7, 4, 7, [3, 2, 3], (g) => { g.ell(3, 2, 3, 3.4, 2.1, 3.4, LENS); }),
         leg_fl: leg(), leg_fr: leg(), leg_bl: leg(), leg_br: leg(),
       },
-      layout: { hull: [0, 18, 0], tower: [0, 31, 3], lantern: [0, 43, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
+      layout: { ring: [0, 0, 0], hull: [0, 18, 0], tower: [0, 31, 3], lantern: [0, 43, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
     });
   }
   // the mob kind (not enumerable: the codex's creature pages stay as they are)
@@ -207,7 +209,7 @@
     if (C.rise < 1) { for (let i = 0; i < (lo ? 3 : 6); i++) { const a = Math.random() * TAU, r = 1.5 + Math.random() * 2.5; P.spawn(m.pos[0] + Math.cos(a) * r, m.pos[1] + 0.2, m.pos[2] + Math.sin(a) * r, 0, 1.5 + Math.random(), 0, { life: 1.2, size: 0.3, grav: -0.2, col: [0.6, 0.55, 0.5], drag: 1, collide: false }); } BS.cost.sparks += 6; }
     if (b.st === 'tele') {
       const u = C.tele, n = lo ? 12 : 22;
-      if (b.att === 'stomp') { for (let i = 0; i < n; i++) { const a = i * TAU / n + u; P.spawn(m.pos[0] + Math.cos(a) * BB.stompR * (0.4 + 0.6 * u), m.pos[1] + 0.15, m.pos[2] + Math.sin(a) * BB.stompR * (0.4 + 0.6 * u), 0, 0.6, 0, { life: 0.25, size: 0.16, grav: 0, col: [1, 0.35 + 0.3 * u, 0.15], emis: 1, collide: false }); } }
+      if (b.att === 'stomp') { const rr = BB.stompR * (0.35 + 0.65 * u); for (let i = 0; i < n * 1.5; i++) { const a = i * TAU / (n * 1.5) + u; P.spawn(m.pos[0] + Math.cos(a) * rr, m.pos[1] + 0.2, m.pos[2] + Math.sin(a) * rr, 0, 0.9, 0, { life: 0.3, size: 0.32, grav: 0, col: [1, 0.3 + 0.35 * u, 0.12], emis: 1, collide: false }); } }
       else if (b.att === 'slam') { const fx = -Math.sin(m.yaw), fz = -Math.cos(m.yaw); for (let i = 0; i < n * 0.6; i++) { const d = 2 + i * (BB.slamR - 2) / (n * 0.6); for (const s of [-1.6, 1.6]) P.spawn(m.pos[0] + fx * d + fz * s, m.pos[1] + 0.15, m.pos[2] + fz * d - fx * s, 0, 0.4, 0, { life: 0.22, size: 0.14, grav: 0, col: [1, 0.45, 0.2], emis: 1, collide: false }); } }
       else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 26 / 16 * SC, m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
       BS.cost.sparks += n;
@@ -255,24 +257,27 @@
     if (C.won) return; C.won = true;
     const s = st(), A = VR.Adventure, m = C.m, P = g.particles, au = g.audio, RG = VR.RPGame;
     if (s) { s.won[C.rid] = Date.now(); s.healed[C.rid] = 1; }
+    BS.banner(g, null);   // (first: the level-up the reward brings waits for it — VR.Adventure.busy, wrapped in rpg.js)
     let r = null; if (A && A.award) r = A.award('boss', { id: 'rpg:' + C.rid });
+    { const ads = g.entities.mobs.filter(q => q.foe && q.foe.rpgAdd && !q.foe.gone); if (ads.length && F.leaveAll) F.leaveAll(ads, F.W); }
     if (P) { P.spark(m.pos[0], m.pos[1] + 5, m.pos[2], [1, 0.9, 0.5], 90, 9, 1); P.spark(m.pos[0], m.pos[1] + 5, m.pos[2], [0.6, 1, 1], 60, 6, 1); for (let i = 0; i < 60; i++) { const a = i * TAU / 60; P.spawn(m.pos[0], m.pos[1] + 0.5, m.pos[2], Math.cos(a) * 16, 0.5, Math.sin(a) * 16, { life: 1.6, size: 0.25, grav: 0, col: [1, 0.85, 0.45], emis: 1, drag: 0.6, collide: false }); } }
     const L = VR.Liberate; if (L && L.bloom) L.bloom();
     if (au && au.play) au.play('thump', { vol: 1 });
     if (au && au.swell) au.swell(g.env ? g.env.day | 0 : 0, 1);
     if (au && au.ctx && au.tone) { const t = au.ctx.currentTime + 0.3; [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => { au.tone(f, 0.08, 3 - i * 0.2, 'sine', true, t + i * 0.14); au.tone(f * 1.5, 0.03, 2, 'triangle', true, t + i * 0.14 + 0.02); }); }
     BS.healAt = [m.pos[0], m.pos[2]]; BS.healT = 0;
-    BS.banner(g, r);
+    BS.banner(g, r, true);
     if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('milestone', 'boss', 5, [m.pos[0], m.pos[1] + 4, m.pos[2]], 'rpg', 60);
     if (RG) { setTimeout(() => RG.find('b:' + C.rid, 'boss'), 5200); RG.save(); }
     BS.bar(false); BS.calmUi(false); BS.warn('');
     setTimeout(() => { if (BS.cur === C) BS.drop(g); }, 9000);
   };
-  BS.banner = function (g, r) {
+  BS.banner = function (g, r, fill) {
     if (!hasDoc) return; css();
     let el = document.getElementById('rpgwon');
     if (!el) { el = document.createElement('div'); el.id = 'rpgwon'; (document.getElementById('app') || document.body).appendChild(el); }
-    const xp = r && r.xp ? r.xp : 0, tl = r ? (r.taler || 0) + (r.gift || 0) : 0;
+    const xp = r && r.xp ? r.xp : BB.reward.xp, tl = r ? (r.taler || 0) + (r.gift || 0) : BB.reward.taler;
+    if (fill) { const sb = el.querySelector('.sub'); if (sb) sb.textContent = T('g.rpg.boss.won.sub', { xp, t: tl }); return; }
     el.innerHTML = `<div class="rays"></div><div class="kick">${esc(T('g.rpg.boss.won.kick'))}</div><div class="big">${esc(T('g.rpg.boss.won.title'))}</div><div class="sub">${esc(T('g.rpg.boss.won.sub', { xp, t: tl }))}</div>`;
     el.className = ''; void el.offsetWidth; el.className = 'on';
     clearTimeout(BS.banT); BS.banT = setTimeout(() => { el.className = 'off'; BS.banT = setTimeout(() => { el.className = ''; }, 900); }, 5200);
@@ -336,8 +341,15 @@
     LP[0] = 0 + 4 * coreOpen; part(r, p, model, 'hatch', B, LP, 0, 0, 0, ONE, fl);
     const lant = healed ? [1.8, 1.5, 0.6] : b.calm ? [0.9 + 0.4 * pul, 0.5, 1.2] : TN;
     part(r, p, model, 'lantern', B, null, 0, now() / 900, 0, lant, 0);
+    if (b.st === 'tele' && b.att === 'stomp' && model.parts.ring) {
+      const k = 0.35 + 0.65 * C.tele, t = MR; t.set(ID);
+      mat4.translate(t, t, m.pos[0] - cam.x, m.pos[1] - cam.y + 0.08, m.pos[2] - cam.z); mat4.scale(t, t, SC / 16 * k, SC / 16, SC / 16 * k);
+      RC[0] = 1.8; RC[1] = 0.45 + 0.5 * C.tele; RC[2] = 0.2;
+      part(r, p, model, 'ring', t, LP0, 0, 0, 0, RC, 0);
+    }
     gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0);
   };
+  const MR = mat4 ? mat4.create() : null, RC = [1, 1, 1], LP0 = [0, 0, 0];
 
   // ---------------------------------------------------------------- the HUD: the bar, the warning, the hint
   BS.bar = function (on) {

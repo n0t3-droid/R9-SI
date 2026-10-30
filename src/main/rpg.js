@@ -350,6 +350,8 @@
     // the ⚔ card's summary gets a „Charakter" button beside its stats button
     const a = A();
     if (a && a.renderCard && !a.renderCard.__rpg) { const orc = a.renderCard; a.renderCard = function () { const r = orc.apply(this, arguments); try { const go = document.querySelector('#adventure .advsum .go'); if (go && !document.querySelector('#adventure [data-rpopen]') && RP.st()) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn go'; b.setAttribute('data-rpopen', '1'); b.textContent = T('g.rpg.open'); b.onclick = () => RP.open('hero'); go.after(b); } } catch (e) { console.warn('rpg', e); } return r; }; a.renderCard.__rpg = true; }
+    // a level-up waits for the boss's banner (one big moment at a time)
+    if (a && a.busy && !a.busy.__rpg) { const ob = a.busy; a.busy = function () { if (ob.apply(this, arguments)) return true; const w = document.getElementById('rpgwon'); return !!(w && /\b(on|off)\b/.test(w.className || '')); }; a.busy.__rpg = true; }
     if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { try { if (ui.screen === 'rpgchar') RP.render(); } catch (e) { /* the next open draws it */ } });
     if (!RP.timer) RP.timer = setInterval(RP.tick, 500);
   };
