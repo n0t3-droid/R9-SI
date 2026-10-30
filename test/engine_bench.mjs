@@ -29,7 +29,7 @@ const SHOTS = ROOT + 'test/shots/';
 const ENV = process.env;
 const BUILDS_ALL = { before: ROOT + '.tmp_tests/before_dist/index.html', after: ROOT + 'dist/index.html' };
 const BUILDS = (ENV.BUILDS || 'before,after').split(',').filter(b => BUILDS_ALL[b]);
-const PARTS = (ENV.PARTS || 'load,flight,leak,views').split(',');
+const PARTS = (ENV.PARTS || 'load,flight,prof,leak,views').split(',');
 const ROUNDS = +(ENV.ROUNDS || 3), PRESETS = (ENV.PRESETS || 'potato,balanced').split(',');
 const FRAMES = +(ENV.FRAMES || 300), DT = +(ENV.DT || 0.2), SPEED = +(ENV.SPEED || 20), OUT = +(ENV.OUT || 1000), LOOPS = +(ENV.LOOPS || 3);
 const TAG = ENV.TAG || BUILDS.join('_');
@@ -282,6 +282,85 @@ if (PARTS.includes('flight')) {
       save();
       await br.close();
     }
+  }
+}
+
+// ---------------------------------------------------------------- 2b. PROF — where the main thread's frame goes (the after build;
+// a flight of PFRAMES frames with every larger method of the game's systems timed per frame, a CPU profile and the
+// sampled allocations). Diagnosis only: its frames are slower than the measured ones.
+const PFRAMES = +(ENV.PFRAMES || 120);
+if (PARTS.includes('prof')) {
+  const b = BUILDS.includes('after') ? 'after' : BUILDS[0];
+  for (const preset of PRESETS) {
+    const br = await launch();
+    const P = await openWorld(br, b, preset, 960, 540);
+    const path = await pathFor(P, PFRAMES, DT, SPEED);
+    await P.ev((c) => window.__place(...c), path[0]);
+    await settle(P, 600);
+    // the timers: every prototype method longer than 300 characters of the game's objects (and the game's own)
+    const nW = await P.ev(() => {
+      const g = VR.game, T = window.__eb, acc = T.pacc = new Map();
+      let n = 0;
+      const seen = new Set();
+      const wrapObj = (o, label) => {
+        let proto = Object.getPrototypeOf(o);
+        while (proto && proto !== Object.prototype && !seen.has(proto)) {
+          seen.add(proto);
+          for (const k of Object.getOwnPropertyNames(proto)) {
+            if (k === 'constructor') continue;
+            const d = Object.getOwnPropertyDescriptor(proto, k);
+            if (!d || typeof d.value !== 'function' || d.value.__w) continue;
+            const f = d.value; let src = ''; try { src = Function.prototype.toString.call(f); } catch (e) { continue; }
+            if (src.length < 300) continue;
+            const name = label + '.' + k;
+            const w = function () { const t0 = performance.now(); try { return f.apply(this, arguments); } finally { acc.set(name, (acc.get(name) || 0) + performance.now() - t0); } };
+            w.__w = true; proto[k] = w; n++;
+          }
+          proto = Object.getPrototypeOf(proto);
+        }
+      };
+      wrapObj(g, 'game');
+      for (const k of Object.keys(g)) { const o = g[k]; if (o && typeof o === 'object' && !Array.isArray(o) && !(o instanceof Node) && !ArrayBuffer.isView(o) && Object.getPrototypeOf(o) !== Object.prototype) { try { wrapObj(o, k); } catch (e) { /* skip */ } } }
+      if (g.horizon && g.horizon.far) wrapObj(g.horizon.far, 'far');
+      if (g.world && g.world.uploadQ) wrapObj(g.world.uploadQ, 'uploadQ');
+      return n;
+    });
+    const cdp = await P.ctx.newCDPSession(P.page);
+    await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 250 });
+    await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384 });
+    await cdp.send('Profiler.start');
+    const fr = [];
+    for (let i = 0; i < path.length; i++) {
+      await P.ev((c) => window.__place(...c), path[i]);
+      const f = await P.ev((dt) => { const r = window.__frame(dt); const top = [...window.__eb.pacc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, v]) => [k, Math.round(v * 10) / 10]); window.__eb.pacc.clear(); return { js: r.js, hand: r.hand, alloc: r.allocKB, top }; }, DT);
+      fr.push(f);
+    }
+    const { profile } = await cdp.send('Profiler.stop');
+    const { profile: heap } = await cdp.send('HeapProfiler.stopSampling');
+    // the CPU profile's self time by function
+    const self = new Map(), dts = profile.timeDeltas || [], byId = new Map(profile.nodes.map(n => [n.id, n]));
+    const total = dts.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < profile.samples.length; i++) { const n = byId.get(profile.samples[i]), cf = n.callFrame, k = `${cf.functionName || '(anon)'} ${cf.url ? cf.url.split('/').pop() : ''}:${cf.lineNumber + 1}`; self.set(k, (self.get(k) || 0) + (dts[i] || 0)); }
+    const cpuTop = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, v]) => [k, +(v / 1000).toFixed(0), +(100 * v / total).toFixed(1)]);
+    // the sampled allocations by function (self)
+    const al = new Map();
+    const walk = (n) => { const cf = n.callFrame, k = `${cf.functionName || '(anon)'} :${cf.lineNumber + 1}`; al.set(k, (al.get(k) || 0) + n.selfSize); for (const c of n.children || []) walk(c); };
+    walk(heap.head);
+    const allocTotal = [...al.values()].reduce((a, b) => a + b, 0);
+    const allocTop = [...al.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => [k, +(v / 1048576).toFixed(1), +(100 * v / allocTotal).toFixed(1)]);
+    const js = fr.map(f => f.js + f.hand), m = med(js);
+    const spikes = fr.map((f, i) => ({ i, ms: r1(f.js + f.hand), js: r1(f.js), hand: r1(f.hand), alloc: r0(f.alloc), top: f.top.slice(0, 8) })).filter(f => f.ms > 2 * m).sort((a, b) => b.ms - a.ms).slice(0, 12);
+    const sum = new Map(); for (const f of fr) for (const [k, v] of f.top) sum.set(k, (sum.get(k) || 0) + v);
+    const sysTop = [...sum.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, v]) => [k, r1(v / fr.length)]);
+    rec.prof = rec.prof || {};
+    rec.prof[preset] = { wrapped: nW, frames: fr.length, med: r1(m), cpuTop, allocMB: +(allocTotal / 1048576).toFixed(1), allocTop, sysTop, spikes };
+    console.log(`PROF ${preset}: ${nW} methods timed · main thread median ${r1(m)} ms · sampled allocations ${(allocTotal / 1048576).toFixed(1)} MB`);
+    console.log('  cpu self: ' + cpuTop.slice(0, 15).map(x => `${x[0]} ${x[1]}ms ${x[2]}%`).join(' | '));
+    console.log('  alloc: ' + allocTop.slice(0, 12).map(x => `${x[0]} ${x[1]}MB ${x[2]}%`).join(' | '));
+    console.log('  systems (ms a frame, inclusive): ' + sysTop.slice(0, 18).map(x => `${x[0]} ${x[1]}`).join(' | '));
+    for (const sp of spikes.slice(0, 8)) console.log(`  spike #${sp.i}: ${sp.ms} ms (js ${sp.js}, handlers ${sp.hand}, alloc ${sp.alloc} KB): ` + sp.top.map(x => `${x[0]} ${x[1]}`).join(' · '));
+    save();
+    await br.close();
   }
 }
 
