@@ -993,6 +993,181 @@ html:not(.pro) #zenpanel .field { display: none; }
   #invent .erf-card.hint, #invent .erf-eq.glow { animation: none; box-shadow: 0 0 0 4px rgba(255, 201, 77, 0.6); }
   #invent .erf-rays, #invent .erf-big, #invent .erf-card.pop, #invent .erf-bench.wobble .erf-slot { animation: none; }
 }
+
+/* ============================================================================
+   e-ux · the design tokens — the ONE place for the game's colours, radii, spacing and type scale (plan
+   docs/superpowers/plans/2026-10-30-e-ux.md; test/ux.js checks them). Loaded after every other stylesheet of the game:
+   the older variables (style.css --panel …, start.css --st-* …) are aliases of these, so the HUD, the start screen and
+   the menus speak one palette. --ux-scale is the UI scale (⚙ Spiel · „Größe der Anzeige", 90–140 %, src/main/ux.js).
+   Text colours reach 4.5:1 on --ux-panel-solid (the darkest a panel gets behind its text).
+   ============================================================================ */
+:root {
+  /* colour */
+  --ux-bg: #05070e;
+  --ux-panel: rgba(10, 14, 28, 0.86);
+  --ux-panel-2: rgba(16, 22, 42, 0.92);
+  --ux-panel-solid: #0c1122;
+  --ux-pill: rgba(6, 9, 20, 0.72);
+  --ux-line: rgba(140, 200, 255, 0.24);
+  --ux-line-strong: rgba(140, 210, 255, 0.5);
+  --ux-ink: #eef4ff;
+  --ux-ink-2: #aebbd4;
+  --ux-acc: #3af0ff;
+  --ux-acc-ink: #04121a;
+  --ux-acc-soft: rgba(58, 240, 255, 0.18);
+  --ux-acc2: #ff4ad8;
+  --ux-good: #5cf08a;
+  --ux-warn: #ffb347;
+  --ux-bad: #ff6b7a;
+  --ux-gold: #ffd166;
+  /* radius */
+  --ux-r1: 8px;
+  --ux-r2: 12px;
+  --ux-r3: 18px;
+  /* spacing (4-px scale) */
+  --ux-s1: 4px;
+  --ux-s2: 8px;
+  --ux-s3: 12px;
+  --ux-s4: 16px;
+  --ux-s5: 24px;
+  /* type */
+  --ux-scale: 1;
+  --ux-font: 'Rajdhani', 'Sora', 'Segoe UI', system-ui, sans-serif;
+  --ux-display: 'Orbitron', 'Rajdhani', 'Segoe UI', sans-serif;
+  --ux-fs-xs: calc(13px * var(--ux-scale));
+  --ux-fs-s: calc(14px * var(--ux-scale));
+  --ux-fs: calc(16px * var(--ux-scale));
+  --ux-fs-l: calc(20px * var(--ux-scale));
+  --ux-fs-xl: calc(26px * var(--ux-scale));
+  /* depth */
+  --ux-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ux-ring: 0 0 0 3px var(--ux-acc);
+  /* the older names: one palette (style.css, start.css) */
+  --panel: var(--ux-panel);
+  --panel2: var(--ux-panel-2);
+  --line: var(--ux-line);
+  --line2: var(--ux-line-strong);
+  --text: var(--ux-ink);
+  --muted: var(--ux-ink-2);
+  --accent: var(--ux-acc);
+  --accent2: var(--ux-acc2);
+  --gold: var(--ux-gold);
+  --good: var(--ux-good);
+  --bad: var(--ux-bad);
+  --font: var(--ux-font);
+  --display: var(--ux-display);
+  --st-acc: var(--ux-acc);
+  --st-ink: var(--ux-ink);
+  --st-mute: var(--ux-ink-2);
+  --st-bg: var(--ux-panel);
+  --st-bg2: var(--ux-panel-2);
+  --st-line: var(--ux-line);
+  --st-font: var(--ux-font);
+}
+
+/* ============================================================================
+   e-ux · the shared components, built from the tokens (src/ui/tokens.css) — loaded last, so these win. One panel style,
+   one key cap, one pill for every text that floats over the world, readable sizes at 720p, the HUD and the menus
+   following the UI scale (--ux-scale, ⚙ Spiel · „Größe der Anzeige"). Plan docs/superpowers/plans/2026-10-30-e-ux.md.
+   ============================================================================ */
+
+/* ---- one panel, one button language ---- */
+.panel { background: var(--ux-panel); border-color: var(--ux-line); border-radius: var(--ux-r3); box-shadow: var(--ux-shadow); }
+.btn { border-radius: var(--ux-r2); border-color: var(--ux-line-strong); }
+.btn.primary { background: linear-gradient(180deg, #5ff5ff, #23c9dc); border-color: #8ff8ff; color: var(--ux-acc-ink); text-shadow: none; font-weight: 700; }
+.btn.primary:hover { box-shadow: 0 0 0 3px rgba(58, 240, 255, 0.35), 0 0 24px rgba(58, 240, 255, 0.35); }
+.box h2 { font-size: var(--ux-fs-xl); }
+.field label { font-size: var(--ux-fs-xs); color: var(--ux-ink-2); }
+.note { color: var(--ux-ink-2); }
+
+/* ---- the key cap (hints, the strip, the Aktion prompt) ---- */
+.ux-kbd, #keystrip kbd, #hints kbd {
+  display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px;
+  border: 1px solid var(--ux-line-strong); border-bottom-width: 3px; background: rgba(255, 255, 255, 0.1);
+  color: var(--ux-ink); font: 700 var(--ux-fs-xs) var(--ux-font); line-height: 1; white-space: nowrap;
+}
+
+/* ---- the HUD follows the UI scale (each cluster around its own anchor) ---- */
+#hotbar, #itemname, #stats, #air, #xpbar, #xplvl, #toasts, #modebadge, #mirrorchip, #petchip, #minimap, #compass, #hints, #keystrip,
+#vehiclehud, #advhud, #hint, #chatlog { zoom: var(--ux-scale); }   /* (not the bubble or the prompt under the crosshair: they are placed in screen pixels) */
+
+/* ---- text over the world sits on a pill (contrast on a bright sky) ---- */
+#compass { background: var(--ux-pill); border-radius: var(--ux-r2); padding: 3px 8px 4px; color: var(--ux-ink); font-size: var(--ux-fs-xs); line-height: 1.35; }
+#modebadge { font-size: var(--ux-fs-xs); letter-spacing: 1.2px; color: var(--ux-acc); background: var(--ux-pill); border-color: var(--ux-line); }
+#hint { background: var(--ux-pill); border: 1px solid var(--ux-line); border-radius: var(--ux-r2); color: var(--ux-ink); font-size: var(--ux-fs); padding: 8px 14px; text-shadow: none; }
+#hud > #ctxprompt { background: var(--ux-pill); border: 1px solid var(--ux-line); padding: 4px 12px 4px 5px; font-size: var(--ux-fs-s); border-radius: 999px; }
+#hud > #ctxprompt b { font-size: 0; color: transparent; margin-right: 2px; }
+#hud > #ctxprompt b::before { content: attr(data-key); display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--ux-acc); color: var(--ux-acc-ink); font: 700 var(--ux-fs-xs) var(--ux-font); vertical-align: middle; }
+#hud > #ctxprompt b:not([data-key])::before { content: none; }
+#hud > #ctxprompt b:not([data-key]) { font-size: inherit; color: #9affd8; }
+/* the quest ring and the Aktion prompt share the place under the crosshair: the ring steps down while the prompt shows */
+#hud:has(> #ctxprompt.on) > #qring { top: calc(50% + 64px); }
+
+/* ---- the key-hint strip: only what you can do now (src/main/ux.js) ---- */
+#keystrip { position: absolute; right: 18px; bottom: 86px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; opacity: 0; transition: opacity .45s ease; }
+#keystrip.on { opacity: 1; }
+#keystrip .ks { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 12px; border-radius: var(--ux-r2); background: var(--ux-pill); border: 1px solid var(--ux-line); color: var(--ux-ink); font: 600 var(--ux-fs-s) var(--ux-font); }
+#ui.touchon #keystrip, #hud.cockpit #keystrip { display: none; }
+@media (prefers-reduced-motion: reduce) { #keystrip { transition: none; } }
+
+/* ---- the first minute's hints: the picture carries the key, the line one short word ---- */
+#hints .hint { background: var(--ux-panel-2); border-color: var(--ux-line-strong); }
+#hints .picto { color: var(--ux-acc); }
+
+/* ---- the cockpit: its key line on a pill, the walking chips away ---- */
+#hud.cockpit #modebadge, #hud.cockpit #mirrorchip, #hud.cockpit #petchip, #hud.ux-ride #modebadge, #hud.ux-ride #mirrorchip, #hud.ux-ride #petchip { display: none; }
+#vehiclehud small { display: inline-block; max-width: min(860px, 86vw); margin-top: 6px; padding: 5px 12px; border-radius: var(--ux-r2); background: var(--ux-pill); color: var(--ux-ink); font-size: var(--ux-fs-xs); line-height: 1.5; white-space: normal; text-shadow: none; }
+#vehiclehud small b { color: var(--ux-acc); }
+
+/* ---- the loading screen: the words on a card, the counters a Profi detail ---- */
+#loading #loadmsg { font-size: var(--ux-fs-l) !important; color: var(--ux-ink); }
+#loading .tip { background: var(--ux-pill); border: 1px solid var(--ux-line); border-radius: var(--ux-r2); padding: 10px 16px; color: var(--ux-ink); font-size: var(--ux-fs); min-height: 0; }
+#loading .tip:empty { display: none; }
+#loading .ldetail { font-size: var(--ux-fs-xs); }
+html:not(.pro) #loading .ldetail { visibility: hidden; }
+
+/* ---- the start screen: one row of quiet secondary buttons under the tiles ---- */
+#title .tile.play { border-color: var(--ux-acc); box-shadow: 0 0 0 1px rgba(58, 240, 255, 0.35), 0 16px 50px rgba(0, 0, 0, 0.45); }
+#title .btn.kids { margin: 2px auto 0; min-width: 0; padding: 0 16px; font: 600 var(--st-fs) var(--ux-font); background: var(--ux-panel); border: 1px solid rgba(92, 240, 138, 0.55); border-radius: var(--ux-r2); }
+#title .sub .kids { border-color: rgba(92, 240, 138, 0.6); }
+#title .sub { flex-wrap: wrap; justify-content: center; }
+#title .studionote .btn.tiny { background: var(--ux-panel); border: 1px solid var(--ux-line-strong); }
+#title .foot .credit { color: var(--ux-ink-2); }
+
+/* ---- the pause menu: two columns when the screen is short, so nothing hides below the fold ---- */
+@media (min-width: 1000px) and (max-height: 900px) {
+  #pause .panel.box { min-width: min(1000px, 96vw); }
+  #pause .pgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 18px; row-gap: 8px; }
+  #pause .ptop { grid-column: 1; grid-row: 1 / span 2; }
+  #pause .pside { grid-column: 2; grid-row: 1; }
+  #pause .pbottom { grid-column: 2; grid-row: 2; align-self: end; }
+  #pause #mppanel .subtitle, #pause #zenpanel .subtitle { margin-top: 0; }
+}
+
+/* ---- the settings: header and Done stay, the rows scroll; search and ↺ Empfohlen; readable tips ---- */
+#settings .panel.box { display: flex; flex-direction: column; max-height: 92vh; overflow: hidden; }
+#settings #setbody { flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 6px; }
+#setbar { display: flex; gap: var(--ux-s2); margin: 0 0 var(--ux-s2); align-items: stretch; }
+#setsearch { flex: 1 1 auto; min-width: 0; min-height: 40px; font: 600 var(--ux-fs) var(--ux-font); color: var(--ux-ink); background: rgba(5, 9, 20, 0.85); border: 1px solid var(--ux-line-strong); border-radius: var(--ux-r2); padding: 0 12px; outline: none; }
+#setsearch:focus { border-color: var(--ux-acc); box-shadow: 0 0 0 2px var(--ux-acc-soft); }
+#setsearch::placeholder { color: #9aa8c2; }
+#setrec { min-height: 40px; white-space: nowrap; }
+#settabs.dim button:not(:hover) { opacity: 0.55; }
+.setgrouphead { font-family: var(--ux-display); font-size: var(--ux-fs-s); color: var(--ux-ink); margin: var(--ux-s4) 0 0; padding-bottom: 4px; border-bottom: 1px solid var(--ux-line); }
+.setnone { margin: var(--ux-s4) 0; font-size: var(--ux-fs); }
+.setip { font-size: var(--ux-fs-xs); color: var(--ux-ink-2); }
+.setsec h3 { font-size: var(--ux-fs-xs); }
+.setrow .sethead label, .setrow.sw .swl { font-size: var(--ux-fs); }
+.setrow .val { font-size: var(--ux-fs-xs); }
+.tabs button { font-size: var(--ux-fs-s); min-height: 40px; }
+.pvwrap { flex-direction: row; align-self: flex-start; gap: var(--ux-s3); margin: 0 0 var(--ux-s2); }
+.pv { width: 192px; max-width: 40vw; }
+.pvnote { font-size: var(--ux-fs-xs); }
+/* Fertig on the left, 📜 on the right of the same line (the panel no longer stretches them across) */
+#settings .panel.box { position: relative; }
+#settings .panel.box > [data-act="setback"] { align-self: flex-start; min-width: 180px; min-height: 44px; }
+#settings .panel.box > [data-legal] { position: absolute; right: 26px; bottom: 22px; width: auto; min-width: 0; min-height: 44px; }
+.cost { font-size: var(--ux-fs-xs); }
 </style></head><body><div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"></div></div>
 <script type="text/js-worker" id="worker-src">
 
@@ -91514,6 +91689,28 @@ VR.I18N.add('en',{
 'story.ctx.scan':'Scan',
 'story.ctx.touch':'Touch',
 
+
+'ux.k.up':"Up",
+'ux.k.down':"Down",
+'ux.k.fly':"Fly",
+'ux.k.build':"Build",
+'ux.k.inv':"Inventory",
+'ux.k.journal':"Journal",
+'ux.k.map':"Map",
+'ux.k.veh':"Action",
+'ux.h.move':"walk",
+'ux.h.moveTouch':"🕹 drag on the left = walk",
+'ux.h.look':"move the mouse = look around",
+'ux.h.lookTouch':"drag on the right = look around",
+'ux.h.v':"does the right thing: talk, get in, travel",
+'ux.set.scale':"Display size",
+'ux.set.scaleTip':"Makes bars, buttons and text in the game bigger or smaller (90–140 %).",
+'ux.set.search':"🔎 Find a setting …",
+'ux.set.rec':"↺ Recommended",
+'ux.set.recTip':"Sets picture, display and size to what this computer is recommended.",
+'ux.set.none':"Nothing found — try another word.",
+'ux.set.recDone':"↺ Recommended: ",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -94217,6 +94414,28 @@ VR.I18N.add('de',{
 'story.act.j':'Kleine Aufgabe',
 'story.ctx.scan':'Scannen',
 'story.ctx.touch':'Berühren',
+
+
+'ux.k.up':"Hoch",
+'ux.k.down':"Runter",
+'ux.k.fly':"Fliegen",
+'ux.k.build':"Bauen",
+'ux.k.inv':"Inventar",
+'ux.k.journal':"Tagebuch",
+'ux.k.map':"Karte",
+'ux.k.veh':"Aktion",
+'ux.h.move':"laufen",
+'ux.h.moveTouch':"🕹 links ziehen = laufen",
+'ux.h.look':"Maus bewegen = umschauen",
+'ux.h.lookTouch':"rechts ziehen = umschauen",
+'ux.h.v':"tut das Passende: reden, einsteigen, reisen",
+'ux.set.scale':"Größe der Anzeige",
+'ux.set.scaleTip':"Macht Leisten, Knöpfe und Schrift im Spiel größer oder kleiner (90–140 %).",
+'ux.set.search':"🔎 Einstellung suchen …",
+'ux.set.rec':"↺ Empfohlen",
+'ux.set.recTip':"Stellt Bild, Anzeige und Größe so ein, wie es für diesen Rechner empfohlen ist.",
+'ux.set.none':"Nichts gefunden — versuch ein anderes Wort.",
+'ux.set.recDone':"↺ Empfohlen: ",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -138118,7 +138337,7 @@ lastText=text;
 if(!text){d.pr.classList.remove('on');return;}
 const i=text.indexOf('] ');
 d.pr.innerHTML='';
-const b=document.createElement('b');b.textContent=text.slice(0,i+1);d.pr.appendChild(b);
+const b=document.createElement('b');b.textContent=text.slice(0,i+1);b.dataset.key=text.slice(1,i);d.pr.appendChild(b);
 d.pr.appendChild(document.createTextNode(' '+text.slice(i+2)));
 d.pr.classList.add('on');
 void res;
@@ -142548,7 +142767,7 @@ const p=prefs(),ws=ST.worldsCache,last=ws&&ws[0];
 for(const k of TILES){
 const b=$(`#title .tile[data-tile="${k}"]`);if(!b)continue;
 const lbl=k==='play'?(ws===null?'▶ …':ws.length?tl('play'):tl('first')):tl(k);
-$('.lbl',b).textContent=lbl;
+$('.lbl',b).textContent=lbl.replace(/^[^\p{L}\p{N}\s]+\s+(?=\p{L})/u,'');
 $('.sub2',b).textContent=k==='play'?(last?last.name:(ws&&ws.length===0?tx('start.myWorld',null,'Meine Welt','My World'):'')):k==='bauen'?tx('start.bauenSub',null,'Häuser & Möbel setzen','Place houses & furniture'):k==='erschaffen'?tx('start.erschaffenSub',null,'Haus · Fahrzeug · Figur …','House · vehicle · figure …'):tx('start.meinsSub',null,'Favoriten · Designs · Welten','Favourites · designs · worlds');
 b.title=k==='play'?(last?tx('start.playT',{n:last.name},'Weiter in „{n}“, wo du warst','Back into “{n}”, where you were'):tx('start.firstT',null,'Macht deine erste Welt und bringt dich hinein','Makes your first world and takes you in')):'';
 if(k==='play')b.classList.toggle('pulse',!!(VR.Hints&&VR.Hints.want('play')));
@@ -142829,6 +143048,7 @@ const inp=g.input,keys= !!(inp&&(inp.down('KeyW')||inp.down('KeyA')||inp.down('K
 const d=Math.hypot(p.pos[0]-hintState.lastPos[0],p.pos[2]-hintState.lastPos[2]);
 if(keys||d>1.5){H.done('move');hintState.lastPos=p.pos.slice();hintState.standAt=now;}
 if(p.flying)H.done('fly');
+if(VR.UX&&VR.UX.ownsHints&&VR.UX.ownsHints())return;
 const st=H.read();
 if(!st.done.move){if(now-hintState.standAt>5000&&H.want('move'))H.show('move',hintOf('move'));return;}
 if(!st.done.fly&&p.mode!=='survival'&&H.want('fly'))H.show('fly',hintOf('fly'));
@@ -143936,7 +144156,7 @@ if(bub||typeof document==='undefined'|| !document.createElement)return bub;
 if(!document.getElementById('funkecss')){
 const st=document.createElement('style');st.id='funkecss';
 st.textContent='#funkebub{position:absolute;left:0;top:0;max-width:min(330px,70vw);padding:6px 13px 8px;border-radius:15px;background:rgba(248,252,255,0.96);color:#16222e;font:600 15px/1.28 var(--font,sans-serif);box-shadow:0 5px 18px rgba(0,0,0,.30),0 0 0 2px rgba(70,232,255,.85),0 0 22px rgba(70,232,255,.45);pointer-events:none;display:none;z-index:28;will-change:transform}'
-+'#funkebub b{display:block;font:700 10px/1.4 var(--display,sans-serif);letter-spacing:.12em;color:#0a9fc0;text-transform:uppercase}'
++'#funkebub b{display:block;font:700 12px/1.3 var(--display,sans-serif);letter-spacing:.12em;color:#0a9fc0;text-transform:uppercase}'
 +'#funkebub .pic{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle}#funkebub kbd{display:inline-block;min-width:16px;padding:0 4px;border:1px solid #9fb2c2;border-bottom-width:2px;border-radius:4px;font:700 11px/16px var(--font,sans-serif);text-align:center;background:#fff;color:#223}'
 +'#funkebub .x{pointer-events:auto;margin-left:8px;border:0;background:none;color:#7a8a99;font:700 13px sans-serif;cursor:pointer}'
 +'#funkebub:after{content:"";position:absolute;top:50%;margin-top:-7px;border:7px solid transparent}#funkebub.l:after{right:-13px;border-left-color:rgba(248,252,255,.96)}#funkebub.r:after{left:-13px;border-right-color:rgba(248,252,255,.96)}'
@@ -144238,7 +144458,11 @@ if(cw>0.05){const cx=(vp[0]*x+vp[4]*y+vp[8]*z+vp[12])/cw,cy=(vp[1]*x+vp[5]*y+vp[
 else{sx=W-40;sy=H*0.45;left=true;}
 const bw=el.offsetWidth||240,bh=el.offsetHeight||50;
 let X=left?sx-26-bw:sx+26,Y=sy-bh/2;
-X=clamp(X,10,W-bw-10);Y=clamp(Y,10,H-bh-10);
+X=clamp(X,10,W-bw-10);Y=clamp(Y,10,H-bh-96);
+if(X+bw>W-200&&Y<236)Y=236;
+{const ks=VR.UX&&VR.UX.stripBox;if(ks&&X+bw>W-ks.w&&Y+bh>H-ks.h)Y=Math.max(10,H-ks.h-bh-8);}
+
+if(X<W/2+160&&X+bw>W/2-160&&Y<H/2+66&&Y+bh>H/2-14)Y=Math.max(10,H/2-18-bh);
 if(!this.bx||Math.abs(this.bx[0]-X)>=1||Math.abs(this.bx[1]-Y)>=1||this.bx[2]!==left){this.bx=[X,Y,left];el.style.transform='translate('+(X|0)+'px,'+(Y|0)+'px)';el.className=left?'l':'r';}
 }
 
@@ -156007,6 +156231,263 @@ return list.map(o=>Object.assign({source:'regie',place:'',eta:0,start:()=>(o.act
 if(VR.Regie&&VR.Regie.addSource)VR.Regie.addSource(RA.source);
 void game;
 if(typeof module!=='undefined'&&module.exports)module.exports=RA;
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const X=VR.UX=VR.UX||{};
+const dict=(l)=>(VR.I18N&&VR.I18N.dict&&VR.I18N.dict[l])||{};
+const W=(k,de,en,l)=>{const v=dict(l)[k];return typeof v==='string'?v:(l==='en'?en:de);};
+const lang=()=>(VR.I18N&&VR.I18N.lang==='en'?'en':'de');
+const tx=(k,v,de,en)=>W(k,de,en,lang());
+
+
+X.SCALE_MIN=0.9;X.SCALE_MAX=1.4;
+X.clampScale=function(v){
+const n=typeof v==='number'?v:typeof v==='string'&&v.trim()? +v:NaN;
+if(!Number.isFinite(n))return 1;
+return Math.min(X.SCALE_MAX,Math.max(X.SCALE_MIN,Math.round(n*20)/20));
+};
+
+
+
+const KEYLAB={de:{Space:'Leertaste',ShiftLeft:'Umschalt',ShiftRight:'Umschalt'},en:{Space:'Space',ShiftLeft:'Shift',ShiftRight:'Shift'}};
+const keyLab=(code,l)=>{if(!code)return'—';const t=KEYLAB[l][code];if(t)return t;let m= /^Key([A-Z])$/.exec(code);if(m)return m[1];m= /^Digit(\d)$/.exec(code);if(m)return m[1];return code;};
+const keyOf=(name,l,binds)=>{const B=binds||(VR.Binds&&VR.Binds.current)||null;const c=B&&B.codesFor?B.codesFor(name):null;return keyLab(c&&c.length?c[0]:name,l);};
+X.STRIP_MAX=4;
+X.strip=function(s,l,binds){
+l=l==='en'?'en':'de';
+if(!s||s.menu||s.touch||s.mode!=='foot')return[];
+const out=[],add=(id,name,k,de,en,keyText)=>{if(out.length<X.STRIP_MAX)out.push({id,key:keyText||keyOf(name,l,binds),text:W(k,de,en,l)});};
+if(s.flying){add('up','Space','ux.k.up','Hoch','Up');add('down','ShiftLeft','ux.k.down','Runter','Down');}
+else if(s.canFly)add('fly','Space','ux.k.fly','Fliegen','Fly',keyOf('Space',l,binds)+' 2×');
+add('inv','KeyE',s.creative?'ux.k.build':'ux.k.inv',s.creative?'Bauen':'Inventar',s.creative?'Build':'Inventory');
+if(s.quests)add('journal','KeyJ','ux.k.journal','Tagebuch','Journal');
+add('map','KeyM','ux.k.map','Karte','Map');
+if(s.ctxKey!=='veh')add('veh','KeyV','ux.k.veh','Aktion','Action');
+return out;
+};
+
+
+
+X.ONBOARD=['move','look','v'];
+X.onboard=function(st){
+if(!st||st.menu)return null;
+const d=st.done||{},q= +st.quiet||0;
+for(const id of X.ONBOARD){
+if(d[id])continue;
+if(id==='v')return st.ctx||q>=10?'v':null;
+return q>=3?id:null;
+}
+return null;
+};
+
+
+const WEAK= /SwiftShader|llvmpipe|Mesa|Mali-[4T]|Mali-G[0-6]\d\b|Adreno \(TM\) [3-5]|PowerVR|Intel\(R\) HD Graphics( [2-5]\d{3})?\b|Intel\(R\) HD Graphics [2-5]\d{2}\b|GMA|Apple A[0-9]\b/i;
+const MID= /Intel\(R\) (UHD|Iris)|Intel\(R\) HD Graphics 6|Adreno \(TM\) 6|Mali-G7|Radeon\(TM\) (Vega|Graphics)|GeForce (9|GT |MX)/i;
+X.recommend=function(m){
+m=m||{};const cores=m.cores||4,mem=m.mem||8,gpu=String(m.gpu||'');
+if(cores<=2||mem<=2||WEAK.test(gpu))return'potato';
+if(cores<=4||MID.test(gpu))return'low';
+return'balanced';
+};
+
+
+const fold=(s)=>String(s||'').toLowerCase().replace(/ß/g,'ss').replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u')
+.normalize('NFD').replace(/[̀-ͯ]/g,'');
+X.match=function(q,text){
+const words=fold(q).split(/\s+/).filter(Boolean);if(!words.length)return true;
+const t=fold(text);return words.every(w=>t.indexOf(w)>=0);
+};
+
+
+if(typeof document==='undefined'||typeof window==='undefined'|| !document.documentElement|| !document.documentElement.style)return;
+const game=()=>VR.game;
+const $=(id)=>document.getElementById(id);
+
+
+X.applyScale=function(v){const s=X.clampScale(v);try{document.documentElement.style.setProperty('--ux-scale',String(s));}catch(e){}return s;};
+X.setScale=function(v){const g=game(),s=X.applyScale(v);if(g&&g.settings){g.settings.uiScale=s;if(g.saveSettings)g.saveSettings();}return s;};
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'uiScale',g:'play',sec:'play',t:'slider',lab:'ux.set.scale',tip:'ux.set.scaleTip',def:1,min:X.SCALE_MIN,max:X.SCALE_MAX,step:0.05,fmt:'pct'});
+const G=VR.Game;
+if(G&&G.prototype.applySettings&& !G.prototype.applySettings.__ux){
+const oa=G.prototype.applySettings;
+G.prototype.applySettings=function(key){const r=oa.apply(this,arguments);if(key==='*'||key==='uiScale'||key===undefined)X.applyScale(this.settings&&this.settings.uiScale!==undefined?this.settings.uiScale:1);return r;};
+G.prototype.applySettings.__ux=true;
+}
+
+
+let strip=null,stripSig='',stripAt=0;
+const SHOW_S=9;
+function stripEl(){
+if(strip&&strip.isConnected)return strip;
+const hud=$('hud');if(!hud)return null;
+strip=document.createElement('div');strip.id='keystrip';strip.setAttribute('role','status');strip.setAttribute('aria-live','off');
+hud.appendChild(strip);return strip;
+}
+X.state=function(g){
+const p=g.player,ui=g.ui,gad=g.gadgets,pr=$('ctxprompt');
+const mode=(g.photo||(g.photoCam&&g.photoCam.on))?'photo':(gad&&(gad.riding||gad.drone))?((g.cockpit&&g.cockpit.wasActive)?'cockpit':'vehicle'):'foot';
+let quests=false;try{quests= !!(VR.Quests&&VR.Quests.on&&VR.Quests.on());}catch(e){quests=false;}
+return{
+mode,menu: !!(ui.screen||ui.typing||g.studioOpen||g.arrival||(g.wow&&g.wow.active)),
+touch: !!(document.getElementById('ui')&&document.getElementById('ui').classList.contains('touchon')),
+flying: !!p.flying,canFly:p.mode!=='survival',creative:p.mode!=='survival',quests,
+ctxKey:pr&&pr.classList.contains('on')?'veh':null,
+};
+};
+function stripTick(g,now){
+const el=stripEl();if(!el)return;
+const st=g.state==='play'&&g.player?X.state(g):null,list=st?X.strip(st,lang()):[];
+const ride= !!st&&(st.mode==='vehicle'||st.mode==='cockpit'),hud=el.parentNode;
+if(hud&&hud.classList.contains('ux-ride')!==ride)hud.classList.toggle('ux-ride',ride);
+const sig=list.map(e=>e.id+e.key+e.text).join('|');
+if(sig!==stripSig){
+stripSig=sig;stripAt=now;el.innerHTML='';
+for(const e of list){const r=document.createElement('span');r.className='ks';r.dataset.k=e.id;const k=document.createElement('kbd');k.textContent=e.key;const t=document.createElement('span');t.textContent=e.text;r.appendChild(t);r.appendChild(k);el.appendChild(r);}
+}
+const pro=document.documentElement.classList.contains('pro'),mode=(g.settings&&g.settings.hudMode)||'auto';
+const show=list.length>0&&(mode==='always'||now-stripAt<SHOW_S*1000||(!pro&&firstMin.active));
+el.classList.toggle('on',show);
+
+if(show){const r=el.getBoundingClientRect();X.stripBox={w:innerWidth-r.left+8,h:innerHeight-r.top+8};}else X.stripBox=null;
+}
+
+
+const firstMin={active:false,quiet:0,last:0,pos:null,yaw:0,look:0,playing:false};
+const hintOf=(id)=>{
+const touch=document.getElementById('ui')&&document.getElementById('ui').classList.contains('touchon');
+if(id==='move')return touch?{text:tx('ux.h.moveTouch',null,'🕹 links ziehen = laufen','🕹 drag on the left = walk'),picto:[]}:{text:tx('ux.h.move',null,'laufen','walk'),picto:['W','A','S','D']};
+if(id==='look')return touch?{text:tx('ux.h.lookTouch',null,'rechts ziehen = umschauen','drag on the right = look around'),picto:['finger']}:{text:tx('ux.h.look',null,'Maus bewegen = umschauen','move the mouse = look around'),picto:['mouse']};
+if(id==='v')return{text:tx('ux.h.v',null,'tut das Passende: reden, einsteigen, reisen','does the right thing: talk, get in, travel'),picto:[keyOf('KeyV',lang())]};
+return null;
+};
+function firstTick(g,now,dt){
+const H=VR.Hints,p=g.player;if(!H|| !p)return;
+const playing=g.state==='play'&& !g.studioOpen;
+if(playing&& !firstMin.playing){firstMin.pos=p.pos.slice();firstMin.yaw=p.yaw;firstMin.look=0;firstMin.quiet=0;}
+firstMin.playing=playing;
+const st=H.read(),allDone=X.ONBOARD.every(id=>st.done[id]);
+firstMin.active=playing&& !allDone;
+if(!playing||allDone)return;
+const inp=g.input,down=(k)=> !!(inp&&inp.down&&inp.down(k));
+const moved=down('KeyW')||down('KeyA')||down('KeyS')||down('KeyD')||Math.hypot(p.pos[0]-firstMin.pos[0],p.pos[2]-firstMin.pos[2])>1.5;
+let dy=Math.abs(p.yaw-firstMin.yaw);if(dy>Math.PI)dy=Math.abs(dy-Math.PI*2);
+firstMin.look+=dy;firstMin.yaw=p.yaw;
+if(moved){H.done('move');firstMin.pos=p.pos.slice();}
+if(firstMin.look>0.6)H.done('look');
+if(down('KeyV'))H.done('v');
+const busy=moved||dy>0.01;
+firstMin.quiet=busy?0:firstMin.quiet+dt;
+const pr=$('ctxprompt'),menu= !!(g.ui.screen||g.ui.typing||g.arrival||(g.wow&&g.wow.active)||(g.photoCam&&g.photoCam.on));
+const want=X.onboard({done:H.read().done,quiet:firstMin.quiet,menu,ctx: !!(pr&&pr.classList.contains('on'))});
+const cur=H.current();
+if(cur&&X.ONBOARD.indexOf(cur)>=0&&H.read().done[cur])H.done(cur);
+if(want&& !H.current()&&H.want(want)){const h=hintOf(want);if(h)H.show(want,h);}
+}
+X.firstMin=firstMin;
+
+X.ownsHints=()=> !!(VR.Hints&& !X.ONBOARD.every(id=>VR.Hints.read().done[id]));
+
+let lastT=0;
+X.tick=function(){
+const g=game();if(!g|| !g.ui)return;
+const now=performance.now(),dt=lastT?Math.min(1,(now-lastT)/1000):0.25;lastT=now;
+try{stripTick(g,now);}catch(e){}
+try{firstTick(g,now,dt);}catch(e){}
+};
+setInterval(X.tick,250);
+if(VR.I18N&&VR.I18N.on)VR.I18N.on(()=>{stripSig='';const H=VR.Hints,id=H&&H.current();if(id&&X.ONBOARD.indexOf(id)>=0&&H.retext)H.retext(hintOf(id).text);});
+
+
+const UI=VR.UI;
+
+if(UI&&UI.prototype.build&& !UI.prototype.build.__ux){
+const ob=UI.prototype.build;
+UI.prototype.build=function(){
+const r=ob.apply(this,arguments);
+try{
+const k=document.querySelector('#title .kids'),sub=document.querySelector('#title .sub');
+if(k&&sub&&k.parentNode!==sub){k.classList.remove('btn');k.classList.add('lnk');sub.insertBefore(k,sub.firstChild);const d=document.createElement('span');d.className='dot';d.setAttribute('aria-hidden','true');d.textContent='·';k.after(d);}
+}catch(e){}
+return r;
+};
+UI.prototype.build.__ux=true;
+}
+X.settingsQuery='';
+if(UI&&UI.prototype.showSettings&& !UI.prototype.showSettings.__ux){
+const os=UI.prototype.showSettings;
+UI.prototype.showSettings=function(group){
+if(group)X.settingsQuery='';
+const r=os.apply(this,arguments);
+try{settingsBar(this);if(X.settingsQuery)searchRender(this);}catch(e){console.warn('ux settings',e);}
+return r;
+};
+UI.prototype.showSettings.__ux=true;
+}
+function settingsBar(ui){
+const tabs=$('settabs');if(!tabs)return;
+let bar=$('setbar');
+if(!bar){
+bar=document.createElement('div');bar.id='setbar';
+const inp=document.createElement('input');inp.type='search';inp.id='setsearch';inp.autocomplete='off';inp.spellcheck=false;
+inp.addEventListener('keydown',(e)=>{e.stopPropagation();if(e.key==='Escape'&&inp.value){e.preventDefault();inp.value='';X.settingsQuery='';ui.showSettings();}});
+inp.addEventListener('input',()=>{X.settingsQuery=inp.value;if(!inp.value.trim()){ui.showSettings();inp.focus();}else searchRender(ui);});
+const rec=document.createElement('button');rec.type='button';rec.className='btn small';rec.id='setrec';
+rec.onclick=()=>recommendNow(ui);
+bar.appendChild(inp);bar.appendChild(rec);
+tabs.after(bar);
+}
+const inp=$('setsearch'),rec=$('setrec');
+inp.placeholder=tx('ux.set.search',null,'🔎 Einstellung suchen …','🔎 Find a setting …');inp.setAttribute('aria-label',inp.placeholder);
+if(inp.value!==X.settingsQuery)inp.value=X.settingsQuery;
+rec.textContent=tx('ux.set.rec',null,'↺ Empfohlen','↺ Recommended');
+rec.title=tx('ux.set.recTip',null,'Stellt Bild, Anzeige und Größe so ein, wie es für diesen Rechner empfohlen ist.','Sets picture, display and size to what this computer is recommended.');
+tabs.classList.toggle('dim',!!X.settingsQuery.trim());
+}
+
+function searchRender(ui){
+const body=$('setbody');if(!body|| !VR.SettingsPanel)return;
+body.innerHTML='';
+for(const gr of VR.Settings.GROUPS){
+const part=document.createElement('div');part.className='setgroup';
+VR.SettingsPanel.render(ui,part,gr.id);
+const pv=part.querySelector('.pvwrap');if(pv)pv.remove();
+let n=0;
+for(const row of part.querySelectorAll('.setrow')){const ok=X.match(X.settingsQuery,row.textContent+' '+(row.title||''));row.hidden= !ok;if(ok)n++;}
+for(const sec of part.querySelectorAll('.setsec'))sec.hidden= !sec.querySelector('.setrow:not([hidden])');
+for(const nt of part.querySelectorAll('.gpunote'))nt.remove();
+if(!n)continue;
+const h=document.createElement('div');h.className='setgrouphead';h.textContent=(gr.icon?gr.icon+' ':'')+(VR.I18N?VR.I18N.t(gr.lab):gr.de);
+body.appendChild(h);body.appendChild(part);
+}
+if(!body.children.length){const e=document.createElement('div');e.className='note setnone';e.textContent=tx('ux.set.none',null,'Nichts gefunden — versuch ein anderes Wort.','Nothing found — try another word.');body.appendChild(e);}
+}
+function recommendNow(ui){
+const g=ui.game;if(!g)return;
+const p=X.recommend({cores:navigator.hardwareConcurrency,mem:navigator.deviceMemory,gpu:VR.GL&&VR.GL.rendererName});
+if(g.applyPreset)g.applyPreset(p);
+g.settings.uiScale=1;g.settings.hudMode='auto';
+g.applySettings('*');g.saveSettings();
+X.settingsQuery='';ui.showSettings();
+const name=VR.I18N?VR.I18N.t({potato:'g.set.pVeryLow',low:'g.set.pLow',balanced:'g.set.pBalanced'}[p]):p;
+if(ui.hint)ui.hint(tx('ux.set.recDone',null,'↺ Empfohlen: ','↺ Recommended: ')+name,2600);
+}
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 VR.GenieLazy=function(){
