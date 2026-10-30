@@ -3027,6 +3027,7 @@
     "g.rpg.boss.won.sub": "+{xp} XP · +{t} Heliataler · a splendid find awaits",
     "g.rpg.boss.hint": "Core Beacon · {d} m",
     "g.rpg.boss.ready": "Two beacons free — the Core Beacon in {region} wakes. Its guardian waits!",
+    "g.rpg.map.core": "Core Beacon",
     // ---- a-rpg end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

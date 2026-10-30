@@ -224,18 +224,24 @@
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = 'rgba(140,180,255,.07)'; ctx.lineWidth = 1;
     for (let i = 0; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(i * W / 8, 0); ctx.lineTo(i * W / 8, H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i * H / 8); ctx.lineTo(W, i * H / 8); ctx.stroke(); }
-    const S = B.REGION;
     for (const r of C.regions) {
-      const [ix, iz] = r.id.split('_').map(Number), px = X(ix * S), pz = Z(iz * S), sz = S * k;
-      const healed = r.boss === 'won', t = r.pct / 100;
-      ctx.fillStyle = healed ? 'rgba(255,205,90,.20)' : `rgba(${Math.round(150 - 110 * t)},${Math.round(70 + 150 * t)},${Math.round(190 + 40 * t)},${0.12 + 0.16 * t})`;
-      ctx.fillRect(px, pz, sz, sz);
-      ctx.strokeStyle = healed ? 'rgba(255,214,110,.75)' : 'rgba(140,220,255,.35)'; ctx.lineWidth = 2; ctx.setLineDash(healed ? [] : [6, 5]); ctx.strokeRect(px + 1, pz + 1, sz - 2, sz - 2); ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(230,240,255,.85)'; ctx.font = '600 12px sans-serif'; ctx.fillText(RP.regionName(r) + ' · ' + r.pct + ' %', px + 8, pz + 18);
+      let rx = 0; for (const s of r.sites) rx = Math.max(rx, Math.hypot(s.x - r.cx, s.z - r.cz));
+      const px = X(r.cx), pz = Z(r.cz), rad = Math.max(46, (rx + 90) * k), healed = r.boss === 'won', t = r.pct / 100;
+      const gr = ctx.createRadialGradient(px, pz, rad * 0.2, px, pz, rad);
+      const col = healed ? '255,205,90' : `${Math.round(190 - 140 * t)},${Math.round(80 + 150 * t)},${Math.round(220 + 20 * t)}`;
+      gr.addColorStop(0, `rgba(${col},${0.30 + 0.15 * t})`); gr.addColorStop(1, `rgba(${col},0.04)`);
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(px, pz, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(${col},.8)`; ctx.lineWidth = 2; ctx.setLineDash(healed ? [] : [7, 6]); ctx.stroke(); ctx.setLineDash([]);
+      const lab = RP.regionName(r) + ' · ' + r.pct + ' %';
+      ctx.font = '700 13px sans-serif'; const tw = ctx.measureText(lab).width, ly = Math.max(16, pz - rad - 8);
+      ctx.fillStyle = 'rgba(8,12,26,.75)'; ctx.fillRect(px - tw / 2 - 8, ly - 14, tw + 16, 20);
+      ctx.fillStyle = healed ? '#ffe08a' : '#e8f4ff'; ctx.fillText(lab, px - tw / 2, ly);
       if (r.core && r.boss !== 'none' && r.boss !== 'locked') {
         const qx = X(r.core[0]), qz = Z(r.core[1]);
-        ctx.fillStyle = healed ? '#ffd76a' : '#ff5ea8'; ctx.beginPath(); ctx.moveTo(qx, qz - 13); ctx.lineTo(qx + 9, qz + 8); ctx.lineTo(qx - 9, qz + 8); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.shadowColor = healed ? '#ffd76a' : '#ff5ea8'; ctx.shadowBlur = 16;
+        ctx.fillStyle = healed ? '#ffd76a' : '#ff5ea8'; ctx.beginPath(); ctx.moveTo(qx, qz - 14); ctx.lineTo(qx + 10, qz + 9); ctx.lineTo(qx - 10, qz + 9); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.font = '700 11px sans-serif'; ctx.fillStyle = healed ? '#ffe08a' : '#ffc0de'; ctx.fillText(T('g.rpg.map.core'), qx + 13, qz + 4);
       }
     }
     // the links between freed beacons (Schnellreise)
@@ -363,21 +369,21 @@
     const s = document.createElement('style'); s.id = 'rpgcss'; s.textContent = CSS; document.head.appendChild(s);
   }
   const CSS = `
-.rpgcard { width: min(860px, 96vw); max-height: 92vh; overflow: auto; }
+.rpgcard { width: min(860px, 96vw); max-height: 94vh; overflow: auto; margin: 0 auto; padding-top: 14px !important; padding-bottom: 14px !important; }
 .rpgcard .rhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .rpgcard .rtabs { display: flex; gap: 6px; }
 .rpgcard .rtabs button { font: 800 16px/1 var(--display, sans-serif); color: #cfe0ff; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 9px 18px; cursor: pointer; }
 .rpgcard .rtabs button.on { color: #1a1206; background: linear-gradient(135deg, #ffe58f, #ffae42); border-color: transparent; box-shadow: 0 0 14px rgba(255,190,80,.5); }
 .rhero { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
 @media (max-width: 720px) { .rhero { grid-template-columns: 1fr; } }
-.rfig { position: relative; height: 330px; border-radius: 16px; background: radial-gradient(circle at 50% 40%, rgba(90,140,255,.22), rgba(10,14,28,.6) 70%); border: 1px solid rgba(140,180,255,.18); }
-.rfig .fig { position: absolute; left: 70px; top: 40px; width: 160px; height: 220px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+.rfig { position: relative; height: 312px; border-radius: 16px; background: radial-gradient(circle at 50% 40%, rgba(90,140,255,.22), rgba(10,14,28,.6) 70%); border: 1px solid rgba(140,180,255,.18); }
+.rfig .fig { position: absolute; left: 70px; top: 36px; width: 160px; height: 220px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
 .rslot { position: absolute; width: 112px; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; column-gap: 6px; text-align: left; padding: 6px 8px; border-radius: 10px; background: rgba(8,12,26,.82); border: 2px solid var(--rc); color: #e8eeff; cursor: pointer; box-shadow: 0 0 0 transparent; }
 .rslot.has { box-shadow: 0 0 14px color-mix(in srgb, var(--rc) 55%, transparent); }
 .rslot i { grid-row: span 2; font-style: normal; font-size: 20px; align-self: center; }
 .rslot b { font: 700 11px/1.15 var(--font, sans-serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rslot small { font: 700 10px/1.2 var(--font, sans-serif); color: var(--rc); text-transform: uppercase; letter-spacing: .5px; }
-.rslot.s-head { left: 8px; top: 12px; } .rslot.s-tool { right: 8px; top: 150px; } .rslot.s-body { left: 8px; top: 140px; } .rslot.s-feet { right: 8px; top: 262px; }
+.rslot.s-head { left: 8px; top: 12px; } .rslot.s-tool { right: 8px; top: 150px; } .rslot.s-body { left: 8px; top: 140px; } .rslot.s-feet { right: 8px; top: 252px; }
 .rlv { position: absolute; right: 12px; top: 12px; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; align-content: center; background: radial-gradient(circle, #3a2a08, #120c02); border: 3px solid #ffc94d; box-shadow: 0 0 18px rgba(255,190,80,.6); }
 .rlv b { font: 900 26px/1 var(--display, sans-serif); color: #fff3c4; } .rlv small { font: 700 9px/1 var(--font, sans-serif); color: #ffd98a; text-transform: uppercase; }
 .rside { display: flex; flex-direction: column; gap: 10px; }
@@ -392,13 +398,13 @@
 .rpts { font: 800 12px/1 var(--font, sans-serif); color: #cdd8f0; } .rpts.has { color: #1a1206; background: linear-gradient(135deg, #ffe58f, #ffae42); border-radius: 999px; padding: 4px 10px; animation: rpgGlow 1.6s ease-in-out infinite; }
 @keyframes rpgGlow { 50% { box-shadow: 0 0 14px rgba(255,196,80,.9); } }
 .rstats { display: flex; flex-direction: column; gap: 5px; }
-.rstat { display: grid; grid-template-columns: 1fr auto 34px; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.rstat { display: grid; grid-template-columns: 1fr auto 34px; gap: 8px; align-items: center; padding: 3px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
 .rstat .nm { font: 800 14px/1.15 var(--font, sans-serif); color: var(--c); } .rstat .nm small { display: block; font: 500 11px/1.2 var(--font, sans-serif); color: #b8c4dc; }
 .rstat .pips { display: flex; gap: 3px; } .rstat .pips i { width: 9px; height: 14px; border-radius: 3px; background: rgba(255,255,255,.1); } .rstat .pips i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
 .rgear { display: flex; flex-wrap: wrap; gap: 6px; } .rgear span { font: 700 12px/1 var(--font, sans-serif); color: #8592ad; background: rgba(255,255,255,.04); border-radius: 999px; padding: 5px 9px; } .rgear span.on { color: #eaf3ff; background: rgba(90,160,255,.18); }
-.rbagh { margin: 14px 0 6px; font: 800 13px/1 var(--font, sans-serif); color: #cdd8f0; text-transform: uppercase; letter-spacing: .6px; }
+.rbagh { margin: 10px 0 6px; font: 800 13px/1 var(--font, sans-serif); color: #cdd8f0; text-transform: uppercase; letter-spacing: .6px; }
 .rbag { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.ritem { height: 58px; border-radius: 10px; border: 2px solid var(--rc, rgba(255,255,255,.1)); background: linear-gradient(180deg, color-mix(in srgb, var(--rc, #000) 22%, rgba(8,12,26,.9)), rgba(8,12,26,.9)); color: #eef; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 2px 4px; }
+.ritem { height: 52px; border-radius: 10px; border: 2px solid var(--rc, rgba(255,255,255,.1)); background: linear-gradient(180deg, color-mix(in srgb, var(--rc, #000) 22%, rgba(8,12,26,.9)), rgba(8,12,26,.9)); color: #eef; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 2px 4px; }
 .ritem.none { border-style: dashed; border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.02); cursor: default; }
 .ritem.sel { box-shadow: 0 0 0 2px #fff, 0 0 16px var(--rc); }
 .ritem i { font-style: normal; font-size: 20px; } .ritem b { font: 600 10px/1.1 var(--font, sans-serif); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -424,7 +430,8 @@
 #rpgfind .rk { font: 800 11px/1 var(--font, sans-serif); text-transform: uppercase; letter-spacing: 1px; color: #cfd8ee; } #rpgfind .rk span { color: var(--rc); }
 #rpgfind .rn { font: 900 20px/1.2 var(--display, sans-serif); margin: 6px 0 4px; color: var(--rc); text-shadow: 0 0 12px color-mix(in srgb, var(--rc) 70%, transparent); } #rpgfind .rn i { font-style: normal; margin-right: 6px; }
 #rpgfind .rp { font-size: 13px; color: #dde6ff; } #rpgfind .rh { margin-top: 6px; font: 700 12px/1.2 var(--font, sans-serif); color: #ffe39a; }
-.rpgcoin { position: fixed; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; z-index: 60; pointer-events: none; }
+.rpgcoin { position: fixed; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; z-index: 60; pointer-events: none; }
+.rpgcoin::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; border: 2px solid rgba(184,107,12,.75); box-shadow: 0 0 0 3px rgba(255,236,160,.35); }
 .rpgplus { position: fixed; z-index: 61; transform: translate(-50%, 0); font: 900 30px/1 var(--display, sans-serif); color: #ffe27a; text-shadow: 0 0 14px rgba(255,190,60,.95), 0 2px 3px #000; pointer-events: none; animation: rpgPlus 1.4s ease-out both; }
 @keyframes rpgPlus { 0% { opacity: 0; transform: translate(-50%, 16px) scale(.6); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -34px) scale(1); } }
 #advhud.rpgtick .tal { animation: rpgTick .25s ease-out; } @keyframes rpgTick { 50% { transform: scale(1.14); box-shadow: 0 0 16px rgba(255,200,80,.9); } }

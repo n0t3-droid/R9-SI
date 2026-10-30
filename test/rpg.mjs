@@ -62,7 +62,7 @@ try {
     const g = VR.game, L0 = Object.getPrototypeOf(g).loop;
     window.__step = (t) => L0.call(g, t); g.loop = function (t) { if (window.__live) return L0.call(this, t); };
     g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar');
-    const st = document.createElement('style'); st.textContent = '#hints,#lockhint,#toasts,.toast,#uxkeys{display:none !important}'; document.head.appendChild(st);
+    const st = document.createElement('style'); st.textContent = '#hints,#lockhint,#toasts,.toast,#uxkeys,#ctxprompt,#ctxring{display:none !important}'; document.head.appendChild(st);
     const A = VR.Adventure; A.setOn(true); A.setEnc('normal');
     window.__c = {
       known: () => !!window.__site && !!VR.Liberate.siteOf(window.__site) && VR.Liberate.siteOf(window.__site).known,
@@ -72,6 +72,8 @@ try {
       teleStomp: () => !!VR.RPGBoss.cur && VR.RPGBoss.cur.b.st === 'tele' && VR.RPGBoss.cur.b.att === 'stomp' && VR.RPGBoss.cur.tele > 0.6,
       won: () => !!VR.RPGBoss.cur && VR.RPGBoss.cur.b.st === 'won',
     };
+    // the shots' camera: in front of the boss and a little aside, two blocks over the ground; the Helfer out of the frame
+    window.__cam = (d, side, up) => { const m = VR.RPGBoss.cur.m, p = g.player, a = m.yaw + side, cx = m.pos[0] - Math.sin(a) * d, cz = m.pos[2] - Math.cos(a) * d; for (let i = g.entities.mobs.length - 1; i >= 0; i--) { const f = g.entities.mobs[i].foe; if (f && (f.mine || f.helper)) g.entities.mobs.splice(i, 1); } p.flying = true; p.teleport(cx, g.world.topAt(Math.floor(cx), Math.floor(cz)) + up, cz); p.vel[0] = p.vel[1] = p.vel[2] = 0; window.__aim([m.pos[0], m.pos[1] + 3.2, m.pos[2]]); };
     window.__aim = (t) => { const p = g.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = t[0] - e[0], dy = t[1] - e[1], dz = t[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); };
   });
 
@@ -158,8 +160,10 @@ try {
     check(!!core && core.boss === 'ready', 'two freed in the region: the Kernfeuer wakes');
     const cl = await ev(() => { VR.RPGame.open('map'); const n = VR.RPGame.claim(); VR.RPGame.render(); return { n, c: !!document.getElementById('rpgmapc'), regs: document.querySelectorAll('#rpgchar .rreg').length, pct: (document.querySelector('#rpgchar .rworld b') || {}).textContent }; });
     check(cl.n > 0 && cl.c && cl.regs >= 1, 'the map: ' + cl.regs + ' region(s), ' + cl.pct + ', the tribute claimed (+' + cl.n + ')');
+    await ev(() => { for (const id of ['advup', 'funkebub', 'rpgfind']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });
     await hold(1500);
     pics.map = await shot('rpg_conquest_map');
+    await ev(() => { for (const id of ['advup', 'funkebub', 'rpgfind']) { const e = document.getElementById(id); if (e) e.style.visibility = ''; } });
     await release();
     await ev(() => VR.RPGame.close());
   });
@@ -184,7 +188,7 @@ try {
     check(t.hit, 'a stomp telegraphed (the ring on the ground, the warning)');
     N.teleMin = await ev(() => VR.RPG.teleOf('stomp', VR.RPGBoss.cur.b.band));
     // the camera: back and up, the boss and its ring in view (the player stands still: the simulation is held)
-    await ev(() => { const g = VR.game, m = VR.RPGBoss.cur.m, p = g.player, a = m.yaw; const cx = m.pos[0] - Math.sin(a) * 15, cz = m.pos[2] - Math.cos(a) * 15; p.flying = true; p.teleport(cx, g.world.topAt(Math.floor(cx), Math.floor(cz)) + 3.5, cz); window.__aim([m.pos[0], m.pos[1] + 2.4, m.pos[2]]); });
+    await ev(() => window.__cam(16, 0.55, 2.2));
     await ev(() => { const C = VR.RPGBoss.cur; C.fxT = 0; VR.RPGBoss.fx(VR.game, C, 0.1, 10); VR.RPGBoss.bar(true); });
     await draw(); await draw();
     await hold(500);
@@ -204,12 +208,13 @@ try {
     await ev(() => { const b = VR.RPGBoss.cur.b; b.shield = false; b.ph = 3; b.st = 'recover'; b.hp = 1; b.hit(10, 'weak'); });
     const w = await run(260, 33, 'won');
     check(w.hit, 'it powers down and the region heals');
+    await ev(() => window.__cam(17, 0.5, 2.5));
     await run(20);
     const r = await ev(() => { const st = VR.RPGame.st(), C = VR.RPGBoss.cur; return { won: !!st.won[C.rid], healed: !!st.healed[C.rid], xp: VR.Adventure.rec.me.xp, t: VR.Adventure.rec.me.taler, ban: (document.querySelector('#rpgwon .big') || {}).textContent }; });
     check(r.won && r.healed && r.xp > a0.xp + 500 && r.t > a0.t + 700, 'the boss reward and the healed region (' + JSON.stringify({ dxp: r.xp - a0.xp, dt: r.t - a0.t }) + ')');
     check(/atmet auf/.test(r.ban || ''), 'the banner „' + r.ban + '"');
-    await ev(() => { const g = VR.game, m = VR.RPGBoss.cur.m, p = g.player; window.__aim([m.pos[0], m.pos[1] + 3.5, m.pos[2]]); });
     await draw(); await draw();
+    await ev(() => { const el = document.getElementById('rpgwon'); if (el) { el.className = ''; void el.offsetWidth; el.className = 'on'; } });
     await hold(1200);
     pics.fin = await shot('rpg_boss_finish');
     await release();
@@ -224,7 +229,7 @@ try {
     await ev(() => { document.querySelectorAll('.rpgcoin,.rpgplus').forEach(e => e.remove()); const w = document.getElementById('rpgwon'); if (w) w.className = ''; const f = document.getElementById('rpgfind'); if (f) f.className = ''; });
     const n = await ev(() => VR.RPGame.burst(640, 0));
     check(n >= 20, 'a burst of ' + n + ' coins');
-    await hold(420);
+    await hold(650);
     pics.loot = await shot('rpg_loot_burst');
     await release();
   });

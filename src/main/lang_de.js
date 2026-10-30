@@ -3027,6 +3027,7 @@
     "g.rpg.boss.won.sub": "+{xp} EP · +{t} Heliataler · ein prächtiger Fund wartet",
     "g.rpg.boss.hint": "Kernfeuer · {d} m",
     "g.rpg.boss.ready": "Zwei Leuchtfeuer frei — das Kernfeuer im {region} erwacht. Sein Wächter wartet!",
+    "g.rpg.map.core": "Kernfeuer",
     // ---- a-rpg end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

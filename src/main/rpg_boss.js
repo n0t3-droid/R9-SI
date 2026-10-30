@@ -3,7 +3,7 @@
 // the old beacon network, four-legged, a lantern tower on its back: once two outposts of a region are freed it rises at
 // the region's Kernfeuer (amid the freed beacons) and guards it. Our own design, a machine that powers down — never
 // hurt, never killed. The rules are VR.RPG.Boss (src/shared/rpg.js, test/rpg.js); here the game:
-//   the model     rpg_walker (voxmodels' grid, 1/16 block, drawn ×2.2: about five and a half blocks tall) — hull,
+//   the model     rpg_walker (voxmodels' grid, 1/16 block, drawn ×2.8: about seven blocks tall) — hull,
 //                 four legs, glowing knees (phase 1's weak points), a chest core behind two hatch plates (phases 2–3),
 //                 the visor, the lantern on its tower; the glowing parts tinted at draw time
 //   the fight     a mob of its own kind ('rpg_boss', foe: true — VR.Foes.ai / hurtMob / gone / draw are wrapped here for
@@ -29,7 +29,7 @@
   const game = () => VR.game || null;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
-  const TAU = Math.PI * 2, BB = R.BAL.boss, SC = 2.2;
+  const TAU = Math.PI * 2, BB = R.BAL.boss, SC = 2.8;
   const BS = VR.RPGBoss = { cur: null, cost: { frames: 0, ms: 0, draws: 0, sparks: 0 }, healT: -1, healAt: null, note: {}, hintEl: null };
   BS.KEYS = ['g.rpg.boss.name', 'g.rpg.boss.awake', 'g.rpg.boss.phase', 'g.rpg.boss.shield', 'g.rpg.boss.warn.stomp', 'g.rpg.boss.warn.slam', 'g.rpg.boss.warn.fan', 'g.rpg.boss.weak', 'g.rpg.boss.calm', 'g.rpg.boss.calmOk', 'g.rpg.boss.calmMiss', 'g.rpg.boss.won.kick', 'g.rpg.boss.won.title', 'g.rpg.boss.won.sub', 'g.rpg.boss.hint', 'g.rpg.boss.ready', 'g.rpg.boss.funke'];
 
@@ -54,7 +54,7 @@
         visor: part(12, 2, 1, [6, 1, 0], (g) => { g.box(0, 0, 0, 11, 1, 0, LENS); }),
         core: part(8, 6, 1, [4, 3, 0], (g) => { g.ell(4, 3, 0.5, 3.8, 2.9, 1, LENS); }),
         hatch: part(5, 7, 1, [0, 3, 0], (g) => { g.box(0, 0, 0, 4, 6, 0, (x, y) => (y === 3 ? OR : WH)); }),
-        knee: part(5, 3, 5, [2, 1, 2], (g) => { g.ell(2, 1, 2, 2.6, 1.6, 2.6, LENS); }),
+        knee: part(7, 4, 7, [3, 2, 3], (g) => { g.ell(3, 2, 3, 3.4, 2.1, 3.4, LENS); }),
         leg_fl: leg(), leg_fr: leg(), leg_bl: leg(), leg_br: leg(),
       },
       layout: { hull: [0, 18, 0], tower: [0, 31, 3], lantern: [0, 43, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
@@ -62,7 +62,7 @@
   }
   // the mob kind (not enumerable: the codex's creature pages stay as they are)
   VR.MOBS = VR.MOBS || {};
-  Object.defineProperty(VR.MOBS, 'rpg_boss', { value: { model: 'rpg_walker', hp: 1e6, speed: 1.6, w: 1.5, h: 5.2, foe: true, foeKind: 'boss', drops: [], xp: 0 }, enumerable: false, writable: true, configurable: true });
+  Object.defineProperty(VR.MOBS, 'rpg_boss', { value: { model: 'rpg_walker', hp: 1e6, speed: 1.6, w: 1.9, h: 6.6, foe: true, foeKind: 'boss', drops: [], xp: 0 }, enumerable: false, writable: true, configurable: true });
 
   // ---------------------------------------------------------------- the wraps (the boss alone; every other foe as before)
   const isB = (m) => !!(m && m.rpgBoss);
@@ -136,7 +136,7 @@
     if (b.st === 'down' || b.st === 'won') C.sink = Math.min(1, C.sink + dt / BB.down);
     BS.fx(g, C, dt, dist);
     if (C.calm) BS.stepCalm(g, C);
-    if ((C.barT = (C.barT || 0) - dt) <= 0) { C.barT = 0.15; BS.bar(true); }
+    if (!C.won && (C.barT = (C.barT || 0) - dt) <= 0) { C.barT = 0.15; BS.bar(true); }
     const c = BS.cost; c.frames++; c.ms += now() - t0;
   };
   BS.event = function (g, En, C, e) {
@@ -186,7 +186,7 @@
     let zone = 'body';
     if (from) {
       const hy = from[1] - m.pos[1], dx = from[0] - m.pos[0], dz = from[2] - m.pos[2], l = Math.hypot(dx, dz) || 1, front = (dx / l) * -Math.sin(m.yaw) + (dz / l) * -Math.cos(m.yaw);
-      zone = b.ph === 1 ? (hy < 2.8 ? 'weak' : 'body') : (front > 0.35 && hy > 2.0 && hy < 5 ? 'weak' : 'body');
+      zone = b.ph === 1 ? (hy < 3.4 ? 'weak' : 'body') : (front > 0.35 && hy > 2.6 && hy < 6.2 ? 'weak' : 'body');
     }
     const shielded = b.shield, d = b.hit(dmg * k, zone);
     const hp = from ? [from[0], from[1], from[2]] : [m.pos[0], m.pos[1] + 3, m.pos[2]];
@@ -209,7 +209,7 @@
       const u = C.tele, n = lo ? 12 : 22;
       if (b.att === 'stomp') { for (let i = 0; i < n; i++) { const a = i * TAU / n + u; P.spawn(m.pos[0] + Math.cos(a) * BB.stompR * (0.4 + 0.6 * u), m.pos[1] + 0.15, m.pos[2] + Math.sin(a) * BB.stompR * (0.4 + 0.6 * u), 0, 0.6, 0, { life: 0.25, size: 0.16, grav: 0, col: [1, 0.35 + 0.3 * u, 0.15], emis: 1, collide: false }); } }
       else if (b.att === 'slam') { const fx = -Math.sin(m.yaw), fz = -Math.cos(m.yaw); for (let i = 0; i < n * 0.6; i++) { const d = 2 + i * (BB.slamR - 2) / (n * 0.6); for (const s of [-1.6, 1.6]) P.spawn(m.pos[0] + fx * d + fz * s, m.pos[1] + 0.15, m.pos[2] + fz * d - fx * s, 0, 0.4, 0, { life: 0.22, size: 0.14, grav: 0, col: [1, 0.45, 0.2], emis: 1, collide: false }); } }
-      else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 3.6, m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
+      else { const p = g.player.pos, o = [m.pos[0], m.pos[1] + 26 / 16 * SC, m.pos[2]], base = Math.atan2(p[0] - o[0], p[2] - o[2]), hd = Math.hypot(p[0] - o[0], p[2] - o[2]); for (const s of [-0.3, 0, 0.3]) for (let i = 1; i < 8; i++) { const d = i * hd / 8 * u; P.spawn(o[0] + Math.sin(base + s) * d, o[1] + (p[1] + 1 - o[1]) * i / 8 * u, o[2] + Math.cos(base + s) * d, 0, 0, 0, { life: 0.18, size: 0.1, grav: 0, col: [0.9, 0.4, 1], emis: 1, collide: false }); } }
       BS.cost.sparks += n;
     }
     if (b.shield) { for (let i = 0; i < (lo ? 6 : 14); i++) { const a = Math.random() * TAU, e = Math.random() * Math.PI * 0.5; P.spawn(m.pos[0] + Math.cos(a) * Math.cos(e) * 4.2, m.pos[1] + 0.5 + Math.sin(e) * 5, m.pos[2] + Math.sin(a) * Math.cos(e) * 4.2, 0, 0, 0, { life: 0.3, size: 0.12, grav: 0, col: [0.45, 0.75, 1], emis: 1, collide: false }); } }
