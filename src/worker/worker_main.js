@@ -273,11 +273,14 @@
       } else if (m.type === 'villageplan') {
         const g = getGen(m.dim), VG = VR.VillageGen;
         let plan = null;
-        if (VG && g.climateAt && g.singleBiome < 0) { const ij = String(m.vid).split('_').map(Number); const site = VG.site(g, ij[0], ij[1]); if (site && site.id === m.vid) plan = VG.summary(VG.plan(g, site)); }
+        if (VR.WorldEco && g.bgen >= VR.WorldEco.BGEN && /^eco:/.test(String(m.vid))) plan = VR.WorldEco.planFor(g, m.vid);   // u-worlds: the natives' villages
+        else if (VG && g.climateAt && g.singleBiome < 0) { const ij = String(m.vid).split('_').map(Number); const site = VG.site(g, ij[0], ij[1]); if (site && site.id === m.vid) plan = VG.summary(VG.plan(g, site)); }
         post({ type: 'villageplan', id: m.id, vid: m.vid, plan });
       } else if (m.type === 'villages') {
         const g = getGen(m.dim), VG = VR.VillageGen, list = [];
-        if (VG && g.climateAt && g.singleBiome < 0) {
+        const eco = VR.WorldEco && g.bgen >= VR.WorldEco.BGEN ? VR.WorldEco.sitesNear(g, m.x, m.z, m.r) : null;   // u-worlds
+        if (eco) for (const s of eco) list.push(s);
+        else if (VG && g.climateAt && g.singleBiome < 0) {
           const C = VG.cell(g), R0 = Math.ceil(m.r / C), ci = Math.floor(m.x / C), cj = Math.floor(m.z / C);
           for (let di = -R0; di <= R0; di++) for (let dj = -R0; dj <= R0; dj++) { const s = VG.site(g, ci + di, cj + dj); if (s && Math.hypot(s.x - m.x, s.z - m.z) <= m.r) list.push({ id: s.id, name: s.name, style: s.style, x: s.x, y: s.y, z: s.z, rad: VG.siteRad ? VG.siteRad(g, s) : VG.rad(g) }); }
         }

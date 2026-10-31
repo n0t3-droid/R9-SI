@@ -22,7 +22,7 @@ const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
 console.log('a · bgen 2');
 {
   const meta = V.Bodies.stamp({ seed: 1 });
-  check(V.Bodies.BGEN === 2 && ['zinn', 'ocker', 'aqua'].every(k => meta.universe.bodies[k].bgen === 2), 'a new save is stamped bgen 2');
+  check(V.Bodies.BGEN >= 2 && ['zinn', 'ocker', 'aqua'].every(k => meta.universe.bodies[k].bgen === V.Bodies.BGEN), 'a new save is stamped the current bgen (u-moons3: 2; u-worlds: 3)');
   const old = { universe: { bodies: { aqua: { bgen: 1 } } } };
   check(V.Bodies.bgenOf(old).aqua === 1 && new V.BodyGen(SEED, 'aqua', { bgen: { aqua: 1 } }).bgen === 1, 'a save stamped 1 keeps bgen 1 (its chunks: body_same.js)');
 }

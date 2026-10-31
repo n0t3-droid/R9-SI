@@ -19,7 +19,7 @@
   // the player's language (lang_de.js / lang_en.js): T a text, TL a list, FS a villager's line (g.folk.<key>)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const FS = (key, h, vars) => Folk.say(key, h, vars), pickL = (key, k) => { const L = TL(key); return L.length ? L[(k >>> 0) % L.length] : ''; };
-  const WORK_ROLE = { bakery: 'baker', smithy: 'smith', library: 'scholar', clinic: 'healer', hall: 'mayor', workshop: 'builder', garden: 'gardener', base: 'operator', market: 'cashier', barn: 'farmer', school: 'teacher', factory: 'worker', office: 'office', cafe: 'barista' };
+  const WORK_ROLE = { bakery: 'baker', smithy: 'smith', library: 'scholar', clinic: 'healer', hall: 'mayor', workshop: 'builder', garden: 'gardener', base: 'operator', market: 'cashier', stall: 'trader', barn: 'farmer', school: 'teacher', factory: 'worker', office: 'office', cafe: 'barista' };
   // how many keepers a workplace employs
   const WORK_N = { factory: 4, office: 4, school: 2, market: 1 };
   // t-folk2: the seats' and the tables' tops (blocks over the floor) as the furniture draws them — the café's bentwood
@@ -35,8 +35,10 @@
     const P = vil.plan, st = vil.st;
     const fams = [];
     const usedNames = new Set(), usedSur = new Set();
-    const nameFor = (seed, kid) => { const list = kid ? Folk.KIDS : Folk.FIRST; for (let k = 0; k < 40; k++) { const n = list[H(seed, k, 3) % list.length]; if (!usedNames.has(n)) { usedNames.add(n); return n; } } return list[seed % list.length]; };
-    const surFor = (seed) => { for (let k = 0; k < 40; k++) { const n = Folk.SUR[H(seed, k, 5) % Folk.SUR.length]; if (!usedSur.has(n)) { usedSur.add(n); return n; } } return Folk.SUR[seed % Folk.SUR.length]; };
+    const NM = P.names || null;   // u-worlds: a native village names its people in its own language (WorldEco.names)
+    const nameFor = (seed, kid) => { const list = kid ? (NM ? NM.kids : Folk.KIDS) : (NM ? NM.first : Folk.FIRST); for (let k = 0; k < 40; k++) { const n = list[H(seed, k, 3) % list.length]; if (!usedNames.has(n)) { usedNames.add(n); return n; } } return list[seed % list.length]; };
+    const SUR = NM ? NM.sur : Folk.SUR;
+    const surFor = (seed) => { for (let k = 0; k < 40; k++) { const n = SUR[H(seed, k, 5) % SUR.length]; if (!usedSur.has(n)) { usedSur.add(n); return n; } } return SUR[seed % SUR.length]; };
     const homes = P.homes.slice();
     for (const li of st.built || []) if (P.lots[li]) homes.push(Object.assign({}, P.lots[li], { newHome: true }));
     // houses the player built (a roof, a door and a bed near the village): a family moved in

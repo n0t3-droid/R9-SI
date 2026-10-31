@@ -200,6 +200,71 @@
       gait: 'quad',
     };
   };
+  // ---------------- u-worlds: the creatures of the other worlds (worldlife.js spawns them; our own designs) ----------------
+  // a four-legged grazer: a body ellipsoid in two tones, a head with eyes, legs; extra(g) decorates the body
+  const quadBeast = (o) => () => {
+    const L = o.leg, bw = o.body[0], bh = o.body[1], bl = o.body[2];
+    const legs = {}; for (const k of ['leg_fl', 'leg_fr', 'leg_bl', 'leg_br']) legs[k] = part(2, L + 1, 2, [1, L + 1, 1], (g) => g.box(0, 0, 0, 1, L, 1, (x, y) => (y < 1 ? o.dark : o.c1)));
+    return {
+      h: o.h, w: o.w, parts: Object.assign({
+        body: part(bw + 2, bh + 2, bl + 2, [(bw + 2) / 2, 0, (bl + 2) / 2], (g) => { g.ell((bw + 2) / 2, bh / 2 + 1, (bl + 2) / 2, bw / 2, bh / 2, bl / 2, (x, y, z) => (y < bh * 0.4 ? o.c2 : o.pat && o.pat(x, y, z) ? o.c3 : o.c1), { shade: 0.14 }); if (o.extra) o.extra(g, bw + 2, bh + 2, bl + 2); }),
+        head: part(o.hd[0] + 2, o.hd[1] + 2, o.hd[2] + 2, [(o.hd[0] + 2) / 2, 1, o.hd[2]], (g) => { const [hw, hh, hl] = o.hd; g.ell(hw / 2 + 1, hh / 2 + 1, hl / 2 + 1, hw / 2, hh / 2, hl / 2, o.c1, { shade: 0.1 }); g.box(1, hh - 1, 1, 1, hh - 1, 1, o.eye, { emis: o.glowEye ? 1 : 0 }); g.box(hw, hh - 1, 1, hw, hh - 1, 1, o.eye, { emis: o.glowEye ? 1 : 0 }); if (o.headX) o.headX(g, hw, hh, hl); }),
+      }, legs),
+      layout: { body: [0, L, 0], head: [0, L + bh - 1, -bl / 2 - 1], leg_fl: [-bw / 2 + 1, L, -bl / 2 + 2], leg_fr: [bw / 2 - 1, L, -bl / 2 + 2], leg_bl: [-bw / 2 + 1, L, bl / 2 - 2], leg_br: [bw / 2 - 1, L, bl / 2 - 2] },
+      gait: 'quad',
+    };
+  };
+  // a flyer: a slim body, two wings that beat (the 'wings' gait), a tail streamer
+  const flyer = (o) => () => ({
+    h: o.h, w: o.w, fly: true, parts: {
+      body: part(6, 5, 12, [3, 2, 6], (g) => { g.ell(3, 2.5, 6, 2.2, 2, 5.4, (x, y) => (y < 2 ? o.c2 : o.c1), { shade: 0.12 }); g.box(1, 3, 1, 1, 3, 1, o.eye, { emis: 1 }); g.box(5, 3, 1, 5, 3, 1, o.eye, { emis: 1 }); }),
+      wing_l: part(o.span, 1, 8, [o.span - 1, 0, 4], (g) => { for (let x = 0; x < o.span; x++) { const w = Math.round(3.5 * Math.sin(Math.PI * (x + 1) / (o.span + 1))) + 1; g.box(x, 0, 4 - w, x, 0, 4 + w - 1, (xx, y, z) => ((xx + z) % 4 === 0 ? o.c3 : o.c1), { emis: o.glow ? 1 : 0 }); } }),
+      wing_r: part(o.span, 1, 8, [0, 0, 4], (g) => { for (let x = 0; x < o.span; x++) { const w = Math.round(3.5 * Math.sin(Math.PI * (o.span - x) / (o.span + 1))) + 1; g.box(x, 0, 4 - w, x, 0, 4 + w - 1, (xx, y, z) => ((xx + z) % 4 === 0 ? o.c3 : o.c1), { emis: o.glow ? 1 : 0 }); } }),
+      tail: part(2, 1, 10, [1, 0, 0], (g) => { g.box(0, 0, 0, 1, 0, 9, o.c2); g.box(0, 0, 8, 1, 0, 9, o.c3, { emis: 1 }); }),
+    },
+    layout: { body: [0, 0, 0], wing_l: [-2, 3, 0], wing_r: [2, 3, 0], tail: [0, 2, 5] },
+    gait: 'wings',
+  });
+  // Riffgleiter (Aquamarin): a flat, wide swimmer with a glowing rim and a long tail
+  M.reef_glider = () => ({
+    h: 0.4, w: 0.45, parts: {
+      body: part(14, 4, 14, [7, 0, 7], (g) => { g.ell(7, 2, 7, 6.6, 1.6, 6, (x, y) => (y < 2 ? 0xd8f4f0 : (x + 1) % 3 === 0 ? 0x5af0e0 : 0x2a8aa8), { shade: 0.1 }); g.box(5, 3, 2, 5, 3, 2, 0x102030); g.box(9, 3, 2, 9, 3, 2, 0x102030); }),
+      tail: part(2, 1, 12, [1, 0, 0], (g) => { g.box(0, 0, 0, 1, 0, 11, 0x2a8aa8); g.box(0, 0, 10, 1, 0, 11, 0x9afff0, { emis: 1 }); }),
+    },
+    layout: { body: [0, 0, 0], tail: [0, 1, 6] },
+    gait: 'quad',
+  });
+  // Muschelschreiter (Aquamarin): a long-legged grazer under a ridged shell, two eye stalks
+  M.shell_strider = quadBeast({ h: 1.1, w: 0.42, leg: 9, body: [8, 6, 12], hd: [4, 4, 4], c1: 0xe8d8c0, c2: 0xf4ece0, c3: 0x3ab8b0, dark: 0x5a4a3a, eye: 0x101820, pat: (x, y, z) => (z % 3 === 0 && y > 4), headX: (g, hw, hh) => { g.box(1, hh, 2, 1, hh + 1, 2, 0x3ab8b0); g.box(hw, hh, 2, hw, hh + 1, 2, 0x3ab8b0); } });
+  // Gischtsegler (Aquamarin): a sea bird of the spray, white and teal
+  M.spray_sailor = flyer({ h: 0.4, w: 0.3, span: 12, c1: 0xf4f8f8, c2: 0x8ad8d0, c3: 0x2a9aa0, eye: 0x203040 });
+  // Dünentraber (Ocker): a tall, slender runner with a crest of spines, rust and cream
+  M.dune_trotter = quadBeast({ h: 1.5, w: 0.42, leg: 12, body: [7, 6, 12], hd: [4, 5, 6], c1: 0xb8643a, c2: 0xe8d0a8, c3: 0x7a3a22, dark: 0x3a2214, eye: 0x101010, pat: (x, y) => y > 5 && x === 4, extra: (g, W, Hh, Ll) => { for (let z = 2; z < Ll - 3; z += 2) g.box(W / 2, Hh - 1, z, W / 2, Hh, z, 0xe8d0a8); } });
+  // Rosthüpfer (Ocker): a small round hopper with long ears
+  M.rust_hopper = quadBeast({ h: 0.55, w: 0.26, leg: 3, body: [6, 6, 7], hd: [4, 4, 4], c1: 0xc87a4a, c2: 0xf0dcc0, c3: 0x8a4a2a, dark: 0x5a3020, eye: 0x101010, headX: (g, hw, hh) => { g.box(1, hh + 1, 3, 1, hh + 4, 3, 0xc87a4a); g.box(hw, hh + 1, 3, hw, hh + 4, 3, 0xc87a4a); } });
+  // Staubfalter (Ocker): a big dusk-coloured moth with eye spots on its wings
+  M.dust_moth = flyer({ h: 0.35, w: 0.3, span: 10, c1: 0xd8a070, c2: 0x7a4a2a, c3: 0xffe0a0, eye: 0xffd080, glow: false });
+  // Glutschnecke (Zinnober): a slow grazer under a spiral shell of glowing seams
+  M.ember_snail = () => ({
+    h: 0.8, w: 0.4, parts: {
+      body: part(6, 4, 14, [3, 0, 7], (g) => { g.box(0, 0, 0, 5, 2, 13, 0x4a3a3a, { shade: 0.1 }); g.box(1, 3, 0, 1, 3, 0, 0xffa030, { emis: 1 }); g.box(4, 3, 0, 4, 3, 0, 0xffa030, { emis: 1 }); }),
+      shell: part(10, 11, 10, [5, 0, 5], (g) => { g.ell(5, 5.5, 5, 4.5, 5, 4.5, (x, y, z) => (Math.abs(Math.hypot(x - 5, y - 5.5) - 2.5) < 0.6 ? 0xff7a2a : 0x2a2226), { shade: 0.15, emis: 0 }); g.box(5, 5, 0, 5, 6, 0, 0xffd050, { emis: 1 }); }),
+    },
+    layout: { body: [0, 0, 0], shell: [0, 2, 1] },
+    gait: 'quad',
+  });
+  // Aschelerche (Zinnober): a small grey lark with ember-tipped wings
+  M.ash_lark = flyer({ h: 0.3, w: 0.25, span: 8, c1: 0x5a5254, c2: 0x8a7a70, c3: 0xff8a2a, eye: 0xffd050, glow: false });
+  // Schwefelkäfer (Zinnober): a hopping beetle with a yellow wing case
+  M.sulfur_beetle = quadBeast({ h: 0.45, w: 0.3, leg: 2, body: [7, 4, 9], hd: [4, 3, 3], c1: 0xe8c838, c2: 0x2a2226, c3: 0x8a6a10, dark: 0x1a1416, eye: 0xff6a2a, glowEye: true, pat: (x) => x === 4 });
+  // Kraterroller (Basalt): a round armoured grazer, plates of grey with blue seams
+  M.crater_roller = quadBeast({ h: 0.8, w: 0.45, leg: 4, body: [9, 8, 10], hd: [5, 4, 4], c1: 0x8a8e96, c2: 0xb8bcc4, c3: 0x5ac8f0, dark: 0x3a3e46, eye: 0x7af0ff, glowEye: true, pat: (x, y, z) => (z % 3 === 0) });
+  // Mondfalter (Basalt): a pale moth with glowing cyan wing veins
+  M.moon_moth = flyer({ h: 0.35, w: 0.3, span: 11, c1: 0xd8dce8, c2: 0x8a90a8, c3: 0x7af0ff, eye: 0x7af0ff, glow: false });
+  // Frostrobbe (Opal): a round, white-furred grazer of the ice with blue flippers
+  M.frost_seal = quadBeast({ h: 0.7, w: 0.45, leg: 2, body: [8, 6, 14], hd: [5, 5, 5], c1: 0xf0f4f8, c2: 0xd8e4ee, c3: 0x8ab8e0, dark: 0x5a8ab8, eye: 0x102030, pat: (x, y, z) => ((x * 7 + z * 3) % 11 === 0) });
+  // Eisflimmer (Opal): a small glowing flyer of ice-blue light
+  M.ice_wisp = flyer({ h: 0.3, w: 0.22, span: 7, c1: 0xc8f0ff, c2: 0x7ac0f0, c3: 0xffffff, eye: 0xffffff, glow: true });
   // Crystal Crab: violet crystal shell
   M.crystal_crab = () => {
     const shell = 0x8a4ad0, cry = 0xd08aff, leg = 0x5a2a8a;

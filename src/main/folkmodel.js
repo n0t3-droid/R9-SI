@@ -875,6 +875,29 @@
       F(0, eyeY, rim, TG.metal); F(A.xl, eyeY, rim, TG.metal); F(A.xr, eyeY, rim, TG.metal);
       for (const sx of [A.xl - 1, A.xr + 1]) for (let z = A.z0 + 1; z <= 0; z++) if (!head.has(sx, eyeY, z)) head.set(sx, eyeY, z, fr, 0, TG.metal);
     }
+    // ---- u-worlds: a native of another world — the head's own feature (worldlife.js V.speciesLook sets L.feat):
+    // fins along the crown and at the ears (the Wellari), curved horns (the Dunelin), a glowing crest of spikes (the
+    // Glutani), two antennae with lit tips (the Regoli), crystal antlers (the Nivari) — our own designs
+    if (L.feat) {
+      const fc = L.featC || 0xffffff, em = L.glow ? 1 : 0, top = A.top, Xm = Math.round(cx), sc = kid ? 0.7 : 1;
+      const P = (x, y, z, c, e) => { if (!head.has(x, y, z)) head.set(x, y, z, c, e || 0, TG.other); };
+      const tip = mix(fc, 0xffffff, 0.35);
+      if (L.feat === 'fins') {
+        const hz = [1, 2, 3, 3, 2, 1];
+        for (let k = 0; k < 6; k++) for (let y = 1; y <= Math.round(hz[k] * sc); y++) P(Xm, top + y, A.z0 + 1 + k, y === Math.round(hz[k] * sc) ? tip : fc);
+        for (const ex of [A.xl - 2, A.xr + 2]) for (let y = 2; y <= 4; y++) for (let z = 0; z <= (y === 4 ? 2 : 1); z++) P(ex, y, z, fc);
+      } else if (L.feat === 'horns') {
+        for (const sx of [-1, 1]) { const x0 = sx < 0 ? A.xl : A.xr; const path = [[0, -1, -1], [sx, 0, -1], [sx, 1, 0], [2 * sx, 2, 1], [2 * sx, 3, 2], [2 * sx, 3, 3]]; path.slice(0, kid ? 3 : 6).forEach(([dx, dy, dz], i) => P(x0 + dx, top + dy, dz, i >= 4 ? tip : fc)); }
+      } else if (L.feat === 'crest') {
+        const hz = [2, 3, 4, 3, 2, 1];
+        for (let k = 0; k < 6; k++) for (let y = 1; y <= Math.max(1, Math.round(hz[k] * sc)); y++) P(Xm, top + y, A.z0 + k, y >= hz[k] - 1 ? tip : fc, em);
+      } else if (L.feat === 'antennae') {
+        const n = kid ? 3 : 5;
+        for (const x of [A.xl + 1, A.xr - 1]) { for (let y = 1; y <= n; y++) P(x + (y > 3 ? Math.sign(x - Xm) : 0), top + y, -1, mix(L.skin, 0x303040, 0.3)); const bx = x + Math.sign(x - Xm) * (n > 3 ? 1 : 0); P(bx, top + n + 1, -1, fc, 1); P(bx, top + n + 1, 0, fc, 1); P(bx, top + n + 2, -1, tip, 1); }
+      } else if (L.feat === 'antlers') {
+        for (const sx of [-1, 1]) { const x0 = sx < 0 ? A.xl : A.xr; for (let y = 1; y <= (kid ? 2 : 4); y++) P(x0, top + y, 0, fc, em); if (!kid) { P(x0 + sx, top + 3, 0, fc); P(x0 + 2 * sx, top + 4, 0, tip); P(x0, top + 3, -1, fc); P(x0, top + 5, 1, tip); P(x0 + sx, top + 5, 0, tip); } }
+      }
+    }
     // ---- hats (at the head's scale; H1 is the first row over the hair)
     const hat = kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);
     const H1 = A.top + (bald ? 1 : 2);

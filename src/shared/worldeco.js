@@ -261,8 +261,8 @@
       const F = VR.Fractal, s = this.s;
       this.nB = new F(s ^ 0x101, 2, 1 / 230, 0.5);
       this.nB2 = new F(s ^ 0x102, 2, 1 / 140, 0.5);
-      this.nC1 = new F(s ^ 0x201, 2, 1 / 44, 0.5);
-      this.nC2 = new F(s ^ 0x202, 2, 1 / 44, 0.5);
+      this.nC1 = new F(s ^ 0x201, 1, 1 / 40, 0.5);
+      this.nC2 = new F(s ^ 0x202, 1, 1 / 40, 0.5);
       this.nCE = new F(s ^ 0x203, 1, 1 / 160, 0.5);
       this.baseOk = this.W.base ? new Set(this.W.base.map(k => VR.BIOME[k])) : null;
       this.land = gen.findSpawn(gen.prof.spawn.x, gen.prof.spawn.z);
@@ -277,10 +277,18 @@
       return this.nB2.n2(x, z) > 0.12 ? 2 : -1;
     }
     // the base ground allows the eco (land, not lava, not the stripes); h: the ground's height
-    okAt(x, z, h) {
+    okAt(x, z, h, bio) {
       if (this.kind === 'aqua' && h < SEA + 1) return false;
-      if (this.baseOk && !this.baseOk.has(this.gen.biomeAt(x, z))) return false;
+      if (this.baseOk && !this.baseOk.has(bio !== undefined ? bio : this.gen.biomeAt(x, z))) return false;
       return true;
+    }
+    // a plant's or a pond's ground outside the chunk: the generator's height and whether the eco may grow there (cached:
+    // the neighbours ask for the same cells)
+    groundAt(x, z) {
+      const key = x * 65536 + z, C = this.gc || (this.gc = new Map());
+      let v = C.get(key);
+      if (v === undefined) { const y = this.gen.surfaceY(x, z); v = this.okAt(x, z, y) ? y : -1; if (C.size > 8192) C.clear(); C.set(key, v); }
+      return v;
     }
     near(x, z, pad) { for (const m of this.marks) if (Math.abs(m.x - x) < m.r + pad && Math.abs(m.z - z) < m.r + pad) return true; return false; }
     // ---------------------------------------------------------------- the sites and their plans
@@ -365,7 +373,7 @@
         if (b < 0) continue;
         const B0 = W.biomes[b];
         if (B0.under) { if (this.kind === 'aqua' && y < SEA - 1 && y > SEA - 16) { ebio[c] = b; out.biome[c] = BI[b]; } continue; }
-        if (!this.okAt(x, z, y) || this.near(x, z, 0)) continue;
+        if (!this.okAt(x, z, y, out.biome[c]) || this.near(x, z, 0)) continue;
         ebio[c] = b; out.biome[c] = BI[b];
         const ts = blocks[(y << 8) | c];
         if (surfS[b] && solid(ts) && !(R.T.flags[blocks[((y + 1) << 8) | c]] & VR.F.SOLID)) blocks[(y << 8) | c] = surfS[b];
@@ -385,35 +393,33 @@
       return out;
     }
     caves(blocks, x0, z0, tops) {
-      // two 3-D noises on a 4-block lattice, trilinear: a tunnel where both are near zero (|a| + |b| < t)
-      const g = this.gen, aqua = this.kind === 'aqua';
-      const Y0 = 6, Y1 = 132, NY = (Y1 - Y0) / 4 + 1;
-      const A = this._ca || (this._ca = new Float32Array(5 * 5 * NY)), Bn = this._cb || (this._cb = new Float32Array(5 * 5 * NY));
-      let maxTop = 0; for (let i = 0; i < 256; i++) if (tops[i] > maxTop) maxTop = tops[i];
-      const ny = Math.min(NY, Math.ceil((Math.min(maxTop, Y1) - Y0) / 4) + 1);
-      if (ny < 2) return;
-      for (let i = 0; i < 5; i++) for (let k = 0; k < 5; k++) for (let j = 0; j < ny; j++) {
-        const x = x0 + i * 4, z = z0 + k * 4, y = Y0 + j * 4, q = (i * 5 + k) * NY + j;
+      // two 3-D noises on a lattice (8 blocks across, 4 up), trilinear: a tunnel where both are near zero (|a| + |b| < t),
+      // in a band from 36 below the ground to 6 below it (where they can be found; a mouth reaches the light)
+      const aqua = this.kind === 'aqua', NY = 64;
+      const A = this._ca || (this._ca = new Float32Array(3 * 3 * NY)), Bn = this._cb || (this._cb = new Float32Array(3 * 3 * NY));
+      let maxTop = 0, minTop = 999; for (let i = 0; i < 256; i++) { const t = tops[i]; if (t > maxTop) maxTop = t; if (t > 0 && t < minTop) minTop = t; }
+      const Y0 = Math.max(6, (minTop - 40) & ~3), ny = Math.min(NY, Math.ceil((maxTop - Y0) / 4) + 2);
+      if (ny < 2 || maxTop < 12) return;
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) for (let j = 0; j < ny; j++) {
+        const x = x0 + i * 8, z = z0 + k * 8, y = Y0 + j * 4, q = (i * 3 + k) * NY + j;
         A[q] = this.nC1.n3(x, y * 1.6, z); Bn[q] = this.nC2.n3(x + 911, y * 1.6, z - 377);
       }
       const bed = VR.GEN.S().bedrock;
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const c = lz * 16 + lx, top = tops[c], x = x0 + lx, z = z0 + lz;
-        if (this.near(x, z, 6)) continue;
-        if (aqua && top < SEA + 3) continue;
+        if (top < 12 || (aqua && top < SEA + 8) || this.near(x, z, 6)) continue;
         const open = this.nCE.n2(x, z) > 0.55;   // a cave's mouth: here the tunnels may reach the light
-        const yTop = Math.min(aqua ? 30 : 9999, open ? top : top - 6, Y0 + (ny - 1) * 4);
-        const i = lx >> 2, k = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
-        for (let y = Y0; y <= yTop; y++) {
+        const yTop = Math.min(open && !aqua ? top : top - 6, Y0 + (ny - 2) * 4 + 3), yBot = Math.max(Y0, top - 36);
+        const i = lx >> 3, k = lz >> 3, fx = (lx & 7) / 8, fz = (lz & 7) / 8;
+        for (let y = yBot; y <= yTop; y++) {
           const j = (y - Y0) >> 2, fy = ((y - Y0) & 3) / 4;
-          if (j + 1 >= ny) break;
-          if (Math.abs(tri(A, NY, i, k, j, fx, fz, fy)) + Math.abs(tri(Bn, NY, i, k, j, fx, fz, fy)) < 0.075) {
+          const a = tri(A, NY, i, k, j, fx, fz, fy); if (a > 0.075 || a < -0.075) continue;
+          if (Math.abs(a) + Math.abs(tri(Bn, NY, i, k, j, fx, fz, fy)) < 0.075) {
             const p = (y << 8) | c, s = blocks[p];
             if (s && s !== bed && !isFluid(s)) blocks[p] = 0;
           }
         }
       }
-      void g;
     }
     ores(blocks, cx, cz, tops) {
       const bed = VR.GEN.S().bedrock;
@@ -471,7 +477,7 @@
         const f = opts[Math.floor(h01(i, j, this.s ^ 0xf3) * opts.length)];
         if (h01(i, j, this.s ^ 0xf4) > f.p) continue;
         if (this.near(x, z, 4)) continue;
-        const y0 = g.surfaceY(x, z); if (!this.okAt(x, z, y0)) continue;
+        const y0 = this.groundAt(x, z); if (y0 < 0) continue;
         // (inside the chunk the real ground decides: a pond, a crater's boulder — no plant there)
         if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
         plant(f, x, y0 + 1, z, h01(i, j, this.s ^ 0xf5), put);
@@ -500,11 +506,11 @@
     }
   }
   E.Eco = Eco;
-  // the lattice's trilinear value (5 × 5 columns of NY samples)
+  // the lattice's trilinear value (3 × 3 columns of NY samples, 8 blocks apart)
   function tri(Arr, NY, i, k, j, fx, fz, fy) {
-    const q = (a, b2, cc) => Arr[(a * 5 + b2) * NY + cc];
-    const c00 = q(i, k, j) * (1 - fx) + q(i + 1, k, j) * fx, c10 = q(i, k + 1, j) * (1 - fx) + q(i + 1, k + 1, j) * fx;
-    const c01 = q(i, k, j + 1) * (1 - fx) + q(i + 1, k, j + 1) * fx, c11 = q(i, k + 1, j + 1) * (1 - fx) + q(i + 1, k + 1, j + 1) * fx;
+    const a = (i * 3 + k) * NY + j, b = ((i + 1) * 3 + k) * NY + j, c = (i * 3 + k + 1) * NY + j, d = ((i + 1) * 3 + k + 1) * NY + j;
+    const c00 = Arr[a] * (1 - fx) + Arr[b] * fx, c10 = Arr[c] * (1 - fx) + Arr[d] * fx;
+    const c01 = Arr[a + 1] * (1 - fx) + Arr[b + 1] * fx, c11 = Arr[c + 1] * (1 - fx) + Arr[d + 1] * fx;
     return (c00 * (1 - fz) + c10 * fz) * (1 - fy) + (c01 * (1 - fz) + c11 * fz) * fy;
   }
 
