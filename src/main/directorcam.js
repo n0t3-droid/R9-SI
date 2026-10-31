@@ -338,7 +338,9 @@
       const shots = [{ frame: 'title', dur: 3, cap: 'g.reel.title', tod: list.length ? list[0].tod : undefined }];
       for (const h of list) {
         let f = h.card ? 'card' : h.self ? 'view' : FRAME_SUB[h.sub] || FRAME_KIND[h.kind] || 'compose';   // (self: an event on the screen by itself — a wow moment's vista: over your shoulder)
-        const prev = shots[shots.length - 1].frame;
+        const prev = shots[shots.length - 1].frame, ph = shots[shots.length - 1].h;
+        // the same place twice in a row (≤ 40 m): the second one from round about — an orbit (or a crane after one)
+        if (ph && !ph.card && !h.card && Math.hypot(ph.x - h.x, ph.z - h.z) <= 40) f = prev === 'orbit' ? 'crane' : 'orbit';
         if (f === prev) f = f === 'card' ? 'cardpan' : f === 'sun' || f === 'view' ? (f === 'sun' ? 'view' : 'sun') : ALT.find((a) => a !== prev);
         if (f === 'cardpan' && prev === 'cardpan') f = 'card';
         shots.push({ h, frame: f, dur: stretch ? 8 : shotLen(h), tod: h.tod, cap: D.capKey(h) });

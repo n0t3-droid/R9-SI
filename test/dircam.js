@@ -204,6 +204,8 @@ if (P && D.reelPlan && D.stage) {
   check(pl.shots.every((s, i) => i === 0 || s.frame !== pl.shots[i - 1].frame), 'never the same framing twice in a row');
   check(pl.shots.filter((s) => s.h).every((s) => s.tod === s.h.tod), 'each shot at its moment\'s time of day');
   check(pl.shots.every((s) => typeof s.cap === 'string' && s.cap.length > 0), 'each shot has its caption key');
+  const twin = D.reelPlan([ev(10, 'travel', 'arrive', 3, 0, -15), Object.assign(ev(60, 'wow', 'temple', 3, 8, -20), { self: true }), ev(200, 'milestone', 'freed', 5, -300, 200)], {});
+  check(twin.shots[1].frame === 'compose' && (twin.shots[2].frame === 'orbit' || twin.shots[2].frame === 'crane'), `the same place twice in a row: the second from round about (${twin.shots.map((s) => s.frame).join(' ')})`);
   const short = D.reelPlan(P.slice(0, 3), {});
   check(short.dur >= 30 || short.shots.every((s) => s.dur >= 7.99 || !s.h), `three highlights stretched (${short.dur.toFixed(1)} s)`);
   // stage every in-world shot over a hilly ground: finite, looks at its subject, clear line, moves at both ends
