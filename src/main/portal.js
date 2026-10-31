@@ -168,7 +168,7 @@
   }, true);
 
   // ---------------------------------------------------------------- the journey
-  // dest: {dim, at?, yaw?, fav?, id?} · o: {dry: the film only (pictures, tests), seed}
+  // dest: {dim, at?, yaw?, fav?, id?} · o: {dry: the film only (pictures, tests), seed, film: a given film}
   Portal.go = function (g, dest, o) {
     o = o || {};
     if (!doc || !g || !dest || !dest.dim || M.J) return false;
@@ -179,7 +179,7 @@
       if (!local && VR.Travel) { const w = VR.Travel.canGo(g, dest.dim); if (w) { if (g.ui && g.ui.hint) g.ui.hint(T(w, { dim: dimName(dest.dim) }), 2200); return false; } }
     }
     style();
-    const film = C.film(rec, (o.seed !== undefined ? o.seed : seedOf(g)) >>> 0, g.dim, dest.dim, { low: low(g) });
+    const film = o.film || C.film(rec, (o.seed !== undefined ? o.seed : seedOf(g)) >>> 0, g.dim, dest.dim, { low: low(g) });
     rec.last = dest.id || null;
     const homeBody = palOf(D.home(g.meta));
     const P = F.make(film, palOf(dest.dim), palOf(g.dim), { air: C.airOf(dest.dim), curveFrom: C.kindOf(g.dim) === 'deep' ? homeBody : palOf(g.dim) });
@@ -389,5 +389,7 @@
       return r;
     };
   }
+  // the idle cost (the test): n frames of the gates' and fast flight's look, ms per frame
+  Portal.idleCost = (g, n) => { const t0 = now(); for (let i = 0; i < n; i++) { gateTick(g, 0.016); flyTick(g, 0.016); } return (now() - t0) / n; };
   Portal.stats = () => ({ pick: !!M.pick, cards: M.pick ? M.pick.cards.length : 0, film: M.J ? { id: M.J.film.id, t: +M.J.t.toFixed(2), len: M.J.film.len, phase: M.J.phase, went: M.J.went, arrived: M.J.arrived, shot: M.J.P.shotAt(M.J.t), low: M.J.film.low, w: M.J.cv.width, h: M.J.cv.height } : null, drawMs: +M.drawMs.toFixed(2), maxMs: +M.maxMs.toFixed(2), draws: M.draws, last: Portal.last || null, fly: Portal.fly() });
 })(VR);
