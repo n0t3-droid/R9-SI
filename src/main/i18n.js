@@ -16,17 +16,19 @@
   I.langs = LANGS;
   I.dict = I.dict || {};
   I.listeners = I.listeners || [];
-  I.add = function (lang, table) { Object.assign(I.dict[lang] || (I.dict[lang] = {}), table); };
+  I.add = function (lang, table) { if (VR.Names && VR.Names.fixTable) VR.Names.fixTable(lang, table); Object.assign(I.dict[lang] || (I.dict[lang] = {}), table); };
+  // n-names: a fallback text written at the call gets VR.Names' renames too (an old word in a new line still shows new)
+  const fx = (s) => (VR.Names && VR.Names.fixText && typeof s === 'string' ? VR.Names.fixText(I.lang === 'de' ? 'de' : 'en', s) : s);
   const fill = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : String(s));
   I.t = function (key, vars, fallback) {
     let s;
     const d = I.dict[I.lang]; if (d) s = d[key];
     if (s === undefined && I.lang !== 'en' && I.dict.en) s = I.dict.en[key];
-    if (s === undefined) s = fallback !== undefined ? fallback : key;
+    if (s === undefined) s = fallback !== undefined ? fx(fallback) : key;
     return fill(s, vars);
   };
   // the fallback text is German in the Studio, English in the game: English users must never see German
-  I.tx = function (key, vars, de, en) { const d = I.dict[I.lang]; if (d && d[key] !== undefined) return fill(d[key], vars); if (I.lang === 'de') return fill(de !== undefined ? de : en, vars); const e = I.dict.en && I.dict.en[key]; return fill(e !== undefined ? e : (en !== undefined ? en : de), vars); };
+  I.tx = function (key, vars, de, en) { const d = I.dict[I.lang]; if (d && d[key] !== undefined) return fill(d[key], vars); if (I.lang === 'de') return fill(fx(de !== undefined ? de : en), vars); const e = I.dict.en && I.dict.en[key]; return fill(e !== undefined ? e : fx(en !== undefined ? en : de), vars); };
   // a list of lines (villager talk, loading tips): the table holds an array — the English list when the chosen
   // language has none, an empty list when nobody has it
   I.list = function (key) { const d = I.dict[I.lang], v = d && d[key]; if (Array.isArray(v)) return v; const e = I.dict.en && I.dict.en[key]; return Array.isArray(e) ? e : []; };

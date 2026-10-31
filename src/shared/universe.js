@@ -281,7 +281,7 @@
     star: { type: 'F5 V', T: 6550, L: 3.6, M: 1.33, R: 1.5, color: '#dddeff' },
     bodies: [
       { id: 'helia', kind: 'star', name: name('Helia', 'Helia'), R: 1.5 * R_SUN, mu: 1.33 * MU_SUN, spin: { tilt: 0, T: 3 * 86400 / 8 } },
-      { id: 'amarant', kind: 'giant', name: name('Amarant', 'Amaranth'), parent: 'helia', R: 60000e3, f: 0.098, mu: MU_JUP, air: 'H₂/He', landable: false,
+      { id: 'amarant', kind: 'giant', name: name('Turmalin', 'Tourmaline'), parent: 'helia', R: 60000e3, f: 0.098, mu: MU_JUP, air: 'H₂/He', landable: false,
         orbit: { a: 1.9 * AU, e: 0, i: 0, node: 0, peri: 0, start: { sunOverEquator: 12, falling: true } },
         // the pole 14° from the ecliptic's; 5.8 h real-equivalent: Saturn's q = ω²R³/GM with Jupiter's mass (its 9.8 %)
         spin: { tilt: 14, toward: 0, T: 5.8 * 3600 / 8 },

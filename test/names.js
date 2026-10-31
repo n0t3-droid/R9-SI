@@ -12,6 +12,7 @@
 //   bash test/wt_run.sh names.js 300
 const fs = require('fs'), path = require('path');
 require('./load_shared.js');
+require('../src/shared/pets.js');
 require('../src/main/i18n.js');
 require('../src/main/lang_en.js');
 require('../src/main/lang_de.js');
@@ -219,6 +220,72 @@ console.log('5 · the ship liveries: a name of the tables in each language, the 
   const styles = []; for (const t of (VR.Forge && VR.Forge.types) || []) for (const st of t.styles || []) styles.push(st.name);
   const bad = styles.filter(n => RETIRED.some(r => r.re.test(n)));
   check(styles.length > 20 && !bad.length, 'no Forge style is named with a retired word (' + styles.length + ' styles)' + (bad.length ? ': ' + bad.join(', ') : ''));
+}
+
+// ---------------------------------------------------------------- 6 · n-names: one table of names (VR.Names)
+console.log('6 · n-names: the peoples\' names, the villages, the stars, the renames (VR.Names)');
+{
+  const N = VR.Names, E = VR.WorldEco, I = VR.I18N;
+  check(!!(N && N.pool && N.place && N.village && N.star && N.blocked && N.PEOPLES), 'VR.Names is there (pool, place, village, star, blocked, PEOPLES)');
+  const KINDS = ['herz', 'aqua', 'ocker', 'zinn', 'basalt', 'opal'];
+  const word = /^[A-ZÄÖÜ][a-zäöüß]{1,11}$/;
+  const given = {};
+  for (const k of KINDS) {
+    const P = N.pool(k), all = P.first.concat(P.kids, P.elders, P.sur);
+    const full = new Set(); for (const f of P.first.concat(P.elders)) for (const s of P.sur) full.add(f + ' ' + s);
+    check(full.size >= 200 && P.kids.length >= 16 && P.elders.length >= 16 && P.sur.length >= 16, k + ': ' + full.size + ' distinct full names (' + P.first.length + ' given, ' + P.elders.length + ' elders, ' + P.kids.length + ' children, ' + P.sur.length + ' families) — e.g. ' + P.first[0] + ' ' + P.sur[0] + ', ' + P.kids[0] + ', ' + P.elders[0]);
+    const odd = all.filter(w => !word.test(w)), bad = all.filter(w => N.blocked(w)), res = all.filter(w => N.reserved(w));
+    check(!odd.length && !bad.length && !res.length, k + ': every name one readable word, none on the block list, none a name of the story or the sky' + (odd.length + bad.length + res.length ? ': ' + odd.concat(bad, res).slice(0, 8).join(', ') : ''));
+    const sep = P.kids.filter(w => P.first.includes(w) || P.elders.includes(w)).concat(P.elders.filter(w => P.first.includes(w)));
+    check(!sep.length, k + ': children and elders have their own names' + (sep.length ? ': ' + sep.join(', ') : ''));
+    given[k] = new Set(P.first.concat(P.kids, P.elders));
+    const pl = new Set(); for (let i = 0; i < 400; i++) pl.add(N.place(k, i * 7919 + 13));
+    const plBad = [...pl].filter(w => !word.test(w.replace(/ /g, '')) || N.blocked(w) || N.reserved(w));
+    check(pl.size >= 120 && !plBad.length, k + ': ' + pl.size + ' place names from 400 seeds (' + [...pl].slice(0, 4).join(', ') + ')' + (plBad.length ? ': bad ' + plBad.slice(0, 6).join(', ') : ''));
+  }
+  const cross = []; for (let a = 0; a < KINDS.length; a++) for (let b = a + 1; b < KINDS.length; b++) for (const w of given[KINDS[a]]) if (given[KINDS[b]].has(w)) cross.push(KINDS[a] + '/' + KINDS[b] + ' ' + w);
+  check(!cross.length, 'each people sounds like itself: no given name shared by two peoples' + (cross.length ? ': ' + cross.slice(0, 6).join(', ') : ''));
+  // the native villages use the pools (WorldEco.names → VR.Names.pool), the site names VR.Names.place
+  const en0 = E.names('zinn'), p0 = N.pool('zinn');
+  check(en0.first === p0.first && en0.elders === p0.elders && en0.sur === p0.sur && E.word('zinn', 77, 2) === N.place('zinn', 77), 'WorldEco.names / word speak through VR.Names (' + E.word('aqua', 5, 2) + ', ' + E.word('zinn', 77, 2) + ', ' + E.word('opal', 9, 3) + ')');
+  // Herzwelt's villages
+  const vil = new Set(); for (let i = 0; i < 500; i++) vil.add(VR.VillageGen.name(i * 104729 + 7));
+  const vBad = [...vil].filter(w => !word.test(w) || N.blocked(w) || N.reserved(w));
+  check(vil.size >= 200 && !vBad.length, 'Herzwelt\'s villages: ' + vil.size + ' names from 500 seeds (' + [...vil].slice(0, 5).join(', ') + ')' + (vBad.length ? ': bad ' + vBad.join(', ') : ''));
+  check(![...vil].some(w => /water|haven|hollow|brook|shire|field/.test(w)), 'no English village names any more (Brightwater, Oakhaven … went)');
+  // the stars
+  const NB = VR.Galaxy.build(53), names = NB.list.filter(s => !s.home).map(s => s.name), seen = new Set(names);
+  const sBad = names.filter(n => !/^[A-Z][a-z]{3,10}$/.test(n) || N.blocked(n) || VR.Galaxy.blocked(n) || N.reserved(n));
+  check(seen.size === names.length && !sBad.length, names.length + ' star names, unique, soft and clean (' + names.slice(0, 6).join(', ') + ')' + (sBad.length ? ': bad ' + sBad.slice(0, 6).join(', ') : ''));
+  const NB2 = VR.Galaxy.build(53);
+  check(NB2.list.every((s, i) => s.name === NB.list[i].name), 'a star keeps its name (seeded by the system)');
+  check(N.blocked('Ussr') && N.blocked('Nemo') && N.blocked('Paul') && N.blocked('Amarant') && !N.blocked('Lindenau'), 'the block list catches Ussr, Nemo, Paul, Amarant; Lindenau passes');
+  // the renames, in both tables and in the fallbacks
+  check(de['g.eco.sp.zinn'] === 'Glimari' && en['g.eco.sp.zinn'] === 'Glimari' && de['g.eco.sp.opal'] === 'Isveli' && en['g.eco.sp.opal'] === 'Isveli', 'the peoples: „' + de['g.eco.sp.zinn'] + '" (was Glutani), „' + de['g.eco.sp.opal'] + '" (was Nivari)');
+  check(de['story.c4.title'] === 'Die Monde von Turmalin' && /Tourmaline/.test(en['story.c4.title']), 'the ringed giant: „' + de['story.c4.title'] + '" / „' + en['story.c4.title'] + '"');
+  const OLD = /\bAmarant(h|s|s')?\b|Glutani|Nivari/;
+  const left = DE.concat(EN).filter(([, s]) => OLD.test(s)).map(([k]) => k);
+  check(!left.length, 'no table value says Amarant, Amaranth, Glutani or Nivari any more' + (left.length ? ': ' + left.slice(0, 8).join(', ') + ' (' + left.length + ')' : ''));
+  const was = I.lang; I.lang = 'en'; const fb = I.tx('n.names.test', null, 'die Glutani bei Amarant', 'the Glutani by Amaranth'); I.lang = was;
+  check(fb === 'the Glimari by Tourmaline', 'a fallback text is renamed too: „' + fb + '"');
+  const giant = VR.Universe.HELIA.bodies.find(b => b.id === 'amarant'), sp = E.KINDS.zinn.species, sp2 = E.KINDS.opal.species;
+  check(giant && giant.name.de === 'Turmalin' && giant.name.en === 'Tourmaline' && sp.de === 'Glimari' && sp2.de === 'Isveli', 'the data: the giant „' + (giant && giant.name.de) + '" / „' + (giant && giant.name.en) + '" (its id amarant stays), the peoples ' + sp.de + ', ' + sp2.de);
+  // no two shown proper names collide: the sky, the peoples, the story's speakers, the outposts, the nebulae, the pets
+  const shown = [];
+  for (const b of VR.Universe.HELIA.bodies) shown.push(['body', b.name.de], ['body', b.name.en]);
+  for (const k of ['aqua', 'ocker', 'zinn', 'basalt', 'opal']) shown.push(['people', de['g.eco.sp.' + k]]);
+  for (const k in de) if (/^story\.who\./.test(k)) shown.push(['speaker', String(de[k]).replace(/^(Opa|Meisterin|Kapitän) /, '')]);
+  for (const k in de) if (/^g\.lib\.n\./.test(k)) shown.push(['outpost', de[k]]);
+  for (const n of VR.Galaxy.NEB_NAMES) shown.push(['nebula', n.de]);
+  const byWord = {}; for (const [what, w] of shown) { const l = String(w).toLowerCase(); (byWord[l] = byWord[l] || new Set()).add(what); }
+  const clash = Object.keys(byWord).filter(w => byWord[w].size > 1);
+  check(!clash.length, shown.length + ' fixed names: no word names two different things' + (clash.length ? ': ' + clash.join(', ') : ''));
+  const pets = []; for (const k in VR.Pets.KINDS) for (const n of VR.Pets.KINDS[k].names) if (byWord[n.toLowerCase()] || N.reserved(n)) pets.push(n);
+  check(!pets.length, 'no pet is called like a speaker, a world or a people (Funke and Lumi went)' + (pets.length ? ': ' + pets.join(', ') : ''));
+  const gen = []; for (const k of KINDS) for (const w of given[k]) if (byWord[w.toLowerCase()]) gen.push(k + ' ' + w);
+  check(!gen.length, 'no villager is called like a speaker, a world, a people or an outpost' + (gen.length ? ': ' + gen.join(', ') : ''));
+  const vsrc = fs.readFileSync(path.join(ROOT, 'src/main/villagers.js'), 'utf8'), vgs = fs.readFileSync(path.join(ROOT, 'src/main/villages.js'), 'utf8');
+  check(/VR\.Names\.pool\('herz'\)/.test(vsrc) && /elders/.test(vgs), 'Herzwelt\'s villagers take their names from VR.Names (villagers.js), the elders their own (villages.js)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

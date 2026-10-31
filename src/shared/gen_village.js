@@ -416,7 +416,7 @@
   const SUF = ['water', 'hollow', 'fall', 'vale', 'ford', 'haven', 'brook', 'rest', 'meadow', 'field', 'crest', 'glen', 'wick', 'shire', 'stead', 'reach', 'mere', 'bloom'];
   VG.dbg = null;
   VG.fail = (why) => { if (VG.dbg) VG.dbg[why] = (VG.dbg[why] || 0) + 1; return null; };
-  VG.name = (seed) => { const r = new VR.RNG(M.hash2(seed, 0x7a11, 3)); r.next(); return r.pick(PRE) + r.pick(SUF); };
+  VG.name = (seed) => (VR.Names ? VR.Names.village(M.hash2(seed, 0x7a11, 3)) : PRE[0] + SUF[0]);   // n-names: German village names (Lindenau, Mohnbrunn …), display only
 
   // ---------------------------------------------------------------- site selection
   // v1 worlds keep their villages exactly as generated; worlds made from v0.17 on (vgen 2) get
