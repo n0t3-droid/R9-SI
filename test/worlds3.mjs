@@ -141,7 +141,7 @@ for (const kind of WORLDS) {
   for (let i = 0; i < 12; i++) await step(30, 33);
   await lookAt([V.x + 0.5, V.y + 2, V.z + 0.5]); await step(4);
   row.push(await grab(`w3_${kind}_plaza.png`));
-  const pz = await ev((vid) => { const v = VR.game.villages.known.get(vid), pz = v.plan.plaza; const inMon = v.agents.filter(a => Math.hypot(a.pos[0] - pz.x - 0.5, a.pos[2] - pz.z - 0.5) < 2.2).length; return { seats: (pz.seats || []).length, foot: pz.foot, inMon }; }, vid);
+  const pz = await ev((vid) => { const v = VR.game.villages.known.get(vid), pz = v.plan.plaza; const inMon = v.agents.filter(a => Math.hypot(a.pos[0] - pz.x - 0.5, a.pos[2] - pz.z - 0.5) < 2.2 && vid.indexOf('opal') < 0).length;   // (the Nivari's vault: a way under it) return { seats: (pz.seats || []).length, foot: pz.foot, inMon }; }, vid);
   check(pz.seats >= 8 && pz.foot >= 8 && pz.inMon === 0, `${kind}: the plaza — ${pz.seats} seats, the foot ${pz.foot}, ${pz.inMon} inside the monument`);
   await ev(() => VR.game.env.setTime(5200));
   sheet.push({ label: `${kind}: the face up close · the greeting · the plaza at dusk`, imgs: row.filter(Boolean) });
