@@ -337,9 +337,9 @@
     const build = (stretch) => {
       const shots = [{ frame: 'title', dur: 3, cap: 'g.reel.title', tod: list.length ? list[0].tod : undefined }];
       for (const h of list) {
-        let f = h.card ? 'card' : FRAME_SUB[h.sub] || FRAME_KIND[h.kind] || 'compose';
+        let f = h.card ? 'card' : h.self ? 'view' : FRAME_SUB[h.sub] || FRAME_KIND[h.kind] || 'compose';   // (self: an event on the screen by itself — a wow moment's vista: over your shoulder)
         const prev = shots[shots.length - 1].frame;
-        if (f === prev) f = f === 'card' ? 'cardpan' : f === 'sun' ? 'compose' : ALT.find((a) => a !== prev);
+        if (f === prev) f = f === 'card' ? 'cardpan' : f === 'sun' || f === 'view' ? (f === 'sun' ? 'view' : 'sun') : ALT.find((a) => a !== prev);
         if (f === 'cardpan' && prev === 'cardpan') f = 'card';
         shots.push({ h, frame: f, dur: stretch ? 8 : shotLen(h), tod: h.tod, cap: D.capKey(h) });
       }
@@ -377,8 +377,9 @@
     } else if (f === 'crane') {
       const R = r * 1.8 + 14, x = T[0] + ux * R, z = T[2] + uz * R, y0 = gy(x, z, T[1] - 2) + 2, y1 = Math.max(y0 + 6, T[1] + R * 0.8);
       pos = (t) => { const u = t / dur; return [T[0] + ux * R * (1 + 0.15 * u), y0 + (y1 - y0) * u, T[2] + uz * R * (1 + 0.15 * u)]; };
-    } else if (f === 'sun') {
-      const az = ctx.sunAz !== undefined ? ctx.sunAz : 0, sx = Math.cos(az), sz = Math.sin(az), Ap = A0 ? [A0.x, A0.y, A0.z] : [T[0], gy(T[0], T[2], T[1]), T[2]];
+    } else if (f === 'sun' || f === 'view') {
+      // sun: behind you, into the low sun; view: over your shoulder where you looked then (a vista's moment)
+      const az = f === 'view' && A0 ? Math.atan2(-Math.cos(A0.yaw), -Math.sin(A0.yaw)) : ctx.sunAz !== undefined ? ctx.sunAz : 0, sx = Math.cos(az), sz = Math.sin(az), Ap = A0 ? [A0.x, A0.y, A0.z] : [T[0], gy(T[0], T[2], T[1]), T[2]];
       subj = [Ap[0] + sx * 40, Ap[1] + 1, Ap[2] + sz * 40];   // (the low sun's side of the land, ahead of you)
       pos = (t) => { const k = 9 - 0.6 * t, x = Ap[0] - sx * k, z = Ap[2] - sz * k; return [x, Math.max(Ap[1] + 2.6, gy(x, z, Ap[1]) + 2), z]; };
     } else {   // push (and any other): a slow push-in from the avatar's side
@@ -398,7 +399,7 @@
         const dT = Math.hypot(T[0] - C[0], T[2] - C[2]), dS = Math.hypot(S[0] - C[0], S[2] - C[2]), aT = Math.atan2(T[1] - C[1], dT), aS = Math.atan2(S[1] - C[1], dS);
         o.pitch = (aT + aS) / 2; o.fov = clamp(2 * Math.atan(3 * Math.tan(Math.max(0.05, aT - aS) / 2)), 30 * DEG, 80 * DEG);
       }
-      else if (f === 'sun') o.pitch = Math.max(o.pitch, -0.12);
+      else if (f === 'sun' || f === 'view') o.pitch = Math.max(o.pitch, -0.12);
       return o;
     };
     return out;
