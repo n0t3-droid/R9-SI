@@ -188,7 +188,7 @@ const nearRing = (P, off) => P.ev((off) => {
   return { d: Math.round(L), y: Math.round(mp[1]) };
 }, off);
 // a fixed camera for the pictures in space (the space frame takes g.vehicleCam): eye and target in map coordinates
-const fixCam = (P, eye, at) => P.ev(([e, a]) => { const g = VR.game; if (window.__vc0 === undefined) window.__vc0 = g.vehicleCam || null; const dx = a[0] - e[0], dy = a[1] - e[1], dz = a[2] - e[2]; const C = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), roll: 0, fov: 66 * Math.PI / 180, far: 30000 }; g.vehicleCam = () => Object.assign({}, C); return C; }, [eye, at]);
+const fixCam = (P, eye, at, fovDeg) => P.ev(([e, a, fd]) => { const g = VR.game; if (window.__vc0 === undefined) window.__vc0 = g.vehicleCam || null; const dx = a[0] - e[0], dy = a[1] - e[1], dz = a[2] - e[2]; const C = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), roll: 0, fov: (fd || 66) * Math.PI / 180, far: 30000 }; g.vehicleCam = () => Object.assign({}, C); return C; }, [eye, at, fovDeg || 0]);
 const freeCam = (P) => P.ev(() => { const g = VR.game; if (window.__vc0 !== undefined) { g.vehicleCam = window.__vc0 || undefined; if (!window.__vc0) delete g.vehicleCam; delete window.__vc0; } });
 async function stationRun(P, hi, Rr, tag) {
   const bd = await board(P);
@@ -200,13 +200,20 @@ async function stationRun(P, hi, Rr, tag) {
     const n = await nearRing(P, [2600, -1400, 900]);
     await chase(P, 0.1, 0);
     const cp = await P.ev(() => VR.Stations.chartPos());
-    await fixCam(P, [cp[0] + 400, cp[1] + 900, cp[2] + 380], [cp[0], cp[1] - 60, cp[2]]);
-    await waitTex(P, 60000, 1); await P.step(20, 1);
-    for (let i = 0; i < 120; i++) { const s = await S_(P); if (s.stats.meshes >= 4 && s.stats.drawn >= 6) break; await P.step(4, 1); await P.wait(250); }
-    await P.step(4, 1); await keep(P, '__Fo');
-    const m = await picture(P, '__Fo', SH('ringstation_outside.png'), K);
-    const s = await S_(P);
-    check(!m.err && m.sd > 6 && s.stats.drawn >= 6, `ringstation_outside: the ring from above, ${s.stats.drawn} meshes drawn, ${s.stats.shuttles} shuttles near (L ${m.mean} ± ${m.sd}) ${m.err || ''}`);
+    // u-stations2: in true scale — a telephoto view (32°) from 2.3 km, looking down 47° so the ring sits on Herzwelt's limb
+    // (the horizon dips ≈ 49° at 53 km); headings round the ring for the sun from the side (HEAD=deg,deg,…)
+    const HEADS = (process.env.HEAD || '0,120,240').split(',').map(Number), D0 = 2300, PIT = 47 * Math.PI / 180;
+    let first = true;
+    for (const hd of HEADS) {
+      const hx = Math.sin(hd * Math.PI / 180), hz = -Math.cos(hd * Math.PI / 180);
+      await fixCam(P, [cp[0] - hx * D0 * Math.cos(PIT), cp[1] + D0 * Math.sin(PIT), cp[2] - hz * D0 * Math.cos(PIT)], [cp[0], cp[1], cp[2]], 32);
+      if (first) { await waitTex(P, 60000, 1); await P.step(20, 1); for (let i = 0; i < 120; i++) { const s = await S_(P); if (s.stats.meshes >= 4 && s.stats.drawn >= 6) break; await P.step(4, 1); await P.wait(250); } first = false; }
+      await P.step(4, 1); await keep(P, '__Fo');
+      const nm = hd === HEADS[0] ? 'ringstation_outside.png' : `ringstation_outside_${hd}.png`;
+      const m = await picture(P, '__Fo', SH(nm), K);
+      const s = await S_(P);
+      check(!m.err && m.sd > 6 && s.stats.drawn >= 6, `${nm}: the ring on the limb (heading ${hd}°), ${s.stats.drawn} meshes drawn, ${s.stats.shuttles} shuttles near (L ${m.mean} ± ${m.sd}) ${m.err || ''}`);
+    }
     await freeCam(P);
   }
   // ---- docking from 8 km out (G: looking at it)
@@ -249,7 +256,11 @@ async function stationRun(P, hi, Rr, tag) {
   check(ok && s.dim === 'stn.ring' && s.pilot, `docked: in ${s.dim}, the ship on the berth, aboard (${s.pos && s.pos.join(', ')})`);
   if (s.dim !== 'stn.ring') return;
   // the first frames in the station (the hand-off: the game's frames while the station streams in)
-  const hf = []; for (let i = 0; i < 60; i++) hf.push(await P.ev(() => { const g = VR.game, t0 = performance.now(); window.__norender = true; g.last = t0 - 33; g.loop(t0); return +(performance.now() - t0).toFixed(1); }));
+  // (u-stations2: each frame's parts — every subsystem of the game with an update, the world's — the dearest frame's logged)
+  await P.ev(() => { const g = VR.game; window.__parts = {}; for (const k of Object.keys(g)) { const o = g[k]; if (!o || typeof o !== 'object' || o === g) continue; for (const fn of ['update', 'tick', 'pump']) { if (typeof o[fn] !== 'function' || o['__w' + fn]) continue; const f0 = o[fn]; o['__w' + fn] = true; o[fn] = function () { const t0 = performance.now(); try { return f0.apply(this, arguments); } finally { const d = performance.now() - t0; window.__parts[k + '.' + fn] = (window.__parts[k + '.' + fn] || 0) + d; } }; } } });
+  const hf = [], hp = []; for (let i = 0; i < 60; i++) { const r0 = await P.ev(() => { const g = VR.game, t0 = performance.now(); window.__parts = {}; window.__norender = true; g.last = t0 - 33; g.loop(t0); const ms = +(performance.now() - t0).toFixed(1); const top = Object.entries(window.__parts).filter(e => e[1] > 1).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0] + ' ' + e[1].toFixed(1)).join(', '); return [ms, top]; }); hf.push(r0[0]); hp.push(r0[1]); }
+  { const ix = hf.indexOf(Math.max(...hf.slice(3))); console.log(`  the hand-off's dearest frame #${ix}: ${hf[ix]} ms — ${hp[ix]}`); hf.forEach((f, i) => { if (f > 12) console.log(`    #${i} ${f} ms: ${hp[i]}`); }); }
+  { const q = await P.ev(() => ({ sgen: VR.game.meta.universe && VR.game.meta.universe.sgen, deck: Object.assign({}, VR.Stations.stats.deck) })); Rr.deck = q; check(q.sgen === 2 && q.deck.hall >= 4, `the deck lives: ${q.deck.hall} people in the hall, ${q.deck.folk} aboard, ${q.deck.drones} drones (sgen ${q.sgen})`); }
   const hm = med(hf.slice(3)), hx = Math.max(...hf.slice(3));
   Rr.handoff = { median: hm, max: hx, all: hf };
   console.log(`  the hand-off's game frames: ${hf.map(Math.round).join(' ')}`);
@@ -264,8 +275,11 @@ async function stationRun(P, hi, Rr, tag) {
     check(!m.err && m.sd > 5, `${name}: ${cap} (${m.err || m.draws + ' draws'}, L ${m.mean} ± ${m.sd})`);
     return m;
   };
+  await P.ev(() => { VR.Stations.DECK_BUILD = 99; });   // (the pictures: every deck figure's model at the first draw)
   if (hi) {
     await look(-6.5, 64, 9.5, -0.25, 0.12, 'station_window', 'the window wall, Herzwelt 81.5° wide beyond the deck');
+    await look(-5.5, 65.4, 3.0, Math.atan2(9.5, -5.5), -0.16, 'station_cafe', 'the café: the barista, the guests, the oak floor');
+    { const q = await P.ev(() => Object.assign({}, VR.Stations.stats.deck)); check(q.drawn >= 3, `the deck life drawn in the café picture: ${q.drawn} figures`); }
     await look(12.5, 66, -3.5, Math.PI - 0.5, -0.12, 'station_interior', 'the Panoramahalle, the garden beyond');
     // a shuttle landing on the deck: the hangar deck's clock a few seconds before a touchdown
     const vt = await P.ev(() => { const g = VR.game, Lf = g.stnLife; if (!Lf) return null; const pad = Lf.actor.pads.get('stn'), T = VR.Stations.visits('ring', g.meta.seed | 0, Lf.actor.clock, Lf.actor.clock + 400); const Tn = T[1] || T[0]; Lf.actor.clock = Tn - 9; return { T: Tn, pad: [pad.x, pad.y, pad.z] }; });
@@ -328,6 +342,8 @@ save();
 // the sheet
 try {
   const rows = [{ label: 'Ringstation · outside, docking', imgs: ['ringstation_outside.png', 'docking.png'].map(SH).filter(f => fs.existsSync(f)) },
+    { label: 'the ring from other headings', imgs: fs.readdirSync(SHOTS).filter(f => /^ringstation_outside_\d+\.png$/.test(f)).map(SH) },
+    { label: 'the café · the deck life', imgs: ['station_cafe.png'].map(SH).filter(f => fs.existsSync(f)) },
     { label: 'the window · the hall', imgs: ['station_window.png', 'station_interior.png'].map(SH).filter(f => fs.existsSync(f)) },
     { label: 'traffic on the deck · the shop', imgs: ['station_traffic.png', 'station_shop.png'].map(SH).filter(f => fs.existsSync(f)) },
     { label: 'Very Low: the window · the plaza', imgs: ['station_window_vl.png', 'stations_plaza_vl.png'].map(SH).filter(f => fs.existsSync(f)) }].filter(r => r.imgs.length);

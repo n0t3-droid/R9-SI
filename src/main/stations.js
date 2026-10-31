@@ -799,7 +799,7 @@
       f.pos[0] = q.pos[0]; f.pos[1] = q.pos[1]; f.pos[2] = q.pos[2]; f.yaw = q.yaw; f.state = q.state; f.walk = q.walk; f.walkAmt = q.walkAmt; f.talking = q.talking; f.headYaw = q.headYaw;
       f.on = true;
       if (q.kind === 'folk') {
-        if (!f.look && !made) { const n = wk[q.role] = (wk[q.role] | 0) + 1, R0 = LOOKROLE[q.role], role = Array.isArray(R0) ? R0[(n - 1) % R0.length] : R0 || 'office'; f.look = LK.folk(0x57a7 + q.seed * 7919 + (Lf.id === 'ring' ? 0 : 3), role, 'adult'); made++; }
+        if (!f.look && made < (STN.DECK_BUILD || 1)) { const n = wk[q.role] = (wk[q.role] | 0) + 1, R0 = LOOKROLE[q.role], role = Array.isArray(R0) ? R0[(n - 1) % R0.length] : R0 || 'office'; f.look = LK.folk(0x57a7 + q.seed * 7919 + (Lf.id === 'ring' ? 0 : 3), role, 'adult'); made++; }
         else if (!f.look) wk[q.role] = (wk[q.role] | 0) + 1;
         D.folk++; if (q.pos[0] >= -20 && q.pos[0] <= 21 && q.pos[2] >= -6 && q.pos[2] <= 15) D.hall++;
       } else D.drones++;
@@ -815,7 +815,7 @@
       if (!f || !f.on) continue;
       if (f.kind === 'drone') { if (!p) p = ent.beginVox(r, E); if (LK.drawModel(g, r, p, 'hover_drone', f.pos, f.yaw, cam, { pose })) n++; continue; }
       if (!f.look) continue;
-      if (!f.ready) { if (built) continue; built++; }   // (one model built a frame)
+      if (!f.ready) { if (built >= (STN.DECK_BUILD || 1)) continue; built++; }   // (one model built a frame)
       if (!p) p = ent.beginVox(r, E);
       if (LK.drawFolk(g, r, p, f, cam, t)) { n++; f.ready = true; }
     }
