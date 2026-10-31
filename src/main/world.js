@@ -721,7 +721,8 @@
         // Zinnober the sections round the lava ponds near the player were dirty again every frame, and the empty ones
         // high above the village waited behind them for ever: its columns were never shown. A section's priority also
         // grows with its wait (2 a frame), so a churn nearer by never starves the rest)
-        if (free < 64) for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending && s.count === 0 && free < 64) { free++; this.meshSection(c, sy, false, 0, pos); } }
+        // (in the takt they too stop at the frame's share of the budget)
+        if (free < 64 && !(tk && free > 0 && performance.now() - t0 > cap)) for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending && s.count === 0 && free < 64) { if (tk && free > 0 && performance.now() - t0 > cap) break; free++; this.meshSection(c, sy, false, 0, pos); } }
         const fr = this.frame || 0;
         if (!c.dirtyF) c.dirtyF = fr || 1;
         if (best.length === budget && d2 - 2 * (fr - c.dirtyF) >= worst) continue;   // nothing in this column can beat the list
