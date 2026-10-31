@@ -1416,7 +1416,7 @@
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
         const sleeping = a.pose === 'sleep';
         if (a.shadeT === undefined || t - a.shadeT > 0.25) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }   // terrain-shadow ray only 4× a second per villager
-        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn, item_r: a.pose === 'sit' || sleeping, item_l: a.pose === 'sit' || sleeping } };   // (t-folk2: a guest puts the bag down)
+        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: (a.kid ? 0.82 : 1) * (a.p.look && a.p.look.species && Folk.SPECIES_BODY && Folk.SPECIES_BODY[a.p.look.species] ? Folk.SPECIES_BODY[a.p.look.species].scale : 1), shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn, item_r: a.pose === 'sit' || sleeping, item_l: a.pose === 'sit' || sleeping } };   // (t-folk2: a guest puts the bag down)
         if (a.pose === 'sit' && VR.FolkAnim.sitHides && VR.FolkAnim.sitHides(a.gait)) for (const k of VR.FolkAnim.SIT_HIDE) opts.hide[k] = true;   // (a robe's lap hides the legs)
         let pos = a.pos;
         if (sleeping) { opts.pitch = Math.PI / 2; pos = [a.pos[0] - VR.HF_DX[a.p.bed ? a.p.bed[3] : 0] * 0.85, a.pos[1] + 0.12, a.pos[2] - VR.HF_DZ[a.p.bed ? a.p.bed[3] : 0] * 0.85]; }
@@ -1488,6 +1488,7 @@
       if (a.talkAnim > 0) { a.talkAnim -= dt; a.mouthOn = Math.sin(t * 21 + a.p.seed) > 0.1; } else a.mouthOn = false;
       a.speaking = a.talkAnim > 0;   // (t-folk2: the speaker gestures, the listener's hands rest — folkanim.js FA.gesture)
       P.lids = null; P.mouth = null;
+      if (a.p.look && a.p.look.species && VR.WorldLife && VR.WorldLife.idle) VR.WorldLife.idle(P, a.p.look.species, t + (a.p.seed || 0) * 0.37, wa, state, a);   // u-worlds2: the natives' own idle and gestures
       return P;
     }
     // speech bubbles & name tags (DOM, projected each frame)

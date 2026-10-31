@@ -740,6 +740,102 @@
     F.face = { eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / 2, mouthX: (bL + 1) / 2, mouthY: (by + 1) / 2 + 0.25, noseY: (Ye - 2) / 2 + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2) };
     return { head: F, lids, mouth };
   }
+  // ============================== u-worlds2 · the natives' body plans
+  // Five plans of our own on the person's rig (no new bones: the tail hangs on the hips, the plates on the upper arms,
+  // the shell on the body, so every path — the voxel people, their half-resolution LOD, the smooth bodies — has them):
+  //   Wellari (Aquamarin)  a wide, smooth dome head, big round eyes, no nose; a fluked swimmer's tail
+  //   Dunelin (Ocker)      tall, a long neck (the head lifted 4 units), a short muzzle, russet stripes, a long tail
+  //                        with a tuft
+  //   Glutani (Zinnober)   stocky, a broad flat head with glowing amber seams, rock plates on the shoulders, a short
+  //                        thick tail with an ember tip
+  //   Regoli (Basalt)      small, a big round head with large eyes, a mineral shell on the back
+  //   Nivari (Opal)        tall and slim, a long narrow crown, ice crystals down the back, a thin tail with a crystal tip
+  // The patterns carry the 'other' tag (the smooth head keeps them; skin-tagged voxels are wiped to the plain skin).
+  // V.SPECIES_BODY: the scale (villages.js draws with it) and the neck lift; speciesBody returns them for the rig.
+  V.SPECIES_BODY = { aqua: { scale: 0.96, neck: 0 }, ocker: { scale: 1.1, neck: 4 }, zinn: { scale: 0.93, neck: 0 }, basalt: { scale: 0.8, neck: 0 }, opal: { scale: 1.07, neck: 1 } };
+  function speciesBody(L, C) {
+    const sp = V.SPECIES_BODY[L.species]; if (!sp) return null;
+    const { head, body, hips, upper, A, skin, kid, eyeY } = C, OT = TG.other, SKT = TG.skin;
+    const fc = L.featC || 0xffffff, dark = mul(skin, 0.78), lite = mix(skin, 0xffffff, 0.3);
+    const P = (part, x, y, z, c, e, t) => { if (!part.has(x, y, z)) part.set(x, y, z, c, e || 0, t || SKT); };
+    const S2 = (part, x, y, z, c, e, t) => part.set(x, y, z, c, e || 0, t || OT);   // (over what is there)
+    const sc = kid ? 0.6 : 1, n = (v) => Math.max(1, Math.round(v * sc));
+    // a tail on the hips: a path of points (y down, z back from the hip joint), its thickness, its end
+    const tail = (pts, r0, r1, col, endF) => {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) * 2));
+        for (let k = 0; k <= steps; k++) {
+          const t = k / steps, x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t;
+          const f = (i + t) / (pts.length - 1), r = r0 + (r1 - r0) * f;
+          for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx * dx + dy * dy + dz * dz <= r * r) hips.set(Math.round(x + dx), Math.round(y + dy), Math.round(z + dz), typeof col === 'function' ? col(f) : col, 0, SKT);
+        }
+      }
+      if (endF) endF(pts[pts.length - 1]);
+    };
+    const X0 = A.xl, X1 = A.xr, Z0 = A.z0, Z1 = A.z1, top = A.top;
+    if (L.species === 'aqua') {
+      // a wide smooth dome: a shell at the sides and the back, the crown rounded higher
+      for (let y = 1; y <= top - 1; y++) for (let z = Z0 + 1; z <= Z1; z++) { P(head, X0 - 1, y, z, skin); P(head, X1 + 1, y, z, skin); }
+      for (let y = 1; y <= top - 1; y++) for (let x = X0; x <= X1; x++) P(head, x, y, Z1 + 1, skin);
+      for (let z = Z0 + 1; z <= Z1; z++) for (let x = X0 + 1; x <= X1 - 1; x++) P(head, x, top + 1, z, skin);
+      // big round eyes, two voxels tall, a light glint; no nose; a pale throat
+      head.del(0, 2, Z0 - 1);
+      for (const ex of A.eyes) { head.del(ex, eyeY + 1, Z0); S2(head, ex, eyeY + 1, Z0 + 1, mix(L.eye, 0x0a0806, 0.4)); S2(head, ex, eyeY, Z0 + 1, mix(L.eye, 0x0a0806, 0.5)); S2(head, ex, eyeY + 1, Z0, mix(L.eye, 0xffffff, 0.75), 0, OT); }
+      for (let x = X0 + 1; x <= X1 - 1; x++) S2(head, x, 0, Z0 + 1, lite);
+      // the fluked tail, spots on it
+      if (!kid) tail([[0, -2, 3], [0, -6, 6], [0, -10, 8], [0, -14, 9]], 1.6, 1.0, (f) => mix(skin, fc, f * 0.5), (e) => {
+        for (let x = -5; x <= 5; x++) { const ax = Math.abs(x); for (let dz = 0; dz <= 2; dz++) if (dz <= 2 - (ax > 3 ? 1 : 0)) hips.set(x, Math.round(e[1] - (ax > 3 ? 1 : 0)), Math.round(e[2] + dz + (ax >> 1)), mix(fc, 0xffffff, ax > 3 ? 0.3 : 0), 0, SKT); }
+      });
+      else tail([[0, -1, 2], [0, -4, 4], [0, -6, 5]], 1.1, 0.8, skin);
+    } else if (L.species === 'ocker') {
+      // the long neck (the rig lifts the head 4 units): skin from the collar up
+      if (!kid) for (let y = 19; y <= 24; y++) for (let z = -2; z <= 1; z++) for (let x = -1; x <= 1; x++) if (!(Math.abs(x) === 1 && (z === -2 || z === 1))) body.set(x, y, z, y > 21 ? skin : mul(skin, 0.94), 0, SKT);
+      // a short muzzle, its dark tip
+      for (let x = -1; x <= 1; x++) for (let y = 0; y <= 2; y++) P(head, x, y, Z0 - 1, y === 0 && x !== 0 ? null : skin);
+      S2(head, 0, 2, Z0 - 2, mul(skin, 0.45)); S2(head, 0, 1, Z0 - 2, mul(skin, 0.85));
+      // russet stripes over the crown and the back of the head
+      const str = mix(skin, 0x6a2a14, 0.55);
+      for (let y = 3; y <= top; y += 2) for (let z = Z0 + 2; z <= Z1; z++) for (let x = X0; x <= X1; x++) if (head.has(x, y, z) && head.tagAt(x, y, z) === SKT && (x === X0 || x === X1 || z === Z1 || y === top)) head.set(x, y, z, str, 0, OT);
+      // the long tail, curving back and up at its end, a dark tuft
+      tail(kid ? [[0, -2, 3], [0, -6, 6], [0, -8, 8]] : [[0, -2, 3], [0, -8, 6], [0, -14, 9], [0, -17, 11], [0, -15, 12]], kid ? 1 : 1.3, 0.8, skin, (e) => hips.ell(e[0], e[1] + 1, e[2], 1.8, 2.2, 1.6, (x, y, z) => mul(str, 0.8 + H3(x, y, z, 77) * 0.2), null, SKT));
+    } else if (L.species === 'zinn') {
+      // a broad flat head: a shell at the sides, the crown flat
+      for (let y = 0; y <= top - 1; y++) for (let z = Z0 + 1; z <= Z1; z++) { P(head, X0 - 1, y, z, dark); P(head, X1 + 1, y, z, dark); }
+      // glowing amber seams (the smooth head keeps them: 'other')
+      const glow = mix(fc, 0xffffff, 0.15);
+      for (const [x, y, z] of [[X0 - 1, 1, Z0 + 1], [X0 - 1, 2, Z0 + 2], [X0 - 1, 3, Z0 + 2], [X1 + 1, 2, Z0 + 1], [X1 + 1, 3, Z0 + 2], [X1 + 1, 4, Z0 + 3], [-1, top - 1, Z0], [0, top - 2, Z0], [1, top - 1, Z0]]) if (head.has(x, y, z)) S2(head, x, y, z, glow, 1);
+      // rock plates on the shoulders (on the upper arm, they swing with it), seams lit
+      if (!kid) for (let y = 0; y <= 3; y++) for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) { const d = x * x / 9 + (y - 0.5) * (y - 0.5) / 9 + z * z / 9; if (d <= 1 && (y >= 1 || Math.abs(x) >= 2 || Math.abs(z) >= 2)) upper.set(x, y, z, (x + z + y) % 4 === 0 ? glow : mul(skin, 1.15 + H3(x, y, z, 61) * 0.2), (x + z + y) % 4 === 0 ? 1 : 0, OT); }
+      // the short thick tail, an ember at its end
+      tail([[0, -2, 3], [0, -5, 6], [0, -7, 8]], kid ? 1.3 : 2.0, 1.2, dark, (e) => { hips.set(0, Math.round(e[1]), Math.round(e[2]) + 1, glow, 1, OT); hips.set(0, Math.round(e[1]) - 1, Math.round(e[2]) + 1, glow, 1, OT); });
+    } else if (L.species === 'basalt') {
+      // the big round head: a shell all round but the face
+      for (let y = 0; y <= top + 1; y++) for (let z = Z0; z <= Z1 + 1; z++) for (let x = X0 - 1; x <= X1 + 1; x++) {
+        const dx = (x - C.cx) / 3.6, dy = (y - 3) / 4.4, dz = (z - C.zc - 0.5) / 3.7;
+        if (dx * dx + dy * dy + dz * dz <= 1) P(head, x, y, z, skin);
+      }
+      // large eyes (2 × 2 each, a glint), the nose a dot
+      head.del(0, 2, Z0 - 1);
+      for (const ex of A.eyes) { const ox = ex < 0 ? -1 : 1; for (const [x, y] of [[ex, eyeY], [ex + ox, eyeY], [ex, eyeY + 1], [ex + ox, eyeY + 1]]) { head.del(x, y, Z0); S2(head, x, y, Z0 + 1, mix(L.eye, 0x101828, 0.3)); } S2(head, ex + ox, eyeY + 1, Z0, mix(fc, 0xffffff, 0.6), 1); }
+      // the mineral shell on the back (over the garb), plates of the feature's colour
+      if (!kid) for (let y = 2; y <= 18; y++) for (let z = 2; z <= 6; z++) for (let x = -5; x <= 5; x++) {
+        const d = x * x / 25 + (y - 10) * (y - 10) / 81 + (z - 1) * (z - 1) / 25; if (d > 1 || d < 0.55) continue;
+        if (body.has(x, y, z)) continue;
+        body.set(x, y, z, (y % 5 === 0 || x === 0) ? mul(mix(skin, 0x303048, 0.5), 0.8) : mix(mix(skin, 0x606078, 0.4), fc, 0.12), 0, OT);
+      }
+    } else if (L.species === 'opal') {
+      // a long narrow crown: two rows more, narrower
+      for (let y = top + 1; y <= top + 2; y++) for (let z = Z0 + 1; z <= Z1 - (y === top + 2 ? 1 : 0); z++) for (let x = X0 + 1; x <= X1 - 1; x++) P(head, x, y, z, skin);
+      // frosted cheeks
+      S2(head, X0, 2, Z0 + 1, lite); S2(head, X1, 2, Z0 + 1, lite);
+      // ice crystals down the back
+      const ice = mix(fc, 0xffffff, 0.35);
+      if (!kid) for (const y of [5, 9, 13, 17]) { const zb = 3; for (let k = 0; k <= 3 - (y === 5 ? 1 : 0); k++) { body.set(0, y + k, zb + k, ice, k >= 2 ? 1 : 0, OT); if (k < 2) { body.set(-1, y + k, zb + k, mul(ice, 0.85), 0, OT); body.set(1, y + k, zb + k, mul(ice, 0.85), 0, OT); } } }
+      // the thin tail, a crystal at its tip
+      tail(kid ? [[0, -2, 3], [0, -6, 5]] : [[0, -2, 3], [0, -9, 6], [0, -15, 9], [0, -18, 11]], 1.0, 0.7, skin, (e) => { for (let k = 0; k < 3; k++) hips.set(0, Math.round(e[1]) - k, Math.round(e[2]) + 1, ice, k === 1 ? 1 : 0, OT); hips.set(-1, Math.round(e[1]) - 1, Math.round(e[2]) + 1, mul(ice, 0.9), 0, OT); hips.set(1, Math.round(e[1]) - 1, Math.round(e[2]) + 1, mul(ice, 0.9), 0, OT); });
+    }
+    return { scale: sp.scale, neck: kid ? Math.round(sp.neck * 0.5) : sp.neck };
+  }
   function buildPerson(L, opts) {
     const kid = L.age === 'child', elder = L.age === 'elder';
     const role = V.ROLES[L.role] || V.ROLES.farmer;
@@ -1343,8 +1439,11 @@
       shin.set(x, y, z, y === ground ? sole : (kid && y === ankle - 1) ? 0xF4F4F0 : shC(x, y, z), 0, TG.leather);
     }
 
+    // ---- u-worlds2: the natives' own body plans (L.species, worldlife.js V.speciesLook) — our own designs, friendly:
+    // the head's shape, the eyes, a tail, shoulder plates, a back shell, crystals, a long neck (the rig lifts the head)
+    const SPB = L.species && !L.hero ? speciesBody(L, { head, body, hips, upper, thigh, shin, A, S, skin, kid, eyeY, cx, zc }) : null;
     // ============================== the rig
-    const hipY = S.hip, headY = S.head, shY = S.sh, hx = S.hx;
+    const hipY = S.hip, headY = S.head + (SPB && SPB.neck || 0), shY = S.sh, hx = S.hx;
     const legXl = -S.legX - (kid ? 0 : 0), legXr = S.legX;
     // (the smooth path: the head, its lids and its talking mouth at 64 a block — fineFace)
     const fine = opts && opts.fine ? fineFace({ head: head.g, A, eyeY, skin, hair: hc, eye: L.eye, kid, elder, beard: !!(L.beard && !kid), glasses, frame: frameC, freckles: !!L.freckles, lashes: !!L.lashes, bald }) : null;
@@ -1358,6 +1457,7 @@
       skel: S,
     };
     if (fine) def.fine = fine;
+    if (SPB) { def.species = L.species; def.h *= SPB.scale; }
     // (t-folk2: the smooth path's hands at the wrists and what they hold at the grips — their own bones: the wrist bends,
     // a bag hangs straight down; the voxel people keep them in the forearm)
     if (fine0) {

@@ -116,6 +116,92 @@
     return L;
   };
 
+  // ---------------------------------------------------------------- u-worlds2 · the natives' own idle and gestures
+  // villages.js pose() calls it after the person's pose (FolkAnim resets every joint each frame, so this only adds):
+  // standing (or talking) each species keeps its own bearing and now and then makes its own gesture — the Wellari sway
+  // and flutter their hands like fins, the Dunelin bob their long necks and look up, the Glutani stand wide and warm their
+  // hands, the Regoli bounce on their toes and tilt their heads, the Nivari stand tall and breathe slowly, a hand to the
+  // chest in greeting. t: the game's time (seconded by the person's seed), wa: the walk amount (0 standing).
+  // A culture moment (WL.Culture) makes them dance their own dance: state 'dance' is the villagers' own.
+  WL.idle = function (P, kind, t, wa, state, a) {
+    const k = Math.max(0, 1 - wa * 3);   // walking: the bearing fades out
+    if (k <= 0 || !P.head || !P.body) return;
+    const sn = Math.sin, add = (j, i, v) => { const q = P[j]; if (q) q[i] += v * k; };
+    const talk = state === 'talk', gest = ((t * 0.16) % 1) < 0.22 || talk, gk = gest ? sn(Math.min(1, ((t * 0.16) % 1) / 0.22) * Math.PI) : 0;
+    if (state !== 'idle' && !talk && state !== 'dance') return;
+    if (kind === 'aqua') {
+      add('body', 2, sn(t * 1.3) * 0.06); add('head', 2, sn(t * 1.3 + 1.1) * 0.1);
+      if (gest) { add('fore_l', 2, sn(t * 9) * 0.22 * gk); add('fore_r', 2, -sn(t * 9 + 0.6) * 0.22 * gk); add('arm_l', 0, 0.35 * gk); add('arm_r', 0, 0.35 * gk); }
+    } else if (kind === 'ocker') {
+      add('head', 0, sn(t * 0.9) * 0.1 + (gest ? 0.28 * gk : 0)); add('body', 0, -sn(t * 0.9) * 0.03);
+      if (gest) { add('arm_r', 0, 1.1 * gk); add('fore_r', 0, 0.6 * gk); }   // a hand shading the eyes, the head up: looking out over the dunes
+    } else if (kind === 'zinn') {
+      add('arm_l', 2, -0.2); add('arm_r', 2, 0.2); add('body', 1, sn(t * 0.7) * 0.07);
+      if (gest) { add('arm_l', 0, 0.7 * gk); add('arm_r', 0, 0.7 * gk); add('fore_l', 0, 0.8 * gk); add('fore_r', 0, 0.8 * gk); add('fore_l', 2, sn(t * 4) * 0.1 * gk); }   // the hands held to the warmth
+    } else if (kind === 'basalt') {
+      add('hips', 4, Math.max(0, sn(t * 3.4)) * 1.4); add('head', 2, sn(t * 1.6) * 0.16);
+      if (gest) { add('arm_l', 2, -0.9 * gk); add('arm_r', 2, 0.9 * gk); add('hips', 4, Math.max(0, sn(t * 7)) * 1.6 * gk); }   // a happy hop, the arms out
+    } else if (kind === 'opal') {
+      add('head', 0, 0.1); add('body', 0, sn(t * 0.5) * 0.025);
+      if (gest) { add('arm_r', 0, 0.9 * gk); add('fore_r', 0, 1.2 * gk); add('arm_r', 2, -0.25 * gk); add('head', 0, -0.18 * gk); }   // a hand to the chest, a slow bow
+    }
+  };
+
+  // ---------------------------------------------------------------- u-worlds2 · the culture moments
+  // Every evening at dusk (festival.js's hours) a native village holds its own moment on the plaza round its monument —
+  // the Wellari's Gezeitenlied (a tide song), the Dunelin's Laternenmarkt, the Glutani's Glutreigen (an ember dance), the
+  // Regoli's Sternwache (a star watch), the Nivari's Frostklang — the villagers' ring dance and music (festival.js) under
+  // the species' own lights. The player joins by staying in the ring (JOIN_S seconds): the villagers thank them with
+  // goods that are useful at home, once a village a day, and the friendship is counted (meta.ecoCult, additive).
+  // Very Low: the species' lights at a third of the rate.
+  const CULT = WL.CULTURE = {
+    aqua: { col: [[0.35, 0.85, 1], [0.55, 1, 0.85], [0.9, 1, 1]], rise: 0.6, gift: [['tide_lantern', 4], ['sponge', 2]] },
+    ocker: { col: [[1, 0.65, 0.25], [1, 0.82, 0.4], [1, 0.5, 0.2]], rise: 0.45, gift: [['lantern', 4], ['terracotta', 16]] },
+    zinn: { col: [[1, 0.45, 0.1], [1, 0.75, 0.25], [1, 0.3, 0.05]], rise: 1.2, gift: [['glowing_obsidian', 4], ['magma_block', 8]] },
+    basalt: { col: [[0.55, 0.9, 1], [0.75, 1, 0.6], [1, 0.95, 0.55]], rise: 0.9, gift: [['azure_crystal_block', 4], ['iron_ingot', 6]] },
+    opal: { col: [[0.85, 0.95, 1], [1, 0.8, 0.95], [0.7, 0.85, 1]], rise: 0.3, gift: [['blue_ice', 8], ['rose_crystal_block', 3]] },
+  };
+  WL.JOIN_S = 15;
+  // the joining: dt in the ring → done once (true when the gift was given); pure enough for the node test
+  WL.cultJoin = function (g, vil, F, dt, inRing) {
+    const kind = vil.plan && vil.plan.species, C = CULT[kind]; if (!C || F.joined) return false;
+    if (inRing) F.join = (F.join || 0) + dt;
+    if ((F.join || 0) < WL.JOIN_S) return false;
+    F.joined = true;
+    const p = g.player, got = [];
+    for (const [id, n] of C.gift) if (p && p.inv && p.inv.add && VR.itemDef(id)) { p.inv.add(id, n); got.push(n + '× ' + (VR.itemName ? VR.itemName(id) : id)); }
+    if (p && p.inv) p.inv.changed = true;
+    const m = g.meta || (g.meta = {}), rec = m.ecoCult || (m.ecoCult = {});
+    rec[vil.id] = (rec[vil.id] || 0) + 1;
+    const name = T('g.eco.cult.' + kind);
+    if (g.ui && g.ui.toast) g.ui.toast('🎶 ' + name, T('g.eco.cult.joined', { v: vil.name, sp: T('g.eco.sp.' + kind), gift: got.join(', ') }));
+    if (VR.EventLog) VR.EventLog.emit('social', 'festival', 3, [vil.plan.plaza.x + 0.5, vil.plan.plaza.y + 2, vil.plan.plaza.z + 0.5], 'festival', 12);
+    const host = vil.agents && vil.agents.find(a => !a.kid); if (host && host.say) host.say(T('g.eco.cult.thanks'), 4);
+    return true;
+  };
+  const Vs = VR.Villages;
+  if (Vs && !Vs.prototype.__ecoCult) {
+    const VP = Vs.prototype; VP.__ecoCult = true;
+    const fd = VP.festivalDay; VP.festivalDay = function (vil) { return vil.plan && CULT[vil.plan.species] ? true : fd.call(this, vil); };   // (every evening)
+    const uf = VP.updateFestival;
+    VP.updateFestival = function (vil, dt, tod) {
+      uf.call(this, vil, dt, tod);
+      const kind = vil.plan && vil.plan.species, C = CULT[kind]; if (!C) return;
+      const g = this.g; if (!g || !g.player || !this.festivalOn(vil, tod)) return;
+      const pz = vil.plan.plaza, pl = g.player.pos, cx = pz.x + 0.5, cz = pz.z + 0.5, dPl = Math.hypot(pl[0] - cx, pl[2] - cz), PR = pz.r || 4;
+      const F = this.festState(vil);
+      if (!F.invited && dPl < 48) { F.invited = true; if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.eco.cult.invite', { v: vil.name, what: T('g.eco.cult.' + kind) }), '#ffd98a'); }
+      WL.cultJoin(g, vil, F, dt, dPl < PR + 3 && Math.abs(pl[1] - pz.y) < 4);
+      // the species' lights over the ring
+      if (dPl > 140 || !g.particles) return;
+      F.cultT = (F.cultT || 0) - dt * (g.settings && g.settings.preset === 'potato' ? 0.33 : 1);
+      if (F.cultT > 0) return;
+      F.cultT = 0.18;
+      const a = Math.random() * Math.PI * 2, r = PR - 1 + Math.random() * 2, c = C.col[Math.floor(Math.random() * C.col.length)];
+      g.particles.spawn(cx + Math.cos(a) * r, pz.y + 1 + Math.random() * 2, cz + Math.sin(a) * r, (Math.random() - 0.5) * 0.3, C.rise * (0.6 + Math.random() * 0.6), (Math.random() - 0.5) * 0.3, { life: 4 + Math.random() * 3, size: 0.12, grav: 0, col: c, glow: 1 });
+    };
+  }
+
   // ---------------------------------------------------------------- the trade: the stall's goods
   const Shop = VR.Shop;
   if (Shop && !Shop.__eco) {
@@ -230,6 +316,16 @@
         if (kind && S.said !== this.dim + ':' + (this.meta && this.meta.seed) && this.world && this.world.cols && this.world.cols.size > 8 && this.ui && this.ui.toast) {
           S.said = this.dim + ':' + (this.meta && this.meta.seed);
           this.ui.toast('🪐 ' + T('g.eco.welcome', { world: VR.Travel ? VR.Travel.dimName(this.dim) : this.dim }), T('g.eco.home.' + kind));
+          // (u-worlds2: the arrival's vista — standing at the landing, the eye turns to the first village and its monument)
+          const eco = WL.eco(this);
+          if (eco && eco.sites && eco.sites[0]) { S.vista = eco.sites[0]; S.vistaN = 90; }
+        }
+        // (the arrival's own settling may turn the eye after the welcome: for 90 frames the vista holds, at the landing)
+        if (S.vistaN > 0 && this.player) {
+          const p = this.player, s0 = S.vista, eco = WL.eco(this);
+          if (VR.Travel && VR.Travel.busy && VR.Travel.busy(this)) { /* still arriving: wait */ }
+          else if (eco && eco.land && Math.hypot(p.pos[0] - eco.land[0], p.pos[2] - eco.land[2]) < 40) { S.vistaN--; p.yaw = Math.atan2(-(s0.x - p.pos[0]), -(s0.z - p.pos[2])); p.viewYaw = p.yaw; if (S.vistaN > 85) p.pitch = 0.02; }
+          else S.vistaN = 0;   // (arrived elsewhere: no vista)
         }
       } else if (this.dim === 'overworld') S.said = null;
       return pf.call(this, dt);
