@@ -112,7 +112,7 @@
 
   P.joyUpdate = function (dt) {
     const g = this.g, p = g.player, J = this.joyState();
-    if (!p) return;
+    if (!p || FJ.off) return;   // (FJ.off: the measurement's switch — the moments, their timers and the pets stop)
     // the player: still or moving, a take-off, a big landing
     const mv = Math.hypot(p.pos[0] - J.lp[0], p.pos[2] - J.lp[2]);
     J.still = mv < 0.04 ? J.still + dt : 0; J.lp[0] = p.pos[0]; J.lp[1] = p.pos[1]; J.lp[2] = p.pos[2];
@@ -541,7 +541,7 @@
   const prevDraw = P.draw;
   P.draw = function (r, E, cam) {
     prevDraw.call(this, r, E, cam);
-    const J = this.joy; if (!J || !J.pets.length || !VR.LifeKit) return;
+    const J = this.joy; if (!J || FJ.off || !J.pets.length || !VR.LifeKit) return;
     const g = this.g, ent = g.entities; if (!ent) return;
     let prog = null, n = 0;
     for (const q of J.pets) {
