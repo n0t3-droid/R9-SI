@@ -240,7 +240,10 @@
     const fresh = !seq.cur;
     if (fresh) seq.cur = { x: out.x, y: out.y, z: out.z, yaw: out.yaw, pitch: out.pitch, fov: out.fov, roll: out.roll || 0 };
     const cu = seq.cur, glide = seq.kind === 'chase' || seq.kind === 'side' || seq.kind === 'approach' || seq.kind === 'call' || seq.kind === 'walk';
-    const kp = fresh || !glide ? 1 : k1(seq.kind === 'approach' ? 2.5 : 5, dt), ka = fresh ? 1 : k1(9, dt);
+    // e-access · Weniger Bewegung: a turn of more than ~25° (or a big tilt) is a cut, not a fast pan; the camera never rolls
+    const less = !!(VR.A11y && VR.A11y.less(g.settings)), jump = less && !fresh && (Math.abs(wrapA(out.yaw - cu.yaw)) > 0.44 || Math.abs(out.pitch - cu.pitch) > 0.3);
+    if (less) out.roll = 0;
+    const kp = fresh || !glide || jump ? 1 : k1(seq.kind === 'approach' ? 2.5 : 5, dt), ka = fresh || jump ? 1 : k1(9, dt);
     cu.x += (out.x - cu.x) * kp; cu.y += (out.y - cu.y) * kp; cu.z += (out.z - cu.z) * kp;
     cu.yaw += wrapA(out.yaw - cu.yaw) * ka; cu.pitch += (out.pitch - cu.pitch) * ka; cu.fov += (out.fov - cu.fov) * ka; cu.roll += ((out.roll || 0) - cu.roll) * ka;
     const L = c.look || { yaw: 0, pitch: 0 };

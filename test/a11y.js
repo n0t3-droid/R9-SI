@@ -149,7 +149,7 @@ console.log('e · Ein-Hand');
 
 console.log('f · Weniger Bewegung reaches every hook');
 {
-  const H = { 'flight.js': 'VR.A11y.less(S)', 'ascent.js': 'VR.A11y.less(S)', 'game.js': 'VR.A11y.less(S)', 'wowmoment.js': 'VR.A11y.less(g.settings)', 'starjump.js': 'g.settings.lessMotion', 'festival.js': 'VR.A11y.less()', 'bodylife.js': 'VR.A11y.less(g.settings)' };
+  const H = { 'flight.js': 'VR.A11y.less(S)', 'ascent.js': 'VR.A11y.less(S)', 'game.js': 'VR.A11y.less(S)', 'wowmoment.js': 'VR.A11y.less(g.settings)', 'starjump.js': 'g.settings.lessMotion', 'festival.js': 'VR.A11y.less()', 'bodylife.js': 'VR.A11y.less(g.settings)', 'directorcam.js': 'VR.A11y.less(g.settings)' };
   for (const f in H) check(src(f).includes(H[f]), `${f}: ${H[f]}`);
   check(A.less({ lessMotion: true }) && A.less({ reduceMotion: true }) && !A.less({}), 'less(): the switch (and the older reduceMotion name)');
 }
