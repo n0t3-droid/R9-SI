@@ -31,7 +31,7 @@
   const wrapA = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
 
   // ---------------------------------------------------------------- the numbers
-  F.GAP = 90;          // s between two unprompted lines (any line restarts the wait)
+  F.GAP = 180;         // s between two unprompted lines (any line restarts the wait; f-quiet: 3 min, was 90 s)
   F.BAURUHE = 20;      // s of quiet after a build action
   F.MUTE = 600;        // s of „Funke, Ruhe!"
   F.WAY_T = 4;         // s the light line shows
@@ -1078,6 +1078,7 @@ void main() {
     }
     destroy() { this.endLine(); this.photoEnd(); this.scanJob = null; this.scanData = null; this.wayT = 0; this.scanT = 0; }
   }
+
   F.Actor = Actor;
 
   // ---------------------------------------------------------------- the public calls (e-ctx's V row, the chat, the menu)

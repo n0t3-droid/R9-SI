@@ -127,7 +127,7 @@
       for (const e of rows) { const r = document.createElement('span'); r.className = 'ks'; r.dataset.k = e.id; const k = document.createElement('kbd'); if (padK) { k.className = 'pad'; k.innerHTML = AX.glyph(AX.padOf(e.id)); } else k.textContent = e.key; const t = document.createElement('span'); t.textContent = e.text; r.appendChild(t); r.appendChild(k); el.appendChild(r); }
     }
     const pro = document.documentElement.classList.contains('pro'), mode = (g.settings && g.settings.hudMode) || 'auto';
-    const show = rows.length > 0 && (mode === 'always' || now - stripAt < SHOW_S * 1000 || (!pro && firstMin.active));
+    const show = rows.length > 0 && (mode === 'always' || now - stripAt < SHOW_S * 1000 || (!pro && firstMin.active && !(VR.Quiet && VR.Quiet.level && VR.Quiet.level() !== 'normal'))) && !(VR.Quiet && VR.Quiet.stripOff && VR.Quiet.stripOff(g));   // (f-quiet: ⚙ Hinweise — Wenig only in a world's first minutes, Aus never)
     el.classList.toggle('on', show);
     // its box from the screen's bottom-right corner (Funke's bubble keeps out of it) — read at 4 Hz, only while it shows
     if (show) { const r = el.getBoundingClientRect(); X.stripBox = { w: innerWidth - r.left + 8, h: innerHeight - r.top + 8 }; } else X.stripBox = null;
