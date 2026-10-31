@@ -9,6 +9,7 @@ files.push('galaxy');   // u-stars: the neighbourhood (VR.Galaxy), after univers
 files.splice(files.indexOf('blocks4'), 0, 'exo_blocks'); files.push('exoworld');   // u-stars2: the exo blocks (last), VR.Exo
 files.splice(files.indexOf('blocks4'), 0, 'lifeblocks');   // a-life: the ferry dock and the grow lamp (the last blocks, after u-stars2's exo blocks)
 files.splice(files.indexOf('blocks4'), 0, 'stn_blocks'); files.splice(files.indexOf('forge_park') + 1, 0, 'forge_station', 'gen_stn');   // u-stations: the station blocks (the last), the Forge's station kind, the stn.* dims
+files.push('worldeco');   // u-worlds: the worlds' ecosystems (after exoworld)
 const skip = (process.env.R9_SKIP || '').split(',');   // (test/land_v9_same.js: the shared code without some files)
 for (const f of files) { if (skip.includes(f)) continue; const p = __dirname + '/../src/shared/' + f + '.js'; if (require('fs').existsSync(p)) require(p); }
 module.exports=globalThis.VR;

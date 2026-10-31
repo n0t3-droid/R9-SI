@@ -728,6 +728,9 @@ void main() {
   F.tick = function (g, dt) {
     const p = g.player; if (!p || !p.pos) return;
     if (!F.isRock(g.dim)) { RS.dim = null; return; }
+    // u-worlds: without ⚙ „Echte Schwerkraft der Welten" a rock holds you like Herzwelt — no boots, no drift, no tow
+    if (VR.DimReg && !VR.DimReg.realGrav) { if (RS.dim !== g.dim || RS.p !== p || RS.real !== false) { RS.dim = g.dim; RS.p = p; RS.real = false; RS.said = false; p.grav = VR.DimReg.walkGravity(g.dim); } return; }
+    if (RS.real === false) { RS.real = true; RS.dim = null; }
     if (RS.dim !== g.dim || RS.p !== p) {
       RS.dim = g.dim; RS.p = p; RS.boots = true; RS.said = false; RS.driftSaid = false; RS.jumpTop = 0;
       const gen = new VR.RubbleGen(0, g.dim); RS.spawn = gen.findSpawn(); RS.D = gen.D;

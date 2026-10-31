@@ -21,7 +21,8 @@
 (function (VR) {
   'use strict';
   const L = 64;                                     // U§3: real-equivalent lengths = 64 × game lengths
-  const BGEN = 2;                                   // the bodies' generator version (gen_body.js); test/body_same.js pins it (u-moons3: 2 — Zinnober, Ocker, Aquamarin made over; bgen 1 as pinned)
+  const BGEN = 3;   // u-worlds: 3 — every world's ecosystem (worldeco.js: biomes, flora, caves, ores, ponds, landmarks, the natives' villages); bgen 2 as it was
+  // (was 2)                                   // the bodies' generator version (gen_body.js); test/body_same.js pins it (u-moons3: 2 — Zinnober, Ocker, Aquamarin made over; bgen 1 as pinned)
   const walk = (g) => 30 * g / 9.81;                // the walking gravity (U§4.3): the genre's 30 at home, every world in its ratio
 
   // ---------------------------------------------------------------- morphology (R§5.2)
@@ -205,7 +206,11 @@
     stamp(meta) {
       if (!meta || meta.guest) return meta;
       const u = meta.universe || (meta.universe = { v: 1 }), b = u.bodies || (u.bodies = {});
-      for (const id of Bodies.ids) { const e = b[id] || (b[id] = {}); if (!(e.bgen > 0)) e.bgen = BGEN; }
+      // u-worlds: a body this save never stood on (nor a world of its kind under another star) has no generated chunk
+      // saved — it takes the current bgen (its ecosystem); one it stood on keeps its own, as every chunk it saved
+      const been = [meta.dim].concat(Object.keys(meta.pos || {})).map(d => String(d || ''));
+      const stood = (id) => been.some(d => d === id || (d.charCodeAt(0) === 120 && d.slice(-id.length - 1) === '.' + id));
+      for (const id of Bodies.ids) { const e = b[id] || (b[id] = {}); if (!(e.bgen > 0) || (e.bgen < BGEN && e.bgen >= 2 && !stood(id))) e.bgen = BGEN; }
       // u-fields2: the rubble bodies' generator (gen_rubble.js rgen) — a save that ever stood on a rock keeps rgen 1
       if (!(u.rgen > 0)) { const was = [meta.dim].concat(Object.keys(meta.pos || {})).some(d => /^rock\./.test(String(d || ''))); u.rgen = was ? 1 : ((VR.Rubble && VR.Rubble.RGEN) || 2); }
       return meta;

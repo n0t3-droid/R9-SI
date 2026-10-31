@@ -131,8 +131,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const home = fall('overworld'), none = fall(undefined);
     check(Math.abs(home.dv + 30 * home.dt) < 1e-12 && Math.abs(none.dv + 30 * none.dt) < 1e-12, 'a falling player at home: Δv = −30·dt (as before)', home.dv.toFixed(6));
     D.add('test.moon', { sky: true, code: 0, g: 1.62 });
+    D.realGrav = true;   // (u-worlds: a world's own gravity is ⚙ „Echte Schwerkraft der Welten" — off by default: Herzwelt's everywhere)
     const moon = fall('test.moon');
-    check(Math.abs(moon.dv + 30 * 1.62 / 9.81 * moon.dt) < 1e-12, 'on a registered moon (g 1.62): Δv = −30·1.62/9.81·dt', moon.dv.toFixed(6));
+    check(Math.abs(moon.dv + 30 * 1.62 / 9.81 * moon.dt) < 1e-12, 'on a registered moon (g 1.62), real gravity on: Δv = −30·1.62/9.81·dt', moon.dv.toFixed(6));
+    D.realGrav = false;
+    const moon2 = fall('test.moon');
+    check(Math.abs(moon2.dv + 30 * moon2.dt) < 1e-12, 'u-worlds: the switch off — the moon walks at Herzwelt\'s 30', moon2.dv.toFixed(6));
     check(Math.abs(D.gravity('test.moon') - 30 * 1.62 / 9.81) < 1e-12 && D.has('test.moon'), 'gravity(test.moon) = 4.95');
   }
 

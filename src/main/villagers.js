@@ -125,12 +125,13 @@
       lashes: (r(16) & 1) === 1,
     };
     const out = style === 'hall' && role !== 'hero' ? weiss(L, r, R0, age) : L;
+    if (style && style.charCodeAt(0) === 115 && style.slice(0, 3) === 'sp:' && V.speciesLook) V.speciesLook(out, r, age, style.slice(3));   // u-worlds: a native of another world (worldlife.js)
     // (t-folk2: a barista carries a round tray with a cup on the open hand)
     if (role === 'barista' && age !== 'child') out.tool = 'tray';
     return out;
   };
   // (the helmet and the white panels join the key only when a suit has them: the villagers' keys stay as they were)
-  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '') + (L.cape ? ':c' + L.cape : '');
+  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '') + (L.cape ? ':c' + L.cape : '') + (L.feat ? ':f' + L.feat + (L.featC | 0) + (L.glow ? 'g' : '') : '');
 
   // ---------------------------------------------------------------- t-folk: no two neighbours dressed alike
   // the clothes of a look (the outfit family, the colours): two people with the same key wear the same clothes

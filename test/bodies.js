@@ -67,7 +67,7 @@ check(PB.kind === 'airless' && PO.kind === 'ice', 'kinds: Basalt airless (crater
 check(Math.abs(PB.R - U.home.by.basalt.R) < 1 && Math.abs(PO.R - U.home.by.opal.R) < 1, 'radii from VR.Universe: Basalt ' + (PB.R / 1000).toFixed(2) + ' km, Opal ' + (PO.R / 1000).toFixed(2) + ' km (game)');
 check(PB.g === 1.62 && PO.g === 0.49, 'g: Basalt 1.62, Opal 0.49 (U§2.1)');
 check(Math.abs(PB.walk - 30 * 1.62 / 9.81) < 1e-9 && Math.abs(PO.walk - 30 * 0.49 / 9.81) < 1e-9, 'the walking gravity 30·g/9.81 (U§4.3)', PB.walk.toFixed(3) + ' · ' + PO.walk.toFixed(3));
-check(B.BGEN === 2 && PB.bgen === B.BGEN && PO.bgen === B.BGEN, 'the current bgen for both (u-moons3: 2 — Basalt and Opal the same at 1 and 2)');
+check(B.BGEN === 3 && PB.bgen === B.BGEN && PO.bgen === B.BGEN, 'the current bgen for both (u-worlds: 3 — the ecosystems over bgen 2\'s ground; Basalt and Opal the same at 1 and 2)');
 check(D.has('basalt') && D.has('opal') && D.code('basalt') === 5 && D.code('opal') === 5 && D.sky('basalt') && D.sky('opal'), 'DimReg: basalt and opal, u_dim 5 (airless body), light from above');
 check(D.g('basalt') === 1.62 && D.g('opal') === 0.49 && !D.actorsHome('basalt') && !D.actorsHome('opal'), 'DimReg: their g, no village life (actors none)');
 check(D.get('basalt').travel && D.get('opal').travel && D.travelable({}).includes('basalt') && D.travelable({}).includes('opal'), '/dim reaches both (travel)');
@@ -89,7 +89,7 @@ check(V.makeGen('basalt', SEED, {}) instanceof BG && V.makeGen('opal', SEED, {})
   check(meta.universe && meta.universe.bodies && meta.universe.bodies.basalt.bgen === B.BGEN && meta.universe.bodies.opal.bgen === B.BGEN, 'stamp: a save gets the current bgen for each body');
   meta.universe.bodies.opal.bgen = 0.5; B.stamp(meta);
   check(meta.universe.bodies.opal.bgen === 0.5, 'stamp keeps what a save has (old worlds keep their moons)');
-  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 2, opal: 0.5, zinn: 2, ocker: 2, aqua: 2, rubble: 2, exo: 2 }), 'bgenOf → the genOpts table (u-fields2: + the rubble bodies\' rgen)', JSON.stringify(B.bgenOf(meta)));
+  check(JSON.stringify(B.bgenOf(meta)) === JSON.stringify({ basalt: 3, opal: 0.5, zinn: 3, ocker: 3, aqua: 3, rubble: 2, exo: 2 }), 'bgenOf → the genOpts table (u-fields2: + the rubble bodies\' rgen)', JSON.stringify(B.bgenOf(meta)));
   check(new BG(SEED, 'opal', { bgen: { opal: 1 } }).bgen === 1 && new BG(SEED, 'basalt', {}).bgen === B.BGEN, 'a generator takes its bgen from the options, else the current');
 }
 
@@ -137,7 +137,7 @@ console.log('b · morphology by the real-equivalent size (R§5.2)');
 
 // ================================================================ c · the population
 console.log('c · the population (R§5.2: slope −2.9)');
-const gB = new BG(SEED, 'basalt', {}), gO = new BG(SEED, 'opal', {});
+const gB = new BG(SEED, 'basalt', { bgen: { basalt: 2 } }), gO = new BG(SEED, 'opal', { bgen: { opal: 2 } });   // (u-worlds: the ground of bgen 2 — bgen 3 decorates it, test/worlds_eco.js)
 {
   // per octave, the craters of an 80 × 80-cell square far from the landing (the octave's own scale: 3.8 km for 12–24 m,
   // 61 km for 192–384 m), split by the ground at their centres: the density per km² of maria and of highlands
@@ -312,6 +312,7 @@ console.log('g · walking: the jump, the fall');
     for (let k = 0; k < 60 * 40; k++) { p.update(dt, input); t += dt; top = Math.max(top, p.pos[1] - ground); if (p.pos[1] > ground + 0.05) left = true; if (left && p.onGround) break; }
     return { top, t };
   };
+  V.DimReg.realGrav = true;   // (u-worlds: the worlds' real gravity is ⚙ „Echte Schwerkraft der Welten" — on for these numbers)
   const jo = jump('opal'), jb = jump('basalt'), jh = jump('overworld');
   check(Math.abs(jo.top - 27.6) <= 0.5, 'a jump on Opal 27.6 ± 0.5 m high (9.1 m/s at 1.50 m/s², U§4.3)', jo.top.toFixed(2) + ' m, ' + jo.t.toFixed(1) + ' s in the air');
   check(Math.abs(jo.t - 12.1) < 0.4, 'and 12.1 s in the air', jo.t.toFixed(2) + ' s');
@@ -321,6 +322,8 @@ console.log('g · walking: the jump, the fall');
   const dO = fall('opal', 25), dH = fall('overworld', 6), dO2 = fall('opal', 90);
   check(dO === 0, 'a 25-m fall on Opal hurts nothing (it counts as 1.25 m at home)', dO);
   check(dH > 0 && dO2 > 0, 'a 6-m fall at home hurts as before; 90 m on Opal (4.5 m at home) hurts too', dH + ' · ' + dO2);
+  V.DimReg.realGrav = false;   // u-worlds: the switch off (the default) — Opal walks like Herzwelt
+  { const jo2 = jump('opal'); check(Math.abs(jo2.top - jh.top) < 0.05, 'u-worlds: with the switch off a jump on Opal is Herzwelt\'s', jo2.top.toFixed(2) + ' m'); }
 }
 
 // ================================================================ i · the sky, the light, the geysers, the suit
