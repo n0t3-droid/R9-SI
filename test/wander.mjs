@@ -117,8 +117,8 @@ await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.ze
 await settle(30);
 check(await ev(() => !!VR.Wander && !!VR.game.wanderer), 'the Wanderregisseur rides along (VR.game.wanderer)');
 
-const T = (t) => () => VR.game.env.setTime(t);
-const WX = (k) => () => VR.game.env.wx.force(k);
+const T = (t) => `VR.game.env.setTime(${t})`;
+const WX = (k) => `VR.game.env.wx.force('${k}')`;
 if (want('heart')) {
   console.log('== Herzwelt');
   const H = await walk('heart', HEART_S, [[0, T(2600)], [60, T(6200)], [110, WX('regen')], [125, WX('klar')], [130, T(9000)], [190, T(12300)], [250, T(15500)]]);
@@ -152,14 +152,14 @@ if (want('aqua')) {
 }
 if (want('cost')) {
   console.log('== cost');
-  // the same spot, 40 rendered frames: Very Low / High, the director off / on (one moment staged in view)
+  // the same spot, 12 rendered frames (after 4 to warm up, each to the GPU's end): Very Low / High, the director off / on (one moment staged in view)
   const cost = run.cost = {};
   for (const preset of ['potato', 'high']) for (const on of [false, true]) {
     const r = await ev(([preset, on]) => {
       const g = VR.game; g.applyPreset(preset); g.settings.dynRes = false; g.settings.wander = on; g.applySettings('*');
       const D = g.wanderer; if (D && on && !D.ms.length) { D.ctx = D.context(); D.start('shrine', 900001, true) || D.start('sign', 900002, true); }
-      window.__norender = false; const times = [];
-      for (let i = 0; i < 45; i++) { const a = performance.now(); g.last = a - 33; g.loop(a); times.push(performance.now() - a); }
+      window.__norender = false; const times = [], gl = g.renderer.gl;
+      for (let i = 0; i < 16; i++) { const a = performance.now(); g.last = a - 33; g.loop(a); gl.finish(); if (i >= 4) times.push(performance.now() - a); }   // (gl.finish: the GPU's part counts too; the first four warm up)
       window.__norender = true; times.sort((x, y) => x - y);
       return { frame: +times[Math.floor(times.length / 2)].toFixed(2), upd: D ? +D.st.cost.toFixed(3) : 0, active: D ? D.ms.map(m => m.kind) : [], beacon: !!(D && D.bcOn) };
     }, [preset, on]);

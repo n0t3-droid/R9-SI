@@ -226,16 +226,19 @@
     // a spot on open ground about `d` m ahead in the view, `side` (radians) off it — the first of a fixed list that is
     // free and level enough: [x, y, z] or null
     spot(d, side, flat) {
-      const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos;
+      const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let fb = null;
       for (const dd of [d, d + 6, d - 5, d + 12]) for (const aa of [side, -side, side * 0.4, 0, side * 1.4]) {
         if (dd < 8) continue;
         const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
         const y = this.ground(x, z, p[1]); if (y === null) continue;
         if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) continue; }
-        return [x + 0.0, y, z + 0.0];
+        // in sight: nothing in the way (eventlog.js's view test) — a spot behind a wall or a hill is the fallback only
+        if (!this.inSight([x, y + 1, z])) { if (!fb) fb = [x, y, z]; continue; }
+        return [x, y, z];
       }
-      return null;
+      return fb;
     }
+    inSight(q) { const L = VR.EventLog; if (!L || !L.inView) return true; try { return !!L.inView(q, 1.2, this.g).inView; } catch (e) { return true; } }
     // the highest ground of a few spots ahead (the cairn's hilltop)
     high(d) {
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let best = null;
@@ -277,7 +280,8 @@
       const vs = (g.villages && g.villages.sites) || [];
       for (const s of vs) if (s && Number.isFinite(s.x)) out.push({ id: 'v:' + s.id, x: s.x, z: s.z, name: s.name || T('g.q.pl.village'), rad: Math.min(70, s.rad || 40), kind: 'village' });
       if (g.dim === 'overworld' && Lnd && Lnd.SITES && (meta.vgen | 0) >= (Lnd.VGEN || 10) && meta.type !== 'flat') {
-        for (const [id, x, z, kind] of Lnd.SITES) if (W.SITE_KINDS.indexOf(kind) >= 0 && (x || z)) out.push({ id: 'l:' + id, x, z, name: T('g.wd.site.' + kind), rad: kind === 'city' || kind === 'temple' ? 60 : 32, kind });
+        const twin = new Set((Lnd.JOINED || []).map(j => j[1]));   // (the temple's and the city's two anchors are one place)
+        for (const [id, x, z, kind] of Lnd.SITES) if (W.SITE_KINDS.indexOf(kind) >= 0 && (x || z) && !twin.has(id)) out.push({ id: 'l:' + id, x, z, name: T('g.wd.site.' + kind), rad: kind === 'city' || kind === 'temple' ? 60 : 32, kind });
       }
       const WL = VR.WorldLife, kind = WL && WL.kindOf ? WL.kindOf(g) : null;
       if (kind) {
