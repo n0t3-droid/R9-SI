@@ -22,12 +22,12 @@
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const R = VR.Reel = {
     on: true, track: new D.Track(), hl: [], cards: 0, dims: ['overworld'], world: null, run: null, want: null,
-    stats: { frames: 0, recMs: 0, cardMs: 0, cards: 0, saved: 0, video: null, startMs: 0 },
+    stats: { calls: 0, frames: 0, recMs: 0, cardMs: 0, cards: 0, saved: 0, video: null, startMs: 0 },
   };
   R.CARD_W = 480; R.CARD_H = 270; R.MAX_CARDS = 8; R.MAX_HL = 64; R.BEST = 50; R.LOW_SCALE = 0.45;
   const low = (g) => !!(g && g.settings && g.settings.preset === 'potato');
   const dimI = (d) => { d = d || 'overworld'; let i = R.dims.indexOf(d); if (i < 0) { R.dims.push(d); i = R.dims.length - 1; } return i; };
-  const fresh = (g) => { if (g.world !== R.world) { R.world = g.world; R.track.clear(); R.hl.length = 0; R.cards = 0; R.want = null; } };
+  const fresh = (g) => { const k = (g.meta && (g.meta.id || g.meta.name)) || g.world; if (k !== R.world) { R.world = k;   /* (one save: its moons and stars stay in the reel) */ R.track.clear(); R.hl.length = 0; R.cards = 0; R.want = null; } };
 
   // ---------------------------------------------------------------- the highlights as they happen (EventLog.emit)
   R.note = function (g, rec, r) {
@@ -69,14 +69,14 @@
   // ---------------------------------------------------------------- the track (EventLog.frame, every frame)
   R.frame = function (g) {
     if (!R.on || R.run || !g || g.state !== 'play' || !g.player) return;
-    const t0 = now(); fresh(g);
+    const t0 = now(); fresh(g); R.stats.calls++;
     if (g.director && g.director.active) return;
     const p = g.player;
     if (R.track.rec(+(g.time || 0), p.pos[0], p.pos[1], p.pos[2], p.yaw, g.env ? g.env.timeOfDay : 6000, dimI(g.dim))) R.stats.frames++;
     R.stats.recMs += now() - t0;
     if (!R.rHooked && g.renderer) {   // (the postcard's copy right after a frame is drawn)
       const r = g.renderer, r0 = r.render; R.rHooked = true;
-      r.render = function () { const o = r0.apply(this, arguments); if (R.want && !this.capK) R.grab(this.canvas); return o; };
+      r.render = function () { const n0 = this.frameNo, o = r0.apply(this, arguments); if (R.want && !this.capK && this.frameNo !== n0) R.grab(this.canvas); return o; };   // (only a frame really drawn)
     }
   };
 
@@ -101,7 +101,7 @@
     if (!hl.length) { if (g.ui && g.ui.toast) g.ui.toast('🎬 ' + tx('g.reel.none', null, 'Noch keine Highlights', 'No highlights yet'), tx('g.reel.noneTip', null, 'Befreie einen Außenposten, bau etwas fertig, reise — dann zeigt F9 deinen Film.', 'Free an outpost, finish a build, travel — then F9 shows your film.')); return false; }
     const plan = D.reelPlan(hl, {});
     const p = g.player, saved = D.reelSave(g);
-    const run = R.run = { plan, saved, name: (g.meta && g.meta.name) || '', home: { x: p.pos[0], y: p.pos[1], z: p.pos[2], yaw: p.yaw }, t0: +(g.time || 0), di, ground: groundOf(g), shot: null, st: null, frames: false, saved: 0, rec: null, shotI: -1 };
+    const run = R.run = { plan, saved, name: (g.meta && g.meta.name) || '', home: { x: p.pos[0], y: p.pos[1], z: p.pos[2], yaw: p.yaw }, t0: +(g.time || 0), di, ground: groundOf(g), shot: null, st: null, frames: false, nSaved: 0, rec: null, shotI: -1 };
     const shots = plan.shots.map((s) => ({ name: 'reel', dur: s.dur, fov: 60, tod: s.tod, keys: [[0, [p.pos[0], p.pos[1] + 2, p.pos[2]], [p.pos[0] + 1, p.pos[1] + 2, p.pos[2]]], [s.dur, [p.pos[0], p.pos[1] + 2, p.pos[2]], [p.pos[0] + 1, p.pos[1] + 2, p.pos[2]]]], caption: R.caption(s), capSmall: s.frame !== 'title', reel: s }));
     if (!g.director.play(shots, { quick: true, skipAny: true })) { R.run = null; return false; }
     g.zenFreezeTime = true;   // (each shot holds its moment's hour; the hour of now comes back after)
@@ -187,9 +187,9 @@
   };
   // B: this shot's picture at 2× (renderer.capNext, the photo mode's download)
   R.saveFrame = function (g, s) {
-    const r = g.renderer, run = R.run; if (!r || r.capNext || !run || run.saved >= 12) return;
+    const r = g.renderer, run = R.run; if (!r || r.capNext || !run || run.nSaved >= 12) return;
     if (s.h && s.h.card) return;
-    run.saved++;
+    run.nSaved++;
     r.capNext = { k: (VR.PhotoMode && VR.PhotoMode.SCALE) || 2, cb: (img) => { if (!img) return; R.stats.saved++; try { const ph = g.photoCam || (VR.PhotoMode && VR.PhotoMode.Photo ? (g.photoCam = new VR.PhotoMode.Photo(g)) : null); if (ph) ph.save(img); } catch (e) { /* */ } } };
   };
   // V: from the start again, recorded — the canvas at 30 frames a second and the music's bus, a WebM saved locally
@@ -232,9 +232,8 @@
     P.update = function (dt) {
       const g = this.g, run = R.run;
       if (run && this.active && this.opts && this.opts.skipAny && this.phase === 'run') {
-        const I = g.input;
-        if (I.pressed.has('KeyB')) { I.pressed.delete('KeyB'); run.frames = true; run.grabbed = false; if (VR.PhotoMode && VR.PhotoMode.note) VR.PhotoMode.note('📷 ' + tx('g.reel.frames', null, 'Bilder werden gespeichert — eins je Szene, doppelte Größe', 'Saving frames — one a shot, at twice the size'), 2500); }
-        if (I.pressed.has('KeyV')) { I.pressed.delete('KeyV'); if (!run.rec && R.recStart(g) && VR.PhotoMode && VR.PhotoMode.note) VR.PhotoMode.note('⏺ ' + tx('g.reel.recording', null, 'Aufnahme — von vorn', 'Recording — from the start'), 2500); }
+        if (run.wantB) { run.wantB = false; run.frames = true; run.grabbed = false; if (VR.PhotoMode && VR.PhotoMode.note) VR.PhotoMode.note('📷 ' + tx('g.reel.frames', null, 'Bilder werden gespeichert — eins je Szene, doppelte Größe', 'Saving frames — one a shot, at twice the size'), 2500); }
+        if (run.wantV) { run.wantV = false; if (!run.rec && R.recStart(g) && VR.PhotoMode && VR.PhotoMode.note) VR.PhotoMode.note('⏺ ' + tx('g.reel.recording', null, 'Aufnahme — von vorn', 'Recording — from the start'), 2500); }
       }
       const o = up0.apply(this, arguments);
       if (R.run && this.active) { try { R.tick(g, this, dt); } catch (e) { console.warn('reel', e); this.stop(); } }
@@ -251,7 +250,9 @@
   if (G) {
     const hk0 = G.prototype.handleKeys;
     G.prototype.handleKeys = function () {
-      const i = this.input;
+      const i = this.input, run = R.run;
+      // (the reel's own keys never reach the Bauhand or the Aktion key: B and V are taken here, before anyone polls them)
+      if (run) { if (i.pressed.has('KeyB')) { i.pressed.delete('KeyB'); run.wantB = true; } if (i.pressed.has('KeyV')) { i.pressed.delete('KeyV'); run.wantV = true; } }
       if (!this.ui.typing && !this.ui.screen && i.hit('F9') && this.state === 'play') { if (R.run) R.stop(this); else R.play(this); return; }
       return hk0.apply(this, arguments);
     };
