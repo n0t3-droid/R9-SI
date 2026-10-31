@@ -94,6 +94,25 @@ const rec = () => ev(() => JSON.parse(JSON.stringify(VR.Fairy.debug.rec())));
 const said = () => ev(() => VR.Fairy.debug.said());
 const pics = {};
 
+// ---------------------------------------------------------------- 3 · the frame's cost in the wood at dusk (from where the picture was taken)
+async function costHere() {
+  const cost = {};
+  for (const preset of ['potato', 'high']) {
+    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, preset);
+    await settle(12);
+    for (const on of [false, true, false, true]) {
+      const r = await ev(([on]) => { const g = VR.game; g.settings.fairy = on; window.__norender = false; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws, js: +VR.Fairy.debug.cost().ms.toFixed(3) }; }, [on]);
+      const k = preset + (on ? '_on' : '_off'); (cost[k] || (cost[k] = [])).push(r);
+    }
+    console.log('  cost ' + preset + ' ' + JSON.stringify(cost) + ' (' + secs() + ')');
+  }
+  await ev(() => { const g = VR.game; g.settings.fairy = true; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); });
+  run.cost = cost;
+  const med = (a) => a.map(x => x.ms).sort((x, y) => x - y)[0];
+  check(med(cost.potato_on) <= med(cost.potato_off) * 1.15 + 2, `Very Low in the wood: on ${med(cost.potato_on)} ms, off ${med(cost.potato_off)} ms (High ${med(cost.high_on)} / ${med(cost.high_off)} ms; draws ${cost.high_on[0].draws} / ${cost.high_off[0].draws})`);
+  await settle(10);
+}
+
 // ---------------------------------------------------------------- 1 · the places at their hours
 if (want('places')) {
   const H = { tree: [5200, 30, 4, 12, 0.5], shroom: [12700, 15, 1.5, 2.5, 0.3], spring: [11400, 11, 2.5, 0.8, 0.6], circle: [18000, 15, 3, 1.5, 0.2], garden: [23700, 38, 5, 0, 0.35] };
@@ -108,6 +127,7 @@ if (want('places')) {
       await step(60, 33);   // (the fireflies gather, the dancers turn, the bridge rises)
       pics[kind] = await grab('fairy_' + kind + '.png', 4);
       const c = await ev(() => VR.Fairy.debug.cost()); console.log('  ' + kind + ' parts ' + c.parts + ' · ' + c.ms.toFixed(3) + ' ms');
+      if (kind === 'shroom' && want('cost')) await costHere();
       if (kind === 'shroom') { await ev(() => VR.game.env.setTime(17500)); await step(40, 33); pics.shroomN = await grab('fairy_shroom_night.png', 4); }
       if (kind === 'tree') { await ev(() => VR.game.env.setTime(13800)); await step(30, 33); pics.treeN = await grab('fairy_tree_night.png', 4); }
       if (kind === 'circle') { await view(s, 6, 1, s.y + 1.4, 1.2); await step(40, 33); pics.circle2 = await grab('fairy_circle_dance.png', 4); }
@@ -209,27 +229,9 @@ if (want('adv')) {
   check(r.done.length === 5 && r.pages.length === 5, 'all five adventures done, five Wanderbuch pages: ' + r.pages.join(', '));
 }
 
-// ---------------------------------------------------------------- 3 · the frame's cost at the wood at dusk
-if (want('cost')) {
-  const s = await goTo('shroom'); await ev(() => VR.game.env.setTime(12700));
-  await view(s, 9, 1.5, s.y + 2, 0.3);
-  const cost = {};
-  for (const preset of ['potato', 'high']) {
-    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, preset);
-    await settle(20);
-    for (const on of [false, true, false, true]) {
-      const r = await ev(([on]) => { const g = VR.game; g.settings.fairy = on; window.__norender = false; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws, js: +VR.Fairy.debug.cost().ms.toFixed(3) }; }, [on]);
-      const k = preset + (on ? '_on' : '_off'); (cost[k] || (cost[k] = [])).push(r);
-    }
-  }
-  await ev(() => { VR.game.settings.fairy = true; });
-  run.cost = cost; console.log('  cost ' + JSON.stringify(cost));
-  const med = (a) => a.map(x => x.ms).sort((x, y) => x - y)[0];
-  check(med(cost.potato_on) <= med(cost.potato_off) * 1.15 + 2, `Very Low in the wood: on ${med(cost.potato_on)} ms, off ${med(cost.potato_off)} ms (High ${med(cost.high_on)} / ${med(cost.high_off)} ms)`);
-  // far from every place: nothing
-  await ev(() => { const p = VR.game.player; p.teleport(p.pos[0] + 900, 150, p.pos[2] + 900); }); await step(30, 33);
-  check(await ev(() => VR.Fairy.debug.near()) === null, 'far from every place: nothing near, nothing drawn');
-}
+// far from every place: nothing
+await ev(() => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0] + 900, 150, p.pos[2] + 900); }); await step(30, 33);
+check(await ev(() => VR.Fairy.debug.near()) === null, 'far from every place: nothing near, nothing drawn');
 
 check(!logs.some(l => /pageerror/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 3).join(' · ') : ''));
 save();
