@@ -54,6 +54,8 @@ const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying =
 const loaded = async (C, r) => { for (let i = 0; i < 120; i++) { await step(10, 33); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (!w.isLoaded(C[0] + dx, C[2] + dz)) return false; return true; }, [C, r]); if (ok) return true; await wait(250); } return false; };
 const acts = (vid) => ev((vid) => { const v = VR.game.villages.known.get(vid), c = {}; if (!v) return c; for (const a of v.agents) { const t = (a.act && a.act.type) || '-'; c[t] = (c[t] || 0) + 1; } return c; }, vid);
 const sheet = [];
+// (the sheet after every world: a run cut short keeps its pictures' sheet)
+const writeSheet = () => { if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/worlds4_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'worlds4_sheet.jpg', ROOT + '/.tmp_tests/worlds4_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } };
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.smoothFolk = true; g.applySettings('*'); });
@@ -141,12 +143,12 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
     check(back < 0.05, `${kind}: the view back to the game's own after the talk (${back.toFixed(3)})`);
   } else check(false, `${kind}: a native to talk to`);
   sheet.push({ label: `${kind}: ${kind === 'aqua' ? 'landing · ' : ''}town by day · avenue · dusk · native (talk camera)`, imgs: row.filter(Boolean) });
-  save();
+  save(); writeSheet();
 }
 
 // ---------------------------------------------------------------- the cost at Ocker's town vs its plain village
 if (want('cost')) {
-  if (await ev(() => VR.game.dim) !== 'ocker') await trip('ocker');
+  if (await ev(() => VR.game.dim) !== 'ocker') console.log('  · to ocker ' + await trip('ocker') + ' (' + secs() + ')');
   await settle(30);
   const S = await ev(() => VR.game.villages.sites.filter(q => /^eco:ocker:[01]$/.test(q.id)).map(s => [s.x, s.y, s.z, s.id]));
   const cost = {};
@@ -156,7 +158,8 @@ if (want('cost')) {
     for (const V of S) {
       const at = V[3].endsWith(':0') ? 'town' : 'village';
       await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
-      await loaded(V, 32); await settle(40); await step(120, 33);
+      const ld = await loaded(V, 32); await settle(25); await step(90, 33);
+      console.log(`  · ${preset} ${at}: loaded ${ld} (${secs()})`);
       await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
       const r = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length }; });
       cost[preset + '_' + at] = r;
@@ -171,7 +174,6 @@ if (want('cost')) {
 
 check(!logs.some(l => /pageerror/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 3).join(' · ') : ''));
 save();
-if (sheet.length) { fs.writeFileSync(ROOT + '/.tmp_tests/worlds4_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'worlds4_sheet.jpg', ROOT + '/.tmp_tests/worlds4_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } }
 await browser.close();
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

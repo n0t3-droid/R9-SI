@@ -53,7 +53,7 @@
   N.MARKET_ACTS = new Set(['market', 'hall', 'lantern']);
   N.CAP = { potato: 14, low: 20, medium: 30, balanced: 30 };
   N.agentCap = (preset, n) => Math.min(n, N.CAP[preset] !== undefined ? N.CAP[preset] : n);
-  const KEEP = { trader: 0, mayor: 0, cashier: 0, gardener: 1 };
+  const KEEP = { trader: 0, mayor: 0, cashier: 0 };   // (the gardeners go to market too: a third of a town's adults are gardeners)
   const u01 = (s, salt) => { let h = Math.imul((s | 0) ^ Math.imul((salt | 0) + 0x632BE5AB, 0x9E3779B1), 0x85EBCA6B); h = Math.imul(h ^ (h >>> 15), 0xC2B2AE35); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   // who a town wakes when it may wake only cap of its people: the keepers, the lamplighters, the adults, the elders,
   // the children — each group in the order of its seeds (the same people every time)
@@ -385,10 +385,17 @@
       if (this.goTo(a, lp[0] + 1, lp[1] - 2, lp[2], 1.4)) { a.lookAt = [lp[0] + 0.5, lp[1] - 0.5, lp[2] + 0.5]; act.rest = (act.rest || 0) + dt; if (act.rest > 3) { act.rest = 0; act.i = (act.i + 1 + (H2(8) % 3)) % L.length; act.n = (act.n || 0) + 1; } }
       else if (act.t > 60) { act.t = 0; act.i = (act.i + 1) % L.length; }
     };
+    // (a preset changed while in a town: it wakes again with the new tier)
+    const uv = VP.updateVillage;
+    VP.updateVillage = function (vil, dt, tod) {
+      if (vil.plan && vil.plan.town && vil._capP !== preset(this.g) && !this.talking) { this.deactivate(vil); this.activate(vil, tod); }
+      return uv.apply(this, arguments);
+    };
     const av = VP.activate;
     VP.activate = function (vil, tod) {
       const r = av.apply(this, arguments);
       if (vil.plan && vil.plan.town) {
+        vil._capP = preset(this.g);
         const cap = N.agentCap(preset(this.g), vil.agents.length);
         const lamps = N.lamplighters(vil, N.LAMPS_N(preset(this.g)));
         for (const a of vil.agents) a.lamp = lamps.has(a.p.id);
