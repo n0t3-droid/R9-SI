@@ -97,7 +97,7 @@
       // ---------------------------------------------------------------- the Panoramahalle
       room(-20, -6, 20, 14, 9, 'vx_tech_hex_white', 'hull_plating', 'hull_plating_gray');
       // the window wall: glass from the floor to the ceiling, mullions every 6, a band at mid height
-      for (let x = -20; x <= 20; x++) for (let y = FY; y <= FY + 8; y++) S(x, y, -7, (x + 20) % 6 === 0 ? 'hull_plating_dark' : y === FY + 4 ? 'hull_plating_dark' : 'viewport');
+      for (let x = -20; x <= 20; x++) for (let y = FY; y <= FY + 8; y++) S(x, y, -7, (x + 20) % 6 === 0 ? 'hull_plating_dark' : y === FY + 4 ? 'hull_plating_dark' : 'glass');
       for (let x = -21; x <= 21; x++) { S(x, F0, -7, 'hull_plating_dark'); S(x, FY + 9, -7, 'hull_plating_dark'); }
       // the airlock to the deck at the east end of the window wall (an opening framed in hazard stripes)
       for (let x = 15; x <= 17; x++) for (let y = FY; y <= FY + 3; y++) S(x, y, -7, 0);
@@ -185,7 +185,7 @@
       berth(Math.floor(PL.berth[0]), Math.floor(PL.berth[2]), 8, true);
       berth(Math.floor(PL.pad[0]), Math.floor(PL.pad[2]), 8, true);
       room(-10, -6, 10, 8, 7, 'vx_tech_hex_white', 'vx_tech_white', 'hull_plating_gray');
-      for (let x = -10; x <= 10; x++) for (let y = FY; y <= FY + 6; y++) S(x, y, -7, (x + 10) % 5 === 0 ? 'hull_plating_dark' : 'viewport');
+      for (let x = -10; x <= 10; x++) for (let y = FY; y <= FY + 6; y++) S(x, y, -7, (x + 10) % 5 === 0 ? 'hull_plating_dark' : 'glass');
       for (let x = 7; x <= 8; x++) for (let y = FY; y <= FY + 2; y++) S(x, y, -7, 0);
       S(PL.counter[0], FY, PL.counter[2], 'vx_shop_checkout', { facing: 3 });
       S(PL.board[0], FY + 1, PL.board[2] + 1, 'vx_holo_screen_amber', { facing: 0 });

@@ -346,7 +346,7 @@
   // (the ring's grid is filled a few rows a frame — 12 of 96 — so no frame pays for all of it; then the worker meshes it)
   function meshOf(g, key) {
     const m = M[key]; if (m && m.gpu) return m;
-    if (m && !m.rows) return null;
+    if (m && !m.rows) return null;   // (in a worker, or its sections on their way to the GPU)
     if (!g.pool || !g.renderer || !g.renderer.uploadShip) return null;
     const rec = m || (M[key] = { gpu: null, modelMat: new Float32Array(16), normalMat: new Float32Array(9), clipNear: 0, rows: key === 'ring' ? { Gd: null, z: 0 } : null });
     let Gd;
@@ -354,13 +354,14 @@
     else Gd = STN[MESH[key].grid]();
     const copy = Gd.blocks.slice();
     let wi = 0; g.pool.workers.forEach((wk, i) => { if (wk.inflight < g.pool.workers[wi].inflight) wi = i; });
-    g.pool.direct(wi, { type: 'shipmesh', sx: Gd.sx, sy: Gd.sy, sz: Gd.sz, blocks: copy }, [copy.buffer], (msg) => { if (msg.type === 'shipmesh') { rec.gpu = g.renderer.uploadShip(msg.sections); STN.stats.meshes++; } });
+    g.pool.direct(wi, { type: 'shipmesh', sx: Gd.sx, sy: Gd.sy, sz: Gd.sz, blocks: copy }, [copy.buffer], (msg) => { if (msg.type === 'shipmesh') { rec.queue = msg.sections; rec.parts = []; } });   // (uploaded two sections a frame: STN.prepare)
     return null;
   }
   // the meshes asked for from the frame (not the draw: a frame may be drawn rarely) while a station's world is near
   STN.prepare = function (g) {
     const a = g.flight && g.flight.asc; if (!a || !on(g)) return;
     const L = STN.atBody(a.st.frame); if (!L) return;
+    for (const k in M) { const m = M[k]; if (m.queue) { for (const o of g.renderer.uploadShip(m.queue.splice(0, 2))) m.parts.push(o); if (!m.queue.length) { m.gpu = m.parts; m.queue = null; m.parts = null; STN.stats.meshes++; } } }
     const P = STN.place(L.id, a.st.t, _P), d = Math.hypot(P.r[0] - a.st.r[0], P.r[1] - a.st.r[1], P.r[2] - a.st.r[2]);
     if (d < 200000) { meshOf(g, L.kind === 0 ? 'ring' : 'outpost'); meshOf(g, 'gate'); meshOf(g, 'shuttle'); }
   };
