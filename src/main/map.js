@@ -65,7 +65,10 @@
       if (this.row >= MS && this.again) this.wait -= dt;
       if (this.row >= MS && !(this.again && this.wait > 0)) { this.row = 0; this.pending = [Math.floor(p.pos[0]) - MS / 2, Math.floor(p.pos[2]) - MS / 2]; this.whole = !this.snap || !!this.again; this.again = false; this.missN = 0; this.inPass = true; }
       const [x0, z0] = this.pending, d = this.img.data, col = [0, 0, 0, 0], nb = [0, 0, 0, 0];
-      for (let k = 0, kn = this.whole ? MS : 16; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
+      // (u-stations2: where budgetIf(g) says so — a station while it streams in — a picture already there is redone in
+      // 16-row passes, never whole in one frame: the station's hand-off paid 25–35 ms for one)
+      const spread = this.whole && this.snap && MapView.budgetIf && MapView.budgetIf(g);
+      for (let k = 0, kn = this.whole && !spread ? MS : 16; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
         const z = z0 + this.row;
         for (let i = 0; i < MS; i++) {
           const x = x0 + i, o = (this.row * MS + i) * 4;
@@ -279,5 +282,6 @@
       c.addEventListener('contextmenu', (e) => e.preventDefault());
     }
   }
+  MapView.budgetIf = null;   // u-stations2: (g) → true where a picture is redone in 16-row passes only (the stations: src/main/stations.js)
   VR.MapView = MapView;
 })(VR);
