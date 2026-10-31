@@ -42560,17 +42560,17 @@ landmarks:[
 ocker:{
 liquid:'ice',
 biomes:[
-{key:'ocker_lichen',de:'Rostflechtenfeld',en:'Rust Lichen Field',col:0xb04a3a,surf:'crimson_mycel'},
+{key:'ocker_lichen',de:'Rostflechtenfeld',en:'Rust Lichen Field',col:0x8a6448,surf:'podzol'},
 {key:'ocker_thorn',de:'Dornsteppe',en:'Thorn Steppe',col:0x9a8a50,surf:'coarse_dirt'},
 {key:'ocker_amber',de:'Bernsteingarten',en:'Amber Garden',col:0xd89a40,surf:'red_sand'},
 ],
 base:null,
 flora:[
-{id:'rustcap',de:'Rostschirm',en:'Rust Cap',shape:'umbrella',bio:[0],p:0.35,stem:'stripped_crimson_stalk',cap:'crimson_wart_block',under:'lantern',h:[3,6],r:[2,3]},
+{id:'rustcap',de:'Rostschirm',en:'Rust Cap',shape:'umbrella',bio:[0],p:0.35,stem:'mushroom_stem',cap:'brown_mushroom_block',under:'lantern',h:[3,6],r:[2,3]},
 {id:'thornpillar',de:'Dornsäule',en:'Thorn Pillar',shape:'spire',bio:[1],p:0.4,base:'cactus',tip:'cactus_flower',h:[2,4]},
 {id:'ambernadel',de:'Bernsteinnadel',en:'Amber Needle',shape:'spire',bio:[2],p:0.35,base:'amber_crystal_block',tip:'amber_crystal_cluster',h:[1,4]},
-{id:'dusttuft',de:'Staubgras',en:'Dust Grass',shape:'tuft',bio:[0,1,2],p:0.12,b:['dead_bush','crimson_roots','short_grass']},
-{id:'rustbulb',de:'Rostknolle',en:'Rust Bulb',shape:'bulb',bio:[0,1],p:0.18,stem:'stripped_crimson_stalk',head:'orange_terracotta',h:[1,2]},
+{id:'dusttuft',de:'Staubgras',en:'Dust Grass',shape:'tuft',bio:[0,1,2],p:0.12,b:['dead_bush','short_grass','dead_bush']},
+{id:'rustbulb',de:'Rostknolle',en:'Rust Bulb',shape:'bulb',bio:[0,1],p:0.18,stem:'mushroom_stem',head:'brown_terracotta',h:[1,2]},
 ],
 fauna:[
 {id:'dune_trotter',de:'Dünentraber',en:'Dune Trotter',does:'graze'},
@@ -42579,7 +42579,7 @@ fauna:[
 ],
 species:{
 de:'Dunelin',en:'Dunelin',
-look:{skin:[0xc85a2a,0xb84e22,0xd06a34,0xa84a20],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
+look:{skin:[0xd8b444,0xc8a43a,0xe0c25a,0xbc9a36],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
 kit:{shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
 goods:['red_sand','terracotta','orange_terracotta','cactus','red_sandstone','amber_crystal_block','lantern','iron_ingot'],
 syl:['du','ne','ka','ro','tes','ul','mar','ze','om','ra','bek','sim','ta','ho','gal','ir'],end:['in','ek','a','ur'],
@@ -42612,7 +42612,7 @@ fauna:[
 ],
 species:{
 de:'Glutani',en:'Glutani',
-look:{skin:[0x3a3036,0x4a3a3a,0x2e2830,0x54403c],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
+look:{skin:[0x4a2a3a,0x542e3e,0x3e2434,0x5a3440],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
 kit:{shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
 goods:['sulfur','obsidian','magma_block','amber_crystal_block','polished_sulfur','glowing_obsidian','sulfur_bricks','gold_ingot'],
 syl:['glu','ta','ni','ber','os','kai','rum','ze','fa','lo','tir','ga','van','ur','pe','sol'],end:['an','i','or','et'],
@@ -42783,7 +42783,7 @@ return v;
 near(x,z,pad){for(const m of this.marks)if(Math.abs(m.x-x)<m.r+pad&&Math.abs(m.z-z)<m.r+pad)return true;return false;}
 
 build(){
-const g=this.gen,L=this.land,rings=[[110,170],[420,620],[880,1150]];
+const g=this.gen,L=this.land,rings=[[75,105],[420,620],[880,1150]]
 const rot=h01(this.s,1,7)*Math.PI*2;
 rings.forEach(([r0,r1],ri)=>{
 let best=null,bs=1e9;
@@ -42971,6 +42971,20 @@ const y0=this.groundAt(x,z);if(y0<0)continue;
 
 if(x>=x0&&x<x0+16&&z>=z0&&z<z0+16){const t=tops[(z-z0)*16+x-x0];if(t<0||Math.abs(t-y0)>1)continue;}
 plant(f,x,y0+1,z,h01(i,j,this.s^0xf5),put);
+}
+
+
+const L=this.land;
+if(big.length&&Math.abs(L[0]-x0-8)<32&&Math.abs(L[2]-z0-8)<32)for(let k=0;k<7;k++){
+const a=k/7*Math.PI*2+h01(k,3,this.s^0xfa)*0.5,r=8+h01(k,4,this.s^0xfa)*5;
+const x=Math.round(L[0]+Math.cos(a)*r),z=Math.round(L[2]+Math.sin(a)*r);
+if(x<x0-4||x>x0+19||z<z0-4||z>z0+19||this.near(x,z,2))continue;
+
+const s0=this.sites&&this.sites[0];
+if(s0){let da=Math.abs(Math.atan2(z-L[2],x-L[0])-Math.atan2(s0.z-L[2],s0.x-L[0]));if(da>Math.PI)da=2*Math.PI-da;if(da<0.61)continue;}
+const y0=this.groundAt(x,z);if(y0<0)continue;
+if(x>=x0&&x<x0+16&&z>=z0&&z<z0+16){const t=tops[(z-z0)*16+x-x0];if(t<0||Math.abs(t-y0)>1)continue;}
+plant(big[k%big.length],x,y0+1,z,h01(k,5,this.s^0xfa),put);
 }
 
 for(let c=0;c<256;c++){
@@ -43167,16 +43181,53 @@ put(cx,F+top,cz,S('light_panel',{facing:5}));
 put(cx+1+(u>0.5?0: -2),F+1,cz+dz+s,S(Kit.light));
 return{kind:'home',ops:W.ops,door:[cx,F+1,cz+dz],outside:[cx,F+1,cz+dz+s],inside:[cx,F+1,cz+dz-2*s],beds,seats:[],work:[],chimney:null,table:null,lights:[[cx,F+top,cz]],box:[cx-R,F,cz-R,cx+R,F+9,cz+R]};
 }
+
+
+
+
+E.CENTRE={aqua:14,ocker:18,zinn:20,basalt:13,opal:15};
+function centrepiece(kind,put,X,F,Z){
+const S=(n,p)=>st(n,p),H=E.CENTRE[kind]||10;
+const ring=(y,r,f)=>{for(let dx= -3;dx<=3;dx++)for(let dz= -3;dz<=3;dz++){const d=Math.hypot(dx,dz);if(d<=r){const v=f(dx,dz,d);if(v)put(X+dx,F+y,Z+dz,v);}}};
+if(kind==='aqua'){
+const wall=S('calcite'),band=S('cyan_terracotta'),cap=S('tube_coral_block');
+for(let y=1;y<=H-2;y++){const r=2.9-y*0.15,a0=y*0.7;ring(y,r,(dx,dz,d)=>{if(d<r-1.1)return 0;const a=Math.atan2(dz,dx);return Math.abs(((a-a0)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI)<0.6?band:wall;});}
+put(X,F+H-1,Z,cap);put(X,F+H,Z,S('tide_lantern'));
+}else if(kind==='ocker'){
+const wall=S('terracotta'),band=S('red_sandstone'),win=S('orange_stained_glass');
+for(let y=1;y<=H-3;y++){const r=y<7?2:y<13?1.5:1;for(let dx= -2;dx<=2;dx++)for(let dz= -2;dz<=2;dz++){if(Math.max(Math.abs(dx),Math.abs(dz))>Math.floor(r+0.5)||(r===1.5&&Math.abs(dx)===2&&Math.abs(dz)===2))continue;const edge=Math.max(Math.abs(dx),Math.abs(dz))===Math.floor(r+0.5);put(X+dx,F+y,Z+dz,y%4===0?band:edge&&y%4===2&&(dx===0||dz===0)?win:wall);}}
+put(X,F+H-2,Z,band);put(X,F+H-1,Z,S('lantern'));put(X,F+H,Z,S('amber_crystal_block'));
+}else if(kind==='zinn'){
+const base=S('polished_basalt'),br=S('sulfur_bricks'),ps=S('polished_sulfur'),core=S('magma_block');
+for(let y=1;y<=H-3;y++){const r=y<=2?2.6:2.2*(1-(y-2)/(H-2))+0.4;ring(y,r,(dx,dz,d)=>(dx===0&&dz===0&&y>2&&y%3===0?core:y<=2?base:(y+Math.round(Math.atan2(dz,dx)*2))%3===0?ps:br));}
+put(X,F+H-2,Z,S('amber_crystal_block'));put(X,F+H-1,Z,S('amber_crystal_block'));put(X,F+H,Z,S('spirit_lantern'));
+for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]])put(X+dx,F+H-2,Z+dz,S('amber_crystal_block'));
+}else if(kind==='basalt'){
+const rim=S('smooth_basalt'),glass=S('light_blue_stained_glass'),mast=S('polished_andesite');
+for(let y=1;y<=4;y++)ring(y,3.2,(dx,dz,d)=>{if(y===1)return d>2.4?rim:0;const R=Math.sqrt(Math.max(0,9.6-(y-1)*(y-1)*1.1));return d<=R&&d>R-1.1?glass:0;});
+for(let y=4;y<=H-1;y++)put(X,F+y,Z,mast);
+put(X-1,F+H-3,Z,mast);put(X+1,F+H-3,Z,mast);put(X,F+H,Z,S('azure_crystal_block'));put(X,F+2,Z,S('lantern'));
+}else{
+const ice=S('packed_ice'),blue=S('blue_ice'),snow=S('snow_block');
+
+for(let y=1;y<=H-2;y++)for(const sx of[-2,2])for(let dz= -1;dz<=1;dz++){
+const lean=Math.max(0,y-6)/(H-8)*2;const x=Math.round(sx-Math.sign(sx)*lean);
+put(X+x,F+y,Z+dz,y%4===1?snow:dz===0?blue:ice);
+}
+for(let dz= -1;dz<=1;dz++){put(X,F+H-2,Z+dz,blue);put(X,F+H-1,Z+dz,ice);}
+put(X,F+H,Z,S('rose_crystal_block'));
+}
+}
 const HOMES=[[-13,-14],[0,-15],[13,-14],[-13,14],[0,15],[13,14]];
 function villagePlan(eco,site){
 const Kit=eco.W.species.kit,g=eco.gen,F=site.y|0,X=site.x,Z=site.z,kind=eco.kind;
 const ground=(x,z)=>g.surfaceY(x,z);
 const seed=strHash(site.id+':'+(eco.s>>>0))>>>0;
-const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
+const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z,r:6},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
 const W=writer(ground,F,Kit),put=W.put,pav=st(Kit.paving),mark=st(Kit.mark);
 
 for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);put(X+dx,F,Z+dz,(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
-put(X,F+1,Z,mark);put(X,F+2,Z,mark);put(X,F+3,Z,st(Kit.light));
+centrepiece(kind,put,X,F,Z);
 for(const[dx,dz]of HOMES){
 const s=dz>0? -1:1;
 for(let k=6;k<Math.abs(dz)-4;k++){W.level(X+dx,Z+k*Math.sign(dz));put(X+dx,F,Z+k*Math.sign(dz),pav);if(dx)for(let q=Math.min(0,dx);q<=Math.max(0,dx);q++){W.level(X+q,Z+7*Math.sign(dz));put(X+q,F,Z+7*Math.sign(dz),pav);}}
@@ -48185,6 +48236,102 @@ const hu=(X)=>(X+0.5)/2;
 F.face={eyesX:[hu(eL),hu(mir(eL))],eyeY:(Ye+0.5)/2,mouthX:(bL+1)/2,mouthY:(by+1)/2+0.25,noseY:(Ye-2)/2+0.25,cheekX:hu(eL),cheekY:hu(Ye-2)};
 return{head:F,lids,mouth};
 }
+
+
+
+
+
+
+
+
+
+
+
+
+V.SPECIES_BODY={aqua:{scale:0.96,neck:0},ocker:{scale:1.1,neck:4},zinn:{scale:0.93,neck:0},basalt:{scale:0.8,neck:0},opal:{scale:1.07,neck:1}};
+function speciesBody(L,C){
+const sp=V.SPECIES_BODY[L.species];if(!sp)return null;
+const{head,body,hips,upper,A,skin,kid,eyeY}=C,OT=TG.other,SKT=TG.skin;
+const fc=L.featC||0xffffff,dark=mul(skin,0.78),lite=mix(skin,0xffffff,0.3);
+const P=(part,x,y,z,c,e,t)=>{if(!part.has(x,y,z))part.set(x,y,z,c,e||0,t||SKT);};
+const S2=(part,x,y,z,c,e,t)=>part.set(x,y,z,c,e||0,t||OT);
+const sc=kid?0.6:1,n=(v)=>Math.max(1,Math.round(v*sc));
+
+const tail=(pts,r0,r1,col,endF)=>{
+for(let i=0;i<pts.length-1;i++){
+const a=pts[i],b=pts[i+1],steps=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2])*2));
+for(let k=0;k<=steps;k++){
+const t=k/steps,x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t,z=a[2]+(b[2]-a[2])*t;
+const f=(i+t)/(pts.length-1),r=r0+(r1-r0)*f;
+for(let dz= -1;dz<=1;dz++)for(let dy= -1;dy<=1;dy++)for(let dx= -1;dx<=1;dx++)if(dx*dx+dy*dy+dz*dz<=r*r)hips.set(Math.round(x+dx),Math.round(y+dy),Math.round(z+dz),typeof col==='function'?col(f):col,0,SKT);
+}
+}
+if(endF)endF(pts[pts.length-1]);
+};
+const X0=A.xl,X1=A.xr,Z0=A.z0,Z1=A.z1,top=A.top;
+if(L.species==='aqua'){
+
+for(let y=1;y<=top-1;y++)for(let z=Z0+1;z<=Z1;z++){P(head,X0-1,y,z,skin);P(head,X1+1,y,z,skin);}
+for(let y=1;y<=top-1;y++)for(let x=X0;x<=X1;x++)P(head,x,y,Z1+1,skin);
+for(let z=Z0+1;z<=Z1;z++)for(let x=X0+1;x<=X1-1;x++)P(head,x,top+1,z,skin);
+
+head.del(0,2,Z0-1);
+for(const ex of A.eyes){head.del(ex,eyeY+1,Z0);S2(head,ex,eyeY+1,Z0+1,mix(L.eye,0x0a0806,0.4));S2(head,ex,eyeY,Z0+1,mix(L.eye,0x0a0806,0.5));S2(head,ex,eyeY+1,Z0,mix(L.eye,0xffffff,0.75),0,OT);}
+for(let x=X0+1;x<=X1-1;x++)S2(head,x,0,Z0+1,lite);
+
+if(!kid)tail([[0,-2,3],[0,-6,6],[0,-10,8],[0,-14,9]],1.6,1.0,(f)=>mix(skin,fc,f*0.5),(e)=>{
+for(let x= -5;x<=5;x++){const ax=Math.abs(x);for(let dz=0;dz<=2;dz++)if(dz<=2-(ax>3?1:0))hips.set(x,Math.round(e[1]-(ax>3?1:0)),Math.round(e[2]+dz+(ax>>1)),mix(fc,0xffffff,ax>3?0.3:0),0,SKT);}
+});
+else tail([[0,-1,2],[0,-4,4],[0,-6,5]],1.1,0.8,skin);
+}else if(L.species==='ocker'){
+
+if(!kid)for(let y=19;y<=24;y++)for(let z= -2;z<=1;z++)for(let x= -1;x<=1;x++)if(!(Math.abs(x)===1&&(z=== -2||z===1)))body.set(x,y,z,y>21?skin:mul(skin,0.94),0,SKT);
+
+for(let x= -1;x<=1;x++)for(let y=0;y<=2;y++)P(head,x,y,Z0-1,y===0&&x!==0?null:skin);
+S2(head,0,2,Z0-2,mul(skin,0.45));S2(head,0,1,Z0-2,mul(skin,0.85));
+
+const str=mix(skin,0x6a2a14,0.55);
+for(let y=3;y<=top;y+=2)for(let z=Z0+2;z<=Z1;z++)for(let x=X0;x<=X1;x++)if(head.has(x,y,z)&&head.tagAt(x,y,z)===SKT&&(x===X0||x===X1||z===Z1||y===top))head.set(x,y,z,str,0,OT);
+
+tail(kid?[[0,-2,3],[0,-6,6],[0,-8,8]]:[[0,-2,3],[0,-8,6],[0,-14,9],[0,-17,11],[0,-15,12]],kid?1:1.3,0.8,skin,(e)=>hips.ell(e[0],e[1]+1,e[2],1.8,2.2,1.6,(x,y,z)=>mul(str,0.8+H3(x,y,z,77)*0.2),null,SKT));
+}else if(L.species==='zinn'){
+
+for(let y=0;y<=top-1;y++)for(let z=Z0+1;z<=Z1;z++){P(head,X0-1,y,z,dark);P(head,X1+1,y,z,dark);}
+
+const glow=mix(fc,0xffffff,0.15);
+for(const[x,y,z]of[[X0-1,1,Z0+1],[X0-1,2,Z0+2],[X0-1,3,Z0+2],[X1+1,2,Z0+1],[X1+1,3,Z0+2],[X1+1,4,Z0+3],[-1,top-1,Z0],[0,top-2,Z0],[1,top-1,Z0]])if(head.has(x,y,z))S2(head,x,y,z,glow,1);
+
+if(!kid)for(let y=0;y<=3;y++)for(let z= -3;z<=3;z++)for(let x= -3;x<=3;x++){const d=x*x/9+(y-0.5)*(y-0.5)/9+z*z/9;if(d<=1&&(y>=1||Math.abs(x)>=2||Math.abs(z)>=2))upper.set(x,y,z,(x+z+y)%4===0?glow:mul(skin,1.15+H3(x,y,z,61)*0.2),(x+z+y)%4===0?1:0,OT);}
+
+tail([[0,-2,3],[0,-5,6],[0,-7,8]],kid?1.3:2.0,1.2,dark,(e)=>{hips.set(0,Math.round(e[1]),Math.round(e[2])+1,glow,1,OT);hips.set(0,Math.round(e[1])-1,Math.round(e[2])+1,glow,1,OT);});
+}else if(L.species==='basalt'){
+
+for(let y=0;y<=top+1;y++)for(let z=Z0;z<=Z1+1;z++)for(let x=X0-1;x<=X1+1;x++){
+const dx=(x-C.cx)/3.6,dy=(y-3)/4.4,dz=(z-C.zc-0.5)/3.7;
+if(dx*dx+dy*dy+dz*dz<=1)P(head,x,y,z,skin);
+}
+
+head.del(0,2,Z0-1);
+for(const ex of A.eyes){const ox=ex<0? -1:1;for(const[x,y]of[[ex,eyeY],[ex+ox,eyeY],[ex,eyeY+1],[ex+ox,eyeY+1]]){head.del(x,y,Z0);S2(head,x,y,Z0+1,mix(L.eye,0x101828,0.3));}S2(head,ex+ox,eyeY+1,Z0,mix(fc,0xffffff,0.6),1);}
+
+if(!kid)for(let y=2;y<=18;y++)for(let z=2;z<=6;z++)for(let x= -5;x<=5;x++){
+const d=x*x/25+(y-10)*(y-10)/81+(z-1)*(z-1)/25;if(d>1||d<0.55)continue;
+if(body.has(x,y,z))continue;
+body.set(x,y,z,(y%5===0||x===0)?mul(mix(skin,0x303048,0.5),0.8):mix(mix(skin,0x606078,0.4),fc,0.12),0,OT);
+}
+}else if(L.species==='opal'){
+
+for(let y=top+1;y<=top+2;y++)for(let z=Z0+1;z<=Z1-(y===top+2?1:0);z++)for(let x=X0+1;x<=X1-1;x++)P(head,x,y,z,skin);
+
+S2(head,X0,2,Z0+1,lite);S2(head,X1,2,Z0+1,lite);
+
+const ice=mix(fc,0xffffff,0.35);
+if(!kid)for(const y of[5,9,13,17]){const zb=3;for(let k=0;k<=3-(y===5?1:0);k++){body.set(0,y+k,zb+k,ice,k>=2?1:0,OT);if(k<2){body.set(-1,y+k,zb+k,mul(ice,0.85),0,OT);body.set(1,y+k,zb+k,mul(ice,0.85),0,OT);}}}
+
+tail(kid?[[0,-2,3],[0,-6,5]]:[[0,-2,3],[0,-9,6],[0,-15,9],[0,-18,11]],1.0,0.7,skin,(e)=>{for(let k=0;k<3;k++)hips.set(0,Math.round(e[1])-k,Math.round(e[2])+1,ice,k===1?1:0,OT);hips.set(-1,Math.round(e[1])-1,Math.round(e[2])+1,mul(ice,0.9),0,OT);hips.set(1,Math.round(e[1])-1,Math.round(e[2])+1,mul(ice,0.9),0,OT);});
+}
+return{scale:sp.scale,neck:kid?Math.round(sp.neck*0.5):sp.neck};
+}
 function buildPerson(L,opts){
 const kid=L.age==='child',elder=L.age==='elder';
 const role=V.ROLES[L.role]||V.ROLES.farmer;
@@ -48789,7 +48936,10 @@ shin.set(x,y,z,y===ground?sole:(kid&&y===ankle-1)?0xF4F4F0:shC(x,y,z),0,TG.leath
 }
 
 
-const hipY=S.hip,headY=S.head,shY=S.sh,hx=S.hx;
+
+const SPB=L.species&& !L.hero?speciesBody(L,{head,body,hips,upper,thigh,shin,A,S,skin,kid,eyeY,cx,zc}):null;
+
+const hipY=S.hip,headY=S.head+(SPB&&SPB.neck||0),shY=S.sh,hx=S.hx;
 const legXl= -S.legX-(kid?0:0),legXr=S.legX;
 
 const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald}):null;
@@ -48803,6 +48953,7 @@ order:['hips','body','head','lids','mouth','arm_l','arm_r','fore_l','fore_r','le
 skel:S,
 };
 if(fine)def.fine=fine;
+if(SPB){def.species=L.species;def.h*=SPB.scale;}
 
 
 if(fine0){
@@ -91148,17 +91299,17 @@ landmarks:[
 ocker:{
 liquid:'ice',
 biomes:[
-{key:'ocker_lichen',de:'Rostflechtenfeld',en:'Rust Lichen Field',col:0xb04a3a,surf:'crimson_mycel'},
+{key:'ocker_lichen',de:'Rostflechtenfeld',en:'Rust Lichen Field',col:0x8a6448,surf:'podzol'},
 {key:'ocker_thorn',de:'Dornsteppe',en:'Thorn Steppe',col:0x9a8a50,surf:'coarse_dirt'},
 {key:'ocker_amber',de:'Bernsteingarten',en:'Amber Garden',col:0xd89a40,surf:'red_sand'},
 ],
 base:null,
 flora:[
-{id:'rustcap',de:'Rostschirm',en:'Rust Cap',shape:'umbrella',bio:[0],p:0.35,stem:'stripped_crimson_stalk',cap:'crimson_wart_block',under:'lantern',h:[3,6],r:[2,3]},
+{id:'rustcap',de:'Rostschirm',en:'Rust Cap',shape:'umbrella',bio:[0],p:0.35,stem:'mushroom_stem',cap:'brown_mushroom_block',under:'lantern',h:[3,6],r:[2,3]},
 {id:'thornpillar',de:'Dornsäule',en:'Thorn Pillar',shape:'spire',bio:[1],p:0.4,base:'cactus',tip:'cactus_flower',h:[2,4]},
 {id:'ambernadel',de:'Bernsteinnadel',en:'Amber Needle',shape:'spire',bio:[2],p:0.35,base:'amber_crystal_block',tip:'amber_crystal_cluster',h:[1,4]},
-{id:'dusttuft',de:'Staubgras',en:'Dust Grass',shape:'tuft',bio:[0,1,2],p:0.12,b:['dead_bush','crimson_roots','short_grass']},
-{id:'rustbulb',de:'Rostknolle',en:'Rust Bulb',shape:'bulb',bio:[0,1],p:0.18,stem:'stripped_crimson_stalk',head:'orange_terracotta',h:[1,2]},
+{id:'dusttuft',de:'Staubgras',en:'Dust Grass',shape:'tuft',bio:[0,1,2],p:0.12,b:['dead_bush','short_grass','dead_bush']},
+{id:'rustbulb',de:'Rostknolle',en:'Rust Bulb',shape:'bulb',bio:[0,1],p:0.18,stem:'mushroom_stem',head:'brown_terracotta',h:[1,2]},
 ],
 fauna:[
 {id:'dune_trotter',de:'Dünentraber',en:'Dune Trotter',does:'graze'},
@@ -91167,7 +91318,7 @@ fauna:[
 ],
 species:{
 de:'Dunelin',en:'Dunelin',
-look:{skin:[0xc85a2a,0xb84e22,0xd06a34,0xa84a20],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
+look:{skin:[0xd8b444,0xc8a43a,0xe0c25a,0xbc9a36],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
 kit:{shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
 goods:['red_sand','terracotta','orange_terracotta','cactus','red_sandstone','amber_crystal_block','lantern','iron_ingot'],
 syl:['du','ne','ka','ro','tes','ul','mar','ze','om','ra','bek','sim','ta','ho','gal','ir'],end:['in','ek','a','ur'],
@@ -91200,7 +91351,7 @@ fauna:[
 ],
 species:{
 de:'Glutani',en:'Glutani',
-look:{skin:[0x3a3036,0x4a3a3a,0x2e2830,0x54403c],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
+look:{skin:[0x4a2a3a,0x542e3e,0x3e2434,0x5a3440],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
 kit:{shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
 goods:['sulfur','obsidian','magma_block','amber_crystal_block','polished_sulfur','glowing_obsidian','sulfur_bricks','gold_ingot'],
 syl:['glu','ta','ni','ber','os','kai','rum','ze','fa','lo','tir','ga','van','ur','pe','sol'],end:['an','i','or','et'],
@@ -91371,7 +91522,7 @@ return v;
 near(x,z,pad){for(const m of this.marks)if(Math.abs(m.x-x)<m.r+pad&&Math.abs(m.z-z)<m.r+pad)return true;return false;}
 
 build(){
-const g=this.gen,L=this.land,rings=[[110,170],[420,620],[880,1150]];
+const g=this.gen,L=this.land,rings=[[75,105],[420,620],[880,1150]]
 const rot=h01(this.s,1,7)*Math.PI*2;
 rings.forEach(([r0,r1],ri)=>{
 let best=null,bs=1e9;
@@ -91559,6 +91710,20 @@ const y0=this.groundAt(x,z);if(y0<0)continue;
 
 if(x>=x0&&x<x0+16&&z>=z0&&z<z0+16){const t=tops[(z-z0)*16+x-x0];if(t<0||Math.abs(t-y0)>1)continue;}
 plant(f,x,y0+1,z,h01(i,j,this.s^0xf5),put);
+}
+
+
+const L=this.land;
+if(big.length&&Math.abs(L[0]-x0-8)<32&&Math.abs(L[2]-z0-8)<32)for(let k=0;k<7;k++){
+const a=k/7*Math.PI*2+h01(k,3,this.s^0xfa)*0.5,r=8+h01(k,4,this.s^0xfa)*5;
+const x=Math.round(L[0]+Math.cos(a)*r),z=Math.round(L[2]+Math.sin(a)*r);
+if(x<x0-4||x>x0+19||z<z0-4||z>z0+19||this.near(x,z,2))continue;
+
+const s0=this.sites&&this.sites[0];
+if(s0){let da=Math.abs(Math.atan2(z-L[2],x-L[0])-Math.atan2(s0.z-L[2],s0.x-L[0]));if(da>Math.PI)da=2*Math.PI-da;if(da<0.61)continue;}
+const y0=this.groundAt(x,z);if(y0<0)continue;
+if(x>=x0&&x<x0+16&&z>=z0&&z<z0+16){const t=tops[(z-z0)*16+x-x0];if(t<0||Math.abs(t-y0)>1)continue;}
+plant(big[k%big.length],x,y0+1,z,h01(k,5,this.s^0xfa),put);
 }
 
 for(let c=0;c<256;c++){
@@ -91755,16 +91920,53 @@ put(cx,F+top,cz,S('light_panel',{facing:5}));
 put(cx+1+(u>0.5?0: -2),F+1,cz+dz+s,S(Kit.light));
 return{kind:'home',ops:W.ops,door:[cx,F+1,cz+dz],outside:[cx,F+1,cz+dz+s],inside:[cx,F+1,cz+dz-2*s],beds,seats:[],work:[],chimney:null,table:null,lights:[[cx,F+top,cz]],box:[cx-R,F,cz-R,cx+R,F+9,cz+R]};
 }
+
+
+
+
+E.CENTRE={aqua:14,ocker:18,zinn:20,basalt:13,opal:15};
+function centrepiece(kind,put,X,F,Z){
+const S=(n,p)=>st(n,p),H=E.CENTRE[kind]||10;
+const ring=(y,r,f)=>{for(let dx= -3;dx<=3;dx++)for(let dz= -3;dz<=3;dz++){const d=Math.hypot(dx,dz);if(d<=r){const v=f(dx,dz,d);if(v)put(X+dx,F+y,Z+dz,v);}}};
+if(kind==='aqua'){
+const wall=S('calcite'),band=S('cyan_terracotta'),cap=S('tube_coral_block');
+for(let y=1;y<=H-2;y++){const r=2.9-y*0.15,a0=y*0.7;ring(y,r,(dx,dz,d)=>{if(d<r-1.1)return 0;const a=Math.atan2(dz,dx);return Math.abs(((a-a0)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI)<0.6?band:wall;});}
+put(X,F+H-1,Z,cap);put(X,F+H,Z,S('tide_lantern'));
+}else if(kind==='ocker'){
+const wall=S('terracotta'),band=S('red_sandstone'),win=S('orange_stained_glass');
+for(let y=1;y<=H-3;y++){const r=y<7?2:y<13?1.5:1;for(let dx= -2;dx<=2;dx++)for(let dz= -2;dz<=2;dz++){if(Math.max(Math.abs(dx),Math.abs(dz))>Math.floor(r+0.5)||(r===1.5&&Math.abs(dx)===2&&Math.abs(dz)===2))continue;const edge=Math.max(Math.abs(dx),Math.abs(dz))===Math.floor(r+0.5);put(X+dx,F+y,Z+dz,y%4===0?band:edge&&y%4===2&&(dx===0||dz===0)?win:wall);}}
+put(X,F+H-2,Z,band);put(X,F+H-1,Z,S('lantern'));put(X,F+H,Z,S('amber_crystal_block'));
+}else if(kind==='zinn'){
+const base=S('polished_basalt'),br=S('sulfur_bricks'),ps=S('polished_sulfur'),core=S('magma_block');
+for(let y=1;y<=H-3;y++){const r=y<=2?2.6:2.2*(1-(y-2)/(H-2))+0.4;ring(y,r,(dx,dz,d)=>(dx===0&&dz===0&&y>2&&y%3===0?core:y<=2?base:(y+Math.round(Math.atan2(dz,dx)*2))%3===0?ps:br));}
+put(X,F+H-2,Z,S('amber_crystal_block'));put(X,F+H-1,Z,S('amber_crystal_block'));put(X,F+H,Z,S('spirit_lantern'));
+for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]])put(X+dx,F+H-2,Z+dz,S('amber_crystal_block'));
+}else if(kind==='basalt'){
+const rim=S('smooth_basalt'),glass=S('light_blue_stained_glass'),mast=S('polished_andesite');
+for(let y=1;y<=4;y++)ring(y,3.2,(dx,dz,d)=>{if(y===1)return d>2.4?rim:0;const R=Math.sqrt(Math.max(0,9.6-(y-1)*(y-1)*1.1));return d<=R&&d>R-1.1?glass:0;});
+for(let y=4;y<=H-1;y++)put(X,F+y,Z,mast);
+put(X-1,F+H-3,Z,mast);put(X+1,F+H-3,Z,mast);put(X,F+H,Z,S('azure_crystal_block'));put(X,F+2,Z,S('lantern'));
+}else{
+const ice=S('packed_ice'),blue=S('blue_ice'),snow=S('snow_block');
+
+for(let y=1;y<=H-2;y++)for(const sx of[-2,2])for(let dz= -1;dz<=1;dz++){
+const lean=Math.max(0,y-6)/(H-8)*2;const x=Math.round(sx-Math.sign(sx)*lean);
+put(X+x,F+y,Z+dz,y%4===1?snow:dz===0?blue:ice);
+}
+for(let dz= -1;dz<=1;dz++){put(X,F+H-2,Z+dz,blue);put(X,F+H-1,Z+dz,ice);}
+put(X,F+H,Z,S('rose_crystal_block'));
+}
+}
 const HOMES=[[-13,-14],[0,-15],[13,-14],[-13,14],[0,15],[13,14]];
 function villagePlan(eco,site){
 const Kit=eco.W.species.kit,g=eco.gen,F=site.y|0,X=site.x,Z=site.z,kind=eco.kind;
 const ground=(x,z)=>g.surfaceY(x,z);
 const seed=strHash(site.id+':'+(eco.s>>>0))>>>0;
-const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
+const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z,r:6},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
 const W=writer(ground,F,Kit),put=W.put,pav=st(Kit.paving),mark=st(Kit.mark);
 
 for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);put(X+dx,F,Z+dz,(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
-put(X,F+1,Z,mark);put(X,F+2,Z,mark);put(X,F+3,Z,st(Kit.light));
+centrepiece(kind,put,X,F,Z);
 for(const[dx,dz]of HOMES){
 const s=dz>0? -1:1;
 for(let k=6;k<Math.abs(dz)-4;k++){W.level(X+dx,Z+k*Math.sign(dz));put(X+dx,F,Z+k*Math.sign(dz),pav);if(dx)for(let q=Math.min(0,dx);q<=Math.max(0,dx);q++){W.level(X+q,Z+7*Math.sign(dz));put(X+q,F,Z+7*Math.sign(dz),pav);}}
@@ -94699,7 +94901,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="874bc5a5a94929c8";
+VR.TEX_SRC_HASH="f56678571ef2b870";
 
 
 
@@ -98282,6 +98484,14 @@ VR.I18N.add('en',{
 "g.eco.lm.basalt.circle":"Moonstone Circle",
 "g.eco.sp.opal":"Nivari",
 "g.eco.home.opal":"Here live the Nivari, the vault folk of the ice",
+"g.eco.cult.aqua":"Tide Song",
+"g.eco.cult.ocker":"Lantern Market",
+"g.eco.cult.zinn":"Ember Round",
+"g.eco.cult.basalt":"Star Watch",
+"g.eco.cult.opal":"Frost Chime",
+"g.eco.cult.invite":"In {v} it begins: {what} — join them in the circle!",
+"g.eco.cult.joined":"The {sp} of {v} thank you for celebrating with them: {gift}",
+"g.eco.cult.thanks":"How lovely that you celebrate with us!",
 "g.biome.opal_fernfrost":"Frost Fern Field",
 "g.biome.opal_icebloom":"Ice Bloom Meadow",
 "g.biome.opal_bluegrove":"Blue Chalice Grove",
@@ -101766,6 +101976,14 @@ VR.I18N.add('de',{
 "g.eco.lm.basalt.circle":"Mondsteinkreis",
 "g.eco.sp.opal":"Nivari",
 "g.eco.home.opal":"Hier leben die Nivari, das Gewölbevolk des Eises",
+"g.eco.cult.aqua":"Gezeitenlied",
+"g.eco.cult.ocker":"Laternenmarkt",
+"g.eco.cult.zinn":"Glutreigen",
+"g.eco.cult.basalt":"Sternwache",
+"g.eco.cult.opal":"Frostklang",
+"g.eco.cult.invite":"In {v} beginnt: {what} — stell dich zu ihnen in den Kreis!",
+"g.eco.cult.joined":"Die {sp} von {v} danken dir fürs Mitfeiern: {gift}",
+"g.eco.cult.thanks":"Schön, dass du mit uns feierst!",
 "g.biome.opal_fernfrost":"Frostfarnfeld",
 "g.biome.opal_icebloom":"Eisblütenwiese",
 "g.biome.opal_bluegrove":"Blaukelchhain",
@@ -117408,17 +117626,25 @@ if(lcx===undefined){lcx=pcx;lcz=pcz;}
 
 const best=this._best||(this._best=[]);
 best.length=0;
-let worst=Infinity;
+let worst=Infinity,free=0;
 const hold=this.seamHold&&this.seamHold.size;
 for(const c of this.cols.values()){
 const dx=c.cx-pcx,dz=c.cz-pcz,ex=c.cx-lcx,ez=c.cz-lcz;
 const d2=Math.min(dx*dx+dz*dz,ex*ex+ez*ez);
 if(d2>r2)continue;
 if(hold&&this.seamHeld(c.key))continue;
-if(best.length===budget&&d2>=worst)continue;
 let anyDirty=false;
 for(let sy=0;sy<c.sec.length;sy++){const s=c.sec[sy];if(s.dirty&& !s.pending){anyDirty=true;break;}}
-if(!anyDirty)continue;
+if(!anyDirty){c.dirtyF=0;continue;}
+
+
+
+
+
+if(free<64&& !(tk&&free>0&&performance.now()-t0>cap))for(let sy=0;sy<c.sec.length;sy++){const s=c.sec[sy];if(s.dirty&& !s.pending&&s.count===0&&free<64){if(tk&&free>0&&performance.now()-t0>cap)break;free++;this.meshSection(c,sy,false,0,pos);}}
+const fr=this.frame||0;
+if(!c.dirtyF)c.dirtyF=fr||1;
+if(best.length===budget&&d2-2*(fr-c.dirtyF)>=worst)continue;
 
 let ok=true;
 for(let oz= -1;oz<=1&&ok;oz++)for(let ox= -1;ox<=1;ox++){if(!ox&& !oz)continue;if(!this.col(c.cx+ox,c.cz+oz)){ok=false;break;}}
@@ -117426,7 +117652,8 @@ if(!ok)continue;
 for(let sy=0;sy<c.sec.length;sy++){
 const s=c.sec[sy];
 if(!s.dirty||s.pending)continue;
-const dy=sy-pcy,prio=d2+dy*dy*0.5;
+if(!s.dirtyF)s.dirtyF=fr||1;
+const dy=sy-pcy,prio=d2+dy*dy*0.5-2*(fr-s.dirtyF);
 if(best.length===budget){if(prio>=worst)continue;best.pop();}
 let i=best.length;
 while(i>0&&best[i-1][0]>prio)i--;
@@ -117462,7 +117689,7 @@ return dx*dx+dy*dy*0.5+dz*dz<keep*keep;
 }
 meshSection(c,sy,urgent,prio,pos,hand){
 const s=c.sec[sy];
-s.dirty=false;
+s.dirty=false;s.dirtyF=0;
 
 if(s.count===0){
 s.uTok=(s.uTok||0)+1;
@@ -134023,6 +134250,102 @@ const hu=(X)=>(X+0.5)/2;
 F.face={eyesX:[hu(eL),hu(mir(eL))],eyeY:(Ye+0.5)/2,mouthX:(bL+1)/2,mouthY:(by+1)/2+0.25,noseY:(Ye-2)/2+0.25,cheekX:hu(eL),cheekY:hu(Ye-2)};
 return{head:F,lids,mouth};
 }
+
+
+
+
+
+
+
+
+
+
+
+
+V.SPECIES_BODY={aqua:{scale:0.96,neck:0},ocker:{scale:1.1,neck:4},zinn:{scale:0.93,neck:0},basalt:{scale:0.8,neck:0},opal:{scale:1.07,neck:1}};
+function speciesBody(L,C){
+const sp=V.SPECIES_BODY[L.species];if(!sp)return null;
+const{head,body,hips,upper,A,skin,kid,eyeY}=C,OT=TG.other,SKT=TG.skin;
+const fc=L.featC||0xffffff,dark=mul(skin,0.78),lite=mix(skin,0xffffff,0.3);
+const P=(part,x,y,z,c,e,t)=>{if(!part.has(x,y,z))part.set(x,y,z,c,e||0,t||SKT);};
+const S2=(part,x,y,z,c,e,t)=>part.set(x,y,z,c,e||0,t||OT);
+const sc=kid?0.6:1,n=(v)=>Math.max(1,Math.round(v*sc));
+
+const tail=(pts,r0,r1,col,endF)=>{
+for(let i=0;i<pts.length-1;i++){
+const a=pts[i],b=pts[i+1],steps=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2])*2));
+for(let k=0;k<=steps;k++){
+const t=k/steps,x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t,z=a[2]+(b[2]-a[2])*t;
+const f=(i+t)/(pts.length-1),r=r0+(r1-r0)*f;
+for(let dz= -1;dz<=1;dz++)for(let dy= -1;dy<=1;dy++)for(let dx= -1;dx<=1;dx++)if(dx*dx+dy*dy+dz*dz<=r*r)hips.set(Math.round(x+dx),Math.round(y+dy),Math.round(z+dz),typeof col==='function'?col(f):col,0,SKT);
+}
+}
+if(endF)endF(pts[pts.length-1]);
+};
+const X0=A.xl,X1=A.xr,Z0=A.z0,Z1=A.z1,top=A.top;
+if(L.species==='aqua'){
+
+for(let y=1;y<=top-1;y++)for(let z=Z0+1;z<=Z1;z++){P(head,X0-1,y,z,skin);P(head,X1+1,y,z,skin);}
+for(let y=1;y<=top-1;y++)for(let x=X0;x<=X1;x++)P(head,x,y,Z1+1,skin);
+for(let z=Z0+1;z<=Z1;z++)for(let x=X0+1;x<=X1-1;x++)P(head,x,top+1,z,skin);
+
+head.del(0,2,Z0-1);
+for(const ex of A.eyes){head.del(ex,eyeY+1,Z0);S2(head,ex,eyeY+1,Z0+1,mix(L.eye,0x0a0806,0.4));S2(head,ex,eyeY,Z0+1,mix(L.eye,0x0a0806,0.5));S2(head,ex,eyeY+1,Z0,mix(L.eye,0xffffff,0.75),0,OT);}
+for(let x=X0+1;x<=X1-1;x++)S2(head,x,0,Z0+1,lite);
+
+if(!kid)tail([[0,-2,3],[0,-6,6],[0,-10,8],[0,-14,9]],1.6,1.0,(f)=>mix(skin,fc,f*0.5),(e)=>{
+for(let x= -5;x<=5;x++){const ax=Math.abs(x);for(let dz=0;dz<=2;dz++)if(dz<=2-(ax>3?1:0))hips.set(x,Math.round(e[1]-(ax>3?1:0)),Math.round(e[2]+dz+(ax>>1)),mix(fc,0xffffff,ax>3?0.3:0),0,SKT);}
+});
+else tail([[0,-1,2],[0,-4,4],[0,-6,5]],1.1,0.8,skin);
+}else if(L.species==='ocker'){
+
+if(!kid)for(let y=19;y<=24;y++)for(let z= -2;z<=1;z++)for(let x= -1;x<=1;x++)if(!(Math.abs(x)===1&&(z=== -2||z===1)))body.set(x,y,z,y>21?skin:mul(skin,0.94),0,SKT);
+
+for(let x= -1;x<=1;x++)for(let y=0;y<=2;y++)P(head,x,y,Z0-1,y===0&&x!==0?null:skin);
+S2(head,0,2,Z0-2,mul(skin,0.45));S2(head,0,1,Z0-2,mul(skin,0.85));
+
+const str=mix(skin,0x6a2a14,0.55);
+for(let y=3;y<=top;y+=2)for(let z=Z0+2;z<=Z1;z++)for(let x=X0;x<=X1;x++)if(head.has(x,y,z)&&head.tagAt(x,y,z)===SKT&&(x===X0||x===X1||z===Z1||y===top))head.set(x,y,z,str,0,OT);
+
+tail(kid?[[0,-2,3],[0,-6,6],[0,-8,8]]:[[0,-2,3],[0,-8,6],[0,-14,9],[0,-17,11],[0,-15,12]],kid?1:1.3,0.8,skin,(e)=>hips.ell(e[0],e[1]+1,e[2],1.8,2.2,1.6,(x,y,z)=>mul(str,0.8+H3(x,y,z,77)*0.2),null,SKT));
+}else if(L.species==='zinn'){
+
+for(let y=0;y<=top-1;y++)for(let z=Z0+1;z<=Z1;z++){P(head,X0-1,y,z,dark);P(head,X1+1,y,z,dark);}
+
+const glow=mix(fc,0xffffff,0.15);
+for(const[x,y,z]of[[X0-1,1,Z0+1],[X0-1,2,Z0+2],[X0-1,3,Z0+2],[X1+1,2,Z0+1],[X1+1,3,Z0+2],[X1+1,4,Z0+3],[-1,top-1,Z0],[0,top-2,Z0],[1,top-1,Z0]])if(head.has(x,y,z))S2(head,x,y,z,glow,1);
+
+if(!kid)for(let y=0;y<=3;y++)for(let z= -3;z<=3;z++)for(let x= -3;x<=3;x++){const d=x*x/9+(y-0.5)*(y-0.5)/9+z*z/9;if(d<=1&&(y>=1||Math.abs(x)>=2||Math.abs(z)>=2))upper.set(x,y,z,(x+z+y)%4===0?glow:mul(skin,1.15+H3(x,y,z,61)*0.2),(x+z+y)%4===0?1:0,OT);}
+
+tail([[0,-2,3],[0,-5,6],[0,-7,8]],kid?1.3:2.0,1.2,dark,(e)=>{hips.set(0,Math.round(e[1]),Math.round(e[2])+1,glow,1,OT);hips.set(0,Math.round(e[1])-1,Math.round(e[2])+1,glow,1,OT);});
+}else if(L.species==='basalt'){
+
+for(let y=0;y<=top+1;y++)for(let z=Z0;z<=Z1+1;z++)for(let x=X0-1;x<=X1+1;x++){
+const dx=(x-C.cx)/3.6,dy=(y-3)/4.4,dz=(z-C.zc-0.5)/3.7;
+if(dx*dx+dy*dy+dz*dz<=1)P(head,x,y,z,skin);
+}
+
+head.del(0,2,Z0-1);
+for(const ex of A.eyes){const ox=ex<0? -1:1;for(const[x,y]of[[ex,eyeY],[ex+ox,eyeY],[ex,eyeY+1],[ex+ox,eyeY+1]]){head.del(x,y,Z0);S2(head,x,y,Z0+1,mix(L.eye,0x101828,0.3));}S2(head,ex+ox,eyeY+1,Z0,mix(fc,0xffffff,0.6),1);}
+
+if(!kid)for(let y=2;y<=18;y++)for(let z=2;z<=6;z++)for(let x= -5;x<=5;x++){
+const d=x*x/25+(y-10)*(y-10)/81+(z-1)*(z-1)/25;if(d>1||d<0.55)continue;
+if(body.has(x,y,z))continue;
+body.set(x,y,z,(y%5===0||x===0)?mul(mix(skin,0x303048,0.5),0.8):mix(mix(skin,0x606078,0.4),fc,0.12),0,OT);
+}
+}else if(L.species==='opal'){
+
+for(let y=top+1;y<=top+2;y++)for(let z=Z0+1;z<=Z1-(y===top+2?1:0);z++)for(let x=X0+1;x<=X1-1;x++)P(head,x,y,z,skin);
+
+S2(head,X0,2,Z0+1,lite);S2(head,X1,2,Z0+1,lite);
+
+const ice=mix(fc,0xffffff,0.35);
+if(!kid)for(const y of[5,9,13,17]){const zb=3;for(let k=0;k<=3-(y===5?1:0);k++){body.set(0,y+k,zb+k,ice,k>=2?1:0,OT);if(k<2){body.set(-1,y+k,zb+k,mul(ice,0.85),0,OT);body.set(1,y+k,zb+k,mul(ice,0.85),0,OT);}}}
+
+tail(kid?[[0,-2,3],[0,-6,5]]:[[0,-2,3],[0,-9,6],[0,-15,9],[0,-18,11]],1.0,0.7,skin,(e)=>{for(let k=0;k<3;k++)hips.set(0,Math.round(e[1])-k,Math.round(e[2])+1,ice,k===1?1:0,OT);hips.set(-1,Math.round(e[1])-1,Math.round(e[2])+1,mul(ice,0.9),0,OT);hips.set(1,Math.round(e[1])-1,Math.round(e[2])+1,mul(ice,0.9),0,OT);});
+}
+return{scale:sp.scale,neck:kid?Math.round(sp.neck*0.5):sp.neck};
+}
 function buildPerson(L,opts){
 const kid=L.age==='child',elder=L.age==='elder';
 const role=V.ROLES[L.role]||V.ROLES.farmer;
@@ -134627,7 +134950,10 @@ shin.set(x,y,z,y===ground?sole:(kid&&y===ankle-1)?0xF4F4F0:shC(x,y,z),0,TG.leath
 }
 
 
-const hipY=S.hip,headY=S.head,shY=S.sh,hx=S.hx;
+
+const SPB=L.species&& !L.hero?speciesBody(L,{head,body,hips,upper,thigh,shin,A,S,skin,kid,eyeY,cx,zc}):null;
+
+const hipY=S.hip,headY=S.head+(SPB&&SPB.neck||0),shY=S.sh,hx=S.hx;
 const legXl= -S.legX-(kid?0:0),legXr=S.legX;
 
 const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald}):null;
@@ -134641,6 +134967,7 @@ order:['hips','body','head','lids','mouth','arm_l','arm_r','fore_l','fore_r','le
 skel:S,
 };
 if(fine)def.fine=fine;
+if(SPB){def.species=L.species;def.h*=SPB.scale;}
 
 
 if(fine0){
@@ -136114,7 +136441,7 @@ if(a.gait)a.gait.hands=sm;
 const pose=(!VR.Crowd||VR.Crowd.due(a,d2)|| !a.poseOut)?this.pose(a,t):a.poseOut;
 const sleeping=a.pose==='sleep';
 if(a.shadeT===undefined||t-a.shadeT>0.25){a.shade=ent.sunShade(a.pos,1.2);a.shadeT=t;}
-const opts={flash:a.hurt>0.2?1:0,scale:a.kid?0.82:1,shade:a.shade,hide:{lids:far|| !(a.blinkOn||sleeping||a.eyesClosed),mouth:far|| !a.mouthOn,item_r:a.pose==='sit'||sleeping,item_l:a.pose==='sit'||sleeping}};
+const opts={flash:a.hurt>0.2?1:0,scale:(a.kid?0.82:1)*(a.p.look&&a.p.look.species&&Folk.SPECIES_BODY&&Folk.SPECIES_BODY[a.p.look.species]?Folk.SPECIES_BODY[a.p.look.species].scale:1),shade:a.shade,hide:{lids:far|| !(a.blinkOn||sleeping||a.eyesClosed),mouth:far|| !a.mouthOn,item_r:a.pose==='sit'||sleeping,item_l:a.pose==='sit'||sleeping}};
 if(a.pose==='sit'&&VR.FolkAnim.sitHides&&VR.FolkAnim.sitHides(a.gait))for(const k of VR.FolkAnim.SIT_HIDE)opts.hide[k]=true;
 let pos=a.pos;
 if(sleeping){opts.pitch=Math.PI/2;pos=[a.pos[0]-VR.HF_DX[a.p.bed?a.p.bed[3]:0]*0.85,a.pos[1]+0.12,a.pos[2]-VR.HF_DZ[a.p.bed?a.p.bed[3]:0]*0.85];}
@@ -136186,6 +136513,7 @@ if(a.blinkT<0){a.blinkOn=true;if(a.blinkT< -0.14){a.blinkOn=false;a.blinkT=2.2+M
 if(a.talkAnim>0){a.talkAnim-=dt;a.mouthOn=Math.sin(t*21+a.p.seed)>0.1;}else a.mouthOn=false;
 a.speaking=a.talkAnim>0;
 P.lids=null;P.mouth=null;
+if(a.p.look&&a.p.look.species&&VR.WorldLife&&VR.WorldLife.idle)VR.WorldLife.idle(P,a.p.look.species,t+(a.p.seed||0)*0.37,wa,state,a);
 return P;
 }
 
@@ -173321,6 +173649,92 @@ return L;
 };
 
 
+
+
+
+
+
+
+WL.idle=function(P,kind,t,wa,state,a){
+const k=Math.max(0,1-wa*3);
+if(k<=0|| !P.head|| !P.body)return;
+const sn=Math.sin,add=(j,i,v)=>{const q=P[j];if(q)q[i]+=v*k;};
+const talk=state==='talk',gest=((t*0.16)%1)<0.22||talk,gk=gest?sn(Math.min(1,((t*0.16)%1)/0.22)*Math.PI):0;
+if(state!=='idle'&& !talk&&state!=='dance')return;
+if(kind==='aqua'){
+add('body',2,sn(t*1.3)*0.06);add('head',2,sn(t*1.3+1.1)*0.1);
+if(gest){add('fore_l',2,sn(t*9)*0.22*gk);add('fore_r',2,-sn(t*9+0.6)*0.22*gk);add('arm_l',0,0.35*gk);add('arm_r',0,0.35*gk);}
+}else if(kind==='ocker'){
+add('head',0,sn(t*0.9)*0.1+(gest?0.28*gk:0));add('body',0,-sn(t*0.9)*0.03);
+if(gest){add('arm_r',0,1.1*gk);add('fore_r',0,0.6*gk);}
+}else if(kind==='zinn'){
+add('arm_l',2,-0.2);add('arm_r',2,0.2);add('body',1,sn(t*0.7)*0.07);
+if(gest){add('arm_l',0,0.7*gk);add('arm_r',0,0.7*gk);add('fore_l',0,0.8*gk);add('fore_r',0,0.8*gk);add('fore_l',2,sn(t*4)*0.1*gk);}
+}else if(kind==='basalt'){
+add('hips',4,Math.max(0,sn(t*3.4))*1.4);add('head',2,sn(t*1.6)*0.16);
+if(gest){add('arm_l',2,-0.9*gk);add('arm_r',2,0.9*gk);add('hips',4,Math.max(0,sn(t*7))*1.6*gk);}
+}else if(kind==='opal'){
+add('head',0,0.1);add('body',0,sn(t*0.5)*0.025);
+if(gest){add('arm_r',0,0.9*gk);add('fore_r',0,1.2*gk);add('arm_r',2,-0.25*gk);add('head',0,-0.18*gk);}
+}
+};
+
+
+
+
+
+
+
+
+const CULT=WL.CULTURE={
+aqua:{col:[[0.35,0.85,1],[0.55,1,0.85],[0.9,1,1]],rise:0.6,gift:[['tide_lantern',4],['sponge',2]]},
+ocker:{col:[[1,0.65,0.25],[1,0.82,0.4],[1,0.5,0.2]],rise:0.45,gift:[['lantern',4],['terracotta',16]]},
+zinn:{col:[[1,0.45,0.1],[1,0.75,0.25],[1,0.3,0.05]],rise:1.2,gift:[['glowing_obsidian',4],['magma_block',8]]},
+basalt:{col:[[0.55,0.9,1],[0.75,1,0.6],[1,0.95,0.55]],rise:0.9,gift:[['azure_crystal_block',4],['iron_ingot',6]]},
+opal:{col:[[0.85,0.95,1],[1,0.8,0.95],[0.7,0.85,1]],rise:0.3,gift:[['blue_ice',8],['rose_crystal_block',3]]},
+};
+WL.JOIN_S=15;
+
+WL.cultJoin=function(g,vil,F,dt,inRing){
+const kind=vil.plan&&vil.plan.species,C=CULT[kind];if(!C||F.joined)return false;
+if(inRing)F.join=(F.join||0)+dt;
+if((F.join||0)<WL.JOIN_S)return false;
+F.joined=true;
+const p=g.player,got=[];
+for(const[id,n]of C.gift)if(p&&p.inv&&p.inv.add&&VR.itemDef(id)){p.inv.add(id,n);got.push(n+'× '+(VR.itemName?VR.itemName(id):id));}
+if(p&&p.inv)p.inv.changed=true;
+const m=g.meta||(g.meta={}),rec=m.ecoCult||(m.ecoCult={});
+rec[vil.id]=(rec[vil.id]||0)+1;
+const name=T('g.eco.cult.'+kind);
+if(g.ui&&g.ui.toast)g.ui.toast('🎶 '+name,T('g.eco.cult.joined',{v:vil.name,sp:T('g.eco.sp.'+kind),gift:got.join(', ')}));
+if(VR.EventLog)VR.EventLog.emit('social','festival',3,[vil.plan.plaza.x+0.5,vil.plan.plaza.y+2,vil.plan.plaza.z+0.5],'festival',12);
+const host=vil.agents&&vil.agents.find(a=> !a.kid);if(host&&host.say)host.say(T('g.eco.cult.thanks'),4);
+return true;
+};
+const Vs=VR.Villages;
+if(Vs&& !Vs.prototype.__ecoCult){
+const VP=Vs.prototype;VP.__ecoCult=true;
+const fd=VP.festivalDay;VP.festivalDay=function(vil){return vil.plan&&CULT[vil.plan.species]?true:fd.call(this,vil);};
+const uf=VP.updateFestival;
+VP.updateFestival=function(vil,dt,tod){
+uf.call(this,vil,dt,tod);
+const kind=vil.plan&&vil.plan.species,C=CULT[kind];if(!C)return;
+const g=this.g;if(!g|| !g.player|| !this.festivalOn(vil,tod))return;
+const pz=vil.plan.plaza,pl=g.player.pos,cx=pz.x+0.5,cz=pz.z+0.5,dPl=Math.hypot(pl[0]-cx,pl[2]-cz),PR=pz.r||4;
+const F=this.festState(vil);
+if(!F.invited&&dPl<48){F.invited=true;if(g.ui&&g.ui.chatLine)g.ui.chatLine(T('g.eco.cult.invite',{v:vil.name,what:T('g.eco.cult.'+kind)}),'#ffd98a');}
+WL.cultJoin(g,vil,F,dt,dPl<PR+3&&Math.abs(pl[1]-pz.y)<4);
+
+if(dPl>140|| !g.particles)return;
+F.cultT=(F.cultT||0)-dt*(g.settings&&g.settings.preset==='potato'?0.33:1);
+if(F.cultT>0)return;
+F.cultT=0.18;
+const a=Math.random()*Math.PI*2,r=PR-1+Math.random()*2,c=C.col[Math.floor(Math.random()*C.col.length)];
+g.particles.spawn(cx+Math.cos(a)*r,pz.y+1+Math.random()*2,cz+Math.sin(a)*r,(Math.random()-0.5)*0.3,C.rise*(0.6+Math.random()*0.6),(Math.random()-0.5)*0.3,{life:4+Math.random()*3,size:0.12,grav:0,col:c,glow:1});
+};
+}
+
+
 const Shop=VR.Shop;
 if(Shop&& !Shop.__eco){
 Shop.__eco=true;
@@ -173434,6 +173848,16 @@ const kind=WL.kindOf(this);
 if(kind&&S.said!==this.dim+':'+(this.meta&&this.meta.seed)&&this.world&&this.world.cols&&this.world.cols.size>8&&this.ui&&this.ui.toast){
 S.said=this.dim+':'+(this.meta&&this.meta.seed);
 this.ui.toast('🪐 '+T('g.eco.welcome',{world:VR.Travel?VR.Travel.dimName(this.dim):this.dim}),T('g.eco.home.'+kind));
+
+const eco=WL.eco(this);
+if(eco&&eco.sites&&eco.sites[0]){S.vista=eco.sites[0];S.vistaN=90;}
+}
+
+if(S.vistaN>0&&this.player){
+const p=this.player,s0=S.vista,eco=WL.eco(this);
+if(VR.Travel&&VR.Travel.busy&&VR.Travel.busy(this)){}
+else if(eco&&eco.land&&Math.hypot(p.pos[0]-eco.land[0],p.pos[2]-eco.land[2])<40){S.vistaN--;p.yaw=Math.atan2(-(s0.x-p.pos[0]),-(s0.z-p.pos[2]));p.viewYaw=p.yaw;if(S.vistaN>85)p.pitch=0.02;}
+else S.vistaN=0;
 }
 }else if(this.dim==='overworld')S.said=null;
 return pf.call(this,dt);
