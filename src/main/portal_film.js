@@ -113,7 +113,14 @@
     if (L.air) { const h = X.createRadialGradient(cx, cy, R * 0.97, cx, cy, R * 1.09); h.addColorStop(0, css(L.air, 0.75)); h.addColorStop(1, css(L.air, 0)); X.fillStyle = h; X.beginPath(); X.arc(cx, cy, R * 1.09, 0, TAU); X.fill(); }
   }
   // Amarant, the ringed giant, hanging in a moon's sky: its bands, its shadowed side, the ring across it
+  const RINGS = [[1.55, 0.16, '#f4e2c4', 0.85], [1.78, 0.08, '#c8a880', 0.6], [1.95, 0.12, '#ead6b4', 0.75]];
+  function rings(X, cx, cy, R, tilt, a0, a1) {
+    X.save(); X.translate(cx, cy); X.rotate(tilt); X.scale(1, 0.22);
+    for (const [r, w, c, a] of RINGS) { X.strokeStyle = c; X.globalAlpha = a; X.lineWidth = R * w; X.beginPath(); X.arc(0, 0, R * r, a0, a1); X.stroke(); }
+    X.restore(); X.globalAlpha = 1;
+  }
   function giant(X, cx, cy, R, tilt, k) {
+    rings(X, cx, cy, R, tilt, PI, TAU);   // the ring's far half, behind the giant
     disc(X, cx, cy, R, hex('#c98a5a'), hex('#ffe0b0'), -0.5, -0.6, hex('#ffb070'));
     X.save(); X.beginPath(); X.arc(cx, cy, R, 0, TAU); X.clip();
     const B = ['#e8b888', '#b8784c', '#f0c898', '#a86a44', '#e0a878'];
@@ -121,9 +128,7 @@
     X.globalAlpha = 1;
     const g = X.createLinearGradient(cx - R, cy - R, cx + R, cy + R); g.addColorStop(0.35, 'rgba(10,6,20,0)'); g.addColorStop(1, 'rgba(10,6,20,.75)'); X.fillStyle = g; X.fillRect(cx - R, cy - R, R * 2, R * 2);
     X.restore();
-    X.save(); X.translate(cx, cy); X.rotate(tilt); X.scale(1, 0.22);
-    for (const [r, w, c, a] of [[1.55, 0.16, '#f4e2c4', 0.85], [1.78, 0.08, '#c8a880', 0.6], [1.95, 0.12, '#ead6b4', 0.75]]) { X.strokeStyle = c; X.globalAlpha = a; X.lineWidth = R * w; X.beginPath(); X.arc(0, 0, R * r, 0, TAU); X.stroke(); }
-    X.restore(); X.globalAlpha = 1;
+    rings(X, cx, cy, R, tilt, 0, PI);   // and its near half, in front
     void k;
   }
   // ---------------------------------------------------------------- the shots: (X, W, H, k 0…1, v, S) — S the film's state
