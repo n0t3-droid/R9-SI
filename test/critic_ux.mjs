@@ -214,7 +214,8 @@ if (!process.env.NO_ADV) {
   OUT.hits = await ev(() => ({ stats: VR.HitFeel && Object.assign({}, VR.HitFeel.stats), clank: VR.HitFeel && VR.HitFeel.clankN, shake: VR.game.settings.hitShake })).catch(() => null);
   check(OUT.hits && OUT.hits.stats && OUT.hits.stats.hits >= 3 && OUT.hits.clank >= 3 && OUT.hits.shake !== true, 'the first fight: three hits felt (sparks, clank, rock back), the shake off by default: ' + JSON.stringify(OUT.hits));
   await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 60, g.player.pos); }).catch(() => {});
-  { const t = Date.now(); while (Date.now() - t < 400000 && !(await ev(() => !!document.querySelector('.hfpop') || VR.HitFeel.stats.pops > 0).catch(() => false))) await wait(500); }
+  // (the power-down lasts 2.4 s of play — 24 frames at least; under load a frame took 10–60 s: the wait counts frames, cap 40 min)
+  { const f0 = await ev(() => VR.game.frame).catch(() => 0), t = Date.now(); while (Date.now() - t < 2400000 && !(await ev(() => !!document.querySelector('.hfpop') || VR.HitFeel.stats.pops > 0).catch(() => false)) && (await ev(() => VR.game.frame).catch(() => f0)) - f0 < 80) await wait(500); }
   await shot('20_adv_pop');
   OUT.pop = await ev(() => ({ pops: VR.HitFeel.stats.pops, el: [...document.querySelectorAll('.hfpop')].map(e => e.textContent) })).catch(() => null);
   check(OUT.pop && OUT.pop.pops >= 1, 'the power-down: the EP pop where it stood: ' + JSON.stringify(OUT.pop));
