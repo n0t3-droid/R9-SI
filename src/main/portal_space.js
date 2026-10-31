@@ -72,14 +72,22 @@
     const fwd = norm(sub(add(A.p, mul(n, -sg * 0.25 * R('amarant'))), pos));
     return { pos, fwd, up: perp(n, fwd), fov: 48 * D2R, ref: 'amarant', body: null };
   }
-  // arrive (an airless world): down from 0.6 R to 0.04 R over a place where its parent stands 25° up, looking at it — the
-  // land a strip at the bottom, the giant (or Herzwelt) above it
+  // arrive (an airless world): down from 0.6 R to 0.04 R over a place where its parent stands 18° up, looking at it — the
+  // limb at the bottom, the giant (or Herzwelt) lit above it; the view's middle between the two (a wide 72° lens)
+  const ARR_EL = 18 * D2R;
+  const ARR_SUN = 12 * D2R;
   function arrive(id, k, v, eph) {
     const b = eph.bodies[id], r = R(id), up = norm(sub(eph.bodies[PS.parentOf(id)].p, b.p)), s = norm(sub(eph.bodies.helia.p, b.p));
-    let ax = cross(up, s); if (len(ax) < 1e-6) ax = cross(up, b.axis); ax = norm(ax);
-    const N = rot(rot(up, ax, -(90 - 25) * D2R), up, ((v % 3) - 1) * 0.2), hd = perp(up, N);
-    const alt = r * lerp(0.6, 0.04, ease(clamp(k, 0, 1))), dip = Math.acos(r / (r + alt)), fov = 60 * D2R;
-    const p = -dip + 25 * D2R, fwd = norm(add(mul(hd, Math.cos(p)), mul(N, Math.sin(p))));
+    // the place where the parent stands ARR_EL and Helia ARR_SUN over the horizon (Helia then off to the side or behind:
+    // the parent lit); where no such place is (Helia too near the parent), the parent's height alone
+    const e2 = perp(s, up), e3 = cross(up, e2), ct = dot(s, up), st = Math.sqrt(Math.max(0, 1 - ct * ct));
+    const a = Math.sin(ARR_EL), bb = st > 1e-3 ? (Math.sin(ARR_SUN) - a * ct) / st : 2, c2 = 1 - a * a - bb * bb;
+    let N;
+    if (c2 > 0.02) N = norm(add(add(mul(up, a), mul(e2, bb)), mul(e3, ((v % 2) ? 1 : -1) * Math.sqrt(c2))));
+    else { let ax = cross(up, s); if (len(ax) < 1e-6) ax = cross(up, b.axis); ax = norm(ax); N = rot(up, ax, -(Math.PI / 2 - ARR_EL)); }
+    const hd = perp(up, N);
+    const alt = r * lerp(0.6, 0.04, ease(clamp(k, 0, 1))), dip = Math.acos(r / (r + alt)), fov = 72 * D2R;
+    const p = (ARR_EL - dip) / 2 - 2 * D2R, fwd = norm(add(mul(hd, Math.cos(p)), mul(N, Math.sin(p))));
     return { pos: add(b.p, mul(N, r + alt)), fwd, up: perp(N, fwd), fov, ref: id, body: id };
   }
   PS.pose = function (shot, k, v, id, eph) {
@@ -116,7 +124,8 @@
         const t = t0 + P * i / 72; SS.ephemeris(t, eph);
         const p = arrive(id, 1, 1, eph), b = eph.bodies[id], par = eph.bodies[PS.parentOf(id)], h = eph.bodies.helia.p, N = norm(sub(p.pos, b.p));
         const el = Math.asin(clamp(dot(N, norm(sub(h, b.p))), -1, 1)) / D2R, pp = ang(sub(h, par.p), sub(p.pos, par.p)) / D2R;
-        const sc = Math.abs(el - 12) + Math.max(0, pp - 100) * 0.5 + i * 0.05;
+        const sv = ang(p.fwd, sub(h, p.pos)) / D2R;   // (Helia out of the picture: no glare over the land)
+        const sc = Math.abs(el - 12) + Math.max(0, pp - 85) * 3 + Math.max(0, 50 - sv) * 3 + i * 0.05;
         if (sc < bs) { bs = sc; best = t; }
       }
       return best;

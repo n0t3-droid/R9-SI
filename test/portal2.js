@@ -97,11 +97,17 @@ console.log('c · the moments');
   {
     const ar = [];
     for (const id of ['opal', 'basalt', 'zinn']) {
-      const t = PS.when('arrive', id, t0), eph = SS.ephemeris(t, {}), p = PS.pose('arrive', 1, 1, id, eph), b = eph.bodies[id], N = norm(sub(p.pos, b.p));
-      const el = Math.asin(dot(N, norm(sub(eph.bodies.helia.p, b.p)))) / D2R, par = eph.bodies[PS.parentOf(id)];
-      ar.push([id, el, ang(p.fwd, sub(par.p, p.pos)) / D2R]);
+      const t = PS.when('arrive', id, t0), eph = SS.ephemeris(t, {}), b = eph.bodies[id], par = eph.bodies[PS.parentOf(id)], h = eph.bodies.helia.p;
+      for (const k of [0.5, 1]) {
+        const p = PS.pose('arrive', k, 1, id, eph), N = norm(sub(p.pos, b.p)), r = SS.BODIES[id].R, alt = len(sub(p.pos, b.p)) - r;
+        const el = Math.asin(dot(N, norm(sub(h, b.p)))) / D2R, half = p.fov / 2 / D2R * 0.8;   // (the letterbox: 80 % of the half-height)
+        const parUp = Math.asin(dot(norm(sub(par.p, p.pos)), p.up)) / D2R, rPar = Math.asin(SS.BODIES[PS.parentOf(id)].R / len(sub(par.p, p.pos))) / D2R;
+        const limb = -(Math.asin(dot(p.fwd, N)) / D2R + Math.acos(r / (r + alt)) / D2R);   // the limb's angle above the middle
+        const sun = ang(p.fwd, sub(h, p.pos)) / D2R, pp = ang(sub(h, par.p), sub(p.pos, par.p)) / D2R;
+        ar.push([id + '@' + k, el > 3 && el < 30 && parUp - rPar < half && parUp > -half && limb > -half && limb < 0 && sun > 45 && pp < 95, 'sun ' + el.toFixed(0) + '° (' + sun.toFixed(0) + '° off) parent ' + parUp.toFixed(0) + '°±' + rPar.toFixed(0) + ' ph ' + pp.toFixed(0) + '° limb ' + limb.toFixed(0) + '°']);
+      }
     }
-    check(ar.every(q => q[1] > 3 && q[1] < 30 && q[2] < 30), 'arrive (airless): Helia low over the landing, the parent in the picture (' + ar.map(q => q[0] + ' sun ' + q[1].toFixed(0) + '° parent ' + q[2].toFixed(0) + '° off the middle').join(' · ') + ')');
+    check(ar.every(q => q[1]), 'arrive (airless): Helia low and out of the picture, the parent lit in it, the land at the bottom (' + ar.map(q => q[0] + ' ' + q[2]).join(' · ') + ')');
   }
   check(ph.every(q => q[1] && q[2] > 40 && q[2] < 95 && q[3] < 110), 'moon: the terminator across the target, the parent lit (' + ph.map(q => q[0] + ' ' + q[2].toFixed(0) + '°/' + q[3].toFixed(0) + '°').join(' · ') + ')');
   const eph = SS.ephemeris(PS.when('ring', 'amarant', t0), {}), A = eph.bodies.amarant, s = norm(sub(eph.bodies.helia.p, A.p)), open = Math.asin(Math.abs(dot(s, A.axis))) / D2R;
