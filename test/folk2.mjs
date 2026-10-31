@@ -78,12 +78,14 @@ const closeUp = async (vid, pick, expr, name) => {
   if (!at) { check(false, `${name}: a person for the close-up`); return null; }
   await lookFrom(at.P, at.T); await step(6, 33);
   await ev(([P, T]) => { const a = window.__cu; a.lookAt = [P[0], P[1] + 0.1, P[2]]; }, [at.P, at.T]);
+  // its smooth mesh made and waited for (the voxel self shows until then)
+  const sm = await ev(async () => { const g = VR.game, FG = VR.FolkGPU, a = window.__cu; if (!FG || !FG.on(g)) return 'off'; const rec = a.fg || (a.fg = FG.recFor(a.p.look)); const P0 = FG.PER_FRAME, I0 = FG.INFLIGHT; FG.PER_FRAME = 1e9; FG.INFLIGHT = 1e9; if (rec.state === 0) FG.want(g, rec, 0); g.world.pool.pump(); const t0 = performance.now(); while (rec.state !== 2 && performance.now() - t0 < 90000) { await new Promise(r => setTimeout(r, 250)); g.world.pool.pump(); } FG.PER_FRAME = P0; FG.INFLIGHT = I0; return rec.state; });
   await step(20, 33); await lookFrom(at.P, at.T);
-  console.log('  · close-up of ' + at.who);
+  console.log('  · close-up of ' + at.who + ' (smooth mesh state ' + sm + ', gl lost ' + await ev(() => !!VR.game.glLost) + ')');
   return grab(name);
 };
 const sheet = [];
-const writeSheet = () => { if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/folk2_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'folk2_sheet.jpg', ROOT + '/.tmp_tests/folk2_sheet.json']).toString().trim()); } catch (e) { console.log('  (no sheet: ' + String(e.message).slice(0, 200) + ')'); } };
+const writeSheet = () => { for (const r of sheet) r.imgs = r.imgs.filter(Boolean); for (let i = sheet.length - 1; i >= 0; i--) if (!sheet[i].imgs.length) sheet.splice(i, 1); if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/folk2_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'folk2_sheet.jpg', ROOT + '/.tmp_tests/folk2_sheet.json']).toString().trim()); } catch (e) { console.log('  (no sheet: ' + String(e.message).slice(0, 200) + ')'); } };
 const stats = () => ev(() => { const S = VR.FolkJoy.stats; return { n: S.n, by: Object.assign({}, S.by) }; });
 const resetStats = () => ev(() => { const FJ = VR.FolkJoy; FJ.stats = FJ.newStats(); const J = VR.game.villages.joy; if (J) J.stats = FJ.stats; });
 const ADULT = `(v) => v.agents.filter(a => !a.kid && !a.elder && a.pose !== 'sleep' && a.pose !== 'sit').sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0]`;
@@ -107,7 +109,7 @@ if (want('herz') || want('walk') || want('cost')) {
     await loaded([HV.x, HV.y, HV.z], 48); await settle(60);
     for (let i = 0; i < 40 && !HP; i++) { await step(20, 33); HP = await villageOf(HV.id); }
     check(!!HP && HP.agents > 4, `${HV.name} lives (${HP ? HP.agents : 0} people about)`);
-    await ev(() => { window.__rEvery = 10; });   // (from here 1 frame in 10 drawn: the people's moments need them seen)
+    await ev(() => { window.__rEvery = 10; VR.game.env.setTime(7000); });   // (the afternoon: the children out of school)   // (from here 1 frame in 10 drawn: the people's moments need them seen)
     await step(240, 33);   // the morning's walk out
     console.log('  · prewarm ' + JSON.stringify(await prewarm()));
   }
@@ -124,8 +126,11 @@ if (want('herz') && HP) {
     const c3 = await closeUp(HV.id, KID, 'wow', 'f2_herz_close_kid.png');
     await ev(() => { const a = window.__cu; if (a) { a.holdT = 0; a.expr = null; a.lookAt = null; } window.__cu = null; });
     sheet.push({ label: 'Herzwelt close-up: resting / joy / a child in surprise', imgs: [c1, c2, c3].filter(Boolean) });
+  } catch (e) { check(false, 'Herzwelt close-ups: ' + String(e && e.stack || e).slice(0, 300)); }
+  try {
     // hand in hand: a family's adult and child
     const hand = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); for (const a of v.agents) { if (a.kid || a.pose === 'sleep') continue; const k = v.agents.find(b => b.kid && b.p.fam === a.p.fam && b.pose !== 'sleep'); if (k) { M.joyEnd && M.joyEnd(a); M.joyEnd(k); a.act = a.act || { type: 'stroll' }; const ok = M.joyStart(v, 'hand', { _who: { hand: [a, k] } }); window.__hand = [a, k]; return { ok, lead: a.p.name, kid: k.p.name }; } } return null; }, HV.id);
+    if (!hand) throw new Error('no family with a child about');
     let held = 0;
     for (let i = 0; i < 30; i++) { await step(20, 33); const h = await ev(() => { const [a, k] = window.__hand; return { k: k.joyHand, a: a.joyHand, d: Math.hypot(a.pos[0] - k.pos[0], a.pos[2] - k.pos[2]) }; }); if (h.k === 'hold' && h.a === 'lead') held++; if (held >= 4) break; }
     check(!!hand && held >= 2, `hand in hand: ${hand ? hand.lead + ' and ' + hand.kid : '-'} (${held} checks holding)`);
@@ -144,6 +149,8 @@ if (want('herz') && HP) {
     if (cl) { const pp = await ev(() => VR.game.player.pos.slice()); await lookFrom([pp[0], pp[1] + 1.62, pp[2]], cl); }
     herzRows.push(await grab('f2_herz_applause.png'));
     sheet.push({ label: 'Herzwelt: hand in hand / applause for a build', imgs: herzRows.splice(0) });
+  } catch (e) { check(false, 'Herzwelt hand/applause: ' + String(e && e.stack || e).slice(0, 300)); if (herzRows.length) sheet.push({ label: 'Herzwelt: hand in hand / applause', imgs: herzRows.splice(0).filter(Boolean) }); }
+  try {
     // the story at dusk
     await ev(() => VR.game.env.setTime(11200));
     const st = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); const el = v.agents.find(a => a.elder && a.pose !== 'sleep') || v.agents.find(a => !a.kid); const kids = v.agents.filter(a => a.kid && a.pose !== 'sleep').slice(0, 4); for (const a of [el].concat(kids)) { M.joyEnd(a); a.pose = a.pose === 'sit' || a.pose === 'sitground' ? 'stand' : a.pose; } const ok = M.joyStart(v, 'story', { _who: { story: [el, kids] } }); window.__story = el; return { ok, el: el.p.name, kids: kids.length }; }, HV.id);
@@ -167,6 +174,8 @@ if (want('herz') && HP) {
     check(asked && !!D && D.dancing >= 3, `the dance: ${inv} asks „${bub}", [use] → ${D ? D.n : 0} in the ring, ${D ? D.dancing : 0} dancing`);
     if (D) { await lookFrom([D.c[0] + 5.5, D.c[1] + 3.2, D.c[2] + 5.5], [D.c[0], D.c[1] + 0.9, D.c[2]]); await step(4, 33); herzRows.push(await grab('f2_herz_dance.png')); }
     sheet.push({ label: 'Herzwelt: the grandparent\'s story by the fire at dusk / the dance round the player', imgs: herzRows.splice(0) });
+  } catch (e) { check(false, 'Herzwelt story/dance: ' + String(e && e.stack || e).slice(0, 300)); if (herzRows.length) sheet.push({ label: 'Herzwelt: story / dance', imgs: herzRows.splice(0).filter(Boolean) }); }
+  try {
     await step(600, 33);   // the dance ends (30 s)
     // a pet
     await ev(() => VR.game.env.setTime(3600));
@@ -186,7 +195,8 @@ if (want('herz') && HP) {
 // ---------------------------------------------------------------- the 60-s walk round the plaza
 if (want('walk') && HP) {
   try {
-    await ev(() => VR.game.env.setTime(4200));
+    await ev(() => VR.game.env.setTime(7200));
+    console.log('  · gl lost before the walk: ' + await ev(() => !!VR.game.glLost));
     await ev(([x, y, z]) => { const p = VR.game.player; p.flying = false; p.noclip = false; p.teleport(x + 7, y + 1.2, z); }, HP.plaza);
     await step(40, 33); await resetStats();
     // W held toward a point 2 m ahead on the circle round the plaza; at 12 s and 33 s a jump, at 20 s and 44 s a pause of
