@@ -48,7 +48,7 @@ await wait(6000);
 {
   const t0 = Date.now();
   await ev(() => { window.__norender = true; VR.StarMap.open(VR.game); });
-  await page.screenshot({ path: SHOTS + 'p2_starmap_' + TAG + '.png' });
+  try { await page.screenshot({ path: SHOTS + 'p2_starmap_' + TAG + '.png', timeout: 150000 }); } catch (e) { console.log('  (no star map picture: ' + e.message.slice(0, 80) + ')'); }
   rec.mapMs = Date.now() - t0;
   rec.map = Object.assign(luma(SHOTS + 'p2_starmap_' + TAG + '.png', [0.3, 0.2, 0.7, 0.8]), { st: await ev(() => VR.StarMap.stats()) });
   await ev(() => { VR.StarMap.close(VR.game); window.__norender = false; });

@@ -208,11 +208,23 @@
   P.fovAdd = (mul) => Math.round(Math.max(0, (mul || 1) - 1) * 1.6 * 10) / 10;   // +11° at ×8
   P.step = (mul, wheel) => Math.max(1, Math.min(P.FLY_MAX, (mul | 0 || 1) + (wheel < 0 ? 1 : wheel > 0 ? -1 : 0)));
 
+  // ---------------------------------------------------------------- e-portal2: the skip that always takes
+  // a press at t (s): before `after` it is kept (null: take it at `after`); from then on the film is at its end — the
+  // reveal follows the moment the land is there (portal.js)
+  P.skipTo = (t, len, after) => (t < after ? null : len);
+  // a gamepad's fresh press of A (0), B (1) or Start (9): true once per press (st keeps what was held)
+  P.PAD_SKIP = [0, 1, 9];
+  P.padSkip = function (pads, st) {
+    let held = false;
+    if (pads) for (const p of pads) { if (!p || !p.buttons) continue; for (const i of P.PAD_SKIP) { const b = p.buttons[i]; if (b && (b.pressed || b.value > 0.5)) held = true; } }
+    const fresh = held && !st.held; st.held = held; return fresh;
+  };
+
   // ---------------------------------------------------------------- the words
   P.UI_KEYS = ['g.pt.title', 'g.pt.sub.free', 'g.pt.sub.earned', 'g.pt.surprise', 'g.pt.surpriseTip', 'g.pt.home', 'g.pt.here', 'g.pt.locked', 'g.pt.lockedTip',
     'g.pt.favHere', 'g.pt.favHereDone', 'g.pt.favSpot', 'g.pt.favWorld', 'g.pt.unfav', 'g.pt.close', 'g.pt.skip', 'g.pt.menu', 'g.pt.menuTip', 'g.pt.holdK',
     'g.pt.guest', 'g.pt.busy', 'g.pt.gate', 'g.pt.kind.home', 'g.pt.kind.deep', 'g.pt.kind.isles', 'g.pt.kind.moon', 'g.pt.kind.world', 'g.pt.kind.station',
-    'g.pt.kind.exo', 'g.pt.kind.unknown', 'g.pt.kind.fav', 'g.pt.episode', 'g.pt.fly', 'g.set.flyFast', 'g.set.flyFast.tip', 'g.pt.flyMp', 'g.pt.slow'];
+    'g.pt.kind.exo', 'g.pt.kind.unknown', 'g.pt.kind.fav', 'g.pt.episode', 'g.pt.fly', 'g.set.flyFast', 'g.set.flyFast.tip', 'g.pt.flyMp', 'g.pt.slow', 'g.pt.skipWait', 'g.pt.bestHour'];
   P.keys = function () {
     const out = P.UI_KEYS.slice();
     for (const k of Object.keys(P.HOOKS)) for (let i = 1; i <= P.HOOKS[k]; i++) out.push('g.pt.hook.' + k + '.' + i);

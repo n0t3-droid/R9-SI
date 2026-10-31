@@ -11,6 +11,14 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // ---- e-portal2 (R55-05): the first view of a new player's map — the nearest n systems round `here` (their indices,
+  // nearest first) and the zoom that frames them (the farthest at ~38 % of the picture's height from the middle)
+  VR.StarMapFit = function (N, here, n) {
+    const c = N.list[here].p, d = N.list.map((s, i) => [i, Math.hypot(s.p[0] - c[0], s.p[1] - c[1], s.p[2] - c[2])]).filter(q => q[0] !== here).sort((a, b) => a[1] - b[1]).slice(0, n || 24);
+    const far = d.length ? d[d.length - 1][1] : 30;
+    return { labels: d.map(q => q[0]), dist: Math.max(12, Math.min(520, far * 0.95 / 0.38 + far)), far };
+  };
+  // ---- e-portal2 end
   if (typeof window === 'undefined' || !VR.Game) return;
   const SM = VR.StarMap = {};
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);

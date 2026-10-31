@@ -3731,5 +3731,9 @@
     "g.nat.set.ocker": "Dünenbau",
     "g.nat.set.opal": "Frostbau",
     // ---- u-worlds end
+    // ---- e-portal2 · der Leuchtpfad-Film (portal.js, portal_space.js)
+    "g.pt.skipWait": "Gleich da — die Welt wird noch gebaut …",
+    "g.pt.bestHour": "zur goldenen Stunde",
+    // ---- e-portal2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
