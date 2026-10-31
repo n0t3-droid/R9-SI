@@ -163,7 +163,7 @@
       first: ['Tummel', 'Huschel', 'Trippel', 'Wuppel', 'Bimmel', 'Tröpfel', 'Flitzel', 'Krispel', 'Nuppel', 'Kribbel',
         'Zwinkel', 'Glimpel', 'Rupfel', 'Dimpel', 'Lupfel', 'Moosel', 'Knöpfel', 'Pimsel', 'Wimmel', 'Hupsel', 'Lirpel',
         'Schwirrel', 'Summsel', 'Tapsel', 'Nimmel', 'Silpel', 'Brummsel', 'Pelzel', 'Sprenkel'],
-      kids: ['Flitz', 'Hupfi', 'Wipsi', 'Tropfi', 'Nuppi', 'Kiesel', 'Sprossi', 'Knospi', 'Tauli', 'Perli', 'Farni',
+      kids: ['Flitz', 'Hupfi', 'Wipsi', 'Tropfi', 'Nuppi', 'Wurzli', 'Sprossi', 'Knospi', 'Tauli', 'Perli', 'Farni',
         'Pilzi', 'Beerli', 'Halmi', 'Flaumi', 'Sämi'],
       elders: ['Murmelbart', 'Flechtenbart', 'Rindenhold', 'Moosgrau', 'Wurzelweis', 'Farnwalt', 'Eichelgrau', 'Knorzel',
         'Nebelbart', 'Silberflaum', 'Tannengrau', 'Harzwalt', 'Pilzhold', 'Zapfenweis', 'Mooswalt', 'Steinflaum'],
@@ -246,13 +246,23 @@
   const SVOW = ['a', 'e', 'i', 'o', 'ia', 'ei', 'ae', 'a', 'e', 'i'];
   const SEND = ['n', 'ra', 'ris', 'nor', 'lan', 'mir', 'dis', 'ven', 'rin', 'sa', 'na', 'va', 'wen', 'lia', 'mara', 'lis', 'ne',
     'thea', 'sel', 'dra', 'la', 'mel', 'vane', 'rys', 'tis', 'lon', 'l', 's'];
+  // a star is never called like a villager of any people, nor shaped like a native place (a people's head + place
+  // ending: Ma·thal, Ta·mesa) — test/name_clash.js
+  let GIVEN = null;
+  const peopleLike = (w) => {
+    if (!GIVEN) { GIVEN = new Set(); for (const k in N.PEOPLES) { const P = N.pool(k); for (const x of P.first.concat(P.kids, P.elders)) GIVEN.add(x.toLowerCase()); } }
+    const l = w.toLowerCase(); if (GIVEN.has(l)) return true;
+    for (const k in N.PEOPLES) { const P = N.PEOPLES[k]; if (!P.A) continue; for (const a of P.A) if (l.indexOf(a.toLowerCase()) === 0) for (const t of P.L) if (l.length > a.length + 1 && l.slice(-t.length) === t) return true; }
+    return false;
+  };
+  N.peopleLike = peopleLike;
   N.star = function (seed, used) {
     for (let k = 0; k < 40; k++) {
       const s = (seed | 0) ^ Math.imul(k + 1, 0x9e3779b1), f = h01(s, 0, 0x81);
       const on = pick(SON, s, 1, 0x82), m = pick(SMID, s, 2, 0x83), v = pick(SVOW, s, 3, 0x84), e = pick(SEND, s, 4, 0x85);
       let w = f < 0.75 ? on + m + v + e : on + m + v + pick(['l', 'n', 'r', 'v', 'm'], s, 5, 0x86) + pick(SVOW, s, 6, 0x87) + e;
       w = cap(w.toLowerCase());
-      if (w.length < 4 || w.length > (f < 0.75 ? 11 : 9) || !/^[A-Z][a-z]+$/.test(w) || N.blocked(w) || N.reserved(w) || (used && used.has(w))) continue;
+      if (w.length < 4 || w.length > (f < 0.75 ? 11 : 9) || !/^[A-Z][a-z]+$/.test(w) || N.blocked(w) || N.reserved(w) || peopleLike(w) || (used && used.has(w))) continue;
       if (used) used.add(w);
       return w;
     }
