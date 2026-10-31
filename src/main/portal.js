@@ -83,7 +83,7 @@
       '#ptCap .pt-ce{margin-top:14px;font:500 clamp(14px,1.5vw,17px) var(--font,sans-serif);color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.7);min-height:1.4em;transition:opacity .4s}',
       '#ptCap .pt-ce b{color:#ffd166}',
       '#ptRing{position:fixed;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;z-index:870;pointer-events:none;border-radius:50%;opacity:0;box-shadow:0 0 0 2px rgba(255,214,140,.9),0 0 30px rgba(255,190,90,.6);transition:opacity .2s}',
-      'html.pt-gl #ui,html.pt-gl #app>*:not(#gl):not(#ptFilm):not(#ptSkip):not(#ptCap),html.pt-gl body>*:not(#app){visibility:hidden !important}',   // (e-portal2: a 3-D shot shows through the film's canvas — nothing of the HUD over it)
+      'html.pt-gl #ui,html.pt-gl #ui *,html.pt-gl #app>*:not(#gl):not(#ptFilm):not(#ptSkip):not(#ptCap),html.pt-gl body>*:not(#app),html.pt-gl body>*:not(#app) *{visibility:hidden !important}',   // (e-portal2: a 3-D shot shows through the film's canvas — nothing of the HUD over it)
       'html.pt-on #ctxprompt,html.pt-on #keystrip,html.pt-on #hints,html.pt-on #hint,html.pt-on #toasts{visibility:hidden !important}',   // (a film's moment: no prompts, hints or toasts over it)
       '#ptFly{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:860;pointer-events:none;padding:4px 12px;border-radius:12px;background:rgba(8,10,26,.55);color:#ffe2a8;font:700 14px var(--font,sans-serif);opacity:0;transition:opacity .4s}',
     ].join('\n');
