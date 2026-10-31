@@ -387,7 +387,7 @@
   const glow = (c, x, y, r, col, a) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + col + ',' + a + ')'); g.addColorStop(1, 'rgba(' + col + ',0)'); c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r); };
   const ease = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
   // the arrow the beacons draw (normalised, on the planet below the window), lit one after another
-  Fx.ARROW = (() => { const out = []; for (let i = 0; i < 9; i++) out.push([0.26 + i * 0.045, 0.66 - i * 0.03]); for (let i = 1; i < 4; i++) { out.push([0.62 - i * 0.04, 0.42 + i * 0.006]); out.push([0.62 - i * 0.008, 0.42 + i * 0.045]); } return out; })();   // (on the planet's face in the window: the frame's middle band)
+  Fx.ARROW = (() => { const out = []; for (let i = 0; i < 9; i++) out.push([0.26 + i * 0.045, 0.66 - i * 0.03]); for (let i = 1; i < 4; i++) { out.push([0.62 - i * 0.04, 0.42 + i * 0.006]); out.push([0.62 - i * 0.008, 0.42 + i * 0.045]); } for (const q of out) q[1] = 0.2 + (q[1] - 0.39) * 0.8; return out; })();   // (a-story4: on the planet's face — from inside the glass the planet stands over the deck's horizon)   // (on the planet's face in the window: the frame's middle band)
   Fx.draw = function (c, kind, t, u, w, h, o) {
     o = o || {}; const low = !!o.low, S0 = Math.min(w, h);
     c.clearRect(0, 0, w, h);
