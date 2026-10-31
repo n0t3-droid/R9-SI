@@ -61,7 +61,7 @@ if (part('b')) {
     const paved = (x, z) => { const s = top.get(x + ',' + z); return s && /sandstone|basalt|andesite|stone|snow|terracotta|deepstone|mud|tuff|planks|quartz|sulfur/.test(nameOf(s)); };
     const bad = P.homes.filter(h => { const o = h.outside; return !(paved(o[0], o[2]) || paved(o[0], o[2] + Math.sign(o[2] - h.door[2]))); }).length;
     check(bad === 0, `${k}: every door opens onto the town's paving (${bad} not)`);
-    const doorOk = P.homes.every(h => /door/.test(nameOf((() => { for (let i = 0; i < ops.length; i += 4) if (ops[i] === h.door[0] && ops[i + 1] === h.door[1] && ops[i + 2] === h.door[2]) return ops[i + 3]; return 0; })())));
+    const doorOk = P.homes.every(h => /door/.test(nameOf((() => { let v = 0; for (let i = 0; i < ops.length; i += 4) if (ops[i] === h.door[0] && ops[i + 1] === h.door[1] && ops[i + 2] === h.door[2]) v = ops[i + 3]; return v; })())));
     check(doorOk, `${k}: every home has its door`);
     // the other villages stay the 6-home villages
     check(e.sites.slice(1).every(s => { const q = e.planOf(s); return !q.town && q.homes.length === 6; }), `${k}: the other two sites stay villages`);

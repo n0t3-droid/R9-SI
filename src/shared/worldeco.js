@@ -198,6 +198,28 @@
     },
   };
   E.ids = Object.keys(K);
+  // u-worlds4 · bgen 5's kits (the dusk: a darker second paving tone everywhere — the pale stones washed pink at dusk —,
+  // Zinnober's benches and posts of dark polished deepstone instead of crimson — no basalt slab exists, no new blocks),
+  // the towns' roads between the villages and their bridges over water and lava. E.kit(kind, bgen): bgen ≤ 4 the kit as
+  // it was (the same object), bgen 5 a copy with pave4/bench4/post4 taken from these (plaza4 reads them as before).
+  const K5 = {
+    aqua: { pave5: ['smooth_sandstone', 'packed_mud'], road5: 'cut_sandstone', bridge5: 'bamboo_planks' },
+    ocker: { pave5: ['cut_red_sandstone', 'brown_terracotta'], road5: 'packed_mud', bridge5: 'acacia_planks' },
+    zinn: { pave5: ['polished_basalt', 'polished_deepstone'], bench5: 'polished_deepstone_slab', post5: 'polished_deepstone_wall', road5: 'smooth_basalt', bridge5: 'polished_basalt' },
+    basalt: { pave5: ['polished_andesite', 'polished_deepstone'], road5: 'polished_tuff', bridge5: 'smooth_stone' },
+    opal: { pave5: ['smooth_stone', 'stone_bricks'], road5: 'spruce_planks', bridge5: 'spruce_planks' },
+  };
+  E.K5 = K5;
+  E.DARK = new Set(['packed_mud', 'brown_terracotta', 'polished_deepstone', 'smooth_basalt', 'stone_bricks', 'mud_bricks', 'tuff_bricks', 'polished_tuff']);
+  const KIT5 = {};
+  E.kit = function (kind, bgen) {
+    const k0 = K[kind].species.kit;
+    if (!(bgen >= 5)) return k0;
+    if (KIT5[kind]) return KIT5[kind];
+    const k5 = Object.assign({}, k0, K5[kind]);
+    k5.pave4 = k5.pave5; if (k5.bench5) k5.bench4 = k5.bench5; else k5.bench5 = k5.bench4; if (k5.post5) k5.post4 = k5.post5; else k5.post5 = k5.post4;
+    return (KIT5[kind] = k5);
+  };
   // every block name the worlds use (the tests check they exist)
   E.blockNames = function (kind) {
     const W = K[kind], out = new Set(), add = (v) => { if (typeof v === 'string') out.add(v); else if (Array.isArray(v)) v.forEach(add); };
@@ -255,6 +277,9 @@
     const kind = kindOf(gen); if (!kind) return null;
     return (gen.eco = new Eco(gen, kind));
   };
+  const SITE_PTS = [[0, 0], [-18, -18], [0, -18], [18, -18], [-18, 0], [18, 0], [-18, 18], [0, 18], [18, 18], [-9, -9], [9, 9], [-9, 9], [9, -9]];
+  // (u-worlds4: a town's ground — 25 points over ±48)
+  const TOWN_PTS = []; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) TOWN_PTS.push([i * 24, j * 24]);
   class Eco {
     constructor(gen, kind) {
       this.gen = gen; this.kind = kind; this.W = K[kind]; this.s = (gen.s ^ 0xec0) >>> 0;
@@ -293,18 +318,19 @@
     near(x, z, pad) { for (const m of this.marks) if (Math.abs(m.x - x) < m.r + pad && Math.abs(m.z - z) < m.r + pad) return true; return false; }
     // ---------------------------------------------------------------- the sites and their plans
     build() {
-      const g = this.gen, L = this.land, rings = [[75, 105], [420, 620], [880, 1150]]   // (u-worlds2: the first village closer — in the arrival's view);
+      const g = this.gen, L = this.land, T5 = g.bgen >= 5, rings = [[T5 ? 100 : 75, T5 ? 125 : 105], [420, 620], [880, 1150]]   // (u-worlds2: the first village closer — in the arrival's view; u-worlds4, bgen 5: the town a little further, its edge 35–60 m off);
       const rot = h01(this.s, 1, 7) * Math.PI * 2;
       rings.forEach(([r0, r1], ri) => {
         let best = null, bs = 1e9;
         for (let k = 0; k < 28; k++) {
           const a = rot + ri * 2.1 + k / 28 * Math.PI * 2, r = r0 + (r1 - r0) * h01(this.s, ri, k + 11);
           const x = Math.round(L[0] + Math.cos(a) * r), z = Math.round(L[2] + Math.sin(a) * r);
-          const sc = this.siteScore(x, z); if (sc.score < bs) { bs = sc.score; best = { x, z, y: sc.y }; }
+          const sc = this.siteScore(x, z, T5 && ri === 0); if (sc.score < bs) { bs = sc.score; best = { x, z, y: sc.y }; }
         }
-        const id = 'eco:' + this.kind + ':' + ri;
-        const site = { id, x: best.x, z: best.z, y: best.y, ring: ri, rad: 30, name: E.word(this.kind, this.s + ri * 131, 2 + (ri === 1 ? 1 : 0)) };
-        this.sites.push(site); this.marks.push({ x: site.x, z: site.z, r: 34 });
+        const id = 'eco:' + this.kind + ':' + ri, town = T5 && ri === 0;
+        const site = { id, x: best.x, z: best.z, y: best.y, ring: ri, rad: town ? 64 : 30, name: E.word(this.kind, this.s + ri * 131, 2 + (ri === 1 ? 1 : 0)) };
+        if (town) site.town = true;
+        this.sites.push(site); this.marks.push({ x: site.x, z: site.z, r: town ? 72 : 34 });
       });
       // the landmarks: on a ring 230–380 m out, away from the villages
       this.landmarks = this.W.landmarks.map((lm, i) => {
@@ -321,17 +347,18 @@
       });
       for (const s of this.sites) this.addOps(this.planOf(s).ops);
       for (const l of this.landmarks) this.addOps(landmarkOps(l, this.W));
+      if (T5) this.buildWays();
     }
-    siteScore(x, z) {
+    siteScore(x, z, town) {
       const g = this.gen, hs = [];
       let wet = 0, bad = 0;
-      for (const [dx, dz] of [[0, 0], [-18, -18], [0, -18], [18, -18], [-18, 0], [18, 0], [-18, 18], [0, 18], [18, 18], [-9, -9], [9, 9], [-9, 9], [9, -9]]) {
+      for (const [dx, dz] of (town ? TOWN_PTS : SITE_PTS)) {
         const h = g.surfaceY(x + dx, z + dz); hs.push(h);
         if (this.kind === 'aqua' && h < SEA + 1) wet++;
         if (this.baseOk && this.kind !== 'aqua' && !this.baseOk.has(g.biomeAt(x + dx, z + dz))) bad++;
       }
       hs.sort((a, b) => a - b);
-      const med = hs[6], range = hs[hs.length - 1] - hs[0];
+      const med = hs[hs.length >> 1], range = hs[hs.length - 1] - hs[0];
       return { y: this.kind === 'aqua' ? Math.max(SEA + 1, med) : med, score: range + wet * 12 + bad * 20 };
     }
     planOf(site) {
@@ -347,6 +374,60 @@
       return out;
     }
     fauna() { return this.W.fauna.slice(); }
+    // ---------------------------------------------------------------- u-worlds4 · bgen 5: the ways between the villages
+    // From the town's edge to the second village, from there to the third: 3 wide, a gentle meander, the species' road
+    // block laid on the ground at decoration (a bridge of its planks or stone over water and lava), nothing planted on
+    // them. this.ways [{from, to, a, b, n}], this.wayB: per chunk [x, z, state …]
+    buildWays() {
+      const kit = E.kit(this.kind, this.gen.bgen), road = st(kit.road5);
+      this.bridge = st(kit.bridge5);
+      this.ways = []; this.wayB = new Map();
+      const seen = new Set();
+      const S = this.sites;
+      for (let i = 0; i + 1 < S.length; i++) {
+        const A = S[i], B = S[i + 1], dx = B.x - A.x, dz = B.z - A.z, len = Math.hypot(dx, dz), ux = dx / len, uz = dz / len;
+        const a = [A.x + ux * (A.rad + 4), A.z + uz * (A.rad + 4)], b = [B.x - ux * (B.rad + 4), B.z - uz * (B.rad + 4)];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ph = h01(this.s, i, 0x77) * 6.28;
+        let n = 0;
+        for (let t = 0; t <= L; t += 0.5) {
+          const m = 3 * Math.sin(t / 37 + ph) * Math.min(1, t / 30, (L - t) / 30);
+          const cx = a[0] + ux * t - uz * m, cz = a[1] + uz * t + ux * m;
+          for (let q = -1; q <= 1; q++) {
+            const x = Math.round(cx - uz * q), z = Math.round(cz + ux * q), key = x * 65536 + z;
+            if (seen.has(key)) continue; seen.add(key);
+            if (this.nearSite(x, z)) continue;
+            const ck = (x >> 4) + ',' + (z >> 4);
+            let bk = this.wayB.get(ck); if (!bk) this.wayB.set(ck, bk = []);
+            bk.push(x, z, road); n++;
+          }
+        }
+        this.ways.push({ from: A.id, to: B.id, a, b, n, ux, uz, L });
+      }
+    }
+    nearSite(x, z) { for (const m of this.marks) { const r = m.r > 30 ? m.r - 4 : m.r; if (Math.abs(m.x - x) < r && Math.abs(m.z - z) < r) return true; } return false; }
+    wayCells(cx, cz) { return (this.wayB && this.wayB.get(cx + ',' + cz)) || []; }
+    // a column on (or within pad of) a way: its distance from the way's line (the meander is at most 3)
+    onWay(x, z, pad) {
+      for (const w of this.ways) {
+        const px = x - w.a[0], pz = z - w.a[1], t = px * w.ux + pz * w.uz;
+        if (t < -pad || t > w.L + pad) continue;
+        if (Math.abs(-px * w.uz + pz * w.ux) <= 4.5 + pad) return true;
+      }
+      return false;
+    }
+    // the ways' blocks in one chunk: on the ground's top (plants and snow over it cleared), a bridge over a liquid
+    layWays(blocks, cx, cz) {
+      const list = this.wayCells(cx, cz); if (!list.length) return;
+      const R = VR.R;
+      for (let i = 0; i < list.length; i += 3) {
+        const c = ((list[i + 1] & 15) << 4) | (list[i] & 15);
+        let y = 250, s = 0;
+        while (y > 1) { s = blocks[(y << 8) | c]; if (s && ((R.T.flags[s] & VR.F.SOLID) || isFluid(s))) break; y--; }
+        if (y <= 1) continue;
+        blocks[(y << 8) | c] = isFluid(s) ? this.bridge : list[i + 2];
+        for (let k = 1; k <= 3; k++) { const p = ((y + k) << 8) | c, q = blocks[p]; if (q && !(R.T.flags[q] & VR.F.SOLID)) blocks[p] = 0; }
+      }
+    }
     addOps(ops) {
       // ops [x, y, z, state …] into per-chunk buckets
       for (let i = 0; i < ops.length; i += 4) {
@@ -386,6 +467,8 @@
       if (W.liquid) this.ponds(blocks, x0, z0, tops);
       // ---- flora
       this.flora(blocks, x0, z0, tops, ebio);
+      // ---- (u-worlds4, bgen 5) the ways between the villages
+      if (this.wayB) this.layWays(blocks, cx, cz);
       // ---- the structures: villages and landmarks (their blocks last)
       const bk = this.buckets.get(cx + ',' + cz);
       if (bk) for (let i = 0; i < bk.length; i += 4) { const y = bk[i + 1]; if (y < 1 || y > 254) continue; blocks[(y << 8) | ((bk[i + 2] & 15) << 4) | (bk[i] & 15)] = bk[i + 3]; }
@@ -476,7 +559,7 @@
         const opts = big.filter(f => f.bio.indexOf(b) >= 0); if (!opts.length) continue;
         const f = opts[Math.floor(h01(i, j, this.s ^ 0xf3) * opts.length)];
         if (h01(i, j, this.s ^ 0xf4) > f.p) continue;
-        if (this.near(x, z, 4)) continue;
+        if (this.near(x, z, 4) || (this.ways && this.onWay(x, z, 3))) continue;
         const y0 = this.groundAt(x, z); if (y0 < 0) continue;
         // (inside the chunk the real ground decides: a pond, a crater's boulder — no plant there)
         if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
@@ -485,14 +568,15 @@
       // ---- (u-worlds2) the landing's garden: seven of the world's big plants on a ring 8–13 m round the landing, so
       // the first look shows the world's life whatever biome the landing lies in
       const L = this.land;
-      if (big.length && Math.abs(L[0] - x0 - 8) < 32 && Math.abs(L[2] - z0 - 8) < 32) for (let k = 0; k < 7; k++) {
-        const a = k / 7 * Math.PI * 2 + h01(k, 3, this.s ^ 0xfa) * 0.5, r = 8 + h01(k, 4, this.s ^ 0xfa) * 5;
+      const G5 = this.gen.bgen >= 5 && this.kind === 'aqua', NG = G5 ? 12 : 7;   // (u-worlds4, bgen 5: Aquamarin's landing garden fuller, on the beach too)
+      if (big.length && Math.abs(L[0] - x0 - 8) < 32 && Math.abs(L[2] - z0 - 8) < 32) for (let k = 0; k < NG; k++) {
+        const a = k / NG * Math.PI * 2 + h01(k, 3, this.s ^ 0xfa) * 0.5, r = 8 + h01(k, 4, this.s ^ 0xfa) * 5;
         const x = Math.round(L[0] + Math.cos(a) * r), z = Math.round(L[2] + Math.sin(a) * r);
         if (x < x0 - 4 || x > x0 + 19 || z < z0 - 4 || z > z0 + 19 || this.near(x, z, 2)) continue;
         // (none in the arrival's view of the first village: ±35° round its bearing stays open)
         const s0 = this.sites && this.sites[0];
         if (s0) { let da = Math.abs(Math.atan2(z - L[2], x - L[0]) - Math.atan2(s0.z - L[2], s0.x - L[0])); if (da > Math.PI) da = 2 * Math.PI - da; if (da < 0.61) continue; }
-        const y0 = this.groundAt(x, z); if (y0 < 0) continue;
+        let y0 = this.groundAt(x, z); if (y0 < 0 && G5) { const yy = g.surfaceY(x, z); if (yy >= SEA) y0 = yy; } if (y0 < 0) continue;
         if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
         plant(big[k % big.length], x, y0 + 1, z, h01(k, 5, this.s ^ 0xfa), put);
       }
@@ -759,7 +843,8 @@
   }
   const HOMES = [[-13, -14], [0, -15], [13, -14], [-13, 14], [0, 15], [13, 14]];
   function villagePlan(eco, site) {
-    const Kit = eco.W.species.kit, g = eco.gen, F = site.y | 0, X = site.x, Z = site.z, kind = eco.kind;
+    const g = eco.gen, Kit = E.kit(eco.kind, g.bgen), F = site.y | 0, X = site.x, Z = site.z, kind = eco.kind;   // (u-worlds4: bgen 5's kit — the darker tones)
+    if (site.town) return townPlan(eco, site, Kit);
     const ground = (x, z) => g.surfaceY(x, z);
     const seed = strHash(site.id + ':' + (eco.s >>> 0)) >>> 0;
     const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, x: X, y: F + 1, z: Z, seed, rad: 30, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z, r: 6 }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
@@ -796,6 +881,169 @@
     return P;
   }
   E.villagePlan = villagePlan;
+
+  // ================================================================ u-worlds4 · bgen 5: the first site is a town
+  // The plaza and its monument in the middle (as the villages: plaza4), four avenues out to ±56, 18 homes along them
+  // (their doors to the avenue or toward the plaza, a short way from each door), the hall west of the plaza (benches
+  // facing the speaker's stone, an open entrance toward the plaza), the market east (four stalls of the species' goods),
+  // the landmark at the north avenue's end, a garden at the south end, lamps along the avenues. All ours, all procedural.
+  // ([dx, dz, door side] — the door side +1: +z)
+  const TOWN_HOMES = [[-10, -18, 1], [10, -18, 1], [-10, -32, 1], [10, -32, 1], [-10, -46, 1], [10, -46, 1],
+    [-10, 18, -1], [10, 18, -1], [-10, 32, -1], [10, 32, -1], [-10, 46, -1], [10, 46, -1],
+    [34, -10, 1], [34, 10, -1], [48, -10, 1], [48, 10, -1], [-40, -10, 1], [-40, 10, -1], [-54, -10, 1], [-54, 10, -1]];
+  E.TOWN_HOMES = TOWN_HOMES;
+  E.LANDMARK5 = { aqua: 'lighthouse', ocker: 'windcatcher', zinn: 'obelisk', basalt: 'observatory', opal: 'frostspire' };
+  function townPlan(eco, site, Kit) {
+    const g = eco.gen, F = site.y | 0, X = site.x, Z = site.z, kind = eco.kind;
+    const ground = (x, z) => g.surfaceY(x, z);
+    const seed = strHash(site.id + ':' + (eco.s >>> 0)) >>> 0;
+    const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, town: true, x: X, y: F + 1, z: Z, seed, rad: 64, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z, r: 6 }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
+    const W = writer(ground, F, Kit), put = W.put, pa = st(Kit.pave4[0]), pb = st(Kit.pave4[1]);
+    const pave = (x, z, s) => { W.level(x, z); put(x, F, z, s); };
+    // the plaza (13 × 13, the dance ring in the second tone), the monument, the benches, the monument's foot, the lanterns
+    for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) { const d = Math.hypot(dx, dz); pave(X + dx, Z + dz, d >= 4.4 && d < 5.5 ? pb : pa); }
+    centrepiece(kind, put, X, F, Z);
+    plaza4(kind, Kit, put, P, X, F, Z);
+    // the avenues: 3 wide, their edges in the second tone; lamps on posts every 12 blocks, two blocks off the way
+    const post = st(Kit.post4), light = st(Kit.lamp4);
+    const AV = [[0, -1, 7, 56], [0, 1, 7, 56], [1, 0, 7, 56], [-1, 0, 32, 60]];   // (west: behind the hall)
+    for (const [ux, uz, k0, len] of AV) {
+      for (let k = k0; k <= len; k++) for (let t = -1; t <= 1; t++) { const x = X + ux * k + (uz ? t : 0), z = Z + uz * k + (ux ? t : 0); pave(x, z, t === 0 ? pa : pb); }
+      for (let k = k0 + 5; k <= len; k += 12) for (const sd of [-1, 1]) { const x = X + ux * k + uz * 2 * sd, z = Z + uz * k + ux * 2 * sd; if (Math.abs(k - 18) < 3 || Math.abs(k - 32) < 3 || Math.abs(k - 46) < 3) continue; put(x, F + 1, z, post); put(x, F + 2, z, light); P.lamps.push([x, F + 3, z]); }
+    }
+    // the homes and the ways from their doors to the avenue
+    const homeOps = [];
+    TOWN_HOMES.forEach(([dx, dz, s], i) => {
+      const cx = X + dx, cz = Z + dz;
+      const h = house(Kit, ground, F, cx, cz, s, h01(seed, i, 5));
+      const o = h.outside;
+      if (Math.abs(dx) <= 12) { const step = Math.sign(X - cx); for (let x = o[0]; Math.abs(x - X) > 1; x += step) pave(x, o[2], pa); }
+      else { const step = Math.sign(Z - cz); for (let z = o[2]; Math.abs(z - Z) > 1; z += step) pave(o[0], z, pa); }
+      P.homes.push(h); for (const q of h.ops) homeOps.push(q); delete h.ops;
+    });
+    // the hall (west): 19 × 13, walls five high, the band under the roof, windows, an open entrance toward the plaza
+    const hall = hallOps(Kit, ground, F, X - 22, Z, kind);
+    for (const q of hall.ops) homeOps.push(q);
+    P.hall = { box: hall.box, door: hall.door, inside: hall.inside, seats: hall.seats, speaker: hall.speaker };
+    P.work.push({ kind: 'hall', spot: hall.speaker.slice(), inside: hall.speaker.slice(), seats: hall.seats });
+    P.lights = (P.lights || []).concat(hall.lights);
+    // the market (east): a square of the second tone, four stalls with the species' goods
+    const mk = marketOps(eco, Kit, ground, F, X + 20, Z);
+    for (const q of mk.ops) homeOps.push(q);
+    P.market = { box: mk.box, spots: mk.spots, x: X + 20, y: F + 1, z: Z };
+    for (const w of mk.work) P.work.push(w);
+    // the garden (south end): beds of the world's crops, a keeper
+    const gx = X, gz = Z + 60;
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -4; dz <= 4; dz++) { pave(gx + dx, gz + dz, Math.abs(dx) === 1 || Math.abs(dx) === 3 ? st('moss_block') : pa); if (Math.abs(dx) === 1 || Math.abs(dx) === 3) put(gx + dx, F + 1, gz + dz, st('vm_crop_rows')); }
+    P.work.push({ kind: 'garden', spot: [gx, F + 1, gz] });
+    // the landmark (north end): the species' own, seen from the landing and from the other villages' ways
+    const lm = landmark5(kind, Kit, ground, F, X, Z - 64);
+    for (const q of lm.ops) homeOps.push(q);
+    P.landmark = { kind, shape: E.LANDMARK5[kind], h: lm.h, x: X, y: F + 1, z: Z - 64, box: lm.box };
+    for (const o of W.ops) P.ops.push(o);
+    for (const o of homeOps) P.ops.push(o);
+    return P;
+  }
+  // the hall: its long side along x, the entrance on the east end (+x, toward the plaza), the speaker's stone at the west
+  function hallOps(Kit, ground, F, cx, cz, kind) {
+    const W = writer(ground, F, Kit), put = W.put, S = (n, p) => st(n, p);
+    const wall = S(Kit.wall), band = S(Kit.band), roof = S(Kit.roof), win = S(Kit.window), floor = S(Kit.floor), bench = S(Kit.bench4), mark = S(Kit.mark);
+    const RX = 9, RZ = 6, H = 5;
+    for (let dx = -RX; dx <= RX; dx++) for (let dz = -RZ; dz <= RZ; dz++) { W.level(cx + dx, cz + dz); put(cx + dx, F, cz + dz, floor); }
+    for (let dx = -RX; dx <= RX; dx++) for (let dz = -RZ; dz <= RZ; dz++) for (let dy = 1; dy <= H; dy++) {
+      const ax = Math.abs(dx), az = Math.abs(dz), edge = ax === RX || az === RZ;
+      if (!edge) continue;
+      if (dx === RX && az <= 1 && dy <= 3) { put(cx + dx, F + dy, cz + dz, 0); continue; }   // (the open entrance)
+      const corner = ax === RX && az === RZ;
+      put(cx + dx, F + dy, cz + dz, dy === H ? band : !corner && dy >= 2 && dy <= 3 && ((az === RZ && (dx + 30) % 3 === 0) || (ax === RX && dx < 0 && az % 3 === 0 && az > 0)) ? win : wall);
+    }
+    // the roof: a flat roof with a parapet (earth, basalt and ice), a stepped one for the round shells and the domes
+    const stepped = Kit.shape === 'round' || Kit.shape === 'dome';
+    for (let i = 0; i < (stepped ? 4 : 1); i++) for (let dx = -RX + i; dx <= RX - i; dx++) for (let dz = -RZ + i; dz <= RZ - i; dz++) put(cx + dx, F + H + 1 + i, cz + dz, roof);
+    if (!stepped) for (let dx = -RX; dx <= RX; dx++) for (let dz = -RZ; dz <= RZ; dz++) if ((Math.abs(dx) === RX || Math.abs(dz) === RZ) && ((dx + dz) & 1) === 0) put(cx + dx, F + H + 2, cz + dz, band);
+    // inside: four rows of benches each side of the aisle facing the speaker (west, f 3 −x), the speaker's stone, lights
+    const seats = [];
+    for (const bx of [-3, 0, 3, 6]) for (const bz of [-4, -3, -2, 2, 3, 4]) { put(cx + bx, F + 1, cz + bz, bench); seats.push([cx + bx, F + 1, cz + bz, 3]); }
+    const sp = [cx - RX + 2, F + 1, cz];
+    put(sp[0] - 1, F + 1, sp[2], mark); put(sp[0] - 1, F + 2, sp[2], S(Kit.light));
+    const lights = [];
+    for (const lx of [-6, -1, 4]) { put(cx + lx, F + H - 0, cz, S('light_panel', { facing: 5 })); lights.push([cx + lx, F + H, cz]); }
+    // the sign of the hall over its entrance: the species' mark and a light each side
+    put(cx + RX, F + 4, cz, mark); put(cx + RX + 1, F + 1, cz - 2, S(Kit.light)); put(cx + RX + 1, F + 1, cz + 2, S(Kit.light));
+    void kind;
+    return { ops: W.ops, box: [cx - RX, F, cz - RZ, cx + RX + 1, F + 10, cz + RZ], door: [cx + RX, F + 1, cz], inside: [cx, F + 1, cz], seats, speaker: sp, lights };
+  }
+  // the market: a square 16 × 17 of the second tone, four stalls (posts, a counter toward the lane, a striped canopy)
+  function marketOps(eco, Kit, ground, F, cx, cz) {
+    const W = writer(ground, F, Kit), put = W.put, S = (n, p) => st(n, p);
+    const pa = S(Kit.pave4[0]), pb = S(Kit.pave4[1]);
+    for (let dx = -8; dx <= 7; dx++) for (let dz = -8; dz <= 8; dz++) { W.level(cx + dx, cz + dz); put(cx + dx, F, cz + dz, Math.abs(dz) <= 1 ? pa : ((dx + dz) & 3) === 0 ? pa : pb); }
+    const goods = eco.W.species.goods.filter(n => VR.R.byName[n]);
+    const spots = [], work = [];
+    let gi = 0;
+    for (const [sx, sz] of [[-4, -5], [3, -5], [-4, 5], [3, 5]]) {
+      const x0 = cx + sx, z0 = cz + sz, fz = Math.sign(sz);   // (fz: the stall's back side; the lane at z = cz)
+      for (const [dx, dz] of [[-2, -1], [2, -1], [-2, 1], [2, 1]]) for (let k = 1; k <= 3; k++) put(x0 + dx, F + k, z0 + dz, S(Kit.wall));
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -1; dz <= 1; dz++) put(x0 + dx, F + 4, z0 + dz, (dx & 1) ? S(Kit.canopy) : S('white_wool'));
+      for (let dx = -1; dx <= 1; dx++) put(x0 + dx, F + 1, z0 - fz, S(Kit.band));
+      for (let k = 0; k < 3; k++) { const gname = goods[(gi++) % goods.length]; if (gname) put(x0 - 1 + k, F + 2, z0 - fz, S(gname)); }
+      const cust = [x0, F + 1, z0 - 2 * fz];
+      spots.push(cust);
+      work.push({ kind: 'stall', spot: cust.slice(), keeper: [x0 + 0.5, F + 1, z0 + fz * 0 + 0.5] });
+    }
+    // a lamp at the square's four corners
+    for (const [dx, dz] of [[-8, -8], [7, -8], [-8, 8], [7, 8]]) { put(cx + dx, F + 1, cz + dz, S(Kit.post4)); put(cx + dx, F + 2, cz + dz, S(Kit.lamp4)); }
+    return { ops: W.ops, box: [cx - 8, F, cz - 8, cx + 7, F + 9, cz + 8], spots, work };
+  }
+  // the landmarks: the species' own forms, 22–28 high
+  function landmark5(kind, Kit, ground, F, X, Z) {
+    const W = writer(ground, F, Kit), put = W.put, S = (n, p) => st(n, p);
+    for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) if (Math.hypot(dx, dz) <= 6.5) { W.level(X + dx, Z + dz); put(X + dx, F, Z + dz, S(Kit.pave4[(Math.hypot(dx, dz) > 5) ? 1 : 0])); }
+    const disc = (y, r, f) => { const R = Math.ceil(r); for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) { const d = Math.hypot(dx, dz); if (d <= r) { const v = f(dx, dz, d); if (v !== undefined) put(X + dx, F + y, Z + dz, v); } } };
+    let h = 22;
+    if (kind === 'aqua') {
+      // the lighthouse: a round tower of calcite with a cyan band winding up, a glass lantern room, the tide lantern
+      const wall = S('calcite'), band = S('cyan_terracotta'), glass = S('light_blue_stained_glass'); h = 24;
+      for (let y = 1; y <= 19; y++) { const r = 3.4 - y * 0.06; disc(y, r, (dx, dz, d) => { if (d < r - 1.2) return 0; const a = Math.atan2(dz, dx); return (Math.round((a / (Math.PI * 2)) * 12 + y * 0.8) % 6 === 0) ? band : (y % 6 === 3 && (dx === 0 || dz === 0) ? glass : wall); }); }
+      disc(20, 3.2, () => S('smooth_sandstone_slab'));
+      for (let y = 21; y <= 22; y++) disc(y, 2.2, (dx, dz, d) => (d > 1.2 ? glass : y === 21 ? S('tide_lantern') : 0));
+      disc(23, 2.2, () => S('dried_kelp_block')); put(X, F + 24, Z, S('tube_coral_block'));
+    } else if (kind === 'ocker') {
+      // the windcatcher: a square tower of terracotta in bands of red sandstone, open vents at the top, a lantern, amber
+      const wall = S('terracotta'), band = S('red_sandstone'), glass = S('orange_stained_glass'); h = 25;
+      for (let y = 1; y <= 22; y++) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const edge = Math.abs(dx) === 2 || Math.abs(dz) === 2, corner = Math.abs(dx) === 2 && Math.abs(dz) === 2;
+        if (!edge) { put(X + dx, F + y, Z + dz, 0); continue; }
+        if (y >= 18 && y <= 20 && !corner) { put(X + dx, F + y, Z + dz, 0); continue; }   // (the vents)
+        put(X + dx, F + y, Z + dz, y % 5 === 0 || y === 21 ? band : (y % 5 === 2 && !corner && (dx === 0 || dz === 0)) ? glass : wall);
+      }
+      for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) put(X + dx, F + 23, Z + dz, Math.abs(dx) === 3 || Math.abs(dz) === 3 ? band : S('smooth_red_sandstone'));
+      put(X, F + 19, Z, S('lantern')); put(X, F + 24, Z, S('lantern')); put(X, F + 25, Z, S('amber_crystal_block'));
+    } else if (kind === 'zinn') {
+      // the obelisk: polished basalt tapering from 5 to 1, seams of magma up its faces, an amber crown, the spirit lantern
+      const b = S('polished_basalt'), seam = S('magma_block'), amb = S('amber_crystal_block'); h = 27;
+      for (let y = 1; y <= 24; y++) { const r = y < 3 ? 3 : Math.max(0, Math.round(2.4 * (1 - (y - 3) / 23) + 0.2)); for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) put(X + dx, F + y, Z + dz, (dx === 0 || dz === 0) && (Math.abs(dx) === r || Math.abs(dz) === r) && y > 3 && y % 4 !== 0 ? seam : b); }
+      put(X, F + 25, Z, amb); put(X, F + 26, Z, amb); put(X, F + 27, Z, S('spirit_lantern'));
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(X + dx, F + 25, Z + dz, amb);
+    } else if (kind === 'basalt') {
+      // the observatory: a tower of polished andesite, a glass dome on a basalt ring, the azure crystal lens toward the sky
+      const wall = S('polished_andesite'), rim = S('smooth_basalt'), glass = S('light_blue_stained_glass'), lens = S('azure_crystal_block'); h = 23;
+      for (let y = 1; y <= 14; y++) disc(y, 2.6, (dx, dz, d) => (d > 1.5 ? (y % 5 === 0 ? rim : y % 5 === 3 && (dx === 0 || dz === 0) ? glass : wall) : 0));
+      disc(15, 4.6, () => rim);
+      for (let y = 16; y <= 20; y++) { const R = Math.sqrt(Math.max(0, 4.6 * 4.6 - (y - 15) * (y - 15))); disc(y, R, (dx, dz, d) => (d > R - 1.1 ? glass : 0)); }
+      for (let k = 0; k < 5; k++) put(X + 1 + (k >> 1), F + 17 + k, Z, lens);
+      put(X, F + 16, Z, S('lantern')); put(X, F + 21, Z, S('polished_andesite')); put(X, F + 22, Z, S('polished_andesite')); put(X, F + 23, Z, lens);
+    } else {
+      // the frost spire: packed ice tapering round, blue ice winding up it, the rose crystal at the point, chimes of crystal
+      const ice = S('packed_ice'), blue = S('blue_ice'), snow = S('snow_block'), rose = S('rose_crystal_block'); h = 26;
+      for (let y = 1; y <= 24; y++) { const r = 3.2 * Math.pow(1 - y / 26, 0.8) + 0.3; disc(y, r, (dx, dz, d) => { if (y > 3 && d < r - 1.2) return 0; const a = Math.atan2(dz, dx); return y % 7 === 1 ? snow : (Math.round(a / (Math.PI * 2) * 8 + y * 0.5) % 4 === 0 ? blue : ice); }); }
+      put(X, F + 25, Z, rose); put(X, F + 26, Z, rose);
+      for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) { put(X + dx, F + 14, Z + dz, S('lantern')); }
+    }
+    // four lamps round its foot
+    for (const [dx, dz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { put(X + dx, F + 1, Z + dz, S(Kit.post4)); put(X + dx, F + 2, Z + dz, S(Kit.lamp4)); }
+    return { ops: W.ops, h, box: [X - 6, F, Z - 6, X + 6, F + h, Z + 6] };
+  }
 
   // ================================================================ the hook: the generators of bgen ≥ 3
   const wrap = (proto) => {
