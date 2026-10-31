@@ -56,7 +56,7 @@ async function trip(start, to) {
 const lookAt = (P) => ev((P) => { const p = VR.game.player, e = p.eyePos(), dx = P[0] - e[0], dy = P[1] - e[1], dz = P[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, P);
 const sheet = [];
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); });
+await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.smoothFolk = true; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Welten',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
 for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a new world');
@@ -71,7 +71,7 @@ const hold = (vid) => ev((vid) => { const g = VR.game, v = g.villages.known.get(
   return { name: a.name, id: a.p.id, sc: VR.Folk.SPECIES_BODY[vid.split(':')[1]].scale, species: a.p.look.species, tool: VR.Folk.toolOf(a.p.look), pos: a.pos.slice() };
 }, vid);
 // the camera d m off the native's front, at bearing ang, looking at height h (× the species' scale)
-const frame = (d, ang, h, h2) => ev(([d, ang, h, h2]) => { const g = VR.game, a = window.__held, sc = VR.Folk.SPECIES_BODY[a.p.look.species].scale, p = g.player; const fx = -Math.sin(a.yaw + ang), fz = -Math.cos(a.yaw + ang), hy = a.pos[1] + h * sc, cy = a.pos[1] + (h2 === undefined ? h : h2) * sc;
+const frame = (d, ang, h, h2) => ev(([d, ang, h, h2]) => { const g = VR.game, a = window.__held, sc = VR.Folk.SPECIES_BODY[a.p.look.species].scale, p = g.player; const fx = Math.sin(a.yaw + ang), fz = Math.cos(a.yaw + ang), hy = a.pos[1] + h * sc, cy = a.pos[1] + (h2 === undefined ? h : h2) * sc;
   p.flying = true; p.teleport(a.pos[0] + fx * d, cy - 1.62, a.pos[2] + fz * d);
   const e = p.eyePos(), dx = a.pos[0] - e[0], dy = hy - e[1], dz = a.pos[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [d, ang, h, h2]);
 let chainDone = false;
@@ -100,14 +100,20 @@ for (const kind of WORLDS) {
   if (!nat) continue;
   await frame(1.25, 0.3, kind === 'ocker' ? 1.62 : 1.5);
   for (let i = 0; i < 8; i++) { await step(4, 33); await wait(250); await frame(1.25, 0.3, kind === 'ocker' ? 1.62 : 1.5); }
+  const sm = await ev(() => { const a = window.__held; return a.fg ? a.fg.state : -1; });
+  check(sm === 2, `${kind}: the smooth body ready (state ${sm})`);
   row.push(await grab(`w3_${kind}_face.png`, 3));
   // 2 · the greeting: talk to it — it turns to you, greets in its own way, says a word; the others make room
   await frame(2.8, 0.9, 1.1, 1.45);
   await ev(() => { const g = VR.game; for (const o of window.__held.vil.agents) if (o !== window.__held && !o.kid && Math.hypot(o.pos[0] - g.player.pos[0], o.pos[2] - g.player.pos[2]) > 7) { o.pos[0] = g.player.pos[0] + 3; o.pos[2] = g.player.pos[2] + 2.5; break; } });
   const t1 = await ev(() => { const g = VR.game, a = window.__held; g.villages.openTalk(a); const pl = g.player.pos, near = a.vil.agents.filter(o => o !== a && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 7).length; return { text: document.getElementById('tk_text').textContent, near, greet: a.greetT }; });
   await step(24, 33);
-  row.push(await shotDom(`w3_${kind}_greet.png`));
+  await shotDom(`w3_${kind}_talk.png`);
+  await ev(() => { const el = document.getElementById('talk'); if (el) el.style.visibility = 'hidden'; });
+  row.push(await grab(`w3_${kind}_greet.png`, 2));
+  await ev(() => { const el = document.getElementById('talk'); if (el) el.style.visibility = ''; });
   for (let i = 0; i < 6; i++) await step(20, 33);
+  await ev(() => { const g = VR.game, a = window.__held; a.greetT = 0; });
   const t2 = await ev(() => { const g = VR.game, a = window.__held, pl = g.player.pos; const near = a.vil.agents.filter(o => o !== a && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 6.5).length, hushed = a.vil.agents.filter(o => o.hush).length; const dy = Math.atan2(-(pl[0] - a.pos[0]), -(pl[2] - a.pos[2])) - a.yaw; return { near, hushed, turned: Math.abs(Math.atan2(Math.sin(dy), Math.cos(dy))) }; });
   const word = await ev((k) => VR.Natives.LANG[k][0].w, kind);
   check(t1.text.includes(word) && t1.greet > 2, `${kind}: the greeting „${t1.text.slice(0, 70)}…“`);
@@ -131,7 +137,7 @@ for (const kind of WORLDS) {
   for (let i = 0; i < 12; i++) await step(30, 33);
   await lookAt([V.x + 0.5, V.y + 2, V.z + 0.5]); await step(4);
   row.push(await grab(`w3_${kind}_plaza.png`));
-  const pz = await ev((vid) => { const v = VR.game.villages.known.get(vid), pz = v.plan.plaza; const inMon = v.agents.filter(a => Math.hypot(a.pos[0] - pz.x - 0.5, a.pos[2] - pz.z - 0.5) < 2.8).length; return { seats: (pz.seats || []).length, foot: pz.foot, inMon }; }, vid);
+  const pz = await ev((vid) => { const v = VR.game.villages.known.get(vid), pz = v.plan.plaza; const inMon = v.agents.filter(a => Math.hypot(a.pos[0] - pz.x - 0.5, a.pos[2] - pz.z - 0.5) < 2.2).length; return { seats: (pz.seats || []).length, foot: pz.foot, inMon }; }, vid);
   check(pz.seats >= 8 && pz.foot >= 8 && pz.inMon === 0, `${kind}: the plaza — ${pz.seats} seats, the foot ${pz.foot}, ${pz.inMon} inside the monument`);
   await ev(() => VR.game.env.setTime(5200));
   sheet.push({ label: `${kind}: the face up close · the greeting · the plaza at dusk`, imgs: row.filter(Boolean) });

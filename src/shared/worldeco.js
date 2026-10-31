@@ -57,7 +57,7 @@
       species: {
         de: 'Wellari', en: 'Wellari',
         look: { skin: [0x4fa8b8, 0x5cb8c0, 0x3e96a8, 0x6ac0c4], cut: ['tunic', 'gown', 'tunic'], feat: 'fins', featC: [0x2a6a9a, 0x1f7a8a, 0x3a5aa8], garb: [0xf2eedc, 0xe8d8b0, 0xf0a890, 0xd86a5a, 0xf4f0f4, 0x7ad0c8], eye: 0x1a3a5a },
-        kit: { pave4: ['smooth_sandstone', 'cut_sandstone'], bench4: 'smooth_sandstone_slab', flower4: 'blue_orchid', shape: 'round', wall: 'calcite', band: 'cyan_terracotta', roof: 'dried_kelp_block', floor: 'bamboo_planks', fill: 'sandstone', window: 'light_blue_stained_glass', door: 'bamboo_door', bed: 'cyan_bed', light: 'tide_lantern', paving: 'smooth_quartz', lamp: 'vx_lamppost_crystal', canopy: 'cyan_wool', mark: 'tube_coral_block' },
+        kit: { lamp4: 'lantern', post4: 'bamboo_fence', pave4: ['smooth_sandstone', 'cut_sandstone'], bench4: 'smooth_sandstone_slab', flower4: 'blue_orchid', shape: 'round', wall: 'calcite', band: 'cyan_terracotta', roof: 'dried_kelp_block', floor: 'bamboo_planks', fill: 'sandstone', window: 'light_blue_stained_glass', door: 'bamboo_door', bed: 'cyan_bed', light: 'tide_lantern', paving: 'smooth_quartz', lamp: 'vx_lamppost_crystal', canopy: 'cyan_wool', mark: 'tube_coral_block' },
         goods: ['dried_kelp_block', 'kelp', 'sea_pickle', 'tube_coral_block', 'brain_coral_block', 'sponge', 'tide_lantern', 'lily_pad'],
         syl: ['wa', 'li', 'nel', 'sa', 'ri', 'mo', 'thi', 'lu', 'na', 've', 'ar', 'io', 'ma', 'el', 'sha', 'ne'], end: ['i', 'a', 'el', 'en'],
       },
@@ -90,7 +90,7 @@
       species: {
         de: 'Dunelin', en: 'Dunelin',
         look: { skin: [0xd8b444, 0xc8a43a, 0xe0c25a, 0xbc9a36], cut: ['robe', 'cape', 'robe'], feat: 'horns', featC: [0xf0e2c0, 0xd8c8a0, 0xe8d0a8], garb: [0xe8d8b8, 0x9a4a2a, 0x5a6a7a, 0xd8b060, 0x7a3a2a, 0x3a6a6a], eye: 0x2a1a10 },
-        kit: { pave4: ['smooth_red_sandstone', 'cut_red_sandstone'], bench4: 'acacia_slab', flower4: 'orange_tulip', shape: 'terrace', wall: 'terracotta', band: 'red_sandstone', roof: 'smooth_red_sandstone', floor: 'acacia_planks', fill: 'red_sandstone', window: 'orange_stained_glass', door: 'acacia_door', bed: 'orange_bed', light: 'lantern', paving: 'smooth_red_sandstone', lamp: 'vx_lamppost_black', canopy: 'orange_wool', mark: 'amber_crystal_block' },
+        kit: { lamp4: 'lantern', post4: 'acacia_fence', pave4: ['smooth_red_sandstone', 'cut_red_sandstone'], bench4: 'acacia_slab', flower4: 'orange_tulip', shape: 'terrace', wall: 'terracotta', band: 'red_sandstone', roof: 'smooth_red_sandstone', floor: 'acacia_planks', fill: 'red_sandstone', window: 'orange_stained_glass', door: 'acacia_door', bed: 'orange_bed', light: 'lantern', paving: 'smooth_red_sandstone', lamp: 'vx_lamppost_black', canopy: 'orange_wool', mark: 'amber_crystal_block' },
         goods: ['red_sand', 'terracotta', 'orange_terracotta', 'cactus', 'red_sandstone', 'amber_crystal_block', 'lantern', 'iron_ingot'],
         syl: ['du', 'ne', 'ka', 'ro', 'tes', 'ul', 'mar', 'ze', 'om', 'ra', 'bek', 'sim', 'ta', 'ho', 'gal', 'ir'], end: ['in', 'ek', 'a', 'ur'],
       },
@@ -123,7 +123,7 @@
       species: {
         de: 'Glutani', en: 'Glutani',
         look: { skin: [0x4a2a3a, 0x542e3e, 0x3e2434, 0x5a3440], cut: ['coat', 'robe', 'coat'], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
-        kit: { pave4: ['polished_basalt', 'smooth_basalt'], bench4: 'crimson_slab', flower4: 'torchflower', shape: 'tower', wall: 'polished_basalt', band: 'sulfur_bricks', roof: 'amber_crystal_block', floor: 'crimson_planks', fill: 'basalt', window: 'yellow_stained_glass', door: 'crimson_door', bed: 'red_bed', light: 'spirit_lantern', paving: 'polished_sulfur', lamp: 'vx_lamppost_crystal', canopy: 'yellow_wool', mark: 'magma_block' },
+        kit: { lamp4: 'spirit_lantern', post4: 'crimson_fence', pave4: ['polished_basalt', 'smooth_basalt'], bench4: 'crimson_slab', flower4: 'torchflower', shape: 'tower', wall: 'polished_basalt', band: 'sulfur_bricks', roof: 'amber_crystal_block', floor: 'crimson_planks', fill: 'basalt', window: 'yellow_stained_glass', door: 'crimson_door', bed: 'red_bed', light: 'spirit_lantern', paving: 'polished_sulfur', lamp: 'vx_lamppost_crystal', canopy: 'yellow_wool', mark: 'magma_block' },
         goods: ['sulfur', 'obsidian', 'magma_block', 'amber_crystal_block', 'polished_sulfur', 'glowing_obsidian', 'sulfur_bricks', 'gold_ingot'],
         syl: ['glu', 'ta', 'ni', 'ber', 'os', 'kai', 'rum', 'ze', 'fa', 'lo', 'tir', 'ga', 'van', 'ur', 'pe', 'sol'], end: ['an', 'i', 'or', 'et'],
       },
@@ -154,7 +154,7 @@
       species: {
         de: 'Regoli', en: 'Regoli',
         look: { skin: [0x8a8cc0, 0x7a80b4, 0x9a98cc, 0x8484b8], cut: ['tunic', 'coat', 'tunic'], feat: 'antennae', featC: [0x7af0ff, 0xb0ff9a, 0xffe07a], garb: [0x3a4a6a, 0x6a7a9a, 0xe8e8f0, 0x2a3a4a, 0x8a5a9a], eye: 0x101828, glow: true },
-        kit: { pave4: ['polished_andesite', 'andesite'], bench4: 'smooth_stone_slab', flower4: 'azure_bluet', shape: 'dome', wall: 'polished_andesite', band: 'smooth_basalt', roof: 'light_blue_stained_glass', floor: 'smooth_stone', fill: 'andesite', window: 'light_blue_stained_glass', door: 'door_glass_white', bed: 'gray_bed', light: 'lantern', paving: 'polished_andesite', lamp: 'vx_lamppost_tech', canopy: 'gray_wool', mark: 'azure_crystal_block' },
+        kit: { lamp4: 'lantern', post4: 'andesite_wall', pave4: ['polished_andesite', 'andesite'], bench4: 'smooth_stone_slab', flower4: 'azure_bluet', shape: 'dome', wall: 'polished_andesite', band: 'smooth_basalt', roof: 'light_blue_stained_glass', floor: 'smooth_stone', fill: 'andesite', window: 'light_blue_stained_glass', door: 'door_glass_white', bed: 'gray_bed', light: 'lantern', paving: 'polished_andesite', lamp: 'vx_lamppost_tech', canopy: 'gray_wool', mark: 'azure_crystal_block' },
         goods: ['regolith', 'basalt', 'smooth_basalt', 'azure_crystal_block', 'lantern', 'diorite', 'andesite', 'iron_ingot'],
         syl: ['re', 'go', 'li', 'mun', 'sel', 'ka', 'tor', 'vi', 'den', 'ul', 'pa', 'so', 'ren', 'ix', 'ma', 'thel'], end: ['i', 'o', 'un', 'is'],
       },
@@ -186,7 +186,7 @@
       species: {
         de: 'Nivari', en: 'Nivari',
         look: { skin: [0x9ac8f0, 0x8abce8, 0xaad4f4, 0x7ab0e0], cut: ['coat', 'cape', 'coat'], feat: 'antlers', featC: [0x9ad8ff, 0xc8f0ff, 0x7ac0f0], garb: [0x2a4a7a, 0x7a2a4a, 0xe8e0d0, 0x3a6a5a, 0xc84a4a], eye: 0x2a3a6a },
-        kit: { pave4: ['smooth_stone', 'snow_block_cut'], bench4: 'spruce_slab', flower4: 'white_tulip', shape: 'vault', wall: 'packed_ice', band: 'snow_block', roof: 'blue_ice', floor: 'spruce_planks', fill: 'packed_ice', window: 'light_blue_stained_glass', door: 'spruce_door', bed: 'light_blue_bed', light: 'lantern', paving: 'snow_block_cut', lamp: 'vx_lamppost_crystal', canopy: 'light_blue_wool', mark: 'rose_crystal_block' },
+        kit: { lamp4: 'lantern', post4: 'spruce_fence', pave4: ['smooth_stone', 'snow_block_cut'], bench4: 'spruce_slab', flower4: 'white_tulip', shape: 'vault', wall: 'packed_ice', band: 'snow_block', roof: 'blue_ice', floor: 'spruce_planks', fill: 'packed_ice', window: 'light_blue_stained_glass', door: 'spruce_door', bed: 'light_blue_bed', light: 'lantern', paving: 'snow_block_cut', lamp: 'vx_lamppost_crystal', canopy: 'light_blue_wool', mark: 'rose_crystal_block' },
         goods: ['packed_ice', 'blue_ice', 'ice_crystal', 'snow_block', 'tholin_ice', 'rose_crystal_block', 'azure_crystal_cluster', 'lantern'],
         syl: ['ni', 'va', 'ri', 'is', 'fel', 'ka', 'ylo', 'sen', 'mi', 'tor', 'al', 'kel', 'su', 'vin', 'ha', 'ren'], end: ['i', 'a', 'el', 'is'],
       },
@@ -730,7 +730,7 @@
   }
   // u-worlds3 · bgen 4's plaza round the dance ring: benches on its four edges facing in (plaza.seats, the culture
   // moment's onlookers sit there), the monument's foot — a low step of the band's slab round it, the species' lights at
-  // its corners, flowers on moss in the middle of each side —, lanterns on short posts of the wall's block. The counts
+  // its corners, flowers on moss in the middle of each side —, lanterns on short posts (the species' fence or wall). The counts
   // on the plan (plaza.foot, plaza.lanterns) for test/worlds3.js.
   function plaza4(kind, Kit, put, P, X, F, Z) {
     const pz = P.plaza, seats = pz.seats = [], bench = st(Kit.bench4);
@@ -740,7 +740,7 @@
     }
     // the monument's foot (its ring of cells three out; Regoli's dome reaches there at its rim: left free)
     let foot = 0;
-    const step = st(Kit.bench4), light = st(Kit.light), moss = st('moss_block'), fl = st(Kit.flower4);
+    const step = st(Kit.bench4), light = st(Kit.lamp4), moss = st('moss_block'), fl = st(Kit.flower4);
     for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== 3) continue;
       if (kind === 'basalt' && Math.hypot(dx, dz) <= 3.25) continue;
@@ -753,7 +753,7 @@
     pz.foot = foot;
     // the lanterns on posts between the benches and the corners' lamps
     let n = 0;
-    const post = st(Kit.wall);
+    const post = st(Kit.post4);
     for (const [x, z] of [[-4, -6], [4, -6], [-4, 6], [4, 6], [-6, -4], [-6, 4], [6, -4], [6, 4]]) { put(X + x, F + 1, Z + z, post); put(X + x, F + 2, Z + z, light); P.lamps.push([X + x, F + 3, Z + z]); n++; }
     pz.lanterns = n;
   }
@@ -763,10 +763,10 @@
     const ground = (x, z) => g.surfaceY(x, z);
     const seed = strHash(site.id + ':' + (eco.s >>> 0)) >>> 0;
     const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, x: X, y: F + 1, z: Z, seed, rad: 30, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z, r: 6 }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
-    const W = writer(ground, F, Kit), put = W.put, pav = st(Kit.paving), mark = st(Kit.mark);
+    const W = writer(ground, F, Kit), put = W.put, v4 = g.bgen >= 4 && Kit.pave4, pav = v4 ? st(Kit.pave4[0]) : st(Kit.paving), mark = st(Kit.mark);   // (u-worlds3, bgen 4: the ways in the calm tone too)
     // the plaza: 13 × 13 paving, the species' mark stone in its middle (a pillar with its light), the ways to the homes
     // (u-worlds3, bgen 4: two calm tones — the dance ring's path in the second — instead of the loud band pattern)
-    const v4 = g.bgen >= 4 && Kit.pave4, pa = v4 ? st(Kit.pave4[0]) : pav, pb = v4 ? st(Kit.pave4[1]) : pav;
+    const pa = pav, pb = v4 ? st(Kit.pave4[1]) : pav;
     for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) { W.level(X + dx, Z + dz); const d = Math.hypot(dx, dz); put(X + dx, F, Z + dz, v4 ? (d >= 4.4 && d < 5.5 ? pb : pa) : (dx + dz) % 4 === 0 && Math.abs(dx) < 5 && Math.abs(dz) < 5 ? st(Kit.band) : pav); }
     centrepiece(kind, put, X, F, Z);   // (u-worlds2: the species' own monument in the plaza's middle, seen from 100 m)
     if (v4) plaza4(kind, Kit, put, P, X, F, Z);
