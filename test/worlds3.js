@@ -102,6 +102,13 @@ if (part('c')) {
   const pz0 = { x: 10, y: 64, z: 20 }, om = N.offMonument([11, 64, 21], pz0, 'basalt');
   check(om && Math.abs(Math.hypot(om[0] - 10.5, om[1] - 20.5) - 4.5) < 0.01 && N.offMonument([11, 64, 21], pz0, 'opal') === null && N.offMonument([15, 64, 20], pz0, 'zinn') === null, 'someone stuck in the monument is put back on the ring');
   // the lang keys
+  // (the keys natives.js uses)
+  N.keys = function () {
+    const k = ['g.nat.greet', 'g.nat.words', 'g.nat.opt', 'g.nat.give', 'g.nat.short', 'g.nat.thanks', 'g.nat.q0', 'g.nat.q1', 'g.nat.q2', 'g.nat.q3', 'g.nat.done0', 'g.nat.learnt', 'g.nat.teach.recipe', 'g.nat.teach.pieces', 'g.nat.teach.gadget'];
+    for (const m of N.MEAN) k.push('g.nat.mean.' + m);
+    for (const kind of N.KINDS) { k.push('g.nat.line.' + kind, 'g.nat.why.' + kind); if (N.TEACH[kind].type === 'pieces') k.push('g.nat.set.' + kind); }
+    return k;
+  };
   const miss = N.keys().filter(key => !(key in VR.I18N.dict.de) || !(key in VR.I18N.dict.en));
   check(miss.length === 0, 'the lang keys in both tables' + (miss.length ? ': ' + miss.slice(0, 5).join(', ') : ''));
   // saved worlds stay valid: an odd record is ignored

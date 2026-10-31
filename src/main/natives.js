@@ -15,7 +15,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k), nm = (id) => (VR.itemName ? VR.itemName(id) : id), spN = (k) => T('g.eco.sp.' + k);
   const N = VR.Natives = {};
   const KINDS = N.KINDS = ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
   const MEAN = N.MEAN = ['hello', 'thanks', 'friend', 'bye'];
@@ -29,10 +29,10 @@
   };
   N.TEACH = {
     aqua: { type: 'recipe', ins: ['glass', 'sea_pickle', 'kelp'], out: 'tide_lantern', n: 2 },
-    ocker: { type: 'pieces', set: 'ocker', pieces: ['b:terracotta', 'b:red_sandstone', 'b:smooth_red_sandstone', 'b:orange_stained_glass', 'b:acacia_planks', 'b:lantern', 'b:amber_crystal_block', 'b:orange_wool'] },
+    ocker: { type: 'pieces', pieces: ['b:terracotta', 'b:red_sandstone', 'b:smooth_red_sandstone', 'b:orange_stained_glass', 'b:acacia_planks', 'b:lantern', 'b:amber_crystal_block', 'b:orange_wool'] },
     zinn: { type: 'recipe', ins: ['obsidian', 'magma_block'], out: 'glowing_obsidian', n: 2 },
     basalt: { type: 'gadget', ins: ['iron_ingot', 'copper_ingot', 'azure_crystal_block'], out: 'scanner', n: 1 },
-    opal: { type: 'pieces', set: 'opal', pieces: ['b:packed_ice', 'b:blue_ice', 'b:snow_block', 'b:light_blue_stained_glass', 'b:spruce_planks', 'b:rose_crystal_block', 'b:lantern', 'b:vx_lamppost_crystal'] },
+    opal: { type: 'pieces', pieces: ['b:packed_ice', 'b:blue_ice', 'b:snow_block', 'b:light_blue_stained_glass', 'b:spruce_planks', 'b:rose_crystal_block', 'b:lantern', 'b:vx_lamppost_crystal'] },
   };
   // the three quests: greet three natives · bring the gift · join the culture moment
   N.CHAIN = {
@@ -103,23 +103,21 @@
     return { word, fresh, text: T('g.nat.greet', { w: word.w, mean: T('g.nat.mean.' + word.mean), line: T('g.nat.line.' + kind) }) };
   };
   // the greeting's gesture, f: 0 → 1 over GREET_S (adds to the pose; nothing at its ends)
+  // (each: [joint, axis, amount × the gesture's swell]; the Wellari flutter, the Glutani open their hands, the Regoli hop)
+  const GP = {
+    aqua: [['arm_l', 0, 1.1], ['arm_r', 0, 1.1], ['fore_l', 0, 0.9], ['fore_r', 0, 0.9]],       // hands raised before the chest, fluttering like fins
+    ocker: [['head', 0, -0.55], ['body', 0, -0.12], ['arm_l', 2, -0.95], ['arm_r', 2, 0.95]],  // the long neck bowed, the arms opened wide
+    zinn: [['arm_l', 0, 1], ['arm_r', 0, 1]],                                                  // the hands together, then opened to you
+    basalt: [['arm_l', 0, 1.5], ['arm_r', 0, 1.5], ['arm_l', 2, -0.9], ['arm_r', 2, 0.9]],      // two happy hops, the arms up and out
+    opal: [['body', 0, -0.35], ['head', 0, -0.2], ['arm_r', 0, 0.9], ['fore_r', 0, 1.2], ['arm_r', 2, -0.25]],   // a hand to the chest, a deep bow
+  };
   N.greetPose = function (P, kind, f) {
-    if (!(f > 0 && f < 1) || !P.body) return;
-    const w = Math.sin(f * Math.PI), add = (j, i, v) => { const q = P[j]; if (q) q[i] += v; };
-    if (kind === 'aqua') {   // both hands raised before the chest, fluttering like fins, the body swaying
-      add('arm_l', 0, 1.1 * w); add('arm_r', 0, 1.1 * w); add('fore_l', 0, 0.9 * w); add('fore_r', 0, 0.9 * w);
-      add('fore_l', 2, Math.sin(f * 40) * 0.35 * w); add('fore_r', 2, -Math.sin(f * 40 + 0.7) * 0.35 * w); add('body', 2, Math.sin(f * 9) * 0.08 * w);
-    } else if (kind === 'ocker') {   // the long neck bowed, the arms opened wide
-      add('head', 0, -0.55 * w); add('body', 0, -0.12 * w); add('arm_l', 2, -0.95 * w); add('arm_r', 2, 0.95 * w);
-    } else if (kind === 'zinn') {    // the hands together before the chest, then opened to you (the warmth shared)
-      const o = f > 0.55 ? (f - 0.55) / 0.45 : 0;
-      add('arm_l', 0, 1.0 * w); add('arm_r', 0, 1.0 * w); add('fore_l', 0, 1.1 * w * (1 - o)); add('fore_r', 0, 1.1 * w * (1 - o));
-      add('arm_l', 2, -0.6 * o * w); add('arm_r', 2, 0.6 * o * w);
-    } else if (kind === 'basalt') {  // two happy hops, the arms up and out
-      add('hips', 4, Math.abs(Math.sin(f * Math.PI * 4)) * 2.4 * w); add('arm_l', 0, 1.5 * w); add('arm_r', 0, 1.5 * w); add('arm_l', 2, -0.9 * w); add('arm_r', 2, 0.9 * w);
-    } else {                          // a hand to the chest, a slow deep bow
-      add('body', 0, -0.35 * w); add('head', 0, -0.2 * w); add('arm_r', 0, 0.9 * w); add('fore_r', 0, 1.2 * w); add('arm_r', 2, -0.25 * w);
-    }
+    const L = GP[kind]; if (!(f > 0 && f < 1) || !P.body || !L) return;
+    const w = Math.sin(f * Math.PI), add = (j, i, v) => { if (P[j]) P[j][i] += v; };
+    for (const [j, i, v] of L) add(j, i, v * w);
+    if (kind === 'aqua') { const q = Math.sin(f * 40) * 0.35 * w; add('fore_l', 2, q); add('fore_r', 2, -q); }
+    else if (kind === 'zinn') { const o = f > 0.55 ? (f - 0.55) / 0.45 : 0; add('fore_l', 0, 1.1 * w * (1 - o)); add('fore_r', 0, 1.1 * w * (1 - o)); add('arm_l', 2, -0.6 * o * w); add('arm_r', 2, 0.6 * o * w); }
+    else if (kind === 'basalt') add('hips', 4, Math.abs(Math.sin(f * Math.PI * 4)) * 2.4 * w);
   };
   // where someone near the player waits during a talk: on the line from the player through them, HUSH_D away
   N.hushSpot = function (pos, pl) {
@@ -138,25 +136,19 @@
   };
   // the quest's text for the talk panel
   N.status = function (meta, kind) {
-    const r = N.rec(meta, kind), sp = T('g.eco.sp.' + kind), Q = N.CHAIN[kind];
+    const r = N.rec(meta, kind), sp = spN(kind), Q = N.CHAIN[kind];
     const words = N.known(meta, kind).map(o => o.w + ' (' + T('g.nat.mean.' + o.mean) + ')').join(' · ');
     const wl = words ? '\n' + T('g.nat.words', { list: words }) : '';
     if (r.s === 0) return T('g.nat.q0', { sp, n: r.met.length, of: Q[0].n }) + wl;
-    if (r.s === 1) return T('g.nat.q1', { sp, n: Q[1].n, item: VR.itemName ? VR.itemName(Q[1].item) : Q[1].item, why: T('g.nat.why.' + kind) }) + wl;
+    if (r.s === 1) return T('g.nat.q1', { sp, n: Q[1].n, item: nm(Q[1].item), why: T('g.nat.why.' + kind) }) + wl;
     if (r.s === 2) return T('g.nat.q2', { sp, what: T('g.eco.cult.' + kind) }) + wl;
     return T('g.nat.q3', { sp, what: N.teachText(kind) }) + wl;
   };
   N.teachText = function (kind) {
-    const Tt = N.TEACH[kind], nm = (id) => (VR.itemName ? VR.itemName(id) : id);
+    const Tt = N.TEACH[kind];
     if (Tt.type === 'pieces') return T('g.nat.teach.pieces', { name: T('g.nat.set.' + kind), n: Tt.pieces.length });
     if (Tt.type === 'gadget') return T('g.nat.teach.gadget', { item: nm(Tt.out), ins: Tt.ins.map(nm).join(' + ') });
     return T('g.nat.teach.recipe', { ins: Tt.ins.map(nm).join(' + '), n: Tt.n, out: nm(Tt.out) });
-  };
-  N.keys = function () {
-    const k = ['g.nat.greet', 'g.nat.words', 'g.nat.opt', 'g.nat.give', 'g.nat.short', 'g.nat.thanks', 'g.nat.q0', 'g.nat.q1', 'g.nat.q2', 'g.nat.q3', 'g.nat.done0', 'g.nat.learnt', 'g.nat.teach.recipe', 'g.nat.teach.pieces', 'g.nat.teach.gadget'];
-    for (const m of MEAN) k.push('g.nat.mean.' + m);
-    for (const kind of KINDS) { k.push('g.nat.line.' + kind, 'g.nat.why.' + kind); if (N.TEACH[kind].type === 'pieces') k.push('g.nat.set.' + kind); }
-    return k;
   };
 
   // ---------------------------------------------------------------- the game's side
@@ -165,7 +157,7 @@
   N.taught = function (g, kind) {
     const Tt = N.TEACH[kind];
     if (Tt.type === 'pieces' && VR.Favs && VR.Favs.addMany) VR.Favs.addMany(Tt.pieces.filter(id => VR.R && VR.R.byName[id.slice(2)]));
-    if (g && g.ui && g.ui.toast) g.ui.toast('🗝 ' + T('g.nat.learnt', { sp: T('g.eco.sp.' + kind) }), N.teachText(kind));
+    if (g && g.ui && g.ui.toast) g.ui.toast('🗝 ' + T('g.nat.learnt', { sp: spN(kind) }), N.teachText(kind));
     if (g && g.player && g.player.inv) g.player.inv.changed = true;
   };
   // the culture moment's join counts as the third quest
@@ -245,7 +237,7 @@
       if (gr) { this.talkText(gr.text); a.say(gr.word.w + '!', 2.5); }
       a.greetT = N.GREET_S; a.path = null;
       const ev = N.talked(meta, kind, a.p.id);
-      if (ev && ev.done === 0 && g.ui && g.ui.chatLine) g.ui.chatLine('🗝 ' + T('g.nat.done0', { sp: T('g.eco.sp.' + kind), item: VR.itemName ? VR.itemName(N.CHAIN[kind][1].item) : N.CHAIN[kind][1].item, n: N.CHAIN[kind][1].n }), '#ffd98a');
+      if (ev && ev.done === 0 && g.ui && g.ui.chatLine) g.ui.chatLine('🗝 ' + T('g.nat.done0', { sp: spN(kind), item: nm(N.CHAIN[kind][1].item), n: N.CHAIN[kind][1].n }), '#ffd98a');
       // the others make room
       for (const o of a.vil.agents) {
         if (o === a || o.pose === 'sleep' || o.inBoat) continue;
@@ -260,11 +252,11 @@
       const box = document.getElementById('tk_opts'); if (!box) return r;
       const g = this.g, meta = g.meta || (g.meta = {});
       const mk = (label, fn) => { const b = document.createElement('button'); b.className = 'btn small'; b.textContent = label; b.onclick = () => { this.chirp(a); fn(); }; return b; };
-      box.insertBefore(mk(T('g.nat.opt', { sp: T('g.eco.sp.' + kind) }), () => {
+      box.insertBefore(mk(T('g.nat.opt', { sp: spN(kind) }), () => {
         this.talkText(N.status(meta, kind));
         if (N.step(meta, kind) === 1 && !box.querySelector('[data-natgive]')) {
           const q = N.CHAIN[kind][1];
-          const b = mk(T('g.nat.give', { n: q.n, item: VR.itemName ? VR.itemName(q.item) : q.item }), () => {
+          const b = mk(T('g.nat.give', { n: q.n, item: nm(q.item) }), () => {
             const inv = g.player && g.player.inv;
             if (N.give(meta, kind, inv)) { this.talkText(T('g.nat.thanks', { w: N.LANG[kind][1].w, mean: T('g.nat.mean.thanks'), what: T('g.eco.cult.' + kind) })); a.greetT = N.GREET_S; b.remove(); if (g.ui.updateHUD) g.ui.updateHUD(true); }
             else this.talkText(T('g.nat.short', { have: inv ? inv.count(q.item) : 0, n: q.n }));

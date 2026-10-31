@@ -716,7 +716,7 @@
     // glinting eyes and a little round mouth with rosy dots, the Nivari's almond ice-blue eyes with frost lashes and a
     // rose crystal on the brow. The lids close what the eyes cover; the mouth darkens before its line.
     if (C.species) {
-      const sp = C.species, fc = C.featC || 0xffffff, SKE = (c, t) => (SK(c, t) | (1 << 24)) >>> 0;
+      const sp = C.species, O = TG.other, EY = TG.eye, HR = TG.hair, fc = C.featC || 0xffffff, SKE = (c, t) => (SK(c, t) | (1 << 24)) >>> 0;
       const eyeAt2 = [], mouthAt = [];
       const put = (X, Y, c, t, em, list) => { const Z = frontZ(X, Y); if (Z === null) return; F.c[idx(F, X, Y, Z)] = em ? SKE(c, t) : SK(c, t); if (list) list.push([X, Y, Z]); };
       const pair = (X, Y, c, t, em, list) => { put(X, Y, c, t, em, list); put(mir(X), Y, c, t, em, list); };
@@ -726,7 +726,7 @@
         for (let Y = Math.floor(cy - ry); Y <= Math.ceil(cy + ry); Y++) for (let X = Math.floor(cx - rx); X <= Math.min(eL + 1, Math.ceil(cx + rx)); X++) {
           const u = (X - cx) / rx, v = (Y - cy) / ry; if (u * u + v * v > 1.05) continue;
           const c = col(u, v); if (c === null) continue;
-          pair(X, Y, c, TG.eye, em && em(u, v), eyeAt2);
+          pair(X, Y, c, EY, em && em(u, v), eyeAt2);
         }
       };
       const dark = 0x0E1018, glint = 0xFFFFFF;
@@ -734,39 +734,39 @@
       if (sp === 'aqua') {
         const ir = mix(C.eye, 0x0A0806, 0.45), rim = mix(C.eye, fc, 0.5);
         eye(eL - 0.5, Ye - 0.5, 2.15, 2.15, (u, v) => (u < -0.25 && v > 0.25 && u > -0.8 ? glint : u * u + v * v > 0.62 ? rim : ir));
-        for (const X of [bL - 1, bL]) pair(X, Ye - 5, mul(skin, 0.5), TG.other, 0, mouthAt);
-        pair(bL - 2, Ye - 4, mul(skin, 0.6), TG.other);
-        for (const Y of [Ye - 3, Ye - 4]) pair(eL - 3, Y, mix(skin, fc, 0.55), TG.other);
-        pair(eL - 2, Ye - 4, mix(skin, fc, 0.4), TG.other);
+        for (const X of [bL - 1, bL]) pair(X, Ye - 5, mul(skin, 0.5), O, 0, mouthAt);
+        pair(bL - 2, Ye - 4, mul(skin, 0.6), O);
+        for (const Y of [Ye - 3, Ye - 4]) pair(eL - 3, Y, mix(skin, fc, 0.55), O);
+        pair(eL - 2, Ye - 4, mix(skin, fc, 0.4), O);
       } else if (sp === 'ocker') {
         const amber = mix(0xE8A030, C.eye, 0.2);
         eye(eL - 0.5, Ye, 2.1, 1.35, (u) => (Math.abs(u) < 0.3 ? dark : u < -0.6 ? mix(amber, 0xFFF0C0, 0.5) : amber));
-        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 2, mix(skin, 0x3A2010, 0.55), TG.hair);
-        pair(eL - 3, Ye + 2, mix(skin, 0x3A2010, 0.35), TG.hair);
+        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 2, mix(skin, 0x3A2010, 0.55), HR);
+        pair(eL - 3, Ye + 2, mix(skin, 0x3A2010, 0.35), HR);
         // the nose pad on the muzzle's front, the mouth under it
-        for (const Y of [Ye - 2, Ye - 3]) pair(bL, Y, 0x2A1A14, TG.other);
-        pair(bL, Ye - 5, mul(skin, 0.45), TG.other, 0, mouthAt); pair(bL - 1, Ye - 4, mul(skin, 0.55), TG.other);
+        for (const Y of [Ye - 2, Ye - 3]) pair(bL, Y, 0x2A1A14, O);
+        pair(bL, Ye - 5, mul(skin, 0.45), O, 0, mouthAt); pair(bL - 1, Ye - 4, mul(skin, 0.55), O);
         mouthY = Ye - 5;
       } else if (sp === 'zinn') {
         const ember = mix(fc, 0xFFFFFF, 0.3), brow = mul(skin, 0.62);
-        for (let X = eL - 3; X <= eL + 1; X++) pair(X, Ye + 2, brow, TG.other);
+        for (let X = eL - 3; X <= eL + 1; X++) pair(X, Ye + 2, brow, O);
         eye(eL - 0.5, Ye - 0.3, 2.1, 1.35, (u, v) => (Math.abs(u) < 0.3 && Math.abs(v) < 0.5 ? 0x2A0A04 : v > 0.35 && u < 0 ? mix(ember, 0xFFFFFF, 0.6) : ember), (u, v) => !(Math.abs(u) < 0.3 && Math.abs(v) < 0.5));
-        for (let X = bL - 2; X <= bL; X++) pair(X, Ye - 5, X === bL ? mix(fc, 0x401000, 0.5) : mul(skin, 0.45), TG.other, 0, mouthAt);
-        pair(bL - 3, Ye - 4, mul(skin, 0.55), TG.other);
+        for (let X = bL - 2; X <= bL; X++) pair(X, Ye - 5, X === bL ? mix(fc, 0x401000, 0.5) : mul(skin, 0.45), O, 0, mouthAt);
+        pair(bL - 3, Ye - 4, mul(skin, 0.55), O);
       } else if (sp === 'basalt') {
         const ir = mix(C.eye, 0x101828, 0.3);
         eye(eL - 0.5, Ye - 0.5, 2.7, 2.7, (u, v) => (u < -0.15 && u > -0.75 && v > 0.15 && v < 0.75 ? glint : (u > 0.25 && u < 0.7 && v < -0.3 && v > -0.75) ? mix(ir, 0xBFE6FF, 0.6) : ir), (u, v) => u < -0.15 && v > 0.15 && u > -0.75 && v < 0.75);
-        pair(bL, Ye - 5, 0x3A1E24, TG.other, 0, mouthAt); pair(bL, Ye - 6, mul(skin, 0.6), TG.other);
-        for (const X of [eL - 2, eL - 1]) pair(X, Ye - 4, mix(skin, 0xFF7E86, 0.45), TG.other);
+        pair(bL, Ye - 5, 0x3A1E24, O, 0, mouthAt); pair(bL, Ye - 6, mul(skin, 0.6), O);
+        for (const X of [eL - 2, eL - 1]) pair(X, Ye - 4, mix(skin, 0xFF7E86, 0.45), O);
         mouthY = Ye - 5;
       } else {
         const ice = mix(0x9FD8FF, C.eye, 0.25), lash = 0xE8F6FF;
         eye(eL - 0.5, Ye - 0.5, 2.1, 1.1, (u) => (Math.abs(u + 0.1) < 0.25 ? mix(ice, 0x101828, 0.75) : Math.abs(u) < 0.6 ? ice : 0xF4F8FC));
-        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 1, lash, TG.hair);
-        pair(eL - 3, Ye + 2, lash, TG.hair);
-        for (const X of [bL]) for (const Y of [Ye + 3, Ye + 4]) pair(X, Y, 0xF4A0C8, TG.other, 1);
-        pair(bL, Ye - 5, mix(skin, 0x5A6AA0, 0.55), TG.other, 0, mouthAt);
-        for (const [X, Y] of [[eL - 2, Ye - 3], [eL - 1, Ye - 4], [eL - 3, Ye - 4]]) pair(X, Y, mix(skin, 0xFFFFFF, 0.45), TG.other);
+        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 1, lash, HR);
+        pair(eL - 3, Ye + 2, lash, HR);
+        for (const X of [bL]) for (const Y of [Ye + 3, Ye + 4]) pair(X, Y, 0xF4A0C8, O, 1);
+        pair(bL, Ye - 5, mix(skin, 0x5A6AA0, 0.55), O, 0, mouthAt);
+        for (const [X, Y] of [[eL - 2, Ye - 3], [eL - 1, Ye - 4], [eL - 3, Ye - 4]]) pair(X, Y, mix(skin, 0xFFFFFF, 0.45), O);
       }
       const lids = grid(), mouth = grid();
       for (const [X, Y, Z] of eyeAt2) fset(lids, X, Y, Z - 1, mul(skin, 0.9));
