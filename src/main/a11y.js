@@ -269,6 +269,8 @@
   A.CSS = [
     ':root{--a11y-text:1}',
     'html.a11y-text #hint,html.a11y-text #ctxprompt,html.a11y-text #storybox .sub,html.a11y-text #keystrip,html.a11y-text #hints,html.a11y-text #toasts,html.a11y-text #itemname,html.a11y-text #chat{zoom:var(--a11y-text)}',
+    // (the hint card sits under the Aktion prompt: it grows less, so the two never overlap)
+    'html.a11y-text #hints{zoom:min(var(--a11y-text),1.1)}',
     // high contrast: solid dark plates, white ink, a 2-px outline; the crosshair drawn black-on-white
     'html.a11y-hc #hint,html.a11y-hc #ctxprompt,html.a11y-hc #keystrip .ks,html.a11y-hc #hints .hint,html.a11y-hc #storybox .sub,html.a11y-hc #itemname,html.a11y-hc .toast{background:#000 !important;color:#fff !important;outline:2px solid #fff;outline-offset:0;text-shadow:none !important;box-shadow:none !important;opacity:1}',
     'html.a11y-hc #hotbar{background:#000 !important;outline:2px solid #fff}',
@@ -279,7 +281,7 @@
     'html.a11y-hc #stats,html.a11y-hc #compass,html.a11y-hc #minimap{outline:2px solid #fff;background:#000}',
     // the pad's glyphs in the prompts
     '.a11y-g{display:inline-block;vertical-align:middle;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.6))}',
-    '#keystrip kbd.pad,#ctxprompt b.pad{background:none !important;border:0 !important;padding:0 !important;box-shadow:none !important;min-width:0}',
+    '#keystrip kbd.pad,#ctxprompt b.pad,html.a11y-hc #keystrip kbd.pad,html.a11y-hc #ctxprompt b.pad{background:none !important;border:0 !important;padding:0 !important;box-shadow:none !important;min-width:0}',
     '#a11ybump{position:absolute;pointer-events:none;display:none;z-index:5}',
     '#a11ybump.on{display:block}#a11ybump .l,#a11ybump .r{position:absolute;top:0}',
     'html.a11y-hc .a11y-g{filter:none}',
@@ -308,7 +310,31 @@
     bump.classList.toggle('on', on);
     if (on) { const r = hb.getBoundingClientRect(), pr = (hb.offsetParent || document.body).getBoundingClientRect(); bump.style.left = (r.left - pr.left - 36) + 'px'; bump.style.top = (r.top - pr.top + r.height / 2 - 9) + 'px'; bump.style.width = (r.width + 72) + 'px'; bump.querySelector('.r').style.left = (r.width + 42) + 'px'; }
   }
+  // ⚙ Einfach (first2.js) shows three rows: a button under them leads to „Zugänglichkeit" (Alle Einstellungen · Spiel)
+  A.openAccess = function (ui) {
+    ui.setAll = true; ui.showSettings('play');
+    const h = [...document.querySelectorAll('#ui h3')].find(e => e.textContent === tx('g.set.sec.access', null, 'Zugänglichkeit', 'Accessibility'));
+    if (h && h.scrollIntoView) h.scrollIntoView({ block: 'start' });
+    return !!h;
+  };
+  function wrapSimple() {
+    const F = VR.First2; if (!F || !F.renderSimple || F.renderSimple.__a11y) return;
+    const or = F.renderSimple;
+    F.renderSimple = function (ui) {
+      const r = or.apply(this, arguments);
+      try {
+        const tabs = document.getElementById('settabs');
+        if (r && tabs && !tabs.querySelector('.a11ybtn')) {
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'a11ybtn';
+          b.textContent = tx('g.a11y.open', null, 'Zugänglichkeit …', 'Accessibility …'); b.onclick = () => A.openAccess(ui); tabs.appendChild(b);
+        }
+      } catch (e) { /* a nicety */ }
+      return r;
+    };
+    F.renderSimple.__a11y = true;
+  }
   A.tick = function () {
+    try { if (hasDoc) wrapSimple(); } catch (e) { /* */ }
     const g = game(); if (!g || !g.settings) return;
     const s = g.settings;
     try { A.applyPage(s); } catch (e) { /* */ }

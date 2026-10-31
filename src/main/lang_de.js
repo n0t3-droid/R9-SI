@@ -3207,6 +3207,7 @@
     "g.a11y.mono.tip": "Alles auf beiden Ohren gleich — für einen Kopfhörer oder ein Ohr.",
     "ctl.bauhand": "Bauhand / Ankerstiefel",
     "ctl.mirror": "Stempel spiegeln / Schiffslicht",
+    "g.a11y.open": "Zugänglichkeit …",
     "ctl.stamps": "Stempel-Sammlung",
     // ---- e-access end
 });

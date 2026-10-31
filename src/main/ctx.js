@@ -370,7 +370,7 @@
     const i = text.indexOf('] ');
     d.pr.innerHTML = '';
     const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); b.dataset.key = text.slice(1, i); d.pr.appendChild(b);
-    if (VR.A11y && VR.A11y.padMode()) { b.innerHTML = VR.A11y.glyph(VR.A11y.padOf('veh')); b.className = 'pad'; }   // e-access: the pad's own glyph   // (e-ux: data-key — the key cap without its brackets, ux.css)
+    if (VR.A11y && VR.A11y.padMode()) { b.innerHTML = VR.A11y.glyph(VR.A11y.padOf('veh')); b.className = 'pad'; b.removeAttribute('data-key'); }   // e-access: the pad's own glyph   // (e-ux: data-key — the key cap without its brackets, ux.css)
     d.pr.appendChild(document.createTextNode(' ' + text.slice(i + 2)));
     d.pr.classList.add('on');
     void res;

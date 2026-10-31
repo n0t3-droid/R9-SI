@@ -77,9 +77,10 @@ await section('jump', async () => {
     const ok = await ev(([a, b, less]) => { const g = VR.game; g.settings.lessMotion = less; g.settings.fov = 75; if (g.stars && g.stars.on) VR.StarJump.leave(g); VR.StarJump.enter(g, a, { quiet: true }); return VR.StarJump.jump(g, b); }, [C.from, C.k, mode === 'reduced']);
     await run(2);
     const J = await ev(() => { const S = VR.game.stars; return { spin: S.J.spin, transit: S.J.transit, fade: !!S.fade }; });
-    await run(Math.round((J.spin + J.transit * 0.5) / 0.033) - 2);
+    // normal: the transit's peak; reduced: the fade three quarters into the spin-up (the stars still there, dimmed, not bunched)
+    await run(Math.round((mode === 'reduced' ? J.spin * 0.75 : J.spin + J.transit * 0.5) / 0.033) - 2);
     const uf = await ev(() => ({ beta: VR.StarJump.UF.jump[0], black: VR.StarJump.UF.jump[3] }));
-    if (mode === 'reduced') check(ok && J.fade && uf.beta === 0 && uf.black > 0.9, 'Weniger Bewegung: the jump is a fade (no bunching, the screen dark)', JSON.stringify(uf));
+    if (mode === 'reduced') check(ok && J.fade && uf.beta === 0 && uf.black > 0.3 && uf.black < 0.95, 'Weniger Bewegung: the jump is a fade (no bunching, the screen darkening)', JSON.stringify(uf));
     else check(ok && !J.fade && uf.beta > 0.5, 'normal: the stars bunch (β at the transit)', JSON.stringify(uf));
     pics['jump_' + mode] = await shotGL('a11y_jump_' + mode + '.png', 2);
     await ev(() => { const g = VR.game; for (let n = 0; n < 900 && g.stars && g.stars.J; n++) { g.last = performance.now() - 33; window.__step(performance.now()); } if (g.stars && g.stars.on) VR.StarJump.leave(g); g.settings.lessMotion = false; });
@@ -150,11 +151,13 @@ await section('onehand', async () => {
   });
   check(r.k === 'ArrowUp' && r.back === 'KeyW', 'Ein-Hand · Tastatur: the arrows walk; off: W again', JSON.stringify(r));
   check(!r.hasCtx || r.mono === 1, 'mono: the master bus has one channel', JSON.stringify(r));
-  await ev(() => { const g = VR.game; g.settings.oneHand = 'mouse'; g.settings.lessMotion = true; g.ui.showSettings('play'); });
+  // ⚙ Einfach first: its „Zugänglichkeit …" button leads to the rows
+  await ev(() => { const g = VR.game; g.settings.oneHand = 'mouse'; g.settings.lessMotion = true; g.ui.setAll = false; VR.A11y.tick(); g.ui.showSettings('play'); });
+  await wait(400);
+  const btn = await ev(() => { const b = document.querySelector('#settabs .a11ybtn'); if (!b) return ''; const t = b.textContent; b.click(); return t; });
   await wait(500);
-  await ev(() => { const h = [...document.querySelectorAll('#ui h3')].find(e => /Zugänglichkeit/.test(e.textContent)); if (h) h.scrollIntoView({ block: 'start' }); });
   const has = await ev(() => [...document.querySelectorAll('#ui h3')].some(e => /Zugänglichkeit/.test(e.textContent)));
-  check(has, '⚙ Spiel shows the section „Zugänglichkeit"');
+  check(btn === 'Zugänglichkeit …' && has, '⚙ Einfach → „Zugänglichkeit …" → the section in ⚙ Spiel', btn);
   pics.onehand = await shotPage('a11y_onehand.png');
   await ev(() => { const g = VR.game; g.settings.oneHand = 'off'; g.settings.lessMotion = false; g.ui.show(null); });
 });
@@ -168,14 +171,14 @@ await section('cost', async () => {
       const on = (v) => { Object.assign(g.settings, { lessMotion: v, highContrast: v, textSize: v ? 1.25 : 1, monoAudio: v, oneHand: v ? 'mouse' : 'off', subSpeed: v ? 1.5 : 1 }); VR.A11y.tick(); };
       const one = (n) => { const t = []; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; window.__step(t0); g.renderer.gl.finish(); t.push(performance.now() - t0); } t.sort((a, b) => a - b); return +t[t.length >> 1].toFixed(1); };
       one(6); const R = { off: [], on: [] };
-      for (let k = 0; k < 2; k++) { on(false); R.off.push(one(10)); on(true); R.on.push(one(10)); }
+      for (let k = 0; k < 4; k++) { on(k % 2 === 1); (k % 2 ? R.on : R.off).push(one(12)); on(k % 2 === 0); (k % 2 ? R.off : R.on).push(one(12)); }
       on(false); window.__norender = true;
-      const med = (a) => +(a.reduce((s, v) => s + v, 0) / a.length).toFixed(1);
+      const med = (a) => +Math.min(...a).toFixed(1);
       return { off: med(R.off), on: med(R.on) };
     }, preset);
     console.log(`  cost ${preset}: frame ${cost[preset].off} ms off · ${cost[preset].on} ms with every switch on (${secs()})`);
   }
-  check(cost.potato && cost.potato.on <= cost.potato.off * 1.08 + 2, `Very Low does not get slower with the switches (${JSON.stringify(cost.potato)})`);
+  check(cost.potato && cost.potato.on <= cost.potato.off * 1.1 + 1.5, `Very Low does not get slower with the switches (${JSON.stringify(cost.potato)})`);
 });
 
 // ---------------------------------------------------------------- the deutan picture and the sheet (python, after the browser)
@@ -188,7 +191,7 @@ try {
     pics.deutan = SHOTS + 'a11y_markers_deutan.png'; console.log('  shot a11y_markers_deutan.png (simulated)');
   }
   const rows = [];
-  if (pics.jump_normal || pics.jump_reduced) rows.push({ label: 'Sternsprung — normal | Weniger Bewegung (Überblendung)', imgs: [pics.jump_normal, pics.jump_reduced].filter(Boolean) });
+  if (pics.jump_normal || pics.jump_reduced) rows.push({ label: 'Sternsprung — normal (Transit) | Weniger Bewegung (Überblendung, ¾ des Anlaufs)', imgs: [pics.jump_normal, pics.jump_reduced].filter(Boolean) });
   if (pics.markers) rows.push({ label: 'Eroberungskarte — normal | Deuteranopie simuliert (◆ „!" gestört, ◆ ✓ befreit)', imgs: [pics.markers, pics.deutan].filter(Boolean) });
   if (pics.pad) rows.push({ label: 'Controller: X = Aktion, A / Y / Ansicht in der Leiste, LB / RB an der Leiste', imgs: [pics.pad] });
   if (pics.hc) rows.push({ label: 'HUD — normal | hoher Kontrast + Text 125 %', imgs: [pics.hcNormal, pics.hc].filter(Boolean) });

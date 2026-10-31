@@ -3207,6 +3207,7 @@
     "g.a11y.mono.tip": "Everything the same in both ears — for one earphone or one ear.",
     "ctl.bauhand": "Bauhand / anchor boots",
     "ctl.mirror": "Mirror stamp / ship lights",
+    "g.a11y.open": "Accessibility …",
     "ctl.stamps": "Stamp library",
     // ---- e-access end
 });
