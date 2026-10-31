@@ -162,6 +162,8 @@
     Portal.close(true);
     Portal.go(g, dest);
   }
+  // K held (as the convoy's wheel reads it, konvoi.js: the raw key; in a session K is the wheel's)
+  if (typeof window !== 'undefined' && window.addEventListener) { window.addEventListener('keydown', (e) => { if (e.code === 'KeyK' && !e.repeat) M.kDown = true; }, true); window.addEventListener('keyup', (e) => { if (e.code === 'KeyK') M.kDown = false; }, true); window.addEventListener('blur', () => { M.kDown = false; }); }
   if (doc) doc.addEventListener('keydown', (e) => {
     if (M.pick && e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); Portal.close(); return; }
     if (M.J && !M.J.dry && (e.code === 'Space' || e.code === 'Escape' || e.code === 'Enter')) { e.preventDefault(); e.stopPropagation(); skip(); }
@@ -182,7 +184,8 @@
     const film = o.film || C.film(rec, (o.seed !== undefined ? o.seed : seedOf(g)) >>> 0, g.dim, dest.dim, { low: low(g) });
     rec.last = dest.id || null;
     const homeBody = palOf(D.home(g.meta));
-    const P = F.make(film, palOf(dest.dim), palOf(g.dim), { air: C.airOf(dest.dim), curveFrom: C.kindOf(g.dim) === 'deep' ? homeBody : palOf(g.dim) });
+    const fromBody = C.kindOf(g.dim) === 'deep' || C.kindOf(g.dim) === 'station' ? D.home(g.meta) : g.dim;
+    const P = F.make(film, palOf(dest.dim), palOf(g.dim), { air: C.airOf(dest.dim), curveFrom: C.kindOf(g.dim) === 'deep' ? homeBody : palOf(g.dim), to: dest.dim, from: g.dim, fromBody, kind: C.kindOf(dest.dim) });
     let cv = doc.getElementById('ptFilm');
     if (!cv) { cv = el('canvas'); cv.id = 'ptFilm'; host().appendChild(cv); cv.addEventListener('mousedown', () => skip()); const sk = el('div'); sk.id = 'ptSkip'; host().appendChild(sk); }
     const sc = low(g) ? 0.4 : 0.75;
@@ -230,6 +233,7 @@
       if (!J.dry && J.went && !J.arrived && !J.local && VR.Travel && !VR.Travel.busy(g) && g.state === 'play' && g.dim === J.dest.dim) J.arrived = true;
       if (J.failed) { end(J); return; }
       if (J.went && g.state === 'title') { end(J); return; }   // (the trip broke: the title shows)
+      if (!J.dry) { const cover = !!(g.ui && g.ui.screen); if (cover !== !!J.covered) { J.covered = cover; J.cv.style.visibility = cover ? 'hidden' : 'visible'; } }   // (a menu opened over the trip — the pause: it stays usable, the film waits under it)
       draw(J);
       if (!J.paused && J.t >= J.P.len && (J.arrived || J.dry)) {
         if (J.dry) { end(J); return; }
@@ -352,7 +356,7 @@
     const ui = g.ui, p = g.player, input = g.input;
     const frozen = !p || p.dead || (ui && (ui.screen || ui.typing || ui.blocking)) || (g.director && g.director.active) || g.studioOpen || (VR.Travel && VR.Travel.busy(g));
     // K held: the picker (in a multiplayer session K is the convoy's wheel)
-    if (!frozen && input && input.down && input.down('KeyK') && !(g.mp && g.mp.session)) { M.kT += dt; if (M.kT >= Portal.HOLD_K) { M.kT = 0; Portal.open(g, 'key'); return; } } else M.kT = 0;
+    if (!frozen && M.kDown && !(g.mp && g.mp.session)) { M.kT += dt; if (M.kT >= Portal.HOLD_K) { M.kT = 0; M.kDown = false; Portal.open(g, 'key'); return; } } else M.kT = 0;
     const inside = !frozen && inGate(g);
     if (!inside) { if (M.gateT) { M.gateT = 0; ring(0); } if (!frozen) M.armed = true; return; }
     if (!M.armed) return;

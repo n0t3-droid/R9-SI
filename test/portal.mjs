@@ -23,12 +23,14 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, l
 const page = await ctx.newPage();
 const logs = [];
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 800)));
-page.on('console', m => { if (m.type() === 'error') logs.push('[error] ' + m.text().slice(0, 300)); });
+page.on('console', m => { if (m.type() === 'error' || /travel|portal/i.test(m.text())) { logs.push('[' + m.type() + '] ' + m.text().slice(0, 300)); if (/travel|portal/i.test(m.text())) console.log('    console: ' + m.text().slice(0, 200)); } });
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, a) => page.evaluate(fn, a);
-const shot = async (name) => { await page.screenshot({ path: SHOTS + name }); return SHOTS + name; };
+// (SwiftShader: the 3D frame is held while the page is pictured — the last frame stays on the screen, the DOM and the film's canvas on top)
+const shot = async (name) => { await ev(() => { window.__norender = true; }); await wait(400); try { await page.screenshot({ path: SHOTS + name, timeout: 120000 }); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => { window.__norender = false; }); return SHOTS + name; };
 await page.goto(DIST);
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
+await ev(() => { const r = VR.game.renderer; r._render = r.render; r.render = function (F) { if (window.__norender) return; return this._render(F); }; });
 await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.renderDist = 6; g.settings.dynRes = false; g.applySettings('*'); });
 await ev(() => VR.game.createWorld({ name: 'Portal', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '53', cheats: true, kit: true }));
 for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
@@ -68,6 +70,7 @@ check(a1.sh === 'clouds' && a2.sh === 'curve' && a3.sh === 'arrive', 'the shots:
 const F2 = await filmWith({ from: 'overworld', to: 'x.2.1.1', need: ['tunnel'] });
 const a4 = await filmShot({ dim: 'x.2.1.1' }, F2, 'tunnel', 0.6, 'journey_exo_tunnel.png');
 const a5 = await filmShot({ dim: 'opal' }, F1, 'swallow', 0.55, 'journey_swallow.png');
+const a6 = await filmShot({ dim: 'opal' }, F1, 'moon', 0.75, 'journey_moon_opal.png');
 check(a4.sh === 'tunnel', 'the star-jump tunnel to another star');
 // the film's draw cost: High, then Very Low (a dry film played for 3 s each)
 for (const pr of ['high', 'potato']) {
@@ -83,13 +86,17 @@ console.log('  film draw ms: High ' + JSON.stringify(rec.film_high) + ' · Very 
 check(rec.film_potato.drawMs <= rec.film_high.drawMs + 0.5, 'Very Low draws the film no dearer than High');
 save();
 // ---------------------------------------------------------------- a real trip: Herzwelt → Opal
+rec.ctxBefore = await ev(() => ({ ctx: VR.Portal.ctx(VR.game), screen: VR.game.ui.screen, blocking: VR.game.ui.blocking, state: VR.game.state, mode: VR.game.player.mode, adv: VR.Adventure && VR.Adventure.on && VR.Adventure.on(), role: VR.game.mp && VR.game.mp.role }));
+console.log('  before the trip: ' + JSON.stringify(rec.ctxBefore));
+await ev(() => { const g = VR.game; if (g.ui.screen) g.ui.resume(); });
 const t0 = Date.now();
 const film = await ev(() => { const g = VR.game; const F = VR.Portal.go(g, { dim: 'opal', id: 'w:opal' }); return F && F.id; });
 check(!!film, 'the journey starts: ' + film);
 let capShot = null, phase = null;
-for (let i = 0; i < 240; i++) {
+for (let i = 0; i < 600; i++) {
   await wait(500);
-  const s = await ev(() => ({ st: VR.Portal.stats(), dim: VR.game.dim, state: VR.game.state }));
+  const s = await ev(() => ({ st: VR.Portal.stats(), dim: VR.game.dim, state: VR.game.state, screen: VR.game.ui.screen, busy: VR.Travel.busy(VR.game), trip: VR.game.travel && VR.game.travel.trip && { to: VR.game.travel.trip.to, sw: VR.game.travel.trip.tSwitch } }));
+  if (i % 20 === 0) console.log('    ' + (i / 2) + ' s: ' + JSON.stringify({ f: s.st.film && { t: s.st.film.t, ph: s.st.film.phase, went: s.st.film.went, arr: s.st.film.arrived }, dim: s.dim, state: s.state, screen: s.screen, busy: s.busy, trip: s.trip }));
   if (s.st.film) phase = s.st.film.phase;
   if (s.st.film && s.st.film.phase === 'reveal' && !capShot) { await wait(1400); capShot = await shot('arrival_caption.png'); }
   if (!s.st.film && s.dim === 'opal' && s.state === 'play') break;
@@ -107,9 +114,9 @@ await ev(() => VR.Portal.go(VR.game, { dim: 'overworld', id: 'w:overworld' }));
 for (let i = 0; i < 200; i++) { await wait(500); await page.keyboard.press('Space'); const s = await ev(() => ({ f: VR.Portal.stats().film, dim: VR.game.dim })); if (!s.f && s.dim === 'overworld') break; }
 await wait(6000);
 async function fly(mul, name) {
-  await ev((m) => { const g = VR.game, p = g.player; g.settings.flyFast = m; p.flying = true; p.pitch = -0.12; g.input.keys.add('KeyW'); g.input.keys.add('ControlLeft'); }, mul);
+  await ev((m) => { const g = VR.game, p = g.player; g.settings.flyFast = m; p.flying = true; p.pitch = -0.12; g.input.captured = true; if (g.ui.screen) g.ui.resume(); g.input.keys.add('KeyW'); g.input.keys.add('ControlLeft'); }, mul);
   await wait(2500);
-  const r = await ev(() => { const p = VR.game.player; return { flySpeed: p.flySpeed, hs: Math.hypot(p.vel[0], p.vel[2]), fly: VR.Portal.fly() }; });
+  const r = await ev(() => { const p = VR.game.player; return { flySpeed: p.flySpeed, hs: Math.hypot(p.vel[0], p.vel[2]), fly: VR.Portal.fly(), ctx: VR.Portal.ctx(VR.game), flying: p.flying, sprint: p.sprinting, screen: VR.game.ui.screen }; });
   await shot(name);
   await ev(() => { const g = VR.game; g.input.keys.delete('KeyW'); g.input.keys.delete('ControlLeft'); });
   await wait(800);
@@ -132,7 +139,7 @@ try {
     { label: 'Durch die Wolken · die Krümmung der Welt', imgs: [SHOTS + 'journey_clouds.png', SHOTS + 'journey_planet.png'] },
     { label: 'Ankunft Opal · der Sternensprung-Tunnel', imgs: [SHOTS + 'journey_arrival_opal.png', SHOTS + 'journey_exo_tunnel.png'] },
     { label: 'Die Enthüllung mit Titel · Kreativ-Flug ×1', imgs: [SHOTS + 'arrival_caption.png', SHOTS + 'creative_fast_flight_x1.png'] },
-    { label: 'Kreativ-Flug ×8', imgs: [SHOTS + 'creative_fast_flight_x8.png'] },
+    { label: 'Kreativ-Flug ×8 · Opal schwillt an (Amarant dahinter)', imgs: [SHOTS + 'creative_fast_flight_x8.png', SHOTS + 'journey_moon_opal.png'] },
   ] };
   fs.writeFileSync(ROOT + '.tmp_tests/portal_sheet.json', JSON.stringify(spec));
   execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'portal_sheet.jpg', ROOT + '.tmp_tests/portal_sheet.json']);

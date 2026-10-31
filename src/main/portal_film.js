@@ -83,6 +83,49 @@
   }
   function glow(X, x, y, r, c, a) { const g = X.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, css(c, a)); g.addColorStop(1, css(c, 0)); X.fillStyle = g; X.fillRect(x - r, y - r, r * 2, r * 2); }
 
+  // the worlds as seen from space (our own colours, after the game's own skies and grounds): sea, land, cloud, air, kind
+  const LOOK = {
+    overworld: { sea: '#2d6cb5', land: '#5f9a48', cloud: '#ffffff', air: '#8fd0ff', ground: '#4f8a3c', sky: 1 },
+    flat: { sea: '#3a78c0', land: '#79a84f', cloud: '#ffffff', air: '#9ad8ff', ground: '#6a9c44', sky: 1 },
+    drift: { sea: '#7cc6f0', land: '#d8f2ff', cloud: '#ffffff', air: '#b8ecff', ground: '#6aa860', sky: 1 },
+    basalt: { sea: '#55565c', land: '#7d7c80', cloud: null, air: null, ground: '#6b6a70' },
+    opal: { sea: '#cfe2f2', land: '#f4f8ff', cloud: null, air: null, ground: '#dfeaf6' },
+    zinn: { sea: '#b8442c', land: '#e0874a', cloud: null, air: null, ground: '#c96a3c' },
+    ocker: { sea: '#b8823e', land: '#e2b264', cloud: '#fff1d6', air: '#ffcf8a', ground: '#c9944c', sky: 1 },
+    aqua: { sea: '#1e8f9a', land: '#58c4a8', cloud: '#ffffff', air: '#8ff0ff', ground: '#3fa890', sky: 1 },
+  };
+  F.look = (dim, pal) => { const L = LOOK[dim]; if (L) return { sea: hex(L.sea), land: hex(L.land), cloud: L.cloud ? hex(L.cloud) : null, air: L.air ? hex(L.air) : null, ground: hex(L.ground), sky: !!L.sky }; const p = pal || ['#cccccc', '#888888', '#222244']; return { sea: hex(p[1]), land: hex(p[0]), cloud: null, air: null, ground: hex(p[1]), sky: false }; };
+  // a world seen from space: its sea, continents (the film's crater list as their seeds), cloud swirls, the air's rim
+  function planet(X, cx, cy, R, L, lx, ly, P, spin) {
+    if (R <= 0.5) return;
+    disc(X, cx, cy, R, L.sea, mix(L.sea, [255, 255, 255], 0.35), lx, ly, null);
+    X.save(); X.beginPath(); X.arc(cx, cy, R, 0, TAU); X.clip();
+    const C = P.craters, n = C.length / 3, airless = !L.air;
+    for (let i = 0; i < n; i++) {
+      const x = cx + ((C[i * 3] + spin) % 1.7 + 1.7) % 1.7 * R - R * 0.85, y = cy + C[i * 3 + 1] * R, r = C[i * 3 + 2] * R * (airless ? 1 : 2.6);
+      if (airless) { X.fillStyle = css(mix(L.sea, [0, 0, 0], 0.25), 0.45); X.beginPath(); X.arc(x, y, r, 0, TAU); X.fill(); X.fillStyle = css(L.land, 0.35); X.beginPath(); X.arc(x - r * 0.18, y - r * 0.18, r * 0.72, 0, TAU); X.fill(); }
+      else if (i % 3 !== 2) { X.fillStyle = css(mix(L.land, L.sea, (i % 4) * 0.1), 0.95); X.beginPath(); X.ellipse(x, y, r, r * 0.62, i, 0, TAU); X.fill(); }
+    }
+    if (L.cloud) { X.strokeStyle = css(L.cloud, 0.55); X.lineCap = 'round'; for (let i = 0; i < 9; i++) { const yy = cy + (C[i * 3 + 1] * 0.9) * R, w = R * (0.25 + C[i * 3 + 2] * 3); X.lineWidth = R * 0.035; X.beginPath(); X.ellipse(cx + C[i * 3] * R + spin * R * 0.4, yy, w, R * 0.05, 0.12, 0, PI * 1.3); X.stroke(); } }
+    const g = X.createLinearGradient(cx + lx * R, cy + ly * R, cx - lx * R, cy - ly * R); g.addColorStop(0, 'rgba(0,0,12,0)'); g.addColorStop(0.55, 'rgba(0,0,12,.15)'); g.addColorStop(1, 'rgba(0,0,12,.72)');
+    X.fillStyle = g; X.fillRect(cx - R, cy - R, R * 2, R * 2);
+    X.restore();
+    if (L.air) { const h = X.createRadialGradient(cx, cy, R * 0.97, cx, cy, R * 1.09); h.addColorStop(0, css(L.air, 0.75)); h.addColorStop(1, css(L.air, 0)); X.fillStyle = h; X.beginPath(); X.arc(cx, cy, R * 1.09, 0, TAU); X.fill(); }
+  }
+  // Amarant, the ringed giant, hanging in a moon's sky: its bands, its shadowed side, the ring across it
+  function giant(X, cx, cy, R, tilt, k) {
+    disc(X, cx, cy, R, hex('#c98a5a'), hex('#ffe0b0'), -0.5, -0.6, hex('#ffb070'));
+    X.save(); X.beginPath(); X.arc(cx, cy, R, 0, TAU); X.clip();
+    const B = ['#e8b888', '#b8784c', '#f0c898', '#a86a44', '#e0a878'];
+    for (let i = 0; i < 7; i++) { X.fillStyle = B[i % 5]; X.globalAlpha = 0.45; X.fillRect(cx - R, cy - R + (i + 0.3) * R * 0.29, R * 2, R * 0.12); }
+    X.globalAlpha = 1;
+    const g = X.createLinearGradient(cx - R, cy - R, cx + R, cy + R); g.addColorStop(0.35, 'rgba(10,6,20,0)'); g.addColorStop(1, 'rgba(10,6,20,.75)'); X.fillStyle = g; X.fillRect(cx - R, cy - R, R * 2, R * 2);
+    X.restore();
+    X.save(); X.translate(cx, cy); X.rotate(tilt); X.scale(1, 0.22);
+    for (const [r, w, c, a] of [[1.55, 0.16, '#f4e2c4', 0.85], [1.78, 0.08, '#c8a880', 0.6], [1.95, 0.12, '#ead6b4', 0.75]]) { X.strokeStyle = c; X.globalAlpha = a; X.lineWidth = R * w; X.beginPath(); X.arc(0, 0, R * r, 0, TAU); X.stroke(); }
+    X.restore(); X.globalAlpha = 1;
+    void k;
+  }
   // ---------------------------------------------------------------- the shots: (X, W, H, k 0…1, v, S) — S the film's state
   const SHOT = {};
   // the gate's light swallows you: rings rush outward from the centre, motes fall in, the light fills everything
@@ -113,12 +156,14 @@
     const pf = puff(); if (!pf) return;
     const C = S.P.clouds, n = C.length / 4;
     for (let i = 0; i < n; i++) {
-      const z = (C[i * 4 + 3] + k * 1.6) % 1, sc = 0.25 + z * z * 3.2, x = (C[i * 4] - 0.5) * W * (1 + z * 2) + W / 2, y = H * (0.15 + C[i * 4 + 1] * 0.5) + z * z * H * 1.4;
+      const z = (C[i * 4 + 3] + k * 1.6) % 1, sc = 0.5 + z * z * 5, x = (C[i * 4] - 0.5) * W * (1 + z * 2) + W / 2, y = H * (0.15 + C[i * 4 + 1] * 0.5) + z * z * H * 1.4;
       const w = W * 0.22 * sc * C[i * 4 + 2];
       X.globalAlpha = clamp(Math.sin(z * PI) * 1.2, 0, 0.92) * (1 - up * 0.55);
       X.drawImage(pf, x - w / 2, y - w * 0.3, w, w * 0.6);
     }
     X.globalAlpha = 1;
+    const fog = Math.max(0, 1 - Math.abs(k - 0.42) / 0.14);   // through a cloud: everything white for a breath
+    if (fog > 0) { X.fillStyle = 'rgba(250,252,255,' + (fog * 0.85).toFixed(3) + ')'; X.fillRect(0, 0, W, H); }
   };
   // off an airless ground: the grey horizon falls away under you, dust drifts, the stars are there at once
   SHOT.rise = function (X, W, H, k, v, S) {
@@ -167,11 +212,11 @@
   SHOT.curve = function (X, W, H, k, v, S) {
     X.fillStyle = '#03040b'; X.fillRect(0, 0, W, H);
     starfield(X, W, H, S.P, 1, 0.02 * k, S.t);
-    const w = S.curveFrom || S.from, R = W * lerp(2.6, 1.0, ease(k)), cx = W * (0.5 + (v - 1) * 0.12), cy = H * 0.72 + R - lerp(0, H * 0.18, k);
-    disc(X, cx, cy, R, w.b, mix(w.a, [255, 255, 255], 0.3), (v - 1) * 0.4, -0.95, mix(w.a, [140, 200, 255], 0.5));
-    const sx = cx + (v - 1) * W * 0.35, sy = cy - R;
-    glow(X, sx, sy, W * 0.12, [255, 245, 220], 0.9 * (0.6 + 0.4 * Math.sin(k * PI)));
-    X.fillStyle = 'rgba(255,250,235,.85)'; X.fillRect(sx - W * 0.25 * k, sy - 1, W * 0.5 * k, 2);
+    const R = W * lerp(2.4, 0.95, ease(k)), cx = W * (0.5 + (v - 1) * 0.12), cy = H * 0.74 + R - lerp(0, H * 0.2, k);
+    planet(X, cx, cy, R, S.lookFrom, (v - 1) * 0.4, -0.95, S.P, k * 0.15);
+    const sx = cx + (v - 1) * W * 0.32, sy = cy - R * 1.01;
+    glow(X, sx, sy, W * 0.16, [255, 245, 220], 0.85 * (0.5 + 0.5 * Math.sin(k * PI)));
+    X.fillStyle = 'rgba(255,250,235,.8)'; X.fillRect(sx - W * 0.3 * k, sy - 1, W * 0.6 * k, 2);
   };
   // Amarant's ring: a giant's banded edge behind, the ring's bright bands sweep across, ice motes glint
   SHOT.ring = function (X, W, H, k, v, S) {
@@ -191,14 +236,9 @@
   SHOT.moon = function (X, W, H, k, v, S) {
     X.fillStyle = '#03040a'; X.fillRect(0, 0, W, H);
     starfield(X, W, H, S.P, 1 - k * 0.3, 0, S.t);
+    if (S.kind === 'moon') giant(X, W * (0.84 - v * 0.05), H * 0.2, H * lerp(0.16, 0.1, k), -0.35, k);
     const R = lerp(H * 0.06, H * 0.95, Math.pow(k, 1.6)), cx = W * lerp(0.5 + (v - 1) * 0.2, 0.5, k), cy = H * lerp(0.42, 0.75, k);
-    const p = S.pal, lx = (v - 1) * 0.6 - 0.3;
-    disc(X, cx, cy, R, p.b, mix(p.a, [255, 255, 255], 0.4), lx, -0.6, S.air ? mix(p.a, [150, 210, 255], 0.4) : null);
-    const C = S.P.craters, n = C.length / 3;
-    for (let i = 0; i < n; i++) { const x = cx + C[i * 3] * R, y = cy + C[i * 3 + 1] * R, r = C[i * 3 + 2] * R; X.fillStyle = css(mix(p.c, p.b, 0.5), 0.35); X.beginPath(); X.arc(x, y, r, 0, TAU); X.fill(); X.fillStyle = css(mix(p.a, [255, 255, 255], 0.5), 0.25); X.beginPath(); X.arc(x - r * 0.15, y - r * 0.15, r * 0.7, 0, TAU); X.fill(); }
-    // the night side
-    const g = X.createLinearGradient(cx + lx * R, cy - R * 0.6, cx - lx * R * 1.4, cy + R * 0.6); g.addColorStop(0, 'rgba(0,0,10,0)'); g.addColorStop(1, 'rgba(0,0,10,.55)');
-    X.fillStyle = g; X.beginPath(); X.arc(cx, cy, R, 0, TAU); X.fill();
+    planet(X, cx, cy, R, S.lookTo, (v - 1) * 0.6 - 0.3, -0.6, S.P, k * 0.1);
   };
   // a station's wheel turns closer, its red beacon blinking
   SHOT.station = function (X, W, H, k, v, S) {
@@ -229,17 +269,22 @@
   };
   // the arrival: you come down into the destination's own light, its horizon rises, the light opens onto the world
   SHOT.arrive = function (X, W, H, k, v, S) {
-    const p = S.pal, sk = SKIES[v % 3], air = S.air;
-    const top = air ? mix(p.c, sk.top, 0.5) : mix(p.c, [2, 3, 10], 0.7), lo = air ? mix(p.a, sk.low, 0.4) : p.b;
-    vgrad(X, W, H, 0, H, [[0, css(top)], [0.65, css(mix(top, lo, 0.7))], [1, css(lo)]]);
-    if (!air) starfield(X, W, H, S.P, 1 - k, 0, S.t);
-    const y = H * lerp(1.1, 0.62, easeOut(k));
-    glow(X, W * (0.3 + v * 0.2), y - H * 0.05, W * 0.45, mix(p.a, [255, 255, 255], 0.5), 0.7);
+    const p = S.pal, sk = SKIES[v % 3], L = S.lookTo, air = S.air;
+    const top = air ? mix(L.air || p.c, sk.top, 0.55) : [3, 4, 12], lo = air ? mix(L.air || p.a, sk.low, 0.45) : mix(L.land, [20, 24, 40], 0.55);
+    vgrad(X, W, H, 0, H, [[0, css(top)], [0.62, css(mix(top, lo, 0.75))], [1, css(lo)]]);
+    if (!air) starfield(X, W, H, S.P, 1, 0, S.t);
+    if (S.kind === 'moon') giant(X, W * (0.7 - v * 0.15), H * lerp(0.62, 0.3, easeOut(k)), H * 0.3, -0.3 + v * 0.1, k);
+    if (S.kind === 'home') { disc(X, W * 0.78, H * lerp(0.5, 0.2, k), H * 0.05, hex('#cfe2f2'), hex('#ffffff'), -0.5, -0.4, null); disc(X, W * 0.62, H * lerp(0.55, 0.27, k), H * 0.03, hex('#7d7c80'), hex('#cccccc'), -0.5, -0.4, null); }
+    const y = H * lerp(1.15, 0.62, easeOut(k)), sunx = W * (0.25 + v * 0.22);
+    glow(X, sunx, y - H * 0.04, W * 0.42, air ? sk.sun : [255, 250, 240], 0.75);
     const h = S.P.hills;
-    X.fillStyle = css(mix(p.b, p.c, 0.35)); X.beginPath(); X.moveTo(0, H);
-    for (let i = 0; i <= 20; i++) { const x = i / 20 * W; X.lineTo(x, y - H * 0.05 * (Math.sin(i * 0.9 + h[0] * 9) * 0.5 + 0.5)); }
-    X.lineTo(W, H); X.closePath(); X.fill();
-    if (k > 0.78) { X.fillStyle = css(mix(p.a, [255, 255, 255], 0.6), (k - 0.78) / 0.22 * 0.9); X.fillRect(0, 0, W, H); }
+    for (let Lr = 0; Lr < 3; Lr++) {
+      const yy = y + Lr * H * 0.07, col = mix(L.ground, top, 0.45 - Lr * 0.2);
+      X.fillStyle = css(col); X.beginPath(); X.moveTo(0, H);
+      for (let i = 0; i <= 24; i++) { const x = i / 24 * W; X.lineTo(x, yy - H * (0.07 - Lr * 0.015) * (Math.sin(i * 0.7 + h[Lr] * 9 + k * (Lr + 1)) * 0.5 + 0.5)); }
+      X.lineTo(W, H); X.closePath(); X.fill();
+    }
+    if (k > 0.8) { X.fillStyle = css(air ? sk.low : [255, 255, 255], (k - 0.8) / 0.2 * 0.85); X.fillRect(0, 0, W, H); }
   };
   F.SHOT = SHOT;
 
@@ -249,6 +294,7 @@
     const q = film.low ? 0.4 : 1, seed = (VR.PortalCore ? VR.PortalCore.hash(film.id) : 1) ^ (o.seed | 0);
     const S = { P: props(seed, q), pal: { a: hex(pal[0]), b: hex(pal[1]), c: hex(pal[2]) }, from: { a: hex(from[0]), b: hex(from[1]), c: hex(from[2]) }, air: !!o.air, t: 0 };
     if (o.curveFrom) S.curveFrom = { a: hex(o.curveFrom[0]), b: hex(o.curveFrom[1]), c: hex(o.curveFrom[2]) };
+    S.lookTo = F.look(o.to, pal); S.lookFrom = F.look(o.fromBody || o.from, from); S.kind = o.kind || 'unknown';
     const starts = []; let acc = 0; for (const s of film.shots) { starts.push(acc); acc += s.dur; }
     const len = acc;
     const which = (t) => { let i = film.shots.length - 1; while (i > 0 && starts[i] > t) i--; return i; };
