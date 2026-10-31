@@ -94,6 +94,15 @@ console.log('c · the moments');
     const par = PS.parentOf(id), pp = ang(sub(eph.bodies.helia.p, eph.bodies[par].p), sub(p.pos, eph.bodies[par].p)) / D2R;
     ph.push([id, t >= t0, phase, pp]);
   }
+  {
+    const ar = [];
+    for (const id of ['opal', 'basalt', 'zinn']) {
+      const t = PS.when('arrive', id, t0), eph = SS.ephemeris(t, {}), p = PS.pose('arrive', 1, 1, id, eph), b = eph.bodies[id], N = norm(sub(p.pos, b.p));
+      const el = Math.asin(dot(N, norm(sub(eph.bodies.helia.p, b.p)))) / D2R, par = eph.bodies[PS.parentOf(id)];
+      ar.push([id, el, ang(p.fwd, sub(par.p, p.pos)) / D2R]);
+    }
+    check(ar.every(q => q[1] > 3 && q[1] < 30 && q[2] < 30), 'arrive (airless): Helia low over the landing, the parent in the picture (' + ar.map(q => q[0] + ' sun ' + q[1].toFixed(0) + '° parent ' + q[2].toFixed(0) + '° off the middle').join(' · ') + ')');
+  }
   check(ph.every(q => q[1] && q[2] > 40 && q[2] < 95 && q[3] < 110), 'moon: the terminator across the target, the parent lit (' + ph.map(q => q[0] + ' ' + q[2].toFixed(0) + '°/' + q[3].toFixed(0) + '°').join(' · ') + ')');
   const eph = SS.ephemeris(PS.when('ring', 'amarant', t0), {}), A = eph.bodies.amarant, s = norm(sub(eph.bodies.helia.p, A.p)), open = Math.asin(Math.abs(dot(s, A.axis))) / D2R;
   const p = PS.pose('ring', 0.5, 1, 'amarant', eph), side = Math.sign(dot(sub(p.pos, A.p), A.axis)) === Math.sign(dot(s, A.axis));

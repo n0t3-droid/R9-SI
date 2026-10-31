@@ -66,11 +66,21 @@
   function ring(k, v, eph) {
     const A = eph.bodies.amarant, n = A.axis, s = norm(sub(eph.bodies.helia.p, A.p)), sg = Math.sign(dot(s, n)) || 1;
     const sp = perp(s, n), side = cross(n, sp), e = ease(clamp(k, 0, 1));
-    const az = 0.75 + ((v % 3) - 1) * 0.35 + lerp(-0.2, 0.2, e), el = lerp(24, 15, e) * D2R;
+    const az = 1.05 + ((v % 3) - 1) * 0.3 + lerp(-0.2, 0.2, e), el = lerp(24, 15, e) * D2R;
     const dir = norm(add(add(mul(sp, Math.cos(az)), mul(side, Math.sin(az))), mul(n, sg * Math.tan(el))));
     const pos = add(A.p, mul(dir, lerp(4.2, 3.0, e) * R('amarant')));
     const fwd = norm(sub(add(A.p, mul(n, -sg * 0.25 * R('amarant'))), pos));
     return { pos, fwd, up: perp(n, fwd), fov: 48 * D2R, ref: 'amarant', body: null };
+  }
+  // arrive (an airless world): down from 0.6 R to 0.04 R over a place where its parent stands 25° up, looking at it — the
+  // land a strip at the bottom, the giant (or Herzwelt) above it
+  function arrive(id, k, v, eph) {
+    const b = eph.bodies[id], r = R(id), up = norm(sub(eph.bodies[PS.parentOf(id)].p, b.p)), s = norm(sub(eph.bodies.helia.p, b.p));
+    let ax = cross(up, s); if (len(ax) < 1e-6) ax = cross(up, b.axis); ax = norm(ax);
+    const N = rot(rot(up, ax, -(90 - 25) * D2R), up, ((v % 3) - 1) * 0.2), hd = perp(up, N);
+    const alt = r * lerp(0.6, 0.04, ease(clamp(k, 0, 1))), dip = Math.acos(r / (r + alt)), fov = 60 * D2R;
+    const p = -dip + 25 * D2R, fwd = norm(add(mul(hd, Math.cos(p)), mul(N, Math.sin(p))));
+    return { pos: add(b.p, mul(N, r + alt)), fwd, up: perp(N, fwd), fov, ref: id, body: id };
   }
   PS.pose = function (shot, k, v, id, eph) {
     if (!eph || !eph.bodies) return null;
@@ -79,7 +89,7 @@
     if (shot === 'curve') return curve(id, k, v, eph);
     if (shot === 'station') return curve('herz', 0.3, v, eph);
     if (shot === 'moon') return moon(id, k, v, eph);
-    if (shot === 'arrive') return curve(id, lerp(0.75, 0, ease(clamp(k, 0, 1))), v, eph);   // (an airless world: down onto its land)
+    if (shot === 'arrive') return arrive(id, k, v, eph);
     return null;
   };
 
@@ -95,7 +105,18 @@
         const t = t0 + P * i / 72; SS.ephemeris(t, eph);
         const p = moon(id, 0.6, 1, eph), b = eph.bodies[id], par = eph.bodies[PS.parentOf(id)], h = eph.bodies.helia.p;
         const ph = ang(sub(h, b.p), sub(p.pos, b.p)) / D2R, pp = ang(sub(h, par.p), sub(p.pos, par.p)) / D2R;
-        const sc = Math.abs(ph - 65) + Math.max(0, pp - 90) * 2 + i * 0.05;
+        const sc = Math.abs(ph - 80) + Math.max(0, pp - 90) * 2 + i * 0.05;
+        if (sc < bs) { bs = sc; best = t; }
+      }
+      return best;
+    }
+    if (shot === 'arrive' && id && SS.BODIES[id] && SS.BODIES[id].P) {   // Helia ~12° over the landing, the parent lit
+      const P = SS.BODIES[id].P, eph = {}; let best = t0, bs = 1e9;
+      for (let i = 0; i < 72; i++) {
+        const t = t0 + P * i / 72; SS.ephemeris(t, eph);
+        const p = arrive(id, 1, 1, eph), b = eph.bodies[id], par = eph.bodies[PS.parentOf(id)], h = eph.bodies.helia.p, N = norm(sub(p.pos, b.p));
+        const el = Math.asin(clamp(dot(N, norm(sub(h, b.p))), -1, 1)) / D2R, pp = ang(sub(h, par.p), sub(p.pos, par.p)) / D2R;
+        const sc = Math.abs(el - 12) + Math.max(0, pp - 100) * 0.5 + i * 0.05;
         if (sc < bs) { bs = sc; best = t; }
       }
       return best;

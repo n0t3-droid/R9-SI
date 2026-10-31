@@ -66,12 +66,20 @@
     if (CUMU || typeof document === 'undefined') return CUMU;
     const c = document.createElement('canvas'); c.width = 192; c.height = 112;
     const x = c.getContext('2d'); if (!x) return null;
-    const lobes = [[40, 70, 30], [70, 52, 36], [104, 44, 40], [138, 58, 32], [160, 74, 24], [92, 76, 34], [124, 78, 30], [56, 82, 24]];
+    // lobes heaped over a flat base (bigger in the middle, smaller and lower at the sides), soft-edged
+    const lobes = [];
+    for (let i = 0; i < 17; i++) {
+      const u = (i + 0.5) / 17, mid = Math.sin(u * PI), rr = 9 + 24 * mid * (0.7 + 0.3 * Math.sin(i * 2.3));
+      lobes.push([14 + u * 164 + Math.sin(i * 5.1) * 5, 86 - rr * 0.55 - mid * 26 * (0.6 + 0.4 * Math.cos(i * 1.7)), rr]);
+    }
     for (const [cx, cy, rr] of lobes) {
-      const g = x.createRadialGradient(cx - rr * 0.25, cy - rr * 0.35, rr * 0.1, cx, cy, rr);
-      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(244,247,252,.96)'); g.addColorStop(0.85, 'rgba(214,224,238,.75)'); g.addColorStop(1, 'rgba(200,212,230,0)');
+      const g = x.createRadialGradient(cx - rr * 0.3, cy - rr * 0.4, rr * 0.05, cx, cy, rr);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(246,248,252,.95)'); g.addColorStop(0.9, 'rgba(222,230,242,.55)'); g.addColorStop(1, 'rgba(210,220,236,0)');
       x.fillStyle = g; x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
     }
+    x.globalCompositeOperation = 'destination-out';   // the flat base: the cloud ends at its condensation level
+    const cut = x.createLinearGradient(0, 80, 0, 96); cut.addColorStop(0, 'rgba(0,0,0,0)'); cut.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = cut; x.fillRect(0, 80, 192, 32);
     x.globalCompositeOperation = 'source-atop';   // the shaded underside: the light comes from above
     const sh = x.createLinearGradient(0, 40, 0, 104); sh.addColorStop(0, 'rgba(120,135,165,0)'); sh.addColorStop(0.6, 'rgba(120,135,165,.35)'); sh.addColorStop(1, 'rgba(92,104,135,.7)');
     x.fillStyle = sh; x.fillRect(0, 0, 192, 112);
@@ -187,14 +195,14 @@
     const D = S.P.deck, n = D.length / 4, camH = lerp(0.12, 1.35, up), aw = cu.width / cu.height;
     // three passes, far → near (no sorting a frame): depth z 0 far … 1 near, moving toward you as k runs
     for (let pass = 0; pass < 3; pass++) {
+      if (pass === 1) { X.globalAlpha = 1; const g = X.createLinearGradient(0, hor - H * 0.05, 0, hor + H * 0.12); g.addColorStop(0, css(low, 0)); g.addColorStop(0.45, css(low, 0.55)); g.addColorStop(1, css(low, 0)); X.fillStyle = g; X.fillRect(0, hor - H * 0.05, W, H * 0.17); }   // the far deck fades into the air
       for (let i = 0; i < n; i++) {
         const z = (D[i * 4 + 1] + k * 0.85) % 1, bin = z < 0.45 ? 0 : z < 0.8 ? 1 : 2; if (bin !== pass) continue;
         const dist = lerp(9, 0.55, z), px = W / 2 + D[i * 4] * W * 1.6 / dist, py = hor + camH * H * 0.55 / dist;
         const w = W * 0.5 * D[i * 4 + 2] / dist; if (w < 3 || px < -w || px > W + w || py - w * 0.5 > H) continue;
-        const near = clamp((z - 0.86) / 0.14, 0, 1), haze = clamp(1 - z * 1.3, 0, 1);
+        const near = clamp((z - 0.86) / 0.14, 0, 1), haze = clamp(1 - z * 1.3, 0, 1);   // (haze: the far ones paler)
         X.globalAlpha = clamp((0.25 + z) * (1 - near), 0, 1) * (0.92 - 0.25 * haze);
         X.drawImage(cu, px - w / 2, py - w / aw * 0.62, w, w / aw);
-        if (haze > 0.05) { X.globalAlpha = haze * 0.45 * (1 - near); X.fillStyle = css(low); X.fillRect(px - w / 2, py - w / aw * 0.62, w, w / aw * 0.9); }
       }
     }
     X.globalAlpha = 1;

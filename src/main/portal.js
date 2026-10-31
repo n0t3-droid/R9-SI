@@ -83,6 +83,7 @@
       '#ptCap .pt-ce{margin-top:14px;font:500 clamp(14px,1.5vw,17px) var(--font,sans-serif);color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.7);min-height:1.4em;transition:opacity .4s}',
       '#ptCap .pt-ce b{color:#ffd166}',
       '#ptRing{position:fixed;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;z-index:870;pointer-events:none;border-radius:50%;opacity:0;box-shadow:0 0 0 2px rgba(255,214,140,.9),0 0 30px rgba(255,190,90,.6);transition:opacity .2s}',
+      'html.pt-gl #ui,html.pt-gl #app>*:not(#gl):not(#ptFilm):not(#ptSkip):not(#ptCap),html.pt-gl body>*:not(#app){visibility:hidden !important}',   // (e-portal2: a 3-D shot shows through the film's canvas — nothing of the HUD over it)
       'html.pt-on #ctxprompt,html.pt-on #keystrip,html.pt-on #hints,html.pt-on #hint,html.pt-on #toasts{visibility:hidden !important}',   // (a film's moment: no prompts, hints or toasts over it)
       '#ptFly{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:860;pointer-events:none;padding:4px 12px;border-radius:12px;background:rgba(8,10,26,.55);color:#ffe2a8;font:700 14px var(--font,sans-serif);opacity:0;transition:opacity .4s}',
     ].join('\n');
@@ -280,6 +281,7 @@
   function draw(J) {
     const t0 = now(), W = J.cv.width, H = J.cv.height;
     J.P.draw(J.x, W, H, J.t); if (J.P.gl) J.glN = (J.glN || 0) + 1;
+    glClass(!J.covered && J.P.gl);
     // the arrival waits for the land: a soft breathing light over the last look
     if (J.t >= J.P.len && !J.arrived) { J.x.fillStyle = 'rgba(255,246,228,' + (0.05 + 0.04 * Math.sin(J.t * 2)).toFixed(3) + ')'; J.x.fillRect(0, 0, W, H); }   // (e-portal2: a soft breath, not a white veil)
     const ms = now() - t0; M.drawMs = M.drawMs * 0.9 + ms * 0.1; M.maxMs = Math.max(M.maxMs, ms); M.draws++;
@@ -317,7 +319,7 @@
   }
   function reveal(J) {
     const g = J.g, d = J.dest, p = g.player, rec = C.rec(g.meta);
-    J.phase = 'reveal'; J.rt = 0;
+    J.phase = 'reveal'; J.rt = 0; glClass(false);
     const sk = doc.getElementById('ptSkip'); if (sk) sk.style.display = 'none';
     if (p && d.fav && Number.isFinite(d.yaw)) { p.yaw = d.yaw; if ('viewYaw' in p) p.viewYaw = d.yaw; p.pitch = 0; }
     else if (p && !J.local) bestLight(g, J);   // e-portal2: the destination at its best hour (Kreativ alone), the land side-lit
@@ -343,10 +345,12 @@
       if (sun[1] > 0.02 && Math.hypot(sun[0], sun[2]) > 0.05) { const y = Math.atan2(-sun[0], -sun[2]) + 0.95; p.yaw = y; if ('viewYaw' in p) p.viewYaw = y; p.pitch = -0.08; }
     } catch (e) { /* the light as it is */ }
   }
+  let glOn = false;
+  const glClass = (on) => { on = !!on; if (on === glOn) return; glOn = on; try { doc.documentElement.classList.toggle('pt-gl', on); } catch (e) { /* no page */ } };
   const cinema = (on) => { try { doc.documentElement.classList.toggle('pt-on', !!on); } catch (e) { /* no page */ } };
   function end(J) {
     if (M.J !== J) return;
-    M.J = null; J.cv.style.display = 'none';
+    M.J = null; J.cv.style.display = 'none'; glClass(false);
     if (J.phase !== 'reveal') cinema(false);
     const sk = doc.getElementById('ptSkip'); if (sk) sk.style.display = 'none';
     if (J.g && J.g.renderer) J.g.renderer.tsrReset = true;   // (e-portal2: the world again, no ghost of space)
