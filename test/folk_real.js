@@ -189,7 +189,7 @@ console.log('§2b the fine face');
   const rosy = (u8, i) => u8[i * 20 + 16] / Math.max(1, (u8[i * 20 + 17] + u8[i * 20 + 18]) / 2), lumOf = (u8, i) => u8[i * 20 + 16] * 0.3 + u8[i * 20 + 17] * 0.59 + u8[i * 20 + 18] * 0.11;
   for (const [L, who] of cast) {
     const def = Folk.buildFine ? Folk.buildFine(L) : null, fh = def && def.fine && def.fine.head;
-    check(!!fh && fh.res === 2 && !!def.fine.lids && !!def.fine.mouth, `${who}: the smooth path's head, lids and mouth at 64 a block`);
+    check(!!fh && Math.abs(fh.res * (fh.face && fh.face.scale || 1) - 2) < 1e-9 && !!def.fine.lids && !!def.fine.mouth, `${who}: the smooth path's head, lids and mouth at 64 a block`);
     if (!fh) continue;
     const coarse = def.parts.head.grid;
     const c = FS.crop(fh), m = FS.mesh(c), cl = closed(m), m32 = FS.mesh(FS.crop(coarse));

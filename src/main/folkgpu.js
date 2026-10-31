@@ -351,7 +351,9 @@ void main() {
         for (let q = 0; q < 16; q++) D[off + q] = M[q];
         // a hidden part (the lids while the eyes are open, the talking mouth, a seated guest's bag): its vertices fall onto
         // its pivot
-        if (hide && hide[order[b]]) for (let q = 0; q < 12; q++) D[off + q] = 0;
+        // (u-folk2: the expressions `joy` and `wow` are hidden unless o.expr names one — every other caller stays as it was)
+        const nm = order[b];
+        if ((hide && hide[nm]) || ((nm === 'joy' || nm === 'wow') && o.expr !== nm)) for (let q = 0; q < 12; q++) D[off + q] = 0;
       }
       const L = row + (BW - 2) * 4;
       D[L] = it.sky; D[L + 1] = o.shade || 0; D[L + 2] = o.flash || 0; D[L + 3] = o.noFog ? 1 : 0;
