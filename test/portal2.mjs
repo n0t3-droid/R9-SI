@@ -48,7 +48,11 @@ await wait(6000);
 {
   const t0 = Date.now();
   await ev(() => { window.__norender = true; VR.StarMap.open(VR.game); });
-  try { await page.screenshot({ path: SHOTS + 'p2_starmap_' + TAG + '.png', timeout: 150000 }); } catch (e) { console.log('  (no star map picture: ' + e.message.slice(0, 80) + ')'); }
+  rec.mapOpenMs = Date.now() - t0;
+  // the map's own canvas, as it is right after the open (a page picture can wait long on a held frame: run 1 timed out)
+  const durl = await ev(() => { const c = document.getElementById('smCv'); return c ? c.toDataURL('image/png') : null; });
+  if (durl) fs.writeFileSync(SHOTS + 'p2_starmap_' + TAG + '.png', Buffer.from(durl.split(',')[1], 'base64'));
+  try { await page.screenshot({ path: SHOTS + 'p2_starmap_page_' + TAG + '.png', timeout: 60000 }); } catch (e) { console.log('  (no page picture of the map: ' + e.message.slice(0, 60) + ')'); }
   rec.mapMs = Date.now() - t0;
   rec.map = Object.assign(luma(SHOTS + 'p2_starmap_' + TAG + '.png', [0.3, 0.2, 0.7, 0.8]), { st: await ev(() => VR.StarMap.stats()) });
   await ev(() => { VR.StarMap.close(VR.game); window.__norender = false; });
