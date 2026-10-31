@@ -89,7 +89,7 @@
       ],
       species: {
         de: 'Dunelin', en: 'Dunelin',
-        look: { skin: [0xc85a2a, 0xb84e22, 0xd06a34, 0xa84a20], cut: ['robe', 'cape', 'robe'], feat: 'horns', featC: [0xf0e2c0, 0xd8c8a0, 0xe8d0a8], garb: [0xe8d8b8, 0x9a4a2a, 0x5a6a7a, 0xd8b060, 0x7a3a2a, 0x3a6a6a], eye: 0x2a1a10 },
+        look: { skin: [0xd8b444, 0xc8a43a, 0xe0c25a, 0xbc9a36], cut: ['robe', 'cape', 'robe'], feat: 'horns', featC: [0xf0e2c0, 0xd8c8a0, 0xe8d0a8], garb: [0xe8d8b8, 0x9a4a2a, 0x5a6a7a, 0xd8b060, 0x7a3a2a, 0x3a6a6a], eye: 0x2a1a10 },
         kit: { shape: 'terrace', wall: 'terracotta', band: 'red_sandstone', roof: 'smooth_red_sandstone', floor: 'acacia_planks', fill: 'red_sandstone', window: 'orange_stained_glass', door: 'acacia_door', bed: 'orange_bed', light: 'lantern', paving: 'smooth_red_sandstone', lamp: 'vx_lamppost_black', canopy: 'orange_wool', mark: 'amber_crystal_block' },
         goods: ['red_sand', 'terracotta', 'orange_terracotta', 'cactus', 'red_sandstone', 'amber_crystal_block', 'lantern', 'iron_ingot'],
         syl: ['du', 'ne', 'ka', 'ro', 'tes', 'ul', 'mar', 'ze', 'om', 'ra', 'bek', 'sim', 'ta', 'ho', 'gal', 'ir'], end: ['in', 'ek', 'a', 'ur'],
@@ -122,7 +122,7 @@
       ],
       species: {
         de: 'Glutani', en: 'Glutani',
-        look: { skin: [0x3a3036, 0x4a3a3a, 0x2e2830, 0x54403c], cut: ['coat', 'robe', 'coat'], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
+        look: { skin: [0x4a2a3a, 0x542e3e, 0x3e2434, 0x5a3440], cut: ['coat', 'robe', 'coat'], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
         kit: { shape: 'tower', wall: 'polished_basalt', band: 'sulfur_bricks', roof: 'amber_crystal_block', floor: 'crimson_planks', fill: 'basalt', window: 'yellow_stained_glass', door: 'crimson_door', bed: 'red_bed', light: 'spirit_lantern', paving: 'polished_sulfur', lamp: 'vx_lamppost_crystal', canopy: 'yellow_wool', mark: 'magma_block' },
         goods: ['sulfur', 'obsidian', 'magma_block', 'amber_crystal_block', 'polished_sulfur', 'glowing_obsidian', 'sulfur_bricks', 'gold_ingot'],
         syl: ['glu', 'ta', 'ni', 'ber', 'os', 'kai', 'rum', 'ze', 'fa', 'lo', 'tir', 'ga', 'van', 'ur', 'pe', 'sol'], end: ['an', 'i', 'or', 'et'],

@@ -116,6 +116,37 @@
     return L;
   };
 
+  // ---------------------------------------------------------------- u-worlds2 · the natives' own idle and gestures
+  // villages.js pose() calls it after the person's pose (FolkAnim resets every joint each frame, so this only adds):
+  // standing (or talking) each species keeps its own bearing and now and then makes its own gesture — the Wellari sway
+  // and flutter their hands like fins, the Dunelin bob their long necks and look up, the Glutani stand wide and warm their
+  // hands, the Regoli bounce on their toes and tilt their heads, the Nivari stand tall and breathe slowly, a hand to the
+  // chest in greeting. t: the game's time (seconded by the person's seed), wa: the walk amount (0 standing).
+  // A culture moment (WL.Culture) makes them dance their own dance: state 'dance' is the villagers' own.
+  WL.idle = function (P, kind, t, wa, state, a) {
+    const k = Math.max(0, 1 - wa * 3);   // walking: the bearing fades out
+    if (k <= 0 || !P.head || !P.body) return;
+    const sn = Math.sin, add = (j, i, v) => { const q = P[j]; if (q) q[i] += v * k; };
+    const talk = state === 'talk', gest = ((t * 0.16) % 1) < 0.22 || talk, gk = gest ? sn(Math.min(1, ((t * 0.16) % 1) / 0.22) * Math.PI) : 0;
+    if (state !== 'idle' && !talk && state !== 'dance') return;
+    if (kind === 'aqua') {
+      add('body', 2, sn(t * 1.3) * 0.06); add('head', 2, sn(t * 1.3 + 1.1) * 0.1);
+      if (gest) { add('fore_l', 2, sn(t * 9) * 0.22 * gk); add('fore_r', 2, -sn(t * 9 + 0.6) * 0.22 * gk); add('arm_l', 0, 0.35 * gk); add('arm_r', 0, 0.35 * gk); }
+    } else if (kind === 'ocker') {
+      add('head', 0, sn(t * 0.9) * 0.1 + (gest ? 0.28 * gk : 0)); add('body', 0, -sn(t * 0.9) * 0.03);
+      if (gest) { add('arm_r', 0, 1.1 * gk); add('fore_r', 0, 0.6 * gk); }   // a hand shading the eyes, the head up: looking out over the dunes
+    } else if (kind === 'zinn') {
+      add('arm_l', 2, -0.2); add('arm_r', 2, 0.2); add('body', 1, sn(t * 0.7) * 0.07);
+      if (gest) { add('arm_l', 0, 0.7 * gk); add('arm_r', 0, 0.7 * gk); add('fore_l', 0, 0.8 * gk); add('fore_r', 0, 0.8 * gk); add('fore_l', 2, sn(t * 4) * 0.1 * gk); }   // the hands held to the warmth
+    } else if (kind === 'basalt') {
+      add('hips', 4, Math.max(0, sn(t * 3.4)) * 1.4); add('head', 2, sn(t * 1.6) * 0.16);
+      if (gest) { add('arm_l', 2, -0.9 * gk); add('arm_r', 2, 0.9 * gk); add('hips', 4, Math.max(0, sn(t * 7)) * 1.6 * gk); }   // a happy hop, the arms out
+    } else if (kind === 'opal') {
+      add('head', 0, 0.1); add('body', 0, sn(t * 0.5) * 0.025);
+      if (gest) { add('arm_r', 0, 0.9 * gk); add('fore_r', 0, 1.2 * gk); add('arm_r', 2, -0.25 * gk); add('head', 0, -0.18 * gk); }   // a hand to the chest, a slow bow
+    }
+  };
+
   // ---------------------------------------------------------------- the trade: the stall's goods
   const Shop = VR.Shop;
   if (Shop && !Shop.__eco) {

@@ -50,5 +50,46 @@ if (part('a')) {
   check(far.meshed, 'the far solid section meshed in the end (no starvation by the near churn)');
 }
 
+if (part('b')) {
+  console.log('b · the species\' own body plans');
+  require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
+  require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
+  require('../src/main/villages.js'); require('../src/main/worldlife.js');
+  const Folk = VR.Folk, KINDS = ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
+  // a grid's voxels as model-space points (the rig's layout: the parts' pivots; the head on the body's joint)
+  const stats = (def) => {
+    const g = (k) => def.parts[k].grid || def.parts[k].g || def.parts[k];
+    const cnt = (G, f) => { let n = 0; for (let y = 0; y < G.sy; y++) for (let z = 0; z < G.sz; z++) for (let x = 0; x < G.sx; x++) if (G.c[G.i(x, y, z)] && f(x - G.ox, y - G.oy, z - G.oz)) n++; return n; };
+    const H = g('head'), ext = (G) => { let x0 = 99, x1 = -99, y1 = -99; for (let y = 0; y < G.sy; y++) for (let z = 0; z < G.sz; z++) for (let x = 0; x < G.sx; x++) if (G.c[G.i(x, y, z)]) { x0 = Math.min(x0, x - G.ox); x1 = Math.max(x1, x - G.ox); y1 = Math.max(y1, y - G.oy); } return { w: x1 - x0 + 1, top: y1 }; };
+    return { tail: cnt(g('hips'), (x, y, z) => z >= 5 && y < -1), back: cnt(g('body'), (x, y, z) => z >= 4), shoulder: cnt(g('arm_l'), (x, y, z) => y >= 1), head: cnt(H, () => true), hw: ext(H).w, htop: ext(H).top, neck: def.rig.head[1][1], h: def.h };
+  };
+  const sig = {};
+  for (const k of KINDS) {
+    const L = Folk.look(77, 'farmer', 'adult', null, 'sp:' + k);
+    // (the person in the same costume: the look without its species — what u-worlds drew)
+    const human = stats(Folk.buildHiRes(Object.assign({}, L, { species: undefined })));
+    const st = stats(Folk.buildHiRes(L)), sb = Folk.SPECIES_BODY[k];
+    sig[k] = st;
+    const diff = [st.tail > human.tail + 8 ? 'tail ' + st.tail : '', st.back > human.back + 10 ? 'back ' + st.back : '', st.shoulder > human.shoulder + 10 ? 'plates' : '', st.hw > human.hw ? 'head ' + st.hw + ' wide' : '', st.head > human.head * 1.15 ? 'head ×' + (st.head / human.head).toFixed(2) : '', st.htop > human.htop + 1 ? 'crown ' + st.htop : '', st.neck > human.neck ? 'neck +' + (st.neck - human.neck) : '', Math.abs(sb.scale - 1) > 0.05 ? '×' + sb.scale : ''].filter(Boolean);
+    check(L.species === k && diff.length >= 2, `${k} (${E2(k)}): ${diff.join(', ')} — skin #${L.skin.toString(16)}`);
+    // the skin far from people's: not the warm peach-to-brown band (hue 10°–40° with saturation 0.2–0.75)
+    const r = (L.skin >> 16) & 255, gg = (L.skin >> 8) & 255, b = L.skin & 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    let hue = mx === mn ? 0 : mx === r ? 60 * (((gg - b) / (mx - mn)) % 6) : mx === gg ? 60 * ((b - r) / (mx - mn) + 2) : 60 * ((r - gg) / (mx - mn) + 4); if (hue < 0) hue += 360;
+    const sat = mx ? (mx - mn) / mx : 0;
+    check(!(hue >= 10 && hue <= 40 && sat >= 0.2 && sat <= 0.75), `${k}: the skin far from a person's (hue ${hue.toFixed(0)}°, sat ${sat.toFixed(2)})`);
+    // the smooth build and the kid's build carry it too, nothing thrown
+    let okF = true; try { const f = Folk.buildFine(L), kd = Folk.buildHiRes(Folk.look(78, 'farmer', 'child', null, 'sp:' + k)); okF = !!(f.parts.head && kd.parts.hips); } catch (e) { okF = false; console.log(e.stack); }
+    check(okF, `${k}: the smooth body and a child build`);
+  }
+  const keys = KINDS.map(k => JSON.stringify(sig[k]));
+  check(new Set(keys).size === 5, 'five different body plans');
+  // the idle: each species adds its own bearing to a standing pose, nothing while walking
+  const P0 = () => { const o = {}; for (const j of VR.FolkAnim.JOINTS) o[j] = [0, 0, 0, 0, 0, 0]; return o; };
+  const idl = KINDS.map(k => { const P = P0(); VR.WorldLife.idle(P, k, 1.0, 0, 'idle'); return JSON.stringify(P); });
+  const walk = P0(); VR.WorldLife.idle(walk, 'aqua', 1.0, 1, 'idle');
+  check(new Set(idl).size === 5 && JSON.stringify(walk) === JSON.stringify(P0()), 'five idles of their own, none while walking');
+}
+function E2(k) { return VR.WorldEco.KINDS[k].species.de; }
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
