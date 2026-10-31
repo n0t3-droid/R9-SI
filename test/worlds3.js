@@ -56,6 +56,7 @@ if (part('b')) {
 }
 if (part('c')) {
   console.log('c · the chains, the teachings, the language');
+  if (!VR.Folk) { require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js'); require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js'); require('../src/main/villages.js'); require('../src/main/festival.js'); require('../src/main/worldlife.js'); }
   require('../src/main/natives.js');
   const N = VR.Natives, R = VR.R;
   check(!!N && KINDS.every(k => N.LANG[k] && N.LANG[k].length === 4 && N.TEACH[k] && N.CHAIN[k] && N.CHAIN[k].length === 3), 'every species: 4 words, a teaching, 3 quests');
