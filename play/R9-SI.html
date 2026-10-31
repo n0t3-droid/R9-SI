@@ -5972,7 +5972,7 @@ const SKIRT={robe:2,gown:2,coat:1,frock:1,whitecoat:1,cape:1,tunic:1,dress:1};
 V.toolOf=function(L){const role=V.ROLES[L.role]||V.ROLES.farmer;return L.age==='child'?null:L.tool!==undefined&&L.tool!==null?L.tool:L.role==='hero'?null:role.tool;};
 V.gaitFor=function(L){
 const kid=L.age==='child',S=kid?SKEL.child:SKEL.adult,fam=V.familyOf(L),role=V.ROLES[L.role]||V.ROLES.farmer;
-const tool=V.toolOf(L),carry=tool==='bag'||tool==='basket'||tool==='can'||tool==='tray'?tool:null;
+const tool=V.toolOf(L),carry=tool==='bag'||tool==='basket'||tool==='can'||tool==='tray'||tool==='lantern'?tool:null;
 return VR.FolkAnim.gait({unit:32,scale:kid?0.82:1,hip:S.hip,thigh: -S.knee,shin:S.hip+S.knee,stride:STRIDE[fam]||0.6,kid,stoop:L.age==='elder'?0.12:0,
 arm:{L1: -S.elbow,L2:S.fore,x:S.armX,y:S.sh-S.hip},hw:S.hw,legX:S.legX,wide:fam==='robe'||fam==='gown'?1:0,
 carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]||0});
@@ -5983,6 +5983,7 @@ carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]
 V.SPECIES_TOOL={aqua:'shellstaff',ocker:'lanternpole',zinn:'tongs',basalt:'finder',opal:'chime'};
 const SP_TOOLS=new Set(Object.values(V.SPECIES_TOOL));
 function speciesItem(set,t,fy,z0){
+if(t==='lantern'){handLantern(set,fy,z0+2);return true;}
 if(!SP_TOOLS.has(t))return false;
 const wood=(y)=>mul(0x7A5236,(y&1)?0.95:1.03);
 if(t==='shellstaff'){
@@ -6014,6 +6015,25 @@ for(let x= -3;x<=3;x++)set(x,fy+12,z0,0xB8D0E4,0);
 for(const x of[-3,0,3])for(let k=1;k<=(x?3:4);k++)set(x,fy+12-k,z0,k>=(x?3:4)?0xE8F8FF:0x9AD4F4,k>=(x?3:4)?1:0);
 }
 return true;
+}
+
+
+
+V.LANTERN_GLOW=0xFFC860;
+function handLantern(set,fy,zc){
+
+const iron=0x2A221C,A=(v)=>Math.abs(v);
+set(0,fy-1,zc,iron,0);set(0,fy-2,zc,iron,0);
+for(let x= -1;x<=1;x++)for(let z=zc-1;z<=zc+1;z++)set(x,fy-3,z,iron,0);
+for(let x= -2;x<=2;x++)for(let z=zc-2;z<=zc+2;z++)set(x,fy-4,z,iron,0);
+for(let y=fy-12;y<=fy-5;y++)for(let z=zc-3;z<=zc+3;z++)for(let x= -3;x<=3;x++){
+const ex=A(x)===3,ez=A(z-zc)===3,rim=y===fy-5||y===fy-12,mid=y===fy-9;
+if(ex&&ez)set(x,y,z,iron,0);
+else if(rim)set(x,y,z,ex||ez?iron:mul(iron,1.25),0);
+else if(ex||ez)set(x,y,z,mid&&(A(x)+A(z-zc))%2?iron:0xFFB347,1);
+else set(x,y,z,A(x)<=1&&A(z-zc)<=1&&y>=fy-10&&y<=fy-7?0xFFF2C8:V.LANTERN_GLOW,1);
+}
+for(let x= -2;x<=2;x++)for(let z=zc-2;z<=zc+2;z++)set(x,fy-13,z,iron,0);
 }
 
 
@@ -8596,7 +8616,7 @@ const LAG=0.09,FLAG=[0,0,0],FRAG=[0,0,0];
 function armSwing(out,s,a,al,run,amt,load,wide){
 const sx=s==='l'? -1:1,w=wide?0.05:0;
 let rx,rz,fx,fz,fy;
-if(load==='bag'||load==='basket'||load==='can'){rx=a*0.35;rz=sx*(0.16+w)*amt;fx=0.05*amt;fz=0;fy=0;}
+if(load==='bag'||load==='basket'||load==='can'||load==='lantern'){rx=a*0.35;rz=sx*(0.16+w)*amt;fx=0.05*amt;fz=0;fy=0;}
 else if(load==='cane'){rx=a*0.5+0.12*amt;rz=sx*(0.08+w)*amt;fx=(0.35+0.25*Math.max(0,al))*amt;fz=0;fy=0;}
 else if(load==='tray'){rx=0.12*amt;rz=sx*0.1*amt;fx=1.45*amt;fz=0;fy=sx*0.3*amt;}
 else{
@@ -8685,7 +8705,7 @@ const bodyR=(P,R)=>mulM3(jointR(P,'hips',M3a),jointR(P,'body',M3b),R);
 const toBody=(P,X,o)=>{const R=bodyR(P,M3c);return mulTV(R,X,o);};
 
 
-const IT={bag:1,basket:1,can:1,tray:1};
+const IT={bag:1,basket:1,can:1,tray:1,lantern:1};
 function holdItems(G,P){
 if(G.carry&&IT[G.carry])hangItem(P,'r');
 if(G.cane)hangItem(P,'l');
@@ -53224,7 +53244,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="1bd68316df8ad013";
+VR.TEX_SRC_HASH="78af6898146097a9";
 
 
 
@@ -81384,6 +81404,8 @@ this.beacons=new Map();
 this.mists=new Map();
 this.acc=0;this.macc=0;this.beam=0;this.t=0;this.lit=false;
 }
+
+static heartOn(g){const m=g&&g.meta;return!!g&&(g.dim||'overworld')==='overworld'&&(!m||((m.vgen|0)>=3&&m.type!=='flat'));}
 reset(){this.list.clear();this.beacons.clear();this.mists.clear();this.acc=0;this.macc=0;this.beam=0;this.t=0;this.lit=false;}
 
 absorb(spawns){
@@ -81455,7 +81477,9 @@ if(!low)for(let k=0;k<3;k++)P.glow(x,y+0.5,z,[1,0.35,0.3],0.5,0.2,0.6+Math.rando
 }else if(!on)this.lit=false;
 if(mo)this.ringLights(P,eye);
 
-const C=HEART&&HEART.CITADEL;
+
+
+const C=HEART&&HEART.CITADEL&&Vents.heartOn(g)?HEART.CITADEL:null;
 if(C&& !low){
 const dx=C.x-eye[0],dz=C.z-eye[2];
 if(dx*dx+dz*dz<REACH_BEAM*REACH_BEAM){
@@ -92962,7 +92986,7 @@ const SKIRT={robe:2,gown:2,coat:1,frock:1,whitecoat:1,cape:1,tunic:1,dress:1};
 V.toolOf=function(L){const role=V.ROLES[L.role]||V.ROLES.farmer;return L.age==='child'?null:L.tool!==undefined&&L.tool!==null?L.tool:L.role==='hero'?null:role.tool;};
 V.gaitFor=function(L){
 const kid=L.age==='child',S=kid?SKEL.child:SKEL.adult,fam=V.familyOf(L),role=V.ROLES[L.role]||V.ROLES.farmer;
-const tool=V.toolOf(L),carry=tool==='bag'||tool==='basket'||tool==='can'||tool==='tray'?tool:null;
+const tool=V.toolOf(L),carry=tool==='bag'||tool==='basket'||tool==='can'||tool==='tray'||tool==='lantern'?tool:null;
 return VR.FolkAnim.gait({unit:32,scale:kid?0.82:1,hip:S.hip,thigh: -S.knee,shin:S.hip+S.knee,stride:STRIDE[fam]||0.6,kid,stoop:L.age==='elder'?0.12:0,
 arm:{L1: -S.elbow,L2:S.fore,x:S.armX,y:S.sh-S.hip},hw:S.hw,legX:S.legX,wide:fam==='robe'||fam==='gown'?1:0,
 carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]||0});
@@ -92973,6 +92997,7 @@ carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]
 V.SPECIES_TOOL={aqua:'shellstaff',ocker:'lanternpole',zinn:'tongs',basalt:'finder',opal:'chime'};
 const SP_TOOLS=new Set(Object.values(V.SPECIES_TOOL));
 function speciesItem(set,t,fy,z0){
+if(t==='lantern'){handLantern(set,fy,z0+2);return true;}
 if(!SP_TOOLS.has(t))return false;
 const wood=(y)=>mul(0x7A5236,(y&1)?0.95:1.03);
 if(t==='shellstaff'){
@@ -93004,6 +93029,25 @@ for(let x= -3;x<=3;x++)set(x,fy+12,z0,0xB8D0E4,0);
 for(const x of[-3,0,3])for(let k=1;k<=(x?3:4);k++)set(x,fy+12-k,z0,k>=(x?3:4)?0xE8F8FF:0x9AD4F4,k>=(x?3:4)?1:0);
 }
 return true;
+}
+
+
+
+V.LANTERN_GLOW=0xFFC860;
+function handLantern(set,fy,zc){
+
+const iron=0x2A221C,A=(v)=>Math.abs(v);
+set(0,fy-1,zc,iron,0);set(0,fy-2,zc,iron,0);
+for(let x= -1;x<=1;x++)for(let z=zc-1;z<=zc+1;z++)set(x,fy-3,z,iron,0);
+for(let x= -2;x<=2;x++)for(let z=zc-2;z<=zc+2;z++)set(x,fy-4,z,iron,0);
+for(let y=fy-12;y<=fy-5;y++)for(let z=zc-3;z<=zc+3;z++)for(let x= -3;x<=3;x++){
+const ex=A(x)===3,ez=A(z-zc)===3,rim=y===fy-5||y===fy-12,mid=y===fy-9;
+if(ex&&ez)set(x,y,z,iron,0);
+else if(rim)set(x,y,z,ex||ez?iron:mul(iron,1.25),0);
+else if(ex||ez)set(x,y,z,mid&&(A(x)+A(z-zc))%2?iron:0xFFB347,1);
+else set(x,y,z,A(x)<=1&&A(z-zc)<=1&&y>=fy-10&&y<=fy-7?0xFFF2C8:V.LANTERN_GLOW,1);
+}
+for(let x= -2;x<=2;x++)for(let z=zc-2;z<=zc+2;z++)set(x,fy-13,z,iron,0);
 }
 
 
@@ -128921,7 +128965,8 @@ return list.length;
 
 
 
-const NEB_Z=[0.10,0.035,0.17],NEB_M=[0.42,0.13,0.36],NEB_H=[0.80,0.36,0.46],NZ=[0,0,0],NM=[0,0,0],NH=[0,0,0],NF=[0,0,0];
+const NEB_Z=[0.05,0.015,0.11],NEB_M=[0.24,0.05,0.22],NEB_H=[0.46,0.12,0.24],
+NZ=[0,0,0],NM=[0,0,0],NH=[0,0,0],NF=[0,0,0];
 const mixTo=(o,a,b,k)=>{for(let i=0;i<3;i++)o[i]=a[i]+(b[i]-a[i])*k;return o;};
 {const BS=VR.BodySky;if(BS&&BS.env&& !BS._story4){BS._story4=true;const env0=BS.env;BS.env=function(E){const r=env0.apply(this,arguments);try{const g=game(),s=g&&pl(g),sc=s&&s.scene;if(E&&sc&&sc.b.ch===9&&E.bodySky&&E.zenith&&E.horizon){const k=smooth(sc.t/2.5)*0.85;E.nebula=1.6;E.zenith=mixTo(NZ,E.zenith,NEB_Z,k);E.skyMid=mixTo(NM,E.skyMid||E.zenith,NEB_M,k);E.horizon=mixTo(NH,E.horizon,NEB_H,k);if(E.fogColor)E.fogColor=mixTo(NF,E.fogColor,NEB_H,k*0.7);P.stats.nebSky=(P.stats.nebSky||0)+1;}}catch(e){}return r;};}}
 
@@ -128966,21 +129011,28 @@ const low= !!(g.settings&&g.settings.preset==='potato'),out=[],id=sc.b.id,t=sc.t
 if(sc.b.ch===9){
 const k=smooth(t/2.5),at=S.shotAt(sc.b,t);
 const dir=(az,el,D)=>[e[0]-Math.sin(az)*Math.cos(el)*D,e[1]+Math.sin(el)*D,e[2]-Math.cos(az)*Math.cos(el)*D];
-const PAL=[[[1.0,0.28,0.52],[0.3,0.7,0.9]],[[0.7,0.25,0.95],[1.0,0.4,0.62]],[[1.0,0.42,0.4],[0.5,0.28,0.9]],[[0.95,0.3,0.7],[0.25,0.85,0.8]]];
-const nW=low?6:14;
+
+
+const PAL=[[[0.95,0.12,0.36],[0.2,0.6,0.85]],[[0.55,0.14,0.9],[0.95,0.22,0.5]],[[0.9,0.2,0.26],[0.4,0.16,0.85]],[[0.85,0.14,0.6],[0.15,0.75,0.72]]];
+const nW=low?6:14,flim=id==='c9.b2'||id==='c9.b3'||(at&&at.shot.fx==='flimmi'),FD=P._fd||(P._fd=[0,0,0]);
+if(flim&&sc.tg.sky){const q=sc.tg.sky,L=Math.hypot(q[0]-e[0],q[1]-e[1],q[2]-e[2])||1;FD[0]=(q[0]-e[0])/L;FD[1]=(q[1]-e[1])/L;FD[2]=(q[2]-e[2])/L;}
+const nearF=(az,el)=>{if(!flim|| !sc.tg.sky)return 1;const c= -Math.sin(az)*Math.cos(el)*FD[0]+Math.sin(el)*FD[1]-Math.cos(az)*Math.cos(el)*FD[2];return 0.3+0.7*smooth((Math.acos(clamp(c,-1,1))/DEG-12)/24);};
 for(let i=0;i<nW;i++){
 const az=y0+(i<nW*0.65?(r5(i,1)-0.5)*2.4:r5(i,1)*TAU),el=(4+46*r5(i,2)*r5(i,2))*DEG,D=700+900*r5(i,3);
 const sx=D*(0.35+0.45*r5(i,4)),pal=PAL[i%PAL.length];
-out.push({p:dir(az,el,D),s:[sx,sx*(0.35+0.45*r5(i,5))],rot:(r5(i,6)-0.5)*1.3+t*0.004,col:pal[0],col2:pal[1],a:(0.32+0.2*r5(i,7))*k,kind:1,far:true,seed:i*1.37+0.5});
+out.push({p:dir(az,el,D),s:[sx,sx*(0.35+0.45*r5(i,5))],rot:(r5(i,6)-0.5)*1.3+t*0.004,col:pal[0],col2:pal[1],a:(0.17+0.12*r5(i,7))*k*nearF(az,el),kind:1,far:true,seed:i*1.37+0.5});
 }
 
 const hs=dir(y0-0.35,28*DEG,1500);
-out.push({p:hs,s:[420,360],rot:0.3,col:[0.35,0.95,0.95],col2:[0.25,0.45,0.95],a:0.24*k,kind:1,far:true,seed:9.1});
-out.push({p:hs,s:[70,70],col:[0.85,0.97,1.0],a:0.9*k,kind:0,far:true});
-for(let i=0;i<(low?2:5);i++){
+out.push({p:hs,s:[420,360],rot:0.3,col:[0.3,0.85,0.9],col2:[0.2,0.35,0.9],a:0.2*k*nearF(y0-0.35,28*DEG),kind:1,far:true,seed:9.1});
+out.push({p:hs,s:[70,70],col:[0.85,0.97,1.0],a:(flim?0.4:0.9)*k,kind:0,far:true});
+for(let i=0;i<(low?2:7);i++){
+if(low&&flim&&i===1)break;
 const D=650+300*r5(i,11),sx=D*(0.45+0.3*r5(i,12));
-out.push({p:dir(y0+(r5(i,13)-0.5)*2.0,(6+20*r5(i,14))*DEG,D),s:[sx,sx*0.09],rot:(r5(i,15)-0.5)*0.6,col:[1,1,1],a:0.55*k,kind:2,far:true,seed:20+i});
+out.push({p:dir(y0+(r5(i,13)-0.5)*2.0,(6+24*r5(i,14))*DEG,D),s:[sx,sx*(0.1+0.06*r5(i,16))],rot:(r5(i,15)-0.5)*0.6,col:[1,1,1],a:0.82*k,kind:2,far:true,seed:20+i});
 }
+
+if(flim&&sc.tg.sky){const q=[e[0]+FD[0]*900,e[1]+FD[1]*900,e[2]+FD[2]*900];out.push({p:q,s:[520,150],rot: -0.18,col:[1,1,1],a:0.9*k,kind:2,far:true,seed:31.7});}
 for(let i=0;i<(low?6:18);i++){
 const D=1300,tw=0.6+0.4*Math.sin(t*(1.5+3*r5(i,21))+i);
 out.push({p:dir(y0+(r5(i,22)-0.5)*3.0,(5+55*r5(i,23))*DEG,D),s:[D*0.007*(1+r5(i,24)),D*0.007*(1+r5(i,24))],col:i%3?[1.0,0.92,0.97]:[0.7,0.9,1.0],a:1.1*tw*k,kind:0,far:true});
@@ -128988,9 +129040,10 @@ out.push({p:dir(y0+(r5(i,22)-0.5)*3.0,(5+55*r5(i,23))*DEG,D),s:[D*0.007*(1+r5(i,
 
 if(id==='c9.b2'||id==='c9.b3'||(at&&at.shot.fx==='flimmi')){
 const F0=sc.tg.sky,pu=0.8+0.2*Math.sin(t*7)*Math.sin(t*2.3);
-out.push({p:F0,s:[18,18],col:[1.0,0.6,0.3],a:0.85*pu,kind:0});
-out.push({p:F0,s:[12,1.8],rot: -0.18,col:[1.0,0.82,0.55],a:0.9,kind:0});
-out.push({p:F0,s:[4.2,4.2],col:[1.0,0.97,0.9],a:1.8*pu,kind:0});
+
+out.push({p:F0,s:[28,28],col:[1.0,0.62,0.28],a:0.85*pu,kind:0});
+out.push({p:F0,s:[24,3.0],rot: -0.18,col:[1.0,0.84,0.55],a:1.4,kind:0});
+out.push({p:F0,s:[8,8],col:[1.0,0.98,0.92],a:3.2*pu,kind:0});
 }
 return out;
 }
@@ -129062,7 +129115,7 @@ const n=VR.StoryGlow.draw(r,cam,L);
 P.stats.glows=(P.stats.glows||0)+n;
 };
 
-const NEB3=[[0.30,0.10,0.50],[0.80,0.36,0.46],[1.0,0.55,0.50]],NEBK=[0.2,0.38,0.5];
+const NEB3=[[0.22,0.05,0.42],[0.62,0.12,0.40],[0.80,0.26,0.36]],NEBK=[0.10,0.2,0.28];
 P.tintAir=function(U,k){
 if(!U|| !U.airK|| !(U.airK[0]>0.5)|| !U.air3|| !(k>0))return false;
 const A=U.air3,lu=(v,o)=>0.2126*v[o]+0.7152*v[o+1]+0.0722*v[o+2];
@@ -134041,6 +134094,16 @@ return ids;
 };
 N.LAMPS_N=(preset)=>(preset==='potato'?2:3);
 
+
+N.lanternLook=(L)=>Object.assign({},L,{tool:'lantern'});
+N.carryLantern=function(a,on){
+const p=a&&a.p;if(!p|| !p.look||a.kid)return false;
+if(on=== !!p._dayLook)return false;
+if(on){p._dayLook=p.look;p.look=N.lanternLook(p.look);}else{p.look=p._dayLook;p._dayLook=null;}
+a.mdl=null;a.fg=null;a.gait=undefined;
+return true;
+};
+
 N.routine=function(a,tod,preset){
 const vil=a.vil,P=vil&&vil.plan;
 if(!P|| !P.town||a.kid||(a.role in KEEP))return null;
@@ -134355,6 +134418,10 @@ const lp=L[act.i];
 if(this.goTo(a,lp[0]+1,lp[1]-2,lp[2],1.4)){a.lookAt=[lp[0]+0.5,lp[1]-0.5,lp[2]+0.5];act.rest=(act.rest||0)+dt;if(act.rest>3){act.rest=0;act.i=(act.i+1+(H2(8)%3))%L.length;act.n=(act.n||0)+1;}}
 else if(act.t>60){act.t=0;act.i=(act.i+1)%L.length;}
 };
+
+
+const ra4=VP.runAct;
+VP.runAct=function(a,dt,tod){N.carryLantern(a,!!(a.act&&a.act.type==='lantern'));return ra4.call(this,a,dt,tod);};
 
 const uv=VP.updateVillage;
 VP.updateVillage=function(vil,dt,tod){
@@ -135317,6 +135384,7 @@ return F.solidTall(solid,tall);
 
 F.STEP_BACK=1;
 F.PAVE_RE= /flagstone|floor_plaza|dirt_path|coarse_dirt|gravel|path/;
+F.LAND_RE= /grass|^dirt$|^sand$|^red_sand$|snow|moss|podzol|mud|mycel|^stone$|^clay$/;
 F.stepBack=function(feet,u,get,isPave,solid){
 if(!feet|| !u)return null;
 const x=feet[0]-u[0]*F.STEP_BACK,z=feet[2]-u[1]*F.STEP_BACK,y=feet[1],X=Math.floor(x),Y=Math.floor(y+0.01),Z=Math.floor(z);
@@ -135325,14 +135393,52 @@ return[x,y,z];
 };
 
 
+F.OPEN_STEPS=[2,1];
+F.stepBackOpen=function(feet,u,get,isGround,solid,steps){
+if(!feet|| !u)return null;
+const y=feet[1],Y=Math.floor(y+0.01);
+for(const k of steps||F.OPEN_STEPS){
+let ok=true;
+for(let j=1;j<=k&&ok;j++){const X=Math.floor(feet[0]-u[0]*j),Z=Math.floor(feet[2]-u[1]*j);ok=isGround(get(X,Y-1,Z))&& !solid(get(X,Y,Z))&& !solid(get(X,Y+1,Z));}
+if(ok)return[feet[0]-u[0]*k,y,feet[2]-u[1]*k];
+}
+return null;
+};
+
+F.shiftEye=function(v,from,to){
+if(!v|| !Array.isArray(v.eye)||v._eyeFrom===from[0]+','+from[2]||Math.hypot(v.eye[0]-from[0],v.eye[2]-from[2])>3)return false;
+v.eye=[v.eye[0]+to[0]-from[0],v.eye[1],v.eye[2]+to[2]-from[2]];v._eyeFrom=to[0]+','+to[2];
+return true;
+};
+
+
 F.vistaBack=function(g,v0){
 const m=g&&g.meta,A=g&&g.arrival,v=v0||(A&&A.v),p=g&&g.player;
 if(!m||m.guest||m.f4back|| !m.vistaId|| !v|| !Array.isArray(v.u)|| !p|| !g.world|| !Array.isArray(p.spawn))return null;
+
+
+const w=g.world,bx=Math.floor(p.pos[0]-v.u[0]*F.STEP_BACK),bz=Math.floor(p.pos[2]-v.u[1]*F.STEP_BACK);
+if(w.isLoaded&& !w.isLoaded(bx,bz)){F.backWhy='unloaded';return null;}
 m.f4back=1;
-if(Math.hypot(p.pos[0]-p.spawn[0],p.pos[2]-p.spawn[2])>0.5)return null;
-const R=VR.R,T=R.T.flags,S=VR.F?VR.F.SOLID:1,w=g.world;
-const r=F.stepBack(p.pos,v.u,(x,y,z)=>w.getBlock(x,y,z),(b)=> !!b&&F.PAVE_RE.test((R.types[R.T.type[b]]||{}).name||''),(b)=> !!(T[b]&S));
-if(!r)return null;
+if(Math.hypot(p.pos[0]-p.spawn[0],p.pos[2]-p.spawn[2])>0.5){F.backWhy='moved';return null;}
+const R=VR.R,T=R.T.flags,S=VR.F?VR.F.SOLID:1;
+
+
+const nmOf=(b)=>(b?(R.types[R.T.type[b]]||{}).name||'':''),under=w.getBlock(Math.floor(p.pos[0]),Math.floor(p.pos[1]+0.01)-1,Math.floor(p.pos[2]));
+const own=under&&(T[under]&S)&& !F.LAND_RE.test(nmOf(under))?under:0;
+const r=F.stepBack(p.pos,v.u,(x,y,z)=>w.getBlock(x,y,z),(b)=> !!b&&(b===own||F.PAVE_RE.test(nmOf(b))),(b)=> !!(T[b]&S));
+
+
+const isGround=(b)=> !!b&&(b===own||F.PAVE_RE.test(nmOf(b))||F.LAND_RE.test(nmOf(b)));
+const r2=r||F.stepBackOpen(p.pos,v.u,(x,y,z)=>w.getBlock(x,y,z),isGround,(b)=> !!(T[b]&S),F.OPEN_STEPS);
+if(!r&& !r2){const b=w.getBlock(bx,Math.floor(p.pos[1]+0.01)-1,bz);F.backWhy='stays:'+(b?(R.types[R.T.type[b]]||{}).name:'air');return null;}
+
+
+const to=r||r2;
+F.shiftEye(v,p.pos,to);if(A&&A.v&&A.v!==v)F.shiftEye(A.v,p.pos,to);
+{const W=g.wow,b=W&&W.active&&W.b;if(b&&Math.hypot(b.x-p.pos[0],b.z-p.pos[2])<3){b.x+=to[0]-p.pos[0];b.z+=to[2]-p.pos[2];}}
+if(!r){p.teleport(to[0],to[1],to[2]);p.spawn=to.slice();if(Array.isArray(m.worldSpawn))m.worldSpawn=to.slice();F.backed=to;F.backWhy='back:ground';return to;}
+F.backWhy='back';
 p.teleport(r[0],r[1],r[2]);p.spawn=r.slice();if(Array.isArray(m.worldSpawn))m.worldSpawn=r.slice();
 F.backed=r;return r;
 };
