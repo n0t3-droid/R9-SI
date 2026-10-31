@@ -505,7 +505,7 @@ void main() {
     // the way: toward where the target star will stand at the arrival (no cut when we get there)
     const toDef = idx === 0 ? null : G().system(N, idx), arr = toDef ? SJ.arrival(toDef, t) : null;
     const V = arr ? arr.toStar : SJ.fwd(yaw, pitch);
-    Object.assign(S, { on: true, J: SJ.plan(ly), js: 0, to: idx, toDef, arr, V, yaw0: yaw, pitch0: pitch, yaw, pitch, fromCol: A.color, fromT: A.T, toCol: B.color, toT: B.T, toR: B.R, ly, home: idx === 0, fade: !!(g.settings.jumpFade || g.settings.reduceMotion) });
+    Object.assign(S, { on: true, J: SJ.plan(ly), js: 0, to: idx, toDef, arr, V, yaw0: yaw, pitch0: pitch, yaw, pitch, fromCol: A.color, fromT: A.T, toCol: B.color, toT: B.T, toR: B.R, ly, home: idx === 0, fade: !!(g.settings.jumpFade || g.settings.reduceMotion || g.settings.lessMotion) });
     hud(g, false);
     if (g.audio && g.audio.play) g.audio.play('boost');
     if (g.ui && g.ui.chatLine) g.ui.chatLine(T(idx === 0 ? 'g.stars.homeGo' : 'g.stars.jumpGo', { name: B.name, ly: ly.toFixed(1) }), '#9affd8');

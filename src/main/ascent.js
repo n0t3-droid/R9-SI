@@ -586,7 +586,7 @@
     }
     if (g) g.flightWind = Math.min(0.9, qd / 25000);
     const glow = A.glowFl(fl);
-    const amp = S.camShake === false ? 0 : clamp(Math.min(1.6, qd / 15000) * 0.5 + glow * 0.9 + fl.bump + 0.02 * fl.spool, 0, 3);
+    const amp = S.camShake === false || (VR.A11y && VR.A11y.less(S)) ? 0 : clamp(Math.min(1.6, qd / 15000) * 0.5 + glow * 0.9 + fl.bump + 0.02 * fl.spool, 0, 3);
     fl.bump = Math.max(0, fl.bump - dt * 2.2);
     fl.shakeAmp += (amp - fl.shakeAmp) * k1(5, dt);
     const t = fl.t, Am = fl.shakeAmp, n = (p, q, r) => Math.sin(t * p + q) * 0.5 + Math.sin(t * p * 1.73 + r) * 0.32 + Math.sin(t * p * 2.71 + q * 2.1) * 0.18;

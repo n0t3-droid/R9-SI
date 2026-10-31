@@ -212,5 +212,25 @@
     return { a, b, d: gap.d, samples: S.length, places, landmarks, sky: S.length ? sky / n : 0, movers: S.length ? mv / n : 0, moversShare: S.length ? mvN / n : 0, inputs, from: pos(S[0]), to: pos(S[S.length - 1]), inside };
   };
 
+  // ---------------------------------------------------------------- e-access: the release gate (waves §6.6)
+  // verdicts by type → { fails, warns, lines }: a gated type that misses a target fails the release; a warned one is
+  // reported only; a type that did not run counts as a fail when it is gated (the gate cannot be passed by skipping)
+  SS.GATE = { gate: ['builder'], warn: ['adventurer'] };
+  SS.gate = function (verdicts, cfg) {
+    const c = cfg || SS.GATE, out = { fails: 0, warns: 0, lines: [] };
+    for (const t of c.gate || []) {
+      const v = verdicts && verdicts[t];
+      if (!v) { out.fails++; out.lines.push(`gate ${t}: did not run`); continue; }
+      const miss = v.rows.filter(r => !r.ok).map(r => r.key);
+      if (miss.length) { out.fails++; out.lines.push(`gate ${t}: ${v.met}/${v.total} — missed ${miss.join(', ')}`); } else out.lines.push(`gate ${t}: ${v.met}/${v.total} ✓`);
+    }
+    for (const t of c.warn || []) {
+      const v = verdicts && verdicts[t]; if (!v) { out.lines.push(`warn ${t}: did not run`); continue; }
+      const miss = v.rows.filter(r => !r.ok).map(r => r.key);
+      if (miss.length) { out.warns++; out.lines.push(`warn ${t}: ${v.met}/${v.total} — missed ${miss.join(', ')}`); } else out.lines.push(`warn ${t}: ${v.met}/${v.total} ✓`);
+    }
+    return out;
+  };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = SS;
 })(typeof VR !== 'undefined' ? VR : ((typeof globalThis !== 'undefined' ? globalThis : self).VR = (typeof globalThis !== 'undefined' ? globalThis : self).VR || {}));

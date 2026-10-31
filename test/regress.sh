@@ -6,6 +6,8 @@
 #   results file  default .tmp_tests/regress.txt of this checkout ("" keeps the default when names follow)
 #   test names    run only these (*.js = node, *.mjs = browser) instead of the whole set
 #   REGRESS_ONLY  node | browser  runs only that part of the set
+#   R9_RELEASE=1  the release lane: also test/session.mjs as a gate (the builder must meet erlebnis §7's targets, the
+#                 adventurer is warned about; e-access)
 # One line per test, in the results file and on screen:   <name> <exit code> <seconds> <summary>
 #   summary  ALL OK | FAILED <n> | no summary (the test printed neither)
 #   seconds  wall time of the run; a browser test includes its wait for the browser lock
@@ -51,6 +53,10 @@ run_test() { # <name> <timeout seconds>; returns 0 only for exit code 0 and ALL 
 total=0; fails=0
 for t in "${NODES[@]}"; do total=$((total + 1)); run_test "$t" 600 || fails=$((fails + 1)); done
 for t in "${BROWSERS[@]}"; do total=$((total + 1)); run_test "$t" "${R9_BROWSER_TO:-1800}" || fails=$((fails + 1)); done   # (R9_BROWSER_TO: a longer limit for the long ones, e.g. horizon.mjs on this machine)
+# e-access: the release lane's gate — the sessions of erlebnis §7 (the builder gated, the adventurer warned; SS.gate)
+if [ "${R9_RELEASE:-0}" = 1 ] && [ $# -eq 0 ] && [ "${REGRESS_ONLY:-all}" != node ]; then
+  total=$((total + 1)); ONLY=builder,adventurer SESSION_GATE=1 run_test session.mjs "${R9_SESSION_TO:-12000}" || fails=$((fails + 1))
+fi
 echo "$total tests, $fails failed; results in $RESULTS"
 if [ "$fails" = 0 ]; then echo "ALL OK"; exit 0; fi
 echo "FAILED $fails"

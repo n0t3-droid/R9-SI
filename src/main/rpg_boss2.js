@@ -618,7 +618,7 @@
       const h = o.apply(this, arguments); if (!on()) return h;
       const g = game(), s = RP.st(), sites = RP.sites(), C = R.conquest(sites, s), n = B2.nextGoal(C, sites, g && g.player ? g.player.pos : null);
       const goal = !n ? T('g.rpg.boss2.nextNone') : n.kind === 'boss' ? T('g.rpg.boss2.nextBoss', { d: n.d }) : T('g.rpg.boss2.nextOut', { name: n.name, d: n.d });
-      const leg = [['out', '◆', '#b65cff'], ['free', '◆', '#7ff6ff'], ['travel', '⚡', '#7ff6ff'], ['boss', '⬢', '#ff5ea8'], ['shop', '⌂', '#ffd76a'], ['goal', '◎', '#ffe27a']]
+      const leg = [['out', '◆', '#b65cff'], ['free', '◈', '#7ff6ff'], ['travel', '⚡', '#7ff6ff'], ['boss', '⬢', '#ff5ea8'], ['shop', '⌂', '#ffd76a'], ['goal', '◎', '#ffe27a']]
         .map(([k, ic, c]) => `<span><i style="color:${c}">${ic}</i>${esc(T('g.rpg.boss2.leg.' + k))}</span>`).join('');
       const add = `<div class="rgoal"><small>${esc(T('g.rpg.boss2.next'))}</small><b>${esc(goal)}</b></div><div class="rleg">${leg}</div>`;
       return h.replace('<div class="rworld">', add + '<div class="rworld">');
@@ -690,7 +690,10 @@
       if (ic.kind === 'outpost') {
         const c = ic.free ? '#7ff6ff' : '#c06bff'; ctx.shadowColor = c; ctx.shadowBlur = 10;
         ctx.fillStyle = shade(ic.free ? [20, 60, 70] : [50, 20, 70], 1); ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(8, 0); ctx.lineTo(0, 11); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill();
-        ctx.shadowBlur = 0; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = c; ctx.fillRect(-1.5, -5, 3, 8); ctx.beginPath(); ctx.arc(0, -6, 2.6, 0, TAU); ctx.fill();
+        ctx.shadowBlur = 0; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.stroke();
+        // e-access: a shape as well as a colour — „!" disturbed, ✓ freed (VR.A11y.MARKERS)
+        if (ic.free) { ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-1, 3.5); ctx.lineTo(4.5, -4); ctx.stroke(); }
+        else { ctx.fillStyle = c; ctx.fillRect(-1.5, -6.5, 3, 7); ctx.beginPath(); ctx.arc(0, 4, 1.9, 0, TAU); ctx.fill(); }
       } else if (ic.kind === 'travel') {
         ctx.translate(10, 9); ctx.fillStyle = '#0d2a33'; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, TAU); ctx.fill(); ctx.strokeStyle = '#7ff6ff'; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.moveTo(1, -5); ctx.lineTo(-3, 1); ctx.lineTo(0, 1); ctx.lineTo(-1, 5); ctx.lineTo(3, -1); ctx.lineTo(0, -1); ctx.closePath(); ctx.fill();
@@ -702,7 +705,8 @@
         ctx.shadowColor = c; ctx.shadowBlur = 18; ctx.fillStyle = ic.won ? '#4a3a10' : '#3a0f2a';
         ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.PI / 6; ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 13); } ctx.closePath(); ctx.fill();
         ctx.shadowBlur = 0; ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.stroke();
-        ctx.fillStyle = c; ctx.fillRect(-7, -3, 14, 4); ctx.fillRect(-1.5, -10, 3, 6); ctx.beginPath(); ctx.arc(0, 5, 2.5, 0, TAU); ctx.fill();
+        if (ic.won) { ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-1.5, 5); ctx.lineTo(6.5, -5.5); ctx.stroke(); }   // (e-access: ✓ when won)
+        else { ctx.fillStyle = c; ctx.fillRect(-7, -3, 14, 4); ctx.fillRect(-1.5, -10, 3, 6); ctx.beginPath(); ctx.arc(0, 5, 2.5, 0, TAU); ctx.fill(); }
       }
       ctx.restore();
     }

@@ -120,13 +120,14 @@
     const st = g.state === 'play' && g.player ? X.state(g) : null, list = st ? X.strip(st, lang()) : [];
     const ride = !!st && (st.mode === 'vehicle' || st.mode === 'cockpit'), hud = el.parentNode;
     if (hud && hud.classList.contains('ux-ride') !== ride) hud.classList.toggle('ux-ride', ride);   // (the walking chips step away in a vehicle, ux.css)
-    const sig = list.map(e => e.id + e.key + e.text).join('|');
+    const AX = VR.A11y, padK = !!(AX && AX.padMode()), rows = padK ? list.filter(e => AX.padOf(e.id) !== null) : list;   // e-access: the pad's glyphs
+    const sig = (padK ? 'pad|' : '') + rows.map(e => e.id + e.key + e.text).join('|');
     if (sig !== stripSig) {
       stripSig = sig; stripAt = now; el.innerHTML = '';
-      for (const e of list) { const r = document.createElement('span'); r.className = 'ks'; r.dataset.k = e.id; const k = document.createElement('kbd'); k.textContent = e.key; const t = document.createElement('span'); t.textContent = e.text; r.appendChild(t); r.appendChild(k); el.appendChild(r); }
+      for (const e of rows) { const r = document.createElement('span'); r.className = 'ks'; r.dataset.k = e.id; const k = document.createElement('kbd'); if (padK) { k.className = 'pad'; k.innerHTML = AX.glyph(AX.padOf(e.id)); } else k.textContent = e.key; const t = document.createElement('span'); t.textContent = e.text; r.appendChild(t); r.appendChild(k); el.appendChild(r); }
     }
     const pro = document.documentElement.classList.contains('pro'), mode = (g.settings && g.settings.hudMode) || 'auto';
-    const show = list.length > 0 && (mode === 'always' || now - stripAt < SHOW_S * 1000 || (!pro && firstMin.active));
+    const show = rows.length > 0 && (mode === 'always' || now - stripAt < SHOW_S * 1000 || (!pro && firstMin.active));
     el.classList.toggle('on', show);
     // its box from the screen's bottom-right corner (Funke's bubble keeps out of it) — read at 4 Hz, only while it shows
     if (show) { const r = el.getBoundingClientRect(); X.stripBox = { w: innerWidth - r.left + 8, h: innerHeight - r.top + 8 }; } else X.stripBox = null;

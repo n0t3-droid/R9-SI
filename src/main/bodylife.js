@@ -146,7 +146,7 @@
     if (VR.BodyLife2) VR.BodyLife2.update(g, dt, eye, E, id, t, plumes, tier, lit);   // u-moons2: Zinnober's plumes, Ocker's devils and storms, Aquamarin's nights
     if (BS) BS.plumes = plumes;
     // the ground's tremble near a firing vent: a small dip of the eye now and then (presence.js's landing dip)
-    if (S.shake > 0 && Math.random() < dt * 6) { p.dipAmp = Math.max(p.dipAmp || 0, 0.02 * S.shake); p.dipT = 0; }
+    if (S.shake > 0 && Math.random() < dt * 6 && !(VR.A11y && VR.A11y.less(g.settings))) { p.dipAmp = Math.max(p.dipAmp || 0, 0.02 * S.shake); p.dipT = 0; }
     // ---- Basalt: the impact flashes and Amarant rising
     if (id === 'basalt') {
       const slot = Math.floor(t / 180);
@@ -177,7 +177,7 @@
   // an impact: the white flash and the ejecta flying out in slow arcs; heard only as a faint thud through the ground nearby
   function impact(g, x, y, z, grav, tier, lit) {
     const P = g.particles; if (!P) return;
-    P.spawn(x, y + 0.5, z, 0, 0, 0, { life: 0.35, size: 6, grav: 0, drag: 0.0001, col: [6, 6, 5.5], emis: 2, force: true, collide: false, fade: true });
+    if (!VR.A11y || VR.A11y.flash('impact')) P.spawn(x, y + 0.5, z, 0, 0, 0, { life: 0.35, size: 6, grav: 0, drag: 0.0001, col: [6, 6, 5.5], emis: 2, force: true, collide: false, fade: true });
     P.spawn(x, y + 0.5, z, 0, 0, 0, { life: 0.9, size: 14, grav: 0, drag: 0.0001, col: [1.5, 1.4, 1.2], emis: 1, force: true, collide: false, fade: true });
     const n = tier === 0 ? 30 : tier === 1 ? 60 : 110, big = tier === 0 ? 2.5 : 1, col = lit([0.22, 0.21, 0.2]);
     for (let k = 0; k < n; k++) {

@@ -343,7 +343,7 @@
   };
 
   // ---------------------------------------------------------------- the prompt, the ring, the touch button
-  let dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1, textRes = null, text = '';
+  let dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1, textRes = null, text = '', textDev = '';
   const st = C.pressState();
   function mount() {
     if (dom || typeof document === 'undefined') return dom;
@@ -363,12 +363,14 @@
   }
   function show(text, res) {
     const d = mount(); if (!d) return;
-    if (text === lastText) return;
-    lastText = text;
+    const tk = text + (VR.A11y && VR.A11y.padMode() ? '#pad' : '');   // (e-access: the device switches the key cap)
+    if (tk === lastText) return;
+    lastText = tk;
     if (!text) { d.pr.classList.remove('on'); return; }
     const i = text.indexOf('] ');
     d.pr.innerHTML = '';
-    const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); b.dataset.key = text.slice(1, i); d.pr.appendChild(b);   // (e-ux: data-key — the key cap without its brackets, ux.css)
+    const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); b.dataset.key = text.slice(1, i); d.pr.appendChild(b);
+    if (VR.A11y && VR.A11y.padMode()) { b.innerHTML = VR.A11y.glyph(VR.A11y.padOf('veh')); b.className = 'pad'; b.removeAttribute('data-key'); }   // e-access: the pad's own glyph   // (e-ux: data-key — the key cap without its brackets, ux.css)
     d.pr.appendChild(document.createTextNode(' ' + text.slice(i + 2)));
     d.pr.classList.add('on');
     void res;
@@ -401,7 +403,7 @@
     const res = last || NONE;
     g.ctxRow = res.row;
     // the prompt's words only when the resolution changed (10 Hz at most): no binding or language lookups in between
-    if (res !== textRes) { textRes = res; const B = VR.Binds, code = B && B.current ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV'; text = C.text(res, code); }
+    if (res !== textRes || textDev !== (VR.A11y ? VR.A11y.device : '')) { textRes = res; textDev = VR.A11y ? VR.A11y.device : ''; const B = VR.Binds, code = B && B.current ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV'; text = C.text(res, code); }
     show(VR.FirstLook && !VR.FirstLook.keyFree(g) ? '' : text, res);   // (f-first R53-05: a story card owns V while it stands)
     touchIcon(res);
     // V: on foot a tap is the action and a hold the Heimkehr ring; a tool or a vehicle has V to itself

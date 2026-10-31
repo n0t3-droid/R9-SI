@@ -240,8 +240,8 @@
       pa.spawn(x, y, z, dx * s * 0.82, dy * s * 0.82, dz * s * 0.82, { life: life * 0.8, size: big ? 0.3 : 0.2, grav: willow ? 5 : 3.2, col: c, emis: 0.5, drag: willow ? 1.6 : 1.3, collide: false });
     }
     // flash, then glitter
-    pa.spawn(x, y, z, 0, 0, 0, { life: 0.2, size: 4, grav: 0, col: [1, 0.95, 0.85], emis: 0.8, drag: 0, collide: false, grow: 8 });
-    if (big && Math.random() < 0.6) F.glitter = (F.glitter || []).concat([{ x, y, z, t: 1.0, r: spd * 0.75 }]);
+    if (!VR.A11y || VR.A11y.flash('fireworks')) pa.spawn(x, y, z, 0, 0, 0, { life: 0.2, size: 4, grav: 0, col: [1, 0.95, 0.85], emis: 0.8, drag: 0, collide: false, grow: 8 });
+    if (big && Math.random() < 0.6 && !(VR.A11y && VR.A11y.less())) F.glitter = (F.glitter || []).concat([{ x, y, z, t: 1.0, r: spd * 0.75 }]);
     if (r.type === 'crossette' && !r.sub) {
       for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + 0.4; F.rockets.push({ p: [x, y, z], v: [Math.cos(a) * 9, 3, Math.sin(a) * 9], fuse: 0.55, col: r.col2, col2: r.col, type: 'peony', sub: true, whistle: true }); }
     }

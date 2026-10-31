@@ -3185,5 +3185,30 @@
     "g.set.spaceLife": "Life between the worlds",
     "g.set.spaceLife.tip": "Settlements on the moons, ferries and traffic in space",
     // ---- a-life end
+    // ---- e-access: accessibility (a11y.js)
+    "g.set.sec.access": "Accessibility",
+    "g.a11y.less": "Less motion",
+    "g.a11y.less.tip": "No shake, no head bob, shorter swings; the star jump only fades.",
+    "g.a11y.hand": "One-hand controls",
+    "g.a11y.hand.tip": "Play with only the mouse or only the keyboard.",
+    "g.a11y.hand.off": "Off",
+    "g.a11y.hand.off.tip": "The usual mouse and keyboard controls.",
+    "g.a11y.hand.mouse": "Mouse only",
+    "g.a11y.hand.mouse.tip": "Tap right = action, hold right = walk, wheel = hotbar, middle = place.",
+    "g.a11y.hand.keys": "Keyboard only",
+    "g.a11y.hand.keys.tip": "Arrows walk and turn, PgUp/PgDn look, right Shift jumps, right Ctrl = action, period breaks, comma places, [ ] hotbar.",
+    "g.a11y.sub": "Subtitle speed",
+    "g.a11y.sub.tip": "How long a line stays: at least 2.5 s and 0.06 s a character, times this value.",
+    "g.a11y.text": "Text size (Aa)",
+    "g.a11y.text.tip": "Bigger hints, subtitles and key hints.",
+    "g.a11y.hc": "High contrast",
+    "g.a11y.hc.tip": "The HUD on dark plates with a white edge.",
+    "g.a11y.mono": "Mono sound",
+    "g.a11y.mono.tip": "Everything the same in both ears — for one earphone or one ear.",
+    "ctl.bauhand": "Bauhand / anchor boots",
+    "ctl.mirror": "Mirror stamp / ship lights",
+    "g.a11y.open": "Accessibility …",
+    "ctl.stamps": "Stamp library",
+    // ---- e-access end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

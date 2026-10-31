@@ -3185,5 +3185,30 @@
     "g.set.spaceLife": "Leben zwischen den Welten",
     "g.set.spaceLife.tip": "Siedlungen auf den Monden, Fähren und Verkehr im All",
     // ---- a-life end
+    // ---- e-access: accessibility (a11y.js)
+    "g.set.sec.access": "Zugänglichkeit",
+    "g.a11y.less": "Weniger Bewegung",
+    "g.a11y.less.tip": "Kein Wackeln, kein Wippen beim Gehen, kürzere Schwenks; der Sternsprung blendet nur über.",
+    "g.a11y.hand": "Ein-Hand-Steuerung",
+    "g.a11y.hand.tip": "Spielen mit nur der Maus oder nur der Tastatur.",
+    "g.a11y.hand.off": "Aus",
+    "g.a11y.hand.off.tip": "Die übliche Steuerung mit Maus und Tastatur.",
+    "g.a11y.hand.mouse": "Nur Maus",
+    "g.a11y.hand.mouse.tip": "Rechts tippen = Aktion, rechts halten = losgehen, Rad = Leiste, Mitte = setzen.",
+    "g.a11y.hand.keys": "Nur Tastatur",
+    "g.a11y.hand.keys.tip": "Pfeile gehen und drehen, Bild↑/Bild↓ schauen, Umschalt rechts springt, Strg rechts = Aktion, Punkt abbauen, Komma setzen, [ ] Leiste.",
+    "g.a11y.sub": "Untertitel-Tempo",
+    "g.a11y.sub.tip": "Wie lange eine Zeile stehen bleibt: mindestens 2,5 s und 0,06 s je Zeichen, mal diesem Wert.",
+    "g.a11y.text": "Textgröße (Aa)",
+    "g.a11y.text.tip": "Hinweise, Untertitel und Tastenhinweise größer.",
+    "g.a11y.hc": "Hoher Kontrast",
+    "g.a11y.hc.tip": "Anzeigen auf dunklem Grund mit weißem Rand.",
+    "g.a11y.mono": "Mono-Ton",
+    "g.a11y.mono.tip": "Alles auf beiden Ohren gleich — für einen Kopfhörer oder ein Ohr.",
+    "ctl.bauhand": "Bauhand / Ankerstiefel",
+    "ctl.mirror": "Stempel spiegeln / Schiffslicht",
+    "g.a11y.open": "Zugänglichkeit …",
+    "ctl.stamps": "Stempel-Sammlung",
+    // ---- e-access end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
