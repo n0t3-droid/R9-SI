@@ -1,7 +1,6 @@
 // n-names: the names in the game (docs/superpowers/plans/2026-10-31-n-names.md): a Herzwelt village with its people's
 // name tags (their speech bubbles carry the name), the talk card of an elder and their family, a Glimari village on
-// Zinnober, the star map's labels, and the peoples' names from VR.Names (a page the test lays over the game: the game
-// has no codex page of the peoples yet) → test/shots/names_*.png, test/shots/names_sheet.jpg
+// Zinnober, the star map's labels, the codex's page „Völker" and the Wanderbuch's sites → test/shots/names_*.png, test/shots/names_sheet.jpg
 //   nohup bash test/wt_run.sh names_shots.mjs 3600 > .tmp_tests/names_shots.log 2>&1 &
 // regress: skip  (a showcase with pictures; the gate is test/names.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -109,17 +108,22 @@ for (let i = 0; i < 3; i++) await step(2, 33);
 const ok = await trip((d) => VR.Travel.go(VR.game, { dim: d, via: 'cmd' }), 'zinn').catch(() => false);
 check(ok, 'the jump to Zinnober');
 if (ok) { await ev(() => VR.game.env.setTime(5200)); await settle(30); const Z = await village('eco:zinn:0', 'zinn'); check(Z && !/Glutani/.test(Z.name), 'a Glimari village: „' + (Z ? Z.name : '?') + '"'); }
-// the peoples' names, live from VR.Names and the tables (a page laid over the game by the test)
-await ev(() => { const N = VR.Names, T = (k) => VR.I18N.t(k); const d = document.createElement('div'); d.id = 'n_book';
-  d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#14121c;color:#f2eee6;font:13px/1.35 sans-serif;padding:14px 18px;overflow:hidden';
-  const P = [['herz', 'Herzwelt'], ['aqua', T('g.eco.sp.aqua')], ['ocker', T('g.eco.sp.ocker')], ['zinn', T('g.eco.sp.zinn')], ['basalt', T('g.eco.sp.basalt')], ['opal', T('g.eco.sp.opal')]];
-  const giant = VR.Universe.HELIA.bodies.find(b => b.id === 'amarant').name.de;
-  let h = '<div style="font:bold 20px serif;color:#ffd98a">Namensbuch · die Völker und ihre Namen</div><div style="opacity:.75;margin-bottom:8px">Helia · ' + giant + ' · Herzwelt · Aquamarin · Zinnober · Opal · Basalt · Ocker — ' + T('story.c4.title') + '</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
-  for (const [k, nm] of P) { const p = N.pool(k), S = N.PEOPLES[k]; h += '<div style="background:#221e2e;border-radius:8px;padding:8px 10px"><div style="font:bold 16px serif;color:#9affd8">' + nm + '</div><div style="opacity:.7;font-size:11px">' + S.sound + '</div>' +
-    '<div><b>Große:</b> ' + p.first.slice(0, 5).map((f, i) => f + ' ' + p.sur[i]).join(', ') + '</div><div><b>Kinder:</b> ' + p.kids.slice(0, 6).join(', ') + '</div><div><b>Ältere:</b> ' + p.elders.slice(0, 4).join(', ') + '</div><div><b>Orte:</b> ' + [1, 2, 3, 4].map(i => N.place(k, i * 977, 2 + (i & 1))).join(', ') + '</div></div>'; }
-  d.innerHTML = h + '</div>'; document.body.appendChild(d); });
-pics.book = await shotDom('names_peoples.png');
-const spec = { w: 620, rows: [{ label: 'Herzwelt: ein Dorf mit deutschem Namen, die Leute tragen ihre Namen · die Karte einer Älteren', imgs: [pics.herz, pics.talk].filter(Boolean) }, { label: 'Zinnober: ein Glimari-Dorf · die Sternkarte mit den neuen Sternnamen', imgs: [pics.zinn, pics.stars].filter(Boolean) }, { label: 'Die Völker und ihre Namen (live aus VR.Names)', imgs: [pics.book].filter(Boolean) }].filter(r => r.imgs.length) };
+// the codex's page „Völker" (codex.js): every people found, its sound and a few of its names
+await ev(() => { const g = VR.game; for (const k of VR.Names.PEOPLE_ORDER) g.codex.unlock('p:' + k, true); g.ui.showCodex(); const c = [...document.querySelectorAll('#codexgrid .codexcat')].find(e => /Völker/.test(e.textContent)); if (c) c.scrollIntoView({ block: 'start' }); });
+for (let i = 0; i < 3; i++) await step(2, 33);
+const cx = await ev(() => VR.game.codex.list().filter(e => e.catKey === 'peoples').map(e => e.found + ' ' + e.name + ': ' + e.desc.slice(-70)));
+console.log('  codex: ' + cx.join(' | '));
+check(cx.length === 7 && cx.every(l => /^true /.test(l) && /So heißen sie: /.test(l)), 'the codex shows the seven peoples with their names');
+pics.codex = await shotDom('names_codex.png');
+await ev(() => VR.game.ui.show(null));
+// the Wanderbuch: the Heartland's sites by their new names (the book stored the old words at the visit)
+await ev(() => { const g = VR.game, W = VR.Wander; for (const [id, old] of [['l:hills_w', 'Hügeldorf'], ['l:canyon', 'Schlucht'], ['l:farm_c', 'Bauernhof'], ['l:farm_n', 'Bauernhof'], ['l:east', 'Hain'], ['l:citadel', 'Turmzitadelle'], ['l:temple_w', 'Tor-Tempel']]) W.note(g.meta, 'places', id, old); if (g.villages && g.villages.sites[0]) W.note(g.meta, 'places', 'v:' + g.villages.sites[0].id, g.villages.sites[0].name); W.note(g.meta, 'people', 'Greta Lindenblatt'); W.open(g); });
+for (let i = 0; i < 3; i++) await step(2, 33);
+const wb = await ev(() => (document.querySelector('#wanderbuch .wdl') || {}).textContent || '');
+console.log('  wanderbuch: ' + wb);
+check(/Mohnbühl/.test(wb) && /Hallklamm/.test(wb) && /Sonnenhof/.test(wb) && !/Hügeldorf|Bauernhof/.test(wb), 'the Wanderbuch reads the sites\' new names');
+pics.book = await shotDom('names_wanderbuch.png');
+const spec = { w: 620, rows: [{ label: 'Herzwelt: ein Dorf mit deutschem Namen, die Leute tragen ihre Namen · die Karte einer Älteren', imgs: [pics.herz, pics.talk].filter(Boolean) }, { label: 'Zinnober: ein Glimari-Dorf · die Sternkarte mit den neuen Sternnamen', imgs: [pics.zinn, pics.stars].filter(Boolean) }, { label: 'Der Kodex: die Seite „Völker" · das Wanderbuch mit den Orten des Herzlands', imgs: [pics.codex, pics.book].filter(Boolean) }].filter(r => r.imgs.length) };
 fs.writeFileSync(ROOT + '/.tmp_tests/names_sheet.json', JSON.stringify(spec));
 try { console.log(execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'names_sheet.jpg', ROOT + '/.tmp_tests/names_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); }
 const errs = logs.filter(l => /pageerror/.test(l));
