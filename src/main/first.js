@@ -309,6 +309,7 @@
   // true while it rises (the world waits under the loading screen), false once it stands (or for any other world)
   FI.holdLoading = function (g, done, dt) {
     if (!done) return false;
+    if (g.arrivalPending && !g.arrival && VR.First2 && VR.First2.vistaBack) { try { VR.First2.vistaBack(g, g.arrivalPending.vista); } catch (e) { /* the spawn stays */ } }   // (f-first4: one block back on the way, unseen)
     if (g.arrivalPending && !g.arrival) { const A = new Arrival(g, { vista: g.arrivalPending.vista }); g.arrival = A; A.rise(); return true; }
     const A = g.arrival;
     return !!(A && A.phase === 'in' && A.stepIn(dt));

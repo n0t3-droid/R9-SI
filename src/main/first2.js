@@ -260,9 +260,10 @@
     if (!isPave(get(X, Y - 1, Z)) || solid(get(X, Y, Z)) || solid(get(X, Y + 1, Z))) return null;
     return [x, y, z];
   };
-  // (once, under the arrival's white, on a vista start's own first arrival: the feet still on the spawn)
-  F.vistaBack = function (g) {
-    const m = g && g.meta, A = g && g.arrival, v = A && A.v, p = g && g.player;
+  // (once, on a vista start's own first arrival, the feet still on the spawn: from the loading screen's last moments
+  //  (First.holdLoading, the world there, the screen still the loading screen), else under the arrival's white (settle))
+  F.vistaBack = function (g, v0) {
+    const m = g && g.meta, A = g && g.arrival, v = v0 || (A && A.v), p = g && g.player;
     if (!m || m.guest || m.f4back || !m.vistaId || !v || !Array.isArray(v.u) || !p || !g.world || !Array.isArray(p.spawn)) return null;
     m.f4back = 1;
     if (Math.hypot(p.pos[0] - p.spawn[0], p.pos[2] - p.spawn[2]) > 0.5) return null;
