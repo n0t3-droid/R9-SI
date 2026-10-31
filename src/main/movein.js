@@ -260,6 +260,8 @@
   const P = Vs.prototype; P.__movein = true;
   const hasDoc = typeof document !== 'undefined';
   const host = (g) => !(g.mp && g.mp.isClient);
+  // the switch: settings.movein === false — no homes noticed, no arrivals, nothing drawn (the families who live here stay)
+  MI.on = (g) => !(g && g.settings && g.settings.movein === false);
   const tierOf = (g) => (VR.LifeKit && VR.LifeKit.tierOf ? VR.LifeKit.tierOf(g.settings) : 2);
   const now = (g) => (g.env.day || 0) * MI.DAY + g.env.timeOfDay;
   const playerName = (g) => { const n = g.settings && g.settings.playerName; return n && String(n).trim() ? String(n).trim().slice(0, 24) : ''; };
@@ -302,7 +304,7 @@
   const baseChanged = P.onBlockChanged;
   P.onBlockChanged = function (x, y, z, old, s) {
     baseChanged.call(this, x, y, z, old, s);
-    if (this.selfEdit || !this._mi || !host(this.g)) return;
+    if (this.selfEdit || !this._mi || !host(this.g) || !MI.on(this.g)) return;
     try { MI.onChange(this, x, y, z, old, s); } catch (e) { if (!MI.warned) { MI.warned = true; console.warn('movein', e); } }
   };
   const baseUpdate = P.update;
@@ -394,7 +396,7 @@
 
   // ---------------------------------------------------------------- the schedule
   MI.tick = function (V, dt) {
-    const g = V.g, M = V._mi; if (!M || !g.player || !g.env) return;
+    const g = V.g, M = V._mi; if (!M || !g.player || !g.env || (!MI.on(g) && !M.job)) return;
     if (M.checkT >= 0) { M.checkT -= dt; if (M.checkT < 0 && host(g)) MI.check(V); }
     if (M.job) MI.updateJob(V, dt);
     MI.updateGifts(V, dt);
@@ -427,6 +429,9 @@
     h.fam = st.custom.length;
     st.custom.push({ kind: 'home', beds: h.beds.length ? h.beds : [], door: h.door, inside: h.inside, outside: h.outside, seats: [], table: null, lights: [], work: [], box: h.box && h.box.length === 6 ? [h.box[0] - 1, h.box[1] - 1, h.box[2] - 1, h.box[3] + 1, h.box[4] + 1, h.box[5] + 1] : null, F: h.F, chimney: null, mine: true });
     MI.workFor(vil.plan, set, rec);
+    // the plaza follows the homes (the middle of their doorsteps): the festival dances there, the stall stands near
+    const pz = MI.plazaOf(rec, set); set.x = pz.x; set.y = pz.y; set.z = pz.z;
+    Object.assign(vil.plan.plaza, { x: pz.x, y: pz.y, z: pz.z }); vil.plan.x = pz.x; vil.plan.y = pz.y; vil.plan.z = pz.z; vil.center = [pz.x, pz.y, pz.z];
     if (!vil.active && g.world.isLoaded(vil.plan.x, vil.plan.z) && Math.hypot(g.player.pos[0] - vil.plan.x, g.player.pos[2] - vil.plan.z) < 110) V.activate(vil, g.env.timeOfDay);
     const before = vil.agents.length;
     V.onCustomHome(vil);
@@ -683,7 +688,7 @@
 
   // ---------------------------------------------------------------- drawing (presentation only)
   MI.draw = function (V, r, E, cam) {
-    const g = V.g, ent = g.entities, LK = VR.LifeKit; if (!ent || !LK || !g.meta || !g.meta.movein) return;
+    const g = V.g, ent = g.entities, LK = VR.LifeKit; if (!ent || !LK || !g.meta || !g.meta.movein || !MI.on(g)) return;
     const rec = g.meta.movein, J = V._mi && V._mi.job;
     const cart = J ? J.cart : rec.cart && rec.cart.at;
     const sets = rec.sets.filter(s => s.market && s.stall);
@@ -764,6 +769,17 @@
     if (unlock && document.exitPointerLock && document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) { /* fine */ } }
   }
   MI.card = card;
+  // the test's window (test/movein.mjs)
+  MI.debug = function (g) {
+    const V = g.villages, rec = MI.rec(g), J = V && V._mi && V._mi.job;
+    return {
+      homes: rec.homes.map(h => ({ st: h.st, due: h.due, set: h.set, fam: h.fam, decor: (h.decor || []).length, door: h.door, beds: h.beds.length })),
+      sets: rec.sets.map(s => ({ id: s.id, name: s.name, named: s.named, market: s.market, stall: s.stall, fest: s.fest })),
+      job: J ? { fam: J.fam, phases: J.agents.map(a => (a.act && a.act.type === 'arrive' ? a.act.phase : 'done')), cart: J.cart.map(v => +v.toFixed(1)) } : null,
+      gifts: rec.gifts.slice(), mem: rec.mem, decor: rec.decor, card: hasDoc && document.getElementById('mi_card') ? document.getElementById('mi_card').textContent : null,
+      agents: V ? V.agents.filter(a => a.vil.plan && a.vil.plan.mine).map(a => [a.p.name, a.vil.fams[a.p.fam].surname, a.p.role, a.act && a.act.type, a.pos.map(Math.round), a.bubble ? a.bubble.text : null]) : [],
+    };
+  };
   if (hasDoc && typeof window !== 'undefined' && window.addEventListener) window.addEventListener('keydown', (e) => {
     const g = VR.game; if (!g || !g.villages || !g.villages._mi || !g.villages._mi.job) return;
     if (e.code === 'Backspace' && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) { e.preventDefault(); MI.skip(g); }
