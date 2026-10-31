@@ -884,11 +884,11 @@ body.storyon #storychoice { visibility: hidden !important; }
       if (!sc.inGlass || !sc.winC) return out;
       const at = S.shotAt(sc.b, sc.t); if (!at || at.shot.cam !== 'window') return out;
       const C = sc.winC, f = sc.fwd, pt = -6 * DEG, F = [f[0] * Math.cos(pt), Math.sin(pt), f[2] * Math.cos(pt)], Rt = [-f[2], 0, f[0]], U = [F[1] * Rt[2] - F[2] * Rt[1], F[2] * Rt[0] - F[0] * Rt[2], F[0] * Rt[1] - F[1] * Rt[0]];
-      const tv = Math.tan(P.WIN_FOV * DEG / 2), th = tv * 16 / 9, A = VR.StoryFx && VR.StoryFx.ARROW || [], lit = smooth(at.u * 1.6) * A.length, D = 420;
+      const tv = Math.tan(P.WIN_FOV * DEG / 2), th = tv * 16 / 9, A = VR.StoryFx && VR.StoryFx.ARROW || [], lit = smooth(at.u * 1.6) * A.length, D = 85;   // (inside the near plane's reach: the station's view ends a few hundred metres out)
       for (let i = 0; i < A.length; i++) {
         const q = clamp(lit - i, 0, 1); if (!q) continue;
         const a = (2 * A[i][0] - 1) * th, b = (1 - 2 * A[i][1]) * tv, d = [F[0] + Rt[0] * a - U[0] * b, F[1] + Rt[1] * a - U[1] * b, F[2] + Rt[2] * a - U[2] * b], L0 = Math.hypot(d[0], d[1], d[2]);
-        out.push({ p: [C[0] + d[0] / L0 * D, C[1] + d[1] / L0 * D, C[2] + d[2] / L0 * D], up: [0, 1, 0], len: 70 * q, w: 2.6, col: [0.35, 1.6, 2.0], a: 0.75 * q });
+        out.push({ p: [C[0] + d[0] / L0 * D, C[1] + d[1] / L0 * D, C[2] + d[2] / L0 * D], up: [0, 1, 0], len: 15 * q, w: 0.55, col: [0.35, 1.6, 2.0], a: 0.8 * q });
       }
       return out;
     }
@@ -955,7 +955,11 @@ body.storyon #storychoice { visibility: hidden !important; }
 
   // ---------------------------------------------------------------- a-story4 · ch. 9: the nebula's veil, from inside
   // (while a chapter-9 scene plays on a nebula world: the sky's cosmic veil raised — one uniform, nothing drawn more)
-  { const BS = VR.BodySky; if (BS && BS.env && !BS._story4) { BS._story4 = true; const env0 = BS.env; BS.env = function (E) { const r = env0.apply(this, arguments); try { const g = game(), s = g && pl(g), sc = s && s.scene; if (E && sc && sc.b.ch === 9 && E.bodySky) E.nebula = 1.6; } catch (e) { /* the sky */ } return r; }; } }
+  // (and its glow: the sky's stops turned to the nebula's own — a violet top, rose in the middle, a warm pink horizon —
+  // by day or night alike, eased in over the scene's first seconds; fixed arrays, nothing allocated per frame)
+  const NEB_Z = [0.10, 0.035, 0.17], NEB_M = [0.42, 0.13, 0.36], NEB_H = [0.80, 0.36, 0.46], NZ = [0, 0, 0], NM = [0, 0, 0], NH = [0, 0, 0], NF = [0, 0, 0];
+  const mixTo = (o, a, b, k) => { for (let i = 0; i < 3; i++) o[i] = a[i] + (b[i] - a[i]) * k; return o; };
+  { const BS = VR.BodySky; if (BS && BS.env && !BS._story4) { BS._story4 = true; const env0 = BS.env; BS.env = function (E) { const r = env0.apply(this, arguments); try { const g = game(), s = g && pl(g), sc = s && s.scene; if (E && sc && sc.b.ch === 9 && E.bodySky && E.zenith && E.horizon) { const k = smooth(sc.t / 2.5) * 0.85; E.nebula = 1.6; E.zenith = mixTo(NZ, E.zenith, NEB_Z, k); E.skyMid = mixTo(NM, E.skyMid || E.zenith, NEB_M, k); E.horizon = mixTo(NH, E.horizon, NEB_H, k); if (E.fogColor) E.fogColor = mixTo(NF, E.fogColor, NEB_H, k * 0.7); P.stats.nebSky = (P.stats.nebSky || 0) + 1; } } catch (e) { /* the sky */ } return r; }; } }
 
   // ---------------------------------------------------------------- the frames the game's own frame does not run (the space views)
   const G = VR.Game;

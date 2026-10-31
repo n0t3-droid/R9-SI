@@ -410,8 +410,10 @@ try {
       const w9 = await why('c9.b1');
       check(w9 === null, 'c9.b1 holds on the nebula\'s world (' + w9 + ')');
       const td = await nightTod();   // (inside the nebula it is not dark: its glow fills the night)
+      console.log('     the nebula\'s world: night at ' + td);
       const s1 = await play('c9.b1', 10, 'c9_nebula', td === null ? undefined : td);
       check(s1 && s1.fx === 'nebin' && /lumi/.test(s1.who), 'c9.b1: the nebula from inside; Lumi is there (her branch)');
+      check(await ev(() => (VR.StoryPlay.stats.nebSky || 0) > 0), 'c9.b1: the sky turned to the nebula\'s own glow while the scene plays');
       await ev(() => VR.StoryPlay.debug.reach('c9.b2'));
       const s2 = await play('c9.b2', 11, 'c9_flimmi', td === null ? undefined : td);
       check(s2 && s2.fx === 'flimmi' && /flimmi/.test(s2.who), 'c9.b2: Flimmi — the star being born, the one the beacons were calling');
