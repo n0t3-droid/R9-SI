@@ -1,5 +1,5 @@
 // u-folk2 in the browser (docs/superpowers/plans/2026-10-31-u-folk2.md): a new Kreativ world (seed 4242), 960 × 540,
-// de-DE, High with the smooth people. Herzwelt's nearest village: a close-up resting and in joy, a parent and a child hand
+// de-DE, Balanced with the smooth people (High for its cost). Herzwelt's nearest village: a close-up resting and in joy, a parent and a child hand
 // in hand, applause for a build, the grandparent's story by the fire at dusk, the dance round the player, a pet; a 60-s
 // walk round the plaza (W held, two jumps, a fall, four blocks built, two pauses; offers and invitations taken with
 // [use]) counting the moments (≥ 4 distinct); the cost Very Low / High with the moments on and off (FolkJoy.off);
@@ -30,7 +30,7 @@ page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slic
 await page.goto(DIST);
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
-const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } for (let i = 0; i < m; i++) { window.__norender = (i % 5) !== 0; if (window.__each) window.__each(g); g.last = performance.now() - d; g.loop(performance.now()); } window.__norender = true; }, [Math.min(10, n - k), dtms]); await wait(3); } };
+const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } for (let i = 0; i < m; i++) { window.__norender = !(window.__rEvery && (window.__fr = (window.__fr || 0) + 1) % window.__rEvery === 0); if (window.__each) window.__each(g); g.last = performance.now() - d; g.loop(performance.now()); } window.__norender = true; }, [Math.min(10, n - k), dtms]); await wait(3); } };
 const settle = async (max = 50) => {
   let s = null;
   for (let i = 0; i < max; i++) {
@@ -90,7 +90,7 @@ const ADULT = `(v) => v.agents.filter(a => !a.kid && !a.elder && a.pose !== 'sle
 const KID = `(v) => v.agents.filter(a => a.kid && a.pose !== 'sleep').sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0]`;
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.smoothFolk = true; g.applySettings('*'); });
+await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.smoothFolk = true; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Bewohner',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
 for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a new world');
@@ -107,6 +107,7 @@ if (want('herz') || want('walk') || want('cost')) {
     await loaded([HV.x, HV.y, HV.z], 48); await settle(60);
     for (let i = 0; i < 40 && !HP; i++) { await step(20, 33); HP = await villageOf(HV.id); }
     check(!!HP && HP.agents > 4, `${HV.name} lives (${HP ? HP.agents : 0} people about)`);
+    await ev(() => { window.__rEvery = 10; });   // (from here 1 frame in 10 drawn: the people's moments need them seen)
     await step(240, 33);   // the morning's walk out
     console.log('  · prewarm ' + JSON.stringify(await prewarm()));
   }
@@ -205,7 +206,7 @@ if (want('walk') && HP) {
           if (t >= 27 && t < 27.04) { const w = g.world, st = VR.R.byName.stone ? VR.R.byName.stone.id : 1; for (let k = 0; k < 4; k++) { const x = Math.floor(p.pos[0]) + 2, y = Math.floor(p.pos[1]) + k, z = Math.floor(p.pos[2]) + 2; if (!w.getBlock(x, y, z)) w.setBlock(x, y, z, st); } }
           if (t >= 50 && t < 50.04) p.teleport(p.pos[0], p.pos[1] + 6.5, p.pos[2]);
           for (const a of M.agents) if (a.act && a.act.type === 'joy' && a.act.wait && !a.act.done && (a.pos[0] - p.pos[0]) ** 2 + (a.pos[2] - p.pos[2]) ** 2 < 9) { out.use.push(a.act.kind); M.openTalk(a); }
-          window.__norender = (i % 5) !== 0;
+          window.__norender = (i % 8) !== 0;
           g.last = performance.now() - 33; g.loop(performance.now());
         }
         window.__norender = true; inp.keys.delete('KeyW'); inp.keys.delete('Space');
@@ -247,7 +248,7 @@ if (want('cost') && HP) {
     run.cost = cost;
     console.log(`  cost Very Low off ${best('potato_off')} / on ${best('potato_on')} ms · High off ${best('high_off')} / on ${best('high_on')} ms`);
     check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `Very Low not slower with the moments (${best('potato_off')} → ${best('potato_on')} ms)`);
-    await preset('high'); await settle(20);
+    await preset('balanced'); await ev(() => { VR.game.settings.smoothFolk = true; VR.game.applySettings('*'); }); await settle(20);
   } catch (e) { check(false, 'cost: ' + String(e && e.stack || e).slice(0, 500)); }
   save();
 }
