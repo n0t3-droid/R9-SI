@@ -174,7 +174,7 @@
   function armSwing(out, s, a, al, run, amt, load, wide) {
     const sx = s === 'l' ? -1 : 1, w = wide ? 0.05 : 0;
     let rx, rz, fx, fz, fy;
-    if (load === 'bag' || load === 'basket' || load === 'can') { rx = a * 0.35; rz = sx * (0.16 + w) * amt; fx = 0.05 * amt; fz = 0; fy = 0; }
+    if (load === 'bag' || load === 'basket' || load === 'can' || load === 'lantern') { rx = a * 0.35; rz = sx * (0.16 + w) * amt; fx = 0.05 * amt; fz = 0; fy = 0; }
     else if (load === 'cane') { rx = a * 0.5 + 0.12 * amt; rz = sx * (0.08 + w) * amt; fx = (0.35 + 0.25 * Math.max(0, al)) * amt; fz = 0; fy = 0; }
     else if (load === 'tray') { rx = 0.12 * amt; rz = sx * 0.1 * amt; fx = 1.45 * amt; fz = 0; fy = sx * 0.3 * amt; }
     else {
@@ -263,7 +263,7 @@
   const toBody = (P, X, o) => { const R = bodyR(P, M3c); return mulTV(R, X, o); };
   // the things in the hands: a bag, a basket or a can hangs straight down (its pose turns it back against the arm, the
   // hand and the body), a cane too (its tip under the hand), a tray stays level (as the hand holds it)
-  const IT = { bag: 1, basket: 1, can: 1, tray: 1 };
+  const IT = { bag: 1, basket: 1, can: 1, tray: 1, lantern: 1 };   // (f-polish4: the lamplighter's lantern hangs too)
   function holdItems(G, P) {
     if (G.carry && IT[G.carry]) hangItem(P, 'r');
     if (G.cane) hangItem(P, 'l');

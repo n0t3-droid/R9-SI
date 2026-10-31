@@ -70,6 +70,16 @@
     return ids;
   };
   N.LAMPS_N = (preset) => (preset === 'potato' ? 2 : 3);
+  // f-polish4: the lantern in the lamplighter's hand (on: the round's look, a copy with tool 'lantern'; off: the day's look
+  // back); the cached models and the gait follow the look. → true when the look changed
+  N.lanternLook = (L) => Object.assign({}, L, { tool: 'lantern' });
+  N.carryLantern = function (a, on) {
+    const p = a && a.p; if (!p || !p.look || a.kid) return false;
+    if (on === !!p._dayLook) return false;
+    if (on) { p._dayLook = p.look; p.look = N.lanternLook(p.look); } else { p.look = p._dayLook; p._dayLook = null; }
+    a.mdl = null; a.fg = null; a.gait = undefined;
+    return true;
+  };
   // the activity a native of a town wants now, or null (the villages' own schedule then)
   N.routine = function (a, tod, preset) {
     const vil = a.vil, P = vil && vil.plan;
@@ -385,6 +395,10 @@
       if (this.goTo(a, lp[0] + 1, lp[1] - 2, lp[2], 1.4)) { a.lookAt = [lp[0] + 0.5, lp[1] - 0.5, lp[2] + 0.5]; act.rest = (act.rest || 0) + dt; if (act.rest > 3) { act.rest = 0; act.i = (act.i + 1 + (H2(8) % 3)) % L.length; act.n = (act.n || 0) + 1; } }
       else if (act.t > 60) { act.t = 0; act.i = (act.i + 1) % L.length; }
     };
+    // f-polish4 · the lamplighter's lantern: while the lamp round is the act, the look holds a lantern (folkmodel.js
+    // handLantern); the day's own thing back with the morning (the models are keyed by the look: two looks a lamplighter)
+    const ra4 = VP.runAct;
+    VP.runAct = function (a, dt, tod) { N.carryLantern(a, !!(a.act && a.act.type === 'lantern')); return ra4.call(this, a, dt, tod); };
     // (a preset changed while in a town: it wakes again with the new tier)
     const uv = VP.updateVillage;
     VP.updateVillage = function (vil, dt, tod) {

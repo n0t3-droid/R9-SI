@@ -593,7 +593,7 @@
   V.toolOf = function (L) { const role = V.ROLES[L.role] || V.ROLES.farmer; return L.age === 'child' ? null : L.tool !== undefined && L.tool !== null ? L.tool : L.role === 'hero' ? null : role.tool; };
   V.gaitFor = function (L) {
     const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult, fam = V.familyOf(L), role = V.ROLES[L.role] || V.ROLES.farmer;
-    const tool = V.toolOf(L), carry = tool === 'bag' || tool === 'basket' || tool === 'can' || tool === 'tray' ? tool : null;
+    const tool = V.toolOf(L), carry = tool === 'bag' || tool === 'basket' || tool === 'can' || tool === 'tray' || tool === 'lantern' ? tool : null;
     return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[fam] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0,
       arm: { L1: -S.elbow, L2: S.fore, x: S.armX, y: S.sh - S.hip }, hw: S.hw, legX: S.legX, wide: fam === 'robe' || fam === 'gown' ? 1 : 0,
       carry, cane: !kid && L.age === 'elder' && role.tool === 'cane', item: tool, skirt: SKIRT[fam] || 0 });
@@ -604,6 +604,7 @@
   V.SPECIES_TOOL = { aqua: 'shellstaff', ocker: 'lanternpole', zinn: 'tongs', basalt: 'finder', opal: 'chime' };
   const SP_TOOLS = new Set(Object.values(V.SPECIES_TOOL));
   function speciesItem(set, t, fy, z0) {
+    if (t === 'lantern') { handLantern(set, fy, z0 + 2); return true; }   // f-polish4: the lamplighter's lantern
     if (!SP_TOOLS.has(t)) return false;
     const wood = (y) => mul(0x7A5236, (y & 1) ? 0.95 : 1.03);
     if (t === 'shellstaff') {
@@ -635,6 +636,23 @@
       for (const x of [-3, 0, 3]) for (let k = 1; k <= (x ? 3 : 4); k++) set(x, fy + 12 - k, z0, k >= (x ? 3 : 4) ? 0xE8F8FF : 0x9AD4F4, k >= (x ? 3 : 4) ? 1 : 0);
     }
     return true;
+  }
+  // ============================== f-polish4 · the lamplighter's hand lantern (natives.js swaps it in at night)
+  // our own design: a short bail from the fist, a dark iron cage with a peaked cap, the warm flame glass glowing inside;
+  // it hangs straight down from the fist (folkanim.js: a carried thing). zc: the hanging middle's z
+  V.LANTERN_GLOW = 0xFFC860;
+  function handLantern(set, fy, zc) {
+    const iron = 0x2E2620;
+    set(0, fy - 1, zc, iron, 0); set(0, fy - 2, zc, iron, 0);
+    for (let x = -1; x <= 1; x++) for (let z = zc - 1; z <= zc + 1; z++) set(x, fy - 3, z, iron, 0);
+    for (let y = fy - 9; y <= fy - 4; y++) for (let z = zc - 2; z <= zc + 2; z++) for (let x = -2; x <= 2; x++) {
+      const ex = Math.abs(x) === 2, ez = Math.abs(z - zc) === 2, rim = y === fy - 4 || y === fy - 9;
+      if (ex && ez) set(x, y, z, iron, 0);                                   // the four posts
+      else if (rim) set(x, y, z, ex || ez ? iron : mul(iron, 1.2), 0);       // the cap's and the foot's plates
+      else if (ex || ez) set(x, y, z, 0xFFB347, 1);                          // the warm glass
+      else set(x, y, z, x === 0 && z === zc && y >= fy - 7 ? 0xFFF2C8 : V.LANTERN_GLOW, 1);   // the flame's core
+    }
+    for (let x = -1; x <= 1; x++) for (let z = zc - 1; z <= zc + 1; z++) set(x, fy - 10, z, iron, 0);
   }
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
