@@ -79,7 +79,7 @@ try {
   const atTitle = () => ev(() => typeof VR !== 'undefined' && !!VR.game && VR.game.state === 'title');
   for (let i = 0; i < 160; i++) { await wait(500); if (await atTitle()) break; }
   check(await atTitle(), 'the start screen (' + secs() + ')');
-  check(await ev(() => !!(VR.Story && VR.StoryPlay && VR.Regie && VR.Story.BEATS.length === 12)), 'VR.Story (12 beats), VR.StoryPlay and VR.Regie are in the page');
+  check(await ev(() => !!(VR.Story && VR.StoryPlay && VR.Regie && VR.Story.BEATS.length === 24)), 'VR.Story (24 beats: a-story3 wrote 5–8), VR.StoryPlay and VR.Regie are in the page');
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); try { g.audio.resume(); } catch (e) { /* */ } if (VR.Hints) for (const h of ['play', 'move', 'fly', 'bauhand', 'bhring', 'bhundo', 'bhchange']) VR.Hints.done(h); });
   await ev(`VR.game.createWorld({name:'Leuchtfeuer',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
   for (let i = 0; i < 200; i++) { await wait(500); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)) break; }
@@ -97,6 +97,7 @@ try {
       sceneT: (t) => { const s = g.story; return !s || !s.scene || s.scene.t >= t; },
       noScene: () => !VR.StoryPlay.holds(g),
       known: () => !!window.__site && !!VR.Liberate.siteOf(window.__site) && VR.Liberate.siteOf(window.__site).known,
+      choice: () => !!VR.StoryPlay.choiceUp(VR.game),
       momentEnd: () => !VR.Liberate.moment && !!window.__site && VR.Liberate.siteOf(window.__site).st === 'frei',
     };
     window.__ft = {
@@ -285,6 +286,90 @@ try {
     N.cost = cost;
     check(cost.potato_on.storyMs < 0.05 && cost.high_on.storyMs < 0.05, 'the story and the Regie ≤ 0.05 ms a frame (Very Low ' + cost.potato_on.storyMs + ', High ' + cost.high_on.storyMs + ')');
   });
+
+  // ---------------------------------------------------------------- 7 · a-story3: chapters 5–8 across the universe
+  await section('7', async () => {
+    console.log('7 · a-story3: chapters 5–8');
+    const trip = async (dim) => {
+      await ev((d) => { window.__lastTrip = VR.Travel.last; VR.Travel.go(VR.game, { dim: d, via: 'cmd' }); }, dim);
+      let s = null;
+      for (let i = 0; i < 900; i++) { await run(10); s = await ev((d) => { const g = VR.game, L = VR.Travel.last; return { state: g.state, dim: g.dim, arrived: !!(L && L !== window.__lastTrip && L.to === d) }; }, dim); if (s.arrived && s.state === 'play') break; await wait(20); }
+      check(s && s.dim === dim, 'the trip to ' + dim + ' (' + secs() + ')');
+      if (s && s.dim === dim) await settle(18, dim);
+      return s && s.dim === dim;
+    };
+    const play = async (id, t, name, tod) => {
+      await ev((id) => VR.StoryPlay.debug.play(id), id);
+      await sceneTo(t);
+      const st = await ev(() => { const sc = VR.game.story.scene; return sc ? { id: sc.b.id, shot: sc.shot, fx: sc.fxKind || null, line: sc.line, who: sc.lines.map(l => l.who).join(' ') } : null; });
+      await draw(tod); const pth = await shot(name);
+      console.log('     ' + name + ' ' + JSON.stringify(st));
+      while (await ev(() => VR.StoryPlay.holds(VR.game))) { await ev(() => VR.game.story.skip()); await run(5); }
+      return st;
+    };
+    // standing ~38 m from the nearest native village, facing it
+    const toVillage = async () => {
+      let v = null;
+      for (let i = 0; i < 30 && !v; i++) { await run(10); await wait(400); v = await ev(() => { const g = VR.game, n = VR.StoryPlay.village(g); return n ? { x: n.s.x, z: n.s.z, d: Math.round(n.d) } : null; }); }
+      if (!v) return null;
+      await ev((v) => { const p = VR.game.player; p.flying = true; p.safeTeleport(v.x + 30.5, 120, v.z + 24.5); }, v);
+      for (let i = 0; i < 60; i++) { await run(4); await wait(250); if (await ev((v) => VR.game.world.isLoaded(Math.floor(v.x + 30), Math.floor(v.z + 24)) && !VR.game.player.hold, v)) break; }
+      await ev((v) => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(v.x + 30), Math.floor(v.z + 24)) + 1; p.flying = false; p.teleport(v.x + 30.5, y, v.z + 24.5); window.__ft.aim([v.x, y + 2, v.z]); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, v);
+      await run(40);
+      return v;
+    };
+    // 5 · Zinnober: the glass beacon's song
+    if (await trip('zinn')) {
+      await ev(() => VR.StoryPlay.debug.reach('c5.b2'));
+      const v = await toVillage();
+      const c = await ev(() => { const x = VR.StoryPlay.ctxOf(VR.game, VR.game.story); return { near: Math.round(x.near.village), dim: x.dim, why: VR.Story.why(VR.Story.byId('c5.b2'), Object.assign({}, x, { calm: 30 }), VR.game.story.rec) }; });
+      check(!!v && c.near < 90 && c.why === null, 'Zinnober: a Glutani village ' + c.near + ' m away — c5.b2 holds there (' + JSON.stringify(c) + ')');
+      const st = await play('c5.b2', 8.5, 'c5_song', 4600);
+      check(st && st.fx === 'song' && /solgani/.test(st.who), 'c5.b2: the song\'s rings over the village, Solgani speaks');
+    }
+    // 6 · Aquamarin: Opa Anselm's notes, then the choice card
+    if (await trip('aqua')) {
+      await ev(() => VR.StoryPlay.debug.reach('c6.b2'));
+      await ev(() => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; p.flying = false; p.teleport(p.pos[0], Math.max(y, p.pos[1]), p.pos[2]); p.pitch = -0.05; });
+      const st = await play('c6.b2', 3.2, 'c6_notes', 4200);
+      check(st && st.fx === 'notes' && /lumi/.test(st.who), 'c6.b2: the notebook page, Lumi reads it');
+      await ev(() => VR.StoryPlay.debug.reach('c7.b1'));
+      const r = await run(900, 33, 'choice');
+      const cu = await ev(() => { const el = document.getElementById('storychoice'); return { up: VR.StoryPlay.choiceUp(VR.game), vis: !!el && el.style.display === 'flex', n: el ? el.querySelectorAll('button').length : 0 }; });
+      check(r.hit && cu.up === 'c6' && cu.vis && cu.n === 2, 'the choice card on a calm screen after ' + (r.n * 0.033).toFixed(0) + ' s (' + JSON.stringify(cu) + ')');
+      await draw(4200); await shot('c6_choice');
+      await page.keyboard.press('Digit2'); await run(10);
+      const ch = await ev(() => ({ c: VR.game.meta.story.choices, up: VR.StoryPlay.choiceUp(VR.game) }));
+      check(ch.c && ch.c.c6 === 'lumi' && !ch.up, '[2]: Lumi comes along — kept in the world\'s record (' + JSON.stringify(ch) + ')');
+    }
+    // 7 · the gate turns aside; the Ringstation's window
+    const turn = await ev(() => { VR.StoryPlay.debug.reach('c7.b2'); const t = VR.StoryPlay.gateTurn(VR.game, { dim: 'zinn', id: 'zinn' }); return t && t.dim; });
+    check(turn === 'stn.ring', 'with c7.b2 open, a gate trip to Zinnober turns aside to the Ringstation (' + turn + ')');
+    if (await trip('stn.ring')) {
+      const st = await play('c7.b2', 10.2, 'c7_window');
+      check(st && st.fx === 'beacons' && /lumi/.test(st.who) && /anselm/.test(st.who), 'c7.b2: from the window the beacons draw an arrow; Lumi meets Opa Anselm');
+    }
+    // 8 · a close double star: two suns; the beam to the nebula
+    const bin = await ev(() => { const G = VR.Galaxy, N = G.cur || G.build(0); for (let i = 1; i < N.list.length; i++) { const st = N.list[i]; if (!st || !st.bin || !st.bin.close) continue; const sy = G.system(i), p = sy && sy.bodies.find(b => b.landable && !b.locked && /aqua|ocker|basalt/.test(b.dim || '')); if (p) return p.dim; } return null; });
+    check(!!bin, 'a landable world of a close double star: ' + bin);
+    if (bin && await trip(bin)) {
+      await ev(() => VR.StoryPlay.debug.reach('c7.b3'));
+      const su = await ev(() => VR.StoryPlay.ctxOf(VR.game, VR.game.story).suns);
+      check(su === 2, 'two suns over ' + bin);
+      await ev(() => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; p.flying = false; p.teleport(p.pos[0], Math.max(y, p.pos[1]), p.pos[2]); p.pitch = 0; });
+      await play('c7.b3', 8.0, 'c7_blink');
+      await ev(() => VR.StoryPlay.debug.reach('c8.b1'));
+      const st = await play('c8.b1', 9.5, 'c8_twin');
+      check(st && st.fx === 'twin' && /selkatun/.test(st.who), 'c8.b1: two suns, Selkatun of the Regoli');
+      await ev(() => VR.StoryPlay.debug.reach('c8.b3'));
+      const s3 = await play('c8.b3', 4.5, 'c8_beam');
+      check(s3 && s3.fx === 'beam', 'c8.b3: the beam swings to the nebula');
+    }
+    N.fx = await ev(() => ({ fxMs: VR.StoryPlay.stats.fxMs, fxN: VR.StoryPlay.stats.fxN, swells: VR.StoryPlay.stats.swells, err: VR.StoryPlay.stats.fxErr || null }));
+    console.log('     fx ' + JSON.stringify(N.fx));
+    check(!N.fx.err && N.fx.fxN > 0 && N.fx.fxMs / N.fx.fxN < 3, 'the fx: ' + (N.fx.fxMs / Math.max(1, N.fx.fxN)).toFixed(2) + ' ms a drawn frame (only in scenes)');
+    if (await ev(() => VR.game.dim) !== 'overworld') await trip('overworld');
+  });
   // ---------------------------------------------------------------- 3 · chapter 3: the station's beacon over the limb
   await section('3', async () => {
     console.log('3 · chapter 3 in orbit');
@@ -345,9 +430,17 @@ try {
   add('2 · der Lichtring · 3 · das Leuchtfeuer der Ringstation über dem Rand', ['c2_light_ring', 'c3_station_beacon']);
   add('4 · der Eiswächter unter dem Eis · Amarant verschluckt Helia', ['c4_warden', 'c4_eye', 'c4_eclipse']);
   add('5 · das Tagebuch', ['journal_chapter']);
+  add('a-story3 · 5 Zinnober: das Lied · 6 Aquamarin: Opas Notizen · die Entscheidung', ['c5_song', 'c6_notes', 'c6_choice']);
+  add('a-story3 · 7 das Fenster der Ringstation · der fremde Stern · 8 zwei Sonnen · der Strahl', ['c7_window', 'c7_blink', 'c8_twin', 'c8_beam']);
   fs.writeFileSync(ROOT + '.tmp_tests/story_sheet.json', JSON.stringify({ w: 620, rows }));
   execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story_sheet.jpg', ROOT + '.tmp_tests/story_sheet.json']);
   console.log('     sheet test/shots/story_sheet.jpg');
+  const r3 = [];
+  const add3 = (label, names) => { const imgs = names.map(n => P0[n]).filter(Boolean); if (imgs.length) r3.push({ label, imgs }); };
+  add3('Kapitel 5 · Zinnober — das gläserne Leuchtfeuer singt · Kapitel 6 · Aquamarin — Opa Anselms Notizen', ['c5_song', 'c6_notes']);
+  add3('Kapitel 6 · die Entscheidung (wer hilft dir?) · Kapitel 7 · das Fenster der Ringstation: die Leuchtfeuer sind ein Pfeil', ['c6_choice', 'c7_window']);
+  add3('Kapitel 7 · der fremde Stern: ein Leuchtfeuer blinkt zweimal · Kapitel 8 · zwei Sonnen · der Strahl zum Nebel', ['c7_blink', 'c8_twin', 'c8_beam']);
+  if (r3.length) { fs.writeFileSync(ROOT + '.tmp_tests/story3_sheet.json', JSON.stringify({ w: 620, rows: r3 })); execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story3_sheet.jpg', ROOT + '.tmp_tests/story3_sheet.json']); console.log('     sheet test/shots/story3_sheet.jpg'); }
 } catch (e) { console.log('  (the sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
 save();
 await browser.close();
