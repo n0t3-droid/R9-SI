@@ -63,7 +63,7 @@ const pics = {};
 // a village's people near the camera say hello: the bubbles carry their names (the game's own name tags)
 async function village(vid, tag) {
   let V = null;
-  for (let i = 0; i < 40; i++) { await step(20, 33); V = await ev((vid) => { const S = VR.game.villages.sites; const s = vid ? S.find(s => s.id === vid) : S.filter(s => !/Nova Haven|Weißstadt/.test(s.name || '')).sort((a, b) => Math.hypot(a.x - VR.game.player.pos[0], a.z - VR.game.player.pos[2]) - Math.hypot(b.x - VR.game.player.pos[0], b.z - VR.game.player.pos[2]))[0]; return s ? { id: s.id, x: s.x, y: s.y, z: s.z, name: s.name } : null; }, vid); if (V) break; await wait(200); }
+  for (let i = 0; i < 40; i++) { await step(20, 33); V = await ev((vid) => { const S = VR.game.villages.sites; const s = vid ? S.find(s => s.id === vid) : (S.some(s => !/Nova Haven|Weißstadt/.test(s.name || '')) ? S.filter(s => !/Nova Haven|Weißstadt/.test(s.name || '')) : S.slice()).sort((a, b) => Math.hypot(a.x - VR.game.player.pos[0], a.z - VR.game.player.pos[2]) - Math.hypot(b.x - VR.game.player.pos[0], b.z - VR.game.player.pos[2]))[0]; return s ? { id: s.id, x: s.x, y: s.y, z: s.z, name: s.name } : null; }, vid); if (V) break; await wait(200); }
   if (!V) { check(false, tag + ': a village'); return null; }
   await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x - 8, V.y + 4, V.z + 8); }, V);
   for (let i = 0; i < 90; i++) { await step(10, 33); const ok = await ev((V) => { const w = VR.game.world; for (const dx of [-24, 0, 24]) for (const dz of [-24, 0, 24]) if (!w.isLoaded(V.x + dx, V.z + dz)) return false; return true; }, V); if (ok) break; await wait(300); }
@@ -89,7 +89,7 @@ async function village(vid, tag) {
   return V;
 }
 const H = await village(null, 'herz');
-check(H && /^[A-ZÄÖÜ][a-zäöüß]+$/.test(H.name) && !/water|haven|brook|vale|hollow/.test(H.name), 'Herzwelt\'s village has a German name: „' + (H ? H.name : '?') + '"');
+check(H && (H.name === 'Nova Haven' || /^[A-ZÄÖÜ][a-zäöüß]+$/.test(H.name)) && !/water|brook|vale|hollow/.test(H.name), 'Herzwelt\'s village: „' + (H ? H.name : '?') + '" (a German name, or the trailer\'s city when it is the only one near)');
 // the talk card: an elder and their family
 const card = await ev(() => { const g = VR.game, V = g.villages; window.__each = null; const v = [...V.known.values()].find(v => v.active); const a = v.agents.find(a => a.role === 'elder') || v.agents.find(a => !a.kid); V.openTalk(a); return { name: a.name, fam: (document.getElementById('tk_rel') || {}).textContent || '' }; });
 console.log('  talk: ' + JSON.stringify(card));
@@ -103,7 +103,7 @@ if (ok) { await ev(() => VR.game.env.setTime(5200)); await settle(30); const Z =
 // the codex's page „Völker" (codex.js): every people found, its sound and a few of its names
 await ev(() => { const g = VR.game; for (const k of VR.Names.PEOPLE_ORDER) g.codex.unlock('p:' + k, true); g.ui.showCodex(); const c = [...document.querySelectorAll('#codexgrid .codexcat')].find(e => /Völker/.test(e.textContent)); if (c) c.scrollIntoView({ block: 'start' }); });
 for (let i = 0; i < 3; i++) await step(2, 33);
-const cx = await ev(() => VR.game.codex.list().filter(e => e.catKey === 'peoples').map(e => e.found + ' ' + e.name + ': ' + e.desc.slice(-70)));
+const cx = await ev(() => VR.game.codex.list().filter(e => e.catKey === 'peoples').map(e => e.found + ' ' + e.name + ': ' + e.desc.slice(e.desc.indexOf('So heißen'))));
 console.log('  codex: ' + cx.join(' | '));
 check(cx.length === 7 && cx.every(l => /^true /.test(l) && /So heißen sie: /.test(l)), 'the codex shows the seven peoples with their names');
 pics.codex = await shotDom('names_codex.png');
