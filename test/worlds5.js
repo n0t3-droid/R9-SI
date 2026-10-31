@@ -61,15 +61,16 @@ if (part('b')) {
     for (let dx = -70; dx <= 70; dx += 2) for (let dz = -70; dz <= 70; dz += 2) {
       const x = X + dx, z = Z + dz, own = ops.get(x + ',' + z); n++;
       const f = at(x, F, z);
-      if (!solid(f)) { hole++; if (fluid(f)) water++; }
-      if (f === deckS) deck++;
+      const lagoon = !solid(f) && !fluid(f) && fluid(at(x, F - 1, z)) && P.dress && P.dress.pier;   // (the pier quarter's open lagoon)
+      if (!solid(f) && !lagoon) { hole++; if (fluid(f)) water++; }
+      if (f === deckS || lagoon) deck++;
       if (!(own && own.has(F)) && /sulfur|magma|lava|crimson|red_/.test(nameOf(f)) && k === 'zinn') red++;
       // raw terrain above the floor: a solid cell the plan did not put (plants and the dress's own beds aside)
-      for (let y = F + 1; y <= F + 12; y++) { const s = at(x, y, z); if (solid(s) && !(own && own.has(y))) { raw++; break; } }
+      for (let y = F + 1; y <= F + 12; y++) { const s = at(x, y, z); if (solid(s) && !(own && own.has(y)) && !(P.dress && s === P.dress.rail)) { raw++; break; } }
     }
     check(raw / n < 0.01, `${k}: no raw terrain above the floor (${raw}/${n} columns)`);
     check(hole / n < 0.01 && water === 0, `${k}: the floor whole (${hole} holes, ${water} open water)`);
-    if (k === 'aqua') check(deck / n > 0.05, `aqua: the water a pier deck (${(deck / n * 100).toFixed(0)} % of the town's columns)`);
+    if (k === 'aqua') check(deck / n > 0.05, `aqua: the water a pier quarter — boardwalks and the open lagoon between (${(deck / n * 100).toFixed(0)} % of the town's columns)`);
     if (k === 'zinn') check(red === 0, `zinn: no red ground in the town's floor (${red})`);
     // the ring eased into the world: neighbouring columns' tops within 2 of each other (where the world allows)
     let steps = 0, pairs = 0;
@@ -101,7 +102,7 @@ if (part('c')) {
       if (own && own.has(F)) continue;
       gaps++;
       const f = at(x, F, z), nm = nameOf(f); cnt[nm] = (cnt[nm] || 0) + 1;
-      if (cover.has(f) || f === P.dress.bed || f === P.dress.deck) covered++;
+      if (cover.has(f) || f === P.dress.bed || f === P.dress.deck || (P.dress.pier && !f && fluid(at(x, F - 1, z)))) covered++;
       const u = at(x, F + 1, z); if (u && !solid(u) && !fluid(u)) plants++;
     }
     check(covered / gaps > 0.95, `${k}: the gaps the species' ground (${(covered / gaps * 100).toFixed(0)} %: ${Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 4).map(q => q[0] + ' ' + q[1]).join(', ')})`);

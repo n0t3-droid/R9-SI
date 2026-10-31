@@ -92,16 +92,16 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
   check(P && P.town && P.dress && P.climb, `${kind}: the town ${V.name} (bgen 6: dressed ${P && P.dress}, the ${LMN[kind]} climbable ${!!(P && P.climb)}; ${P ? P.agents : 0} of ${P ? P.people : 0} people about)`);
   check(P && P.agents <= 30, `${kind}: High wakes at most 30 (${P ? P.agents : '-'})`);
   // the floor in the world: columns on a grid inside the town at the floor (no hole, no raw hill, no open water)
-  const fl = await ev(([X, Z, F]) => { const w = VR.game.world, R = VR.R; let n = 0, bad = 0, water = 0; const nm = {}; for (let dx = -60; dx <= 60; dx += 6) for (let dz = -60; dz <= 60; dz += 6) { const s = w.getBlock(X + dx, F, Z + dz); n++; const f = s ? R.T.flags[s] : 0; if (!s || !(f & VR.F.SOLID)) bad++; if (f & VR.F.FLUID) water++; const k = s ? R.types[R.T.type[s]].name : 'air'; nm[k] = (nm[k] || 0) + 1; } return { n, bad, water, top: Object.entries(nm).sort((a, b) => b[1] - a[1]).slice(0, 5) }; }, [V.x, V.z, P ? P.F : V.y]);
+  const fl = await ev(([X, Z, F]) => { const w = VR.game.world, R = VR.R; let n = 0, bad = 0, water = 0; const nm = {}; for (let dx = -60; dx <= 60; dx += 6) for (let dz = -60; dz <= 60; dz += 6) { const s = w.getBlock(X + dx, F, Z + dz); n++; const f = s ? R.T.flags[s] : 0; const below = w.getBlock(X + dx, F - 1, Z + dz), lag = !s && below && (R.T.flags[below] & VR.F.FLUID); if ((!s || !(f & VR.F.SOLID)) && !lag) { bad++; (nm.__bad = nm.__bad || []).push([dx, dz, s ? R.types[R.T.type[s]].name : 'air', below ? R.types[R.T.type[below]].name : 'air']); } if (f & VR.F.FLUID) water++; const k = s ? R.types[R.T.type[s]].name : 'air'; nm[k] = (nm[k] || 0) + 1; } const badL = nm.__bad || []; delete nm.__bad; return { n, bad, water, badL, top: Object.entries(nm).sort((a, b) => b[1] - a[1]).slice(0, 5) }; }, [V.x, V.z, P ? P.F : V.y]);
   R.floor = fl;
-  check(fl.bad <= 2 && fl.water === 0, `${kind}: the floor in the world (${fl.n - fl.bad}/${fl.n}: ${fl.top.map(q => q.join(' ')).join(', ')})`);
+  check(fl.bad <= 2 && fl.water === 0, `${kind}: the floor in the world (${fl.n - fl.bad}/${fl.n}: ${fl.top.map(q => q.join(' ')).join(', ')})${fl.bad ? ' — not solid: ' + JSON.stringify(fl.badL) : ''}`);
   await step(60, 33);
   await lookFrom(OV, OT); await step(4);
   row.push(await grab(`w5_${kind}_town.png`));
   // a street: between the north homes, along the avenue's side at eye height (the gardens, the aprons, the doors)
   const F = P ? P.F : V.y;
-  await lookFrom([V.x - 4.5, F + 2.6, V.z - 12], [V.x - 7, F + 1.2, V.z - 36]);
-  await loaded([V.x, V.y, V.z - 30], 32); await settle(30); await step(20, 33);
+  await lookFrom([V.x + 2.5, F + 2.7, V.z - 25], [V.x - 30, F + 0.6, V.z - 25]);   // (west through the gap between two homes)
+  await loaded([V.x - 16, V.y, V.z - 25], 32); await settle(30); await step(20, 33);
   row.push(await grab(`w5_${kind}_street.png`));
   // the landmark: up its ladder's top onto the deck, looking back over the town; the view's toast once
   if (P && P.climb) {
@@ -112,7 +112,7 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
     const vw = await ev(() => ({ last: VR.Towns.last || null, toasts: (window.__toasts || []).map(t => t.join(' — ')), pos: VR.game.player.pos.map(v => +v.toFixed(1)) }));
     R.view = vw;
     check(vw.last && vw.last.kind === kind && vw.last.first && vw.toasts.some(t => /erklommen/.test(t)), `${kind}: on the ${LMN[kind]}'s deck — ${vw.toasts.filter(t => /erklommen/.test(t)).join(' | ') || 'no toast'} (${vw.pos.join(', ')})`);
-    await ev(([C, X, Z, F]) => { const p = VR.game.player; p.flying = true; const e = p.eyePos(), dx = X - e[0], dz = Z - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(F - e[1], Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [C, V.x, V.z, F]);
+    await ev(([C, X, Z, F]) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0], p.pos[1] + 1.6, p.pos[2]); const e = p.eyePos(), dx = X - e[0], dz = Z - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(F - e[1], Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [C, V.x, V.z, F]);
     await loaded([V.x, V.y, V.z], 64); await settle(30); await step(10, 33);
     await ev(() => { const el = document.querySelector('#toasts, .toasts'); if (el) el.style.visibility = 'hidden'; });
     row.push(await grab(`w5_${kind}_view.png`));

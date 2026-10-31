@@ -214,7 +214,7 @@
   // ground — Zinnober basalt, nothing red that reads as lava), the garden beds and their plants, Aquamarin's pier
   // quarter over the water (a deck, posts every four blocks, a railing at the outer edge)
   const K6 = {
-    aqua: { floor6: ['pale_moss_block', 'sand'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'lily_of_the_valley', 'blue_orchid'], deck6: 'bamboo_mosaic', postp6: 'bamboo_block', rail6: 'bamboo_fence' },
+    aqua: { floor6: ['pale_moss_block', 'sand'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'lily_of_the_valley', 'blue_orchid'], deck6: 'mangrove_planks', postp6: 'stripped_mangrove_log', rail6: 'bamboo_fence' },
     ocker: { floor6: ['coarse_dirt', 'packed_mud'], bed6: 'podzol', plants6: ['dead_bush', 'short_grass', 'orange_tulip'] },
     zinn: { floor6: ['basalt', 'smooth_basalt'], bed6: 'tuff', plants6: ['amber_crystal_cluster', 'violet_crystal_cluster', 'torchflower'] },
     basalt: { floor6: ['regolith', 'regolith_dark'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'azure_bluet'] },
@@ -573,6 +573,9 @@
       const D = this.dress, X = D.x, Z = D.z, F = D.F, R = VR.R;
       if (x0 + 15 < X - D.r1 || x0 > X + D.r1 || z0 + 15 < Z - D.r1 || z0 > Z + D.r1) return;
       const inBox = (x, z) => { for (const b of D.boxes) if (x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3]) return true; return false; };
+      const nearBox = (x, z, p) => { for (const b of D.boxes) if (x >= b[0] - p && x <= b[2] + p && z >= b[1] - p && z <= b[3] + p) return true; return false; };
+      // a smooth value noise (cells of 5, bilinear): the beds and the floor's second tone in soft shapes, not squares
+      const vn = (x, z, salt, k) => { const fx = x / k, fz = z / k, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, a = h01(i, j, salt), b = h01(i + 1, j, salt), c2 = h01(i, j + 1, salt), d2 = h01(i + 1, j + 1, salt); return (a * (1 - u) + b * u) * (1 - v) + (c2 * (1 - u) + d2 * u) * v; };
       const sol = (s) => s && (R.T.flags[s] & VR.F.SOLID) && !(R.T.flags[s] & VR.F.FLUID);
       for (let c = 0; c < 256; c++) {
         const x = x0 + (c & 15), z = z0 + (c >> 4), d = Math.max(Math.abs(x - X), Math.abs(z - Z));
@@ -582,18 +585,21 @@
         if (d <= D.r0) {
           const box = inBox(x, z);
           if (wet && D.pier && !box) {
-            // the pier: the deck at the floor, a post every four blocks down to the sea bed, the railing at the edge
+            // the pier quarter: boardwalks three wide round the buildings and along the avenues' causeways (on posts every
+            // four blocks, down to the sea bed), the lagoon open between them
             for (let y = F; y <= hi; y++) blocks[(y << 8) | c] = 0;
-            blocks[(F << 8) | c] = D.deck;
-            if ((((x - X) & 3) === 0 && ((z - Z) & 3) === 0) || d === D.r0) for (let y = gy + 1; y < F; y++) blocks[(y << 8) | c] = D.post;
-            if (d === D.r0) blocks[((F + 1) << 8) | c] = D.rail;
+            if (nearBox(x, z, 3)) {
+              blocks[(F << 8) | c] = D.deck;
+              if (((x - X) & 3) === 0 && ((z - Z) & 3) === 0) for (let y = gy + 1; y < F; y++) blocks[(y << 8) | c] = D.post;
+              if (!nearBox(x, z, 2)) blocks[((F + 1) << 8) | c] = D.rail;   // (the railing on the lagoon's side)
+            }
             tops[c] = -1; continue;
           }
           for (let y = F + 1; y <= hi; y++) blocks[(y << 8) | c] = 0;
           for (let y = gy + 1; y < F; y++) blocks[(y << 8) | c] = D.fill;
           // the floor: two tones in blotches, beds of the species' plants in a quarter of the 4 × 4 cells
-          const bed = !box && h01(x >> 2, z >> 2, this.s ^ 0x6b1) < 0.22;
-          blocks[(F << 8) | c] = bed ? D.bed : D.floor[h01((x + 1) >> 1, (z + 1) >> 1, this.s ^ 0x6b2) < 0.3 ? 1 : 0];
+          const bed = !box && vn(x, z, this.s ^ 0x6b1, 5) > 0.66;
+          blocks[(F << 8) | c] = bed ? D.bed : D.floor[vn(x, z, this.s ^ 0x6b2, 3) > 0.62 ? 1 : 0];
           const hp = h01(x, z, this.s ^ 0x6b3);
           if (!box && (bed ? hp < 0.55 : hp < 0.04)) blocks[((F + 1) << 8) | c] = D.plants[Math.floor(h01(x, z, this.s ^ 0x6b4) * D.plants.length)];
           tops[c] = -1;
