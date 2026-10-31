@@ -251,7 +251,7 @@
   STN.stampS = function (meta) {
     if (!meta || meta.guest) return meta;
     const u = meta.universe || (meta.universe = { v: 1 });
-    if (!(u.sgen > 0)) { const was = [meta.dim].concat(Object.keys(meta.pos || {})).some(d => /^stn\./.test(String(d || ''))); u.sgen = was ? 1 : STN.SGEN; }
+    if (!(u.sgen > 0)) { const was = [meta.dim].concat(Object.keys(meta.pos || {})).some(d => /^stn\./.test(String(d || ''))) || !!(meta.stations && meta.stations.first && Object.keys(meta.stations.first).length); u.sgen = was ? 1 : STN.SGEN; }
     return meta;
   };
   STN.sgenOf = (meta) => { const u = meta && meta.universe; return u && u.sgen > 0 ? u.sgen : STN.SGEN; };
@@ -437,6 +437,8 @@
   STN.stats = { meshes: 0, drawn: 0, shuttles: 0, glare: 0, dockMs: [], err: null, phase: null, frames: 0, interior: 0 };
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'stations', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.stations', tip: 'g.set.stations.tip', cost: 'low', def: true });
 
+  // u-stations2: the station generator's version in the save (Bodies.stamp / bgenOf wrapped: genOpts.bgen.stn)
+  { const BD = VR.Bodies; if (BD && BD.stamp && !BD.__stn2) { BD.__stn2 = true; const s0 = BD.stamp, b0 = BD.bgenOf; BD.stamp = function (meta) { const m = s0.apply(this, arguments); STN.stampS(meta); return m; }; BD.bgenOf = function (meta) { const o = b0.apply(this, arguments); if (o) o.stn = STN.sgenOf(meta); return o; }; } }
   // ---------------------------------------------------------------- the meshes (the grids: the pure part above → the worker's shipmesh job)
   const MESH = { ring: { grid: 'ringGrid', piv: [48, 6, 48], s: STN.SCALE }, outpost: { grid: 'outpostGrid', piv: [14, 3.5, 14], s: STN.SCALE }, gate: { grid: 'gateGrid', piv: [4.5, 0.5, 4.5], s: 3.2 }, shuttle: { grid: 'shuttleGrid', piv: [2.5, 1.5, 5.5], s: 1.6 } };
   const M = STN.meshes = {};
@@ -752,9 +754,10 @@
           }
           Lf.actor.update(dt);
           STN.lifeTick(g, Lf, dt);
+          STN.deckTick(g, Lf);   // u-stations2
         } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations life', e); } }
       };
-      AP.draw = function (r, E, layer, cam) { dr0.call(this, r, E, layer, cam); if (this.stn || this.ferry) return; const Lf = this.g && this.g.stnLife; if (Lf && Lf.world === this.g.world) Lf.actor.draw(r, E, layer, cam); };
+      AP.draw = function (r, E, layer, cam) { dr0.call(this, r, E, layer, cam); if (this.stn || this.ferry) return; const Lf = this.g && this.g.stnLife; if (Lf && Lf.world === this.g.world) { Lf.actor.draw(r, E, layer, cam); if (layer === 'opaque') STN.drawDeck(this.g, r, E, cam, Lf); } };
     }
   }
   // the crew: a village plan of the station (its cabins the homes, the hall its square) — villages.js does the rest
@@ -777,6 +780,47 @@
     }
   };
 
+  // ---------------------------------------------------------------- u-stations2: the deck life drawn (STN.deckLife, pure)
+  // the people and the drones of the Ringstation's hall and deck on the world clock (the hangar deck's PadLife clock);
+  // their looks are made one a frame and their models built one a frame (no frame pays for all of them: the hand-off).
+  // Tier: PadLife's (Very Low four people, no drone). Switch: settings.stations / settings.stationCrew.
+  const LOOKROLE = { barista: 'barista', guest: ['office', 'scholar'], watcher: ['pilot', 'teacher'], sitter: 'elder', docker: 'worker', walker: 'operator' };
+  STN.stats.deck = { folk: 0, drones: 0, hall: 0, drawn: 0 };
+  STN.deckTick = function (g, Lf) {
+    const L = STN.byDim(g.dim), D = STN.stats.deck; D.folk = D.drones = D.hall = 0;
+    if (!L || L.kind !== 0 || !on(g) || g.settings.stationCrew === false || !VR.LifeKit) { Lf.deck = null; return; }
+    const tier = PL && PL.tierOf ? PL.tierOf(g.settings || {}) : 1, LK = VR.LifeKit;
+    const list = STN.deckLife(Lf.actor.clock, tier, Lf.deckL || (Lf.deckL = []));
+    const F = Lf.deck || (Lf.deck = { figs: [], made: 0 });
+    let made = 0, wk = {};
+    for (let i = 0; i < list.length; i++) {
+      const q = list[i], f = F.figs[i] || (F.figs[i] = { look: null, pos: [0, 0, 0], yaw: 0, seed: q.seed * 0.37, kind: q.kind, role: q.role });
+      if (f.role !== q.role) { f.role = q.role; f.kind = q.kind; f.look = null; f.mdl = null; f.ready = false; }
+      f.pos[0] = q.pos[0]; f.pos[1] = q.pos[1]; f.pos[2] = q.pos[2]; f.yaw = q.yaw; f.state = q.state; f.walk = q.walk; f.walkAmt = q.walkAmt; f.talking = q.talking; f.headYaw = q.headYaw;
+      f.on = true;
+      if (q.kind === 'folk') {
+        if (!f.look && !made) { const n = wk[q.role] = (wk[q.role] | 0) + 1, R0 = LOOKROLE[q.role], role = Array.isArray(R0) ? R0[(n - 1) % R0.length] : R0 || 'office'; f.look = LK.folk(0x57a7 + q.seed * 7919 + (Lf.id === 'ring' ? 0 : 3), role, 'adult'); made++; }
+        else if (!f.look) wk[q.role] = (wk[q.role] | 0) + 1;
+        D.folk++; if (q.pos[0] >= -20 && q.pos[0] <= 21 && q.pos[2] >= -6 && q.pos[2] <= 15) D.hall++;
+      } else D.drones++;
+    }
+    F.figs.length = list.length;
+  };
+  STN.drawDeck = function (g, r, E, cam, Lf) {
+    const F = Lf.deck, ent = g.entities, LK = VR.LifeKit; if (!F || !ent || !LK) return;
+    let p = null, built = 0, n = 0; const t = g.time || 0;
+    const pose = F.dronePose || (F.dronePose = { rotor_l: [0, 0, 0], rotor_r: [0, 0, 0] });
+    pose.rotor_l[1] = t * 30; pose.rotor_r[1] = -t * 30;
+    for (const f of F.figs) {
+      if (!f || !f.on) continue;
+      if (f.kind === 'drone') { if (!p) p = ent.beginVox(r, E); if (LK.drawModel(g, r, p, 'hover_drone', f.pos, f.yaw, cam, { pose })) n++; continue; }
+      if (!f.look) continue;
+      if (!f.ready) { if (built) continue; built++; }   // (one model built a frame)
+      if (!p) p = ent.beginVox(r, E);
+      if (LK.drawFolk(g, r, p, f, cam, t)) { n++; f.ready = true; }
+    }
+    STN.stats.deck.drawn = n;
+  };
   // ---------------------------------------------------------------- the shop 🛰 and the job board ([V] at the counter, the board)
   const SH = VR.Shop;
   if (SH && SH.SHOPS && SH.SHOPS.indexOf('station') < 0) {

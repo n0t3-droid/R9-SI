@@ -276,6 +276,7 @@
       sc.tg.window = ahead(60, -22); sc.tg.sea = ahead(20, -12);
       sc.tg.sky = ahead(60, 60);
       sc.tg.echo = ahead(10, -1.5);   // a-story4: where Echo glows in the Ringstation's hall
+      { const Pe = g.dim === 'stn.ring' && VR.Forge && VR.Forge.Station ? VR.Forge.Station.place(0).echo : null; if (Pe) sc.tg.echo = [Pe[0], eye[1] - 1.5, Pe[2]]; }   // u-stations2: in the hall's open middle (not by the glass)
       const an = P.answerAt && Math.hypot(P.answerAt[0] - eye[0], P.answerAt[2] - eye[2]) < 200 ? P.answerAt : null; sc.tg.answer = an || ahead(25, 6);
       const BS = VR.BodySky, md = BS && BS.cur && BS.cur.light && g.dim !== 'overworld' ? BS.cur.light.moonDir : null;
       sc.tg.amarant = md && md[1] > -0.05 ? [eye[0] + md[0] * 200, eye[1] + md[1] * 200, eye[2] + md[2] * 200] : ahead(80, 70);
@@ -366,6 +367,12 @@
           const r = sh.target === 'beacon' ? 16 : 7, a = sc.a0 + (u - 0.5) * 1.1, C = [Q[0] + Math.sin(a) * r, Q[1] + (sh.target === 'beacon' ? 7 : 2.5), Q[2] + Math.cos(a) * r];
           return lookAt(lift(C, Q), sh.target === 'beacon' ? [Q[0], Q[1] + 3, Q[2]] : Q, 60, base);
         }
+        case 'circle': {
+          // u-stations2: round Echo at a few metres, at a standing person's eye height — a slow arc from the player's side,
+          // the five peoples on the far side of Echo facing it (and so the camera): large in the frame, nothing between
+          const a = P.circleA0(sc, Q) + (u - 0.5) * 0.9, C = P.circleAt(Q, a);
+          return lookAt(C, [Q[0], Q[1] + 0.85, Q[2]], 50, base);
+        }
         case 'up': {
           // the sky's subject on the upper third, the land's edge in the frame below it when the subject stands low enough
           const C = [pe[0] - f[0] * 1.5, pe[1] - 0.3, pe[2] - f[2] * 1.5], fov = 66 - 8 * smooth(u), c = lookAt(C, Q, fov, base);
@@ -413,6 +420,19 @@
     destroy() { if (this.scene) { P.fxEnd(this.scene); this.scene = null; overlay(this, false); } card(null); choiceCard(null); if (VR.Regie) VR.Regie.inScene(this.g, false); }
   }
   P.Player = Player;
+  P.CIRCLE_R = 4.8;   // u-stations2: the circle shot's distance from Echo (m)
+  P.circleAt = (Q, a) => [Q[0] + Math.sin(a) * P.CIRCLE_R, Q[1] + 1.75, Q[2] + Math.cos(a) * P.CIRCLE_R];
+  // the circle's middle angle, once a scene: from the player's side, turned until the whole arc is free (the hall's holo
+  // table, a pillar); the peoples stand on the far side of it (P.peoples)
+  P.circleA0 = function (sc, Q) {
+    if (sc.circA0 !== undefined) return sc.circA0;
+    const e = sc.eye0 || [Q[0], Q[1], Q[2] + 1], base = Math.atan2(e[0] - Q[0], e[2] - Q[2]);
+    let best = base;
+    if (sc.free) for (const d of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) {
+      if ([-0.5, -0.25, 0, 0.25, 0.5].every(k => { const C = P.circleAt(Q, base + d + k); return sc.free(C) && sc.free([C[0], C[1] - 0.8, C[2]]); })) { best = base + d; break; }
+    }
+    return (sc.circA0 = best);
+  };
   P.WIN_FOV = 64;   // a-story4: the window's view, fixed (its beams are placed in it)
   P.WARDEN_SCALE = 3; P.WARDEN_H = 43 / 16;   // (a-story2: story_warden is 43 voxels tall — 8 m at ×3)
 
@@ -1073,12 +1093,13 @@ body.storyon #storychoice { visibility: hidden !important; }
   P.peoples = function (sc) {
     if (sc.peoples) return sc.peoples;
     const E0 = sc.tg && sc.tg.echo, Lk = VR.LifeKit, FB = VR.Folk && VR.Folk.SPECIES_BODY; if (!E0 || !Lk || !Lk.folk) return (sc.peoples = []);
-    const out = [], f = sc.fwd || [0, 0, -1], a0 = Math.atan2(f[2], f[0]);   // (round Echo's far side, facing it and the player)
+    const ca = sc.b.scene.shots.some(q => q.cam === 'circle') ? P.circleA0(sc, E0) : null, f = ca !== null ? [-Math.sin(ca), 0, -Math.cos(ca)] : (sc.fwd || [0, 0, -1]);   // (u-stations2: Echo's far side from the circle shot's camera — Echo stands in the hall's middle, not always ahead)
+    const out = [], a0 = Math.atan2(f[2], f[0]);   // (round Echo's far side, facing it and the player)
     // (run 1: on the far side the hall's glass wall stood between them and the camera — the places are tried round Echo,
     // the far side first, then the sides, and only free floor near Echo's own height is taken)
     const ok = (x, z) => { const gy = sc.ground ? sc.ground(x, z) : null; if (gy === null || gy === undefined) return !sc.ground; return Math.abs(gy - E0[1]) < 1.6 && (!sc.free || (sc.free([x, gy + 0.5, z]) && sc.free([x, gy + 1.5, z]))); };
     const spots = [];
-    for (const R of [4.3, 3.2]) for (const d of [0, -0.6, 0.6, -1.2, 1.2, -1.8, 1.8, -2.4, 2.4]) { if (spots.length >= 5) break; const a = a0 + d, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R; if (ok(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 1.6)) spots.push([x, z]); }
+    for (const R of [3.7, 4.3, 3.2]) for (const d of [0, -0.6, 0.6, -1.2, 1.2, -1.8, 1.8, -2.4, 2.4]) { if (spots.length >= 5) break; const a = a0 + d, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R; if (ok(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 1.6)) spots.push([x, z]); }
     for (let j = 0; spots.length < 5 && j < 5; j++) { const a = a0 + (j - 2) * 0.62; spots.push([E0[0] + Math.cos(a) * 4.3, E0[2] + Math.sin(a) * 4.3]); }
     spots.sort((p0, p1) => Math.atan2(p0[1] - E0[2], p0[0] - E0[0]) - Math.atan2(p1[1] - E0[2], p1[0] - E0[0]));
     for (let i = 0; i < 5; i++) {
@@ -1113,6 +1134,10 @@ body.storyon #storychoice { visibility: hidden !important; }
     for (let j = 0; j < 3; j++) { const o = j * 3, c = NEB3[j], m = lu(A, o) / lu(c, 0) * NEBK[j]; for (let i = 0; i < 3; i++) A[o + i] += (c[i] * m - A[o + i]) * k; }
     if (U.airB) { const B = U.airB, c = NEB3[1], m = lu(B, 0) / lu(c, 0) * NEBK[1]; for (let i = 0; i < 3; i++) B[i] += (c[i] * m - B[i]) * k; }
     if (k > 0.05) U.airK[2] = 0;   // (the three stops, not the LUT, while the nebula fills the sky)
+    // u-stations2: Helia's disc and its glare in the air dimmed — a-story5's c9 was a white-pink bloom in its middle that
+    // ate Flimmi (u_bsSunK x the disc, y the glare); the sunward stop darker still
+    if (U.sunK) { U.sunK = U.sunK.slice(); U.sunK[0] *= 1 - 0.5 * k; U.sunK[1] *= 1 - 0.8 * k; }
+    if (k > 0.05) { const o = 6, f2 = 1 - 0.35 * k; for (let i = 0; i < 3; i++) A[o + i] *= f2; }
     return true;
   };
   { const BS = VR.BodySky; if (BS && BS.env && !BS._story5) { BS._story5 = true; const env1 = BS.env; BS.env = function (E) {

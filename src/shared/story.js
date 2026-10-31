@@ -149,10 +149,10 @@
       who: ['funke:happy', 'dumarin:worried', 'ylosenis:worried', 'funke:worried'], task: { kind: 'station', target: 'station' }, reward: { xp: 220 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 10 } }),
     // 11 · Echo — five peoples in the Ringstation's heart; the answer Echo can see, given your own way
     B(11, 1, { when: { after: 'c10.b3', adv: true, dim: ['stn.*'] },
-      scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'wide', target: 'player', dur: 9, fx: 'echo', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'echo' }], music: 'wide' },
+      scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'circle', target: 'echo', dur: 9, fx: 'echo', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'echo' }], music: 'wide' },
       who: ['anselm:happy', 'solgani:happy', 'dumarin:happy', 'ylosenis:happy', 'funke:worried'], task: { kind: 'listen', target: 'station' }, reward: { xp: 200 }, act: { kind: 'look', target: 'window', dim: ['stn.*'], cone: 25, hold: 1.5 } }),
     BV(11, 2, { when: { after: 'c11.b1', adv: true, dim: ['stn.*'] }, vary: 'c6', choice: 'how',
-      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'echo' }, { cam: 'wide', target: 'player', dur: 7, fx: 'echo', swell: true }, { cam: 'shoulder', target: 'player', dur: 6 }], music: 'tense' },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'echo' }, { cam: 'circle', target: 'echo', dur: 7, fx: 'echo', swell: true }, { cam: 'shoulder', target: 'player', dur: 6 }], music: 'tense' },
       alt: { wellari: ['anselm', 'funke', 'selkatun', 'ariveli:happy'], lumi: ['anselm', 'funke', 'selkatun', 'lumi:happy'] }, task: { kind: 'feat', target: 'echo' }, reward: { xp: 200 }, act: { kind: 'feat' } }),
     BV(11, 3, { when: { after: 'c11.b2', adv: true, deed: 'c11.b2', dim: ['overworld', 'aqua', 'zinn', 'ocker', 'basalt', 'opal', 'stn.*', 'x.*'] }, vary: 'how',
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'wake' }, { cam: 'skyline', target: 'answer', dur: 8, fx: 'wake', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'hum' }], music: 'rise' },
