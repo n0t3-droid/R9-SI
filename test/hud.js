@@ -88,4 +88,16 @@ console.log('f · the texts');
   void de; V.I18N.set('de');
   check(ok === keys.length, ok + '/' + keys.length + ' texts in German and English');
 }
+console.log('g · the cost');
+{
+  const g = { time: 0, settings: { preset: 'potato' }, ui: {}, hf: null };
+  V.Liberate = V.Liberate || null;
+  let t0 = process.hrtime.bigint(); for (let i = 0; i < 200000; i++) { g.time += 0.016; H.tick(g, 0.016); if (g.hf) H.cam(g, {}, 0.016); }
+  const idle = Number(process.hrtime.bigint() - t0) / 1e6 / 200000;
+  const cam = { x: 0, y: 0, z: 0, yaw: 0, roll: 0 }; g.settings.hitShake = true;
+  t0 = process.hrtime.bigint(); for (let i = 0; i < 200000; i++) { g.hf = { shake: 0.1, amp: 1, seed: i }; H.cam(g, cam, 0.016); }
+  const shake = Number(process.hrtime.bigint() - t0) / 1e6 / 200000;
+  check(idle < 0.002, 'a frame outside a fight (Very Low): ' + (idle * 1000).toFixed(3) + ' µs (≤ 2 µs: the 4-Hz tick, no camera work)');
+  check(shake < 0.005, 'a frame of the shake (switch on): ' + (shake * 1000).toFixed(3) + ' µs');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
