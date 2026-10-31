@@ -21,7 +21,7 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
 const page = await ctx.newPage();
 const logs = [];
-page.on('console', (m) => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|reel/i.test(s)) logs.push(`[${t}] ${s.slice(0, 400)}`); });
+page.on('console', (m) => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|reel/i.test(s)) { logs.push(`[${t}] ${s.slice(0, 400)}`); if (/reel/i.test(s)) console.log('  ! page: ' + s.slice(0, 300)); } });
 page.on('pageerror', (e) => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const wait = (ms) => page.waitForTimeout(ms);
@@ -37,6 +37,7 @@ await ev(() => {
 });
 await ev(() => VR.game.createWorld({ name: 'Herzland', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true }));
 for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
+await ev(() => { window.requestAnimationFrame = () => 0; VR.game.zenFreezeWeather = true; VR.game.env.rain = 0; VR.game.env.rainTarget = 0; });   // (the clock is ours: no animation frames — every g.loop would queue one more)
 const step = (n, draw) => ev(([n, d]) => window.__step(n, d), [n, !!draw]);
 for (let i = 0; i < 20; i++) { await step(10); await wait(300); }
 check(await ev(() => VR.game.state === 'play' && !!VR.Reel && !!VR.DirCam.Track), 'in play, VR.Reel loaded');
@@ -84,10 +85,10 @@ console.log('  spawn ' + sp.join(', '));
 await tod(2600);
 await goTo(20, -90, [0, 120, -15]);
 console.log('  arrive', JSON.stringify(await emit(['travel', 'arrive', 3, [0, 120, -15], 'intent', 40])));
-await stay(20);
+await stay(50);
 await ev(() => window.__look(0, 130, -15));
 console.log('  wow', JSON.stringify(await emit(['wow', 'temple', 3, null, 'wow'])));
-await stay(25);
+await stay(60);
 // 2 · a little tower by the way: built block by block, then the build stands
 await tod(4200);
 const B = await ev(() => {
@@ -101,24 +102,24 @@ for (let y = 0; y < 9; y++) {
 }
 await ev((b) => window.__look(b.x0 + 2, b.y0 + 5, b.z0 + 2), B);
 console.log('  build', JSON.stringify(await emit(['build', 'site_done', 3, [B.x0 + 2, B.y0 + 4.5, B.z0 + 2], 'site', 6])));
-await stay(20);
+await stay(60);
 // 3 · the Spire Citadel at noon: an outpost freed there (the freeing's own emit is liberate.js's — here its stand-in)
 await tod(6400);
 await goTo(-360, 330, [-420, 200, 380]);
 console.log('  freed', JSON.stringify(await emit(['milestone', 'freed', 5, [-420, 190, 380], 'liberate', 40])));
-await stay(30);
+await stay(80);
 // 4 · the Sky Isles in the afternoon: the boss (stand-in: rpg_boss.js's emit)
 await tod(8600);
 await goTo(270, 90, [330, 160, 140]);
 console.log('  boss', JSON.stringify(await emit(['milestone', 'boss', 5, [330, 165, 140], 'rpg', 60])));
-await stay(30);
+await stay(80);
 // 5 · the golden hour on the open land west of the isles: 14 s with the low sun
 await tod(11850);
 await ev(() => { const g = VR.game, p = g.player, az = VR.DirCam.sunAz(11850); window.__look(p.pos[0] + Math.cos(az) * 100, p.pos[1] + 4, p.pos[2] + Math.sin(az) * 100); g.zenFreezeTime = true; });
 await stay(16);
 await ev(() => { VR.game.zenFreezeTime = false; });
-const lowSun = await ev(() => VR.EventLog.samples().filter((s) => s.sky === 'low_sun').length);
-console.log('  golden hour: ' + lowSun + ' samples of a low sun');
+const lowSun = await ev(() => ({ n: VR.EventLog.samples().filter((s) => s.sky === 'low_sun').length, hl: VR.Reel.hl.filter((h) => h.sub === 'sunset' || h.sub === 'sunrise').length }));
+console.log('  golden hour: ' + JSON.stringify(lowSun) + ' (samples of a low sun, highlights)');
 // 6 · a star jump (the real one): into a system, a jump on, its arrival's postcard
 let jumped = null;
 try {
@@ -132,17 +133,20 @@ console.log('  star jump: ' + jumped + ', postcards ' + (await ev(() => VR.Reel.
 // 7 · the landing on Basalt (the real trip) and home again
 let moon = null;
 try {
-  moon = await ev(async () => { const g = VR.game; if (!VR.Travel || !VR.Travel.go) return 'no Travel'; await VR.Travel.go(g, { dim: 'basalt', via: 'cmd' }); return g.dim; });
-  for (let i = 0; i < 60; i++) { await step(10); await wait(250); const r = await ev(() => VR.Reel.hl.some((h) => h.sub === 'moon_land')); if (r) break; }
+  moon = await ev(() => { const g = VR.game; if (!VR.Travel || !VR.Travel.go) return 'no Travel'; window.__trip = 'going'; Promise.resolve(VR.Travel.go(g, { dim: 'basalt', via: 'cmd' })).then(() => { window.__trip = 'done'; }, (e) => { window.__trip = 'error ' + e; }); return 'go'; });
+  for (let i = 0; i < 240; i++) { await step(5); await wait(250); const r = await ev(() => ({ dim: VR.game.dim, st: VR.game.state, trip: window.__trip, hello: VR.Reel.hl.some((h) => h.sub === 'moon_land') })); if (r.hello) break; if (i % 20 === 0) console.log('    trip ' + JSON.stringify(r)); }
+  moon += ' · ' + (await ev(() => VR.game.dim));
   await step(1, true); await step(1, true);
   await stay(8);
-  const home = await ev(async () => { const g = VR.game; if (VR.Travel.goHome) await VR.Travel.goHome(g); return g.dim; });
-  for (let i = 0; i < 30; i++) { await step(10); await wait(250); }
+  await ev(() => { const g = VR.game; window.__trip = 'home'; Promise.resolve(VR.Travel.goHome(g)).then(() => { window.__trip = 'done'; }, (e) => { window.__trip = 'error ' + e; }); });
+  for (let i = 0; i < 240; i++) { await step(5); await wait(250); const r = await ev(() => ({ dim: VR.game.dim, st: VR.game.state, trip: window.__trip })); if (r.dim === 'overworld' && r.st === 'play' && r.trip === 'done') break; }
+  for (let i = 0; i < 20; i++) { await step(10); await wait(200); }
+  const home = await ev(() => VR.game.dim);
   moon += ' → ' + home;
 } catch (e) { moon = 'error ' + e.message; }
 console.log('  moon: ' + moon + ', postcards ' + (await ev(() => VR.Reel.cards)));
 await tod(9000);
-await stay(10);
+await stay(30);
 const sess = await ev(() => { const g = VR.game, R = VR.Reel; return { time: +g.time.toFixed(0), hl: R.hl.map((h) => `${h.sub}@${h.t.toFixed(0)}${h.card ? '🖼' : ''}${h.dim !== 'overworld' ? '(' + h.dim + ')' : ''}`), track: R.track.n, bytes: R.track.bytes, meta: (g.meta.highlights || []).length, rec: R.stats }; });
 console.log('  session: ' + JSON.stringify(sess));
 NUM.session = sess;

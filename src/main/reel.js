@@ -27,7 +27,7 @@
   R.CARD_W = 480; R.CARD_H = 270; R.MAX_CARDS = 8; R.MAX_HL = 64; R.BEST = 50; R.LOW_SCALE = 0.45;
   const low = (g) => !!(g && g.settings && g.settings.preset === 'potato');
   const dimI = (d) => { d = d || 'overworld'; let i = R.dims.indexOf(d); if (i < 0) { R.dims.push(d); i = R.dims.length - 1; } return i; };
-  const fresh = (g) => { const k = (g.meta && (g.meta.id || g.meta.name)) || g.world; if (k !== R.world) { R.world = k;   /* (one save: its moons and stars stay in the reel) */ R.track.clear(); R.hl.length = 0; R.cards = 0; R.want = null; } };
+  const fresh = (g) => { const k = (g.meta && (g.meta.id || g.meta.name)) || g.world; if (k !== R.world) { R.world = k; R.sun.n = 0; R.sun.last = -1e9;   /* (one save: its moons and stars stay in the reel) */ R.track.clear(); R.hl.length = 0; R.cards = 0; R.want = null; } };
 
   // ---------------------------------------------------------------- the highlights as they happen (EventLog.emit)
   R.note = function (g, rec, r) {
@@ -73,10 +73,25 @@
     if (g.director && g.director.active) return;
     const p = g.player;
     if (R.track.rec(+(g.time || 0), p.pos[0], p.pos[1], p.pos[2], p.yaw, g.env ? g.env.timeOfDay : 6000, dimI(g.dim))) R.stats.frames++;
+    const L = VR.EventLog; if (L && L.nSamples !== R.ns) { R.ns = L.nSamples; R.golden(g, L); }
     R.stats.recMs += now() - t0;
     if (!R.rHooked && g.renderer) {   // (the postcard's copy right after a frame is drawn)
       const r = g.renderer, r0 = r.render; R.rHooked = true;
       r.render = function () { const n0 = this.frameNo, o = r0.apply(this, arguments); if (R.want && !this.capK && this.frameNo !== n0) R.grab(this.canvas); return o; };   // (only a frame really drawn)
+    }
+  };
+
+  // the golden hour: the log's 1-Hz sample says a low sun with open sky — after 8 s of it, once a run and at most every
+  // 5 minutes, a highlight (kept here: the log's samples start again in every world of the save)
+  R.sun = { n: 0, at: null, last: -1e9 };
+  R.golden = function (g, L) {
+    const a = L.samples(R.sun.t1 === undefined ? undefined : R.sun.t1), S = a[a.length - 1]; if (!S) return;
+    R.sun.t1 = S.t;
+    if (S.sky !== 'low_sun') { R.sun.n = 0; return; }
+    if (++R.sun.n === 4) R.sun.at = { t: S.t, x: S.x, z: S.z, tod: S.tod };
+    if (R.sun.n === 8 && S.t - R.sun.last > 300 && R.sun.at) {
+      const m = R.sun.at; R.sun.last = S.t;
+      R.hl.push({ t: m.t, kind: 'sky', sub: m.tod > 6000 && m.tod < 18000 ? 'sunset' : 'sunrise', w: 3, x: m.x, y: null, z: m.z, r: 6, inView: true, long: true, self: false, dim: g.dim || 'overworld', tod: m.tod, place: R.placeAt(g, m.x, m.z), card: null });
     }
   };
 
@@ -96,8 +111,7 @@
     fresh(g);
     const dim = g.dim || 'overworld', di = dimI(dim);
     const evs = R.hl.filter((h) => h.dim === dim || h.card);
-    const smp = VR.EventLog && VR.EventLog.samples ? VR.EventLog.samples() : [];
-    const hl = D.pick(evs, smp, { dimAt: (t) => { const a = R.track.at(t); return a ? R.dims[a.dim | 0] : dim; } }).filter((h) => h.dim === dim || h.card);
+    const hl = D.pick(evs, [], {}).filter((h) => h.dim === dim || h.card);   // (the golden hours are in R.hl already: R.golden)
     if (!hl.length) { if (g.ui && g.ui.toast) g.ui.toast('🎬 ' + tx('g.reel.none', null, 'Noch keine Highlights', 'No highlights yet'), tx('g.reel.noneTip', null, 'Befreie einen Außenposten, bau etwas fertig, reise — dann zeigt F9 deinen Film.', 'Free an outpost, finish a build, travel — then F9 shows your film.')); return false; }
     const plan = D.reelPlan(hl, {});
     const p = g.player, saved = D.reelSave(g);
@@ -144,6 +158,8 @@
       D.reelRewind(g, run.saved, s.h ? Math.max(0, run.t0 - s.h.t) : 0);
       R.cardEl(g, s.h && s.h.card && (s.frame === 'card' || s.frame === 'cardpan') ? s : null);
     }
+    // the opening card is filmed where you stand (loaded already) and a postcard needs no world: no wait on black
+    if (dir.phase === 'load' && dir.loadT > 0.1 && (s.frame === 'title' || s.frame === 'end' || s.frame === 'card' || s.frame === 'cardpan')) dir.phase = 'run';
     if (!run.st || (dir.phase === 'run' && !run.staged)) { run.st = R.stageOf(g, s); run.staged = dir.phase === 'run'; }
     const t = dir.phase === 'run' ? dir.t : 0, c = run.st.cam(t);
     run.cam = c;
@@ -152,7 +168,7 @@
     if (A) {
       const mv = Math.hypot(A.x - p.pos[0], A.z - p.pos[2]);
       p.pos = [A.x, A.y, A.z]; p.yaw = A.yaw; p.pitch = 0; p.flying = false; p.vel = [0, 0, 0];
-      const sp = dt > 0 && mv < 5 ? mv / dt : 0; p.bob = (p.bob || 0) + mv * 0.9; p.bobAmt += ((sp > 0.6 ? 1 : 0) - (p.bobAmt || 0)) * Math.min(1, dt * 8);
+      const sp = dt > 0 && mv < 5 ? mv / dt : 0; p.bob = (p.bob || 0) + mv * 0.9; p.bobAmt = (p.bobAmt || 0) + ((sp > 0.6 ? 1 : 0) - (p.bobAmt || 0)) * Math.min(1, dt * 8);
       g.camMode = 1;
     } else { p.pos = [c.x, c.y - (p.eye || 1.62), c.z]; g.camMode = 0; }
     // the cards keep the fade off between shots: a cut, not a dip to black (only the first fades in, the last out)
