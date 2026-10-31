@@ -445,6 +445,7 @@
           for (let x = -4; x <= 4; x++) { const h = Math.round(4 - (x * x) / 4); a.set(x, fy - 5 + h, -1, 0x8A6A40); }
           a.ell(-1.5, fy - 5, -1, 2.2, 1.2, 1.4, 0xD89A50); a.ell(2, fy - 5.5, 1, 1.3, 1.3, 1.3, 0xD8402E); a.ell(0.5, fy - 5.5, 1.5, 1.2, 1.2, 1.2, 0x6AB04A);
         }
+        else if (speciesItem((x, y, z, c, e) => a.set(x, y, z, c, e), tool, fy, -3)) { /* u-worlds3: a native's own thing */ }
         else if (tool === 'can') { a.box(-2, fy - 7, -3, 2, fy - 2, 2, (x, y, z) => mul(0x5A9AC0, 0.92 + H3(x, y, z, 25) * 0.1)); for (let k = 0; k < 5; k++) a.set(0, fy - 5 + k, -4 - k, 0x5A9AC0); a.box(-1, fy - 1, -1, 1, fy, 1, 0x3A6A8A); }
       }
       if (!right && elder && role.tool === 'cane') { for (let y = -armLen - 22; y <= fy + 1; y++) a.set(0, y, -3, mul(0x8A5A3A, 0.9 + ((y & 1) ? 0.08 : 0))); a.set(0, fy + 2, -4, 0x8A5A3A); a.set(0, fy + 2, -5, 0x8A5A3A); a.set(0, fy + 1, -5, 0x8A5A3A); }
@@ -597,6 +598,44 @@
       arm: { L1: -S.elbow, L2: S.fore, x: S.armX, y: S.sh - S.hip }, hw: S.hw, legX: S.legX, wide: fam === 'robe' || fam === 'gown' ? 1 : 0,
       carry, cane: !kid && L.age === 'elder' && role.tool === 'cane', item: tool, skirt: SKIRT[fam] || 0 });
   };
+  // ============================== u-worlds3 · the natives' own things in the hand (instead of the role's hoe and bag)
+  // our own designs: the Wellari's shell staff, the Dunelin's lantern pole, the Glutani's ember tongs, the Regoli's crystal
+  // finder, the Nivari's frost chime. set(x, y, z, c, e): y up the shaft from the fist (fy), z forward (z0 the shaft's)
+  V.SPECIES_TOOL = { aqua: 'shellstaff', ocker: 'lanternpole', zinn: 'tongs', basalt: 'finder', opal: 'chime' };
+  const SP_TOOLS = new Set(Object.values(V.SPECIES_TOOL));
+  function speciesItem(set, t, fy, z0) {
+    if (!SP_TOOLS.has(t)) return false;
+    const wood = (y) => mul(0x7A5236, (y & 1) ? 0.95 : 1.03);
+    if (t === 'shellstaff') {
+      for (let y = fy - 13; y <= fy + 11; y++) set(0, y, z0, mul(0xD8C8A0, (y & 1) ? 0.94 : 1.02), 0);
+      for (let y = fy + 12; y <= fy + 16; y++) for (let z = z0 - 2; z <= z0 + 2; z++) for (let x = -2; x <= 2; x++) {
+        const d = x * x + (y - fy - 14) * (y - fy - 14) * 0.9 + (z - z0) * (z - z0); if (d > 5.2) continue;
+        set(x, y, z, (x + y + z) % 3 === 0 ? 0x5ACCC8 : mix(0xF4B4A0, 0xFFF0E0, (y - fy - 12) / 5), 0);
+      }
+      set(0, fy + 17, z0, 0xFFF0E0, 0);
+    } else if (t === 'lanternpole') {
+      for (let y = fy - 12; y <= fy + 13; y++) set(0, y, z0, wood(y), 0);
+      for (let z = z0 - 4; z <= z0; z++) set(0, fy + 13, z, 0x3A2A20, 0);
+      set(0, fy + 12, z0 - 4, 0x3A2A20, 0);
+      for (let y = fy + 7; y <= fy + 11; y++) for (let z = z0 - 5; z <= z0 - 3; z++) for (let x = -1; x <= 1; x++) {
+        const edge = y === fy + 7 || y === fy + 11, core = !edge && x === 0 && z === z0 - 4;
+        set(x, y, z, edge ? 0x3A2A20 : core ? 0xFFE6A0 : 0xFFB040, edge ? 0 : 1);
+      }
+    } else if (t === 'tongs') {
+      for (let z = z0 - 10; z <= z0; z++) for (const x of [-1, 1]) set(z < z0 - 2 ? x : 0, fy, z, mul(0x50545C, (z & 1) ? 0.92 : 1.05), 0);
+      for (let z = z0 - 12; z <= z0 - 10; z++) for (let y = fy - 1; y <= fy + 1; y++) set(0, y, z, y === fy && z === z0 - 11 ? 0xFFE080 : 0xFF7A2A, 1);
+    } else if (t === 'finder') {
+      for (let z = z0 - 6; z <= z0; z++) set(0, fy, z, 0x8A92A0, 0);
+      for (let y = fy - 2; y <= fy + 2; y++) for (let x = -2; x <= 2; x++) if (Math.abs(x) + Math.abs(y - fy) >= 2 && Math.abs(x) + Math.abs(y - fy) <= 3) set(x, y, z0 - 7, 0xB8C0CC, 0);
+      for (let z = z0 - 9; z <= z0 - 7; z++) set(0, fy, z, 0x7AD8FF, 1);
+      set(0, fy + 1, z0 - 8, 0xC8F0FF, 1);
+    } else {
+      for (let y = fy - 4; y <= fy + 12; y++) set(0, y, z0, 0xD8E8F4, 0);
+      for (let x = -3; x <= 3; x++) set(x, fy + 12, z0, 0xB8D0E4, 0);
+      for (const x of [-3, 0, 3]) for (let k = 1; k <= (x ? 3 : 4); k++) set(x, fy + 12 - k, z0, k >= (x ? 3 : 4) ? 0xE8F8FF : 0x9AD4F4, k >= (x ? 3 : 4) ? 1 : 0);
+    }
+    return true;
+  }
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
   // (3 cm) fades into the skin of the smooth head — the eyes thin slits, the lips gone. The smooth path takes the head at
@@ -1433,6 +1472,7 @@
         P.ell(-1.5, 3.6, 2.5, 1.4, 0.5, 1.4, 0xF4F2EC, null, TG.other); P.box(-2, 4, 2, -1, 5, 3, 0xF4F2EC); P.set(0, 5, 2, 0xF4F2EC);
         P.tray = true;
       }
+      else if (speciesItem((x, y, z, c, e) => P.set(x, y, z, c, e, TG.other), t, 0, -2)) { /* u-worlds3 */ }
       else if (t === 'cane') {
         // (the crook over the fist, the stick straight down to the floor: as long as the grip stands over it at rest)
         const len = Math.round(caneLen);
