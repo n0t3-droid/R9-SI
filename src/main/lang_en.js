@@ -3733,5 +3733,9 @@
     "g.nat.set.ocker": "Dune build",
     "g.nat.set.opal": "Frost build",
     // ---- u-worlds end
+    // ---- e-portal2 · the Beacon Path film (portal.js, portal_space.js)
+    "g.pt.skipWait": "Almost there — the world is still being built …",
+    "g.pt.bestHour": "at the golden hour",
+    // ---- e-portal2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

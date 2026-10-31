@@ -11,6 +11,14 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // ---- e-portal2 (R55-05): the first view of a new player's map — the nearest n systems round `here` (their indices,
+  // nearest first) and the zoom that frames them (the farthest at ~38 % of the picture's height from the middle)
+  VR.StarMapFit = function (N, here, n) {
+    const c = N.list[here].p, d = N.list.map((s, i) => [i, Math.hypot(s.p[0] - c[0], s.p[1] - c[1], s.p[2] - c[2])]).filter(q => q[0] !== here).sort((a, b) => a[1] - b[1]).slice(0, n || 24);
+    const far = d.length ? d[d.length - 1][1] : 30;
+    return { labels: d.map(q => q[0]), dist: Math.max(12, Math.min(520, far * 0.95 / 0.38 + far)), far };
+  };
+  // ---- e-portal2 end
   if (typeof window === 'undefined' || !VR.Game) return;
   const SM = VR.StarMap = {};
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
@@ -84,6 +92,11 @@
     root.style.display = 'block';
     resize(); showCard();
     M.opened = performance.now();
+    // ---- e-portal2 (R55-05): Helia's neighbourhood framed on the first open (here), and the first frame drawn now —
+    // not only from the next play frame (a held or slow frame showed a black map)
+    if (M.fitHere !== M.here && VR.StarMapFit) { const f = VR.StarMapFit(M.N, M.here, 28); M.fitLabels = f.labels; M.fitHere = M.here; M.dist = f.dist; }
+    try { const t0 = performance.now(); draw(); M.drawMs = performance.now() - t0; M.draws++; M.dirty = false; } catch (e) { M.dirty = true; }
+    // ---- e-portal2 end
     return true;
   };
   SM.close = function (g, quiet) {
@@ -166,7 +179,7 @@
       const i = order[k], s = N.list[i], z = P.z[i]; if (z < 1) continue;
       const x = P.x[i], y = P.y[i]; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
       const on = shown(i), pr = clamp(80 / z, 0.35, 2.2);
-      const r = clamp((1.6 + 0.55 * Math.log10(s.L + 0.001)) * pr, 0.8, 7);
+      const r = clamp((1.6 + 0.55 * Math.log10(s.L + 0.001)) * pr, 1.1, 7);
       if (s.neb >= 0 && on) { X.fillStyle = '#ff4f8a22'; X.beginPath(); X.arc(x, y, r * 4, 0, Math.PI * 2); X.fill(); }
       X.globalAlpha = on ? 1 : 0.12;
       X.fillStyle = s.color; X.beginPath(); X.arc(x, y, r, 0, Math.PI * 2); X.fill();
@@ -193,9 +206,20 @@
     // ---- u-stars2 end
     // home, here, the selection, the hovered — and the names in reach
     X.font = '600 12px system-ui,sans-serif'; X.textBaseline = 'middle';
-    const label = (i, col, txt) => { if (P.z[i] < 1) return; X.fillStyle = '#000a'; const w = X.measureText(txt).width; X.fillRect(P.x[i] + 9, P.y[i] - 8, w + 6, 16); X.fillStyle = col; X.fillText(txt, P.x[i] + 12, P.y[i]); };
+    // (e-portal2: the labels counted and kept apart — a name over another is left out, except the marked ones)
+    const boxes = []; M.labels = 0;
+    const label = (i, col, txt, opt) => {
+      if (P.z[i] < 1) return; const w = X.measureText(txt).width, bx = P.x[i] + 9, by = P.y[i] - 8;
+      if (bx > W || by > H || bx + w < 0 || by < -16) return;
+      if (opt) for (const b of boxes) if (bx < b[0] + b[2] && bx + w + 6 > b[0] && by < b[1] + 16 && by + 16 > b[1]) return;
+      boxes.push([bx, by, w + 6]); M.labels++;
+      X.fillStyle = '#000a'; X.fillRect(bx, by, w + 6, 16); X.fillStyle = col; X.fillText(txt, P.x[i] + 12, P.y[i]);
+    };
     const near = G().systemsNear(N, N.list[M.here].p, range);
-    for (const q of near) if (q.idx !== M.here && shown(q.idx)) label(q.idx, '#cfe6ffcc', q.s.name + ' · ' + fmt(q.d) + ' ' + T('g.stars.ly'));
+    for (const q of near) if (q.idx !== M.here && shown(q.idx)) label(q.idx, '#cfe6ffcc', q.s.name + ' · ' + fmt(q.d) + ' ' + T('g.stars.ly'), true);
+    // ---- e-portal2 (R55-05): the neighbourhood's names beyond the jump's reach too (the nearest 28, dimmer)
+    if (M.fitHere === M.here && M.fitLabels) for (const i of M.fitLabels) if (shown(i) && !near.some(q => q.idx === i)) label(i, '#9fb8d8b0', N.list[i].name + ' · ' + fmt(distLy(i, M.here)) + ' ' + T('g.stars.ly'), true);
+    // ---- e-portal2 end
     { const i = 0; X.strokeStyle = '#ffd36a'; X.lineWidth = 2; X.beginPath(); X.arc(P.x[i], P.y[i], 9, 0, Math.PI * 2); X.stroke(); label(i, '#ffd36a', '🏠 ' + T('g.stars.home') + (M.here ? ' · ' + fmt(distLy(0, M.here)) + ' ' + T('g.stars.ly') : '')); }
     if (M.here) { const i = M.here; X.strokeStyle = '#7fffd4'; X.lineWidth = 2; X.beginPath(); X.moveTo(P.x[i] - 12, P.y[i]); X.lineTo(P.x[i] - 5, P.y[i]); X.moveTo(P.x[i] + 5, P.y[i]); X.lineTo(P.x[i] + 12, P.y[i]); X.moveTo(P.x[i], P.y[i] - 12); X.lineTo(P.x[i], P.y[i] - 5); X.moveTo(P.x[i], P.y[i] + 5); X.lineTo(P.x[i], P.y[i] + 12); X.stroke(); label(i, '#7fffd4', T('g.stars.here') + ': ' + N.list[i].name); }
     for (const i of [M.sel, M.hov]) {
@@ -282,5 +306,5 @@
     if (!M.open && i && ui && !ui.typing && !ui.screen && i.hit && i.hit('KeyO') && !(this.stars && this.stars.on) && !this.photo && !(this.photoCam && this.photoCam.on)) { SM.open(this); return; }
     return origPlay.call(this, dt);
   };
-  SM.stats = () => ({ open: M.open, drawMs: +M.drawMs.toFixed(2), draws: M.draws, sel: M.sel, here: M.here, dist: M.dist });
+  SM.stats = () => ({ open: M.open, drawMs: +M.drawMs.toFixed(2), draws: M.draws, sel: M.sel, here: M.here, dist: M.dist, labels: M.labels || 0 });
 })(VR);
