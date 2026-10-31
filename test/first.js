@@ -56,7 +56,7 @@ if (pick) {
   const blockAt = (x, y, z) => { x = Math.floor(x); y = Math.floor(y); z = Math.floor(z); const k = (x >> 4) + ',' + (z >> 4); let c = CH.get(k); if (!c) { c = g.generate(x >> 4, z >> 4); CH.set(k, c); } return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
   const under = nameOf(blockAt(fx, fy - 1, fz)), body = [blockAt(fx, fy, fz), blockAt(fx, fy + 1, fz)];
   const solid = (s) => !!(s && (R.T.flags[s] & F.SOLID));
-  check(/flagstone|floor_plaza/.test(under) && !solid(body[0]) && !solid(body[1]), `the feet stand on the spur's walk: ${under} under them at (${fx.toFixed(1)}, ${fy}, ${fz.toFixed(1)}), ${nameOf(body[0])} / ${nameOf(body[1])} for the body`);
+  check(/flagstone|floor_plaza|dirt_path|coarse_dirt|gravel|path/.test(under) && !solid(body[0]) && !solid(body[1]), `the feet stand on the way at the spur's mouth (f-first3: the open path) or its walk: ${under} under them at (${fx.toFixed(1)}, ${fy}, ${fz.toFixed(1)}), ${nameOf(body[0])} / ${nameOf(body[1])} for the body`);
   const dWay = Math.hypot(fx - (pick.x + 0.5), fz - (pick.z + 0.5));
   check(dWay <= W.REACH && dWay >= 1, `the feet are ${dWay.toFixed(2)} blocks out on the walk — within the wow trigger's reach (${W.REACH})`);
   const toAim = yawTo(pick.aim[0] - fx, pick.aim[2] - fz);

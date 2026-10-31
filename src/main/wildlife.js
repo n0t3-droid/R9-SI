@@ -268,6 +268,7 @@
       if (!(dt > 0)) return;
       dt = Math.min(dt, 0.1);
       this.live = true; this.time += dt;
+      if (this.ageW !== g.world) { this.ageW = g.world; this.age = 0; this.fresh = W.freshWorld(g, Date.now()); } this.age += dt;   // f-first3: the seconds played on this world, and whether it was just made (W.murmStart)
       const clock = this.tick(dt), E = (g.env && g.env.E) || {}, tod = g.env ? g.env.timeOfDay : 6000, day = g.env ? (g.env.day | 0) : 0;
       const p = g.player.pos, eye = this.eye || (this.eye = [0, 0, 0]); eye[0] = p[0]; eye[1] = p[1] + 1.62; eye[2] = p[2];
       const sc = W.sched(this.seed, day, tod), wet = (E.rain || 0) > 0.15 || (E.snow || 0) > 0.15, cap = this.b.cap;
@@ -300,6 +301,7 @@
     updMurm(dt, ctx, n) {
       const g = this.g, ph = W.murmPhase(ctx.tod);
       if (!n || ph === 'off' || ctx.wet) { this.murm = null; return; }
+      this.murmK = W.murmStart(this.age || 0, !!this.fresh); if (this.murmK <= 0) { this.murm = null; return; }   // f-first3 (R55-03): not in a new world's first minute
       // the cycle: the dusk of a day and the dawn after it are one flock (after midnight it is still yesterday's)
       const t = ctx.tod, key = (t < 2000 ? ctx.day - 1 : ctx.day);
       let Mu = this.murm;
@@ -1012,7 +1014,7 @@
         // (the bank ≤ 0.9 rad: its cosine and sine as short series, within 0.3 %)
         const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, b = fl.bank[i], b2 = b * b, cb = 1 - b2 * (0.5 - b2 / 24), sb = b * (1 - b2 * (1 / 6 - b2 / 120));
         const nx = ux * cb + rx * sb, ny = uy * cb, nz = uz * cb + rz * sb, ndv = Math.abs(nx * x + ny * y + nz * z) / d;
-        const tau = W.puffTau(fl.dens[i], ndv, kv, KB, Mu.n);
+        const tau = Math.min(W.MURM_TAU_MAX, W.puffTau(fl.dens[i], ndv, kv, KB, Mu.n)) * W.murmFar(d) * (this.murmK === undefined ? 1 : this.murmK);   // (f-first3: thinner from afar; in over a new world's second minute)
         if (tau < 0.004) continue;
         // (WG.put's layout written in place — the slots it leaves 0 stay 0: the buffer holds only impostors)
         const q = n++ * WS; D[q] = x; D[q + 1] = y; D[q + 2] = z; D[q + 3] = R; D[q + 8] = 0.022; D[q + 9] = 0.02; D[q + 10] = 0.026; D[q + 11] = tau; D[q + 16] = (i * 0.618034) % 1;   // (the glow's slot: the grain's seed)

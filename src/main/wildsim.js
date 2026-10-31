@@ -361,6 +361,18 @@
   W.PUFF = { R: 2.2, tau0: 1.0, gam: 2.0, dref: 9, base: 0.15, nRef: 720, kFar: [90, 150], kMin: 2, fog: 0.55, cut: 1.2, grain: [5, 0.4, 1.6] };
   // (grain: the impostor's stipple — cells across a unit radius, the depth's factor in half the cells and in the other half)
   W.puffGrain = function (cx, cy, seed) { const G = W.PUFF.grain, v = Math.sin(cx * 12.9898 + cy * 78.233 + seed * 61.7) * 43758.5453; return v - Math.floor(v) < 0.5 ? G[1] : G[2]; };
+  // f-first3 (R55-03: a black ragged blot over the horizon in every frame of the first three minutes — the far flock's
+  // impostors, 1.8× the depth on Balanced, all of them near-black): from afar the flock thins and pales — its depth × murmFar
+  // (1 within FAR[0], FAR_MIN beyond FAR[1]), the air counted in full there (wildgpu's impostor fog) — and a new world's
+  // first QUIET seconds have none (it comes in over FADE s): the first look is the land, not a smudge. Pure: test/first3.js
+  W.MURM_FAR = [60, 240]; W.MURM_FAR_MIN = 0.22; W.MURM_QUIET = 60; W.MURM_FADE = 30; W.MURM_TAU_MAX = 1.4;   // (an impostor's depth at most: its core a dark grey through which the sky shows, not ink)
+  W.murmFar = function (d) { const F = W.MURM_FAR; if (d <= F[0]) return 1; if (d >= F[1]) return W.MURM_FAR_MIN; const t = (d - F[0]) / (F[1] - F[0]); return 1 + (W.MURM_FAR_MIN - 1) * t * t * (3 - 2 * t); };
+  // a new world's flock: 0 within its first QUIET s (age: the seconds played on it; fresh: a world just made), then in over FADE
+  // a world just made: no player record when it opened (First2's f2new) or made within FRESH_MS (meta.created — under a
+  // slow GPU the loading screen alone takes a minute; the after run of critic_ux had a player record by the first frame)
+  W.FRESH_MS = 5 * 60 * 1000;
+  W.freshWorld = function (g, now) { const m = g && g.meta; return !!(g && g.f2new) || !!(m && Number.isFinite(m.created) && now - m.created >= 0 && now - m.created < W.FRESH_MS); };
+  W.murmStart = function (age, fresh) { if (!fresh) return 1; return age <= W.MURM_QUIET ? 0 : Math.min(1, (age - W.MURM_QUIET) / W.MURM_FADE); };
   W.birdsVisible = function (d) {
     const P = W.PUFF, K = W.MURM_K;
     if (d <= P.kFar[0]) return K;

@@ -59,7 +59,10 @@
   };
   // the feet on the spur's walk: its axis 2.5 blocks out from the way's middle (past the way's own cells, between the
   // low walls, within the wow trigger's reach), on the paving (the walk's floor is at the way's level)
-  FI.WALK_T = 2.5;
+  // f-first3 (R55-12, critic_ux_v054_05_t15: the first picture a bench and two walls — a walled nook): the feet on the open
+  // way itself, 1 m before the walk's mouth, facing the vista — the walk's low walls lead from the frame's lower corners to
+  // the bench and the landmark, nothing within 3 m in the centre third (test/first3.js, critic_ux's view3)
+  FI.WALK_T = -1;
   FI.feet = (v) => { const u = v.u || [0, 0]; return [v.x + 0.5 + u[0] * FI.WALK_T, v.y + 1, v.z + 0.5 + u[1] * FI.WALK_T]; };
   FI.spawn = (v) => (v ? { pos: FI.feet(v), yaw: v.yaw, pitch: v.pitch, vista: v } : null);
 

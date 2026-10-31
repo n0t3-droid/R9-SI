@@ -39,7 +39,7 @@
         add('b:' + b.key, catKey, null, () => { const name = T('g.biome.' + b.key, null, b.name); return { name, desc: T('g.codex.foundBiome', { name }), hint: T(catKey === 'caves' ? 'g.codex.biomeHintCave' : catKey === 'moons' ? 'g.codex.biomeHintMoon' : 'g.codex.biomeHint') }; });
       }
       // u-moons1: the moons' pages (bodylife.js finds them: a geyser seen, the eclipse, Amarant rising, a 20-m jump …)
-      if (VR.BodyLife) for (const id of VR.BodyLife.PAGES) add('moon:' + id, 'moons', null, () => { const L = TL('g.codex.moon.' + id); return { name: L[0] || id, desc: L[1] || '', hint: L[2] || '' }; });
+      if (VR.BodyLife) for (const id of VR.BodyLife.PAGES) add('moon:' + id, 'moons', null, () => { const L = TL(VR.DimReg && VR.DimReg.gravKey ? VR.DimReg.gravKey('g.codex.moon.' + id) : 'g.codex.moon.' + id);   /* f-first3 */ return { name: L[0] || id, desc: L[1] || '', hint: L[2] || '' }; });
       // 💡 Erfindungen (src/main/inventions.js): one entry per invention, found when the profile has made it
       const IV = VR.Inventions;
       if (IV) for (const c of IV.LIST) add('i:' + c.k, 'inventions', c.id, () => { const x = IV.text(c.k); return { name: x.name, desc: x.line, hint: T('g.codex.inventHint') }; }, () => IV.has(c.k));

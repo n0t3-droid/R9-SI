@@ -36,6 +36,53 @@ const ev = (fn, a) => page.evaluate(fn, a);
 const texts = () => ev(() => { const s = (VR.game && VR.game.ui && VR.game.ui.screen) || ''; const vis = [...document.querySelectorAll('#ui button, #ui h1, #ui h2, #ui h3, #ui label, #hint, #hud .tip, .toast, #ui .hint')].filter(e => e.offsetParent !== null && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)); return { screen: s, state: VR.game && VR.game.state, n: vis.length, vis: vis.slice(0, 40) }; }).catch(() => ({}));
 const TAG = process.env.TAG ? process.env.TAG + '_' : '';
 const shot = async (name) => { try { await page.screenshot({ path: SHOTS + 'critic_ux_' + TAG + name + '.png', timeout: 120000 }); } catch (e) { console.log('  (no shot ' + name + ')'); } const t = await texts(); OUT.steps.push({ name, ...t }); console.log('  · ' + name + ' ' + JSON.stringify(t).slice(0, 400)); };
+// f-first3 (docs/superpowers/plans/2026-10-31-f-first3.md, the v0.54 review's R55-03/-04/-10/-12/-13): the probes read the
+// pictures' own pixels (the PNG decoded in the page): skyBlob — the largest dark mass (4×4 cells ≥ 25 % luma < 40) in the
+// upper 56 % that touches no edge of that band (trees stand on the ground and run out of it; the minimap's corner left out)
+// and has a lit ring (mean luma > 90: the sky round it); crop — luma sd and mean HSV saturation of a box of the picture
+const pngOf = (name) => fs.readFileSync(SHOTS + 'critic_ux_' + TAG + name + '.png').toString('base64');
+const pixProbe = (name, box) => ev(async ([b64, box]) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+  const W0 = img.naturalWidth, H0 = img.naturalHeight, cv = document.createElement('canvas'); cv.width = W0; cv.height = H0;
+  const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0); const D = cx.getImageData(0, 0, W0, H0).data, lum = (i) => 0.2126 * D[i] + 0.7152 * D[i + 1] + 0.0722 * D[i + 2];
+  if (box) {
+    const [x0, y0, x1, y1] = box.map(Math.round); let m = 0, m2 = 0, n = 0, sat = 0, ns = 0;
+    for (let y = Math.max(0, y0); y < Math.min(H0, y1); y++) for (let x = Math.max(0, x0); x < Math.min(W0, x1); x++) { const i = (y * W0 + x) * 4, L = lum(i); m += L; m2 += L * L; n++; const mx = Math.max(D[i], D[i + 1], D[i + 2]), mn = Math.min(D[i], D[i + 1], D[i + 2]); if (mx > 50) { sat += (mx - mn) / mx; ns++; } }
+    m /= Math.max(1, n); return { sd: +Math.sqrt(Math.max(0, m2 / Math.max(1, n) - m * m)).toFixed(1), mean: +m.toFixed(1), sat: +(sat / Math.max(1, ns)).toFixed(3) };
+  }
+  const CW = W0 >> 2, CH = Math.floor(H0 * 0.56) >> 2, dark = new Uint8Array(CW * CH), avg = new Float32Array(CW * CH);
+  for (let cy = 0; cy < CH; cy++) for (let c = 0; c < CW; c++) { let n = 0, s = 0; for (let y = cy * 4; y < cy * 4 + 4; y++) for (let x = c * 4; x < c * 4 + 4; x++) { const L = lum((y * W0 + x) * 4); s += L; if (L < 40) n++; } avg[cy * CW + c] = s / 16; dark[cy * CW + c] = n >= 4 && !(c > CW * 0.83 && cy < 60) ? 1 : 0; }
+  const seen = new Uint8Array(CW * CH); let best = { share: 0, box: null };
+  for (let k = 0; k < CW * CH; k++) {
+    if (!dark[k] || seen[k]) continue;
+    const st = [k], comp = []; seen[k] = 1;
+    while (st.length) { const q = st.pop(); comp.push(q); const qx = q % CW, qy = (q / CW) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const a = qx + dx, b = qy + dy; if (a < 0 || b < 0 || a >= CW || b >= CH) continue; const r = b * CW + a; if (dark[r] && !seen[r]) { seen[r] = 1; st.push(r); } } }
+    let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (const q of comp) { const qx = q % CW, qy = (q / CW) | 0; x0 = Math.min(x0, qx); x1 = Math.max(x1, qx); y0 = Math.min(y0, qy); y1 = Math.max(y1, qy); }
+    if (x0 === 0 || y0 === 0 || x1 === CW - 1 || y1 === CH - 1) continue;   // (a tree, a roof: it runs out of the band)
+    let rs = 0, rn = 0;
+    for (let b = Math.max(0, y0 - 2); b <= Math.min(CH - 1, y1 + 2); b++) for (let a = Math.max(0, x0 - 2); a <= Math.min(CW - 1, x1 + 2); a++) { if (a >= x0 && a <= x1 && b >= y0 && b <= y1) continue; rs += avg[b * CW + a]; rn++; }
+    const share = comp.length * 16 / (W0 * H0);
+    if (rn && rs / rn > 90 && share > best.share) best = { share, box: [x0 * 4, y0 * 4, x1 * 4 + 4, y1 * 4 + 4], ring: Math.round(rs / rn) };
+  }
+  best.share = +(best.share * 100).toFixed(3); return best;
+}, [pngOf(name), box || null]).catch((e) => ({ err: String(e).slice(0, 120) }));
+// Funke: his distance from the eye, his screen box (the 64 cm span of his rotors, the camera's fov) when in the frame, and the murmuration's state
+const f3Probe = () => ev(() => {
+  const g = VR.game, fk = g.funke, c = g.cam, FK = VR.Funke, Mu = g.wild && g.wild.murm;
+  const o = { murm: Mu ? { state: Mu.state, n: Mu.n, d: Mu.fl && Mu.fl.ctr ? Math.round(Math.hypot(Mu.fl.ctr[0] - c.x, Mu.fl.ctr[2] - c.z)) : -1 } : null, murmK: g.wild ? g.wild.murmK : null };
+  if (fk && fk.pos && c) {
+    const dx = fk.pos[0] - c.x, dy = fk.pos[1] - c.y, dz = fk.pos[2] - c.z, d = Math.hypot(dx, dy, dz), cp = Math.cos(c.pitch || 0), sp = Math.sin(c.pitch || 0);
+    const f = [-Math.sin(c.yaw) * cp, sp, -Math.cos(c.yaw) * cp], r = [Math.cos(c.yaw), 0, -Math.sin(c.yaw)], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const ah = dx * f[0] + dy * f[1] + dz * f[2], fov = c.fov > 4 ? c.fov * Math.PI / 180 : (c.fov || 75 * Math.PI / 180), t = Math.tan(fov / 2), A = innerWidth / innerHeight;
+    const sx = ah > 0 ? (dx * r[0] + dz * r[2]) / ah / (t * A) : 9, sy = ah > 0 ? Math.abs(dx * u[0] + dy * u[1] + dz * u[2]) / ah / t : 9;
+    const inFrame = ah > 0 && Math.abs(sx) < 1.1 && sy < 1.1;
+    o.funkeD = +d.toFixed(2); o.funkeX = +sx.toFixed(2); o.funkeBox = inFrame && FK && FK.screenShare ? +(FK.screenShare(d, 0.64, fov * 180 / Math.PI, A) * 100).toFixed(2) : 0; o.funkeCentre = inFrame && Math.abs(sx) < 1 / 3 && sy < 1 / 3; o.funkeHidden = !!(FK && FK.inAim && (g.camMode | 0) === 0 && FK.inAim(c.yaw, c.pitch, dx, dy, dz));   // (f-first3: the lagging spring in the aim is not drawn)
+  }
+  return o;
+}).catch((e) => ({ err: String(e).slice(0, 120) }));
+// the spawn's view: the nearest block in the centre third of the frame (Travel.facing at the eye's own yaw and pitch)
+const viewClear = () => ev(() => { const g = VR.game, c = g.cam, p = g.player, TR = VR.Travel; if (!TR || !TR.facing) return -1; const f = TR.facing((x, y, z) => g.world.getBlock(x, y, z), [c.x, c.y, c.z], [], { yaw0: c.yaw, pitch0: c.pitch, feet: p.pos[1], keep0: true, n: 1, want: 1e9, fov: (c.fov > 4 ? c.fov : c.fov * 180 / Math.PI) || 75 }); return +f.clear.toFixed(2); }).catch(() => -1);
+OUT.f3 = {};
 const untilState = async (st, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const s = await ev(() => VR.game && VR.game.state).catch(() => null); if (s === st) return Date.now() - t; await wait(400); } return -1; };
 // a player's click: the real one first; if Playwright cannot (covered, moving), what lies on top is logged and the click forced
 const click = async (sel, what) => { try { await page.click(sel, { timeout: 6000 }); return 'real'; } catch (e) {
@@ -107,6 +154,10 @@ await wait(1500); await shot('04_t0');
   const pf = await ev(() => window.__arr ? window.__arr.prev : -1).catch(() => -1); OUT.arrivalPrevFrame = pf;
   check(arr >= 0 && (arr <= 9000 || pf <= 9000), 'the arrival is over in ' + arr + ' ms (≤ 9 s, or on the first frame after 9 s: the frame before at ' + pf + ' ms; no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
+OUT.f3.t15 = { blob: await pixProbe('05_t15'), view3: await viewClear(), pos: await ev(() => VR.game.player.pos.map(v => +v.toFixed(1))).catch(() => null), ...(await f3Probe()) };
+console.log('  f3 15 s: ' + JSON.stringify(OUT.f3.t15));
+check(OUT.f3.t15.blob && !(OUT.f3.t15.blob.share > 0.3), 'R55-03: at 15 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t15.blob) + ' ≤ 0.3 %)');
+check(OUT.f3.t15.view3 >= 3, 'R55-12: at 15 s no block within 3 m in the view\'s centre third (' + OUT.f3.t15.view3 + ' m)');
 OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h), A = VR.game.arrival, a = document.activeElement; return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud, arrival: A ? { phase: A.phase, holds: A.holds(), t: +(A.t || 0).toFixed(2) } : null, wow: !!(VR.game.wow && VR.game.wow.active), focus: a ? a.tagName + '#' + a.id : '', captured: !!VR.game.input.captured, poll: window.__arr || null } : null; }).catch(() => null);
 OUT.moved15 = await ev(() => VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null).catch(() => null);
 check(!OUT.moved15 || OUT.moved15.phase !== 'after', 'the spawn\'s settle move (first2) under the arrival\'s white: ' + JSON.stringify(OUT.moved15));
@@ -124,11 +175,17 @@ OUT.walkedW1 = p0 && pW1 ? +Math.hypot(pW1[0] - p0[0], pW1[2] - p0[2]).toFixed(2
 check(OUT.walkedW1 >= 0.5, 'W moves the player within its first second: ' + OUT.walkedW1 + ' m (≥ 0.5)');
 const pW = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 await holdFor('KeyS', 3000, 3); await shot('06_t25_walk');
+OUT.f3.t25 = await f3Probe(); console.log('  f3 25 s: ' + JSON.stringify(OUT.f3.t25));
+check(OUT.f3.t25.funkeD >= 2 && (OUT.f3.t25.funkeHidden || (OUT.f3.t25.funkeBox <= 2 && !OUT.f3.t25.funkeCentre)), 'R55-04: at 25 s Funke ' + OUT.f3.t25.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t25.funkeBox + ' % (≤ 2), not in the centre third — or not drawn there' + (OUT.f3.t25.funkeHidden ? ' (hidden)' : ''));
 { const p1 = await ev(() => VR.game.player.pos.slice()).catch(() => null); const dW = p0 && pW ? Math.hypot(pW[0] - p0[0], pW[2] - p0[2]) : -1, dS = pW && p1 ? Math.hypot(p1[0] - pW[0], p1[2] - pW[2]) : -1;
   OUT.walked = +Math.max(dW, dS).toFixed(2); OUT.walkedW = +dW.toFixed(2); OUT.walkedS = +dS.toFixed(2);
   check(OUT.walked >= 2, 'W held 4 s, then S 3 s, right after: W ' + OUT.walkedW + ' m · S ' + OUT.walkedS + ' m (≥ 2 by one of them)'); }
 await page.mouse.move(640, 360); await page.mouse.move(900, 330, { steps: 10 }); await wait(15000); await shot('07_t45');
 await wait(15000); await shot('08_t60');
+OUT.f3.t60 = { blob: await pixProbe('08_t60'), ...(await f3Probe()) };
+console.log('  f3 60 s: ' + JSON.stringify(OUT.f3.t60));
+check(OUT.f3.t60.blob && !(OUT.f3.t60.blob.share > 0.3), 'R55-03: at 60 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t60.blob) + ')');
+check(OUT.f3.t60.funkeD >= 2 && (OUT.f3.t60.funkeHidden || (OUT.f3.t60.funkeBox <= 2 && !OUT.f3.t60.funkeCentre)), 'R55-04: at 60 s Funke ' + OUT.f3.t60.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t60.funkeBox + ' % (≤ 2), not in the centre third');
 const handProbe = () => ev(() => { const g = VR.game, h = g.player.inv.held, F = VR.First2; return { held: h ? h.id : null, block: !!(h && g.entities && g.entities.itemMesh(h.id).block), cover: F ? +F.handCover(F.HAND, innerWidth / innerHeight).toFixed(4) : 1, cine: F ? F.cine(g) : null }; }).catch(() => null);
 OUT.hand60 = await handProbe();
 check(OUT.hand60 && (!OUT.hand60.block || OUT.hand60.cover <= 0.03), 'at 60 s the held block covers ≤ 3 % of the frame: ' + JSON.stringify(OUT.hand60));
@@ -154,6 +211,8 @@ for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
   //  W (≥ 3 s, then on to 3 m or 15 frames: holdWalk) a sample, small alternating looks so the way keeps a heading, a jump after each)
   for (let i = 0; i < WALK_HOLDS; i++) { await holdWalk(); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
+  if (name === '08b_t120') { OUT.f3.t120 = { blob: await pixProbe(name), ...(await f3Probe()) }; console.log('  f3 120 s: ' + JSON.stringify(OUT.f3.t120)); check(OUT.f3.t120.blob && !(OUT.f3.t120.blob.share > 0.3), 'R55-03: at 120 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t120.blob) + ')'); }
+  else { OUT.f3.t180 = { blob: await pixProbe(name), hand: await pixProbe(name, [840, 560, 990, 700]), ...(await f3Probe()) }; console.log('  f3 180 s: ' + JSON.stringify(OUT.f3.t180)); check(OUT.f3.t180.hand && OUT.f3.t180.hand.sat <= 0.6, 'R55-13: at 180 s the held block\'s mean saturation ' + (OUT.f3.t180.hand && OUT.f3.t180.hand.sat) + ' ≤ 0.6'); }
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
 OUT.hand180 = await handProbe();
@@ -175,6 +234,9 @@ check(OUT.pause && OUT.pause.bottom <= 720 && OUT.pause.top >= 0 && OUT.pause.n 
   await ev(() => { const b = document.querySelector('#pause [data-act="pauseless"]'); if (b) b.click(); }).catch(() => {}); await wait(300); }
 OUT.settings = await click('#pause [data-act="settings"]', 'settings');
 await wait(2500); await shot('10_settings');
+{ const box = await ev(() => { const c = [...document.querySelectorAll('#settings canvas.pv')].find(e => e.offsetParent !== null); if (!c) return null; const r = c.getBoundingClientRect(); return [r.left + 2, r.top + 2, r.right - 2, r.bottom - 2]; }).catch(() => null);
+  OUT.f3.preview = box ? Object.assign({ box: box.map(Math.round) }, await pixProbe('10_settings', box)) : null;
+  check(OUT.f3.preview && OUT.f3.preview.sd > 10, 'R55-10: the preview element\'s own pixels in the picture show the world (luma sd ' + JSON.stringify(OUT.f3.preview) + ' > 10)'); }
 OUT.setUi = await ev(() => { const s = document.getElementById('settings'), c = s && s.querySelector('canvas.pv'); let sd = -1; if (c && c.width) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let m = 0, m2 = 0, n = 0; for (let i = 0; i < d.length; i += 16) { const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; m += L; m2 += L * L; n++; } m /= n; sd = Math.sqrt(Math.max(0, m2 / n - m * m)); } const ctl = s ? [...s.querySelectorAll('button, input, select')].filter(e => e.offsetParent !== null && e.getBoundingClientRect().height > 0).length : -1; return { sd: +sd.toFixed(1), controls: ctl }; }).catch(() => null);
 check(OUT.setUi && OUT.setUi.sd > 10, 'the settings\' preview shows the world (luma sd ' + (OUT.setUi && OUT.setUi.sd) + ' > 10)');
 check(OUT.setUi && OUT.setUi.controls > 0 && OUT.setUi.controls <= 20, 'Einfach: ' + (OUT.setUi && OUT.setUi.controls) + ' controls (≤ 20)');

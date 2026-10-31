@@ -50,6 +50,33 @@
   // in a camera that is not the player's eye (the wow moment's composition, the director's shots, the arrival's moment)
   F.NEAR = 0.6;        // m from the camera: closer is not drawn
   F.camNear = (dx, dy, dz) => dx * dx + dy * dy + dz * dz < F.NEAR * F.NEAR;
+  // f-first3 (R55-04, critic_ux_v054_08_t60: a white-and-cyan ball ≈ 8–10 % of the frame at 0.86 m): in first person
+  // Funke's place keeps CLEAR_D from the eye and out of the view's centre third (|across / ahead| ≥ CLEAR_K — the
+  // centre third of a 16:9 frame at 70° is |across / ahead| < 0.415), so never between the eye and the aim point; the
+  // drone's 35 cm at 2.5 m is ≈ 0.6 % of the frame. eye [x, y, z], yaw, A the place (changed in place), side ±1 (the
+  // shoulder when it stands dead ahead). Pure: test/first3.js
+  F.CLEAR_D = 2.5; F.CLEAR_K = 0.6;
+  F.keepClear = function (eye, yaw, A, side) {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    const dx = A[0] - eye[0], dy = A[1] - eye[1], dz = A[2] - eye[2];
+    let ah = dx * fx + dz * fz, ac = dx * rx + dz * rz, up = dy;
+    if (ah > 0 && Math.abs(ac) < F.CLEAR_K * ah) ac = (ac > 0.02 ? 1 : ac < -0.02 ? -1 : (side || 1)) * F.CLEAR_K * ah;   // out of the centre third, to its side
+    let L = Math.sqrt(ah * ah + ac * ac + up * up);
+    if (L < 1e-3) { ac = side || 1; L = 1; }
+    if (L < F.CLEAR_D) { const k = F.CLEAR_D / L; ah *= k; ac *= k; up *= k; if (up > 1.2) { const h = Math.sqrt(Math.max(0, F.CLEAR_D * F.CLEAR_D - 1.44)), hl = Math.hypot(ah, ac) || 1; up = 1.2; ah = ah / hl * h; ac = ac / hl * h; if (Math.hypot(ah, ac) < 1e-3) ac = h * (side || 1); } }
+    A[0] = eye[0] + fx * ah + rx * ac; A[1] = eye[1] + up; A[2] = eye[2] + fz * ah + rz * ac;
+    return A;
+  };
+  // (the drawn place: the spring lags behind its place — when it trails into the view's centre third nearer than CLEAR_D, it
+  //  is not drawn there; pitch-aware: the third is ±0.256 of the forward distance up and down, ±0.415 across at 16:9 75°)
+  F.inAim = function (yaw, pitch, dx, dy, dz) {
+    const cp = Math.cos(pitch || 0), sp = Math.sin(pitch || 0), fx = -Math.sin(yaw) * cp, fy = sp, fz = -Math.cos(yaw) * cp, rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    const ah = dx * fx + dy * fy + dz * fz; if (ah <= 0 || dx * dx + dy * dy + dz * dz >= F.CLEAR_D * F.CLEAR_D * 0.81) return false;
+    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, ac = Math.abs(dx * rx + dz * rz), up = Math.abs(dx * ux + dy * uy + dz * uz);
+    return ac < 0.415 * ah && up < 0.256 * ah;
+  };
+  // the share of a 16:9 frame (vertical fov in degrees) a ball of size m covers at d m (its square box)
+  F.screenShare = (d, size, fov, aspect) => { const t = Math.tan((fov || 70) * Math.PI / 360), h = size / (2 * d * t), w = h / (aspect || 16 / 9); return h * w; };
   F.SPARK_NEAR = 2.5;  // m: the arrival sparkle only this far from the camera (critic_ux_16: the pale balls in the face)
   F.sparkOk = (dx, dy, dz) => dx * dx + dy * dy + dz * dz >= F.SPARK_NEAR * F.SPARK_NEAR;
   F.camHidden = (g) => !!(g && ((g.wow && g.wow.active) || (g.director && g.director.active) || (g.arrival && g.arrival.phase === 'moment')));
@@ -610,6 +637,18 @@ void main() {
         if (!blocked(mx, A[1], mz)) { A[0] = mx; A[2] = mz; }
         else { A[0] = P[0] - fx * 0.2; A[1] = P[1] + 2.3 + bob; A[2] = P[2] - fz * 0.2; if (this.solid(A[0], A[1], A[2])) { A[0] = hx - fx * 0.5; A[1] = hy + 0.1; A[2] = hz - fz * 0.5; } }
       }
+      // f-first3 (R55-04): first person — 2.5 m from the eye, out of the view's centre third (F.keepClear); where that place
+      // is in a block (a cave, a hall), the other side; else it stays (the 0.6 m cull still keeps it out of the face)
+      if (firstPerson && cam) {
+        const E = this.kcE || (this.kcE = [0, 0, 0]), Q = this.kcQ || (this.kcQ = [0, 0, 0]); E[0] = cam.x; E[1] = cam.y; E[2] = cam.z;
+        const free = (q) => !this.solid(q[0], q[1], q[2]) && !this.solid(q[0], q[1] + 0.3, q[2]) && !this.solid((q[0] + E[0]) / 2, (q[1] + E[1]) / 2, (q[2] + E[2]) / 2);
+        for (const sd of [1, -1]) {
+          Q[0] = A[0]; Q[1] = A[1]; Q[2] = A[2];
+          if (sd < 0) { Q[0] = 2 * E[0] - A[0]; Q[2] = 2 * E[2] - A[2]; const ah = (Q[0] - E[0]) * fx + (Q[2] - E[2]) * fz; Q[0] -= 2 * ah * fx; Q[2] -= 2 * ah * fz; }   // (the mirror across the view's axis: the other side, as far ahead)
+          F.keepClear(E, yaw, Q, sd);
+          if (free(Q)) { A[0] = Q[0]; A[1] = Q[1]; A[2] = Q[2]; break; }
+        }
+      }
     }
     // banking: roll from the sideways acceleration, pitch from the forward one; the yaw turns toward its look
     attitude(dt, T) {
@@ -982,6 +1021,7 @@ void main() {
       const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.32 * OPTS.scale / F.SCALE;   // (the rotors' reach; run 1's 0.5 drew it beside the first-person eye, out of the view)
       if (!m4.boxInFrustum(r.planes, dx - R0, dy - R0, dz - R0, dx + R0, dy + R0, dz + R0)) return;   // not seen: nothing at all
       if (!OPTS.baseMat && F.camNear(dx, dy, dz)) return;   // (f-hud: in the face — the spring caught up with the eye)
+      if (!OPTS.baseMat && (this.g.camMode | 0) === 0 && !(this.g.photoCam && this.g.photoCam.on) && F.inAim(cam.yaw, cam.pitch, dx, dy, dz)) return;   // (f-first3: the spring lagged into the aim — not drawn there)
       const prog = ent.beginVox(r, E);
       if (prog.u.u_clipNear) gl.uniform1f(prog.u.u_clipNear, 0);
       POSE.rotor_l[1] = this.spin; POSE.rotor_r[1] = -this.spin;
