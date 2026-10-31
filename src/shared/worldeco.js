@@ -895,7 +895,7 @@
   E.LANDMARK5 = { aqua: 'lighthouse', ocker: 'windcatcher', zinn: 'obelisk', basalt: 'observatory', opal: 'frostspire' };
   function townPlan(eco, site, Kit) {
     const g = eco.gen, F = site.y | 0, X = site.x, Z = site.z, kind = eco.kind;
-    const ground = (x, z) => g.surfaceY(x, z);
+    const GM = new Map(), ground = (x, z) => { const k = x * 65536 + z; let v = GM.get(k); if (v === undefined) GM.set(k, v = g.surfaceY(x, z)); return v; };   // (each column asked once)
     const seed = strHash(site.id + ':' + (eco.s >>> 0)) >>> 0;
     const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, town: true, x: X, y: F + 1, z: Z, seed, rad: 64, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z, r: 6 }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
     const W = writer(ground, F, Kit), put = W.put, pa = st(Kit.pave4[0]), pb = st(Kit.pave4[1]);
