@@ -82,6 +82,7 @@ const NAMES = [
   { de: 'Nachtmohn', en: 'Nightpoppy', role: 'livery', what: 'a dark ship livery with magenta lights (replaces „Nightwing", a DC Comics superhero and trademark)', checked: '2026-10-30', by: 'f-first', found: 'no game, ship skin, brand or toy of either spelling (WebSearch „Nachtmohn" OR „Night Poppy" game ship skin brand; „Nightpoppy")' },
   { de: 'Mittagsglanz', en: 'Noonglow', role: 'livery', what: 'a white ship livery with red and yellow stripes (replaces „Sunstrike": a trademark of a gaming company and a role-playing setting\'s name)', checked: '2026-10-30', by: 'f-first', found: 'no game or brand of either spelling (WebSearch „Mittagsglanz" OR „Nachtmohn" Spiel Marke; „Noonglow" game brand)' },
   { de: 'Karminflotte', en: 'Carmine Fleet', role: 'livery', what: 'a red ship livery (replaces „Crimson Fleet", a pirate faction of a 2023 space game)', checked: '2026-10-30', by: 'f-first', found: 'no game or brand of either spelling (WebSearch „Carmine Fleet" OR „Karminflotte" game)' },
+  { de: 'Leuchtpfad', en: 'Beacon Path', role: 'network', what: 'the gate network you travel by without piloting (e-portal: the Gate Temple\'s portal, 🌍 Reisen, K)', checked: '2026-10-31', by: 'e-portal', found: 'no game, app, toy or brand of either name; „Beacon Patrol" is a board game (a different word); the obvious „Sternentor" was not taken — it is the common German rendering of a film franchise\'s gate' },
 ];
 // the words that went: never again in a table, an item name or a string the game writes
 const RETIRED = [

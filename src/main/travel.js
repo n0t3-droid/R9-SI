@@ -269,7 +269,7 @@
     S.trip = null; S.armed = false;   // (arrived in a gate: it waits until you have stepped out)
     veilHide();
     const home = g.dim === homeDimOf(g);   // u-home: „wieder daheim" on the home's world
-    if (g.ui && g.ui.chatLine) g.ui.chatLine(T(home ? 'g.travel.home' : 'g.travel.arrived', { dim: Travel.dimName(g.dim) }), home ? '#9affd8' : '#9ad8ff');
+    if (trip.via !== 'portal' && g.ui && g.ui.chatLine) g.ui.chatLine(T(home ? 'g.travel.home' : 'g.travel.arrived', { dim: Travel.dimName(g.dim) }), home ? '#9affd8' : '#9ad8ff');   // e-portal: a journey by the Leuchtpfad says it in its caption
     if (trip.ride) S.ride = trip.ride;
     try { g.saveMeta(); } catch (e) { console.warn(e); }
   }

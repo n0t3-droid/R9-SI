@@ -1271,6 +1271,7 @@
       else if (VR.StoryPlay && VR.StoryPlay.holds(this)) { /* a-story: a scene of the story holds the view: the player stands (story.js) */ }
       else if (this.wow && this.wow.active) { /* a wow moment holds the view: the player stands (t-vista) */ }
       else if (this.arrival && this.arrival.holds()) { /* t-first: the arrival's veil holds the view (first.js) */ }
+      else if (VR.Portal && VR.Portal.holds(this)) { /* e-portal: the journey's film and reveal hold the player (portal.js) */ }
       else if (this.photoCam && this.photoCam.on) this.photoCam.update(dt, input);   // (t-first: 📷 the free camera glides, the player stands — photomode.js)
       else if (!this.ui.blocking || this.ui.screen === null) {
         // ✨ arrived in front of something new: the flight starts a moment later (the Studio's blocks are built by then)
@@ -1369,7 +1370,8 @@
       if (VR.Ferries && VR.Ferries.camOn) { const fc = VR.Ferries.cam(this, cam); if (fc) cam = fc; }   // a-life: the ferry ride's chase view (ferries.js)   // a-foes2: the freeing's swing over the land and back (any key: back now)
       if (VR.StoryPlay && VR.StoryPlay.holds(this)) { const sc = VR.StoryPlay.cam(this, cam); if (sc) cam = sc; }   // a-story: the scene's shots (story.js)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
-      if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }   // e-funke: the photo from Funke's spot
+      if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }
+      if (VR.Portal) { const pc = VR.Portal.cam(this, cam); if (pc) cam = pc; }   // e-portal: the journey's reveal, fast flight's wider view (portal.js)   // e-funke: the photo from Funke's spot
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
         const d = this.camMode === 1 ? 4 : -4, dir = p.lookDir();
         const ray = VR.PHYS.raycast((x, y, z) => w.getBlock(x, y, z), eye[0], eye[1], eye[2], -dir[0] * Math.sign(d), -dir[1] * Math.sign(d), -dir[2] * Math.sign(d), Math.abs(d));
