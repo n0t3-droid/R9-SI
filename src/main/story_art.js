@@ -388,7 +388,8 @@
       }
     } else if (kind === 'blink2') {
       // a far beacon in the sky: two blinks, then a pause (the 'here, here')
-      const x = w * 0.66, y = h * 0.28, ph0 = t % 2.2, on = (ph0 < 0.25 || (ph0 > 0.5 && ph0 < 0.75)) ? 1 : 0.12;
+      const x = w * 0.66, y = h * 0.28, ph0 = t % 2.2, on = (ph0 < 0.25 || (ph0 > 0.5 && ph0 < 0.75)) ? 1 : 0.3;
+      { const g1 = c.createLinearGradient(x, y, x, h * 0.95); g1.addColorStop(0, 'rgba(120,240,255,' + (0.35 * on) + ')'); g1.addColorStop(1, 'rgba(120,240,255,0)'); c.fillStyle = g1; c.fillRect(x - S0 * 0.006, y, S0 * 0.012, h * 0.95 - y); }   // (its light column down to the land)
       glow(c, x, y, S0 * 0.14 * on, '90,230,255', 0.55); glow(c, x, y, S0 * 0.025, '230,255,255', on);
       c.strokeStyle = 'rgba(180,250,255,' + (0.6 * on) + ')'; c.lineWidth = Math.max(1, S0 * 0.003); c.beginPath(); c.moveTo(x - S0 * 0.1 * on, y); c.lineTo(x + S0 * 0.1 * on, y); c.moveTo(x, y - S0 * 0.06 * on); c.lineTo(x, y + S0 * 0.06 * on); c.stroke();
     } else if (kind === 'twin') {

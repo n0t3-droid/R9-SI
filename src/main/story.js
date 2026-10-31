@@ -84,7 +84,10 @@
     let n = 1; try { const G = VR.Galaxy, N = G && G.build ? G.build((seed >>> 0) || 0x5eed) : null, st = N && N.list ? N.list[+m[1]] : null; n = st && st.bin && st.bin.close ? 2 : 1; } catch (e) { /* one sun */ }
     sunsC.set(key, n); return n;
   };
-  P.ctx3 = (g) => ({ suns: P.suns(g.dim, g.meta && g.meta.seed) });
+  P.ctx3 = function (g) {
+    const BS = VR.BodySky, L = BS && BS.cur && BS.cur.light, sd = L && (L.sunDir || L.sun);
+    return { suns: P.suns(g.dim, g.meta && g.meta.seed), sunUp: g.dim && g.dim !== 'overworld' && sd && sd.length === 3 ? sd[1] > 0.04 : undefined };   // (the sun over a strange world: BodySky's light)
+  };
 
   // a-story2: what the view sees for a deed (→ Story.actCheck): the angle and the distance to its target, the pitch, the
   // height, the moon, the eclipse, the ground (the frame's camera: on foot, in a ship, in the photo mode alike)

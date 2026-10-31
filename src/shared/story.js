@@ -91,7 +91,7 @@
       scene: { shots: [{ cam: 'wide', target: 'player', dur: 6, fx: 'embers' }, { cam: 'up', target: 'amarant', dur: 6, fx: 'embers', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'wide' },
       who: ['funke:surprised', 'solgani:happy', 'solgani', 'funke:worried', 'solgani:happy'], task: { kind: 'go', target: 'village' }, reward: { xp: 90 }, act: { kind: 'look', target: 'village', dim: ['zinn'], max: 400, cone: 16, hold: 1.5 } }),
     B(5, 2, { when: { after: 'c5.b1', adv: true, dim: ['zinn'], near: { village: 90 } },
-      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'orbit', target: 'village', dur: 7, fx: 'song', swell: true }, { cam: 'shoulder', target: 'village', dur: 6 }], music: 'rise' },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'wide', target: 'village', dur: 7, fx: 'song', swell: true }, { cam: 'shoulder', target: 'village', dur: 6 }], music: 'rise' },
       who: ['funke:surprised', 'solgani', 'funke:surprised', 'solgani:worried'], task: { kind: 'listen', target: 'village' }, reward: { xp: 110 }, act: { kind: 'scan', target: 'village', dim: ['zinn'], max: 200, cone: 22 } }),
     B(5, 3, { when: { after: 'c5.b2', adv: true, dim: ['zinn'] },
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 7, fx: 'hum' }, { cam: 'wide', target: 'player', dur: 6 }, { cam: 'up', target: 'amarant', dur: 6, swell: true }], music: 'tense' },
@@ -113,14 +113,14 @@
     BV(7, 2, { when: { after: 'c7.b1', adv: true, dim: ['stn.*'] }, vary: 'c6',
       scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'window', target: 'window', dur: 9, fx: 'beacons', swell: true }, { cam: 'close', target: 'funke', dur: 7 }], music: 'wide' },
       alt: { wellari: ['funke:surprised', 'anselm:happy', 'funke:surprised', 'anselm'], lumi: ['funke:surprised', 'lumi:surprised', 'anselm:happy', 'anselm'] }, task: { kind: 'jump', target: 'star' }, reward: { xp: 160 }, act: { kind: 'photo', target: 'window', dim: ['stn.*'] } }),
-    B(7, 3, { when: { after: 'c7.b2', adv: true, dim: ['x.*'] },
+    B(7, 3, { when: { after: 'c7.b2', adv: true, dim: ['x.*'], sun: true },
       scene: { shots: [{ cam: 'wide', target: 'player', dur: 6 }, { cam: 'up', target: 'sky', dur: 7, fx: 'blink2', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'wide' },
       who: ['funke:surprised', 'anselm', 'funke:worried', 'funke:happy'], task: { kind: 'jump', target: 'binary' }, reward: { xp: 150 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 25 } }),
     // 8 · Zwei Sonnen — the Regoli who stayed to wait; the answer, given by the helper you chose; the beam to the nebula
-    B(8, 1, { when: { after: 'c7.b3', adv: true, dim: ['x.*'], suns: 2 },
+    B(8, 1, { when: { after: 'c7.b3', adv: true, dim: ['x.*'], suns: 2, sun: true },
       scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'twin' }, { cam: 'up', target: 'sky', dur: 6, swell: true }, { cam: 'close', target: 'funke', dur: 5 }], music: 'wide' },
       who: ['funke:surprised', 'selkatun:happy', 'selkatun'], task: { kind: 'go', target: 'village' }, reward: { xp: 120 }, act: { kind: 'look', target: 'village', dim: ['x.*'], max: 400, cone: 18, hold: 1.5 } }),
-    BV(8, 2, { when: { after: 'c8.b1', adv: true, dim: ['x.*'], suns: 2 }, vary: 'c6',
+    BV(8, 2, { when: { after: 'c8.b1', adv: true, dim: ['x.*'], suns: 2, sun: true }, vary: 'c6',
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'orbit', target: 'player', dur: 6, fx: 'song', swell: true }, { cam: 'wide', target: 'vista', dur: 6, fx: 'twin' }], music: 'rise' },
       alt: { wellari: ['funke', 'ariveli:happy', 'funke:surprised', 'selkatun:surprised'], lumi: ['lumi', 'lumi:happy', 'funke:surprised', 'selkatun:surprised'] }, task: { kind: 'wait', target: 'sunset' }, reward: { xp: 180 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 3 } }),
     B(8, 3, { when: { after: 'c8.b2', adv: true, dim: ['x.*'], suns: 2 },
@@ -190,6 +190,7 @@
     if (w.orbit && !ctx.orbit) return 'orbit';
     if (w.eclipse && !((ctx.eclipse || 0) >= w.eclipse)) return 'eclipse';
     if (w.suns && !((ctx.suns || 1) >= w.suns)) return 'suns';
+    if (w.sun && ctx.sunUp === false) return 'sun';   // a-story3: a beat under a strange sun plays by day (unknown: no rule)
     return null;
   };
   // a-story3: a dim list may hold patterns — 'stn.*' (a station), 'x.*' (a world of another star)

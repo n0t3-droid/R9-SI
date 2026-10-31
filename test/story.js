@@ -381,6 +381,7 @@ console.log('13 · a-story3: chapters 5–8 written in full');
   check(S.why(S.byId('c7.b3'), calm({ dim: 'stn.ring' }), r7) === 'dim' && S.why(S.byId('c7.b3'), calm({ dim: 'x.3.1.ocker' }), r7) === null, 'c7.b3 at another star (x.*)');
   S.mark(r7, 'c7.b3');
   check(S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 1 }), r7) === 'suns' && S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2 }), r7) === null, 'chapter 8 under two suns (a close double star)');
+  check(S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2, sunUp: false }), r7) === 'sun' && S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2, sunUp: true }), r7) === null, 'two suns are seen by day: c8.b1 waits for the morning');
   const junk = S.load({ v: 1, beats: {}, choices: { c6: 'pirates', c9: 'lumi', x: 1 } });
   check(JSON.stringify(junk.choices) === '{}' && JSON.stringify(S.load({ v: 1, beats: {} }).choices) === '{}', 'the record sanitises the choices (an old world: none)');
   // never during building: 3,000 random contexts on 5–8 (and the choice card)
