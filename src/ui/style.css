@@ -265,3 +265,7 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 #wbanner.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 #wbanner.off { opacity: 0; transform: translate(-50%, -50%) scale(1.04); transition: opacity .7s ease-in, transform .7s ease-in; }
 #wcompass { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: none; padding: 4px 13px; border-radius: 14px; background: rgba(8, 12, 28, .5); border: 1px solid rgba(255, 220, 150, .35); color: #ffe7a6; font-family: var(--font); font-weight: 700; font-size: 15px; letter-spacing: .3px; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+
+/* u-folk2: a villager's icon bubble (♪ ♥ ! ☆ ✿) — small and round, no name (folkjoy.js; villages.js updateBubbles) */
+.vbub.ico { padding: 2px 9px 4px; border-radius: 16px; min-width: 14px; text-align: center; }
+.vbub.ico i { font: 700 17px/1.2 var(--display), sans-serif; font-style: normal; color: #d0406a; }

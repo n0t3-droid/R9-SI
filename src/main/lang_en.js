@@ -3757,5 +3757,15 @@
     "g.town.rewardAdv": "For the climb: +{xp} XP, +{t} Heliataler",
     "g.town.again": "The view is as lovely as the first time.",
     // ---- u-worlds5 end
+    // ---- u-folk2 (folkjoy.js: the inhabitants' warm moments)
+    "g.joy.forYouFlower": "For you – a flower!",
+    "g.joy.forYouSnack": "Fancy something tasty?",
+    "g.joy.dance": "Will you dance with us? ♪",
+    "g.joy.hide": "Play hide-and-seek? Find me!",
+    "g.joy.found": "You found me! Hehe!",
+    "g.joy.here": "Here I am!",
+    "g.joy.enjoy": "Enjoy!",
+    "g.joy.danceThanks": "That was lovely – thank you!",
+    // ---- u-folk2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

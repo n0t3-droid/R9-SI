@@ -443,6 +443,12 @@
   } });
   def('point', { len: 1, loop: false, tracks: { arm_r: [[0, 1.5, 0, 0.05]], fore_r: [[0, 0, 0, 0]], head: [[0, 0.05, 0.1, 0]] } });
   def('carry', { len: 1, loop: false, tracks: { arm_l: [[0, 0.55, 0, 0.05]], arm_r: [[0, 0.55, 0, -0.05]], fore_l: [[0, 1.3, 0, 0.1]], fore_r: [[0, 1.3, 0, -0.1]] } });
+  // u-folk2 (folkjoy.js): applause for the player's build — the hands meet before the chest, three claps a second
+  // (+rz brings the left arm in, −rz the right); a gasp — both hands up to the cheeks, the chest back a little; give —
+  // the right hand held out, palm up, something offered
+  def('clap', { len: 0.36, loop: true, tracks: { arm_l: [[0, 0.95, 0, 0.12], [0.18, 0.95, 0, 0.32], [0.36, 0.95, 0, 0.12]], arm_r: [[0, 0.95, 0, -0.12], [0.18, 0.95, 0, -0.32], [0.36, 0.95, 0, -0.12]], fore_l: [[0, 0.95, 0, 0.2], [0.18, 0.95, 0, 0.45], [0.36, 0.95, 0, 0.2]], fore_r: [[0, 0.95, 0, -0.2], [0.18, 0.95, 0, -0.45], [0.36, 0.95, 0, -0.2]], head: [[0, 0.08, 0, 0]] } });
+  def('gasp', { len: 1, loop: false, tracks: { arm_l: [[0, 0.75, 0, 0.3]], arm_r: [[0, 0.75, 0, -0.3]], fore_l: [[0, 1.9, 0, 0.35]], fore_r: [[0, 1.9, 0, -0.35]], body: [[0, 0.07, 0, 0]], head: [[0, 0.12, 0, 0]] } });
+  def('give', { len: 1, loop: false, tracks: { arm_r: [[0, 1.05, 0, 0.06]], fore_r: [[0, 0.35, -0.6, 0]], hand_r: [[0, -0.2, 0, 0]], arm_l: [[0, 0.04, 0, -0.12]], fore_l: [[0, 0.25, 0, 0]], head: [[0, -0.12, 0, 0]], body: [[0, -0.04, 0, 0]] } });
 
   // ------------------------------------------------------------------ the player: per-agent state with crossfades
   // a.anim = { cur, t, prev, prevT, fade } ; the base is the walk cycle (by walkAmt) blended with the state clip

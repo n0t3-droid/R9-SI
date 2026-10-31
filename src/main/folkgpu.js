@@ -299,6 +299,10 @@ void main() {
   vec3 V = normalize(-v_rel);
   float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0);
   col += (u_skyHorizon * 0.5 + lc * 0.08) * rim * 0.22 * sk * alb;
+  // u-folk2: a soft warm rim where the sun stands behind the person (the golden edge of a cartoon film's people against
+  // the light) — a few ALU, the smooth people only (Echte Menschen: off on Very Low and Low)
+  float back = smoothstep(0.1, 0.9, dot(L, -V));
+  col += lc * (0.35 + 0.65 * alb) * rim * back * 0.55 * outdoor * sun;
   col += lc * pow(max(dot(n, normalize(L + V)), 0.0), 28.0) * 0.05 * outdoor;
   col = mix(col, alb * 2.2, em);
   col = mix(col, vec3(1.0, 0.2, 0.15), v_light.z * 0.6);
