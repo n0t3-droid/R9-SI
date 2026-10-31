@@ -534,34 +534,35 @@ try {
 const errs = logs.filter(l => l.startsWith('[pageerror]'));
 check(!errs.length, 'no page error' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
 if (logs.length) console.log('     logs: ' + logs.slice(0, 6).join(' | ').slice(0, 1200));
-// the sheet
-try {
-  const P0 = N.pics, rows = [];
-  const add = (label, names) => { const imgs = names.map(n => P0[n]).filter(Boolean); if (imgs.length) rows.push({ label, imgs }); };
-  add('1 · Funke wacht auf — das Angebot, die Szene, das Wegstück', ['c1_offer', 'c1_funke_wakes', 'c1_way']);
-  add('2 · der Lichtring · 3 · das Leuchtfeuer der Ringstation über dem Rand', ['c2_light_ring', 'c3_station_beacon']);
-  add('4 · der Eiswächter unter dem Eis · Amarant verschluckt Helia', ['c4_warden', 'c4_eye', 'c4_eclipse']);
-  add('5 · das Tagebuch', ['journal_chapter']);
-  add('a-story3 · 5 Zinnober: das Lied · 6 Aquamarin: Opas Notizen · die Entscheidung', ['c5_song', 'c6_notes', 'c6_choice']);
-  add('a-story3 · 7 das Fenster der Ringstation · der fremde Stern · 8 zwei Sonnen · der Strahl', ['c7_window', 'c7_blink', 'c8_twin', 'c8_beam']);
-  fs.writeFileSync(ROOT + '.tmp_tests/story_sheet.json', JSON.stringify({ w: 620, rows }));
-  execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story_sheet.jpg', ROOT + '.tmp_tests/story_sheet.json']);
-  console.log('     sheet test/shots/story_sheet.jpg');
-  const r3 = [];
-  const add3 = (label, names) => { const imgs = names.map(n => P0[n]).filter(Boolean); if (imgs.length) r3.push({ label, imgs }); };
-  add3('Kapitel 5 · Zinnober — das gläserne Leuchtfeuer singt · Kapitel 6 · Aquamarin — Opa Anselms Notizen', ['c5_song', 'c6_notes']);
-  add3('Kapitel 6 · die Entscheidung (wer hilft dir?) · Kapitel 7 · das Fenster der Ringstation: die Leuchtfeuer sind ein Pfeil', ['c6_choice', 'c7_window']);
-  add3('Kapitel 7 · der fremde Stern: ein Leuchtfeuer blinkt zweimal · Kapitel 8 · zwei Sonnen · der Strahl zum Nebel', ['c7_blink', 'c8_twin', 'c8_beam']);
-  const r4 = [];
-  const add4 = (label, names) => { const imgs = names.map(n => P0[n]).filter(Boolean); if (imgs.length) r4.push({ label, imgs }); };
-  add4('a-story3s offene Punkte · c5 das Lied (Weitwinkel) · c7 das Fenster: 3-D-Strahlen · c8 zwei Sonnen am Tag', ['c5_song', 'c7_window', 'c8_twin']);
-  add4('Kapitel 9 · Im Nebel — von innen · Flimmi, der Stern, der geboren wird', ['c9_nebula', 'c9_flimmi']);
-  add4('Kapitel 10 · Die geduldige Sonne — Dumarin · der Strahl zeigt heim', ['c10_red', 'c10_beam']);
-  add4('Kapitel 11 · Echo und die fünf Völker · der Plan · das selbst gebaute Leuchtfeuer · Echo erwacht', ['c11_echo', 'c11_plan', 'c11_built', 'c11_wake']);
-  add4('Kapitel 12 · Heimkehr · jedes Leuchtfeuer auf einmal · der Himmel · der Epilog', ['c12_home', 'c12_finale', 'c12_sky', 'c12_epilogue']);
-  if (r4.length) { fs.writeFileSync(ROOT + '.tmp_tests/story4_sheet.json', JSON.stringify({ w: 620, rows: r4 })); execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story4_sheet.jpg', ROOT + '.tmp_tests/story4_sheet.json']); console.log('     sheet test/shots/story4_sheet.jpg'); }
-  if (r3.length) { fs.writeFileSync(ROOT + '.tmp_tests/story3_sheet.json', JSON.stringify({ w: 620, rows: r3 })); execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story3_sheet.jpg', ROOT + '.tmp_tests/story3_sheet.json']); console.log('     sheet test/shots/story3_sheet.jpg'); }
-} catch (e) { console.log('  (the sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
+// the sheet (a-story5: each sheet in its own try — a missing earlier shot never costs the later sheets)
+const P0 = N.pics || {};
+const sheet = (file, rows0) => {
+  try {
+    const rows = rows0.map(([label, names]) => ({ label, imgs: names.map(n => P0[n]).filter(f => f && fs.existsSync(f)) })).filter(r => r.imgs.length);
+    if (!rows.length) { console.log('     (sheet ' + file + ': no pictures)'); return; }
+    fs.writeFileSync(ROOT + '.tmp_tests/' + file + '.json', JSON.stringify({ w: 620, rows }));
+    execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + file + '.jpg', ROOT + '.tmp_tests/' + file + '.json']);
+    console.log('     sheet test/shots/' + file + '.jpg');
+  } catch (e) { console.log('  (the sheet ' + file + ': ' + String(e.message || e).slice(0, 200) + ')'); }
+};
+sheet('story_sheet', [
+  ['1 · Funke wacht auf — das Angebot, die Szene, das Wegstück', ['c1_offer', 'c1_funke_wakes', 'c1_way']],
+  ['2 · der Lichtring · 3 · das Leuchtfeuer der Ringstation über dem Rand', ['c2_light_ring', 'c3_station_beacon']],
+  ['4 · der Eiswächter unter dem Eis · Amarant verschluckt Helia', ['c4_warden', 'c4_eye', 'c4_eclipse']],
+  ['5 · das Tagebuch', ['journal_chapter']],
+  ['a-story3 · 5 Zinnober: das Lied · 6 Aquamarin: Opas Notizen · die Entscheidung', ['c5_song', 'c6_notes', 'c6_choice']],
+  ['a-story3 · 7 das Fenster der Ringstation · der fremde Stern · 8 zwei Sonnen · der Strahl', ['c7_window', 'c7_blink', 'c8_twin', 'c8_beam']]]);
+sheet('story3_sheet', [
+  ['Kapitel 5 · Zinnober — das gläserne Leuchtfeuer singt · Kapitel 6 · Aquamarin — Opa Anselms Notizen', ['c5_song', 'c6_notes']],
+  ['Kapitel 6 · die Entscheidung (wer hilft dir?) · Kapitel 7 · das Fenster der Ringstation: die Leuchtfeuer sind ein Pfeil', ['c6_choice', 'c7_window']],
+  ['Kapitel 7 · der fremde Stern: ein Leuchtfeuer blinkt zweimal · Kapitel 8 · zwei Sonnen · der Strahl zum Nebel', ['c7_blink', 'c8_twin', 'c8_beam']]]);
+const R4 = [
+  ['Kapitel 9 · Im Nebel — von innen · Flimmi, der Stern, der geboren wird', ['c9_nebula', 'c9_flimmi']],
+  ['Kapitel 10 · Die geduldige Sonne — Dumarin · der Strahl zeigt heim', ['c10_red', 'c10_beam']],
+  ['Kapitel 11 · Echo und die fünf Völker · der Plan · das selbst gebaute Leuchtfeuer · Echo erwacht', ['c11_echo', 'c11_plan', 'c11_built', 'c11_wake']],
+  ['Kapitel 12 · Heimkehr · jedes Leuchtfeuer auf einmal · der Himmel · der Epilog', ['c12_home', 'c12_finale', 'c12_sky', 'c12_epilogue']]];
+sheet('story4_sheet', [['a-story3s offene Punkte · c5 das Lied (Weitwinkel) · c7 das Fenster: 3-D-Strahlen · c8 zwei Sonnen am Tag', ['c5_song', 'c7_window', 'c8_twin']]].concat(R4));
+sheet('story5_sheet', [['a-story5 · das Fenster: der Pfeil der Leuchtfeuer', ['c7_window']]].concat(R4));
 save();
 await browser.close();
 console.log((fails ? 'FAILED ' + fails : 'ALL OK') + ' (' + secs() + ')');
