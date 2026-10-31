@@ -311,6 +311,7 @@
   // ---------------------------------------------------------------- fast flight
   function flyTick(g, dt) {
     const p = g.player, FL = M.fly, input = g.input; if (!p) return;
+    if (FL.p !== p) { FL.p = p; FL.lastSet = null; FL.slow = 0; }   // (a new world, a new player: nothing of the last one's speed is taken for a /fly)
     const ctx = ctxOf(g), ok = C.fastOk(ctx), S = g.settings || {};
     let chosen = Math.max(1, Math.min(C.FLY_MAX, S.flyFast | 0 || 1));
     if (ok && p.flying && p.sprinting && input && input.mouse && input.mouse.wheel && !(g.ui && (g.ui.screen || g.ui.typing))) {
@@ -321,7 +322,7 @@
     const mul = C.flyMul(chosen, ctx, pend);
     if (ok) {
       if (FL.lastSet !== null && p.flySpeed !== FL.lastSet) {   // /fly: the command's speed becomes the setting (a slow one is kept)
-        if (p.flySpeed < 1) FL.slow = p.flySpeed; else { FL.slow = 0; S.flyFast = Math.max(1, Math.min(C.FLY_MAX, Math.round(p.flySpeed))); }
+        if (p.flySpeed < 1) { FL.slow = p.flySpeed; S.flyFast = 1; } else { FL.slow = 0; S.flyFast = Math.max(1, Math.min(C.FLY_MAX, Math.round(p.flySpeed))); }
       } else p.flySpeed = chosen === 1 && FL.slow ? FL.slow : mul;
       FL.lastSet = p.flySpeed;
       const capped = mul < chosen && p.flying; if (capped && !FL.capped) pill(T('g.pt.slow')); FL.capped = capped;

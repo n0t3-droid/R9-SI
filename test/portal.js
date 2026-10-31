@@ -134,6 +134,42 @@ console.log('f · fast flight');
   check(P.step(1, -1) === 2 && P.step(8, -1) === 8 && P.step(1, 1) === 1 && P.step(4, 1) === 3, 'the wheel steps the speed');
 }
 
+console.log('h · fast flight in the game (portal.js on a stand-in game)');
+{
+  global.performance = global.performance || { now: () => Date.now() };
+  global.requestAnimationFrame = global.requestAnimationFrame || (() => 0);
+  V.Game = class { playFrame() { this.played = (this.played || 0) + 1; } };
+  V.UI = V.UI || class {};
+  for (const f of ['portal_film', 'portal']) require(path.join(__dirname, '..', 'src', 'main', f + '.js'));
+  const Po = V.Portal;
+  check(!!Po && typeof Po.cam === 'function', 'VR.Portal loads (no page: no DOM is touched)');
+  const mk = (o) => { const g = new V.Game(); Object.assign(g, { state: 'play', meta: {}, dim: 'overworld', ui: {}, settings: { flyFast: 8, fov: 75 }, mp: { role: null }, input: { mouse: { wheel: 0 } }, world: { pending: new Map(), getBlock: () => 0 }, player: { mode: 'creative', flying: true, sprinting: true, flySpeed: 1, vel: [0, 0, 0], pos: [0.5, 70, 0.5] } }, o || {}); return g; };
+  const run = (g, n) => { for (let i = 0; i < (n || 3); i++) g.playFrame(1 / 60); return g.player.flySpeed; };
+  check(run(mk()) === 8 && mk().playFrame && true, 'Kreativ, alone, ×8 chosen: the player flies ×8');
+  { const g = mk(); g.mp.role = 'host'; check(run(g) === 1, 'as a multiplayer host: ×1'); }
+  { const g = mk(); g.mp.role = 'client'; check(run(g) === 1, 'as a guest: ×1'); }
+  { const g = mk(); g.player.mode = 'survival'; check(run(g) === 1, 'Überleben: ×1'); }
+  { V.Adventure = { on: () => true }; const g = mk(); check(run(g) === 1, 'Abenteuer: ×1'); delete V.Adventure; }
+  { const g = mk(); for (let i = 0; i < 300; i++) g.world.pending.set(i, true); check(run(g) === 2, 'the land can\'t keep up (300 chunks waiting): the soft cap ×2'); }
+  { const g = mk(); g.settings.flyFast = 2; run(g); g.input.mouse.wheel = -1; run(g, 1); check(g.settings.flyFast === 3 && g.input.mouse.wheel === 0 && run(g) === 3, 'the wheel while flying fast: ×2 → ×3 (the hotbar does not see it)'); }
+  { const g = mk(); g.player.sprinting = false; g.settings.flyFast = 2; run(g); g.input.mouse.wheel = -1; run(g, 1); check(g.settings.flyFast === 2 && g.input.mouse.wheel === -1, 'without sprint the wheel stays the hotbar\'s'); }
+  { const g = mk(); g.settings.flyFast = 1; run(g); g.player.flySpeed = 5; run(g, 1); check(g.settings.flyFast === 5 && run(g) === 5, '/fly 5 becomes the setting'); g.player.flySpeed = 0.5; run(g, 1); check(run(g) === 0.5, '/fly 0.5 (slow, for building) is kept'); }
+  { const g = mk(); g.player.vel = [180, 0, 0]; for (let i = 0; i < 200; i++) g.playFrame(1 / 30); const c = Po.cam(g, { fov: 1.3, y: 0, yaw: 0, pitch: 0 }); check(c && c.fov > 1.3 + 0.1 && c.fov < 1.3 + 0.21, 'at speed the view widens: +' + (c ? ((c.fov - 1.3) * 180 / Math.PI).toFixed(1) : '?') + '°'); }
+  { const g = mk(); g.player.vel = [180, 0, 0]; g.settings.lessMotion = true; V.A11y = V.A11y || { less: (s) => !!(s && s.lessMotion) }; for (let i = 0; i < 100; i++) g.playFrame(1 / 30); check(!Po.cam(g, { fov: 1.3 }), 'Weniger Bewegung: no widening'); }
+}
+
+console.log('i · the film\'s cost (a counting stand-in for the 2D canvas)');
+{
+  const F = V.PortalFilm, C = P;
+  const counter = () => { const n = { ops: 0, px: 0 }; const grad = { addColorStop() {} }; const X = new Proxy({}, { get: (o, k) => { if (k === '__n') return n; if (k in o) return o[k]; if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => { n.ops++; return grad; }; if (k === 'fillRect') return (x, y, w, h) => { n.ops++; n.px += Math.abs(w * h); }; return () => { n.ops++; }; }, set: (o, k, v) => { o[k] = v; return true; } }); return X; };
+  const film = C.film(C.rec({}), 7, 'overworld', 'opal');
+  const cost = (low, W, H) => { const X = counter(), Pl = F.make(Object.assign({}, film, { low }), ['#fff', '#cde', '#123'], ['#fff', '#ffc978', '#3b2a5c'], { to: 'opal', from: 'overworld', kind: 'moon' }); let worst = 0, sum = 0; for (let i = 0; i < 60; i++) { const n0 = X.__n.ops; Pl.draw(X, W, H, (i + 0.5) / 60 * Pl.len); const d = X.__n.ops - n0; worst = Math.max(worst, d); sum += d; } return { avg: sum / 60, worst, px: X.__n.px / 60 }; };
+  const hi = cost(false, 960, 540), lo = cost(true, 512, 288);
+  console.log('    High: ' + hi.avg.toFixed(0) + ' draw calls a frame (worst ' + hi.worst + '), ' + (hi.px / 1e6).toFixed(2) + ' Mpx filled · Very Low: ' + lo.avg.toFixed(0) + ' (worst ' + lo.worst + '), ' + (lo.px / 1e6).toFixed(2) + ' Mpx');
+  check(lo.avg <= hi.avg * 0.7 && lo.px <= hi.px * 0.4, 'Very Low: fewer draw calls and a third of the pixels');
+  check(hi.worst < 1000, 'the film\'s worst frame is bounded (' + hi.worst + ' draw calls)');
+}
+
 console.log('g · the texts');
 {
   const I = V.I18N, de = I.dict.de, en = I.dict.en;
