@@ -111,8 +111,8 @@
     }
     return best;
   };
-  N.cam = function (g, cam) {
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now(), dt = Math.min(0.1, Math.max(0, (now - (PS.t || now)) / 1000)); PS.t = now;
+  N.cam = function (g, cam, fdt) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now(), dt = fdt > 0 ? Math.min(0.1, fdt) : Math.min(0.1, Math.max(0, (now - (PS.t || now)) / 1000)); PS.t = now;
     const V = g.villages, pc = g.photoCam;
     let a = null;
     if (pc && pc.on && pc.s) a = N.photoTarget(g, pc.s);
