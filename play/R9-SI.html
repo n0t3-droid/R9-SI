@@ -74858,11 +74858,17 @@ this.maskF=null;this.maskTexF=null;this.maskTex1=null;
 
 setFar(r1){if(this.far)this.far.setRadius(r1);}
 farOn(){return!!(this.far&&this.far.on());}
+
+
+
+
+static focusD(F,L,tx,tz){if(!F)return Infinity;const S=tileSize(L),x0=tx*S,z0=tz*S;return Math.hypot(Math.max(x0-F[0],0,F[0]-(x0+S)),Math.max(z0-F[1],0,F[1]-(z0+S)));}
+static prio(d,L,fd){const S=tileSize(L);return d/S-L*0.6-(fd<S?Horizon.FOCUS_K:0);}
 static radiusFor(level){return RADII[Math.max(0,Math.min(4,level|0))];}
 setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level];if(r!==this.radius){this.radius=r;}}
 key(L,tx,tz){return L+':'+tx+':'+tz;}
 free(t){const gl=this.g.renderer.gl;if(t.vao){gl.deleteVertexArray(t.vao);gl.deleteBuffer(t.vbo);gl.deleteBuffer(t.ibo);t.vao=null;this.bytes-=t.bytes||0;t.bytes=0;}}
-reset(){for(const t of this.tiles.values())this.free(t);this.tiles.clear();this.drawList.length=0;this.inflight=0;this.bytes=0;if(this.far)this.far.reset();}
+reset(){for(const t of this.tiles.values())this.free(t);this.tiles.clear();this.drawList.length=0;this.inflight=0;this.bytes=0;this.focus=null;if(this.far)this.far.reset();}
 
 
 
@@ -74880,6 +74886,8 @@ if(!this.maskTex){const gl=r.gl;this.maskTex=VR.GL.tex2D(64,64,gl.R8,gl.RED,gl.U
 if(!this.sentAvg&&g.tex&&g.tex.avgColor){g.pool.broadcast({type:'lodinit',avg:g.tex.avgColor});this.sentAvg=true;}
 const wk=w.seed+':'+(w.genOpts&&w.genOpts.worldType||'')+':'+(w.genOpts&&w.genOpts.vgen||1);
 if(wk!==this.worldKey){this.reset();this.worldKey=wk;}
+
+{const av=(g.arrival&&g.arrival.v)||(g.arrivalPending&&g.arrivalPending.vista);if(av&&Array.isArray(av.aim)&& !this.focus){this.focus=[av.aim[0],av.aim[2]];this.focusAt=performance.now();}if(this.focus&&performance.now()-this.focusAt>Horizon.FOCUS_MS)this.focus=null;}
 
 
 if(w!==this.qWorld){if(this.qWorld)this.dropQueued();this.qWorld=w;}
@@ -74936,8 +74944,9 @@ this.stats.coarse=topN?topOk/topN:1;
 const maxInflight=4+g.pool.workers.length*2;
 let asked=0;
 if(want.length&&this.inflight<maxInflight){
-want.sort((p,q)=>(p[0]/tileSize(p[1])-p[1]*0.6)-(q[0]/tileSize(q[1])-q[1]*0.6));
-for(const[d,L,tx,tz]of want){if(this.inflight>=maxInflight)break;if(!this.tiles.has(this.key(L,tx,tz))){this.request(L,tx,tz,d);asked++;}}
+const fo=this.focus;for(const w of want)w[4]=Horizon.prio(w[0],w[1],Horizon.focusD(fo,w[1],w[2],w[3]));
+want.sort((p,q)=>p[4]-q[4]);
+for(const[d,L,tx,tz,k]of want){if(this.inflight>=maxInflight)break;if(!this.tiles.has(this.key(L,tx,tz))){this.request(L,tx,tz,d,k);asked++;}}
 }
 this.stats.want=want.length-asked;this.stats.done=done;
 
@@ -74952,7 +74961,8 @@ if(far1&&this.bytes+this.far.set.bytes>capB*0.92)this.far.evict(capB*0.92-this.b
 }
 this.stats.tiles=this.tiles.size;this.stats.mb=this.bytes/1048576;
 }
-request(L,tx,tz,d){
+request(L,tx,tz,d,k){
+if(!Number.isFinite(k))k=Horizon.prio(d,L,Infinity);
 const g=this.g,key=this.key(L,tx,tz),S=tileSize(L);
 const t={L,tx,tz,S,x0:tx*S,z0:tz*S,state:0,used:this.frame,empty:false};
 this.tiles.set(key,t);
@@ -74974,7 +74984,7 @@ if(w&&w.uploadQ&& !t.queued){
 t.queued=true;
 
 const P=Horizon.parted(g.renderer.gl,m),mine=()=>this.tiles.get(key)===t&& !t.vao;
-w.uploadQ.push({key:null,col:undefined,lane:1,prio:d/S-L*0.6,x:t.x0+S/2,z:t.z0+S/2,bytes:P.bytes,
+w.uploadQ.push({key:null,col:undefined,lane:1,prio:k,x:t.x0+S/2,z:t.z0+S/2,bytes:P.bytes,
 alive:()=>mine()&&this.frame-t.used<=120,
 abort:()=>{P.abort();if(mine())this.tiles.delete(key);},
 step:P.step,
@@ -74983,7 +74993,7 @@ run:()=>{if(mine())this.put(t,m,S);}});
 return;
 }
 this.put(t,m,S);
-},d/S-L*0.6);
+},k);
 }
 
 
@@ -75134,6 +75144,7 @@ r.stats.draws+=n;r.stats.tris+=tris;
 farPlane(){return this.enabled()?this.radius+400:0;}
 destroy(){this.reset();}
 }
+Horizon.FOCUS_K=10;Horizon.FOCUS_MS=300000;
 VR.Horizon=Horizon;
 })(VR);
 
@@ -102843,8 +102854,9 @@ W.puffGrain=function(cx,cy,seed){const G=W.PUFF.grain,v=Math.sin(cx*12.9898+cy*7
 
 
 
-W.MURM_FAR=[60,240];W.MURM_FAR_MIN=0.22;W.MURM_QUIET=60;W.MURM_FADE=30;W.MURM_TAU_MAX=1.4;
-W.murmFar=function(d){const F=W.MURM_FAR;if(d<=F[0])return 1;if(d>=F[1])return W.MURM_FAR_MIN;const t=(d-F[0])/(F[1]-F[0]);return 1+(W.MURM_FAR_MIN-1)*t*t*(3-2*t);};
+W.MURM_PALE=[60,240];W.MURM_FAR_MIN=0.22;W.MURM_QUIET=60;W.MURM_FADE=30;W.MURM_TAU_MAX=1.4;W.MURM_ASIDE=60;
+W.murmFar=function(d){const F=W.MURM_PALE;
+if(d<=F[0])return 1;if(d>=F[1])return W.MURM_FAR_MIN;const t=(d-F[0])/(F[1]-F[0]);return 1+(W.MURM_FAR_MIN-1)*t*t*(3-2*t);};
 
 
 
@@ -102972,6 +102984,18 @@ rays:true,
 
 
 
+
+
+
+W.stageAside=function(st,sp,yaw,minDeg){
+const dx=st.x-sp[0],dz=st.z-sp[2],l=Math.hypot(dx,dz);if(!(l>1e-6))return st;
+const fx= -Math.sin(yaw),fz= -Math.cos(yaw),rx=Math.cos(yaw),rz= -Math.sin(yaw),m=minDeg*Math.PI/180;
+const a=Math.atan2(dx*rx+dz*rz,dx*fx+dz*fz);
+if(Math.abs(a)>=m)return st;
+const b=(a>=0?1: -1)*m,cb=Math.cos(b)*l,sb=Math.sin(b)*l;
+st.x=sp[0]+fx*cb+rx*sb;st.z=sp[2]+fz*cb+rz*sb;
+return st;
+};
 W.stageOf=function(seed,day,phase,eye,nearLake){
 const d=(day|0)*2+(phase==='dawn'?1:0);
 if(nearLake){
@@ -104022,6 +104046,9 @@ if(!Mu){
 const L=VR.Land&&VR.Land.LAKE,heart= !!(g.meta&&(g.meta.vgen|0)>=3&&g.meta.type!=='flat');
 const nearLake= !!(heart&&L&&Math.hypot(ctx.eye[0]-L.x,ctx.eye[2]-L.z)<450);
 const st=W.stageOf(this.seed,key,'dusk',ctx.eye,nearLake);
+
+const m0=g.meta,sp0=m0&&(Array.isArray(m0.worldSpawn)?m0.worldSpawn:g.player.spawn);
+if(this.fresh&&m0&&m0.vistaId&&Number.isFinite(m0.spawnYaw)&&sp0&& !st.lake)W.stageAside(st,sp0,m0.spawnYaw,W.MURM_ASIDE);
 if(st.y===null){const w=g.world,X=Math.floor(st.x),Z=Math.floor(st.z);st.y=(w.isLoaded(X,Z)?w.topAt(X,Z):ctx.eye[1]-1.6)+40;}
 if(Math.hypot(st.x-ctx.eye[0],st.z-ctx.eye[2])>700)return;
 const fl=new W.Flock(n,(W.h(this.seed,key,0x6b)*4294967295)>>>0);
@@ -112045,6 +112072,7 @@ FI.onLoad=function(g,meta){if(meta&&meta.clearUntil>0&&g.env&&g.env.wx)g.env.wx.
 
 FI.holdLoading=function(g,done,dt){
 if(!done)return false;
+if(g.arrivalPending&& !g.arrival&&VR.First2&&VR.First2.vistaBack){try{VR.First2.vistaBack(g,g.arrivalPending.vista);}catch(e){}}
 if(g.arrivalPending&& !g.arrival){const A=new Arrival(g,{vista:g.arrivalPending.vista});g.arrival=A;A.rise();return true;}
 const A=g.arrival;
 return!!(A&&A.phase==='in'&&A.stepIn(dt));
@@ -135283,8 +135311,34 @@ const solid=(x,y,z)=> !!(T[w.getBlock(x,y,z)]&S);
 const tall=(x,y,z)=>{const b=w.getBlock(x,y,z);if(!(T[b]&S)|| !shp)return false;const h=shp[b];return h===SH.FENCE||h===SH.WALL||h===SH.PANE;};
 return F.solidTall(solid,tall);
 };
+
+
+
+
+F.STEP_BACK=1;
+F.PAVE_RE= /flagstone|floor_plaza|dirt_path|coarse_dirt|gravel|path/;
+F.stepBack=function(feet,u,get,isPave,solid){
+if(!feet|| !u)return null;
+const x=feet[0]-u[0]*F.STEP_BACK,z=feet[2]-u[1]*F.STEP_BACK,y=feet[1],X=Math.floor(x),Y=Math.floor(y+0.01),Z=Math.floor(z);
+if(!isPave(get(X,Y-1,Z))||solid(get(X,Y,Z))||solid(get(X,Y+1,Z)))return null;
+return[x,y,z];
+};
+
+
+F.vistaBack=function(g,v0){
+const m=g&&g.meta,A=g&&g.arrival,v=v0||(A&&A.v),p=g&&g.player;
+if(!m||m.guest||m.f4back|| !m.vistaId|| !v|| !Array.isArray(v.u)|| !p|| !g.world|| !Array.isArray(p.spawn))return null;
+m.f4back=1;
+if(Math.hypot(p.pos[0]-p.spawn[0],p.pos[2]-p.spawn[2])>0.5)return null;
+const R=VR.R,T=R.T.flags,S=VR.F?VR.F.SOLID:1,w=g.world;
+const r=F.stepBack(p.pos,v.u,(x,y,z)=>w.getBlock(x,y,z),(b)=> !!b&&F.PAVE_RE.test((R.types[R.T.type[b]]||{}).name||''),(b)=> !!(T[b]&S));
+if(!r)return null;
+p.teleport(r[0],r[1],r[2]);p.spawn=r.slice();if(Array.isArray(m.worldSpawn))m.worldSpawn=r.slice();
+F.backed=r;return r;
+};
 F.settle=function(g){
 try{
+try{F.vistaBack(g);}catch(e){}
 if(!g|| !g.meta|| !g.f2new||g.meta.guest||g.meta.f2open|| !g.world|| !g.player)return null;
 g.meta.f2open=1;
 const p=g.player,r=F.openGround(F.solidOf(g.world),p.pos,p.yaw);
