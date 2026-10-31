@@ -1,6 +1,6 @@
 // Funke, the companion drone (src/main/funke.js, VR.Funke; plan docs/superpowers/plans/2026-10-22-e-funke.md, erlebnis
 // §3, abenteuer §9–§11) — the pure parts and a stand-in game:
-//  a · the talking budget: over a simulated hour of offers every second ≤ 1 unprompted line per 90 s (every gap ≥ 90 s),
+//  a · the talking budget: over a simulated hour of offers every second ≤ 1 unprompted line per 3 min (every gap ≥ 180 s),
 //      an asked line always passes and restarts the wait, „Funke, Ruhe!" silences the unprompted lines for 10 minutes and
 //      „an" brings them back, nothing unprompted during Bauruhe (20 s after a build action);
 //  b · lost-player detection on synthetic tracks (1 Hz): a straight walk over new ground — never; pacing in a 40-m yard —
@@ -33,7 +33,7 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
 // ---------------------------------------------------------------- a · the talking budget
 {
   const B = new F.Budget();
-  check(F.GAP === 90 && F.BAURUHE === 20 && F.MUTE === 600, 'the numbers: one unprompted line per 90 s, Bauruhe 20 s, the mute 10 min');
+  check(F.GAP === 180 && F.BAURUHE === 20 && F.MUTE === 600, 'the numbers: one unprompted line per 3 min (f-quiet), Bauruhe 20 s, the mute 10 min');
   // an hour of offers every second, an asked line now and then, building now and then
   const said = [];
   for (let t = 0; t < 3600; t++) {
@@ -42,13 +42,13 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
     if (B.can(t, false)) { said.push(t); B.said(t); }
   }
   let minGap = Infinity; for (let i = 1; i < said.length; i++) minGap = Math.min(minGap, said[i] - said[i - 1]);
-  check(said.length >= 25 && said.length <= 40 && minGap >= 90, `an hour of offers: ${said.length} unprompted lines, the shortest gap ${minGap} s (≥ 90)`);
+  check(said.length >= 12 && said.length <= 21 && minGap >= 180, `an hour of offers: ${said.length} unprompted lines, the shortest gap ${minGap} s (≥ 180)`);
   check(said.every(t => !(t % 400 >= 250 && t % 400 < 270)), 'no unprompted line within 20 s after a build action (Bauruhe)');
   const B2 = new F.Budget();
   B2.said(10);
   check(!B2.can(50, false) && B2.can(50, true), 'an asked line passes when an unprompted one may not');
   B2.said(50);
-  check(!B2.can(130, false) && B2.can(141, false), 'an asked line restarts the wait (the next unprompted one 90 s after it)');
+  check(!B2.can(220, false) && B2.can(231, false), 'an asked line restarts the wait (the next unprompted one 3 min after it)');
   const B3 = new F.Budget();
   B3.mute(100);
   check(B3.muted(100) && B3.muted(699) && !B3.can(300, false) && B3.can(300, true), '„Funke, Ruhe!": 10 minutes without unprompted lines — asked lines still answer');

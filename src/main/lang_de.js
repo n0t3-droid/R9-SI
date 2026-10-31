@@ -3265,5 +3265,17 @@
     "g.stn.dockHint": "G: Andocken an der {name} ({km} km)",
     "g.stn.need": "Bring {n} × {item}: hast {have}",
     // ---- u-stations end
+    // ---- f-quiet (the calm screen: quiet.js)
+    "g.set.notices": "Hinweise",
+    "g.set.notices.tip": "Wie viele Meldungen auf dem Bildschirm erscheinen. Alles steht auch im Tagebuch (J) und im Pausenmenü.",
+    "g.set.notices.normal": "Normal",
+    "g.set.notices.normal.tip": "Alle Meldungen, auch Entdeckungen und Tipps.",
+    "g.set.notices.few": "Wenig",
+    "g.set.notices.few.tip": "Nur Wichtiges, selten. Tipps nur in den ersten Minuten einer neuen Welt.",
+    "g.set.notices.off": "Aus",
+    "g.set.notices.off.tip": "Nur die Antwort auf das, was du gerade tust. Funke spricht nur, wenn du ihn fragst.",
+    "g.quiet.recent": "Letzte Meldungen",
+    "g.quiet.none": "Noch keine Meldungen.",
+    // ---- f-quiet end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -25,6 +25,7 @@
   'use strict';
   const C = VR.Ctx = VR.Ctx || {};
   const DEG = Math.PI / 180;
+  C.PROMPT_T = 2;   // f-quiet: s a prompt shows, then it steps back until what V does changes
   C.REACH = 4.5; C.CONE = 6 * DEG; C.TAP = 0.3; C.HOLD = 1.5; C.NEAR_MIN = 20; C.FAR_MAX = 8000;
   // the words (German first), also in the tables (test/ctx.js keeps them the same)
   const LABELS = C.LABELS = {
@@ -139,6 +140,7 @@
     return tr(res.key, res.vars);
   };
   C.text = function (res, code) {
+    if (res && res.id === 'funke') return '';   // f-quiet: V still asks Funke, but no standing „[V] Funke fragen"
     const s = C.label(res); if (!s) return '';
     const B = VR.Binds, k = B ? B.label(code || 'KeyV', lang()) : 'V';
     return '[' + k + '] ' + s;
@@ -343,14 +345,14 @@
   };
 
   // ---------------------------------------------------------------- the prompt, the ring, the touch button
-  let dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1, textRes = null, text = '', textDev = '';
+  let shownAt = 0, lastSig = '', dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1, textRes = null, text = '', textDev = '';
   const st = C.pressState();
   function mount() {
     if (dom || typeof document === 'undefined') return dom;
     const hud = document.getElementById('hud'); if (!hud) return null;
     if (!document.getElementById('ctxstyle')) {
       const s = document.createElement('style'); s.id = 'ctxstyle';
-      s.textContent = '#ctxprompt{position:absolute;left:50%;top:calc(50% + 26px);transform:translateX(-50%);padding:4px 12px;border-radius:14px;background:rgba(6,9,20,.42);color:#f4f7ff;font:600 14px/1.25 var(--font,sans-serif);letter-spacing:.02em;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s}' +
+      s.textContent = '#ctxprompt{position:absolute;left:50%;top:calc(50% + 14vh);transform:translateX(-50%);padding:3px 10px;border-radius:12px;background:rgba(6,9,20,.36);color:#f4f7ff;font:600 13px/1.25 var(--font,sans-serif);letter-spacing:.02em;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .4s}' +
         '#ctxprompt.on{opacity:1}#ctxprompt b{color:#9affd8;font-weight:700}' +
         '#ctxring{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;pointer-events:none;display:none;--p:0;background:conic-gradient(#9affd8 calc(var(--p) * 1turn),rgba(255,255,255,.16) 0);-webkit-mask:radial-gradient(circle,transparent 22px,#000 23px);mask:radial-gradient(circle,transparent 22px,#000 23px)}' +
         '#ctxringl{position:absolute;left:50%;top:calc(50% + 36px);transform:translateX(-50%);color:#d8fff0;font:600 13px var(--font,sans-serif);text-shadow:0 1px 3px #000;display:none;pointer-events:none}';
@@ -364,15 +366,19 @@
   function show(text, res) {
     const d = mount(); if (!d) return;
     const tk = text + (VR.A11y && VR.A11y.padMode() ? '#pad' : '');   // (e-access: the device switches the key cap)
-    if (tk === lastText) return;
+    // f-quiet: a prompt shows PROMPT_T s, then steps back until what V does changes (a new thing, not a new distance)
+    const fade = () => { if (shownAt && now() - shownAt > C.PROMPT_T * 1000) { shownAt = 0; d.pr.classList.remove('on'); } };
+    if (tk === lastText) { fade(); return; }
     lastText = tk;
-    if (!text) { d.pr.classList.remove('on'); return; }
+    if (!text) { shownAt = 0; lastSig = ''; d.pr.classList.remove('on'); return; }
+    const sg = (res ? res.row + '|' + res.key + '|' + (res.vars ? (res.vars.name || '') + (res.vars.toKey || '') : '') : text) + (tk.endsWith('#pad') ? '#pad' : '');
+    const fresh = sg !== lastSig; lastSig = sg;
     const i = text.indexOf('] ');
     d.pr.innerHTML = '';
     const b = document.createElement('b'); b.textContent = text.slice(0, i + 1); b.dataset.key = text.slice(1, i); d.pr.appendChild(b);
     if (VR.A11y && VR.A11y.padMode()) { b.innerHTML = VR.A11y.glyph(VR.A11y.padOf('veh')); b.className = 'pad'; b.removeAttribute('data-key'); }   // e-access: the pad's own glyph   // (e-ux: data-key — the key cap without its brackets, ux.css)
     d.pr.appendChild(document.createTextNode(' ' + text.slice(i + 2)));
-    d.pr.classList.add('on');
+    if (fresh) { shownAt = now(); d.pr.classList.add('on'); } else fade();
     void res;
   }
   function ring(k) {
@@ -415,5 +421,5 @@
     const Cs = C.cost, ms = now() - t0; Cs.frames++; Cs.ms += ms; if (ms > Cs.worst) Cs.worst = ms;
   };
   C.current = () => last;
-  C.reset = () => { last = null; lastText = ''; lastIcon = ''; textRes = null; text = ''; st.t = -1; st.fired = false; ringShown = -1; if (dom) { dom.pr.classList.remove('on'); dom.rg.style.display = 'none'; dom.rl.style.display = 'none'; } };
+  C.reset = () => { last = null; lastText = ''; lastSig = ''; shownAt = 0; lastIcon = ''; textRes = null; text = ''; st.t = -1; st.fired = false; ringShown = -1; if (dom) { dom.pr.classList.remove('on'); dom.rg.style.display = 'none'; dom.rl.style.display = 'none'; } };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

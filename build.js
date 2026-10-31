@@ -52,6 +52,7 @@ MAIN.push('a11y');   // e-access: VR.A11y (src/main/a11y.js) — Weniger Bewegun
 MAIN.push('first2');   // f-first2: VR.First2 (src/main/first2.js) — the held block, the Abenteuer start, open ground, the trips' ends, ⚙ Einfach, J/O (last: it wraps ui.js, game.js, cruise.js and fields2.js)
 MAIN.push('hitfeel');   // f-hud: VR.HitFeel (src/main/hitfeel.js) — the HUD up in a new world, the hit's feel, the XP pop, Funke's what now (after first2: it wraps its Einfach page)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'stn_blocks'); SHARED.splice(SHARED.indexOf('forge_park') + 1, 0, 'forge_station', 'gen_stn'); MAIN.push('stations');   // u-stations: the gravity plate and the docking clamp (the last blocks, after a-life's), the Forge's station kind, the stn.* dims, VR.Stations (src/main/stations.js: last — it wraps spaceflight, cruise, ascent, padlife, shop, story)
+MAIN.push('quiet');   // f-quiet: VR.Quiet (src/main/quiet.js) — one quiet message channel, ⚙ Hinweise, Funke's budget and bubble at the edge (last: it wraps ui.js, funke.js, the hints, first2's Einfach page)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

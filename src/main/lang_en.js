@@ -3265,5 +3265,17 @@
     "g.stn.dockHint": "G: Dock at {name} ({km} km)",
     "g.stn.need": "Bring {n} × {item}: you have {have}",
     // ---- u-stations end
+    // ---- f-quiet (the calm screen: quiet.js)
+    "g.set.notices": "Notices",
+    "g.set.notices.tip": "How many messages appear on the screen. Everything is also in the journal (J) and the pause menu.",
+    "g.set.notices.normal": "Normal",
+    "g.set.notices.normal.tip": "Every message, discoveries and tips too.",
+    "g.set.notices.few": "Few",
+    "g.set.notices.few.tip": "Only what matters, rarely. Tips only in the first minutes of a new world.",
+    "g.set.notices.off": "Off",
+    "g.set.notices.off.tip": "Only the answer to what you are doing. Funke speaks only when you ask him.",
+    "g.quiet.recent": "Recent messages",
+    "g.quiet.none": "No messages yet.",
+    // ---- f-quiet end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
