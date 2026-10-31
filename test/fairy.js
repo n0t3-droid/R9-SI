@@ -42,7 +42,7 @@ const tree = o1.find(s => s.kind === 'tree'), L1 = F.lanternSpots(1, tree), L2 =
 check(L1.length === 3 && JSON.stringify(L1) === JSON.stringify(L2) && L1.every(p => { const r = Math.hypot(p[0] - tree.x, p[1] - tree.z); return r >= 16 && r <= 40; }), 'three lost lanterns 16–40 m round the tree, deterministic');
 // the wood's mushrooms: deterministic, within 16 m
 const sh = o1.find(s => s.kind === 'shroom'), M1 = F.shrooms(1, sh);
-check(M1.length >= 10 && M1.every(m => Math.hypot(m.x - sh.x, m.z - sh.z) <= 16 && m.h >= 1.4 && m.h <= 6) && JSON.stringify(M1) === JSON.stringify(F.shrooms(1, sh)), 'the wood: ' + M1.length + ' mushrooms, 1.4–6 m, within 16 m');
+check(M1.length >= 10 && M1.every(m => Math.hypot(m.x - sh.x, m.z - sh.z) <= 16 && m.h >= 1.4 && m.h <= 8.5) && JSON.stringify(M1) === JSON.stringify(F.shrooms(1, sh)), 'the wood: ' + M1.length + ' mushrooms, 1.4–8.5 m, within 16 m');
 
 // ---------------------------------------------------------------- 2. the hours (timeOfDay: 0 sunrise · 6000 noon · 12000 sunset · 18000 midnight)
 check(F.best('shroom', 12500, true) > 0.8 && F.best('shroom', 6000, true) < 0.3, 'the wood glows at dusk, not at noon');

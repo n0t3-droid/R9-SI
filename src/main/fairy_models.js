@@ -21,14 +21,14 @@
 
   // ---------------------------------------------------------------- the glowing mushrooms (1 voxel = 1/4 m; 4.5 m tall at scale 1)
   const SHROOM = [
-    { cap: 0x2fb7a8, top: 0x5fd8c4, spot: 0xd8fff6, gill: 0x7affe6, stem: 0xeef6ea, capR: 6.2, capH: 5.5, stemH: 13, cone: 1 },
-    { cap: 0x7a4ad8, top: 0x9a6ae8, spot: 0xf4e4ff, gill: 0xc89aff, stem: 0xf2ecf6, capR: 8.5, capH: 3.6, stemH: 11, cone: 0 },
-    { cap: 0xe0607e, top: 0xf08aa0, spot: 0xfff4f6, gill: 0xffb4cc, stem: 0xfaf0ea, capR: 7.2, capH: 4.6, stemH: 12, cone: 0.4 },
+    { cap: 0x2fb7a8, top: 0x5fd8c4, spot: 0xd8fff6, gill: 0x7affe6, stem: 0xeef6ea, capR: 6.4, capH: 7, stemH: 12, cone: 1 },
+    { cap: 0x7a4ad8, top: 0x9a6ae8, spot: 0xf4e4ff, gill: 0xc89aff, stem: 0xf2ecf6, capR: 8.8, capH: 5, stemH: 10, cone: 0 },
+    { cap: 0xe0607e, top: 0xf08aa0, spot: 0xfff4f6, gill: 0xffb4cc, stem: 0xfaf0ea, capR: 7.4, capH: 6.2, stemH: 11, cone: 0.4 },
   ];
   SHROOM.forEach((S, v) => {
     M['fy_shroom_' + v] = () => {
       const W = 20, c = 10;
-      const body = part(W, 21, W, [c, 0, c], (gr) => {
+      const body = part(W, 22, W, [c, 0, c], (gr) => {
         // the stem: a gentle lean, thicker at the foot, a skirt of glow at the ground
         for (let y = 0; y <= S.stemH; y++) {
           const lean = Math.sin(y / S.stemH * 1.4) * 0.9, r = 1.6 + (y < 3 ? (3 - y) * 0.45 : 0) + (v === 1 ? 0.4 : 0);

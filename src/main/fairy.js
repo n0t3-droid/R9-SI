@@ -75,7 +75,7 @@
       const x = Math.round((site.x + Math.cos(a) * r) * 10) / 10, z = Math.round((site.z + Math.sin(a) * r) * 10) / 10;
       if (out.some((m) => Math.hypot(m.x - x, m.z - z) < 2.6)) continue;
       const big = out.length < 3;
-      out.push({ x, z, h: Math.round((big ? 4.2 + h(seed, s0, k, 3) * 1.6 : 1.5 + h(seed, s0, k, 3) * 2.4) * 10) / 10, v: Math.floor(h(seed, s0, k, 4) * 3), yaw: Math.round(h(seed, s0, k, 5) * 628) / 100 });
+      out.push({ x, z, h: Math.round((big ? 5.5 + h(seed, s0, k, 3) * 2.5 : 1.8 + h(seed, s0, k, 3) * 2.8) * 10) / 10, v: Math.floor(h(seed, s0, k, 4) * 3), yaw: Math.round(h(seed, s0, k, 5) * 628) / 100 });
     }
     return out;
   };
@@ -209,13 +209,37 @@
     hideBubble();
     if (VR.Wander && VR.Wander.register) { try { VR.Wander.register({ id: 'fairy', kind: 'places', places: () => S.sites.filter((s) => s.y !== null).map((s) => ({ id: s.id, kind: s.kind, name: placeName(s.kind), pos: [s.x, s.y, s.z], seen: !!recOf(g).seen[s.id], best: F.best(s.kind, tod(g), clear(g)) })), pages: () => recOf(g).pages.slice() }); } catch (e) { /* the director is theirs */ } }
   }
-  // settle: the centre on dry ground (a few deterministic steps along the yaw if it is water), then its parts
+  // natural ground: what the generator lays (grass, earth, sand, snow, rock, moss, leaves …), never a roof or a road
+  const NAT = /(^|_)(grass|dirt|sand|snow|podzol|moss|mud|gravel|stone|regolith|basalt|ice|ash|dust|clay|mycel|tuff|andesite|granite|diorite|calcite|soil|rubble|leaves|log|sandstone|rock|obsidian|frost|sulfur|scoria|nodule)/;
+  const ART = /brick|plank|concrete|^vx_|^vm_|glass|wool|path|slab|stairs|polished|smooth|tile|cobble|wall|fence|chiseled|cut_|_cut$|lamp|temple|spire|stacked|stucco|bossed|paver|panorama|door|vollton|button|pressure|logic|stonecutter|block_of/;
+  const natCache = new Map();
+  const natural = (st) => { if (!st) return false; let v = natCache.get(st); if (v === undefined) { const R = VR.R, t = R && R.T && R.types ? R.types[R.T.type[st]] : null, n = t ? t.name : ''; v = !!n && NAT.test(n) && !ART.test(n); natCache.set(st, v); } return v; };
+  // a spot's land: 'wait' while a column is not loaded, else true when the centre and eight points round it at R are
+  // natural, dry and within `step` m of each other
+  const RAD = { tree: 12, shroom: 14, spring: 8, circle: 10, garden: 17 };
+  F.SETTLE_TRIES = 24;
+  function landOk(g, x, z, R, step) {
+    let lo = 1e9, hi = -1e9;
+    for (let k = 0; k < 9; k++) {
+      const a = k * TAU / 8, px = k ? x + Math.cos(a) * R : x, pz = k ? z + Math.sin(a) * R : z, y = ground(g, px, pz);
+      if (y === null) return 'wait';
+      const st = g.world.getBlock(Math.floor(px), y - 1, Math.floor(pz));
+      if (!natural(st) || wet(g, px, y, pz)) return false;
+      lo = Math.min(lo, y); hi = Math.max(hi, y);
+    }
+    return hi - lo <= step;
+  }
+  // settle: the first spot of a deterministic spiral round the planned one whose land is open, natural and dry (no
+  // town, no road, no water); then its parts
   function settle(g, s) {
-    if (s.y !== null) return true;
-    for (let k = s.tries; k < 6; k++) {
-      const x = s.x + Math.cos(s.yaw) * k * 9, z = s.z + Math.sin(s.yaw) * k * 9, y = ground(g, x, z);
-      if (y === null) return false;
-      if (!wet(g, x, y, z) || k === 5) { s.x = Math.round(x); s.z = Math.round(z); s.y = y; build(g, s); return true; }
+    if (s.y !== null || s.tries >= F.SETTLE_TRIES) return s.y !== null;
+    const x0 = s.x0 === undefined ? (s.x0 = s.x) : s.x0, z0 = s.z0 === undefined ? (s.z0 = s.z) : s.z0;
+    for (let k = s.tries; k < F.SETTLE_TRIES; k++) {
+      const a = s.yaw + k * 0.93, r = k * 12, x = Math.round(x0 + Math.cos(a) * r), z = Math.round(z0 + Math.sin(a) * r);
+      if (S.sites.some((o) => o !== s && o.y !== null && Math.hypot(o.x - x, o.z - z) < F.APART)) { s.tries = k + 1; continue; }
+      const ok = landOk(g, x, z, RAD[s.kind] || 10, s.kind === 'garden' ? 8 : 5);
+      if (ok === 'wait') return false;
+      if (ok) { s.x = x; s.z = z; s.y = ground(g, x, z); build(g, s); return true; }
       s.tries = k + 1;
     }
     return false;
@@ -229,12 +253,12 @@
     const seed = seedOf(g), P = s.parts = [], folk = s.folk = [], add = (m, pos, yaw, o) => P.push({ m, pos, yaw: yaw || 0, o: o || {} });
     const sprite = (who, mood, v, pos, o) => folk.push(Object.assign({ who, mood, v, pos: pos.slice(), home: pos.slice(), yaw: s.yaw, t: h(seed, strH(who)) * 10, sx: 0 }, o || {}));
     if (s.kind === 'shroom') {
-      for (const m of F.shrooms(seed, s)) add('fy_shroom_' + m.v, at(g, m.x, m.z, -0.1), m.yaw, { scale: m.h / 4.5, glow: 1, h: m.h });
+      for (const m of F.shrooms(seed, s)) add('fy_shroom_' + m.v, at(g, m.x, m.z, -0.1), m.yaw, { scale: m.h / 4.6, glow: 1, h: m.h });
       const [fx, fz] = off(s, 0.6, 5); sprite('flocke', 'lost', 4, at(g, fx, fz, 0.1));
     } else if (s.kind === 'spring') {
       add('fy_pool', at(g, s.x, s.z, -0.05), s.yaw);
-      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 4.4); add(i % 3 === 0 ? 'fy_crystal_1' : 'fy_crystal_0', at(g, x, z, -0.1), i * 1.3, { scale: 0.8 + h(seed, i, 3) * 0.7 }); }
-      s.wishes = [0, 1, 2].map((i) => { const [x, z] = off(s, Math.PI + (i - 1) * 0.55, 6.2); const p = at(g, x, z, 0); add('fy_crystal_' + (i === 1 ? 2 : i), p, 0, { scale: 1.3 }); return { i, pos: p }; });
+      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 4.4); add(i % 3 === 0 ? 'fy_crystal_1' : 'fy_crystal_0', at(g, x, z, -0.1), i * 1.3, { scale: 0.45 + h(seed, i, 3) * 0.45 }); }
+      s.wishes = [0, 1, 2].map((i) => { const [x, z] = off(s, Math.PI + (i - 1) * 0.55, 6.2); const p = at(g, x, z, 0); add('fy_crystal_' + (i === 1 ? 2 : i), p, 0, { scale: 0.75 }); return { i, pos: p }; });
       const [zx, zz] = off(s, 1.9, 6.5); sprite('zwirbel', 'cheeky', 1, at(g, zx, zz, 0.1), { hat: true });
     } else if (s.kind === 'tree') {
       add('fy_tree', at(g, s.x, s.z, -0.4), look(Math.cos(s.yaw), Math.sin(s.yaw)));
@@ -244,7 +268,7 @@
       const [bx, bz] = off(s, 0.25, 5.4); sprite('borke', 'wise', 3, at(g, bx, bz, 0.1));
       const [tx, tz] = off(s, 1.6, 9.5); sprite('tuepfel', 'shy', 0, at(g, tx, tz, 0.1));
       for (let i = 0; i < 2; i++) { const [x, z] = off(s, 2.6 + i * 1.7, 10); sprite('folk' + i, 'busy', (i + 2) % 5, at(g, x, z, 0.1)); }
-      s.lanterns = F.lanternSpots(seed, s).map(([x, z], i) => ({ i, pos: at(g, x, z, 0.1) }));
+      s.lanterns = F.lanternSpots(seed, s).map(([x, z], i) => { for (let k = 0; k < 5; k++) { const u = 1 - k * 0.15, px = s.x + (x - s.x) * u, pz = s.z + (z - s.z) * u, y = ground(g, px, pz); if (y !== null && natural(g.world.getBlock(Math.floor(px), y - 1, Math.floor(pz))) && !wet(g, px, y, pz)) return { i, pos: [px, y + 0.1, pz] }; } return { i, pos: at(g, x, z, 0.1) }; });
     } else if (s.kind === 'circle') {
       for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 8); add('fy_stone', at(g, x, z, -0.3), faceIn(s, i * TAU / 9), { scale: 0.85 + h(seed, i, 5) * 0.4 }); }
       add('fy_altar', at(g, s.x, s.z, -0.1), s.yaw);
@@ -294,7 +318,9 @@
       if (s.kind === 'tree') treeLife(g, s, dt, p, T0);
       if (s.kind === 'garden') gardenLife(g, s, dt, p, T0, b);
     }
+    if (LATER.length) for (let i = LATER.length - 1; i >= 0; i--) if (S.t >= LATER[i].t) { const L = LATER.splice(i, 1)[0]; try { L.fn(); } catch (e) { /* a nicety */ } }
     if (S.escort) escort(g, dt, p);
+    if (s && s.kind === 'garden') F.hold(g.player);
     if (S.bubble) bubbleFrame(g);
     if (recOf(g).buddy && g.settings.fairyBuddy !== false) buddy(g, dt, eye);
     const ms = performance.now() - t0; S.cost.ms = S.cost.ms * 0.95 + ms * 0.05; S.cost.frames++; if (ms > S.cost.worst) S.cost.worst = ms;
@@ -411,7 +437,7 @@
       }
     }
     // the builder's way: three lights within 10 m of the door (looked at once a second)
-    if (q && q.s === 1 && (S.litT = (S.litT || 0) - dt) <= 0) { S.litT = 1; if (F.Q.built(q, lightsNear(g, s.door, 10))) { save(g); chime(g, [659, 880, 1175], 0.1); note(g, T('g.fairy.lan.built'), 3, 'fy-lan'); } }
+    if (q && q.s === 1 && (S.litT = (S.litT || 0) - dt) <= 0) { S.litT = 1; if (q.base === undefined) q.base = lightsNear(g, s.door, 10); if (F.Q.built(q, lightsNear(g, s.door, 10) - q.base)) { save(g); chime(g, [659, 880, 1175], 0.1); note(g, T('g.fairy.lan.built'), 3, 'fy-lan'); } }
     if (night > 0.3 && Math.random() < dt * (T0 ? 3 : 1)) { const a = Math.random() * TAU; mote(g, s.x + Math.cos(a) * 4, s.y + 6 + Math.random() * 8, s.z + Math.sin(a) * 4, 0, -0.1, 0, [1, 0.85, 0.5], 0.05, 3, 0.05); }
   }
   // the light blocks a builder set round a point (blocks that give light: lanterns, candles, lamps, glowing mushrooms)
@@ -455,8 +481,8 @@
   // ---- Flöckchen follows you home
   function escort(g, dt, p) {
     const E0 = S.escort, f = E0.f, dx = p[0] - f.pos[0], dz = p[2] - f.pos[2], d = Math.hypot(dx, dz);
-    if (d > 2.2 && d < 26) { const sp = Math.min(6, d * 1.2) * dt; f.pos[0] += dx / d * sp; f.pos[2] += dz / d * sp; E0.waitSaid = false; }
-    else if (d >= 26 && !E0.waitSaid) { E0.waitSaid = true; say(g, f, T('g.fairy.lost.wait')); }
+    if (d > 2.2) { const sp = (d < 26 ? Math.min(7.5, d * 1.5) : 2.5) * dt; f.pos[0] += dx / d * sp; f.pos[2] += dz / d * sp; }   // far behind it calls and comes on slowly
+    if (d >= 26 && !E0.waitSaid) { E0.waitSaid = true; say(g, f, T('g.fairy.lost.wait')); } else if (d < 12) E0.waitSaid = false;
     if (d > 80) { f.pos[0] = p[0] - 2; f.pos[2] = p[2] - 2; }
     const y = ground(g, f.pos[0], f.pos[2]); f.pos[1] += ((y === null ? p[1] : y) + 0.9 + Math.sin(S.t * 3) * 0.15 - f.pos[1]) * Math.min(1, dt * 4);
     f.yaw = Math.atan2(-dx, -dz);
@@ -500,7 +526,7 @@
   function buddy(g, dt, eye) {
     const B = S.bud || (S.bud = { pos: [eye[0], eye[1], eye[2]], t: 0 }), pl = g.player, yaw = pl.yaw;
     B.t += dt;
-    const tx = eye[0] + Math.cos(yaw) * 0.75 - Math.sin(yaw) * 0.35, tz = eye[2] - Math.sin(yaw) * 0.75 - Math.cos(yaw) * 0.35, ty = eye[1] - 0.25 + Math.sin(B.t * 2.1) * 0.12;
+    const tx = eye[0] + Math.cos(yaw) * 1.1 - Math.sin(yaw) * 1.6, tz = eye[2] - Math.sin(yaw) * 1.1 - Math.cos(yaw) * 1.6, ty = eye[1] - 0.15 + Math.sin(B.t * 2.1) * 0.12;   // ahead and to the right, at the edge of the view
     const k = Math.min(1, dt * 3); B.pos[0] += (tx - B.pos[0]) * k; B.pos[1] += (ty - B.pos[1]) * k; B.pos[2] += (tz - B.pos[2]) * k;
     if (Math.hypot(tx - B.pos[0], tz - B.pos[2]) > 12) { B.pos[0] = tx; B.pos[1] = ty; B.pos[2] = tz; }
     if (g.particles) { dot(g, B.pos[0], B.pos[1], B.pos[2], [1, 0.9, 0.6], 0.09); if (Math.random() < dt * (tier(g) ? 8 : 2)) mote(g, B.pos[0], B.pos[1], B.pos[2], 0, -0.1, 0, [1, 0.85, 0.55], 0.03, 0.8, 0); }
@@ -575,12 +601,14 @@
     s.doorT = S.t + 6;
     return true;
   }
+  const LATER = [];
+  const later = (dt, fn) => LATER.push({ t: S.t + dt, fn });
   const NOTE_F = [523.25, 587.33, 659.25, 783.99, 880];   // C D E G A — the five singing stones
   function hum(g, s) {
     const f = s.folk.find((x) => x.who === 'dusel'); f.wakeT = S.t + 30;
     say(g, f, T('g.fairy.dusel.hum'));
     const mel = F.Q.melody(seedOf(g), s.id), a = g.audio;
-    mel.forEach((n, i) => { setTimeout(() => { s.lit = { i: n, t: S.t + 0.5 }; tone(a, NOTE_F[n], 0.13, 0.7); }, 900 + i * 650); });
+    mel.forEach((n, i) => later(0.9 + i * 0.65, () => { s.lit = { i: n, t: S.t + 0.5 }; tone(a, NOTE_F[n], 0.13, 0.7); }));
   }
   function play(g, s, i) {
     tone(g.audio, NOTE_F[i], 0.14, 0.8); s.lit = { i, t: S.t + 0.5 };
@@ -589,7 +617,7 @@
     const r = F.Q.note(q, i, F.Q.melody(seedOf(g), s.id)); save(g);
     const f = s.folk.find((x) => x.who === 'dusel');
     if (r === 'wrong') say(g, f, T('g.fairy.note.wrong'));
-    if (r === 'done') { S.awake = S.t + 240; setTimeout(() => chime(g, [523, 659, 784, 1047, 1319], 0.1, 0.14), 500); say(g, f, T('g.fairy.bridge.awake')); setTimeout(() => finish(g, s, f), 1800); }
+    if (r === 'done') { S.awake = S.t + 240; later(0.5, () => chime(g, [523, 659, 784, 1047, 1319], 0.1, 0.14)); say(g, f, T('g.fairy.bridge.awake')); later(1.8, () => finish(g, s, f)); }
     return true;
   }
   function answer(g, s, j) {
@@ -678,7 +706,7 @@
       if (s.kind === 'tree' && s.lanterns) { const q = recOf(g).q[s.id]; if (q && q.s === 1) for (const L of s.lanterns) if (!(q.m & (1 << L.i))) { MP.scale = 1; LK.drawModel(g, r, P(), 'fy_lantern', L.pos, S.t * 0.3, c, MP); n++; } }
     }
     if (S.escort && (!s || s.folk.indexOf(S.escort.f) < 0)) n += drawSprite(g, r, P, S.escort.f, c);
-    if (S.bud && recOf(g).buddy && g.settings.fairyBuddy !== false && g.player) { const B = S.bud; MP.scale = 0.55; MP.pose = wings(B, 'bud'); LK.drawModel(g, r, P(), 'fy_sprite_0', [B.pos[0], B.pos[1] - 0.2, B.pos[2]], g.player.yaw, c, MP); MP.pose = null; n++; }
+    if (S.bud && recOf(g).buddy && g.settings.fairyBuddy !== false && g.player) { const B = S.bud; MP.scale = 0.42; MP.pose = wings(B, 'bud'); LK.drawModel(g, r, P(), 'fy_sprite_0', [B.pos[0], B.pos[1] - 0.2, B.pos[2]], g.player.yaw, c, MP); MP.pose = null; n++; }
     S.cost.parts = n;
   };
   function wings(f, k) { const p = f._pose || (f._pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], cap: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0] }); const a = Math.sin(S.t * (f.mood === 'sleepy' ? 3 : 14) + (f.v || 0)) * (f.sleep ? 0.1 : 0.55); p.wing_l[1] = 0.4 + a; p.wing_r[1] = -0.4 - a; void k; return p; }
@@ -713,6 +741,6 @@
     play: (i) => (S.near ? play(VR.game, S.near, i) : false), answer: (j) => (S.near ? answer(VR.game, S.near, j) : false), wish: (i) => (S.near ? wish(VR.game, S.near, i) : false), knock: () => (S.near ? knock(VR.game, S.near) : false),
     melody: () => (S.near ? F.Q.melody(seedOf(VR.game), S.near.id) : null), riddles: () => (S.near ? F.Q.riddles(seedOf(VR.game), S.near.id) : null),
     escort: () => (S.escort ? { pos: S.escort.f.pos.slice(), to: [S.escort.to.x, S.escort.to.y, S.escort.to.z] } : null), chase: () => (S.chase ? { pos: S.chase.f.pos.slice(), hop: S.chase.hop } : null),
-    wake: () => { S.awake = S.t + 240; }, rec: () => recOf(VR.game), ride: () => !!S.ride,
+    wake: () => { S.awake = S.t + 240; }, rec: () => recOf(VR.game), ride: () => (S.ride ? S.ride.u : -1), bridge: () => (S.near && S.near.bridge) || 0,
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

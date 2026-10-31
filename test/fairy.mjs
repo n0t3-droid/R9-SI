@@ -75,8 +75,12 @@ run.sites0 = sites0;
 // go near a place and wait until it settled (its ground read, its parts built)
 async function goTo(kind) {
   const s0 = (await ev(() => VR.Fairy.debug.sites())).find(s => s.kind === kind); if (!s0) return null;
-  await ev((s) => { const p = VR.game.player; p.flying = true; p.teleport(s.x + 0.5, 140, s.z + 0.5); }, s0);
-  for (let i = 0; i < 40; i++) { await settle(6); await step(20, 33); const s = (await ev(() => VR.Fairy.debug.sites())).find(x => x.kind === kind); if (s && s.y !== null && await ev(() => VR.Fairy.debug.near()) === s.id) return s; }
+  for (let i = 0; i < 40; i++) {
+    const s = (await ev(() => VR.Fairy.debug.sites())).find(x => x.kind === kind);
+    if (s && s.y !== null && await ev(() => VR.Fairy.debug.near()) === s.id) return s;
+    await ev((s) => { const p = VR.game.player; p.flying = true; p.teleport(s.x + 0.5, 150, s.z + 0.5); }, s);   // (the spot may move while it settles: off a town, a road, the water)
+    await settle(6); await step(20, 33);
+  }
   return (await ev(() => VR.Fairy.debug.sites())).find(x => x.kind === kind);
 }
 const view = async (s, d, up, lookY, side) => {
@@ -119,7 +123,9 @@ if (want('adv')) {
     const s = await goTo('tree');
     const tf = s.folk.find(f => f.who === 'tuepfel');
     await walkTo([tf.pos[0] + 2.5, tf.pos[1], tf.pos[2] + 1]); await lookAt([tf.pos[0], tf.pos[1] + 0.5, tf.pos[2]]);
-    const near = await ev(() => { const r = VR.Ctx && VR.Ctx.current ? VR.Ctx.current() : null; return r ? { key: r.key, kind: r.kind, vars: r.vars } : null; });
+    await step(12, 33);
+    const near = await ev(() => { const g = VR.game, p = g.player, r = VR.Ctx && VR.Ctx.current ? VR.Ctx.current() : null, h = VR.Fairy.near(g, p.eyePos(), p.lookDir ? p.lookDir() : [-Math.sin(p.yaw), 0, -Math.cos(p.yaw)]); return { cur: r ? { key: r.key, kind: r.kind, vars: r.vars } : null, hook: h ? { name: h.name, dist: +h.dist.toFixed(2) } : null }; });
+    check(near.hook && /Tüpfel/.test(near.hook.name), 'the Aktion key: „' + (near.hook && near.hook.name) + '" (the prompt: ' + JSON.stringify(near.cur) + ')');
     console.log('  the Aktion key offers: ' + JSON.stringify(near));
     await ev(() => VR.Fairy.debug.talk('tuepfel')); const a1 = await said();
     await step(4, 33); pics.talk = await shotDom('fairy_talk.png');
@@ -127,7 +133,7 @@ if (want('adv')) {
     let r = await rec(); const id = 'overworld:tree';
     check(r.q[id] && r.q[id].s === 1 && /Laterne/.test(a1 && a1.text), 'lanterns: Tüpfel asks (' + (a1 && a1.text.slice(0, 50)) + '…), the adventure begins');
     const L = (await ev(() => VR.Fairy.debug.sites())).find(x => x.kind === 'tree').lanterns;
-    { const p = L[0]; await ev((p) => { const pl = VR.game.player; pl.flying = true; pl.teleport(p[0] + 4, p[1] + 1.5, p[2] + 4); }, p); await settle(6); await lookAt([p[0], p[1] + 0.3, p[2]]); await step(20, 33); pics.lantern = await grab('fairy_lantern.png', 4); }
+    { const p = L[0], e = [p[0] + (s.x - p[0]) * 0.12, 0, p[2] + (s.z - p[2]) * 0.12]; e[1] = await ev((e) => VR.game.world.topAt(Math.floor(e[0]), Math.floor(e[2])) + 2.6, e); await ev((e) => { const pl = VR.game.player; pl.flying = true; pl.teleport(e[0], e[1], e[2]); }, e); await settle(6); await lookAt([p[0], p[1] + 0.3, p[2]]); await ev(() => VR.game.env.setTime(13300)); await step(20, 33); pics.lantern = await grab('fairy_lantern.png', 4); await ev(() => VR.game.env.setTime(5200)); }
     for (const p of L) { await walkTo(p, 10); }
     r = await rec(); check(r.q[id].s === 2 && r.q[id].m === 7, 'lanterns: three found by walking to them (mask ' + r.q[id].m + ')');
     await walkTo([tf.pos[0] + 2.5, tf.pos[1], tf.pos[2] + 1]); await ev(() => VR.Fairy.debug.talk('tuepfel'));
@@ -156,15 +162,15 @@ if (want('adv')) {
     const mel = await ev(() => VR.Fairy.debug.melody());
     await step(120, 33);
     for (const n of mel) { await ev((n) => VR.Fairy.debug.play(n), n); await step(8, 33); }
-    await step(90, 33);
+    await step(120, 33);
     let r = await rec();
     check(r.done.includes('overworld:garden'), 'bridge: the melody ' + mel.join('-') + ' played on the singing stones, the bridge wakes');
     await walkTo(s.foot, 4);
-    const riding = await ev(() => VR.Fairy.debug.ride());
-    await step(120, 33); pics.ride = await grab('fairy_ride.png', 4);
-    await step(140, 33);
+    let u0 = -1, shot = false, tr = [];
+    for (let k = 0; k < 40; k++) { await step(10, 33); const u = await ev(() => VR.Fairy.debug.ride()); tr.push(u < 0 ? -1 : +u.toFixed(2)); if (u >= 0) u0 = Math.max(u0, u); if (u > 0.45 && !shot) { shot = true; await lookAt([s.x, s.top + 1, s.z]); pics.ride = await grab('fairy_ride.png', 4); } if (u0 >= 0 && u < 0) break; }
+    console.log('  the ride: ' + tr.join(' ') + ' · bridge ' + (await ev(() => VR.Fairy.debug.bridge())).toFixed(2));
     const p = await ev(() => VR.game.player.pos.slice());
-    check(riding && Math.abs(p[1] - s.top) < 1.2, `bridge: the clouds carried the player up (y ${p[1].toFixed(1)}, the garden ${s.top})`);
+    check(u0 > 0.9 && Math.abs(p[1] - s.top) < 1.2, `bridge: the clouds carried the player up (y ${p[1].toFixed(1)}, the garden ${s.top})`);
     await step(60, 33);
     const p2 = await ev(() => VR.game.player.pos.slice());
     check(Math.abs(p2[1] - s.top) < 0.3, 'the garden holds the player (y ' + p2[1].toFixed(2) + ')');
