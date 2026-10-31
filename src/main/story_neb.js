@@ -59,13 +59,18 @@ void main() {
   vec3 ce = mix(mv, GOLD, smoothstep(0.05, 0.8, cav));
   float outer = smoothstep(0.35, 0.9, th) * smoothstep(0.42, 0.62, g2);
   ce = mix(ce, TEAL, outer);
-  float gas = 0.12 + 0.88 * pow(smoothstep(0.25, 0.85, g), 2.0);
+  float gas = 0.06 + 0.94 * pow(smoothstep(0.3, 0.85, g), 2.2);
   vec3 col = vec3(0.012, 0.010, 0.035) + vec3(0.0, 0.02, 0.025) * smoothstep(0.3, -0.1, D.y);
   col += ce * gas * (0.05 + 0.45 * rose + 1.8 * cav + 0.5 * exp(-abs(D.y - 0.22) / 0.16));   // (a glowing wall behind the pillars)
+  col += vec3(1.0, 0.42, 0.12) * gas * exp(-th / 0.3) * 0.3;   // (the warm cavity, wider)
+  col += vec3(0.05, 0.55, 0.62) * pow(smoothstep(0.55, 0.85, g2), 2.0) * smoothstep(0.15, 0.5, th) * 0.4;   // (teal veins of cooler gas)
   // the dust: dark lanes (thicker toward the land), rim-lit at their edge, thinned in the cavity
   float dk = clamp(smoothstep(0.42, 0.66, du) * (1.0 - 0.7 * cav) + 0.8 * smoothstep(0.02, -0.15, D.y), 0.0, 1.0);
   float rim = (smoothstep(0.42, 0.48, du) - smoothstep(0.48, 0.58, du)) * (0.02 + 0.3 * rose + 2.4 * cav);
   col = col * (1.0 - 0.94 * dk) + vec3(0.012, 0.03, 0.04) * dk + mix(MAG, GOLD, smoothstep(0.0, 0.6, cav)) * rim * 0.22;
+  // the near dust round the frame's edge: deep indigo and teal (the eye is pulled to the light)
+  float vg = smoothstep(0.55, 1.35, length(v_ndc * vec2(0.85, 1.0)));
+  col = mix(col, col * 0.3 + vec3(0.008, 0.02, 0.035), vg * 0.7);
   // the shafts from the star, broken by the dust
   float sh = pow(vn(vec3(cos(phi) * 9.0, sin(phi) * 9.0, 0.3 + u_k.z * 0.02)), 4.0) * exp(-th / 0.4) * smoothstep(0.03, 0.12, th) * 0.6;
   col += GOLD * sh * (1.0 - 0.6 * dk) * (Q > 0 ? 1.0 : 0.7);
@@ -107,14 +112,18 @@ float vn2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f)
   return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }
 float fb2(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vn2(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s / 0.9375; }
 float pillar(vec2 c, float sd) {
-  float n = fb2(vec2(c.y * 2.2 + sd, sd * 1.7)), n2 = fb2(c * vec2(5.0, 3.0) + sd * 3.1);
-  float bend = 0.16 * sin(c.y * 1.6 + sd * 2.0);
-  float wd = (0.36 - 0.07 * (c.y + 1.0)) * (0.75 + 0.5 * n);
+  // (a6b: a tall column tapering to a ragged tip — not a thumb —, a small globule breaking off above it)
+  float y01 = clamp((c.y + 1.0) * 0.5, 0.0, 1.0);
+  float n = fb2(vec2(c.y * 2.2 + sd, sd * 1.7)), n2 = fb2(c * vec2(6.0, 3.5) + sd * 3.1);
+  float bend = 0.07 * sin(c.y * 1.9 + sd * 2.0) + 0.06 * y01 * y01;
+  float wd = 0.31 * (1.0 - 0.7 * y01) * (0.8 + 0.4 * n);
   float ax = abs(c.x - bend) / wd;
-  float s = 1.0 - smoothstep(0.8, 1.0, ax + (n2 - 0.5) * 0.55);
-  float tipY = 0.72 + 0.12 * (n - 0.5) - 0.35 * pow(clamp(ax, 0.0, 1.0), 2.0);
-  s *= 1.0 - smoothstep(tipY - 0.06, tipY + 0.04, c.y + (n2 - 0.5) * 0.12);
-  return s * smoothstep(-1.0, -0.55, c.y);
+  float s = 1.0 - smoothstep(0.72, 1.0, ax + (n2 - 0.5) * (0.35 + 0.6 * y01));
+  float tipY = 0.74 + 0.14 * (n - 0.5);
+  s *= 1.0 - smoothstep(tipY - 0.12, tipY + 0.02, c.y + (n2 - 0.5) * 0.3 + 0.3 * ax * ax);
+  float gb = 1.0 - smoothstep(0.03, 0.05, length((c - vec2(bend + 0.05 * (n - 0.5), tipY + 0.1)) * vec2(1.0, 0.8)) + (n2 - 0.5) * 0.03);
+  s = max(s, gb * step(0.35, fract(sd * 3.7)));
+  return s * smoothstep(-1.0, -0.6, c.y);
 }
 float cloud(vec2 c, float sd) {
   vec2 q = c * 1.4 + sd * vec2(7.13, 3.71);
@@ -127,15 +136,17 @@ void main() {
     bool pl = k < 3.5;
     float s = pl ? pillar(v_c, sd) : cloud(v_c, sd);
     if (s < 0.004) discard;
-    float s2 = pl ? pillar(v_c + u_ld * 0.05, sd) : cloud(v_c + u_ld * 0.05, sd);
-    float rim = s * (1.0 - s2) * (pl ? 0.12 + 0.88 * smoothstep(0.0, 0.65, v_c.y) : 0.05);
-    vec3 body = u_col2 * (0.7 + 0.6 * vn2(v_c * 6.0 + sd)) + u_col * 0.05 * smoothstep(0.0, 1.0, dot(v_c, u_ld));
-    o = vec4((body * s + u_col * rim * 1.5) * a, s * a);
+    float s2 = pl ? pillar(v_c + u_ld * 0.022, sd) : cloud(v_c + u_ld * 0.04, sd);
+    float s3 = pl ? pillar(v_c + u_ld * 0.09, sd) : s2;
+    float rim = s * (1.0 - s2) * (pl ? 0.15 + 0.85 * smoothstep(-0.2, 0.7, v_c.y) : 0.05);
+    float glow = pl ? s * (1.0 - s3) * (0.1 + 0.5 * smoothstep(-0.3, 0.8, v_c.y)) : 0.0;   // (the lit flank's soft inner glow)
+    vec3 body = u_col2 * (0.6 + 0.8 * vn2(v_c * 7.0 + sd)) + u_col * (0.04 * smoothstep(0.0, 1.0, dot(v_c, u_ld)) + 0.16 * glow);
+    o = vec4((body * s + mix(u_col, vec3(1.6, 1.2, 0.8), 0.25) * rim * 1.25) * a, s * a);
     return;
   }
   if (k < 5.5) {   // Flimmi
     float pu = 1.0 + 0.06 * sin(t * 2.1), rr = r / pu, an = atan(v_c.y, v_c.x);
-    vec3 c = vec3(1.0, 0.97, 0.9) * exp(-rr * rr * 90.0) * 4.5 + vec3(1.0, 0.78, 0.40) * exp(-rr * 9.0) * 2.0 + vec3(1.0, 0.50, 0.22) * exp(-rr * 3.2) * 0.45;
+    vec3 c = vec3(1.0, 0.95, 0.82) * exp(-rr * rr * 70.0) * 3.0 + vec3(1.0, 0.78, 0.40) * exp(-rr * 9.0) * 2.0 + vec3(1.0, 0.50, 0.22) * exp(-rr * 3.2) * 0.45;
     float st = vn2(vec2(cos(an), sin(an)) * 2.5 + vec2(t * 0.15, rr * 2.0 - t * 0.4));
     c += vec3(1.0, 0.6, 0.3) * pow(st, 3.0) * exp(-rr * 2.6) * 1.4 * smoothstep(0.08, 0.2, rr);   // (the corona's slow streamers)
     float ca = cos(t * 0.1), sa = sin(t * 0.1); vec2 q = mat2(ca, -sa, sa, ca) * v_c;
@@ -143,11 +154,15 @@ void main() {
     c *= 1.0 - smoothstep(0.85, 1.0, r);
     // the face: two eyes that blink now and then, a small smile
     float bl = 0.08 + 0.92 * smoothstep(0.0, 0.04, abs(fract(t * 0.27 + 0.3) - 0.5) - 0.02);
-    vec2 e1 = (v_c - vec2(-0.052, 0.018)) * vec2(1.0, 1.0 / bl), e2 = (v_c - vec2(0.052, 0.018)) * vec2(1.0, 1.0 / bl);
-    float eye = max(1.0 - smoothstep(0.021, 0.028, length(e1 * vec2(1.25, 0.8))), 1.0 - smoothstep(0.021, 0.028, length(e2 * vec2(1.25, 0.8))));
-    float mo = (1.0 - smoothstep(0.005, 0.01, abs(length(v_c - vec2(0.0, 0.03)) - 0.058))) * step(v_c.y, -0.012) * step(abs(v_c.x), 0.034);
-    float fa = max(eye, mo * 0.85) * u_face;
-    o = vec4(c * a * (1.0 - fa) + vec3(0.2, 0.07, 0.02) * fa, fa);
+    vec2 e1 = (v_c - vec2(-0.06, 0.02)) * vec2(1.0, 1.0 / bl), e2 = (v_c - vec2(0.06, 0.02)) * vec2(1.0, 1.0 / bl);
+    float l1 = length(e1 * vec2(1.2, 0.78)), l2 = length(e2 * vec2(1.2, 0.78));
+    float eye = max(1.0 - smoothstep(0.028, 0.035, l1), 1.0 - smoothstep(0.028, 0.035, l2));
+    float spk = (1.0 - smoothstep(0.006, 0.01, length(e1 - vec2(0.009, 0.012)))) + (1.0 - smoothstep(0.006, 0.01, length(e2 - vec2(0.009, 0.012))));
+    float mo = (1.0 - smoothstep(0.007, 0.013, abs(length(v_c - vec2(0.0, 0.035)) - 0.07))) * step(v_c.y, -0.014) * step(abs(v_c.x), 0.042);
+    float ck = (exp(-dot(v_c - vec2(-0.1, -0.03), v_c - vec2(-0.1, -0.03)) * 2500.0) + exp(-dot(v_c - vec2(0.1, -0.03), v_c - vec2(0.1, -0.03)) * 2500.0)) * u_face;
+    float fa = max(eye * (1.0 - spk * step(0.5, bl)), mo * 0.9) * u_face;
+    c = mix(c, vec3(1.6, 0.55, 0.45), ck * 0.45);
+    o = vec4(c * a * (1.0 - fa) + vec3(0.16, 0.05, 0.03) * fa, fa);
     return;
   }
   if (k < 6.5) {   // a soft glow (the motes round Flimmi)
@@ -208,7 +223,7 @@ void main() {
     const faz = Math.atan2(-FD[0], -FD[2]), fel = Math.asin(Math.max(-1, Math.min(1, FD[1])));
     const dirA = (az, el) => [-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)];
     const shine = id !== 'c9.b1';   // (9.1: the star still in its cocoon)
-    const GOLDR = [1.7, 0.75, 0.28], MAGR = [1.5, 0.28, 0.55];
+    const GOLDR = [1.7, 0.8, 0.32], MAGR = [1.45, 0.4, 0.62];
     // the pillars: from the land up toward the star, on both sides of it
     const nP = q === 0 ? 3 : 5;
     for (let i = 0; i < nP; i++) {
@@ -217,7 +232,7 @@ void main() {
       const B = dirA(azB, -0.12), T = dirA(azT, fel * (0.62 + 0.2 * r6(i, 3)));
       const P0 = [e[0] + B[0] * D, e[1] + B[1] * D, e[2] + B[2] * D], P1 = [e[0] + T[0] * D, e[1] + T[1] * D, e[2] + T[2] * D];
       const C = [(P0[0] + P1[0]) / 2, (P0[1] + P1[1]) / 2, (P0[2] + P1[2]) / 2], ax0 = nrm([P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]]);
-      const H = Math.hypot(P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]) / 2 * 1.12, Wd = H * (0.62 + 0.25 * r6(i, 4));
+      const H = Math.hypot(P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]) / 2 * 1.12, Wd = H * (0.58 + 0.2 * r6(i, 4));
       const rel = [C[0] - e[0], C[1] - e[1], C[2] - e[2]], am = SN.aim(rel, ax0, ax0);
       out.push({ p: C, s: [Wd, H], rot: am.rot, ld: am.ld, kind: 3, a: k, col: i < 2 ? GOLDR : MAGR, col2: [0.016, 0.014, 0.04], seed: 1.3 + i * 2.71, far: true });
     }

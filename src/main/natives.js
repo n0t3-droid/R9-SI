@@ -112,8 +112,8 @@
       N.lanternAt(a, H);
       const fl = 0.86 + 0.14 * Math.sin((P.clock || 0) * 9.1 + a.pos[0]) * Math.sin((P.clock || 0) * 5.3 + a.pos[2]);
       o.life = dt * 1.5 + 1e-4;
-      o.size = 0.5; o.col[0] = 1.15 * fl; o.col[1] = 0.74 * fl; o.col[2] = 0.34 * fl; P.spawn(H[0], H[1], H[2], 0, 0, 0, o);
-      o.size = 2.1; o.col[0] = 0.5 * fl; o.col[1] = 0.27 * fl; o.col[2] = 0.08 * fl; P.spawn(H[0], H[1] - 0.2, H[2], 0, 0, 0, o);
+      o.size = 0.45; o.col[0] = 1.15 * fl; o.col[1] = 0.74 * fl; o.col[2] = 0.34 * fl; P.spawn(H[0], H[1], H[2], 0, 0, 0, o);
+      o.size = 1.5; o.col[0] = 0.3 * fl; o.col[1] = 0.16 * fl; o.col[2] = 0.05 * fl; P.spawn(H[0], H[1] - 0.2, H[2], 0, 0, 0, o);
       n++;
     }
     P.lantN = n;

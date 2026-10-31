@@ -57,6 +57,7 @@ console.log('c · the lantern\'s halo');
   check(N.lanternHalos(P, 0.016, [0, 64, 0], 0.1) === 0 && spawned.length === 0, 'by day: no halo');
   const n = N.lanternHalos(P, 0.016, [0, 64, 0], 0.9);
   check(n === 1 && spawned.length === 2 && spawned[0][1][0] > spawned[0][1][2] * 2.5 && spawned[1][0] > 3 * spawned[0][0], `at night: the glass's warm glow and a wide pool round it (${spawned.map(q => q[0]).join(', ')} m), none for a sitter or a staff`);
+  check(spawned[1][0] <= 1.6 && spawned[1][1][0] <= 0.36, `the pool soft, not a second sun at arm's length (${spawned[1][0]} m, ${spawned[1][1][0].toFixed(2)})`);
   const far = { game: { villages: { known: new Map([['v', { agents: [a] }]]) } }, clock: 1, spawn() { far.n = (far.n || 0) + 1; } };
   check(N.lanternHalos(far, 0.016, [200, 64, 0], 0.9) === 0, 'none beyond 48 m');
   check(!!(VR.Particles && VR.Particles.prototype._lant6), 'drawn where the lamps\' halos are (Particles.lampGlows: Balanced and up)');

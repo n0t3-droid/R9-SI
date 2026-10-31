@@ -125,7 +125,7 @@ try {
       await off6(false); await play('c7.b2', 12.5, 'c7_window_before'); await skipScene();
       await off6(true); await ev(() => { VR.StoryPlay.stats.arrowTrue = 0; VR.StoryPlay.debug.reach('c7.b2'); });
       const r7 = await play('c7.b2', 12.5, 'c7_window');
-      N.c7 = await ev(() => ({ visible: VR.StoryPlay.stats.arrow6, trueFrames: VR.StoryPlay.stats.arrowTrue || 0, near: VR.StoryPlay.stats.arrowNear || 0, cos: VR.StoryPlay.stats.arrowCos, beams: VR.StoryPlay.stats.beams || 0, fr: !!(VR.SpaceFlight && VR.SpaceFlight.cur && VR.SpaceFlight.cur.axes), sky: VR.StoryPlay.station ? 1 : 0 }));
+      N.c7 = await ev(() => ({ visible: VR.StoryPlay.stats.arrow6, trueFrames: VR.StoryPlay.stats.arrowTrue || 0, near: VR.StoryPlay.stats.arrowNear || 0, far: VR.StoryPlay.stats.arrowFar || 0, cos: VR.StoryPlay.stats.arrowCos, beams: VR.StoryPlay.stats.beams || 0, fr: !!(VR.SpaceFlight && VR.SpaceFlight.cur && VR.SpaceFlight.cur.axes), sky: VR.StoryPlay.station ? 1 : 0 }));
       console.log('     c7 ' + JSON.stringify(N.c7));
       check(r7.st && r7.st.fx === 'beacons', 'c7.b2 plays');
       check(N.c7.visible >= 3 ? N.c7.trueFrames > 0 : true, 'the arrow on the true beacons when three or more show in the window (' + N.c7.visible + ' visible)');
