@@ -48,6 +48,11 @@ if (part('b')) {
   loaded = true;
   const r = F.vistaBack(g);
   check(r && g.meta.f4back === 1 && Math.abs(p.pos[2] - 19.5) < 1e-9 && F.backWhy === 'back', 'the next call steps back on the way (' + JSON.stringify(r) + ', ' + F.backWhy + ')');
+  const sid = (re) => { for (let s = 1; s < R.T.type.length; s++) { const n = (R.types[R.T.type[s]] || {}).name || ''; if (re.test(n) && (R.T.flags[s] & VR.F.SOLID)) return s; } return 0; };
+  const bricks = sid(/^bricks$/), grass = sid(/^grass_block$/);
+  const try2 = (under) => { const w2 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? under : 0) }, p2 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } }; return F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p2, world: w2 }); };
+  check(bricks && try2(bricks) && F.backWhy === 'back', 'a walk of bricks (the feet\'s own paving behind): one block back');
+  check(grass && try2(grass) === null && /^stays:grass/.test(F.backWhy), 'grass under the feet and behind: stays (' + F.backWhy + ')');
 }
 if (part('c')) {
   console.log('c · the citadel\'s beam only on the Heartland (the station café\'s white orbs)');

@@ -190,16 +190,20 @@ try {
     if (V) {
       await ev((V) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(V.x + 8, V.y + 6, V.z + 8); g.env.setTime(15500); }, V);
       await settle(30, 'the town');
+      // the world's own night (a strange world's clock: the sun down) within the lamplighters' hours (13000–23300)
+      let tdN = null; for (const tod of [18000, 15000, 21000, 13500, 22500]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up === false) { tdN = tod; break; } }
+      console.log('     the night at ' + tdN); if (tdN === null) tdN = 18000;
+      await ev((t) => VR.game.env.setTime(t), tdN);
       await run(400);
       const a = await ev(() => { const v = VR.game.villages.known.get('eco:aqua:0'); if (!v) return null; const L = v.agents.filter(o => o.act && o.act.type === 'lantern'); const o = L.find(q => q.pose !== 'sit') || L[0]; if (!o) return { n: 0, acts: v.agents.map(q => q.act && q.act.type).join(',') }; window.__lampA = o; return { n: L.length, pos: o.pos.slice(), yaw: o.yaw, tool: o.p.look.tool }; });
       console.log('     lamplighters ' + JSON.stringify(a).slice(0, 400));
       check(a && a.n >= 2, 'at night the lamplighters walk (' + (a && a.n) + ')');
       if (a && a.n) {
         // the camera 2.6 m before the lamplighter, a little above the head; the figure held still
-        await ev(() => { const g = VR.game, o = window.__lampA, p = g.player, fx = -Math.sin(o.yaw), fz = -Math.cos(o.yaw); p.flying = true; p.noclip = true; const e = [o.pos[0] + fx * 2.6 + fz * 0.8, o.pos[1] + 1.9, o.pos[2] + fz * 2.6 - fx * 0.8]; p.teleport(e[0], e[1] - 1.62, e[2]); const dx = o.pos[0] - e[0], dy = o.pos[1] + 0.9 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); window.__hold = o.pos.slice(); });
+        await ev(() => { const g = VR.game, o = window.__lampA, p = g.player, fx = Math.sin(o.yaw), fz = Math.cos(o.yaw); p.flying = true; p.noclip = true; const e = [o.pos[0] + fx * 2.8 - fz * 1.0, o.pos[1] + 1.6, o.pos[2] + fz * 2.8 + fx * 1.0]; p.teleport(e[0], e[1] - 1.62, e[2]); const dx = o.pos[0] - e[0], dy = o.pos[1] + 0.8 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); window.__hold = o.pos.slice(); });
         await run(6);
-        await ev(() => { const o = window.__lampA, g = VR.game, p = g.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = o.pos[0] - e[0], dy = o.pos[1] + 0.9 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); });
-        await draw(); await shot('lamplighter');
+        await ev(() => { const o = window.__lampA, g = VR.game, p = g.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = o.pos[0] - e[0], dy = o.pos[1] + 0.8 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); });
+        await draw(tdN); await shot('lamplighter');
         N.lamp = await ev(() => ({ tool: window.__lampA.p.look.tool, act: window.__lampA.act && window.__lampA.act.type }));
         console.log('     ' + JSON.stringify(N.lamp));
         if (TAG === 'after') check(N.lamp.tool === 'lantern', 'the lamplighter holds a lantern at night (' + N.lamp.tool + ')');

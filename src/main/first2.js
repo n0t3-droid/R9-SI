@@ -254,6 +254,7 @@
   // isPave(state), solid(state) → the new feet or null (test/first4.js)
   F.STEP_BACK = 1;
   F.PAVE_RE = /flagstone|floor_plaza|dirt_path|coarse_dirt|gravel|path/;
+  F.LAND_RE = /grass|^dirt$|^sand$|^red_sand$|snow|moss|podzol|mud|mycel|^stone$|^clay$/;   // (f-polish4: the land's own ground, never 'the way')
   F.stepBack = function (feet, u, get, isPave, solid) {
     if (!feet || !u) return null;
     const x = feet[0] - u[0] * F.STEP_BACK, z = feet[2] - u[1] * F.STEP_BACK, y = feet[1], X = Math.floor(x), Y = Math.floor(y + 0.01), Z = Math.floor(z);
@@ -272,7 +273,11 @@
     m.f4back = 1;
     if (Math.hypot(p.pos[0] - p.spawn[0], p.pos[2] - p.spawn[2]) > 0.5) { F.backWhy = 'moved'; return null; }
     const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : 1;
-    const r = F.stepBack(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), (b) => !!b && F.PAVE_RE.test((R.types[R.T.type[b]] || {}).name || ''), (b) => !!(T[b] & S));
+    // (f-polish4: the way's paving is also whatever made block the feet stand on — a walk of bricks or terracotta — but
+    // never the land's own ground: grass behind still keeps the start where it is)
+    const nmOf = (b) => (b ? (R.types[R.T.type[b]] || {}).name || '' : ''), under = w.getBlock(Math.floor(p.pos[0]), Math.floor(p.pos[1] + 0.01) - 1, Math.floor(p.pos[2]));
+    const own = under && (T[under] & S) && !F.LAND_RE.test(nmOf(under)) ? under : 0;
+    const r = F.stepBack(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), (b) => !!b && (b === own || F.PAVE_RE.test(nmOf(b))), (b) => !!(T[b] & S));
     if (!r) { const b = w.getBlock(bx, Math.floor(p.pos[1] + 0.01) - 1, bz); F.backWhy = 'stays:' + (b ? (R.types[R.T.type[b]] || {}).name : 'air'); return null; }
     F.backWhy = 'back';
     p.teleport(r[0], r[1], r[2]); p.spawn = r.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r.slice();
