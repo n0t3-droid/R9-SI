@@ -197,8 +197,25 @@
     if (g.audio && g.audio.play && !o.dry) g.audio.play('portal');
     if (g.audio && g.audio.cue && !o.dry) g.audio.cue('hold');   // (the score makes room: the film has its own swell)
     save(g);
+    hush(g);
     requestAnimationFrame(frame);
     return film;
+  };
+  // while the film covers the whole screen the 3D world is not drawn (the camera is still set: streaming follows it)
+  Portal.covers = () => { const J = M.J; return !!(J && !J.dry && J.phase === 'film' && !J.covered && J.t > J.film.shots[0].dur * 0.85); };
+  function hush(g) {
+    const r = g && g.renderer; if (!r || r.__ptHush) return;
+    const orig = r.render; r.__ptHush = true;
+    r.render = function (F) { if (Portal.covers() && F && F.cam) { if (this.setupCamera) this.setupCamera(F.cam); return; } return orig.apply(this, arguments); };
+  }
+  // the film's own cost (the test): n frames across a film drawn into a canvas of the preset's size → ms a frame
+  Portal.bench = function (film, n, lowP) {
+    if (!doc) return 0;
+    const c = el('canvas'), sc = lowP ? 0.4 : 0.75; c.width = Math.max(320, Math.round(innerWidth * sc)); c.height = Math.max(180, Math.round(innerHeight * sc));
+    const x = c.getContext('2d'), P = F.make(Object.assign({}, film, { low: !!lowP }), palOf(film.to), palOf(film.from), { air: C.airOf(film.to), to: film.to, from: film.from, kind: C.kindOf(film.to) });
+    P.draw(x, c.width, c.height, 0.5);
+    const t0 = now(); for (let i = 0; i < n; i++) P.draw(x, c.width, c.height, (i + 0.5) / n * P.len); x.getImageData(0, 0, 1, 1);
+    return (now() - t0) / n;
   };
   Portal.seek = (t) => { const J = M.J; if (!J) return false; J.t = t; J.paused = true; draw(J); return J.P.shotAt(t); };
   Portal.play = () => { const J = M.J; if (J) { J.paused = false; J.last = now(); } };
@@ -225,7 +242,7 @@
   }
   function frame() {
     const J = M.J; if (!J) return;
-    const tn = now(), dt = Math.min(0.1, (tn - J.last) / 1000); J.last = tn;
+    const tn = now(), dt = Math.min(0.25, (tn - J.last) / 1000); J.last = tn;   // (the wall clock: a slow frame does not slow the film)
     const g = J.g;
     if (J.phase === 'film') {
       if (!J.paused) J.t += dt;

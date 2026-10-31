@@ -72,18 +72,11 @@ const a4 = await filmShot({ dim: 'x.2.1.1' }, F2, 'tunnel', 0.6, 'journey_exo_tu
 const a5 = await filmShot({ dim: 'opal' }, F1, 'swallow', 0.55, 'journey_swallow.png');
 const a6 = await filmShot({ dim: 'opal' }, F1, 'moon', 0.75, 'journey_moon_opal.png');
 check(a4.sh === 'tunnel', 'the star-jump tunnel to another star');
-// the film's draw cost: High, then Very Low (a dry film played for 3 s each)
-for (const pr of ['high', 'potato']) {
-  await ev((p) => { const g = VR.game; g.settings.preset = p; }, pr);
-  await ev((F) => VR.Portal.go(VR.game, { dim: 'opal' }, { dry: true, film: Object.assign({}, F, { low: VR.game.settings.preset === 'potato' }) }), F1);
-  await wait(4000);
-  const s = await ev(() => VR.Portal.stats());
-  rec['film_' + pr] = { drawMs: s.drawMs, maxMs: s.maxMs, w: s.film && s.film.w, h: s.film && s.film.h };
-  await ev(() => VR.Portal.cancel());
-}
-await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.renderDist = 6; g.applySettings('*'); });
-console.log('  film draw ms: High ' + JSON.stringify(rec.film_high) + ' · Very Low ' + JSON.stringify(rec.film_potato));
-check(rec.film_potato.drawMs <= rec.film_high.drawMs + 0.5, 'Very Low draws the film no dearer than High');
+// the film's draw cost: High, then Very Low (60 frames across the film, drawn in the page at each preset's canvas size)
+rec.film_high = await ev((F) => VR.Portal.bench(F, 60, false), F1);
+rec.film_potato = await ev((F) => VR.Portal.bench(F, 60, true), F1);
+console.log('  film draw ms a frame: High ' + rec.film_high.toFixed(2) + ' · Very Low ' + rec.film_potato.toFixed(2));
+check(rec.film_potato <= rec.film_high, 'Very Low draws the film no dearer than High');
 save();
 // ---------------------------------------------------------------- a real trip: Herzwelt → Opal
 rec.ctxBefore = await ev(() => ({ ctx: VR.Portal.ctx(VR.game), screen: VR.game.ui.screen, blocking: VR.game.ui.blocking, state: VR.game.state, mode: VR.game.player.mode, adv: VR.Adventure && VR.Adventure.on && VR.Adventure.on(), role: VR.game.mp && VR.game.mp.role }));
