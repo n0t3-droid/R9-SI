@@ -437,6 +437,8 @@
   STN.stats = { meshes: 0, drawn: 0, shuttles: 0, glare: 0, dockMs: [], err: null, phase: null, frames: 0, interior: 0 };
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'stations', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.stations', tip: 'g.set.stations.tip', cost: 'low', def: true });
 
+  // u-stations2: the hand-off — the minimap's whole re-do passes while the station streams in spread over frames
+  if (VR.MapView) VR.MapView.budgetIf = (g) => STN.inStation(g);
   // u-stations2: the station generator's version in the save (Bodies.stamp / bgenOf wrapped: genOpts.bgen.stn)
   { const BD = VR.Bodies; if (BD && BD.stamp && !BD.__stn2) { BD.__stn2 = true; const s0 = BD.stamp, b0 = BD.bgenOf; BD.stamp = function (meta) { const m = s0.apply(this, arguments); STN.stampS(meta); return m; }; BD.bgenOf = function (meta) { const o = b0.apply(this, arguments); if (o) o.stn = STN.sgenOf(meta); return o; }; } }
   // ---------------------------------------------------------------- the meshes (the grids: the pure part above → the worker's shipmesh job)
