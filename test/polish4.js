@@ -56,6 +56,9 @@ if (part('b')) {
   const path = sid(/^dirt_path$/);
   const w3 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? (z === 20 ? path : grass) : y === 71 && z === 17 ? grass : 0) }, p3 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
   const r3 = F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p3, world: w3 });
+  const v3 = { u: [0, 1], eye: [10.6, 72.62, 20.4] }, p3b = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
+  F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: v3 }, player: p3b, world: w3 });
+  check(Math.abs(v3.eye[2] - 18.4) < 1e-9 && Math.abs(v3.eye[0] - 10.6) < 1e-9 && v3.eye[1] === 72.62, 'the wow moment\'s camera steps back with the feet (' + v3.eye.join(', ') + ')');
   check(r3 && Math.abs(p3.pos[2] - 18.5) < 1e-9 && F.backWhy === 'back:ground', 'the meadow behind the walk\'s first cell: two blocks back onto it (' + JSON.stringify(r3) + ', ' + F.backWhy + ')');
   const w4 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? (z === 20 ? path : grass) : y === 71 && z === 18 ? grass : 0) }, p4 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
   F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p4, world: w4 });

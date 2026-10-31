@@ -274,6 +274,12 @@
     }
     return null;
   };
+  // f-polish4: the arrival's camera (v.eye, when it stands over the old feet) moved by the feet's step
+  F.shiftEye = function (v, from, to) {
+    if (!v || !Array.isArray(v.eye) || v._eyeFrom === from[0] + ',' + from[2] || Math.hypot(v.eye[0] - from[0], v.eye[2] - from[2]) > 3) return false;
+    v.eye = [v.eye[0] + to[0] - from[0], v.eye[1], v.eye[2] + to[2] - from[2]]; v._eyeFrom = to[0] + ',' + to[2];
+    return true;
+  };
   // (once, on a vista start's own first arrival, the feet still on the spawn: from the loading screen's last moments
   //  (First.holdLoading, the world there, the screen still the loading screen), else under the arrival's white (settle))
   F.vistaBack = function (g, v0) {
@@ -295,8 +301,13 @@
     // now it steps back onto the land's own plain ground too, two blocks where both are free, else one)
     const isGround = (b) => !!b && (b === own || F.PAVE_RE.test(nmOf(b)) || F.LAND_RE.test(nmOf(b)));
     const r2 = r || F.stepBackOpen(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), isGround, (b) => !!(T[b] & S), F.OPEN_STEPS);
-    if (!r && r2) { p.teleport(r2[0], r2[1], r2[2]); p.spawn = r2.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r2.slice(); F.backed = r2; F.backWhy = 'back:ground'; return r2; }
-    if (!r) { const b = w.getBlock(bx, Math.floor(p.pos[1] + 0.01) - 1, bz); F.backWhy = 'stays:' + (b ? (R.types[R.T.type[b]] || {}).name : 'air'); return null; }
+    if (!r && !r2) { const b = w.getBlock(bx, Math.floor(p.pos[1] + 0.01) - 1, bz); F.backWhy = 'stays:' + (b ? (R.types[R.T.type[b]] || {}).name : 'air'); return null; }
+    // (run 3: the feet moved but the first seconds' picture did not — the wow moment's camera is the vista's own eye
+    // (FI.arrivalOf: the sight test's), standing at the feet: it steps back with them)
+    const to = r || r2;
+    F.shiftEye(v, p.pos, to); if (A && A.v && A.v !== v) F.shiftEye(A.v, p.pos, to);
+    { const W = g.wow, b = W && W.active && W.b; if (b && Math.hypot(b.x - p.pos[0], b.z - p.pos[2]) < 3) { b.x += to[0] - p.pos[0]; b.z += to[2] - p.pos[2]; } }   // (the moment already playing: its camera too)
+    if (!r) { p.teleport(to[0], to[1], to[2]); p.spawn = to.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = to.slice(); F.backed = to; F.backWhy = 'back:ground'; return to; }
     F.backWhy = 'back';
     p.teleport(r[0], r[1], r[2]); p.spawn = r.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r.slice();
     F.backed = r; return r;
