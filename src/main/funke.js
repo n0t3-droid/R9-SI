@@ -585,7 +585,7 @@ void main() {
     }
     sparkle() {
       const P = this.g.particles, p = this.pos; if (!P || !P.spawn) return;
-      { const c = this.g.cam; if (c && !F.sparkOk(p[0] - c.x, p[1] - c.y, p[2] - c.z)) return; }   // (f-hud: its 14 sparks at the eye were the big pale balls in the face)
+      { const c = this.g.cam, pl = this.g.player, e = pl && pl.eyePos ? pl.eyePos() : null; if ((c && !F.sparkOk(p[0] - c.x, p[1] - c.y, p[2] - c.z)) || (e && !F.sparkOk(p[0] - e[0], p[1] - e[1], p[2] - e[2]))) { F.cost.sparkSkip = (F.cost.sparkSkip || 0) + 1; return; } }   // (the eye too: the first frame's camera can be the last world's)   // (f-hud: its 14 sparks at the eye were the big pale balls in the face)
       PO.col = [0.45, 0.95, 1];
       for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; P.spawn(p[0], p[1], p[2], Math.cos(a) * 2.2, (i % 3 - 1) * 0.8, Math.sin(a) * 2.2, PO); }
     }

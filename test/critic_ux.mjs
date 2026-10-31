@@ -81,13 +81,15 @@ await wait(1500); await shot('04_t0');
   check(arr >= 0 && (arr <= 9000 || pf <= 9000), 'the arrival is over in ' + arr + ' ms (≤ 9 s, or on the first frame after 9 s: the frame before at ' + pf + ' ms; no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
 OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h), A = VR.game.arrival, a = document.activeElement; return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud, arrival: A ? { phase: A.phase, holds: A.holds(), t: +(A.t || 0).toFixed(2) } : null, wow: !!(VR.game.wow && VR.game.wow.active), focus: a ? a.tagName + '#' + a.id : '', captured: !!VR.game.input.captured, poll: window.__arr || null } : null; }).catch(() => null);
+OUT.moved15 = await ev(() => VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null).catch(() => null);
+check(!OUT.moved15 || OUT.moved15.phase !== 'after', 'the spawn\'s settle move (first2) under the arrival\'s white: ' + JSON.stringify(OUT.moved15));
 check(OUT.hud15 && OUT.hud15.vis !== 'hidden' && OUT.hud15.op > 0.5 && !OUT.hud15.hideHud, 'at 15 s the HUD is up: ' + JSON.stringify(OUT.hud15));
 const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 // (W, then S: the spawn may face a bench or a parapet — a key that moves the player at all is the measure)
 // (W's first second of play: at least 1 s of wall time and 2 frames with W held — under SwiftShader a frame can take seconds)
 const fW0 = await ev(() => VR.game.frame).catch(() => 0), tW0 = Date.now();
 await page.keyboard.down('KeyW'); await wait(1000);
-{ let fw = 0; while (Date.now() - tW0 < 60000) { fw = await ev(() => VR.game.frame).catch(() => 0); if (fw - fW0 >= 3) break; await wait(200); } OUT.wFirst = { ms: Date.now() - tW0, frames: fw - fW0 }; }
+{ let fw = 0; while (Date.now() - tW0 < 180000) { fw = await ev(() => VR.game.frame).catch(() => 0); if (fw - fW0 >= 3) break; await wait(200); } OUT.wFirst = { ms: Date.now() - tW0, frames: fw - fW0 }; }
 const pW1 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 console.log('  W first second: ' + JSON.stringify(OUT.wFirst) + ' fps ' + await ev(() => +(VR.game.fps || 0).toFixed(2)).catch(() => -1));
 { const f1 = await ev(() => VR.game.frame).catch(() => 0), t1 = Date.now(); await wait(3000); while (Date.now() - t1 < 90000 && (await ev(() => VR.game.frame).catch(() => f1 + 3)) - f1 < 3) await wait(200); } await page.keyboard.up('KeyW');
@@ -116,10 +118,14 @@ OUT.itemNamesData = await ev(() => { const inv = VR.game.player.inv; return inv.
 // and which hints the HUD gives at 2 and 3 minutes
 OUT.hints3 = [];
 const WALK_HOLDS = 6;
+// (f-hud) one W hold of the walk: at least 3 s, then on until the player went 3 m or 15 frames passed (cap 240 s) — at a
+// frame a minute (the machine under load) a 3-s hold walked 0.2 m; a slow frame walks only 0.1 s (a stall is no walk)
+const holdWalk = async () => { const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null), f0 = await ev(() => VR.game.frame).catch(() => 0), t = Date.now(); await page.keyboard.down('KeyW'); await wait(3000);
+  while (Date.now() - t < 240000) { const q = await ev(() => [VR.game.frame, VR.game.player.pos[0], VR.game.player.pos[2]]).catch(() => null); if (!q || !p0 || q[0] - f0 >= 15 || Math.hypot(q[1] - p0[0], q[2] - p0[2]) >= 3) break; await wait(300); } await page.keyboard.up('KeyW'); };
 for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
   // (f-hud: the walk counted in W holds, not wall time — under SwiftShader the wall clock ran out with 17 m walked: six holds of
-  //  W (3 s and 2 frames each) a sample, small alternating looks so the way keeps a heading, a jump after each)
-  for (let i = 0; i < WALK_HOLDS; i++) { await holdFor('KeyW', 3000, 2); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
+  //  W (≥ 3 s, then on to 3 m or 15 frames: holdWalk) a sample, small alternating looks so the way keeps a heading, a jump after each)
+  for (let i = 0; i < WALK_HOLDS; i++) { await holdWalk(); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
@@ -192,7 +198,7 @@ if (!process.env.NO_ADV) {
   await wait(20000); await shot('17_adv_t25');
   // f-hud: the Abenteuer start shows its HUD (critic_ux_17 of f-first2: none — F1's hidden HUD of the first world carried
   // over), Funke never in the camera's face, the settle move made under the arrival's white
-  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), funkeCull: !!(VR.Funke && VR.Funke.camNear), moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
+  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), funkeCull: !!(VR.Funke && VR.Funke.camNear), sparkSkip: VR.Funke && VR.Funke.cost ? VR.Funke.cost.sparkSkip || 0 : -1, moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
   console.log('  adv 25 s: ' + JSON.stringify(OUT.advHud25));
   check(OUT.advHud25 && OUT.advHud25.vis !== 'hidden' && OUT.advHud25.op > 0.5 && !OUT.advHud25.hideHud, 'Abenteuer: at 25 s the HUD is up (F1 in the first world does not carry over): ' + JSON.stringify(OUT.advHud25));
   check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6 || OUT.advHud25.funkeCull), 'Abenteuer: Funke not drawn in the camera\'s face (closer than 0.6 m: culled; ' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
