@@ -102,8 +102,8 @@ for (const kind of WORLDS) {
   const nat = await hold(vid);
   check(nat && nat.species === kind && nat.tool, `${kind}: a native, ${nat ? nat.name : '?'} with its ${nat ? nat.tool : '?'}`);
   if (!nat) continue;
-  await frame(1.3, kind === 'ocker' ? 1.62 : 1.5, 0.05, -0.35);
-  for (let i = 0; i < 8; i++) { await step(6, 33); await frame(1.3, kind === 'ocker' ? 1.62 : 1.5, 0.05, -0.35); await ev(() => { window.__norender = false; const g = VR.game; window.__each(g); g.last = performance.now() - 33; g.loop(performance.now()); window.__each(g); window.__norender = true; }); await wait(400); }
+  await frame(1.0, kind === 'ocker' ? 1.66 : 1.5, kind === 'basalt' ? -0.2 : 0.05, -0.3);
+  for (let i = 0; i < 8; i++) { await step(6, 33); await frame(1.0, kind === 'ocker' ? 1.66 : 1.5, kind === 'basalt' ? -0.2 : 0.05, -0.3); await ev(() => { window.__norender = false; const g = VR.game; window.__each(g); g.last = performance.now() - 33; g.loop(performance.now()); window.__each(g); window.__norender = true; }); await wait(400); }
   const sm = await ev(() => { const a = window.__held; return a.fg ? a.fg.state : -1; });
   check(sm === 2, `${kind}: the smooth body ready (state ${sm})`);
   row.push(await grab(`w3_${kind}_face.png`, 3));
@@ -118,11 +118,11 @@ for (const kind of WORLDS) {
   await ev(() => { const el = document.getElementById('talk'); if (el) el.style.visibility = ''; });
   for (let i = 0; i < 6; i++) await step(20, 33);
   await ev(() => { const g = VR.game, a = window.__held; a.greetT = 0; });
-  const t2 = await ev(() => { const g = VR.game, a = window.__held, pl = g.player.pos; const near = a.vil.agents.filter(o => o !== a && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 6.5).length, hushed = a.vil.agents.filter(o => o.hush).length; const dy = Math.atan2(-(pl[0] - a.pos[0]), -(pl[2] - a.pos[2])) - a.yaw; return { near, hushed, turned: Math.abs(Math.atan2(Math.sin(dy), Math.cos(dy))) }; });
+  const t2 = await ev(() => { const g = VR.game, a = window.__held, pl = g.player.pos; const near = a.vil.agents.filter(o => o !== a && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 6.5).length, free = a.vil.agents.filter(o => o !== a && !o.hush && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 6.5).length, hushed = a.vil.agents.filter(o => o.hush).length; const dy = Math.atan2(-(pl[0] - a.pos[0]), -(pl[2] - a.pos[2])) - a.yaw; return { near, free, hushed, turned: Math.abs(Math.atan2(Math.sin(dy), Math.cos(dy))) }; });
   const word = await ev((k) => VR.Natives.LANG[k][0].w, kind);
   check(t1.text.includes(word) && t1.greet > 2, `${kind}: the greeting „${t1.text.slice(0, 70)}…“`);
   check(t2.turned < 0.35, `${kind}: turned to the player (${(t2.turned * 57.3).toFixed(0)}° off)`);
-  check(t2.near <= Math.max(0, t1.near - 1) || t2.near === 0, `${kind}: the others made room (${t1.near} → ${t2.near} within 6.5 m, ${t2.hushed} waiting)`);
+  check(t2.free === 0, `${kind}: the others make room (${t1.near} → ${t2.near} within 6.5 m, all of them stepping back: ${t2.hushed} waiting)`);
   // the three quests (on the first world): two more natives greeted → the gift → the culture moment → taught
   if (!chainDone) {
     const c = await ev((k) => { const g = VR.game, v = window.__held.vil; g.villages.closeTalk(); for (const o of v.agents.filter(o => o !== window.__held && !o.kid).slice(0, 2)) { g.villages.openTalk(o); g.villages.closeTalk(); } const s1 = VR.Natives.step(g.meta, k), q = VR.Natives.CHAIN[k][1]; g.player.inv.add(q.item, q.n); g.villages.openTalk(window.__held); const b = [...document.querySelectorAll('#tk_opts button')][0]; b.click(); const gb = document.querySelector('[data-natgive]'); if (gb) gb.click(); const s2 = VR.Natives.step(g.meta, k); g.villages.closeTalk(); return { s1, s2, text: document.getElementById('tk_text').textContent.slice(0, 90) }; }, kind);
