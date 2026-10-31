@@ -310,6 +310,9 @@
         const L = VR.Land && VR.Land.LAKE, heart = !!(g.meta && (g.meta.vgen | 0) >= 3 && g.meta.type !== 'flat');
         const nearLake = !!(heart && L && Math.hypot(ctx.eye[0] - L.x, ctx.eye[2] - L.z) < 450);
         const st = W.stageOf(this.seed, key, 'dusk', ctx.eye, nearLake);
+        // f-first4: a new world's first flock off the vista start's view line (the landmark's place in the first picture)
+        const m0 = g.meta, sp0 = m0 && (Array.isArray(m0.worldSpawn) ? m0.worldSpawn : g.player.spawn);
+        if (this.fresh && m0 && m0.vistaId && Number.isFinite(m0.spawnYaw) && sp0 && !st.lake) W.stageAside(st, sp0, m0.spawnYaw, W.MURM_ASIDE);
         if (st.y === null) { const w = g.world, X = Math.floor(st.x), Z = Math.floor(st.z); st.y = (w.isLoaded(X, Z) ? w.topAt(X, Z) : ctx.eye[1] - 1.6) + 40; }
         if (Math.hypot(st.x - ctx.eye[0], st.z - ctx.eye[2]) > 700) return;
         const fl = new W.Flock(n, (W.h(this.seed, key, 0x6b) * 4294967295) >>> 0);

@@ -248,8 +248,34 @@
     const tall = (x, y, z) => { const b = w.getBlock(x, y, z); if (!(T[b] & S) || !shp) return false; const h = shp[b]; return h === SH.FENCE || h === SH.WALL || h === SH.PANE; };
     return F.solidTall(solid, tall);
   };
+  // f-first4 (f-first3's self-review: the spawn picture's lower corners filled by the walk's first wall cells): a vista
+  // start steps STEP_BACK further back on the way (against the walk's direction u) when that cell is the way's paving with
+  // air for the body — the walls smaller, the way leading in; else it stays. Pure: feet [x, y, z], get(x, y, z) → a state,
+  // isPave(state), solid(state) → the new feet or null (test/first4.js)
+  F.STEP_BACK = 1;
+  F.PAVE_RE = /flagstone|floor_plaza|dirt_path|coarse_dirt|gravel|path/;
+  F.stepBack = function (feet, u, get, isPave, solid) {
+    if (!feet || !u) return null;
+    const x = feet[0] - u[0] * F.STEP_BACK, z = feet[2] - u[1] * F.STEP_BACK, y = feet[1], X = Math.floor(x), Y = Math.floor(y + 0.01), Z = Math.floor(z);
+    if (!isPave(get(X, Y - 1, Z)) || solid(get(X, Y, Z)) || solid(get(X, Y + 1, Z))) return null;
+    return [x, y, z];
+  };
+  // (once, on a vista start's own first arrival, the feet still on the spawn: from the loading screen's last moments
+  //  (First.holdLoading, the world there, the screen still the loading screen), else under the arrival's white (settle))
+  F.vistaBack = function (g, v0) {
+    const m = g && g.meta, A = g && g.arrival, v = v0 || (A && A.v), p = g && g.player;
+    if (!m || m.guest || m.f4back || !m.vistaId || !v || !Array.isArray(v.u) || !p || !g.world || !Array.isArray(p.spawn)) return null;
+    m.f4back = 1;
+    if (Math.hypot(p.pos[0] - p.spawn[0], p.pos[2] - p.spawn[2]) > 0.5) return null;
+    const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : 1, w = g.world;
+    const r = F.stepBack(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), (b) => !!b && F.PAVE_RE.test((R.types[R.T.type[b]] || {}).name || ''), (b) => !!(T[b] & S));
+    if (!r) return null;
+    p.teleport(r[0], r[1], r[2]); p.spawn = r.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r.slice();
+    F.backed = r; return r;
+  };
   F.settle = function (g) {
     try {
+      try { F.vistaBack(g); } catch (e) { /* the spawn stays */ }
       if (!g || !g.meta || !g.f2new || g.meta.guest || g.meta.f2open || !g.world || !g.player) return null;   // (f2new: no player record when the world opened — an autosave writes one within seconds)
       g.meta.f2open = 1;
       const p = g.player, r = F.openGround(F.solidOf(g.world), p.pos, p.yaw);

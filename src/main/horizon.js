@@ -29,11 +29,17 @@
     // the preset's ring-1 radius in chunks (0 = off: the horizon works exactly as before)
     setFar(r1) { if (this.far) this.far.setRadius(r1); }
     farOn() { return !!(this.far && this.far.on()); }
+    // f-first4 (critic_ux v0.54.9: no citadel, no isles on the horizon at 60 s — under a starved machine the landmark's tile
+    // came after the coarse ring and ~240 other tiles): a tile within one tile's width of the focus (a vista start's
+    // landmark, the arrival's aim, for the world's first FOCUS_MS) goes first, for the pool and the upload queue alike.
+    // Without a focus the order is the old one: coarse and near first, relative to the tile's size. Pure: test/first4.js
+    static focusD(F, L, tx, tz) { if (!F) return Infinity; const S = tileSize(L), x0 = tx * S, z0 = tz * S; return Math.hypot(Math.max(x0 - F[0], 0, F[0] - (x0 + S)), Math.max(z0 - F[1], 0, F[1] - (z0 + S))); }
+    static prio(d, L, fd) { const S = tileSize(L); return d / S - L * 0.6 - (fd < S ? Horizon.FOCUS_K : 0); }
     static radiusFor(level) { return RADII[Math.max(0, Math.min(4, level | 0))]; }
     setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level]; if (r !== this.radius) { this.radius = r; } }
     key(L, tx, tz) { return L + ':' + tx + ':' + tz; }
     free(t) { const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
-    reset() { for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; if (this.far) this.far.reset(); }
+    reset() { for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; this.focus = null; if (this.far) this.far.reset(); }
     // u-dims · a trip between the worlds of one save (travel.js): the tiles on the GPU stay for the way back (the same
     // world key finds them, the coarse ring is whole on the first frame home); what was still asked for is forgotten
     // with its jobs (the pool is cleared with the world), ring 1 starts again. Not drawn elsewhere (enabled: overworld)
@@ -51,6 +57,8 @@
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
       const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
       if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
+      // (f-first4) the landmark of a vista start's arrival: its tiles first for the world's first minutes
+      { const av = (g.arrival && g.arrival.v) || (g.arrivalPending && g.arrivalPending.vista); if (av && Array.isArray(av.aim) && !this.focus) { this.focus = [av.aim[0], av.aim[2]]; this.focusAt = performance.now(); } if (this.focus && performance.now() - this.focusAt > Horizon.FOCUS_MS) this.focus = null; }
       // (F-Far) another world object (a dimension and back) took the old upload queue with it: the tiles and forms that
       // waited in it are asked for again
       if (w !== this.qWorld) { if (this.qWorld) this.dropQueued(); this.qWorld = w; }
@@ -107,8 +115,9 @@
       const maxInflight = 4 + g.pool.workers.length * 2;
       let asked = 0;
       if (want.length && this.inflight < maxInflight) {
-        want.sort((p, q) => (p[0] / tileSize(p[1]) - p[1] * 0.6) - (q[0] / tileSize(q[1]) - q[1] * 0.6));
-        for (const [d, L, tx, tz] of want) { if (this.inflight >= maxInflight) break; if (!this.tiles.has(this.key(L, tx, tz))) { this.request(L, tx, tz, d); asked++; } }
+        const fo = this.focus; for (const w of want) w[4] = Horizon.prio(w[0], w[1], Horizon.focusD(fo, w[1], w[2], w[3]));
+        want.sort((p, q) => p[4] - q[4]);
+        for (const [d, L, tx, tz, k] of want) { if (this.inflight >= maxInflight) break; if (!this.tiles.has(this.key(L, tx, tz))) { this.request(L, tx, tz, d, k); asked++; } }
       }
       this.stats.want = want.length - asked; this.stats.done = done;
       // ---- eviction: a tile cap and a memory budget that grow with the horizon level (F-Far: ring 1's forms count in the
@@ -123,7 +132,8 @@
       }
       this.stats.tiles = this.tiles.size; this.stats.mb = this.bytes / 1048576;
     }
-    request(L, tx, tz, d) {
+    request(L, tx, tz, d, k) {
+      if (!Number.isFinite(k)) k = Horizon.prio(d, L, Infinity);
       const g = this.g, key = this.key(L, tx, tz), S = tileSize(L);
       const t = { L, tx, tz, S, x0: tx * S, z0: tz * S, state: 0, used: this.frame, empty: false };
       this.tiles.set(key, t);
@@ -145,7 +155,7 @@
           t.queued = true;
           // (in parts: a coarse tile bigger than a frame's bytes straddles frames; drawn only once complete)
           const P = Horizon.parted(g.renderer.gl, m), mine = () => this.tiles.get(key) === t && !t.vao;
-          w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: d / S - L * 0.6, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: P.bytes,
+          w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: k, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: P.bytes,
             alive: () => mine() && this.frame - t.used <= 120,
             abort: () => { P.abort(); if (mine()) this.tiles.delete(key); },
             step: P.step,
@@ -154,7 +164,7 @@
           return;
         }
         this.put(t, m, S);
-      }, d / S - L * 0.6);
+      }, k);
     }
     // F10 · a tile's (or a form's) mesh in packets for the upload queue: the buffers take their full size on the first
     // packet, then the vertices (whole 12-byte vertices) and the indices are written a slice at a time; take() hands the
@@ -305,5 +315,6 @@
     farPlane() { return this.enabled() ? this.radius + 400 : 0; }
     destroy() { this.reset(); }
   }
+  Horizon.FOCUS_K = 10; Horizon.FOCUS_MS = 300000;   // (f-first4: the landmark's tiles ahead of everything, for 5 minutes)
   VR.Horizon = Horizon;
 })(VR);
