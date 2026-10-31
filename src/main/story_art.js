@@ -465,6 +465,7 @@
       c.strokeStyle = g; c.lineWidth = S0 * 0.03; c.lineCap = 'round'; c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
       c.lineWidth = S0 * 0.008; c.strokeStyle = 'rgba(230,255,255,0.7)'; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + (tx - bx) * 0.7, by + (ty - by) * 0.7); c.stroke();
     } else if (kind === 'nebin') {
+      if (o.neb6) { c.restore(); return true; }   // (a-story6: the whole frame is the nebula's own — story_neb.js; nothing flat over it)
       // a-story4 · the nebula from inside: walls of Hα pink and violet, a teal rim round a hot young star, dark dust lanes
       // in front of them, newborn stars twinkling; strongest high in the frame, fading to the land
       const n = o.neb3d ? 0 : low ? 5 : 11, drift = t * 0.006;   // (a-story5: o.neb3d — the walls, the young star and the dust are 3-D in the sky: story_glow.js)
@@ -478,6 +479,7 @@
       // Flimmi: a star being born — a bright point in a flat glowing disc, two thin jets out of its poles, sparks round it;
       // it pulses as it speaks
       const x = w * 0.5, y = h * 0.3, pu = 0.8 + 0.2 * Math.sin(t * 7) * Math.sin(t * 2.3);
+      if (o.neb6) { c.restore(); return true; }   // (a-story6: Flimmi shines in the world, where it is — story_neb.js)
       if (o.flimmi3d) { for (let i = 0; i < (low ? 5 : 12); i++) { const a = t * (0.4 + 0.3 * rnd(i, 32)) + i * 2.1, rr = S0 * (0.1 + 0.14 * rnd(i, 33)); glow(c, w * 0.5 + Math.cos(a) * rr, h * 0.36 + Math.sin(a) * rr * 0.3, S0 * 0.005, '255,230,170', 0.6); } c.restore(); return true; }   // (a-story5: Flimmi itself shines in the sky — story_glow.js — the film adds only its sparks)
       glow(c, x, y, S0 * 0.3, '255,170,90', 0.22 * pu);
       c.save(); c.translate(x, y); c.rotate(-0.18); c.scale(1, 0.18); glow(c, 0, 0, S0 * 0.22, '255,200,120', 0.5); c.restore();   // (the disc, seen nearly edge on)
