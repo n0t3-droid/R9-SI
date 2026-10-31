@@ -84,9 +84,17 @@
     let n = 1; try { const G = VR.Galaxy, N = G && G.build ? G.build((seed >>> 0) || 0x5eed) : null, st = N && N.list ? N.list[+m[1]] : null; n = st && st.bin && st.bin.close ? 2 : 1; } catch (e) { /* one sun */ }
     sunsC.set(key, n); return n;
   };
+  // a-story4: the star of a strange world — inside a nebula (neb), a red dwarf (red: under 4,000 K)
+  const starC = new Map();
+  P.star = function (dim, seed) {
+    const m = /^x\.(\d+)\./.exec(String(dim || '')); if (!m) return null;
+    const key = (seed >>> 0) + ':' + m[1]; if (starC.has(key)) return starC.get(key);
+    let o = null; try { const G = VR.Galaxy, N = G && G.build ? G.build((seed >>> 0) || 0x5eed) : null, st = N && N.list ? N.list[+m[1]] : null; if (st) o = { neb: st.neb >= 0, red: st.cls === 'M' || st.T < 4000 }; } catch (e) { /* no star */ }
+    starC.set(key, o); return o;
+  };
   P.ctx3 = function (g) {
-    const BS = VR.BodySky, L = BS && BS.cur && BS.cur.light, sd = L && (L.sunDir || L.sun);
-    return { suns: P.suns(g.dim, g.meta && g.meta.seed), sunUp: g.dim && g.dim !== 'overworld' && sd && sd.length === 3 ? sd[1] > 0.04 : undefined };   // (the sun over a strange world: BodySky's light)
+    const BS = VR.BodySky, L = BS && BS.cur && BS.cur.light, sd = L && (L.sunDir || L.sun), st = P.star(g.dim, g.meta && g.meta.seed);
+    return { neb: !!(st && st.neb), red: !!(st && st.red), suns: P.suns(g.dim, g.meta && g.meta.seed), sunUp: g.dim && g.dim !== 'overworld' && sd && sd.length === 3 ? sd[1] > 0.04 : undefined };   // (the sun over a strange world: BodySky's light)
   };
 
   // a-story2: what the view sees for a deed (→ Story.actCheck): the angle and the distance to its target, the pitch, the
@@ -145,6 +153,7 @@
       if (!b || g.settings && g.settings.storyOffer === false) return false;
       const a = P.actCtx(g, b.act); if (ev) Object.assign(a, ev);
       const st = this.actSt && this.actSt.id === b.id ? this.actSt : (this.actSt = { id: b.id });
+      if (b.act.kind === 'feat') { if (!st.base) st.base = P.featNow(g); a.feat = S.featWay(st.base, P.featNow(g, st.base)); if (a.feat) { S.answer(this.rec, a.feat); st.way = a.feat; } }   // a-story4: the set piece — your way
       const done = S.actStep(st, b.act, a, dt);
       if (done) { this.actDone(b); return true; }
       if (st.last === 'armed') this.armed = b;
@@ -152,7 +161,9 @@
     }
     actDone(b) {
       const g = this.g; S.markAct(this.rec, b.id); this.armed = null; this.actHint = null; P.stats.acts = (P.stats.acts || 0) + 1;
-      const fk = g.funke; if (fk && fk.show && fk.on && fk.on()) fk.show(T(b.act.kind === 'scan' ? 'story.act.scanning' : 'story.act.done'));
+      const way = b.act.kind === 'feat' ? this.rec.choices && this.rec.choices.how : null;   // (a-story4: Funke names your way)
+      if (way) { P.stats.way = way; this.calm = Math.min(this.calm, 0); if (g.audio && g.audio.swell) { try { g.audio.swell(g.env ? g.env.day | 0 : 0, 1); } catch (e) { /* the score */ } } }
+      const fk = g.funke; if (fk && fk.show && fk.on && fk.on()) fk.show(way ? T('story.choice.how.' + way + '.after') : T(b.act.kind === 'scan' ? 'story.act.scanning' : 'story.act.done'));
       else if (g.ui && g.ui.hint) g.ui.hint(T('story.act.done'), 3000);
       if (g.audio && g.audio.play) { try { g.audio.play('ping', { vol: 0.4 }); } catch (e) { /* a sound */ } }
       const A = VR.Adventure; if (A && A.award) { try { A.award('beat', { id: 'act:' + b.id, xp: 30 }); } catch (e) { /* optional */ } }
@@ -294,10 +305,11 @@
       if (sc.fl0 && g.flight) { g.flight.headPitch = sc.fl0.hp; g.flight.headYaw = sc.fl0.hy; }
       if (sc.b.id === 'c2.b2' && VR.Liberate && VR.Liberate.moment && VR.Liberate.moment.replay) VR.Liberate.moment = null;
       if (sc.seen) return;   // (watched again from the journal)
-      S.mark(this.rec, sc.b.id, skipped ? 'skip' : 'done');
+      S.mark(this.rec, sc.b.id, skipped ? 'skip' : 'done'); S.visit(this.rec, g.dim || 'overworld');   // (a-story4: the star book's places)
       const A = VR.Adventure; if (A && A.award) { try { A.award('beat', { id: sc.b.id, xp: sc.b.reward.xp }); } catch (e) { /* optional */ } }
       this.save();
       this.task(sc.b);
+      if (sc.b.id === 'c12.b3' && g.ui && g.ui.hint) { try { g.ui.hint(T('story.gift.places'), 6000); } catch (e) { /* the journal holds it */ } }   // a-story4: the epilogue's gift
       if (VR.Quests && g.ui && g.ui.screen === 'journal') VR.Quests.renderJournal();
     }
     // the beat's task: Funke's line and his Wegstück toward its target
@@ -320,7 +332,7 @@
     }
     pose(sc, sh, u, base) {
       const c = this.pose0(sc, sh, u, base);
-      if (c && sh.cam !== 'shoulder' && sh.cam !== 'ice' && sh.cam !== 'eye' && sc.free && !sc.free([c.x, c.y, c.z])) { (sc.blocked || (sc.blocked = {}))[sc.shot] = true; return this.pose0(sc, { cam: 'shoulder', target: sh.target, dur: sh.dur }, u, base); }
+      if (c && sh.cam !== 'shoulder' && sh.cam !== 'ice' && sh.cam !== 'eye' && !(sh.cam === 'window' && sc.inGlass) && sc.free && !sc.free([c.x, c.y, c.z])) { (sc.blocked || (sc.blocked = {}))[sc.shot] = true; return this.pose0(sc, { cam: 'shoulder', target: sh.target, dur: sh.dur }, u, base); }
       return c;
     }
     pose0(sc, sh, u, base) {
@@ -374,9 +386,16 @@
         case 'window': {
           // a-story3 · the Ringstation's window: walked up close to the glass ahead (the first solid block along the view,
           // stopped 1.6 m short; fixed at the scene's start), looking out over the planet; a slow push in
-          if (!sc.winC) { let d = 1; for (; d < 16; d += 0.5) if (!sc.free([e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d])) break; d = Math.max(0, d - 1.6); sc.winC = [e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d]; }
-          const W0 = sc.winC, C = [W0[0] - f[0] * 0.6 * (1 - smooth(u)), W0[1], W0[2] - f[2] * 0.6 * (1 - smooth(u))];
-          return lookAt(C, [C[0] + f[0] * 40, C[1] - 40 * Math.tan(6 * DEG), C[2] + f[2] * 40], 70 - 6 * smooth(u), base);
+          // a-story4: when that block is glass, the camera sits inside it (from inside a block neither its faces nor its
+          // neighbours' are drawn — no pane, no frame across the planet), fixed (the 3-D beams are placed in its view)
+          if (!sc.winC) {
+            let d = 1; for (; d < 16; d += 0.5) if (!sc.free([e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d])) break;
+            const Q0 = [e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d], w = g.world, R0 = VR.R, F0 = VR.F, bl = w && w.getBlock ? w.getBlock(Math.floor(Q0[0]), Math.floor(Q0[1]), Math.floor(Q0[2])) : 0;
+            sc.inGlass = d < 16 && !!(bl && R0 && F0 && !(R0.T.flags[bl] & F0.OPAQUE));
+            const dd = sc.inGlass ? d + 0.3 : Math.max(0, d - 1.6); sc.winC = [e[0] + f[0] * dd, e[1] + 0.2, e[2] + f[2] * dd];
+          }
+          const W0 = sc.winC;
+          return lookAt(W0, [W0[0] + f[0] * 40, W0[1] - 40 * Math.tan(6 * DEG), W0[2] + f[2] * 40], P.WIN_FOV, base);
         }
         default: return null;
       }
@@ -385,6 +404,7 @@
     destroy() { if (this.scene) { P.fxEnd(this.scene); this.scene = null; overlay(this, false); } card(null); choiceCard(null); if (VR.Regie) VR.Regie.inScene(this.g, false); }
   }
   P.Player = Player;
+  P.WIN_FOV = 64;   // a-story4: the window's view, fixed (its beams are placed in it)
   P.WARDEN_SCALE = 3; P.WARDEN_H = 43 / 16;   // (a-story2: story_warden is 43 voxels tall — 8 m at ×3)
 
   // ---------------------------------------------------------------- the public calls
@@ -557,7 +577,7 @@ body.storyon #storychoice { visibility: hidden !important; }
     if (cv.width !== W) cv.width = W; if (cv.height !== H) cv.height = H;
     cv.style.display = 'block'; sc.fxKind = kind;
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-    const c = cv.getContext ? cv.getContext('2d') : null; if (c) Fx.draw(c, kind, sc.t, at.u, W, H, { low, seed: sc.b.ch * 31 + sc.b.n });
+    const c = cv.getContext ? cv.getContext('2d') : null; if (c) Fx.draw(c, kind, sc.t, at.u, W, H, { low, seed: sc.b.ch * 31 + sc.b.n, beams3d: !!(sc.beams3d && at.shot.cam === 'window') });
     if (t0) { P.stats.fxMs = (P.stats.fxMs || 0) + performance.now() - t0; P.stats.fxN = (P.stats.fxN || 0) + 1; }
   };
   P.fxEnd = function (sc) { if (sc && sc.fxCv) { sc.fxCv.style.display = 'none'; } };
@@ -668,6 +688,13 @@ body.storyon #storychoice { visibility: hidden !important; }
       if (!c.written && c.n === cur) h += `<div class="jl note">${esc(T('story.j.end'))}</div>`;
       h += '</div>';
     }
+    // a-story4 · the epilogue: free play and Opa Anselm's star book — one click to every place the story took you
+    if (S.free(rec)) {
+      h += `<div class="jch"><div><b>${esc(T('story.j.free'))}</b></div><div class="w">${esc(T('story.j.places'))}</div>`;
+      const TR = VR.Travel, here = (s.g && s.g.dim) || 'overworld';
+      for (const d of Object.keys(rec.places || {})) { let nm = d; try { nm = TR && TR.dimName ? TR.dimName(d) : d; } catch (e) { /* the id */ } h += `<div class="jwait"><span>✦ ${esc(nm)}</span>${d === here ? '' : `<button type="button" class="btn small" data-jact="story:go:${esc(d)}">${esc(T('story.j.go'))}</button>`}</div>`; }
+      h += `<div class="lg">${esc(T('story.j.hook'))}</div></div>`;
+    }
     return h + '</div>';
   };
   const Q = VR.Quests;
@@ -676,9 +703,10 @@ body.storyon #storychoice { visibility: hidden !important; }
     Q.journalSections.unshift(() => P.journalHTML());
     const ja = Q.jact;
     Q.jact = function (what, pid) {
-      const m = /^story:(watch|again)(?::(.+))?$/.exec(String(what || ''));
+      const m = /^story:(watch|again|go)(?::(.+))?$/.exec(String(what || ''));
       if (!m) return ja.apply(this, arguments);
       const s = pl(); if (!s) return;
+      if (m[1] === 'go') { if (S.placeOk(m[2]) && s.rec.places && s.rec.places[m[2]] && VR.Travel && VR.Travel.go) { Q.closeJournal(); VR.Travel.go(s.g, { dim: m[2], via: 'gate' }); } return; }   // a-story4: the star book's trip
       const b = m[1] === 'watch' ? S.open(s.rec) : S.byId(m[2]);
       if (b) { Q.closeJournal(); setTimeout(() => s.watch(b), 30); }
     };
@@ -802,10 +830,98 @@ body.storyon #storychoice { visibility: hidden !important; }
     const d0 = FA.prototype.draw;
     FA.prototype.draw = function (r, E, cam) {
       const g = this.g;
-      if (g && g.story && g.story.scene) { try { P.drawWarden(g, r, E, cam); } catch (e) { if (!P.warned) { P.warned = true; console.warn('story draw', e); } } if (P.flicker(g)) return; }
+      if (g && g.story && g.story.scene) { try { P.drawWarden(g, r, E, cam); P.drawBeams(g, r, E, cam); } catch (e) { if (!P.warned) { P.warned = true; console.warn('story draw', e); } } if (P.flicker(g)) return; }
       return d0.apply(this, arguments);
     };
   }
+
+
+  // ---------------------------------------------------------------- a-story4 · the set piece: the answer Echo can see
+  // The placements counted (Adventure.placed is every block a player sets in an Abenteuer world): a count and the last
+  // 256 heights with their number, so the beacon you build is seen as tall as it is. The calmed machines (Foes' stats),
+  // the freed beacons (the ctx's count), the height over the sea, the orbit.
+  P.placedN = 0; P.placedLog = [];
+  P.notePlaced = function (x, y, z) { P.placedN++; const L = P.placedLog; if (L.length >= 256) L.shift(); L.push([y | 0, P.placedN]); };
+  { const A = VR.Adventure; if (A && A.placed && !A._story4) { A._story4 = true; const pl0 = A.placed; A.placed = function (x, y, z) { try { P.notePlaced(x, y, z); } catch (e) { /* counted */ } return pl0.apply(this, arguments); }; } }
+  P.featNow = function (g, base) {
+    const p = g && g.player, sea = (VR.C && VR.C.SEA) || 64, from = base ? base.placed : P.placedN;
+    let lo = Infinity, hi = -Infinity; for (const q of P.placedLog) if (q[1] > from) { if (q[0] < lo) lo = q[0]; if (q[0] > hi) hi = q[0]; }
+    let freed = 0; try { for (const st of P.sites()) if (st.st === 'frei') freed++; const fr = VR.Adventure && VR.Adventure.rec && VR.Adventure.rec.freed; if (fr) freed = Math.max(freed, Object.keys(fr).length); } catch (e) { /* none */ }
+    const Fo = VR.Foes;
+    return { placed: P.placedN, span: hi >= lo ? hi - lo + 1 : 0, freed, calms: Fo && Fo.stats ? Fo.stats.calms | 0 : 0, high: p && p.pos ? p.pos[1] - sea : 0, orbit: !!(g && g.flight !== undefined && P.orbit(g)) };
+  };
+
+  // ---------------------------------------------------------------- a-story4 · the beams: real light in the world
+  // c7.b2 · the Ringstation's window: the beacons' arrow as columns of light rising from the planet's face, far beyond the
+  //   glass, lit one after another (placed in the window's fixed view: Fx.ARROW's points through P.WIN_FOV).
+  // c12.b2 · the finale: a beam over every freed beacon (and the network's far beacons round the horizon), lit in a wave
+  //   from the player outward, and arcs of light between them across the sky.
+  // One emissive column (story_beam) stretched by its own matrix, additive, no fog; only while those scenes play.
+  // Very Low: fewer beams, fewer arc segments.
+  let BM = null;
+  const basis = (M, o, X, Y, Z) => { M[0] = X[0]; M[1] = X[1]; M[2] = X[2]; M[3] = 0; M[4] = Y[0]; M[5] = Y[1]; M[6] = Y[2]; M[7] = 0; M[8] = Z[0]; M[9] = Z[1]; M[10] = Z[2]; M[11] = 0; M[12] = o[0]; M[13] = o[1]; M[14] = o[2]; M[15] = 1; return M; };
+  P.beamList = function (g, sc) {
+    const low = !!(g.settings && g.settings.preset === 'potato'), out = [], id = sc.b.id;
+    if (id === 'c7.b2') {
+      if (!sc.inGlass || !sc.winC) return out;
+      const at = S.shotAt(sc.b, sc.t); if (!at || at.shot.cam !== 'window') return out;
+      const C = sc.winC, f = sc.fwd, pt = -6 * DEG, F = [f[0] * Math.cos(pt), Math.sin(pt), f[2] * Math.cos(pt)], Rt = [-f[2], 0, f[0]], U = [F[1] * Rt[2] - F[2] * Rt[1], F[2] * Rt[0] - F[0] * Rt[2], F[0] * Rt[1] - F[1] * Rt[0]];
+      const tv = Math.tan(P.WIN_FOV * DEG / 2), th = tv * 16 / 9, A = VR.StoryFx && VR.StoryFx.ARROW || [], lit = smooth(at.u * 1.6) * A.length, D = 420;
+      for (let i = 0; i < A.length; i++) {
+        const q = clamp(lit - i, 0, 1); if (!q) continue;
+        const a = (2 * A[i][0] - 1) * th, b = (1 - 2 * A[i][1]) * tv, d = [F[0] + Rt[0] * a - U[0] * b, F[1] + Rt[1] * a - U[1] * b, F[2] + Rt[2] * a - U[2] * b], L0 = Math.hypot(d[0], d[1], d[2]);
+        out.push({ p: [C[0] + d[0] / L0 * D, C[1] + d[1] / L0 * D, C[2] + d[2] / L0 * D], up: [0, 1, 0], len: 70 * q, w: 2.6, col: [0.35, 1.6, 2.0], a: 0.75 * q });
+      }
+      return out;
+    }
+    if (id !== 'c12.b2') return out;
+    const p = g.player.pos, pts = [];
+    for (const st of P.sites()) if (st.st === 'frei' && st.beacon) pts.push([st.beacon[0] + 0.5, st.beacon[1] + 1, st.beacon[2] + 0.5]);
+    const nFar = low ? 6 : 14;   // (the network's far beacons round the horizon, seeded by the world)
+    for (let i = 0; i < nFar; i++) { const a = i / nFar * TAU + 0.37, r = 260 + 420 * ((Math.sin(i * 12.9898 + 4.1) * 43758.5453) % 1 + 1) % 1; pts.push([p[0] + Math.sin(a) * r, p[1] - 20, p[2] + Math.cos(a) * r]); }
+    const wave = sc.t * 120;   // m a second: the lights run outward from you
+    pts.sort((u, v) => Math.hypot(u[0] - p[0], u[2] - p[2]) - Math.hypot(v[0] - p[0], v[2] - p[2]));
+    const on = [];
+    for (const q of pts.slice(0, low ? 10 : 24)) { const d = Math.hypot(q[0] - p[0], q[2] - p[2]), k = clamp((wave - d) / 60, 0, 1); if (!k) continue; on.push(q); out.push({ p: q, up: [0, 1, 0], len: 420 * smooth(k), w: 2.4 + d * 0.006, col: [0.4, 1.5, 2.0], a: 0.7 }); }
+    // the arcs: each lit beam to the next one round the circle, a curve of segments high over the land
+    const seg = low ? 4 : 9;
+    for (let i = 0; i + 1 < on.length && i < (low ? 5 : 14); i++) {
+      const A0 = [on[i][0], on[i][1] + 420, on[i][2]], B0 = [on[i + 1][0], on[i + 1][1] + 420, on[i + 1][2]], H = 140 + 0.25 * Math.hypot(A0[0] - B0[0], A0[2] - B0[2]);
+      let prev = A0;
+      for (let k = 1; k <= seg; k++) { const u = k / seg, Q = [A0[0] + (B0[0] - A0[0]) * u, A0[1] + (B0[1] - A0[1]) * u + Math.sin(u * Math.PI) * H, A0[2] + (B0[2] - A0[2]) * u]; const v = [Q[0] - prev[0], Q[1] - prev[1], Q[2] - prev[2]]; out.push({ p: prev, up: v, len: 1, w: 1.6, col: [0.6, 1.4, 2.0], a: 0.45, seg: true }); prev = Q; }
+    }
+    return out;
+  };
+  P.drawBeams = function (g, r, E, cam) {
+    const s = pl(g), sc = s && s.scene; if (!sc || (sc.b.id !== 'c7.b2' && sc.b.id !== 'c12.b2') || !VR.getVoxModel) return 0;
+    const list = P.beamList(g, sc); sc.beams3d = sc.b.id === 'c7.b2' && sc.inGlass; if (!list.length) return 0;
+    const gl = r.gl, md = VR.getVoxModel(gl, 'story_beam'); if (!md || !md.parts || !md.parts.whole) return 0;
+    const t0 = performance.now(), p = g.entities.beginVox(r, E), pr = md.parts.whole; BM = BM || new Float32Array(16);
+    gl.uniform1f(p.u.u_sky, 1); gl.uniform3f(p.u.u_blockLight, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0); gl.uniform1f(p.u.u_noFog, 1);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+    gl.bindVertexArray(pr.vao);
+    for (const b of list) {
+      const L = b.seg ? Math.hypot(b.up[0], b.up[1], b.up[2]) : b.len; if (!(L > 0.01)) continue;
+      const Y = b.seg ? [b.up[0] / 16, b.up[1] / 16, b.up[2] / 16] : [b.up[0] * L / 16, b.up[1] * L / 16, b.up[2] * L / 16];
+      const yn = [Y[0] * 16 / L, Y[1] * 16 / L, Y[2] * 16 / L], cx = [cam.x - b.p[0], cam.y - b.p[1], cam.z - b.p[2]];
+      let X = [yn[1] * cx[2] - yn[2] * cx[1], yn[2] * cx[0] - yn[0] * cx[2], yn[0] * cx[1] - yn[1] * cx[0]]; const xl = Math.hypot(X[0], X[1], X[2]) || 1; X = [X[0] / xl * b.w, X[1] / xl * b.w, X[2] / xl * b.w];   // (its broad side to the camera)
+      const Z = [(yn[1] * X[2] - yn[2] * X[1]), (yn[2] * X[0] - yn[0] * X[2]), (yn[0] * X[1] - yn[1] * X[0])];
+      for (let k = 0; k < 2; k++) {   // (a soft wide halo, then the bright core)
+        const sx = k ? 0.35 : 1.6, Xs = [X[0] * sx, X[1] * sx, X[2] * sx], Zs = [Z[0] * sx, Z[1] * sx, Z[2] * sx];
+        basis(BM, [b.p[0] - (Xs[0] + Zs[0]) / 2 - cam.x, b.p[1] - (Xs[1] + Zs[1]) / 2 - cam.y, b.p[2] - (Xs[2] + Zs[2]) / 2 - cam.z], Xs, Y, Zs);
+        gl.uniform3f(p.u.u_tint, b.col[0] * (k ? 1.4 : 0.6), b.col[1] * (k ? 1.1 : 0.6), b.col[2] * (k ? 1 : 0.6)); gl.uniform1f(p.u.u_alpha, b.a * (k ? 0.9 : 0.35));
+        gl.uniformMatrix4fv(p.u.u_model, false, BM); gl.drawArrays(gl.TRIANGLES, 0, pr.count);
+      }
+    }
+    gl.bindVertexArray(null); gl.enable(gl.CULL_FACE); gl.depthMask(true); gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform1f(p.u.u_alpha, 1); gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_noFog, 0);
+    P.stats.beams = (P.stats.beams || 0) + list.length; P.stats.beamMs = (P.stats.beamMs || 0) + performance.now() - t0;
+    return list.length;
+  };
+
+  // ---------------------------------------------------------------- a-story4 · ch. 9: the nebula's veil, from inside
+  // (while a chapter-9 scene plays on a nebula world: the sky's cosmic veil raised — one uniform, nothing drawn more)
+  { const BS = VR.BodySky; if (BS && BS.env && !BS._story4) { BS._story4 = true; const env0 = BS.env; BS.env = function (E) { const r = env0.apply(this, arguments); try { const g = game(), s = g && pl(g), sc = s && s.scene; if (E && sc && sc.b.ch === 9 && E.bodySky) E.nebula = 1.6; } catch (e) { /* the sky */ } return r; }; } }
 
   // ---------------------------------------------------------------- the frames the game's own frame does not run (the space views)
   const G = VR.Game;

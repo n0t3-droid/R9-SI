@@ -2946,7 +2946,7 @@
     'story.task.redsun': 'Zur roten Sonne! Auf der Sternkarte sind rote Zwerge die kleinen, roten Sterne.',
     'story.task.station': 'Zurück zur Ringstation! Ein Leuchtpfad-Tor oder ein Schiff bringt uns hin.',
     'story.task.feat': 'Zeig Echo ein neues Licht — auf deine Weise. Ich bin gespannt!',
-    'story.task.home': 'Nach Hause, nach Herzwelt! Alle warten auf dem Platz.',
+    'story.task.home': 'Heim nach Herzwelt! Alle warten auf dem Platz.',
     'story.task.night': 'Warten wir auf die Nacht. Dann geht\'s los!',
     'story.task.play': 'Die Welt gehört dir, Partner. Wohin zuerst?',
     'story.j.free': 'Freies Spiel — das Buch ist zu Ende, die Reise nicht.',

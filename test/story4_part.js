@@ -94,11 +94,21 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
   }
   if (VR.Portrait) for (const w of ['dumarin', 'ylosenis', 'flimmi', 'echo']) { const o = VR.Portrait.ops(w, 'happy', false, true), o2 = VR.Portrait.ops('funke', 'happy', false, true); check(o.length > 25 && JSON.stringify(o) !== JSON.stringify(o2) && VR.Portrait.WHO.includes(w), 'a face of its own: ' + w + ' (' + o.length + ' rects)'); }
   // the player: the set piece watched (a stand-in game), the journal's star book
-  if (SP && SP.featNow) {
+  {
     const g = { player: { pos: [0, 70, 0] }, dim: 'stn.ring' };
     const base = SP.featNow(g);
     for (let i = 0; i < 26; i++) SP.notePlaced(3, 64 + (i % 7), 4);
     const now = SP.featNow(g, base);
+    const done = {}; for (const b of S.BEATS) done[b.id] = 'done';
+    const g2 = { state: 'play', world: {}, time: 0, dim: 'overworld', settings: { storyOffer: true, preset: 'high' }, meta: { seed: 9, story: { v: 1, beats: done, later: {}, places: { 'x.4.2.aqua': 1, 'stn.ring': 1, overworld: 1 } } }, ui: { screen: 'journal' },
+      player: { pos: [0, 70, 0], yaw: 0, pitch: 0, spawn: [0, 70, 0], onGround: true, eyePos() { return [0, 71.6, 0]; } }, cam: { x: 0, y: 71.6, z: 0, yaw: 0, pitch: 0 }, wow: { list: new Map() },
+      funke: { on: () => true, show: () => {}, budget: { quiet: () => false }, buildFocus: () => false, startWay: () => {} }, lifeDirector: { ctx: { place: 'plaza', hour: 'night' } }, saveMeta: () => {} };
+    VR.game = g2; SP.frame(g2, 0.05);
+    const jh = SP.journalHTML();
+    check(/story:go:x\.4\.2\.aqua/.test(jh) && /story:go:stn\.ring/.test(jh) && !/story:go:overworld/.test(jh) && jh.indexOf(tr('de', 'story.j.hook').slice(0, 20)) > 0, 'the epilogue: the star book lists the places (a trip to each but the one you are on) and the new signal');
+    const hi = SP.beamList(g2, { b: S.byId('c12.b2'), t: 8 }); g2.settings.preset = 'potato'; const lo = SP.beamList(g2, { b: S.byId('c12.b2'), t: 8 });
+    check(hi.length > 30 && lo.length > 6 && lo.length < hi.length / 2 && SP.beamList(g2, { b: S.byId('c12.b2'), t: 0.1 }).length < 4, 'the finale\'s beams light in a wave, with arcs (' + hi.length + ' High, ' + lo.length + ' Very Low)');
+    check(SP.beamList(g2, { b: S.byId('c12.b1'), t: 8 }).length === 0, 'no beams outside their scenes');
     check(now.placed - base.placed === 26 && now.span >= 6 && S.featWay(base, now) === 'build', 'the placements counted for the set piece (' + (now.placed - base.placed) + ' blocks, ' + now.span + ' m)');
   }
 };
