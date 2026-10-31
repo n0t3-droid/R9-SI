@@ -3709,6 +3709,7 @@
     "g.nat.q1": "Auftrag 2/3 · Bring den {sp} {n}× {item}: {why}",
     "g.nat.q2": "Auftrag 3/3 · Feiere in der Abenddämmerung beim {what} mit (bleib im Kreis).",
     "g.nat.q3": "Die {sp} zeigten dir: {what}",
+    "g.nat.dawn": "Die Reise hat die Nacht gedauert — du landest bei den {sp} am Morgen.",
     "g.nat.done0": "Du kennst drei {sp}! Nun: bring ihnen {n}× {item}.",
     "g.nat.learnt": "Gelernt bei den {sp}",
     "g.nat.teach.recipe": "Rezept: {ins} → {n}× {out}",

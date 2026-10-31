@@ -317,6 +317,7 @@
         if (kind && S.said !== this.dim + ':' + (this.meta && this.meta.seed) && this.world && this.world.cols && this.world.cols.size > 8 && this.ui && this.ui.toast) {
           S.said = this.dim + ':' + (this.meta && this.meta.seed);
           this.ui.toast('🪐 ' + T('g.eco.welcome', { world: VR.Travel ? VR.Travel.dimName(this.dim) : this.dim }), T('g.eco.home.' + kind));
+          if (VR.Natives && VR.Natives.arrive) VR.Natives.arrive(this, kind);   // u-worlds4: the first arrival at night lands in the morning
           // (u-worlds2: the arrival's vista — standing at the landing, the eye turns to the first village and its monument)
           const eco = WL.eco(this);
           if (eco && eco.sites && eco.sites[0]) { S.vista = eco.sites[0]; S.vistaN = 90; }

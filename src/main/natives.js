@@ -44,6 +44,108 @@
   };
   N.GREET_S = 2.4; N.HUSH_R = 7; N.HUSH_D = 8; N.PHOTO_R = 14; N.PHOTO_S = 20;
 
+  // ---------------------------------------------------------------- u-worlds4 · a town's day (test/worlds4.js e)
+  // In a town (bgen 5's first site: plan.town) the natives keep a day of their own on top of the villages' schedule:
+  // by day a share of the adults go to the market (stand at a stall, look, move on), at dusk to the hall (sit on its
+  // benches, the rest stand inside), at night two or three lamplighters walk the avenues' lamps. The traders, the
+  // mayor (the hall's keeper) and the gardener keep their work. The agents a town wakes are tiered by preset (Very Low
+  // 14, Low 20, Balanced 30, High all): the others are at home (the street's draw cap, folkcrowd.js, stays as it is).
+  N.MARKET_ACTS = new Set(['market', 'hall', 'lantern']);
+  N.CAP = { potato: 14, low: 20, medium: 30, balanced: 30 };
+  N.agentCap = (preset, n) => Math.min(n, N.CAP[preset] !== undefined ? N.CAP[preset] : n);
+  const KEEP = { trader: 0, mayor: 0, cashier: 0, gardener: 1 };
+  const u01 = (s, salt) => { let h = Math.imul((s | 0) ^ Math.imul((salt | 0) + 0x632BE5AB, 0x9E3779B1), 0x85EBCA6B); h = Math.imul(h ^ (h >>> 15), 0xC2B2AE35); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+  // who a town wakes when it may wake only cap of its people: the keepers, the lamplighters, the adults, the elders,
+  // the children — each group in the order of its seeds (the same people every time)
+  N.keepers = function (ags, cap) {
+    const rank = (a) => (KEEP[a.role] === 0 ? 0 : a.lamp ? 1 : a.kid ? 4 : a.elder ? 3 : 2);
+    return ags.slice().sort((x, y) => (rank(x) - rank(y)) || (u01(x.p.seed, 3) - u01(y.p.seed, 3))).slice(0, cap);
+  };
+  // the town's lamplighters: the n adults (not keepers) with the smallest numbers of their seeds
+  N.lamplighters = function (vil, n) {
+    if (vil._lamp && vil._lamp.n === n) return vil._lamp.ids;
+    const ad = (vil.people || []).filter(p => p.age === 'adult' && !(p.role in KEEP)).sort((a, b) => u01(a.seed, 9) - u01(b.seed, 9));
+    const ids = new Set(ad.slice(0, n).map(p => p.id));
+    vil._lamp = { n, ids };
+    return ids;
+  };
+  N.LAMPS_N = (preset) => (preset === 'potato' ? 2 : 3);
+  // the activity a native of a town wants now, or null (the villages' own schedule then)
+  N.routine = function (a, tod, preset) {
+    const vil = a.vil, P = vil && vil.plan;
+    if (!P || !P.town || a.kid || (a.role in KEEP)) return null;
+    const s = a.p.seed;
+    if (tod >= 13000 && tod < 23300) return N.lamplighters(vil, N.LAMPS_N(preset)).has(a.p.id) ? 'lantern' : null;
+    if (tod >= 10600 && tod < 12800) return u01(s, 41) < (a.elder ? 0.7 : 0.55) ? 'hall' : null;
+    if (tod >= 1500 && tod < 10000 && !(tod >= 5600 && tod < 6900)) return !a.elder && u01(s, 42) < 0.32 ? 'market' : null;
+    return null;
+  };
+
+  // ---------------------------------------------------------------- u-worlds4 · the portrait (test/worlds4.js f)
+  // The head's middle over the feet per species (the rig's head at 1.5 m on a person's scale, the Dunelin's neck lifts
+  // it, the Regoli are small) and the field of view that frames it: the head fills N.FRAME of the frame's height, the
+  // game's own field of view at most, 12° at least. N.cam (game.js's camera chain): talking to a native the eye turns to
+  // the head and the view narrows; 📷 a native's head within 5 m near the view's middle is framed the same way.
+  N.HEAD_M = 0.44; N.FRAME = 0.26; N.PORTRAIT_R = 5; N.PORTRAIT_A = 0.21;
+  const spBody = (k) => (VR.Folk && VR.Folk.SPECIES_BODY && VR.Folk.SPECIES_BODY[k]) || { scale: 1, neck: 0 };
+  N.headAt = function (a) {
+    const k = a.p && a.p.look && a.p.look.species, b = spBody(k), sc = b.scale * (a.kid ? 0.82 : 1);
+    return [a.pos[0], a.pos[1] + (1.5 + (b.neck || 0) * 0.031) * sc, a.pos[2]];
+  };
+  N.portraitFov = function (d, kind, base) {
+    const s = N.HEAD_M * spBody(kind).scale, f = 2 * Math.atan(s / (2 * Math.max(0.3, d) * N.FRAME));
+    return Math.max(12 * Math.PI / 180, Math.min(base, f));
+  };
+  const PS = N.ps = { w: 0, t: 0, head: null, kind: null, a: null };
+  // the native the 📷 camera looks at (its head within 5 m and 12° of the view's middle), or null
+  N.photoTarget = function (g, s) {
+    const V = g.villages; if (!V || !V.agents) return null;
+    const fx = -Math.sin(s.yaw) * Math.cos(s.pitch), fy = Math.sin(s.pitch), fz = -Math.cos(s.yaw) * Math.cos(s.pitch);
+    let best = null, bc = Math.cos(N.PORTRAIT_A);
+    for (const a of V.agents) {
+      if (!a.vil || !a.vil.plan || !a.vil.plan.species || a.pose === 'sleep') continue;
+      const h = N.headAt(a), dx = h[0] - s.x, dy = h[1] - s.y, dz = h[2] - s.z, d = Math.hypot(dx, dy, dz);
+      if (d > N.PORTRAIT_R || d < 0.4) continue;
+      const c = (dx * fx + dy * fy + dz * fz) / d;
+      if (c > bc) { bc = c; best = a; }
+    }
+    return best;
+  };
+  N.cam = function (g, cam) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now(), dt = Math.min(0.1, Math.max(0, (now - (PS.t || now)) / 1000)); PS.t = now;
+    const V = g.villages, pc = g.photoCam;
+    let a = null;
+    if (pc && pc.on && pc.s) a = N.photoTarget(g, pc.s);
+    else if (V && V.talking && V.talking.vil && V.talking.vil.plan && V.talking.vil.plan.species) a = V.talking;
+    if (a) { PS.a = a; PS.head = N.headAt(a); PS.kind = a.p.look && a.p.look.species; }
+    PS.w += ((a ? 1 : 0) - PS.w) * Math.min(1, dt * 3.2);
+    if (!a && PS.w < 0.003) { PS.w = 0; PS.a = null; N.last = null; return null; }
+    if (!PS.head) return null;
+    const H = PS.head, dx = H[0] - cam.x, dy = H[1] - cam.y, dz = H[2] - cam.z, hd = Math.hypot(dx, dz), d = Math.hypot(hd, dy);
+    const w = PS.w * PS.w * (3 - 2 * PS.w), fovT = N.portraitFov(d, PS.kind, cam.fov);
+    let dyw = Math.atan2(-dx, -dz) - cam.yaw; while (dyw > Math.PI) dyw -= Math.PI * 2; while (dyw < -Math.PI) dyw += Math.PI * 2;
+    const fov = cam.fov + (fovT - cam.fov) * w;
+    N.last = { fov, d, kind: PS.kind, w, frac: N.HEAD_M * spBody(PS.kind).scale / (2 * d * Math.tan(fov / 2)) };
+    return Object.assign({}, cam, { yaw: cam.yaw + dyw * w, pitch: cam.pitch + (Math.atan2(dy, hd) - cam.pitch) * w, fov });
+  };
+
+  // ---------------------------------------------------------------- u-worlds4 · the arrival by day
+  // The first arrival on a native world at night lands in the morning (the journey took the night): the clock to
+  // N.DAWN, a day on when the night was before midnight. Not for a guest, nor with friends in the world (their clock).
+  N.DAWN = 1000;
+  N.dawn = (tod, first) => (first && (tod >= 12800 || tod < 300) ? N.DAWN : null);
+  N.arrive = function (g, kind) {
+    const m = g.meta || (g.meta = {}), d = isRecL(m.ecoDawn) ? m.ecoDawn : (m.ecoDawn = {});
+    const first = !d[kind]; d[kind] = 1;
+    if ((m.guest) || (g.mp && g.mp.remote && g.mp.remote.size > 0) || !g.env) return false;
+    const tod = g.env.timeOfDay, t = N.dawn(tod, first); if (t === null) return false;
+    if (tod >= 12800) g.env.day = (g.env.day || 0) + 1;
+    g.env.setTime(t);
+    if (g.ui && g.ui.chatLine) g.ui.chatLine('🌅 ' + T('g.nat.dawn', { sp: spN(kind) }), '#ffd98a');
+    return true;
+  };
+  const isRecL = (r) => !!r && typeof r === 'object' && !Array.isArray(r);
+
   // ---------------------------------------------------------------- the pure core (test/worlds3.js c)
   const isRec = (r) => !!r && typeof r === 'object' && !Array.isArray(r);
   N.rec = function (meta, kind) {
@@ -242,6 +344,59 @@
       for (const o of a.vil.agents) {
         if (o === a || o.pose === 'sleep' || o.inBoat) continue;
         if ((o.pos[0] - pl[0]) ** 2 + (o.pos[2] - pl[2]) ** 2 < N.HUSH_R * N.HUSH_R) o.hush = { t: 6, spot: N.hushSpot(o.pos, pl) };
+      }
+      return r;
+    };
+    // u-worlds4 · the town's day: the schedule, the three activities, the agents tiered
+    const preset = (g) => (g && g.settings && g.settings.preset) || 'high';
+    const sch = VP.schedule;
+    VP.schedule = function (a, tod) {
+      const r = a.vil && a.vil.plan && a.vil.plan.town ? N.routine(a, tod, preset(this.g)) : null;
+      return r || sch.call(this, a, tod);
+    };
+    const ra = VP.runAct;
+    VP.runAct = function (a, dt, tod) {
+      const act = a.act;
+      if (!act || !N.MARKET_ACTS.has(act.type)) return ra.call(this, a, dt, tod);
+      act.t += dt;
+      const P = a.vil.plan, H2 = (k) => H(a.p.id + ':' + k + ':' + ((act.n || 0)));
+      if (act.type === 'market') {
+        const M = P.market; if (!M || !M.spots.length) return;
+        if (!act.spot) { const sp = M.spots[H2(1) % M.spots.length]; act.spot = [sp[0] + (H2(2) % 5) - 2, sp[1], sp[2] + Math.sign(P.z - sp[2]) * (H2(9) % 2)]; act.look = sp; }
+        if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.2)) { a.lookAt = [act.look[0] + 0.5, act.look[1] + 1, act.look[2] + 0.5 + Math.sign(act.look[2] - P.z) * 2]; if (act.t > 18 + H2(3) % 16) { act.spot = null; act.t = 0; act.n = (act.n || 0) + 1; } }
+        return;
+      }
+      if (act.type === 'hall') {
+        const Hl = P.hall; if (!Hl) return;
+        if (a.pose === 'sit') { a.lookAt = [Hl.speaker[0] + 0.5, Hl.speaker[1] + 1, Hl.speaker[2] + 0.5]; return; }
+        if (!act.seat && !act.stand) {
+          const own = a.vil._hallSeat || (a.vil._hallSeat = new Map()), n = Hl.seats.length;
+          for (let k = 0, i = H2(4) % n; k < n; k++, i = (i + 1) % n) { const o = own.get(i); if (!o || o === a || !o.act || o.act.type !== 'hall') { own.set(i, a); act.seat = Hl.seats[i]; break; } }
+          if (!act.seat) act.stand = [Hl.inside[0] + (H2(5) % 7) - 3, Hl.inside[1], Hl.inside[2] + (H2(6) % 3) - 1];
+        }
+        const tg = act.seat || act.stand;
+        if (this.goTo(a, tg[0], tg[1], tg[2], act.seat ? 0.8 : 1.4)) { if (act.seat) this.sit(a, act.seat); else a.lookAt = [Hl.speaker[0] + 0.5, Hl.speaker[1] + 1, Hl.speaker[2] + 0.5]; }
+        return;
+      }
+      // the lamplighter: lamp after lamp along the avenues, a pause at each
+      const L = P.lamps; if (!L || !L.length) return;
+      if (act.i === undefined) act.i = H2(7) % L.length;
+      const lp = L[act.i];
+      if (this.goTo(a, lp[0] + 1, lp[1] - 2, lp[2], 1.4)) { a.lookAt = [lp[0] + 0.5, lp[1] - 0.5, lp[2] + 0.5]; act.rest = (act.rest || 0) + dt; if (act.rest > 3) { act.rest = 0; act.i = (act.i + 1 + (H2(8) % 3)) % L.length; act.n = (act.n || 0) + 1; } }
+      else if (act.t > 60) { act.t = 0; act.i = (act.i + 1) % L.length; }
+    };
+    const av = VP.activate;
+    VP.activate = function (vil, tod) {
+      const r = av.apply(this, arguments);
+      if (vil.plan && vil.plan.town) {
+        const cap = N.agentCap(preset(this.g), vil.agents.length);
+        const lamps = N.lamplighters(vil, N.LAMPS_N(preset(this.g)));
+        for (const a of vil.agents) a.lamp = lamps.has(a.p.id);
+        if (cap < vil.agents.length) {
+          const keep = new Set(N.keepers(vil.agents, cap));
+          for (const a of vil.agents) if (!keep.has(a)) { const i = this.agents.indexOf(a); if (i >= 0) this.agents.splice(i, 1); }
+          vil.agents = vil.agents.filter(a => keep.has(a));
+        }
       }
       return r;
     };
