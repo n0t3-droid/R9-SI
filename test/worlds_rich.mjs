@@ -25,7 +25,7 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
 const page = await ctx.newPage();
 const logs = [];
-page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 400)}`); });
+page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|world eco/i.test(s) || (process.env.DIAG && t === 'warning')) logs.push(`[${t}] ${s.slice(0, 400)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
 await page.goto(DIST);
 const wait = (ms) => page.waitForTimeout(ms);
@@ -81,7 +81,7 @@ let first = true;
 for (const dim of WORLDS) {
   console.log('== ' + dim);
   const t0 = Date.now();
-  const ok = await trip(first ? () => { document.querySelector('#ecoWorlds [data-eco="' + 'aqua' + '"]').click(); } : (d) => VR.Travel.go(VR.game, { dim: d, via: 'cmd' }), dim).catch(() => false);
+  const ok = await trip(first ? (d) => { document.querySelector('#ecoWorlds [data-eco="' + d + '"]').click(); } : (d) => VR.Travel.go(VR.game, { dim: d, via: 'cmd' }), dim).catch(() => false);
   first = false;
   trips.push({ dim, ok, s: Math.round((Date.now() - t0) / 1000) });
   check(ok, `the Kreativ jump to ${dim} (${Math.round((Date.now() - t0) / 1000)} s)`);
@@ -110,6 +110,7 @@ for (const dim of WORLDS) {
   let door = null;
   for (let i = 0; i < 120; i++) { door = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid), w = g.world; if (!v) return { none: 1 }; const d = v.plan.homes[0].door, s = w.getBlock(d[0], d[1], d[2]), t = s ? VR.R.types[VR.R.T.type[s]].name : 'air'; return { name: t, cols: w.cols ? w.cols.size : -1, loaded: w.isLoaded(d[0], d[2]) }; }, vid); if (door && /door/.test(door.name || '')) break; await step(10, 33); await wait(250); }
   check(door && /door/.test(door.name || ''), `${dim}: the first home's door in the world (${JSON.stringify(door)})`);
+  if (process.env.DIAG) console.log('  diag ' + JSON.stringify(await ev((vid) => { const g = VR.game, w = g.world, v = g.villages.known.get(vid), d = v.plan.homes[0].door, c = w.col(d[0] >> 4, d[2] >> 4); const p = g.player.pos; return { col: c ? { ready: c.ready, shownAt: c.shownAt, fade: c.fade, grow: c.grow, nsec: c.sec.length, meshed: c.sec.filter(s => s.meshed).length, h: c.height && c.height[((d[2] & 15) << 4) | (d[0] & 15)] } : null, fading: w.fading ? w.fading.size : -1, p: p.map(Math.round), door: d, far: !!g.farRing }; }, vid)));
   let vs = null;
   for (let i = 0; i < 30; i++) { await step(20, 33); vs = await ev((vid) => { const v = VR.game.villages.known.get(vid); return v ? { active: v.active, agents: v.agents.length, homes: v.plan.homes.length, style: v.plan.style, people: v.people ? v.people.length : 0, name: v.name, first: v.people && v.people[0] ? v.people[0].name : '' } : null; }, vid); if (vs && vs.active && vs.agents > 0) break; await wait(150); }
   check(vs && vs.active && vs.agents >= 4 && vs.style === 'sp:' + kind, `${dim}: ${vs ? vs.name : '?'} — ${vs ? vs.homes : 0} homes, ${vs ? vs.agents : 0} people about (${vs ? vs.first : ''} …), style ${vs ? vs.style : ''}`);
@@ -165,6 +166,7 @@ if (want('cost') && WORLDS.includes('ocker')) {
   check(V && cost.potato_village, 'cost measured: ' + JSON.stringify(cost));
 }
 
+if (process.env.DIAG) console.log(logs.slice(0, 20).join('\n'));
 check(!logs.some(l => /pageerror/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 3).join(' · ') : ''));
 save();
 if (sheet.length) { if (panel) sheet.unshift({ label: 'Kreativ: 🪐 Welten', imgs: [panel] }); fs.writeFileSync(ROOT + '/.tmp_tests/worlds_rich_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'worlds_rich_sheet.jpg', ROOT + '/.tmp_tests/worlds_rich_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } }

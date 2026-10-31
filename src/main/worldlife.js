@@ -190,7 +190,7 @@
       const sub = w.exo ? esc(w.exo.star) + (sp ? ' · ' + esc(sp) : '') : esc(sp);
       return `<button type="button" class="btn" data-eco="${esc(w.dim)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left${w.dim === g.dim ? ';opacity:.55' : ''}"><b>${w.exo ? '✦ ' : ''}${esc(w.exo ? w.exo.name.de || w.name : w.name)}</b><span style="font-size:12px;opacity:.8">${sub}</span></button>`;
     }).join('');
-    el.innerHTML = `<div class="panel box col gap" style="min-width:320px;max-width:min(92vw,640px);max-height:86vh;overflow:auto"><h2 style="margin:0">${esc(T('g.eco.worlds'))}</h2><div class="note">${esc(T('g.eco.worlds.tip'))}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">${rows}</div><button type="button" class="btn" data-eco="~close">✕</button></div>`;
+    el.innerHTML = `<div class="panel box col gap" style="width:min(92vw,680px);max-height:86vh;overflow:auto"><h2 style="margin:0">${esc(T('g.eco.worlds'))}</h2><div class="note">${esc(T('g.eco.worlds.tip'))}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">${rows}</div><button type="button" class="btn" data-eco="~close">✕</button></div>`;
     el.style.display = 'flex';
     if (document.exitPointerLock) try { document.exitPointerLock(); } catch (e) { /* (no lock) */ }
     return true;
