@@ -26,7 +26,7 @@ const NAMES = [
   { de: 'Heliataler', en: 'Heliataler', role: 'currency', what: 'the Abenteuer\'s coin (after Helia, the sun)', checked: '2026-10-22', by: 'f-names', found: 'no product, game or currency of that name; game currencies called Taler/Thaler exist (a generic word), the prefix is ours. English keeps the proper noun: „Helia coin" would read like a small crypto token\'s ticker HELIA' },
   { de: 'Wolkenrochen', en: 'Cloud Ray', role: 'ray', what: 'the great rays between the Sky Isles (t-wild)', checked: '2026-10-22', by: 'f-names', found: 'no game, toy or app creature of either name; one fan-made homebrew stat block on D&D Beyond; „Cloudray" (one word) is a maker of laser-engraver parts' },
   { de: 'Helia', en: 'Helia', what: 'the sun of Herzwelt (u-orbit)', checked: '2026-10-22', by: 'critic v0.49 · f-names', found: 'a given name, an Australian mortgage insurer, a moth and a plant genus, a cartoon character\'s first name — no game or toy product' },
-  { de: 'Amarant', en: 'Amaranth', what: 'the ringed giant', checked: '2026-10-22', by: 'critic v0.49', found: 'a plant word; a character\'s first name in Final Fantasy IX — no action' },
+  { de: 'Turmalin', en: 'Tourmaline', role: 'giant', what: 'the ringed giant, Herzwelt\'s parent (n-names; replaces Amarant / Amaranth: a Final Fantasy IX character\'s name and two spellings in the English table, R54-13 / R55-14). The many-coloured gem: its bands and rings', checked: '2026-10-31', by: 'n-names', found: 'a mineral word in both languages (like Opal, Basalt); WebSearch „Turmalin" OR „Tourmaline" planet game character: only fan-made gem characters and a lore entry naming the gem — no planet, game or brand of that name' },
   { de: 'Herzwelt', en: 'Heartworld', what: 'the home world', checked: '2026-10-22', by: 'critic v0.49', found: 'no product or game of that name' },
   { de: 'Aquamarin', en: 'Aquamarine', what: 'Herzwelt\'s moon', checked: '2026-10-22', by: 'critic v0.49', found: 'a mineral word' },
   { de: 'Zinnober', en: 'Cinnabar', what: 'the volcanic moon', checked: '2026-10-22', by: 'critic v0.49', found: 'a mineral and pigment word' },
@@ -96,9 +96,9 @@ const NAMES = [
   // u-worlds: the native species of the five worlds (worldeco.js, their names in both tables: g.eco.sp.*)
   { de: 'Wellari', en: 'Wellari', role: 'species', what: 'the shell folk of Aquamarin\'s islands (u-worlds)', checked: '2026-10-31', by: 'u-worlds', found: 'no game, species or brand of that name (WebSearch „Wellari" game OR species OR brand: only the board game Wari and unrelated words)' },
   { de: 'Dunelin', en: 'Dunelin', role: 'species', what: 'the earth folk of Ocker\'s dunes (u-worlds; replaces „Okari", near a creature name of a TV series\' wiki)', checked: '2026-10-31', by: 'u-worlds', found: 'no game, species or brand of that name (WebSearch „Dunelin" game OR species OR brand: the dunlin, a shore bird, and unrelated games)' },
-  { de: 'Glutani', en: 'Glutani', role: 'species', what: 'the tower folk of Zinnober\'s sulfur plains (u-worlds)', checked: '2026-10-31', by: 'u-worlds', found: 'no game, species or brand of that name (WebSearch „Glutani": gluten-free food brands Glutano / Glutino, a different word)' },
+  { de: 'Glimari', en: 'Glimari', role: 'species', what: 'the ember folk of Zinnober\'s sulfur plains (n-names; replaces „Glutani": a fan wiki\'s word, R55-14). After German „glimmen", to glow: their crests glimmer like embers', checked: '2026-10-31', by: 'n-names', found: 'no game, species, toy or brand of that name (WebSearch „Glimari" game OR species OR brand; „Isveli" OR „Glimari": only „Glimmer" items and games, another word). „Lohari" was set aside: too near Lohri, a harvest festival' },
   { de: 'Regoli', en: 'Regoli', role: 'species', what: 'the dome folk of Basalt\'s craters (u-worlds; after regolith)', checked: '2026-10-31', by: 'u-worlds', found: 'no game or species of that name (WebSearch „Regoli": the Italian word for rules, a toy brand „Rigolo" spelled otherwise)' },
-  { de: 'Nivari', en: 'Nivari', role: 'species', what: 'the vault folk of Opal\'s ice (u-worlds)', checked: '2026-10-31', by: 'u-worlds', found: 'no game, species or brand of that name (WebSearch „Nivari": a Sanskrit word nivar, the game Vivarium — no action)' },
+  { de: 'Isveli', en: 'Isveli', role: 'species', what: 'the frost folk of Opal\'s ice (n-names; replaces „Nivari": „Nivarians" are a World Anvil species and it is near „Sylvari", R55-14). After „Eis", ice — crisp and clear', checked: '2026-10-31', by: 'n-names', found: 'no game, species, toy or brand of that name (WebSearch „Ysveli" OR „Isveli" game OR character OR brand: unrelated Isabelle, Isvar)' },
 ];
 // the words that went: never again in a table, an item name or a string the game writes
 const RETIRED = [
@@ -120,6 +120,17 @@ const RETIRED = [
   { word: 'Sunstrike', re: /Sunstrike/, why: 'a registered games trademark and a role-playing setting\'s name; the key sunstrike stays', now: 'Mittagsglanz / Noonglow' },
   { word: 'Crimson Fleet', re: /Crimson Fleet/, why: 'a pirate faction of a 2023 space game', now: 'Karminflotte / Carmine Fleet' },
 ];
+// n-names (docs/design/names.md): the pets' names that clashed with the story's speakers
+NAMES.push(
+  { de: 'Flämmchen', en: 'Flämmchen', role: 'pet', what: 'a glimmer fox\'s name (replaces „Funke": the companion drone\'s name)', checked: '2026-10-31', by: 'n-names', found: 'a German diminutive (little flame); WebSearch „Leuchti" OR „Flämmchen" Spielzeug OR Spiel OR Marke: only lamps and LED toys described with the word — no product of that name' },
+  { de: 'Leuchti', en: 'Leuchti', role: 'pet', what: 'a glimmer fox\'s name (replaces „Lumi": the girl of Nova Haven)', checked: '2026-10-31', by: 'n-names', found: 'a German pet word (little light); the same search: no toy, game or brand of that name' },
+  { de: 'Lindenau', en: 'Lindenau', role: 'village', what: 'Herzwelt\'s village names are German compounds (VR.Names.village: Linden·au, Mohn·brunn, Lerchen·hain …; Rosenheim, Rosenthal, Silbersee and Sternberg are blocked — a TV series\' town, a porcelain brand, a famous novel\'s lake)', checked: '2026-10-31', by: 'n-names', found: 'real small places carry some compounds (Lindenau in Leipzig) — ordinary German place words; WebSearch „Mohnbrunn" OR „Honigborn" OR „Lerchenhain" game OR Spiel: only old board games of other names' },
+);
+RETIRED.push(
+  { word: 'Amarant', re: /\bAmarant(h|s)?\b/, why: 'a Final Fantasy IX character\'s name; two spellings (R54-13, R55-14); the id amarant stays', now: 'Turmalin / Tourmaline' },
+  { word: 'Glutani', re: /Glutani/, why: 'a fan wiki\'s word (R55-14)', now: 'Glimari' },
+  { word: 'Nivari', re: /Nivari/, why: '„Nivarians": a World Anvil species; ≈ Sylvari (R55-14)', now: 'Isveli' },
+);
 module.exports = { NAMES, RETIRED };
 if (require.main !== module && !process.env.NAMES_RUN) return;
 
@@ -156,7 +167,8 @@ for (const r of RETIRED) {
   const inDe = DE.filter(([, s]) => r.re.test(s)).map(([k]) => k), inEn = EN.filter(([, s]) => r.re.test(s)).map(([k]) => k);
   check(!inDe.length && !inEn.length, '„' + r.word + '" (' + r.why + ') is in no table value' + (inDe.length + inEn.length ? ': de ' + inDe.slice(0, 8).join(', ') + ' · en ' + inEn.slice(0, 8).join(', ') + ' (' + (inDe.length + inEn.length) + ')' : ''));
   const inSrc = [];
-  for (const [f, s] of TEXT) { if (/lang_(de|en)\.js$/.test(f)) continue; const c = code(s).split('\n'); c.forEach((l, i) => { if (r.re.test(l)) inSrc.push(f + ':' + (i + 1)); }); }
+  for (const [f, s] of TEXT) { if (/lang_(de|en)\.js$|shared\/names\.js$/.test(f)) continue;   // (n-names: names.js is the table of the renames itself)
+    const c = code(s).split('\n'); c.forEach((l, i) => { if (r.re.test(l)) inSrc.push(f + ':' + (i + 1)); }); }
   check(!inSrc.length, '„' + r.word + '" is in no string the sources write (comments aside)' + (inSrc.length ? ': ' + inSrc.slice(0, 8).join(', ') + (inSrc.length > 8 ? ' … (' + inSrc.length + ')' : '') : ''));
 }
 {

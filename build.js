@@ -144,6 +144,7 @@ STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'bodies2');   // u-moons2 
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'fields_blocks');   // u-fields (after u-moons2's)
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'exo_blocks');   // u-stars2 (after u-fields')
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'lifeblocks');   // a-life (after u-stars2's exo blocks)
+STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('core') + 1, 0, 'names');   // n-names: VR.Names in the Studio too (the language tables' renames)
 const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']) + '\n' + uiShared;   // (uiShared: the language module and its tables — the choice is shared with the game)
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');
