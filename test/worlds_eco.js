@@ -21,7 +21,7 @@ D.realGrav = false;
 check(Math.abs(D.gravity('basalt') - 30 * 1.62 / 9.81) < 1e-9, 'the real values kept for the ships (DimReg.gravity)');
 
 console.log('b · the registry');
-check(!!E && E.BGEN === 3 && V.Bodies.BGEN === 3, 'VR.WorldEco, bgen 3');
+check(!!E && E.BGEN === 3 && V.Bodies.BGEN >= 3, 'VR.WorldEco from bgen 3 (u-worlds3: the bodies at 4)');
 const kinds = ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
 const allNames = new Set();
 for (const k of kinds) {
