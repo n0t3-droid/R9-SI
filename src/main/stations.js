@@ -340,7 +340,7 @@
     Gd.set(0, 1, 6, RD); Gd.set(4, 1, 6, GN);
     return Gd;
   };
-  const MESH = { ring: { grid: 'ringGrid', piv: [48, 6, 48], s: STN.SCALE }, outpost: { grid: 'outpostGrid', piv: [14, 3.5, 14], s: STN.SCALE }, gate: { grid: 'gateGrid', piv: [4.5, 0.5, 4.5], s: 2 }, shuttle: { grid: 'shuttleGrid', piv: [2.5, 1.5, 5.5], s: 1.6 } };
+  const MESH = { ring: { grid: 'ringGrid', piv: [48, 6, 48], s: STN.SCALE }, outpost: { grid: 'outpostGrid', piv: [14, 3.5, 14], s: STN.SCALE }, gate: { grid: 'gateGrid', piv: [4.5, 0.5, 4.5], s: 3.2 }, shuttle: { grid: 'shuttleGrid', piv: [2.5, 1.5, 5.5], s: 1.6 } };
   const M = STN.meshes = {};
   function meshOf(g, key) {
     const m = M[key]; if (m) return m.gpu ? m : null;
@@ -379,8 +379,10 @@
       const st0 = a.st, L = STN.atBody(st0.frame); if (!L) return;
       const cam = r.cam, t = st0.t, C = camInertial(g, cam, st0, fl.b);
       const P = STN.place(L.id, t, _P), d = Math.hypot(P.r[0] - C[0], P.r[1] - C[1], P.r[2] - C[2]);
-      if (d > 16000) return;
+      if (d > 200000) return;
       const key = L.kind === 0 ? 'ring' : 'outpost', m = meshOf(g, key); let n = 0;
+      meshOf(g, 'gate'); meshOf(g, 'shuttle');   // (asked for early: in a worker while the ship is still far)
+      if (d > 16000) return;
       if (m) {
         const c = Math.cos(P.phi), s = Math.sin(P.phi), gx = [0, 1, 2].map(i => c * P.e1[i] + s * P.e2[i]);
         place(m, key, gx, P.A, P.r, C); r.drawShip(m, E, layer); n++;
@@ -551,7 +553,7 @@
   }
 
   // ---------------------------------------------------------------- the station's sky: the space scene behind its blocks
-  STN.TILT = 34 * D2R;   // the hall's view: the planet's middle 34° under the eye line, its limb across the window's top
+  STN.TILT = 22 * D2R;   // the hall's view: the planet's middle 22° under the eye line, its limb across the window's top (+19°)
   STN.inStation = (g) => !!(g && STN.isDim(g.dim));
   const eph = {}, SFs = { anc: null };
   STN.interiorFrame = function (g, cam, t) {

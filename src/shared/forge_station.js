@@ -97,8 +97,8 @@
       // ---------------------------------------------------------------- the Panoramahalle
       room(-20, -6, 20, 14, 9, 'vx_tech_hex_white', 'hull_plating', 'hull_plating_gray');
       // the window wall: glass from the floor to the ceiling, mullions every 6, a band at mid height
-      for (let x = -20; x <= 20; x++) for (let y = FY; y <= FY + 8; y++) S(x, y, -7, (x + 20) % 6 === 0 ? 'vx_tech_trim' : y === FY + 4 ? 'vx_tech_band' : 'hardened_glass');
-      for (let x = -21; x <= 21; x++) { S(x, F0, -7, 'vx_tech_trim'); S(x, FY + 9, -7, 'vx_tech_trim'); }
+      for (let x = -20; x <= 20; x++) for (let y = FY; y <= FY + 8; y++) S(x, y, -7, (x + 20) % 6 === 0 ? 'hull_plating_dark' : y === FY + 4 ? 'hull_plating_dark' : 'vx_glass_wall', { facing: 0 });
+      for (let x = -21; x <= 21; x++) { S(x, F0, -7, 'hull_plating_dark'); S(x, FY + 9, -7, 'hull_plating_dark'); }
       // the airlock to the deck at the east end of the window wall (an opening framed in hazard stripes)
       for (let x = 15; x <= 17; x++) for (let y = FY; y <= FY + 3; y++) S(x, y, -7, 0);
       for (let y = FY; y <= FY + 4; y++) { S(14, y, -7, 'hazard_stripes'); S(18, y, -7, 'hazard_stripes'); }
@@ -113,7 +113,10 @@
       for (const [x, z] of [[-19, 13], [19, 13], [-19, 8], [19, 8]]) model(rng.chance(0.5) ? 'vm_plant_palm_concrete' : 'vm_plant_fig_concrete', x, FY, z, 0);
       for (const z of [6, 10]) { S(-8, FY, z, 'vx_sofa_blue', { facing: 0 }); S(-7, FY, z, 'vx_sofa_blue', { facing: 0 }); S(8, FY, z, 'vx_sofa_blue', { facing: 0 }); S(9, FY, z, 'vx_sofa_blue', { facing: 0 }); }
       lights(-20, -6, 20, 14, 8, 5);
-      for (let x = -20; x <= 20; x++) S(x, FY + 7, 14, 'neon_cyan');
+      // the back wall: a blue band, holo screens with the station's views, planters under them, cyan accents
+      for (let x = -20; x <= 20; x++) { S(x, FY + 6, 15, 'hull_stripe_blue', { axis: 1 }); if (x % 4 === 0) S(x, FY + 7, 15, 'neon_cyan'); }
+      for (const x of [-16, -10, 10, 16]) for (let dx = 0; dx < 3; dx++) { S(x + dx, FY + 2, 14, dx === 1 ? 'vx_holo_screen_amber' : 'vx_holo_screen', { facing: 2 }); S(x + dx, FY + 3, 14, 'vx_holo_screen', { facing: 2 }); S(x + dx, FY, 13, 'vx_planter'); S(x + dx, FY + 1, 13, dx === 1 ? 'vx_fern_lush' : 'vx_flowerbed'); }
+      for (const z of [-2, 4, 10]) for (const x of [-21, 21]) { S(x, FY + 2, z, 'vx_hex_light_cyan', { head: 0 }); S(x, FY + 3, z, 'vx_holo_screen', { facing: x < 0 ? 1 : 3 }); }
       // ---------------------------------------------------------------- the Hydrogarten (behind the hall, a glass roof)
       room(-20, 16, 20, 28, 9, 'moss_block', 'hull_plating', 'vx_dome_glass');
       doorX(-2, 15, 5, 4);
@@ -126,11 +129,10 @@
       // ---------------------------------------------------------------- the Stationsladen (east of the hall)
       room(22, -5, 34, 9, 6, 'vx_shop_floor', 'hull_plating', 'hull_plating_gray');
       door(21, 2, 2, 3);
-      for (let x = 23; x <= 33; x += 2) { S(x, FY, -5, 'vx_shop_shelf_tech', { facing: 2 }); }
+      for (let x = 23; x <= 33; x += 2) { S(x, FY, -5, 'vx_shop_shelf_tech', { facing: 2 }); S(x, FY + 1, -5, 'vx_shop_shelf_toys', { facing: 2 }); S(x + 1, FY, -5, 'vx_shop_fridge_drinks', { facing: 2 }); }
       for (let z = -3; z <= 3; z += 2) { S(34, FY, z, 'vx_shop_shelf_drinks', { facing: 3 }); }
       for (let x = 24; x <= 31; x += 2) S(x, FY, 0, 'vx_shop_shelf_snacks', { facing: 2 });
       S(PL.counter[0], FY, PL.counter[2], 'vx_shop_checkout', { facing: 3 }); S(PL.counter[0], FY, PL.counter[2] + 1, 'vx_shop_checkout', { facing: 3 });
-      model('vm_shop_neon_open', 27, FY + 4, 9, 0);
       for (let x = 24; x <= 32; x += 4) S(x, FY + 6, 3, 'vx_shop_light');
       // the job board by the counter (a holo screen: [V] there shows the station's jobs)
       S(PL.board[0], FY + 1, PL.board[2] + 1, 'vx_holo_screen_amber', { facing: 0 });
@@ -183,7 +185,7 @@
       berth(Math.floor(PL.berth[0]), Math.floor(PL.berth[2]), 8, true);
       berth(Math.floor(PL.pad[0]), Math.floor(PL.pad[2]), 8, true);
       room(-10, -6, 10, 8, 7, 'vx_tech_hex_white', 'vx_tech_white', 'hull_plating_gray');
-      for (let x = -10; x <= 10; x++) for (let y = FY; y <= FY + 6; y++) S(x, y, -7, (x + 10) % 5 === 0 ? 'vx_tech_trim' : 'hardened_glass');
+      for (let x = -10; x <= 10; x++) for (let y = FY; y <= FY + 6; y++) S(x, y, -7, (x + 10) % 5 === 0 ? 'hull_plating_dark' : 'vx_glass_wall', { facing: 0 });
       for (let x = 7; x <= 8; x++) for (let y = FY; y <= FY + 2; y++) S(x, y, -7, 0);
       S(PL.counter[0], FY, PL.counter[2], 'vx_shop_checkout', { facing: 3 });
       S(PL.board[0], FY + 1, PL.board[2] + 1, 'vx_holo_screen_amber', { facing: 0 });
