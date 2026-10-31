@@ -106,6 +106,10 @@ for (const dim of WORLDS) {
   // (the village's columns loaded and meshed before the picture: the far land alone shows nothing of it)
   for (let i = 0; i < 90; i++) { await step(10, 33); const ok = await ev((V) => { const w = VR.game.world; for (const dx of [-24, 0, 24]) for (const dz of [-24, 0, 24]) if (!w.isLoaded(V.x + dx, V.z + dz)) return false; return true; }, V); if (ok) break; await wait(300); }
   await settle(60);
+  // (and the first home's door stands: the village's blocks are there, not the far land under it)
+  let door = null;
+  for (let i = 0; i < 120; i++) { door = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid), w = g.world; if (!v) return { none: 1 }; const d = v.plan.homes[0].door, s = w.getBlock(d[0], d[1], d[2]), t = s ? VR.R.types[VR.R.T.type[s]].name : 'air'; return { name: t, cols: w.cols ? w.cols.size : -1, loaded: w.isLoaded(d[0], d[2]) }; }, vid); if (door && /door/.test(door.name || '')) break; await step(10, 33); await wait(250); }
+  check(door && /door/.test(door.name || ''), `${dim}: the first home's door in the world (${JSON.stringify(door)})`);
   let vs = null;
   for (let i = 0; i < 30; i++) { await step(20, 33); vs = await ev((vid) => { const v = VR.game.villages.known.get(vid); return v ? { active: v.active, agents: v.agents.length, homes: v.plan.homes.length, style: v.plan.style, people: v.people ? v.people.length : 0, name: v.name, first: v.people && v.people[0] ? v.people[0].name : '' } : null; }, vid); if (vs && vs.active && vs.agents > 0) break; await wait(150); }
   check(vs && vs.active && vs.agents >= 4 && vs.style === 'sp:' + kind, `${dim}: ${vs ? vs.name : '?'} — ${vs ? vs.homes : 0} homes, ${vs ? vs.agents : 0} people about (${vs ? vs.first : ''} …), style ${vs ? vs.style : ''}`);

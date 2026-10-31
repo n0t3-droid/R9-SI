@@ -154,7 +154,7 @@
       species: {
         de: 'Regoli', en: 'Regoli',
         look: { skin: [0x8a8cc0, 0x7a80b4, 0x9a98cc, 0x8484b8], cut: ['tunic', 'coat', 'tunic'], feat: 'antennae', featC: [0x7af0ff, 0xb0ff9a, 0xffe07a], garb: [0x3a4a6a, 0x6a7a9a, 0xe8e8f0, 0x2a3a4a, 0x8a5a9a], eye: 0x101828, glow: true },
-        kit: { shape: 'dome', wall: 'polished_andesite', band: 'smooth_basalt', roof: 'vx_dome_glass', floor: 'smooth_stone', fill: 'andesite', window: 'vx_dome_glass', door: 'door_glass_white', bed: 'gray_bed', light: 'lantern', paving: 'polished_andesite', lamp: 'vx_lamppost_tech', canopy: 'gray_wool', mark: 'azure_crystal_block' },
+        kit: { shape: 'dome', wall: 'polished_andesite', band: 'smooth_basalt', roof: 'light_blue_stained_glass', floor: 'smooth_stone', fill: 'andesite', window: 'light_blue_stained_glass', door: 'door_glass_white', bed: 'gray_bed', light: 'lantern', paving: 'polished_andesite', lamp: 'vx_lamppost_tech', canopy: 'gray_wool', mark: 'azure_crystal_block' },
         goods: ['regolith', 'basalt', 'smooth_basalt', 'azure_crystal_block', 'lantern', 'diorite', 'andesite', 'iron_ingot'],
         syl: ['re', 'go', 'li', 'mun', 'sel', 'ka', 'tor', 'vi', 'den', 'ul', 'pa', 'so', 'ren', 'ix', 'ma', 'thel'], end: ['i', 'o', 'un', 'is'],
       },

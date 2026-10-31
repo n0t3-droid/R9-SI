@@ -23,12 +23,18 @@
 
   // ---------------------------------------------------------------- facts
   // the kind of the world the game stands on when its ecosystem is there (bgen ≥ 3), else null
+  const KC = { dim: null, meta: null, kind: null };
   WL.kindOf = function (g) {
+    if (g && KC.dim === g.dim && KC.meta === g.meta) return KC.kind;   // (once per world: nothing allocated per frame)
+    const k = kindOf0(g); if (g) { KC.dim = g.dim; KC.meta = g.meta; KC.kind = k; }
+    return k;
+  };
+  function kindOf0(g) {
     const d = g && g.dim && D.get(g.dim), kind = d && d.body;
     if (!kind || !E.KINDS[kind]) return null;
     const bg = VR.Bodies && VR.Bodies.bgenOf ? VR.Bodies.bgenOf(g.meta)[kind] : 0;
     return bg >= E.BGEN ? kind : null;
-  };
+  }
 
   // ---------------------------------------------------------------- the gravity switch
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'realGrav', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.realGrav', tip: 'g.set.realGrav.tip', cost: 'low', def: false });

@@ -35,9 +35,9 @@
   // the place kept for a dim: [x, y, z, yaw, pitch] or null
   Travel.posOf = (meta, dim) => { const a = meta && meta.pos && meta.pos[dim]; return finite(a, 3) ? [a[0], a[1], a[2], r3(a[3]), r3(a[4])] : null; };
   // u-worlds · every world one can stand on — the owner: „Im Kreativmodus alle Planeten ohne Freischalten": Herzwelt (or
-  // the flat land), the old dims, the five bodies of Helia and, in Kreativ (or with cheats), the small Spaltmond and one
+  // the flat land), the old dims, the five bodies of Helia and, in Kreativ, the small Spaltmond and one
   // world of each kind under the nearest other stars → [{dim, name, kind, exo}] (Travel.canGo lets every one through)
-  Travel.creative = (g) => !!(g && ((g.player && g.player.mode === 'creative') || (g.meta && (g.meta.mode === 'creative' || g.meta.cheats))));
+  Travel.creative = (g) => !!(g && ((g.player && g.player.mode === 'creative') || (g.meta && g.meta.mode === 'creative')));
   const EXO = new Map();
   Travel.exoPicks = (seed) => {
     seed = (seed >>> 0) || 0x5eed;
