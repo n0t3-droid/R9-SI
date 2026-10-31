@@ -519,8 +519,8 @@ void main() {
     ES2.bodies = null;
     if (hzR > 0) hz.update(cam);
     r.render({ cam, world: null, env: ES2, noSky: true, horizon: hzR > 0 ? hz : null, particles: g.particles,
-      drawOpaque: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'opaque'); },
-      drawTranslucent: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'trans'); if (g.trails) g.trails.draw(r2, E2); } });
+      drawOpaque: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'opaque'); if (VR.Stations && VR.Stations.drawSpace) VR.Stations.drawSpace(g, r2, E2, 'opaque'); },   // u-stations: the station, its gates, its shuttles
+      drawTranslucent: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'trans'); if (VR.Stations && VR.Stations.drawSpace) VR.Stations.drawSpace(g, r2, E2, 'trans'); if (g.trails) g.trails.draw(r2, E2); } });   // u-stations
     if (g.cockpit) g.cockpit.updateHud(dt);
     if (g.audio && g.audio.listen) g.audio.listen(eye, p.yaw, null, false);
     if (g.ambience) g.ambience.update(dt, { space: true });   // e-music2: space is silent but for the cockpit's hum (ambience.js 'cabin')

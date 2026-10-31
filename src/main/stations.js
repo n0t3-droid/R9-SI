@@ -227,7 +227,7 @@
     { id: 'ice', kind: 'bring', item: 'ice', n: 16, size: 'M', at: ['ring', 'basalt'] },
     { id: 'iron', kind: 'bring', item: 'iron_ingot', n: 8, size: 'M', at: ['ring', 'opal'] },
     { id: 'wheat', kind: 'bring', item: 'wheat', n: 12, size: 'S', at: ['ring', 'basalt', 'opal'] },
-    { id: 'glow', kind: 'bring', item: 'glowstone_dust', n: 6, size: 'S', at: ['ring'] },
+    { id: 'copper', kind: 'bring', item: 'copper_ingot', n: 10, size: 'S', at: ['ring'] },
     { id: 'photo', kind: 'photo', size: 'S', at: ['ring', 'basalt', 'opal'] },
   ];
   STN.jobsFor = (id, day, wseed) => {
@@ -241,4 +241,506 @@
     'g.stn.tooFar', 'g.stn.undock', 'g.stn.undockGo', 'g.stn.site', 'g.stn.hud', 'g.stn.shop', 'g.stn.board', 'g.stn.jobs', 'g.stn.job.bring', 'g.stn.job.photo', 'g.stn.job.done', 'g.stn.job.need',
     'g.stn.job.take', 'g.stn.job.hand', 'g.stn.job.open', 'g.stn.welcome', 'g.stn.first', 'g.shop.name.station', 'g.set.stations', 'g.set.stations.tip', 'g.fg.stnRing', 'g.fg.stnOutpost', 'g.fg.stnHall',
     'g.fg.stnDeck3', 'g.fg.stnDeck2', 'g.fg.stnShop', 'g.fg.stnCabins', 'g.fg.stnGarden', 'g.fg.stnBunks', 'g.stn.shuttle', 'g.stn.beacon', 'g.stn.dockHint', 'g.stn.need'];
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
+
+// ============================================================================ the game part (VR.Game present)
+// the station's outside as voxel meshes in the space frame (spaceflight.js's marked hook), its beacon far away, the
+// docking and the undocking, the station's own sky (the space scene behind the station dims' blocks), the shuttles on
+// the hangar deck (a PadLife pad), the crew, the shop 🛰 and the job board. Switch: settings.stations (⚙ Bild).
+(function (VR) {
+  'use strict';
+  const STN = VR.Stations, G0 = VR.Game, SF = VR.SpaceFlight, A = VR.Ascent;
+  if (!STN || !G0 || !SF || !A || typeof document === 'undefined') return;
+  const U = () => VR.Universe, T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const PI = Math.PI, D2R = PI / 180;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const len = (a) => Math.hypot(a[0], a[1], a[2]);
+  const nrm = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const on = (g) => !(g && g.settings && g.settings.stations === false);
+  const wseedOf = (g) => ((g && g.meta && g.meta.seed) | 0);
+  const worldT = (g) => (g && g.env ? U().worldSeconds(g.env.day | 0, g.env.ticks) : 0);
+  STN.stats = { meshes: 0, drawn: 0, shuttles: 0, glare: 0, dockMs: [], err: null, phase: null, frames: 0, interior: 0 };
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'stations', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.stations', tip: 'g.set.stations.tip', cost: 'low', def: true });
+
+  // ---------------------------------------------------------------- the meshes (block grids → the worker's shipmesh job)
+  const st = (n, pr) => { const t = VR.R.byName[n]; return t ? (pr ? t.state(pr) : t.defaultState) : 0; };
+  function grid(sx, sy, sz) { const b = new Uint16Array(sx * sy * sz); return { sx, sy, sz, blocks: b, set(x, y, z, s) { if (x >= 0 && y >= 0 && z >= 0 && x < sx && y < sy && z < sz) b[(y * sz + z) * sx + x] = s; } }; }
+  // the Ringstation: 96 × 32 × 96 blocks of 4 m — the ring (radius 40, a 5 × 5 tube), four spokes, the hub, the mast with
+  // the red beacon, two solar wings, four decks on the ring's planet side (y 0 … 3)
+  STN.ringGrid = function () {
+    const Gd = grid(96, 32, 96), C = 48;
+    const W = st('hull_plating'), GR = st('hull_plating_gray'), DK = st('hull_plating_dark'), CY = st('neon_cyan'), AM = st('neon_amber'), WIN = st('window_warm'), VP = st('viewport'), BM = st('black_metal'), SOL = st('blue_stained_glass'), RED = st('beacon_red'), ANT = st('antenna'), HZ = st('hazard_stripes'), TT = st('vx_tech_trim');
+    for (let z = 0; z < 96; z++) for (let x = 0; x < 96; x++) {
+      const dx = x + 0.5 - C, dz = z + 0.5 - C, r = Math.hypot(dx, dz), a = Math.atan2(dz, dx);
+      if (r >= 37.5 && r <= 42.5) for (let y = 4; y <= 8; y++) {
+        let s = W;
+        if (y === 4) s = DK; else if (y === 8) s = Math.abs(r - 40) < 0.6 ? CY : W;
+        else if (r > 41.6) s = y === 6 ? (Math.floor((a + PI) / (2 * PI) * 160) % 3 === 0 ? WIN : GR) : GR;
+        else if (r < 38.4) s = y === 6 ? VP : GR;
+        Gd.set(x, y, z, s);
+      }
+      // the hub
+      if (r <= 6.5) for (let y = 2; y <= 14; y++) Gd.set(x, y, z, y === 10 && r > 5.5 ? CY : y === 2 ? DK : (r > 5.5 && y % 4 === 0 ? TT : W));
+      // the spokes (between the decks)
+      for (let k = 0; k < 4; k++) {
+        const sa = PI / 4 + k * PI / 2, ux = Math.cos(sa), uz = Math.sin(sa), al = dx * ux + dz * uz, ac = Math.abs(-dx * uz + dz * ux);
+        if (al > 6 && al < 38 && ac <= 1.5) for (let y = 5; y <= 7; y++) Gd.set(x, y, z, ac > 0.9 ? BM : (Math.floor(al) % 6 === 0 ? CY : GR));
+      }
+      // the decks: under the ring at 0°, 90°, 180°, 270°
+      for (let k = 0; k < 4; k++) {
+        const da = k * PI / 2, ux = Math.cos(da), uz = Math.sin(da), al = dx * ux + dz * uz, ac = -dx * uz + dz * ux;
+        if (Math.abs(al - 40) <= 5 && Math.abs(ac) <= 5) for (let y = 0; y <= 3; y++) {
+          const edge = Math.abs(al - 40) > 4.4 || Math.abs(ac) > 4.4;
+          Gd.set(x, y, z, y === 0 ? (edge ? HZ : DK) : y === 3 ? GR : (edge && y === 1 ? AM : GR));
+        }
+      }
+    }
+    // the mast, its beacon, the wings on their boom
+    for (let y = 15; y <= 29; y++) Gd.set(C, y, C, y === 29 ? ANT : BM);
+    Gd.set(C, 30, C, RED); Gd.set(C - 1, 30, C, RED);
+    for (let z = 26; z <= 70; z++) { if (z > 44 && z < 52) continue; for (let x = C - 3; x <= C + 2; x++) Gd.set(x, 20, z, x === C - 3 || x === C + 2 || z % 6 === 2 ? BM : SOL); }
+    for (let z = 44; z <= 52; z++) Gd.set(C, 20, z, BM);
+    return Gd;
+  };
+  // an outpost: a hub, one deck under it, a short mast, one wing
+  STN.outpostGrid = function () {
+    const Gd = grid(28, 18, 28), C = 14;
+    const W = st('vx_tech_white'), DK = st('hull_plating_dark'), CY = st('neon_cyan'), AM = st('neon_amber'), BM = st('black_metal'), SOL = st('blue_stained_glass'), RED = st('beacon_red'), HZ = st('hazard_stripes'), WIN = st('window_warm');
+    for (let z = 0; z < 28; z++) for (let x = 0; x < 28; x++) {
+      const dx = x + 0.5 - C, dz = z + 0.5 - C, r = Math.hypot(dx, dz);
+      if (r <= 4.5) for (let y = 1; y <= 10; y++) Gd.set(x, y, z, y === 6 && r > 3.6 ? WIN : y === 9 && r > 3.6 ? CY : W);
+      if (Math.abs(dx) <= 5 && Math.abs(dz) <= 5) Gd.set(x, 0, z, Math.abs(dx) > 4.4 || Math.abs(dz) > 4.4 ? HZ : DK);
+      if ((Math.abs(dx) > 4.4 || Math.abs(dz) > 4.4) && Math.abs(dx) <= 5 && Math.abs(dz) <= 5) Gd.set(x, 1, z, AM);
+    }
+    for (let y = 11; y <= 15; y++) Gd.set(C, y, C, BM);
+    Gd.set(C, 16, C, RED);
+    for (let x = 0; x < 28; x++) { if (Math.abs(x + 0.5 - C) < 5) continue; for (let z = C - 2; z <= C + 1; z++) Gd.set(x, 8, z, z === C - 2 || x % 5 === 0 ? BM : SOL); }
+    return Gd;
+  };
+  // a guide gate: a square frame, cyan, amber corners
+  STN.gateGrid = function () {
+    const Gd = grid(9, 1, 9), CY = st('neon_cyan'), AM = st('neon_amber');
+    for (let z = 0; z < 9; z++) for (let x = 0; x < 9; x++) if (x === 0 || z === 0 || x === 8 || z === 8) Gd.set(x, 0, z, (x === 0 || x === 8) && (z === 0 || z === 8) ? AM : CY);
+    return Gd;
+  };
+  // a station shuttle: 5 × 3 × 11, the nose toward −z
+  STN.shuttleGrid = function () {
+    const Gd = grid(5, 3, 11), W = st('vx_hull_white'), GL = st('tinted_glass'), CY = st('neon_cyan'), RD = st('neon_magenta'), GN = st('neon_lime'), DK = st('hull_plating_dark');
+    for (let z = 0; z < 11; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) {
+      const tip = z < 2 && (x === 0 || x === 4 || y === 2);
+      if (tip) continue;
+      let s = W;
+      if (z <= 2 && y >= 1 && x >= 1 && x <= 3) s = GL;
+      if (z === 10) s = (x === 2 && y === 1) || (x !== 2 && y === 1 && (x === 1 || x === 3)) ? CY : DK;
+      if (y === 0) s = DK;
+      Gd.set(x, y, z, s);
+    }
+    Gd.set(0, 1, 6, RD); Gd.set(4, 1, 6, GN);
+    return Gd;
+  };
+  const MESH = { ring: { grid: 'ringGrid', piv: [48, 6, 48], s: STN.SCALE }, outpost: { grid: 'outpostGrid', piv: [14, 3.5, 14], s: STN.SCALE }, gate: { grid: 'gateGrid', piv: [4.5, 0.5, 4.5], s: 2 }, shuttle: { grid: 'shuttleGrid', piv: [2.5, 1.5, 5.5], s: 1.6 } };
+  const M = STN.meshes = {};
+  function meshOf(g, key) {
+    const m = M[key]; if (m) return m.gpu ? m : null;
+    if (!g.pool || !g.renderer || !g.renderer.uploadShip) return null;
+    const rec = M[key] = { gpu: null, modelMat: new Float32Array(16), normalMat: new Float32Array(9), clipNear: 0 };
+    const Gd = STN[MESH[key].grid](), copy = Gd.blocks.slice();
+    let wi = 0; g.pool.workers.forEach((wk, i) => { if (wk.inflight < g.pool.workers[wi].inflight) wi = i; });
+    g.pool.direct(wi, { type: 'shipmesh', sx: Gd.sx, sy: Gd.sy, sz: Gd.sz, blocks: copy }, [copy.buffer], (msg) => { if (msg.type === 'shipmesh') { rec.gpu = g.renderer.uploadShip(msg.sections); STN.stats.meshes++; } });
+    return null;
+  }
+  // the camera's place (body-inertial) and its local frame (row-major local → inertial; columns east, up, south)
+  const _M = new Float64Array(9), _cr = [0, 0, 0], _cv = [0, 0, 0];
+  function camInertial(g, cam, st0, b) {
+    const S = U().home;
+    if (st0.frame === 'herz') { S.chartToInertial('herz', [cam.x, cam.y, cam.z], null, st0.t, _cr, _cv); A.localM(cam.x, cam.z, st0.t, _M); }
+    else { A.localFrame(st0, _M); const dx = cam.x - b.pos[0], dy = cam.y - b.pos[1], dz = cam.z - b.pos[2]; for (let i = 0; i < 3; i++) _cr[i] = st0.r[i] + _M[i * 3] * dx + _M[i * 3 + 1] * dy + _M[i * 3 + 2] * dz; }
+    return _cr;
+  }
+  const toLocal = (v) => [_M[0] * v[0] + _M[3] * v[1] + _M[6] * v[2], _M[1] * v[0] + _M[4] * v[1] + _M[7] * v[2], _M[2] * v[0] + _M[5] * v[1] + _M[8] * v[2]];
+  // a mesh's matrices: grid axes gx, gy (inertial unit vectors; gz = gx × gy), its pivot at inertial P, the camera at C
+  function place(m, key, gx, gy, P, C) {
+    const D = MESH[key], s = D.s, gz = cross(gx, gy), X = toLocal(gx), Y = toLocal(gy), Z = toLocal(gz), tr = toLocal([P[0] - C[0], P[1] - C[1], P[2] - C[2]]);
+    const mm = m.modelMat, nm = m.normalMat, pv = D.piv;
+    for (let i = 0; i < 3; i++) { mm[i] = X[i] * s; mm[4 + i] = Y[i] * s; mm[8 + i] = Z[i] * s; mm[12 + i] = tr[i] - (X[i] * pv[0] + Y[i] * pv[1] + Z[i] * pv[2]) * s; nm[i] = X[i]; nm[3 + i] = Y[i]; nm[6 + i] = Z[i]; }
+    mm[3] = mm[7] = mm[11] = 0; mm[15] = 1;
+    return len(tr);
+  }
+  // one instance list per mesh kind (the gates and the shuttles are several)
+  const inst = { gate: [], shuttle: [] };
+  const instOf = (key, i) => { const L = inst[key]; while (L.length <= i) L.push({ gpu: null, modelMat: new Float32Array(16), normalMat: new Float32Array(9), clipNear: 0 }); const o = L[i]; o.gpu = M[key].gpu; return o; };
+  const _P = {}, _D = {}, _sh = [], _shc = {};
+  // spaceflight.js's space frame, opaque and translucent: the station near the ship, its gates, its shuttles
+  STN.drawSpace = function (g, r, E, layer) {
+    try {
+      const fl = g && g.flight, a = fl && fl.asc; if (!a || !on(g)) return;
+      const st0 = a.st, L = STN.atBody(st0.frame); if (!L) return;
+      const cam = r.cam, t = st0.t, C = camInertial(g, cam, st0, fl.b);
+      const P = STN.place(L.id, t, _P), d = Math.hypot(P.r[0] - C[0], P.r[1] - C[1], P.r[2] - C[2]);
+      if (d > 16000) return;
+      const key = L.kind === 0 ? 'ring' : 'outpost', m = meshOf(g, key); let n = 0;
+      if (m) {
+        const c = Math.cos(P.phi), s = Math.sin(P.phi), gx = [0, 1, 2].map(i => c * P.e1[i] + s * P.e2[i]);
+        place(m, key, gx, P.A, P.r, C); r.drawShip(m, E, layer); n++;
+      }
+      // the gates of berth 0 (always: they are the station's lights in the dark), the shuttles near
+      const gm = meshOf(g, 'gate');
+      if (gm) {
+        const Dk = STN.deck(L.id, 0, t, _D), side = cross(Dk.n, Dk.u);
+        for (let i = 0; i < STN.GATES.length; i++) { const o = instOf('gate', i), p = [0, 1, 2].map(j => Dk.p[j] + Dk.n[j] * STN.GATES[i]); place(o, 'gate', Dk.u, Dk.n, p, C); r.drawShip(o, E, layer); n++; }
+        void side;
+      }
+      const sm = meshOf(g, 'shuttle');
+      if (sm) {
+        const list = STN.shuttles(L.id, wseedOf(g), t, _sh, _shc); let k = 0;
+        for (const cr of list) {
+          if (Math.hypot(cr.p[0] - C[0], cr.p[1] - C[1], cr.p[2] - C[2]) > 9000) continue;
+          const z = [-cr.fwd[0], -cr.fwd[1], -cr.fwd[2]], y0 = cr.up, y = nrm([y0[0] - z[0] * dot(y0, z), y0[1] - z[1] * dot(y0, z), y0[2] - z[2] * dot(y0, z)]), x = cross(y, z);
+          const o = instOf('shuttle', k++); place(o, 'shuttle', x, y, cr.p, C); r.drawShip(o, E, layer); n++;
+        }
+        STN.stats.shuttles = k;
+      }
+      STN.stats.drawn = n;
+    } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations space', e); } }
+  };
+
+  // ---------------------------------------------------------------- the beacon far away (one additive glare)
+  const perm = (v) => [v[1], v[2], v[0]];
+  STN.beaconDir = function (fr, eph, id, t) {
+    const L = STN.LIST[id], b = eph && eph.bodies && eph.bodies[L.body], SSb = VR.SpaceScene && VR.SpaceScene.BODIES; if (!b || !SSb) return null;
+    const q = perm(STN.beacon(id, t, [0, 0, 0])), P = [b.p[0] + q[0], b.p[1] + q[1], b.p[2] + q[2]], rel = [P[0] - fr.pos[0], P[1] - fr.pos[1], P[2] - fr.pos[2]], d = len(rel);
+    if (!(d > 1)) return null;
+    // behind a world? (the line of sight against each body's sphere)
+    for (const k of ['herz', 'aqua', 'opal', 'basalt', 'amarant']) {
+      const bb = eph.bodies[k], B = SSb[k]; if (!bb || !B) continue;
+      const ox = bb.p[0] - fr.pos[0], oy = bb.p[1] - fr.pos[1], oz = bb.p[2] - fr.pos[2], tc = (ox * rel[0] + oy * rel[1] + oz * rel[2]) / d;
+      if (tc <= 0 || tc >= d) continue;
+      if (ox * ox + oy * oy + oz * oz - tc * tc < B.R * B.R) return null;
+    }
+    const D = [rel[0] / d, rel[1] / d, rel[2] / d], Ax = fr.axes;
+    return { dir: [dot(Ax[0], D), dot(Ax[1], D), dot(Ax[2], D)], d };
+  };
+  const blink = (t) => { const u = ((t % 1.6) + 1.6) % 1.6; return u < 0.12 ? u / 0.12 : u < 0.42 ? 1 : u < 0.62 ? 1 - (u - 0.42) / 0.2 : 0; };
+  const SSc = VR.SpaceScene;
+  if (SSc && SSc.frameSetup && !SSc._stn) {
+    SSc._stn = true;
+    const fs0 = SSc.frameSetup;
+    SSc.frameSetup = function (Sx, eph, o) {
+      const fr = fs0.apply(this, arguments);
+      try {
+        const g = VR.game, fl = g && g.flight, a = fl && fl.asc;
+        if (fr && g && a && SF.inSpace(g) && !STN.inStation(g)) {
+          const L = STN.atBody(a.st.frame), t = a.st.t;
+          const B = L ? STN.beaconDir(fr, eph, L.id, t) : null;
+          if (B && B.d > 900) {
+            const dS = B.dir, bu0 = Math.abs(dS[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], k = dot(bu0, dS), u = nrm([bu0[0] - dS[0] * k, bu0[1] - dS[1] * k, bu0[2] - dS[2] * k]), v = cross(dS, u);
+            const tt = performance.now() / 1000, bl = 0.15 + 0.85 * blink(tt), far = clamp(1.2 - Math.log10(B.d / 1000) * 0.35, 0.25, 1);
+            fr.draws.push({ prog: 'glare', add: true, stn: true, u: { u_cdir: dS, u_bu: u, u_bv: v, u_half: Math.tan(25 * D2R), u_sunDir: dS, u_sunCol: [1.0, 0.13, 0.07], u_gl: [bl * far, 0.0012, 1.3, 0.5] }, tex: {} });
+            STN.stats.glare++;
+            STN.lastBeacon = { dir: dS, d: B.d };
+          }
+        }
+      } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations beacon', e); } }
+      return fr;
+    };
+  }
+  // the story's ch. 3 beacon: now the real one (its direction from the true place — the old one hung over the limb)
+  const SP = VR.StoryPlay;
+  if (SP && SP.stationDir) {
+    SP.stationDir = function (fr, eph, t, cam) { void cam; const g = VR.game, a = g && g.flight && g.flight.asc, tt = a ? a.st.t : worldT(g); const B = STN.beaconDir(fr, eph, 'ring', tt); return B ? B.dir : null; };
+  }
+
+  // ---------------------------------------------------------------- docking (G at the station in space)
+  STN.target = function (g, fl) {
+    const a = fl && fl.asc; if (!a || fl.regime !== 'space' || a.jump || a.cruise) return null;
+    const st0 = a.st, L = STN.atBody(st0.frame); if (!L) return null;
+    const cam = g.cam || (g.renderer && g.renderer.cam); if (!cam) return null;
+    const C = camInertial(g, cam, st0, fl.b), P = STN.place(L.id, st0.t, _P), rel = [P.r[0] - C[0], P.r[1] - C[1], P.r[2] - C[2]], d = len(rel);
+    const cp = Math.cos(cam.pitch || 0), fL = [-Math.sin(cam.yaw || 0) * cp, Math.sin(cam.pitch || 0), -Math.cos(cam.yaw || 0) * cp];
+    const f = [_M[0] * fL[0] + _M[1] * fL[1] + _M[2] * fL[2], _M[3] * fL[0] + _M[4] * fL[1] + _M[5] * fL[2], _M[6] * fL[0] + _M[7] * fL[1] + _M[8] * fL[2]];
+    const ang = Math.acos(clamp(dot(f, rel) / d, -1, 1));
+    return { id: L.id, d, ang, ok: d < 40000 || ang < 9 * D2R };
+  };
+  STN.dock = function (g, fl, id, quiet) {
+    const a = A.ascOf(fl), st0 = a.st;
+    const why = VR.Travel && VR.Travel.canGo ? VR.Travel.canGo(g, STN.LIST[id].dim) : null;
+    if (why) { SF.hint(fl, why); return false; }
+    const J = STN.dockPlan(id, 0, st0.t, st0.r, st0.v);
+    a.jump = { dock: true, J, s: 0, to: id, id, ph: null };
+    fl.auto = null; fl.regime = 'space';
+    if (g.trails && g.trails.clear) g.trails.clear();
+    if (!quiet) SF.say(fl, 'g.stn.dockGo', { name: STN.nameOf(id), km: (J.dist / 1000).toFixed(1), s: Math.round(J.dur) });
+    if (g.audio && g.audio.play) g.audio.play('boost');
+    STN.stats.dockMs = []; STN.stats.phase = 'transfer'; STN.stats.dockT0 = performance.now();
+    return true;
+  };
+  const toggle0 = SF.toggle;
+  SF.toggle = (fl) => {
+    const g = fl && fl.g;
+    try {
+      // in a station, in the parked ship: G undocks
+      if (g && STN.isDim(g.dim) && (fl.regime || 'air') === 'air' && g.starships && g.starships.pilot && g.starships.pilot.flight === fl) return STN.undock(g, fl);
+      if (g && fl.regime === 'space' && !fl.auto) { const tg = STN.target(g, fl); if (tg && tg.ok) return STN.dock(g, fl, tg.id); }
+    } catch (e) { console.warn('stations G', e); }
+    return toggle0(fl);
+  };
+  const flash0 = SF.jumpFlash;
+  SF.jumpFlash = (J, s) => (J && J.dock ? Math.exp(-Math.pow((s - (J.T1 + J.T2 + J.T3 + 0.08)) / 0.12, 2)) * 0.55 : flash0(J, s));
+  const _o = {}, _mp = [0, 0, 0], _mv = [0, 0, 0];
+  const jump0 = SF.jumpStep;
+  SF.jumpStep = (fl, h) => {
+    const a = A.ascOf(fl), j = a.jump;
+    if (!j || !j.dock) return jump0(fl, h);
+    const st0 = a.st, g = fl.g, J = j.J;
+    j.s = Math.min(J.dur, j.s + h); st0.t += h;
+    STN.dockAt(J, j.s, _o);
+    for (let i = 0; i < 3; i++) { st0.v[i] = (_o.p[i] - st0.r[i]) / Math.max(h, 1e-4); st0.r[i] = _o.p[i]; }
+    st0.coast = false;
+    if (_o.phase === 'transfer' && _o.u < 0.85) { A.slew(a.S, _o.fwd, _o.up, 2.4 * h, 1.2 * h); A.math.ortho(a.S); }
+    else A.frameFrom(_o.fwd, _o.up, a.S);
+    if (st0.frame === 'herz') { A.toMap(st0, _mp, _mv); for (let i = 0; i < 3; i++) { a.pos[i] = _mp[i]; fl.b.pos[i] = _mp[i]; fl.b.vel[i] = 0; } }
+    if (_o.phase !== j.ph) {
+      j.ph = _o.phase; STN.stats.phase = _o.phase;
+      if (_o.phase === 'corridor') SF.hint(fl, 'g.stn.corridor', null, 3000);
+      if (_o.phase === 'align') SF.hint(fl, 'g.stn.align', null, 3000);
+      if (_o.phase === 'clamp') {
+        SF.hint(fl, 'g.stn.clamp', null, 2600);
+        fl.bump = Math.max(fl.bump || 0, 0.9);
+        if (g && g.audio && g.audio.tone) { g.audio.tone(110, 0.18, 0.35, 'square', true); setTimeout(() => { try { g.audio.tone(165, 0.12, 0.25, 'square', true); } catch (e) { /* the sound is a nicety */ } }, 140); }
+      }
+    }
+    if (fl.auto === null && fl.g) STN.hudAuto(fl, j, _o);
+    if (j.s >= J.dur && !j.hold) {
+      // the clamp holds the ship at the berth while the veil closes (the trip tears the space frame down)
+      j.hold = performance.now(); STN.stats.dockDone = j.hold;
+      const ho = STN.handoff(j.id);
+      STN.arriving = { id: j.id, t: j.hold };
+      fl.auto = null;
+      try { VR.Travel.go(g, { dim: ho.dim, via: 'cmd', at: ho.at }); } catch (e) { console.warn(e); }
+    }
+    if (j.hold && performance.now() - j.hold > 25000) a.jump = null;   // (a trip that never went: the hands back, at the berth)
+  };
+  STN.hudAuto = (fl, j, o) => { const I = fl.asc && fl.asc.info; if (I) { I.speed = 0; I.alt = o.d; } };
+
+  // ---------------------------------------------------------------- undocking (G in the parked ship)
+  STN.undock = function (g, fl) {
+    const L = STN.byDim(g.dim); if (!L || !VR.Travel) return false;
+    const home = VR.DimReg.home(g.meta), to = home === 'flat' ? 'flat' : 'overworld';
+    STN.pendingUndock = { id: L.id, to, t0: performance.now() };
+    SF.hint(fl, 'g.stn.undockGo', null, 2600);
+    try { VR.Travel.go(g, { dim: to, via: 'cmd' }); } catch (e) { console.warn(e); STN.pendingUndock = null; }
+    return true;
+  };
+  function undockTick(g) {
+    const U0 = STN.pendingUndock; if (!U0) return;
+    if (performance.now() - U0.t0 > 40000) { STN.pendingUndock = null; return; }
+    if (g.dim !== U0.to || g.state !== 'play' || (g.travel && g.travel.trip)) return;
+    const SS = g.starships, fl = SS && SS.pilot && SS.pilot.flight; if (!fl) return;
+    STN.pendingUndock = null;
+    const L = STN.LIST[U0.id], t = A.clock(fl);
+    A.orbitAt(fl, [0, SF.ORBIT, 0], t);
+    const a = A.ascOf(fl), s0 = a.st, Ud = STN.undockState(U0.id, 0, s0.t, {});
+    s0.frame = L.body; s0.r.set ? s0.r.set(Ud.r) : Ud.r.forEach((x, i) => { s0.r[i] = x; }); Ud.v.forEach((x, i) => { s0.v[i] = x; });
+    s0.coast = true; U().verletInit(s0, U().home.body(L.body).mu);
+    A.frameFrom(Ud.fwd, Ud.up, a.S);
+    if (L.body === 'herz') { A.toMap(s0, _mp, _mv); for (let i = 0; i < 3; i++) { a.pos[i] = _mp[i]; fl.b.pos[i] = _mp[i]; } }
+    if (VR.Cruise && VR.Cruise.ensureScene) VR.Cruise.ensureScene(g);
+    SF.say(fl, 'g.stn.undockGo');
+  }
+
+  // ---------------------------------------------------------------- the station's sky: the space scene behind its blocks
+  STN.TILT = 34 * D2R;   // the hall's view: the planet's middle 34° under the eye line, its limb across the window's top
+  STN.inStation = (g) => !!(g && STN.isDim(g.dim));
+  const eph = {}, SFs = { anc: null };
+  STN.interiorFrame = function (g, cam, t) {
+    const L = STN.byDim(g.dim), SS = VR.SpaceScene, r = g.renderer; if (!L || !SS || !SS.state || !r) return null;
+    if (VR.Cruise && VR.Cruise.ensureScene) VR.Cruise.ensureScene(g);
+    SS.ephemeris(t, eph);
+    const P = STN.place(L.id, t, _P), Dk = STN.deck(L.id, 0, t, _D);
+    const y0 = [-Dk.u[0], -Dk.u[1], -Dk.u[2]], z0 = P.A, c = Math.cos(STN.TILT), s = Math.sin(STN.TILT);
+    const fwd = [0, 1, 2].map(i => -z0[i] * c + y0[i] * s), up = [0, 1, 2].map(i => y0[i] * c + z0[i] * s);
+    const ref = eph.bodies[L.body], q = perm(Dk.p), pos = [ref.p[0] + q[0], ref.p[1] + q[1], ref.p[2] + q[2]];
+    const anc = SS.anchor({ name: 'stn', ref: L.body, pos, fwd: perm(fwd), up: perm(up), fov: (cam && cam.fov) || 1.2, nadir: null, body: L.body }, eph);
+    const tier = SS.tier(g);
+    if ((STN._needT = (STN._needT || 0) - 1) <= 0) { STN._needT = 20; SS.needs(g, anc, tier); }
+    SFs.anc = anc;
+    const fr = SS.frameSetup(SFs, eph, { H: r.H, tier, bloom: !!(r.q.bloom && r.hdr), patch: SS.state.patch });
+    if (VR.PlanetLODGL && fr.bodies.herz && r.gl && L.body === 'herz') { try { VR.PlanetLODGL.update(g, r.gl, fr.bodies.herz.camB, tier); } catch (e) { /* the impostor alone */ } }
+    return fr;
+  };
+  const env0 = A.env;
+  A.env = function (E, o, env) {
+    const res = env0.apply(this, arguments);
+    const g = A.game || VR.game;
+    if (o && STN.isDim(o.dim) && g && !SF.inSpace(g)) {
+      try {
+        const t = U().worldSeconds(env.day | 0, env.ticks), fr = STN.interiorFrame(g, g.cam, t);
+        if (fr) {
+          SF.cur = fr; STN.stats.interior++;
+          E.climb = { space: true, y: 0, k: 1, airK: 0, bg: 1, body: 1, imp: 1, t, curve: 0, cut0: 0, cut1: 0, hzR: 0, dip: 0 };
+          const k = 2.2 / Math.max(0.5, fr.look.exposure);
+          E.sunDir = fr.sunS; E.sunColor = [k, k, k * 1.02]; E.moonDir = [-fr.sunS[0], -fr.sunS[1], -fr.sunS[2]]; E.moonColor = [0.02, 0.025, 0.035];
+          const pk = (0.05 + 0.08 * fr.look.dayK) / Math.max(0.5, fr.look.exposure);
+          E.ambSky = [pk * 0.75, pk * 0.85, pk * 1.15];
+          E.exposure = fr.look.exposure * 0.62;
+          const rd = ((o.renderDist || 8) * 16);
+          E.fog = [rd * 0.95, rd * 1.2, 0, 0]; E.fogColor = [0, 0, 0];
+          E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;
+          if (E.storm) { E.storm[2] = 0; E.storm[3] = 0; } if (E.bolt) E.bolt[3] = 0;
+          E.night = 0.5; E.emissiveBoost = 0.9; E.bloomThreshold = 1.3; E.bloomStrength = 0.07;
+        }
+      } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations sky', e); } }
+    }
+    return res;
+  };
+
+  // ---------------------------------------------------------------- life aboard: the hangar deck's shuttles (PadLife)
+  const PL = VR.PadLife;
+  if (PL && PL.Actor) {
+    class StnActor extends PL.Actor {
+      constructor(g) { super(g); this.stn = true; }
+      update(dt) {
+        const g = this.g, pl = g.player;
+        this.clock += dt;
+        this.on = on(g) && g.settings.padLife !== false && g.state === 'play';
+        this.tier = PL.tierOf(g.settings || {});
+        const st0 = this.st; st0.pads = this.pads.size; st0.crafts = 0; st0.parked = 0; st0.crew = 0; st0.drones = 0; st0.visible = 0;
+        if (!this.on || !pl || !g.starships) { for (const p of this.pads.values()) p.live = null; return; }
+        const E = g.env && g.env.E, night = E ? E.night || 0 : 0;
+        for (const pad of this.pads.values()) {
+          const d = Math.hypot(pad.x - pl.pos[0], pad.z - pl.pos[2]);
+          pad.outs = pad.outs || [{}, {}, {}];
+          const list = PL.active(pad, pad.seed, this.clock, pad.cache || (pad.cache = { seed: pad.seed, n: 0, T: PL.t0(pad.seed) }), pad.outs, pad.o, pad.list || (pad.list = []));
+          pad.live = list;
+          for (const q of list) this.craft(pad, q, dt, d, night);
+        }
+      }
+    }
+    STN.StnActor = StnActor;
+    const AP = PL.Actor.prototype;
+    if (!AP.__stn) {
+      AP.__stn = true;
+      const up0 = AP.update, dr0 = AP.draw;
+      AP.update = function (dt) {
+        up0.call(this, dt); if (this.stn || this.ferry) return;
+        const g = this.g;
+        try {
+          undockTick(g);
+          if (!STN.inStation(g)) { if (g.stnLife) { g.stnLife.actor.destroy(); g.stnLife = null; } return; }
+          let Lf = g.stnLife;
+          if (!Lf || Lf.world !== g.world) {
+            if (Lf) Lf.actor.destroy();
+            const L = STN.byDim(g.dim), act = new StnActor(g);
+            act.clock = worldT(g);
+            act.pads.set('stn', STN.padFor(L.id, wseedOf(g)));
+            Lf = g.stnLife = { world: g.world, dim: g.dim, id: L.id, actor: act, crew: null, t: 0 };
+          }
+          Lf.actor.update(dt);
+          STN.lifeTick(g, Lf, dt);
+        } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations life', e); } }
+      };
+      AP.draw = function (r, E, layer, cam) { dr0.call(this, r, E, layer, cam); if (this.stn || this.ferry) return; const Lf = this.g && this.g.stnLife; if (Lf && Lf.world === this.g.world) Lf.actor.draw(r, E, layer, cam); };
+    }
+  }
+  // the crew: a village plan of the station (its cabins the homes, the hall its square) — villages.js does the rest
+  STN.crewPlan = function (id) {
+    const L = STN.LIST[id], Pl = VR.Forge.Station.place(L.kind), seed = (STN.seedOf(id, 1) >>> 0);
+    const homes = Pl.cabins.map((c, i) => ({ kind: 'home', ops: [], door: c.door ? c.door.slice() : c.inside.slice(), outside: c.outside.slice(), inside: c.inside.slice(), beds: [c.bed.slice()], seats: [], work: [], chimney: null, table: null, lights: [], box: [c.inside[0] - 3, Pl.hall[1] - 1, c.inside[2] - 3, c.inside[0] + 3, Pl.hall[1] + 4, c.inside[2] + 3], F: Pl.hall[1] - 1, r: 0, w: 5, d: 6, ox: c.inside[0] - 2, oz: c.inside[2] - 2, i }));
+    return { id: 'stn:' + id, name: STN.nameOf(id), style: 'moon', kit: 'terminal', x: Pl.hall[0], y: Pl.hall[1], z: Pl.hall[2], seed, homes, work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: Pl.hall[0], y: Pl.hall[1], z: Pl.hall[2] }, roads: [], bell: null, pad: null, shops: [], pastures: [], prefab: [] };
+  };
+  STN.lifeTick = function (g, Lf, dt) {
+    Lf.t += dt;
+    // the welcome (once a visit) and the first time (once a save)
+    if (!Lf.hello && g.state === 'play' && Lf.t > 1.2) {
+      Lf.hello = true;
+      const m = g.meta, rec = m && (m.stations || (m.stations = { v: 1, first: {}, jobs: {} }));
+      if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.stn.welcome', { name: STN.nameOf(Lf.id) }), '#9ad8ff');
+      if (rec && !rec.first[Lf.id]) { rec.first[Lf.id] = (g.env && g.env.day) | 0 || 1; if (g.ui && g.ui.toast) g.ui.toast('🛰 ' + T('g.stn.first', { name: STN.nameOf(Lf.id) }), '', null); if (VR.Quests && VR.Quests.emit) { try { VR.Quests.emit('arrive', { dim: g.dim }); } catch (e) { /* an Abenteuer world only */ } } }
+    }
+    if (!Lf.crew && Lf.t > 2 && g.villages && g.villages.addVillage && g.settings.stationCrew !== false) {
+      try { const P = STN.crewPlan(Lf.id); g.villages.addVillage(P); Lf.crew = g.villages.known.get(P.id) || true; } catch (e) { Lf.crew = true; console.warn('stations crew', e); }
+    }
+  };
+
+  // ---------------------------------------------------------------- the shop 🛰 and the job board ([V] at the counter, the board)
+  const SH = VR.Shop;
+  if (SH && SH.SHOPS && SH.SHOPS.indexOf('station') < 0) {
+    SH.SHOPS.push('station'); SH.ICON.station = '🛰'; SH.BUYS.station = true;
+    const cat0 = SH.catalog;
+    let cache = null;
+    SH.catalog = function (shop) {
+      if (shop !== 'station') return cat0.apply(this, arguments);
+      if (cache) return cache;
+      const out = [], Adv = VR.Adv, ex = (id) => !!((VR.itemDef && VR.itemDef(id)) || (VR.R && VR.R.byName[id]));
+      if (Adv && Adv.PRICES) for (const id of ['engine', 'shield', 'jump']) if (Adv.PRICES[id]) out.push({ key: 'up:' + id, kind: 'up', id, price: Adv.PRICES[id][0], cat: 'up' });
+      for (const [id, p] of [['energy_cell', 10], ['photo_drone', 75], ['scanner', 55], ['spyglass', 22], ['shuttle_beacon', 240]]) if (ex(id)) out.push({ key: 'item:' + id, kind: 'item', id, price: p, cat: 'item' });
+      for (const k of [{ id: 'stnplates', price: 55, parts: [['stn_gravplate', 12]] }, { id: 'stnclamps', price: 45, parts: [['stn_clamp', 4], ['hazard_stripes', 16]] }]) if (k.parts.every(([id]) => ex(id))) out.push({ key: 'kit:' + k.id, kind: 'kit', id: k.id, price: k.price, parts: k.parts.map(p => p.slice()), cat: 'kit' });
+      return (cache = out);
+    };
+  }
+  STN.openShop = (g) => { if (!SH || !SH.open) return false; const ok = SH.open('station', null, null); if (!ok && g.ui && g.ui.hint) g.ui.hint(T('g.stn.shop'), 2400); return ok; };
+  // the jobs: two a game day per station; [V] at the board takes one, [V] again with the things hands it in
+  const jobRec = (g) => { const m = g && g.meta; if (!m) return null; const r = m.stations || (m.stations = { v: 1, first: {}, jobs: {} }); r.jobs = r.jobs || {}; r.first = r.first || {}; return r; };
+  STN.board = function (g) {
+    const Lf = g.stnLife; if (!Lf) return false;
+    const R0 = jobRec(g), day = (g.env && g.env.day) | 0, list = STN.jobsFor(Lf.id, day, wseedOf(g)), key = Lf.id + ':' + day;
+    const J = R0.jobs[key] || (R0.jobs[key] = { taken: null, done: [] });
+    const say = (k, v, c) => { if (g.ui && g.ui.chatLine) g.ui.chatLine(T(k, v), c || '#ffd98a'); };
+    const name = (id) => (VR.itemName ? VR.itemName(id) : id);
+    const open = list.filter(j => J.done.indexOf(j.id) < 0);
+    if (!open.length) { say('g.stn.job.done', { taler: 0 }); return true; }
+    if (!J.taken || J.done.indexOf(J.taken) >= 0) { J.taken = open[0].id; const j = open[0]; say('g.stn.job.open'); say(j.kind === 'bring' ? 'g.stn.job.bring' : 'g.stn.job.photo', { n: j.n, item: name(j.item) }, '#9ad8ff'); return true; }
+    const j = list.find(x => x.id === J.taken); if (!j) return true;
+    if (j.kind === 'bring') {
+      const inv = g.player && g.player.inv, have = inv ? inv.count(j.item) : 0;
+      if (have < j.n) { say('g.stn.job.need', { n: j.n - have, item: name(j.item) }, '#ffb08a'); return true; }
+      inv.remove(j.item, j.n);
+      STN.payJob(g, J, j);
+    } else say('g.stn.job.photo', null, '#9ad8ff');
+    return true;
+  };
+  STN.payJob = function (g, J, j) {
+    J.done.push(j.id); J.taken = null;
+    let taler = STN.REWARD[j.size] || 25;
+    try { if (VR.Adventure && VR.Adventure.award) { const r = VR.Adventure.award('quest', { size: j.size }); if (r && r.taler) taler = r.taler; } } catch (e) { /* a builder's world: the thanks alone */ }
+    if (g.ui && g.ui.toast) g.ui.toast('🛰 ' + T('g.stn.job.done', { taler }), STN.nameOf(g.stnLife ? g.stnLife.id : 'ring'), null);
+    if (g.audio && g.audio.cue) g.audio.cue('wonder');
+  };
+  // the photo job: a picture taken in the station while it is the one taken
+  const PMc = VR.PhotoMode;
+  if (PMc && PMc.Photo && PMc.Photo.prototype.shoot && !PMc.Photo.prototype.shoot.__stn) {
+    const os = PMc.Photo.prototype.shoot;
+    PMc.Photo.prototype.shoot = function () {
+      try { const g = VR.game; if (!this.busy && g && STN.inStation(g) && g.stnLife) { const R0 = jobRec(g), J = R0 && R0.jobs[g.stnLife.id + ':' + ((g.env && g.env.day) | 0)]; const j = J && J.taken && STN.JOBS.find(x => x.id === J.taken); if (j && j.kind === 'photo') STN.payJob(g, J, j); } } catch (e) { /* the picture comes first */ }
+      return os.apply(this, arguments);
+    };
+    for (const k of Object.keys(os)) PMc.Photo.prototype.shoot[k] = os[k];
+    PMc.Photo.prototype.shoot.__stn = true;
+  }
+  // [V] near the counter or the board (e-ctx's near hooks)
+  if (VR.Ctx && VR.Ctx.hooks && Array.isArray(VR.Ctx.hooks.near)) VR.Ctx.hooks.near.push((g, eye, dir) => {
+    const Lf = g && g.stnLife; if (!Lf || !STN.inStation(g)) return null;
+    const Pl = VR.Forge.Station.place(STN.LIST[Lf.id].kind), list = [];
+    const c = Pl.counter, b = Pl.board;
+    if (Math.abs(c[0] + 0.5 - eye[0]) < 5 && Math.abs(c[2] + 0.5 - eye[2]) < 5) list.push({ kind: 'shop', name: T('g.stn.shop'), pos: [c[0] + 0.5, c[1] + 1, c[2] + 0.5], r: 1.1, act: (gg) => STN.openShop(gg) });
+    if (Math.abs(b[0] + 0.5 - eye[0]) < 5 && Math.abs(b[2] + 1.5 - eye[2]) < 5) list.push({ kind: 'board', name: T('g.stn.board'), pos: [b[0] + 0.5, b[1] + 1.5, b[2] + 1.5], r: 1.0, act: (gg) => STN.board(gg) });
+    return list.length && VR.Ctx.pickNear ? VR.Ctx.pickNear(eye, dir, list) : null;
+  });
+  // the hint in space: G docks when you look at the station (or are near it)
+  let hintT = 0;
+  const play0 = G0.prototype.playFrame;
+  G0.prototype.playFrame = function (dt) {
+    try {
+      const fl = this.flight;
+      if (fl && fl.regime === 'space' && !fl.auto && (hintT -= dt) <= 0) {
+        hintT = 1.5;
+        const tg = STN.target(this, fl);
+        if (tg && tg.ok && tg.d > 2000 && this.ui && this.ui.hint) this.ui.hint(T('g.stn.dockHint', { name: STN.nameOf(tg.id), km: (tg.d / 1000).toFixed(1) }), 1400);
+      }
+      if (STN.inStation(this) && this.starships && this.starships.pilot && (hintT -= dt) <= 0) { hintT = 4; if (this.ui && this.ui.hint) this.ui.hint(T('g.stn.undock'), 2000); }
+    } catch (e) { /* a hint is a nicety */ }
+    return play0.call(this, dt);
+  };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
