@@ -878,6 +878,9 @@ in vec4 v_shadow;
 uniform ivec3 u_camInt;
 uniform vec3 u_camFrac;
 uniform float u_emissiveBoost;
+#ifdef LIGHT2
+uniform float u_lavaTint;   // f-polish: 1 the worlds' melt deep orange
+#endif
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
@@ -1423,6 +1426,15 @@ void main() {
     float n1 = vnoise(p * 1.7 + vec2(u_time * 0.25, u_time * 0.18));
     float n2 = vnoise(p * 4.0 - vec2(u_time * 0.4, -u_time * 0.2));
     col = alb.rgb * (1.6 + n1 * 1.2 + n2 * 0.6) * vec3(1.0, 0.85, 0.7);
+#ifdef LIGHT2
+    // f-polish: a world's melt (u_dim 5) deep orange with bright cracks — the texture's own colour went yellow-white
+    // through the bloom and the tone curve (Low and up; Very Low draws the base's)
+    if (u_dim == 5 && u_lavaTint > 0.5) {
+      float hb = clamp(n1 * 0.65 + n2 * 0.35, 0.0, 1.0), ck = smoothstep(0.72, 0.92, n2) * (0.6 + 0.4 * n1);
+      vec3 melt = mix(vec3(0.42, 0.05, 0.01), vec3(1.25, 0.32, 0.04), smoothstep(0.2, 0.75, hb));
+      col = (melt + vec3(1.6, 0.75, 0.18) * ck) * (0.7 + 0.3 * dot(alb.rgb, vec3(0.333)));
+    }
+#endif
   }
   float dist = length(v_rel);
   col = applyFog(col, v_rel, dist);
@@ -2543,6 +2555,9 @@ uniform sampler2D u_noise;
 uniform vec3 u_camFrac;
 uniform ivec3 u_camInt;
 uniform float u_emissiveBoost;
+#ifdef LIGHT2
+uniform float u_lavaTint;   // f-polish: the worlds' melt deep orange (the far tiles too)
+#endif
 uniform float u_lodNear;
 uniform float u_blockVar;     // Klassisch: per-block shades and the block grid instead of the macro mottling
 uniform vec2 u_climbCut;      // u-ascent: in the climb the tiles' far edge dissolves (from, to: metres from the eye)
@@ -2719,6 +2734,12 @@ void main() {
 #endif
     col = alb * (amb + lc * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
     if (v_kind == 2u) col = alb * (1.5 + vnoise(wp * 0.3 + u_time * 0.2) * 1.2) * vec3(1.0, 0.8, 0.6);
+#ifdef LIGHT2
+    if (v_kind == 2u && u_dim == 5 && u_lavaTint > 0.5) {   // f-polish: the Glutsee's far melt deep orange, bright cracks
+      float hb = vnoise(wp * 0.3 + u_time * 0.2), ck = smoothstep(0.7, 0.92, vnoise(wp * 0.9 - u_time * 0.15));
+      col = (mix(vec3(0.42, 0.05, 0.01), vec3(1.25, 0.32, 0.04), smoothstep(0.2, 0.75, hb)) + vec3(1.6, 0.75, 0.18) * ck) * (0.7 + 0.3 * dot(alb, vec3(0.333)));
+    }
+#endif
     else if (v_kind == 3u) col = vec3(0.12, 0.75, 1.0) * (1.4 + vnoise(wp * 0.2 + u_time * 0.1) * 1.6);
     else if (v_kind == 4u) col = alb * (1.3 + u_emissiveBoost) * (0.85 + 0.15 * sin(u_time * 1.3 + wp.x * 0.1 + wp.y * 0.07));
     else if (v_kind == 6u) { vec3 H = normalize(L + V); col += lc * pow(max(dot(N, H), 0.0), 40.0) * 0.18; }

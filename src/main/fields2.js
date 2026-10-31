@@ -117,6 +117,15 @@
   // a body of the swarm in the system frame (its offset is kept in the space scene's axes: universe = (s.z, s.x, s.y))
   F2.rockOff = (k) => { const p = swarmB()[k].p; return [p[2], p[0], p[1]]; };
   F2.rockPos = (k, t, out) => { const c = UNI().home.pos('swarm', t, out || v3()), o = F2.rockOff(k); c[0] += o[0]; c[1] += o[1]; c[2] += o[2]; return c; };
+  // f-polish: the arrival near the swarm's biggest body, on its lit side (the cruise's end 2.5 km off the centre left the
+  // rocks dots): rel the end off the centre, sun the direction to Helia (unit) → {k, r: the new end off the centre, look:
+  // unit from there to the body, d: the distance to its centre}; the side half toward where we came from, all toward Helia
+  F2.swarmEnd = (rel, sun) => {
+    const B = swarmB(); let k = 0; for (let i = 1; i < B.length; i++) if (B[i].D > B[k].D) k = i;
+    const o = F2.rockOff(k), rl = Math.hypot(rel[0], rel[1], rel[2]) || 1, d = B[k].D / 2 + 700;
+    const s = unit([sun[0] + 0.5 * rel[0] / rl, sun[1] + 0.5 * rel[1] / rl, sun[2] + 0.5 * rel[2] / rl]);
+    return { k, d, r: [o[0] + s[0] * d, o[1] + s[1] * d, o[2] + s[2] * d], look: [-s[0], -s[1], -s[2]] };
+  };
   F2.inSwarm = (P, t, far) => { const c = UNI().home.pos('swarm', t, v3()); return Math.hypot(P[0] - c[0], P[1] - c[1], P[2] - c[2]) < (far || 40000); };
   // the body the view points at (its disc + 3°, else within 10° the nearest to the middle), else null; skip: a k
   F2.pickRock = (P, dir, t, skip) => {
@@ -265,9 +274,22 @@
   C.finish = (fl, a, c) => {
     // (the swarm has no frame of its own in the space scene: the end is kept in Helia's)
     const sw = c.end && c.end.frame === 'swarm';
-    if (sw) { const S = UNI().home, b = S.state(c.end.t).b.swarm; for (let i = 0; i < 3; i++) { c.end.r[i] += b.r[i]; c.end.v[i] += b.v[i]; } c.end.frame = 'helia'; }
+    let se = null;
+    if (sw) {
+      const S = UNI().home, b = S.state(c.end.t).b.swarm;
+      if (!(VR.Polish && VR.Polish.off && VR.Polish.off.swarm)) {   // f-polish: end by the biggest body's lit side
+        const bl = Math.hypot(b.r[0], b.r[1], b.r[2]) || 1, old = [c.end.r[0], c.end.r[1], c.end.r[2]]; se = F2.swarmEnd(c.end.r, [-b.r[0] / bl, -b.r[1] / bl, -b.r[2] / bl]); se.old = old;
+        for (let i = 0; i < 3; i++) c.end.r[i] = se.r[i];
+        F2.stats = F2.stats || {}; F2.stats.swarmEnd = { k: se.k, d: Math.round(se.d), old: se.old };   // (old: u-fields2's end off the swarm's centre — the tests' before)
+      }
+      for (let i = 0; i < 3; i++) { c.end.r[i] += b.r[i]; c.end.v[i] += b.v[i]; } c.end.frame = 'helia';
+    }
     finish0(fl, a, c);
-    if (sw) { C.blend = null; SF.hint(fl, 'g.fields2.land', null, 5200); return; }
+    if (sw) {
+      C.blend = null;
+      if (se && a.st) { const up = unit(a.st.r); for (let i = 0; i < 3; i++) A.slew(a.S, se.look, up, Math.PI, Math.PI); AM.ortho(a.S); }   // (the nose on the body)
+      SF.hint(fl, 'g.fields2.land', null, 5200); return;
+    }
     const e = c.end || {};
     if (e.goal) {
       C.blend = null;

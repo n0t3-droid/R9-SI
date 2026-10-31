@@ -260,6 +260,7 @@ async function runPreset(preset) {
       // ---- the swarm
       if (want('swarm')) {
         await P.ev(() => { const fl = VR.game.flight; fl.auto = null; if (fl.asc && fl.asc.cruise) fl.asc.cruise = null; });
+        if (process.env.POLISH && !want('ring')) { await P.ev(() => VR.SpaceFlight.debug.orbit(VR.game, 0, 40, 3063)); await chase(P, 0.1, 0); await P.step(6); }   // f-polish: in orbit first (the ring's leg skipped)
         const go = await P.ev(() => VR.Cruise.start(VR.game.flight, 'swarm'));
         check(go, 'G on the Trümmerschwarm: the Reiseantrieb engaged');
         const s = await fly(P, null, 6000, 6);
@@ -269,6 +270,17 @@ async function runPreset(preset) {
         await chase(P, 0.08, 0.3); await P.step(2);
         Rr.swarm = await shoot(P, 'swarm_arrive.png', '__Fs');
         save();
+        // f-polish (POLISH=1): the same arrival at u-fields2's end (2.5 km off the swarm's centre, the nose on it) → before
+        if (process.env.POLISH) {
+          const se = await P.ev(() => { const F2 = VR.Fields2, e = F2.stats && F2.stats.swarmEnd; return e ? { k: e.k, d: e.d, old: e.old } : null; });
+          console.log('  f-polish swarm end ' + JSON.stringify(se));
+          fs.copyFileSync(SH('swarm_arrive.png'), SH('polish_swarm_after.png'));
+          if (se && se.old) {
+            await P.ev((o) => { const fl = VR.game.flight, a = fl.asc, st = a.st, A = VR.Ascent, U = VR.Universe.home, c = U.state(st.t).b.swarm.r; for (let i = 0; i < 3; i++) st.r[i] = c[i] + o[i]; const n = [-o[0], -o[1], -o[2]], l = Math.hypot(...n), up = st.r.map(v => v / Math.hypot(...st.r)); for (let i = 0; i < 3; i++) A.slew(a.S, n.map(v => v / l), up, Math.PI, Math.PI); A.math.ortho(a.S); }, se.old);
+            await chase(P, 0.08, 0.3); await P.step(4);
+            await shoot(P, 'polish_swarm_before.png', '__Fs');
+          }
+        }
         // V: the rock looked at (else the nearest) → the trip by ship → the landing
         const v = await P.ev(() => VR.SpaceFlight.land(VR.game.flight));
         check(v, 'V in the swarm: on to a rock');

@@ -110,6 +110,26 @@
     [[0, 1, 1], [0, 0, 1], [1, 0, 1], [1, 1, 1]], [[1, 1, 0], [1, 0, 0], [0, 0, 0], [0, 1, 0]]];
   const UVS = [[0, 0], [0, 1], [1, 1], [1, 0]], ORD = [0, 1, 2, 0, 2, 3], SHADE = [0.8, 0.8, 1, 0.55, 0.9, 0.9];
   const popBuf = new Float32Array(BF.MAX_POPS * 36 * 5);
+  // f-polish: one line buffer for the pops' bright rims and the stamp ghost's edges (the line program, a draw each)
+  const POff = (k) => !!(VR.Polish && VR.Polish.off && VR.Polish.off[k]);
+  const EDGES = [[0, 0, 0, 1, 0, 0], [0, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1], [0, 1, 1, 1, 1, 1], [0, 0, 0, 0, 1, 0], [1, 0, 0, 1, 1, 0], [0, 0, 1, 0, 1, 1], [1, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 1], [1, 0, 0, 1, 0, 1], [0, 1, 0, 0, 1, 1], [1, 1, 0, 1, 1, 1]];
+  const rimBuf = new Float32Array(BF.MAX_POPS * 24 * 3);
+  BF.RIM_DUR = 0.16;   // s: the pop's rim, bright, fading
+  const THICK = [[0, 0, 0], [0.018, 0.018, 0], [0, 0.018, 0.018]];
+  Ren.prototype.bfLines = function (data, nFloats, ver) {
+    const gl = this.gl;
+    if (!this.bfLineVBO) {
+      this.bfLineVBO = gl.createBuffer(); this.bfLineVAO = gl.createVertexArray();
+      gl.bindVertexArray(this.bfLineVAO); gl.bindBuffer(gl.ARRAY_BUFFER, this.bfLineVBO); gl.bufferData(gl.ARRAY_BUFFER, 4, gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 12, 0);
+      this.bfLineCap = 4; this.bfLineVer = -1;
+    }
+    gl.bindVertexArray(this.bfLineVAO); gl.bindBuffer(gl.ARRAY_BUFFER, this.bfLineVBO);
+    if (ver === undefined || ver !== this.bfLineVer) {
+      if (nFloats * 4 > this.bfLineCap) { gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, nFloats), gl.DYNAMIC_DRAW); this.bfLineCap = nFloats * 4; } else gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, nFloats);
+      this.bfLineVer = ver === undefined ? -1 : ver;
+    }
+  };
   Ren.prototype.popFx = function (F) {
     const g = VR.game; if (!g || !F || !F.cam) return;
     if (g._bfPops) this.drawPops(g, F);
@@ -148,6 +168,26 @@
     }
     gl.depthMask(true); gl.disable(gl.BLEND);
     this.stats.pops = n;
+    // f-polish: a thin bright rim on each young pop's edges (its first 0.16 s, fading), additive
+    const pl = this.P.line;
+    if (pl && !POff('pop')) {
+      let m = 0;
+      for (const q of L) {
+        if (!q.on) continue; const age = now - q.t; if (age > BF.RIM_DUR) continue;
+        const h = BF.popScale(age) / 2 + 0.01, cx = q.x - bx + 0.5, cy = q.y - by + 0.5, cz = q.z - bz + 0.5;
+        for (const e of EDGES) { const o = m * 6; rimBuf[o] = cx + (e[0] - 0.5) * 2 * h; rimBuf[o + 1] = cy + (e[1] - 0.5) * 2 * h; rimBuf[o + 2] = cz + (e[2] - 0.5) * 2 * h; rimBuf[o + 3] = cx + (e[3] - 0.5) * 2 * h; rimBuf[o + 4] = cy + (e[4] - 0.5) * 2 * h; rimBuf[o + 5] = cz + (e[5] - 0.5) * 2 * h; m++; }
+      }
+      if (m) {
+        const ag = L.reduce((a, q) => (q.on && now - q.t <= BF.RIM_DUR ? Math.min(a, now - q.t) : a), 1), k = 1 - ag / BF.RIM_DUR;
+        this.bfLines(rimBuf, m * 6);
+        gl.useProgram(pl.p); gl.uniformMatrix4fv(pl.u.u_viewProj, false, this.viewProj); gl.uniform3f(pl.u.u_offset, bx - cam.x, by - cam.y, bz - cam.z);
+        gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.depthMask(false);
+        gl.uniform4f(pl.u.u_color, 1.0 * (1 + day), 0.95 * (1 + day), 0.8 * (1 + day), 0.9 * k);
+        for (const d of THICK) { gl.uniform3f(pl.u.u_offset, bx - cam.x + d[0], by - cam.y + d[1], bz - cam.z + d[2]); gl.drawArrays(gl.LINES, 0, m * 2); }   // (three passes a hair apart: a 2–3 px line where GL draws 1)
+        gl.depthMask(true); gl.disable(gl.BLEND); gl.bindVertexArray(null);
+        this.stats.popRims = m / 12;
+      }
+    }
   };
 
   // ---- 3 · the stamp's ghost
@@ -181,6 +221,13 @@
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     const pulse = 0.85 + 0.15 * Math.sin(performance.now() / 260);
     for (const q of G2.parts) { gl.uniform4f(p.u.u_color, q.c[0], q.c[1], q.c[2], q.c[3] * pulse); gl.drawArrays(gl.TRIANGLES, q.at, q.n); }
+    // f-polish: the stamp's edges as bright lines (one draw) — the ghost's shape reads, not one flat tint
+    if (G2.lines && G2.lines.length && !POff('ghost')) {
+      this.bfLines(G2.lines, G2.lines.length, 'g' + G2.ver);
+      gl.uniform4f(p.u.u_color, 1.0, 0.98, 0.88, 0.8 + 0.2 * pulse);
+      for (const d of THICK) { gl.uniform3f(p.u.u_offset, o[0] - cam.x + d[0], o[1] - cam.y + d[1], o[2] - cam.z + d[2]); gl.drawArrays(gl.LINES, 0, G2.lines.length / 3); }
+      this.stats.ghostEdges = G2.lines.length / 6;
+    }
     gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(null);
     this.stats.ghost = G2.faces;

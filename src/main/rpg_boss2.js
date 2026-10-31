@@ -89,6 +89,36 @@
     return out;
   };
   B2.hintKey = (ph, calm) => 'g.rpg.boss2.hint' + clamp(ph | 0, 1, 3) + (calm ? 'c' : '');
+  // f-polish: one crack's strip as ground-hugging pieces (≤ 0.9 m, cut at the block borders it crosses): top(x, z) the
+  // ground's height; a piece whose four corners differ by more than 0.6 m (a step under it) is dropped — no scorch
+  // floating over a step. pv(x, y, z) takes the vertices (two triangles a piece). cut false: the a-boss2 strip.
+  B2.crackStrip = function (top, x0, z0, x1, z1, hw, pv, cut) {
+    const len = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / len * hw, nz = (x1 - x0) / len * hw;
+    const us = [0];
+    if (cut) {   // the block borders along the line (x or z crossing an integer), then ≤ 0.9 m between them
+      for (const [a, b] of [[x0, x1], [z0, z1]]) { if (Math.abs(b - a) < 1e-6) continue; for (let k = Math.ceil(Math.min(a, b)); k <= Math.floor(Math.max(a, b)); k++) { const u = (k - a) / (b - a); if (u > 1e-3 && u < 1 - 1e-3) us.push(u); } }
+      us.push(1); us.sort((a, b) => a - b);
+      for (let i = us.length - 1; i > 0; i--) { const d = (us[i] - us[i - 1]) * len; if (d > 0.9) { const m = Math.ceil(d / 0.9); for (let j = 1; j < m; j++) us.push(us[i - 1] + (us[i] - us[i - 1]) * j / m); } }
+      us.sort((a, b) => a - b);
+    } else { const n = Math.max(1, Math.ceil(len / 0.9)); for (let i = 1; i <= n; i++) us.push(i / n); }
+    let kept = 0, dropped = 0;
+    for (let i = 0; i + 1 < us.length; i++) {
+      const u0 = us[i], u1 = us[i + 1]; if (u1 - u0 < 1e-4) continue;
+      const ax = x0 + (x1 - x0) * u0, az = z0 + (z1 - z0) * u0, bx = x0 + (x1 - x0) * u1, bz = z0 + (z1 - z0) * u1;
+      let ya, yb;
+      if (cut) {   // the piece's own column (its middle), the corners only to tell a step
+        const mx = (ax + bx) / 2, mz = (az + bz) / 2, ym = top(mx, mz);
+        const c1 = top(ax + nx, az + nz), c2 = top(ax - nx, az - nz), c3 = top(bx + nx, bz + nz), c4 = top(bx - nx, bz - nz);
+        if (Math.max(c1, c2, c3, c4, ym) - Math.min(c1, c2, c3, c4, ym) > 0.6) { dropped++; continue; }
+        ya = yb = ym + 0.05;
+      } else { ya = Math.max(top(ax + nx, az + nz), top(ax - nx, az - nz)) + 0.05; yb = Math.max(top(bx + nx, bz + nz), top(bx - nx, bz - nz)) + 0.05; }
+      pv(ax + nx, ya, az + nz); pv(ax - nx, ya, az - nz); pv(bx - nx, yb, bz - nz); pv(ax + nx, ya, az + nz); pv(bx - nx, yb, bz - nz); pv(bx + nx, yb, bz + nz);
+      kept++;
+    }
+    return { kept, dropped };
+  };
+  // f-polish's switches (the tests' before | after): VR.Polish.off[key] = true draws what the base drew
+  const PL = VR.Polish || (VR.Polish = { off: {} });
 
   // ================================================================ the game
   const F = VR.Foes, BS = VR.RPGBoss, M = VR.VOXMODELS, Grid = VR.VoxGrid, mat4 = VR.mat4;
@@ -443,14 +473,8 @@
   B2.buildCracks = function (g, A) {
     const w = g.world, out = [], ranges = [];
     const pv = (x, y, z) => out.push(x - A.x, y - A.y, z - A.z, 0.5, 0.5);
-    const strip = (x0, z0, x1, z1, hw) => {
-      const len = Math.hypot(x1 - x0, z1 - z0) || 1, n = Math.max(1, Math.ceil(len / 0.9)), nx = -(z1 - z0) / len * hw, nz = (x1 - x0) / len * hw;
-      for (let i = 0; i < n; i++) {
-        const u0 = i / n, u1 = (i + 1) / n, ax = x0 + (x1 - x0) * u0, az = z0 + (z1 - z0) * u0, bx = x0 + (x1 - x0) * u1, bz = z0 + (z1 - z0) * u1;
-        const ya = Math.max(topY(w, ax + nx, az + nz), topY(w, ax - nx, az - nz)) + 0.05, yb = Math.max(topY(w, bx + nx, bz + nz), topY(w, bx - nx, bz - nz)) + 0.05;
-        pv(ax + nx, ya, az + nz); pv(ax - nx, ya, az - nz); pv(bx - nx, yb, bz - nz); pv(ax + nx, ya, az + nz); pv(bx - nx, yb, bz - nz); pv(bx + nx, yb, bz + nz);
-      }
-    };
+    const topW = (x, z) => topY(w, x, z), cut = !PL.off.cracks;   // f-polish: the pieces cut at the steps
+    const strip = (x0, z0, x1, z1, hw) => B2.crackStrip(topW, x0, z0, x1, z1, hw, pv, cut);
     for (const c of A.L.cracks) {
       const s0 = out.length / 5;
       for (let i = 0; i < c.segs.length; i++) { const s = c.segs[i], k = 1 - 0.55 * i / c.segs.length; strip(A.x + s[0], A.z + s[1], A.x + s[2], A.z + s[3], c.w * 1.8 * k); }

@@ -306,11 +306,43 @@
   // the plan as villages.js sees it now: the lots unlocked so far
   Fe.villagePlan = function (P, days, home) { const v = Object.assign({}, P); v.lots = P.lots.slice(0, Math.min(P.lots.length, Fe.unlocked(days, home))); return v; };
 
+  // f-polish: Herzwelt's port, found whatever the ground: the candidates 34–118 m from the spawn on four rings, their
+  // order turned by the world's seed; probe(x, z) → {y, nat, built} (the ground's height, natural / built ground) or
+  // null (not loaded). Strict: a footprint of natural ground within ±3 m (a-life's rule); else the loaded candidate
+  // with the fewest misses (≤ 30 % of the footprint, nothing built, ±5 m) — open snow, a forest's edge, a hill. → site
+  // {x, y, z, loose} or null (too few loaded: asked again in a second)
+  Fe.herzPick = function (sp, seed, probe, padx) {
+    const PX = (padx || 24) + 4, rot = ((seed >>> 0) % 997) / 997 * TAU;
+    let best = null, bs = 1e9, loose = null, ls = 1e9, loaded = 0;
+    for (let k = 0; k < 64; k++) {
+      const a = rot + (k + (k >> 4) * 0.5) / 16 * TAU, r = 34 + Math.floor(k / 16) * 28;
+      const x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
+      const c = probe(x, z); if (!c) continue;
+      if (!probe(x - PX, z) || !probe(x + PX, z)) continue;
+      loaded++;
+      const y0 = c.y; let miss = 0, sc = 0, n = 0, built = false;
+      for (let dx = -PX; dx <= PX; dx += 2) for (let dz = -4; dz <= 4; dz += 2) {
+        const q = probe(x + dx, z + dz); n++;
+        if (!q) { miss++; continue; }
+        const dy = Math.abs(q.y - y0);
+        if (q.built) built = true;
+        if (dy > 3 || !q.nat) miss++;
+        sc += Math.min(dy, 8);
+      }
+      if (built) continue;
+      if (!miss && sc < bs) { bs = sc; best = { x, y: y0, z }; }
+      const lsc = miss * 40 + sc + r * 0.2;
+      if (miss <= n * 0.3 && lsc < ls && sc / n <= 5) { ls = lsc; loose = { x, y: y0, z, loose: 1 }; }
+    }
+    return best || (loaded >= 8 ? loose : null);
+  };
+
   // the words (German first; also in lang_de.js / lang_en.js)
   Fe.KEYS = ['g.fe.founded', 'g.fe.foundedSub', 'g.fe.grows', 'g.fe.neighbours', 'g.fe.title', 'g.fe.to', 'g.fe.parked', 'g.fe.next', 'g.fe.board', 'g.fe.close', 'g.fe.wait', 'g.fe.aboard', 'g.fe.welcome', 'g.fe.none', 'g.fe.routes', 'g.fe.legend', 'g.fe.terminal', 'g.fe.grows.greenhouse', 'g.fe.grows.lamps', 'g.ctx.ferry', 'g.set.spaceLife', 'g.set.spaceLife.tip'];
 
   // ================================================================================ the game
   if (typeof window === 'undefined' || !VR.Game || !VR.PadLife || !VR.PadLife.Actor) return;
+  const POL = VR.Polish || (VR.Polish = { off: {} });   // f-polish's switches (the tests' before | after)
   const P0 = VR.PadLife, LK = VR.LifeKit;
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -483,22 +515,37 @@
   // Herzwelt's ferry port: the flattest open place 34–60 m from the world's spawn (natural ground, nothing over it)
   const NATURAL = /grass|dirt|sand$|^stone$|gravel|snow|podzol|mud|clay|moss_block|terracotta|andesite|diorite|granite/;
   const BUILT = /brick|polished|smooth|cut_|chiseled|planks|slab|stairs|vx_|vm_|path|concrete|tile|paver/;
+  Fe.herzSiteOf = (g) => herzSite(g);   // f-polish: the tests ask where the port would go (nothing founded)
   function herzSite(g) {
     const w = g.world, Tv = VR.Travel, sp = Tv && Tv.herzTarget ? Tv.herzTarget(g, true).pos : g.player.pos; if (!sp) return null;
-    const R = R0(); let best = null, bs = 1e9;
-    Fe.stats.herz = { tried: 0, loaded: 0 };
-    for (let k = 0; k < 64; k++) {
-      const a = (k + (k >> 4) * 0.5) / 16 * TAU, r = 34 + Math.floor(k / 16) * 28; Fe.stats.herz.tried++;
-      const x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
-      if (!loadedRound(w, x, z, Fe.PADX + 6)) continue; Fe.stats.herz.loaded++;
-      const y0 = topAt(w, x, z, Math.round(sp[1])); let ok = true, sc = 0;
-      for (let dx = -Fe.PADX - 4; dx <= Fe.PADX + 4 && ok; dx += 2) for (let dz = -4; dz <= 4 && ok; dz += 2) {
-        const y = topAt(w, x + dx, z + dz, y0), n = R.types[R.T.type[w.getBlock(x + dx, y, z + dz)]], nm = n ? n.name : '';
-        if (Math.abs(y - y0) > 3 || !NATURAL.test(nm) || BUILT.test(nm)) { ok = false; Fe.stats.herz.why = nm + ' ' + (y - y0); } else sc += Math.abs(y - y0);
+    const R = R0(), y0 = Math.round(sp[1]);
+    Fe.stats.herz = { tried: 64, loaded: 0 };
+    // the ground under the trees and the snow's layer (the leaves are no floor; a-life's search read them as one)
+    const SOFT = /leaves|log$|_log|wood$|stem|snow_layer|flower|fern|bush|sapling|tall|short_grass|^grass$|vine|mushroom/;
+    const probe = (x, z) => {
+      if (!w.isLoaded(x, z)) return null;
+      let y = Math.min(250, y0 + 40);
+      for (; y > Math.max(1, y0 - 60); y--) { const s = w.getBlock(x, y, z); if (!s || !(R.T.flags[s] & SOLID())) continue; const n = R.types[R.T.type[s]], nm = n ? n.name : ''; if (SOFT.test(nm)) continue; return { y, nat: NATURAL.test(nm) && !BUILT.test(nm), built: BUILT.test(nm) }; }
+      return { y: y0, nat: false, built: false };
+    };
+    if (POL.off.port) {   // a-life's search (the switch: the tests' before)
+      let best = null, bs = 1e9;
+      for (let k = 0; k < 64; k++) {
+        const a = (k + (k >> 4) * 0.5) / 16 * TAU, r = 34 + Math.floor(k / 16) * 28;
+        const x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
+        if (!loadedRound(w, x, z, Fe.PADX + 6)) continue; Fe.stats.herz.loaded++;
+        const yy = topAt(w, x, z, y0); let ok = true, sc = 0;
+        for (let dx = -Fe.PADX - 4; dx <= Fe.PADX + 4 && ok; dx += 2) for (let dz = -4; dz <= 4 && ok; dz += 2) {
+          const y = topAt(w, x + dx, z + dz, yy), n = R.types[R.T.type[w.getBlock(x + dx, y, z + dz)]], nm = n ? n.name : '';
+          if (Math.abs(y - yy) > 3 || !NATURAL.test(nm) || BUILT.test(nm)) ok = false; else sc += Math.abs(y - yy);
+        }
+        if (ok && sc < bs) { bs = sc; best = { x, y: yy, z, day0: (g.env && g.env.day) | 0, id: 'life:overworld:' + (wseedOf(g) & 0xffff) }; }
       }
-      if (ok && sc < bs) { bs = sc; best = { x, y: y0, z, day0: (g.env && g.env.day) | 0, id: 'life:overworld:' + (wseedOf(g) & 0xffff) }; }
+      return best;
     }
-    return best;
+    const c = Fe.herzPick(sp, wseedOf(g), probe, Fe.PADX);
+    Fe.stats.herz.found = c ? (c.loose ? 'loose' : 'strict') : null;
+    return c ? { x: c.x, y: c.y, z: c.z, day0: (g.env && g.env.day) | 0, id: 'life:overworld:' + (wseedOf(g) & 0xffff) } : null;
   }
   // the prefab under way: day 0 at once; the rest 24 blocks a second while you are within 160 m (sparks), at once when not
   function stepPrefab(g, L, dt) {

@@ -42,10 +42,15 @@
     const leg = () => part(5, 20, 5, [2, 19, 2], (g) => { g.box(0, 10, 0, 4, 19, 4, GR); g.box(0, 2, 0, 4, 9, 4, (x, y, z) => (y === 6 ? OR : wz(WH, x, y, z))); g.box(-0, 0, -1, 4, 1, 5, DK); });
     // a-boss2: rpg_walker2 — the same machine with its glowing parts emissive (readable from 60 m), a mast on the tower and
     // a bigger lantern on top of it (src/main/rpg_boss2.js draws it ×1.25; VR.RPGBoss2.off draws the first one)
-    const walker = (v2) => () => ({
+    // f-polish (pol): the hull reads against a white, hazy horizon at 60 m — a dark under-hull (the lower half charcoal,
+    // its belly a darker band), and on its widest band a red-violet rim that glows (emissive voxels, every other one)
+    const RV = 0xff2a9c, DKH = 0x2a2d35;
+    const walker = (v2, pol) => () => ({
       h: 5.4, w: 1.6, parts: {
         hull: part(24, 14, 24, [12, 0, 12], (g) => {
-          g.ell(12, 7, 12, 11.6, 6.8, 11.6, (x, y, z) => (y <= 2 ? GR2 : y === 7 && ((x + z) & 3) !== 0 ? OR : y < 6 ? OR2 : wz(WH, x, y, z)), { shade: 0.08 });
+          if (pol) g.ell(12, 7, 12, 11.6, 6.8, 11.6, (x, y, z) => (y <= 2 ? GR2 : y < 6 ? (y === 5 && ((x + z) & 3) === 0 ? OR2 : DKH) : y === 7 ? GR2 : wz(WH, x, y, z)), { shade: 0.08 });
+          else g.ell(12, 7, 12, 11.6, 6.8, 11.6, (x, y, z) => (y <= 2 ? GR2 : y === 7 && ((x + z) & 3) !== 0 ? OR : y < 6 ? OR2 : wz(WH, x, y, z)), { shade: 0.08 });
+          if (pol) for (let x = 0; x < 24; x++) for (let z = 0; z < 24; z++) { const d = Math.hypot(x + 0.5 - 12, z + 0.5 - 12); if (d > 10.2 && g.get(x, 7, z) && ((x + z) & 1) === 0) g.set(x, 7, z, RV, 1); }
           for (let x = 6; x <= 17; x += 2) for (let z = 18; z <= 21; z++) g.set(x, 11, z, DK);   // the back's vents
           g.box(7, 4, 0, 16, 10, 1, GR2);   // the chest's frame (the core sits in it)
         }),
@@ -65,8 +70,8 @@
       },
       layout: { ring: [0, 0, 0], hull: [0, 18, 0], tower: [0, 31, 3], lantern: v2 ? [0, 66, 3] : [0, 43, 3], mast: [0, 42, 3], visor: [0, 26, -11.6], core: [0, 25, -12.2], hatch: [0, 25, -12.6], knee: [0, 0, 0], leg_fl: [-9, 20, -8], leg_fr: [9, 20, -8], leg_bl: [-9, 20, 8], leg_br: [9, 20, 8] },
     });
-    M.rpg_walker = walker(false); M.rpg_walker2 = walker(true);
-    for (const k of ['rpg_walker', 'rpg_walker2']) { const f = M[k]; M[k] = () => { const d = f(); for (const n in d.parts) if (!d.parts[n]) delete d.parts[n]; return d; }; }
+    M.rpg_walker = walker(false); M.rpg_walker2 = walker(true, true); M.rpg_walker2_base = walker(true, false);   // f-polish: _base = a-boss2's hull (VR.Polish.off.hull)
+    for (const k of ['rpg_walker', 'rpg_walker2', 'rpg_walker2_base']) { const f = M[k]; M[k] = () => { const d = f(); for (const n in d.parts) if (!d.parts[n]) delete d.parts[n]; return d; }; }
   }
   // the mob kind (not enumerable: the codex's creature pages stay as they are)
   VR.MOBS = VR.MOBS || {};
@@ -317,7 +322,7 @@
   const LP = [0, 0, 0];
   BS.draw = function (En, r, p, m, cam) {
     const C = BS.cur; if (!C || C.m !== m || !mat4) return;
-    const gl = r.gl, v2 = B2on(), SC = scNow(), model = VR.getVoxModel(gl, v2 ? 'rpg_walker2' : 'rpg_walker'); if (!model) return;
+    const gl = r.gl, v2 = B2on(), SC = scNow(), model = VR.getVoxModel(gl, v2 ? (VR.Polish && VR.Polish.off && VR.Polish.off.hull ? 'rpg_walker2_base' : 'rpg_walker2') : 'rpg_walker'); if (!model) return;
     const b = C.b, light = En.lightAt(m.pos[0], m.pos[1] + 3, m.pos[2]);
     gl.uniform1f(p.u.u_sky, light.sky); gl.uniform3f(p.u.u_blockLight, light.bl[0], light.bl[1], light.bl[2]);
     if (p.u.u_sunShadow) gl.uniform1f(p.u.u_sunShadow, 0);
