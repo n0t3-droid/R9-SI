@@ -21,7 +21,8 @@
 (function (VR) {
   'use strict';
   const L = 64;                                     // U§3: real-equivalent lengths = 64 × game lengths
-  const BGEN = 5;   // u-worlds4: 5 — a town per world (worldeco.js townPlan: 18 homes, a hall, a market, a landmark, the ways between the villages), the dusk kits, Aquamarin's landing garden; bgen 4 as shipped in v0.54.6
+  const BGEN = 6;   // u-worlds5: 6 — the towns sit in their world (worldeco.js dressTown: the floor levelled and dressed, Aquamarin's pier quarter, the climbable landmark); bgen 5 as shipped in u-worlds4 (test/worlds5.js a)
+  // (was 5)  u-worlds4: 5 — a town per world (worldeco.js townPlan: 18 homes, a hall, a market, a landmark, the ways between the villages), the dusk kits, Aquamarin's landing garden; bgen 4 as shipped in v0.54.6
   // (was 4)  u-worlds3: 4 — the native villages' plazas (worldeco.js plaza4: calm paving, benches, the monument's foot, lanterns); bgen 3 as shipped in v0.54
   // (was 3)  u-worlds: 3 — every world's ecosystem (worldeco.js: biomes, flora, caves, ores, ponds, landmarks, the natives' villages); bgen 2 as it was
   // (was 2)                                   // the bodies' generator version (gen_body.js); test/body_same.js pins it (u-moons3: 2 — Zinnober, Ocker, Aquamarin made over; bgen 1 as pinned)
