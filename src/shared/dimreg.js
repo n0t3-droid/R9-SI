@@ -38,6 +38,8 @@
     realGrav: false,
     walkG(id) { return DimReg.realGrav ? DimReg.g(id) : G_HOME; },
     walkGravity(id) { return GRAV_HOME * (DimReg.walkG(id) / G_HOME); },
+    // f-first3 (R55-01): the text set for the switch — with realGrav off a key's '.home' twin (the land and the sky, no gravity facts)
+    gravKey(k) { if (DimReg.realGrav) return k; const I = VR.I18N, h = k + '.home'; return I && I.dict && ((I.dict[I.lang] || {})[h] !== undefined || (I.dict.en || {})[h] !== undefined) ? h : k; },
     actorsHome(id) { const d = DimReg.get(id); return !!(d && d.actors === 'home'); },
     horizon(id) { const d = DimReg.get(id); return !!(d && d.horizon); },
     mp(id) { const d = DimReg.get(id); return d ? d.mp : 'none'; },

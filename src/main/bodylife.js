@@ -71,7 +71,7 @@
     if (S.id !== id) {   // arrived
       S.id = id; S.landY = null; S.wasGround = true; S.impactSlot = Math.floor(t / 180); S.parUp = null;
       unlock(g, 'moon:' + id);
-      if (!S.said[id] && g.ui) { S.said[id] = true; if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('space', 'moon_land', 4, null, 'moon');   /* e-cam: a highlight (the reel's postcard) */ g.ui.toast(T('g.moon.hello', { name: T('g.dim.' + id, null, prof.name.de) }), T('g.moon.hello.' + id)); }
+      if (!S.said[id] && g.ui) { S.said[id] = true; if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('space', 'moon_land', 4, null, 'moon');   /* e-cam: a highlight (the reel's postcard) */ g.ui.toast(T('g.moon.hello', { name: T('g.dim.' + id, null, prof.name.de) }), T(VR.DimReg.gravKey ? VR.DimReg.gravKey('g.moon.hello.' + id) : 'g.moon.hello.' + id)); }
     }
     const BS = VR.BodySky;
     // the sky's eye and the ground under it (the horizon's dip)
