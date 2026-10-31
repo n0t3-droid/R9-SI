@@ -6,6 +6,8 @@
 #   results file  default .tmp_tests/regress.txt of this checkout ("" keeps the default when names follow)
 #   test names    run only these (*.js = node, *.mjs = browser) instead of the whole set
 #   REGRESS_ONLY  node | browser  runs only that part of the set
+#   R9_RELEASE=1  the release lane: also test/session.mjs as a gate (the builder must meet erlebnis §7's targets, the
+#                 adventurer is warned about; e-access)
 # One line per test, in the results file and on screen:   <name> <exit code> <seconds> <summary>
 #   summary  ALL OK | FAILED <n> | no summary (the test printed neither)
 #   seconds  wall time of the run; a browser test includes its wait for the browser lock
