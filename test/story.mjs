@@ -74,6 +74,7 @@ const section = async (tag, fn) => {
 // a-story4: the time of day when this strange world's sun stands up (its own clock: tried in steps; null — never, e.g. a
 // locked world's night side)
 const sunTod = async () => { for (const tod of [6000, 3000, 9000, 0, 12000, 15000, 18000, 21000]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up !== false) return tod; } return null; };
+const nightTod = async () => { for (const tod of [18000, 15000, 21000, 12000, 0, 3000]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up === false) return tod; } return null; };
 // a scene stepped to its time t (s): the frames of 33 ms, then held
 const sceneTo = async (t) => { const r = await run(Math.ceil(t / 0.033) + 60, 33, 'sceneT', t); return r; };
 
@@ -408,7 +409,7 @@ try {
       await ev(() => VR.StoryPlay.debug.reach('c9.b1')); await ground();
       const w9 = await why('c9.b1');
       check(w9 === null, 'c9.b1 holds on the nebula\'s world (' + w9 + ')');
-      const td = await sunTod();
+      const td = await nightTod();   // (inside the nebula it is not dark: its glow fills the night)
       const s1 = await play('c9.b1', 10, 'c9_nebula', td === null ? undefined : td);
       check(s1 && s1.fx === 'nebin' && /lumi/.test(s1.who), 'c9.b1: the nebula from inside; Lumi is there (her branch)');
       await ev(() => VR.StoryPlay.debug.reach('c9.b2'));

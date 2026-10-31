@@ -153,7 +153,7 @@
       if (!b || g.settings && g.settings.storyOffer === false) return false;
       const a = P.actCtx(g, b.act); if (ev) Object.assign(a, ev);
       const st = this.actSt && this.actSt.id === b.id ? this.actSt : (this.actSt = { id: b.id });
-      if (b.act.kind === 'feat') { if (!st.base) st.base = P.featNow(g); a.feat = S.featWay(st.base, P.featNow(g, st.base)); if (a.feat) { S.answer(this.rec, a.feat); st.way = a.feat; } }   // a-story4: the set piece — your way
+      if (b.act.kind === 'feat') { if (!st.base) st.base = P.featNow(g); a.feat = S.featWay(st.base, P.featNow(g, st.base)); if (a.feat) { S.answer(this.rec, a.feat); st.way = a.feat; P.answerAt = P.answerOf(g, a.feat, st.base); } }   // a-story4: the set piece — your way (and where its light is)
       const done = S.actStep(st, b.act, a, dt);
       if (done) { this.actDone(b); return true; }
       if (st.last === 'armed') this.armed = b;
@@ -275,6 +275,8 @@
       const vl = P.village(g); sc.tg.village = vl && vl.d < 500 ? [vl.s.x + 0.5, (vl.s.y || top(vl.s.x, vl.s.z, eye[1])) + 3, vl.s.z + 0.5] : ahead(70, 3);   // a-story3
       sc.tg.window = ahead(60, -22); sc.tg.sea = ahead(20, -12);
       sc.tg.sky = ahead(60, 60);
+      sc.tg.echo = ahead(10, -1.5);   // a-story4: where Echo glows in the Ringstation's hall
+      const an = P.answerAt && Math.hypot(P.answerAt[0] - eye[0], P.answerAt[2] - eye[2]) < 200 ? P.answerAt : null; sc.tg.answer = an || ahead(25, 6);
       const BS = VR.BodySky, md = BS && BS.cur && BS.cur.light && g.dim !== 'overworld' ? BS.cur.light.moonDir : null;
       sc.tg.amarant = md && md[1] > -0.05 ? [eye[0] + md[0] * 200, eye[1] + md[1] * 200, eye[2] + md[2] * 200] : ahead(80, 70);
       // the Eiswächter: 8 m ahead, standing frozen in the ice — its head 1.6 m under the surface — and facing the player
@@ -369,6 +371,12 @@
           const C = [pe[0] - f[0] * 1.5, pe[1] - 0.3, pe[2] - f[2] * 1.5], fov = 66 - 8 * smooth(u), c = lookAt(C, Q, fov, base);
           c.pitch = Math.max(c.pitch * 0.55, c.pitch - fov * DEG * 0.13);   // (inside the letterbox: the subject a sixth above the middle)
           return c;
+        }
+        case 'skyline': {
+          // a-story4: low behind the player, looking out over the land and up into the sky (the beams, the arcs, the stars)
+          const dx = Q[0] - pe[0], dz = Q[2] - pe[2], L = Math.hypot(dx, dz), ux = L > 2 ? dx / L : f[0], uz = L > 2 ? dz / L : f[2];
+          const C = [pe[0] - ux * 4 + rt[0] * 1.2, pe[1] + 0.6 + 0.4 * u, pe[2] - uz * 4 + rt[2] * 1.2];
+          return lookAt(lift(C, pe), [pe[0] + ux * 100, pe[1] + 30 + 6 * u, pe[2] + uz * 100], 72, base);
         }
         case 'limb': {
           const C = [pe[0], pe[1] + 0.2, pe[2]];
@@ -495,6 +503,9 @@ body.storyon #storychoice { visibility: hidden !important; }
 #storybox canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 #storybox .sub .por.solgani { border-color: #ffb02a; background: radial-gradient(circle at 35% 30%, rgba(255, 176, 42, .6), rgba(60, 25, 15, .92)); } #storybox .sub .por.ariveli { border-color: #6ae0d0; background: radial-gradient(circle at 35% 30%, rgba(106, 224, 208, .55), rgba(15, 50, 60, .92)); }
 #storybox .sub .por.selkatun { border-color: #c0b0ff; background: radial-gradient(circle at 35% 30%, rgba(192, 176, 255, .55), rgba(30, 30, 70, .92)); } #storybox .sub .por.anselm { border-color: #e8c890; background: radial-gradient(circle at 35% 30%, rgba(232, 200, 144, .55), rgba(60, 45, 30, .92)); }
+#storybox .sub .por.dumarin { border-color: #e0b050; background: radial-gradient(circle at 35% 30%, rgba(224, 176, 80, .55), rgba(60, 40, 15, .92)); } #storybox .sub .por.ylosenis { border-color: #9ad8ff; background: radial-gradient(circle at 35% 30%, rgba(154, 216, 255, .55), rgba(20, 35, 70, .92)); }
+#storybox .sub .por.flimmi { border-color: #ffd25a; background: radial-gradient(circle at 35% 30%, rgba(255, 210, 90, .55), rgba(70, 40, 10, .92)); } #storybox .sub .por.echo { border-color: #b8a8ff; background: radial-gradient(circle at 35% 30%, rgba(184, 168, 255, .55), rgba(25, 20, 60, .92)); }
+#storybox .sub b.dumarin { color: #e0b050; } #storybox .sub b.ylosenis { color: #9ad8ff; } #storybox .sub b.flimmi { color: #ffd25a; } #storybox .sub b.echo { color: #b8a8ff; }
 #storybox .sub b.solgani { color: #ffb02a; } #storybox .sub b.ariveli { color: #6ae0d0; } #storybox .sub b.selkatun { color: #c0b0ff; } #storybox .sub b.anselm { color: #e8c890; }
 @keyframes storyIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .jstory h3 .bk { font-weight: 500; opacity: .7; font-size: .85em; margin-left: 6px; }
@@ -841,8 +852,15 @@ body.storyon #storychoice { visibility: hidden !important; }
   // 256 heights with their number, so the beacon you build is seen as tall as it is. The calmed machines (Foes' stats),
   // the freed beacons (the ctx's count), the height over the sea, the orbit.
   P.placedN = 0; P.placedLog = [];
-  P.notePlaced = function (x, y, z) { P.placedN++; const L = P.placedLog; if (L.length >= 256) L.shift(); L.push([y | 0, P.placedN]); };
+  P.notePlaced = function (x, y, z) { P.placedN++; const L = P.placedLog; if (L.length >= 256) L.shift(); L.push([y | 0, P.placedN, x | 0, z | 0]); };
   { const A = VR.Adventure; if (A && A.placed && !A._story4) { A._story4 = true; const pl0 = A.placed; A.placed = function (x, y, z) { try { P.notePlaced(x, y, z); } catch (e) { /* counted */ } return pl0.apply(this, arguments); }; } }
+  // where the answer's light stands: the top of the beacon you built, the beacon you freed, else above you
+  P.answerOf = function (g, way, base) {
+    const p = g.player.pos;
+    if (way === 'build') { let top = null; for (const q of P.placedLog) if (q[1] > (base ? base.placed : 0) && (!top || q[0] > top[1])) top = [q[2] + 0.5, q[0] + 1, q[3] + 0.5]; if (top) return top; }
+    if (way === 'free') { const n = P.nearSite(g, true); if (n && n.s.beacon) return [n.s.beacon[0] + 0.5, n.s.beacon[1] + 2, n.s.beacon[2] + 0.5]; }
+    return [p[0], p[1] + 3, p[2]];
+  };
   P.featNow = function (g, base) {
     const p = g && g.player, sea = (VR.C && VR.C.SEA) || 64, from = base ? base.placed : P.placedN;
     let lo = Infinity, hi = -Infinity; for (const q of P.placedLog) if (q[1] > from) { if (q[0] < lo) lo = q[0]; if (q[0] > hi) hi = q[0]; }
@@ -858,7 +876,7 @@ body.storyon #storychoice { visibility: hidden !important; }
   //   from the player outward, and arcs of light between them across the sky.
   // One emissive column (story_beam) stretched by its own matrix, additive, no fog; only while those scenes play.
   // Very Low: fewer beams, fewer arc segments.
-  let BM = null;
+  let BM = null; const frc = (x) => x - Math.floor(x);
   const basis = (M, o, X, Y, Z) => { M[0] = X[0]; M[1] = X[1]; M[2] = X[2]; M[3] = 0; M[4] = Y[0]; M[5] = Y[1]; M[6] = Y[2]; M[7] = 0; M[8] = Z[0]; M[9] = Z[1]; M[10] = Z[2]; M[11] = 0; M[12] = o[0]; M[13] = o[1]; M[14] = o[2]; M[15] = 1; return M; };
   P.beamList = function (g, sc) {
     const low = !!(g.settings && g.settings.preset === 'potato'), out = [], id = sc.b.id;
@@ -872,6 +890,21 @@ body.storyon #storychoice { visibility: hidden !important; }
         const a = (2 * A[i][0] - 1) * th, b = (1 - 2 * A[i][1]) * tv, d = [F[0] + Rt[0] * a - U[0] * b, F[1] + Rt[1] * a - U[1] * b, F[2] + Rt[2] * a - U[2] * b], L0 = Math.hypot(d[0], d[1], d[2]);
         out.push({ p: [C[0] + d[0] / L0 * D, C[1] + d[1] / L0 * D, C[2] + d[2] / L0 * D], up: [0, 1, 0], len: 70 * q, w: 2.6, col: [0.35, 1.6, 2.0], a: 0.75 * q });
       }
+      return out;
+    }
+    if (id === 'c11.b1' || id === 'c11.b2') {   // Echo asleep in the hall: a ring of violet light, the five peoples' lanterns round it
+      const E0 = sc.tg && sc.tg.echo; if (!E0) return out;
+      const br = 0.6 + 0.4 * Math.sin(sc.t * 1.1), n = low ? 8 : 16, FO = [[1.0, 0.69, 0.16], [0.42, 0.88, 0.82], [0.75, 0.69, 1.0], [0.88, 0.69, 0.31], [0.6, 0.85, 1.0]];
+      for (let i = 0; i < n; i++) { const a = i / n * TAU + sc.t * 0.15; out.push({ p: [E0[0] + Math.cos(a) * 2.6, E0[1], E0[2] + Math.sin(a) * 2.6], up: [0, 1, 0], len: 2.2 + 0.6 * br, w: 0.22, col: [0.9, 0.75, 2.0], a: 0.55 * br }); }
+      out.push({ p: E0, up: [0, 1, 0], len: 5 + br, w: 0.9, col: [1.0, 0.85, 2.0], a: 0.5 });
+      for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU / 5; out.push({ p: [E0[0] + Math.cos(a) * 5.2, E0[1], E0[2] + Math.sin(a) * 5.2], up: [0, 1, 0], len: 3.2, w: 0.45, col: FO[i].map(v => v * 1.6), a: 0.75 }); }
+      return out;
+    }
+    if (id === 'c11.b3') {   // the answer: a new light rising where you gave it, and the ring of Echo's waking round its foot
+      const A0 = sc.tg && sc.tg.answer; if (!A0) return out;
+      const k = smooth(sc.t / 5), n = low ? 8 : 14;
+      out.push({ p: A0, up: [0, 1, 0], len: 260 * k, w: 1.4, col: [0.45, 1.6, 2.0], a: 0.85 });
+      for (let i = 0; i < n; i++) { const a = i / n * TAU + sc.t * 0.4, r = 3 + 6 * frc(sc.t * 0.25); out.push({ p: [A0[0] + Math.cos(a) * r, A0[1] - 1, A0[2] + Math.sin(a) * r], up: [0, 1, 0], len: 1.6, w: 0.25, col: [0.5, 1.6, 2.0], a: 0.6 * (1 - frc(sc.t * 0.25)) }); }
       return out;
     }
     if (id !== 'c12.b2') return out;
@@ -892,8 +925,9 @@ body.storyon #storychoice { visibility: hidden !important; }
     }
     return out;
   };
+  P.BEAM_BEATS = { 'c7.b2': 1, 'c11.b1': 1, 'c11.b2': 1, 'c11.b3': 1, 'c12.b2': 1 };
   P.drawBeams = function (g, r, E, cam) {
-    const s = pl(g), sc = s && s.scene; if (!sc || (sc.b.id !== 'c7.b2' && sc.b.id !== 'c12.b2') || !VR.getVoxModel) return 0;
+    const s = pl(g), sc = s && s.scene; if (!sc || !P.BEAM_BEATS[sc.b.id] || !VR.getVoxModel) return 0;
     const list = P.beamList(g, sc); sc.beams3d = sc.b.id === 'c7.b2' && sc.inGlass; if (!list.length) return 0;
     const gl = r.gl, md = VR.getVoxModel(gl, 'story_beam'); if (!md || !md.parts || !md.parts.whole) return 0;
     const t0 = performance.now(), p = g.entities.beginVox(r, E), pr = md.parts.whole; BM = BM || new Float32Array(16);

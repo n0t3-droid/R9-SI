@@ -469,7 +469,7 @@
       for (let i = 0; i < n; i++) { const x = (rnd(i, 21) + drift * (rnd(i, 22) - 0.5)) * w, y = h * (0.05 + 0.5 * rnd(i, 23)), r = S0 * (0.25 + 0.3 * rnd(i, 24)); glow(c, x, y, r, i % 4 === 0 ? '150,80,220' : i % 3 === 0 ? '255,110,150' : '235,70,120', 0.16 + 0.08 * rnd(i, 25)); }
       const hx = w * 0.68, hy = h * 0.2; glow(c, hx, hy, S0 * 0.42, '60,210,200', 0.16); glow(c, hx, hy, S0 * 0.06, '220,250,255', 0.6); glow(c, hx, hy, S0 * 0.015, '255,255,255', 1);
       c.globalCompositeOperation = 'source-over';
-      for (let i = 0; i < (low ? 3 : 6); i++) { const x = w * (0.1 + 0.15 * i + 0.05 * Math.sin(t * 0.05 + i)), y = h * (0.28 + 0.12 * rnd(i, 26)); const g = c.createRadialGradient(x, y, 0, x, y, S0 * 0.22); g.addColorStop(0, 'rgba(18,8,22,0.42)'); g.addColorStop(1, 'rgba(18,8,22,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, S0 * 0.34, S0 * 0.08, -0.25 + 0.2 * rnd(i, 27), 0, Math.PI * 2); c.fill(); }   // (the dust lanes)
+      for (let i = 0; i < (low ? 3 : 6); i++) { const x = w * (0.1 + 0.15 * i + 0.05 * Math.sin(t * 0.05 + i)), y = h * (0.28 + 0.12 * rnd(i, 26)); const g = c.createRadialGradient(x, y, 0, x, y, S0 * 0.22); g.addColorStop(0, 'rgba(40,12,40,0.26)'); g.addColorStop(1, 'rgba(40,12,40,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, S0 * 0.34, S0 * 0.08, -0.25 + 0.2 * rnd(i, 27), 0, Math.PI * 2); c.fill(); }   // (the dust lanes)
       c.globalCompositeOperation = 'lighter';
       for (let i = 0; i < (low ? 10 : 28); i++) { const x = rnd(i, 28) * w, y = h * 0.62 * rnd(i, 29), tw = 0.55 + 0.45 * Math.sin(t * (1.5 + rnd(i, 30) * 3) + i); glow(c, x, y, S0 * 0.008 * (1 + rnd(i, 31)), i % 3 ? '255,240,250' : '180,230,255', 0.7 * tw); }
     } else if (kind === 'flimmi') {
@@ -494,7 +494,7 @@
       // brightens to cyan and rings of light run outward
       const x = w * 0.5, y = h * 0.42, wk = kind === 'wake' ? ease(u * 1.4) : 0, br = 0.5 + 0.5 * Math.sin(t * (0.8 + wk * 2));
       const col = wk > 0.5 ? '120,235,255' : '170,150,255';
-      c.lineWidth = Math.max(2, S0 * (0.012 + 0.01 * wk)); c.strokeStyle = 'rgba(' + col + ',' + (0.25 + 0.2 * br + 0.4 * wk) + ')'; c.beginPath(); c.ellipse(x, y, S0 * 0.24, S0 * 0.24 * 0.55, 0, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = Math.max(2, S0 * (0.016 + 0.01 * wk)); c.strokeStyle = 'rgba(' + col + ',' + (0.4 + 0.2 * br + 0.35 * wk) + ')'; c.beginPath(); c.ellipse(x, y, S0 * 0.24, S0 * 0.24 * 0.55, 0, 0, Math.PI * 2); c.stroke();
       glow(c, x, y, S0 * (0.12 + 0.1 * wk), col, 0.2 + 0.15 * br + 0.5 * wk);
       if (wk > 0) for (let i = 0; i < (low ? 3 : 6); i++) { const q = fr(t * 0.45 + i / 6), rr = S0 * (0.24 + q * 0.7); c.strokeStyle = 'rgba(140,240,255,' + (0.5 * (1 - q) * wk) + ')'; c.lineWidth = Math.max(1, S0 * 0.004); c.beginPath(); c.ellipse(x, y, rr, rr * 0.55, 0, 0, Math.PI * 2); c.stroke(); }
       for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5 + t * 0.05, lx = x + Math.cos(a) * S0 * 0.42, ly = y + Math.sin(a) * S0 * 0.24 + Math.sin(t * 1.3 + i) * S0 * 0.01; glow(c, lx, ly, S0 * 0.06, Fx.FOLK[i], 0.45); glow(c, lx, ly, S0 * 0.012, '255,255,240', 0.9); }

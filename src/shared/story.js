@@ -155,17 +155,17 @@
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'echo' }, { cam: 'wide', target: 'player', dur: 7, fx: 'echo', swell: true }, { cam: 'shoulder', target: 'player', dur: 6 }], music: 'tense' },
       alt: { wellari: ['anselm', 'funke', 'selkatun', 'ariveli:happy'], lumi: ['anselm', 'funke', 'selkatun', 'lumi:happy'] }, task: { kind: 'feat', target: 'echo' }, reward: { xp: 200 }, act: { kind: 'feat' } }),
     BV(11, 3, { when: { after: 'c11.b2', adv: true, deed: 'c11.b2', dim: ['overworld', 'aqua', 'zinn', 'ocker', 'basalt', 'opal', 'stn.*', 'x.*'] }, vary: 'how',
-      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'wake' }, { cam: 'wide', target: 'player', dur: 8, fx: 'wake', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'hum' }], music: 'rise' },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'wake' }, { cam: 'skyline', target: 'answer', dur: 8, fx: 'wake', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'hum' }], music: 'rise' },
       alt: { build: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], fly: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], free: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], calm: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'] }, task: { kind: 'home', target: 'home' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 15 } }),
     // 12 · Heimkehr — everyone on the square; at night every freed beacon lights at once; free play and a new signal
     BV(12, 1, { when: { after: 'c11.b3', adv: true, dim: ['overworld'] }, vary: 'c6',
       scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'orbit', target: 'player', dur: 7, fx: 'gather', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
       alt: { wellari: ['ilka:happy', 'oskar:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'oskar:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'night', target: 'night' }, reward: { xp: 200 }, act: { kind: 'look', target: 'vista', max: 600, cone: 22, hold: 1.5 } }),
     B(12, 2, { when: { after: 'c12.b1', adv: true, dim: ['overworld'], hours: ['dusk', 'night'] },
-      scene: { shots: [{ cam: 'up', target: 'sky', dur: 8, fx: 'finale', swell: true }, { cam: 'wide', target: 'player', dur: 9, fx: 'finale' }, { cam: 'close', target: 'funke', dur: 6, fx: 'finale', swell: true }], music: 'rise' },
+      scene: { shots: [{ cam: 'up', target: 'sky', dur: 8, fx: 'finale', swell: true }, { cam: 'skyline', target: 'vista', dur: 9, fx: 'finale' }, { cam: 'close', target: 'funke', dur: 6, fx: 'finale', swell: true }], music: 'rise' },
       who: ['echo:happy', 'funke:surprised', 'selma:surprised', 'flimmi:happy', 'funke:happy'], task: { kind: 'play', target: 'free' }, reward: { xp: 500 }, act: { kind: 'photo', target: 'sky', pitch: 20 } }),
     B(12, 3, { when: { after: 'c12.b2', adv: true, dim: ['overworld'] },
-      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 6, fx: 'gather' }, { cam: 'up', target: 'sky', dur: 8, fx: 'blink3', swell: true }], music: 'wide' },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6 }, { cam: 'skyline', target: 'vista', dur: 6, fx: 'gather' }, { cam: 'up', target: 'sky', dur: 8, fx: 'blink3', swell: true }], music: 'wide' },
       who: ['jonte:happy', 'anselm:happy', 'funke:happy', 'funke:surprised'], task: { kind: 'play', target: 'free' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 30 } }),
   ];
   for (const b of S.BEATS) delete b.who;
