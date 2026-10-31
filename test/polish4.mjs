@@ -191,7 +191,7 @@ try {
       await ev((V) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(V.x + 8, V.y + 6, V.z + 8); g.env.setTime(15500); }, V);
       await settle(30, 'the town');
       // the world's own night (a strange world's clock: the sun down) within the lamplighters' hours (13000–23300)
-      let tdN = null; for (const tod of [18000, 15000, 21000, 13500, 22500]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up === false) { tdN = tod; break; } }
+      let tdN = null; for (const tod of [21000, 19500, 18000, 22500, 15000]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up === false) { tdN = tod; break; } }
       console.log('     the night at ' + tdN); if (tdN === null) tdN = 18000;
       await ev((t) => VR.game.env.setTime(t), tdN);
       await run(400);

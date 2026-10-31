@@ -642,17 +642,19 @@
   // it hangs straight down from the fist (folkanim.js: a carried thing). zc: the hanging middle's z
   V.LANTERN_GLOW = 0xFFC860;
   function handLantern(set, fy, zc) {
-    const iron = 0x2E2620;
+    // (run 2: 5 voxels across read as a spark at the hip — now 7 across and 9 high, some 22 × 28 cm, a hand lantern's size)
+    const iron = 0x2A221C, A = (v) => Math.abs(v);
     set(0, fy - 1, zc, iron, 0); set(0, fy - 2, zc, iron, 0);
     for (let x = -1; x <= 1; x++) for (let z = zc - 1; z <= zc + 1; z++) set(x, fy - 3, z, iron, 0);
-    for (let y = fy - 9; y <= fy - 4; y++) for (let z = zc - 2; z <= zc + 2; z++) for (let x = -2; x <= 2; x++) {
-      const ex = Math.abs(x) === 2, ez = Math.abs(z - zc) === 2, rim = y === fy - 4 || y === fy - 9;
-      if (ex && ez) set(x, y, z, iron, 0);                                   // the four posts
-      else if (rim) set(x, y, z, ex || ez ? iron : mul(iron, 1.2), 0);       // the cap's and the foot's plates
-      else if (ex || ez) set(x, y, z, 0xFFB347, 1);                          // the warm glass
-      else set(x, y, z, x === 0 && z === zc && y >= fy - 7 ? 0xFFF2C8 : V.LANTERN_GLOW, 1);   // the flame's core
+    for (let x = -2; x <= 2; x++) for (let z = zc - 2; z <= zc + 2; z++) set(x, fy - 4, z, iron, 0);
+    for (let y = fy - 12; y <= fy - 5; y++) for (let z = zc - 3; z <= zc + 3; z++) for (let x = -3; x <= 3; x++) {
+      const ex = A(x) === 3, ez = A(z - zc) === 3, rim = y === fy - 5 || y === fy - 12, mid = y === fy - 9;
+      if (ex && ez) set(x, y, z, iron, 0);                                         // the four posts
+      else if (rim) set(x, y, z, ex || ez ? iron : mul(iron, 1.25), 0);            // the cap's and the foot's plates
+      else if (ex || ez) set(x, y, z, mid && (A(x) + A(z - zc)) % 2 ? iron : 0xFFB347, 1);   // the warm glass, a thin band
+      else set(x, y, z, A(x) <= 1 && A(z - zc) <= 1 && y >= fy - 10 && y <= fy - 7 ? 0xFFF2C8 : V.LANTERN_GLOW, 1);   // the flame
     }
-    for (let x = -1; x <= 1; x++) for (let z = zc - 1; z <= zc + 1; z++) set(x, fy - 10, z, iron, 0);
+    for (let x = -2; x <= 2; x++) for (let z = zc - 2; z <= zc + 2; z++) set(x, fy - 13, z, iron, 0);
   }
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block

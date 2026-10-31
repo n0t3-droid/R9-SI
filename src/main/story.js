@@ -1041,7 +1041,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       for (let i = 0; i < nW; i++) {   // the walls: most of them ahead and high, a few all round
         const az = y0 + (i < nW * 0.65 ? (r5(i, 1) - 0.5) * 2.4 : r5(i, 1) * TAU), el = (4 + 46 * r5(i, 2) * r5(i, 2)) * DEG, D = 700 + 900 * r5(i, 3);
         const sx = D * (0.35 + 0.45 * r5(i, 4)), pal = PAL[i % PAL.length];
-        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.2 + 0.14 * r5(i, 7)) * k * nearF(az, el), kind: 1, far: true, seed: i * 1.37 + 0.5 });
+        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.17 + 0.12 * r5(i, 7)) * k * nearF(az, el), kind: 1, far: true, seed: i * 1.37 + 0.5 });
       }
       // a hot young star with its teal rim, ahead and up
       const hs = dir(y0 - 0.35, 28 * DEG, 1500);
@@ -1062,7 +1062,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       if (id === 'c9.b2' || id === 'c9.b3' || (at && at.shot.fx === 'flimmi')) {
         const F0 = sc.tg.sky, pu = 0.8 + 0.2 * Math.sin(t * 7) * Math.sin(t * 2.3);
         // (f-polish4: twice the halo, a longer disc, a hot white core — the brightest thing in the frame)
-        out.push({ p: F0, s: [34, 34], col: [1.0, 0.62, 0.28], a: 1.1 * pu, kind: 0 });
+        out.push({ p: F0, s: [28, 28], col: [1.0, 0.62, 0.28], a: 0.85 * pu, kind: 0 });
         out.push({ p: F0, s: [24, 3.0], rot: -0.18, col: [1.0, 0.84, 0.55], a: 1.4, kind: 0 });
         out.push({ p: F0, s: [8, 8], col: [1.0, 0.98, 0.92], a: 3.2 * pu, kind: 0 });
       }
