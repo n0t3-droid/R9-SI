@@ -292,14 +292,21 @@
       starfield(X, W, H, S.P, 1, 0.01 * k, S.t);
       disc(X, W * (0.15 + v * 0.3), H * 1.35, H * 0.8, S.curveFrom ? S.curveFrom.b : hex('#4a7ab8'), hex('#bfe0ff'), 0, -1, hex('#9ad0ff'));
     }
-    const R = lerp(H * 0.08, H * 0.6, Math.pow(k, 1.4)), cx = W / 2, cy = H * 0.46, rot = S.t * 0.4 + v;
-    X.save(); X.translate(cx, cy); X.scale(1, 0.42 + 0.1 * v); X.rotate(rot);
-    X.strokeStyle = '#cfd8e6'; X.lineWidth = Math.max(2, R * 0.12); X.beginPath(); X.arc(0, 0, R, 0, TAU); X.stroke();
-    X.strokeStyle = '#ffe2a0'; X.lineWidth = Math.max(1, R * 0.03); X.setLineDash([R * 0.08, R * 0.06]); X.beginPath(); X.arc(0, 0, R, 0, TAU); X.stroke(); X.setLineDash([]);
-    X.strokeStyle = '#9aa6b8'; X.lineWidth = Math.max(1, R * 0.04); for (let i = 0; i < 4; i++) { const a = i * PI / 2; X.beginPath(); X.moveTo(0, 0); X.lineTo(Math.cos(a) * R, Math.sin(a) * R); X.stroke(); }
+    const R = lerp(H * 0.08, H * 0.5, Math.pow(k, 1.4)), cx = W / 2, cy = H * 0.44, rot = S.t * 0.25 + v, sq = 0.42 + 0.1 * v;
+    // (e-portal2: the wheel with a body — its rim's dark underside under the lit top, lit from Helia's side; thin spokes,
+    // a hub with its modules, a small blinking beacon)
+    X.save(); X.translate(cx, cy); X.scale(1, sq);
+    X.strokeStyle = '#3a4252'; X.lineWidth = Math.max(2, R * 0.13); X.beginPath(); X.arc(0, R * 0.06 / sq, R, 0, TAU); X.stroke();
+    const lg = X.createLinearGradient(-R, -R, R, R); lg.addColorStop(0, '#f4f7fb'); lg.addColorStop(0.5, '#b9c3d2'); lg.addColorStop(1, '#5d6778');
+    X.strokeStyle = lg; X.lineWidth = Math.max(2, R * 0.11); X.beginPath(); X.arc(0, 0, R, 0, TAU); X.stroke();
+    X.rotate(rot);
+    X.strokeStyle = 'rgba(255,226,160,.9)'; X.lineWidth = Math.max(1, R * 0.018); X.setLineDash([R * 0.05, R * 0.09]); X.beginPath(); X.arc(0, 0, R * 1.0, 0, TAU); X.stroke(); X.setLineDash([]);
+    X.strokeStyle = '#8f9aab'; X.lineWidth = Math.max(1, R * 0.022); for (let i = 0; i < 6; i++) { const a = i * PI / 3; X.beginPath(); X.moveTo(Math.cos(a) * R * 0.16, Math.sin(a) * R * 0.16); X.lineTo(Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95); X.stroke(); }
     X.restore();
-    X.fillStyle = '#dfe6f0'; X.beginPath(); X.arc(cx, cy, R * 0.14, 0, TAU); X.fill();
-    if (Math.sin(S.t * 5) > 0.2) glow(X, cx, cy - R * 0.32, R * 0.25 + 6, [255, 60, 50], 0.9);
+    const hg = X.createRadialGradient(cx - R * 0.05, cy - R * 0.06, 1, cx, cy, R * 0.16); hg.addColorStop(0, '#ffffff'); hg.addColorStop(0.7, '#aeb8c8'); hg.addColorStop(1, '#4a5262');
+    X.fillStyle = hg; X.beginPath(); X.ellipse(cx, cy, R * 0.16, R * 0.16 * (sq + 0.25), 0, 0, TAU); X.fill();
+    X.fillStyle = '#c9d2de'; X.fillRect(cx - R * 0.05, cy - R * 0.36, R * 0.1, R * 0.22);   // the docking mast
+    if (Math.sin(S.t * 5) > 0.55) glow(X, cx, cy - R * 0.38, R * 0.06 + 3, [255, 70, 60], 0.95);
   };
   // the star-jump tunnel: streaks rush from the centre, the colour turns to the far star's
   SHOT.tunnel = function (X, W, H, k, v, S) {
