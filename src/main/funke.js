@@ -907,7 +907,9 @@ void main() {
       const job = this.scanJob, res = job.result(); this.scanJob = null;
       this.scanData = res.list; this.scanDirty = true; this.scanN = res.list.length;
       const K = F.scanOrder(res.veins).slice(0, 4);   // (the rarest four kinds, each counted in finds)
-      if (!K.length) { this.say('scan.none', null, this.scanAsked); return; }
+      const regie = this.regieScan; this.regieScan = false;   // (a-session: the Regie's scan on the way — quiet when it finds nothing, a discovery when it does)
+      if (!K.length) { if (!regie) this.say('scan.none', null, this.scanAsked); return; }
+      if (regie && VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('discovery', 'scan', 2, null, 'funke');
       const list = K.map(k => T('g.funke.scan.item', { n: res.veins[k], what: T('g.funke.ore.' + k) })).join(' · ');
       this.say('scan.found', { list }, this.scanAsked);
     }

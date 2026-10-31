@@ -23,6 +23,7 @@
     const since = t - (st.t0 || 0);
     if (!st.called && st.site && since >= R.call) out.push({ act: 'call', weight: 3, kind: 'discovery', first: true });
     if (!st.strayed && !st.kids && st.enc !== 'off' && !(st.encounters > 0) && since >= R.stray) out.push({ act: 'stray', weight: 4, kind: 'encounter', first: true });
+    if (st.scan && R.scan && since >= R.scan && !st.foeNear && t - (st.scanT === undefined ? -1e9 : st.scanT) >= R.scanEvery) out.push({ act: 'scan', weight: 2, kind: 'discovery' });   // a-session: Funke's scan on the way
     return out;
   };
   // ---- pure: the spots ahead to try (the view's middle first, then a little to each side), forward = (-sin yaw, -cos yaw)
@@ -30,6 +31,16 @@
     const R = RA.RULES, side = [0, 0.22, -0.22, 0.4, -0.4][k % 5], d = R.dmin + (R.dmax - R.dmin) * ((Math.floor(k / 5) % 3) / 2), a = yaw + side;
     return [x - Math.sin(a) * d, z - Math.cos(a) * d];
   };
+  // a-session (plan docs/superpowers/plans/2026-10-31-a-session.md §2.4): the Regie's fill on the way — Funke scans the
+  // ground round the player (its ring, the marks of chests and ores, one line): a discovery when it finds something.
+  // Offered after RULES.scan s, not with a foe near, at most once in RULES.scanEvery s; taken in a gap like any offer
+  RA.RULES.scan = 50; RA.RULES.scanEvery = 120;
+  function scan(g, S) {
+    const fk = g.funke; if (!fk || !fk.on || !fk.on() || fk.scanJob || !fk.scan) return why('noscan');
+    if (!fk.scan(false)) return why('noscan');
+    fk.regieScan = true; S.scanT = g.time || 0; RA.stats.scans = (RA.stats.scans | 0) + 1;
+    return true;
+  }
   RA.st = null;
   RA.stats = { calls: 0, strays: 0, tries: 0, why: {} };
   const game = () => VR.game || null;
@@ -110,9 +121,9 @@
     const Fo = VR.Foes; if (!Fo || !Fo.advOn || !Fo.advOn(g) || (g.dim || 'overworld') !== 'overworld') return null;
     const S = state(g); tend(g, S); sight(g, S);
     if ((g.time || 0) < (S.retry || 0)) return null;
-    const st = { adv: true, guest: !!(g.meta && g.meta.guest), enc: Fo.enc ? Fo.enc() : 'off', kids: !!(g.settings && g.settings.kids), t0: S.t0, called: S.called, strayed: S.strayed, encounters: Fo.stats ? Fo.stats.encounters : 0, site: S.called ? null : nearestSite(g) };
+    const st = { adv: true, guest: !!(g.meta && g.meta.guest), enc: Fo.enc ? Fo.enc() : 'off', kids: !!(g.settings && g.settings.kids), t0: S.t0, called: S.called, strayed: S.strayed, encounters: Fo.stats ? Fo.stats.encounters : 0, site: S.called ? null : nearestSite(g), scan: true, foeNear: !!(VR.Funke && VR.Funke.foeOf && VR.Funke.foeOf(g)), scanT: S.scanT };   // (a-session: foeNear, scanT)
     const list = RA.offers(st, g.time || 0); if (!list.length) return null;
-    return list.map(o => Object.assign({ source: 'regie', place: '', eta: 0, start: () => (o.act === 'call' ? call(g, S) : stray(g, S)) }, o));
+    return list.map(o => Object.assign({ source: 'regie', place: '', eta: 0, start: () => (o.act === 'call' ? call(g, S) : o.act === 'scan' ? scan(g, S) : stray(g, S)) }, o));
   };
   if (VR.Regie && VR.Regie.addSource) VR.Regie.addSource(RA.source);
   void game;

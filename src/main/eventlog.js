@@ -264,6 +264,9 @@
     S.mv = mv;
   }
   // the known landmarks: the Heartland's (gen_heart.js, gen_vista.js landmarks: id, x, z, base, top, r) and any added
+  // a-session: landmark sources — fn(g) → [{id, x, z, base, top, r}] (an iterable; read at the 1-Hz sample)
+  const LMSRC = [];
+  L.addLandmarks = (fn) => { if (typeof fn === 'function' && LMSRC.indexOf(fn) < 0) LMSRC.push(fn); };
   const HEART_LM = [['temple', 0, -15, 80, 167, 52], ['citadel', -420, 380, 112, 249, 30], ['isles', 330, 140, 130, 175, 110], ['nova', 0, -140, 80, 100, 95], ['station', -380, -150, 150, 230, 30], ['hills', 0, -322, 90, 125, 150]];
   L.HEART_LM = HEART_LM;
   let lmBest = '', lmSize = 0;
@@ -281,6 +284,7 @@
     const m = g.meta, heart = !!(m && (m.vgen | 0) >= 3 && m.type !== 'flat') && (g.dim || 'overworld') === 'overworld';
     if (heart) for (const q of HEART_LM) oneLandmark(g, B, q[0], q[1], q[2], q[3], q[4], q[5]);
     if (L.landmarks) for (const q of L.landmarks) if (q) oneLandmark(g, B, q.id, q.x, q.z, q.base, q.top, q.r || 4);
+    for (let i = 0; i < LMSRC.length; i++) { let list = null; try { list = LMSRC[i](g); } catch (e) { list = null; } if (list) for (const q of list) if (q) oneLandmark(g, B, q.id, q.x, q.z, q.base, q.top, q.r || 4); }   // a-session: the landmarks a sibling adds (the Abenteuer's outposts)
     return lmBest;
   }
   function bodyInView(g, B, d, ang) {

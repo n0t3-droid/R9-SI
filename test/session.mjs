@@ -239,8 +239,14 @@ function pageHelpers(win, VRx) {
     const M = S.mode, In = VR.Intent; release(I);
     if (!In || !In.start) { S.done = true; return; }
     if (!M.started) {
-      const q = (In.targets || []).find(t => t.id === M.target);
-      if (!q) { if (S.t > 6) { S.log.push(['intent', 'no target', M.target]); S.done = true; } return; }
+      // (a-session: M.prefix — the first target whose id starts so; M.pick — the nearest of a kind beyond 40 m)
+      if (!M.q || S.t - (M.qT || 0) > 1) {
+        const P = p.pos, dd = (t) => Math.hypot(t.pos[0] - P[0], t.pos[2] - P[2]), T0 = In.targets || [];
+        M.q = M.prefix ? T0.find(t => String(t.id).startsWith(M.prefix)) : M.pick ? T0.filter(t => t.kind === M.pick && dd(t) > 40).sort((a, b) => dd(a) - dd(b))[0] : T0.find(t => t.id === M.target); M.qT = S.t;
+        if (M.q && (M.prefix || M.pick)) M.target = M.q.id;
+      }
+      const q = M.q;
+      if (!q) { if (S.t > 6) { S.log.push(['intent', 'no target', M.target || M.prefix || M.pick]); S.done = true; } return; }
       const e = p.eyePos(), dx = q.pos[0] - e[0], dy = q.pos[1] - e[1], dz = q.pos[2] - e[2];
       p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
       if (M.aimT === undefined) M.aimT = S.t;
@@ -249,7 +255,7 @@ function pageHelpers(win, VRx) {
       if (M.released) {
         const c = In.current && In.current();
         if (c) { M.started = S.t; S.log.push(['intent', M.target, c.means, +(+g.time).toFixed(1)]); }
-        else if (S.t - M.pressT > 2) { S.log.push(['intent', 'not started', M.target, VR.Ctx && VR.Ctx.current() ? VR.Ctx.current().id : '?']); S.done = true; }
+        else if (S.t - M.pressT > 2) { S.log.push(['intent', 'not started', M.target, VR.Ctx && VR.Ctx.current() ? VR.Ctx.current().id : '?']); if (M.direct && !M.tried) { M.tried = true; const ok = In.start(g, q); S.log.push(['fallback', 'Intent.start ' + M.target, ok]); if (ok) M.started = S.t; else S.done = true; } else S.done = true; }   // (a-session: direct — the trip started by hand when the key did not take, logged)
       }
       return;
     }
@@ -373,7 +379,7 @@ function pageHelpers(win, VRx) {
     if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
       const P = p.pos, near = (m) => Math.hypot(m.pos[0] - P[0], m.pos[2] - P[2]), pref = (m) => near(m) + (m.foe.k === 'crane' ? 60 : 0) + (A.fought < 1 && m.foe.k === 'driller' ? -12 : 0);
-      A.tg = active.slice().sort((x, y) => pref(x) - pref(y))[0]; A.tgT = A.t; A.vTry = 0;
+      A.tg = active.slice().sort((x, y) => pref(x) - pref(y))[0]; A.tgT = A.t; A.vTry = 0; A.tout = 0;
       A.ph = A.fought < 1 && A.tg.foe.k !== 'crane' ? 'fight' : 'calmgo';
     }
     const m = A.tg, K = Fo.KINDS[m.foe.k], c = [m.pos[0], m.pos[1] + K.h * 0.55, m.pos[2]], d = Math.hypot(m.pos[0] - p.pos[0], m.pos[2] - p.pos[2]);
@@ -392,11 +398,11 @@ function pageHelpers(win, VRx) {
       if (A.hitAsk > 40 && A.hits === 0) { fall('melee never lands'); Fo.hurtMob ? En.hurtMob(m, 4, p.pos) : 0; A.hitAsk = 0; }
       return;
     }
-    // calm: close, face it, [V]; the ring did not start → the direct call (logged)
-    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? 4.5 : 3.0)) { aim(p, c, dt, 0); return; }
+    // calm: close, face it, [V]; the ring did not start → the direct call (logged); a Kranarm on its tower from its foot
+    if (A.t - A.tgT > 12) { A.tgT = A.t; A.tout = (A.tout | 0) + 1; if (A.tout >= 2) { fall('powerdown direct ' + m.foe.k); En.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 2, m.pos[1] + 0.6, m.pos[2] + Math.cos(m.yaw) * 2]); A.tout = 0; } else { fall('calm direct ' + m.foe.k); L.calmBegin(g, m); } return; }
+    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? 5.5 : 3.0) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
     aim(p, c, dt, 5);
     if (A.vTry === 0 || (S.t - A.vTry > 1.4)) { if (A.vTry && !L.calmSt) { fall('calmBegin'); L.calmBegin(g, m); } tapV(); A.vTry = S.t; }
-    if (A.t - A.tgT > 25) { fall('calm timeout ' + m.foe.k); A.tg = null; }
   }
   S.control = function (dt) {
     const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
@@ -838,10 +844,12 @@ try {
     await ev(() => { window.__S.acceptStory = true; });
     recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the minimap 4 s after the start: luma sd ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
       { name: 'arrive', de: 'Ankunft: umsehen', mode: { kind: 'look', sec: 8, speed: 0.12 }, max: 8 },
-      { name: 'to_outpost', de: 'Funkes Weg: zum Außenposten', mode: { kind: 'walk', toSite: 30 }, max: 150 },
+      { name: 'to_outpost', de: 'Funkes Weg: [V] zum Außenposten', mode: { kind: 'intent', prefix: 'out:', direct: true }, max: 120 },
+      { name: 'to_outpost2', de: 'Zu Fuß: die letzten Meter', mode: { kind: 'walk', toSite: 26 }, max: 60 },
       { name: 'outpost', de: 'Am Außenposten: kämpfen, beruhigen, Lichtleiter', mode: { kind: 'outpost' }, max: 150 },
       { name: 'after', de: 'Befreit: umsehen', mode: { kind: 'look', sec: 15, speed: 0.3 }, max: 15 },
-      { name: 'onward', de: 'Weiter: zum nächsten Dorf', mode: { kind: 'walk', toVillage: 12 }, max: DUR },
+      { name: 'onward', de: 'Weiter: [V] zum nächsten Dorf', mode: { kind: 'intent', pick: 'village', direct: true }, max: DUR },
+      { name: 'onward2', de: 'Zu Fuß weiter', mode: { kind: 'walk', toVillage: 12 }, max: DUR },
     ]);
     await ev(() => { window.__S.acceptStory = false; });
     const R = recs.adventurer, st = R && R.metrics ? R.metrics : null;
