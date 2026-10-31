@@ -261,6 +261,19 @@
     if (!isPave(get(X, Y - 1, Z)) || solid(get(X, Y, Z)) || solid(get(X, Y + 1, Z))) return null;
     return [x, y, z];
   };
+  // f-polish4: the step back onto open ground — k blocks back (the first of steps that works): the ground under each cell
+  // on the way back isGround and at the feet's level, the body's two cells free; pure (test/polish4.js b)
+  F.OPEN_STEPS = [2, 1];
+  F.stepBackOpen = function (feet, u, get, isGround, solid, steps) {
+    if (!feet || !u) return null;
+    const y = feet[1], Y = Math.floor(y + 0.01);
+    for (const k of steps || F.OPEN_STEPS) {
+      let ok = true;
+      for (let j = 1; j <= k && ok; j++) { const X = Math.floor(feet[0] - u[0] * j), Z = Math.floor(feet[2] - u[1] * j); ok = isGround(get(X, Y - 1, Z)) && !solid(get(X, Y, Z)) && !solid(get(X, Y + 1, Z)); }
+      if (ok) return [feet[0] - u[0] * k, y, feet[2] - u[1] * k];
+    }
+    return null;
+  };
   // (once, on a vista start's own first arrival, the feet still on the spawn: from the loading screen's last moments
   //  (First.holdLoading, the world there, the screen still the loading screen), else under the arrival's white (settle))
   F.vistaBack = function (g, v0) {
@@ -278,6 +291,11 @@
     const nmOf = (b) => (b ? (R.types[R.T.type[b]] || {}).name || '' : ''), under = w.getBlock(Math.floor(p.pos[0]), Math.floor(p.pos[1] + 0.01) - 1, Math.floor(p.pos[2]));
     const own = under && (T[under] & S) && !F.LAND_RE.test(nmOf(under)) ? under : 0;
     const r = F.stepBack(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), (b) => !!b && (b === own || F.PAVE_RE.test(nmOf(b))), (b) => !!(T[b] & S));
+    // (f-polish4: the browser showed the walk's first cell under the feet and the meadow behind — the start never moved;
+    // now it steps back onto the land's own plain ground too, two blocks where both are free, else one)
+    const isGround = (b) => !!b && (b === own || F.PAVE_RE.test(nmOf(b)) || F.LAND_RE.test(nmOf(b)));
+    const r2 = r || F.stepBackOpen(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), isGround, (b) => !!(T[b] & S), F.OPEN_STEPS);
+    if (!r && r2) { p.teleport(r2[0], r2[1], r2[2]); p.spawn = r2.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r2.slice(); F.backed = r2; F.backWhy = 'back:ground'; return r2; }
     if (!r) { const b = w.getBlock(bx, Math.floor(p.pos[1] + 0.01) - 1, bz); F.backWhy = 'stays:' + (b ? (R.types[R.T.type[b]] || {}).name : 'air'); return null; }
     F.backWhy = 'back';
     p.teleport(r[0], r[1], r[2]); p.spawn = r.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r.slice();

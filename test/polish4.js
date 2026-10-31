@@ -52,7 +52,16 @@ if (part('b')) {
   const bricks = sid(/^bricks$/), grass = sid(/^grass_block$/);
   const try2 = (under) => { const w2 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? under : 0) }, p2 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } }; return F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p2, world: w2 }); };
   check(bricks && try2(bricks) && F.backWhy === 'back', 'a walk of bricks (the feet\'s own paving behind): one block back');
-  check(grass && try2(grass) === null && /^stays:grass/.test(F.backWhy), 'grass under the feet and behind: stays (' + F.backWhy + ')');
+  // the browser's case: the walk's first cell (a dirt path) under the feet, the meadow behind → two blocks back onto it
+  const path = sid(/^dirt_path$/);
+  const w3 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? (z === 20 ? path : grass) : y === 71 && z === 17 ? grass : 0) }, p3 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
+  const r3 = F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p3, world: w3 });
+  check(r3 && Math.abs(p3.pos[2] - 18.5) < 1e-9 && F.backWhy === 'back:ground', 'the meadow behind the walk\'s first cell: two blocks back onto it (' + JSON.stringify(r3) + ', ' + F.backWhy + ')');
+  const w4 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 ? (z === 20 ? path : grass) : y === 71 && z === 18 ? grass : 0) }, p4 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
+  F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p4, world: w4 });
+  check(Math.abs(p4.pos[2] - 19.5) < 1e-9, 'a block where the second step\'s body would stand: one block back (' + p4.pos[2] + ')');
+  const w5 = { isLoaded: () => true, getBlock: (x, y, z) => (y === 70 && z === 20 ? path : 0) }, p5 = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
+  check(F.vistaBack({ meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p5, world: w5 }) === null && p5.pos[2] === 20.5, 'a drop behind (no ground): stays (' + F.backWhy + ')');
 }
 if (part('c')) {
   console.log('c · the citadel\'s beam only on the Heartland (the station café\'s white orbs)');
