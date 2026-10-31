@@ -598,10 +598,10 @@
           for (let y = F + 1; y <= hi; y++) blocks[(y << 8) | c] = 0;
           for (let y = gy + 1; y < F; y++) blocks[(y << 8) | c] = D.fill;
           // the floor: two tones in blotches, beds of the species' plants in a quarter of the 4 × 4 cells
-          const bed = !box && vn(x, z, this.s ^ 0x6b1, 5) > 0.66;
+          const bed = !box && vn(x, z, this.s ^ 0x6b1, 5) > 0.68;
           blocks[(F << 8) | c] = bed ? D.bed : D.floor[vn(x, z, this.s ^ 0x6b2, 4) > 0.66 ? 1 : 0];
           const hp = h01(x, z, this.s ^ 0x6b3);
-          if (!box && (bed ? hp < 0.55 : hp < 0.04)) blocks[((F + 1) << 8) | c] = D.plants[Math.floor(h01(x, z, this.s ^ 0x6b4) * D.plants.length)];
+          if (!box && (bed ? hp < 0.28 : hp < 0.01)) blocks[((F + 1) << 8) | c] = D.plants[Math.floor(h01(x, z, this.s ^ 0x6b4) * D.plants.length)];
           tops[c] = -1;
         } else {
           // the ring: the floor eased back to the world's ground (smoothstep), the world's own top kept
