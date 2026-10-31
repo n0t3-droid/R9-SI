@@ -83,6 +83,24 @@ const f3Probe = () => ev(() => {
 // the spawn's view: the nearest block in the centre third of the frame (Travel.facing at the eye's own yaw and pitch)
 const viewClear = () => ev(() => { const g = VR.game, c = g.cam, p = g.player, TR = VR.Travel; if (!TR || !TR.facing) return -1; const f = TR.facing((x, y, z) => g.world.getBlock(x, y, z), [c.x, c.y, c.z], [], { yaw0: c.yaw, pitch0: c.pitch, feet: p.pos[1], keep0: true, n: 1, want: 1e9, fov: (c.fov > 4 ? c.fov : c.fov * 180 / Math.PI) || 75 }); return +f.clear.toFixed(2); }).catch(() => -1);
 OUT.f3 = {};
+// f-first4 (docs/superpowers/plans/2026-10-31-f-first4.md — v0.54.9's critic_ux pictures had no citadel, no isles at 60 s): the
+// vista's landmark (its aim point, captured while the world loads) — is a drawn horizon tile or a loaded chunk column holding
+// it, where it stands on the screen, the horizon's coarse ring, frames, the player's place and look
+const lmProbe = () => ev(() => {
+  const g = VR.game, hz = g.horizon, c = g.cam, p = g.player, A = window.__aim;
+  const o = { pos: p.pos.map(v => +v.toFixed(1)), yaw: +c.yaw.toFixed(3), pitch: +c.pitch.toFixed(3), frame: g.frame, cols: g.world && g.world.cols ? g.world.cols.size : -1 };
+  if (hz) { const s = hz.stats; o.hz = { r: hz.radius, coarse: +(s.coarse || 0).toFixed(2), tiles: s.tiles, drawn: s.drawn, want: s.want }; }
+  if (A) {
+    o.lm = A.lm; let inHz = false; for (const t of hz ? hz.drawList : []) { const S = 32 * (4 << t.L); if (A.aim[0] >= t.tx * S && A.aim[0] < (t.tx + 1) * S && A.aim[2] >= t.tz * S && A.aim[2] < (t.tz + 1) * S) { inHz = true; break; } }
+    o.lmHz = inHz; o.lmCol = !!(g.world && g.world.cols && g.world.cols.get(VR.ckey(Math.floor(A.aim[0] / 16), Math.floor(A.aim[2] / 16)))); o.lmD = Math.round(Math.hypot(A.aim[0] - c.x, A.aim[2] - c.z));
+    const cp = Math.cos(c.pitch), f = [-Math.sin(c.yaw) * cp, Math.sin(c.pitch), -Math.cos(c.yaw) * cp], r = [Math.cos(c.yaw), 0, -Math.sin(c.yaw)], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const dx = A.aim[0] - c.x, dy = A.aim[1] - c.y, dz = A.aim[2] - c.z, ah = dx * f[0] + dy * f[1] + dz * f[2], fov = c.fov > 4 ? c.fov * Math.PI / 180 : (c.fov || 75 * Math.PI / 180), t = Math.tan(fov / 2);
+    o.lmScr = ah > 0 ? [+((dx * r[0] + dz * r[2]) / ah / t / (innerWidth / innerHeight)).toFixed(2), +((dx * u[0] + dy * u[1] + dz * u[2]) / ah / t).toFixed(2)] : null;
+    o.lmOn = !!(o.lmScr && Math.abs(o.lmScr[0]) < 1 && Math.abs(o.lmScr[1]) < 1); o.lmDrawn = o.lmHz || o.lmCol;
+  }
+  return o;
+}).catch((e) => ({ err: String(e).slice(0, 120) }));
+OUT.f4 = {};
 const untilState = async (st, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const s = await ev(() => VR.game && VR.game.state).catch(() => null); if (s === st) return Date.now() - t; await wait(400); } return -1; };
 // a player's click: the real one first; if Playwright cannot (covered, moving), what lies on top is logged and the click forced
 const click = async (sel, what) => { try { await page.click(sel, { timeout: 6000 }); return 'real'; } catch (e) {
@@ -112,6 +130,7 @@ OUT.createFields = await ev(() => [...document.querySelectorAll('#create input, 
 console.log('  create: ' + JSON.stringify(OUT.createFields).slice(0, 900));
 await ev(() => { const s = document.getElementById('cw_seed'); if (s) { s.value = '4242'; s.dispatchEvent(new Event('input')); } }).catch(() => {});
 const tc = Date.now();
+await ev(() => { window.__aimIv = setInterval(() => { const g = VR.game, v = g && ((g.arrival && g.arrival.v) || (g.arrivalPending && g.arrivalPending.vista)); if (v && v.aim) { window.__aim = { lm: v.lm, aim: v.aim.slice(), id: v.id }; clearInterval(window.__aimIv); } }, 100); }).catch(() => {});   // (f-first4: the landmark's aim)
 OUT.create = await click('#create .btn.primary', 'create');
 if (await ev(() => VR.game.state) === 'title' && await ev(() => VR.game.ui.screen) !== 'create') { console.log('  (still on the title: ▶ Losspielen)'); await click('#title .tile[data-tile="play"]', 'play'); }
 await wait(2500); await shot('03_loading');
@@ -155,6 +174,7 @@ await wait(1500); await shot('04_t0');
   check(arr >= 0 && (arr <= 9000 || pf <= 9000), 'the arrival is over in ' + arr + ' ms (≤ 9 s, or on the first frame after 9 s: the frame before at ' + pf + ' ms; no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
 OUT.f3.t15 = { blob: await pixProbe('05_t15'), view3: await viewClear(), pos: await ev(() => VR.game.player.pos.map(v => +v.toFixed(1))).catch(() => null), ...(await f3Probe()) };
+OUT.f4.t15 = await lmProbe(); console.log('  f4 15 s: ' + JSON.stringify(OUT.f4.t15));
 console.log('  f3 15 s: ' + JSON.stringify(OUT.f3.t15));
 check(OUT.f3.t15.blob && !(OUT.f3.t15.blob.share > 0.3), 'R55-03: at 15 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t15.blob) + ' ≤ 0.3 %)');
 check(OUT.f3.t15.view3 >= 3, 'R55-12: at 15 s no block within 3 m in the view\'s centre third (' + OUT.f3.t15.view3 + ' m)');
@@ -183,6 +203,8 @@ check(OUT.f3.t25.funkeD >= 2 && (OUT.f3.t25.funkeHidden || (OUT.f3.t25.funkeBox 
 await page.mouse.move(640, 360); await page.mouse.move(900, 330, { steps: 10 }); await wait(15000); await shot('07_t45');
 await wait(15000); await shot('08_t60');
 OUT.f3.t60 = { blob: await pixProbe('08_t60'), ...(await f3Probe()) };
+OUT.f4.t60 = await lmProbe(); console.log('  f4 60 s: ' + JSON.stringify(OUT.f4.t60));
+check(OUT.f4.t60.lmDrawn && (OUT.f4.t60.lmOn || Math.abs(OUT.f4.t60.yaw - (OUT.f4.t15.yaw || 0)) > 0.6), 'f-first4: at 60 s the landmark (' + OUT.f4.t60.lm + ', ' + OUT.f4.t60.lmD + ' m) drawn (horizon ' + OUT.f4.t60.lmHz + ', chunks ' + OUT.f4.t60.lmCol + ') and on the screen ' + JSON.stringify(OUT.f4.t60.lmScr) + ' (or the player turned away)');
 console.log('  f3 60 s: ' + JSON.stringify(OUT.f3.t60));
 check(OUT.f3.t60.blob && !(OUT.f3.t60.blob.share > 0.3), 'R55-03: at 60 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t60.blob) + ')');
 check(OUT.f3.t60.funkeD >= 2 && (OUT.f3.t60.funkeHidden || (OUT.f3.t60.funkeBox <= 2 && !OUT.f3.t60.funkeCentre)), 'R55-04: at 60 s Funke ' + OUT.f3.t60.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t60.funkeBox + ' % (≤ 2), not in the centre third');
@@ -211,10 +233,12 @@ for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
   //  W (≥ 3 s, then on to 3 m or 15 frames: holdWalk) a sample, small alternating looks so the way keeps a heading, a jump after each)
   for (let i = 0; i < WALK_HOLDS; i++) { await holdWalk(); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
+  OUT.f4[name] = await lmProbe(); console.log('  f4 ' + name + ': ' + JSON.stringify(OUT.f4[name]));
   if (name === '08b_t120') { OUT.f3.t120 = { blob: await pixProbe(name), ...(await f3Probe()) }; console.log('  f3 120 s: ' + JSON.stringify(OUT.f3.t120)); check(OUT.f3.t120.blob && !(OUT.f3.t120.blob.share > 0.3), 'R55-03: at 120 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t120.blob) + ')'); }
   else { OUT.f3.t180 = { blob: await pixProbe(name), hand: await pixProbe(name, [840, 560, 990, 700]), ...(await f3Probe()) }; console.log('  f3 180 s: ' + JSON.stringify(OUT.f3.t180)); check(OUT.f3.t180.hand && OUT.f3.t180.hand.sat <= 0.6, 'R55-13: at 180 s the held block\'s mean saturation ' + (OUT.f3.t180.hand && OUT.f3.t180.hand.sat) + ' ≤ 0.6'); }
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
+if (process.env.CRIT_FIRST) { fs.writeFileSync(SHOTS + 'critic_ux' + (TAG ? '_' + TAG.slice(0, -1) : '') + '.json', JSON.stringify(OUT, null, 1)); await browser.close(); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); process.exit(fails ? 1 : 0); }   // (f-first4: the first three minutes only)
 OUT.hand180 = await handProbe();
 check(OUT.hand180 && (!OUT.hand180.block || OUT.hand180.cover <= 0.03), 'at 180 s the held block covers ≤ 3 %: ' + JSON.stringify(OUT.hand180));
 { const last = OUT.hints3[OUT.hints3.length - 1], sp = await ev(() => VR.game.player.spawn).catch(() => null); OUT.away180 = last && last.pos && sp ? Math.round(Math.hypot(last.pos[0] - sp[0], last.pos[2] - sp[2])) : -1;
