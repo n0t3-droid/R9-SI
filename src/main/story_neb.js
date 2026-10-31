@@ -106,6 +106,7 @@ uniform vec3 u_col2;   // the body's colour (dust)
 uniform vec4 u_p;      // x alpha, y kind (3 pillar · 4 cloud · 5 Flimmi · 6 a soft glow · 7 a shaft), z seed, w time
 uniform vec2 u_ld;     // toward the light, in the quad's own axes
 uniform float u_face;  // Flimmi's face (0…1) and its blink
+uniform float u_q;     // quality 0…2 (Very Low: no third look at a pillar's shape)
 out vec4 o;
 float h2(vec2 p) { p = fract(p * vec2(0.1031, 0.1030)); p += dot(p, p.yx + 33.33); return fract((p.x + p.y) * p.x); }
 float vn2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -137,7 +138,7 @@ void main() {
     float s = pl ? pillar(v_c, sd) : cloud(v_c, sd);
     if (s < 0.004) discard;
     float s2 = pl ? pillar(v_c + u_ld * 0.022, sd) : cloud(v_c + u_ld * 0.04, sd);
-    float s3 = pl ? pillar(v_c + u_ld * 0.09, sd) : s2;
+    float s3 = (pl && u_q > 0.5) ? pillar(v_c + u_ld * 0.09, sd) : s2;
     float rim = s * (1.0 - s2) * (pl ? 0.15 + 0.85 * smoothstep(-0.2, 0.7, v_c.y) : 0.05);
     float glow = pl ? s * (1.0 - s3) * (0.1 + 0.5 * smoothstep(-0.3, 0.8, v_c.y)) : 0.0;   // (the lit flank's soft inner glow)
     vec3 body = u_col2 * (0.6 + 0.8 * vn2(v_c * 7.0 + sd)) + u_col * (0.04 * smoothstep(0.0, 1.0, dot(v_c, u_ld)) + 0.16 * glow);
@@ -283,7 +284,7 @@ void main() {
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); n++; }
     // the layers
     const L = SN.layers(o.e, o.y0, o.F0, o.t, o.id, o.q), u = LP.u, rel = [0, 0, 0], G = VR.StoryGlow;
-    gl.useProgram(LP.p); gl.uniformMatrix4fv(u.u_vp, false, r.viewProj);
+    gl.useProgram(LP.p); gl.uniformMatrix4fv(u.u_vp, false, r.viewProj); if (u.u_q) gl.uniform1f(u.u_q, o.q);
     for (const q of L) {
       if (!(q.a > 0.002)) continue;
       rel[0] = q.p[0] - cam.x; rel[1] = q.p[1] - cam.y; rel[2] = q.p[2] - cam.z;
