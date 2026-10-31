@@ -101,6 +101,18 @@ const rec = { dist: DIST, base: DIST_BASE, rounds: ROUNDS, load: os.loadavg().ma
 const save = () => fs.writeFileSync(ROOT + '.tmp_tests/f_slim.json', JSON.stringify(rec, null, 1));
 // DIST_BASE: one url, or tag=url,tag=url
 const pages = [['cur', DIST]].concat(DIST_BASE ? DIST_BASE.split(',').map((u, i) => /^\w+=/.test(u) ? [u.split('=')[0], u.slice(u.indexOf('=') + 1)] : ['base' + (i || ''), u]) : []);
+// the cold caches (the GPU's shader cache, the script's compile) on a fresh browser's first page alone: every page's
+// title once on Very Low first (WARM=0: not)
+if (process.env.WARM !== '0') for (const [, url] of pages) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' }), page = await ctx.newPage();
+  try {
+    await page.goto(url);
+    for (let i = 0; i < 160; i++) { await page.waitForTimeout(500); if (await page.evaluate(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
+    await page.evaluate(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); }).catch(() => 0);
+    await page.waitForTimeout(3000);
+  } catch (e) { console.log('  (warm-up: ' + e.message.slice(0, 80) + ')'); }
+  await ctx.close();
+}
 for (let r = 0; r < ROUNDS; r++) {
   const order = pages.map((_, i) => pages[(i + r) % pages.length]);
   for (const [tag, url] of order) {

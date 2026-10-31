@@ -201,6 +201,20 @@ async function prepare(P) {
 }
 
 // ---------------------------------------------------------------- run
+// (f-slim, R55-06: the first page in a fresh browser pays the cold caches — the GPU's shader cache, the script's
+// compile — on this build's load alone: in f_slim.mjs's runs the first page's preset switch took 14 s against 2–4 s.
+// Each build's title once on Very Low first, closed again, so the two loads compare like with like; WARM=0: as before)
+if (process.env.WARM !== '0') for (const u of [DIST_PREV, DIST]) {
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, locale: 'de-DE' }), page = await ctx.newPage();
+  try {
+    await page.goto(u);
+    for (let i = 0; i < 160; i++) { await page.waitForTimeout(500); if (await page.evaluate(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
+    await page.evaluate(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); }).catch(() => 0);
+    await page.waitForTimeout(3000);
+  } catch (e) { console.log('  (warm-up: ' + e.message.slice(0, 80) + ')'); }
+  await ctx.close();
+}
+console.log(`warmed (${secs()})`);
 const A = await openWorld(DIST, 'cur');
 console.log(`this build: ${A.ok ? 'play' : 'NOT play'} after ${r1(A.loadS)} s ${JSON.stringify(A.info)} (${secs()})`);
 const B = await openWorld(DIST_PREV, 'prev');
