@@ -29,6 +29,7 @@ if (FK && FK.keepClear) {
   // a place already clear stays where it is
   const far = place(0.4, 3, 2.5, 0), kept = FK.keepClear(eye, 0.4, far.slice(), 1);
   check(Math.hypot(kept[0] - far[0], kept[1] - far[1], kept[2] - far[2]) < 1e-9, 'a place 3.9 m away beside the view stays');
+  check(FK.inAim(0, 0, 0, 0, -1.5) && FK.inAim(0, 0.3, 0.2, 0.4, -1.5) && !FK.inAim(0, 0, 1.2, 0, -1.5) && !FK.inAim(0, 0, 0, 0, 1.5) && !FK.inAim(0, 0, 0, 0, -3), 'the drawn place: in the aim nearer than 2.25 m not drawn; beside, behind or beyond: drawn');
   const share = FK.screenShare(2.5, 0.64, 75, 16 / 9);
   check(share <= 0.02, `his 64 cm (the rotors' span) at 2.5 m: ${(share * 100).toFixed(2)} % of the frame (≤ 2 %; at 0.86 m it was ${(FK.screenShare(0.86, 0.64, 75, 16 / 9) * 100).toFixed(1)} %)`);
 }

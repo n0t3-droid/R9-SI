@@ -55,7 +55,7 @@
   // centre third of a 16:9 frame at 70° is |across / ahead| < 0.415), so never between the eye and the aim point; the
   // drone's 35 cm at 2.5 m is ≈ 0.6 % of the frame. eye [x, y, z], yaw, A the place (changed in place), side ±1 (the
   // shoulder when it stands dead ahead). Pure: test/first3.js
-  F.CLEAR_D = 2.5; F.CLEAR_K = 0.5;
+  F.CLEAR_D = 2.5; F.CLEAR_K = 0.6;
   F.keepClear = function (eye, yaw, A, side) {
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const dx = A[0] - eye[0], dy = A[1] - eye[1], dz = A[2] - eye[2];
@@ -66,6 +66,14 @@
     if (L < F.CLEAR_D) { const k = F.CLEAR_D / L; ah *= k; ac *= k; up *= k; if (up > 1.2) { const h = Math.sqrt(Math.max(0, F.CLEAR_D * F.CLEAR_D - 1.44)), hl = Math.hypot(ah, ac) || 1; up = 1.2; ah = ah / hl * h; ac = ac / hl * h; if (Math.hypot(ah, ac) < 1e-3) ac = h * (side || 1); } }
     A[0] = eye[0] + fx * ah + rx * ac; A[1] = eye[1] + up; A[2] = eye[2] + fz * ah + rz * ac;
     return A;
+  };
+  // (the drawn place: the spring lags behind its place — when it trails into the view's centre third nearer than CLEAR_D, it
+  //  is not drawn there; pitch-aware: the third is ±0.256 of the forward distance up and down, ±0.415 across at 16:9 75°)
+  F.inAim = function (yaw, pitch, dx, dy, dz) {
+    const cp = Math.cos(pitch || 0), sp = Math.sin(pitch || 0), fx = -Math.sin(yaw) * cp, fy = sp, fz = -Math.cos(yaw) * cp, rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    const ah = dx * fx + dy * fy + dz * fz; if (ah <= 0 || dx * dx + dy * dy + dz * dz >= F.CLEAR_D * F.CLEAR_D * 0.81) return false;
+    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, ac = Math.abs(dx * rx + dz * rz), up = Math.abs(dx * ux + dy * uy + dz * uz);
+    return ac < 0.415 * ah && up < 0.256 * ah;
   };
   // the share of a 16:9 frame (vertical fov in degrees) a ball of size m covers at d m (its square box)
   F.screenShare = (d, size, fov, aspect) => { const t = Math.tan((fov || 70) * Math.PI / 360), h = size / (2 * d * t), w = h / (aspect || 16 / 9); return h * w; };
@@ -1013,6 +1021,7 @@ void main() {
       const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.32 * OPTS.scale / F.SCALE;   // (the rotors' reach; run 1's 0.5 drew it beside the first-person eye, out of the view)
       if (!m4.boxInFrustum(r.planes, dx - R0, dy - R0, dz - R0, dx + R0, dy + R0, dz + R0)) return;   // not seen: nothing at all
       if (!OPTS.baseMat && F.camNear(dx, dy, dz)) return;   // (f-hud: in the face — the spring caught up with the eye)
+      if (!OPTS.baseMat && (this.g.camMode | 0) === 0 && !(this.g.photoCam && this.g.photoCam.on) && F.inAim(cam.yaw, cam.pitch, dx, dy, dz)) return;   // (f-first3: the spring lagged into the aim — not drawn there)
       const prog = ent.beginVox(r, E);
       if (prog.u.u_clipNear) gl.uniform1f(prog.u.u_clipNear, 0);
       POSE.rotor_l[1] = this.spin; POSE.rotor_r[1] = -this.spin;

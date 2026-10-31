@@ -76,7 +76,7 @@ const f3Probe = () => ev(() => {
     const ah = dx * f[0] + dy * f[1] + dz * f[2], fov = c.fov > 4 ? c.fov * Math.PI / 180 : (c.fov || 75 * Math.PI / 180), t = Math.tan(fov / 2), A = innerWidth / innerHeight;
     const sx = ah > 0 ? (dx * r[0] + dz * r[2]) / ah / (t * A) : 9, sy = ah > 0 ? Math.abs(dx * u[0] + dy * u[1] + dz * u[2]) / ah / t : 9;
     const inFrame = ah > 0 && Math.abs(sx) < 1.1 && sy < 1.1;
-    o.funkeD = +d.toFixed(2); o.funkeX = +sx.toFixed(2); o.funkeBox = inFrame && FK && FK.screenShare ? +(FK.screenShare(d, 0.64, fov * 180 / Math.PI, A) * 100).toFixed(2) : 0; o.funkeCentre = inFrame && Math.abs(sx) < 1 / 3 && sy < 1 / 3;
+    o.funkeD = +d.toFixed(2); o.funkeX = +sx.toFixed(2); o.funkeBox = inFrame && FK && FK.screenShare ? +(FK.screenShare(d, 0.64, fov * 180 / Math.PI, A) * 100).toFixed(2) : 0; o.funkeCentre = inFrame && Math.abs(sx) < 1 / 3 && sy < 1 / 3; o.funkeHidden = !!(FK && FK.inAim && (g.camMode | 0) === 0 && FK.inAim(c.yaw, c.pitch, dx, dy, dz));   // (f-first3: the lagging spring in the aim is not drawn)
   }
   return o;
 }).catch((e) => ({ err: String(e).slice(0, 120) }));
@@ -176,7 +176,7 @@ check(OUT.walkedW1 >= 0.5, 'W moves the player within its first second: ' + OUT.
 const pW = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 await holdFor('KeyS', 3000, 3); await shot('06_t25_walk');
 OUT.f3.t25 = await f3Probe(); console.log('  f3 25 s: ' + JSON.stringify(OUT.f3.t25));
-check(OUT.f3.t25.funkeD >= 2 && OUT.f3.t25.funkeBox <= 2 && !OUT.f3.t25.funkeCentre, 'R55-04: at 25 s Funke ' + OUT.f3.t25.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t25.funkeBox + ' % (≤ 2), not in the centre third');
+check(OUT.f3.t25.funkeD >= 2 && (OUT.f3.t25.funkeHidden || (OUT.f3.t25.funkeBox <= 2 && !OUT.f3.t25.funkeCentre)), 'R55-04: at 25 s Funke ' + OUT.f3.t25.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t25.funkeBox + ' % (≤ 2), not in the centre third — or not drawn there' + (OUT.f3.t25.funkeHidden ? ' (hidden)' : ''));
 { const p1 = await ev(() => VR.game.player.pos.slice()).catch(() => null); const dW = p0 && pW ? Math.hypot(pW[0] - p0[0], pW[2] - p0[2]) : -1, dS = pW && p1 ? Math.hypot(p1[0] - pW[0], p1[2] - pW[2]) : -1;
   OUT.walked = +Math.max(dW, dS).toFixed(2); OUT.walkedW = +dW.toFixed(2); OUT.walkedS = +dS.toFixed(2);
   check(OUT.walked >= 2, 'W held 4 s, then S 3 s, right after: W ' + OUT.walkedW + ' m · S ' + OUT.walkedS + ' m (≥ 2 by one of them)'); }
@@ -185,7 +185,7 @@ await wait(15000); await shot('08_t60');
 OUT.f3.t60 = { blob: await pixProbe('08_t60'), ...(await f3Probe()) };
 console.log('  f3 60 s: ' + JSON.stringify(OUT.f3.t60));
 check(OUT.f3.t60.blob && !(OUT.f3.t60.blob.share > 0.3), 'R55-03: at 60 s no dark blob over the horizon (' + JSON.stringify(OUT.f3.t60.blob) + ')');
-check(OUT.f3.t60.funkeD >= 2 && OUT.f3.t60.funkeBox <= 2 && !OUT.f3.t60.funkeCentre, 'R55-04: at 60 s Funke ' + OUT.f3.t60.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t60.funkeBox + ' % (≤ 2), not in the centre third');
+check(OUT.f3.t60.funkeD >= 2 && (OUT.f3.t60.funkeHidden || (OUT.f3.t60.funkeBox <= 2 && !OUT.f3.t60.funkeCentre)), 'R55-04: at 60 s Funke ' + OUT.f3.t60.funkeD + ' m from the eye (≥ 2), his box ' + OUT.f3.t60.funkeBox + ' % (≤ 2), not in the centre third');
 const handProbe = () => ev(() => { const g = VR.game, h = g.player.inv.held, F = VR.First2; return { held: h ? h.id : null, block: !!(h && g.entities && g.entities.itemMesh(h.id).block), cover: F ? +F.handCover(F.HAND, innerWidth / innerHeight).toFixed(4) : 1, cine: F ? F.cine(g) : null }; }).catch(() => null);
 OUT.hand60 = await handProbe();
 check(OUT.hand60 && (!OUT.hand60.block || OUT.hand60.cover <= 0.03), 'at 60 s the held block covers ≤ 3 % of the frame: ' + JSON.stringify(OUT.hand60));
