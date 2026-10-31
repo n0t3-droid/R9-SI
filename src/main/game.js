@@ -1377,6 +1377,7 @@
         cam.x = eye[0] - dir[0] * dist * Math.sign(d); cam.y = eye[1] - dir[1] * dist * Math.sign(d); cam.z = eye[2] - dir[2] * dist * Math.sign(d);
         if (this.camMode === 2) { cam.yaw += Math.PI; cam.pitch = -cam.pitch; }
       }
+      if (this.hf && VR.HitFeel) VR.HitFeel.cam(this, cam, dt);   // f-hud: the hit's jolt (the switch Bildschirmwackeln, off by default)
       this.cam = cam;
       if (VR.EventLog) VR.EventLog.frame(this, dt);   // e-log: the event log's clock, input and 1-Hz sample (eventlog.js)
       if (VR.Ctx) VR.Ctx.tick(this, dt); if (VR.Intent) VR.Intent.ui(this); if (VR.HudFade) VR.HudFade.tick(this, dt);   // e-ctx: the Aktion key and its prompt, the aimed target's marker, the fading HUD

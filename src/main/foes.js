@@ -986,6 +986,7 @@
     mat4.translate(B, B, m.pos[0] - cam.x, m.pos[1] - cam.y + bob - kn * K.kneel / 16, m.pos[2] - cam.z);
     mat4.rotY(B, B, m.yaw);
     if (f.st === 'tele' && f.k === 'driller') mat4.rotX(B, B, -0.1 * f.flare);
+    if (f.hitT > 0 && VR.HitFeel && !K.fixed) mat4.rotX(B, B, -VR.HitFeel.recoil(f.hitT));   // (f-hud: the hit rocks it back)
     { const bw = F.bowOf(f); if (bw) mat4.rotX(B, B, -bw); }   // (a-foes2: the bow after standing up, from the feet)
     if (f.st === 'recover' && f.k === 'driller') mat4.rotX(B, B, -0.22);
     if (kn && f.k !== 'drone') mat4.rotX(B, B, -0.12 * kn);

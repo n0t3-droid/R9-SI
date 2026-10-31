@@ -46,6 +46,13 @@
   F.KIND_WAIT = { vista: 240, _: 600 };   // s before the same kind is told again unprompted (asked: any time)
   F.SCALE = 0.62;      // the drone's size (≈ 35 cm)
   F.SEAT_SCALE = 0.45; // on the dashboard (run 1: 0.55 filled the middle of the windscreen)
+  // f-hud (critic_ux_16: a cyan block and white planes filled the Abenteuer start): never drawn in the camera's face, nor
+  // in a camera that is not the player's eye (the wow moment's composition, the director's shots, the arrival's moment)
+  F.NEAR = 0.6;        // m from the camera: closer is not drawn
+  F.camNear = (dx, dy, dz) => dx * dx + dy * dy + dz * dz < F.NEAR * F.NEAR;
+  F.SPARK_NEAR = 2.5;  // m: the arrival sparkle only this far from the camera (critic_ux_16: the pale balls in the face)
+  F.sparkOk = (dx, dy, dz) => dx * dx + dy * dy + dz * dz >= F.SPARK_NEAR * F.SPARK_NEAR;
+  F.camHidden = (g) => !!(g && ((g.wow && g.wow.active) || (g.director && g.director.active) || (g.arrival && g.arrival.phase === 'moment')));
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
 
   // ---------------------------------------------------------------- the talking budget (pure)
@@ -495,7 +502,7 @@ void main() {
       const first = this.startT === null; if (first) this.startT = T;
       this.feel(T);
       if (this.buildFocus()) this.budget.build(T);
-      this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds());
+      this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds()) && !F.camHidden(g);   // (f-hud: no cinematic camera's foreground)
       // where it wants to be
       this.seat = g.flight || null;
       if (!this.seat) {
@@ -578,6 +585,7 @@ void main() {
     }
     sparkle() {
       const P = this.g.particles, p = this.pos; if (!P || !P.spawn) return;
+      { const c = this.g.cam, pl = this.g.player, e = pl && pl.eyePos ? pl.eyePos() : null; if ((c && !F.sparkOk(p[0] - c.x, p[1] - c.y, p[2] - c.z)) || (e && !F.sparkOk(p[0] - e[0], p[1] - e[1], p[2] - e[2]))) { F.cost.sparkSkip = (F.cost.sparkSkip || 0) + 1; return; } }   // (the eye too: the first frame's camera can be the last world's)   // (f-hud: its 14 sparks at the eye were the big pale balls in the face)
       PO.col = [0.45, 0.95, 1];
       for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; P.spawn(p[0], p[1], p[2], Math.cos(a) * 2.2, (i % 3 - 1) * 0.8, Math.sin(a) * 2.2, PO); }
     }
@@ -916,6 +924,7 @@ void main() {
       }
       const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.32 * OPTS.scale / F.SCALE;   // (the rotors' reach; run 1's 0.5 drew it beside the first-person eye, out of the view)
       if (!m4.boxInFrustum(r.planes, dx - R0, dy - R0, dz - R0, dx + R0, dy + R0, dz + R0)) return;   // not seen: nothing at all
+      if (!OPTS.baseMat && F.camNear(dx, dy, dz)) return;   // (f-hud: in the face — the spring caught up with the eye)
       const prog = ent.beginVox(r, E);
       if (prog.u.u_clipNear) gl.uniform1f(prog.u.u_clipNear, 0);
       POSE.rotor_l[1] = this.spin; POSE.rotor_r[1] = -this.spin;

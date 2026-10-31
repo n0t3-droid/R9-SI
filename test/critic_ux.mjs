@@ -81,13 +81,15 @@ await wait(1500); await shot('04_t0');
   check(arr >= 0 && (arr <= 9000 || pf <= 9000), 'the arrival is over in ' + arr + ' ms (≤ 9 s, or on the first frame after 9 s: the frame before at ' + pf + ' ms; no key)'); }
 await wait(Math.max(0, 15000 - (Date.now() - tPlay))); await shot('05_t15');
 OUT.hud15 = await ev(() => { const h = document.getElementById('hud'), cs = h && getComputedStyle(h), A = VR.game.arrival, a = document.activeElement; return h ? { vis: cs.visibility, op: +cs.opacity, hideHud: !!VR.game.hideHud, arrival: A ? { phase: A.phase, holds: A.holds(), t: +(A.t || 0).toFixed(2) } : null, wow: !!(VR.game.wow && VR.game.wow.active), focus: a ? a.tagName + '#' + a.id : '', captured: !!VR.game.input.captured, poll: window.__arr || null } : null; }).catch(() => null);
+OUT.moved15 = await ev(() => VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null).catch(() => null);
+check(!OUT.moved15 || OUT.moved15.phase !== 'after', 'the spawn\'s settle move (first2) under the arrival\'s white: ' + JSON.stringify(OUT.moved15));
 check(OUT.hud15 && OUT.hud15.vis !== 'hidden' && OUT.hud15.op > 0.5 && !OUT.hud15.hideHud, 'at 15 s the HUD is up: ' + JSON.stringify(OUT.hud15));
 const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 // (W, then S: the spawn may face a bench or a parapet — a key that moves the player at all is the measure)
 // (W's first second of play: at least 1 s of wall time and 2 frames with W held — under SwiftShader a frame can take seconds)
 const fW0 = await ev(() => VR.game.frame).catch(() => 0), tW0 = Date.now();
 await page.keyboard.down('KeyW'); await wait(1000);
-{ let fw = 0; while (Date.now() - tW0 < 60000) { fw = await ev(() => VR.game.frame).catch(() => 0); if (fw - fW0 >= 3) break; await wait(200); } OUT.wFirst = { ms: Date.now() - tW0, frames: fw - fW0 }; }
+{ let fw = 0; while (Date.now() - tW0 < 180000) { fw = await ev(() => VR.game.frame).catch(() => 0); if (fw - fW0 >= 3) break; await wait(200); } OUT.wFirst = { ms: Date.now() - tW0, frames: fw - fW0 }; }
 const pW1 = await ev(() => VR.game.player.pos.slice()).catch(() => null);
 console.log('  W first second: ' + JSON.stringify(OUT.wFirst) + ' fps ' + await ev(() => +(VR.game.fps || 0).toFixed(2)).catch(() => -1));
 { const f1 = await ev(() => VR.game.frame).catch(() => 0), t1 = Date.now(); await wait(3000); while (Date.now() - t1 < 90000 && (await ev(() => VR.game.frame).catch(() => f1 + 3)) - f1 < 3) await wait(200); } await page.keyboard.up('KeyW');
@@ -115,15 +117,22 @@ OUT.itemNamesData = await ev(() => { const inv = VR.game.player.inv; return inv.
 // (v0.53 review) the first three minutes as a new player spends them: walking about, looking round; what is on screen
 // and which hints the HUD gives at 2 and 3 minutes
 OUT.hints3 = [];
+const WALK_HOLDS = 6;
+// (f-hud) one W hold of the walk: at least 3 s, then on until the player went 3 m or 15 frames passed (cap 240 s) — at a
+// frame a minute (the machine under load) a 3-s hold walked 0.2 m; a slow frame walks only 0.1 s (a stall is no walk)
+const holdWalk = async () => { const p0 = await ev(() => VR.game.player.pos.slice()).catch(() => null), f0 = await ev(() => VR.game.frame).catch(() => 0), t = Date.now(); await page.keyboard.down('KeyW'); await wait(3000);
+  while (Date.now() - t < 240000) { const q = await ev(() => [VR.game.frame, VR.game.player.pos[0], VR.game.player.pos[2]]).catch(() => null); if (!q || !p0 || q[0] - f0 >= 15 || Math.hypot(q[1] - p0[0], q[2] - p0[2]) >= 3) break; await wait(300); } await page.keyboard.up('KeyW'); };
 for (const [tEnd, name] of [[120000, '08b_t120'], [180000, '08c_t180']]) {
-  while (Date.now() - tPlay < tEnd - 6000) { await holdFor('KeyW', 3000, 2); await page.mouse.move(640 + (Math.random() * 400 - 200), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(1500); }
+  // (f-hud: the walk counted in W holds, not wall time — under SwiftShader the wall clock ran out with 17 m walked: six holds of
+  //  W (≥ 3 s, then on to 3 m or 15 frames: holdWalk) a sample, small alternating looks so the way keeps a heading, a jump after each)
+  for (let i = 0; i < WALK_HOLDS; i++) { await holdWalk(); await page.mouse.move(640 + (i % 2 ? 60 : -60), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
   await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
   OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
 }
 OUT.hand180 = await handProbe();
 check(OUT.hand180 && (!OUT.hand180.block || OUT.hand180.cover <= 0.03), 'at 180 s the held block covers ≤ 3 %: ' + JSON.stringify(OUT.hand180));
 { const last = OUT.hints3[OUT.hints3.length - 1], sp = await ev(() => VR.game.player.spawn).catch(() => null); OUT.away180 = last && last.pos && sp ? Math.round(Math.hypot(last.pos[0] - sp[0], last.pos[2] - sp[2])) : -1;
-  check(OUT.away180 >= 20, 'at 3 minutes the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
+  check(OUT.away180 >= 20, 'after ' + (OUT.wHolds || 0) + ' W holds (3 minutes) the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
 console.log('  first 3 min: ' + JSON.stringify(OUT.hints3).slice(0, 1200));
 await page.keyboard.press('Escape'); await wait(1500); await shot('09_pause');
 // R53-04: the pause menu fits 720 px, few buttons at its top level
@@ -187,7 +196,29 @@ if (!process.env.NO_ADV) {
   check(ok && OUT.adv && OUT.adv.adv && OUT.adv.d >= 0 && OUT.adv.d <= 320, 'Abenteuer: the nearest outpost ' + (OUT.adv && OUT.adv.d) + ' m from the spawn (≤ 320)');
   check(light >= 5, 'Abenteuer: ' + OUT.advLightMin + ' minutes of day light ahead (≥ 5)');
   await wait(20000); await shot('17_adv_t25');
+  // f-hud: the Abenteuer start shows its HUD (critic_ux_17 of f-first2: none — F1's hidden HUD of the first world carried
+  // over), Funke never in the camera's face, the settle move made under the arrival's white
+  OUT.advHud25 = await ev(() => { const g = VR.game, h = document.getElementById('hud'), cs = getComputedStyle(h), fk = g.funke, c = g.cam; return { vis: cs.visibility, op: +cs.opacity, hideHud: !!g.hideHud, storyon: document.body.classList.contains('storyon'), arrival: !!g.arrival, funkeD: fk && fk.pos && c ? +Math.hypot(fk.pos[0] - c.x, fk.pos[1] - c.y, fk.pos[2] - c.z).toFixed(2) : -1, funkeVis: !!(fk && fk.visible), funkeCull: !!(VR.Funke && VR.Funke.camNear), sparkSkip: VR.Funke && VR.Funke.cost ? VR.Funke.cost.sparkSkip || 0 : -1, moved: VR.First2 && VR.First2.moved ? { r: VR.First2.moved.r, phase: VR.First2.moved.phase || 'after' } : null }; }).catch((e) => ({ err: String(e) }));
+  console.log('  adv 25 s: ' + JSON.stringify(OUT.advHud25));
+  check(OUT.advHud25 && OUT.advHud25.vis !== 'hidden' && OUT.advHud25.op > 0.5 && !OUT.advHud25.hideHud, 'Abenteuer: at 25 s the HUD is up (F1 in the first world does not carry over): ' + JSON.stringify(OUT.advHud25));
+  check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6 || OUT.advHud25.funkeCull), 'Abenteuer: Funke not drawn in the camera\'s face (closer than 0.6 m: culled; ' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
+  check(OUT.advHud25 && (!OUT.advHud25.moved || OUT.advHud25.moved.phase !== 'after'), 'Abenteuer: the spawn\'s settle move under the arrival\'s white (' + JSON.stringify(OUT.advHud25 && OUT.advHud25.moved) + ')');
   await offerCheck('18');
+  // f-hud: the first fight — a Wächter 4 m ahead, three hits (the sparks where it is struck, the rock back, the clank), the
+  // power-down (the „+EP" pop where it stood)
+  await ev(() => { const u = VR.game.ui; if (u && u.screen && u.show) u.show(null); }).catch(() => {}); await untilClosed();
+  OUT.foe = await ev(() => { const g = VR.game, p = g.player, En = g.entities, F = VR.Foes; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.pos[0] + fx * 4, z = p.pos[2] + fz * 4;
+    let y = Math.floor(p.pos[1]) + 3; while (y > p.pos[1] - 6 && !(VR.R.T.flags[g.world.getBlock(Math.floor(x), y - 1, Math.floor(z))] & VR.F.SOLID)) y--;
+    const m = En.summon('foe_sentry', x, y, z); if (!m) return null; m.foe = F.make('sentry', m.id, [x, y, z]); m.yaw = p.yaw + Math.PI; window.__m = m; p.pitch = -0.08; return [x, y, z].map(Math.round); }).catch(e => String(e));
+  for (let i = 1; i <= 3; i++) { await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 3, g.player.pos); }).catch(() => {}); const f0 = await ev(() => VR.game.frame).catch(() => 0); const t = Date.now(); while (Date.now() - t < 60000 && (await ev(() => VR.game.frame).catch(() => f0 + 1)) < f0 + 1) await wait(200); if (i === 2) await shot('19_adv_hit'); }
+  OUT.hits = await ev(() => ({ stats: VR.HitFeel && Object.assign({}, VR.HitFeel.stats), clank: VR.HitFeel && VR.HitFeel.clankN, shake: VR.game.settings.hitShake })).catch(() => null);
+  check(OUT.hits && OUT.hits.stats && OUT.hits.stats.hits >= 3 && OUT.hits.clank >= 3 && OUT.hits.shake !== true, 'the first fight: three hits felt (sparks, clank, rock back), the shake off by default: ' + JSON.stringify(OUT.hits));
+  await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 60, g.player.pos); }).catch(() => {});
+  // (the power-down lasts 2.4 s of play — 24 frames at least; under load a frame took 10–60 s: the wait counts frames, cap 40 min)
+  { const f0 = await ev(() => VR.game.frame).catch(() => 0), t = Date.now(); while (Date.now() - t < 2400000 && !(await ev(() => !!document.querySelector('.hfpop') || VR.HitFeel.stats.pops > 0).catch(() => false)) && (await ev(() => VR.game.frame).catch(() => f0)) - f0 < 80) await wait(500); }
+  await shot('20_adv_pop');
+  OUT.pop = await ev(() => ({ pops: VR.HitFeel.stats.pops, el: [...document.querySelectorAll('.hfpop')].map(e => e.textContent) })).catch(() => null);
+  check(OUT.pop && OUT.pop.pops >= 1, 'the power-down: the EP pop where it stood: ' + JSON.stringify(OUT.pop));
 }
 OUT.errors = errs; OUT.ms = Date.now() - t0;
 fs.writeFileSync(SHOTS + 'critic_ux' + (TAG ? '_' + TAG.slice(0, -1) : '') + '.json', JSON.stringify(OUT, null, 1));
