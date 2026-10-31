@@ -284,9 +284,10 @@
     if (oo) UI.prototype.openChat = function () { const l = document.getElementById('chatlog'); if (l) l.classList.add('open'); return oo.apply(this, arguments); };
     if (ox) UI.prototype.closeChat = function () { chatClosed = nowS(); const l = document.getElementById('chatlog'); if (l) setTimeout(() => { if (!this.typing) l.classList.remove('open'); }, 6000); return ox.apply(this, arguments); };
     // the pause menu: the last six
-    const op = UI.prototype.pause;
-    if (op) UI.prototype.pause = function () {
+    const op = UI.prototype.show;
+    if (op) UI.prototype.show = function (name) {
       const r = op.apply(this, arguments);
+      if (name !== 'pause') return r;
       try {
         const pan = document.querySelector('#pause .panel'); if (!pan) return r;
         let d = document.getElementById('qrecent'); if (!d) { d = document.createElement('div'); d.id = 'qrecent'; pan.appendChild(d); }
