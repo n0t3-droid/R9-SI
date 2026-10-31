@@ -105,12 +105,13 @@ for (const kind of WORLDS) {
   // 4 · a native up close (the face and the body plan)
   let vs = null;
   for (let i = 0; i < 30; i++) { await step(20, 33); vs = await ev((vid) => { const v = VR.game.villages.known.get(vid); return v ? { active: v.active, agents: v.agents.length } : null; }, vid); if (vs && vs.active && vs.agents > 0) break; await wait(150); }
-  const nat = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); if (!v) return null; const P = v.plan; const ag = v.agents.filter(o => !o.kid && o.pose !== 'sleep' && o.pose !== 'sit'); const a = ag[0] || v.agents[0]; if (!a) return null; const p = g.player, yaw = a.yaw || 0, sc = VR.Folk.SPECIES_BODY[kindOf(vid)].scale; function kindOf(id) { return id.split(':')[1]; } p.flying = true; p.teleport(a.pos[0] - Math.sin(yaw) * 2.4 + Math.cos(yaw) * 0.9, a.pos[1] + 1.1 * sc - 1.0, a.pos[2] - Math.cos(yaw) * 2.4 - Math.sin(yaw) * 0.9); a.freeze = 6; return { pos: a.pos.slice(), sc, name: a.name, species: a.p.look.species }; }, vid);
+  // (the native stepped out to the open west side of the plaza, facing the camera; the camera 2.4 m in front, a little aside)
+  const nat = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); if (!v) return null; const pz = v.plan.plaza; const ag = v.agents.filter(o => !o.kid && o.pose !== 'sleep' && o.pose !== 'sit'); const a = ag[0] || v.agents[0]; if (!a) return null; const sc = VR.Folk.SPECIES_BODY[vid.split(':')[1]].scale; a.pos[0] = pz.x - 8.5; a.pos[1] = pz.y; a.pos[2] = pz.z + 0.5; a.yaw = Math.PI / 2; a.vel && (a.vel[0] = a.vel[2] = 0); a.freeze = 8; a.steer = null; const p = g.player; p.flying = true; p.teleport(a.pos[0] - 2.4, a.pos[1] + 1.55 * sc - 1.5, a.pos[2] + 0.8); return { pos: a.pos.slice(), sc, name: a.name, species: a.p.look.species }; }, vid);
   check(nat && nat.species === kind, `${kind}: a native, ${nat ? nat.name : '?'} (×${nat ? nat.sc : '?'})`);
   if (nat) { await lookAt([nat.pos[0], nat.pos[1] + 1.15 * nat.sc, nat.pos[2]]); await step(8); row.push(await grab(`w2_${kind}_native.png`)); }
   // 5 · the culture moment at dusk: the villagers gather in the ring round the monument; the player joins
   await ev(() => VR.game.env.setTime(12500));
-  await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 0.5, V.y + 3.5, V.z + 13.5); }, V);
+  await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 0.5, V.y + 2.4, V.z + 10.5); }, V);
   for (let i = 0; i < 25; i++) await step(40, 33);
   const fest = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid), F = v && v.fest; const pz = v.plan.plaza; const n = v.agents.filter(a => Math.hypot(a.pos[0] - pz.x, a.pos[2] - pz.z) < (pz.r || 4) + 4).length; return { on: g.villages.festivalOn(v, g.env.timeOfDay), n, agents: v.agents.length }; }, vid);
   await lookAt([V.x + 0.5, V.y + 2.5, V.z + 0.5]); await step(6);

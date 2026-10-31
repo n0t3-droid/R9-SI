@@ -317,8 +317,15 @@
           S.said = this.dim + ':' + (this.meta && this.meta.seed);
           this.ui.toast('🪐 ' + T('g.eco.welcome', { world: VR.Travel ? VR.Travel.dimName(this.dim) : this.dim }), T('g.eco.home.' + kind));
           // (u-worlds2: the arrival's vista — standing at the landing, the eye turns to the first village and its monument)
-          const eco = WL.eco(this), p = this.player;
-          if (eco && eco.sites && eco.sites[0] && eco.land && p && Math.hypot(p.pos[0] - eco.land[0], p.pos[2] - eco.land[2]) < 24) { const s0 = eco.sites[0]; p.yaw = Math.atan2(-(s0.x - p.pos[0]), -(s0.z - p.pos[2])); p.viewYaw = p.yaw; p.pitch = 0.02; }
+          const eco = WL.eco(this);
+          if (eco && eco.sites && eco.sites[0]) { S.vista = eco.sites[0]; S.vistaN = 90; }
+        }
+        // (the arrival's own settling may turn the eye after the welcome: for 90 frames the vista holds, at the landing)
+        if (S.vistaN > 0 && this.player) {
+          const p = this.player, s0 = S.vista, eco = WL.eco(this);
+          if (VR.Travel && VR.Travel.busy && VR.Travel.busy(this)) { /* still arriving: wait */ }
+          else if (eco && eco.land && Math.hypot(p.pos[0] - eco.land[0], p.pos[2] - eco.land[2]) < 40) { S.vistaN--; p.yaw = Math.atan2(-(s0.x - p.pos[0]), -(s0.z - p.pos[2])); p.viewYaw = p.yaw; if (S.vistaN > 85) p.pitch = 0.02; }
+          else S.vistaN = 0;   // (arrived elsewhere: no vista)
         }
       } else if (this.dim === 'overworld') S.said = null;
       return pf.call(this, dt);
