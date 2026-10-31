@@ -303,7 +303,10 @@
       const dP = Math.hypot(pz.x + 0.5 - a.pos[0], pz.z + 0.5 - a.pos[2]);
       if (!act.round && dP > 8) { this.goTo(a, pz.x, pz.y, pz.z, 6); }
       else { act.round = true; act.ang += dt * 0.11; this.joySteer(a, pz.x + 0.5 + Math.cos(act.ang) * 6, pz.z + 0.5 + Math.sin(act.ang) * 6, 0.4); }
-      if (!a.joyHand && Math.hypot(m.pos[0] - a.pos[0], m.pos[2] - a.pos[2]) > 2.5) { a.steer = null; a.path = null; a.lookAt = [m.pos[0], m.pos[1] + 1, m.pos[2]]; } else a.lookAt = null;
+      const dm = Math.hypot(m.pos[0] - a.pos[0], m.pos[2] - a.pos[2]);
+      // (the child far and not coming — a way it cannot find: the parent fetches it)
+      if (!a.joyHand && dm > 9 && act.t > 6) { a.steer = null; this.goTo(a, m.pos[0], m.pos[1] + 0.05, m.pos[2], 1.2); a.lookAt = null; }
+      else if (!a.joyHand && dm > 2.5) { a.steer = null; a.path = null; a.lookAt = [m.pos[0], m.pos[1] + 1, m.pos[2]]; } else a.lookAt = null;
       if (act.t > act.len - 0.1) this.joyEnd(m);
       return;
     }
@@ -313,7 +316,7 @@
     a.speed = Math.min(act.sp0 * 1.6, Math.max(0.6, lv + d * 2.2));
     act.run = d > 3;
     if (d < 0.25 && lv < 0.3) { a.steer = null; a.lookAt = null; let dy = m.yaw - a.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; a.yaw += dy * Math.min(1, dt * 5); }
-    else if (d > 9) { a.steer = null; this.goTo(a, m.pos[0], m.pos[1] + 0.05, m.pos[2], 1.5); }
+    else if (d > 9) { a.steer = null; if (!act.go || Math.hypot(act.go[0] - m.pos[0], act.go[1] - m.pos[2]) > 2) act.go = [m.pos[0], m.pos[2]]; this.goTo(a, act.go[0], m.pos[1] + 0.05, act.go[1], 1.5); }
     else { a.path = null; a.steer = a.steer || [0, 0]; a.steer[0] = tx; a.steer[1] = tz; }
     a.joyHand = Math.hypot(s[0] - a.pos[0], s[1] - a.pos[2]) < 0.6 ? 'hold' : null;
     if (a.joyHand && Math.random() < dt * 0.15) smile(a, 'joy', 2);
@@ -547,6 +550,8 @@
       // the ground under it (the owner's height, a block up or down)
       const bx = Math.floor(q.pos[0]), bz = Math.floor(q.pos[2]); let gy = Math.floor(o.pos[1] + 1.2);
       for (let k = 0; k < 4 && w && gy > 0; k++, gy--) { const s0 = w.getBlock(bx, gy - 1, bz); if (R.T.flags[s0] & VR.F.SOLID) break; }
+      // (never up on a counter, a bench, a table: higher than the owner's floor — the pet keeps close behind its owner)
+      if (gy > Math.floor(o.pos[1] + 0.05) + 0.5) { q.pos[0] = o.pos[0] - fx * 0.5; q.pos[2] = o.pos[2] - fz * 0.5; gy = o.pos[1]; }
       q.pos[1] += (gy - q.pos[1]) * Math.min(1, dt * 10);
       q.walk += sp * dt * 1.6; q.walkAmt += ((sp > 0.3 ? 1 : 0) - q.walkAmt) * Math.min(1, dt * 6);
       q.still = sp > 0.3 ? 0 : q.still + dt;

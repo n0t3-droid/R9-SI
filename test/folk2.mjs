@@ -96,12 +96,13 @@ await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes
 await ev(`VR.game.createWorld({name:'Bewohner',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
 for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a new world');
+await ev(() => { window.__home = VR.game.dim; });
 await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(3000); if (g.ui && g.ui.show) g.ui.show(null); });
 await settle(30);
 
 // ---------------------------------------------------------------- Herzwelt's nearest village
 let HV = null, HP = null;
-if (want('herz') || want('walk') || want('cost')) {
+if (want('herz') || want('hand') || want('walk') || want('cost')) {
   // (the towns that budget their people let the children go first: a village WITH children is looked for — the classic
   // styles first, nearest first, up to three tried)
   let list = null;
@@ -124,8 +125,8 @@ if (want('herz') || want('walk') || want('cost')) {
   }
 }
 const herzRows = [];
-if (want('herz') && HP) {
-  try {
+if ((want('herz') || want('hand')) && HP) {
+  if (want('herz')) try {
     const before = ['folk_sheet_faces.png', 'folk_sheet_expr.png'].map(n => fs.existsSync(SHOTS + 'folk2_before/' + n) ? SHOTS + 'folk2_before/' + n : null);
     if (before[0] && fs.existsSync(SHOTS + 'folk_sheet_faces.png')) sheet.push({ label: 'faces before / after (node sheet, the smooth path)', imgs: [before[0], SHOTS + 'folk_sheet_faces.png'] });
     if (fs.existsSync(SHOTS + 'folk_sheet_expr.png')) sheet.push({ label: 'expressions: resting / joy / surprise (node sheet)', imgs: [SHOTS + 'folk_sheet_expr.png'] });
@@ -138,7 +139,7 @@ if (want('herz') && HP) {
   } catch (e) { check(false, 'Herzwelt close-ups: ' + String(e && e.stack || e).slice(0, 300)); }
   try {
     // hand in hand: a family's adult and child
-    const hand = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); for (const a of v.agents) { if (a.kid || a.pose === 'sleep') continue; const k = v.agents.find(b => b.kid && b.p.fam === a.p.fam && b.pose !== 'sleep'); if (k) { M.joyEnd && M.joyEnd(a); M.joyEnd(k); a.act = a.act || { type: 'stroll' }; const ok = M.joyStart(v, 'hand', { _who: { hand: [a, k] } }); window.__hand = [a, k]; return { ok, lead: a.p.name, kid: k.p.name }; } } return null; }, HV.id);
+    const hand = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); let best = null, bd = 1e9; for (const a of v.agents) { if (a.kid || a.pose === 'sleep' || a.pose === 'sit') continue; for (const b of v.agents) if (b.kid && b.p.fam === a.p.fam && b.pose !== 'sleep') { const d = Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]); if (d < bd) { bd = d; best = [a, b]; } } } for (const [a, k] of best ? [best] : []) { if (k) { M.joyEnd && M.joyEnd(a); M.joyEnd(k); a.act = a.act || { type: 'stroll' }; const ok = M.joyStart(v, 'hand', { _who: { hand: [a, k] } }); window.__hand = [a, k]; return { ok, lead: a.p.name, kid: k.p.name }; } } return null; }, HV.id);
     if (!hand) throw new Error('no family with a child about');
     let held = 0;
     for (let i = 0; i < 30; i++) { await step(20, 33); const h = await ev(() => { const [a, k] = window.__hand; return { k: k.joyHand, a: a.joyHand, d: Math.hypot(a.pos[0] - k.pos[0], a.pos[2] - k.pos[2]) }; }); if (h.k === 'hold' && h.a === 'lead') held++; if (held >= 4) break; }
@@ -159,7 +160,7 @@ if (want('herz') && HP) {
     herzRows.push(await grab('f2_herz_applause.png'));
     sheet.push({ label: 'Herzwelt: hand in hand / applause for a build', imgs: herzRows.splice(0) });
   } catch (e) { check(false, 'Herzwelt hand/applause: ' + String(e && e.stack || e).slice(0, 300)); if (herzRows.length) sheet.push({ label: 'Herzwelt: hand in hand / applause', imgs: herzRows.splice(0).filter(Boolean) }); }
-  try {
+  if (want('herz')) try {
     // the story at dusk
     await ev(() => VR.game.env.setTime(11200));
     const st = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); const el = v.agents.find(a => a.elder && a.pose !== 'sleep') || v.agents.find(a => !a.kid); const kids = v.agents.filter(a => a.kid && a.pose !== 'sleep').slice(0, 4); for (const a of [el].concat(kids)) { M.joyEnd(a); a.pose = a.pose === 'sit' || a.pose === 'sitground' ? 'stand' : a.pose; } const ok = M.joyStart(v, 'story', { _who: { story: [el, kids] } }); window.__story = el; return { ok, el: el.p.name, kids: kids.length }; }, HV.id);
@@ -184,7 +185,7 @@ if (want('herz') && HP) {
     if (D) { await lookFrom([D.c[0] + 5.5, D.c[1] + 3.2, D.c[2] + 5.5], [D.c[0], D.c[1] + 0.9, D.c[2]]); await step(4, 33); herzRows.push(await grab('f2_herz_dance.png')); }
     sheet.push({ label: 'Herzwelt: the grandparent\'s story by the fire at dusk / the dance round the player', imgs: herzRows.splice(0) });
   } catch (e) { check(false, 'Herzwelt story/dance: ' + String(e && e.stack || e).slice(0, 300)); if (herzRows.length) sheet.push({ label: 'Herzwelt: story / dance', imgs: herzRows.splice(0).filter(Boolean) }); }
-  try {
+  if (want('herz')) try {
     await ev(() => { const D = VR.game.villages.joy && VR.game.villages.joy.dance; if (D) D.t = D.len + 1; }); await step(20, 33);   // the dance ends (its 30 s cut short)
     // a pet
     await ev(() => VR.game.env.setTime(3600));
@@ -198,6 +199,7 @@ if (want('herz') && HP) {
       check(await ev(() => VR.game.villages.joy.petsDrawn || 0) >= 1, 'the pet drawn');
     }
   } catch (e) { check(false, 'Herzwelt: ' + String(e && e.stack || e).slice(0, 500)); }
+  console.log('  · gl lost after Herzwelt: ' + await ev(() => !!VR.game.glLost));
   save(); writeSheet();
 }
 
@@ -245,33 +247,6 @@ if (want('walk') && HP) {
   save(); writeSheet();
 }
 
-// ---------------------------------------------------------------- the cost: Very Low / High, the moments on and off
-if (want('cost') && HP) {
-  try {
-    const cost = {};
-    const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length, pets: g.villages.joy ? g.villages.joy.petsDrawn || 0 : 0 }; });
-    const measure = async (name) => { const r1 = await measure0(); await step(20, 33); const r2 = await measure0(); const r = r2.ms < r1.ms ? r2 : r1; r.runs = [r1.ms, r2.ms]; cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
-    const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
-    await ev(() => VR.game.env.setTime(4000));
-    const V = [HP.plaza[0], HP.plaza[1], HP.plaza[2]], CP = [V[0] + 14, V[1] + 6, V[2] + 14];
-    for (const pr of ['potato', 'high']) {
-      await preset(pr); await settle(20); await step(60, 33);
-      for (const off of [true, false, true, false]) {
-        await ev((off) => { VR.FolkJoy.off = off; }, off);
-        await lookFrom(CP, V); await step(10, 33);
-        await measure(`${pr}_${off ? 'off' : 'on'}${cost[pr + '_' + (off ? 'off' : 'on')] ? '2' : ''}`);
-      }
-    }
-    await ev(() => { VR.FolkJoy.off = false; });
-    const best = (k) => Math.min(cost[k] ? cost[k].ms : 999, cost[k + '2'] ? cost[k + '2'].ms : 999);
-    run.cost = cost;
-    console.log(`  cost Very Low off ${best('potato_off')} / on ${best('potato_on')} ms · High off ${best('high_off')} / on ${best('high_on')} ms`);
-    check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `Very Low not slower with the moments (${best('potato_off')} → ${best('potato_on')} ms)`);
-    await preset('balanced'); await ev(() => { VR.game.settings.smoothFolk = true; VR.game.applySettings('*'); }); await settle(20);
-  } catch (e) { check(false, 'cost: ' + String(e && e.stack || e).slice(0, 500)); }
-  save();
-}
-
 // ---------------------------------------------------------------- two other worlds: Aquamarin and Ocker
 for (const kind of (want('worlds') ? ['aqua', 'ocker'] : [])) {
   try {
@@ -312,8 +287,38 @@ for (const kind of (want('worlds') ? ['aqua', 'ocker'] : [])) {
   save(); writeSheet();
 }
 
+// ---------------------------------------------------------------- the cost: Very Low / High, the moments on and off
+if (want('cost') && HP) {
+  try {
+    const home = await ev(() => window.__home); if (await ev(() => VR.game.dim) !== home && !(await trip(home).catch(() => false))) throw new Error('no way back to Herzwelt');
+    await lookFrom([HP.plaza[0] + 14, HP.plaza[1] + 6, HP.plaza[2] + 14], HP.plaza); await loaded(HP.plaza, 48); await settle(40);
+    const cost = {};
+    const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length, pets: g.villages.joy ? g.villages.joy.petsDrawn || 0 : 0 }; });
+    const measure = async (name) => { const r1 = await measure0(); await step(20, 33); const r2 = await measure0(); const r = r2.ms < r1.ms ? r2 : r1; r.runs = [r1.ms, r2.ms]; cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
+    const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
+    await ev(() => VR.game.env.setTime(4000));
+    const V = [HP.plaza[0], HP.plaza[1], HP.plaza[2]], CP = [V[0] + 14, V[1] + 6, V[2] + 14];
+    for (const pr of ['potato', 'high']) {
+      await preset(pr); await settle(20); await step(60, 33);
+      for (const off of [true, false, true, false]) {
+        await ev((off) => { VR.FolkJoy.off = off; }, off);
+        await lookFrom(CP, V); await step(10, 33);
+        await measure(`${pr}_${off ? 'off' : 'on'}${cost[pr + '_' + (off ? 'off' : 'on')] ? '2' : ''}`);
+      }
+    }
+    await ev(() => { VR.FolkJoy.off = false; });
+    const best = (k) => Math.min(cost[k] ? cost[k].ms : 999, cost[k + '2'] ? cost[k + '2'].ms : 999);
+    run.cost = cost;
+    console.log(`  cost Very Low off ${best('potato_off')} / on ${best('potato_on')} ms · High off ${best('high_off')} / on ${best('high_on')} ms`);
+    check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `Very Low not slower with the moments (${best('potato_off')} → ${best('potato_on')} ms)`);
+    await preset('balanced'); await ev(() => { VR.game.settings.smoothFolk = true; VR.game.applySettings('*'); }); await settle(20);
+  } catch (e) { check(false, 'cost: ' + String(e && e.stack || e).slice(0, 500)); }
+  save();
+}
+
 const errs = logs.filter(l => /pageerror|folkjoy|TypeError|ReferenceError/.test(l));
 for (const l of logs.slice(0, 12)) console.log('  log ' + l);
+console.log('  · gl lost at the end: ' + await ev(() => !!VR.game.glLost));
 check(errs.length === 0, `no page error (${errs.length})`);
 run.logs = logs.slice(0, 40); save(); writeSheet();
 await browser.close();
