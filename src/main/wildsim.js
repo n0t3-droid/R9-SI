@@ -365,8 +365,9 @@
   // impostors, 1.8× the depth on Balanced, all of them near-black): from afar the flock thins and pales — its depth × murmFar
   // (1 within FAR[0], FAR_MIN beyond FAR[1]), the air counted in full there (wildgpu's impostor fog) — and a new world's
   // first QUIET seconds have none (it comes in over FADE s): the first look is the land, not a smudge. Pure: test/first3.js
-  W.MURM_FAR = [60, 240]; W.MURM_FAR_MIN = 0.22; W.MURM_QUIET = 60; W.MURM_FADE = 30; W.MURM_TAU_MAX = 1.4;   // (an impostor's depth at most: its core a dark grey through which the sky shows, not ink)
-  W.murmFar = function (d) { const F = W.MURM_FAR; if (d <= F[0]) return 1; if (d >= F[1]) return W.MURM_FAR_MIN; const t = (d - F[0]) / (F[1] - F[0]); return 1 + (W.MURM_FAR_MIN - 1) * t * t * (3 - 2 * t); };
+  W.MURM_PALE = [60, 240]; W.MURM_FAR_MIN = 0.22; W.MURM_QUIET = 60; W.MURM_FADE = 30; W.MURM_TAU_MAX = 1.4; W.MURM_ASIDE = 60;   // (an impostor's depth at most: its core a dark grey through which the sky shows, not ink)
+  W.murmFar = function (d) { const F = W.MURM_PALE;   // (f-first4: its own name — W.MURM_FAR is the step rate's distance, 120)
+    if (d <= F[0]) return 1; if (d >= F[1]) return W.MURM_FAR_MIN; const t = (d - F[0]) / (F[1] - F[0]); return 1 + (W.MURM_FAR_MIN - 1) * t * t * (3 - 2 * t); };
   // a new world's flock: 0 within its first QUIET s (age: the seconds played on it; fresh: a world just made), then in over FADE
   // a world just made: no player record when it opened (First2's f2new) or made within FRESH_MS (meta.created — under a
   // slow GPU the loading screen alone takes a minute; the after run of critic_ux had a player record by the first frame)
@@ -494,6 +495,18 @@
   // where the murmuration plays: over the lake when it is near (the same for every client near it), else over the land in
   // the eye's 256-block cell (a seeded spot of the cell: the same for everyone in it), another one each day. y: over the
   // lake its height; on land null (the game puts it 40 over the ground there)
+  // f-first4 (f-first3's self-review: the pale flock sat by the crosshair in a new world's first minutes, where the landmark
+  // stands): the stage turned about the spawn sp until its bearing is ≥ minDeg off the view's yaw (to the nearer side, its
+  // distance and height kept); a stage already aside is returned as it is. In place. Pure: test/first4.js
+  W.stageAside = function (st, sp, yaw, minDeg) {
+    const dx = st.x - sp[0], dz = st.z - sp[2], l = Math.hypot(dx, dz); if (!(l > 1e-6)) return st;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), m = minDeg * Math.PI / 180;
+    const a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);   // (the bearing off the view: + to the right)
+    if (Math.abs(a) >= m) return st;
+    const b = (a >= 0 ? 1 : -1) * m, cb = Math.cos(b) * l, sb = Math.sin(b) * l;
+    st.x = sp[0] + fx * cb + rx * sb; st.z = sp[2] + fz * cb + rz * sb;
+    return st;
+  };
   W.stageOf = function (seed, day, phase, eye, nearLake) {
     const d = (day | 0) * 2 + (phase === 'dawn' ? 1 : 0);
     if (nearLake) {
