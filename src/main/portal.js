@@ -83,6 +83,7 @@
       '#ptCap .pt-ce{margin-top:14px;font:500 clamp(14px,1.5vw,17px) var(--font,sans-serif);color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.7);min-height:1.4em;transition:opacity .4s}',
       '#ptCap .pt-ce b{color:#ffd166}',
       '#ptRing{position:fixed;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;z-index:870;pointer-events:none;border-radius:50%;opacity:0;box-shadow:0 0 0 2px rgba(255,214,140,.9),0 0 30px rgba(255,190,90,.6);transition:opacity .2s}',
+      'html.pt-on #ctxprompt,html.pt-on #keystrip,html.pt-on #hints,html.pt-on #hint,html.pt-on #toasts{visibility:hidden !important}',   // (a film's moment: no prompts, hints or toasts over it)
       '#ptFly{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:860;pointer-events:none;padding:4px 12px;border-radius:12px;background:rgba(8,10,26,.55);color:#ffe2a8;font:700 14px var(--font,sans-serif);opacity:0;transition:opacity .4s}',
     ].join('\n');
     doc.head.appendChild(s);
@@ -198,6 +199,7 @@
     if (g.audio && g.audio.cue && !o.dry) g.audio.cue('hold');   // (the score makes room: the film has its own swell)
     save(g);
     hush(g);
+    if (!o.dry) cinema(true);
     requestAnimationFrame(frame);
     return film;
   };
@@ -276,9 +278,11 @@
     save(g);
     Portal.last = { film: J.film.id, len: J.film.len, shots: J.film.shots.map((s) => s.id), to: d.dim, episode: ep ? ep.id : null, ms: Math.round(now() - J.t0) };
   }
+  const cinema = (on) => { try { doc.documentElement.classList.toggle('pt-on', !!on); } catch (e) { /* no page */ } };
   function end(J) {
     if (M.J !== J) return;
     M.J = null; J.cv.style.display = 'none';
+    if (J.phase !== 'reveal') cinema(false);
     const sk = doc.getElementById('ptSkip'); if (sk) sk.style.display = 'none';
     const g = J.g; if (!J.dry && g && g.input && g.state === 'play' && g.ui && !g.ui.screen) { g.input.captured = true; if (g.input.requestLock) g.input.requestLock(); }
   }
@@ -290,11 +294,11 @@
     c.appendChild(el('div', 'pt-cn', name)); c.appendChild(el('div', 'pt-ck', kind)); c.appendChild(el('div', 'pt-ch', hook));
     const e = el('div', 'pt-ce'); e.style.opacity = '0'; c.appendChild(e);
     const token = (M.capTok = (M.capTok || 0) + 1);
-    setTimeout(() => { if (M.capTok === token) c.style.opacity = '1'; }, 500);
+    c.style.opacity = '1';
     const lines = ep ? ep.lines : [];
     const at = (ms, f) => setTimeout(() => { if (M.capTok === token) f(); }, ms);
     lines.forEach((l, i) => at(3600 + i * 3400, () => { e.textContent = ''; const b = el('b', '', T('story.who.' + l.who) + ': '); e.appendChild(b); e.appendChild(doc.createTextNode(T(l.key))); e.style.opacity = '1'; if (i === 0 && g.audio && g.audio.cue) g.audio.cue('funke'); }));
-    at(6200 + lines.length * 3400, () => { c.style.opacity = '0'; });
+    at(6200 + lines.length * 3400, () => { c.style.opacity = '0'; cinema(false); });
   }
   Portal.caption = caption;
   // the reveal's camera: from above and aside it swings down into your eyes
