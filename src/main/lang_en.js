@@ -3747,5 +3747,15 @@
     "g.pt.skipWait": "Almost there — the world is still being built …",
     "g.pt.bestHour": "at the golden hour",
     // ---- e-portal2 end
+    // ---- u-worlds5 (src/main/towns.js: the species market, the landmark's view)
+    "g.shop.title.sp_aqua": "🏺 Wellari Market", "g.shop.title.sp_ocker": "🏺 Dunelin Market", "g.shop.title.sp_zinn": "🏺 Glutani Market", "g.shop.title.sp_basalt": "🏺 Regoli Market", "g.shop.title.sp_opal": "🏺 Nivari Market",
+    "g.shop.btn.sp_aqua": "🏺 To the market", "g.shop.btn.sp_ocker": "🏺 To the market", "g.shop.btn.sp_zinn": "🏺 To the market", "g.shop.btn.sp_basalt": "🏺 To the market", "g.shop.btn.sp_opal": "🏺 To the market",
+    "g.shop.kit.sp_aqua": "Wellari building set", "g.shop.kit.sp_ocker": "Dunelin building set", "g.shop.kit.sp_zinn": "Glutani building set", "g.shop.kit.sp_basalt": "Regoli building set", "g.shop.kit.sp_opal": "Nivari building set",
+    "g.town.lm.aqua": "Lighthouse", "g.town.lm.ocker": "Windcatcher", "g.town.lm.zinn": "Obelisk", "g.town.lm.basalt": "Observatory", "g.town.lm.opal": "Frost spire",
+    "g.town.view": "{lm} climbed — the view over {town}",
+    "g.town.reward": "A thank-you for the climb: {n} × {item}",
+    "g.town.rewardAdv": "For the climb: +{xp} XP, +{t} Heliataler",
+    "g.town.again": "The view is as lovely as the first time.",
+    // ---- u-worlds5 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

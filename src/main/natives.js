@@ -52,7 +52,17 @@
   // 14, Low 20, Balanced 30, High all): the others are at home (the street's draw cap, folkcrowd.js, stays as it is).
   N.MARKET_ACTS = new Set(['market', 'hall', 'lantern']);
   N.CAP = { potato: 14, low: 20, medium: 30, balanced: 30 };
-  N.agentCap = (preset, n) => Math.min(n, N.CAP[preset] !== undefined ? N.CAP[preset] : n);
+  N.CAP_TOP = 30;   // (u-worlds5: High and up wake 30 too — a town cost twice a village on High with all 40)
+  N.agentCap = (preset, n) => Math.min(n, N.CAP[preset] !== undefined ? N.CAP[preset] : N.CAP_TOP);
+  // u-worlds5 · a town's far people cheaper: beyond 40 m every second of the villages' own updates is skipped (its time
+  // carried to the next), so they live at a quarter of the rate (40–56 m), a sixth (56–100) and less; drawn with the far
+  // model (villages.js's own beyond 24 m). {every (the rate in frames), mul (the extra skip), far} — null in a village
+  N.LOD_R = 40;
+  N.lod = function (d2, town) {
+    if (!town) return null;
+    const base = d2 < 24 * 24 ? 1 : d2 < 56 * 56 ? 2 : d2 < 100 * 100 ? 3 : 6, mul = d2 > N.LOD_R * N.LOD_R ? 2 : 1;
+    return { every: base * mul, mul, far: d2 > 24 * 24 };
+  };
   const KEEP = { trader: 0, mayor: 0, cashier: 0 };   // (the gardeners go to market too: a third of a town's adults are gardeners)
   const u01 = (s, salt) => { let h = Math.imul((s | 0) ^ Math.imul((salt | 0) + 0x632BE5AB, 0x9E3779B1), 0x85EBCA6B); h = Math.imul(h ^ (h >>> 15), 0xC2B2AE35); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   // who a town wakes when it may wake only cap of its people: the keepers, the lamplighters, the adults, the elders,
@@ -296,6 +306,12 @@
       const vil = a.vil, kind = vil && vil.plan && vil.plan.species;
       if (!kind) return ua.call(this, a, dt, tod);
       const g = this.g, pl = g.player.pos;
+      // (u-worlds5) a town's far people: every second update skipped, its time carried on (not the one you talk to)
+      if (vil.plan.town && this.talking !== a) {
+        const L = N.lod((a.pos[0] - pl[0]) ** 2 + (a.pos[2] - pl[2]) ** 2, true);
+        if (L.mul > 1 && ((a.lodN = (a.lodN | 0) + 1) % L.mul) !== 0) { a.lodAcc = (a.lodAcc || 0) + dt; return; }
+        if (a.lodAcc) { dt = Math.min(0.45, dt + a.lodAcc); a.lodAcc = 0; }
+      }
       const still = () => { a.t += dt; if (a.bubble) { a.bubble.t -= dt; if (a.bubble.t <= 0) a.bubble = null; } a.vel[0] = 0; a.vel[2] = 0; a.walkAmt += (0 - a.walkAmt) * Math.min(1, dt * 6); };
       // the one you talk to: turned to you, standing
       if (this.talking === a) {
