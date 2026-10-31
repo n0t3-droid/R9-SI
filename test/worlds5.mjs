@@ -133,27 +133,33 @@ if (want('cost')) {
   const S = await ev(() => VR.game.villages.sites.filter(q => /^eco:ocker:[01]$/.test(q.id)).map(s => [s.x, s.y, s.z, s.id]));
   const cost = {};
   await ev(() => VR.game.env.setTime(3600));
-  const measure = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length }; });
-  for (const preset of ['potato', 'high']) {
-    await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, preset);
-    for (const V of S) {
-      const at = V[3].endsWith(':0') ? 'town' : 'village';
+  const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length }; });
+  const measure = async (name) => { const t = Date.now(); const r = await Promise.race([measure0(), new Promise(res => setTimeout(() => res({ ms: 999, timeout: true }), 240000))]); cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${((Date.now() - t) / 1000).toFixed(0)} s, ${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
+  const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
+  // the town first (Very Low, High, High broken down, High as u-worlds4 had it: 40 people at the villages' rates), then the village
+  for (const V of S) {
+    const at = V[3].endsWith(':0') ? 'town' : 'village';
+    await preset('potato');
+    await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
+    const ld = await loaded(V, 32); await settle(25); await step(90, 33);
+    console.log(`  · ${at}: loaded ${ld} (${secs()})`);
+    await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
+    await measure('potato_' + at);
+    await preset('high'); await settle(20); await step(90, 33);
+    await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
+    await measure('high_' + at);
+    if (at === 'town') {
+      await ev(() => { const v = VR.game.villages; v.__d = v.draw; v.draw = function () {}; });
+      await measure('high_town_nodraw');
+      await ev(() => { const v = VR.game.villages; v.draw = v.__d; v.__u = v.update; v.update = function () {}; });
+      await measure('high_town_noupdate');
+      await ev(() => { const v = VR.game.villages; v.update = v.__u; });
+      await ev(() => { const N = VR.Natives; N.__c = N.CAP_TOP; N.__r = N.LOD_R; N.CAP_TOP = 99; N.LOD_R = 1e6; for (const v of VR.game.villages.known.values()) v._capP = null; });
+      await step(60, 33);
       await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
-      const ld = await loaded(V, 32); await settle(25); await step(90, 33);
-      console.log(`  · ${preset} ${at}: loaded ${ld} (${secs()})`);
-      await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
-      cost[preset + '_' + at] = await measure();
-      if (preset === 'high' && at === 'town') {
-        // the breakdown: without the people's draw, without their update, without both
-        await ev(() => { const v = VR.game.villages; v.__d = v.draw; v.draw = function () {}; });
-        cost.high_town_nodraw = await measure();
-        await ev(() => { const v = VR.game.villages; v.draw = v.__d; v.__u = v.update; v.update = function () {}; });
-        cost.high_town_noupdate = await measure();
-        await ev(() => { const v = VR.game.villages; v.draw = function () {}; });
-        cost.high_town_nopeople = await measure();
-        await ev(() => { const v = VR.game.villages; v.draw = v.__d; v.update = v.__u; });
-      }
-      console.log(`  · ${preset} ${at}: ${JSON.stringify(cost[preset + '_' + at])}`);
+      await measure('high_town_before');
+      await ev(() => { const N = VR.Natives; N.CAP_TOP = N.__c; N.LOD_R = N.__r; for (const v of VR.game.villages.known.values()) v._capP = null; });
+      await step(30, 33);
     }
   }
   run.cost = cost; run.load = fs.readFileSync('/proc/loadavg', 'utf8').trim();

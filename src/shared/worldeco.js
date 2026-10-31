@@ -216,9 +216,9 @@
   const K6 = {
     aqua: { floor6: ['pale_moss_block', 'sand'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'lily_of_the_valley', 'blue_orchid'], deck6: 'mangrove_planks', postp6: 'stripped_mangrove_log', rail6: 'bamboo_fence' },
     ocker: { floor6: ['coarse_dirt', 'packed_mud'], bed6: 'podzol', plants6: ['dead_bush', 'short_grass', 'orange_tulip'] },
-    zinn: { floor6: ['basalt', 'smooth_basalt'], bed6: 'tuff', plants6: ['amber_crystal_cluster', 'violet_crystal_cluster', 'torchflower'] },
+    zinn: { floor6: ['basalt', 'smooth_basalt'], bed6: 'tuff', plants6: ['dead_bush', 'torchflower', 'dead_bush'] },
     basalt: { floor6: ['regolith', 'regolith_dark'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'azure_bluet'] },
-    opal: { floor6: ['snow_block', 'packed_ice'], bed6: 'snow_block', plants6: ['fern', 'ice_crystal', 'white_tulip'] },
+    opal: { floor6: ['snow_block', 'packed_ice'], bed6: 'snow_block', plants6: ['fern', 'short_grass', 'white_tulip'] },
   };
   E.K6 = K6;
   E.DARK = new Set(['packed_mud', 'brown_terracotta', 'polished_deepstone', 'smooth_basalt', 'stone_bricks', 'mud_bricks', 'tuff_bricks', 'polished_tuff']);
@@ -1151,7 +1151,8 @@
       put(X, F + yd + 2, Z, 0);
     } else if (kind === 'basalt') {
       put(X, F + yd + 1, Z, 0);   // (the lantern under the dome steps aside)
-      put(X - 2, F + yd + 1, Z + 2, S('lantern'));
+      put(X - 2, F + yd + 1, Z - 2, S('lantern'));
+      for (let dx = -1; dx <= 1; dx++) for (let dz = 3; dz <= 5; dz++) for (let y = 1; y <= 2; y++) put(X + dx, F + yd + y, Z + dz, 0);   // (a window open toward the town)
     } else {
       // a gallery round the shaft's top: the obelisk's square collar of basalt, the spire's round one of snow, a parapet
       const R = kind === 'zinn' ? 3 : 4;
@@ -1161,7 +1162,7 @@
         put(X + dx, F + yd, Z + dz, kind === 'zinn' ? S('polished_basalt') : S('snow_block'));
         if (d > R - 0.8) put(X + dx, F + yd + 1, Z + dz, kind === 'zinn' ? S('polished_deepstone_wall') : S('spruce_fence'));
       }
-      for (const [dx, dz] of [[R, 0], [-R, 0], [0, -R], [0, R]]) put(X + dx, F + yd + 2, Z + dz, kind === 'zinn' ? S('spirit_lantern') : S('lantern'));
+      for (const [dx, dz] of [[R, 0], [-R, 0], [0, -R]]) put(X + dx, F + yd + 2, Z + dz, kind === 'zinn' ? S('spirit_lantern') : S('lantern'));
       for (let y = yd + 1; y <= yd + 2; y++) for (let k = 0; k <= 2; k++) put(X, F + y, Z + k, 0);   // (the way out of the shaft)
     }
     return { x: X, z: Z, y0: F + 1, y1: F + yd, deck: F + yd + 1, door: DOOR, how };
