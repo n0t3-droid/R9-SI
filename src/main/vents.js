@@ -29,6 +29,8 @@
       this.mists = new Map();         // 'x,y,z' → [x, y, z, lava] of the falls' feet (gen_realm.js, vgen 9)
       this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false;
     }
+    // the Heartland's own world: a generated (not flat) overworld of vgen 3 and up (quests.js heartOn)
+    static heartOn(g) { const m = g && g.meta; return !!(m && (m.vgen | 0) >= 3 && m.type !== 'flat' && (g.dim || 'overworld') === 'overworld'); }
     reset() { this.list.clear(); this.beacons.clear(); this.mists.clear(); this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false; }
     // the chunk's spawn records: the vents, beacons and mists among them (other kinds belong to other modules)
     absorb(spawns) {
@@ -100,7 +102,9 @@
       } else if (!on) this.lit = false;
       if (mo) this.ringLights(P, eye);
       // the citadel's blue sparkle beam: from the spire's mid-height up into the sky (the Heartland's fixed citadel)
-      const C = HEART && HEART.CITADEL;
+      // (f-polish4: only on the Heartland itself — the citadel's place is a fixed point of the overworld, and in the
+      // Ringstation's hall, near the same numbers, its sparks rose as a column of white orbs through the café)
+      const C = HEART && HEART.CITADEL && Vents.heartOn(g) ? HEART.CITADEL : null;
       if (C && !low) {
         const dx = C.x - eye[0], dz = C.z - eye[2];
         if (dx * dx + dz * dz < REACH_BEAM * REACH_BEAM) {

@@ -49,5 +49,18 @@ if (part('b')) {
   const r = F.vistaBack(g);
   check(r && g.meta.f4back === 1 && Math.abs(p.pos[2] - 19.5) < 1e-9 && F.backWhy === 'back', 'the next call steps back on the way (' + JSON.stringify(r) + ', ' + F.backWhy + ')');
 }
+if (part('c')) {
+  console.log('c · the citadel\'s beam only on the Heartland (the station café\'s white orbs)');
+  require('../src/main/vents.js');
+  const C = VR.Heart.CITADEL, n = { s: 0 };
+  const g = { dim: 'stn.ring', meta: { vgen: 12, type: 'default' }, settings: { preset: 'high', motion: false }, particles: { spawn() { n.s++; }, glow() { n.s++; } } };
+  const V = new VR.Vents(g), eye = [C.x + 10, 65, C.z + 10];
+  for (let i = 0; i < 30; i++) V.update(0.033, eye);
+  const inStation = n.s; n.s = 0; g.dim = 'overworld';
+  for (let i = 0; i < 30; i++) V.update(0.033, eye);
+  check(inStation === 0 && n.s > 10, 'the beam\'s sparks: in the Ringstation ' + inStation + ', on the Heartland ' + n.s);
+  n.s = 0; g.meta.type = 'flat'; for (let i = 0; i < 30; i++) V.update(0.033, eye);
+  check(n.s === 0, 'a flat world has no citadel: ' + n.s);
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
