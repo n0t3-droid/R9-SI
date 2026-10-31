@@ -64,6 +64,8 @@ void main() {
   col += ce * gas * (0.05 + 0.45 * rose + 1.8 * cav + 0.5 * exp(-abs(D.y - 0.22) / 0.16));   // (a glowing wall behind the pillars)
   col += vec3(1.0, 0.42, 0.12) * gas * exp(-th / 0.3) * 0.3;   // (the warm cavity, wider)
   col += vec3(0.05, 0.55, 0.62) * pow(smoothstep(0.55, 0.85, g2), 2.0) * smoothstep(0.15, 0.5, th) * 0.4;   // (teal veins of cooler gas)
+  float fil = (smoothstep(0.5, 0.56, g) - smoothstep(0.58, 0.7, g)) * smoothstep(0.05, 0.45, dot(D, Y)) * smoothstep(0.12, 0.35, th);
+  col += vec3(0.95, 0.32, 0.08) * fil * (0.22 + 0.5 * rose);   // (a6c: rust-orange filaments of warm gas in the upper part — a second hue)
   // the dust: dark lanes (thicker toward the land), rim-lit at their edge, thinned in the cavity
   float dk = clamp(smoothstep(0.42, 0.66, du) * (1.0 - 0.7 * cav) + 0.8 * smoothstep(0.02, -0.15, D.y), 0.0, 1.0);
   float rim = (smoothstep(0.42, 0.48, du) - smoothstep(0.48, 0.58, du)) * (0.02 + 0.3 * rose + 2.4 * cav);
@@ -79,10 +81,11 @@ void main() {
   if (hs > 0.998) col += vec3(1.0, 0.94, 1.0) * (1.0 - dk) * (0.9 + 0.6 * sin(u_k.z * (1.5 + 3.0 * h3(cell + 3.1)) + hs * 60.0));
   // the cocoon (9.1): a dark globule hiding the star, its rim golden, the light leaking round it
   if (u_k.y > 0.0) {
-    float tn = th + (vn(D * 40.0) - 0.5) * 0.02;
+    float tn = th + (vn(D * 40.0) - 0.5) * 0.02 + (vn(D * 12.0 + 3.0) - 0.5) * 0.035;   // (a6c: lumpy, not a flat disc)
     float glob = 1.0 - smoothstep(0.07, 0.1, tn);
-    float gr = smoothstep(0.05, 0.088, tn) * glob;
-    col = mix(col, vec3(0.02, 0.012, 0.03) + GOLD * gr * 2.4, glob * u_k.y) + GOLD * exp(-th / 0.12) * 0.35 * u_k.y;
+    float lk = smoothstep(0.2, 1.0, cos(phi - 0.8));   // (the light leaks out brighter on one side)
+    float gr = smoothstep(0.05, 0.088, tn) * glob * (0.6 + 1.2 * lk);
+    col = mix(col, vec3(0.02, 0.012, 0.03) + GOLD * gr * 2.4, glob * u_k.y) + GOLD * exp(-th / 0.12) * (0.3 + 0.3 * lk) * u_k.y;
   } else col += vec3(1.0, 0.7, 0.4) * exp(-th / 0.03) * 0.6;   // (the star's own glow in the gas round it)
   o = vec4(col * u_k.x, u_k.x);
 }`;
@@ -116,11 +119,12 @@ float pillar(vec2 c, float sd) {
   // (a6b: a tall column tapering to a ragged tip — not a thumb —, a small globule breaking off above it)
   float y01 = clamp((c.y + 1.0) * 0.5, 0.0, 1.0);
   float n = fb2(vec2(c.y * 2.2 + sd, sd * 1.7)), n2 = fb2(c * vec2(6.0, 3.5) + sd * 3.1);
-  float bend = 0.07 * sin(c.y * 1.9 + sd * 2.0) + 0.06 * y01 * y01;
-  float wd = 0.31 * (1.0 - 0.7 * y01) * (0.8 + 0.4 * n);
+  float va = fract(sd * 1.37), vb = fract(sd * 2.91);   // (a6c: each its own taper and lean)
+  float bend = 0.07 * sin(c.y * 1.9 + sd * 2.0) + (0.02 + 0.09 * vb) * y01 * y01;
+  float wd = 0.31 * (1.0 - (0.5 + 0.35 * va) * y01) * (0.8 + 0.4 * n);
   float ax = abs(c.x - bend) / wd;
   float s = 1.0 - smoothstep(0.72, 1.0, ax + (n2 - 0.5) * (0.35 + 0.6 * y01));
-  float tipY = 0.74 + 0.14 * (n - 0.5);
+  float tipY = 0.64 + 0.2 * vb + 0.14 * (n - 0.5);
   s *= 1.0 - smoothstep(tipY - 0.12, tipY + 0.02, c.y + (n2 - 0.5) * 0.3 + 0.3 * ax * ax);
   float gb = 1.0 - smoothstep(0.03, 0.05, length((c - vec2(bend + 0.05 * (n - 0.5), tipY + 0.1)) * vec2(1.0, 0.8)) + (n2 - 0.5) * 0.03);
   s = max(s, gb * step(0.35, fract(sd * 3.7)));
@@ -229,11 +233,13 @@ void main() {
     const nP = q === 0 ? 3 : 5;
     for (let i = 0; i < nP; i++) {
       // (base below the horizon, its tip partway up toward the star and leaning to it: massive, a third as wide as tall)
-      const side = i % 2 ? 1 : -1, D = 300 + 260 * r6(i, 2), azB = faz + side * (0.3 + 0.45 * r6(i, 1)), azT = faz + side * (0.16 + 0.24 * r6(i, 1));
-      const B = dirA(azB, -0.12), T = dirA(azT, fel * (0.62 + 0.2 * r6(i, 3)));
+      // (a6c: not clones — the first a massive column farther back, short of the star, the others each its own height and lean)
+      const big = i === 0, side = i % 2 ? 1 : -1, D = big ? 540 : 300 + 220 * r6(i, 2);
+      const azB = faz + side * (big ? 0.26 : 0.3 + 0.5 * r6(i, 1)), azT = faz + side * (big ? 0.14 : 0.14 + 0.3 * r6(i, 1));
+      const B = dirA(azB, -0.12), T = dirA(azT, fel * (big ? 0.5 : 0.52 + 0.36 * r6(i, 3)));
       const P0 = [e[0] + B[0] * D, e[1] + B[1] * D, e[2] + B[2] * D], P1 = [e[0] + T[0] * D, e[1] + T[1] * D, e[2] + T[2] * D];
       const C = [(P0[0] + P1[0]) / 2, (P0[1] + P1[1]) / 2, (P0[2] + P1[2]) / 2], ax0 = nrm([P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]]);
-      const H = Math.hypot(P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]) / 2 * 1.12, Wd = H * (0.58 + 0.2 * r6(i, 4));
+      const H = Math.hypot(P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]) / 2 * 1.12, Wd = H * (big ? 0.9 : 0.48 + 0.3 * r6(i, 4));
       const rel = [C[0] - e[0], C[1] - e[1], C[2] - e[2]], am = SN.aim(rel, ax0, ax0);
       out.push({ p: C, s: [Wd, H], rot: am.rot, ld: am.ld, kind: 3, a: k, col: i < 2 ? GOLDR : MAGR, col2: [0.016, 0.014, 0.04], seed: 1.3 + i * 2.71, far: true });
     }
@@ -258,7 +264,7 @@ void main() {
     }
     if (shine) {
       // Flimmi: its body, a face, the motes circling it
-      const fd = Math.hypot(F0[0] - e[0], F0[1] - e[1], F0[2] - e[2]), R = fd * 0.3;
+      const fd = Math.hypot(F0[0] - e[0], F0[1] - e[1], F0[2] - e[2]), R = fd * 0.36;
       for (let i = 0; i < (q === 0 ? 3 : 5); i++) {
         const a = t * (0.5 + 0.2 * r6(i, 18)) + i * 2.4, rr = R * (0.55 + 0.25 * r6(i, 19));
         out.push({ p: [F0[0] + Math.cos(a) * rr, F0[1] + Math.sin(a * 0.7 + i) * rr * 0.35, F0[2] + Math.sin(a) * rr], s: [R * 0.08, R * 0.08], kind: 6, a: k * (0.7 + 0.3 * Math.sin(t * 3 + i)), col: [1.0, 0.8, 0.45], seed: i, far: false });
