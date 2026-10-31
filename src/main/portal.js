@@ -248,6 +248,7 @@
   // the film's space shots (VR.PortalSpace): the plan at the world's clock, the draw through the real renderer
   function spacePlan(g, film, from, to) {
     const PS = VR.PortalSpace, SS = VR.SpaceScene; if (!PS || !SS || !g || !g.env) return null;
+    if (g.settings && g.settings.preset === 'potato') return null;   // (Very Low never slower: the painted film, as before e-portal2)
     try { return PS.plan(film, from, to, SS.worldTime(g.env.day, g.env.ticks)); } catch (e) { return null; }
   }
   function spaceDraw(g, plan) {
