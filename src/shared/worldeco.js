@@ -51,7 +51,7 @@
       ],
       fauna: [
         { id: 'reef_glider', de: 'Riffgleiter', en: 'Reef Glider', does: 'swim' },
-        { id: 'shell_strider', de: 'Muschelschreiter', en: 'Shell Strider', does: 'graze' },
+        { id: 'shell_strider', de: 'Muschelschreiter', en: 'Shell Wader', does: 'graze' },
         { id: 'spray_sailor', de: 'Gischtsegler', en: 'Spray Sailor', does: 'fly' },
       ],
       species: {

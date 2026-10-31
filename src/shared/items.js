@@ -82,7 +82,7 @@
   VR.MOB_EGGS = ['glimmer_deer', 'moss_boar', 'sky_ray', 'crystal_crab', 'ember_husk', 'void_stalker', 'shard_wisp', 'bloom_sheep', 'hover_drone', 'glimmer_fox', 'moss_cat', 'crystal_pup'];
   // (the shown name where it is not the id's: f-names — the ray is the Cloud Ray; its id sky_ray stays, eggs in saved
   // inventories are egg_sky_ray)
-  const EGG_NAME = { sky_ray: 'Cloud Ray' };
+  const EGG_NAME = { sky_ray: 'Cloud Ray', void_stalker: 'Void Slinker' }   // (n-names: display only, the ids stay);
   for (const m of VR.MOB_EGGS) item('egg_' + m, { cat: 'spawn', stack: 64, use: 'spawn', mob: m, texKey: 'egg:' + m, name: (EGG_NAME[m] || title(m)) + ' Egg' });
 
   // extra texture layers used by the renderer

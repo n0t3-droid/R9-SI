@@ -153,6 +153,14 @@ NAMES.push(
   { de: 'Morgenhain', en: 'Morgenhain', role: 'site', what: 'the grove in the east, where the sun rises (was „Hain" / „Grove")', checked: '2026-10-31', by: 'n-names', found: 'no game, brand or novel of that name' },
   { de: 'Huschel', en: 'Huschel', role: 'flausel', what: 'a Flausel\'s given name (VR.Names.PEOPLES.flausel: Tummel, Huschel, Tröpfel, Summsel …; elders Murmelbart …; families Moostupf, Tauperle …)', checked: '2026-10-31', by: 'n-names', found: 'no children\'s-book or game character (a book „Husch, die Waldfee" — another word); Fussel (a picture book), Zippel (Rühle\'s keyhole ghost), Purzel (a picture book), Wispel (Mörike) were taken out' },
 );
+NAMES.push(
+  { de: 'Leerenschleicher', en: 'Void Slinker', role: 'slinker', what: 'the dark tall creature of the void (English was „Void Stalker": a game\'s title „Void Stalkers", a D&D monster, an ESO „Voidstalker")', checked: '2026-10-31', by: 'n-names', found: 'no game, creature or brand of either name (WebSearch „Void Slinker")' },
+  { de: 'Muschelschreiter', en: 'Shell Wader', role: 'wader', what: 'Aquamarin\'s grazing shell creature (English was „Shell Strider": ≈ Horizon Zero Dawn\'s Shell-Walker and Strider)', checked: '2026-10-31', by: 'n-names', found: 'no game creature of either name' },
+);
+RETIRED.push(
+  { word: 'Void Stalker', re: /Void ?[Ss]talker/, why: 'a game title (Void Stalkers), a D&D monster, an ESO creature; the id void_stalker stays', now: 'Void Slinker' },
+  { word: 'Shell Strider', re: /Shell Strider/, why: '≈ Horizon Zero Dawn\'s Shell-Walker / Strider machines; the id shell_strider stays', now: 'Shell Wader' },
+);
 module.exports = { NAMES, RETIRED };
 if (require.main !== module && !process.env.NAMES_RUN) return;
 
