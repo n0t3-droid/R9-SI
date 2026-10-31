@@ -14,7 +14,7 @@ global.window = global.window || {};
 if (!global.window.addEventListener) global.window.addEventListener = () => {};
 global.performance = global.performance || { now: () => Date.now() };
 const ROOT = path.join(__dirname, '..'), SRC = path.join(ROOT, 'src/main');
-for (const f of ['i18n', 'lang_en', 'lang_de', 'eventlog', 'intent', 'regie', 'regie_acts', 'foes', 'liberate']) { try { require(path.join(SRC, f + '.js')); } catch (e) { console.log('  (load ' + f + ': ' + e.message + ')'); } }
+for (const f of ['i18n', 'lang_en', 'lang_de', 'eventlog', 'intent', 'regie', 'regie_acts', 'foes', 'liberate', 'input']) { try { require(path.join(SRC, f + '.js')); } catch (e) { console.log('  (load ' + f + ': ' + e.message + ')'); } }
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const I = V.Intent, L = V.Liberate, EL = V.EventLog, RA = V.RegieActs;
@@ -77,6 +77,29 @@ if (RA && RA.offers) {
   check(!has(200, { adv: false }) && !has(200, { guest: true }), '… only in an Abenteuer world, never for a guest');
   const o = RA.offers(st, 200).find(q => q.act === 'scan');
   check(!!o && o.weight === 2 && o.kind === 'discovery' && !o.first, 'its offer: weight 2, a discovery, taken in a gap (not first)');
+}
+// e · a-story5 (R55-16): the adventurer's melee at the outpost. The reach and the hit box at the eye's height are
+// fine (the ray from 1.62 m at the walker's aim enters every stray's box within entities.js's 4.2 m); the click was
+// the fault — headless Chromium has no pointer lock, the game falls back to drag-look, where a click counts on its
+// release (Input.clickAction), and the walker set only mouse.clicked: 0 hits in 2 min. A real player's click is a
+// press and a release; the walker now clicks like one.
+{
+  const PH = V.PHYS;
+  for (const k of ['driller', 'sentry', 'drone', 'wisp']) {
+    const K = V.Foes && V.Foes.KINDS[k]; if (!K || !PH || !PH.rayBox) { check(false, 'Foes.KINDS / PH.rayBox loaded'); break; }
+    let worst = 0;
+    for (const d of [2.4, 3.0, 3.6]) {
+      const fy = K.fly ? 3 : 0, eye = [0, 1.62, 0], c = [0, fy + K.h * 0.55, -d], v = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]], l = Math.hypot(v[0], v[1], v[2]);
+      const r = PH.rayBox(eye[0], eye[1], eye[2], v[0] / l, v[1] / l, v[2] / l, [-K.w, 0, -K.w, K.w, K.h, K.w], c[0], fy, c[2]);
+      worst = Math.max(worst, r ? r[0] : 99);
+    }
+    check(worst < 4.2, `${k}: the walker's aim from the eye (1.62 m) at 2.4–3.6 m enters its box within the 4.2 m reach (worst ${worst.toFixed(2)} m)`);
+  }
+  const ca = V.Input && V.Input.prototype.clickAction;
+  const inp = (rel) => ({ dragLook: true, dragStart: null, mouse: { clicked: [true, false, false], releasedBtn: [rel, false, false] } });
+  check(!!ca && !ca.call(inp(false), 0) && ca.call(inp(true), 0), 'drag-look (no pointer lock, as headless): a click counts on its release — mouse.clicked alone is no click (the R55-16 walker)');
+  const ses = fs.readFileSync(path.join(ROOT, 'test', 'session.mjs'), 'utf8'), fight = ses.slice(ses.indexOf("if (A.ph === 'fight')"), ses.indexOf('// calm: close, face it'));
+  check(/releasedBtn\[0\] = true/.test(fight) && /clicked\[0\] = true/.test(fight), "session.mjs's walker clicks like a player in the fight: a press and a release");
 }
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);

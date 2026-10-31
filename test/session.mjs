@@ -393,7 +393,7 @@ function pageHelpers(win, VRx) {
       if (d > 3.6) { go(spot[0], spot[1], 0.8); aim(p, c, dt, 0); p.pitch += (Math.atan2(c[1] - p.pos[1] - 1.62, Math.max(1, d)) - p.pitch) * Math.min(1, dt * 4); return; }
       I.keys.delete('KeyW'); aim(p, c, dt, 5);
       A.clickT -= dt;
-      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; A.clickT = 0.42; A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1; }
+      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; I.mouse.releasedBtn[0] = true; I.dragStart = null; A.clickT = 0.42;   /* a-story5 (R55-16): a press and its release — headless has no pointer lock, drag-look counts a click on release */ A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1; }
       if (A.hp0 !== undefined && m.foe.hp < A.hp0) { A.hits++; A.hp0 = undefined; }
       if (A.hitAsk > 40 && A.hits === 0) { fall('melee never lands'); Fo.hurtMob ? En.hurtMob(m, 4, p.pos) : 0; A.hitAsk = 0; }
       return;
