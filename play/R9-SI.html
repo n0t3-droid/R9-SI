@@ -117364,6 +117364,12 @@ notes:'4:4 | 5:2 7:2 | 4:2 7:2 | 7:4 | 4:4 | 5:2 4:2 | 3:2 1:2 | 2:4'},
 {id:'bell',kind:'line',inst:'bell',oct:12,gain:0.03,lv:1,pri:1,
 notes:'r:3 4 | r:4 | r:3 2 | r:4 | r:3 4 | r:4 | r:4 | 0:4'},
 ],
+
+B:{chords:'5:4 | 3:4 | 0:4 | 4:4 | 5:4 | 3:4 | 1:2 4:2 | 4:4',lines:{
+mel:'7:1.5 6:.5 5 4 | 5:2 3:2 | 4 5 7 9 | 8:3 r | 9:1.5 8:.5 7 5 | 6:2 4:2 | 3 4 5 6 | 4:4',
+str:'2:4 | 0:4 | 2:2 4:2 | 1:4 | 2:4 | 0:2 1:2 | 3:2 1:2 | 1:4',
+bell:'r:3 9 | r:4 | r:3 7 | r:4 | r:3 9 | r:4 | r:4 | 4:4'}},
+alt:{bass:[{pat:[0,3],plen:1},{pat:[0,1.5,2,3.5],plen:1}]},
 },
 
 space:{
@@ -117376,6 +117382,10 @@ notes:'0 4 9:2 | 8 5 3:2 | 0 4 9 11 | 10:4 | 5 9 12:2 | 10:2 8:2 | 6 4 1:2 | 4:4
 {id:'bass',kind:'bass',inst:'bass',oct: -24,gain:0.06,lv:1,pri:2,pat:[0],plen:4},
 {id:'arp',kind:'arp',inst:'pluck',oct:12,gain:0.018,lv:1,pri:1},
 ],
+
+B:{chords:'5:4 | 1:4 | 2:4 | 1:4 | 5:4 | 4:4 | 1:4 | 1:4',lines:{
+mel:'9:2 7 5 | 8:2 6:2 | 4 6 7 9 | 8:4 | 12:2 11 9 | 10:2 8:2 | 7 8 9 11 | 8:4'}},
+alt:{arp:[[0,4,2,4],[0,2,4,7]]},
 },
 
 adventure:{
@@ -117391,6 +117401,10 @@ notes:'0:1.5 4:.5 4:2 | 3 4 5 7 | 6:1.5 5:.5 4:2 | 2 3 4:2 | 7:1.5 6:.5 5 4 | 5 
 {id:'clap',kind:'drum',inst:'clap',gain:0.07,lv:2,pri:1,hits:'..x...x.'},
 {id:'pad',kind:'chord',inst:'pad',oct: -12,gain:0.035,lv:2,pri:1},
 ],
+
+B:{chords:'2:4 | 6:4 | 3:4 | 0:4 | 2:4 | 6:4 | 3:2 4:2 | 4:4',lines:{
+mel:'7:2 9 7 | 6:1.5 4:.5 3:2 | 3 4 5 6 | 7:3 r | 9:1.5 8:.5 7 6 | 6 7 8:2 | 10 9 8 7 | 8:4'}},
+alt:{bass:[{pat:[0,1,2,3],plen:0.5},{pat:[0,0.5,2,2.5,3.5],plen:0.4}],osti:[[0,4,2,4,0,4,2,7],[0,2,4,2,0,2,4,6]]},
 },
 
 wonder:{
@@ -117432,6 +117446,49 @@ cruise:{lv:1},
 };
 
 
+
+const OUTRO={
+home:{chords:'3:2 0:2',lines:{mel:'5 4 7:2',str:'5:2 4:2',bell:'r:2 7:2'},tail:3.2},
+space:{chords:'1:2 0:2',lines:{mel:'9 8 7:2'},tail:3.8},
+adventure:{chords:'6:2 0:2',lines:{mel:'6 5:.5 4:.5 7:2'},tail:3.4},
+};
+const STING_TAIL=2.8,WANDER_TAIL=3.2;
+
+const FORMS={home:['A','AB','BA','AB','B'],space:['A','AB','BA','B'],adventure:['A','B','AB','BA']};
+function formOf(id,seed){
+const th=THEMES[id],F=FORMS[id];
+if(!seed|| !th|| !th.B|| !F)return'A';
+return F[Math.floor(VR.Klang.rng(((seed>>>0)^0xf0f0a5)>>>0)()*F.length)];
+}
+
+
+
+const COLOURS={
+moon:{inst:{pluck:'glass',strings:'glasspad',pad:'glasspad',lead:'glass',bell:'glass',reed:'glass'},bassG:0.5,drumG:0.45,dry:true},
+ocker:{inst:{pluck:'reed',lead:'reed',bell:'reed'},melOct: -12,tone:0.55,drumG:0.8},
+aqua:{inst:{pluck:'drop'},drops:0.022},
+shore:{drops:0.014},
+dry:{inst:{pluck:'reed'},tone:0.7},
+snow:{inst:{pluck:'glass'},tone:0.85},
+};
+const STAR_MODE=(T)=>(T<3900?'aeolian':T<5200?'dorian':T<6000?'mixolydian':'lydian');
+
+function colourOf(p){
+p=p||{};
+if(p.starT>0)return'exo:'+Math.round(p.starT);
+if(p.body==='basalt'||p.body==='opal'||p.body==='zinn')return'moon';
+if(p.body==='ocker')return'ocker';
+if(p.body==='aqua')return'aqua';
+if(p.body)return'moon';
+const b=p.biome;if(!b)return'';
+if(b.ocean|| /beach|shore/.test(b.key||''))return'shore';
+if(b.temp>=1.5&&b.down<=0.05)return'dry';
+if(b.temp<0.15)return'snow';
+return'';
+}
+const colourDef=(col)=>(col&&COLOURS[col])||(col&&col.startsWith('exo:')?{mode:STAR_MODE(+col.slice(4))}:null);
+
+
 function parseLine(s){
 const out=[];let beat=0,bars=[0];
 for(const bar of String(s).split('|')){
@@ -117450,58 +117507,124 @@ return{notes:out,beats:beat,barBeats:bars.slice(1)};
 
 function degMidi(root,mode,d){const s=MODES[mode]||MODES.major,n=s.length,k=((d%n)+n)%n;return root+s[k]+12*Math.floor(d/n);}
 
-function keyOf(id,plan){
+
+function keyOf(id,plan,colour){
 const th=THEMES[id],r=plan?plan.root:60;
 const root=55+((((r-55)%12)+12)%12);
-const mode=th&&th.minorMode&&plan&&plan.mode==='minor'?th.minorMode:th?th.mode:'major';
+let mode=th&&th.minorMode&&plan&&plan.mode==='minor'?th.minorMode:th?th.mode:'major';
+const cd=colourDef(colour);if(cd&&cd.mode)mode=cd.mode;
 return{root,mode};
 }
 const beatLen=(id,variant)=>60/(THEMES[id].bpm*((VARIANTS[variant]&&VARIANTS[variant].bpm)||1));
 
-function cueLen(id,variant){
-if(id==='wander')return 8*4*WANDER_BEAT[variant==='night'?'night':variant==='cave'?'cave':'day'];
-const th=THEMES[id];return th?th.len*4*beatLen(id,variant):0;
+
+function cueLen(id,variant,seed){
+if(id==='wander')return 9*4*WANDER_BEAT[variant==='night'?'night':variant==='cave'?'cave':'day'];
+const th=THEMES[id];if(!th)return 0;
+return(formOf(id,seed).length*th.len+(OUTRO[id]?1:0))*4*beatLen(id,variant);
 }
 const WANDER_BEAT={day:0.56,night:0.7,cave:0.8};
 
 
 
-function events(id,o){
-o=o||{};
-if(id==='wander')return wanderEvents(o.plan||(VR.Klang&&VR.Klang.musicPlan(0)),o.variant,o.seed);
-const th=THEMES[id];if(!th)return[];
-const V=VARIANTS[o.variant]||{},B=beatLen(id,o.variant),key=keyOf(id,o.plan);
-let lv=o.lv!==undefined?o.lv:V.lv!==undefined?V.lv:0;if(o.calm)lv=Math.min(lv,1);
-const G=(V.gain||1)*(o.calm?0.8:1),out=[];
-const ch=parseLine(th.chords).notes;
-const chordAt=(b)=>{for(const c of ch)if(b>=c.b-1e-6&&b<c.b+c.len-1e-6)return c;return ch[ch.length-1];};
-const total=th.len*4;
-for(const L of th.layers){
-if(L.lv>lv)continue;
-if(o.calm&&L.kind==='drum')continue;
-if(o.lowEnd&&L.pri<2&&L.kind!=='line')continue;
-const inst=(V.inst&&V.inst[L.id])||L.inst,gain=L.gain*G,act=id==='adventure';
-const push=(b,len,midi,g2)=>out.push({t:b*B,dur:len*B,midi,inst,gain:g2===undefined?gain:g2,pri:L.pri,act,layer:L.id});
-if(L.kind==='line')for(const n of parseLine(L.notes).notes)for(const d of n.degs)push(n.b,n.len,degMidi(key.root,key.mode,d)+(L.oct||0));
-else if(L.kind==='chord')for(const c of ch)for(const d of[0,2,4])push(c.b,c.len*1.04,degMidi(key.root,key.mode,c.degs[0]+d)+(L.oct||0),gain*(d?0.8:1));
-else if(L.kind==='bass')for(let b=0;b<total;b+=4)for(const p of L.pat){const c=chordAt(b+p);push(b+p,L.plen,degMidi(key.root,key.mode,c.degs[0])+(L.oct||0));}
-else if(L.kind==='arp')for(let b=0;b<total;b+=0.5){const c=chordAt(b),k=Math.round(b*2)%4;push(b,0.9,degMidi(key.root,key.mode,c.degs[0]+[0,2,4,2][k])+(L.oct||0));}
-else if(L.kind==='osti')for(let b=0;b<total;b+=0.5){const c=chordAt(b),k=Math.round(b*2)%8;push(b,0.45,degMidi(key.root,key.mode,c.degs[0]+L.pat[k])+(L.oct||0));}
-else if(L.kind==='drum')for(let b=0;b<total;b+=0.5){const k=Math.round(b*2)%8;if(L.hits[k]==='x')push(b,0.4,0);}
+
+function vary(notes,r,beats){
+const n=notes.map(x=>({b:x.b,len:x.len,degs:x.degs.slice()}));
+if(r()<0.35){
+const half=n.filter(x=>x.b>=beats/2-1e-6);
+if(half.length>2){const p=half[0].degs[0];for(const x of half.slice(1,-1))x.degs=x.degs.map(d=>{let y=2*p-d;while(y>12)y-=7;while(y< -2)y+=7;return y;});}
+}
+for(let i=1;i<n.length-1;i++)if(r()<0.08)n[i].degs=n[i].degs.map(d=>d>=5?d-7:d+7);
+const out=[],pe=0.3+0.4*r();
+for(let i=0;i<n.length;i++){
+const x=n[i],nx=n[i+1];
+if(nx&&x.degs.length===1&&nx.degs.length===1&&x.len>=1&&Math.abs(nx.degs[0]-x.degs[0])===2&&Math.abs(x.b+x.len-nx.b)<1e-6&&r()<pe){
+out.push({b:x.b,len:x.len-0.5,degs:x.degs},{b:x.b+x.len-0.5,len:0.5,degs:[(x.degs[0]+nx.degs[0])/2]});
+}else if(nx&&x.degs.length===1&&x.len>=2&&r()<0.25){
+out.push({b:x.b,len:x.len-0.5,degs:x.degs},{b:x.b+x.len-0.5,len:0.5,degs:[x.degs[0]+1]});
+}else out.push(x);
+}
+return out;
 }
 
-const end=total*B;
+
+const SUBS={0:[5,2],1:[3],2:[0,4],3:[1,5],4:[2,6],5:[3,0],6:[4]};
+const DIM={major:6,dorian:5,lydian:3,aeolian:1,mixolydian:2};
+function reharm(ch,r,mode){
+return ch.map((c,i)=>{
+if(i===0||i===ch.length-1||r()>0.22)return c;
+const opts=(SUBS[c.degs[0]]||[]).filter(d=>d!==DIM[mode]);if(!opts.length)return c;
+return{b:c.b,len:c.len,degs:[opts[Math.floor(r()*opts.length)]]};
+});
+}
+
+
+
+
+function events(id,o){
+o=o||{};
+if(id==='wander')return wanderEvents(o.plan||(VR.Klang&&VR.Klang.musicPlan(0)),o.variant,o.seed,o.colour);
+const th=THEMES[id];if(!th)return[];
+const V=VARIANTS[o.variant]||{},B=beatLen(id,o.variant),key=keyOf(id,o.plan,o.colour),seed=o.seed>>>0;
+const col=colourDef(o.colour)||{},CI=col.inst||{};
+let lv=o.lv!==undefined?o.lv:V.lv!==undefined?V.lv:0;if(o.calm)lv=Math.min(lv,1);
+const G=(V.gain||1)*(o.calm?0.8:1),out=[];
+const form=th.sting?'A':formOf(id,seed),secBeats=th.len*4,OU=th.sting?null:OUTRO[id];
+const layers=th.layers.slice();
+if(col.drops&& !th.sting)layers.push({id:'drops',kind:'arp',inst:'drop',oct:12,gain:col.drops,lv:0,pri:1,drops:true});
+const midiOf=(d,L)=>degMidi(key.root,key.mode,d)+(L.oct||0)+(L.id==='mel'&&col.melOct?col.melOct:0);
+const emit=(L,off,sec,chords,r,outro)=>{
+if(L.lv>lv)return;
+if(o.calm&&L.kind==='drum')return;
+if(o.lowEnd&&L.pri<2&&L.kind!=='line')return;
+const vi=(V.inst&&V.inst[L.id])||L.inst,inst=CI[vi]||vi,act=id==='adventure';
+const lg=L.gain*G*(L.kind==='bass'&&col.bassG?col.bassG:1)*(L.kind==='drum'&&col.drumG?col.drumG:1);
+const push=(b,len,midi,g2)=>out.push({t:(off+b)*B,dur:len*B,midi,inst,gain:g2===undefined?lg:g2,pri:L.pri,act,layer:L.id,sec:outro?'O':sec});
+const total=outro?4:secBeats,alt=th.alt&&th.alt[L.id];
+const chordAt=(b)=>{for(const c of chords)if(b>=c.b-1e-6&&b<c.b+c.len-1e-6)return c;return chords[chords.length-1];};
+if(L.kind==='line'){
+const txt=outro?OU.lines[L.id]:sec==='B'?th.B.lines[L.id]:L.notes;if(!txt)return;
+let notes=parseLine(txt).notes;if(r&&L.id==='mel'&& !outro)notes=vary(notes,r,secBeats);
+for(const n of notes)for(const d of n.degs)push(n.b,n.len,midiOf(d,L));
+}else if(L.kind==='chord')for(const c of chords)for(const d of[0,2,4])push(c.b,c.len*1.04,midiOf(c.degs[0]+d,L),lg*(d?0.8:1));
+else if(L.kind==='bass'){
+if(outro){for(const c of chords)push(c.b,c.len,midiOf(c.degs[0],L));return;}
+const pp=alt&&r&&r()<0.5?alt[Math.floor(r()*alt.length)]:{pat:L.pat,plen:L.plen};
+for(let b=0;b<total;b+=4)for(const p of pp.pat){const c=chordAt(b+p);push(b+p,pp.plen,midiOf(c.degs[0],L));}
+}else if(L.kind==='arp'||L.kind==='osti'){
+const osti=L.kind==='osti',pat=alt&&r&&r()<0.5?alt[Math.floor(r()*alt.length)]:osti?L.pat:L.drops?[0,2,4,7,4,2]:[0,2,4,2];
+const step=L.drops?0.75:0.5,lim=outro?2:total;
+for(let b=0,k=0;b<lim-1e-6;b+=step,k++){const c=chordAt(b);push(b,osti?0.45:L.drops?1.2:0.9,midiOf(c.degs[0]+pat[k%pat.length],L));}
+}else if(L.kind==='drum'){
+if(outro){if(L.inst==='kick')push(0,0.4,0);return;}
+for(let b=0;b<total;b+=0.5){const k=Math.round(b*2)%8;if(L.hits[k]==='x')push(b,0.4,0);}
+}
+};
+for(let si=0;si<form.length;si++){
+const sec=form[si],r=seed?VR.Klang.rng(((seed^Math.imul(si+1,0x9e3779b1))>>>0)||1):null;
+let chords=parseLine(sec==='B'?th.B.chords:th.chords).notes;if(r)chords=reharm(chords,r,key.mode);
+for(const L of layers)emit(L,si*secBeats,sec,chords,r,false);
+}
+const body=form.length*secBeats;
+if(OU){const och=parseLine(OU.chords).notes;for(const L of layers)emit(L,body,'O',och,null,true);}
+
+
+const end=(body+(OU?4:0))*B,lastCh=OU?parseLine(OU.chords).notes.pop():parseLine(th.chords).notes.pop();
+const lastAt=(OU?body+lastCh.b:lastCh.b)*B,tail=OU?OU.tail:STING_TAIL;
 for(const e of out){
-if(th.arc)e.gain*=th.arc[Math.min(th.arc.length-1,Math.floor(e.t/(4*B)+1e-6))];
-if(e.t+e.dur>=end-1e-6&&e.midi&&e.inst!=='pluck')e.dur+=1.6*B;
+if(th.arc)e.gain*=e.sec==='O'?th.arc[th.arc.length-1]*0.9:th.arc[Math.min(th.arc.length-1,Math.floor((e.t/B-0)/4+1e-6)%th.len)];
+if(e.midi&&e.t>=lastAt-1e-6&&(e.t+e.dur>=end-B*1.01||e.layer==='pad'||e.layer==='bass'||e.layer==='str')){e.dur=Math.max(e.dur,end-e.t);e.tail=tail;}
+if(col.tone&&(e.inst==='pad'||e.inst==='strings'||e.inst==='glasspad'))e.tone=col.tone;
+delete e.sec;
 }
 out.sort((a,b)=>a.t-b.t||b.pri-a.pri);
 return out;
 }
 
 
-function wanderEvents(plan,variant,seed){
+function wanderEvents(plan,variant,seed,colour){
 const K=VR.Klang,r=K.rng((seed>>>0)||(K.seedOf(plan.day)^0x51ed)),out=[];
+const CI=(colourDef(colour)||{}).inst||{};
 const beat=WANDER_BEAT[variant==='night'?'night':variant==='cave'?'cave':'day'],bar=beat*4;
 const density=variant==='cave'?0.25:variant==='night'?0.4:0.6,padG=variant==='cave'?0.03:0.045;
 for(let k=0;k<8;k++){
@@ -117515,12 +117638,18 @@ let d=plan.motif[(k*2+i)%plan.motif.length];if(r()<0.2)d+=1;
 out.push({t:t0+i*beat,dur:beat*1.6,midi:K.degreeMidi(plan,d)+12,inst:variant==='night'?'bell':'pluck',gain:0.05,pri:3,act:false,layer:'mel'});
 }
 }
+
+const t9=8*bar,c0=plan.prog[0];
+for(const d of[c0,c0+2,c0+4])out.push({t:t9,dur:bar,midi:K.degreeMidi(plan,d)-12,inst:'pad',gain:padG*0.9,pri:2,act:false,layer:'pad',tail:WANDER_TAIL});
+out.push({t:t9,dur:bar,midi:K.degreeMidi(plan,c0)-24,inst:'bass',gain:0.06,pri:2,act:false,layer:'bass',tail:WANDER_TAIL});
+out.push({t:t9,dur:bar,midi:K.degreeMidi(plan,0)+12,inst:variant==='night'?'bell':'pluck',gain:0.045,pri:3,act:false,layer:'mel',tail:WANDER_TAIL});
+for(const e of out)if(CI[e.inst])e.inst=CI[e.inst];
 return out;
 }
 
-function scaleOf(id,plan){
+function scaleOf(id,plan,colour){
 if(id==='wander')return new Set(VR.Klang.SCALE[plan.mode].map(s=>(plan.root+s)%12));
-const k=keyOf(id,plan);return new Set(MODES[k.mode].map(s=>(k.root+s)%12));
+const k=keyOf(id,plan,colour);return new Set(MODES[k.mode].map(s=>(k.root+s)%12));
 }
 
 
@@ -117536,6 +117665,7 @@ o=o||{};
 this.seed=(o.seed>>>0)||1;this.r=VR.Klang.rng(this.seed);this.calm= !!o.calm;
 this.cue=null;
 this.restUntil=0;this.queue=[];this.lastSting={};this.rot=0;this.after=null;this.loops=0;
+this.nCue=0;this.colour='';
 this.duckT=1;this.log=[];
 }
 reseed(seed){this.seed=seed>>>0||1;this.r=VR.Klang.rng(this.seed);}
@@ -117588,6 +117718,7 @@ this.out={type:'fade',at:now,len};
 
 
 step(now,c){
+this.colour=c.colour||'';
 const a=this.decide(now,c);
 this.duckT=c.dialogue?0.35:c.hostile&& !(this.cue&&this.cue.id==='adventure')?0.25:1;
 return a;
@@ -117617,10 +117748,11 @@ if(this.after){const a=this.after;this.after=null;return this.start(now,a);}
 return this.start(now,w);
 }
 start(now,w){
-const t0=now+0.05,dur=cueLen(w.id,w.variant);
-this.cue={id:w.id,variant:w.variant,lv:this.calm?Math.min(1,w.lv|0):w.lv|0,t0,t1:t0+dur,fading:false,sting: !!w.sting};
-this.log.push({id:w.id,variant:w.variant,t0,t1:t0+dur});if(this.log.length>64)this.log.shift();
-return(this.out={type:'start',id:w.id,variant:w.variant,lv:this.cue.lv,at:t0,dur,sting: !!w.sting});
+const seed=((Math.imul(this.seed,0x9e3779b1)^Math.imul(++this.nCue,0x85ebca6b))>>>0)||1,colour=this.colour;
+const t0=now+0.05,dur=cueLen(w.id,w.variant,seed),lv=this.calm?Math.min(1,w.lv|0):w.lv|0;
+this.cue={id:w.id,variant:w.variant,lv,t0,t1:t0+dur,fading:false,sting: !!w.sting};
+this.log.push({id:w.id,variant:w.variant,lv,seed,colour,t0,t1:t0+dur});if(this.log.length>64)this.log.shift();
+return(this.out={type:'start',id:w.id,variant:w.variant,lv,at:t0,dur,sting: !!w.sting,seed,colour});
 }
 }
 
@@ -117628,7 +117760,7 @@ return(this.out={type:'start',id:w.id,variant:w.variant,lv:this.cue.lv,at:t0,dur
 function gather(g,s,out){
 out=out||{};
 out.night= +s.night||0;out.cave= !!s.cave;out.festival= !!s.festival;out.danger= !!s.danger;
-out.space=s.space?'cruise':'';out.boss=0;out.outpost=false;out.story=false;out.dialogue=false;out.building=false;
+out.space=s.space?'cruise':'';out.colour='';out.boss=0;out.outpost=false;out.story=false;out.dialogue=false;out.building=false;
 if(!g)return out;
 try{
 const BS=VR.RPGBoss;const bc=BS&&BS.cur;
@@ -117645,13 +117777,19 @@ const SM=VR.StarMap;if(SM&&SM.isOpen&&SM.isOpen())out.space='map';
 const fl=g.flight;if(fl&&(fl.regime==='space'||fl.regime==='climb'))out.space=out.space||(fl.asc&&fl.asc.cruise?'cruise':'orbit');
 if(g.story&&g.story.scene)out.story=true;
 out.dialogue= !!(g.funke&&g.funke.line)|| !!(g.villages&&g.villages.talking&&g.ui&&g.ui.screen==='talk');
+
+const D=VR.DimReg&&g.dim&&VR.DimReg.get(g.dim),st=g.stars;
+const w=g.world,bi= !D|| !D.body?(w&&w.biomeAt&&p&&VR.BIOMES?VR.BIOMES[w.biomeAt(Math.floor(p[0]),Math.floor(p[2]))]:null):null;
+out.colour=colourOf({body:D&&D.body,starT:st&&st.on&&st.def&&st.def.star?st.def.star.T:0,biome:bi});
 const BH=VR.Bauhand;if((BH&&BH.state&&BH.state!=='closed')||(g.baustelle&&g.baustelle.active))out.building=true;
 }catch(e){}
 return out;
 }
 
-VR.Score={MODES,THEMES,VARIANTS,parseLine,degMidi,keyOf,cueLen,events,wanderEvents,scaleOf,Director,gather,FADE,REST,GAP};
+VR.Score={MODES,THEMES,VARIANTS,OUTRO,COLOURS,FORMS,parseLine,degMidi,keyOf,cueLen,formOf,colourOf,vary,events,wanderEvents,scaleOf,Director,gather,FADE,REST,GAP};
 })(VR);
+
+
 
 
 
@@ -117683,51 +117821,82 @@ p.exponentialRampToValueAtTime(0.0001,end);
 }
 function osc(c,type,f,t,end,det){const o=c.createOscillator();o.type=type;o.frequency.value=f;if(det)o.detune.value=det;o.start(t);o.stop(end+0.05);return o;}
 
+
+
+
+
 function note(c,dest,ev,t,o){
 o=o||{};
-const lo= !!o.lowEnd,d=Math.max(0.05,ev.dur),G=ev.gain,f=ev.midi?hz(ev.midi):0;
-const g=c.createGain();g.connect(dest);if(o.rev&& !lo&&(ev.inst==='bell'||ev.inst==='pad'||ev.inst==='strings'))g.connect(o.rev);
+const tier=o.tier!==undefined?o.tier:o.lowEnd?0:1,lo= !!o.lowEnd||tier===0,hi=tier>=3&& !lo;
+const d=Math.max(0.05,ev.dur),G=ev.gain,f=ev.midi?hz(ev.midi):0,tl=ev.tail||0,tone=ev.tone||1;
+const g=c.createGain();g.connect(dest);
+const lush=ev.inst==='bell'||ev.inst==='pad'||ev.inst==='strings'||ev.inst==='glass'||ev.inst==='glasspad';
+if(o.rev&& !lo&&lush)g.connect(o.rev);
+if(o.room&&tier>=2&& !lo&&(lush||ev.inst==='pluck'||ev.inst==='reed'||ev.inst==='drop'||ev.inst==='lead'))g.connect(o.room);
+if(o.chorus&&hi&&(ev.inst==='pad'||ev.inst==='strings'||ev.inst==='glasspad'))g.connect(o.chorus);
+const vib=(x)=>{if(hi&&o.lfo)o.lfo.connect(x.detune);return x;};
 let n=0,end;
 switch(ev.inst){
-case'pad':{
-const rel=Math.min(0.9,d*0.3);end=t+d+rel*0.8;env(g,t,Math.min(0.5,d*0.25),G,rel,end);
-const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(2400,f*3+300);lp.Q.value=0.5;lp.connect(g);
-for(const det of lo?[0]:[-7,7]){osc(c,'triangle',f,t,end,det).connect(lp);n++;}
+case'pad':case'glasspad':{
+const glass=ev.inst==='glasspad';
+const rel=tl||Math.min(0.9,d*0.3);end=t+d+(tl?tl:rel*0.8);env(g,t,Math.min(0.5,d*0.25),G,rel,end);
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(glass?6000:2400,(glass?f*6:f*3+300)*tone);lp.Q.value=0.5;lp.connect(g);
+for(const det of lo?[0]:glass?[-4,1204]:[-7,7]){vib(osc(c,glass?'sine':'triangle',f,t,end,det)).connect(lp);n++;}
+if(hi&& !glass){const g3=c.createGain();g3.gain.value=0.3;g3.connect(lp);vib(osc(c,'sawtooth',f,t,end,-3)).connect(g3);n++;}
 break;
 }
 case'strings':{
-const rel=Math.min(0.6,d*0.35);end=t+d+rel*0.7;env(g,t,Math.min(0.18,d*0.35),G,rel,end);
+const rel=tl||Math.min(0.6,d*0.35);end=t+d+(tl?tl:rel*0.7);env(g,t,Math.min(0.18,d*0.35),G,rel,end);
 const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=0.7;
-lp.frequency.setValueAtTime(f*2.2,t);lp.frequency.linearRampToValueAtTime(Math.min(5000,f*4),t+Math.min(0.4,d));lp.connect(g);
-for(const det of lo?[0]:[-9,8]){osc(c,'sawtooth',f,t,end,det).connect(lp);n++;}
+lp.frequency.setValueAtTime(f*2.2*tone,t);lp.frequency.linearRampToValueAtTime(Math.min(5000,f*4*tone),t+Math.min(0.4,d));lp.connect(g);
+for(const det of lo?[0]:[-9,8]){vib(osc(c,'sawtooth',f,t,end,det)).connect(lp);n++;}
+if(hi){const g3=c.createGain();g3.gain.value=0.3;g3.connect(lp);vib(osc(c,'triangle',f/2,t,end,2)).connect(g3);n++;}
 break;
 }
-case'pluck':{
-end=t+Math.min(1.6,d+0.35);env(g,t,0.006,G,Math.min(1.4,d+0.3),end);
-const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=1.2;
-lp.frequency.setValueAtTime(Math.min(9000,f*7),t);lp.frequency.exponentialRampToValueAtTime(Math.max(200,f*1.4),t+0.22);lp.connect(g);
-osc(c,'triangle',f,t,end).connect(lp);n++;
+case'pluck':case'drop':{
+const drop=ev.inst==='drop';
+end=t+(tl?d+tl:Math.min(drop?0.5:1.6,d+(drop?0.1:0.35)));env(g,t,0.006,G,tl?end-t-0.006:Math.min(drop?0.45:1.4,d+0.3),end);
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=drop?4:1.2;
+lp.frequency.setValueAtTime(Math.min(9000,f*7),t);lp.frequency.exponentialRampToValueAtTime(Math.max(200,f*(drop?2.2:1.4)),t+(drop?0.12:0.22));lp.connect(g);
+const x=osc(c,drop?'sine':'triangle',f,t,end);if(drop){x.frequency.setValueAtTime(f*1.5,t);x.frequency.exponentialRampToValueAtTime(f,t+0.04);}
+x.connect(lp);n++;
 break;
 }
-case'bell':{
-end=t+Math.max(1.2,d*1.6);env(g,t,0.004,G,Math.max(1.1,d*1.5),end);
+case'bell':case'glass':{
+const glass=ev.inst==='glass';
+end=t+(tl?Math.max(d+tl,1.2):Math.max(1.2,d*1.6));env(g,t,glass?0.002:0.004,G,tl?end-t-0.01:Math.max(1.1,d*1.5),end);
 osc(c,'sine',f,t,end).connect(g);n++;
-const g2=c.createGain();g2.gain.setValueAtTime(0.35,t);g2.gain.exponentialRampToValueAtTime(0.01,t+0.6);g2.connect(g);
-osc(c,'sine',f*2.76,t,Math.min(end,t+0.7)).connect(g2);n++;
+const g2=c.createGain();g2.gain.setValueAtTime(glass?0.22:0.35,t);g2.gain.exponentialRampToValueAtTime(0.01,t+(glass?0.35:0.6));g2.connect(g);
+osc(c,'sine',f*(glass?4.07:2.76),t,Math.min(end,t+0.7)).connect(g2);n++;
 break;
 }
 case'bass':{
-end=t+d+0.08;env(g,t,0.012,G,Math.min(0.25,d*0.5),end);
+end=t+d+(tl||0.08);env(g,t,0.012,G,tl||Math.min(0.25,d*0.5),end);
 osc(c,'sine',f,t,end).connect(g);n++;
 if(!lo){const g2=c.createGain();g2.gain.value=0.25;g2.connect(g);osc(c,'triangle',f*2,t,end).connect(g2);n++;}
 break;
 }
 case'lead':{
-end=t+d+0.1;env(g,t,0.03,G,Math.min(0.3,d*0.4),end);
+end=t+d+(tl||0.1);env(g,t,0.03,G,tl||Math.min(0.3,d*0.4),end);
 const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=1.4;
-lp.frequency.setValueAtTime(f*1.5,t);lp.frequency.linearRampToValueAtTime(f*5,t+0.07);lp.frequency.exponentialRampToValueAtTime(f*2.4,t+Math.max(0.1,d));lp.connect(g);
-osc(c,'sawtooth',f,t,end,4).connect(lp);n++;
+lp.frequency.setValueAtTime(f*1.5,t);lp.frequency.linearRampToValueAtTime(f*5,t+0.07);lp.frequency.exponentialRampToValueAtTime(f*2.4,t+Math.max(0.1,d));
+let out=lp;
+if(tier>=2&& !lo){
+const f1=c.createBiquadFilter();f1.type='peaking';f1.frequency.value=780;f1.Q.value=2.2;f1.gain.value=7;
+const f2=c.createBiquadFilter();f2.type='peaking';f2.frequency.value=1220;f2.Q.value=2.6;f2.gain.value=5;
+lp.connect(f1);f1.connect(f2);out=f2;
+}
+out.connect(g);
+vib(osc(c,'sawtooth',f,t,end,4)).connect(lp);n++;
 if(!lo){const g2=c.createGain();g2.gain.value=0.35;g2.connect(lp);osc(c,'square',f/2,t,end).connect(g2);n++;}
+break;
+}
+case'reed':{
+end=t+d+(tl||0.12);env(g,t,0.05,G,tl||Math.min(0.35,d*0.4),end);
+const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=Math.min(3000,f*3);bp.Q.value=1.1;
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(2600,f*5);lp.Q.value=0.6;
+bp.connect(lp);lp.connect(g);
+vib(osc(c,'square',f,t,end,-3)).connect(bp);n++;
 break;
 }
 case'kick':{
@@ -117748,8 +117917,8 @@ default:end=t;
 return{n,end};
 }
 
-const VOICES={pad:2,strings:2,pluck:1,bell:2,bass:2,lead:2,kick:1,hat:1,clap:1};
-const voicesOf=(inst,lowEnd)=>(lowEnd&&(inst==='pad'||inst==='strings'||inst==='bass'||inst==='lead')?1:VOICES[inst]||1);
+const VOICES={pad:2,strings:2,pluck:1,bell:2,bass:2,lead:2,kick:1,hat:1,clap:1,glass:2,glasspad:2,reed:1,drop:1};
+const voicesOf=(inst,lowEnd,tier)=>(lowEnd&&(inst==='pad'||inst==='strings'||inst==='bass'||inst==='lead'||inst==='glasspad')?1:tier>=3&&(inst==='pad'||inst==='strings')?3:VOICES[inst]||1);
 VR.ScoreSynth={note,noise,hz,VOICES,voicesOf};
 })(VR);
 
@@ -117801,7 +117970,7 @@ this.ctx=null;this.enabled=true;
 this.vol={master:0.8,sfx:0.9,music:0.45,ambient:0.6,voice:0.8};
 
 
-this.score=VR.Score?new VR.Score.Director({seed:1}):null;this.scoreDay= -1;this.run=null;this.lowEnd=false;
+this.score=VR.Score?new VR.Score.Director({seed:1}):null;this.scoreDay= -1;this.run=null;this.lowEnd=false;this.tier=1;
 this.mvEnd=[];this.mvN=[];this.sc={};this.wanders=0;this.tickNext=0;
 this.loops={};
 this.music={next:0,bar:0,chord:0,mood:'day',intensity:0,scan:0,hostile:false,village:false,duckT:1,planDay: -1,plan:null,rng:null};
@@ -117843,6 +118012,7 @@ this.rev=null;this.setRev(this.irRoom);
 const nb=c.createBuffer(1,c.sampleRate*2,c.sampleRate),nd=nb.getChannelData(0);
 for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
 this.noise=nb;
+this.buildTier();
 if(c.state==='suspended')c.resume();
 }
 resume(){if(!this.ctx)this.init();else if(this.ctx.state==='suspended')this.ctx.resume();}
@@ -117853,6 +118023,37 @@ if(this.vox)this.vox.gain.value=this.vol.voice===undefined?0.8:this.vol.voice;
 }
 
 setLowEnd(on){this.lowEnd= !!on;if(!this.ctx|| !this.musRev)return;this.musRev.disconnect();if(!this.lowEnd&&this.rev)this.musRev.connect(this.rev);}
+
+
+
+setTier(n){n=Math.max(0,Math.min(3,n|0));const was=this.tier;this.tier=n;this.setLowEnd(n===0);if(this.ctx&&was!==n)this.buildTier();}
+buildTier(){
+const c=this.ctx;if(!c|| !c.createDelay)return;
+if(this.tier>=2&& !this.roomIn){
+this.roomIn=c.createGain();this.roomIn.gain.value=1;
+this.roomOut=c.createGain();this.roomOut.gain.value=0.2;this.roomOut.connect(this.musTalk);
+this.combs=[];
+for(const[dt,fb]of[[0.0311,0.76],[0.0367,0.74],[0.0413,0.72],[0.0471,0.7]]){
+const dl=c.createDelay(0.1);dl.delayTime.value=dt;
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=3400;lp.Q.value=0.3;
+const g=c.createGain();g.gain.value=fb;
+this.roomIn.connect(dl);dl.connect(lp);lp.connect(g);g.connect(dl);dl.connect(this.roomOut);
+this.combs.push(dl,lp,g);
+}
+}else if(this.tier<2&&this.roomIn){
+this.roomIn.disconnect();this.roomOut.disconnect();for(const x of this.combs)x.disconnect();this.roomIn=this.roomOut=null;this.combs=null;
+}
+if(this.tier>=3&& !this.choIn){
+this.choIn=c.createGain();this.choIn.gain.value=1;
+const dl=c.createDelay(0.05);dl.delayTime.value=0.017;
+const lfo=c.createOscillator();lfo.type='sine';lfo.frequency.value=0.63;
+const dep=c.createGain();dep.gain.value=0.0035;lfo.connect(dep);dep.connect(dl.delayTime);lfo.start();
+const out=c.createGain();out.gain.value=0.45;this.choIn.connect(dl);dl.connect(out);out.connect(this.musTalk);
+this.cho=[dl,lfo,dep,out];
+}else if(this.tier<3&&this.choIn){
+this.choIn.disconnect();for(const x of this.cho){x.disconnect();if(x.stop)x.stop();}this.choIn=null;this.cho=null;
+}
+}
 count(name){this.counts[name]=(this.counts[name]|0)+1;}
 prune(){const live=this.live,now=this.ctx?this.ctx.currentTime:0;let k=0;for(let i=0;i<live.length;i++)if(live[i]>now)live[k++]=live[i];live.length=k;return k;}
 stats(){return{voices:this.prune(),counts:this.counts,notes:this.noteCount};}
@@ -118303,7 +118504,7 @@ pluck(f,t,dur,gain,type){this.tone(f,gain,dur,type||'triangle',false,t,this.musD
 
 
 
-musCap(){return this.lowEnd?10:28;}
+musCap(){return this.lowEnd?10:this.tier>=3?36:28;}
 musVoices(at){
 const now=at!==undefined?at:this.ctx?this.ctx.currentTime:0,E=this.mvEnd,N=this.mvN;let k=0,sum=0;
 for(let i=0;i<E.length;i++)if(E[i]>now){E[k]=E[i];N[k]=N[i];sum+=N[i];k++;}
@@ -118319,11 +118520,11 @@ M.scan=0.25;M.hostile=this.hostileNear(s.mobs);M.village=this.villageNear(s.agen
 const day=s.day|0;
 if(this.scoreDay!==day){this.scoreDay=day;M.plan=K.musicPlan(day);if(D.log.length===0)D.reseed(K.seedOf(day)^0x5c0e);}
 const x=SC.gather(s.g||VR.game,s,this.sc);
-x.hostile=M.hostile;if(s.dialogue)x.dialogue=true;if(s.boss)x.boss=s.boss;if(s.outpost)x.outpost=true;
+x.hostile=M.hostile;if(s.colour!==undefined)x.colour=s.colour;if(s.dialogue)x.dialogue=true;if(s.boss)x.boss=s.boss;if(s.outpost)x.outpost=true;
 const act=D.step(now,x);
 M.mood=x.festival?'festival':D.cue?D.cue.id:'quiet';
 if(act&&act.type==='start')this.startCue(act);
-else if(act&&act.type==='fade'&&this.run){const r=this.run;r.bus.gain.setTargetAtTime(0.0001,now,act.len/4);r.stopAt=now+act.len;}
+else if(act&&act.type==='fade'&&this.run){const r=this.run;r.bus.gain.setTargetAtTime(0.0001,now,act.len/4);if(r.wet)r.wet.gain.setTargetAtTime(0.0001,now,act.len/4);r.stopAt=now+act.len;}
 const duck=(M.hostile||s.danger)?0.25:1;
 if(duck!==M.duckT){M.duckT=duck;this.musDuck.gain.setTargetAtTime(duck,now,duck<1?0.6:2.5);}
 const talk=x.dialogue?0.35:1;
@@ -118342,25 +118543,32 @@ const evs=r.evs,cap=this.musCap(),SY=VR.ScoreSynth,c=this.ctx;
 while(r.i<evs.length&&r.t0+evs[r.i].t<until){
 const e=evs[r.i++],t=Math.max(now+0.01,r.t0+e.t);
 if(t>=r.stopAt){r.i=evs.length;break;}
-const v=SY.voicesOf(e.inst,this.lowEnd),live=this.musVoices(t);
+const v=SY.voicesOf(e.inst,this.lowEnd,this.tier),live=this.musVoices(t);
 if(live+v>cap||(e.pri<2&&live+v>cap*0.75))continue;
 if(e.midi){const i=this.noteCount&511;this.noteLog[i]=e.midi;this.noteCount++;}
-const out=SY.note(c,r.bus,e,t,{lowEnd:this.lowEnd,rev:this.lowEnd?null:this.musRev});
+const out=SY.note(c,r.bus,e,t,{lowEnd:this.lowEnd,rev:this.lowEnd?null:this.musRev,tier:this.tier,lfo:r.lfo,chorus:r.cho,room:r.wet});
 this.mvEnd.push(out.end);this.mvN.push(v);
 }
 }
 startCue(a){
 const c=this.ctx,SC=VR.Score,D=this.score;
-if(this.run){this.run.bus.gain.setTargetAtTime(0.0001,c.currentTime,0.3);this.run.stopAt=Math.min(this.run.stopAt,c.currentTime);}
+if(this.run){this.run.bus.gain.setTargetAtTime(0.0001,c.currentTime,0.3);if(this.run.wet)this.run.wet.gain.setTargetAtTime(0.0001,c.currentTime,0.3);this.run.stopAt=Math.min(this.run.stopAt,c.currentTime);}
 const bus=c.createGain();bus.gain.value=1;bus.connect(a.id==='adventure'?this.musAct:this.musDuck);
-const evs=SC.events(a.id,{plan:this.music.plan||K.musicPlan(0),lv:a.lv,variant:a.variant,calm:D.calm,lowEnd:this.lowEnd,seed:(K.seedOf(this.scoreDay)^(0x51ed+977*this.wanders++))>>>0});
-this.run={id:a.id,evs,i:0,t0:a.at,stopAt:a.at+a.dur+0.01,bus};
+
+
+const seed=a.seed!==undefined?a.seed>>>0:(K.seedOf(this.scoreDay)^(0x51ed+977*this.wanders++))>>>0;
+const evs=SC.events(a.id,{plan:this.music.plan||K.musicPlan(0),lv:a.lv,variant:a.variant,calm:D.calm,lowEnd:this.lowEnd,seed,colour:a.colour||''});
+let wet=null,lfo=null;
+if(this.roomIn){wet=c.createGain();wet.gain.value=1;wet.connect(this.roomIn);this.roomOut.gain.setTargetAtTime(a.colour==='moon'?0.0001:0.2,c.currentTime,0.4);}
+if(this.tier>=3&& !this.lowEnd){const o=c.createOscillator();o.type='sine';o.frequency.value=5.1;lfo=c.createGain();lfo.gain.value=7;o.connect(lfo);o.start(a.at);o.stop(a.at+a.dur+6);}
+this.run={id:a.id,evs,i:0,t0:a.at,stopAt:a.at+a.dur+0.01,bus,wet,lfo,cho:this.choIn||null};
 this.count('cue_'+a.id);
 }
 kick(t,gain){const c=this.ctx;const o=c.createOscillator();o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(40,t+0.15);const g=c.createGain();g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);o.connect(g);g.connect(this.musDuck);o.start(t);o.stop(t+0.3);}
 }
 VR.Audio=Audio;
 })(VR);
+
 
 
 
@@ -118439,6 +118647,36 @@ return normalize(x,0.7);
 }
 
 
+
+function genSurf(r){
+const T=9,n=RATE*T,lo=lowpass(white(n,r),500),hi=highpass(white(n,r),1500),mid=highpass(lowpass(white(n,r),2500),200),x=new Float32Array(n);
+for(const[t0,a]of[[0,1],[4.4+r()*0.5,0.8]]){
+for(let i=0;i<n;i++){
+let t=i/RATE-t0;if(t<0)t+=T;
+const swell=t<1.8?Math.pow(t/1.8,2):Math.exp(-(t-1.8)/0.9);
+const crash=t<1.8?0:Math.exp(-(t-1.8)/0.6)*Math.min(1,(t-1.8)*30);
+const wash=t<2.1?0:Math.exp(-(t-2.1)/1.4)*Math.min(1,(t-2.1)*4);
+x[i]+=a*(0.8*swell*lo[i]+0.6*crash*mid[i]+0.35*wash*hi[i]);
+}
+}
+for(let i=0;i<n;i++)x[i]+=0.12*lo[i];
+return normalize(x,0.8);
+}
+
+
+function genCabin(r){
+const T=4,n=RATE*T,air=lowpass(lowpass(white(n,r),700),700),x=new Float32Array(n);
+for(let i=0;i<n;i++){
+const t=i/RATE,p=i/n;
+x[i]=0.32*Math.sin(2*Math.PI*60*t)+0.12*Math.sin(2*Math.PI*120*t)+0.16*Math.sin(2*Math.PI*90*t)+0.05*Math.sin(2*Math.PI*240*t)
++air[i]*2.2*(0.8+0.2*Math.sin(2*Math.PI*p));
+}
+return normalize(x,0.7);
+}
+
+function birdK(b){if(!b)return 1;if(b.temp>=1.5&&b.down<=0.05)return 0.25;if(b.temp<0.15)return 0.4;if(/jungle/.test(b.key||''))return 1.3;return 1;}
+
+
 let LEAF=null;
 const isLeaf=(s)=>{if(!LEAF){LEAF=new Uint8Array(R.stateCount);for(let k=0;k<R.stateCount;k++){const t=R.types[R.T.type[k]];LEAF[k]=t&& /leaves|leaf/.test(t.name)?1:0;}}return LEAF[s]===1;};
 
@@ -118463,7 +118701,7 @@ this.muffle=ctx.createBiquadFilter();this.muffle.type='lowpass';this.muffle.freq
 this.busGain=ctx.createGain();this.busGain.gain.value=1;
 this.muffle.connect(this.busGain);this.busGain.connect(this.audio.amb);
 const birds=genBirds(r);
-const bufs={wind:mkBuf([genWind(r)]),rain:mkBuf([genRain(r)]),water:mkBuf([genWater(r)]),birds:mkBuf(birds),crickets:mkBuf([genCrickets(r)])};
+const bufs={wind:mkBuf([genWind(r)]),rain:mkBuf([genRain(r)]),water:mkBuf([genWater(r)]),birds:mkBuf(birds),crickets:mkBuf([genCrickets(r)]),surf:mkBuf([genSurf(r)]),cabin:mkBuf([genCabin(r)])};
 this.L={};
 for(const k of Object.keys(bufs)){
 const src=ctx.createBufferSource();src.buffer=bufs[k];src.loop=true;
@@ -118481,7 +118719,7 @@ if(!this.L)return;
 this.timer-=dt;
 if(this.timer>0)return;
 this.timer=EVERY;
-if(this.opt.nature||this.opt.weather)this.sample(o);
+if((this.opt.nature||this.opt.weather)&& !o.space)this.sample(o);
 this.mix(o);
 }
 sample(o){
@@ -118515,13 +118753,17 @@ const nat=opt.nature,wx=opt.weather;
 const g={
 wind:nat?(0.06+0.16*windK+0.12*high+0.1*speed)*(1-0.5*snow):0,
 water:nat?clamp01(S.water/8)*0.35:0,
-birds:nat&&dryAir?day*clamp01(S.trees/5)*0.45:0,
+birds:nat&&dryAir?Math.min(0.5,day*clamp01(S.trees/5)*0.45*birdK(b)):0,
+
+surf:nat?clamp01((S.water-(b.ocean|| /beach|shore/.test(b.key||'')?6:18))/16)*0.4:0,
+cabin:0,
 crickets:nat&&night>0.4&&warm&&dryAir?night*clamp01(0.3+S.trees/6)*0.3:0,
 rain:wx&& !(b.down<=0)?rain*0.5:0,
 };
-if(b.moon)for(const k in g)g[k]=0;
+if(b.moon||o.space)for(const k in g)g[k]=0;
+if(o.space)g.cabin=0.2;
 for(const k in g)L[k].g.gain.setTargetAtTime(g[k],t,0.4);
-const muffled=S.indoors;
+const muffled=S.indoors&& !o.space;
 this.muffle.frequency.setTargetAtTime(muffled?800:20000,t,0.3);
 this.busGain.gain.setTargetAtTime(muffled?0.355:1,t,0.3);
 }
@@ -147084,7 +147326,7 @@ if(this.horizon&&this.horizon.setFar)this.horizon.setFar(S.far||0);
 if(this.aq&&this.aq.stack.length)this.aqApply(this.aq,S,this.world);
 if(this.world){this.world.renderDist=Math.max(5,S.renderDist-(this.aq&&this.aq.over&&this.aq.over.rd||0));if(key==='fancyLeaves'||key==='*'){this.world.fancyLeaves=S.fancyLeaves;this.remeshAll();}}
 if(this.input){this.input.sensitivity=0.0024*S.sens;this.input.invertY=S.invertY;this.input.raw=S.rawInput!==false;this.input.smooth= !!S.mouseSmooth;}
-if(this.audio){this.audio.setVolumes({master:S.volMaster,sfx:S.volSfx,music:S.volMusic,ambient:S.volAmbient,voice:S.volVoice===undefined?0.8:S.volVoice,calm: !!S.calmMusic});if(this.audio.setLowEnd)this.audio.setLowEnd(S.preset==='potato'||(S.preset==='custom'&& !S.shadows&& !S.particles));}
+if(this.audio){this.audio.setVolumes({master:S.volMaster,sfx:S.volSfx,music:S.volMusic,ambient:S.volAmbient,voice:S.volVoice===undefined?0.8:S.volVoice,calm: !!S.calmMusic});{const vl=S.preset==='potato'||(S.preset==='custom'&& !S.shadows&& !S.particles);if(this.audio.setTier)this.audio.setTier(vl?0:S.preset==='low'?1:S.preset==='balanced'?2:S.preset==='custom'?((S.shadows|0)>=2?3:(S.shadows|0)>=1?2:1):3);else if(this.audio.setLowEnd)this.audio.setLowEnd(vl);}}
 
 if(this.env&&this.env.wx)this.env.wx.setMode(S.wx);
 if(this.ambience)this.ambience.setOptions({nature:S.natSound!=='off',weather:S.wx!=='off'});
@@ -148301,7 +148543,7 @@ drawHand:this.camMode===0&& !this.hideHud&&this.entities&&this.entities.drawHand
 if(this.cockpit)this.cockpit.updateHud(dt);
 
 
-if(this.ambience)this.ambience.update(dt,{w,eye,E,biome:VR.BIOMES[w.biomeAt(Math.floor(eye[0]),Math.floor(eye[2]))],speed:(p.flying?Math.hypot(p.vel[0],p.vel[2]):0)+(this.flightWind||0)*40,underwater:underwater||inLava});
+if(this.ambience)this.ambience.update(dt,{w,eye,E,biome:VR.BIOMES[w.biomeAt(Math.floor(eye[0]),Math.floor(eye[2]))],speed:(p.flying?Math.hypot(p.vel[0],p.vel[2]):0)+(this.flightWind||0)*40,underwater:underwater||inLava,space: !!(this.flight&&this.flight.regime==='space')});
 this.audio.listen(eye,p.yaw,w,underwater||inLava);
 const skyAtEye=(w.getLight(Math.floor(eye[0]),Math.floor(eye[1]),Math.floor(eye[2]))>>>12);
 this.audio.updateMusic(dt,{night:E.night,cave:skyAtEye<4&&eye[1]<60,danger:this.raidActive,space:this.dim==='drift'||cam.y>180,festival: !!(this.villages&&this.villages.festivalNear&&this.villages.festivalNear()),enabled:true,day:this.env.day,mobs:this.entities?this.entities.mobs:null,agents:this.villages?this.villages.agents:null});
@@ -157722,6 +157964,7 @@ drawOpaque:(r2,E2)=>{if(g.starships)g.starships.draw(r2,E2,'opaque');},
 drawTranslucent:(r2,E2)=>{if(g.starships)g.starships.draw(r2,E2,'trans');if(g.trails)g.trails.draw(r2,E2);}});
 if(g.cockpit)g.cockpit.updateHud(dt);
 if(g.audio&&g.audio.listen)g.audio.listen(eye,p.yaw,null,false);
+if(g.ambience)g.ambience.update(dt,{space:true});
 if(g.audio&&g.audio.updateMusic)g.audio.updateMusic(dt,{night:1,cave:false,danger:false,space:true,festival:false,enabled:true,day:g.env.day,mobs:null,agents:null});
 ui.updateHUD();
 if(g.settings.showFps)ui.fps(T('g.hud.fps',{n:Math.round(g.fps||0)}));
