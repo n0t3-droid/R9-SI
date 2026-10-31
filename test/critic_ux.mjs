@@ -72,6 +72,33 @@ await wait(2500); await shot('03_loading');
 const lt = await untilState('play', 300000); OUT.loadMs = lt >= 0 ? Date.now() - tc : -1;
 check(lt >= 0, 'into the world in ' + OUT.loadMs + ' ms');
 const tPlay = Date.now();
+// (v0.54 review: the owner's wish „a calm screen") the first three minutes sampled once a second with f-quiet's sampler
+// (quiet_probe.mjs): message-seconds outside the HUD chrome, distinct messages, text in the centre, any „Funke fragen"
+const SAMPLE = () => {
+  const W = innerWidth, H = innerHeight, out = [];
+  const CHROME = '#hotbar, #stats, #xpbar, #xplvl, #minimap, #compass, #modebadge, #fps, #debug, #itemname, #advhud, #petchip, #vehiclehud, .screen, #touch, #wcompass, #bauhud, #lockhint, #crosshair, #bhBtn, #mirrorchip';
+  const WIDGET = '#f2point, #intentbar, #rpgfind';   // (way pointers: counted apart as widgets, not as messages)
+  const all = document.querySelectorAll('#app *, body > div *, body > div');
+  const seen = new Set();
+  for (const e of all) {
+    let own = ''; for (const n of e.childNodes) if (n.nodeType === 3) own += n.nodeValue;
+    own = own.trim(); if (!own || own.length < 2) continue;
+    if (e.closest(CHROME)) continue;
+    const wid = !!e.closest(WIDGET);
+    const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || r.right < 0 || r.bottom < 0 || r.left > W || r.top > H) continue;
+    let vis = true; for (let a = e; a && a !== document.body; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.15) { vis = false; break; } }
+    if (!vis) continue;
+    // the message element: the nearest ancestor with an id
+    let m = e; while (m && !m.id && m.parentElement) m = m.parentElement;
+    const key = m && m.id ? '#' + m.id : e.tagName;
+    if (seen.has(key)) { const o = out.find(x => x.k === key); if (o) { o.cx = o.cx || (r.right > W * 0.3 && r.left < W * 0.7 && r.bottom > H * 0.3 && r.top < H * 0.62); } continue; }
+    seen.add(key);
+    out.push({ w: wid, k: key, t: (m.textContent || own).trim().replace(/\s+/g, ' ').slice(0, 70), cx: r.right > W * 0.3 && r.left < W * 0.7 && r.bottom > H * 0.3 && r.top < H * 0.62 });
+  }
+  return { items: out, play: !!(window.VR && VR.game && VR.game.state === 'play' && !VR.game.ui.screen && !VR.game.arrival) };
+};
+await ev((src) => { const S = eval('(' + src + ')'); const C = window.__calm = { n: 0, secs: 0, centre: 0, funke: 0, msgs: {} };
+  window.__calmIv = setInterval(() => { try { const r = S(); if (!r.play) return; C.n++; let cx = false; for (const it of r.items) { if (it.w) continue; C.secs++; cx = cx || it.cx; C.msgs[it.k + ' ' + it.t.slice(0, 40)] = (C.msgs[it.k + ' ' + it.t.slice(0, 40)] || 0) + 1; if (/Funke fragen|Ask Funke/.test(it.t)) C.funke++; } if (cx) C.centre++; } catch (e) { /* */ } }, 1000); }, SAMPLE.toString()).catch(() => {});
 // (the arrival's end measured in the page from here: a screenshot under SwiftShader can take longer than the arrival)
 await ev(() => { window.__arr = { end: VR.game.arrival ? -1 : 0, prev: 0 }; const t = performance.now(); let lastF = VR.game.frame, lastT = 0; const iv = setInterval(() => { const f = VR.game.frame; if (f !== lastF) { window.__arr.prev = lastT; lastF = f; lastT = Math.round(performance.now() - t); } if (!VR.game.arrival) { window.__arr.end = Math.round(performance.now() - t); clearInterval(iv); } }, 100); }).catch(() => {});
 await wait(1500); await shot('04_t0');
@@ -133,6 +160,10 @@ OUT.hand180 = await handProbe();
 check(OUT.hand180 && (!OUT.hand180.block || OUT.hand180.cover <= 0.03), 'at 180 s the held block covers ≤ 3 %: ' + JSON.stringify(OUT.hand180));
 { const last = OUT.hints3[OUT.hints3.length - 1], sp = await ev(() => VR.game.player.spawn).catch(() => null); OUT.away180 = last && last.pos && sp ? Math.round(Math.hypot(last.pos[0] - sp[0], last.pos[2] - sp[2])) : -1;
   check(OUT.away180 >= 20, 'after ' + (OUT.wHolds || 0) + ' W holds (3 minutes) the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
+OUT.calm = await ev(() => { clearInterval(window.__calmIv); const C = window.__calm; return C ? { samples: C.n, msgSecs: C.secs, perMin: +(C.secs / Math.max(1, C.n) * 60).toFixed(1), centreShare: +(C.centre / Math.max(1, C.n)).toFixed(3), funke: C.funke, distinct: Object.keys(C.msgs).length, top: Object.entries(C.msgs).sort((a, b) => b[1] - a[1]).slice(0, 12) } : null; }).catch(() => null);
+console.log('  calm: ' + JSON.stringify(OUT.calm).slice(0, 1400));
+check(OUT.calm && OUT.calm.samples > 20 && !OUT.calm.funke, 'the first three minutes: no standing „Funke fragen" (' + (OUT.calm ? OUT.calm.funke : '?') + ' samples)');
+check(OUT.calm && OUT.calm.centreShare <= 0.05, 'the first three minutes: text in the centre in ≤ 5 % of the samples (' + (OUT.calm ? OUT.calm.centreShare : '?') + ')');
 console.log('  first 3 min: ' + JSON.stringify(OUT.hints3).slice(0, 1200));
 await page.keyboard.press('Escape'); await wait(1500); await shot('09_pause');
 // R53-04: the pause menu fits 720 px, few buttons at its top level
