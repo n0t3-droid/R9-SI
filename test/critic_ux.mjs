@@ -153,7 +153,7 @@ for (const [k, n] of [['KeyE', '11_E'], ['KeyJ', '12_J'], ['KeyM', '13_M'], ['F1
   if (st && st !== 'hud' && st !== 'play') { await page.keyboard.press('Escape'); await wait(800); }
   await untilClosed();
   // (f-first2: a toast lives ~4.7 s and a SwiftShader screenshot can take longer — every toast added since the key is counted)
-  await ev(() => { window.__toastN = 0; window.__toastT = ''; const box = document.getElementById('toasts'); if (window.__toastMO) window.__toastMO.disconnect(); if (box) { window.__toastMO = new MutationObserver((ms) => { for (const m of ms) for (const nd of m.addedNodes) { window.__toastN++; window.__toastT = (nd.textContent || '').trim().slice(0, 60); } }); window.__toastMO.observe(box, { childList: true }); } }).catch(() => {});
+  await ev(() => { window.__toastN = 0; window.__toastT = ''; const box = (window.VR && VR.Quiet && VR.Quiet.box && VR.Quiet.box()) || document.getElementById('toasts');   /* (f-quiet: the notices' line, #notes) */ if (window.__toastMO) window.__toastMO.disconnect(); if (box) { window.__toastMO = new MutationObserver((ms) => { for (const m of ms) for (const nd of m.addedNodes) { window.__toastN++; window.__toastT = (nd.textContent || '').trim().slice(0, 60); } }); window.__toastMO.observe(box, { childList: true }); } }).catch(() => {});
   const toasts0 = 0;
   await page.keyboard.press(k); await wait(1500); await shot(n);
   if (k === 'KeyO') { const t = Date.now(); while (Date.now() - t < 60000 && !(await ev(() => !!(VR.StarMap && VR.StarMap.isOpen()) || !!VR.game.ui.screen).catch(() => true))) await wait(300); }   // (O is read in the next frame: the star map, u-stars2)

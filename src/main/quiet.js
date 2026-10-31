@@ -190,6 +190,7 @@
     box = document.createElement('div'); box.id = 'notes'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite');
     hud.appendChild(box); return box;
   }
+  Q.box = notesEl;
   let sig = '';
   function render(t) {
     const el = notesEl(); if (!el) return;
