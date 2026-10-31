@@ -3720,6 +3720,7 @@
     "g.nat.q1": "Quest 2/3 · Bring the {sp} {n}× {item}: {why}",
     "g.nat.q2": "Quest 3/3 · Join their {what} at dusk (stay in the ring).",
     "g.nat.q3": "The {sp} showed you: {what}",
+    "g.nat.dawn": "The journey took the night — you land among the {sp} in the morning.",
     "g.nat.done0": "You know three {sp}! Now bring them {n}× {item}.",
     "g.nat.learnt": "Learnt from the {sp}",
     "g.nat.teach.recipe": "recipe: {ins} → {n}× {out}",
