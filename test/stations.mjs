@@ -202,7 +202,7 @@ async function stationRun(P, hi, Rr, tag) {
     const cp = await P.ev(() => VR.Stations.chartPos());
     // u-stations2: in true scale — a telephoto view (32°) from 2.3 km, looking down 47° so the ring sits on Herzwelt's limb
     // (the horizon dips ≈ 49° at 53 km); headings round the ring for the sun from the side (HEAD=deg,deg,…)
-    const HEADS = (process.env.HEAD || '0,120,240').split(',').map(Number), D0 = 2300, PIT = 47 * Math.PI / 180;
+    const HEADS = (process.env.HEAD || '120,60').split(',').map(Number), D0 = +(process.env.D0 || 1500), PIT = 47 * Math.PI / 180;
     let first = true;
     for (const hd of HEADS) {
       const hx = Math.sin(hd * Math.PI / 180), hz = -Math.cos(hd * Math.PI / 180);

@@ -358,14 +358,15 @@
       // the spokes (between the decks)
       for (let k = 0; k < 4; k++) {
         const sa = PI / 4 + k * PI / 2, ux = Math.cos(sa), uz = Math.sin(sa), al = dx * ux + dz * uz, ac = Math.abs(-dx * uz + dz * ux);
-        if (al > 6 && al < 38 && ac <= 1.5) for (let y = 5; y <= 7; y++) Gd.set(x, y, z, ac > 0.9 ? BM : (Math.floor(al) % 8 === 0 && y === 7 ? AM : GR));
+        if (al > 6 && al < 38 && ac <= 1.5) for (let y = 5; y <= 7; y++) Gd.set(x, y, z, ac > 0.9 ? BM : (Math.floor(al) % 8 === 0 && y === 7 ? LT : GR));   // (white markers: an amber or cyan one tints the whole spoke — the mesher's light)
       }
       // the decks: under the ring at 0°, 90°, 180°, 270°
       for (let k = 0; k < 4; k++) {
         const da = k * PI / 2, ux = Math.cos(da), uz = Math.sin(da), al = dx * ux + dz * uz, ac = -dx * uz + dz * ux;
         if (Math.abs(al - 40) <= 5 && Math.abs(ac) <= 5) for (let y = 0; y <= 3; y++) {
           const ea = Math.abs(al - 40) > 4.4, eb = Math.abs(ac) > 4.4, edge = ea || eb, corner = ea && eb;
-          Gd.set(x, y, z, y === 0 ? (corner ? (ac > 0 ? GN : RED) : edge ? HZ : DK) : y === 3 ? GR : (edge && y === 1 ? (corner ? (ac > 0 ? GN : RED) : AM) : GR));
+          const mid = (ea && Math.abs(ac) < 0.8) || (eb && Math.abs(al - 40) < 0.8);   // (amber only mid-edge: a row of it turned the deck into a yellow lump)
+          Gd.set(x, y, z, y === 0 ? (corner ? (ac > 0 ? GN : RED) : edge ? HZ : DK) : y === 3 ? GR : (edge && y === 1 ? (corner ? (ac > 0 ? GN : RED) : mid ? AM : DK) : GR));
         }
       }
     }
@@ -553,7 +554,7 @@
           const B = L ? STN.beaconDir(fr, eph, L.id, t) : null;
           if (B && B.d > 900) {
             const dS = B.dir, bu0 = Math.abs(dS[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], k = dot(bu0, dS), u = nrm([bu0[0] - dS[0] * k, bu0[1] - dS[1] * k, bu0[2] - dS[2] * k]), v = cross(dS, u);
-            const tt = performance.now() / 1000, bl = 0.15 + 0.85 * blink(tt), far = clamp(1.2 - Math.log10(B.d / 1000) * 0.35, 0.25, 1);
+            const tt = performance.now() / 1000, bl = 0.15 + 0.85 * blink(tt), far = clamp(1.2 - Math.log10(B.d / 1000) * 0.35, 0.25, 1) * clamp((B.d - 1200) / 7000, 0.1, 1);   // (u-stations2: near, the mesh's own red lamp — the glare fades: run 1's star covered the ring)
             fr.draws.push({ prog: 'glare', add: true, stn: true, u: { u_cdir: dS, u_bu: u, u_bv: v, u_half: Math.tan(25 * D2R), u_sunDir: dS, u_sunCol: [1.0, 0.13, 0.07], u_gl: [bl * far, 0.0012, 1.3, 0.5] }, tex: {} });
             STN.stats.glare++;
             STN.lastBeacon = { dir: dS, d: B.d };
