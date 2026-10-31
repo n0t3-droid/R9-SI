@@ -65,3 +65,27 @@ module.exports = function (S, SP, tr, calm, check) {
       check(Math.abs(q1.x - q0.x) < 1e-6, '… and stands still with the switch off (the old shot)');
     } }
 };
+module.exports.arrow = function (S, SP, check) {
+  console.log('21b · a-story6: ch. 7 — the window\'s arrow on the true beacons');
+  const path = require('path');
+  try { if (!VR.BodyTex) require(path.join(__dirname, '../src/shared/bodytex.js')); } catch (e) { check(false, 'bodytex.js loads: ' + e.message); return; }
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const nrm = (v) => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
+  const had = VR.SpaceScene;
+  VR.SpaceScene = { BODIES: { herz: { R: 99550 } }, frame: (b) => { const k = dot(b.xb, b.axis), x = nrm([b.xb[0] - b.axis[0] * k, b.xb[1] - b.axis[1] * k, b.xb[2] - b.axis[2] * k]), y = b.axis; return [x, y, cross(x, y)]; },
+    toSys: (F, v) => [F[0][0] * v[0] + F[1][0] * v[1] + F[2][0] * v[2], F[0][1] * v[0] + F[1][1] * v[1] + F[2][1] * v[2], F[0][2] * v[0] + F[1][2] * v[1] + F[2][2] * v[2]] };
+  const BT = VR.BodyTex, R = 99550, hb = { p: [0, 0, 0], xb: [1, 0, 0], axis: [0, 1, 0] }, F = VR.SpaceScene.frame(hb);
+  // the camera 30 km over a known beacon, looking straight down at it (the scene's axes: x east-ish, y up = away from Herzwelt)
+  const x0 = BT.CHART.Px !== undefined ? BT.CHART.Px + 20000 : 20000, z0 = BT.CHART.Pz !== undefined ? BT.CHART.Pz : 0;
+  const sp = BT.toSphere(x0, z0), n = VR.SpaceScene.toSys(F, BT.normal(sp[0], sp[1])), pos = n.map(v => v * (R + 30000));
+  const ax = nrm(cross([0, 0, 1], n)), az = cross(ax, n), fr = { pos, axes: [ax, n, az], t: 0 };   // (rows: the scene's x, y, z in the system)
+  const pts = [[x0, z0, 'a'], [x0 + 3000, z0, 'b'], [x0, z0 + 3000, 'c'], [2 * (BT.CHART.Px || 0) - x0 + 9e5, z0, 'far']];
+  const L = SP.trueArrow(fr, hb, pts, null, null), a = L.find(q => q.id === 'a');
+  check(L.length === 3 && !L.find(q => q.id === 'far'), `the beacons on the near side are found (${L.map(q => q.id).join(' ')}), the one on the far side is not`);
+  check(a && a.d[1] < -0.999 && a.n[1] > 0.999, 'the beacon straight below: straight down in the view, its beam standing up from the ground (scene axes)');
+  const b = L.find(q => q.id === 'b'), sep = Math.acos(Math.max(-1, Math.min(1, dot(a.d, b.d)))) * 180 / Math.PI;
+  check(sep > 4 && sep < 7.5, `two beacons 3 km apart seen 30 km up: ${sep.toFixed(1)}° apart (atan 3/30 = 5.7°)`);
+  check(SP.trueArrow(fr, hb, pts, [0, 0, -1], 10 * Math.PI / 180).length === 0, 'only those inside the window\'s view');
+  check(SP.trueArrow(null, hb, pts, null, null).length === 0 && SP.trueArrow(fr, null, pts, null, null).length === 0, 'no frame, no planet: none (the film\'s arrow then)');
+  VR.SpaceScene = had;
+};

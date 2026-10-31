@@ -439,6 +439,7 @@ require(path.join(__dirname, '../test/story5_part.js'))(S, SP, tr, calm, check, 
 require(path.join(__dirname, '../test/story6_part.js'))(S, SP, tr, calm, check, rnd);   // u-stations2
 require(path.join(__dirname, '../test/story7_part.js'))(S, SP, tr, calm, check, rnd);   // f-polish4
 require(path.join(__dirname, '../test/story8_part.js'))(S, SP, tr, calm, check, rnd);   // a-story6
+require(path.join(__dirname, '../test/story8_part.js')).arrow(S, SP, check);   // a-story6
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

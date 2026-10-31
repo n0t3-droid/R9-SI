@@ -159,6 +159,7 @@ void main() {
   float g = exp(-v_c.x * v_c.x * 14.0) * smoothstep(-1.0, -0.8, v_c.y) * (1.0 - smoothstep(-0.3, 1.0, v_c.y)) * (0.75 + 0.25 * sin(t * 0.7 + sd * 3.0));
   o = vec4(u_col * g * a, 0.0);
 }`;
+  SN.SRC = { BG_VS, BG_FS, L_VS, L_FS };   // (test/neb_glsl.mjs compiles them)
   let BG = null, LP = null, VAO = null, failed = false;
   function progs(gl) {
     if (failed) return false;

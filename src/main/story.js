@@ -1221,6 +1221,57 @@ body.storyon #storychoice { visibility: hidden !important; }
     };
   }
 
+  // ---------------------------------------------------------------- a-story6 · ch. 7's window: the arrow on the true beacons
+  // (a-story5's open item 3) The beacons the player knows on Herzwelt (the Abenteuer's record: its sites and the freed
+  // ones, by their map x, z), carried onto the planet seen from the Ringstation's window: BodyTex's chart → the sphere →
+  // Herzwelt's frame in the system (the scene's ephemeris at the frame's own time) → the view's axes (SpaceFlight.cur,
+  // the station's frame). Only those on the near side, inside the window's view; lit one after another along the view's
+  // right. Fewer than three there (the Heartland on the far side, none known yet): the film's arrow as before.
+  P.beaconXZ = function () {
+    const R0 = VR.Adventure && VR.Adventure.rec, out = [], seen = new Set();
+    try {
+      if (R0 && R0.sites) for (const id in R0.sites) { const o = R0.sites[id]; if (o && Number.isFinite(+o.x) && Number.isFinite(+o.z) && !seen.has(id)) { seen.add(id); out.push([+o.x, +o.z, id]); } }
+      if (R0 && R0.freed && VR.Liberate && VR.Liberate.freedList) for (const f of VR.Liberate.freedList(R0)) if (!seen.has(f.id)) { seen.add(f.id); out.push([f.x, f.z, f.id]); }
+    } catch (e) { /* none */ }
+    return out;
+  };
+  // fr { pos, axes } the view's frame in the system, hb { p, xb, axis } Herzwelt, pts [[x, z, id]], F the window's forward
+  // (scene), cone (rad) → [{ d (the direction, scene), n (the ground's normal there, scene), id }]
+  P.trueArrow = function (fr, hb, pts, F, cone) {
+    const BT = VR.BodyTex, SSx = VR.SpaceScene; if (!fr || !fr.axes || !hb || !BT || !SSx || !SSx.frame) return [];
+    const FF = SSx.frame(hb), R = (SSx.BODIES && SSx.BODIES.herz && SSx.BODIES.herz.R) || BT.CHART.R, A = fr.axes, out = [], cc = Math.cos(cone || Math.PI);
+    const dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    for (const q of pts) {
+      const sp = BT.toSphere(q[0], q[1]), n = SSx.toSys(FF, BT.normal(sp[0], sp[1]));
+      const v = [hb.p[0] + n[0] * R - fr.pos[0], hb.p[1] + n[1] * R - fr.pos[1], hb.p[2] + n[2] * R - fr.pos[2]], L = Math.hypot(v[0], v[1], v[2]);
+      if (!(L > 0) || dt(n, v) > -0.02 * L) continue;   // (the far side, the limb)
+      const d = [dt(A[0], v) / L, dt(A[1], v) / L, dt(A[2], v) / L];
+      if (F && dt(d, F) < cc) continue;
+      out.push({ d, n: [dt(A[0], n), dt(A[1], n), dt(A[2], n)], id: q[2] });
+    }
+    return out;
+  };
+  P.arrow6 = function (g, sc) {
+    if (!sc.inGlass || !sc.winC) return null;
+    const at = S.shotAt(sc.b, sc.t); if (!at || at.shot.cam !== 'window') return null;
+    const SF = VR.SpaceFlight, fr = SF && SF.cur, SSx = VR.SpaceScene; if (!fr || !fr.axes || !SSx || !SSx.ephemeris || !Number.isFinite(fr.t)) return null;
+    if (!sc.eph6 || sc.eph6.t !== fr.t) sc.eph6 = SSx.ephemeris(fr.t, sc.eph6 || {});
+    const hb = sc.eph6.bodies && sc.eph6.bodies.herz, f = sc.fwd, pt = -6 * DEG, F = [f[0] * Math.cos(pt), Math.sin(pt), f[2] * Math.cos(pt)];
+    const low = !!(g.settings && g.settings.preset === 'potato');
+    const L = P.trueArrow(fr, hb, P.beaconXZ(), F, P.WIN_FOV * DEG * 0.55);
+    P.stats.arrow6 = L.length;
+    if (L.length < 3) return null;
+    const Rt = [-f[2], 0, f[0]]; L.sort((a, b) => (a.d[0] * Rt[0] + a.d[2] * Rt[2]) - (b.d[0] * Rt[0] + b.d[2] * Rt[2]));
+    const M = L.slice(0, low ? 8 : 16), lit = smooth(at.u * 1.6) * M.length, D = 85, C = sc.winC, out = [];
+    for (let i = 0; i < M.length; i++) { const q = clamp(lit - i, 0, 1); if (!q) continue; const d = M[i].d; out.push({ p: [C[0] + d[0] * D, C[1] + d[1] * D, C[2] + d[2] * D], up: M[i].n, len: 15 * q, w: 0.55, col: [0.35, 1.6, 2.0], a: 0.8 * q, true6: true }); }
+    P.stats.arrowTrue = (P.stats.arrowTrue || 0) + 1;
+    return out;
+  };
+  { const bl6 = P.beamList; P.beamList = function (g, sc) {
+    if (sc && sc.b && sc.b.id === 'c7.b2' && !(VR.StoryNeb && VR.StoryNeb.off)) { try { const o = P.arrow6(g, sc); if (o) return o; } catch (e) { /* the film's arrow */ } }
+    return bl6.apply(this, arguments);
+  }; }
+
   // ---------------------------------------------------------------- the frames the game's own frame does not run (the space views)
   const G = VR.Game;
   if (G && G.prototype && !G.prototype._story) {
