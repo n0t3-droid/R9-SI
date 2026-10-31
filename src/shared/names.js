@@ -59,18 +59,17 @@
     'sirius remus tonks pumba timon rafiki zazu scar kovu kiara sven kristoff hans tiana mowgli baloo bagheera kaa raya sisu ' +
     'mirabel bruno lotte lotti fiete pelle thea bendix wolfram hedwig moritz till linus wilma smilla hanni nanni krümel puck ' +
     'kalle pauli nuki kuddel wuschel knopf hummel pusteblume rosenheim rosenthal silbersee sternberg amarant amaranth glutani ' +
-    'nivari nivarian sylvari ussr seven eleven sesy dune mars luna terra gaia sol eden zeus hera odin').split(' ');
+    'nivari nivarian sylvari ussr seven eleven sesy kira light ryuk dune mars luna terra gaia sol eden zeus hera odin').split(' ');
   // inside any longer word: rude or cruel words in German and English, and a few names that must never show through
   const SUB = ['nazi', 'hitler', 'sex', 'fuck', 'shit', 'fick', 'hure', 'nutte', 'kack', 'scheis', 'piss', 'penis', 'porn', 'mord',
     'kill', 'satan', 'teufel', 'bitch', 'cock', 'dick', 'fotze', 'spast', 'ussr', 'isis', 'kkk', 'arsch', 'dumm', 'doof', 'blöd',
     'kotz', 'sau', 'tod', 'tot', 'mist', 'pups', 'furz', 'ass', 'gay', 'neger', 'pipi', 'popo', 'kaka', 'pupu', 'homo', 'mami', 'papi', 'mama', 'papa', 'baby', 'oma', 'opa', 'jude', 'hass', 'nigg', 'krieg', 'gift', 'blut',
     'kot', 'cum', 'tit', 'anal', 'slut', 'whore', 'rape', 'hell', 'damn', 'god', 'gott', 'jesus', 'allah', 'pimp', 'drug', 'koks',
     'amarant', 'glutan', 'nivar'];
-  const EX = new Set(EXACT);
+  const EX = new Set(EXACT), SUBRE = new RegExp(SUB.join('|'));
   N.blocked = function (w) {
     const l = String(w).toLowerCase();
-    if (EX.has(l)) return true;
-    for (const s of SUB) if (l.indexOf(s) >= 0) return true;
+    if (EX.has(l) || SUBRE.test(l)) return true;
     return !!(VR.Galaxy && VR.Galaxy.blocked && VR.Galaxy.blocked(w));
   };
   // the game's own names (the story's speakers, the sky, the peoples, the places of the story, the outposts)
