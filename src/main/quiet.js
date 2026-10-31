@@ -147,6 +147,8 @@
   }
   Q.Look = Look;
   Q.funkeMay = (o) => !!o && o.level !== 'off' && !o.looking && !o.held && !o.building;
+  Q.STUCK = 10;        // s without a key or a click: the player may be stuck (Wenig shows the key strip then)
+  Q.stripOk = (level, age, idle) => (level === 'normal' ? true : level === 'off' ? false : (age || 0) <= Q.FIRST && idle >= Q.STUCK);
   Q.hintOk = (level, age) => (level === 'normal' ? true : level === 'off' ? false : (age || 0) <= Q.FIRST);
 
   // ---------------------------------------------------------------- the setting
@@ -354,8 +356,9 @@
     };
     Hn.show.__q = true;
   }
-  // the key-hint strip (ux.js asks): Wenig only in the first minutes, Aus never (⚙ HUD „immer" keeps it)
-  Q.stripOff = function (g) { const l = level(); if (g && g.settings && g.settings.hudMode === 'always') return false; return l === 'off' || (l === 'few' && Q.age() > Q.FIRST); };
+  // the key-hint strip (ux.js asks): Wenig only in the first minutes and when the player seems stuck, Aus never (⚙ HUD „immer" keeps it)
+  Q.stripOff = function (g) { if (heldNow(g) && g && g.state === 'play') return true; if (g && g.settings && g.settings.hudMode === 'always') return false; return !Q.stripOk(level(), Q.age(), nowS() - lastInput); };
+  Q.level = level;
 
   // ---- ⚙ Einfach: „Hinweise" under the sliders (after hitfeel's switch)
   const F2 = VR.First2;

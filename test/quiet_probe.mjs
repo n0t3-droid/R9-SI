@@ -22,13 +22,15 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 // the sampler (in the page): every visible element with its own text, outside the chrome and the menus
 const SAMPLE = () => {
   const W = innerWidth, H = innerHeight, out = [];
-  const CHROME = '#hotbar, #stats, #xpbar, #xplvl, #minimap, #compass, #modebadge, #fps, #debug, #itemname, #advhud, #petchip, #vehiclehud, .screen, #touch, #wcompass, #bauhud, #lockhint, #crosshair';
+  const CHROME = '#hotbar, #stats, #xpbar, #xplvl, #minimap, #compass, #modebadge, #fps, #debug, #itemname, #advhud, #petchip, #vehiclehud, .screen, #touch, #wcompass, #bauhud, #lockhint, #crosshair, #bhBtn, #mirrorchip';
+  const WIDGET = '#f2point, #intentbar, #rpgfind';   // (way pointers: counted apart as widgets, not as messages)
   const all = document.querySelectorAll('#app *, body > div *, body > div');
   const seen = new Set();
   for (const e of all) {
     let own = ''; for (const n of e.childNodes) if (n.nodeType === 3) own += n.nodeValue;
     own = own.trim(); if (!own || own.length < 2) continue;
     if (e.closest(CHROME)) continue;
+    const wid = !!e.closest(WIDGET);
     const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || r.right < 0 || r.bottom < 0 || r.left > W || r.top > H) continue;
     let vis = true; for (let a = e; a && a !== document.body; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.15) { vis = false; break; } }
     if (!vis) continue;
@@ -37,7 +39,7 @@ const SAMPLE = () => {
     const key = m && m.id ? '#' + m.id : e.tagName;
     if (seen.has(key)) { const o = out.find(x => x.k === key); if (o) { o.cx = o.cx || (r.right > W * 0.3 && r.left < W * 0.7 && r.bottom > H * 0.3 && r.top < H * 0.62); } continue; }
     seen.add(key);
-    out.push({ k: key, t: (m.textContent || own).trim().replace(/\s+/g, ' ').slice(0, 70), cx: r.right > W * 0.3 && r.left < W * 0.7 && r.bottom > H * 0.3 && r.top < H * 0.62 });
+    out.push({ w: wid, k: key, t: (m.textContent || own).trim().replace(/\s+/g, ' ').slice(0, 70), cx: r.right > W * 0.3 && r.left < W * 0.7 && r.bottom > H * 0.3 && r.top < H * 0.62 });
   }
   return { items: out, play: !!(window.VR && VR.game && VR.game.state === 'play' && !VR.game.ui.screen) };
 };
@@ -76,7 +78,8 @@ async function run(tag, url) {
       if (s && s.play) {
         agg.samples++; let cx = false;
         for (const it of s.items) {
-          agg.secs += dt; const b = agg.by[it.k] = agg.by[it.k] || { s: 0, n: 0, texts: [] }; b.s += dt; b.n++;
+          if (it.w) { agg.widget = (agg.widget || 0) + dt; continue; }
+          agg.secs += dt; agg.cnt = (agg.cnt || 0) + 1; const b = agg.by[it.k] = agg.by[it.k] || { s: 0, n: 0, texts: [] }; b.s += dt; b.n++;
           if (b.texts.length < 4 && !b.texts.includes(it.t)) b.texts.push(it.t);
           if (it.cx) cx = true;
           if (/Funke fragen/.test(it.t)) agg.funkeAsk++;
@@ -106,7 +109,7 @@ async function run(tag, url) {
   agg.secs = +agg.secs.toFixed(1);
   for (const k in agg.by) agg.by[k].s = +agg.by[k].s.toFixed(1);
   const top = Object.entries(agg.by).sort((a, b) => b[1].s - a[1].s).slice(0, 14).map(([k, b]) => k + ' ' + b.s + ' s: ' + b.texts.slice(0, 2).join(' | '));
-  console.log('  ' + tag + ': text-seconds ' + agg.secs + ' · samples ' + agg.samples + ' · centre ' + agg.centre + ' · Funke fragen ' + agg.funkeAsk + ' · ' + JSON.stringify(agg.worlds) + (agg.quiet ? ' · quiet ' + JSON.stringify(agg.quiet) : ''));
+  console.log('  ' + tag + ': text-seconds ' + agg.secs + ' · samples ' + agg.samples + ' · centre ' + agg.centre + ' · Funke fragen ' + agg.funkeAsk + ' · widgets ' + (agg.widget || 0).toFixed(1) + ' s' + ' · ' + JSON.stringify(agg.worlds) + (agg.quiet ? ' · quiet ' + JSON.stringify(agg.quiet) : ''));
   for (const l of top) console.log('     ' + l);
   await ctx.close();
 }
@@ -120,7 +123,9 @@ check(free >= 0.98, 'after: the centre free of text in ' + (free * 100).toFixed(
 check(A.funkeAsk === 0, 'after: no „Funke fragen" on the screen (' + A.funkeAsk + ' samples)');
 check(!A.errors.length, 'after: no page errors ' + JSON.stringify(A.errors));
 if (B) {
-  const drop = B.secs > 0 ? 1 - (A.secs / A.samples) / (B.secs / B.samples) : 0;
+  // (the samples' spacing differs with the machine's load: the mean count of texts on the screen per sample × 300 s)
+  const per = (X) => (X.cnt || 0) / Math.max(1, X.samples), drop = per(B) > 0 ? 1 - per(A) / per(B) : 0;
+  console.log('  text-seconds over 5 min (mean texts per sample × 300 s): before ' + (per(B) * 300).toFixed(0) + ' · after ' + (per(A) * 300).toFixed(0));
   console.log('  before: ' + B.secs + ' text-s over ' + B.samples + ' samples, centre ' + (100 * B.centre / B.samples).toFixed(1) + ' % · after: ' + A.secs + ' over ' + A.samples + ', centre ' + (100 * A.centre / A.samples).toFixed(1) + ' %');
   check(drop >= 0.7, 'the visible-text seconds (per sample) drop ' + (drop * 100).toFixed(0) + ' % (≥ 70 %)');
   try {

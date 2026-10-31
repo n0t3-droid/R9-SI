@@ -105,6 +105,7 @@ console.log('c · looking round a view; Funke');
 console.log('d · the 🧭 hints');
 {
   check(Q.hintOk('normal', 2000) && Q.hintOk('few', 60) && !Q.hintOk('few', Q.FIRST + 1) && !Q.hintOk('off', 10), 'Normal always, Wenig in the first ' + Q.FIRST + ' s of a world, Aus never');
+  check(Q.stripOk('normal', 9999, 0) && !Q.stripOk('few', 60, 2) && Q.stripOk('few', 60, Q.STUCK) && !Q.stripOk('few', Q.FIRST + 1, 60) && !Q.stripOk('off', 1, 60), 'the key strip: Normal always, Wenig only in the first minutes when the player seems stuck (' + Q.STUCK + ' s idle), Aus never');
   check(Q.HINT_HIDE >= 8 && Q.HINT_HIDE <= 15, 'Wenig: a hint steps back after ' + Q.HINT_HIDE + ' s');
 }
 
