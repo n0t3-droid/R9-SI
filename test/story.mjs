@@ -71,6 +71,9 @@ const section = async (tag, fn) => {
   try { await fn(); } catch (e) { fails++; console.log('  ✗ section ' + tag + ' stopped: ' + (e.stack || e.message).slice(0, 900)); try { await page.screenshot({ path: SHOTS + 'story_fail_' + tag + '.png', timeout: 120000 }); } catch (e2) { /* */ } }
   save();
 };
+// a-story4: the time of day when this strange world's sun stands up (its own clock: tried in steps; null — never, e.g. a
+// locked world's night side)
+const sunTod = async () => { for (const tod of [6000, 3000, 9000, 0, 12000, 15000, 18000, 21000]) { await ev((t) => VR.game.env.setTime(t), tod); await run(3); const up = await ev(() => VR.StoryPlay.ctx3(VR.game).sunUp); if (up !== false) return tod; } return null; };
 // a scene stepped to its time t (s): the frames of 33 ms, then held
 const sceneTo = async (t) => { const r = await run(Math.ceil(t / 0.033) + 60, 33, 'sceneT', t); return r; };
 
@@ -79,7 +82,7 @@ try {
   const atTitle = () => ev(() => typeof VR !== 'undefined' && !!VR.game && VR.game.state === 'title');
   for (let i = 0; i < 160; i++) { await wait(500); if (await atTitle()) break; }
   check(await atTitle(), 'the start screen (' + secs() + ')');
-  check(await ev(() => !!(VR.Story && VR.StoryPlay && VR.Regie && VR.Story.BEATS.length === 24)), 'VR.Story (24 beats: a-story3 wrote 5–8), VR.StoryPlay and VR.Regie are in the page');
+  check(await ev(() => !!(VR.Story && VR.StoryPlay && VR.Regie && VR.Story.BEATS.length === 36)), 'VR.Story (36 beats: a-story4 wrote 9–12), VR.StoryPlay and VR.Regie are in the page');
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); try { g.audio.resume(); } catch (e) { /* */ } if (VR.Hints) for (const h of ['play', 'move', 'fly', 'bauhand', 'bhring', 'bhundo', 'bhchange']) VR.Hints.done(h); });
   await ev(`VR.game.createWorld({name:'Leuchtfeuer',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
   for (let i = 0; i < 200; i++) { await wait(500); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)) break; }
@@ -347,7 +350,9 @@ try {
     const turn = await ev(() => { VR.StoryPlay.debug.reach('c7.b2'); const t = VR.StoryPlay.gateTurn(VR.game, { dim: 'zinn', id: 'zinn' }); return t && t.dim; });
     check(turn === 'stn.ring', 'with c7.b2 open, a gate trip to Zinnober turns aside to the Ringstation (' + turn + ')');
     if (await trip('stn.ring')) {
-      const st = await play('c7.b2', 10.2, 'c7_window');
+      const st = await play('c7.b2', 12.5, 'c7_window');
+      const wn = await ev(() => ({ beams: VR.StoryPlay.stats.beams || 0, beamMs: VR.StoryPlay.stats.beamMs || 0 }));
+      check(wn.beams > 0, 'a-story4: the window\'s arrow as 3-D beams in the world (' + JSON.stringify(wn) + ')');
       check(st && st.fx === 'beacons' && /lumi/.test(st.who) && /anselm/.test(st.who), 'c7.b2: from the window the beacons draw an arrow; Lumi meets Opa Anselm');
     }
     // 8 · a close double star: two suns; the beam to the nebula
@@ -358,18 +363,121 @@ try {
       const su = await ev(() => VR.StoryPlay.ctxOf(VR.game, VR.game.story).suns);
       check(su === 2, 'two suns over ' + bin);
       await ev(() => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; p.flying = false; p.teleport(p.pos[0], Math.max(y, p.pos[1]), p.pos[2]); p.pitch = 0; });
-      await play('c7.b3', 8.0, 'c7_blink');
+      const td = await sunTod(); check(td !== null, 'the strange sun is up for the pictures (time ' + td + ')');
+      await play('c7.b3', 8.0, 'c7_blink', td === null ? undefined : td);
       await ev(() => VR.StoryPlay.debug.reach('c8.b1'));
-      const st = await play('c8.b1', 4.5, 'c8_twin');
+      const st = await play('c8.b1', 4.5, 'c8_twin', td === null ? undefined : td);
       check(st && st.fx === 'twin' && /selkatun/.test(st.who), 'c8.b1: two suns, Selkatun of the Regoli');
       await ev(() => VR.StoryPlay.debug.reach('c8.b3'));
-      const s3 = await play('c8.b3', 4.5, 'c8_beam');
+      const s3 = await play('c8.b3', 4.5, 'c8_beam', td === null ? undefined : td);
       check(s3 && s3.fx === 'beam', 'c8.b3: the beam swings to the nebula');
     }
     N.fx = await ev(() => ({ fxMs: VR.StoryPlay.stats.fxMs, fxN: VR.StoryPlay.stats.fxN, swells: VR.StoryPlay.stats.swells, err: VR.StoryPlay.stats.fxErr || null }));
     console.log('     fx ' + JSON.stringify(N.fx));
     check(!N.fx.err && N.fx.fxN > 0 && N.fx.fxMs / N.fx.fxN < 3, 'the fx: ' + (N.fx.fxMs / Math.max(1, N.fx.fxN)).toFixed(2) + ' ms a drawn frame (only in scenes)');
     if (await ev(() => VR.game.dim) !== 'overworld') await trip('overworld');
+  });
+  // ---------------------------------------------------------------- 8 · a-story4: chapters 9–12 — the nebula, the red sun, Echo, home
+  await section('8', async () => {
+    console.log('8 · a-story4: chapters 9–12');
+    const trip = async (dim) => {
+      await ev((d) => { window.__lastTrip = VR.Travel.last; VR.Travel.go(VR.game, { dim: d, via: 'cmd' }); }, dim);
+      let s = null;
+      for (let i = 0; i < 900; i++) { await run(10); s = await ev((d) => { const g = VR.game, L = VR.Travel.last; return { state: g.state, dim: g.dim, arrived: !!(L && L !== window.__lastTrip && L.to === d) }; }, dim); if (s.arrived && s.state === 'play') break; await wait(20); }
+      check(s && s.dim === dim, 'the trip to ' + dim + ' (' + secs() + ')');
+      if (s && s.dim === dim) await settle(18, dim);
+      return s && s.dim === dim;
+    };
+    const ground = () => ev(() => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; p.flying = false; p.teleport(p.pos[0], Math.max(y, p.pos[1]), p.pos[2]); p.pitch = 0; });
+    const play = async (id, t, name, tod) => {
+      await ev((id) => VR.StoryPlay.debug.play(id), id);
+      await sceneTo(t);
+      const st = await ev(() => { const sc = VR.game.story.scene; return sc ? { id: sc.b.id, shot: sc.shot, fx: sc.fxKind || null, line: sc.line, who: sc.lines.map(l => l.who).join(' '), keys: sc.lines.map(l => l.key).join(' ') } : null; });
+      await draw(tod); await shot(name);
+      console.log('     ' + name + ' ' + JSON.stringify(st).slice(0, 300));
+      while (await ev(() => VR.StoryPlay.holds(VR.game))) { await ev(() => VR.game.story.skip()); await run(5); }
+      return st;
+    };
+    const why = (id, extra) => ev(([id, x]) => { const g = VR.game, s = g.story; return VR.Story.why(VR.Story.byId(id), Object.assign(VR.StoryPlay.ctxOf(g, s), { calm: 30 }, x || {}), s.rec); }, [id, extra || null]);
+    // the worlds: one of a system inside a nebula, one of a red dwarf (landable, not locked)
+    const W = await ev(() => { const G = VR.Galaxy, N = G.build((VR.game.meta.seed >>> 0) || 0x5eed), out = {}; for (let i = 1; i < N.list.length && !(out.neb && out.red); i++) { const st = N.list[i]; if (!st) continue; const want = st.neb >= 0 ? 'neb' : (st.cls === 'M' && !st.bin) ? 'red' : null; if (!want || out[want]) continue; const sy = G.system(N, i), p = sy && sy.bodies.find(b => b.landable && !b.locked && /aqua|ocker|basalt|opal/.test(b.dim || '')); if (p) out[want] = p.dim; } return out; });
+    check(!!W.neb && !!W.red, 'a world inside a nebula (' + W.neb + ') and one of a red dwarf (' + W.red + ')');
+    await ev(() => { VR.game.story.rec.choices.c6 = 'lumi'; });
+    // 9 · inside the nebula: Flimmi
+    if (W.neb && await trip(W.neb)) {
+      await ev(() => VR.StoryPlay.debug.reach('c9.b1')); await ground();
+      const w9 = await why('c9.b1');
+      check(w9 === null, 'c9.b1 holds on the nebula\'s world (' + w9 + ')');
+      const td = await sunTod();
+      const s1 = await play('c9.b1', 10, 'c9_nebula', td === null ? undefined : td);
+      check(s1 && s1.fx === 'nebin' && /lumi/.test(s1.who), 'c9.b1: the nebula from inside; Lumi is there (her branch)');
+      await ev(() => VR.StoryPlay.debug.reach('c9.b2'));
+      const s2 = await play('c9.b2', 11, 'c9_flimmi', td === null ? undefined : td);
+      check(s2 && s2.fx === 'flimmi' && /flimmi/.test(s2.who), 'c9.b2: Flimmi — the star being born, the one the beacons were calling');
+    }
+    // 10 · the patient sun: Dumarin and Ylosenis
+    if (W.red && await trip(W.red)) {
+      await ev(() => VR.StoryPlay.debug.reach('c10.b1'));
+      let v = null; for (let i = 0; i < 30 && !v; i++) { await run(10); await wait(400); v = await ev(() => { const n = VR.StoryPlay.village(VR.game); return n ? { x: n.s.x, z: n.s.z } : null; }); }
+      if (v) {
+        await ev((v) => { const p = VR.game.player; p.flying = true; p.safeTeleport(v.x + 30.5, 120, v.z + 24.5); }, v);
+        for (let i = 0; i < 60; i++) { await run(4); await wait(250); if (await ev((v) => VR.game.world.isLoaded(Math.floor(v.x + 30), Math.floor(v.z + 24)) && !VR.game.player.hold, v)) break; }
+        await ev((v) => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(v.x + 30), Math.floor(v.z + 24)) + 1; p.flying = false; p.teleport(v.x + 30.5, y, v.z + 24.5); window.__ft.aim([v.x, y + 2, v.z]); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, v);
+        await settle(12, 'the Dunelin village');
+      } else await ground();
+      const w10 = await why('c10.b1');
+      check(w10 === null, 'c10.b1 holds under the red dwarf (' + w10 + ')');
+      const td = await sunTod();
+      const s1 = await play('c10.b1', 15.5, 'c10_red', td === null ? undefined : td);
+      check(s1 && s1.fx === 'redsun' && /dumarin/.test(s1.who), 'c10.b1: the patient sun; Dumarin of the Dunelin');
+      await ev(() => VR.StoryPlay.debug.reach('c10.b3'));
+      const s3 = await play('c10.b3', 3.5, 'c10_beam', td === null ? undefined : td);
+      check(s3 && /ylosenis/.test(s3.who) && /dumarin/.test(s3.who), 'c10.b3: Ylosenis of the Nivari and Dumarin: the beam points home, to Echo');
+    }
+    // 11 · Echo: the five peoples at the Ringstation
+    if (await trip('stn.ring')) {
+      await ev(() => VR.StoryPlay.debug.reach('c11.b1'));
+      const w11 = await why('c11.b1');
+      check(w11 === null, 'c11.b1 holds at the Ringstation (' + w11 + ')');
+      const s1 = await play('c11.b1', 9, 'c11_echo');
+      check(s1 && s1.fx === 'echo' && ['solgani', 'dumarin', 'ylosenis', 'anselm'].every(w => s1.who.indexOf(w) >= 0), 'c11.b1: the peoples gather round Echo');
+      const s2 = await play('c11.b2', 4, 'c11_plan');
+      check(s2 && /lumi/.test(s2.who), 'c11.b2: the plan — answer Echo your way (Lumi\'s branch)');
+    }
+    // the set piece, home on Herzwelt: a beacon built block by block through the hand's own hook (g.onBlockPlaced)
+    if (await trip('overworld')) {
+      await ground(); await run(20);
+      const b0 = await ev(() => { const s = VR.game.story; return { open: (VR.Story.openAct(s.rec) || {}).id, why: VR.Story.why(VR.Story.byId('c11.b3'), Object.assign(VR.StoryPlay.ctxOf(VR.game, s), { calm: 30 }), s.rec) }; });
+      check(b0.open === 'c11.b2' && b0.why === 'deed', 'the set piece is open; Echo waits for the answer (' + JSON.stringify(b0) + ')');
+      const built = await ev(() => {
+        const g = VR.game, p = g.player, x0 = Math.floor(p.pos[0]) + 5, z0 = Math.floor(p.pos[2]) - 6, y0 = g.world.topAt(x0, z0) + 1, R = VR.R.byName;
+        const stone = (R.stone_bricks || R.stone).defaultState, lamp = (R.sea_lantern || R.glowstone || R.stone).defaultState; let n = 0;
+        for (let y = 0; y < 12; y++) for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { if (y < 11 && (dx + dz) % 2 && y % 2) continue; const id = y === 11 ? lamp : stone; g.world.setBlock(x0 + dx, y0 + y, z0 + dz, id); if (g.onBlockPlaced) g.onBlockPlaced(x0 + dx, y0 + y, z0 + dz, id, p); n++; }
+        window.__ft.aim([x0 + 1, y0 + 8, z0 + 1]); return { n, at: [x0, y0, z0] };
+      });
+      await run(20);
+      const fw = await ev(() => { const s = VR.game.story; return { how: s.rec.choices.how, act: !!(s.rec.acts && s.rec.acts['c11.b2']), way: VR.StoryPlay.stats.way }; });
+      check(fw.how === 'build' && fw.act, 'a builder answers by building: ' + built.n + ' blocks, a lamp on top → ' + JSON.stringify(fw));
+      await draw(6000); await shot('c11_built');
+      const s3 = await play('c11.b3', 9, 'c11_wake', 6000);
+      check(s3 && s3.fx === 'wake' && /\.build\./.test(s3.keys) && /echo/.test(s3.who), 'c11.b3: Echo wakes — and speaks of the beacon you built');
+      // 12 · home: everyone; at night every beacon at once; the epilogue
+      const s4 = await play('c12.b1', 9, 'c12_home', 6000);
+      check(s4 && /ilka/.test(s4.who) && /lumi/.test(s4.who), 'c12.b1: everyone on the square (Lumi in her branch)');
+      await ev(() => VR.game.env.setTime(16500)); await run(40);
+      const w12 = await why('c12.b2');
+      check(w12 === null, 'c12.b2 holds at night on Herzwelt (' + w12 + ')');
+      await ev(() => { VR.StoryPlay.stats.beams = 0; VR.StoryPlay.stats.beamMs = 0; });
+      await ev(() => { const p = VR.game.player; p.pitch = 0.25; });
+      const s5 = await play('c12.b2', 12, 'c12_finale', 16500);
+      const bm = await ev(() => ({ beams: VR.StoryPlay.stats.beams || 0, ms: +(VR.StoryPlay.stats.beamMs || 0).toFixed(1) }));
+      check(s5 && s5.fx === 'finale' && bm.beams > 10, 'c12.b2: every beacon at once — the sky as the reward (' + JSON.stringify(bm) + ')');
+      await ev(() => VR.StoryPlay.debug.play('c12.b2')); await sceneTo(5); await draw(16500); await shot('c12_sky'); while (await ev(() => VR.StoryPlay.holds(VR.game))) { await ev(() => VR.game.story.skip()); await run(5); }
+      const s6 = await play('c12.b3', 17, 'c12_epilogue', 16500);
+      check(s6 && s6.fx === 'blink3', 'c12.b3: the epilogue and the new signal (three blinks)');
+      const fin = await ev(() => { const s = VR.game.story; return { ch: VR.Story.chapter(s.rec), free: VR.Story.free(s.rec), places: Object.keys(s.rec.places || {}), j: /story:go:/.test(VR.StoryPlay.journalHTML()) }; });
+      check(fin.ch === 13 && fin.free && fin.places.length >= 3 && fin.j, 'the book is read: free play, the star book lists ' + fin.places.join(' '));
+    }
   });
   // ---------------------------------------------------------------- 3 · chapter 3: the station's beacon over the limb
   await section('3', async () => {
@@ -441,6 +549,14 @@ try {
   add3('Kapitel 5 · Zinnober — das gläserne Leuchtfeuer singt · Kapitel 6 · Aquamarin — Opa Anselms Notizen', ['c5_song', 'c6_notes']);
   add3('Kapitel 6 · die Entscheidung (wer hilft dir?) · Kapitel 7 · das Fenster der Ringstation: die Leuchtfeuer sind ein Pfeil', ['c6_choice', 'c7_window']);
   add3('Kapitel 7 · der fremde Stern: ein Leuchtfeuer blinkt zweimal · Kapitel 8 · zwei Sonnen · der Strahl zum Nebel', ['c7_blink', 'c8_twin', 'c8_beam']);
+  const r4 = [];
+  const add4 = (label, names) => { const imgs = names.map(n => P0[n]).filter(Boolean); if (imgs.length) r4.push({ label, imgs }); };
+  add4('a-story3s offene Punkte · c5 das Lied (Weitwinkel) · c7 das Fenster: 3-D-Strahlen · c8 zwei Sonnen am Tag', ['c5_song', 'c7_window', 'c8_twin']);
+  add4('Kapitel 9 · Im Nebel — von innen · Flimmi, der Stern, der geboren wird', ['c9_nebula', 'c9_flimmi']);
+  add4('Kapitel 10 · Die geduldige Sonne — Dumarin · der Strahl zeigt heim', ['c10_red', 'c10_beam']);
+  add4('Kapitel 11 · Echo und die fünf Völker · der Plan · das selbst gebaute Leuchtfeuer · Echo erwacht', ['c11_echo', 'c11_plan', 'c11_built', 'c11_wake']);
+  add4('Kapitel 12 · Heimkehr · jedes Leuchtfeuer auf einmal · der Himmel · der Epilog', ['c12_home', 'c12_finale', 'c12_sky', 'c12_epilogue']);
+  if (r4.length) { fs.writeFileSync(ROOT + '.tmp_tests/story4_sheet.json', JSON.stringify({ w: 620, rows: r4 })); execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story4_sheet.jpg', ROOT + '.tmp_tests/story4_sheet.json']); console.log('     sheet test/shots/story4_sheet.jpg'); }
   if (r3.length) { fs.writeFileSync(ROOT + '.tmp_tests/story3_sheet.json', JSON.stringify({ w: 620, rows: r3 })); execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story3_sheet.jpg', ROOT + '.tmp_tests/story3_sheet.json']); console.log('     sheet test/shots/story3_sheet.jpg'); }
 } catch (e) { console.log('  (the sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
 save();
