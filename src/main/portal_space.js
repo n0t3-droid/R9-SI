@@ -29,6 +29,7 @@
 
   PS.GL = { curve: 1, ring: 1, moon: 1, station: 1 };
   const MOONS = { opal: 1, basalt: 1, zinn: 1, ocker: 1, aqua: 1 };
+  PS.AIRLESS = { opal: 1, basalt: 1, zinn: 1 };   // the arrival there is a 3-D descent too (no air to come down through)
   PS.bodyOf = function (dim) {
     const s = String(dim || '');
     if (MOONS[s]) return s;
@@ -78,6 +79,7 @@
     if (shot === 'curve') return curve(id, k, v, eph);
     if (shot === 'station') return curve('herz', 0.3, v, eph);
     if (shot === 'moon') return moon(id, k, v, eph);
+    if (shot === 'arrive') return curve(id, lerp(0.75, 0, ease(clamp(k, 0, 1))), v, eph);   // (an airless world: down onto its land)
     return null;
   };
 
@@ -113,6 +115,7 @@
   PS.plan = function (film, from, to, t0) {
     const fb = PS.bodyOf(from), tb = PS.bodyOf(to);
     return film.shots.map((s) => {
+      if (s.id === 'arrive' && PS.AIRLESS[to]) return { gl: true, id: to, t: PS.when('arrive', to, t0) };
       if (!PS.GL[s.id]) return { gl: false };
       const id = s.id === 'ring' ? 'amarant' : s.id === 'station' ? 'herz' : s.id === 'moon' ? tb : (fb || tb);
       if (!id) return { gl: false };

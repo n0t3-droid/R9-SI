@@ -33,7 +33,7 @@ page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slic
 page.on('console', m => { if (m.type() === 'error') logs.push('[error] ' + m.text().slice(0, 300)); });
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, a) => page.evaluate(fn, a);
-const shot = async (name) => { await ev(() => { window.__norender = true; }); await wait(300); try { await page.screenshot({ path: SHOTS + name, timeout: 120000 }); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => { window.__norender = false; }); return SHOTS + name; };
+const shot = async (name) => { await ev(() => { window.__norender = true; }); await wait(300); try { await page.screenshot({ path: SHOTS + name, timeout: 240000 }); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => { window.__norender = false; }); return SHOTS + name; };
 await page.goto(DIST);
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev(() => { const r = VR.game.renderer; r._render = r.render; r.render = function (F) { if (window.__norender) return; return this._render(F); }; });
@@ -77,7 +77,7 @@ for (const [id, F, to, k] of want) {
   const r = await filmShot({ dim: to }, F, sid, k, 'p2_' + id + '_' + TAG + '.png');
   rec.shots[id] = { film: F.id, shot: r.sh, gl: r.gl, luma: r.l };
   console.log('  ' + id + ': ' + JSON.stringify(rec.shots[id]));
-  if (!BEFORE && ['curve', 'ring', 'moon', 'zinn'].includes(id)) check(r.gl === true && r.l.sd > 12, id + ': drawn by the space renderer (' + r.gl + '), centre sd ' + r.l.sd);
+  if (!BEFORE && ['curve', 'ring', 'moon', 'zinn', 'arrive'].includes(id)) check(r.gl === true && r.l.sd > 12, id + ': drawn by the space renderer (' + r.gl + '), centre sd ' + r.l.sd);
 }
 save();
 

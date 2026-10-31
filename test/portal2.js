@@ -43,7 +43,7 @@ console.log('b · the poses');
   const inView = (v, p, R) => { const d = sub(p, v.pos), a = ang(v.fwd, d), r = Math.asin(Math.min(1, R / len(d))); return a < v.fov * 0.62 + r; };
   const outside = (v, eph) => Object.keys(SS.BODIES).every(id => id === 'helia' || len(sub(v.pos, eph.bodies[id].p)) > SS.BODIES[id].R * 1.001);
   let bad = [];
-  for (const [shot, id] of [['curve', 'herz'], ['curve', 'opal'], ['curve', 'ocker'], ['moon', 'opal'], ['moon', 'herz'], ['moon', 'aqua'], ['moon', 'zinn'], ['ring', 'amarant'], ['station', 'herz']]) {
+  for (const [shot, id] of [['arrive', 'opal'], ['arrive', 'zinn'], ['curve', 'herz'], ['curve', 'opal'], ['curve', 'ocker'], ['moon', 'opal'], ['moon', 'herz'], ['moon', 'aqua'], ['moon', 'zinn'], ['ring', 'amarant'], ['station', 'herz']]) {
     const t = PS.when(shot, id, t0), eph = SS.ephemeris(t, {});
     for (let v = 0; v < 3; v++) for (const k of [0, 0.5, 1]) {
       const p = PS.pose(shot, k, v, id, eph), tag = shot + '/' + id + ' v' + v + ' k' + k;
@@ -100,7 +100,9 @@ console.log('c · the moments');
   check(open >= 8 && side, 'ring: Helia ' + open.toFixed(1) + '° over the ring\'s face, the camera on the lit side');
   const F = C.film(C.rec({}), 7, 'overworld', 'opal', {});
   const plan = PS.plan(F, 'overworld', 'opal', t0);
-  check(plan.length === F.shots.length && F.shots.every((s, i) => !!plan[i].gl === !!PS.GL[s.id] && (!PS.GL[s.id] || (plan[i].id && Number.isFinite(plan[i].t)))), 'the plan of ' + F.id + ': ' + plan.map((q, i) => F.shots[i].id + (q.gl ? '=' + q.id : '')).join(' '));
+  check(plan.length === F.shots.length && F.shots.every((s, i) => !!plan[i].gl === (!!PS.GL[s.id] || s.id === 'arrive') && (!PS.GL[s.id] || (plan[i].id && Number.isFinite(plan[i].t)))), 'the plan of ' + F.id + ': ' + plan.map((q, i) => F.shots[i].id + (q.gl ? '=' + q.id : '')).join(' '));
+  const Fh = C.film(C.rec({}), 7, 'opal', 'overworld', {}), ph2 = PS.plan(Fh, 'opal', 'overworld', t0);
+  check(!ph2[ph2.length - 1].gl, 'home (air): the arrival stays the painted descent through the sky');
   const Fx = C.film(C.rec({}), 3, 'overworld', 'x.2.1.1', {}), px = PS.plan(Fx, 'overworld', 'x.2.1.1', t0);
   check(px.every((q, i) => Fx.shots[i].id !== 'moon' || !q.gl), 'another star: no 3-D moon of ours (' + Fx.shots.map(s => s.id).join(' ') + ')');
 }

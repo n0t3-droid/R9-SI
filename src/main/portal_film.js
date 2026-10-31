@@ -359,6 +359,7 @@
           if (fade && GL3[p.id]) { X.fillStyle = 'rgba(0,0,0,' + ((1 - fk) * 0.85).toFixed(3) + ')'; X.fillRect(0, 0, W, H); }   // two 3-D shots: a short dip
           else if (fade) layer(X, W, H, p, 1, 1 - fk);
           S.gl = true; if (s.id === 'station') f(X, W, H, k, s.v, S); S.gl = false;
+          if (s.id === 'arrive' && k > 0.55) { const L = S.lookTo; X.fillStyle = css(mix(L.land, [20, 24, 40], 0.4), ease((k - 0.55) / 0.45) * 0.8); X.fillRect(0, 0, W, H); }   // (down onto an airless land: its own colour, then the reveal)
         } else if (gPrev) { X.clearRect(0, 0, W, H); layer(X, W, H, s, k, fk); }
         else if (fade) { const pf = SHOT[p.id] || SHOT.arrive; pf(X, W, H, 1, p.v, S); layer(X, W, H, s, k, fk); }   // the cross-fade: the shot before, then this one over it
         else f(X, W, H, k, s.v, S);
@@ -375,7 +376,7 @@
       X.globalAlpha = a; X.drawImage(L.c, 0, 0); X.globalAlpha = 1;
     }
   };
-  const GL3 = { curve: 1, ring: 1, moon: 1, station: 1 };   // (VR.PortalSpace.GL: the shots the space renderer can draw)
+  const GL3 = { curve: 1, ring: 1, moon: 1, station: 1, arrive: 1 };   // (VR.PortalSpace.GL + an airless arrival: the shots the space renderer can draw; the plan says which)
   let LAYER = null;
   function layerCv(W, H) {
     if (typeof document === 'undefined') return null;
