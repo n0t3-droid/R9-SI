@@ -355,6 +355,7 @@
   };
 
   // ---------------------------------------------------------------- staging one shot (pure): a camera function of t
+  D.LIFT_MAX = 24;   // (m: a camera never climbs higher than this to see over the land — under a roof it comes close)
   D.sunAz = (tod) => (((tod || 0) % 24000) / 24000) * TAU + 0.4;   // (env.js: the sun's azimuth; x = cos, z = sin)
   const look = (o, C, P) => { const dx = P[0] - C[0], dy = P[1] - C[1], dz = P[2] - C[2]; o.yaw = Math.atan2(-dx, -dz); o.pitch = Math.atan2(dy, Math.hypot(dx, dz)); return o; };
   // ctx: {target [x, y, z], r, avatar(t) → {x, y, z, yaw} | null, ground(x, z), sunAz}
@@ -363,34 +364,55 @@
     const gy = (x, z, d) => { const v = gnd ? gnd(x, z) : null; return v === null || v === undefined || !Number.isFinite(v) ? d : v; };
     const A0 = ctx.avatar ? ctx.avatar(dur / 2) : null;
     // the side the camera comes from: behind the avatar (it between us and the place), else a fixed quarter
-    let ux = 0.6, uz = 0.8;
-    if (A0) { const dx = A0.x - T[0], dz = A0.z - T[2], L = Math.hypot(dx, dz); if (L > 1) { ux = dx / L; uz = dz / L; } }
+    let ux0 = 0.6, uz0 = 0.8;
+    if (A0) { const dx = A0.x - T[0], dz = A0.z - T[2], L = Math.hypot(dx, dz); if (L > 1) { ux0 = dx / L; uz0 = dz / L; } }
     const fov = (f === 'push' ? 50 : f === 'orbit' ? 55 : 58) * DEG;
-    let subj = T, pos, S = null;   // pos(t) → [x, y, z] before the lift; then the camera looks at subj (or along the sun)
-    if (f === 'compose') {
-      S = A0 ? [A0.x, A0.y + 1, A0.z] : [T[0] + ux * (r * 2 + 15), gy(T[0] + ux * (r * 2 + 15), T[2] + uz * (r * 2 + 15), T[1] - 4) + 1, T[2] + uz * (r * 2 + 15)];
-      const c0 = D.compose(T, S, { fov, size: 2, back: 26, ground: gnd }), c1 = D.compose(T, S, { fov, size: 2, back: 21, ground: gnd });
-      pos = (t) => { const u = t / dur; return [c0.x + (c1.x - c0.x) * u, c0.y + (c1.y - c0.y) * u, c0.z + (c1.z - c0.z) * u]; };
-    } else if (f === 'orbit') {
-      const R = r * 2.2 + 12, a0 = Math.atan2(uz, ux), sw = 30 * DEG * (shot.h && (shot.h.t | 0) % 2 ? -1 : 1);
-      pos = (t) => { const a = a0 + sw * (t / dur - 0.5), x = T[0] + Math.cos(a) * R, z = T[2] + Math.sin(a) * R; return [x, Math.max(T[1] + R * 0.35, gy(x, z, T[1]) + 3), z]; };
-    } else if (f === 'crane') {
-      const R = r * 1.8 + 14, x = T[0] + ux * R, z = T[2] + uz * R, y0 = gy(x, z, T[1] - 2) + 2, y1 = Math.max(y0 + 6, T[1] + R * 0.8);
-      pos = (t) => { const u = t / dur; return [T[0] + ux * R * (1 + 0.15 * u), y0 + (y1 - y0) * u, T[2] + uz * R * (1 + 0.15 * u)]; };
-    } else if (f === 'sun' || f === 'view') {
-      // sun: behind you, into the low sun; view: over your shoulder where you looked then (a vista's moment)
-      const az = f === 'view' && A0 ? Math.atan2(-Math.cos(A0.yaw), -Math.sin(A0.yaw)) : ctx.sunAz !== undefined ? ctx.sunAz : 0, sx = Math.cos(az), sz = Math.sin(az), Ap = A0 ? [A0.x, A0.y, A0.z] : [T[0], gy(T[0], T[2], T[1]), T[2]];
-      subj = [Ap[0] + sx * 40, Ap[1] + 1, Ap[2] + sz * 40];   // (the low sun's side of the land, ahead of you)
-      pos = (t) => { const k = 9 - 0.6 * t, x = Ap[0] - sx * k, z = Ap[2] - sz * k; return [x, Math.max(Ap[1] + 2.6, gy(x, z, Ap[1]) + 2), z]; };
-    } else {   // push (and any other): a slow push-in from the avatar's side
-      const R0 = r * 2.6 + 20;
-      pos = (t) => { const k = R0 * (1 - 0.15 * t / dur), x = T[0] + ux * k, z = T[2] + uz * k; return [x, T[1] + R0 * 0.25, z]; };
+    // one framing from the side (ux, uz): pos(t) → [x, y, z] before the lift; the camera looks at subj (or along the sun);
+    // S: compose's second subject (the avatar on the lower third)
+    const make = (ux, uz, kind) => {
+      let subj = T, pos, S = null;
+      if (kind === 'compose') {
+        S = A0 ? [A0.x, A0.y + 1, A0.z] : [T[0] + ux * (r * 2 + 15), gy(T[0] + ux * (r * 2 + 15), T[2] + uz * (r * 2 + 15), T[1] - 4) + 1, T[2] + uz * (r * 2 + 15)];
+        const c0 = D.compose(T, S, { fov, size: 2, back: 26, ground: gnd }), c1 = D.compose(T, S, { fov, size: 2, back: 21, ground: gnd });
+        if (c0.y - S[1] > 35) return make(ux, uz, 'push');   // (the place towers right over you: the thirds would need a crane — a push-in instead)
+        pos = (t) => { const u = t / dur; return [c0.x + (c1.x - c0.x) * u, c0.y + (c1.y - c0.y) * u, c0.z + (c1.z - c0.z) * u]; };
+      } else if (kind === 'orbit') {
+        const R = r * 2.2 + 12, a0 = Math.atan2(uz, ux), sw = 30 * DEG * (shot.h && (shot.h.t | 0) % 2 ? -1 : 1);
+        pos = (t) => { const a = a0 + sw * (t / dur - 0.5), x = T[0] + Math.cos(a) * R, z = T[2] + Math.sin(a) * R; return [x, Math.max(T[1] + R * 0.35, gy(x, z, T[1]) + 3), z]; };
+      } else if (kind === 'crane') {
+        const R = r * 1.8 + 14, x = T[0] + ux * R, z = T[2] + uz * R, y0 = gy(x, z, T[1] - 2) + 2, y1 = Math.max(y0 + 6, T[1] + R * 0.8);
+        pos = (t) => { const u = t / dur; return [T[0] + ux * R * (1 + 0.15 * u), y0 + (y1 - y0) * u, T[2] + uz * R * (1 + 0.15 * u)]; };
+      } else if (kind === 'sun' || kind === 'view') {
+        // sun: behind you, into the low sun; view: over your shoulder where you looked then (a vista's moment)
+        const az = kind === 'view' && A0 ? Math.atan2(-Math.cos(A0.yaw), -Math.sin(A0.yaw)) : ctx.sunAz !== undefined ? ctx.sunAz : 0, sx = Math.cos(az), sz = Math.sin(az), Ap = A0 ? [A0.x, A0.y, A0.z] : [T[0], gy(T[0], T[2], T[1]), T[2]];
+        subj = [Ap[0] + sx * 40, Ap[1] + 1, Ap[2] + sz * 40];   // (the low sun's side of the land, ahead of you)
+        pos = (t) => { const k = 9 - 0.6 * t, x = Ap[0] - sx * k, z = Ap[2] - sz * k; return [x, Math.max(Ap[1] + 2.6, gy(x, z, Ap[1]) + 2), z]; };
+      } else if (kind === 'close') {
+        // under a roof or in a narrow place (no line over the height map): close behind you, a slow drift — no lift
+        const P = A0 ? [A0.x, A0.y + 1.4, A0.z] : T; subj = P;
+        pos = (t) => { const k = 4.6 - 0.25 * t, a = Math.atan2(uz, ux) + 0.03 * t; return [P[0] + Math.cos(a) * k, P[1] + 0.7, P[2] + Math.sin(a) * k]; };
+      } else {   // push (and any other): a slow push-in from the avatar's side
+        const R0 = r * 2.6 + 20;
+        pos = (t) => { const k = R0 * (1 - 0.15 * t / dur), x = T[0] + ux * k, z = T[2] + uz * k; return [x, T[1] + R0 * 0.25, z]; };
+      }
+      // the lift: one offset for the whole shot (the largest need at five moments), so the camera never hops
+      let need = 0;
+      if (kind !== 'close') for (let i = 0; i <= 4; i++) { const t = (dur * i) / 4, C = pos(t), y0 = C[1]; D.lift(gnd, C, subj); if (C[1] - y0 > need) need = C[1] - y0; }
+      if (need > 0) need += 0.3;
+      return { pos, subj, S, need, kind };
+    };
+    // the side with the clearest line: the avatar's first, then round in eighths (a side must be 2 m better to win);
+    // the sun's and the view's side are fixed. A lift of more than D.LIFT_MAX: the close shot instead
+    let best = make(ux0, uz0, f);
+    if (best.need > 0.5 && f !== 'sun' && f !== 'view' && best.kind !== 'compose') {
+      for (let k = 1; k < 8; k++) {
+        const a = Math.atan2(uz0, ux0) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 4), c = make(Math.cos(a), Math.sin(a), best.kind);
+        if (c.need < best.need - 2) best = c;
+      }
     }
-    // the lift: one offset for the whole shot (the largest need at five moments), so the camera never hops
-    let need = 0;
-    for (let i = 0; i <= 4; i++) { const t = (dur * i) / 4, C = pos(t), y0 = C[1]; D.lift(gnd, C, subj); if (C[1] - y0 > need) need = C[1] - y0; }
-    if (need > 0) need += 0.3;
-    const out = { subject: subj, dur, frame: f };
+    if (best.need > D.LIFT_MAX) best = make(ux0, uz0, 'close');
+    const { pos, subj, S } = best, need = best.need;
+    const out = { subject: subj, dur, frame: f, kind: best.kind, lift: need };
     out.cam = (t) => {
       const C = pos(clamp(t, 0, dur)); C[1] += need;
       const o = { x: C[0], y: C[1], z: C[2], yaw: 0, pitch: 0, roll: 0, fov };
@@ -399,7 +421,7 @@
         const dT = Math.hypot(T[0] - C[0], T[2] - C[2]), dS = Math.hypot(S[0] - C[0], S[2] - C[2]), aT = Math.atan2(T[1] - C[1], dT), aS = Math.atan2(S[1] - C[1], dS);
         o.pitch = (aT + aS) / 2; o.fov = clamp(2 * Math.atan(3 * Math.tan(Math.max(0.05, aT - aS) / 2)), 30 * DEG, 80 * DEG);
       }
-      else if (f === 'sun' || f === 'view') o.pitch = Math.max(o.pitch, -0.12);
+      else if (best.kind === 'sun' || best.kind === 'view') o.pitch = Math.max(o.pitch, -0.12);
       return o;
     };
     return out;

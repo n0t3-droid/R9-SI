@@ -236,6 +236,26 @@ if (P && D.reelPlan && D.stage) {
   else check(false, 'a sun shot in the plan');
 }
 
+console.log('j · the line over the land: another side, the close shot, the tower over you');
+{
+  const H = { t: 10, kind: 'build', sub: 'site_done', w: 3, x: 0, y: 75, z: 0, r: 6, tod: 6000 };
+  const av = () => ({ x: 30, y: 70, z: 0, yaw: 0 });
+  // a wall on the avatar's side (x 12…20, 90 m high): the orbit comes from another side
+  const wall = (x, z) => (x > 12 && x < 20 ? 160 : 70);
+  const so = D.stage({ frame: 'orbit', dur: 5, h: H }, { target: [0, 75, 0], r: 6, avatar: av, ground: wall });
+  const c = so.cam(2.5);
+  check(so.lift <= 24 && Math.hypot(c.x - 0, c.z - 0) < 60 && c.y < 120, `a wall on your side: the orbit from another side (lift ${so.lift.toFixed(1)} m, camera y ${c.y.toFixed(0)})`);
+  // the subject under a roof 130 m up (the Hangar Hall): close behind you, no lift
+  const roof = (x, z) => (Math.hypot(x - 30, z) < 80 ? 200 : 70);
+  const sc = D.stage({ frame: 'orbit', dur: 3, h: null }, { target: [30, 71.2, 0], r: 2, avatar: av, ground: roof });
+  const c0 = sc.cam(0), c3 = sc.cam(3);
+  check(sc.kind === 'close' && Math.hypot(c0.x - 30, c0.z) < 6 && c0.y < 75 && Math.hypot(c3.x - c0.x, c3.z - c0.z) > 0.05, `under a roof: the close shot behind you (${sc.kind}, ${Math.hypot(c0.x - 30, c0.z).toFixed(1)} m, y ${c0.y.toFixed(1)}), still moving`);
+  // a temple 60 m over the avatar 25 m away: no camera 150 m up for the thirds
+  const st = D.stage({ frame: 'compose', dur: 5, h: H }, { target: [0, 130, 0], r: 30, avatar: () => ({ x: 25, y: 70, z: 0, yaw: 0 }), ground: () => 69 });
+  const cm = st.cam(2.5);
+  check(cm.y - 70 < 45, `a tower over you: the camera ${(cm.y - 70).toFixed(0)} m over the avatar (≤ 45; ${st.kind})`);
+}
+
 console.log('i · restoration: the time of day, the view, the actors');
 if (D.reelSave && D.reelRestore) {
   const g = { env: { ticks: 7777, setTime(t) { this.ticks = t; } }, zenFreezeTime: false, camMode: 2, hideHud: false,

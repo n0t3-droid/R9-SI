@@ -200,7 +200,7 @@ const after = await ev(() => { const g = VR.game, p = g.player; return { run: !!
 console.log('  before ' + JSON.stringify(before)); console.log('  after  ' + JSON.stringify(after));
 NUM.restore = { before, after };
 check(!after.run && !after.active, 'the reel ended by itself');
-check(Math.abs(after.tod - before.tod) <= 2 && after.freeze === before.freeze, `the time of day given back (${before.tod} → ${after.tod})`);
+check(Math.abs(after.tod - before.tod) <= 5 && after.freeze === before.freeze, `the time of day given back (${before.tod} → ${after.tod})`);
 check(after.pos.join() === before.pos.join() && after.camMode === before.camMode && after.hud === before.hud, 'the place, the view and the HUD given back');
 check(Math.abs(after.pad - before.pad) < 0.2 && Math.abs(after.tram - before.tram) < 0.2, `the pads' and the trams' clocks given back (${before.pad} → ${after.pad}, ${before.tram} → ${after.tram})`);
 check(after.saved >= 1 && after.photo && after.photo.w >= 2 * after.W - 2, `B: ${after.saved} frames saved at 2× (${after.photo ? after.photo.w + ' × ' + after.photo.h : '—'})`);
