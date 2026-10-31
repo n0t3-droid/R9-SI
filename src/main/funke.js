@@ -54,6 +54,58 @@
   F.sparkOk = (dx, dy, dz) => dx * dx + dy * dy + dz * dz >= F.SPARK_NEAR * F.SPARK_NEAR;
   F.camHidden = (g) => !!(g && ((g.wow && g.wow.active) || (g.director && g.director.active) || (g.arrival && g.arrival.phase === 'moment')));
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
+  // ---- a-session (plan docs/superpowers/plans/2026-10-31-a-session.md §2.2; f-hud's self-review 2): in a fight Funke
+  // keeps to the shoulder away from the machine — out of the view — and its bubble out of the machine's screen box
+  F.FIGHT_R = 22; F.AWAKE_R = 12;
+  const ENGAGED = { notice: 1, approach: 1, tele: 1, strike: 1, recover: 1, stagger: 1 }, ASLEEP = { down: 1, calm: 1, leave: 1, helper: 1 };
+  // the foe that counts (pure): engaged within FIGHT_R, or any awake one within AWAKE_R ahead (the half in front); nearest
+  F.engaged = function (mobs, P, yaw) {
+    let best = null, bd = Infinity; const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    for (let i = 0; i < mobs.length; i++) {
+      const m = mobs[i], f = m.foe; if (!f || f.gone || f.helper || ASLEEP[f.st]) continue;
+      const dx = m.pos[0] - P[0], dz = m.pos[2] - P[2], d = Math.hypot(dx, dz);
+      if (!(d < F.FIGHT_R) || d >= bd) continue;
+      if (!ENGAGED[f.st] && !(d < F.AWAKE_R && dx * fx + dz * fz > 0)) continue;
+      best = m; bd = d;
+    }
+    return best;
+  };
+  // the shoulder away from it: −1 left, +1 right (the foe's side in the view, mirrored)
+  F.fightSide = (P, yaw, q) => (((q[0] - P[0]) * Math.cos(yaw) + (q[2] - P[2]) * -Math.sin(yaw)) >= 0 ? -1 : 1);
+  // the place there: beside the head and a little behind the eye (outside the view), bobbing
+  F.fightAnchor = function (P, yaw, side, bob, A) {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    A[0] = P[0] + rx * 0.82 * side - fx * 0.45; A[1] = P[1] + 1.5 + (bob || 0); A[2] = P[2] + rz * 0.82 * side - fz * 0.45;
+    return A;
+  };
+  // a bubble [X, Y, bw, bh] over the box [x0, y0, x1, y1] (px) moves above it, below it, or beside it (the side with room),
+  // kept on the screen; a bubble clear of it keeps its place
+  F.bubbleAway = function (X, Y, bw, bh, W, H, b) {
+    if (!b || X + bw <= b[0] || X >= b[2] || Y + bh <= b[1] || Y >= b[3]) return [X, Y];
+    const m = 10, cx = (v) => clamp(v, m, Math.max(m, W - bw - m)), cy = (v) => clamp(v, m, Math.max(m, H - bh - m));
+    const tries = [[cx(X), b[1] - bh - 8], [cx(X), b[3] + 8], [b[2] + 12, cy(Y)], [b[0] - bw - 12, cy(Y)]];
+    for (const [x, y] of tries) if (x >= m && y >= m && x + bw <= W - m && y + bh <= H - m) return [x, y];
+    return [X, Y];
+  };
+  // (the game: the foe that counts now — the calm ring's one first; nothing outside an Abenteuer world)
+  F.foeOf = function (g) {
+    const Fo = VR.Foes, En = g && g.entities, p = g && g.player; if (!Fo || !Fo.advOn || !En || !En.mobs || !p || !Fo.advOn(g)) return null;
+    const Lc = VR.Liberate && VR.Liberate.calmSt; if (Lc && Lc.m && Lc.m.foe && !Lc.m.foe.gone) return Lc.m;
+    const cam = g.cam; return F.engaged(En.mobs, p.pos, cam && Number.isFinite(cam.yaw) ? cam.yaw : p.yaw);
+  };
+  // its screen box in px [x0, y0, x1, y1] (y down), or null behind the eye
+  F.screenBox = function (m, vp, cam, W, H) {
+    const K = VR.Foes && VR.Foes.KINDS ? VR.Foes.KINDS[m.foe.k] : null, hh = K ? K.h / 2 + 0.1 : 0.8, rr = K ? K.w + 0.15 : 0.6;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
+    for (let k = 0; k < 8; k++) {
+      const x = m.pos[0] + (k & 1 ? rr : -rr) - cam.x, y = m.pos[1] + hh + (k & 2 ? hh : -hh) - cam.y, z = m.pos[2] + (k & 4 ? rr : -rr) - cam.z;
+      const w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15]; if (w < 0.05) continue; n++;
+      const sx = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w * 0.5 + 0.5) * W, sy = (1 - ((vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w * 0.5 + 0.5)) * H;
+      if (sx < x0) x0 = sx; if (sx > x1) x1 = sx; if (sy < y0) y0 = sy; if (sy > y1) y1 = sy;
+    }
+    return n ? [x0, y0, x1, y1] : null;
+  };
+  // ---- a-session end
 
   // ---------------------------------------------------------------- the talking budget (pure)
   class Budget {
@@ -521,6 +573,7 @@ void main() {
       if (this.scanT > 0) this.scanT = Math.max(0, this.scanT - dt);
       if (this.ph) this.photoStep(dt);
       if ((this.brainT -= dt) <= 0) { this.brainT = 1; try { this.brain(T); } catch (e) { if (!this.warned) { this.warned = true; console.warn('funke', e); } } }
+      if ((this.foeT = (this.foeT || 0) - dt) <= 0) { this.foeT = 0.25; this.foe = F.foeOf(g); }   // a-session: the machine in a fight (4 Hz; Abenteuer worlds only)
       if (this.line) this.placeBubble();
       const ms = now() - t0, C = F.cost; C.frames++; C.ms += ms; if (ms > C.worst) C.worst = ms;
       void p;
@@ -534,7 +587,8 @@ void main() {
       if (this.ph && this.ph.spot) { const s = this.ph.spot; A[0] = s[0]; A[1] = s[1]; A[2] = s[2]; return; }
       if (this.inVehicle() && cam) { A[0] = cam.x + rx * 0.8 - fx * 0.2; A[1] = cam.y - 0.25 + bob; A[2] = cam.z + rz * 0.8 - fz * 0.2; return; }
       const P = p.pos, firstPerson = (g.camMode | 0) === 0 && !(g.photoCam && g.photoCam.on);
-      if (this.wayT > 0 && this.wayTg && this.waySide && firstPerson && cam) {
+      if (this.foe && firstPerson && this.foe.foe && !this.foe.foe.gone) F.fightAnchor(P, yaw, F.fightSide(P, yaw, this.foe.pos), bob * 0.5, A);   // a-session: in a fight, the shoulder away from the machine
+      else if (this.wayT > 0 && this.wayTg && this.waySide && firstPerson && cam) {
         // the target off the view (first person): in the view on the target's side — the ribbon bends round from here
         const s = this.waySide;
         A[0] = cam.x + fx * 1.5 + rx * 0.72 * s; A[1] = cam.y - 0.12 + bob * 0.5; A[2] = cam.z + fz * 1.5 + rz * 0.72 * s;
@@ -740,6 +794,7 @@ void main() {
       { const ks = VR.UX && VR.UX.stripBox; if (ks && X + bw > W - ks.w && Y + bh > H - ks.h) Y = Math.max(10, H - ks.h - bh - 8); }   // (… nor over the key-hint strip while it shows, ux.js)
       // (e-ux) never over the crosshair and its Aktion prompt: the bubble steps above them
       if (X < W / 2 + 160 && X + bw > W / 2 - 160 && Y < H / 2 + 66 && Y + bh > H / 2 - 14) Y = Math.max(10, H / 2 - 18 - bh);
+      if (this.foe) { const fb = F.screenBox(this.foe, vp, cam, W, H); if (fb) { const q = F.bubbleAway(X, Y, bw, bh, W, H, fb); X = q[0]; Y = q[1]; } }   // a-session: never over the machine
       if (!this.bx || Math.abs(this.bx[0] - X) >= 1 || Math.abs(this.bx[1] - Y) >= 1 || this.bx[2] !== left) { this.bx = [X, Y, left]; el.style.transform = 'translate(' + (X | 0) + 'px,' + (Y | 0) + 'px)'; el.className = left ? 'l' : 'r'; }
     }
     // Funke's voice: pentatonic blips from the line's hash, higher than the villagers'

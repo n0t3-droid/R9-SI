@@ -648,7 +648,7 @@ async function openWorld(adv) {
   await page.goto(DIST);
   for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.autoJump = 'on'; g.settings.wowMoments = true; g.applySettings('*'); });
-  if (adv) await ev((seed) => { const A = VR.Adventure; if (A) A.pendingCreate = { at: Date.now(), band: 'normal', enc: 'normal' }; VR.game.createWorld({ name: 'Abenteuer', mode: 'survival', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: false, kit: true }); }, SEED);
+  if (adv) await ev((seed) => { const A = VR.Adventure; if (A) A.pendingCreate = { at: Date.now(), band: 'normal', enc: 'normal' }; VR.game.createWorld({ name: 'Abenteuer', mode: 'survival', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: false, kit: true, first: true }); }, SEED);   // (first: made from the start screen — its own start)
   else await ev((seed) => VR.game.createWorld({ name: 'Sitzung', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: true, kit: true }), SEED);
   let inPlay = false;
   for (let i = 0; i < 300 && !inPlay; i++) { await wait(1000); inPlay = await ev(() => !!(VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)).catch(() => false); }

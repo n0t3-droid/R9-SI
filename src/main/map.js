@@ -60,13 +60,16 @@
       if (vis !== this.shown) { this.shown = vis; this.mini.style.display = vis ? 'block' : 'none'; this.compass.style.display = vis ? 'block' : 'none'; }
       if (!vis || !p) return;
       // progressive refresh: 16 rows per frame
-      if (this.row >= MS) { this.row = 0; this.pending = [Math.floor(p.pos[0]) - MS / 2, Math.floor(p.pos[2]) - MS / 2]; }
+      // (a-session: while the last picture had columns missing — the world still loading — the next one is whole again,
+      // every 0.25 s at most, 40 times at most: no black disc for the eight frames of 16-row passes on a slow start)
+      if (this.row >= MS && this.again) this.wait -= dt;
+      if (this.row >= MS && !(this.again && this.wait > 0)) { this.row = 0; this.pending = [Math.floor(p.pos[0]) - MS / 2, Math.floor(p.pos[2]) - MS / 2]; this.whole = !this.snap || !!this.again; this.again = false; this.missN = 0; this.inPass = true; }
       const [x0, z0] = this.pending, d = this.img.data, col = [0, 0, 0, 0], nb = [0, 0, 0, 0];
-      for (let k = 0, kn = this.snap ? 16 : MS; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
+      for (let k = 0, kn = this.whole ? MS : 16; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
         const z = z0 + this.row;
         for (let i = 0; i < MS; i++) {
           const x = x0 + i, o = (this.row * MS + i) * 4;
-          if (!this.colorAt(x, z, col)) { d[o] = 8; d[o + 1] = 10; d[o + 2] = 18; d[o + 3] = 255; continue; }
+          if (!this.colorAt(x, z, col)) { d[o] = 8; d[o + 1] = 10; d[o + 2] = 18; d[o + 3] = 255; this.missN++; continue; }
           const hn = this.heightAt(x, z - 1), hw = this.heightAt(x - 1, z);
           let shade = 1;
           if (hn >= 0) shade += (col[3] - hn) * 0.07; if (hw >= 0) shade += (col[3] - hw) * 0.05;
@@ -76,7 +79,7 @@
       }
       void nb;
       let fresh = false;
-      if (this.row >= MS) { this.octx.putImageData(this.img, 0, 0); this.snap = this.pending; fresh = true; }
+      if (this.row >= MS && this.inPass) { this.inPass = false; this.octx.putImageData(this.img, 0, 0); this.snap = this.pending; fresh = true; this.redos = this.redos | 0; if (this.missN > MS * MS * 0.1 && this.redos < 40) { this.redos++; this.again = true; this.wait = 0.25; } }
       const now = performance.now(), key = p.yaw.toFixed(3) + ',' + p.pos[0].toFixed(1) + ',' + p.pos[2].toFixed(1);
       if ((fresh || key !== this.lastKey) && now - (this.lastDraw || 0) > 33) { this.lastKey = key; this.lastDraw = now; this.drawMini(); }
       this.ct -= dt;
