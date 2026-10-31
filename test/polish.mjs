@@ -105,26 +105,28 @@ await section('boss', async () => {
   check(up, 'the boss rises');
   await step(200);   // (the entrance's camera hands back)
   await settle(20);
-  // from 60 m on the side the player came from, a little above
-  const P60 = await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, m = VR.RPGBoss.cur.m, cx = A ? A.x : m.pos[0] - 9, cz = A ? A.z : m.pos[2]; let dx = m.pos[0] - cx, dz = m.pos[2] - cz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; const ax = -dz, az = dx, x = m.pos[0] + (dx * 0.5 + ax * 0.87) * 60, z = m.pos[2] + (dz * 0.5 + az * 0.87) * 60; window.__bossAt = { p: m.pos.slice(), yaw: m.yaw }; return { x, z, y: Math.max(g.world.topAt(Math.floor(x), Math.floor(z)) + 3, m.pos[1] + 6), t: [m.pos[0], m.pos[1] + 4, m.pos[2]] }; });
+  // the boss held still (each drawn frame puts it back: the fight would walk it about), facing the camera 60 m off
+  const freeze = (dx, dz) => ev(([dx, dz]) => { const g = VR.game, A = VR.RPGBoss2.arena, B = VR.RPGBoss.cur; if (!B) return null; const x = A.x + dx, z = A.z + dz, y = g.world.topAt(Math.floor(x), Math.floor(z)) + 1; const at = { p: [x, y, z] }; window.__keep = () => { const C = VR.RPGBoss.cur; if (!C) return; C.m.pos[0] = at.p[0]; C.m.pos[1] = at.p[1]; C.m.pos[2] = at.p[2]; if (C.m.vel) { C.m.vel[0] = C.m.vel[1] = C.m.vel[2] = 0; } if (at.yaw !== undefined) { C.m.yaw = at.yaw; C.m.bodyYaw = at.yaw; } for (let i = g.entities.mobs.length - 1; i >= 0; i--) if (g.entities.mobs[i] !== C.m) g.entities.mobs.splice(i, 1); }; window.__bossAt = at; window.__keep(); return at.p; }, [dx, dz]);
+  const bp = await freeze(-14, -6);
+  const P60 = { x: bp[0] + 57, z: bp[2] + 18, y: 0, t: [bp[0], bp[1] + 4.5, bp[2]] };
+  P60.y = await ev(([x, z, y]) => Math.max(VR.game.world.topAt(Math.floor(x), Math.floor(z)) + 2.5, y + 3), [P60.x, P60.z, bp[1]]);
+  await ev(([x, z]) => { const a = window.__bossAt, C = VR.RPGBoss.cur; a.yaw = Math.atan2(-(x - a.p[0]), -(z - a.p[2])); }, [P60.x, P60.z]);
   await ev(() => { const p = VR.game.player; p.inv.slots[p.inv.sel] = null; p.inv.changed = true; });
-  // (only the boss: the drones and the helpers out of the picture; a 38° view so 60 m reads)
-  await ev(() => { const g = VR.game, b = VR.RPGBoss.cur.m; for (let i = g.entities.mobs.length - 1; i >= 0; i--) if (g.entities.mobs[i] !== b) g.entities.mobs.splice(i, 1); window.__fov0 = g.settings.fov; g.settings.fov = 38; });
   await pair('Turmgänger aus 60 m: dunkler Unterrumpf, glühender Rand (vorher | nachher)', 'hull', ['hull'], async () => {
-    await ev(() => { const g = VR.game, b = VR.RPGBoss.cur.m; for (let i = g.entities.mobs.length - 1; i >= 0; i--) if (g.entities.mobs[i] !== b) g.entities.mobs.splice(i, 1); });
-    await tp(P60.x, P60.y, P60.z); await aim(P60.t); await step(2);
-    await ev(() => { const B = VR.RPGBoss.cur, a = window.__bossAt; if (B && a) { B.m.pos[0] = a.p[0]; B.m.pos[1] = a.p[1]; B.m.pos[2] = a.p[2]; B.m.yaw = a.yaw; } });
-  }, 1);
-  await ev(() => { VR.game.settings.fov = window.__fov0 || 75; });
+    await tp(P60.x, P60.y, P60.z); await aim(P60.t); await ev(() => window.__keep()); await step(2); await ev(() => window.__keep());
+  }, 2, true);
+  run.hullAt = { boss: bp, cam: [P60.x, P60.y, P60.z] };
   // the cracks from 13 m above, 9 m off the obelisk
   const pc = await ev(() => { const A = VR.RPGBoss2.arena; return { x: A.x + 2, z: A.z + 12, y: A.y + 13, t: [A.x - 1, A.y, A.z - 2] }; });
   // a one-block step across half the ring (the arena's ground was flat here; a-boss2's pictures had hills)
   await ev(() => { const g = VR.game, A = VR.RPGBoss2.arena, w = g.world, gs = VR.R.byName.grass_block.defaultState; for (let x = Math.floor(A.x) - 12; x <= Math.floor(A.x) + 12; x++) for (let z = Math.floor(A.z) + 2; z <= Math.floor(A.z) + 12; z++) { const d = Math.hypot(x + 0.5 - A.x, z + 0.5 - A.z); if (d < 5.5 || d > 12 || ((x + z) & 7) === 0 && d > 9) continue; const t = w.topAt(x, z); w.setBlock(x, t + 1, z, gs, 4); } });
   await settle(20);
+  await freeze(-4, -18);   // (the boss on the far side, out of the camera's way)
   await pair('Risse im Boden: keine Streifen mehr über Stufen (vorher | nachher)', 'cracks', ['cracks'], async () => {
     await ev(() => { VR.RPGBoss2.buildCracks(VR.game, VR.RPGBoss2.arena); });
-    await tp(pc.x, pc.y, pc.z); await aim(pc.t); await step(2);
-  });
+    await tp(pc.x, pc.y, pc.z); await aim(pc.t); await ev(() => window.__keep()); await step(2); await ev(() => window.__keep());
+  }, 2, true);
+  await ev(() => { window.__keep = null; });
   run.boss = await ev(() => ({ cracks: VR.RPGBoss2.arena && VR.RPGBoss2.arena.crk && VR.RPGBoss2.arena.crk.v.length / 30 }));
   await ev(() => { if (VR.RPGBoss.cur) VR.RPGBoss.drop(VR.game); VR.Adventure.setOn(false); });
 });
