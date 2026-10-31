@@ -165,20 +165,26 @@ await section('onehand', async () => {
 // ---------------------------------------------------------------- 6 · the frame's cost: every switch on vs off, Very Low and High
 const cost = {};
 await section('cost', async () => {
+  // the game's frame on the CPU (the simulation, the HUD, every hook; the GL pass is not touched by the switches — the
+  // foe ring only draws in a fight) per switch, and the whole frame with the GL pass: all off vs all on
   for (const preset of ['potato', 'high']) {
     cost[preset] = await ev((p) => {
-      const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); window.__norender = false;
-      const on = (v) => { Object.assign(g.settings, { lessMotion: v, highContrast: v, textSize: v ? 1.25 : 1, monoAudio: v, oneHand: v ? 'mouse' : 'off', subSpeed: v ? 1.5 : 1 }); VR.A11y.tick(); };
-      const one = (n) => { const t = []; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; window.__step(t0); g.renderer.gl.finish(); t.push(performance.now() - t0); } t.sort((a, b) => a - b); return +t[t.length >> 1].toFixed(1); };
-      one(6); const R = { off: [], on: [] };
-      for (let k = 0; k < 4; k++) { on(k % 2 === 1); (k % 2 ? R.on : R.off).push(one(12)); on(k % 2 === 0); (k % 2 ? R.off : R.on).push(one(12)); }
-      on(false); window.__norender = true;
-      const med = (a) => +Math.min(...a).toFixed(1);
-      return { off: med(R.off), on: med(R.on) };
+      const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*');
+      const SW = { lessMotion: [false, true], highContrast: [false, true], textSize: [1, 1.25], oneHand: ['off', 'mouse'], monoAudio: [false, true], subSpeed: [1, 1.5] };
+      const set = (keys, v) => { for (const k of Object.keys(SW)) g.settings[k] = SW[k][v && keys.includes(k) ? 1 : 0]; VR.A11y.tick(); };
+      const one = (n, draw) => { window.__norender = !draw; const t = []; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 33; window.__step(t0); if (draw) g.renderer.gl.finish(); t.push(performance.now() - t0); } window.__norender = true; t.sort((a, b) => a - b); return t[t.length >> 1]; };
+      const pair = (keys, n, draw, rounds) => { const off = [], on = []; for (let k = 0; k < rounds; k++) { set(keys, false); off.push(one(n, draw)); set(keys, true); on.push(one(n, draw)); } set(keys, false); return [+Math.min(...off).toFixed(2), +Math.min(...on).toFixed(2)]; };
+      one(8, true);
+      const out = { cpu: {} };
+      for (const k of Object.keys(SW)) out.cpu[k] = pair([k], 20, false, 3);
+      out.cpu.all = pair(Object.keys(SW), 20, false, 3);
+      out.frame = pair(Object.keys(SW), 8, true, 2);
+      return out;
     }, preset);
-    console.log(`  cost ${preset}: frame ${cost[preset].off} ms off · ${cost[preset].on} ms with every switch on (${secs()})`);
+    console.log(`  cost ${preset}: frame ${cost[preset].frame[0]} → ${cost[preset].frame[1]} ms (all off → all on); CPU ${JSON.stringify(cost[preset].cpu)} (${secs()})`);
   }
-  check(cost.potato && cost.potato.on <= cost.potato.off * 1.1 + 1.5, `Very Low does not get slower with the switches (${JSON.stringify(cost.potato)})`);
+  const vl = cost.potato;
+  check(vl && vl.cpu.all[1] <= vl.cpu.all[0] * 1.15 + 0.3, `Very Low: the game's CPU frame with every switch on ${vl && vl.cpu.all[1]} ms vs off ${vl && vl.cpu.all[0]} ms`);
 });
 
 // ---------------------------------------------------------------- the deutan picture and the sheet (python, after the browser)

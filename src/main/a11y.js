@@ -276,15 +276,14 @@
     'html.a11y-hc #hotbar{background:#000 !important;outline:2px solid #fff}',
     'html.a11y-hc #hotbar .slot,html.a11y-hc #hotbar > div{border-color:#fff !important}',
     'html.a11y-hc #hotbar .slot.sel,html.a11y-hc #hotbar .sel{outline:3px solid #ffe600;outline-offset:1px}',
-    'html.a11y-hc #crosshair{filter:drop-shadow(0 0 0 #000) drop-shadow(1px 1px 0 #000) drop-shadow(-1px -1px 0 #000)}',
+    'html.a11y-hc #crosshair{mix-blend-mode:normal;opacity:1}html.a11y-hc #crosshair::before,html.a11y-hc #crosshair::after{box-shadow:0 0 0 1.5px #000}',
     'html.a11y-hc #keystrip kbd,html.a11y-hc #ctxprompt b{background:#fff !important;color:#000 !important}',
     'html.a11y-hc #stats,html.a11y-hc #compass,html.a11y-hc #minimap{outline:2px solid #fff;background:#000}',
     // the pad's glyphs in the prompts
-    '.a11y-g{display:inline-block;vertical-align:middle;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.6))}',
+    '.a11y-g{display:inline-block;vertical-align:middle}',   // (no CSS filter: the glyph's own dark body is its contrast)
     '#keystrip kbd.pad,#ctxprompt b.pad,html.a11y-hc #keystrip kbd.pad,html.a11y-hc #ctxprompt b.pad{background:none !important;border:0 !important;padding:0 !important;box-shadow:none !important;min-width:0}',
     '#a11ybump{position:absolute;pointer-events:none;display:none;z-index:5}',
     '#a11ybump.on{display:block}#a11ybump .l,#a11ybump .r{position:absolute;top:0}',
-    'html.a11y-hc .a11y-g{filter:none}',
   ].join('\n');
   let cssOn = false, bump = null;
   function css() { if (cssOn || !hasDoc) return; cssOn = true; const s = document.createElement('style'); s.id = 'a11ycss'; s.textContent = A.CSS; document.head.appendChild(s); }
