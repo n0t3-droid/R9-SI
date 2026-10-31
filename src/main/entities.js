@@ -760,7 +760,10 @@
         mat4.rotY(L, L, -1.35); mat4.rotZ(L, L, def && def.tool ? 0.62 : 0.25); mat4.rotX(L, L, -sw * 1.1);
         mat4.scale(L, L, 0.44, 0.44, 0.44);
       }
-      this.drawMesh(r, p, mesh, L, light, true);
+      // f-first3 (R55-13): the held block 30 % darker than the light at the eye (VR.First2.HAND_DIM) — the eye stays on the world
+      const hk = mesh.block && VR.First2 && VR.First2.HAND_DIM ? VR.First2.HAND_DIM : 1, HL = this.handL || (this.handL = { sky: 0, bl: [0, 0, 0] });
+      HL.sky = light.sky * hk; HL.bl[0] = light.bl[0] * hk; HL.bl[1] = light.bl[1] * hk; HL.bl[2] = light.bl[2] * hk;
+      this.drawMesh(r, p, mesh, L, HL, true);
       gl.enable(gl.CULL_FACE);
     }
     onColumnLoaded(c) {

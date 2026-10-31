@@ -383,7 +383,8 @@ void main() {
     float a = 1.0 - exp(-v_l.y * gm * exp(-2.2 * q2));
     if (a < 0.004) discard;
     vec3 c = v_col * (u_ambSky * 0.55 + 0.02);
-    c = applyFog(c, v_rel * u_fogK, length(v_rel) * u_fogK);
+    float fk = mix(u_fogK, 1.0, smoothstep(60.0, 240.0, length(v_rel)));   // (f-first3: from afar the air counts in full — the far flock pales, R55-03)
+    c = applyFog(c, v_rel * fk, length(v_rel) * fk);
     o = vec4(c, a);
     return;
   }

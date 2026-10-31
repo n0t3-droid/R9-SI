@@ -21,6 +21,9 @@
   // (−0.035, 0.115, −0.06), size 0.235 — a block ≈ 5–6 % of a 16:9 frame; now ≈ 2.2 % (≤ 3 % at 4:3 too), lower in the corner
   F.HAND_OLD = { off: [-0.035, 0.115, -0.06], ry: 0.78, rx: -0.18, s: 0.235 };
   F.HAND = { off: [0.01, 0.045, -0.02], ry: 0.78, rx: -0.22, s: 0.15 };
+  // f-first3 (R55-13): the held block 30 % darker (entities.drawHand scales its light), and the kit's slot 5 a calm
+  // sandstone, not the neon magenta that pulled the eye (game.giveKit, a vgen ≥ 9 world's new kit)
+  F.HAND_DIM = 0.7; F.KIT5 = 'sandstone';
   F.FOV = 70;   // the hand's own projection (entities.drawHand)
   // the fist at rest (no bob, no swing), a block held — drawHand's S, F and d·0.9
   F.fistRest = () => {

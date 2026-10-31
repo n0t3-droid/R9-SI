@@ -812,7 +812,7 @@
       const inv = this.player.inv;
       if (meta.mode !== 'survival') {
         const noCry = (meta.vgen | 0) >= 9;   // (a vgen-9 world has no crystals: none in the kit either)
-        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', noCry ? 'neon_magenta' : 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
+        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', noCry ? ((VR.First2 && VR.First2.KIT5) || 'neon_magenta') : 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
         kit.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[i] = { id, n: 64 }; });
         const extra = ['builder_wand', 'laser_blaster', 'jetpack', 'hoverbike', 'shuttle_beacon', 'torch', noCry ? 'vx_lamppost' : 'azure_crystal_cluster', 'water_bucket', 'tech_panel', 'landing_pad', 'cherry_leaves', 'quartz_block'];
         extra.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[9 + i] = { id, n: VR.maxStack(id) }; });
