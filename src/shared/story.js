@@ -29,17 +29,21 @@
   S.REMIND = 300;       // s between two reminders after „Später"
   S.REMINDS = 3;        // reminders at most, then the beat waits silently in the journal
   S.CARD = 25;          // s the offer's card stays (untaken: Später)
-  S.WHO = ['funke', 'ilka', 'oskar', 'selma', 'jonte', 'lumi'];
+  S.WHO = ['funke', 'ilka', 'oskar', 'selma', 'jonte', 'lumi', 'solgani', 'ariveli', 'selkatun', 'anselm'];   // (a-story3: the Glutani, the Wellari, the Regoli, Lumi's grandfather)
   S.MOODS = ['neutral', 'happy', 'surprised', 'worried'];   // a-story2: the portraits' faces (story_art.js)
   S.NOT = ['building', 'fight', 'menu', 'studio', 'landing', 'scene', 'guest'];
 
   // ---------------------------------------------------------------- the twelve chapters (words: story.c<n>.*)
   S.CHAPTERS = [];
-  for (let n = 1; n <= 12; n++) S.CHAPTERS.push({ n, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: n <= 4 });
+  for (let n = 1; n <= 12; n++) S.CHAPTERS.push({ n, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: n <= 8 });   // (a-story3: 5–8 written)
 
   // ---------------------------------------------------------------- the beats of chapters 1–4
   const L = (ch, n, who) => who.map((w, i) => { const q = w.split(':'); return { who: q[0], key: 'story.c' + ch + '.b' + n + '.' + (i + 1), mood: q[1] || 'neutral' }; });   // a-story2: 'who:mood' (the portrait's face)
   const B = (ch, n, o) => Object.assign({ id: 'c' + ch + '.b' + n, ch, n }, o, { scene: Object.assign({ music: 'warm' }, o.scene, { lines: L(ch, n, o.who) }), who: undefined });
+  // a-story3: a beat whose lines depend on a choice (vary: the choice's id; alt: {option: ['who:mood', …]}; keys
+  // story.c<ch>.b<n>.<option>.<i>); scene.lines are the first option's (the journal, the keys), linesOf picks
+  const LA = (ch, n, opt, who) => who.map((w, i) => { const q = w.split(':'); return { who: q[0], key: 'story.c' + ch + '.b' + n + '.' + opt + '.' + (i + 1), mood: q[1] || 'neutral' }; });
+  const BV = (ch, n, o) => { const alt = {}; for (const k of Object.keys(o.alt)) alt[k] = LA(ch, n, k, o.alt[k]); const b = B(ch, n, Object.assign({}, o, { who: [] })); b.scene.alt = alt; b.scene.lines = alt[Object.keys(alt)[0]]; delete b.alt; return b; };
   S.BEATS = [
     // 1 · Funke — the drone flickers awake on a console; the first vista at the golden hour
     B(1, 1, { when: { after: null, place: ['hangar'], anyAfter: 240, adv: false },
@@ -81,21 +85,65 @@
     B(4, 3, { when: { after: 'c4.b2', adv: true, dim: ['basalt', 'opal'], eclipse: 0.5 },
       scene: { shots: [{ cam: 'up', target: 'amarant', dur: 8 }, { cam: 'wide', target: 'player', dur: 6 }], music: 'rise' },
       who: ['funke:surprised', 'lumi:surprised', 'lumi:happy', 'funke:happy'], task: { kind: 'next', target: 'c5' }, reward: { xp: 150 }, act: { kind: 'photo', target: 'eclipse', dim: ['basalt', 'opal'], eclipse: 0.5 } }),
+    // ================================================================ a-story3 · chapters 5–8 (plan 2026-10-31-a-story3.md)
+    // 5 · Feuer und Glas — Zinnober: the Glutani's glass beacon was never broken. It sings. It calls someone.
+    B(5, 1, { when: { after: 'c4.b3', adv: true, dim: ['zinn'] },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 6, fx: 'embers' }, { cam: 'up', target: 'amarant', dur: 6, fx: 'embers', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'wide' },
+      who: ['funke:surprised', 'solgani:happy', 'solgani', 'funke:worried', 'solgani:happy'], task: { kind: 'go', target: 'village' }, reward: { xp: 90 }, act: { kind: 'look', target: 'village', dim: ['zinn'], max: 400, cone: 16, hold: 1.5 } }),
+    B(5, 2, { when: { after: 'c5.b1', adv: true, dim: ['zinn'], near: { village: 90 } },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'wide', target: 'village', dur: 7, fx: 'song', swell: true }, { cam: 'shoulder', target: 'village', dur: 6 }], music: 'rise' },
+      who: ['funke:surprised', 'solgani', 'funke:surprised', 'solgani:worried'], task: { kind: 'listen', target: 'village' }, reward: { xp: 110 }, act: { kind: 'scan', target: 'village', dim: ['zinn'], max: 200, cone: 22 } }),
+    B(5, 3, { when: { after: 'c5.b2', adv: true, dim: ['zinn'] },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 7, fx: 'hum' }, { cam: 'wide', target: 'player', dur: 6 }, { cam: 'up', target: 'amarant', dur: 6, swell: true }], music: 'tense' },
+      who: ['funke:worried', 'solgani:surprised', 'funke:worried', 'solgani'], task: { kind: 'travel', target: 'aqua' }, reward: { xp: 120 }, act: { kind: 'look', target: 'amarant', dim: ['zinn'], cone: 18, hold: 2 } }),
+    // 6 · Das Atoll — Aquamarin: Opa Anselm's notes — Funke is a beacon's spark. And a choice.
+    B(6, 1, { when: { after: 'c5.b3', adv: true, dim: ['aqua'] },
+      scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6, fx: 'spray' }, { cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'close', target: 'funke', dur: 6 }], music: 'wide' },
+      who: ['lumi:happy', 'ariveli:happy', 'lumi:surprised', 'funke:happy'], task: { kind: 'dive', target: 'sea' }, reward: { xp: 90 }, act: { kind: 'scan', target: 'sea', dim: ['aqua'], below: -25 } }),
+    B(6, 2, { when: { after: 'c6.b1', adv: true, dim: ['aqua'] },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 7, fx: 'notes' }, { cam: 'wide', target: 'player', dur: 6, fx: 'notes' }, { cam: 'close', target: 'funke', dur: 7, swell: true }], music: 'warm' },
+      who: ['lumi:surprised', 'lumi', 'funke:surprised', 'ariveli:worried'], task: { kind: 'go', target: 'village' }, reward: { xp: 130 }, act: { kind: 'photo', target: 'sky', dim: ['aqua'], level: 25 } }),
+    B(6, 3, { when: { after: 'c6.b2', adv: true, dim: ['aqua'] }, choice: 'c6',
+      scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'shoulder', target: 'player', dur: 6 }, { cam: 'close', target: 'funke', dur: 6, swell: true }], music: 'tense' },
+      who: ['ariveli', 'lumi:happy', 'funke:worried'], task: { kind: 'choose', target: 'c6' }, reward: { xp: 120 }, act: { kind: 'look', target: 'vista', dim: ['aqua'], max: 600, cone: 20, hold: 1.5 } }),
+    // 7 · Der Sprung — the gate turns aside; the Ringstation's window; the beacons are an arrow; the first star jump
+    BV(7, 1, { when: { after: 'c6.b3', adv: true, choice: 'c6', dim: ['overworld', 'aqua', 'zinn', 'ocker', 'basalt', 'opal'] }, vary: 'c6',
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'hum' }, { cam: 'wide', target: 'player', dur: 6 }], music: 'rise' },
+      alt: { wellari: ['funke:surprised', 'ariveli:happy', 'funke:happy'], lumi: ['lumi:surprised', 'funke:surprised', 'lumi:happy'] }, task: { kind: 'gate', target: 'gate' }, reward: { xp: 100 }, act: { kind: 'scan', target: 'sky', pitch: 25 } }),
+    BV(7, 2, { when: { after: 'c7.b1', adv: true, dim: ['stn.*'] }, vary: 'c6',
+      scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'window', target: 'window', dur: 9, fx: 'beacons', swell: true }, { cam: 'close', target: 'funke', dur: 7 }], music: 'wide' },
+      alt: { wellari: ['funke:surprised', 'anselm:happy', 'funke:surprised', 'anselm'], lumi: ['funke:surprised', 'lumi:surprised', 'anselm:happy', 'anselm'] }, task: { kind: 'jump', target: 'star' }, reward: { xp: 160 }, act: { kind: 'photo', target: 'window', dim: ['stn.*'] } }),
+    B(7, 3, { when: { after: 'c7.b2', adv: true, dim: ['x.*'], sun: true },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 6 }, { cam: 'up', target: 'sky', dur: 7, fx: 'blink2', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'wide' },
+      who: ['funke:surprised', 'anselm', 'funke:worried', 'funke:happy'], task: { kind: 'jump', target: 'binary' }, reward: { xp: 150 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 25 } }),
+    // 8 · Zwei Sonnen — the Regoli who stayed to wait; the answer, given by the helper you chose; the beam to the nebula
+    B(8, 1, { when: { after: 'c7.b3', adv: true, dim: ['x.*'], suns: 2, sun: true },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'twin' }, { cam: 'up', target: 'sky', dur: 6, swell: true }, { cam: 'close', target: 'funke', dur: 5 }], music: 'wide' },
+      who: ['funke:surprised', 'selkatun:happy', 'selkatun'], task: { kind: 'go', target: 'village' }, reward: { xp: 120 }, act: { kind: 'look', target: 'village', dim: ['x.*'], max: 400, cone: 18, hold: 1.5 } }),
+    BV(8, 2, { when: { after: 'c8.b1', adv: true, dim: ['x.*'], suns: 2, sun: true }, vary: 'c6',
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'orbit', target: 'player', dur: 6, fx: 'song', swell: true }, { cam: 'wide', target: 'vista', dur: 6, fx: 'twin' }], music: 'rise' },
+      alt: { wellari: ['funke', 'ariveli:happy', 'funke:surprised', 'selkatun:surprised'], lumi: ['lumi', 'lumi:happy', 'funke:surprised', 'selkatun:surprised'] }, task: { kind: 'wait', target: 'sunset' }, reward: { xp: 180 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 3 } }),
+    B(8, 3, { when: { after: 'c8.b2', adv: true, dim: ['x.*'], suns: 2 },
+      scene: { shots: [{ cam: 'up', target: 'sky', dur: 7, fx: 'beam', swell: true }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 6, fx: 'beam' }], music: 'tense' },
+      who: ['selkatun:worried', 'funke:worried', 'funke:happy'], task: { kind: 'next', target: 'c9' }, reward: { xp: 200 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 20 } }),
   ];
   for (const b of S.BEATS) delete b.who;
+  // a-story3 · the choices: one at the end of a beat (b.choice), made once, kept in the record (rec.choices)
+  S.CHOICES = { c6: { at: 'c6.b3', opts: ['wellari', 'lumi'] } };
   S.byId = (id) => S.BEATS.find(b => b.id === id) || null;
   S.ofChapter = (ch) => S.BEATS.filter(b => b.ch === ch);
   S.sceneLen = (b) => b.scene.shots.reduce((s, q) => s + q.dur, 0);
   S.keys = function () {
     const out = [];
     for (const c of S.CHAPTERS) out.push(c.title, c.where, c.log);
-    for (const b of S.BEATS) for (const l of b.scene.lines) out.push(l.key);
+    for (const b of S.BEATS) { if (b.scene.alt) { for (const k of Object.keys(b.scene.alt)) for (const l of b.scene.alt[k]) out.push(l.key); } else for (const l of b.scene.lines) out.push(l.key); }
     for (const w of S.WHO) out.push('story.who.' + w);
+    for (const id of Object.keys(S.CHOICES)) { out.push('story.choice.' + id + '.q'); for (const o of S.CHOICES[id].opts) out.push('story.choice.' + id + '.' + o, 'story.choice.' + id + '.' + o + '.d', 'story.choice.' + id + '.' + o + '.after', 'story.choice.' + id + '.' + o + '.j'); }
     return out;
   };
 
   // ---------------------------------------------------------------- the record (meta.story)
-  S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {} });   // (a-story2: acts — the deeds done, {id: 1})
+  S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {}, choices: {} });   // (a-story3: choices — {id: option})   // (a-story2: acts — the deeds done, {id: 1})
   S.load = function (m) {
     const r = S.fresh();
     if (!m || typeof m !== 'object') return r;
@@ -106,12 +154,14 @@
     for (const id of Object.keys(lt)) { const q = lt[id]; if (!S.byId(id) || !q || r.beats[id]) continue; const n = Math.max(0, Math.min(S.REMINDS + 1, q.n | 0)); r.later[id] = { n, at: 0, silent: n > S.REMINDS }; }
     const ac = m.acts && typeof m.acts === 'object' ? m.acts : {};
     for (const id of Object.keys(ac)) if (S.byId(id) && ac[id] === 1) r.acts[id] = 1;
+    const chs = m.choices && typeof m.choices === 'object' ? m.choices : {};
+    for (const id of Object.keys(chs)) if (S.CHOICES[id] && S.CHOICES[id].opts.indexOf(chs[id]) >= 0) r.choices[id] = chs[id];
     return r;
   };
   S.isDone = (rec, id) => !!(rec && rec.beats && rec.beats[id]);
   S.mark = function (rec, id, how) { if (!S.byId(id)) return false; rec.beats[id] = how === 'skip' ? 'skip' : 'done'; delete rec.later[id]; return true; };
   // the chapter the player is in: the chapter of the first beat not seen (13 when the written ones are all seen)
-  S.chapter = function (rec) { for (const b of S.BEATS) if (!S.isDone(rec, b.id)) return b.ch; return 5; };
+  S.chapter = function (rec) { for (const b of S.BEATS) if (!S.isDone(rec, b.id)) return b.ch; const c = S.CHAPTERS.find(q => !q.written); return c ? c.n : 13; };
   S.seen = (rec) => S.BEATS.filter(b => S.isDone(rec, b.id));
 
   // ---------------------------------------------------------------- when (pure)
@@ -120,6 +170,7 @@
     const w = b.when || {}; ctx = ctx || {};
     if (rec && S.isDone(rec, b.id)) return 'done';
     if (w.after && !(rec && S.isDone(rec, w.after))) return 'after';
+    if (w.choice && !(rec && rec.choices && rec.choices[w.choice])) return 'choice';
     if (ctx.guest) return 'guest';
     if (ctx.studio) return 'studio';
     if (ctx.menu) return 'menu';
@@ -129,7 +180,7 @@
     if (ctx.scene) return 'scene';
     if (!((ctx.calm || 0) >= (w.calm || (ctx.adv ? S.CALM_ADV : S.CALM)))) return 'calm';
     if (w.adv && !ctx.adv) return 'adv';
-    if (w.dim && w.dim.indexOf(ctx.dim || 'overworld') < 0) return 'dim';
+    if (w.dim && !S.dimIn(w.dim, ctx.dim || 'overworld')) return 'dim';
     if (!w.dim && ctx.dim && ctx.dim !== 'overworld' && !ctx.orbit) return 'dim';   // (a beat without dims plays on Herzwelt or above it)
     if (w.place && w.place.indexOf(ctx.place) < 0 && !(w.anyAfter && (ctx.played || 0) >= w.anyAfter)) return 'place';
     if (w.hours && ctx.hour && w.hours.indexOf(ctx.hour) < 0) return 'hour';
@@ -138,8 +189,28 @@
     if (w.high && !((ctx.high || 0) >= w.high) && !ctx.orbit) return 'high';
     if (w.orbit && !ctx.orbit) return 'orbit';
     if (w.eclipse && !((ctx.eclipse || 0) >= w.eclipse)) return 'eclipse';
+    if (w.suns && !((ctx.suns || 1) >= w.suns)) return 'suns';
+    if (w.sun && ctx.sunUp === false) return 'sun';   // a-story3: a beat under a strange sun plays by day (unknown: no rule)
     return null;
   };
+  // a-story3: a dim list may hold patterns — 'stn.*' (a station), 'x.*' (a world of another star)
+  S.dimIn = function (list, dim) { for (const d of list) { if (d === dim) return true; if (d.charCodeAt(d.length - 1) === 42 && String(dim).slice(0, d.length - 1) === d.slice(0, -1)) return true; } return false; };
+  // the screen is calm for an offer (the same guards as why: never while building, fighting, in a menu …)
+  S.busy = function (ctx, need) {
+    ctx = ctx || {};
+    for (const k of ['guest', 'studio', 'menu', 'building', 'fighting', 'landing', 'scene']) if (ctx[k]) return k === 'fighting' ? 'fight' : k;
+    if (!((ctx.calm || 0) >= (need || (ctx.adv ? S.CALM_ADV : S.CALM)))) return 'calm';
+    return null;
+  };
+  // ---- a-story3 · the choice (pure)
+  S.choicePending = function (rec) { for (const id of Object.keys(S.CHOICES)) { const c = S.CHOICES[id]; if (S.isDone(rec, c.at) && !(rec.choices && rec.choices[id])) return id; } return null; };
+  S.choiceReady = (rec, ctx) => { const id = S.choicePending(rec); return id && !S.busy(ctx) ? id : null; };
+  S.choose = function (rec, id, opt) {
+    const c = S.CHOICES[id]; if (!c || c.opts.indexOf(opt) < 0 || !rec) return false;
+    rec.choices = rec.choices || {}; if (rec.choices[id]) return false;
+    rec.choices[id] = opt; return true;
+  };
+  S.linesOf = function (b, rec) { if (!b) return []; const alt = b.scene.alt, o = b.vary && rec && rec.choices ? rec.choices[b.vary] : null; return alt && o && alt[o] ? alt[o] : b.scene.lines; };
   S.ready = (b, ctx, rec) => S.why(b, ctx, rec) === null;
   // the beat the story waits on: the first beat not seen whose `after` is seen (one at a time, in order)
   S.open = function (rec) { for (const b of S.BEATS) { if (S.isDone(rec, b.id)) continue; if (!b.when.after || S.isDone(rec, b.when.after)) return b; return null; } return null; };
@@ -163,7 +234,7 @@
   S.timeline = function (b, texts) {
     const len = Math.min(S.SCENE_MAX, S.sceneLen(b)), out = [];
     let t = 0.6;
-    const ds = b.scene.lines.map((l, i) => S.lineDur(texts ? texts[i] : ''));
+    const ds = (texts || b.scene.lines).map((l, i) => S.lineDur(texts ? texts[i] : ''));
     const total = ds.reduce((a, c) => a + c, 0), k = total + 0.6 * ds.length > len - 0.6 ? (len - 0.6 - 0.3 * ds.length) / total : 1;
     for (let i = 0; i < ds.length; i++) { const d = ds[i] * k; out.push({ i, t0: t, t1: t + d }); t += d + (k < 1 ? 0.3 : 0.6); }
     return { len, lines: out };
@@ -179,7 +250,7 @@
   S.actCheck = function (act, a) {
     if (!act) return 'none';
     a = a || {};
-    if (act.dim && act.dim.indexOf(a.dim || 'overworld') < 0) return 'dim';
+    if (act.dim && !S.dimIn(act.dim, a.dim || 'overworld')) return 'dim';
     if (act.high && !((a.high || 0) >= act.high) && !a.orbit) return 'high';
     if (act.eclipse && !((a.eclipse || 0) >= act.eclipse)) return 'eclipse';
     if (act.ground && !a.ground) return 'ground';

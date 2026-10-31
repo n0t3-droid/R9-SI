@@ -29,7 +29,7 @@ const tab = (l) => (I.dict && I.dict[l]) || null;
 
 console.log('1 · the book');
 check(S.CHAPTERS.length === 12, 'twelve chapters (' + S.CHAPTERS.length + ')');
-for (let c = 1; c <= 4; c++) { const bs = S.ofChapter(c); check(bs.length === 3 && bs.every((b, i) => b.n === i + 1), `chapter ${c}: three beats in order`); }
+for (let c = 1; c <= 8; c++) { const bs = S.ofChapter(c); check(bs.length === 3 && bs.every((b, i) => b.n === i + 1), `chapter ${c}: three beats in order`); }
 check(S.BEATS.every(b => b.when && b.scene && b.scene.shots.length && b.scene.lines.length && b.task && b.reward && b.reward.xp > 0), 'every beat: when, scene (shots, lines), task, reward');
 check(S.BEATS.every(b => S.sceneLen(b) <= S.SCENE_MAX && S.sceneLen(b) >= 8), 'every scene 8–30 s (' + S.BEATS.map(b => S.sceneLen(b)).join(' ') + ')');
 check(S.BEATS.every((b, i) => i === 0 ? b.when.after === null : b.when.after === S.BEATS[i - 1].id), 'every beat follows the one before');
@@ -76,7 +76,7 @@ check(S.why(S.byId('c4.b2'), calm({ dim: 'basalt' }), r1) === 'dim' && S.why(S.b
 S.mark(r1, 'c4.b2');
 check(S.why(S.byId('c4.b3'), calm({ dim: 'opal', eclipse: 0.3 }), r1) === 'eclipse' && S.why(S.byId('c4.b3'), calm({ dim: 'opal', eclipse: 0.8 }), r1) === null, 'c4.b3 in the eclipse');
 S.mark(r1, 'c4.b3');
-check(S.open(r1) === null && S.chapter(r1) === 5 && S.next(r1, calm(), 0) === null, 'all twelve beats seen: chapter 5 waits (nothing more offered)');
+check(S.open(r1) && S.open(r1).id === 'c5.b1' && S.chapter(r1) === 5, 'all twelve beats of 1–4 seen: chapter 5 is open (a-story3)');
 check(S.why(S.byId('c1.b1'), calm(), r1) === 'done', 'a seen beat is never offered again');
 
 console.log('3 · never during building or a fight');
@@ -310,6 +310,128 @@ console.log('12 · the deeds and the faces in the player (a stand-in game)');
   while (SP.holds(g)) run(0.5);
   g.settings.storyOffer = false; S.mark(SP.of(g).rec, 'c2.b2'); g.cam.pitch = 0.9; run(1);
   check(!SP.armedAct(g), '⚙ storyOffer off: no deed armed');
+}
+
+// ---------------------------------------------------------------- a-story3 (plan docs/superpowers/plans/2026-10-31-a-story3.md)
+console.log('13 · a-story3: chapters 5–8 written in full');
+{
+  check(S.CHAPTERS.every(c => c.written === (c.n <= 8)), 'chapters 1–8 written, 9–12 loglines');
+  const nb = S.BEATS.filter(b => b.ch >= 5);
+  check(nb.length === 12 && nb.every(b => S.sceneLen(b) <= 25 && S.sceneLen(b) >= 10), 'twelve new beats, every scene 10–25 s (' + nb.map(b => S.sceneLen(b)).join(' ') + ')');
+  check(nb.every(b => b.when.adv === true), 'chapters 5–8 play in Abenteuer worlds');
+  for (const w of ['solgani', 'ariveli', 'selkatun', 'anselm']) check(S.WHO.includes(w) && nb.some(b => S.linesOf(b, { choices: { c6: 'lumi' } }).concat(S.linesOf(b, { choices: { c6: 'wellari' } })).some(l => l.who === w)), 'a new speaker: ' + w);
+  check(nb.every(b => b.scene.lines.length >= 3 && b.scene.lines.length <= 5), 'three to five lines a scene');
+  check(nb.filter(b => b.scene.fx || b.scene.shots.some(q => q.fx)).length >= 6 && nb.filter(b => b.scene.shots.some(q => q.swell)).length >= 4, 'the film\'s own pictures (fx) and the score\'s swells');
+  const vary = nb.filter(b => b.vary === 'c6');
+  check(vary.length >= 3 && vary.every(b => Object.keys(b.scene.alt).join() === 'wellari,lumi'), 'the choice changes the lines of ' + vary.map(b => b.id).join(', '));
+  const la = S.linesOf(S.byId('c7.b2'), { choices: { c6: 'lumi' } }), lw = S.linesOf(S.byId('c7.b2'), { choices: { c6: 'wellari' } });
+  check(la.some(l => l.who === 'lumi') && !lw.some(l => l.who === 'lumi') && la.every(l => /\.lumi\.\d$/.test(l.key)), 'at the Ringstation Lumi is there only when she came along');
+  const ck = S.keys();
+  const miss = ck.filter(k => !tr('de', k) || !tr('en', k)), sameDE = ck.filter(k => /story\.(c[5-8]\.b|choice)/.test(k) && tr('de', k) === tr('en', k));
+  check(!miss.length && ck.length > 140, ck.length + ' keys (variants and the choice included) in both tables' + (miss.length ? ': missing ' + miss.slice(0, 8).join(', ') : ''));
+  check(!sameDE.length, 'every new German line is German' + (sameDE.length ? ': ' + sameDE.slice(0, 5).join(', ') : ''));
+  check(nb.every(b => tr('de', 'story.act.' + b.id) && tr('en', 'story.act.' + b.id) && tr('de', 'story.task.' + b.task.kind)), 'every new deed and task in the tables');
+  const longL = ck.filter(k => /story\.c[5-8]\./.test(k) && /\.\d$/.test(k) && (tr('de', k) || '').length > 120);
+  check(!longL.length, 'every new line short enough to read (≤ 120 characters) ' + longL.join(', '));
+
+
+  if (VR.StoryFx) {
+    const Fx = VR.StoryFx, used = new Set(); for (const b of S.BEATS) for (const q of b.scene.shots) if (q.fx) used.add(q.fx);
+    check([...used].every(k => Fx.KINDS.includes(k)), 'every fx a scene asks for is drawn (' + [...used].join(' ') + ')');
+    let n = 0, err = '';
+    const grad = { addColorStop() {} };
+    const mc = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (k === 'createRadialGradient' || k === 'createLinearGradient') ? () => grad : () => { n++; }), set: (o, k, v) => { o[k] = v; return true; } });
+    for (const k of Fx.KINDS) for (const low of [false, true]) for (const t of [0, 3.3, 8]) { try { Fx.draw(mc, k, t, (t / 8) % 1, 640, 360, { low }); } catch (e) { err = k + ': ' + e.message; } }
+    check(!err && n > 200, 'the fx draw on a 2-D canvas, full and Very Low (' + (err || n + ' calls') + ')');
+    let nl = 0, nh = 0; const cnt = (low) => { const c0 = n; for (const k of Fx.KINDS) Fx.draw(mc, k, 2, 0.5, 640, 360, { low }); return n - c0; };
+    nh = cnt(false); nl = cnt(true);
+    check(nl < nh, `Very Low draws fewer (${nl} < ${nh} calls a frame of all kinds)`);
+  }
+  console.log('14 · a-story3: a scripted run through every beat of 5–8, both choices');
+  const ctxFor = (b) => {
+    const w = b.when, c = calm({ adv: true, calm: 30 });
+    if (w.dim) c.dim = w.dim[0].replace('*', w.dim[0] === 'x.*' ? '7.2.aqua' : 'ring');
+    if (w.near) for (const k of Object.keys(w.near)) c.near[k] = w.near[k] - 5;
+    if (w.suns) c.suns = w.suns;
+    return c;
+  };
+  for (const opt of ['wellari', 'lumi']) {
+    const r = S.fresh(); for (const b of S.BEATS) if (b.ch <= 4) S.mark(r, b.id);
+    let walked = 0, bldBad = 0, path = [];
+    for (let i = 0; i < 40; i++) {
+      const b = S.open(r); if (!b) break;
+      const c = ctxFor(b);
+      if (S.choicePending(r)) {
+        check(S.why(b, c, r) === 'choice' && S.next(r, c, 0) === null, b.id + ' waits for the choice');
+        check(S.choiceReady(r, Object.assign({}, c, { building: true })) === null && S.choiceReady(r, Object.assign({}, c, { calm: 3 })) === null && S.choiceReady(r, c) === 'c6', 'the choice card: only on a calm screen, never while building');
+        check(!S.choose(r, 'c6', 'nobody') && S.choose(r, 'c6', opt) && !S.choose(r, 'c6', opt === 'lumi' ? 'wellari' : 'lumi') && r.choices.c6 === opt, 'chosen: ' + opt + ' (once; another option or a second choice refused)');
+      }
+      if (S.ready(b, Object.assign({}, c, { building: true }), r) || S.ready(b, Object.assign({}, c, { fighting: true }), r)) bldBad++;
+      if (!S.ready(b, c, r)) { check(false, b.id + ' not reachable: ' + S.why(b, c, r)); break; }
+      path.push(b.id); S.mark(r, b.id); walked++;
+    }
+    check(walked === 12 && path[0] === 'c5.b1' && path[11] === 'c8.b3' && !bldBad && S.chapter(r) === 9, `${opt}: all twelve beats reached in order (${path.length}), none while building or fighting, chapter 9 next`);
+    const back = S.load(JSON.parse(JSON.stringify(r)));
+    check(back.choices.c6 === opt && S.linesOf(S.byId('c8.b2'), back).every(l => l.key.indexOf('.' + opt + '.') > 0), 'the choice persists through a save (' + opt + ') and picks chapter 8\'s helper');
+  }
+  check(S.why(S.byId('c5.b1'), calm({ dim: 'overworld' }), (() => { const r = S.fresh(); for (const b of S.BEATS) if (b.ch <= 4) S.mark(r, b.id); return r; })()) === 'dim', 'chapter 5 waits for Zinnober');
+  const r7 = S.fresh(); for (const b of S.BEATS) if (b.id !== 'c7.b2') S.mark(r7, b.id); else break; r7.choices.c6 = 'lumi';
+  check(S.why(S.byId('c7.b2'), calm({ dim: 'overworld' }), r7) === 'dim' && S.why(S.byId('c7.b2'), calm({ dim: 'stn.ring' }), r7) === null && S.why(S.byId('c7.b2'), calm({ dim: 'stn.basalt' }), r7) === null, 'c7.b2 at a station (stn.*)');
+  S.mark(r7, 'c7.b2');
+  check(S.why(S.byId('c7.b3'), calm({ dim: 'stn.ring' }), r7) === 'dim' && S.why(S.byId('c7.b3'), calm({ dim: 'x.3.1.ocker' }), r7) === null, 'c7.b3 at another star (x.*)');
+  S.mark(r7, 'c7.b3');
+  check(S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 1 }), r7) === 'suns' && S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2 }), r7) === null, 'chapter 8 under two suns (a close double star)');
+  check(S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2, sunUp: false }), r7) === 'sun' && S.why(S.byId('c8.b1'), calm({ dim: 'x.3.1.ocker', suns: 2, sunUp: true }), r7) === null, 'two suns are seen by day: c8.b1 waits for the morning');
+  const junk = S.load({ v: 1, beats: {}, choices: { c6: 'pirates', c9: 'lumi', x: 1 } });
+  check(JSON.stringify(junk.choices) === '{}' && JSON.stringify(S.load({ v: 1, beats: {} }).choices) === '{}', 'the record sanitises the choices (an old world: none)');
+  // never during building: 3,000 random contexts on 5–8 (and the choice card)
+  let bad3 = 0, rd3 = 0, cbad = 0;
+  const DM3 = ['zinn', 'aqua', 'stn.ring', 'x.4.2.aqua', 'overworld'];
+  for (let i = 0; i < 3000; i++) {
+    const rec = S.fresh(), k = 12 + Math.floor(rnd() * 12); for (let j = 0; j < k; j++) S.mark(rec, S.BEATS[j].id);
+    if (rnd() < 0.5) rec.choices.c6 = rnd() < 0.5 ? 'lumi' : 'wellari';
+    const c = { calm: rnd() * 60, building: rnd() < 0.3, fighting: rnd() < 0.3, menu: rnd() < 0.1, landing: rnd() < 0.1, adv: true, dim: DM3[Math.floor(rnd() * 5)], near: { village: rnd() * 200, outpost: 999 }, suns: 1 + (rnd() < 0.5 ? 1 : 0) };
+    for (const b of S.BEATS) if (b.ch >= 5 && S.ready(b, c, rec)) { rd3++; if (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV) bad3++; }
+    if (S.choiceReady(rec, c) && (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV)) cbad++;
+  }
+  check(rd3 > 50 && !bad3 && !cbad, `3,000 contexts on 5–8: ${rd3} ready, ${bad3} beats and ${cbad} choice cards while busy`);
+}
+
+console.log('15 · a-story3: the player — the choice card, the variant lines, the gate that turns aside');
+{
+  const said = [], saves = [];
+  const done = {}; for (const b of S.BEATS) { done[b.id] = 'done'; if (b.id === 'c6.b3') break; }
+  const g = { state: 'play', world: {}, time: 0, dim: 'aqua', settings: { storyOffer: true }, meta: { seed: 9, story: { v: 1, beats: done, later: {} } }, ui: { screen: null },
+    player: { pos: [0, 70, 0], yaw: 0, pitch: 0, spawn: [0, 70, 0], onGround: true, eyePos() { return [0, 71.6, 0]; } },
+    cam: { x: 0, y: 71.6, z: 0, yaw: 0, pitch: 0 }, wow: { list: new Map() },
+    funke: { on: () => true, show: (t) => said.push(t), budget: { quiet: () => false }, buildFocus: () => g._build, startWay: () => {} },
+    lifeDirector: { ctx: { place: 'water', hour: 'noon' } }, saveMeta: () => saves.push(1) };
+  VR.game = g; VR.Adventure = { on: () => true };
+  const run = (sec) => { for (let i = 0; i < sec * 20; i++) { g.time += 0.05; SP.frame(g, 0.05); } };
+  run(0.1); const pl = SP.of(g);
+  g._build = true; run(30);
+  check(!pl.choiceUp, 'building: no choice card (' + pl.lastWhy + ')');
+  g._build = false; run(12);
+  check(!!pl.choiceUp && pl.choiceUp.id === 'c6', 'calm again: the choice card is up (' + pl.lastWhy + ')');
+  g._build = true; run(1);
+  check(!pl.choiceUp, 'building begins: the card steps back');
+  g._build = false; run(12);
+  check(!!pl.choiceUp && SP.choose(g, 'lumi') && pl.rec.choices.c6 === 'lumi' && !pl.choiceUp && saves.length && said.some(t => /Lumi/.test(t)), 'chosen: Lumi comes along — saved, Funke says so');
+  check(g.meta.story.choices.c6 === 'lumi', 'the choice is in the world\'s record');
+  SP.debug.play('c7.b2'); run(0.5);
+  const sc = pl.scene;
+  check(sc && sc.lines.some(l => l.who === 'lumi') && sc.texts.length === sc.lines.length && sc.lines[0].key.indexOf('.lumi.') > 0, 'c7.b2 with Lumi: her lines play (' + (sc && sc.lines.map(l => l.who).join(' ')) + ')');
+  while (SP.holds(g)) run(0.5);
+  // the gate that turns aside: with c7.b2 open, a trip through a Leuchtpfad gate to a world ends at the Ringstation
+  const r = pl.rec; r.beats['c7.b1'] = 'done'; delete r.beats['c7.b2']; delete r.beats['c7.b3'];
+  for (const k of Object.keys(r.beats)) if (/^c[78]\./.test(k) && k !== 'c7.b1') delete r.beats[k];
+  check(S.open(r).id === 'c7.b2', 'c7.b2 open');
+  const t1 = SP.gateTurn(g, { dim: 'zinn', id: 'zinn' }), t2 = SP.gateTurn(g, { dim: 'stn.ring' }), t3 = SP.gateTurn(g, { dim: 'x.3.1.aqua' });
+  check(t1 && t1.dim === 'stn.ring' && !t2 && !t3, 'a gate trip to Zinnober turns aside to the Ringstation (not one to a station or another star)');
+  r.beats['c7.b2'] = 'done';
+  check(!SP.gateTurn(g, { dim: 'zinn' }), 'once seen: the gates go where you aim again');
+  g.ui.screen = 'journal';
+  check(/Lumi/.test(SP.journalHTML()), 'the journal names the choice');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
