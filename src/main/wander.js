@@ -60,6 +60,7 @@
   };
   W.NAMES = Object.keys(W.KINDS);
   W.REPEAT = 5;
+  W.FILL = 31;   // s: the longest wait for a moment while walking (a slot that found no stage is filled)
   const nameHash = (s) => { let x = 0x811c9dc5; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x | 0; };
   const NH = {}; for (const n of W.NAMES) NH[n] = nameHash(n);
   W.allowed = function (n, ctx) {
@@ -190,6 +191,7 @@
 
   // ================================================================ the actor (the game)
   const ACT = W.ACT = {};
+  const bname = (b) => { const R = VR.R; if (!b || !R || !R.types) return ''; const t = R.types[R.T.type[b]]; return t ? String(t.name || '') : ''; };
   const FOLK_ROLES = ['farmer', 'gardener', 'crafter', 'scholar', 'baker', 'teacher'];
   W.Actor = class {
     constructor(g) {
@@ -297,14 +299,14 @@
       const v = this.places.filter(P => P.kind === 'village' || P.kind === 'city' || P.kind === 'temple');
       let vd = Infinity; for (const P of v) vd = Math.min(vd, Math.hypot(P.x - p[0], P.z - p[2]) - P.rad);
       const under = this.get(p[0], p[1] - 0.5, p[2]), R = VR.R;
-      const nm = under && R.T.name ? String(R.T.name[under] || '') : '';
+      const nm = bname(under);
       if (this.wet(this.get(p[0], p[1] + 0.2, p[2]))) at = 'water';
       else if (vd < 0) at = 'village';
       else if (/path|gravel|cobble|brick|pav|plank|road|cut_|polished|smooth/.test(nm)) at = 'way';
       else if (vd < 70) at = 'near';
       else {
         let leaves = 0, wat = 0;
-        for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, x = p[0] + Math.cos(a) * 7, z = p[2] + Math.sin(a) * 7, t = g.world.topAt ? g.world.topAt(Math.floor(x), Math.floor(z)) : p[1]; const b = this.get(x, t, z); const bn = b && R.T.name ? String(R.T.name[b] || '') : ''; if (/leaves/.test(bn)) leaves++; if (this.wet(b)) wat++; }
+        for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, x = p[0] + Math.cos(a) * 7, z = p[2] + Math.sin(a) * 7, t = g.world.topAt ? g.world.topAt(Math.floor(x), Math.floor(z)) : p[1]; const b = this.get(x, t, z); const bn = bname(b); if (/leaves/.test(bn)) leaves++; if (this.wet(b)) wat++; }
         at = leaves >= 3 ? 'wood' : wat >= 3 ? 'water' : p[1] > ((VR.C && VR.C.SEA) || 63) + 26 ? 'hill' : 'open';
       }
       const tod = g.env ? g.env.timeOfDay : 6000, hour = VR.LifeDirector && VR.LifeDirector.hourOf ? VR.LifeDirector.hourOf(tod) : 'noon';
@@ -333,7 +335,10 @@
       if (walking) this.clock += dt;
       const k = W.slotAt(this.seed, this.clock);
       if (this.lastK === null) this.lastK = k - 1;   // (the first moment comes with the next slot … or now: see below)
-      if (k > this.lastK && walking && this.auto !== false) { this.lastK = k; this.retry = { k, until: this.time + 8, nextT: 0 }; }
+      if (k > this.lastK && walking && this.auto !== false) { this.lastK = k; const t1 = Math.max(this.time, (this.lastStart || -1e9) + 12); this.retry = { k, until: t1 + 8, nextT: t1 }; }   // (never two moments within 12 s)
+      // the fill: a slot that found no stage (a wall, water, a cliff ahead) leaves no long gap — 30 s after the last start
+      // the next moment is tried at once (a slot of its own: 500000 + n, the same for every guest at the same walk)
+      if (!this.retry && walking && this.auto !== false && this.time - (this.lastStart || 0) > W.FILL) this.retry = { k: 500000 + (this.fillN = (this.fillN || 0) + 1), until: this.time + 6, nextT: 0 };
       if (this.retry && this.time >= this.retry.nextT) {
         if (this.time > this.retry.until) { this.retry = null; this.st.quiet++; }
         else { this.retry.nextT = this.time + 1; if (this.slot(this.retry.k)) this.retry = null; }
@@ -367,7 +372,7 @@
       let ok = false; try { ok = A.start(this, m) !== false; } catch (err) { ok = false; if (!this.warnedS) { this.warnedS = true; console.warn('wander start', kind, err); } }
       if (!ok) return null;
       this.ms.push(m); this.recent.push(kind); if (this.recent.length > 24) this.recent.shift();
-      this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1;
+      this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1; this.lastStart = this.time;
       const p = this.pos; let seen = null;
       if (VR.EventLog && VR.EventLog.emit) { try { const R = VR.EventLog.emit('ambient', 'wd:' + kind, 2, m.pos ? [m.pos[0], m.pos[1] + 1, m.pos[2]] : null, 'wander', 3); seen = R ? !!R.inView : null; } catch (e) { /* the log is optional */ } }
       this.timeline.push({ t: Math.round(this.time * 10) / 10, kind, d: m.pos ? Math.round(this.dist(m.pos)) : 0, x: Math.round(p[0]), z: Math.round(p[2]), seen });
