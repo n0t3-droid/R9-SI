@@ -57,6 +57,14 @@ check(!!d5 && !/neon|magenta|crystal|glow/.test(k5), 'the kit\'s slot 5: ' + k5 
   check(/First2\.HAND_DIM/.test(src), 'entities.drawHand reads First2.HAND_DIM');
 }
 
+// ---------------------------------------------------------------- 5 · the settings preview (R55-10)
+console.log('5 · the settings preview drawn on open');
+check(F2 && typeof F2.keepThumb === 'function' && typeof F2.paintThumb === 'function', 'First2.keepThumb / paintThumb: a copy of the frame when a menu opens');
+{
+  const src = require('fs').readFileSync(__dirname + '/../src/main/first2.js', 'utf8'), rs = src.slice(src.indexOf('F.renderSimple = function'), src.indexOf('F.renderSimple = function') + 4000);
+  check(/F\.paintThumb\(ui\.previewCtx\)/.test(rs) && /previewAt = g\.frame \+ 1/.test(rs), 'Einfach paints the copy at once and asks for the next frame');
+  check(F2.paintThumb({ canvas: { width: 320, height: 180 }, drawImage() { throw new Error('no'); } }) === false, 'no copy yet: nothing painted, no error');
+}
 // ---------------------------------------------------------------- 4 · the spawn
 console.log('4 · the spawn on the walk\'s mouth');
 check(FI && FI.WALK_T === -1, 'the feet on the open way, 1 m before the walk\'s mouth (FI.WALK_T ' + (FI && FI.WALK_T) + ')');

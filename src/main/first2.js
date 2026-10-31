@@ -430,6 +430,7 @@
     pv.innerHTML = '<canvas class="pv" width="320" height="180"></canvas>';
     body.appendChild(pv);
     ui.previewCtx = pv.querySelector('canvas').getContext('2d');
+    if (F.paintThumb) F.paintThumb(ui.previewCtx);   // f-first3: the world at once (the copy kept when the menu opened)
     const row = (lab, tip, val, min, max, step, show, set) => {
       const d = document.createElement('div'); d.className = 'setrow f2row';
       d.innerHTML = '<div class="sethead"><label></label><span class="val"></span></div>';
@@ -446,7 +447,7 @@
     row(tx('g.first2.bright', null, 'Helligkeit', 'Brightness'), tx('g.first2.brightTip', null, 'Heller oder dunkler — für deinen Bildschirm.', 'Lighter or darker — for your screen.'), S.bright || 1, F.BRIGHT.min, F.BRIGHT.max, F.BRIGHT.step, (v) => Math.round(v * 100) + ' %', (v) => { S.bright = v; F.applyBright(g); });
     const X = VR.UX;
     row(tx('g.first2.scale', null, 'UI-Größe', 'UI size'), tx('g.first2.scaleTip', null, 'Knöpfe und Schrift größer oder kleiner.', 'Buttons and text bigger or smaller.'), S.uiScale || 1, X ? X.SCALE_MIN : 0.9, X ? X.SCALE_MAX : 1.4, 0.05, (v) => Math.round(v * 100) + ' %', (v) => { if (X && X.setScale) X.setScale(v); else S.uiScale = v; });
-    if (g.requestPreview) g.requestPreview();
+    if (g.requestPreview) { g.requestPreview(); g.previewAt = g.frame + 1; }   // (f-first3: the next frame, not two later)
     return true;
   };
   if (UI && UI.prototype.showSettings && !UI.prototype.showSettings.__f2) {
@@ -465,6 +466,37 @@
       return r;
     };
     UI.prototype.showSettings.__f2 = true;
+  }
+  // ---- f-first3 (R55-10, critic_ux_v054_10_settings: the preview box empty in the picture — under a slow GPU the two frames
+  // the capture waited for came after the look): a menu opened over the game (the pause, ⚙) keeps a 320 × 180 copy of the
+  // next frame (F.thumb: one drawImage when the menu opens, nothing per frame), and ⚙ Einfach paints it into its preview at
+  // once, then asks for a fresh one on the next frame (not two later)
+  F.thumb = null; F.thumbOk = false;
+  F.keepThumb = function (g) {
+    if (!hasDoc || !g || !g.canvas || !g.canvas.width) return false;
+    const T = F.thumb || (F.thumb = document.createElement('canvas')); if (T.width !== 320) { T.width = 320; T.height = 180; }
+    const c = T.getContext('2d'); let ok = false;
+    try { c.drawImage(g.canvas, 0, 0, T.width, T.height); ok = F.lit(c); } catch (e) { ok = false; }
+    if (!ok) { try { ok = F.readBack(g, c); } catch (e) { ok = false; } }
+    F.thumbOk = ok; return ok;
+  };
+  F.paintThumb = function (ctx) { if (!F.thumbOk || !F.thumb || !ctx || !ctx.canvas) return false; try { ctx.drawImage(F.thumb, 0, 0, ctx.canvas.width, ctx.canvas.height); return true; } catch (e) { return false; } };
+  if (G && G.prototype.capturePreview && !G.prototype.capturePreview.__f3) {
+    const oc = G.prototype.capturePreview;
+    G.prototype.capturePreview = function () {
+      if (this.thumbAt && this.frame >= this.thumbAt) { this.thumbAt = 0; if (!F.keepThumb(this) && (this.thumbTries = (this.thumbTries || 0) + 1) < 6) this.thumbAt = this.frame + 1; else this.thumbTries = 0; }
+      return oc.apply(this, arguments);
+    };
+    G.prototype.capturePreview.__f3 = true;
+  }
+  if (UI && UI.prototype.show && !UI.prototype.show.__f3) {
+    const osh = UI.prototype.show;
+    UI.prototype.show = function (id) {
+      const g = this.game, was = this.screen;
+      if (g && g.state === 'play' && id && (!was || was === 'hud') && (id === 'pause' || id === 'settings')) g.thumbAt = g.frame;   // (the frame drawn next: the world as it was)
+      return osh.apply(this, arguments);
+    };
+    UI.prototype.show.__f3 = true;
   }
   // the pause menu forgets „Alle Einstellungen" (the next ⚙ opens Einfach again)
   if (UI && UI.prototype.resume && !UI.prototype.resume.__f2) { const orr = UI.prototype.resume; UI.prototype.resume = function () { this.setAll = false; return orr.apply(this, arguments); }; UI.prototype.resume.__f2 = true; }
