@@ -906,7 +906,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       const A0 = sc.tg && sc.tg.answer; if (!A0) return out;
       const k = smooth(sc.t / 5), n = low ? 8 : 14;
       out.push({ p: A0, up: [0, 1, 0], len: 260 * k, w: 1.4, col: [0.45, 1.6, 2.0], a: 0.85 });
-      for (let i = 0; i < n; i++) { const a = i / n * TAU + sc.t * 0.4, r = 3 + 6 * frc(sc.t * 0.25); out.push({ p: [A0[0] + Math.cos(a) * r, A0[1] - 1, A0[2] + Math.sin(a) * r], up: [0, 1, 0], len: 1.6, w: 0.25, col: [0.5, 1.6, 2.0], a: 0.6 * (1 - frc(sc.t * 0.25)) }); }
+      if (!(VR.StoryGlow && VR.StoryGlow.ok() && P.lightsOn(g))) for (let i = 0; i < n; i++) { const a = i / n * TAU + sc.t * 0.4, r = 3 + 6 * frc(sc.t * 0.25); out.push({ p: [A0[0] + Math.cos(a) * r, A0[1] - 1, A0[2] + Math.sin(a) * r], up: [0, 1, 0], len: 1.6, w: 0.25, col: [0.5, 1.6, 2.0], a: 0.6 * (1 - frc(sc.t * 0.25)) }); }   // (a-story5: else the ring is soft orbs — P.glowList)
       return out;
     }
     if (id === 'c10.b3') {   // a-story5: the Dunelin's beacon lit — a real beam over it, bending high up toward home (the Ringstation)
@@ -1016,7 +1016,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       for (let i = 0; i < nW; i++) {   // the walls: most of them ahead and high, a few all round
         const az = y0 + (i < nW * 0.65 ? (r5(i, 1) - 0.5) * 2.4 : r5(i, 1) * TAU), el = (4 + 46 * r5(i, 2) * r5(i, 2)) * DEG, D = 700 + 900 * r5(i, 3);
         const sx = D * (0.35 + 0.45 * r5(i, 4)), pal = PAL[i % PAL.length];
-        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.2 + 0.14 * r5(i, 7)) * k, kind: 1, far: true, seed: i * 1.37 + 0.5 });
+        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.32 + 0.2 * r5(i, 7)) * k, kind: 1, far: true, seed: i * 1.37 + 0.5 });
       }
       // a hot young star with its teal rim, ahead and up
       const hs = dir(y0 - 0.35, 28 * DEG, 1500);
@@ -1024,7 +1024,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       out.push({ p: hs, s: [70, 70], col: [0.85, 0.97, 1.0], a: 0.9 * k, kind: 0, far: true });
       for (let i = 0; i < (low ? 2 : 5); i++) {   // the dust lanes in front of the glow
         const D = 650 + 300 * r5(i, 11), sx = D * (0.45 + 0.3 * r5(i, 12));
-        out.push({ p: dir(y0 + (r5(i, 13) - 0.5) * 2.0, (6 + 20 * r5(i, 14)) * DEG, D), s: [sx, sx * 0.09], rot: (r5(i, 15) - 0.5) * 0.6, col: [1, 1, 1], a: 0.42 * k, kind: 2, far: true, seed: 20 + i });
+        out.push({ p: dir(y0 + (r5(i, 13) - 0.5) * 2.0, (6 + 20 * r5(i, 14)) * DEG, D), s: [sx, sx * 0.09], rot: (r5(i, 15) - 0.5) * 0.6, col: [1, 1, 1], a: 0.55 * k, kind: 2, far: true, seed: 20 + i });
       }
       for (let i = 0; i < (low ? 6 : 18); i++) {   // newborn stars, twinkling in the walls
         const D = 1300, tw = 0.6 + 0.4 * Math.sin(t * (1.5 + 3 * r5(i, 21)) + i);
@@ -1033,9 +1033,9 @@ body.storyon #storychoice { visibility: hidden !important; }
       // Flimmi: a star being born, where the sky shot looks (its disc nearly edge on, a warm halo, the bright point)
       if (id === 'c9.b2' || id === 'c9.b3' || (at && at.shot.fx === 'flimmi')) {
         const F0 = sc.tg.sky, pu = 0.8 + 0.2 * Math.sin(t * 7) * Math.sin(t * 2.3);
-        out.push({ p: F0, s: [16, 16], col: [1.0, 0.6, 0.3], a: 0.55 * pu, kind: 0 });
+        out.push({ p: F0, s: [18, 18], col: [1.0, 0.6, 0.3], a: 0.85 * pu, kind: 0 });
         out.push({ p: F0, s: [12, 1.8], rot: -0.18, col: [1.0, 0.82, 0.55], a: 0.9, kind: 0 });
-        out.push({ p: F0, s: [3.2, 3.2], col: [1.0, 0.97, 0.9], a: 1.4 * pu, kind: 0 });
+        out.push({ p: F0, s: [4.2, 4.2], col: [1.0, 0.97, 0.9], a: 1.8 * pu, kind: 0 });
       }
       return out;
     }
@@ -1056,8 +1056,15 @@ body.storyon #storychoice { visibility: hidden !important; }
       for (const q of P.peoples(sc)) out.push({ p: [q.pos[0], q.pos[1] + 2.25 * q.scale, q.pos[2]], s: [0.7, 0.7], col: q.col, a: 0.85, kind: 0 });   // (each people's light over its own)
       return out;
     }
+    if (id === 'c11.b3') {   // Echo's waking ring round the answer's foot: soft orbs running outward
+      const A0 = sc.tg && sc.tg.answer; if (!A0) return out;
+      const n = low ? 8 : 14, q = (t * 0.25) % 1, rr = 3 + 6 * q;
+      for (let i = 0; i < n; i++) { const a = i / n * TAU + t * 0.4; out.push({ p: [A0[0] + Math.cos(a) * rr, A0[1] - 0.4, A0[2] + Math.sin(a) * rr], s: [0.7, 0.7], col: [0.45, 1.0, 1.25], a: 0.9 * (1 - q), kind: 0 }); }
+      out.push({ p: A0, s: [5, 5], col: [0.4, 0.9, 1.2], a: 0.6 * smooth(t / 5), kind: 0 });
+      return out;
+    }
     if (id === 'c12.b2') {   // a warm glow at the foot of every lit beam
-      for (const b of P.beamList(g, sc)) if (!b.seg && b.len > 20) out.push({ p: [b.p[0], b.p[1] + 2, b.p[2]], s: [6 + b.w * 3, 6 + b.w * 3], col: [0.45, 1.0, 1.25], a: 0.6, kind: 0, far: true });
+      for (const b of P.beamList(g, sc)) if (!b.seg && b.len > 20) out.push({ p: [b.p[0], b.p[1] + 2, b.p[2]], s: [6 + b.w * 3, 6 + b.w * 3], col: [0.45, 1.0, 1.25], a: 0.32, kind: 0, far: true });
       return out;
     }
     return out;
@@ -1067,8 +1074,15 @@ body.storyon #storychoice { visibility: hidden !important; }
     if (sc.peoples) return sc.peoples;
     const E0 = sc.tg && sc.tg.echo, Lk = VR.LifeKit, FB = VR.Folk && VR.Folk.SPECIES_BODY; if (!E0 || !Lk || !Lk.folk) return (sc.peoples = []);
     const out = [], f = sc.fwd || [0, 0, -1], a0 = Math.atan2(f[2], f[0]);   // (round Echo's far side, facing it and the player)
+    // (run 1: on the far side the hall's glass wall stood between them and the camera — the places are tried round Echo,
+    // the far side first, then the sides, and only free floor near Echo's own height is taken)
+    const ok = (x, z) => { const gy = sc.ground ? sc.ground(x, z) : null; if (gy === null || gy === undefined) return !sc.ground; return Math.abs(gy - E0[1]) < 1.6 && (!sc.free || (sc.free([x, gy + 0.5, z]) && sc.free([x, gy + 1.5, z]))); };
+    const spots = [];
+    for (const R of [4.3, 3.2]) for (const d of [0, -0.6, 0.6, -1.2, 1.2, -1.8, 1.8, -2.4, 2.4]) { if (spots.length >= 5) break; const a = a0 + d, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R; if (ok(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 1.6)) spots.push([x, z]); }
+    for (let j = 0; spots.length < 5 && j < 5; j++) { const a = a0 + (j - 2) * 0.62; spots.push([E0[0] + Math.cos(a) * 4.3, E0[2] + Math.sin(a) * 4.3]); }
+    spots.sort((p0, p1) => Math.atan2(p0[1] - E0[2], p0[0] - E0[0]) - Math.atan2(p1[1] - E0[2], p1[0] - E0[0]));
     for (let i = 0; i < 5; i++) {
-      const [who, kind, col] = P.PEOPLES[i], a = a0 + (i - 2) * 0.62, R = 4.3, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R;
+      const [who, kind, col] = P.PEOPLES[i], x = spots[i][0], z = spots[i][1];
       const gy = sc.ground ? sc.ground(x, z) : null, look = Lk.folk(0x5a17 + i * 7919, 'farmer', 'adult', 'sp:' + kind);
       if (!look) continue;
       out.push({ who, look, col, pos: [x, gy !== null && gy !== undefined ? gy : E0[1] - 0.1, z], yaw: Lk.yawOf ? Lk.yawOf(E0[0] - x, E0[2] - z) : 0, state: i === 2 ? 'wave' : 'idle', walk: 0, walkAmt: 0, seed: i * 0.7, scale: (FB && FB[kind] ? FB[kind].scale : 1) });
@@ -1092,12 +1106,12 @@ body.storyon #storychoice { visibility: hidden !important; }
     P.stats.glows = (P.stats.glows || 0) + n;
   };
   // the air sky of a ch.-9 scene: the three stops (not the LUT), turned to the nebula's colours at the sky's own brightness
-  const NEB3 = [[0.30, 0.10, 0.50], [0.80, 0.36, 0.46], [1.0, 0.55, 0.50]];
+  const NEB3 = [[0.30, 0.10, 0.50], [0.80, 0.36, 0.46], [1.0, 0.55, 0.50]], NEBK = [0.2, 0.38, 0.5];   // (darker than the day's air: run 1's c9 by day was a white-pink wash — the walls and Flimmi need a dusk to glow in)
   P.tintAir = function (U, k) {
     if (!U || !U.airK || !(U.airK[0] > 0.5) || !U.air3 || !(k > 0)) return false;
     const A = U.air3, lu = (v, o) => 0.2126 * v[o] + 0.7152 * v[o + 1] + 0.0722 * v[o + 2];
-    for (let j = 0; j < 3; j++) { const o = j * 3, c = NEB3[j], m = lu(A, o) / lu(c, 0) * (j === 0 ? 0.55 : 0.8); for (let i = 0; i < 3; i++) A[o + i] += (c[i] * m - A[o + i]) * k; }
-    if (U.airB) { const B = U.airB, c = NEB3[1], m = lu(B, 0) / lu(c, 0) * 0.8; for (let i = 0; i < 3; i++) B[i] += (c[i] * m - B[i]) * k; }
+    for (let j = 0; j < 3; j++) { const o = j * 3, c = NEB3[j], m = lu(A, o) / lu(c, 0) * NEBK[j]; for (let i = 0; i < 3; i++) A[o + i] += (c[i] * m - A[o + i]) * k; }
+    if (U.airB) { const B = U.airB, c = NEB3[1], m = lu(B, 0) / lu(c, 0) * NEBK[1]; for (let i = 0; i < 3; i++) B[i] += (c[i] * m - B[i]) * k; }
     if (k > 0.05) U.airK[2] = 0;   // (the three stops, not the LUT, while the nebula fills the sky)
     return true;
   };
