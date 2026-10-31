@@ -707,17 +707,24 @@
       // order, as the stable sort did
       const best = this._best || (this._best = []);
       best.length = 0;
-      let worst = Infinity;
+      let worst = Infinity, free = 0;
       const hold = this.seamHold && this.seamHold.size;   // (F9: round a spreading seam the columns wait a few frames)
       for (const c of this.cols.values()) {
         const dx = c.cx - pcx, dz = c.cz - pcz, ex = c.cx - lcx, ez = c.cz - lcz;
         const d2 = Math.min(dx * dx + dz * dz, ex * ex + ez * ez);
         if (d2 > r2) continue;
         if (hold && this.seamHeld(c.key)) continue;
-        if (best.length === budget && d2 >= worst) continue;   // nothing in this column can beat the list
         let anyDirty = false;
         for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending) { anyDirty = true; break; } }
-        if (!anyDirty) continue;
+        if (!anyDirty) { c.dirtyF = 0; continue; }
+        // (u-worlds2: an empty section needs no job — it is done here, outside the budget, at most 64 a frame. On
+        // Zinnober the sections round the lava ponds near the player were dirty again every frame, and the empty ones
+        // high above the village waited behind them for ever: its columns were never shown. A section's priority also
+        // grows with its wait (2 a frame), so a churn nearer by never starves the rest)
+        if (free < 64) for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending && s.count === 0 && free < 64) { free++; this.meshSection(c, sy, false, 0, pos); } }
+        const fr = this.frame || 0;
+        if (!c.dirtyF) c.dirtyF = fr || 1;
+        if (best.length === budget && d2 - 2 * (fr - c.dirtyF) >= worst) continue;   // nothing in this column can beat the list
         // all 8 neighbors must be ready
         let ok = true;
         for (let oz = -1; oz <= 1 && ok; oz++) for (let ox = -1; ox <= 1; ox++) { if (!ox && !oz) continue; if (!this.col(c.cx + ox, c.cz + oz)) { ok = false; break; } }
@@ -725,7 +732,8 @@
         for (let sy = 0; sy < c.sec.length; sy++) {
           const s = c.sec[sy];
           if (!s.dirty || s.pending) continue;
-          const dy = sy - pcy, prio = d2 + dy * dy * 0.5;
+          if (!s.dirtyF) s.dirtyF = fr || 1;
+          const dy = sy - pcy, prio = d2 + dy * dy * 0.5 - 2 * (fr - s.dirtyF);
           if (best.length === budget) { if (prio >= worst) continue; best.pop(); }
           let i = best.length;
           while (i > 0 && best[i - 1][0] > prio) i--;
@@ -761,7 +769,7 @@
     }
     meshSection(c, sy, urgent, prio, pos, hand) {
       const s = c.sec[sy];
-      s.dirty = false;
+      s.dirty = false; s.dirtyF = 0;
       // empty section with empty neighbors above/below → no geometry
       if (s.count === 0) {
         s.uTok = (s.uTok || 0) + 1;   // a queued upload of an older mesh must not bring it back
