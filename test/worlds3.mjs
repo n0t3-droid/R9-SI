@@ -42,7 +42,7 @@ const settle = async (max = 50) => {
   return s;
 };
 const grab = async (name, frames = 4) => {
-  const url = await ev((frames) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, frames);
+  const url = await ev((frames) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { if (window.__each) window.__each(g); g.last = performance.now() - 33; g.loop(performance.now()); if (window.__each) window.__each(g); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, frames);
   if (url && url.length > 2000) { fs.writeFileSync(SHOTS + name, Buffer.from(url.split(',')[1], 'base64')); console.log('  📷 ' + name); return SHOTS + name; }
   console.log('  !! no picture ' + name); return null;
 };
@@ -63,17 +63,21 @@ check(await ev(() => VR.game.state) === 'play', 'a new world');
 await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(6000); });
 await settle(30);
 const WORLDS = process.env.WORLDS ? process.env.WORLDS.split(',') : ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
-// one native held in place (window.__each runs every frame): standing in the open west of the plaza, facing +x
+// one native held in place (window.__each runs every frame): on the plaza's ring path east of the monument, facing the
+// camera (the villages' own bearing: yaw = atan2(−dx, −dz) toward what one faces) turned by __yawOff
 const hold = (vid) => ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); if (!v) return null; const pz = v.plan.plaza; const ag = v.agents.filter(o => !o.kid && o.pose !== 'sleep' && o.pose !== 'sit'); const a = ag[1] || ag[0]; if (!a) return null;
-  window.__held = a; a.greetT = 0;
-  window.__each = () => { a.act = null; a.steer = null; a.path = null; a.pose = 'stand'; if (a.vel) { a.vel[0] = 0; a.vel[2] = 0; } a.walkAmt = 0; a.pos[0] = pz.x - 8.5; a.pos[1] = pz.y; a.pos[2] = pz.z + 0.5; if (!(g.villages.talking === a)) a.yaw = Math.PI / 2; };
+  window.__held = a; a.greetT = 0; window.__yawOff = 0.35;
+  const S = window.__spot = [pz.x + 5.5, pz.y, pz.z + 1.8];
+  window.__each = () => { const pl = g.player.pos; a.act = null; a.steer = null; a.path = null; a.pose = 'stand'; if (a.vel) { a.vel[0] = 0; a.vel[2] = 0; } a.walkAmt = 0; a.pos[0] = S[0]; a.pos[1] = S[1]; a.pos[2] = S[2]; if (!(g.villages.talking === a)) a.yaw = Math.atan2(-(pl[0] - a.pos[0]), -(pl[2] - a.pos[2])) + window.__yawOff; };
   window.__each(g);
+  // (the photo framing: the others within 9 m step back and wait — natives.js's hush)
+  for (const o of v.agents) if (o !== a && Math.hypot(o.pos[0] - a.pos[0], o.pos[2] - a.pos[2]) < 9) o.hush = { t: 40, spot: VR.Natives.hushSpot(o.pos, a.pos) };
   return { name: a.name, id: a.p.id, sc: VR.Folk.SPECIES_BODY[vid.split(':')[1]].scale, species: a.p.look.species, tool: VR.Folk.toolOf(a.p.look), pos: a.pos.slice() };
 }, vid);
-// the camera d m off the native's front, at bearing ang, looking at height h (× the species' scale)
-const frame = (d, ang, h, h2) => ev(([d, ang, h, h2]) => { const g = VR.game, a = window.__held, sc = VR.Folk.SPECIES_BODY[a.p.look.species].scale, p = g.player; const fx = Math.sin(a.yaw + ang), fz = Math.cos(a.yaw + ang), hy = a.pos[1] + h * sc, cy = a.pos[1] + (h2 === undefined ? h : h2) * sc;
-  p.flying = true; p.teleport(a.pos[0] + fx * d, cy - 1.62, a.pos[2] + fz * d);
-  const e = p.eyePos(), dx = a.pos[0] - e[0], dy = hy - e[1], dz = a.pos[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [d, ang, h, h2]);
+// the camera d m north of the native (−z), the feet on the plaza (lifted by up), looking at height h (× the scale)
+const frame = (d, h, up, side) => ev(([d, h, up, side]) => { const g = VR.game, a = window.__held, S = window.__spot, sc = VR.Folk.SPECIES_BODY[a.p.look.species].scale, p = g.player;
+  p.flying = true; p.teleport(S[0] + (side || 0), S[1] + (up || 0.05), S[2] - d);
+  const e = p.eyePos(), dx = S[0] - e[0], dy = S[1] + h * sc - e[1], dz = S[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [d, h, up, side]);
 let chainDone = false;
 for (const kind of WORLDS) {
   if (!want('worlds')) break;
@@ -98,13 +102,13 @@ for (const kind of WORLDS) {
   const nat = await hold(vid);
   check(nat && nat.species === kind && nat.tool, `${kind}: a native, ${nat ? nat.name : '?'} with its ${nat ? nat.tool : '?'}`);
   if (!nat) continue;
-  await frame(1.25, 0.3, kind === 'ocker' ? 1.62 : 1.5);
-  for (let i = 0; i < 8; i++) { await step(4, 33); await wait(250); await frame(1.25, 0.3, kind === 'ocker' ? 1.62 : 1.5); }
+  await frame(1.3, kind === 'ocker' ? 1.62 : 1.5, 0.05, -0.35);
+  for (let i = 0; i < 8; i++) { await step(6, 33); await frame(1.3, kind === 'ocker' ? 1.62 : 1.5, 0.05, -0.35); await ev(() => { window.__norender = false; const g = VR.game; window.__each(g); g.last = performance.now() - 33; g.loop(performance.now()); window.__each(g); window.__norender = true; }); await wait(400); }
   const sm = await ev(() => { const a = window.__held; return a.fg ? a.fg.state : -1; });
   check(sm === 2, `${kind}: the smooth body ready (state ${sm})`);
   row.push(await grab(`w3_${kind}_face.png`, 3));
   // 2 · the greeting: talk to it — it turns to you, greets in its own way, says a word; the others make room
-  await frame(2.8, 0.9, 1.1, 1.45);
+  await frame(3.2, 1.0, 0.05, 1.2);
   await ev(() => { const g = VR.game; for (const o of window.__held.vil.agents) if (o !== window.__held && !o.kid && Math.hypot(o.pos[0] - g.player.pos[0], o.pos[2] - g.player.pos[2]) > 7) { o.pos[0] = g.player.pos[0] + 3; o.pos[2] = g.player.pos[2] + 2.5; break; } });
   const t1 = await ev(() => { const g = VR.game, a = window.__held; g.villages.openTalk(a); const pl = g.player.pos, near = a.vil.agents.filter(o => o !== a && Math.hypot(o.pos[0] - pl[0], o.pos[2] - pl[2]) < 7).length; return { text: document.getElementById('tk_text').textContent, near, greet: a.greetT }; });
   await step(24, 33);
