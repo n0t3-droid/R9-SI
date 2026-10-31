@@ -3747,5 +3747,15 @@
     "g.pt.skipWait": "Gleich da — die Welt wird noch gebaut …",
     "g.pt.bestHour": "zur goldenen Stunde",
     // ---- e-portal2 end
+    // ---- u-worlds5 (src/main/towns.js: the species market, the landmark's view)
+    "g.shop.title.sp_aqua": "🏺 Markt der Wellari", "g.shop.title.sp_ocker": "🏺 Markt der Dunelin", "g.shop.title.sp_zinn": "🏺 Markt der Glutani", "g.shop.title.sp_basalt": "🏺 Markt der Regoli", "g.shop.title.sp_opal": "🏺 Markt der Nivari",
+    "g.shop.btn.sp_aqua": "🏺 Zum Markt", "g.shop.btn.sp_ocker": "🏺 Zum Markt", "g.shop.btn.sp_zinn": "🏺 Zum Markt", "g.shop.btn.sp_basalt": "🏺 Zum Markt", "g.shop.btn.sp_opal": "🏺 Zum Markt",
+    "g.shop.kit.sp_aqua": "Bauset der Wellari", "g.shop.kit.sp_ocker": "Bauset der Dunelin", "g.shop.kit.sp_zinn": "Bauset der Glutani", "g.shop.kit.sp_basalt": "Bauset der Regoli", "g.shop.kit.sp_opal": "Bauset der Nivari",
+    "g.town.lm.aqua": "Leuchtturm", "g.town.lm.ocker": "Windfänger", "g.town.lm.zinn": "Obelisk", "g.town.lm.basalt": "Sternwarte", "g.town.lm.opal": "Frostturm",
+    "g.town.view": "{lm} erklommen — der Blick über {town}",
+    "g.town.reward": "Als Dank für den Aufstieg: {n} × {item}",
+    "g.town.rewardAdv": "Für den Aufstieg: +{xp} EP, +{t} Heliataler",
+    "g.town.again": "Der Blick ist so schön wie beim ersten Mal.",
+    // ---- u-worlds5 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
