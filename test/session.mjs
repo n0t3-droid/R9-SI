@@ -170,7 +170,9 @@ function pageHelpers(win, VRx) {
   S.set = function (mode) {
     S.mode = mode || { kind: 'idle' }; S.done = false; S.t = 0;
     const g = VR.game; if (g && g.input) release(g.input);
+    if (S.mode.kind === 'walk' && !S.mode.route) { S.mode.route = S.wayTo(S.mode); S.log.push(['way', S.mode.toSite ? 'site' : 'village', S.mode.route.length, S.mode.route[S.mode.route.length - 1].map(Math.round)]); }   // a-session: the way from where the player stands
     if (S.mode.kind === 'walk') { S.R = S.route(S.mode.route); S.st = { s0: 0, t0: 0, jumpT: 0, lastJump: -9 }; }
+    if (S.mode.kind === 'outpost') S.ad = null;
     if (S.mode.kind === 'bauhand') S.B = { phase: 'start', ding: S.mode.ding, name: S.mode.name, tries: 0, t: 0, dy: 0, whys: [], plan: null, site: null, sitePhase: '', fallback: false, target: S.mode.target, watchDone: 0 };
     return true;
   };
@@ -237,8 +239,14 @@ function pageHelpers(win, VRx) {
     const M = S.mode, In = VR.Intent; release(I);
     if (!In || !In.start) { S.done = true; return; }
     if (!M.started) {
-      const q = (In.targets || []).find(t => t.id === M.target);
-      if (!q) { if (S.t > 6) { S.log.push(['intent', 'no target', M.target]); S.done = true; } return; }
+      // (a-session: M.prefix — the first target whose id starts so; M.pick — the nearest of a kind beyond 40 m)
+      if (!M.q || S.t - (M.qT || 0) > 1) {
+        const P = p.pos, dd = (t) => Math.hypot(t.pos[0] - P[0], t.pos[2] - P[2]), T0 = In.targets || [];
+        M.q = M.prefix ? T0.find(t => String(t.id).startsWith(M.prefix)) : M.pick ? T0.filter(t => t.kind === M.pick && dd(t) > 40).sort((a, b) => dd(a) - dd(b))[0] : T0.find(t => t.id === M.target); M.qT = S.t;
+        if (M.q && (M.prefix || M.pick)) M.target = M.q.id;
+      }
+      const q = M.q;
+      if (!q) { if (S.t > 6) { S.log.push(['intent', 'no target', M.target || M.prefix || M.pick]); S.done = true; } return; }
       const e = p.eyePos(), dx = q.pos[0] - e[0], dy = q.pos[1] - e[1], dz = q.pos[2] - e[2];
       p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
       if (M.aimT === undefined) M.aimT = S.t;
@@ -247,12 +255,154 @@ function pageHelpers(win, VRx) {
       if (M.released) {
         const c = In.current && In.current();
         if (c) { M.started = S.t; S.log.push(['intent', M.target, c.means, +(+g.time).toFixed(1)]); }
-        else if (S.t - M.pressT > 2) { S.log.push(['intent', 'not started', M.target, VR.Ctx && VR.Ctx.current() ? VR.Ctx.current().id : '?']); S.done = true; }
+        else if (S.t - M.pressT > 2) { S.log.push(['intent', 'not started', M.target, VR.Ctx && VR.Ctx.current() ? VR.Ctx.current().id : '?']); if (M.direct && !M.tried) { M.tried = true; const ok = In.start(g, q); S.log.push(['fallback', 'Intent.start ' + M.target, ok]); if (ok) M.started = S.t; else S.done = true; } else S.done = true; }   // (a-session: direct — the trip started by hand when the key did not take, logged)
       }
       return;
     }
     const c = In.current && In.current();
     if (!c) { S.log.push(['intent', 'over', M.target, +(+g.time).toFixed(1)]); S.done = true; }
+  }
+  // ---- a-session: the adventurer's outpost (plan docs/superpowers/plans/2026-10-31-a-session.md §2.1)
+  // the outpost of the world's start (meta.advStart.out) or the nearest not freed one within 400 m
+  S.adSite = function () {
+    const g = VR.game, L = VR.Liberate, p = g.player; if (!L || !L.sites) return null;
+    const o = g.meta && g.meta.advStart && g.meta.advStart.out, ref = o ? [o[0], o[2]] : [p.pos[0], p.pos[2]];
+    let best = null, bd = 400;
+    for (const s of L.sites().values()) { if (!s) continue; const d = Math.hypot(s.x - ref[0], s.z - ref[1]); if (d < bd) { bd = d; best = s; } }
+    return best;
+  };
+  // a straight way (a point every 10 m) from the player to the outpost's beacon (toSite: stop that far short) or to the
+  // nearest village not stood in (toVillage), else on ahead 200 m
+  S.wayTo = function (M) {
+    const g = VR.game, p = g.player, x0 = p.pos[0], z0 = p.pos[2];
+    let tg = null, stop = 0;
+    if (M.toSite) {
+      const s = S.adSite(), o = g.meta && g.meta.advStart && g.meta.advStart.out;
+      tg = s ? (s.beacon ? [s.beacon[0] + 0.5, s.beacon[2] + 0.5] : [s.x, s.z]) : o ? [o[0], o[2]] : null; stop = M.toSite;
+    } else if (M.toVillage) {
+      const V = g.villages; let bd = Infinity;
+      if (V && V.sites) for (const v of V.sites) { const d = Math.hypot(v.x - x0, v.z - z0); if (d > 40 && d < bd && d < 1500) { bd = d; tg = [v.x + 0.5, v.z + 0.5]; } }
+      stop = M.toVillage;
+    }
+    if (!tg) tg = [x0 - Math.sin(p.yaw) * 200, z0 - Math.cos(p.yaw) * 200];
+    const dx = tg[0] - x0, dz = tg[1] - z0, d = Math.hypot(dx, dz) || 1, L = Math.max(4, d - stop), pts = [];
+    for (let k = 0; k < L; k += 10) pts.push([x0 + dx / d * k, z0 + dz / d * k]);
+    pts.push([x0 + dx / d * L, z0 + dz / d * L]);
+    return pts;
+  };
+  const OFF = { down: 1, calm: 1, leave: 1, helper: 1 };
+  const aim = (p, q, dt, rate) => { const e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = q[0] - e[0], dy = q[1] - e[1], dz = q[2] - e[2]; const d = wrap(Math.atan2(-dx, -dz) - p.yaw); p.yaw += Math.max(-rate * dt, Math.min(rate * dt, d)); const pt = Math.atan2(dy, Math.hypot(dx, dz)); p.pitch += (pt - p.pitch) * Math.min(1, dt * 5); if (p.viewYaw !== undefined) p.viewYaw = p.yaw; return Math.abs(d); };
+  // a screen box [x0, y0, x1, y1] (0..1, y down) of a world box round c (half sizes rx, ry), or null behind the eye
+  S.box = function (c, rx, ry) {
+    const g = VR.game, r = g.renderer, vp = r && r.viewProj, cam = g.cam; if (!vp || !cam) return null;
+    let x0 = 2, y0 = 2, x1 = -2, y1 = -2, n = 0;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const x = c[0] + sx * rx - cam.x, y = c[1] + sy * ry - cam.y, z = c[2] + sz * rx - cam.z, w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      if (w < 0.05) continue; n++;
+      const u = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w) * 0.5 + 0.5, v = 1 - (((vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w) * 0.5 + 0.5);
+      x0 = Math.min(x0, u); x1 = Math.max(x1, u); y0 = Math.min(y0, v); y1 = Math.max(y1, v);
+    }
+    if (!n || x1 < 0 || x0 > 1 || y1 < 0 || y0 > 1) return null;
+    return [Math.max(0, x0), Math.max(0, y0), Math.min(1, x1), Math.min(1, y1)];
+  };
+  const overlap = (a, b) => { if (!a || !b) return 0; const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]); return w > 0 && h > 0 ? (w * h) / Math.max(1e-6, (a[2] - a[0]) * (a[3] - a[1])) : 0; };
+  // how much of the machine's screen box Funke's body and its bubble cover (2 Hz while the adventurer faces a machine)
+  function funkeOver(g, m, A) {
+    const K = VR.Foes.KINDS[m.foe.k] || { h: 1.5, w: 0.5 }, fb = S.box([m.pos[0], m.pos[1] + K.h / 2, m.pos[2]], K.w + 0.15, K.h / 2 + 0.1); if (!fb) return;
+    const fk = g.funke; let o = 0;
+    if (fk && fk.visible !== false && fk.pos) o = Math.max(o, overlap(fb, S.box(fk.pos, 0.3, 0.3)));
+    const el = typeof document !== 'undefined' && document.getElementById('funkebub');
+    const bub = el && el.style.display !== 'none' && el.getBoundingClientRect ? el.getBoundingClientRect() : null, cv = g.renderer && g.renderer.canvas;
+    if (bub && bub.width > 0 && cv && cv.clientWidth) { const W = cv.clientWidth, H = cv.clientHeight; o = Math.max(o, overlap(fb, [bub.left / W, bub.top / H, bub.right / W, bub.bottom / H])); }
+    const X = A.fx; X.n++; if (o > 0.15) X.cover++; X.worst = Math.max(X.worst, +o.toFixed(2));
+  }
+  function outpost(g, p, I, dt) {
+    const L = VR.Liberate, Fo = VR.Foes, En = g.entities, T = g.time || 0;
+    const A = S.ad || (S.ad = { ph: 'seek', t: 0, fought: 0, calmed: 0, hits: 0, clickT: 0, vT: -9, tg: null, tgT: 0, fightT: 0, freed: false, freeT: 0, turns: 0, fallbacks: [], fx: { n: 0, cover: 0, worst: 0 }, fxT: 0, last: [p.pos[0], p.pos[2], 0], jumpT: 0, sites: 0 });
+    A.t += dt;
+    if (I.keys.has('KeyV') && T - A.vT > 0.1) I.keys.delete('KeyV');   // (a tap: two frames down)
+    I.captured = false;
+    if (!L || !Fo || !En) { S.done = true; A.why = 'no Liberate/Foes'; return; }
+    const site = S.adSite();
+    const fall = (w) => { A.fallbacks.push(w + '@' + Math.round(S.t)); S.log.push(['fallback', w, +T.toFixed(1)]); };
+    const tapV = () => { I.keys.add('KeyV'); A.vT = T; };
+    // walking to a spot: W while it faces it, a jump when stuck
+    const go = (x, z, near) => {
+      const d = Math.hypot(x - p.pos[0], z - p.pos[2]); if (d <= near) { I.keys.delete('KeyW'); return true; }
+      const off = turnTo(p, x, z, dt, 4); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
+      const lm = A.last; if (Math.hypot(p.pos[0] - lm[0], p.pos[2] - lm[1]) > 0.6) { lm[0] = p.pos[0]; lm[1] = p.pos[2]; lm[2] = S.t; }
+      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; }
+      return false;
+    };
+    if (!site) { const o = g.meta && g.meta.advStart && g.meta.advStart.out; if (o) go(o[0], o[2], 12); if (A.t > 40) { A.why = 'no site'; S.done = true; } return; }
+    const b = site.beacon ? [site.beacon[0] + 0.5, site.beacon[1] + 1.2, site.beacon[2] + 0.5] : [site.x + 0.5, (site.y || p.pos[1]) + 1.2, site.z + 0.5];
+    // freed: watch the moment, then done
+    if (site.st === 'frei') {
+      release(I); if (!A.freed) { A.freed = true; A.freeT = S.t; S.log.push(['freed', site.id, +T.toFixed(1)]); }
+      if (!(g.wow && g.wow.active) && !L.moment) aim(p, b, dt, 2);
+      if (!L.moment && S.t - A.freeT > 5) S.done = true;
+      return;
+    }
+    // the Lichtleiter open: one conduit on the light's path turned every 0.35 s (a player's clicks)
+    if (L.puz) {
+      release(I); A.ph = 'puzzle';
+      if (L.puz.done) return;
+      A.clickT -= dt; if (A.clickT > 0) return; A.clickT = 0.35;
+      const pz = L.puz.s.pz; let i = -1;
+      for (let k = 0; k < pz.tiles.length; k++) { const tl = pz.tiles[k]; if (tl.path && !tl.lock && L.maskOf(tl) !== L.rotMask(tl.t, tl.sol)) { i = k; break; } }
+      if (i >= 0) { L.puzAct('t', i); A.turns++; } else if (A.t - A.tgT > 30) { fall('puzzle stuck'); L.closePuzzle(); }
+      return;
+    }
+    // the calm ring standing: watch the needle, the second tap when it is in the green arc
+    if (L.calmSt) {
+      release(I); A.ph = 'calm';
+      const m = L.calmSt.m; if (m) { const K = Fo.KINDS[m.foe.k]; aim(p, [m.pos[0], m.pos[1] + K.h * 0.55, m.pos[2]], dt, 4); if (S.t - A.fxT > 0.5) { A.fxT = S.t; funkeOver(g, m, A); } }
+      if (T - (L.calmSt.t0 || 0) > 0.25 && L.calmPress(L.calmSt, T)) { const ok = L.calmTap(g); if (ok) { A.calmed++; S.log.push(['calmed', m && m.foe.k, +T.toFixed(1)]); A.tg = null; } }
+      return;
+    }
+    const strays = En.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === site.id && !m.foe.wave && !m.foe.helper);
+    const active = strays.filter(m => !OFF[m.foe.st]);
+    A.sites = strays.length;
+    // ready: to the beacon, [V] — the Lichtleiter
+    if (L.state(site) === 'bereit' || (site.strays !== null && site.strays !== undefined && !active.length && strays.length)) {
+      A.ph = 'beacon';
+      if (!go(b[0], b[2], 3.0)) { p.pitch += (-0.1 - p.pitch) * Math.min(1, dt * 3); return; }
+      aim(p, b, dt, 4);
+      if (A.beaconT === undefined) A.beaconT = S.t;
+      if (S.t - A.beaconT > 0.6 && S.t - A.beaconT < 0.7 + dt) tapV();
+      if (S.t - A.beaconT > 2.2 && !L.puz) { fall('openPuzzle'); L.openPuzzle(g, site); A.tgT = A.t; A.beaconT = S.t + 99; }
+      return;
+    }
+    // the strays not there yet: closer to the beacon (they stand up as their outpost is near)
+    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 60) { A.why = 'no strays'; S.done = true; } return; }
+    // the target: the first one fought (a walker before a sentry, never the crane on its tower), the others calmed
+    if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
+      if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
+      const P = p.pos, near = (m) => Math.hypot(m.pos[0] - P[0], m.pos[2] - P[2]), pref = (m) => near(m) + (m.foe.k === 'crane' ? 60 : 0) + (A.fought < 1 && m.foe.k === 'driller' ? -12 : 0);
+      A.tg = active.slice().sort((x, y) => pref(x) - pref(y))[0]; A.tgT = A.t; A.vTry = 0; A.tout = 0;
+      A.ph = A.fought < 1 && A.tg.foe.k !== 'crane' ? 'fight' : 'calmgo';
+    }
+    const m = A.tg, K = Fo.KINDS[m.foe.k], c = [m.pos[0], m.pos[1] + K.h * 0.55, m.pos[2]], d = Math.hypot(m.pos[0] - p.pos[0], m.pos[2] - p.pos[2]);
+    if (S.t - A.fxT > 0.5 && d < 16) { A.fxT = S.t; funkeOver(g, m, A); }
+    if (A.ph === 'fight') {
+      A.fightT += dt;
+      if (A.fightT > 35) { A.ph = 'calmgo'; fall('fight timeout'); return; }
+      // to its side (its core is the weak point from the side and behind), then strikes at a player's rhythm
+      const sx = Math.cos(m.yaw), sz = -Math.sin(m.yaw), side = ((p.pos[0] - m.pos[0]) * sx + (p.pos[2] - m.pos[2]) * sz) >= 0 ? 1 : -1;
+      const spot = [m.pos[0] + sx * side * 2.4, m.pos[2] + sz * side * 2.4];
+      if (d > 3.6) { go(spot[0], spot[1], 0.8); aim(p, c, dt, 0); p.pitch += (Math.atan2(c[1] - p.pos[1] - 1.62, Math.max(1, d)) - p.pitch) * Math.min(1, dt * 4); return; }
+      I.keys.delete('KeyW'); aim(p, c, dt, 5);
+      A.clickT -= dt;
+      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; A.clickT = 0.42; A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1; }
+      if (A.hp0 !== undefined && m.foe.hp < A.hp0) { A.hits++; A.hp0 = undefined; }
+      if (A.hitAsk > 40 && A.hits === 0) { fall('melee never lands'); Fo.hurtMob ? En.hurtMob(m, 4, p.pos) : 0; A.hitAsk = 0; }
+      return;
+    }
+    // calm: close, face it, [V]; the ring did not start → the direct call (logged); a Kranarm on its tower from its foot
+    if (A.t - A.tgT > 12) { A.tgT = A.t; A.tout = (A.tout | 0) + 1; if (A.tout >= 2) { fall('powerdown direct ' + m.foe.k); En.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 2, m.pos[1] + 0.6, m.pos[2] + Math.cos(m.yaw) * 2]); A.tout = 0; } else { fall('calm direct ' + m.foe.k); L.calmBegin(g, m); } return; }
+    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? 5.5 : 3.0) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
+    aim(p, c, dt, 5);
+    if (A.vTry === 0 || (S.t - A.vTry > 1.4)) { if (A.vTry && !L.calmSt) { fall('calmBegin'); L.calmBegin(g, m); } tapV(); A.vTry = S.t; }
   }
   S.control = function (dt) {
     const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
@@ -262,6 +412,7 @@ function pageHelpers(win, VRx) {
     if (M.kind === 'walk') { walk(g, p, I, dt); return; }
     if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
     if (M.kind === 'intent') { intent(g, p, I, dt); return; }   // e-ctx
+    if (M.kind === 'outpost') { outpost(g, p, I, dt); return; }   // a-session
     if (M.kind === 'showcase') {   // a-builder: the builder shows the house off — the photo mode's circle round it at the golden hour, a picture
       release(I);
       if (!S.sc) { const b = S.B && S.B.site && S.B.site.box, c = b ? [(b[0] + b[3]) / 2 + 0.5, b[1] + 1.5, (b[2] + b[5]) / 2 + 0.5] : null, r = b ? Math.hypot(b[3] - b[0], b[5] - b[2]) / 2 + 7 : 0, h = b ? b[4] - b[1] + 4 : 0; S.sc = { ok: !!(VR.Showcase && VR.Showcase.start(g, { centre: c, golden: true, r, h })), c }; S.log.push(['showcase', S.sc.ok, c && c.map(Math.round)]); if (!S.sc.ok) { S.done = true; S.sc = null; } return; }
@@ -306,7 +457,7 @@ function pageHelpers(win, VRx) {
     return { miss, dirty };
   };
   S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
-  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null }; };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx } : null }; };
   return S;
 }
 
@@ -496,27 +647,42 @@ page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log(
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const wait = (ms) => page.waitForTimeout(ms);
 const RUN = { renders: [], picEvery: Math.max(1, Math.round(PIC_EVERY / 0.5)), waits: 0, waitS: 0, picReal: [] };
-await page.goto(DIST);
-for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
-await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.autoJump = 'on'; g.settings.wowMoments = true; g.applySettings('*'); });
-await ev((seed) => VR.game.createWorld({ name: 'Sitzung', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: true, kit: true }), SEED);
-let inPlay = false;
-for (let i = 0; i < 300 && !inPlay; i++) { await wait(1000); inPlay = await ev(() => !!(VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)).catch(() => false); }
-const meta = await ev(() => { const g = VR.game; return { state: g.state, vgen: (g.meta && g.meta.vgen) | 0, type: g.meta && g.meta.type, preset: g.settings.preset, eventlog: !!VR.EventLog, pos: g.player.pos.map(v => +v.toFixed(1)), W: g.renderer.W, H: g.renderer.H }; });
-console.log(`world (${secs()}): ${JSON.stringify(meta)}`);
-check(inPlay && meta.vgen >= 11 && meta.type === 'default' && meta.eventlog, `a new default world (the Heartland, vgen ${meta.vgen}) with VR.EventLog, Balanced (${meta.preset}, ${meta.W}×${meta.H})`);
-if (!inPlay || !meta.eventlog) { console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l); await browser.close(); console.log('FAILED ' + Math.max(1, fails)); process.exit(1); }
-// the clock is ours: no animation frames, the renderer only draws when asked; the weather held; uploads boosted; the world's known landmarks
-await ev((lms) => {
-  const g = VR.game;
-  window.requestAnimationFrame = () => 0;
-  if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; }
-  window.__norender = true;
-  g.zenFreezeWeather = true; g.env.rain = 0; g.env.rainTarget = 0;
-  if (g.renderer.q) g.renderer.q.upload = 24;
-  if (VR.EventLog) VR.EventLog.landmarks = lms.filter(q => !['temple', 'citadel', 'isles', 'nova', 'station', 'hills'].includes(q.id));
-}, ROUTES.landmarks);
-await page.evaluate(`(${pageHelpers.toString()})(window)`);
+// a-session: a world opened in a page loaded again — the default „Sitzung" (Kreativ · Friedlich) or (adv) a fresh
+// Abenteuer world as the create form's „Abenteuer — mit Begegnungen" (band Normal) makes it: Überleben, peaceful, the
+// record waiting in VR.Adventure.pendingCreate (adventure.js beforeCreate), the start near its first outpost (first.js)
+async function openWorld(adv) {
+  await page.goto(DIST);
+  for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
+  await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.autoJump = 'on'; g.settings.wowMoments = true; g.applySettings('*'); });
+  if (adv) await ev((seed) => { const A = VR.Adventure; if (A) A.pendingCreate = { at: Date.now(), band: 'normal', enc: 'normal' }; VR.game.createWorld({ name: 'Abenteuer', mode: 'survival', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: false, kit: true, first: true }); }, SEED);   // (first: made from the start screen — its own start)
+  else await ev((seed) => VR.game.createWorld({ name: 'Sitzung', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: true, kit: true }), SEED);
+  let inPlay = false;
+  for (let i = 0; i < 300 && !inPlay; i++) { await wait(1000); inPlay = await ev(() => !!(VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)).catch(() => false); }
+  // (a-session, f-hud's self-review 3: the minimap 4 s after the world starts — its luma sd as test/critic_ux.mjs reads it)
+  let mapSd = null;
+  if (adv && inPlay) { await wait(4000); mapSd = await ev(() => { const mm = document.getElementById('minimap'); if (!mm || !mm.width) return -1; try { const d = mm.getContext('2d').getImageData(0, 0, mm.width, mm.height).data; let m = 0, m2 = 0, n = 0; for (let i = 0; i < d.length; i += 8) { if (d[i + 3] < 10) continue; const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; m += L; m2 += L * L; n++; } if (!n) return 0; m /= n; return +Math.sqrt(Math.max(0, m2 / n - m * m)).toFixed(1); } catch (e) { return -2; } }).catch(() => -3); }
+  const meta = await ev(() => { const g = VR.game, A = VR.Adventure; return { state: g.state, vgen: (g.meta && g.meta.vgen) | 0, type: g.meta && g.meta.type, mode: g.meta && g.meta.mode, adv: !!(A && A.on && A.on()), enc: A && A.enc ? A.enc() : null, advStart: g.meta && g.meta.advStart || null, tod: Math.round(g.env.timeOfDay), preset: g.settings.preset, eventlog: !!VR.EventLog, pos: g.player.pos.map(v => +v.toFixed(1)), W: g.renderer.W, H: g.renderer.H }; });
+  meta.mapSd4 = mapSd;
+  console.log(`world (${secs()}): ${JSON.stringify(meta)}`);
+  if (adv) check(inPlay && meta.adv && meta.enc === 'normal' && meta.advStart && meta.advStart.d >= 150 && meta.advStart.d <= 320, `a fresh Abenteuer world (mit Begegnungen, ${meta.mode}), its start ${meta.advStart && meta.advStart.d} m before the first outpost, ${meta.tod} on the clock`);
+  else check(inPlay && meta.vgen >= 11 && meta.type === 'default' && meta.eventlog, `a new default world (the Heartland, vgen ${meta.vgen}) with VR.EventLog, Balanced (${meta.preset}, ${meta.W}×${meta.H})`);
+  if (adv && mapSd !== null) check(mapSd > 10, `Abenteuer: the minimap drawn 4 s after the start (luma sd ${mapSd} > 10)`);
+  if (!inPlay || !meta.eventlog) { console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l); await browser.close(); console.log('FAILED ' + Math.max(1, fails)); process.exit(1); }
+  // the clock is ours: no animation frames, the renderer only draws when asked; the weather held; uploads boosted; the world's known landmarks
+  await ev((lms) => {
+    const g = VR.game;
+    window.requestAnimationFrame = () => 0;
+    if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; }
+    window.__norender = true;
+    g.zenFreezeWeather = true; g.env.rain = 0; g.env.rainTarget = 0;
+    if (g.renderer.q) g.renderer.q.upload = 24;
+    if (VR.EventLog) VR.EventLog.landmarks = lms.filter(q => !['temple', 'citadel', 'isles', 'nova', 'station', 'hills'].includes(q.id));
+  }, ROUTES.landmarks);
+  await page.evaluate(`(${pageHelpers.toString()})(window)`);
+  return meta;
+}
+const wantWorld = !ONLY || ONLY.includes('builder') || ONLY.includes('walk') || ONLY.includes('pilot');
+let META = wantWorld ? await openWorld(false) : null;
 const settle = async (maxS, r, rm) => { const t = Date.now(); let s = null; while (Date.now() - t < maxS * 1000) { s = await ev(([r, rm]) => window.__S.pump(r, rm), [r, rm]); if (s.miss === 0 && s.dirty === 0) break; await wait(60); } return s; };
 
 // half a second of play: the world ahead first, then 15 frames, the last drawn and captured (2 Hz; 1 Hz when a picture costs > 1.5 s)
@@ -545,7 +711,7 @@ async function session(type, setup, script) {
   const real0 = Date.now(), r0 = RUN.renders.length, w0 = [RUN.waits, RUN.waitS];
   sessionReal0 = real0; overBudget = false;
   const rec = { type, seed: SEED, preset: 'balanced', size: [VW, VH], dur: DUR, build: BUILD, parts: [], notes: setup.notes || [], exclude: [] };
-  await ev((o) => { const g = VR.game, p = g.player; p.flying = false; if (o.at) { p.teleport(o.at[0], o.at[1], o.at[2]); } if (o.yaw !== undefined) { p.yaw = o.yaw; p.viewYaw = o.yaw; } p.pitch = 0; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } g.env.setTime(o.tod); g.env.rain = 0; g.env.rainTarget = 0; window.__S.pics = []; window.__S.log = []; window.__S.stat = { hops: 0, jumps: 0 }; window.__S.set({ kind: 'idle' }); }, setup);
+  await ev((o) => { const g = VR.game, p = g.player; p.flying = false; if (o.at) { p.teleport(o.at[0], o.at[1], o.at[2]); } if (o.yaw !== undefined) { p.yaw = o.yaw; p.viewYaw = o.yaw; } if (o.at) p.pitch = 0; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } if (o.tod !== undefined) g.env.setTime(o.tod); g.env.rain = 0; g.env.rainTarget = 0; window.__S.pics = []; window.__S.log = []; window.__S.stat = { hops: 0, jumps: 0 }; window.__S.set({ kind: 'idle' }); }, setup);
   const st = await settle(90, 6, 3);
   await ev(() => window.__S.frames(30, false));   // (a second to land on the ground)
   console.log(`  settled ${JSON.stringify(st)} (${secs()})`);
@@ -598,6 +764,13 @@ async function session(type, setup, script) {
   const gq = pics[pics.length - 1];
   if (gq && gq.url) { fs.writeFileSync(`${SHOTS}session_${type}_gap.jpg`, Buffer.from(gq.url.split(',')[1], 'base64')); rec.gapFrame = { t: +(gq.t - t0).toFixed(2), file: `test/shots/session_${type}_gap.jpg` }; }
   if (process.env.ALL) { const all = await ev(() => window.__S.pics.map(q => [q.t, q.url])); fs.mkdirSync(`${SHOTS}session_${type}`, { recursive: true }); all.forEach(([t, u]) => fs.writeFileSync(`${SHOTS}session_${type}/t${String(Math.round((t - t0) * 10)).padStart(5, '0')}.jpg`, Buffer.from(u.split(',')[1], 'base64'))); }
+  // a-session: the adventurer's picture every 15 s of play (test/shots/session_adventurer/f_000.jpg …), named by the time
+  if (type === 'adventurer' || process.env.EVERY15) {
+    const ts = []; for (let k = 0; k * 15 <= rec.played + 0.01; k++) ts.push(t0 + k * 15);
+    const q15 = await ev((ts) => window.__S.picsAt(ts), ts), dir = `${SHOTS}session_${type}/`; fs.mkdirSync(dir, { recursive: true });
+    rec.every15 = [];
+    q15.forEach((q, k) => { if (!q || !q.url) return; const f = `${dir}f_${String(k * 15).padStart(3, '0')}.jpg`; fs.writeFileSync(f, Buffer.from(q.url.split(',')[1], 'base64')); rec.every15.push({ t: k * 15, pic: +(q.t - t0).toFixed(1), occ: q.occ, file: f.replace(ROOT, '') }); });
+  }
   await ev(() => { window.__S.pics = []; });
   let sheet = null;
   try { sheet = await buildSheet(rec, frames, `${SHOTS}session_${type}_sheet.png`); } catch (e) { console.log('  !! the sheet: ' + String(e && e.message || e).slice(0, 300)); }
@@ -663,24 +836,31 @@ try {
   // Funke offers chapter 1 in the Hangar Hall after 20 s of calm and the adventurer takes it ([V]); the ways to Nova Haven and through the city (c1.b2 out
   // there, 5 min after the first). Only when asked (ONLY=adventurer; DUR=600 for ten minutes: two beats)
   if (ONLY && ONLY.includes('adventurer')) {
-    await ev(() => { const A = VR.Adventure; if (A && A.setOn) { A.setOn(true); A.setEnc('normal'); } window.__S.acceptStory = true; });
-    recs.adventurer = await session('adventurer', { tod: 9200, at: [0.5, 81, 4.5], notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once', 'a-regie: the adventurer follows Funke\'s call toward the nearest disturbed outpost ' + JSON.stringify(ROUTES.outpost) + ' and stops 70 m short (its guardians patrol in sight, outside their notice); the Regie\'s lost stray on the way'] }, [
-      { name: 'hangar', de: 'Hangarhalle: umsehen (Kapitel 1)', mode: { kind: 'look', sec: 40, speed: 0.25 }, max: 40 },
-    ].concat(ROUTES.advA ? [
-      // a-regie: Funke's call — the way to the nearest disturbed outpost (its beam on the horizon), a look at it at the end
-      { name: 'to_outpost', de: 'Funkes Ruf: zum gestörten Außenposten', mode: { kind: 'walk', route: ROUTES.advA }, max: 235 },
-      { name: 'outpost', de: 'Am Außenposten: umsehen', mode: { kind: 'look', sec: 30, speed: 0.3 }, max: DUR },
-    ] : [
-      { name: 'to_nova', de: 'Weg nach Nova Haven', mode: { kind: 'walk', route: ROUTES.walkA }, max: 220 },
-      { name: 'city_plaza', de: 'Stadtplatz: umsehen', mode: { kind: 'look', sec: 15, speed: 0.45 }, max: 15 },
-      { name: 'city', de: 'Durch die Stadt', mode: { kind: 'walk', route: ROUTES.walkB }, max: DUR },
-    ]));
+    // a-session (plan docs/superpowers/plans/2026-10-31-a-session.md §2.1): a real new adventurer — a fresh Abenteuer world
+    // (mit Begegnungen), its own start 200–300 m before the first outpost in the morning; a look at the arrival, then
+    // Funke's way to the outpost, one stray fought, the others calmed, the Lichtleiter at the beacon, the moment; the
+    // story's offer taken when Funke makes it; a look round, then on to the nearest village
+    META = await openWorld(true);
+    await ev(() => { window.__S.acceptStory = true; });
+    recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the minimap 4 s after the start: luma sd ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
+      { name: 'arrive', de: 'Ankunft: umsehen', mode: { kind: 'look', sec: 8, speed: 0.12 }, max: 8 },
+      { name: 'to_outpost', de: 'Funkes Weg: [V] zum Außenposten', mode: { kind: 'intent', prefix: 'out:', direct: true }, max: 120 },
+      { name: 'to_outpost2', de: 'Zu Fuß: die letzten Meter', mode: { kind: 'walk', toSite: 26 }, max: 60 },
+      { name: 'outpost', de: 'Am Außenposten: kämpfen, beruhigen, Lichtleiter', mode: { kind: 'outpost' }, max: 150 },
+      { name: 'after', de: 'Befreit: umsehen', mode: { kind: 'look', sec: 15, speed: 0.3 }, max: 15 },
+      { name: 'onward', de: 'Weiter: [V] zum nächsten Dorf', mode: { kind: 'intent', pick: 'village', direct: true }, max: DUR },
+      { name: 'onward2', de: 'Zu Fuß weiter', mode: { kind: 'walk', toVillage: 12 }, max: DUR },
+    ]);
     await ev(() => { window.__S.acceptStory = false; });
-    const st = recs.adventurer && recs.adventurer.metrics ? recs.adventurer.metrics : null;
+    const R = recs.adventurer, st = R && R.metrics ? R.metrics : null;
     if (st) {
-      const beats = recs.adventurer.events.filter(e => e.kind === 'story' && e.src !== 'offer').length;
-      check(beats / (recs.adventurer.played / 600) >= 1, `adventurer: ${beats} story beat(s) in ${recs.adventurer.played.toFixed(0)} s (≥ 1 per 10 min)`);
+      const beats = R.events.filter(e => e.kind === 'story' && e.src !== 'offer').length;
+      check(beats / (R.played / 600) >= 1, `adventurer: ${beats} story beat(s) in ${R.played.toFixed(0)} s (≥ 1 per 10 min)`);
       check(st.gaps.longest.d <= 60, `adventurer: the longest gap ${st.gaps.longest.d.toFixed(0)} s (≤ 60)`);
+      const op = (R.parts.find(q => q.name === 'outpost') || {}).status, ad = op && op.ad;
+      check(!!ad && ad.fought >= 1 && ad.calmed >= 1 && ad.freed, `adventurer: at the outpost — ${ad ? ad.fought : 0} fought (${ad ? ad.hits : 0} hits), ${ad ? ad.calmed : 0} calmed, ${ad && ad.freed ? 'freed' : 'not freed'} (${ad ? JSON.stringify(ad.fallbacks) : '-'})`);
+      const fx = ad && ad.fx;
+      if (fx && fx.n) check(fx.cover / fx.n <= 0.1, `adventurer: Funke or its bubble over the machine in ${fx.cover} of ${fx.n} fight samples (≤ 10 %; the worst overlap ${fx.worst})`);
     }
   }
 } catch (e) { check(false, 'the sessions ran (' + String(e && e.stack || e).slice(0, 600) + ')'); }

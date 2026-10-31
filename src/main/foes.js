@@ -844,6 +844,7 @@
       for (const [id, n] of d.items) if (VR.itemDef(id) || (VR.R && VR.R.byName[id])) En.dropStack({ id, n }, false, [m.pos[0], m.pos[1] + 0.5, m.pos[2]]);
       for (const what of d.parts) F.shed(g, m, what);
       if (P) for (let i = 0; i < d.motes; i++) P.spawn(m.pos[0] + (Math.random() - 0.5), m.pos[1] + Math.random() * K.h, m.pos[2] + (Math.random() - 0.5), (Math.random() - 0.5) * 0.4, 0.7 + Math.random() * 0.8, (Math.random() - 0.5) * 0.4, { life: 2.6, size: 0.05 + Math.random() * 0.03, grav: -0.2, col: K.fam === 'shadow' ? [0.85, 1, 0.55] : [0.6, 0.95, 1], emis: 1, drag: 0.35, collide: false });
+      if (VR.EventLog && VR.EventLog.emit && !f.wave) VR.EventLog.emit('milestone', 'powerdown', 3, [m.pos[0], m.pos[1] + K.h * 0.5, m.pos[2]], 'foes', Math.max(1.2, K.h * 0.6));   // a-session: the machine powered down into parts — the fight's end, seen
       const A = VR.Adventure;
       if (A && A.award) A.award('foe', { kind: f.k, zone: f.zone ? f.zone.id : undefined });
       const r0 = rec(); if (r0 && d.taler > 0 && A) { Adv().earn(r0.me, d.taler); A.floatTaler = (A.floatTaler || 0) + d.taler; if (A.schedule) A.schedule(); }
@@ -851,7 +852,8 @@
     }
   };
   // a calmed stray (liberate.js's timing ring)
-  F.calmMob = function (g, m) { refresh(g); const ok = F.calm(m, GW); if (ok && VR.Adventure && VR.Adventure.award) VR.Adventure.award('foe', { kind: m.foe.k, zone: m.foe.zone ? m.foe.zone.id : undefined }); F.flush(g); return ok; };
+  F.CALM_RUN = 10;   // (a-session: s — the guards calmed one after another are one moment: the first one weighs 3, the run's others 1)
+  F.calmMob = function (g, m) { refresh(g); const ok = F.calm(m, GW); if (ok && VR.Adventure && VR.Adventure.award) VR.Adventure.award('foe', { kind: m.foe.k, zone: m.foe.zone ? m.foe.zone.id : undefined }); if (ok && VR.EventLog && VR.EventLog.emit) { const K = F.KINDS[m.foe.k], t = g.time || 0, w = t - (F.calmT === undefined ? -1e9 : F.calmT) < F.CALM_RUN ? 1 : 3; F.calmT = t; VR.EventLog.emit('social', 'calmed', w, [m.pos[0], m.pos[1] + (K ? K.h * 0.5 : 1), m.pos[2]], 'foes', K ? Math.max(1.2, K.h * 0.6) : 1.2); } F.flush(g); return ok; };   // (a-session: a calmed stray, its optic green — seen)
 
   // ---------------------------------------------------------------- the director: guardians, swarms, shadows
   F.ctx = function (g) {

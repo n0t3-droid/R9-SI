@@ -40,6 +40,7 @@
     if (o.dist > I.CALL_MAX) return { means: null, why: 'far' };
     if (o.inShip) return { means: 'fly', why: null };
     if (o.dist < I.WALK_MAX) return { means: 'walk', why: null };
+    if (o.walk && o.dist <= I.WALK_FAR) return { means: 'walk', why: null };   // a-session: a target that asks for a walk (Funke's way to a disturbed outpost)
     if (o.ship) return { means: 'call', why: null };
     if (o.dist <= I.WALK_FAR) return { means: 'walk', why: null };
     return { means: null, why: 'noShip' };
@@ -383,7 +384,7 @@
     const sameWorld = !target.dim || target.dim === (g.dim || 'overworld');
     const guest = !!(g.meta && g.meta.guest) || !!(g.mp && g.mp.isClient);
     const ship = inShip || guest ? null : pickShip(g, target);
-    const m = I.meansFor({ dist, inShip, sameWorld, ship: !!ship || canConjure(g), spaceOk: !!I.spaceHandler });
+    const m = I.meansFor({ dist, inShip, sameWorld, ship: !!ship || canConjure(g), spaceOk: !!I.spaceHandler, walk: !!target.walk });   // (a-session: walk)
     if (!m.means) {
       if (m.why === 'noShip') say(g, 'g.int.noShip', { to: toPhrase(target) }, 'Kein Schiff in Reichweite — {to} ist zu Fuß zu weit', 'No ship within reach — {to} is too far to walk');
       else if (m.why === 'other') say(g, 'g.int.other', null, 'Reisen zu anderen Welten kommen bald', 'Trips to other worlds are coming soon');
