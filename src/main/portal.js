@@ -289,10 +289,12 @@
   }
   function frame() {
     const J = M.J; if (!J) return;
-    const tn = now(), dt = Math.min(0.25, (tn - J.last) / 1000); J.last = tn;   // (the wall clock: a slow frame does not slow the film)
+    // (the wall clock: a slow frame does not slow the film — e-portal2, R55-08: no cap; under load a frame took seconds and
+    // the film crawled 0.25 s a frame, so a test's skip came minutes late; the reveal's own fade keeps its cap)
+    const tn = now(), wall = Math.max(0, (tn - J.last) / 1000), dt = Math.min(0.25, wall); J.last = tn;
     const g = J.g;
     if (J.phase === 'film') {
-      if (!J.paused) J.t += dt;
+      if (!J.paused && !J.covered) J.t += wall;   // (a menu over the trip: the film waits under it)
       if (!J.dry) {   // e-portal2: the keys held and the gamepad, read here too
         const ks = g.input && g.input.keys, pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
         const kh = !!(ks && ks.has && (ks.has('Space') || ks.has('Escape') || ks.has('Enter'))), kFresh = kh && !M.keyHeld; M.keyHeld = kh;   // (fresh presses only: Space held to fly up through the gate is no skip)

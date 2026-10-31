@@ -118,7 +118,7 @@ if (!BEFORE) {
     await wait(250);
     const s = await ev(() => ({ f: VR.Portal.stats().film, dim: VR.game.dim, state: VR.game.state, busy: VR.Travel.busy(VR.game) }));
     const el = (Date.now() - t0) / 1000;
-    if (!skipT && s.f && s.f.t >= 3) { await page.keyboard.press('Space'); skipT = el; }
+    if (!skipT && s.f && el >= 3) { await page.keyboard.press('Space'); skipT = el; }   // (3 s of the wall clock: a press before the film's 2 s is kept)
     if (!landT && s.f && s.f.arrived) landT = el;
     if (s.f && s.f.phase === 'reveal' && !capShot) { await wait(1500); capShot = await shot('p2_reveal_after.png'); }
     if (!s.f && s.dim === 'opal' && s.state === 'play') { endT = el; break; }
@@ -139,7 +139,7 @@ if (!BEFORE) {
   for (let i = 0; i < 400; i++) {
     await wait(250);
     const s = await ev(() => ({ f: VR.Portal.stats().film, dim: VR.game.dim, state: VR.game.state }));
-    if (!padT && s.f && s.f.t >= 2.5) { await ev(() => { window.__pad.b = true; }); await wait(300); await ev(() => { window.__pad.b = false; }); padT = (Date.now() - t1) / 1000; }
+    if (!padT && s.f && (Date.now() - t1) / 1000 >= 2.5) { await ev(() => { window.__pad.b = true; }); await wait(300); await ev(() => { window.__pad.b = false; }); padT = (Date.now() - t1) / 1000; }
     if (!s.f && s.dim === 'overworld' && s.state === 'play') { home = (Date.now() - t1) / 1000; break; }
   }
   rec.pad = { padT, home, skipped: await ev(() => VR.Portal.last && VR.Portal.last.skipped) };
