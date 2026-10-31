@@ -57,6 +57,8 @@ MAIN.push('hitfeel');   // f-hud: VR.HitFeel (src/main/hitfeel.js) — the HUD u
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'stn_blocks'); SHARED.splice(SHARED.indexOf('forge_park') + 1, 0, 'forge_station', 'gen_stn'); MAIN.push('stations');   // u-stations: the gravity plate and the docking clamp (the last blocks, after a-life's), the Forge's station kind, the stn.* dims, VR.Stations (src/main/stations.js: last — it wraps spaceflight, cruise, ascent, padlife, shop, story)
 MAIN.push('portal_core', 'portal_film', 'portal_space', 'portal');   // e-portal (+ e-portal2: portal_space, the film's space shots): the Leuchtpfad — the rules (portal_core.js), the film (portal_film.js), the gates, the picker, the journey, fast flight (portal.js; last: it wraps playFrame and the pause menu)
 MAIN.push('quiet');   // f-quiet: VR.Quiet (src/main/quiet.js) — one quiet message channel, ⚙ Hinweise, Funke's budget and bubble at the edge (last: it wraps ui.js, funke.js, the hints, first2's Einfach page)
+MAIN.push('wander');   // o-wander: VR.Wander (src/main/wander.js) — the Wanderregisseur, the Wegballon, the Wanderbuch (after lifedirector, first2, quests, quiet: it wraps them)
+MAIN.push('fairy_models', 'fairy');   // a-fairy: the enchanted places' models (src/main/fairy_models.js) and VR.Fairy (src/main/fairy.js: the places, the Flausel folk, their adventures — after ctx, lifekit, quiet, settings: it uses them)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
