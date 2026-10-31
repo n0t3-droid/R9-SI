@@ -196,4 +196,7 @@
     void G;
     return Object.assign(K.grid, { meta: { front: 0, doors: [], floors: [FY], station: k } });
   });
+  // (a kind the stations' generator builds, not one for the Forge's catalogue: off the list the Studio and the text parser
+  // walk, in TYPES and gens for Forge.build)
+  { const i = Forge.types.indexOf(Forge.TYPES.station); if (i >= 0) Forge.types.splice(i, 1); Forge.TYPES.station.hidden = true; }
 })(VR);

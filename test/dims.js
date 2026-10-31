@@ -78,7 +78,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   check(typeof D.gen('drift') === 'function' && D.gen('nowhere') === null, 'gen(dim): the registry\'s factory, none for an unknown dim');
   check(D.home({}) === 'overworld' && D.home({ type: 'flat' }) === 'flat' && D.home({ type: 'default', dim: 'drift' }) === 'overworld', 'home(meta): flat for a flat world, else overworld');
-  const MOONS = (D.has('basalt') ? ['basalt', 'opal'] : []).concat(D.has('zinn') ? ['zinn', 'ocker', 'aqua'] : []);   // u-moons1: the moons join /dim (u-moons2: and the three worlds of wave 5)
+  const MOONS = (D.has('basalt') ? ['basalt', 'opal'] : []).concat(D.has('zinn') ? ['zinn', 'ocker', 'aqua'] : []).concat(D.has('stn.ring') ? ['stn.ring', 'stn.basalt', 'stn.opal'] : []);   // (u-stations: the stations)   // u-moons1: the moons join /dim (u-moons2: and the three worlds of wave 5)
   check(JSON.stringify(D.travelable({})) === JSON.stringify(['overworld', 'underforge', 'hollow', 'drift'].concat(MOONS)) && JSON.stringify(D.travelable({ type: 'flat' })) === JSON.stringify(['flat', 'underforge', 'hollow', 'drift'].concat(MOONS)), 'travelable: home and the three gate dims (and the moons)', D.travelable({}).join(','));
   check(D.name('drift')[0] === 'g.dim.drift' && FIVE.every(d => V.I18N.dict.de[D.name(d)[0]] && V.I18N.dict.en[D.name(d)[0]]), 'every dim has a name in both tables');
   // dimOf: what a save opens — every old save as before
