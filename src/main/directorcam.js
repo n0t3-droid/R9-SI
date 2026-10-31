@@ -329,7 +329,7 @@
   const FRAME_SUB = { freed: 'crane', boss: 'orbit', site_done: 'orbit', life_done: 'orbit', showcase: 'orbit', arrive: 'compose', ferry_arrive: 'compose', landing: 'compose', sunset: 'sun', sunrise: 'sun', wonder: 'push', outpost: 'push' };
   const FRAME_KIND = { milestone: 'crane', discovery: 'push', build: 'orbit', travel: 'compose', sky: 'compose', story: 'push', encounter: 'orbit', wow: 'push', social: 'compose' };
   const ALT = ['orbit', 'push', 'compose', 'crane'];
-  D.REEL_CAPS = ['freed', 'boss', 'moon_land', 'star_jump', 'site_done', 'life_done', 'arrive', 'ferry_arrive', 'sunset', 'sunrise', 'wonder', 'outpost', 'skyray', 'rays', 'murm', 'fireworks', 'showcase'];
+  D.REEL_CAPS = ['freed', 'boss', 'moon_land', 'star_jump', 'site_done', 'life_done', 'arrive', 'ferry_arrive', 'sunset', 'sunrise', 'wonder', 'outpost', 'skyray', 'rays', 'murm', 'fireworks', 'showcase', 'life_founded'];
   D.capKey = (h) => 'g.reel.c.' + (D.REEL_CAPS.indexOf(h.sub) >= 0 ? h.sub : 'k_' + (FRAME_KIND[h.kind] || h.kind === 'space' ? h.kind : 'other'));
   D.reelPlan = function (hl, opts) {
     opts = opts || {};

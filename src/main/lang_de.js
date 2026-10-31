@@ -3252,6 +3252,7 @@
     "g.reel.c.k_social": "Unter Leuten",
     "g.reel.c.k_space": "Im All",
     "g.reel.c.k_other": "Ein Moment",
+    "g.reel.c.life_founded": "Eine Siedlung entsteht",
     // ---- e-cam end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

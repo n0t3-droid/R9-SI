@@ -85,7 +85,7 @@ console.log('  spawn ' + sp.join(', '));
 await tod(2600);
 await goTo(20, -90, [0, 120, -15]);
 console.log('  arrive', JSON.stringify(await emit(['travel', 'arrive', 3, [0, 120, -15], 'intent', 40])));
-await stay(50);
+await stay(110);
 await ev(() => window.__look(0, 130, -15));
 console.log('  wow', JSON.stringify(await emit(['wow', 'temple', 3, null, 'wow'])));
 await stay(60);
@@ -146,12 +146,13 @@ try {
 } catch (e) { moon = 'error ' + e.message; }
 console.log('  moon: ' + moon + ', postcards ' + (await ev(() => VR.Reel.cards)));
 await tod(9000);
-await stay(30);
+await stay(80);
 const sess = await ev(() => { const g = VR.game, R = VR.Reel; return { time: +g.time.toFixed(0), hl: R.hl.map((h) => `${h.sub}@${h.t.toFixed(0)}${h.card ? '🖼' : ''}${h.dim !== 'overworld' ? '(' + h.dim + ')' : ''}`), track: R.track.n, bytes: R.track.bytes, meta: (g.meta.highlights || []).length, rec: R.stats }; });
 console.log('  session: ' + JSON.stringify(sess));
 NUM.session = sess;
 check(sess.bytes <= 200 * 1024, `the track ${Math.round(sess.bytes / 1024)} KB (≤ 200 KB for 20 minutes)`);
 check(sess.hl.length >= 6, `${sess.hl.length} highlights logged`);
+check(sess.time >= 540, `a session of ${(sess.time / 60).toFixed(1)} minutes of play`);
 check(sess.meta >= 6, `meta.highlights keeps them (${sess.meta})`);
 const trackMs = sess.rec.calls ? sess.rec.recMs / sess.rec.calls : 0;
 console.log(`  the track's cost: ${(trackMs * 1000).toFixed(2)} µs a frame; postcards ${sess.rec.cards} at ${(sess.rec.cardMs / Math.max(1, sess.rec.cards)).toFixed(2)} ms each`);
@@ -228,13 +229,14 @@ const bench = {};
 for (const preset of ['potato', 'high']) {
   await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); }, preset);
   for (let i = 0; i < 10; i++) { await step(5); await wait(200); }
-  const frames = (n) => ev((n) => { const g = VR.game; let ms = 0; for (let i = 0; i < n; i++) { window.__nodraw = false; const t = performance.now(); g.last = t - 1000 / 30; g.loop(t); g.renderer.gl.finish(); ms += performance.now() - t; } window.__nodraw = true; return ms / n; }, n);
+  const frames = (n) => ev((n) => { const g = VR.game; let ms = 0; for (let i = 0; i < n + 6; i++) { if (i === 6) ms = 0; window.__nodraw = false; const t = performance.now(); g.last = t - 1000 / 30; g.loop(t); g.renderer.gl.finish(); ms += performance.now() - t; } window.__nodraw = true; return +(ms / n).toFixed(2); }, n);
   const loopOnly = (on, n) => ev(([on, n]) => { const g = VR.game; VR.Reel.on = on; let ms = 0; for (let i = 0; i < n; i++) { const t = performance.now(); g.last = t - 1000 / 30; g.loop(t); ms += performance.now() - t; } VR.Reel.on = true; return ms / n; }, [on, n]);
   const b = { play: await frames(12), loopOn: await loopOnly(true, 200), loopOff: await loopOnly(false, 200) };
   b.loopOn2 = await loopOnly(true, 200); b.loopOff2 = await loopOnly(false, 200);
   await ev(() => { VR.game.input.pressed.add('F9'); window.__step(1); });
   for (let i = 0; i < 80; i++) { const ph = await ev(() => VR.game.director.phase); if (ph === 'run') break; await step(1); await wait(100); }
   b.reelScale = await ev(() => VR.game.renderer.q.scale);
+  b.reelPhase = await ev(() => VR.game.director.phase + ' ' + VR.game.director.si);
   b.reel = await frames(12);
   if (preset === 'potato') { await step(1, true); await page.screenshot({ path: SHOTS + 'reel_verylow.png', timeout: 120000 }); }
   await ev(() => { VR.game.input.pressed.add('Escape'); window.__step(1); });

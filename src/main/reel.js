@@ -33,12 +33,16 @@
   R.note = function (g, rec, r) {
     if (!rec || rec.w < 3 || !g || R.run) return;
     fresh(g);
+    // the life director's acts (a flock, the cloud rays, fireworks) move on and can't be wound back: only one seen big
+    // (≥ 1 % of the screen) is kept — as its postcard (so never on Very Low)
+    const life = rec.src === 'life';
+    if (life && (!rec.inView || !(rec.frac >= 0.01) || low(g) || R.cards >= R.MAX_CARDS)) return;
     const h = { t: rec.t, kind: rec.kind, sub: rec.sub, w: rec.w, x: rec.x, y: rec.y, z: rec.z, r: r > 0 ? r : 6, inView: rec.inView, self: rec.src === 'wow' || rec.src === 'codex' || rec.src === 'story' || rec.src === 'moon' || rec.src === 'stars',
-      dim: g.dim || 'overworld', tod: g.env ? Math.round(g.env.timeOfDay) : 6000, place: R.placeAt(g, rec.x, rec.z), card: null };
+      dim: g.dim || 'overworld', tod: g.env ? Math.round(g.env.timeOfDay) : 6000, place: R.placeAt(g, rec.x, rec.z), card: null, src: rec.src };
     R.hl.push(h);
     if (R.hl.length > R.MAX_HL) { let wi = 0; for (let i = 1; i < R.hl.length; i++) if (R.hl[i].w < R.hl[wi].w) wi = i; R.hl.splice(wi, 1); }
     // a moment away from the Herzwelt's ground (a moon, another star, space): its postcard from the next frame drawn
-    if ((h.dim !== 'overworld' || h.kind === 'space') && !low(g) && R.cards < R.MAX_CARDS) R.want = h;
+    if ((life || h.dim !== 'overworld' || h.kind === 'space') && !low(g) && R.cards < R.MAX_CARDS) R.want = h;
     R.keep(g, h);
   };
   // meta.highlights: the world's best 50 (the story's finale rolls the best 20)
@@ -110,7 +114,7 @@
     if (g.director.active || (g.photoCam && g.photoCam.on) || (g.wow && g.wow.active)) return false;
     fresh(g);
     const dim = g.dim || 'overworld', di = dimI(dim);
-    const evs = R.hl.filter((h) => h.dim === dim || h.card);
+    const evs = R.hl.filter((h) => (h.dim === dim && h.src !== 'life') || h.card);
     const hl = D.pick(evs, [], {}).filter((h) => h.dim === dim || h.card);   // (the golden hours are in R.hl already: R.golden)
     if (!hl.length) { if (g.ui && g.ui.toast) g.ui.toast('🎬 ' + tx('g.reel.none', null, 'Noch keine Highlights', 'No highlights yet'), tx('g.reel.noneTip', null, 'Befreie einen Außenposten, bau etwas fertig, reise — dann zeigt F9 deinen Film.', 'Free an outpost, finish a build, travel — then F9 shows your film.')); return false; }
     const plan = D.reelPlan(hl, {});
@@ -123,7 +127,7 @@
     const d = g.director.ui(), hc = d.querySelector('.hintc');
     run.hint0 = hc ? hc.textContent : '';
     if (hc) hc.textContent = tx('g.reel.keys', null, 'Taste: Ende · B: Bilder speichern · V: als Video', 'Any key: end · B: save frames · V: as a video');
-    d.classList.add('reel');
+    d.classList.add('reel'); document.body.classList.add('r9reel');
     R.music(g, true);
     R.stats.startMs = now() - t0;
     return true;
@@ -144,7 +148,7 @@
     D.reelRestore(g, run.saved);
     if (g.renderer && run.saved.scale !== undefined) { try { g.renderer.resize(true); } catch (e) { /* */ } }
     if (g.director && g.director.dom) { const d = g.director.dom, hc = d.querySelector('.hintc'); if (hc) hc.textContent = run.hint0; d.classList.remove('reel'); }
-    R.cardEl(g, null);
+    R.cardEl(g, null); document.body.classList.remove('r9reel');
     document.getElementById('hud').style.visibility = g.hideHud ? 'hidden' : 'visible';
     if (run.saved && g.player) g.player.noClip = false;
   };
@@ -276,7 +280,7 @@
   // the postcards' look (a slow push, or a pan) under the letterbox and the caption
   if (typeof document !== 'undefined' && document.head) {
     const st = document.createElement('style');
-    st.textContent = '#cine .reelcard{position:absolute;inset:0;background:#000;overflow:hidden}#cine .reelcard canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:reelPush linear forwards}#cine .reelcard canvas.cardpan{animation-name:reelPan}@keyframes reelPush{from{transform:scale(1.02)}to{transform:scale(1.14)}}@keyframes reelPan{from{transform:scale(1.16) translateX(-3%)}to{transform:scale(1.16) translateX(3%)}}#cine.reel .cap{font-size:26px}';
+    st.textContent = '#cine .reelcard{position:absolute;inset:0;background:#000;overflow:hidden}#cine .reelcard canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:reelPush linear forwards}#cine .reelcard canvas.cardpan{animation-name:reelPan}@keyframes reelPush{from{transform:scale(1.02)}to{transform:scale(1.14)}}@keyframes reelPan{from{transform:scale(1.16) translateX(-3%)}to{transform:scale(1.16) translateX(3%)}}#cine.reel .cap{font-size:26px;white-space:nowrap}#cine.reel .cap.big{font-size:40px}#cine .bar{width:auto}body.r9reel #storycard{display:none!important}';   // (#cine .bar: the page's .bar rule — a progress bar's width — cut the letterbox to half the screen)
     document.head.appendChild(st);
   }
   // 🎬 in the pause menu (start.js's button)

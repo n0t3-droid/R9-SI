@@ -3252,6 +3252,7 @@
     "g.reel.c.k_social": "Among people",
     "g.reel.c.k_space": "In space",
     "g.reel.c.k_other": "A moment",
+    "g.reel.c.life_founded": "A settlement is born",
     // ---- e-cam end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
