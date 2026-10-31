@@ -537,7 +537,7 @@
   function buddy(g, dt, eye) {
     const B = S.bud || (S.bud = { pos: [eye[0], eye[1], eye[2]], t: 0 }), pl = g.player, yaw = pl.yaw;
     B.t += dt;
-    const tx = eye[0] + Math.cos(yaw) * 1.1 - Math.sin(yaw) * 1.6, tz = eye[2] - Math.sin(yaw) * 1.1 - Math.cos(yaw) * 1.6, ty = eye[1] - 0.15 + Math.sin(B.t * 2.1) * 0.12;   // ahead and to the right, at the edge of the view
+    const d = pl.lookDir ? pl.lookDir() : [-Math.sin(yaw), 0, -Math.cos(yaw)], tx = eye[0] + Math.cos(yaw) * 1.0 + d[0] * 1.7, tz = eye[2] - Math.sin(yaw) * 1.0 + d[2] * 1.7, ty = eye[1] - 0.2 + d[1] * 1.7 + Math.sin(B.t * 2.1) * 0.1;   // ahead and to the right, at the edge of the view
     const k = Math.min(1, dt * 3); B.pos[0] += (tx - B.pos[0]) * k; B.pos[1] += (ty - B.pos[1]) * k; B.pos[2] += (tz - B.pos[2]) * k;
     if (Math.hypot(tx - B.pos[0], tz - B.pos[2]) > 12) { B.pos[0] = tx; B.pos[1] = ty; B.pos[2] = tz; }
     if (g.particles) { dot(g, B.pos[0], B.pos[1], B.pos[2], [1, 0.9, 0.6], 0.09); if (Math.random() < dt * (tier(g) ? 8 : 2)) mote(g, B.pos[0], B.pos[1], B.pos[2], 0, -0.1, 0, [1, 0.85, 0.55], 0.03, 0.8, 0); }
@@ -662,7 +662,7 @@
   function say(g, f, text) {
     if (!f || !text) return;
     const B = S.bubble || (S.bubble = {}); B.f = f; B.text = text; B.until = S.t + Math.min(9, 3 + text.length / 18);
-    if (!B.el) { B.el = document.createElement('div'); B.el.className = 'fy-bubble'; (document.getElementById('game') || document.body).appendChild(B.el); css(); }
+    if (!B.el) { B.el = document.createElement('div'); B.el.className = 'fy-bubble'; document.body.appendChild(B.el); css(); }
     B.el.innerHTML = '<b>' + esc(T(nameKey(f.who))) + '</b> ' + esc(text); B.el.style.display = 'block';
     F.lastSaid = { who: f.who, text };
     if (VR.A11y && VR.A11y.subtitle) { try { VR.A11y.subtitle(T(nameKey(f.who)) + ': ' + text); } catch (e) { /* theirs */ } }
@@ -670,24 +670,27 @@
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function hideBubble() { if (S.bubble && S.bubble.el) S.bubble.el.style.display = 'none'; if (S.bubble) S.bubble.f = null; }
-  const V4 = new Float32Array(4);
+  // the bubble over the speaker's head: projected from the player's own eye (yaw, pitch, the field of view) — the
+  // renderer's matrices also serve the mirror's pass, this needs none of them
   function bubbleFrame(g) {
     const B = S.bubble; if (!B.f) return;
     if (S.t > B.until) { hideBubble(); return; }
-    const r = g.renderer, cam = S.cam; if (!r || !r.viewProj || !cam) return;
-    const f = B.f, x = f.pos[0] - cam.x, y = f.pos[1] + 1.05 - cam.y, z = f.pos[2] - cam.z, M = r.viewProj;
-    V4[0] = M[0] * x + M[4] * y + M[8] * z + M[12]; V4[1] = M[1] * x + M[5] * y + M[9] * z + M[13]; V4[3] = M[3] * x + M[7] * y + M[11] * z + M[15];
-    const el = B.el;
-    if (V4[3] < 0.2) { el.style.opacity = '0'; return; }
-    const W = r.gl.canvas.clientWidth || innerWidth, H = r.gl.canvas.clientHeight || innerHeight;
-    const sx = (V4[0] / V4[3] * 0.5 + 0.5) * W, sy = (1 - (V4[1] / V4[3] * 0.5 + 0.5)) * H;
-    el.style.opacity = '1'; el.style.transform = 'translate(' + Math.round(Math.max(90, Math.min(W - 90, sx))) + 'px,' + Math.round(Math.max(40, Math.min(H - 60, sy))) + 'px) translate(-50%,-100%)';
+    const pl = g.player, cv = g.renderer && g.renderer.gl && g.renderer.gl.canvas; if (!pl || !cv) return;
+    const e = pl.eyePos(), f = B.f, x = f.pos[0] - e[0], y = f.pos[1] + 1.05 - e[1], z = f.pos[2] - e[2];
+    const cy = Math.cos(pl.yaw), sy = Math.sin(pl.yaw), cp = Math.cos(pl.pitch), sp = Math.sin(pl.pitch);
+    const fx = -sy * cp, fy = sp, fz = -cy * cp, rx = cy, rz = -sy, ux = sy * sp, uy = cp, uz = cy * sp;   // forward, right, up
+    const d = x * fx + y * fy + z * fz, el = B.el;
+    if (d < 0.3) { el.style.opacity = '0'; return; }
+    const rc = cv.getBoundingClientRect(), W = rc.width || innerWidth, H = rc.height || innerHeight;
+    const t = Math.tan(((g.settings.fov || 75) * Math.PI / 180) / 2), asp = W / H;
+    const sx = rc.left + (0.5 + (x * rx + z * rz) / d / (t * asp) * 0.5) * W, sy2 = rc.top + (0.5 - (x * ux + y * uy + z * uz) / d / t * 0.5) * H;
+    el.style.opacity = '1'; el.style.transform = 'translate(' + Math.round(Math.max(rc.left + 140, Math.min(rc.left + W - 140, sx))) + 'px,' + Math.round(Math.max(rc.top + 70, Math.min(rc.top + H - 60, sy2))) + 'px) translate(-50%,-100%)';
   }
   let cssDone = false;
   function css() {
     if (cssDone) return; cssDone = true;
     const st = document.createElement('style');
-    st.textContent = '.fy-bubble{position:absolute;left:0;top:0;max-width:260px;padding:6px 10px 7px;border-radius:14px;background:rgba(255,250,240,.88);color:#3a2c4a;font:13px/1.35 system-ui,sans-serif;box-shadow:0 2px 10px rgba(60,30,80,.25);pointer-events:none;z-index:30;display:none;transition:opacity .2s}.fy-bubble b{color:#a0508a;font-weight:600;margin-right:4px}.fy-bubble:after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(255,250,240,.88)}';
+    st.textContent = '.fy-bubble{position:fixed;left:0;top:0;max-width:260px;padding:6px 10px 7px;border-radius:14px;background:rgba(255,250,240,.88);color:#3a2c4a;font:13px/1.35 system-ui,sans-serif;box-shadow:0 2px 10px rgba(60,30,80,.25);pointer-events:none;z-index:30;display:none;transition:opacity .2s}.fy-bubble b{color:#a0508a;font-weight:600;margin-right:4px}.fy-bubble:after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(255,250,240,.88)}';
     document.head.appendChild(st);
   }
 
