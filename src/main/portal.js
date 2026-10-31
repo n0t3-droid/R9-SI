@@ -255,6 +255,7 @@
     let lastI = -1;
     return (id, k, v, i) => {
       const it = plan[i]; if (!it || !it.gl) return false;
+      const J = M.J; if (J && J.plan === plan && J.noGL) return false;   // (too slow here: the painted film)
       if (i !== lastI && g.renderer) { g.renderer.tsrReset = true; lastI = i; }   // (a new shot: no ghost of the last one)
       return PS.render(g, id, k, v, it);
     };
@@ -299,6 +300,9 @@
     const g = J.g;
     if (J.phase === 'film') {
       if (!J.paused && !J.covered) J.t += wall;   // (a menu over the trip: the film waits under it)
+      // e-portal2: a machine that cannot draw the space shots smoothly (three frames over 0.25 s while one is shown —
+      // software GL, a weak chip under load) gets the painted film for the rest of the trip: never slower than before
+      if (!J.dry && J.P.gl && J.t < J.P.len) { J.slowN = wall > 0.25 ? (J.slowN || 0) + 1 : Math.max(0, (J.slowN || 0) - 1); if (J.slowN >= 3) J.noGL = true; }
       if (!J.dry) {   // e-portal2: the keys held and the gamepad, read here too
         const ks = g.input && g.input.keys, pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
         const kh = !!(ks && ks.has && (ks.has('Space') || ks.has('Escape') || ks.has('Enter'))), kFresh = kh && !M.keyHeld; M.keyHeld = kh;   // (fresh presses only: Space held to fly up through the gate is no skip)
@@ -334,7 +338,7 @@
     caption(g, nameOf(d, rec), d.fav ? T('g.pt.kind.fav') : (ep ? T('g.pt.episode') + ' · ' : '') + T('g.pt.kind.' + C.kindOf(d.dim)) + (J.hour ? ' · ' + T('g.pt.bestHour') : ''), T(C.hook(rec, seedOf(g), d.dim, !!d.fav)), ep);
     if (!rec.gated.includes(d.dim)) rec.gated.push(d.dim);
     save(g);
-    Portal.last = { film: J.film.id, len: J.film.len, shots: J.film.shots.map((s) => s.id), to: d.dim, episode: ep ? ep.id : null, ms: Math.round(now() - J.t0), skipped: !!J.skipped, hour: !!J.hour, gl: J.glN || 0 };
+    Portal.last = { film: J.film.id, len: J.film.len, shots: J.film.shots.map((s) => s.id), to: d.dim, noGL: !!J.noGL, episode: ep ? ep.id : null, ms: Math.round(now() - J.t0), skipped: !!J.skipped, hour: !!J.hour, gl: J.glN || 0 };
   }
   // e-portal2: Kreativ alone (the clock not frozen): the clock goes forward (as sleeping does) to the next moment Helia
   // stands 6–17° over the landing; every mode: the view turns 55° off the sun, so the land is lit from the side
