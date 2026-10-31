@@ -736,6 +736,13 @@ if (!process.env.NO_TRAIL) {
   } catch (e) { console.log('  !! the contrail pictures: ' + String(e && e.message || e).slice(0, 300)); }
 }
 if (Object.keys(recs).length) console.log('\n' + SS.table(Object.entries(recs).map(([k, r]) => [k, r.metrics])));
+// e-access (waves §6.6): the targets as a release gate — SESSION_GATE=1 (the release lane, test/regress.sh R9_RELEASE=1):
+// the builder must meet every E§7 target (FAILED otherwise), the adventurer is warned about
+if (process.env.SESSION_GATE) {
+  const G = SS.gate(Object.fromEntries(Object.entries(recs).map(([k, r]) => [k, r.verdict])));
+  for (const l of G.lines) console.log('  ' + (l.startsWith('warn') && !l.endsWith('✓') ? '⚠ ' : '') + l);
+  check(G.fails === 0, `the release gate: ${G.fails} gated session(s) short of the targets, ${G.warns} warned`);
+}
 console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l);
 check(!logs.some(l => l.startsWith('[pageerror]')), `no page error (${logs.filter(l => l.startsWith('[pageerror]')).length})`);
 await browser.close();

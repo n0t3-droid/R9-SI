@@ -483,7 +483,7 @@
       }
       // smooth camera shake: speed rumble, ground effect, boost, impacts
       const lowAlt = this.alt !== null && this.alt < 6 && sp > 6 ? (1 - this.alt / 6) * 0.35 : 0;
-      const amp = S.camShake === false ? 0 : clamp(0.22 * (sp / cr) * (sp / cr) * (this.boost ? 1.5 : 1) + lowAlt + this.bump + 0.03 * this.spool, 0, 3);
+      const amp = S.camShake === false || (VR.A11y && VR.A11y.less(S)) ? 0 : clamp(0.22 * (sp / cr) * (sp / cr) * (this.boost ? 1.5 : 1) + lowAlt + this.bump + 0.03 * this.spool, 0, 3);
       this.bump = Math.max(0, this.bump - dt * 2.2);
       this.shakeAmp += (amp - this.shakeAmp) * k1(5, dt);
       const t = this.t, A = this.shakeAmp;

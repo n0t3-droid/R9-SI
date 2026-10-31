@@ -259,7 +259,7 @@
         this.bolt -= dt;
         if (this.bolt <= 0) { this.strike(); this.bolt = 8 + this.rng() * 17; }
       } else this.inStorm = false;
-      this.flash = flashAt(this.sinceStrike);
+      this.flash = flashAt(this.sinceStrike) * (this.flashK === undefined ? 1 : this.flashK);   // (e-access: a bolt the limiter refuses stays dim)
       if (this.thunders.length) {
         const due = this.thunders.filter(e => this.clock >= e.at);
         if (due.length) {
@@ -271,6 +271,7 @@
     }
     strike() {
       this.strikes++; this.sinceStrike = 0;
+      this.flashK = !VR.A11y || VR.A11y.flash('bolt', 2) ? 1 : 0.06;   // e-access: the stroke and its flicker, never more than three flashes a second
       const delay = 0.5 + this.rng() * 3.5;
       this.thunders.push({ at: this.clock + delay, delay });
       // (t-motion: the bolt's place — round the side the storm comes from, as far off as its thunder is late)

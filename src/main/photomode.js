@@ -56,6 +56,7 @@
   };
   PM.flash = function () {
     if (typeof document === 'undefined') return;
+    if (VR.A11y && !VR.A11y.flash('shutter')) return;   // e-access: the limiter
     const f = document.createElement('div'); f.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:#fff;opacity:0.75;pointer-events:none;z-index:32;transition:opacity .35s ease-out';
     (document.getElementById('app') || document.body).appendChild(f);
     requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; setTimeout(() => f.remove(), 420); }));

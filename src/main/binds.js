@@ -47,7 +47,11 @@
     { id: 'undo', group: 'act', names: ['KeyZ'], def: ['KeyZ', ''] },
     { id: 'invent', group: 'act', names: ['KeyI'], def: ['KeyI', ''] },   // 💡 Erfinderwerkstatt (invent.js reads the binding)
     { id: 'journal', group: 'act', names: ['KeyJ'], def: ['KeyJ', ''] },
-    { id: 'starmap', group: 'act', names: ['KeyO'], def: ['KeyO', ''] },   // u-stars: 🌌 the star map (starmap.js, starjump.js read KeyO)   // a-quests: 📖 the Tagebuch of the Abenteuer (quests.js reads the binding)
+    { id: 'starmap', group: 'act', names: ['KeyO'], def: ['KeyO', ''] },
+    // e-access: the keys the game polled without an action (test/a11y.js: every polled key is bindable)
+    { id: 'bauhand', group: 'act', names: ['KeyB'], def: ['KeyB', ''] },   // 🖐 the Bauhand, the anchor boots on a moon
+    { id: 'mirror', group: 'act', names: ['KeyL'], def: ['KeyL', ''] },    // a stamp mirrored; a ship's lights
+    { id: 'stamps', group: 'act', names: ['KeyU'], def: ['KeyU', ''] },    // the stamp library   // u-stars: 🌌 the star map (starmap.js, starjump.js read KeyO)   // a-quests: 📖 the Tagebuch of the Abenteuer (quests.js reads the binding)
     { id: 'hud', group: 'view', names: ['F1'], def: ['F1', ''] },
     { id: 'shot', group: 'view', names: ['F2'], def: ['F2', ''] },
     { id: 'debug', group: 'view', names: ['F3'], def: ['F3', ''] },

@@ -1356,7 +1356,7 @@
       // (F3 · Da-Sein, presence.js: the head bob, the landing dip, the optional turn inertia, the view nudge of a block set
       // or taken, the sprint FOV — every curve is bounded and eased; the raycast and the crosshair keep the true look)
       const S = this.settings, PR = VR.Presence;
-      const bob = S.viewBob && !p.flying ? p.bobAmt : 0;
+      const bob = S.viewBob && !p.flying && !(VR.A11y && VR.A11y.less(S)) ? p.bobAmt : 0;   // (e-access: Weniger Bewegung, no bob)
       const swim = this.swimBob(p, underwater, E);
       const bb = PR.bobAt(p.bob * 2, bob), dip = PR.dipAt(p.dipT, p.dipAmp);
       p.viewYaw = PR.turnFollow(p.viewYaw, p.yaw, dt, !!S.turnInertia);

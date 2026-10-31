@@ -63,7 +63,8 @@
       const c = this.ctx;
       this.master = c.createGain(); this.master.gain.value = this.vol.master;
       const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-      this.master.connect(comp); comp.connect(c.destination);
+      this.master.connect(comp);
+      this.monoNode = c.createGain(); comp.connect(this.monoNode); this.monoNode.connect(c.destination);   // e-access: the mono switch (VR.A11y.applyMono)
       // the world's sound: dry (sfx) through a lowpass that muffles it under water, and wet (the room) into the convolver
       this.sfx = c.createGain(); this.sfx.gain.value = this.vol.sfx;
       this.sfxMuffle = c.createBiquadFilter(); this.sfxMuffle.type = 'lowpass'; this.sfxMuffle.frequency.value = 20000; this.sfxMuffle.Q.value = 0.5;

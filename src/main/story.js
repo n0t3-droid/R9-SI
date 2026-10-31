@@ -190,6 +190,7 @@
       this.offer = null; card(null);
       if (g.ui && g.ui.screen) { try { if (g.ui.screen === 'journal' && VR.Quests) VR.Quests.closeJournal(); else g.ui.resume && g.ui.resume(); } catch (e) { /* the menu */ } }
       const texts = b.scene.lines.map(l => T(l.key)), tl = S.timeline(b, texts);
+      if (VR.A11y) VR.A11y.stretch(tl, texts, VR.A11y.subK(g.settings));   // e-access: every line ≥ 0.06 s a character, ≥ 2.5 s
       const sc = this.scene = { b, t: 0, texts, tl, len: tl.len, line: -1, shot: -1, tg: {}, seen: S.isDone(this.rec, b.id) };
       this.resolve(sc);
       if (VR.Regie) VR.Regie.inScene(g, true);

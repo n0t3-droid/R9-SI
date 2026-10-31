@@ -1033,11 +1033,12 @@
   if (M && Grid) {
     const part = (sx, sy, sz, pv, fn) => { const gr = new Grid(sx, sy, sz, pv[0], pv[1], pv[2]); fn(gr); return { grid: gr, pivot: [0, 0, 0] }; };
     // the ✦: a five-pointed star, two voxels thick, a pale core and a warm rim — it glows (1 voxel = 1/24 block)
-    const starModel = (core, mid, rim) => () => ({
+    // (e-access: the ready ✦ has four points — never told apart by its colour alone, VR.A11y.MARKERS)
+    const starModel = (core, mid, rim, pts) => () => ({
       unit: 24, radius: 0.5, parts: {
         star: part(17, 17, 2, [8, 0, 1], (gr) => {
-          const V = []; for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i & 1 ? 3.3 : 8.3; V.push([8.5 + Math.cos(a) * r, 8.5 + Math.sin(a) * r]); }
-          const inside = (x, y) => { let c = false; for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = V[i], [xj, yj] = V[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+          const n = pts || 5, V = []; for (let i = 0; i < 2 * n; i++) { const a = Math.PI / 2 + i * Math.PI / n, r = i & 1 ? (n === 4 ? 2.6 : 3.3) : 8.3; V.push([8.5 + Math.cos(a) * r, 8.5 + Math.sin(a) * r]); }
+          const inside = (x, y) => { let c = false; for (let i = 0, j = V.length - 1; i < V.length; j = i++) { const [xi, yi] = V[i], [xj, yj] = V[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
           for (let y = 0; y < 17; y++) for (let x = 0; x < 17; x++) {
             if (!inside(x + 0.5, y + 0.5)) continue;
             const edge = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
@@ -1048,7 +1049,7 @@
       }, layout: { star: [0, 0, 0] },
     });
     M.quest_star = starModel(0xfff7d0, 0xffd166, 0xff9a3c);
-    M.quest_star_c = starModel(0xeaffff, 0x7cf3ff, 0x2fb6d8);
+    M.quest_star_c = starModel(0xeaffff, 0x7cf3ff, 0x2fb6d8, 4);
     // a kite stuck in the grass: a diamond in red and yellow quarters, a cross of sticks, a tail of bows (1/16 block)
     M.quest_kite = () => ({ unit: 16, radius: 0.8, parts: { body: part(12, 2, 22, [6, 0, 6], (gr) => {
       for (let z = 0; z < 16; z++) for (let x = 0; x < 12; x++) { const u = Math.abs(x + 0.5 - 6) / 6, v = Math.abs(z + 0.5 - 6) / (z < 6 ? 6 : 10); if (u + v > 1) continue; gr.set(x, 1, z, (x < 6) === (z < 6) ? 0xe8483a : 0xf6d24a); }

@@ -197,6 +197,7 @@
       const tm = menu ? { fwd: 0, str: 0 } : (this.touchMove || { fwd: 0, str: 0 });
       const pf = live && !ship ? -pad.move[1] : 0, ps = live && !ship ? pad.move[0] : 0;
       this.padMove = { fwd: clamp(pf + tm.fwd, -1, 1), str: clamp(ps + tm.str, -1, 1) };
+      if (VR.A11y && VR.A11y.inputFrame) VR.A11y.inputFrame(this, k);   // e-access: the device in use, the one-hand modes
     }
     endFrame() {
       if (this.tRelease.size) { for (const id of this.tRelease) this.tDown.delete(id); this.tRelease.clear(); }

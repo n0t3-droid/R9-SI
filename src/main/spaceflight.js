@@ -569,7 +569,7 @@ void main() {
   let fxC = null, fxX = null, fxOn = false;
   SF.fx = function (g, fl) {
     const a = fl && fl.asc, I = a && a.info;
-    const glow = I ? A.glowFl(fl) : 0, j = a && a.jump, flash = j ? SF.jumpFlash(j.J, j.s) : 0;
+    const glow = I ? A.glowFl(fl) : 0, j = a && a.jump, flash = j ? (VR.A11y ? VR.A11y.pulse('jump', SF.jumpFlash(j.J, j.s)) : SF.jumpFlash(j.J, j.s)) : 0;
     if (glow < 0.01 && flash < 0.01) { if (fxOn) { fxX.clearRect(0, 0, fxC.width, fxC.height); fxC.style.display = 'none'; fxOn = false; } return; }
     if (!fxC) {
       fxC = document.createElement('canvas'); fxC.id = 'ascFx';

@@ -1048,6 +1048,7 @@
         break;
       }
     }
+    if (VR.A11y && VR.A11y.foeRing) VR.A11y.foeRing(r, p, m, model, B, cam, time, part, opt);   // e-access: the weak point's pulsing ring
     tintTo(gl, p, ONE); flashTo(gl, p, 0);   // (the program's tint as the next model expects it)
     F.cost.drawMs += now() - t0;
   };

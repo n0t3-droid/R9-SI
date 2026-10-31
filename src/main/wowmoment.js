@@ -106,7 +106,7 @@
     }
     run(dt) {
       const g = this.g;
-      this.t += dt; this.e += dt;   // t: the curve's clock (a skip moves it on); e: the time since the start (the drift)
+      { const lk = VR.A11y && VR.A11y.less(g.settings) ? 2 : 1; this.t += dt * lk; this.e += dt; }   // (e-access: Weniger Bewegung — the swing in 2 s)   // t: the curve's clock (a skip moves it on); e: the time since the start (the drift)
       // any key, click, tap or pad button: the view comes back now (the fall from where it is)
       const I = g.input, any = !!I && (I.pressed.size > 0 || I.mouse.clicked.some(Boolean) || (I.padPressed && I.padPressed.size > 0) || (I.tPressed && I.tPressed.size > 0));
       if (any && !this.first) this.skip();

@@ -804,6 +804,7 @@
   L.busy = function () { if (L.moment) return true; const el = typeof document !== 'undefined' && document.getElementById ? document.getElementById('libban') : null; return !!(el && /\b(on|off)\b/.test(el.className || '')); };
   L.bloom = function () {
     if (typeof document === 'undefined' || !document.createElement) return;
+    if (VR.A11y && !VR.A11y.flash('bloom')) return;   // e-access: the freeing moment's and the boss finish's flash, through the limiter
     css();
     let el = document.getElementById('libbloom');
     if (!el) { el = document.createElement('div'); el.id = 'libbloom'; (document.getElementById('app') || document.body).appendChild(el); }
