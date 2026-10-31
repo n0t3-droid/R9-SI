@@ -11895,7 +11895,8 @@ VR.BL.late.push(()=>{if(VM._K)VM.registerLate(NAMES3);});
 (function(VR){
 'use strict';
 const L=64;
-const BGEN=3;
+const BGEN=4;
+
 
 const walk=(g)=>30*g/9.81;
 
@@ -42547,7 +42548,7 @@ fauna:[
 species:{
 de:'Wellari',en:'Wellari',
 look:{skin:[0x4fa8b8,0x5cb8c0,0x3e96a8,0x6ac0c4],cut:['tunic','gown','tunic'],feat:'fins',featC:[0x2a6a9a,0x1f7a8a,0x3a5aa8],garb:[0xf2eedc,0xe8d8b0,0xf0a890,0xd86a5a,0xf4f0f4,0x7ad0c8],eye:0x1a3a5a},
-kit:{shape:'round',wall:'calcite',band:'cyan_terracotta',roof:'dried_kelp_block',floor:'bamboo_planks',fill:'sandstone',window:'light_blue_stained_glass',door:'bamboo_door',bed:'cyan_bed',light:'tide_lantern',paving:'smooth_quartz',lamp:'vx_lamppost_crystal',canopy:'cyan_wool',mark:'tube_coral_block'},
+kit:{lamp4:'lantern',post4:'bamboo_fence',pave4:['smooth_sandstone','cut_sandstone'],bench4:'smooth_sandstone_slab',flower4:'blue_orchid',shape:'round',wall:'calcite',band:'cyan_terracotta',roof:'dried_kelp_block',floor:'bamboo_planks',fill:'sandstone',window:'light_blue_stained_glass',door:'bamboo_door',bed:'cyan_bed',light:'tide_lantern',paving:'smooth_quartz',lamp:'vx_lamppost_crystal',canopy:'cyan_wool',mark:'tube_coral_block'},
 goods:['dried_kelp_block','kelp','sea_pickle','tube_coral_block','brain_coral_block','sponge','tide_lantern','lily_pad'],
 syl:['wa','li','nel','sa','ri','mo','thi','lu','na','ve','ar','io','ma','el','sha','ne'],end:['i','a','el','en'],
 },
@@ -42580,7 +42581,7 @@ fauna:[
 species:{
 de:'Dunelin',en:'Dunelin',
 look:{skin:[0xd8b444,0xc8a43a,0xe0c25a,0xbc9a36],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
-kit:{shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
+kit:{lamp4:'lantern',post4:'acacia_fence',pave4:['smooth_red_sandstone','cut_red_sandstone'],bench4:'acacia_slab',flower4:'orange_tulip',shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
 goods:['red_sand','terracotta','orange_terracotta','cactus','red_sandstone','amber_crystal_block','lantern','iron_ingot'],
 syl:['du','ne','ka','ro','tes','ul','mar','ze','om','ra','bek','sim','ta','ho','gal','ir'],end:['in','ek','a','ur'],
 },
@@ -42613,7 +42614,7 @@ fauna:[
 species:{
 de:'Glutani',en:'Glutani',
 look:{skin:[0x4a2a3a,0x542e3e,0x3e2434,0x5a3440],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
-kit:{shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
+kit:{lamp4:'spirit_lantern',post4:'crimson_fence',pave4:['polished_basalt','smooth_basalt'],bench4:'crimson_slab',flower4:'torchflower',shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
 goods:['sulfur','obsidian','magma_block','amber_crystal_block','polished_sulfur','glowing_obsidian','sulfur_bricks','gold_ingot'],
 syl:['glu','ta','ni','ber','os','kai','rum','ze','fa','lo','tir','ga','van','ur','pe','sol'],end:['an','i','or','et'],
 },
@@ -42644,7 +42645,7 @@ fauna:[
 species:{
 de:'Regoli',en:'Regoli',
 look:{skin:[0x8a8cc0,0x7a80b4,0x9a98cc,0x8484b8],cut:['tunic','coat','tunic'],feat:'antennae',featC:[0x7af0ff,0xb0ff9a,0xffe07a],garb:[0x3a4a6a,0x6a7a9a,0xe8e8f0,0x2a3a4a,0x8a5a9a],eye:0x101828,glow:true},
-kit:{shape:'dome',wall:'polished_andesite',band:'smooth_basalt',roof:'light_blue_stained_glass',floor:'smooth_stone',fill:'andesite',window:'light_blue_stained_glass',door:'door_glass_white',bed:'gray_bed',light:'lantern',paving:'polished_andesite',lamp:'vx_lamppost_tech',canopy:'gray_wool',mark:'azure_crystal_block'},
+kit:{lamp4:'lantern',post4:'andesite_wall',pave4:['polished_andesite','andesite'],bench4:'smooth_stone_slab',flower4:'azure_bluet',shape:'dome',wall:'polished_andesite',band:'smooth_basalt',roof:'light_blue_stained_glass',floor:'smooth_stone',fill:'andesite',window:'light_blue_stained_glass',door:'door_glass_white',bed:'gray_bed',light:'lantern',paving:'polished_andesite',lamp:'vx_lamppost_tech',canopy:'gray_wool',mark:'azure_crystal_block'},
 goods:['regolith','basalt','smooth_basalt','azure_crystal_block','lantern','diorite','andesite','iron_ingot'],
 syl:['re','go','li','mun','sel','ka','tor','vi','den','ul','pa','so','ren','ix','ma','thel'],end:['i','o','un','is'],
 },
@@ -42676,7 +42677,7 @@ fauna:[
 species:{
 de:'Nivari',en:'Nivari',
 look:{skin:[0x9ac8f0,0x8abce8,0xaad4f4,0x7ab0e0],cut:['coat','cape','coat'],feat:'antlers',featC:[0x9ad8ff,0xc8f0ff,0x7ac0f0],garb:[0x2a4a7a,0x7a2a4a,0xe8e0d0,0x3a6a5a,0xc84a4a],eye:0x2a3a6a},
-kit:{shape:'vault',wall:'packed_ice',band:'snow_block',roof:'blue_ice',floor:'spruce_planks',fill:'packed_ice',window:'light_blue_stained_glass',door:'spruce_door',bed:'light_blue_bed',light:'lantern',paving:'snow_block_cut',lamp:'vx_lamppost_crystal',canopy:'light_blue_wool',mark:'rose_crystal_block'},
+kit:{lamp4:'lantern',post4:'spruce_fence',pave4:['smooth_stone','snow_block_cut'],bench4:'spruce_slab',flower4:'white_tulip',shape:'vault',wall:'packed_ice',band:'snow_block',roof:'blue_ice',floor:'spruce_planks',fill:'packed_ice',window:'light_blue_stained_glass',door:'spruce_door',bed:'light_blue_bed',light:'lantern',paving:'snow_block_cut',lamp:'vx_lamppost_crystal',canopy:'light_blue_wool',mark:'rose_crystal_block'},
 goods:['packed_ice','blue_ice','ice_crystal','snow_block','tholin_ice','rose_crystal_block','azure_crystal_cluster','lantern'],
 syl:['ni','va','ri','is','fel','ka','ylo','sen','mi','tor','al','kel','su','vin','ha','ren'],end:['i','a','el','is'],
 },
@@ -43218,16 +43219,48 @@ for(let dz= -1;dz<=1;dz++){put(X,F+H-2,Z+dz,blue);put(X,F+H-1,Z+dz,ice);}
 put(X,F+H,Z,S('rose_crystal_block'));
 }
 }
+
+
+
+
+function plaza4(kind,Kit,put,P,X,F,Z){
+const pz=P.plaza,seats=pz.seats=[],bench=st(Kit.bench4);
+
+for(const u of[-3,-2,2,3]){
+for(const[x,z,f]of[[u,-6,2],[u,6,0],[-6,u,1],[6,u,3]]){put(X+x,F+1,Z+z,bench);seats.push([X+x,F+1,Z+z,f]);}
+}
+
+let foot=0;
+const step=st(Kit.bench4),light=st(Kit.lamp4),moss=st('moss_block'),fl=st(Kit.flower4);
+for(let dx= -3;dx<=3;dx++)for(let dz= -3;dz<=3;dz++){
+if(Math.max(Math.abs(dx),Math.abs(dz))!==3)continue;
+if(kind==='basalt'&&Math.hypot(dx,dz)<=3.25)continue;
+const corner=Math.abs(dx)===3&&Math.abs(dz)===3,mid=dx===0||dz===0;
+if(corner)put(X+dx,F+1,Z+dz,light);
+else if(mid){put(X+dx,F,Z+dz,moss);put(X+dx,F+1,Z+dz,fl);}
+else put(X+dx,F+1,Z+dz,step);
+foot++;
+}
+pz.foot=foot;
+
+let n=0;
+const post=st(Kit.post4);
+for(const[x,z]of[[-4,-6],[4,-6],[-4,6],[4,6],[-6,-4],[-6,4],[6,-4],[6,4]]){put(X+x,F+1,Z+z,post);put(X+x,F+2,Z+z,light);P.lamps.push([X+x,F+3,Z+z]);n++;}
+pz.lanterns=n;
+}
 const HOMES=[[-13,-14],[0,-15],[13,-14],[-13,14],[0,15],[13,14]];
 function villagePlan(eco,site){
 const Kit=eco.W.species.kit,g=eco.gen,F=site.y|0,X=site.x,Z=site.z,kind=eco.kind;
 const ground=(x,z)=>g.surfaceY(x,z);
 const seed=strHash(site.id+':'+(eco.s>>>0))>>>0;
 const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z,r:6},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
-const W=writer(ground,F,Kit),put=W.put,pav=st(Kit.paving),mark=st(Kit.mark);
+const W=writer(ground,F,Kit),put=W.put,v4=g.bgen>=4&&Kit.pave4,pav=v4?st(Kit.pave4[0]):st(Kit.paving),mark=st(Kit.mark);
 
-for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);put(X+dx,F,Z+dz,(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
+
+const pa=pav,pb=v4?st(Kit.pave4[1]):pav;
+for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);const d=Math.hypot(dx,dz);put(X+dx,F,Z+dz,v4?(d>=4.4&&d<5.5?pb:pa):(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
 centrepiece(kind,put,X,F,Z);
+if(v4)plaza4(kind,Kit,put,P,X,F,Z);
 for(const[dx,dz]of HOMES){
 const s=dz>0? -1:1;
 for(let k=6;k<Math.abs(dz)-4;k++){W.level(X+dx,Z+k*Math.sign(dz));put(X+dx,F,Z+k*Math.sign(dz),pav);if(dx)for(let q=Math.min(0,dx);q<=Math.max(0,dx);q++){W.level(X+q,Z+7*Math.sign(dz));put(X+q,F,Z+7*Math.sign(dz),pav);}}
@@ -47941,6 +47974,7 @@ for(let y=fy-11;y<=fy-5;y++)for(let z= -4;z<=3;z++)for(let x= -4;x<=4;x++)if(y==
 for(let x= -4;x<=4;x++){const h=Math.round(4-(x*x)/4);a.set(x,fy-5+h,-1,0x8A6A40);}
 a.ell(-1.5,fy-5,-1,2.2,1.2,1.4,0xD89A50);a.ell(2,fy-5.5,1,1.3,1.3,1.3,0xD8402E);a.ell(0.5,fy-5.5,1.5,1.2,1.2,1.2,0x6AB04A);
 }
+else if(speciesItem((x,y,z,c,e)=>a.set(x,y,z,c,e),tool,fy,-3)){}
 else if(tool==='can'){a.box(-2,fy-7,-3,2,fy-2,2,(x,y,z)=>mul(0x5A9AC0,0.92+H3(x,y,z,25)*0.1));for(let k=0;k<5;k++)a.set(0,fy-5+k,-4-k,0x5A9AC0);a.box(-1,fy-1,-1,1,fy,1,0x3A6A8A);}
 }
 if(!right&&elder&&role.tool==='cane'){for(let y= -armLen-22;y<=fy+1;y++)a.set(0,y,-3,mul(0x8A5A3A,0.9+((y&1)?0.08:0)));a.set(0,fy+2,-4,0x8A5A3A);a.set(0,fy+2,-5,0x8A5A3A);a.set(0,fy+1,-5,0x8A5A3A);}
@@ -48096,6 +48130,44 @@ carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]
 
 
 
+V.SPECIES_TOOL={aqua:'shellstaff',ocker:'lanternpole',zinn:'tongs',basalt:'finder',opal:'chime'};
+const SP_TOOLS=new Set(Object.values(V.SPECIES_TOOL));
+function speciesItem(set,t,fy,z0){
+if(!SP_TOOLS.has(t))return false;
+const wood=(y)=>mul(0x7A5236,(y&1)?0.95:1.03);
+if(t==='shellstaff'){
+for(let y=fy-13;y<=fy+11;y++)set(0,y,z0,mul(0xD8C8A0,(y&1)?0.94:1.02),0);
+for(let y=fy+12;y<=fy+16;y++)for(let z=z0-2;z<=z0+2;z++)for(let x= -2;x<=2;x++){
+const d=x*x+(y-fy-14)*(y-fy-14)*0.9+(z-z0)*(z-z0);if(d>5.2)continue;
+set(x,y,z,(x+y+z)%3===0?0x5ACCC8:mix(0xF4B4A0,0xFFF0E0,(y-fy-12)/5),0);
+}
+set(0,fy+17,z0,0xFFF0E0,0);
+}else if(t==='lanternpole'){
+for(let y=fy-12;y<=fy+13;y++)set(0,y,z0,wood(y),0);
+for(let z=z0-4;z<=z0;z++)set(0,fy+13,z,0x3A2A20,0);
+set(0,fy+12,z0-4,0x3A2A20,0);
+for(let y=fy+7;y<=fy+11;y++)for(let z=z0-5;z<=z0-3;z++)for(let x= -1;x<=1;x++){
+const edge=y===fy+7||y===fy+11,core= !edge&&x===0&&z===z0-4;
+set(x,y,z,edge?0x3A2A20:core?0xFFE6A0:0xFFB040,edge?0:1);
+}
+}else if(t==='tongs'){
+for(let z=z0-10;z<=z0;z++)for(const x of[-1,1])set(z<z0-2?x:0,fy,z,mul(0x50545C,(z&1)?0.92:1.05),0);
+for(let z=z0-12;z<=z0-10;z++)for(let y=fy-1;y<=fy+1;y++)set(0,y,z,y===fy&&z===z0-11?0xFFE080:0xFF7A2A,1);
+}else if(t==='finder'){
+for(let z=z0-6;z<=z0;z++)set(0,fy,z,0x8A92A0,0);
+for(let y=fy-2;y<=fy+2;y++)for(let x= -2;x<=2;x++)if(Math.abs(x)+Math.abs(y-fy)>=2&&Math.abs(x)+Math.abs(y-fy)<=3)set(x,y,z0-7,0xB8C0CC,0);
+for(let z=z0-9;z<=z0-7;z++)set(0,fy,z,0x7AD8FF,1);
+set(0,fy+1,z0-8,0xC8F0FF,1);
+}else{
+for(let y=fy-4;y<=fy+12;y++)set(0,y,z0,0xD8E8F4,0);
+for(let x= -3;x<=3;x++)set(x,fy+12,z0,0xB8D0E4,0);
+for(const x of[-3,0,3])for(let k=1;k<=(x?3:4);k++)set(x,fy+12-k,z0,k>=(x?3:4)?0xE8F8FF:0x9AD4F4,k>=(x?3:4)?1:0);
+}
+return true;
+}
+
+
+
 
 
 
@@ -48167,6 +48239,71 @@ const mir=(X)=>2*bL+1-X;
 const both=(X,Y,c,t,over)=>{paint(X,Y,c,t,over);paint(mir(X),Y,c,t,over);};
 const Ye=2*C.eyeY+1,eL=bL-2;
 const LASH=0x2A1D1C,PINK=0xFF7E86;
+
+
+
+
+
+if(C.species){
+const sp=C.species,O=TG.other,EY=TG.eye,HR=TG.hair,fc=C.featC||0xffffff,SKE=(c,t)=>(SK(c,t)|(1<<24))>>>0;
+const eyeAt2=[],mouthAt=[];
+const put=(X,Y,c,t,em,list)=>{const Z=frontZ(X,Y);if(Z===null)return;F.c[idx(F,X,Y,Z)]=em?SKE(c,t):SK(c,t);if(list)list.push([X,Y,Z]);};
+const pair=(X,Y,c,t,em,list)=>{put(X,Y,c,t,em,list);put(mir(X),Y,c,t,em,list);};
+
+
+const eye=(cx,cy,rx,ry,col,em)=>{
+for(let Y=Math.floor(cy-ry);Y<=Math.ceil(cy+ry);Y++)for(let X=Math.floor(cx-rx);X<=Math.min(eL+1,Math.ceil(cx+rx));X++){
+const u=(X-cx)/rx,v=(Y-cy)/ry;if(u*u+v*v>1.05)continue;
+const c=col(u,v);if(c===null)continue;
+pair(X,Y,c,EY,em&&em(u,v),eyeAt2);
+}
+};
+const dark=0x0E1018,glint=0xFFFFFF;
+let mouthY=Ye-5;
+if(sp==='aqua'){
+const ir=mix(C.eye,0x0A0806,0.45),rim=mix(C.eye,fc,0.5);
+eye(eL-0.5,Ye-0.5,2.15,2.15,(u,v)=>(u< -0.25&&v>0.25&&u> -0.8?glint:u*u+v*v>0.62?rim:ir));
+for(const X of[bL-1,bL])pair(X,Ye-5,mul(skin,0.5),O,0,mouthAt);
+pair(bL-2,Ye-4,mul(skin,0.6),O);
+for(const Y of[Ye-3,Ye-4])pair(eL-3,Y,mix(skin,fc,0.55),O);
+pair(eL-2,Ye-4,mix(skin,fc,0.4),O);
+}else if(sp==='ocker'){
+const amber=mix(0xE8A030,C.eye,0.2);
+eye(eL-0.5,Ye,2.1,1.35,(u)=>(Math.abs(u)<0.3?dark:u< -0.6?mix(amber,0xFFF0C0,0.5):amber));
+for(let X=eL-2;X<=eL+1;X++)pair(X,Ye+2,mix(skin,0x3A2010,0.55),HR);
+pair(eL-3,Ye+2,mix(skin,0x3A2010,0.35),HR);
+
+for(const Y of[Ye-2,Ye-3])pair(bL,Y,0x2A1A14,O);
+pair(bL,Ye-5,mul(skin,0.45),O,0,mouthAt);pair(bL-1,Ye-4,mul(skin,0.55),O);
+mouthY=Ye-5;
+}else if(sp==='zinn'){
+const ember=mix(fc,0xFFFFFF,0.3),brow=mul(skin,0.62);
+for(let X=eL-3;X<=eL+1;X++)pair(X,Ye+2,brow,O);
+eye(eL-0.5,Ye-0.3,2.1,1.35,(u,v)=>(Math.abs(u)<0.3&&Math.abs(v)<0.5?0x2A0A04:v>0.35&&u<0?mix(ember,0xFFFFFF,0.6):ember),(u,v)=> !(Math.abs(u)<0.3&&Math.abs(v)<0.5));
+for(let X=bL-2;X<=bL;X++)pair(X,Ye-5,X===bL?mix(fc,0x401000,0.5):mul(skin,0.45),O,0,mouthAt);
+pair(bL-3,Ye-4,mul(skin,0.55),O);
+}else if(sp==='basalt'){
+const ir=mix(C.eye,0x101828,0.3);
+eye(eL-0.5,Ye-0.5,2.7,2.7,(u,v)=>(u< -0.15&&u> -0.75&&v>0.15&&v<0.75?glint:(u>0.25&&u<0.7&&v< -0.3&&v> -0.75)?mix(ir,0xBFE6FF,0.6):ir),(u,v)=>u< -0.15&&v>0.15&&u> -0.75&&v<0.75);
+pair(bL,Ye-5,0x3A1E24,O,0,mouthAt);pair(bL,Ye-6,mul(skin,0.6),O);
+for(const X of[eL-2,eL-1])pair(X,Ye-4,mix(skin,0xFF7E86,0.45),O);
+mouthY=Ye-5;
+}else{
+const ice=mix(0x9FD8FF,C.eye,0.25),lash=0xE8F6FF;
+eye(eL-0.5,Ye-0.5,2.1,1.1,(u)=>(Math.abs(u+0.1)<0.25?mix(ice,0x101828,0.75):Math.abs(u)<0.6?ice:0xF4F8FC));
+for(let X=eL-2;X<=eL+1;X++)pair(X,Ye+1,lash,HR);
+pair(eL-3,Ye+2,lash,HR);
+for(const X of[bL])for(const Y of[Ye+3,Ye+4])pair(X,Y,0xF4A0C8,O,1);
+pair(bL,Ye-5,mix(skin,0x5A6AA0,0.55),O,0,mouthAt);
+for(const[X,Y]of[[eL-2,Ye-3],[eL-1,Ye-4],[eL-3,Ye-4]])pair(X,Y,mix(skin,0xFFFFFF,0.45),O);
+}
+const lids=grid(),mouth=grid();
+for(const[X,Y,Z]of eyeAt2)fset(lids,X,Y,Z-1,mul(skin,0.9));
+for(const[X,Y,Z]of mouthAt){fset(mouth,X,Y,Z-1,0x3A1418);fset(mouth,X,Y-1,Z-1,0x3A1418);}
+const hu=(X)=>(X+0.5)/2;
+F.face={kind:sp,eyesX:[hu(eL),hu(mir(eL))],eyeY:(Ye+0.5)/2,mouthX:(bL+1)/2,mouthY:(mouthY+1)/2+0.25,noseY:(Ye-2)/2+0.25,cheekX:hu(eL),cheekY:hu(Ye-2)};
+return{head:F,lids,mouth};
+}
 
 
 
@@ -48370,9 +48507,13 @@ const iris=mix(L.eye,0x0A0806,0.5);
 
 
 const brow=mix(skin,elder?mix(hc,0xE0E0E0,0.3):mul(hc,0.7),elder?0.32:0.45);
-for(const ex of A.eyes){head.del(ex,eyeY,A.z0);head.set(ex,eyeY,A.z0+1,iris,0,TG.eye);F(ex,eyeY+1,brow,TG.skin);}
 
-if(!kid){head.set(0,2,A.z0-1,mul(skin,1.02),0,TG.skin);F(0,my,mix(skin,LIP,0.85));F(-1,my,mix(skin,LIP,0.4));F(1,my,mix(skin,LIP,0.4));}
+
+const SPF= !!(L.species&& !L.hero);
+for(const ex of A.eyes){head.del(ex,eyeY,A.z0);head.set(ex,eyeY,A.z0+1,iris,0,TG.eye);if(!SPF)F(ex,eyeY+1,brow,TG.skin);}
+
+if(SPF){const mc=mul(skin,0.6);if(L.species==='basalt')F(0,my,mc);else if(L.species!=='ocker'){F(-1,my,mc);F(0,my,mc);F(1,my,mul(skin,0.7));}}
+else if(!kid){head.set(0,2,A.z0-1,mul(skin,1.02),0,TG.skin);F(0,my,mix(skin,LIP,0.85));F(-1,my,mix(skin,LIP,0.4));F(1,my,mix(skin,LIP,0.4));}
 else{F(-1,2,mul(skin,0.98));F(0,2,mul(skin,0.98));F(-1,my,mix(skin,LIP,0.6));F(0,my,mix(skin,LIP,0.6));}
 
 const pink=0xFF7E86;
@@ -48860,6 +49001,7 @@ for(let z= -4;z<=6;z++)for(let x= -5;x<=5;x++){const d=Math.hypot(x,z-1);if(d>5.
 P.ell(-1.5,3.6,2.5,1.4,0.5,1.4,0xF4F2EC,null,TG.other);P.box(-2,4,2,-1,5,3,0xF4F2EC);P.set(0,5,2,0xF4F2EC);
 P.tray=true;
 }
+else if(speciesItem((x,y,z,c,e)=>P.set(x,y,z,c,e,TG.other),t,0,-2)){}
 else if(t==='cane'){
 
 const len=Math.round(caneLen);
@@ -48942,7 +49084,7 @@ const SPB=L.species&& !L.hero?speciesBody(L,{head,body,hips,upper,thigh,shin,A,S
 const hipY=S.hip,headY=S.head+(SPB&&SPB.neck||0),shY=S.sh,hx=S.hx;
 const legXl= -S.legX-(kid?0:0),legXr=S.legX;
 
-const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald}):null;
+const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald,species:SPB?L.species:null,featC:L.featC||0xffffff}):null;
 const def={
 
 unit:32,h:kid?1.1:1.8,w:0.3,gait:'biped',kid,eyeY,person:true,fam,stride:STRIDE[fam]||0.6,
@@ -60634,7 +60776,8 @@ VR.BL.late.push(()=>{if(VM._K)VM.registerLate(NAMES3);});
 (function(VR){
 'use strict';
 const L=64;
-const BGEN=3;
+const BGEN=4;
+
 
 const walk=(g)=>30*g/9.81;
 
@@ -91286,7 +91429,7 @@ fauna:[
 species:{
 de:'Wellari',en:'Wellari',
 look:{skin:[0x4fa8b8,0x5cb8c0,0x3e96a8,0x6ac0c4],cut:['tunic','gown','tunic'],feat:'fins',featC:[0x2a6a9a,0x1f7a8a,0x3a5aa8],garb:[0xf2eedc,0xe8d8b0,0xf0a890,0xd86a5a,0xf4f0f4,0x7ad0c8],eye:0x1a3a5a},
-kit:{shape:'round',wall:'calcite',band:'cyan_terracotta',roof:'dried_kelp_block',floor:'bamboo_planks',fill:'sandstone',window:'light_blue_stained_glass',door:'bamboo_door',bed:'cyan_bed',light:'tide_lantern',paving:'smooth_quartz',lamp:'vx_lamppost_crystal',canopy:'cyan_wool',mark:'tube_coral_block'},
+kit:{lamp4:'lantern',post4:'bamboo_fence',pave4:['smooth_sandstone','cut_sandstone'],bench4:'smooth_sandstone_slab',flower4:'blue_orchid',shape:'round',wall:'calcite',band:'cyan_terracotta',roof:'dried_kelp_block',floor:'bamboo_planks',fill:'sandstone',window:'light_blue_stained_glass',door:'bamboo_door',bed:'cyan_bed',light:'tide_lantern',paving:'smooth_quartz',lamp:'vx_lamppost_crystal',canopy:'cyan_wool',mark:'tube_coral_block'},
 goods:['dried_kelp_block','kelp','sea_pickle','tube_coral_block','brain_coral_block','sponge','tide_lantern','lily_pad'],
 syl:['wa','li','nel','sa','ri','mo','thi','lu','na','ve','ar','io','ma','el','sha','ne'],end:['i','a','el','en'],
 },
@@ -91319,7 +91462,7 @@ fauna:[
 species:{
 de:'Dunelin',en:'Dunelin',
 look:{skin:[0xd8b444,0xc8a43a,0xe0c25a,0xbc9a36],cut:['robe','cape','robe'],feat:'horns',featC:[0xf0e2c0,0xd8c8a0,0xe8d0a8],garb:[0xe8d8b8,0x9a4a2a,0x5a6a7a,0xd8b060,0x7a3a2a,0x3a6a6a],eye:0x2a1a10},
-kit:{shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
+kit:{lamp4:'lantern',post4:'acacia_fence',pave4:['smooth_red_sandstone','cut_red_sandstone'],bench4:'acacia_slab',flower4:'orange_tulip',shape:'terrace',wall:'terracotta',band:'red_sandstone',roof:'smooth_red_sandstone',floor:'acacia_planks',fill:'red_sandstone',window:'orange_stained_glass',door:'acacia_door',bed:'orange_bed',light:'lantern',paving:'smooth_red_sandstone',lamp:'vx_lamppost_black',canopy:'orange_wool',mark:'amber_crystal_block'},
 goods:['red_sand','terracotta','orange_terracotta','cactus','red_sandstone','amber_crystal_block','lantern','iron_ingot'],
 syl:['du','ne','ka','ro','tes','ul','mar','ze','om','ra','bek','sim','ta','ho','gal','ir'],end:['in','ek','a','ur'],
 },
@@ -91352,7 +91495,7 @@ fauna:[
 species:{
 de:'Glutani',en:'Glutani',
 look:{skin:[0x4a2a3a,0x542e3e,0x3e2434,0x5a3440],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
-kit:{shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
+kit:{lamp4:'spirit_lantern',post4:'crimson_fence',pave4:['polished_basalt','smooth_basalt'],bench4:'crimson_slab',flower4:'torchflower',shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
 goods:['sulfur','obsidian','magma_block','amber_crystal_block','polished_sulfur','glowing_obsidian','sulfur_bricks','gold_ingot'],
 syl:['glu','ta','ni','ber','os','kai','rum','ze','fa','lo','tir','ga','van','ur','pe','sol'],end:['an','i','or','et'],
 },
@@ -91383,7 +91526,7 @@ fauna:[
 species:{
 de:'Regoli',en:'Regoli',
 look:{skin:[0x8a8cc0,0x7a80b4,0x9a98cc,0x8484b8],cut:['tunic','coat','tunic'],feat:'antennae',featC:[0x7af0ff,0xb0ff9a,0xffe07a],garb:[0x3a4a6a,0x6a7a9a,0xe8e8f0,0x2a3a4a,0x8a5a9a],eye:0x101828,glow:true},
-kit:{shape:'dome',wall:'polished_andesite',band:'smooth_basalt',roof:'light_blue_stained_glass',floor:'smooth_stone',fill:'andesite',window:'light_blue_stained_glass',door:'door_glass_white',bed:'gray_bed',light:'lantern',paving:'polished_andesite',lamp:'vx_lamppost_tech',canopy:'gray_wool',mark:'azure_crystal_block'},
+kit:{lamp4:'lantern',post4:'andesite_wall',pave4:['polished_andesite','andesite'],bench4:'smooth_stone_slab',flower4:'azure_bluet',shape:'dome',wall:'polished_andesite',band:'smooth_basalt',roof:'light_blue_stained_glass',floor:'smooth_stone',fill:'andesite',window:'light_blue_stained_glass',door:'door_glass_white',bed:'gray_bed',light:'lantern',paving:'polished_andesite',lamp:'vx_lamppost_tech',canopy:'gray_wool',mark:'azure_crystal_block'},
 goods:['regolith','basalt','smooth_basalt','azure_crystal_block','lantern','diorite','andesite','iron_ingot'],
 syl:['re','go','li','mun','sel','ka','tor','vi','den','ul','pa','so','ren','ix','ma','thel'],end:['i','o','un','is'],
 },
@@ -91415,7 +91558,7 @@ fauna:[
 species:{
 de:'Nivari',en:'Nivari',
 look:{skin:[0x9ac8f0,0x8abce8,0xaad4f4,0x7ab0e0],cut:['coat','cape','coat'],feat:'antlers',featC:[0x9ad8ff,0xc8f0ff,0x7ac0f0],garb:[0x2a4a7a,0x7a2a4a,0xe8e0d0,0x3a6a5a,0xc84a4a],eye:0x2a3a6a},
-kit:{shape:'vault',wall:'packed_ice',band:'snow_block',roof:'blue_ice',floor:'spruce_planks',fill:'packed_ice',window:'light_blue_stained_glass',door:'spruce_door',bed:'light_blue_bed',light:'lantern',paving:'snow_block_cut',lamp:'vx_lamppost_crystal',canopy:'light_blue_wool',mark:'rose_crystal_block'},
+kit:{lamp4:'lantern',post4:'spruce_fence',pave4:['smooth_stone','snow_block_cut'],bench4:'spruce_slab',flower4:'white_tulip',shape:'vault',wall:'packed_ice',band:'snow_block',roof:'blue_ice',floor:'spruce_planks',fill:'packed_ice',window:'light_blue_stained_glass',door:'spruce_door',bed:'light_blue_bed',light:'lantern',paving:'snow_block_cut',lamp:'vx_lamppost_crystal',canopy:'light_blue_wool',mark:'rose_crystal_block'},
 goods:['packed_ice','blue_ice','ice_crystal','snow_block','tholin_ice','rose_crystal_block','azure_crystal_cluster','lantern'],
 syl:['ni','va','ri','is','fel','ka','ylo','sen','mi','tor','al','kel','su','vin','ha','ren'],end:['i','a','el','is'],
 },
@@ -91957,16 +92100,48 @@ for(let dz= -1;dz<=1;dz++){put(X,F+H-2,Z+dz,blue);put(X,F+H-1,Z+dz,ice);}
 put(X,F+H,Z,S('rose_crystal_block'));
 }
 }
+
+
+
+
+function plaza4(kind,Kit,put,P,X,F,Z){
+const pz=P.plaza,seats=pz.seats=[],bench=st(Kit.bench4);
+
+for(const u of[-3,-2,2,3]){
+for(const[x,z,f]of[[u,-6,2],[u,6,0],[-6,u,1],[6,u,3]]){put(X+x,F+1,Z+z,bench);seats.push([X+x,F+1,Z+z,f]);}
+}
+
+let foot=0;
+const step=st(Kit.bench4),light=st(Kit.lamp4),moss=st('moss_block'),fl=st(Kit.flower4);
+for(let dx= -3;dx<=3;dx++)for(let dz= -3;dz<=3;dz++){
+if(Math.max(Math.abs(dx),Math.abs(dz))!==3)continue;
+if(kind==='basalt'&&Math.hypot(dx,dz)<=3.25)continue;
+const corner=Math.abs(dx)===3&&Math.abs(dz)===3,mid=dx===0||dz===0;
+if(corner)put(X+dx,F+1,Z+dz,light);
+else if(mid){put(X+dx,F,Z+dz,moss);put(X+dx,F+1,Z+dz,fl);}
+else put(X+dx,F+1,Z+dz,step);
+foot++;
+}
+pz.foot=foot;
+
+let n=0;
+const post=st(Kit.post4);
+for(const[x,z]of[[-4,-6],[4,-6],[-4,6],[4,6],[-6,-4],[-6,4],[6,-4],[6,4]]){put(X+x,F+1,Z+z,post);put(X+x,F+2,Z+z,light);P.lamps.push([X+x,F+3,Z+z]);n++;}
+pz.lanterns=n;
+}
 const HOMES=[[-13,-14],[0,-15],[13,-14],[-13,14],[0,15],[13,14]];
 function villagePlan(eco,site){
 const Kit=eco.W.species.kit,g=eco.gen,F=site.y|0,X=site.x,Z=site.z,kind=eco.kind;
 const ground=(x,z)=>g.surfaceY(x,z);
 const seed=strHash(site.id+':'+(eco.s>>>0))>>>0;
 const P={id:site.id,name:site.name,style:'sp:'+kind,kind,x:X,y:F+1,z:Z,seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z,r:6},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
-const W=writer(ground,F,Kit),put=W.put,pav=st(Kit.paving),mark=st(Kit.mark);
+const W=writer(ground,F,Kit),put=W.put,v4=g.bgen>=4&&Kit.pave4,pav=v4?st(Kit.pave4[0]):st(Kit.paving),mark=st(Kit.mark);
 
-for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);put(X+dx,F,Z+dz,(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
+
+const pa=pav,pb=v4?st(Kit.pave4[1]):pav;
+for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){W.level(X+dx,Z+dz);const d=Math.hypot(dx,dz);put(X+dx,F,Z+dz,v4?(d>=4.4&&d<5.5?pb:pa):(dx+dz)%4===0&&Math.abs(dx)<5&&Math.abs(dz)<5?st(Kit.band):pav);}
 centrepiece(kind,put,X,F,Z);
+if(v4)plaza4(kind,Kit,put,P,X,F,Z);
 for(const[dx,dz]of HOMES){
 const s=dz>0? -1:1;
 for(let k=6;k<Math.abs(dz)-4;k++){W.level(X+dx,Z+k*Math.sign(dz));put(X+dx,F,Z+k*Math.sign(dz),pav);if(dx)for(let q=Math.min(0,dx);q<=Math.max(0,dx);q++){W.level(X+q,Z+7*Math.sign(dz));put(X+q,F,Z+7*Math.sign(dz),pav);}}
@@ -94901,7 +95076,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="f56678571ef2b870";
+VR.TEX_SRC_HASH="a17ad976c5a00c4c";
 
 
 
@@ -98722,6 +98897,38 @@ VR.I18N.add('en',{
 "g.eco.village":"{sp} village {name}",
 "g.eco.met":"You meet the {sp} — {name}",
 
+"g.nat.greet":"“{w}!” — {mean}. {line}",
+"g.nat.words":"Their words: {list}",
+"g.nat.opt":"🗝 What do you teach?",
+"g.nat.give":"🎁 Give: {n}× {item}",
+"g.nat.short":"You only have {have} of {n}.",
+"g.nat.thanks":"“{w}!” — {mean}. Come to our {what} at dusk!",
+"g.nat.q0":"Quest 1/3 · Greet three {sp} ({n}/{of}) — each teaches you a word.",
+"g.nat.q1":"Quest 2/3 · Bring the {sp} {n}× {item}: {why}",
+"g.nat.q2":"Quest 3/3 · Join their {what} at dusk (stay in the ring).",
+"g.nat.q3":"The {sp} showed you: {what}",
+"g.nat.done0":"You know three {sp}! Now bring them {n}× {item}.",
+"g.nat.learnt":"Learnt from the {sp}",
+"g.nat.teach.recipe":"recipe: {ins} → {n}× {out}",
+"g.nat.teach.pieces":"the “{name}” set — {n} pieces in your Bauhand ★",
+"g.nat.teach.gadget":"a {item} and its recipe: {ins}",
+"g.nat.mean.hello":"Hello",
+"g.nat.mean.thanks":"Thank you",
+"g.nat.mean.friend":"Friend",
+"g.nat.mean.bye":"Goodbye",
+"g.nat.line.aqua":"The tide brought you — stay a while.",
+"g.nat.line.ocker":"Sit in the shade; in the wind the dunes sing.",
+"g.nat.line.zinn":"Warm your hands at our embers!",
+"g.nat.line.basalt":"From the stars? We count them every night!",
+"g.nat.line.opal":"Softly — the ice tells stories if you listen.",
+"g.nat.why.aqua":"they build tide lanterns from it.",
+"g.nat.why.ocker":"wood is precious in the dunes.",
+"g.nat.why.zinn":"they have never felt anything cool.",
+"g.nat.why.basalt":"they know bread only from stories.",
+"g.nat.why.opal":"no flowers grow in the ice.",
+"g.nat.set.ocker":"Dune build",
+"g.nat.set.opal":"Frost build",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -102426,6 +102633,38 @@ VR.I18N.add('de',{
 "g.travel.worlds":"Welten: {list}",
 "g.eco.village":"{sp}-Dorf {name}",
 "g.eco.met":"Du triffst {sp} — {name}",
+
+"g.nat.greet":"„{w}!“ — {mean}. {line}",
+"g.nat.words":"Ihre Wörter: {list}",
+"g.nat.opt":"🗝 Was lehrt ihr?",
+"g.nat.give":"🎁 Geben: {n}× {item}",
+"g.nat.short":"Du hast erst {have} von {n}.",
+"g.nat.thanks":"„{w}!“ — {mean}. Komm in der Abenddämmerung zu unserem {what}!",
+"g.nat.q0":"Auftrag 1/3 · Grüße drei {sp} ({n}/{of}) — jeder lehrt dich ein Wort.",
+"g.nat.q1":"Auftrag 2/3 · Bring den {sp} {n}× {item}: {why}",
+"g.nat.q2":"Auftrag 3/3 · Feiere in der Abenddämmerung beim {what} mit (bleib im Kreis).",
+"g.nat.q3":"Die {sp} zeigten dir: {what}",
+"g.nat.done0":"Du kennst drei {sp}! Nun: bring ihnen {n}× {item}.",
+"g.nat.learnt":"Gelernt bei den {sp}",
+"g.nat.teach.recipe":"Rezept: {ins} → {n}× {out}",
+"g.nat.teach.pieces":"Bausatz „{name}“ — {n} Bauteile in deiner Bauhand ★",
+"g.nat.teach.gadget":"ein {item} und sein Rezept: {ins}",
+"g.nat.mean.hello":"Hallo",
+"g.nat.mean.thanks":"Danke",
+"g.nat.mean.friend":"Freund",
+"g.nat.mean.bye":"Auf Wiedersehen",
+"g.nat.line.aqua":"Die Flut hat dich gebracht — bleib ein wenig.",
+"g.nat.line.ocker":"Setz dich in den Schatten; im Wind singen die Dünen.",
+"g.nat.line.zinn":"Wärm dir die Hände an unserer Glut!",
+"g.nat.line.basalt":"Von den Sternen? Wir zählen sie jede Nacht!",
+"g.nat.line.opal":"Leise — das Eis erzählt, wenn man zuhört.",
+"g.nat.why.aqua":"daraus bauen sie Flutlaternen.",
+"g.nat.why.ocker":"Holz ist in den Dünen kostbar.",
+"g.nat.why.zinn":"etwas Kühles kennen sie nicht.",
+"g.nat.why.basalt":"Brot kennen sie nur aus Geschichten.",
+"g.nat.why.opal":"im Eis wachsen keine Blumen.",
+"g.nat.set.ocker":"Dünenbau",
+"g.nat.set.opal":"Frostbau",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -134381,6 +134620,7 @@ for(let y=fy-11;y<=fy-5;y++)for(let z= -4;z<=3;z++)for(let x= -4;x<=4;x++)if(y==
 for(let x= -4;x<=4;x++){const h=Math.round(4-(x*x)/4);a.set(x,fy-5+h,-1,0x8A6A40);}
 a.ell(-1.5,fy-5,-1,2.2,1.2,1.4,0xD89A50);a.ell(2,fy-5.5,1,1.3,1.3,1.3,0xD8402E);a.ell(0.5,fy-5.5,1.5,1.2,1.2,1.2,0x6AB04A);
 }
+else if(speciesItem((x,y,z,c,e)=>a.set(x,y,z,c,e),tool,fy,-3)){}
 else if(tool==='can'){a.box(-2,fy-7,-3,2,fy-2,2,(x,y,z)=>mul(0x5A9AC0,0.92+H3(x,y,z,25)*0.1));for(let k=0;k<5;k++)a.set(0,fy-5+k,-4-k,0x5A9AC0);a.box(-1,fy-1,-1,1,fy,1,0x3A6A8A);}
 }
 if(!right&&elder&&role.tool==='cane'){for(let y= -armLen-22;y<=fy+1;y++)a.set(0,y,-3,mul(0x8A5A3A,0.9+((y&1)?0.08:0)));a.set(0,fy+2,-4,0x8A5A3A);a.set(0,fy+2,-5,0x8A5A3A);a.set(0,fy+1,-5,0x8A5A3A);}
@@ -134536,6 +134776,44 @@ carry,cane: !kid&&L.age==='elder'&&role.tool==='cane',item:tool,skirt:SKIRT[fam]
 
 
 
+V.SPECIES_TOOL={aqua:'shellstaff',ocker:'lanternpole',zinn:'tongs',basalt:'finder',opal:'chime'};
+const SP_TOOLS=new Set(Object.values(V.SPECIES_TOOL));
+function speciesItem(set,t,fy,z0){
+if(!SP_TOOLS.has(t))return false;
+const wood=(y)=>mul(0x7A5236,(y&1)?0.95:1.03);
+if(t==='shellstaff'){
+for(let y=fy-13;y<=fy+11;y++)set(0,y,z0,mul(0xD8C8A0,(y&1)?0.94:1.02),0);
+for(let y=fy+12;y<=fy+16;y++)for(let z=z0-2;z<=z0+2;z++)for(let x= -2;x<=2;x++){
+const d=x*x+(y-fy-14)*(y-fy-14)*0.9+(z-z0)*(z-z0);if(d>5.2)continue;
+set(x,y,z,(x+y+z)%3===0?0x5ACCC8:mix(0xF4B4A0,0xFFF0E0,(y-fy-12)/5),0);
+}
+set(0,fy+17,z0,0xFFF0E0,0);
+}else if(t==='lanternpole'){
+for(let y=fy-12;y<=fy+13;y++)set(0,y,z0,wood(y),0);
+for(let z=z0-4;z<=z0;z++)set(0,fy+13,z,0x3A2A20,0);
+set(0,fy+12,z0-4,0x3A2A20,0);
+for(let y=fy+7;y<=fy+11;y++)for(let z=z0-5;z<=z0-3;z++)for(let x= -1;x<=1;x++){
+const edge=y===fy+7||y===fy+11,core= !edge&&x===0&&z===z0-4;
+set(x,y,z,edge?0x3A2A20:core?0xFFE6A0:0xFFB040,edge?0:1);
+}
+}else if(t==='tongs'){
+for(let z=z0-10;z<=z0;z++)for(const x of[-1,1])set(z<z0-2?x:0,fy,z,mul(0x50545C,(z&1)?0.92:1.05),0);
+for(let z=z0-12;z<=z0-10;z++)for(let y=fy-1;y<=fy+1;y++)set(0,y,z,y===fy&&z===z0-11?0xFFE080:0xFF7A2A,1);
+}else if(t==='finder'){
+for(let z=z0-6;z<=z0;z++)set(0,fy,z,0x8A92A0,0);
+for(let y=fy-2;y<=fy+2;y++)for(let x= -2;x<=2;x++)if(Math.abs(x)+Math.abs(y-fy)>=2&&Math.abs(x)+Math.abs(y-fy)<=3)set(x,y,z0-7,0xB8C0CC,0);
+for(let z=z0-9;z<=z0-7;z++)set(0,fy,z,0x7AD8FF,1);
+set(0,fy+1,z0-8,0xC8F0FF,1);
+}else{
+for(let y=fy-4;y<=fy+12;y++)set(0,y,z0,0xD8E8F4,0);
+for(let x= -3;x<=3;x++)set(x,fy+12,z0,0xB8D0E4,0);
+for(const x of[-3,0,3])for(let k=1;k<=(x?3:4);k++)set(x,fy+12-k,z0,k>=(x?3:4)?0xE8F8FF:0x9AD4F4,k>=(x?3:4)?1:0);
+}
+return true;
+}
+
+
+
 
 
 
@@ -134607,6 +134885,71 @@ const mir=(X)=>2*bL+1-X;
 const both=(X,Y,c,t,over)=>{paint(X,Y,c,t,over);paint(mir(X),Y,c,t,over);};
 const Ye=2*C.eyeY+1,eL=bL-2;
 const LASH=0x2A1D1C,PINK=0xFF7E86;
+
+
+
+
+
+if(C.species){
+const sp=C.species,O=TG.other,EY=TG.eye,HR=TG.hair,fc=C.featC||0xffffff,SKE=(c,t)=>(SK(c,t)|(1<<24))>>>0;
+const eyeAt2=[],mouthAt=[];
+const put=(X,Y,c,t,em,list)=>{const Z=frontZ(X,Y);if(Z===null)return;F.c[idx(F,X,Y,Z)]=em?SKE(c,t):SK(c,t);if(list)list.push([X,Y,Z]);};
+const pair=(X,Y,c,t,em,list)=>{put(X,Y,c,t,em,list);put(mir(X),Y,c,t,em,list);};
+
+
+const eye=(cx,cy,rx,ry,col,em)=>{
+for(let Y=Math.floor(cy-ry);Y<=Math.ceil(cy+ry);Y++)for(let X=Math.floor(cx-rx);X<=Math.min(eL+1,Math.ceil(cx+rx));X++){
+const u=(X-cx)/rx,v=(Y-cy)/ry;if(u*u+v*v>1.05)continue;
+const c=col(u,v);if(c===null)continue;
+pair(X,Y,c,EY,em&&em(u,v),eyeAt2);
+}
+};
+const dark=0x0E1018,glint=0xFFFFFF;
+let mouthY=Ye-5;
+if(sp==='aqua'){
+const ir=mix(C.eye,0x0A0806,0.45),rim=mix(C.eye,fc,0.5);
+eye(eL-0.5,Ye-0.5,2.15,2.15,(u,v)=>(u< -0.25&&v>0.25&&u> -0.8?glint:u*u+v*v>0.62?rim:ir));
+for(const X of[bL-1,bL])pair(X,Ye-5,mul(skin,0.5),O,0,mouthAt);
+pair(bL-2,Ye-4,mul(skin,0.6),O);
+for(const Y of[Ye-3,Ye-4])pair(eL-3,Y,mix(skin,fc,0.55),O);
+pair(eL-2,Ye-4,mix(skin,fc,0.4),O);
+}else if(sp==='ocker'){
+const amber=mix(0xE8A030,C.eye,0.2);
+eye(eL-0.5,Ye,2.1,1.35,(u)=>(Math.abs(u)<0.3?dark:u< -0.6?mix(amber,0xFFF0C0,0.5):amber));
+for(let X=eL-2;X<=eL+1;X++)pair(X,Ye+2,mix(skin,0x3A2010,0.55),HR);
+pair(eL-3,Ye+2,mix(skin,0x3A2010,0.35),HR);
+
+for(const Y of[Ye-2,Ye-3])pair(bL,Y,0x2A1A14,O);
+pair(bL,Ye-5,mul(skin,0.45),O,0,mouthAt);pair(bL-1,Ye-4,mul(skin,0.55),O);
+mouthY=Ye-5;
+}else if(sp==='zinn'){
+const ember=mix(fc,0xFFFFFF,0.3),brow=mul(skin,0.62);
+for(let X=eL-3;X<=eL+1;X++)pair(X,Ye+2,brow,O);
+eye(eL-0.5,Ye-0.3,2.1,1.35,(u,v)=>(Math.abs(u)<0.3&&Math.abs(v)<0.5?0x2A0A04:v>0.35&&u<0?mix(ember,0xFFFFFF,0.6):ember),(u,v)=> !(Math.abs(u)<0.3&&Math.abs(v)<0.5));
+for(let X=bL-2;X<=bL;X++)pair(X,Ye-5,X===bL?mix(fc,0x401000,0.5):mul(skin,0.45),O,0,mouthAt);
+pair(bL-3,Ye-4,mul(skin,0.55),O);
+}else if(sp==='basalt'){
+const ir=mix(C.eye,0x101828,0.3);
+eye(eL-0.5,Ye-0.5,2.7,2.7,(u,v)=>(u< -0.15&&u> -0.75&&v>0.15&&v<0.75?glint:(u>0.25&&u<0.7&&v< -0.3&&v> -0.75)?mix(ir,0xBFE6FF,0.6):ir),(u,v)=>u< -0.15&&v>0.15&&u> -0.75&&v<0.75);
+pair(bL,Ye-5,0x3A1E24,O,0,mouthAt);pair(bL,Ye-6,mul(skin,0.6),O);
+for(const X of[eL-2,eL-1])pair(X,Ye-4,mix(skin,0xFF7E86,0.45),O);
+mouthY=Ye-5;
+}else{
+const ice=mix(0x9FD8FF,C.eye,0.25),lash=0xE8F6FF;
+eye(eL-0.5,Ye-0.5,2.1,1.1,(u)=>(Math.abs(u+0.1)<0.25?mix(ice,0x101828,0.75):Math.abs(u)<0.6?ice:0xF4F8FC));
+for(let X=eL-2;X<=eL+1;X++)pair(X,Ye+1,lash,HR);
+pair(eL-3,Ye+2,lash,HR);
+for(const X of[bL])for(const Y of[Ye+3,Ye+4])pair(X,Y,0xF4A0C8,O,1);
+pair(bL,Ye-5,mix(skin,0x5A6AA0,0.55),O,0,mouthAt);
+for(const[X,Y]of[[eL-2,Ye-3],[eL-1,Ye-4],[eL-3,Ye-4]])pair(X,Y,mix(skin,0xFFFFFF,0.45),O);
+}
+const lids=grid(),mouth=grid();
+for(const[X,Y,Z]of eyeAt2)fset(lids,X,Y,Z-1,mul(skin,0.9));
+for(const[X,Y,Z]of mouthAt){fset(mouth,X,Y,Z-1,0x3A1418);fset(mouth,X,Y-1,Z-1,0x3A1418);}
+const hu=(X)=>(X+0.5)/2;
+F.face={kind:sp,eyesX:[hu(eL),hu(mir(eL))],eyeY:(Ye+0.5)/2,mouthX:(bL+1)/2,mouthY:(mouthY+1)/2+0.25,noseY:(Ye-2)/2+0.25,cheekX:hu(eL),cheekY:hu(Ye-2)};
+return{head:F,lids,mouth};
+}
 
 
 
@@ -134810,9 +135153,13 @@ const iris=mix(L.eye,0x0A0806,0.5);
 
 
 const brow=mix(skin,elder?mix(hc,0xE0E0E0,0.3):mul(hc,0.7),elder?0.32:0.45);
-for(const ex of A.eyes){head.del(ex,eyeY,A.z0);head.set(ex,eyeY,A.z0+1,iris,0,TG.eye);F(ex,eyeY+1,brow,TG.skin);}
 
-if(!kid){head.set(0,2,A.z0-1,mul(skin,1.02),0,TG.skin);F(0,my,mix(skin,LIP,0.85));F(-1,my,mix(skin,LIP,0.4));F(1,my,mix(skin,LIP,0.4));}
+
+const SPF= !!(L.species&& !L.hero);
+for(const ex of A.eyes){head.del(ex,eyeY,A.z0);head.set(ex,eyeY,A.z0+1,iris,0,TG.eye);if(!SPF)F(ex,eyeY+1,brow,TG.skin);}
+
+if(SPF){const mc=mul(skin,0.6);if(L.species==='basalt')F(0,my,mc);else if(L.species!=='ocker'){F(-1,my,mc);F(0,my,mc);F(1,my,mul(skin,0.7));}}
+else if(!kid){head.set(0,2,A.z0-1,mul(skin,1.02),0,TG.skin);F(0,my,mix(skin,LIP,0.85));F(-1,my,mix(skin,LIP,0.4));F(1,my,mix(skin,LIP,0.4));}
 else{F(-1,2,mul(skin,0.98));F(0,2,mul(skin,0.98));F(-1,my,mix(skin,LIP,0.6));F(0,my,mix(skin,LIP,0.6));}
 
 const pink=0xFF7E86;
@@ -135300,6 +135647,7 @@ for(let z= -4;z<=6;z++)for(let x= -5;x<=5;x++){const d=Math.hypot(x,z-1);if(d>5.
 P.ell(-1.5,3.6,2.5,1.4,0.5,1.4,0xF4F2EC,null,TG.other);P.box(-2,4,2,-1,5,3,0xF4F2EC);P.set(0,5,2,0xF4F2EC);
 P.tray=true;
 }
+else if(speciesItem((x,y,z,c,e)=>P.set(x,y,z,c,e,TG.other),t,0,-2)){}
 else if(t==='cane'){
 
 const len=Math.round(caneLen);
@@ -135382,7 +135730,7 @@ const SPB=L.species&& !L.hero?speciesBody(L,{head,body,hips,upper,thigh,shin,A,S
 const hipY=S.hip,headY=S.head+(SPB&&SPB.neck||0),shY=S.sh,hx=S.hx;
 const legXl= -S.legX-(kid?0:0),legXr=S.legX;
 
-const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald}):null;
+const fine=opts&&opts.fine?fineFace({head:head.g,A,eyeY,skin,hair:hc,eye:L.eye,kid,elder,beard: !!(L.beard&& !kid),glasses,frame:frameC,freckles: !!L.freckles,lashes: !!L.lashes,bald,species:SPB?L.species:null,featC:L.featC||0xffffff}):null;
 const def={
 
 unit:32,h:kid?1.1:1.8,w:0.3,gait:'biped',kid,eyeY,person:true,fam,stride:STRIDE[fam]||0.6,
@@ -174773,6 +175121,7 @@ L.garb=age==='child'?null:cut[r(36)%cut.length];
 L.shirt=Lk.garb[r(33)%Lk.garb.length];L.pants=Lk.garb[(r(34)+2)%Lk.garb.length];L.dressCol=Lk.garb[r(35)%Lk.garb.length];L.dress=false;
 if(L.garb==='cape')L.cape=Lk.garb[(r(37)+1)%Lk.garb.length];
 L.trim=L.featC;L.town='sp';
+if(age!=='child'&&Folk.SPECIES_TOOL)L.tool=Folk.SPECIES_TOOL[kind];
 return L;
 };
 
@@ -174998,6 +175347,278 @@ else if(this.ui&&this.ui.chatLine)this.ui.chatLine(T('g.travel.worlds',{list:VR.
 return;
 }
 return ch.apply(this,arguments);
+};
+}
+})(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k),nm=(id)=>(VR.itemName?VR.itemName(id):id),spN=(k)=>T('g.eco.sp.'+k);
+const N=VR.Natives={};
+const KINDS=N.KINDS=['aqua','ocker','zinn','basalt','opal'];
+const MEAN=N.MEAN=['hello','thanks','friend','bye'];
+const W=(a)=>a.map((w,i)=>({w,mean:MEAN[i]}));
+N.LANG={
+aqua:W(['Lunavel','Marithi','Nelisa','Shavelun']),
+ocker:W(['Duraka','Tesulmar','Holgek','Zeromur']),
+zinn:W(['Glusoleta','Kaitiro','Vanuret','Pelorumi']),
+basalt:W(['Remunel','Sovitorn','Kathelo','Golixis']),
+opal:W(['Nivasen','Feltoril','Kelmia','Suvinha']),
+};
+N.TEACH={
+aqua:{type:'recipe',ins:['glass','sea_pickle','kelp'],out:'tide_lantern',n:2},
+ocker:{type:'pieces',pieces:['b:terracotta','b:red_sandstone','b:smooth_red_sandstone','b:orange_stained_glass','b:acacia_planks','b:lantern','b:amber_crystal_block','b:orange_wool']},
+zinn:{type:'recipe',ins:['obsidian','magma_block'],out:'glowing_obsidian',n:2},
+basalt:{type:'gadget',ins:['iron_ingot','copper_ingot','azure_crystal_block'],out:'scanner',n:1},
+opal:{type:'pieces',pieces:['b:packed_ice','b:blue_ice','b:snow_block','b:light_blue_stained_glass','b:spruce_planks','b:rose_crystal_block','b:lantern','b:vx_lamppost_crystal']},
+};
+
+N.CHAIN={
+aqua:[{k:'greet',n:3},{k:'give',item:'glass',n:6},{k:'cult'}],
+ocker:[{k:'greet',n:3},{k:'give',item:'oak_log',n:8},{k:'cult'}],
+zinn:[{k:'greet',n:3},{k:'give',item:'ice',n:6},{k:'cult'}],
+basalt:[{k:'greet',n:3},{k:'give',item:'bread',n:4},{k:'cult'}],
+opal:[{k:'greet',n:3},{k:'give',item:'poppy',n:6},{k:'cult'}],
+};
+N.GREET_S=2.4;N.HUSH_R=7;N.HUSH_D=8;N.PHOTO_R=14;N.PHOTO_S=20;
+
+
+const isRec=(r)=> !!r&&typeof r==='object'&& !Array.isArray(r);
+N.rec=function(meta,kind){
+if(!meta)return{s:0,met:[],w:[]};
+const all=isRec(meta.natives)?meta.natives:(meta.natives={});
+let r=all[kind];
+if(!isRec(r)|| !(r.s>=0&&r.s<=3)|| !Array.isArray(r.met)|| !Array.isArray(r.w))r=all[kind]={s:0,met:[],w:[]};
+return r;
+};
+N.step=(meta,kind)=>N.rec(meta,kind).s;
+N.learned=(meta,kind)=>N.rec(meta,kind).s>=3;
+N.known=(meta,kind)=>N.rec(meta,kind).w.filter(i=>N.LANG[kind]&&N.LANG[kind][i]).map(i=>N.LANG[kind][i]);
+
+N.talked=function(meta,kind,pid){
+const r=N.rec(meta,kind),Q=N.CHAIN[kind];if(!Q)return null;
+if(r.s!==0)return{};
+if(pid!==undefined&& !r.met.includes(String(pid)))r.met.push(String(pid));
+if(r.met.length>=Q[0].n){r.s=1;return{done:0};}
+return{n:r.met.length};
+};
+
+N.give=function(meta,kind,inv){
+const r=N.rec(meta,kind),q=N.CHAIN[kind]&&N.CHAIN[kind][1];
+if(!q||r.s!==1|| !inv||inv.count(q.item)<q.n)return false;
+inv.remove(q.item,q.n);if('changed'in inv)inv.changed=true;
+r.s=2;return true;
+};
+
+N.cult=function(meta,kind,inv){
+const r=N.rec(meta,kind);if(r.s!==2)return null;
+r.s=3;
+const Tt=N.TEACH[kind];
+if(Tt&&Tt.type==='gadget'&&inv&&inv.add){inv.add(Tt.out,1);inv.changed=true;}
+return{taught:kind};
+};
+
+N.match=function(grid,n,meta){
+if(!meta|| !grid)return null;
+const ids=[];for(let i=0;i<grid.length;i++){const s=grid[i];if(s&&s.id)ids.push(s.id);}
+if(!ids.length)return null;
+for(const kind of KINDS){
+const Tt=N.TEACH[kind];if(!Tt.ins|| !N.learned(meta,kind)||Tt.ins.length!==ids.length)continue;
+const left=ids.slice();let ok=true;
+for(const w of Tt.ins){const i=left.indexOf(w);if(i<0){ok=false;break;}left.splice(i,1);}
+if(ok)return{id:Tt.out,n:Tt.n};
+}
+return null;
+};
+
+N.greeting=function(meta,kind,h){
+const L=N.LANG[kind];if(!L)return null;
+const r=N.rec(meta,kind);
+let i=0;while(i<L.length&&r.w.includes(i))i++;
+const fresh=i<L.length;if(!fresh)i=((h>>>0)%L.length);
+if(fresh)r.w.push(i);
+const word=L[i];
+return{word,fresh,text:T('g.nat.greet',{w:word.w,mean:T('g.nat.mean.'+word.mean),line:T('g.nat.line.'+kind)})};
+};
+
+
+const GP={
+aqua:[['arm_l',0,1.1],['arm_r',0,1.1],['fore_l',0,0.9],['fore_r',0,0.9]],
+ocker:[['head',0,-0.55],['body',0,-0.12],['arm_l',2,-0.95],['arm_r',2,0.95]],
+zinn:[['arm_l',0,1],['arm_r',0,1]],
+basalt:[['arm_l',0,1.5],['arm_r',0,1.5],['arm_l',2,-0.9],['arm_r',2,0.9]],
+opal:[['body',0,-0.35],['head',0,-0.2],['arm_r',0,0.9],['fore_r',0,1.2],['arm_r',2,-0.25]],
+};
+N.greetPose=function(P,kind,f){
+const L=GP[kind];if(!(f>0&&f<1)|| !P.body|| !L)return;
+const w=Math.sin(f*Math.PI),add=(j,i,v)=>{if(P[j])P[j][i]+=v;};
+for(const[j,i,v]of L)add(j,i,v*w);
+if(kind==='aqua'){const q=Math.sin(f*40)*0.35*w;add('fore_l',2,q);add('fore_r',2,-q);}
+else if(kind==='zinn'){const o=f>0.55?(f-0.55)/0.45:0;add('fore_l',0,1.1*w*(1-o));add('fore_r',0,1.1*w*(1-o));add('arm_l',2,-0.6*o*w);add('arm_r',2,0.6*o*w);}
+else if(kind==='basalt')add('hips',4,Math.abs(Math.sin(f*Math.PI*4))*2.4*w);
+};
+
+N.hushSpot=function(pos,pl){
+let dx=pos[0]-pl[0],dz=pos[2]-pl[2];const d=Math.hypot(dx,dz);
+if(d<0.05){dx=1;dz=0;}else{dx/=d;dz/=d;}
+return[pl[0]+dx*N.HUSH_D,pos[1],pl[2]+dz*N.HUSH_D];
+};
+
+
+N.offMonument=function(pos,pz,kind){
+if(kind==='opal'|| !pz)return null;
+const cx=pz.x+0.5,cz=pz.z+0.5,dx=pos[0]-cx,dz=pos[2]-cz,d=Math.hypot(dx,dz);
+if(d>=2.4||Math.abs(pos[1]-pz.y)>3)return null;
+const an=d>0.05?Math.atan2(dz,dx):0.7;
+return[cx+Math.cos(an)*4.5,cz+Math.sin(an)*4.5];
+};
+
+N.status=function(meta,kind){
+const r=N.rec(meta,kind),sp=spN(kind),Q=N.CHAIN[kind];
+const words=N.known(meta,kind).map(o=>o.w+' ('+T('g.nat.mean.'+o.mean)+')').join(' · ');
+const wl=words?'\n'+T('g.nat.words',{list:words}):'';
+if(r.s===0)return T('g.nat.q0',{sp,n:r.met.length,of:Q[0].n})+wl;
+if(r.s===1)return T('g.nat.q1',{sp,n:Q[1].n,item:nm(Q[1].item),why:T('g.nat.why.'+kind)})+wl;
+if(r.s===2)return T('g.nat.q2',{sp,what:T('g.eco.cult.'+kind)})+wl;
+return T('g.nat.q3',{sp,what:N.teachText(kind)})+wl;
+};
+N.teachText=function(kind){
+const Tt=N.TEACH[kind];
+if(Tt.type==='pieces')return T('g.nat.teach.pieces',{name:T('g.nat.set.'+kind),n:Tt.pieces.length});
+if(Tt.type==='gadget')return T('g.nat.teach.gadget',{item:nm(Tt.out),ins:Tt.ins.map(nm).join(' + ')});
+return T('g.nat.teach.recipe',{ins:Tt.ins.map(nm).join(' + '),n:Tt.n,out:nm(Tt.out)});
+};
+
+
+const kindOfA=(a)=>(a&&a.p&&a.p.look&&a.p.look.species)||null;
+const H=(s)=>{let h=2166136261;s=String(s);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;};
+N.taught=function(g,kind){
+const Tt=N.TEACH[kind];
+if(Tt.type==='pieces'&&VR.Favs&&VR.Favs.addMany)VR.Favs.addMany(Tt.pieces.filter(id=>VR.R&&VR.R.byName[id.slice(2)]));
+if(g&&g.ui&&g.ui.toast)g.ui.toast('🗝 '+T('g.nat.learnt',{sp:spN(kind)}),N.teachText(kind));
+if(g&&g.player&&g.player.inv)g.player.inv.changed=true;
+};
+
+const WL=VR.WorldLife;
+if(WL&&WL.cultJoin&& !WL.cultJoin.__nat){
+const cj=WL.cultJoin;
+WL.cultJoin=function(g,vil){
+const r=cj.apply(this,arguments);
+const kind=vil&&vil.plan&&vil.plan.species;
+if(r&&kind&&g&&N.cult(g.meta||(g.meta={}),kind,g.player&&g.player.inv))N.taught(g,kind);
+return r;
+};
+WL.cultJoin.__nat=true;
+}
+
+if(WL&&WL.idle&& !WL.idle.__nat){
+const id0=WL.idle;
+WL.idle=function(P,kind,t,wa,state,a){id0.apply(this,arguments);if(a&&a.greetT>0)N.greetPose(P,kind,1-a.greetT/N.GREET_S);};
+WL.idle.__nat=true;
+}
+
+const C=VR.Crafting;
+if(C&&C.match&& !C.match.__nat){
+const m0=C.match;
+C.match=function(grid,n){const g=VR.game,r=g&&g.meta&&g.meta.natives?N.match(grid,n,g.meta):null;return r||m0.apply(this,arguments);};
+C.match.__nat=true;
+}
+const Vs=VR.Villages;
+if(Vs&& !Vs.prototype.__nat){
+const VP=Vs.prototype;VP.__nat=true;
+const ua=VP.updateAgent;
+VP.updateAgent=function(a,dt,tod){
+if(a.greetT>0)a.greetT-=dt;
+const vil=a.vil,kind=vil&&vil.plan&&vil.plan.species;
+if(!kind)return ua.call(this,a,dt,tod);
+const g=this.g,pl=g.player.pos;
+const still=()=>{a.t+=dt;if(a.bubble){a.bubble.t-=dt;if(a.bubble.t<=0)a.bubble=null;}a.vel[0]=0;a.vel[2]=0;a.walkAmt+=(0-a.walkAmt)*Math.min(1,dt*6);};
+
+if(this.talking===a){
+still();
+let dy=Math.atan2(-(pl[0]-a.pos[0]),-(pl[2]-a.pos[2]))-a.yaw;while(dy>Math.PI)dy-=Math.PI*2;while(dy< -Math.PI)dy+=Math.PI*2;
+a.yaw+=dy*Math.min(1,dt*6);a.lookAt=pl;
+return;
+}
+
+const pc=g.photoCam;
+if(pc&&pc.on&&pc.s){
+if((a.photoT=(a.photoT||0)+dt)<N.PHOTO_S&&(a.pos[0]-pc.s.x)**2+(a.pos[2]-pc.s.z)**2<N.PHOTO_R*N.PHOTO_R){still();return;}
+}else a.photoT=0;
+
+if(a.hush){
+if(this.talking)a.hush.t=Math.max(a.hush.t,4);
+a.hush.t-=dt;
+if(a.hush.t>0){
+a.t+=dt;if(a.bubble){a.bubble.t-=dt;if(a.bubble.t<=0)a.bubble=null;}
+a.steer=[a.hush.spot[0],a.hush.spot[2]];a.path=null;
+a.lookAt=this.talking?this.talking.pos:null;
+this.move(a,dt);return;
+}
+a.hush=null;a.lookAt=null;
+}
+
+const act=a.act,pz=vil.plan.plaza;
+{const o=N.offMonument(a.pos,pz,kind);if(o){a.pos[0]=o[0];a.pos[2]=o[1];a.pos[1]=pz.y;a.path=null;}}
+if(act&&act.type==='plaza'&&act.spot&&act.spot.length===3&&pz){
+const dx=act.spot[0]+0.5-(pz.x+0.5),dz=act.spot[2]+0.5-(pz.z+0.5),d=Math.hypot(dx,dz);
+if(d<3.9){const an=d>0.1?Math.atan2(dz,dx):(H(a.p.id)%628)/100,r=4+(H(a.p.id+'r')%20)/10;act.spot[0]=Math.floor(pz.x+0.5+Math.cos(an)*r);act.spot[2]=Math.floor(pz.z+0.5+Math.sin(an)*r);}
+}
+return ua.call(this,a,dt,tod);
+};
+const ot=VP.openTalk;
+VP.openTalk=function(a){
+const r=ot.apply(this,arguments);
+const kind=kindOfA(a);if(!kind|| !N.LANG[kind])return r;
+const g=this.g,meta=g.meta||(g.meta={}),pl=g.player.pos;
+const gr=N.greeting(meta,kind,H(a.p.id+':'+((this.time||0)|0)));
+if(gr){this.talkText(gr.text);a.say(gr.word.w+'!',2.5);}
+a.greetT=N.GREET_S;a.path=null;
+const ev=N.talked(meta,kind,a.p.id);
+if(ev&&ev.done===0&&g.ui&&g.ui.chatLine)g.ui.chatLine('🗝 '+T('g.nat.done0',{sp:spN(kind),item:nm(N.CHAIN[kind][1].item),n:N.CHAIN[kind][1].n}),'#ffd98a');
+
+for(const o of a.vil.agents){
+if(o===a||o.pose==='sleep'||o.inBoat)continue;
+if((o.pos[0]-pl[0])**2+(o.pos[2]-pl[2])**2<N.HUSH_R*N.HUSH_R)o.hush={t:6,spot:N.hushSpot(o.pos,pl)};
+}
+return r;
+};
+const to=VP.talkOptions;
+VP.talkOptions=function(a){
+const r=to.apply(this,arguments);
+const kind=kindOfA(a);if(!kind|| !N.LANG[kind]||typeof document==='undefined')return r;
+const box=document.getElementById('tk_opts');if(!box)return r;
+const g=this.g,meta=g.meta||(g.meta={});
+const mk=(label,fn)=>{const b=document.createElement('button');b.className='btn small';b.textContent=label;b.onclick=()=>{this.chirp(a);fn();};return b;};
+box.insertBefore(mk(T('g.nat.opt',{sp:spN(kind)}),()=>{
+this.talkText(N.status(meta,kind));
+if(N.step(meta,kind)===1&& !box.querySelector('[data-natgive]')){
+const q=N.CHAIN[kind][1];
+const b=mk(T('g.nat.give',{n:q.n,item:nm(q.item)}),()=>{
+const inv=g.player&&g.player.inv;
+if(N.give(meta,kind,inv)){this.talkText(T('g.nat.thanks',{w:N.LANG[kind][1].w,mean:T('g.nat.mean.thanks'),what:T('g.eco.cult.'+kind)}));a.greetT=N.GREET_S;b.remove();if(g.ui.updateHUD)g.ui.updateHUD(true);}
+else this.talkText(T('g.nat.short',{have:inv?inv.count(q.item):0,n:q.n}));
+});
+b.setAttribute('data-natgive','1');box.insertBefore(b,box.children[1]||null);
+}
+}),box.firstChild);
+return r;
 };
 }
 })(VR);
