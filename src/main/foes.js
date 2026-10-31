@@ -852,7 +852,8 @@
     }
   };
   // a calmed stray (liberate.js's timing ring)
-  F.calmMob = function (g, m) { refresh(g); const ok = F.calm(m, GW); if (ok && VR.Adventure && VR.Adventure.award) VR.Adventure.award('foe', { kind: m.foe.k, zone: m.foe.zone ? m.foe.zone.id : undefined }); if (ok && VR.EventLog && VR.EventLog.emit) { const K = F.KINDS[m.foe.k]; VR.EventLog.emit('social', 'calmed', 3, [m.pos[0], m.pos[1] + (K ? K.h * 0.5 : 1), m.pos[2]], 'foes', K ? Math.max(1.2, K.h * 0.6) : 1.2); } F.flush(g); return ok; };   // (a-session: a calmed stray, its optic green — seen)
+  F.CALM_RUN = 10;   // (a-session: s — the guards calmed one after another are one moment: the first one weighs 3, the run's others 1)
+  F.calmMob = function (g, m) { refresh(g); const ok = F.calm(m, GW); if (ok && VR.Adventure && VR.Adventure.award) VR.Adventure.award('foe', { kind: m.foe.k, zone: m.foe.zone ? m.foe.zone.id : undefined }); if (ok && VR.EventLog && VR.EventLog.emit) { const K = F.KINDS[m.foe.k], t = g.time || 0, w = t - (F.calmT === undefined ? -1e9 : F.calmT) < F.CALM_RUN ? 1 : 3; F.calmT = t; VR.EventLog.emit('social', 'calmed', w, [m.pos[0], m.pos[1] + (K ? K.h * 0.5 : 1), m.pos[2]], 'foes', K ? Math.max(1.2, K.h * 0.6) : 1.2); } F.flush(g); return ok; };   // (a-session: a calmed stray, its optic green — seen)
 
   // ---------------------------------------------------------------- the director: guardians, swarms, shadows
   F.ctx = function (g) {

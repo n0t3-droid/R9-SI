@@ -111,6 +111,7 @@
     const L = VR.EventLog, q = [b[0] + 0.5, b[1] + 2, b[2] + 0.5]; if (!L || !L.inView) return;
     const v = L.inView(q, 12, g); if (!v.inView || (v.frac > 0 && v.frac < 0.005)) return;
     if (VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) return;
+    if (VR.Funke && VR.Funke.foeOf && VR.Funke.foeOf(g)) return;   // (a-session: not in the middle of its fight — the outpost is no news then)
     (S.seen || (S.seen = {}))[s.id] = g.time || 0;
     const fk = g.funke, Lb = VR.Liberate; if (fk && fk.on && fk.on()) fk.say('regie.sight', { name: Lb && Lb.nameOf ? Lb.nameOf(s) : '' }, true);
     L.emit('discovery', 'outpost', 3, q, 'regie', 12);

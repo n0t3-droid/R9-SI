@@ -173,10 +173,14 @@
   const actNow = (ev, D) => { const M = L.ACTS[ev.kind]; if (!M) return null; try { return M.now(ev, D); } catch (e) { return null; } };
   // a codex entry unlocked (codex.js unlock): b biome, c creature → discovery 2; w wonder (its banner and fanfare) →
   // discovery 4; m milestone, i invention → milestone 2. On the screen: its toast (a wonder: its banner)
+  L.RIDE = 2;
   const CODEX = { w: ['discovery', 4], b: ['discovery', 2], c: ['discovery', 2], m: ['milestone', 2], i: ['milestone', 2] };
   L.found = function (id) {
     const s = String(id || ''), pre = s[1] === ':' ? s[0] : '', k = CODEX[pre] || ['discovery', 2];
-    return L.emit(k[0], pre ? s.slice(2) : s, k[1], null, 'codex');
+    // (a-session: a toast within 2 s of a weighted moment seen — two entries at once, the ship's milestone as it takes
+    // off — rides that moment: weight 1; a wonder's banner keeps its own)
+    const g = game(), t = g ? +(g.time || 0) : 0, w = k[1] < 4 && t - lastHalf[2] < L.RIDE && t >= lastHalf[2] ? 1 : k[1];
+    return L.emit(k[0], pre ? s.slice(2) : s, w, null, 'codex');
   };
   // a craft of the sky traffic at its nearest point to the player (traffic.js update, every frame with its distance d):
   // once per flight, its leader only; a low pass of the life director (contrail) and the convoy are noticeable (2) to

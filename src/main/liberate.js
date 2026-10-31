@@ -921,8 +921,8 @@
   // ---- a-session (plan docs/superpowers/plans/2026-10-31-a-session.md §2.4): Funke's way, hands free — a disturbed outpost
   // with its beacon is a trip by intent that walks ([V] at the beacon; the walk stops before its guards: r 40 → 20 m)
   L.siteTarget = function (s) {
-    if (!s || s.st === 'frei' || !s.beacon) return null;
-    const b = s.beacon;
+    if (!s || s.st === 'frei' || !Number.isFinite(s.x) || !Number.isFinite(s.z)) return null;
+    const b = s.beacon || [s.x, Number.isFinite(s.y) ? s.y + 1 : 70, s.z];   // (far off, its columns not loaded: the site's middle)
     return { kind: 'pad', id: 'out:' + s.id, name: L.nameOf(s), toKey: 'g.ctx.toThing', pos: [b[0] + 0.5, b[1] + 4, b[2] + 0.5], base: b[1] - 2, top: b[1] + 14, r: 40, walk: true };
   };
   // the outposts are the Abenteuer's landmarks (eventlog.js samples them): every known beacon — a disturbed one's flicker
@@ -931,10 +931,10 @@
   L.siteLandmarks = function (sites, called, out, eye, lite) {
     out.length = 0;
     for (const s of sites) {
-      if (!s || !s.known || !s.beacon) continue;
-      const b = s.beacon; let h = s.st === 'frei' ? 60 : 14;
+      if (!s || !((s.known && s.beacon) || (called === s && Number.isFinite(s.x)))) continue;   // (the called one far off: its middle, as its beam is drawn)
+      const b = s.beacon || [s.x, Number.isFinite(s.y) ? s.y + 1 : 70, s.z]; let h = s.st === 'frei' ? 60 : 14;
       if (called === s && s.st !== 'frei' && !lite && eye) { const d = Math.hypot(b[0] - eye[0], b[2] - eye[2]); if (d > 190 && d < 1150) h = 140 + d * 0.12; }
-      out.push({ id: 'outpost', x: b[0] + 0.5, z: b[2] + 0.5, base: b[1], top: b[1] + 1 + h, r: 4 });
+      out.push({ id: 'outpost', x: b[0] + 0.5, z: b[2] + 0.5, base: b[1], top: b[1] + 1 + h, r: 1.5 });   // (r: standing at the beacon its beam still towers)
     }
     return out;
   };
@@ -946,7 +946,7 @@
   if (I && I.addSource) I.addSource((g) => {
     if (!F() || !F().advOn(g) || !W0.sites.size) return null;
     const p = g.player.pos, out = [];
-    for (const s of W0.sites.values()) { if (!s.known || s.st === 'frei' || Math.hypot(s.x - p[0], s.z - p[2]) > I.WALK_FAR) continue; const t = L.siteTarget(s); if (t) out.push(t); }
+    for (const s of W0.sites.values()) { if ((!s.known && s !== L.callSite) || s.st === 'frei' || Math.hypot(s.x - p[0], s.z - p[2]) > I.WALK_FAR) continue; const t = L.siteTarget(s); if (t) out.push(t); }   // (the called one before it is known)
     return out;
   });
   // ---- a-session end

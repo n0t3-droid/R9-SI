@@ -181,7 +181,7 @@ const run = (sec, each) => { const n = Math.round(sec * 30); for (let i = 0; i <
   }
   check(ok === Object.keys(acts).length, `every act of the life director maps to its kind, weight and place; the flyover and the convoy are the traffic's (${ok}/${Object.keys(acts).length}${bad.length ? ' — ' + bad.join(' ') : ''})`);
   check(Object.keys(L.ACTS).length >= 17 && L.ACTS.flyover === null, 'the act table covers all seventeen acts');
-  const F = (id) => L.found(id);
+  const F = (id) => { const r0 = L.RIDE; L.RIDE = 0; const r = L.found(id); L.RIDE = r0; return r; };   // (a-session: each alone — L.RIDE off; a_session.js checks the ride)
   const wn = F('w:spire'), bi = F('b:birch_forest'), cr = F('c:deer'), ms = F('m:log'), iv = F('i:lamp');
   check(wn.kind === 'discovery' && wn.w === 4 && bi.kind === 'discovery' && bi.w === 2 && cr.kind === 'discovery' && cr.w === 2 && ms.kind === 'milestone' && ms.w === 2 && iv.kind === 'milestone' && iv.w === 2 && wn.sub === 'spire' && bi.inView, 'the codex: a wonder (4), a biome and a creature (discovery 2), a milestone and an invention (milestone 2), on the screen');
   // a craft's nearest pass: once per flight, at its nearest point
