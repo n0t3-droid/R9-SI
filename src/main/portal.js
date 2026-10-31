@@ -312,7 +312,7 @@
         reveal(J);
       }
     } else if (J.phase === 'reveal') {
-      J.rt += dt;
+      J.rt += Math.min(1, wall);   // (e-portal2: the wall clock here too — under load a frame took seconds and the reveal crawled)
       const k = clamp(J.rt / 1.3, 0, 1); J.cv.style.opacity = String(1 - ease(k));
       if (J.rt > 1.3) J.cv.style.display = 'none';
       if (J.rt >= Portal.REVEAL) { end(J); return; }
@@ -489,5 +489,5 @@
   }
   // the idle cost (the test): n frames of the gates' and fast flight's look, ms per frame
   Portal.idleCost = (g, n) => { const t0 = now(); for (let i = 0; i < n; i++) { gateTick(g, 0.016); flyTick(g, 0.016); } return (now() - t0) / n; };
-  Portal.stats = () => ({ pick: !!M.pick, cards: M.pick ? M.pick.cards.length : 0, film: M.J ? { id: M.J.film.id, t: +M.J.t.toFixed(2), len: M.J.film.len, phase: M.J.phase, went: M.J.went, arrived: M.J.arrived, shot: M.J.P.shotAt(M.J.t), low: M.J.film.low, gl: !!M.J.P.gl, skip: !!M.J.skipped, w: M.J.cv.width, h: M.J.cv.height } : null, drawMs: +M.drawMs.toFixed(2), maxMs: +M.maxMs.toFixed(2), draws: M.draws, last: Portal.last || null, fly: Portal.fly() });
+  Portal.stats = () => ({ pick: !!M.pick, cards: M.pick ? M.pick.cards.length : 0, film: M.J ? { id: M.J.film.id, t: +M.J.t.toFixed(2), len: M.J.film.len, phase: M.J.phase, went: M.J.went, arrived: M.J.arrived, shot: M.J.P.shotAt(M.J.t), low: M.J.film.low, gl: !!M.J.P.gl, skip: !!M.J.skipped, rt: +M.J.rt.toFixed(2), w: M.J.cv.width, h: M.J.cv.height } : null, drawMs: +M.drawMs.toFixed(2), maxMs: +M.maxMs.toFixed(2), draws: M.draws, last: Portal.last || null, fly: Portal.fly() });
 })(VR);

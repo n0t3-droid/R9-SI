@@ -110,17 +110,17 @@ save();
 
 if (!BEFORE) {
   // -------------------------------------------------------------- a real trip Herzwelt → Opal, skipped at 3 s
-  await ev(() => { const g = VR.game; if (g.ui.screen) g.ui.resume(); });
+  await ev(() => { const g = VR.game; if (g.ui.screen) g.ui.resume(); g.zenFreezeTime = false; });   // (the best hour needs a running clock: run 4 had it frozen)
   const t0 = Date.now();
   await ev(() => VR.Portal.go(VR.game, { dim: 'opal', id: 'w:opal' }));
   let skipT = null, landT = null, endT = null, capShot = null;
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 1200; i++) {
     await wait(250);
     const s = await ev(() => ({ f: VR.Portal.stats().film, dim: VR.game.dim, state: VR.game.state, busy: VR.Travel.busy(VR.game) }));
     const el = (Date.now() - t0) / 1000;
     if (!skipT && s.f && el >= 3) { await page.keyboard.press('Space'); skipT = el; }   // (3 s of the wall clock: a press before the film's 2 s is kept)
     if (!landT && s.f && s.f.arrived) landT = el;
-    if (s.f && s.f.phase === 'reveal' && !capShot) { await wait(1500); capShot = await shot('p2_reveal_after.png'); }
+    if (s.f && s.f.phase === 'reveal' && !capShot) { for (let j = 0; j < 40; j++) { await wait(500); const rt = await ev(() => VR.Portal.stats().film && VR.Portal.stats().film.rt); if (!(rt < 1.6)) break; } capShot = await shot('p2_reveal_after.png'); }   // (the canvas faded: the world itself)
     if (!s.f && s.dim === 'opal' && s.state === 'play') { endT = el; break; }
     if (i % 40 === 0) console.log('    ' + el.toFixed(0) + ' s ' + JSON.stringify({ f: s.f && { t: s.f.t, ph: s.f.phase, arr: s.f.arrived, sk: s.f.skip }, dim: s.dim, busy: s.busy }));
   }
