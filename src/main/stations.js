@@ -440,6 +440,15 @@
 
   // u-stations2: the hand-off — the minimap's whole re-do passes while the station streams in spread over frames
   if (VR.MapView) VR.MapView.budgetIf = (g) => STN.inStation(g);
+  // … and the station's arrived columns integrated within STN.INTEGRATE_MS a frame (at least one: World.integrate's own
+  // rule) — out of the takt a whole batch came in one frame (run 3: world.update 35 ms while the station streamed in)
+  STN.INTEGRATE_MS = 5;
+  STN.wrapIntegrate = function (WP) {
+    if (!WP || !WP.integrate || WP.__stn2) return; WP.__stn2 = true;
+    const in0 = WP.integrate;
+    WP.integrate = function (pcx, pcz, lcx, lcz, budgetMs) { if (budgetMs === undefined && STN.isDim(this.dim)) budgetMs = STN.INTEGRATE_MS; return in0.call(this, pcx, pcz, lcx, lcz, budgetMs); };
+  };
+  if (VR.World) STN.wrapIntegrate(VR.World.prototype);
   // u-stations2: the station generator's version in the save (Bodies.stamp / bgenOf wrapped: genOpts.bgen.stn)
   { const BD = VR.Bodies; if (BD && BD.stamp && !BD.__stn2) { BD.__stn2 = true; const s0 = BD.stamp, b0 = BD.bgenOf; BD.stamp = function (meta) { const m = s0.apply(this, arguments); STN.stampS(meta); return m; }; BD.bgenOf = function (meta) { const o = b0.apply(this, arguments); if (o) o.stn = STN.sgenOf(meta); return o; }; } }
   // ---------------------------------------------------------------- the meshes (the grids: the pure part above → the worker's shipmesh job)
