@@ -248,11 +248,12 @@
     'thea', 'sel', 'dra', 'la', 'mel', 'vane', 'rys', 'tis', 'lon', 'l', 's'];
   // a star is never called like a villager of any people, nor shaped like a native place (a people's head + place
   // ending: Ma·thal, Ta·mesa) — test/name_clash.js
-  let GIVEN = null;
+  let GIVEN = null, PLACE_RE = null;
   const peopleLike = (w) => {
     if (!GIVEN) { GIVEN = new Set(); for (const k in N.PEOPLES) { const P = N.pool(k); for (const x of P.first.concat(P.kids, P.elders)) GIVEN.add(x.toLowerCase()); } }
     const l = w.toLowerCase(); if (GIVEN.has(l)) return true;
-    for (const k in N.PEOPLES) { const P = N.PEOPLES[k]; if (!P.A) continue; for (const a of P.A) if (l.indexOf(a.toLowerCase()) === 0) for (const t of P.L) if (l.length > a.length + 1 && l.slice(-t.length) === t) return true; }
+    if (!PLACE_RE) PLACE_RE = Object.keys(N.PEOPLES).filter(k => N.PEOPLES[k].A).map(k => new RegExp('^(?:' + N.PEOPLES[k].A.map(a => a.toLowerCase()).join('|') + ').*(?:' + N.PEOPLES[k].L.join('|') + ')$'));
+    for (const re of PLACE_RE) if (re.test(l)) return true;
     return false;
   };
   N.peopleLike = peopleLike;

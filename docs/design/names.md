@@ -43,6 +43,22 @@ kurz und singend (Fips, Nawi, Fiki), Ältere lang und würdig (Adelheid, Oritham
 heißen in deren Sprache: *Vesela* (Wellari), *Rubotob* (Dunelin), *Orliskesh* (Glimari), *Dogolmund* (Regoli),
 *Lyraskel* (Isveli).
 
+**Die Flausel** (das kleine Waldvolk der Märchenorte) heißen jetzt alle: wie die leisen Geräusche des Waldes
+(*Huschel, Tröpfel, Summsel, Zwinkel*), Kinder auf -i (*Hupfi, Tauli*), die Alten nach ihren Bärten und Wurzeln
+(*Murmelbart, Flechtenbart*), die Familien nach Moos, Tau und Beeren (*Moostupf, Tauperle, Pilzhut*) — 900 volle
+Namen. Statt „Ein Flausel" stehen zwei eigene Namen an jedem Schlummerbaum. Weggelassen, weil Kinderbuchfiguren:
+Fussel, Zippel (das Schlossgespenst), Purzel, Wispel (Mörike).
+
+**Die Orte des Herzlands im Wanderbuch.** Wo nur ein Wort stand, steht jetzt ein Name: die Kuppelhügel-Dörfer
+**Mohnbühl** und **Lerchenbühl**, die vier Höfe **Sonnenhof, Kleehof, Lindenhof, Mohnhof**, die Schlucht **Hallklamm**
+(„Whisper Gorge" war zu nah an Spielorten), der Hain **Morgenhain**. Die Wahrzeichen heißen im Wanderbuch wie in den
+Aufträgen (Turmzitadelle / Spire Citadel, Kuppelhügel / Dome Hills). Wanderer tragen Vor- und Familiennamen ihres Volkes.
+
+**Der Kodex hat eine Seite „Völker"**: jedes der sieben Völker mit seinem Klang und ein paar Namen.
+
+**Wesen (Englisch).** „Void Stalker" → **Void Slinker** (ein Spieltitel, ein D&D-Monster), „Shell Strider" → **Shell
+Wader** (≈ Horizon Zero Dawn). Die deutschen Namen bleiben (Leerenschleicher, Muschelschreiter).
+
 **Kleinigkeiten.** Ein Glimmerfuchs hieß „Funke" oder „Lumi" — jetzt **Flämmchen** und **Leuchti** (die Namen gehören
 den Figuren der Geschichte).
 
@@ -73,6 +89,10 @@ den Figuren der Geschichte).
   German children's classics: Pumuckl, Pippi, Ronja, Momo, Jim Knopf …), rude or cruel words in German and English as
   substrings, and galaxy.js's block list. `VR.Names.reserved(w)`: the story's speakers, the sky's bodies, the peoples,
   the outposts, the nebulae — no villager, pet or star is called like them.
+- **Flausel, sites, codex** — `PEOPLES.flausel` (hand lists), `VR.Names.flausel(seed, i)` for a tree village's folk
+  (fairy.js `whoName`), `VR.Names.SITES` + lang keys `g.wd.site.<id>` (wander.js names a site by id, the kind's word as
+  the fallback; `W.placeName` re-reads a stored site in the language of the moment), `VR.Names.PEOPLE_ORDER` /
+  `sample()` for the codex's `peoples` category (`g.codex.p.<kind>`). `test/name_clash.js` proves no collision.
 - **Cost** — no per-frame work. Pools and village names: < 0.1 ms once. Star names: +16 ms once per neighbourhood
   (Galaxy.build is cached per seed; 34 → 50 ms in node) — on every preset, Very Low included, once.
 
@@ -106,7 +126,6 @@ Moritz, Hedwig, Hermine, Momo, Ronja, Pumuckl …).
 
 ## 4 · Next (not done here)
 
-- A codex page „Völker" in the game (today the names live in the talk card, the bubbles and the toasts).
 - Sweep the old words out of the lang source lines once the parallel fronts have merged (the display is already right).
 - Echo (the oldest beacon's voice) is also a common word and a hero's name in a shooter: kept — the story loves it;
   watch it if the owner wants a name of our own.

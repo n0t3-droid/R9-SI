@@ -63,7 +63,7 @@ const pics = {};
 // a village's people near the camera say hello: the bubbles carry their names (the game's own name tags)
 async function village(vid, tag) {
   let V = null;
-  for (let i = 0; i < 40; i++) { await step(20, 33); V = await ev((vid) => { const S = VR.game.villages.sites; const s = vid ? S.find(s => s.id === vid) : S.slice().sort((a, b) => Math.hypot(a.x - VR.game.player.pos[0], a.z - VR.game.player.pos[2]) - Math.hypot(b.x - VR.game.player.pos[0], b.z - VR.game.player.pos[2]))[0]; return s ? { id: s.id, x: s.x, y: s.y, z: s.z, name: s.name } : null; }, vid); if (V) break; await wait(200); }
+  for (let i = 0; i < 40; i++) { await step(20, 33); V = await ev((vid) => { const S = VR.game.villages.sites; const s = vid ? S.find(s => s.id === vid) : S.filter(s => !/Nova Haven|Weißstadt/.test(s.name || '')).sort((a, b) => Math.hypot(a.x - VR.game.player.pos[0], a.z - VR.game.player.pos[2]) - Math.hypot(b.x - VR.game.player.pos[0], b.z - VR.game.player.pos[2]))[0]; return s ? { id: s.id, x: s.x, y: s.y, z: s.z, name: s.name } : null; }, vid); if (V) break; await wait(200); }
   if (!V) { check(false, tag + ': a village'); return null; }
   await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x - 8, V.y + 4, V.z + 8); }, V);
   for (let i = 0; i < 90; i++) { await step(10, 33); const ok = await ev((V) => { const w = VR.game.world; for (const dx of [-24, 0, 24]) for (const dz of [-24, 0, 24]) if (!w.isLoaded(V.x + dx, V.z + dz)) return false; return true; }, V); if (ok) break; await wait(300); }
@@ -96,14 +96,6 @@ console.log('  talk: ' + JSON.stringify(card));
 for (let i = 0; i < 3; i++) await step(2, 33);
 pics.talk = await shotDom('names_herz_talk.png');
 await ev(() => { VR.game.villages.closeTalk(); });
-// the star map
-await ev(() => { VR.game.ui.show && VR.game.ui.show(null); VR.StarMap.open(VR.game); });
-for (let i = 0; i < 4; i++) await step(2, 33);
-const stars = await ev(() => VR.Starjump ? VR.Starjump.hood(VR.game).list.slice(1, 9).map(s => s.name) : (VR.StarJump ? VR.StarJump.hood(VR.game).list.slice(1, 9).map(s => s.name) : []));
-console.log('  stars: ' + stars.join(', '));
-pics.stars = await shotDom('names_starmap.png');
-await ev(() => VR.StarMap.close(VR.game));
-for (let i = 0; i < 3; i++) await step(2, 33);
 // Zinnober's Glimari
 const ok = await trip((d) => VR.Travel.go(VR.game, { dim: d, via: 'cmd' }), 'zinn').catch(() => false);
 check(ok, 'the jump to Zinnober');
@@ -123,12 +115,26 @@ const wb = await ev(() => (document.querySelector('#wanderbuch .wdl') || {}).tex
 console.log('  wanderbuch: ' + wb);
 check(/Mohnbühl/.test(wb) && /Hallklamm/.test(wb) && /Sonnenhof/.test(wb) && !/Hügeldorf|Bauernhof/.test(wb), 'the Wanderbuch reads the sites\' new names');
 pics.book = await shotDom('names_wanderbuch.png');
+// the star map (last: its first draw of ~1500 stars is the slowest step on SwiftShader; a bounded wait)
+const race = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r('timeout'), ms))]);
+let stars = [];
+const smOk = await race((async () => {
+  await ev(() => { VR.game.ui.show && VR.game.ui.show(null); VR.StarMap.open(VR.game); });
+  for (let i = 0; i < 4; i++) await step(2, 33);
+  stars = await ev(() => VR.Starjump ? VR.Starjump.hood(VR.game).list.slice(1, 9).map(s => s.name) : (VR.StarJump ? VR.StarJump.hood(VR.game).list.slice(1, 9).map(s => s.name) : []));
+  console.log('  stars: ' + stars.join(', '));
+  pics.stars = await shotDom('names_starmap.png');
+  await ev(() => VR.StarMap.close(VR.game));
+  for (let i = 0; i < 3; i++) await step(2, 33);
+  return 'ok';
+})(), 240000).catch(e => 'error ' + e.message);
+check(smOk === 'ok' && stars.length >= 6, 'the star map with its names (' + smOk + ')');
 const spec = { w: 620, rows: [{ label: 'Herzwelt: ein Dorf mit deutschem Namen, die Leute tragen ihre Namen · die Karte einer Älteren', imgs: [pics.herz, pics.talk].filter(Boolean) }, { label: 'Zinnober: ein Glimari-Dorf · die Sternkarte mit den neuen Sternnamen', imgs: [pics.zinn, pics.stars].filter(Boolean) }, { label: 'Der Kodex: die Seite „Völker" · das Wanderbuch mit den Orten des Herzlands', imgs: [pics.codex, pics.book].filter(Boolean) }].filter(r => r.imgs.length) };
 fs.writeFileSync(ROOT + '/.tmp_tests/names_sheet.json', JSON.stringify(spec));
 try { console.log(execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'names_sheet.jpg', ROOT + '/.tmp_tests/names_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); }
 const errs = logs.filter(l => /pageerror/.test(l));
 for (const l of logs.slice(0, 12)) console.log(l);
 check(!errs.length, 'no page errors');
-await browser.close();
+await race(browser.close(), 15000);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
