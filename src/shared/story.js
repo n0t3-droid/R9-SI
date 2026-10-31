@@ -29,13 +29,13 @@
   S.REMIND = 300;       // s between two reminders after „Später"
   S.REMINDS = 3;        // reminders at most, then the beat waits silently in the journal
   S.CARD = 25;          // s the offer's card stays (untaken: Später)
-  S.WHO = ['funke', 'ilka', 'oskar', 'selma', 'jonte', 'lumi', 'solgani', 'ariveli', 'selkatun', 'anselm'];   // (a-story3: the Glutani, the Wellari, the Regoli, Lumi's grandfather)
+  S.WHO = ['funke', 'ilka', 'oskar', 'selma', 'jonte', 'lumi', 'solgani', 'ariveli', 'selkatun', 'anselm', 'dumarin', 'ylosenis', 'flimmi', 'echo'];   // (a-story4: the Dunelin, the Nivari, the star being born, the network's old voice)   // (a-story3: the Glutani, the Wellari, the Regoli, Lumi's grandfather)
   S.MOODS = ['neutral', 'happy', 'surprised', 'worried'];   // a-story2: the portraits' faces (story_art.js)
   S.NOT = ['building', 'fight', 'menu', 'studio', 'landing', 'scene', 'guest'];
 
   // ---------------------------------------------------------------- the twelve chapters (words: story.c<n>.*)
   S.CHAPTERS = [];
-  for (let n = 1; n <= 12; n++) S.CHAPTERS.push({ n, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: n <= 8 });   // (a-story3: 5–8 written)
+  for (let n = 1; n <= 12; n++) S.CHAPTERS.push({ n, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: true });   // (a-story3: 5–8 written; a-story4: 9–12)
 
   // ---------------------------------------------------------------- the beats of chapters 1–4
   const L = (ch, n, who) => who.map((w, i) => { const q = w.split(':'); return { who: q[0], key: 'story.c' + ch + '.b' + n + '.' + (i + 1), mood: q[1] || 'neutral' }; });   // a-story2: 'who:mood' (the portrait's face)
@@ -125,11 +125,53 @@
       alt: { wellari: ['funke', 'ariveli:happy', 'funke:surprised', 'selkatun:surprised'], lumi: ['lumi', 'lumi:happy', 'funke:surprised', 'selkatun:surprised'] }, task: { kind: 'wait', target: 'sunset' }, reward: { xp: 180 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 3 } }),
     B(8, 3, { when: { after: 'c8.b2', adv: true, dim: ['x.*'], suns: 2 },
       scene: { shots: [{ cam: 'up', target: 'sky', dur: 7, fx: 'beam', swell: true }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 6, fx: 'beam' }], music: 'tense' },
-      who: ['selkatun:worried', 'funke:worried', 'funke:happy'], task: { kind: 'next', target: 'c9' }, reward: { xp: 200 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 20 } }),
+      who: ['selkatun:worried', 'funke:worried', 'funke:happy'], task: { kind: 'nebula', target: 'c9' }, reward: { xp: 200 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 20 } }),
+    // ================================================================ a-story4 · chapters 9–12 (plan 2026-10-31-a-story4.md)
+    // 9 · Im Nebel — inside the nebula it is not dark: a star is being born, and it has always answered
+    BV(9, 1, { when: { after: 'c8.b3', adv: true, dim: ['x.*'], neb: true }, vary: 'c6',
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'nebin' }, { cam: 'up', target: 'sky', dur: 7, fx: 'nebin', swell: true }, { cam: 'close', target: 'funke', dur: 6, fx: 'nebin' }], music: 'wide' },
+      alt: { wellari: ['funke:surprised', 'ariveli:happy', 'funke:worried'], lumi: ['funke:surprised', 'lumi:surprised', 'funke:worried'] }, task: { kind: 'listen', target: 'sky' }, reward: { xp: 150 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 15 } }),
+    B(9, 2, { when: { after: 'c9.b1', adv: true, dim: ['x.*'], neb: true },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 8, fx: 'flimmi' }, { cam: 'up', target: 'sky', dur: 9, fx: 'flimmi', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'hum' }], music: 'warm' },
+      who: ['flimmi:surprised', 'funke:surprised', 'flimmi:happy', 'flimmi:worried', 'funke:happy'], task: { kind: 'listen', target: 'sky' }, reward: { xp: 220 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 25 } }),
+    B(9, 3, { when: { after: 'c9.b2', adv: true, dim: ['x.*'], neb: true },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 6, fx: 'nebin' }, { cam: 'close', target: 'funke', dur: 6, fx: 'flimmi' }, { cam: 'up', target: 'sky', dur: 7, fx: 'beam', swell: true }], music: 'rise' },
+      who: ['flimmi', 'funke:worried', 'flimmi:happy', 'funke:happy'], task: { kind: 'redsun', target: 'c10' }, reward: { xp: 180 }, act: { kind: 'look', target: 'vista', dim: ['x.*'], max: 600, cone: 22, hold: 1.5 } }),
+    // 10 · Die geduldige Sonne — a red dwarf, older than all; two peoples and a sleeping beacon; the beam points home
+    B(10, 1, { when: { after: 'c9.b3', adv: true, dim: ['x.*'], red: true },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'redsun' }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'village', dur: 8, fx: 'redsun', swell: true }], music: 'wide' },
+      who: ['funke:surprised', 'dumarin:happy', 'dumarin'], task: { kind: 'go', target: 'village' }, reward: { xp: 150 }, act: { kind: 'look', target: 'village', dim: ['x.*'], max: 400, cone: 18, hold: 1.5 } }),
+    B(10, 2, { when: { after: 'c10.b1', adv: true, dim: ['x.*'], red: true },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'hum' }, { cam: 'orbit', target: 'player', dur: 7, fx: 'song', swell: true }, { cam: 'wide', target: 'vista', dur: 6, fx: 'redsun' }], music: 'warm' },
+      who: ['ylosenis:happy', 'ylosenis', 'funke:surprised', 'dumarin:happy'], task: { kind: 'listen', target: 'village' }, reward: { xp: 180 }, act: { kind: 'scan', target: 'village', dim: ['x.*'], max: 250, cone: 22 } }),
+    B(10, 3, { when: { after: 'c10.b2', adv: true, dim: ['x.*'], red: true },
+      scene: { shots: [{ cam: 'up', target: 'sky', dur: 7, fx: 'beam', swell: true }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 7, fx: 'beam' }], music: 'tense' },
+      who: ['funke:happy', 'dumarin:worried', 'ylosenis:worried', 'funke:worried'], task: { kind: 'station', target: 'station' }, reward: { xp: 220 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 10 } }),
+    // 11 · Echo — five peoples in the Ringstation's heart; the answer Echo can see, given your own way
+    B(11, 1, { when: { after: 'c10.b3', adv: true, dim: ['stn.*'] },
+      scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'wide', target: 'player', dur: 9, fx: 'echo', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'echo' }], music: 'wide' },
+      who: ['anselm:happy', 'solgani:happy', 'dumarin:happy', 'ylosenis:happy', 'funke:worried'], task: { kind: 'listen', target: 'station' }, reward: { xp: 200 }, act: { kind: 'look', target: 'window', dim: ['stn.*'], cone: 25, hold: 1.5 } }),
+    BV(11, 2, { when: { after: 'c11.b1', adv: true, dim: ['stn.*'] }, vary: 'c6', choice: 'how',
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'echo' }, { cam: 'wide', target: 'player', dur: 7, fx: 'echo', swell: true }, { cam: 'shoulder', target: 'player', dur: 6 }], music: 'tense' },
+      alt: { wellari: ['anselm', 'funke', 'selkatun', 'ariveli:happy'], lumi: ['anselm', 'funke', 'selkatun', 'lumi:happy'] }, task: { kind: 'feat', target: 'echo' }, reward: { xp: 200 }, act: { kind: 'feat' } }),
+    BV(11, 3, { when: { after: 'c11.b2', adv: true, deed: 'c11.b2', dim: ['overworld', 'aqua', 'zinn', 'ocker', 'basalt', 'opal', 'stn.*', 'x.*'] }, vary: 'how',
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'wake' }, { cam: 'wide', target: 'player', dur: 8, fx: 'wake', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'hum' }], music: 'rise' },
+      alt: { build: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], fly: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], free: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], calm: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'] }, task: { kind: 'home', target: 'home' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 15 } }),
+    // 12 · Heimkehr — everyone on the square; at night every freed beacon lights at once; free play and a new signal
+    BV(12, 1, { when: { after: 'c11.b3', adv: true, dim: ['overworld'] }, vary: 'c6',
+      scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'orbit', target: 'player', dur: 7, fx: 'gather', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
+      alt: { wellari: ['ilka:happy', 'oskar:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'oskar:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'night', target: 'night' }, reward: { xp: 200 }, act: { kind: 'look', target: 'vista', max: 600, cone: 22, hold: 1.5 } }),
+    B(12, 2, { when: { after: 'c12.b1', adv: true, dim: ['overworld'], hours: ['dusk', 'night'] },
+      scene: { shots: [{ cam: 'up', target: 'sky', dur: 8, fx: 'finale', swell: true }, { cam: 'wide', target: 'player', dur: 9, fx: 'finale' }, { cam: 'close', target: 'funke', dur: 6, fx: 'finale', swell: true }], music: 'rise' },
+      who: ['echo:happy', 'funke:surprised', 'selma:surprised', 'flimmi:happy', 'funke:happy'], task: { kind: 'play', target: 'free' }, reward: { xp: 500 }, act: { kind: 'photo', target: 'sky', pitch: 20 } }),
+    B(12, 3, { when: { after: 'c12.b2', adv: true, dim: ['overworld'] },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 6, fx: 'gather' }, { cam: 'up', target: 'sky', dur: 8, fx: 'blink3', swell: true }], music: 'wide' },
+      who: ['jonte:happy', 'anselm:happy', 'funke:happy', 'funke:surprised'], task: { kind: 'play', target: 'free' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 30 } }),
   ];
   for (const b of S.BEATS) delete b.who;
   // a-story3 · the choices: one at the end of a beat (b.choice), made once, kept in the record (rec.choices)
-  S.CHOICES = { c6: { at: 'c6.b3', opts: ['wellari', 'lumi'] } };
+  S.CHOICES = { c6: { at: 'c6.b3', opts: ['wellari', 'lumi'] }, how: { at: null, opts: ['build', 'fly', 'free', 'calm'], deed: 'c11.b2' } };   // (a-story4: how — no card: the way you answered Echo, made by the deed itself)
+  S.WAYS = S.CHOICES.how.opts;
   S.byId = (id) => S.BEATS.find(b => b.id === id) || null;
   S.ofChapter = (ch) => S.BEATS.filter(b => b.ch === ch);
   S.sceneLen = (b) => b.scene.shots.reduce((s, q) => s + q.dur, 0);
@@ -143,7 +185,7 @@
   };
 
   // ---------------------------------------------------------------- the record (meta.story)
-  S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {}, choices: {} });   // (a-story3: choices — {id: option})   // (a-story2: acts — the deeds done, {id: 1})
+  S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {}, choices: {}, places: {} });   // (a-story4: places — the dims a beat was seen in: the epilogue's star book)   // (a-story3: choices — {id: option})   // (a-story2: acts — the deeds done, {id: 1})
   S.load = function (m) {
     const r = S.fresh();
     if (!m || typeof m !== 'object') return r;
@@ -156,6 +198,8 @@
     for (const id of Object.keys(ac)) if (S.byId(id) && ac[id] === 1) r.acts[id] = 1;
     const chs = m.choices && typeof m.choices === 'object' ? m.choices : {};
     for (const id of Object.keys(chs)) if (S.CHOICES[id] && S.CHOICES[id].opts.indexOf(chs[id]) >= 0) r.choices[id] = chs[id];
+    const pls = m.places && typeof m.places === 'object' ? m.places : {};
+    for (const d of Object.keys(pls)) if (pls[d] === 1 && S.placeOk(d)) r.places[d] = 1;
     return r;
   };
   S.isDone = (rec, id) => !!(rec && rec.beats && rec.beats[id]);
@@ -190,7 +234,10 @@
     if (w.orbit && !ctx.orbit) return 'orbit';
     if (w.eclipse && !((ctx.eclipse || 0) >= w.eclipse)) return 'eclipse';
     if (w.suns && !((ctx.suns || 1) >= w.suns)) return 'suns';
-    if (w.sun && ctx.sunUp === false) return 'sun';   // a-story3: a beat under a strange sun plays by day (unknown: no rule)
+    if (w.sun && ctx.sunUp === false) return 'sun';
+    if (w.neb && !ctx.neb) return 'neb';   // a-story4: a world of a system inside a nebula
+    if (w.red && !ctx.red) return 'red';   // a-story4: a world of a red dwarf
+    if (w.deed && !(rec && S.actDone(rec, w.deed))) return 'deed';   // a-story4: the deed of that beat done (the set piece)   // a-story3: a beat under a strange sun plays by day (unknown: no rule)
     return null;
   };
   // a-story3: a dim list may hold patterns — 'stn.*' (a station), 'x.*' (a world of another star)
@@ -203,7 +250,7 @@
     return null;
   };
   // ---- a-story3 · the choice (pure)
-  S.choicePending = function (rec) { for (const id of Object.keys(S.CHOICES)) { const c = S.CHOICES[id]; if (S.isDone(rec, c.at) && !(rec.choices && rec.choices[id])) return id; } return null; };
+  S.choicePending = function (rec) { for (const id of Object.keys(S.CHOICES)) { const c = S.CHOICES[id]; if (c.at && S.isDone(rec, c.at) && !(rec.choices && rec.choices[id])) return id; } return null; };
   S.choiceReady = (rec, ctx) => { const id = S.choicePending(rec); return id && !S.busy(ctx) ? id : null; };
   S.choose = function (rec, id, opt) {
     const c = S.CHOICES[id]; if (!c || c.opts.indexOf(opt) < 0 || !rec) return false;
@@ -246,7 +293,7 @@
   // reach), photo (a picture taken while it holds). Never needed for the next beat — the journal records them (☐ / ✓).
   // a: {ang (° from the view to the target), dist (m), pitch (° up), high (m over the sea), orbit, dim, eclipse, ground
   // (on the ground), press ([V] now), photo (a picture now)} → 'ok' | 'armed' (waits for V / the picture) | the reason.
-  S.ACT_KINDS = ['look', 'scan', 'touch', 'photo'];
+  S.ACT_KINDS = ['look', 'scan', 'touch', 'photo', 'feat'];
   S.actCheck = function (act, a) {
     if (!act) return 'none';
     a = a || {};
@@ -260,6 +307,7 @@
     if (act.pitch !== undefined && !(a.pitch >= act.pitch)) return 'pitch';
     if (act.below !== undefined && !(a.pitch <= act.below)) return 'pitch';
     if (act.level !== undefined && !(Math.abs(a.pitch) <= act.level)) return 'pitch';
+    if (act.kind === 'feat') return S.WAYS.indexOf(a.feat) >= 0 ? 'ok' : 'armed';   // a-story4: one of the four ways seen
     if (act.kind === 'look') return 'ok';
     if (act.kind === 'photo') return a.photo ? 'ok' : 'armed';
     return a.press ? 'ok' : 'armed';
@@ -275,6 +323,28 @@
   S.markAct = function (rec, id) { if (!S.byId(id)) return false; (rec.acts || (rec.acts = {}))[id] = 1; return true; };
   // the deed open now: the last seen beat's, while not done (an older one missed stays ☐ in the journal)
   S.openAct = function (rec) { for (let i = S.BEATS.length - 1; i >= 0; i--) { const b = S.BEATS[i]; if (!S.isDone(rec, b.id)) continue; return b.act && !S.actDone(rec, b.id) ? b : null; } return null; };
+
+  // ---------------------------------------------------------------- a-story4 · the set piece and the epilogue (pure)
+  // The answer Echo can see, your own way: b0 the watch's start, n now — {placed (blocks placed, a count), span (m: the
+  // height of the blocks placed since b0), freed (beacons), calms (machines calmed), high (m over the sea), orbit}
+  S.BUILD_N = 24; S.BUILD_SPAN = 5; S.FLY_UP = 150;
+  S.featWay = function (b0, n) {
+    if (!b0 || !n) return null;
+    if ((n.placed - b0.placed) >= S.BUILD_N && (n.span || 0) >= S.BUILD_SPAN) return 'build';
+    if ((n.freed || 0) > (b0.freed || 0)) return 'free';
+    if ((n.calms || 0) > (b0.calms || 0)) return 'calm';
+    if ((n.orbit && !b0.orbit) || (n.high || 0) - (b0.high || 0) >= S.FLY_UP) return 'fly';
+    return null;
+  };
+  // the answer given: the way kept (once) and the deed of c11.b2 marked
+  S.answer = function (rec, way) {
+    const c = S.CHOICES.how; if (!rec || S.WAYS.indexOf(way) < 0) return false;
+    rec.choices = rec.choices || {}; if (rec.choices.how) return false;
+    rec.choices.how = way; S.markAct(rec, c.deed); return true;
+  };
+  S.placeOk = (d) => /^(overworld|aqua|zinn|ocker|basalt|opal|stn\.[a-z0-9_]+|x\.\d+\.\d+\.[a-z]+)$/.test(String(d));
+  S.visit = function (rec, dim) { if (!rec || !S.placeOk(dim)) return false; rec.places = rec.places || {}; if (rec.places[dim]) return false; rec.places[dim] = 1; return true; };
+  S.free = (rec) => S.isDone(rec, 'c12.b3');   // the epilogue: the book read, free play with the star book
 
   if (typeof module !== 'undefined' && module.exports) module.exports = S;
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

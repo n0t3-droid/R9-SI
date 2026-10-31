@@ -42,7 +42,7 @@ check(!missDe.length, keys.length + ' keys in the German table' + (missDe.length
 check(!missEn.length, 'and in the English one' + (missEn.length ? ': missing ' + missEn.slice(0, 6).join(', ') : ''));
 const same = keys.filter(k => /\.b\d\.\d$/.test(k) && tr('de', k) === tr('en', k));
 check(!same.length, 'every German line is German (not the English) ' + (same.length ? same.join(', ') : ''));
-check(keys.every(k => !/\bEcho\b/.test(tr('de', k) || '') || /c11/.test(k)), 'Echo is named only in chapter 11');
+check(keys.every(k => !/\bEcho\b/.test(tr('de', k) || '') || /c1[012]|choice\.how|who\.echo/.test(k)), 'Echo is named only from chapter 10 on (a-story4)');
 
 console.log('2 · when');
 const calm = (o) => Object.assign({ calm: 30, place: 'hangar', hour: 'noon', played: 60, adv: true, dim: 'overworld', near: { outpost: 9999 }, freed: 0, high: 0, orbit: false, eclipse: 0 }, o || {});
@@ -244,10 +244,10 @@ else {
 }
 
 console.log('10 · the deeds between the beats');
-const KINDS = ['look', 'scan', 'touch', 'photo'];
-check(S.BEATS.every(b => b.act && KINDS.includes(b.act.kind) && b.act.target), 'every beat of chapters 1–4 has one deed (look · scan · touch · photo)');
+const KINDS = ['look', 'scan', 'touch', 'photo', 'feat'];
+check(S.BEATS.every(b => b.act && KINDS.includes(b.act.kind) && (b.act.target || b.act.kind === 'feat')), 'every beat of chapters 1–4 has one deed (look · scan · touch · photo)');
 const kindsUsed = new Set(S.BEATS.map(b => b.act.kind));
-check(kindsUsed.size === 4, 'all four kinds are used (' + [...kindsUsed].join(', ') + ')');
+check(kindsUsed.size === 5, 'all five kinds are used (' + [...kindsUsed].join(', ') + ')');
 const actKeys = S.BEATS.map(b => 'story.act.' + b.id).concat(['story.act.done', 'story.ctx.scan', 'story.ctx.touch', 'story.act.scanning']);
 check(actKeys.every(k => tr('de', k) && tr('en', k) && tr('de', k) !== tr('en', k)), 'every deed\'s words in both tables (German first)');
 check(S.byId('c4.b3').act.kind === 'photo' && S.byId('c2.b1').act.kind === 'touch' && S.byId('c1.b2').act.kind === 'scan', 'photograph the eclipse, touch the beacon, scan with Funke');
@@ -315,8 +315,8 @@ console.log('12 · the deeds and the faces in the player (a stand-in game)');
 // ---------------------------------------------------------------- a-story3 (plan docs/superpowers/plans/2026-10-31-a-story3.md)
 console.log('13 · a-story3: chapters 5–8 written in full');
 {
-  check(S.CHAPTERS.every(c => c.written === (c.n <= 8)), 'chapters 1–8 written, 9–12 loglines');
-  const nb = S.BEATS.filter(b => b.ch >= 5);
+  check(S.CHAPTERS.every(c => c.written), 'all twelve chapters written (a-story4)');
+  const nb = S.BEATS.filter(b => b.ch >= 5 && b.ch <= 8);
   check(nb.length === 12 && nb.every(b => S.sceneLen(b) <= 25 && S.sceneLen(b) >= 10), 'twelve new beats, every scene 10–25 s (' + nb.map(b => S.sceneLen(b)).join(' ') + ')');
   check(nb.every(b => b.when.adv === true), 'chapters 5–8 play in Abenteuer worlds');
   for (const w of ['solgani', 'ariveli', 'selkatun', 'anselm']) check(S.WHO.includes(w) && nb.some(b => S.linesOf(b, { choices: { c6: 'lumi' } }).concat(S.linesOf(b, { choices: { c6: 'wellari' } })).some(l => l.who === w)), 'a new speaker: ' + w);
@@ -359,7 +359,7 @@ console.log('13 · a-story3: chapters 5–8 written in full');
     const r = S.fresh(); for (const b of S.BEATS) if (b.ch <= 4) S.mark(r, b.id);
     let walked = 0, bldBad = 0, path = [];
     for (let i = 0; i < 40; i++) {
-      const b = S.open(r); if (!b) break;
+      const b = S.open(r); if (!b || b.ch > 8) break;
       const c = ctxFor(b);
       if (S.choicePending(r)) {
         check(S.why(b, c, r) === 'choice' && S.next(r, c, 0) === null, b.id + ' waits for the choice');
@@ -370,7 +370,7 @@ console.log('13 · a-story3: chapters 5–8 written in full');
       if (!S.ready(b, c, r)) { check(false, b.id + ' not reachable: ' + S.why(b, c, r)); break; }
       path.push(b.id); S.mark(r, b.id); walked++;
     }
-    check(walked === 12 && path[0] === 'c5.b1' && path[11] === 'c8.b3' && !bldBad && S.chapter(r) === 9, `${opt}: all twelve beats reached in order (${path.length}), none while building or fighting, chapter 9 next`);
+    check(walked >= 12 && path[0] === 'c5.b1' && path[11] === 'c8.b3' && !bldBad && S.chapter(r) === 9, `${opt}: all twelve beats reached in order (${path.length}), none while building or fighting, chapter 9 next`);
     const back = S.load(JSON.parse(JSON.stringify(r)));
     check(back.choices.c6 === opt && S.linesOf(S.byId('c8.b2'), back).every(l => l.key.indexOf('.' + opt + '.') > 0), 'the choice persists through a save (' + opt + ') and picks chapter 8\'s helper');
   }
@@ -391,7 +391,7 @@ console.log('13 · a-story3: chapters 5–8 written in full');
     const rec = S.fresh(), k = 12 + Math.floor(rnd() * 12); for (let j = 0; j < k; j++) S.mark(rec, S.BEATS[j].id);
     if (rnd() < 0.5) rec.choices.c6 = rnd() < 0.5 ? 'lumi' : 'wellari';
     const c = { calm: rnd() * 60, building: rnd() < 0.3, fighting: rnd() < 0.3, menu: rnd() < 0.1, landing: rnd() < 0.1, adv: true, dim: DM3[Math.floor(rnd() * 5)], near: { village: rnd() * 200, outpost: 999 }, suns: 1 + (rnd() < 0.5 ? 1 : 0) };
-    for (const b of S.BEATS) if (b.ch >= 5 && S.ready(b, c, rec)) { rd3++; if (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV) bad3++; }
+    for (const b of S.BEATS) if (b.ch >= 5 && b.ch <= 8 && S.ready(b, c, rec)) { rd3++; if (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV) bad3++; }
     if (S.choiceReady(rec, c) && (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV)) cbad++;
   }
   check(rd3 > 50 && !bad3 && !cbad, `3,000 contexts on 5–8: ${rd3} ready, ${bad3} beats and ${cbad} choice cards while busy`);
@@ -433,6 +433,8 @@ console.log('15 · a-story3: the player — the choice card, the variant lines, 
   g.ui.screen = 'journal';
   check(/Lumi/.test(SP.journalHTML()), 'the journal names the choice');
 }
+
+require(path.join(__dirname, '../test/story4_part.js'))(S, SP, tr, calm, check, rnd);
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
