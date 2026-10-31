@@ -72,10 +72,18 @@ async function run(dist, tag, profile) {
     const g = VR.game, ph = window.__ph = []; const t0 = performance.now();
     const lo = g.ui.loading.bind(g.ui); g.ui.loading = function (text, frac, counts) { if (!ph.length || ph[ph.length - 1][1] !== text) ph.push([Math.round(performance.now() - t0), text]); return lo(text, frac, counts); };
     window.__lt = 0; window.__ltn = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { window.__lt += e.duration; window.__ltn++; } }).observe({ type: 'longtask' }); } catch (e) { /* none */ }
-    g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*');
+    // the worker jobs by kind while the world loads: asked (submit), answered, the worker's own time (m.ms) and the wall
+    const J = window.__jobs = {}, P = g.pool, jk = (t) => J[t] || (J[t] = { sub: 0, n: 0, ms: 0, wall: 0 });
+    const sub = P.submit.bind(P); P.submit = function (msg, tr, cb, prio) { if (msg && msg.type) jk(msg.type).sub++; return sub(msg, tr, cb, prio); };
+    const om = P.onMsg.bind(P); P.onMsg = function (w, m) { if (m && m.type !== 'waiting' && m.type !== 'log') { const st = P.started.get(m.id), j = jk(m.type); j.n++; if (m.ms !== undefined) j.ms += m.ms; if (st) j.wall += performance.now() - st.t0; } return om(w, m); };
+    for (const w of P.workers) w.onmessage = (e) => P.onMsg(w, e.data);
+    window.__poolN = P.workers.length;
   });
   if (cdp) await cdp.send('Profiler.start');
+  // (critic_vl.mjs's measure: from the preset's switch to 'play')
   const t0 = Date.now();
+  await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+  const presetS = (Date.now() - t0) / 1000;
   await ev((seed) => VR.game.createWorld({ name: 'Kritik VL', mode: 'creative', difficulty: 'peaceful', type: 'default', seed, cheats: true, kit: true }), SEED);
   for (let i = 0; i < 960; i++) { await wait(250); if (await ev(() => VR.game.state).catch(() => '') === 'play') break; }
   const loadS = (Date.now() - t0) / 1000;
@@ -83,21 +91,23 @@ async function run(dist, tag, profile) {
   if (cdp) prof.load = (await cdp.send('Profiler.stop')).profile;
   // the first 8 s of play: the longest frame gap
   const hitch = await ev(() => new Promise((res) => { let last = performance.now(), mx = 0, n = 0; const t0 = last; const f = (t) => { mx = Math.max(mx, t - last); last = t; n++; if (t - t0 < 8000) requestAnimationFrame(f); else res({ maxMs: Math.round(mx), frames: n }); }; requestAnimationFrame(f); }));
-  const info = await ev(() => ({ preset: VR.game.settings.preset, rd: VR.game.settings.renderDist, ph: window.__ph, longTaskMs: Math.round(window.__lt), longTasks: window.__ltn, heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 }));
-  await page.screenshot({ path: SHOTS + 'f_slim_' + tag + '.png' });
+  const info = await ev(() => ({ preset: VR.game.settings.preset, rd: VR.game.settings.renderDist, ph: window.__ph, longTaskMs: Math.round(window.__lt), longTasks: window.__ltn, jobs: Object.fromEntries(Object.entries(window.__jobs).map(([k, v]) => [k, { sub: v.sub, n: v.n, ms: Math.round(v.ms), wall: Math.round(v.wall) }])), poolN: window.__poolN, heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 }));
+  await page.screenshot({ path: SHOTS + 'f_slim_' + tag + '.png', timeout: 120000 }).catch((e) => logs.push('[shot] ' + e.message.slice(0, 80)));
   await ctx.close();
-  return { tag, ok, title, bootS: r1(bootS), loadS: r1(loadS), nav, hitch, info, logs, prof };
+  return { tag, ok, title, bootS: r1(bootS), loadS: r1(loadS), presetS: r1(presetS), nav, hitch, info, logs, prof };
 }
 
 const rec = { dist: DIST, base: DIST_BASE, rounds: ROUNDS, load: os.loadavg().map(r1), runs: [] };
 const save = () => fs.writeFileSync(ROOT + '.tmp_tests/f_slim.json', JSON.stringify(rec, null, 1));
-const pages = [['cur', DIST]].concat(DIST_BASE ? [['base', DIST_BASE]] : []);
+// DIST_BASE: one url, or tag=url,tag=url
+const pages = [['cur', DIST]].concat(DIST_BASE ? DIST_BASE.split(',').map((u, i) => /^\w+=/.test(u) ? [u.split('=')[0], u.slice(u.indexOf('=') + 1)] : ['base' + (i || ''), u]) : []);
 for (let r = 0; r < ROUNDS; r++) {
-  const order = r % 2 ? pages.slice().reverse() : pages;
+  const order = pages.map((_, i) => pages[(i + r) % pages.length]);
   for (const [tag, url] of order) {
     const x = await run(url, tag, false);
-    console.log(`${tag} r${r}: ${x.ok ? 'play' : 'NOT play'} boot ${x.bootS} s (dcl ${x.nav.dcl} ms, load ${x.nav.load} ms) · load ${x.loadS} s · hitch ${x.hitch.maxMs} ms · long tasks ${x.info.longTaskMs} ms/${x.info.longTasks} · heap ${x.info.heapMB} MB · loadavg ${os.loadavg()[0].toFixed(2)} (${secs()})`);
+    console.log(`${tag} r${r}: ${x.ok ? 'play' : 'NOT play'} boot ${x.bootS} s (dcl ${x.nav.dcl} ms, load ${x.nav.load} ms) · load ${x.loadS} s (preset ${x.presetS} s) · hitch ${x.hitch.maxMs} ms · long tasks ${x.info.longTaskMs} ms/${x.info.longTasks} · heap ${x.info.heapMB} MB · loadavg ${os.loadavg()[0].toFixed(2)} (${secs()})`);
     console.log('   phases ' + JSON.stringify(x.info.ph).slice(0, 400));
+    console.log(`   jobs (pool ${x.info.poolN}) ` + Object.entries(x.info.jobs).sort((a, b) => b[1].wall - a[1].wall).map(([k, v]) => `${k} ${v.n}/${v.sub} ms ${v.ms} wall ${v.wall}`).join(' · '));
     if (x.logs.length) console.log('   logs ' + x.logs.slice(0, 3).join(' | '));
     delete x.prof; rec.runs.push(x); save();
     check(x.ok && x.title && !x.logs.some(l => l.startsWith('[pageerror]')), `${tag} r${r}: boots, plays, no page error`);
