@@ -19,7 +19,7 @@
   // the species: German name, the treat that tames it (an existing item), names it can be given
   P.KINDS = {
     glimmer_fox: { name: 'Glimmerfuchs', treat: 'glow_berries', names: ['Flämmchen', 'Leuchti', 'Feuerle', 'Glimmi', 'Flitze', 'Sonnu', 'Lichtle', 'Fuchsi', 'Mondi', 'Schimmi'] },
-    moss_cat: { name: 'Mooskätzchen', treat: 'raw_cod', names: ['Moosi', 'Flocke', 'Samtpfote', 'Mümmel', 'Tatze', 'Wolli', 'Grünauge', 'Puschel', 'Fellchen', 'Tüpfel'] },
+    moss_cat: { name: 'Mooskätzchen', treat: 'raw_cod', names: ['Moosi', 'Flocke', 'Samtpfote', 'Mümmel', 'Tatze', 'Wolli', 'Grünauge', 'Puschel', 'Fellchen', 'Tupfen'] },
     crystal_pup: { name: 'Kristallwelpe', treat: 'bone', names: ['Kiesel', 'Splitter', 'Klinke', 'Bergi', 'Prisma', 'Glitzi', 'Fünkchen', 'Quarzi', 'Schnuffel', 'Eisi'] },
   };
   P.STATES = ['follow', 'sit', 'sleep'];

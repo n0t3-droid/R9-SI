@@ -59,7 +59,7 @@
     'sirius remus tonks pumba timon rafiki zazu scar kovu kiara sven kristoff hans tiana mowgli baloo bagheera kaa raya sisu ' +
     'mirabel bruno lotte lotti fiete pelle thea bendix wolfram hedwig moritz till linus wilma smilla hanni nanni krümel puck ' +
     'kalle pauli nuki kuddel wuschel knopf hummel pusteblume rosenheim rosenthal silbersee sternberg amarant amaranth glutani ' +
-    'nivari nivarian sylvari ussr seven eleven sesy kira light ryuk dune mars luna terra gaia sol eden zeus hera odin').split(' ');
+    'zippel purzel fussel wispel hörbe hoerbe nivari nivarian sylvari ussr seven eleven sesy kira light ryuk dune mars luna terra gaia sol eden zeus hera odin').split(' ');
   // inside any longer word: rude or cruel words in German and English, and a few names that must never show through
   const SUB = ['nazi', 'hitler', 'sex', 'fuck', 'shit', 'fick', 'hure', 'nutte', 'kack', 'scheis', 'piss', 'penis', 'porn', 'mord',
     'kill', 'satan', 'teufel', 'bitch', 'cock', 'dick', 'fotze', 'spast', 'ussr', 'isis', 'kkk', 'arsch', 'dumm', 'doof', 'blöd',
@@ -77,7 +77,8 @@
     'herzwelt heartworld turmalin tourmaline aquamarin aquamarine zinnober cinnabar opal basalt ocker ochre bernstein amber ' +
     'cölestin celestine wellari dunelin glimari regoli isveli weißstadt heliataler sternglut ringstation spaltmond glutsee ' +
     'rostschlucht nordwiese kupferhang sternwiese frühlicht silbergrat funkenfeld weitblick glimmerhöhe abendtau wolkenrast ' +
-    'lichtung steinbogen bernsteinkamm himmelsau westhain taufeld rosenschleier glutwiege türkisherz lichtwiege').split(' '));
+    'lichtung steinbogen bernsteinkamm himmelsau westhain taufeld rosenschleier glutwiege türkisherz lichtwiege ' +
+    'flausel tüpfel zwirbel dusel silbrin flöckchen borke mohnbühl lerchenbühl sonnenhof kleehof lindenhof mohnhof hallklamm morgenhain').split(' '));
   N.reserved = (w) => RES.has(String(w).toLowerCase());
   const ok = (w) => w.length >= 2 && !N.blocked(w) && !N.reserved(w) && !/(.)\1\1/.test(w) && !/[^aeiouyäöü]{3}/.test(w.toLowerCase().replace(/^(sch|ch|th|sh)/, ''));
 
@@ -152,7 +153,42 @@
       K: ['li', 'fi', 'pi', 'ni', 'ki', 'sy'], E: ['velvar', 'syren', 'sande', 'korvel', 'skil', 'vane', 'lisvin', 'frida'],
       F: ['vik', 'fjel', 'sen', 'dal', 'skar', 'kel', 'lind', 'vist'], L: ['frost', 'krist', 'ven', 'lys', 'mir', 'skel'],
     },
+    // the Flausel of the enchanted places (a-fairy): the small forest folk under the Slumber Tree. German first,
+    // tiny and whispery: given names are little sounds of the wood ending in -el (Huschel, Tröpfel, Summsel), children
+    // by a -i (Hupfi, Tauli), elders by the beards and roots of old trees (Murmelbart, Flechtenbart), families after
+    // the small things of the forest floor (Moostupf, Tauperle). Searched 2026-10-31: names of children's books'
+    // characters were left out (Fussel, Zippel, Purzel, Wispel — a figure of Mörike's, Hörbe, Wuschel, Mümmelmann)
+    flausel: {
+      de: 'Flausel', en: 'Flausel', sound: 'tiny and whispery: -el, -i, beards and roots — the forest floor',
+      first: ['Tummel', 'Huschel', 'Trippel', 'Wuppel', 'Bimmel', 'Tröpfel', 'Flitzel', 'Krispel', 'Nuppel', 'Kribbel',
+        'Zwinkel', 'Glimpel', 'Rupfel', 'Dimpel', 'Lupfel', 'Moosel', 'Knöpfel', 'Pimsel', 'Wimmel', 'Hupsel', 'Lirpel',
+        'Schwirrel', 'Summsel', 'Tapsel', 'Nimmel', 'Silpel', 'Brummsel', 'Pelzel', 'Sprenkel'],
+      kids: ['Flitz', 'Hupfi', 'Wipsi', 'Tropfi', 'Nuppi', 'Kiesel', 'Sprossi', 'Knospi', 'Tauli', 'Perli', 'Farni',
+        'Pilzi', 'Beerli', 'Halmi', 'Flaumi', 'Sämi'],
+      elders: ['Murmelbart', 'Flechtenbart', 'Rindenhold', 'Moosgrau', 'Wurzelweis', 'Farnwalt', 'Eichelgrau', 'Knorzel',
+        'Nebelbart', 'Silberflaum', 'Tannengrau', 'Harzwalt', 'Pilzhold', 'Zapfenweis', 'Mooswalt', 'Steinflaum'],
+      sur: ['Moostupf', 'Tauperle', 'Pilzhut', 'Kleestiel', 'Eichelhut', 'Distelflaum', 'Farnwedel', 'Beerenkorb',
+        'Wurzelzopf', 'Blütenstaub', 'Mooskissen', 'Nebeltropf', 'Glühwurm', 'Haselkern', 'Rindenmoos', 'Tannenzopf',
+        'Blattgrün', 'Fingerhut', 'Wiesenflaum', 'Butterblum'],
+    },
   };
+  // the order the codex shows the peoples in (codex.js „Völker"): where you meet them
+  N.PEOPLE_ORDER = ['herz', 'flausel', 'aqua', 'zinn', 'opal', 'basalt', 'ocker'];
+  // a Flausel's name for a folk sprite of a place (fairy.js): seeded by the place, the same every visit
+  N.flausel = function (seed, i) { const L = N.pool('flausel').first, a = Math.floor(h01(seed | 0, 0, 0x91) * L.length); return L[(a + (i | 0) * 7) % L.length]; };   // (two folk of one place never share one)
+  // a people's codex card: a few of its names (two grown-ups with their families, a child, an elder)
+  N.sample = function (kind, seed) {
+    const P = N.pool(kind); if (!P) return [];
+    const s = seed | 0, a = pick(P.first, s, 1, 0xa1), b = pick(P.first, s, 2, 0xa2), e = pick(P.elders, s, 3, 0xa3);
+    return [a + ' ' + pick(P.sur, s, 4, 0xa4), (b === a ? P.first[(P.first.indexOf(b) + 1) % P.first.length] : b) + ' ' + pick(P.sur, s, 5, 0xa5), pick(P.kids, s, 6, 0xa6), e];
+  };
+
+  // ---------------------------------------------------------------- the Heartland's sites (o-wander's Wanderbuch)
+  // the trailer's landmarks keep the names the quests use (Tor-Tempel, Turmzitadelle, Bergstation …); the places that
+  // had only a kind word (Hügeldorf, Bauernhof ×4, Schlucht, Hain) get proper names, one form in both languages, as
+  // real places keep theirs: lang keys g.wd.site.<id> (n-names), the kind's word as the fallback
+  N.SITES = { hills_w: 'Mohnbühl', hills_e: 'Lerchenbühl', farm_c: 'Sonnenhof', farm_w: 'Kleehof', farm_n: 'Lindenhof',
+    farm_e: 'Mohnhof', canyon: 'Hallklamm', east: 'Morgenhain' };
 
   // a name of a people's tongue: form = 'first' | 'kid' | 'elder' | 'sur' | 'place' (n ≥ 3: a town, one tail more)
   const TAIL = { first: 'B', kid: 'K', elder: 'E', sur: 'F', place: 'L' };
@@ -180,7 +216,7 @@
     return (POOLS[kind] = { first: gen('first', 48, s ^ 0x11), kids: gen('kid', 24, s ^ 0x22), elders: gen('elder', 24, s ^ 0x44), sur: gen('sur', 32, s ^ 0x33) });
   };
   N.place = function (kind, seed, n) {
-    if (kind === 'herz') return N.village(seed);
+    if (kind === 'herz' || kind === 'flausel') return N.village(seed);
     for (let k = 0; k < 24; k++) { const w = N.word(kind, (seed | 0) + k * 104729, 'place', n || 2); if (w.length >= 4 && ok(w)) return w; }
     return N.PEOPLES[kind] ? N.PEOPLES[kind].A[0] + N.PEOPLES[kind].L[0] : '';
   };

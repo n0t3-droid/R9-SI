@@ -187,6 +187,7 @@
   const tod = (g) => (g.env ? g.env.timeOfDay : 6000);
   const clear = (g) => { const e = g.env, w = e && e.wx; if (!e) return true; const k = w && (w.forced || w.kind); return (e.rain || 0) < 0.15 && k !== 'nebel' && k !== 'gewitter' && k !== 'regen'; };
   const nameKey = (who) => 'g.fairy.who.' + who;
+  const whoName = (f) => f.nm || whoName(f);   // n-names: the tree village's folk have their own Flausel names (VR.Names.flausel)
   const placeName = (kind) => T('g.fairy.place.' + kind);
   let saveT = 0;
   const save = (g) => { const now = Date.now(); if (now - saveT < 4000) return; saveT = now; try { if (g.saveMeta && g.meta && !g.meta.guest) g.saveMeta(); } catch (e) { /* the next save takes it */ } };
@@ -278,7 +279,7 @@
       for (let i = 0; i < 8; i++) { const [x, z] = off(s, 0.75 + i * 0.62, 7); add('fy_lamp', at(g, x, z, 0), 0, { lite: i % 4 === 0 }); }
       const [bx, bz] = off(s, 0.25, 5.4); sprite('borke', 'wise', 3, at(g, bx, bz, 0.1));
       const [tx, tz] = off(s, 1.6, 9.5); sprite('tuepfel', 'shy', 0, at(g, tx, tz, 0.1));
-      for (let i = 0; i < 2; i++) { const [x, z] = off(s, 2.6 + i * 1.7, 10); sprite('folk' + i, 'busy', (i + 2) % 5, at(g, x, z, 0.1)); }
+      for (let i = 0; i < 2; i++) { const [x, z] = off(s, 2.6 + i * 1.7, 10); sprite('folk' + i, 'busy', (i + 2) % 5, at(g, x, z, 0.1), VR.Names && VR.Names.flausel ? { nm: VR.Names.flausel(seed ^ Math.imul(Math.round(s.x), 73856093) ^ Math.imul(Math.round(s.z), 19349663), i) } : null); }
       s.lanterns = F.lanternSpots(seed, s).map(([x, z], i) => { for (let k = 0; k < 5; k++) { const u = 1 - k * 0.15, px = s.x + (x - s.x) * u, pz = s.z + (z - s.z) * u, y = ground(g, px, pz); if (y !== null && natural(g.world.getBlock(Math.floor(px), y - 1, Math.floor(pz))) && !wet(g, px, y, pz)) return { i, pos: [px, y + 0.1, pz] }; } return { i, pos: at(g, x, z, 0.1) }; });
     } else if (s.kind === 'circle') {
       for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 8); add('fy_stone', at(g, x, z, -0.3), faceIn(s, i * TAU / 9), { scale: 0.85 + h(seed, i, 5) * 0.4 }); }
@@ -549,7 +550,7 @@
     const s = S.near; if (!s || !s.parts) return null;
     const list = [], p = g.player.pos, rec = recOf(g), q = rec.q[s.id];
     const push = (label, pos, r, act) => { if (Math.abs(pos[0] - eye[0]) < 6 && Math.abs(pos[2] - eye[2]) < 6) list.push({ kind: 'fairy', name: label, pos, r, act }); };
-    for (const f of s.folk) if (!f.away && f !== S.escort) push(T('g.fairy.talk', { name: T(nameKey(f.who)) }), [f.pos[0], f.pos[1] + 0.4, f.pos[2]], 0.9, (gg) => talk(gg, s, f));
+    for (const f of s.folk) if (!f.away && f !== S.escort) push(T('g.fairy.talk', { name: whoName(f) }), [f.pos[0], f.pos[1] + 0.4, f.pos[2]], 0.9, (gg) => talk(gg, s, f));
     if (s.kind === 'spring') for (const w of s.wishes) push(T('g.fairy.wish.' + w.i), [w.pos[0], w.pos[1] + 0.8, w.pos[2]], 0.8, (gg) => wish(gg, s, w.i));
     if (s.kind === 'tree' && s.door) push(T('g.fairy.knock'), [s.door[0], s.door[1] + 1.3, s.door[2]], 1.2, (gg) => knock(gg, s));
     if (s.kind === 'garden' && s.stones) for (const st of s.stones) push(T('g.fairy.note.' + st.i), [st.pos[0], st.pos[1] + 0.6, st.pos[2]], 0.7, (gg) => play(gg, s, st.i));
@@ -663,9 +664,9 @@
     if (!f || !text) return;
     const B = S.bubble || (S.bubble = {}); B.f = f; B.text = text; B.until = S.t + Math.min(9, 3 + text.length / 18);
     if (!B.el) { B.el = document.createElement('div'); B.el.className = 'fy-bubble'; document.body.appendChild(B.el); css(); }
-    B.el.innerHTML = '<b>' + esc(T(nameKey(f.who))) + '</b> ' + esc(text); B.el.style.display = 'block';
+    B.el.innerHTML = '<b>' + esc(whoName(f)) + '</b> ' + esc(text); B.el.style.display = 'block';
     F.lastSaid = { who: f.who, text };
-    if (VR.A11y && VR.A11y.subtitle) { try { VR.A11y.subtitle(T(nameKey(f.who)) + ': ' + text); } catch (e) { /* theirs */ } }
+    if (VR.A11y && VR.A11y.subtitle) { try { VR.A11y.subtitle(whoName(f) + ': ' + text); } catch (e) { /* theirs */ } }
     tone(g.audio, f.mood === 'sleepy' ? 392 : f.mood === 'cheeky' ? 1047 : 784, 0.05, 0.25);
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

@@ -140,6 +140,19 @@ RETIRED.push(
   { word: 'Glutani', re: /Glutani/, why: 'a fan wiki\'s word (R55-14)', now: 'Glimari' },
   { word: 'Nivari', re: /Nivari/, why: '„Nivarians": a World Anvil species; ≈ Sylvari (R55-14)', now: 'Isveli' },
 );
+// n-names, after the merge of a-fairy and o-wander: the sites of the Heartland that had only a kind word, the Flausel's
+// own names (searched 2026-10-31; the children's-book characters Fussel, Zippel, Purzel and Mörike's Wispel set aside)
+NAMES.push(
+  { de: 'Mohnbühl', en: 'Mohnbühl', role: 'site', what: 'the western Dome Hills village (was „Hügeldorf" / „Hill village" in the Wanderbuch)', checked: '2026-10-31', by: 'n-names', found: 'no game, brand or product; „Lerchenbühl"-like field names exist only as Franconian street and hill names' },
+  { de: 'Lerchenbühl', en: 'Lerchenbühl', role: 'site', what: 'the eastern Dome Hills village', checked: '2026-10-31', by: 'n-names', found: 'a hill pass and streets in Franconia (Kulmbach, Heilsbronn) — real field names, no game or brand' },
+  { de: 'Sonnenhof', en: 'Sonnenhof', role: 'site', what: 'the farm by the river (was „Bauernhof" / „Farm", four times)', checked: '2026-10-31', by: 'n-names', found: 'a common German farm and inn name — an ordinary word, no game or brand of note' },
+  { de: 'Kleehof', en: 'Kleehof', role: 'site', what: 'the western farm', checked: '2026-10-31', by: 'n-names', found: 'a common farm name' },
+  { de: 'Lindenhof', en: 'Lindenhof', role: 'site', what: 'the northern farm', checked: '2026-10-31', by: 'n-names', found: 'a common farm, inn and street name' },
+  { de: 'Mohnhof', en: 'Mohnhof', role: 'site', what: 'the eastern farm', checked: '2026-10-31', by: 'n-names', found: 'a farm name; no game or brand' },
+  { de: 'Hallklamm', en: 'Hallklamm', role: 'site', what: 'the canyon (was „Schlucht" / „Canyon"; Klamm: a gorge, Hall: its echo). „Whisper Gorge" set aside: ≈ Whispering Gorge (FFXIV), Whisper Gulch (WoW)', checked: '2026-10-31', by: 'n-names', found: 'no hit as a name; Austrian gorges are called …klamm (Höllentalklamm) — a landscape word' },
+  { de: 'Morgenhain', en: 'Morgenhain', role: 'site', what: 'the grove in the east, where the sun rises (was „Hain" / „Grove")', checked: '2026-10-31', by: 'n-names', found: 'no game, brand or novel of that name' },
+  { de: 'Huschel', en: 'Huschel', role: 'flausel', what: 'a Flausel\'s given name (VR.Names.PEOPLES.flausel: Tummel, Huschel, Tröpfel, Summsel …; elders Murmelbart …; families Moostupf, Tauperle …)', checked: '2026-10-31', by: 'n-names', found: 'no children\'s-book or game character (a book „Husch, die Waldfee" — another word); Fussel (a picture book), Zippel (Rühle\'s keyhole ghost), Purzel (a picture book), Wispel (Mörike) were taken out' },
+);
 module.exports = { NAMES, RETIRED };
 if (require.main !== module && !process.env.NAMES_RUN) return;
 
@@ -307,6 +320,35 @@ console.log('6 · n-names: the peoples\' names, the villages, the stars, the ren
   check(!gen.length, 'no villager is called like a speaker, a world, a people or an outpost' + (gen.length ? ': ' + gen.join(', ') : ''));
   const vsrc = fs.readFileSync(path.join(ROOT, 'src/main/villagers.js'), 'utf8'), vgs = fs.readFileSync(path.join(ROOT, 'src/main/villages.js'), 'utf8');
   check(/VR\.Names\.pool\('herz'\)/.test(vsrc) && /elders/.test(vgs), 'Herzwelt\'s villagers take their names from VR.Names (villagers.js), the elders their own (villages.js)');
+}
+
+// ---------------------------------------------------------------- 7 · after a-fairy and o-wander: the Flausel, the sites, the codex
+console.log('7 · the Flausel\'s names, the Heartland\'s sites in the Wanderbuch, the codex\'s peoples');
+{
+  const N = VR.Names, src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const P = N.pool('flausel'), full = new Set(); for (const f of P.first.concat(P.elders)) for (const s of P.sur) full.add(f + ' ' + s);
+  const all = P.first.concat(P.kids, P.elders, P.sur), bad = all.filter(w => N.blocked(w) || N.reserved(w) || !/^[A-ZÄÖÜ][a-zäöüß]{2,11}$/.test(w));
+  check(full.size >= 200 && P.kids.length >= 16 && P.elders.length >= 16 && !bad.length, 'the Flausel: ' + full.size + ' full names (' + N.sample('flausel', 3).join(', ') + ')' + (bad.length ? ': bad ' + bad.join(', ') : ''));
+  const others = new Set(); for (const k of ['herz', 'aqua', 'ocker', 'zinn', 'basalt', 'opal']) { const Q = N.pool(k); for (const w of Q.first.concat(Q.kids, Q.elders)) others.add(w); }
+  const sh = P.first.concat(P.kids, P.elders).filter(w => others.has(w));
+  check(!sh.length, 'no Flausel shares a given name with another people' + (sh.length ? ': ' + sh.join(', ') : ''));
+  const fy = src('src/main/fairy.js');
+  check(/VR\.Names\.flausel\(/.test(fy) && /whoName\(f\)/.test(fy) && !/T\(nameKey\(f\.who\)\)/.test(fy), 'the tree village\'s folk have names of their own (fairy.js: VR.Names.flausel, not „Ein Flausel")');
+  check(N.flausel(77, 0) === N.flausel(77, 0) && N.flausel(77, 0) !== N.flausel(77, 1) || N.flausel(78, 1) !== N.flausel(77, 0), 'a Flausel keeps its name (seeded by the place): ' + N.flausel(77, 0) + ', ' + N.flausel(77, 1));
+  // the sites: every Wanderbuch site has a name of its own in both tables; the trailer's landmarks read as the quests read
+  const W = src('src/main/wander.js'), L = VR.Land || {};
+  const ids = Object.keys(N.SITES), miss = ids.filter(id => de['g.wd.site.' + id] !== N.SITES[id] || en['g.wd.site.' + id] !== N.SITES[id]);
+  check(ids.length >= 8 && !miss.length, ids.length + ' sites named (' + ids.map(id => N.SITES[id]).join(', ') + ')' + (miss.length ? ': not in the tables ' + miss.join(', ') : ''));
+  check(/T\('g\.wd\.site\.' \+ id, null, T\('g\.wd\.site\.' \+ kind\)\)/.test(W), 'wander.js names a site by its id first, its kind\'s word only as the fallback');
+  const same = [['temple', 'temple'], ['citadel', 'citadel'], ['station', 'station'], ['hills', 'hills'], ['lookout', 'lookout']].filter(([a, b]) => de['g.wd.site.' + a].toLowerCase() !== String(de['g.q.pl.' + b]).toLowerCase() || en['g.wd.site.' + a].toLowerCase() !== String(en['g.q.pl.' + b]).toLowerCase());
+  check(!same.length, 'the Wanderbuch calls the landmarks what the quests call them (Turmzitadelle / Spire Citadel, Kuppelhügel / Dome Hills …)' + (same.length ? ': ' + same.map(x => x[0]).join(', ') : ''));
+  check(!/'Fiete'|'Paul'|'Mira'|'Emil'/.test(W) && /VR\.Names\.pool\('herz'\)/.test(W), 'the wanderers are called like Herzwelt\'s folk (VR.Names), no Mira, Paul, Emil or Fiete');
+  check(/W\.placeName/.test(W), 'the Wanderbuch shows a site\'s name in the language of the moment (W.placeName), not the word stored at the visit');
+  // the codex: a page „Völker" with every people, its sound and a few of its names
+  const cx = src('src/main/codex.js');
+  check(/'peoples'/.test(cx) && /N\.PEOPLE_ORDER|Names\.PEOPLE_ORDER/.test(cx) && de['g.codex.cat.peoples'] === 'Völker' && en['g.codex.cat.peoples'] === 'Peoples', 'the codex has a page „' + de['g.codex.cat.peoples'] + '" / „' + en['g.codex.cat.peoples'] + '"');
+  const card = N.PEOPLE_ORDER.filter(k => !de['g.codex.p.' + k] || !en['g.codex.p.' + k] || de['g.codex.p.' + k].length < 3 || en['g.codex.p.' + k].length < 3);
+  check(N.PEOPLE_ORDER.length === 7 && !card.length, 'each of the ' + N.PEOPLE_ORDER.length + ' peoples has its card in both tables (' + (de['g.codex.p.flausel'] || [])[0] + ')' + (card.length ? ': missing ' + card.join(', ') : ''));
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
