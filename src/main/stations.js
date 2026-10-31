@@ -757,7 +757,7 @@
           }
           Lf.actor.update(dt);
           STN.lifeTick(g, Lf, dt);
-          STN.deckTick(g, Lf);   // u-stations2
+          STN.deckTick(g, Lf); STN.crewStream(g, Lf);   // u-stations2
         } catch (e) { if (!STN.stats.err) { STN.stats.err = String((e && e.stack) || e); console.error('stations life', e); } }
       };
       AP.draw = function (r, E, layer, cam) { dr0.call(this, r, E, layer, cam); if (this.stn || this.ferry) return; const Lf = this.g && this.g.stnLife; if (Lf && Lf.world === this.g.world) { Lf.actor.draw(r, E, layer, cam); if (layer === 'opaque') STN.drawDeck(this.g, r, E, cam, Lf); } };
@@ -768,6 +768,18 @@
     const L = STN.LIST[id], Pl = VR.Forge.Station.place(L.kind), seed = (STN.seedOf(id, 1) >>> 0);
     const homes = Pl.cabins.map((c, i) => ({ kind: 'home', ops: [], door: c.door ? c.door.slice() : c.inside.slice(), outside: c.outside.slice(), inside: c.inside.slice(), beds: [c.bed.slice()], seats: [], work: [], chimney: null, table: null, lights: [], box: [c.inside[0] - 3, Pl.hall[1] - 1, c.inside[2] - 3, c.inside[0] + 3, Pl.hall[1] + 4, c.inside[2] + 3], F: Pl.hall[1] - 1, r: 0, w: 5, d: 6, ox: c.inside[0] - 2, oz: c.inside[2] - 2, i }));
     return { id: 'stn:' + id, name: STN.nameOf(id), style: 'moon', kit: 'terminal', x: Pl.hall[0], y: Pl.hall[1], z: Pl.hall[2], seed, homes, work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: Pl.hall[0], y: Pl.hall[1], z: Pl.hall[2] }, roads: [], bell: null, pad: null, shops: [], pastures: [], prefab: [] };
+  };
+  // u-stations2 · the hand-off: the crew comes aboard one a frame — a station village's activation keeps one agent and
+  // queues the rest (all eight at once cost a 47 ms frame on Very Low while the station streamed in: their first updates)
+  { const VC = VR.Villages; if (VC && VC.prototype.activate && !VC.prototype.__stn2) { VC.prototype.__stn2 = true; const ac0 = VC.prototype.activate; VC.prototype.activate = function (vil) {
+    const r = ac0.apply(this, arguments);
+    try { if (vil && /^stn:/.test(vil.id) && vil.agents.length > 1) { const rest = vil.agents.splice(1); for (const a of rest) { const i = this.agents.indexOf(a); if (i >= 0) this.agents.splice(i, 1); } vil.stnQueue = rest; } } catch (e) { /* all at once */ }
+    return r;
+  }; } }
+  STN.crewStream = function (g, Lf) {
+    const V = g.villages, vil = Lf.crew && Lf.crew !== true ? Lf.crew : null; if (!V || !vil || !vil.stnQueue || !vil.stnQueue.length) return;
+    if (!vil.active) { vil.stnQueue = null; return; }
+    const a = vil.stnQueue.shift(); vil.agents.push(a); V.agents.push(a);
   };
   STN.lifeTick = function (g, Lf, dt) {
     Lf.t += dt;

@@ -225,10 +225,13 @@ async function stationRun(P, hi, Rr, tag) {
   check(tg && tg.ok && g0 && s.dock, `G at the station starts the docking (${tg && tg.d} m, ${tg && tg.ang}° off the nose; ${s.dock ? s.dock.dur + ' s' : 'no plan'})`);
   if (!s.dock) return;
   // every frame stepped (the game's logic: the docking's own cost, the trip's start), every 30th also drawn
+  await P.ev(() => { const g = VR.game; window.__parts = {}; for (const k of Object.keys(g)) { const o = g[k]; if (!o || typeof o !== 'object' || o === g) continue; for (const fn of ['update', 'tick', 'pump']) { if (typeof o[fn] !== 'function' || o['__w' + fn]) continue; const f0 = o[fn]; o['__w' + fn] = true; o[fn] = function () { const t0 = performance.now(); try { return f0.apply(this, arguments); } finally { const d = performance.now() - t0; window.__parts[k + '.' + fn] = (window.__parts[k + '.' + fn] || 0) + d; } }; } } });
+  const dockParts = [];
   const frames = [], drawn = []; let shot = false, ph = new Set();
   for (let i = 0; i < 2400; i++) {
     const draw = i % 30 === 0;
-    const f = await P.ev((draw) => { const g = VR.game, t0 = performance.now(); window.__norender = !draw; g.last = t0 - 33; g.loop(t0); if (draw) window.__sync(); window.__norender = true; return +(performance.now() - t0).toFixed(1); }, draw);
+    const fp = await P.ev((draw) => { const g = VR.game, t0 = performance.now(); window.__parts = {}; window.__norender = !draw; g.last = t0 - 33; g.loop(t0); if (draw) window.__sync(); window.__norender = true; const ms = +(performance.now() - t0).toFixed(1); return [ms, ms > 8 && !draw ? Object.entries(window.__parts).filter(e => e[1] > 1).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0] + ' ' + e[1].toFixed(1)).join(', ') : '']; }, draw);
+    const f = fp[0]; if (fp[1] || (f > 8 && !draw)) dockParts.push(i + ': ' + f + ' ms — ' + fp[1]);
     s = await S_(P);
     (draw ? drawn : frames).push(f); if (!draw) (Rr.dockWhy || (Rr.dockWhy = [])).push(s.dock ? s.dock.ph + (s.dock.hold ? '/hold' : '') : s.state);
     if (s.dock) ph.add(s.dock.ph);
@@ -242,7 +245,7 @@ async function stationRun(P, hi, Rr, tag) {
     }
     if (s.state !== 'play' || s.dim !== 'overworld') break;
   }
-  Rr.dockDrawn = drawn;
+  Rr.dockDrawn = drawn; if (dockParts.length) console.log('  the docking\'s dear frames by part: ' + dockParts.slice(0, 8).join(' | '));
   console.log(`  the docking's drawn frames: ${drawn.map(Math.round).join(' ')} ms`);
   const dockF = frames.slice(5), dm = med(dockF), dx = Math.max(...dockF), ix = frames.indexOf(dx);
   console.log(`  the dearest game frame: ${dx} ms at #${ix} (${(Rr.dockWhy || [])[ix]}); over 8 ms: ${frames.map((f, i) => f > 8 ? i + ':' + f + ':' + (Rr.dockWhy || [])[i] : null).filter(Boolean).join(' ')}`);
@@ -257,6 +260,7 @@ async function stationRun(P, hi, Rr, tag) {
   if (s.dim !== 'stn.ring') return;
   // the first frames in the station (the hand-off: the game's frames while the station streams in)
   // (u-stations2: each frame's parts — every subsystem of the game with an update, the world's — the dearest frame's logged)
+  await P.ev(() => { const VC = VR.Villages && VR.Villages.prototype; if (VC && !VC.__prof) { VC.__prof = true; for (const fn of ['activate', 'updateVillage', 'updateAgent', 'updateDoors', 'updateBubbles', 'separate', 'pollSites']) { const f0 = VC[fn]; if (typeof f0 !== 'function') continue; VC[fn] = function () { const t0 = performance.now(); try { return f0.apply(this, arguments); } finally { const k = 'vil.' + fn; if (window.__parts) window.__parts[k] = (window.__parts[k] || 0) + performance.now() - t0; } }; } } });
   await P.ev(() => { const g = VR.game; window.__parts = {}; for (const k of Object.keys(g)) { const o = g[k]; if (!o || typeof o !== 'object' || o === g) continue; for (const fn of ['update', 'tick', 'pump']) { if (typeof o[fn] !== 'function' || o['__w' + fn]) continue; const f0 = o[fn]; o['__w' + fn] = true; o[fn] = function () { const t0 = performance.now(); try { return f0.apply(this, arguments); } finally { const d = performance.now() - t0; window.__parts[k + '.' + fn] = (window.__parts[k + '.' + fn] || 0) + d; } }; } } });
   const hf = [], hp = []; for (let i = 0; i < 60; i++) { const r0 = await P.ev(() => { const g = VR.game, t0 = performance.now(); window.__parts = {}; window.__norender = true; g.last = t0 - 33; g.loop(t0); const ms = +(performance.now() - t0).toFixed(1); const top = Object.entries(window.__parts).filter(e => e[1] > 1).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0] + ' ' + e[1].toFixed(1)).join(', '); return [ms, top]; }); hf.push(r0[0]); hp.push(r0[1]); }
   { const ix = hf.indexOf(Math.max(...hf.slice(3))); console.log(`  the hand-off's dearest frame #${ix}: ${hf[ix]} ms — ${hp[ix]}`); hf.forEach((f, i) => { if (f > 12) console.log(`    #${i} ${f} ms: ${hp[i]}`); }); }

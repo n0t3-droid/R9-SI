@@ -69,7 +69,7 @@
       // arrival — stops after MapView.BUDGET ms and goes on next frame: the station's hand-off paid 30–35 ms for one)
       const tEnd = this.whole && this.snap && MapView.budgetIf && MapView.budgetIf(g) ? performance.now() + MapView.BUDGET : Infinity;
       for (let k = 0, kn = this.whole ? MS : 16; k < kn && this.row < MS; k++, this.row++) {   // (f-first2: the first picture in one go — no black disc at the start)
-        if ((k & 7) === 7 && performance.now() > tEnd) break;
+        if ((k & 3) === 3 && performance.now() > tEnd) break;
         const z = z0 + this.row;
         for (let i = 0; i < MS; i++) {
           const x = x0 + i, o = (this.row * MS + i) * 4;
