@@ -31,6 +31,11 @@
     selma: { skin: ['#fbe0c8', '#f1cdb0', '#d4aa8a'], hair: ['#ec8a48', '#cf6a30', '#a24e20'], iris: '#2f7a4a', lash: '#5a2e18', brow: '#a8521f', mouth: '#9a3e3c', tongue: '#e07a74', cloth: ['#5ab878', '#3f9a5a', '#2c7442'], ring: '#b9f2a0' },
     jonte: { skin: ['#dba27a', '#c48a5e', '#a06a44'], hair: ['#3a3634', '#262322', '#161414'], iris: '#2f4a6a', lash: '#1c1a19', brow: '#2a2624', mouth: '#6a3428', tongue: '#c06048', cloth: ['#36507a', '#263a5c', '#1a2840'], cap: ['#ffffff', '#e8ecf0', '#c3cad2'], ring: '#a8c8ff' },
     lumi: { skin: ['#e9b893', '#d9a37c', '#b98260'], hair: ['#3c2a24', '#2a1d19', '#1a110e'], iris: '#5a3420', lash: '#1e1410', brow: '#2e1f1a', mouth: '#a0403e', tongue: '#ec8a86', cloth: ['#ffd84a', '#f2c230', '#cc9a18'], ring: '#ffb0d8' },
+    // a-story3: the natives of the worlds (worldeco.js's species: their skin, their head's feature, their garb) and Lumi's grandfather
+    solgani: { skin: ['#5a4646', '#463638', '#30262a'], iris: '#ff9a20', lash: '#1a1214', brow: '#ffb840', mouth: '#2a1416', tongue: '#e0603a', cloth: ['#e85a32', '#c8401e', '#962c12'], crest: ['#ffe070', '#ffb02a', '#e0761a'], band: '#f2c440', ring: '#ffb02a' },
+    ariveli: { skin: ['#7ad0d6', '#5cb8c0', '#3e96a8'], iris: '#1a3a5a', lash: '#123048', brow: '#2a7a9a', mouth: '#2a5a78', tongue: '#e88a90', cloth: ['#fbf6e6', '#f2eedc', '#d8ceb0'], fin: ['#4a9ac0', '#2a6a9a', '#1f4a78'], shell: '#f0a890', ring: '#6ae0d0' },
+    selkatun: { skin: ['#a4a6d8', '#8a8cc0', '#6e70a4'], iris: '#101828', lash: '#0a0e18', brow: '#5a5c90', mouth: '#3a2a50', tongue: '#d080a0', cloth: ['#4e5e82', '#3a4a6a', '#28344c'], ant: '#c8c8e8', tip: '#7af0ff', tip2: '#d8fcff', ring: '#c0b0ff' },
+    anselm: { skin: ['#f6dcc6', '#e9c7ab', '#caa486'], hair: ['#fafafa', '#e2e2e2', '#bdbdbd'], iris: '#5a7a3a', lash: '#6a5a4a', brow: '#f4f4f4', mouth: '#8a4a40', tongue: '#d87068', cloth: ['#9a6a42', '#7e5232', '#5e3c22'], glass: '#c07a3a', pencil: '#f2c040', ring: '#e8c890' },
     funke: { shell: ['#ffffff', '#e9eff5', '#bcc7d3'], visor: '#16202e', visor2: '#22324a', eye: '#62f2ff', eye2: '#bffaff', ring: '#8fe4ff' },
   };
   Po.LOOK = LOOK;
@@ -133,6 +138,57 @@
       R(8, 14, 1, 1, '#f09a8a'); R(15, 14, 1, 1, '#f09a8a');
       R(11, 13, 2, 1, L.skin[2]);
       mouthOf(R, L, m, mo, 10, 14);
+    },
+    // a-story3 · Solgani of the Glutani: charcoal skin, a glowing crest of flame-coloured spines, ember eyes, a red robe with a gold band
+    solgani(R, L, m, bl, mo) {
+      body(R, L.cloth, 3, 18, 19); R(3, 21, 18, 1, L.band); R(10, 19, 4, 2, L.band);
+      neck(R, L, 16);
+      for (let i = 0; i < 5; i++) { const x = 6 + i * 3, hh = 5 - Math.abs(i - 2); R(x, 5 - hh, 2, hh + 1, L.crest[i % 2]); R(x, 5 - hh, 1, 1, L.crest[0]); }   // (the crest: five spines)
+      R(5, 4, 14, 2, L.crest[2]);
+      head(R, L, 6, 5, 12, 12);
+      brows(R, L, m, 7, 14, 8); eyes(R, L, m, bl, 7, 14, 9);
+      R(7, 13, 1, 1, L.crest[1]); R(16, 13, 1, 1, L.crest[1]);   // (the glowing cheek marks)
+      R(11, 12, 2, 1, L.skin[2]);
+      mouthOf(R, L, m, mo, 10, 14);
+    },
+    // Ariveli of the Wellari: sea-green skin, a fin on each side and a small fin crest, a shell clip, a cream gown
+    ariveli(R, L, m, bl, mo) {
+      body(R, L.cloth, 4, 16, 19); R(9, 18, 6, 2, L.cloth[2]); R(11, 20, 2, 2, L.shell);
+      neck(R, L, 16);
+      R(3, 6, 3, 8, L.fin[1]); R(2, 7, 1, 6, L.fin[2]); R(3, 6, 1, 3, L.fin[0]); R(18, 6, 3, 8, L.fin[1]); R(21, 7, 1, 6, L.fin[2]); R(20, 6, 1, 3, L.fin[0]);   // (the side fins)
+      R(9, 2, 6, 3, L.fin[1]); R(10, 1, 4, 1, L.fin[0]); R(11, 0, 2, 1, L.fin[2]);   // (the crest fin)
+      head(R, L, 6, 4, 12, 13);
+      R(14, 5, 3, 2, L.shell); R(14, 5, 1, 1, '#ffd8c8');   // (the shell clip)
+      brows(R, L, m, 7, 14, 8); eyes(R, L, m, bl, 7, 14, 9);
+      R(11, 12, 2, 1, L.skin[2]); for (const p of [[7, 13], [16, 13]]) R(p[0], p[1], 1, 1, L.fin[0]);
+      mouthOf(R, L, m, mo, 10, 14);
+    },
+    // Selkatun of the Regoli: lilac skin, two antennae with glowing tips, large dark eyes, a navy travelling coat
+    selkatun(R, L, m, bl, mo) {
+      body(R, L.cloth, 3, 18, 19); R(7, 18, 10, 1, L.cloth[0]); R(11, 19, 2, 5, L.tip);
+      neck(R, L, 16);
+      R(7, 1, 1, 5, L.ant); R(6, 0, 3, 2, L.tip); R(6, 0, 1, 1, L.tip2); R(16, 1, 1, 5, L.ant); R(15, 0, 3, 2, L.tip); R(15, 0, 1, 1, L.tip2);   // (the antennae)
+      head(R, L, 6, 5, 12, 12);
+      R(6, 5, 12, 1, L.skin[0]);
+      brows(R, L, m, 7, 14, 8); eyes(R, L, m, bl, 7, 14, 9);
+      if (!bl && m !== 'happy') { R(7, 10, 3, 2, L.iris); R(14, 10, 3, 2, L.iris); R(8, 10, 1, 1, L.tip2); R(15, 10, 1, 1, L.tip2); }   // (the big dark eyes, a glint)
+      R(11, 12, 2, 1, L.skin[2]);
+      mouthOf(R, L, m, mo, 10, 14);
+    },
+    // Opa Anselm: bald on top, white tufts, bushy white brows, round copper spectacles, a pencil behind his ear, a brown cardigan
+    anselm(R, L, m, bl, mo) {
+      body(R, L.cloth, 2, 20, 19); R(9, 19, 6, 5, '#e8e0d0'); R(11, 20, 2, 4, '#3a6a8a'); R(5, 21, 1, 1, '#e8c890'); R(18, 21, 1, 1, '#e8c890');   // (cardigan, shirt, a blue tie, buttons)
+      neck(R, L, 16);
+      head(R, L, 6, 4, 12, 13);
+      R(8, 4, 8, 1, L.skin[0]); R(9, 5, 3, 1, '#fff0e0');   // (the bald crown, its shine)
+      R(4, 7, 3, 5, L.hair[1]); R(4, 7, 1, 5, L.hair[0]); R(17, 7, 3, 5, L.hair[1]); R(19, 7, 1, 5, L.hair[2]);   // (the white tufts)
+      R(18, 4, 4, 1, L.pencil); R(21, 4, 1, 1, '#3a3a3a');   // (the pencil)
+      brows(R, L, m, 7, 14, 8); R(6, m === 'surprised' ? 6 : 7, 1, 1, L.brow); R(17, m === 'surprised' ? 6 : 7, 1, 1, L.brow);
+      eyes(R, L, m, bl, 7, 14, 9);
+      for (const x of [6, 13]) { R(x, 8, 5, 1, L.glass); R(x, 12, 5, 1, L.glass); R(x, 9, 1, 3, L.glass); R(x + 4, 9, 1, 3, L.glass); } R(11, 10, 2, 1, L.glass);
+      R(11, 12, 2, 2, L.skin[2]);
+      R(8, 15, 1, 1, '#e0a090'); R(15, 15, 1, 1, '#e0a090');
+      mouthOf(R, L, m, mo, 10, 15);
     },
     funke(R, L, m, bl, mo) {
       const Sh = L.shell, E = L.eye;
@@ -262,4 +318,94 @@
       return { parts: { win: { grid: win, pivot: [0, 0, 0] }, veil: { grid: veil, pivot: [0, 0, 0] }, cracks: { grid: cracks, pivot: [0, 0, 0] } }, layout: { win: [0, 0, 0], veil: [0, 0, 0], cracks: [0, 0, 0] } };
     };
   }
+
+  // ---------------------------------------------------------------- a-story3 · the film's own pictures (VR.StoryFx)
+  // Drawn over the frame on a small transparent 2-D canvas while a scene plays (story.js P.fxTick): our own shapes —
+  //   embers (Zinnober's sparks rising) · song (the glass beacon's song: rings of cyan light) · hum (Funke humming it)
+  //   spray (the atoll's spray) · notes (Opa Anselm's notebook page: Funke sketched beside a beacon) · beacons (from the
+  //   Ringstation's window: the beacons light one by one into an arrow toward a star) · blink2 (a far beacon blinking
+  //   twice) · twin (two suns) · beam (the beam swinging to a nebula). draw(c, kind, t, u, w, h, {low, seed}).
+  const Fx = VR.StoryFx = VR.StoryFx || {};
+  Fx.KINDS = ['embers', 'song', 'hum', 'spray', 'notes', 'beacons', 'blink2', 'twin', 'beam'];
+  const rnd = (i, k) => fr(Math.sin(i * 127.1 + k * 311.7) * 43758.5453);
+  const glow = (c, x, y, r, col, a) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + col + ',' + a + ')'); g.addColorStop(1, 'rgba(' + col + ',0)'); c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r); };
+  const ease = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+  // the arrow the beacons draw (normalised, on the planet below the window), lit one after another
+  Fx.ARROW = (() => { const out = []; for (let i = 0; i < 9; i++) out.push([0.22 + i * 0.055, 0.86 - i * 0.035]); for (let i = 1; i < 4; i++) { out.push([0.66 - i * 0.045, 0.545 + i * 0.012]); out.push([0.66 - i * 0.012, 0.545 + i * 0.05]); } return out; })();
+  Fx.draw = function (c, kind, t, u, w, h, o) {
+    o = o || {}; const low = !!o.low, S0 = Math.min(w, h);
+    c.clearRect(0, 0, w, h);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    if (kind === 'embers' || kind === 'spray') {
+      const n = low ? 14 : 40, warm = kind === 'embers';
+      if (warm) { const g = c.createLinearGradient(0, h, 0, h * 0.55); g.addColorStop(0, 'rgba(255,90,20,0.22)'); g.addColorStop(1, 'rgba(255,90,20,0)'); c.fillStyle = g; c.fillRect(0, h * 0.55, w, h * 0.45); }
+      for (let i = 0; i < n; i++) {
+        const sp = 0.06 + 0.1 * rnd(i, 1), life = fr(t * sp + rnd(i, 2)), x = (rnd(i, 3) + 0.04 * Math.sin(t * 1.3 + i)) * w, y = h * (warm ? 1.02 - life * 0.9 : 0.95 - Math.sin(life * Math.PI) * 0.35 * (0.5 + rnd(i, 4)));
+        const a = (1 - life) * (warm ? 0.9 : 0.6), r = S0 * (warm ? 0.006 + 0.008 * rnd(i, 5) : 0.004 + 0.006 * rnd(i, 5));
+        glow(c, x, y, r * 4, warm ? '255,150,40' : '200,250,255', a * 0.5); c.fillStyle = warm ? 'rgba(255,230,140,' + a + ')' : 'rgba(255,255,255,' + a + ')'; c.fillRect(x - r * 0.5, y - r * 0.5, r, r);
+      }
+    } else if (kind === 'song' || kind === 'hum') {
+      const cx = w * (kind === 'hum' ? 0.5 : 0.52), cy = h * (kind === 'hum' ? 0.5 : 0.42), n = low ? 3 : 5, R = S0 * (kind === 'hum' ? 0.35 : 0.6);
+      glow(c, cx, cy, S0 * 0.18, '120,240,255', 0.35 + 0.15 * Math.sin(t * 6));
+      c.lineWidth = Math.max(1, S0 * 0.004);
+      for (let i = 0; i < n; i++) { const q = fr(t * 0.35 + i / n), rr = q * R; c.strokeStyle = 'rgba(140,240,255,' + (0.55 * (1 - q)) + ')'; c.beginPath(); c.ellipse(cx, cy, rr, rr * 0.62, 0, 0, Math.PI * 2); c.stroke(); }
+      // the song's line: a sine that trembles across the frame, high and thin
+      c.strokeStyle = 'rgba(190,250,255,0.5)'; c.beginPath();
+      for (let x = 0; x <= w; x += low ? 8 : 4) { const k = x / w, y = cy + Math.sin(k * 22 + t * 5) * S0 * 0.02 * Math.sin(k * Math.PI) + Math.sin(k * 61 - t * 9) * S0 * 0.006; if (x) c.lineTo(x, y); else c.moveTo(x, y); }
+      c.stroke();
+      if (kind === 'song') for (let i = 0; i < (low ? 6 : 14); i++) { const q = fr(t * 0.2 + rnd(i, 7)), x = cx + (rnd(i, 8) - 0.5) * w * 0.8, y = cy - q * h * 0.35; glow(c, x, y, S0 * 0.012, '160,255,250', 0.7 * (1 - q)); }
+    } else if (kind === 'notes') {
+      c.globalCompositeOperation = 'source-over';
+      const a = ease((t % 30) * 1.2) * ease(1.6 - u * 1.6 + 0.6), pw = S0 * 0.62, ph = pw * 0.72, x0 = w * 0.62 - pw / 2 + (1 - a) * w * 0.08, y0 = h * 0.15;
+      c.globalAlpha = Math.min(1, a); c.translate(x0 + pw / 2, y0 + ph / 2); c.rotate(-0.06 + 0.01 * Math.sin(t)); c.translate(-pw / 2, -ph / 2);
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(6, 8, pw, ph);
+      c.fillStyle = '#f3ead2'; c.fillRect(0, 0, pw, ph); c.fillStyle = '#e4d6b2'; c.fillRect(0, 0, pw, ph * 0.08);
+      c.strokeStyle = 'rgba(120,150,190,0.35)'; c.lineWidth = 1; for (let i = 1; i < 9; i++) { c.beginPath(); c.moveTo(0, ph * (0.08 + i * 0.1)); c.lineTo(pw, ph * (0.08 + i * 0.1)); c.stroke(); }
+      const ink = '#2c3a5a'; c.strokeStyle = ink; c.lineWidth = Math.max(1.5, S0 * 0.005);
+      // the beacon tower (left) and its spark flying out of it
+      const bx = pw * 0.2, by = ph * 0.85; c.beginPath(); c.moveTo(bx - pw * 0.06, by); c.lineTo(bx - pw * 0.025, by - ph * 0.5); c.lineTo(bx + pw * 0.025, by - ph * 0.5); c.lineTo(bx + pw * 0.06, by); c.stroke();
+      c.beginPath(); c.arc(bx, by - ph * 0.56, pw * 0.035, 0, Math.PI * 2); c.stroke();
+      c.setLineDash([4, 4]); c.beginPath(); c.moveTo(bx + pw * 0.04, by - ph * 0.58); c.quadraticCurveTo(pw * 0.38, ph * 0.12, pw * 0.55, ph * 0.38); c.stroke(); c.setLineDash([]);
+      // Funke, sketched: a round body, the visor, two eyes, the antenna
+      const fx0 = pw * 0.66, fy = ph * 0.52, fr0 = pw * 0.11; c.beginPath(); c.arc(fx0, fy, fr0, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.ellipse(fx0, fy - fr0 * 0.1, fr0 * 0.7, fr0 * 0.38, 0, 0, Math.PI * 2); c.stroke();
+      c.fillStyle = '#2aa8c8'; c.fillRect(fx0 - fr0 * 0.4, fy - fr0 * 0.2, fr0 * 0.2, fr0 * 0.2); c.fillRect(fx0 + fr0 * 0.2, fy - fr0 * 0.2, fr0 * 0.2, fr0 * 0.2);
+      c.beginPath(); c.moveTo(fx0, fy - fr0); c.lineTo(fx0 + fr0 * 0.2, fy - fr0 * 1.5); c.stroke(); c.beginPath(); c.arc(fx0 + fr0 * 0.2, fy - fr0 * 1.6, fr0 * 0.12, 0, Math.PI * 2); c.stroke();
+      // handwriting: wavy lines (no letters — the words are the subtitles')
+      c.lineWidth = Math.max(1, S0 * 0.003);
+      for (let l = 0; l < 3; l++) { c.beginPath(); const yy = ph * (0.83 + l * 0.0) + l * ph * 0.05; for (let x = pw * 0.44; x < pw * 0.92; x += 3) { const y = yy + Math.sin(x * 0.5 + l) * 1.6; if (x === pw * 0.44) c.moveTo(x, y); else c.lineTo(x, y); } c.stroke(); }
+      c.globalAlpha = 1;
+    } else if (kind === 'beacons') {
+      // the beacons light one after another into an arrow, then a dotted path from its tip to a star
+      const A = Fx.ARROW, lit = ease(u * 1.6) * A.length;
+      for (let i = 0; i < A.length; i++) { const q = Math.max(0, Math.min(1, lit - i)); if (!q) continue; const x = A[i][0] * w, y = A[i][1] * h, pul = 0.75 + 0.25 * Math.sin(t * 5 + i); glow(c, x, y, S0 * 0.05 * q, '90,230,255', 0.5 * pul); glow(c, x, y, S0 * 0.012, '220,255,255', 0.95 * q); }
+      const k = ease((u - 0.55) * 3);
+      if (k > 0) {
+        const tip = A[8], sx = w * 0.9, sy = h * 0.14; c.strokeStyle = 'rgba(140,240,255,' + (0.7 * k) + ')'; c.lineWidth = Math.max(1, S0 * 0.004); c.setLineDash([S0 * 0.012, S0 * 0.014]); c.lineDashOffset = -t * 30;
+        c.beginPath(); c.moveTo(tip[0] * w, tip[1] * h); c.lineTo(tip[0] * w + (sx - tip[0] * w) * k, tip[1] * h + (sy - tip[1] * h) * k); c.stroke(); c.setLineDash([]);
+        glow(c, sx, sy, S0 * 0.09 * k, '255,200,120', 0.7 * k); glow(c, sx, sy, S0 * 0.02, '255,250,230', k);
+        c.strokeStyle = 'rgba(255,230,180,' + (0.6 * k) + ')'; c.beginPath(); c.moveTo(sx - S0 * 0.06, sy); c.lineTo(sx + S0 * 0.06, sy); c.moveTo(sx, sy - S0 * 0.06); c.lineTo(sx, sy + S0 * 0.06); c.stroke();
+      }
+    } else if (kind === 'blink2') {
+      // a far beacon in the sky: two blinks, then a pause (the 'here, here')
+      const x = w * 0.66, y = h * 0.28, ph0 = t % 2.2, on = (ph0 < 0.25 || (ph0 > 0.5 && ph0 < 0.75)) ? 1 : 0.12;
+      glow(c, x, y, S0 * 0.14 * on, '90,230,255', 0.55); glow(c, x, y, S0 * 0.025, '230,255,255', on);
+      c.strokeStyle = 'rgba(180,250,255,' + (0.6 * on) + ')'; c.lineWidth = Math.max(1, S0 * 0.003); c.beginPath(); c.moveTo(x - S0 * 0.1 * on, y); c.lineTo(x + S0 * 0.1 * on, y); c.moveTo(x, y - S0 * 0.06 * on); c.lineTo(x, y + S0 * 0.06 * on); c.stroke();
+    } else if (kind === 'twin') {
+      const d = 0.06 + 0.02 * u, y = h * 0.22;
+      glow(c, w * (0.5 - d), y, S0 * 0.28, '255,190,90', 0.35); glow(c, w * (0.5 - d), y, S0 * 0.05, '255,245,215', 0.95);
+      glow(c, w * (0.5 + d), y + S0 * 0.02, S0 * 0.22, '255,130,80', 0.3); glow(c, w * (0.5 + d), y + S0 * 0.02, S0 * 0.038, '255,225,200', 0.9);
+      for (let i = 1; i <= (low ? 2 : 4); i++) glow(c, w * (0.5 - d) + (w * 0.5 - w * (0.5 - d)) * i * 0.6, y + (h * 0.6 - y) * i * 0.25, S0 * 0.02 * (1 + i * 0.4), '200,220,255', 0.12);   // (a soft flare toward the frame's middle)
+    } else if (kind === 'beam') {
+      // the nebula (pink, violet, a teal edge) and the beam swinging to it from below
+      const nx = w * 0.78, ny = h * 0.2;
+      for (let i = 0; i < (low ? 4 : 8); i++) glow(c, nx + (rnd(i, 9) - 0.5) * S0 * 0.4, ny + (rnd(i, 10) - 0.5) * S0 * 0.2, S0 * (0.12 + 0.1 * rnd(i, 11)), i % 3 === 0 ? '90,200,220' : i % 2 ? '220,90,190' : '150,90,230', 0.18);
+      const k = ease(u * 1.3), bx = w * 0.42, by = h * 1.0, tx = bx + (nx - bx) * k + (1 - k) * w * -0.2, ty = by + (ny - by) * (0.4 + 0.6 * k);
+      const g = c.createLinearGradient(bx, by, tx, ty); g.addColorStop(0, 'rgba(120,240,255,0.55)'); g.addColorStop(1, 'rgba(120,240,255,0)');
+      c.strokeStyle = g; c.lineWidth = S0 * 0.03; c.lineCap = 'round'; c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
+      c.lineWidth = S0 * 0.008; c.strokeStyle = 'rgba(230,255,255,0.7)'; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + (tx - bx) * 0.7, by + (ty - by) * 0.7); c.stroke();
+    }
+    c.restore();
+    return true;
+  };
 })(VR);

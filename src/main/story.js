@@ -67,14 +67,24 @@
     let freed = 0; for (const s of P.sites()) if (s.st === 'frei') freed++;
     try { const fr = A && A.rec && A.rec.freed; if (fr) freed = Math.max(freed, Object.keys(fr).length); } catch (e) { /* optional */ }
     const BS = VR.BodySky, sea = (VR.C && VR.C.SEA) || 64;
-    return {
+    return Object.assign({
       calm: pl ? pl.calm : 0, building: P.building(g), fighting: P.fighting(g), menu: !!(ui && (ui.screen || ui.typing)), studio: !!g.studioOpen,
       landing: P.landing(g), scene: P.otherCam(g) || !!(pl && pl.scene), guest: !!((g.meta && g.meta.guest) || (g.mp && g.mp.isClient)),
       place: g.lifeDirector && g.lifeDirector.ctx ? g.lifeDirector.ctx.place : '', hour: g.lifeDirector && g.lifeDirector.ctx ? g.lifeDirector.ctx.hour : '',
-      played: pl ? pl.played : 0, adv: P.adv(), dim: g.dim || 'overworld', near: { outpost: n ? n.d : Infinity }, freed,
+      played: pl ? pl.played : 0, adv: P.adv(), dim: g.dim || 'overworld', near: { outpost: n ? n.d : Infinity, village: (P.village(g) || { d: Infinity }).d }, freed,
       high: p.pos[1] - sea, orbit: P.orbit(g), eclipse: BS && BS.cur && BS.cur.light ? BS.cur.light.eclipse || 0 : 0, kids: !!(g.settings && g.settings.kids),
-    };
+    }, P.ctx3(g));
   };
+  // a-story3: the village near (villages.js's site list: the natives' villages on every world), the suns over it
+  P.village = function (g) { const V = g.villages, p = g.player.pos; try { const n = V && V.nearestSite ? V.nearestSite(p[0], p[2]) : null; return n && n.site ? { s: n.site, d: n.dist } : null; } catch (e) { return null; } };
+  const sunsC = new Map();
+  P.suns = function (dim) {
+    const m = /^x\.(\d+)\./.exec(String(dim || '')); if (!m) return 1;
+    if (sunsC.has(dim)) return sunsC.get(dim);
+    let n = 1; try { const G = VR.Galaxy, N = G && (G.cur || (G.build && G.build(0))), st = N && N.list ? N.list[+m[1]] : null; n = st && st.bin && st.bin.close ? 2 : 1; } catch (e) { /* one sun */ }
+    sunsC.set(dim, n); return n;
+  };
+  P.ctx3 = (g) => ({ suns: P.suns(g.dim) });
 
   // a-story2: what the view sees for a deed (→ Story.actCheck): the angle and the distance to its target, the pitch, the
   // height, the moon, the eclipse, the ground (the frame's camera: on foot, in a ship, in the photo mode alike)
@@ -89,7 +99,8 @@
       let best = null, ba = 999;
       if (g.wow && g.wow.list) for (const v of g.wow.list.values()) { const Q = [v.x + 0.5, (v.y || e[1]) + 1, v.z + 0.5], dd = Math.hypot(Q[0] - e[0], Q[2] - e[2]); if (dd > act.max) continue; toward(Q); if (a.ang < ba) { ba = a.ang; best = Q; } }
       a.dist = undefined; a.ang = undefined; toward(best);
-    } else if (k === 'outpost') { const n = P.nearSite(g, false) || P.nearSite(g); if (n) toward([n.s.x + 0.5, (n.s.y || e[1]) + 3, n.s.z + 0.5]); }
+    } else if (k === 'village') { const v = P.village(g); if (v) toward([v.s.x + 0.5, (v.s.y || e[1]) + 4, v.s.z + 0.5]); }
+    else if (k === 'outpost') { const n = P.nearSite(g, false) || P.nearSite(g); if (n) toward([n.s.x + 0.5, (n.s.y || e[1]) + 3, n.s.z + 0.5]); }
     else if (k === 'beacon' || k === 'beam') {
       const n = k === 'beam' ? P.nearSite(g, true) : P.nearSite(g), bc = n && n.s.beacon;
       if (bc) { if (k === 'beam') toward([bc[0] + 0.5, bc[1] + 14, bc[2] + 0.5]); else { toward([bc[0] + 0.5, bc[1] + 1.2, bc[2] + 0.5]); a.dist = Math.hypot(bc[0] + 0.5 - p.pos[0], bc[2] + 0.5 - p.pos[2], (bc[1] + 1) - (p.pos[1] + 1) ); } }
@@ -118,6 +129,7 @@
       this.calm = busy ? 0 : this.calm + dt;
       if (this.scene) this.step(dt);
       if (this.offer) this.offerTick(dt);
+      if (this.choiceUp) this.choiceTick(dt);
       if ((this.brainT -= dt) <= 0) { this.brainT = 1; this.brain(); }
       // a-story2: the deed between the beats (a 4-Hz watch), its hint a few seconds after the task's line
       if (!this.scene && (this.actT = (this.actT || 0) - dt) <= 0) { this.actT = 0.25; this.actTick(0.25); }
@@ -153,10 +165,25 @@
       if (!this.scene && !this.offer && g.settings && g.settings.storyOffer !== false) {
         const ctx = P.ctxOf(g, this), b = S.open(this.rec);
         this.lastWhy = b ? (S.due(this.rec, b.id, g.time || 0) ? S.why(b, ctx, this.rec) || 'ready' : 'later') : 'end';
+        if (this.choiceUp && S.busy(ctx, 0.01)) this.choiceHide();   // a-story3: building, a fight, a menu: the card steps back
+        if (!this.choiceUp && S.choicePending(this.rec)) { this.lastWhy = 'choice'; if (S.choiceReady(this.rec, ctx) && (g.time || 0) >= (this.choiceAt || 0)) this.choiceShow(S.choicePending(this.rec)); }
         const nb = S.next(this.rec, ctx, g.time || 0);
         if (nb) { this.want = nb; if (!VR.Regie || !VR.Regie.of(g)) this.announce(nb); }
       }
       if (t0) { P.stats.brainMs += performance.now() - t0; P.stats.brains++; }
+    }
+    // ---- a-story3 · the choice card (on a calm screen only; untaken it steps back and comes again a minute later)
+    choiceShow(id) { this.choiceUp = { id, t: 0 }; P.stats.choices = (P.stats.choices || 0) + 1; try { choiceCard(this); } catch (e) { /* the journal also holds it */ } if (this.g.audio && this.g.audio.play) { try { this.g.audio.play('ping', { vol: 0.5 }); } catch (e) { /* a sound */ } } }
+    choiceHide() { this.choiceUp = null; this.choiceAt = (this.g.time || 0) + 4; choiceCard(null); }
+    choose(opt) {
+      const c = this.choiceUp || { id: S.choicePending(this.rec) }; if (!c.id || !S.choose(this.rec, c.id, opt)) return false;
+      this.choiceUp = null; choiceCard(null); this.save();
+      const fk = this.g.funke, line = T('story.choice.' + c.id + '.' + opt + '.after');
+      if (fk && fk.show && fk.on && fk.on()) fk.show(line); else if (this.g.ui && this.g.ui.hint) this.g.ui.hint(line, 4000);
+      if (VR.EventLog) VR.EventLog.emit('story', 'choice:' + c.id + ':' + opt, 3, null, 'story');
+      if (this.g.audio && this.g.audio.swell) { try { this.g.audio.swell(this.g.env ? this.g.env.day | 0 : 0, 1); } catch (e) { /* the score */ } }
+      if (VR.Quests && this.g.ui && this.g.ui.screen === 'journal') VR.Quests.renderJournal();
+      return true;
     }
     // ---- the offer
     announce(b) {
@@ -176,6 +203,7 @@
       const ctx = P.ctxOf(this.g, this);
       if (o.t > S.CARD || ctx.building || ctx.fighting || ctx.landing) this.later(false);
     }
+    choiceTick(dt) { const c = this.choiceUp; c.t += dt; if (c.t > S.CARD * 2) { this.choiceHide(); this.choiceAt = (this.g.time || 0) + 60; } }
     later(said) {
       const o = this.offer; if (!o) return;
       S.later(this.rec, o.b.id, this.g.time || 0); this.offer = null; P.stats.laters++;
@@ -187,11 +215,13 @@
     watch(b) {
       const g = this.g; b = b || (this.offer && this.offer.b) || S.open(this.rec);
       if (!b || this.scene || (g.meta && g.meta.guest)) return false;
+      if (b.when.choice && !(this.rec.choices && this.rec.choices[b.when.choice]) && !S.isDone(this.rec, b.id)) { this.choiceShow(b.when.choice); return false; }   // a-story3: first the choice
       this.offer = null; card(null);
       if (g.ui && g.ui.screen) { try { if (g.ui.screen === 'journal' && VR.Quests) VR.Quests.closeJournal(); else g.ui.resume && g.ui.resume(); } catch (e) { /* the menu */ } }
-      const texts = b.scene.lines.map(l => T(l.key)), tl = S.timeline(b, texts);
+      const lines = S.linesOf(b, this.rec), texts = lines.map(l => T(l.key)), tl = S.timeline(b, texts);   // (a-story3: the lines of the choice made)
       if (VR.A11y) VR.A11y.stretch(tl, texts, VR.A11y.subK(g.settings));   // e-access: every line ≥ 0.06 s a character, ≥ 2.5 s
-      const sc = this.scene = { b, t: 0, texts, tl, len: tl.len, line: -1, shot: -1, tg: {}, seen: S.isDone(this.rec, b.id) };
+      if (this.choiceUp) { this.choiceUp = null; choiceCard(null); }
+      const sc = this.scene = { b, lines, t: 0, texts, tl, len: tl.len, line: -1, shot: -1, tg: {}, seen: S.isDone(this.rec, b.id) };
       this.resolve(sc);
       if (VR.Regie) VR.Regie.inScene(g, true);
       if (VR.EventLog) VR.EventLog.emit('story', b.id, 4, null, 'story');
@@ -228,6 +258,8 @@
       sc.tg.beacon = b ? [b[0] + 0.5, b[1] + 1.2, b[2] + 0.5] : null;
       sc.tg.outpost = n ? [n.s.x + 0.5, (n.s.y || eye[1]) + 3, n.s.z + 0.5] : ahead(120, 2);
       sc.tg.horizon = ahead(1500, 0);
+      const vl = P.village(g); sc.tg.village = vl && vl.d < 500 ? [vl.s.x + 0.5, (vl.s.y || top(vl.s.x, vl.s.z, eye[1])) + 3, vl.s.z + 0.5] : ahead(70, 3);   // a-story3
+      sc.tg.window = ahead(60, -22); sc.tg.sea = ahead(20, -12);
       sc.tg.sky = ahead(60, 60);
       const BS = VR.BodySky, md = BS && BS.cur && BS.cur.light && g.dim !== 'overworld' ? BS.cur.light.moonDir : null;
       sc.tg.amarant = md && md[1] > -0.05 ? [eye[0] + md[0] * 200, eye[1] + md[1] * 200, eye[2] + md[2] * 200] : ahead(80, 70);
@@ -248,12 +280,13 @@
       let li = -1; for (const q of sc.tl.lines) if (sc.t >= q.t0 && sc.t < q.t1) li = q.i;
       if (li !== sc.line) { sc.line = li; subtitle(sc, li); }
       if (sc.por) P.porTick(sc);   // a-story2: the speaker's face blinks and talks
+      try { P.fxTick(this, sc); } catch (e) { if (!P.stats.fxErr) { P.stats.fxErr = String(e && e.message); console.error('story fx', e); } }   // a-story3: the film's own pictures and the score's swell
       if (sc.t >= sc.len) this.end(false);
     }
     skip() { const sc = this.scene; if (!sc || sc.t < S.SKIP_AFTER) return false; P.stats.skips++; this.end(true); return true; }
     end(skipped) {
       const g = this.g, sc = this.scene; if (!sc) return;
-      this.scene = null; overlay(this, false);
+      this.scene = null; overlay(this, false); P.fxEnd(sc);
       if (VR.Regie) VR.Regie.inScene(g, false);
       if (sc.fl0 && g.flight) { g.flight.headPitch = sc.fl0.hp; g.flight.headYaw = sc.fl0.hy; }
       if (sc.b.id === 'c2.b2' && VR.Liberate && VR.Liberate.moment && VR.Liberate.moment.replay) VR.Liberate.moment = null;
@@ -335,11 +368,16 @@
           const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 6.2 + rt[0] * 1.0, sc.surf + 1.9 - 0.4 * smooth(u), E2[2] - f[2] * 6.2 + rt[2] * 1.0];
           return lookAt(C, [E2[0], E2[1] - 0.7, E2[2]], 36, base);   // (the eye on the upper third, its face and shoulders under it)
         }
+        case 'window': {
+          // a-story3 · the Ringstation's window: from just behind the player's shoulder out into space, a slow push in
+          const C = [pe[0] - f[0] * (1.2 - 0.6 * smooth(u)), pe[1] + 0.25, pe[2] - f[2] * (1.2 - 0.6 * smooth(u))];
+          return lookAt(C, [pe[0] + f[0] * 40, pe[1] + 40 * Math.tan(-12 * DEG), pe[2] + f[2] * 40], 72 - 6 * smooth(u), base);
+        }
         default: return null;
       }
     }
     holds() { return !!this.scene; }
-    destroy() { if (this.scene) { this.scene = null; overlay(this, false); } card(null); if (VR.Regie) VR.Regie.inScene(this.g, false); }
+    destroy() { if (this.scene) { P.fxEnd(this.scene); this.scene = null; overlay(this, false); } card(null); choiceCard(null); if (VR.Regie) VR.Regie.inScene(this.g, false); }
   }
   P.Player = Player;
   P.WARDEN_SCALE = 3; P.WARDEN_H = 43 / 16;   // (a-story2: story_warden is 43 voxels tall — 8 m at ×3)
@@ -351,7 +389,7 @@
     if (g.state !== 'play' || !g.world || !g.player) return;
     if (P.frameN === g.frameN && g.frameN !== undefined) return;
     let s = g.story;
-    if (!s || s.world !== g.world) { if (s) s.destroy(); s = g.story = new Player(g); }
+    if (!s || s.world !== g.world) { if (s) s.destroy(); s = g.story = new Player(g); P.wrapPortal(); }
     s.update(dt);
     if (VR.Regie && VR.Regie.frame) VR.Regie.frame(g, dt);
   };
@@ -385,6 +423,7 @@
     const s = pl(g); if (!s || !s.wayKind) return null;
     const p = g.player.pos;
     if (s.wayKind === 'outpost') { const n = P.nearSite(g, false); if (n && n.d > 12) return { pos: [n.s.x + 0.5, n.s.y || p[1], n.s.z + 0.5], name: T('story.way.outpost'), kind: 'story' }; return null; }
+    if (s.wayKind === 'village') { const v = P.village(g); if (v && v.d > 14 && v.d < 900) return { pos: [v.s.x + 0.5, v.s.y || p[1], v.s.z + 0.5], name: T('story.way.village'), kind: 'story' }; return null; }
     if (s.wayKind === 'home') { const sp = g.player.spawn; if (sp && Math.hypot(sp[0] - p[0], sp[2] - p[2]) > 30) return { pos: [sp[0], sp[1], sp[2]], name: T('story.way.home'), kind: 'story' }; return null; }
     return null;   // (the vista: Funke's own target — the nearest unseen vista; the sky and the moons: the ships)
   };
@@ -419,6 +458,19 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
 #storybox .kick { position: absolute; left: 4%; top: 3.2%; color: rgba(255, 255, 255, .78); font: 600 clamp(11px, 1.3vw, 15px) system-ui, sans-serif; letter-spacing: .04em; }
 #storybox .skip { position: absolute; right: 4%; bottom: 3.6%; color: rgba(255, 255, 255, .55); font: 500 clamp(10px, 1.1vw, 13px) system-ui, sans-serif; opacity: 0; transition: opacity .4s; }
 #storybox .skip.on { opacity: 1; }
+#storychoice { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%); z-index: 61; display: none; flex-direction: column; align-items: center; gap: 8px; padding: 12px 14px 14px; border-radius: 16px; max-width: min(92vw, 640px);
+  background: linear-gradient(180deg, rgba(20, 26, 44, .94), rgba(10, 14, 26, .94)); border: 1px solid rgba(140, 220, 255, .4); box-shadow: 0 8px 28px rgba(0, 0, 0, .5), 0 0 22px rgba(90, 210, 255, .22);
+  color: #eaf6ff; font: 600 14px/1.25 system-ui, sans-serif; pointer-events: auto; animation: storyIn .35s ease-out; }
+#storychoice .k { color: #8fe4ff; font-size: 12px; letter-spacing: .04em; } #storychoice .q { font-size: 18px; }
+#storychoice .opts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#storychoice button.o { position: relative; display: flex; flex-direction: column; gap: 3px; width: min(42vw, 280px); text-align: left; padding: 9px 12px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .07); color: #eaf6ff; cursor: pointer; font: 700 15px system-ui, sans-serif; }
+#storychoice button.o:hover { background: rgba(79, 210, 255, .22); border-color: #4fd2ff; }
+#storychoice button.o .d { font: 500 12.5px/1.3 system-ui, sans-serif; opacity: .8; } #storychoice kbd { position: absolute; right: 8px; top: 8px; font: 700 11px system-ui; padding: 1px 5px; border-radius: 4px; background: rgba(143, 228, 255, .2); }
+body.storyon #storychoice { visibility: hidden !important; }
+#storybox canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+#storybox .sub .por.solgani { border-color: #ffb02a; background: radial-gradient(circle at 35% 30%, rgba(255, 176, 42, .6), rgba(60, 25, 15, .92)); } #storybox .sub .por.ariveli { border-color: #6ae0d0; background: radial-gradient(circle at 35% 30%, rgba(106, 224, 208, .55), rgba(15, 50, 60, .92)); }
+#storybox .sub .por.selkatun { border-color: #c0b0ff; background: radial-gradient(circle at 35% 30%, rgba(192, 176, 255, .55), rgba(30, 30, 70, .92)); } #storybox .sub .por.anselm { border-color: #e8c890; background: radial-gradient(circle at 35% 30%, rgba(232, 200, 144, .55), rgba(60, 45, 30, .92)); }
+#storybox .sub b.solgani { color: #ffb02a; } #storybox .sub b.ariveli { color: #6ae0d0; } #storybox .sub b.selkatun { color: #c0b0ff; } #storybox .sub b.anselm { color: #e8c890; }
 @keyframes storyIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .jstory h3 .bk { font-weight: 500; opacity: .7; font-size: .85em; margin-left: 6px; }
 .jstory .jch { margin: 6px 0 10px; padding: 9px 11px; border-radius: 10px; background: rgba(120, 200, 255, .07); border: 1px solid rgba(140, 220, 255, .18); }
@@ -447,6 +499,90 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     el.appendChild(tx); el.appendChild(w); el.appendChild(l);
     el.style.display = 'flex';
   }
+  // a-story3 · the choice card: the question, two options (each with what it means), [1] / [2]; on a calm screen only
+  let chKey = null;
+  function choiceCard(pl0) {
+    if (!hasDoc) return;
+    let el = document.getElementById('storychoice');
+    if (!pl0) { if (el) el.style.display = 'none'; return; }
+    css();
+    if (!el) { el = mk('div'); el.id = 'storychoice'; if (el.setAttribute) el.setAttribute('id', 'storychoice'); const h = host(); if (!h) return; h.appendChild(el); }
+    const id = pl0.choiceUp.id, C = S.CHOICES[id], ch = S.byId(C.at).ch;
+    el.innerHTML = '';
+    el.appendChild(mk('div', 'k', T('story.choice.kick', { ch })));
+    el.appendChild(mk('div', 'q', T('story.choice.' + id + '.q')));
+    const row = mk('div', 'opts');
+    C.opts.forEach((o, i) => {
+      const b = mk('button', 'o'); b.type = 'button';
+      b.appendChild(mk('span', 'n', T('story.choice.' + id + '.' + o))); b.appendChild(mk('span', 'd', T('story.choice.' + id + '.' + o + '.d'))); const kb = mk('kbd', '', String(i + 1)); b.appendChild(kb);
+      b.onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); pl0.choose(o); };
+      row.appendChild(b);
+    });
+    el.appendChild(row);
+    el.style.display = 'flex';
+    if (!chKey) {
+      chKey = (e) => {
+        const s = pl(); if (!s || !s.choiceUp || e.repeat) return;
+        const i = e.code === 'Digit1' || e.code === 'Numpad1' ? 0 : e.code === 'Digit2' || e.code === 'Numpad2' ? 1 : -1; if (i < 0) return;
+        const C2 = S.CHOICES[s.choiceUp.id]; if (s.choose(C2.opts[i])) { if (e.preventDefault) e.preventDefault(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
+      };
+      window.addEventListener('keydown', chKey, true);
+    }
+  }
+  P.choose = (g, opt) => { const s = pl(g); return !!(s && s.choose(opt)); };
+  P.choiceUp = (g) => { const s = pl(g); return s && s.choiceUp ? s.choiceUp.id : null; };
+
+  // a-story3 · the film's own pictures (VR.StoryFx, story_art.js) on a 2-D canvas over the frame, and the score's swell
+  // at a shot marked swell. Cost: only while a scene plays — Very Low a third of the screen's size and fewer sparks.
+  P.fxTick = function (pl0, sc) {
+    const at = S.shotAt(sc.b, sc.t); if (!at) return;
+    if (at.i !== sc.fxShot) {
+      sc.fxShot = at.i;
+      const g = pl0.g; if (at.shot.swell && g.audio && g.audio.swell) { try { g.audio.swell(g.env ? g.env.day | 0 : 0, 1); } catch (e) { /* the score */ } P.stats.swells = (P.stats.swells || 0) + 1; }
+    }
+    const kind = at.shot.fx || sc.b.scene.fx || null, Fx = VR.StoryFx;
+    if (!hasDoc || !Fx) { sc.fxKind = kind; return; }
+    const box = document.getElementById('storybox'); if (!box) return;
+    let cv = sc.fxCv;
+    if (kind && !cv) { cv = box.querySelector('canvas.fx'); if (!cv) { cv = mk('canvas', 'fx'); if (box.insertBefore && box.firstChild) box.insertBefore(cv, box.firstChild); else box.appendChild(cv); } sc.fxCv = cv; }
+    if (!cv) return;
+    if (!kind) { if (sc.fxKind) { cv.style.display = 'none'; sc.fxKind = null; } return; }
+    const g = pl0.g, low = !!(g.settings && g.settings.preset === 'potato');
+    const k = low ? 0.33 : 0.5, W = Math.max(160, Math.round((window.innerWidth || 1280) * k)), H = Math.max(90, Math.round((window.innerHeight || 720) * k));
+    if (cv.width !== W) cv.width = W; if (cv.height !== H) cv.height = H;
+    cv.style.display = 'block'; sc.fxKind = kind;
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+    const c = cv.getContext ? cv.getContext('2d') : null; if (c) Fx.draw(c, kind, sc.t, at.u, W, H, { low, seed: sc.b.ch * 31 + sc.b.n });
+    if (t0) { P.stats.fxMs = (P.stats.fxMs || 0) + performance.now() - t0; P.stats.fxN = (P.stats.fxN || 0) + 1; }
+  };
+  P.fxEnd = function (sc) { if (sc && sc.fxCv) { sc.fxCv.style.display = 'none'; } };
+
+  // a-story3 · the gate that turns aside: with chapter 7's station beat open, a Leuchtpfad trip to a world ends at the
+  // Ringstation (not one to a station or another star, never a dry run); once seen, the gates go where you aim again
+  P.gateTurn = function (g, dest) {
+    const s = pl(g); if (!s || !dest || !dest.dim) return null;
+    const o = S.open(s.rec); if (!o || o.id !== 'c7.b2') return null;
+    const d = String(dest.dim); if (d.slice(0, 4) === 'stn.' || d.slice(0, 2) === 'x.') return null;
+    if (g.meta && g.meta.guest) return null;
+    return Object.assign({}, dest, { dim: 'stn.ring', id: 'stn.ring', turned: d });
+  };
+  P.wrapPortal = function () {
+    const Po = VR.Portal; if (!Po || !Po.go || Po._story3) return;
+    Po._story3 = true; const go0 = Po.go;
+    Po.go = function (g, dest, o) {
+      if (!(o && o.dry)) {
+        const t = P.gateTurn(g, dest);
+        if (t && !(VR.Travel && VR.Travel.canGo && VR.Travel.canGo(g, t.dim))) {
+          const fk = g.funke; if (fk && fk.show) { try { fk.show(T('story.gate.turn')); } catch (e) { /* the line */ } }
+          P.stats.turns = (P.stats.turns || 0) + 1;
+          if (go0.call(this, g, t, Object.assign({}, o, { film: undefined }))) return true;
+        }
+      }
+      return go0.apply(this, arguments);
+    };
+  };
+  P.wrapPortal();
+
   let keyFn = null;
   function overlay(pl0, on) {
     if (!hasDoc) return;
@@ -481,7 +617,7 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
     const el = document.getElementById('storybox'); if (!el) return;
     const s = el.querySelector('.sub');
     if (i < 0) { s.classList.remove('on'); return; }
-    const ln = sc.b.scene.lines[i], who = ln.who;
+    const ln = (sc.lines || sc.b.scene.lines)[i], who = ln.who;
     s.innerHTML = '';
     // a-story2: the speaker's face (story_art.js), a 24 × 24 canvas scaled up crisp, in a ring of the speaker's colour
     const Po = VR.Portrait;
@@ -516,7 +652,8 @@ body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon
       const soon = c.n > cur || !c.written;
       h += `<div class="jch${soon ? ' soon' : ''}"><div><b>${esc(T('story.j.ch', { n: c.n }))} · ${esc(T(c.title))}</b></div><div class="w">${esc(T(c.where))}</div><div class="lg">${esc(T(c.log))}</div>`;
       if (c.n === shown) for (const b of seen) {
-        for (const l of b.scene.lines) h += `<div class="jline"><b>${esc(T('story.who.' + l.who))}:</b> ${esc(T(l.key))}</div>`;   // (the lines of the chapter in play; the others: their logline and ↺)
+        for (const l of S.linesOf(b, rec)) h += `<div class="jline"><b>${esc(T('story.who.' + l.who))}:</b> ${esc(T(l.key))}</div>`;   // (the lines of the chapter in play; the others: their logline and ↺)
+        if (b.choice && rec.choices && rec.choices[b.choice]) h += `<div class="jline jact ok">✦ ${esc(T('story.choice.' + b.choice + '.' + rec.choices[b.choice] + '.j'))}</div>`;   // a-story3
         if (b.act) h += `<div class="jline jact${S.actDone(rec, b.id) ? ' ok' : ''}">${S.actDone(rec, b.id) ? '✓' : '☐'} <i>${esc(T('story.act.j'))}:</i> ${esc(T('story.act.' + b.id))}</div>`;   // a-story2: the deed, done or open
       } else if (seen.length) { const nd = seen.filter(b => S.actDone(rec, b.id)).length; h += `<div class="jline jact${nd === seen.length ? ' ok' : ''}">${nd === seen.length ? '✓' : '☐'} <i>${esc(T('story.act.j'))}:</i> ${nd} / ${seen.length}</div>`; }
       if (open && open.ch === c.n) {
