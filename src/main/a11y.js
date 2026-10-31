@@ -282,7 +282,7 @@
     // the pad's glyphs in the prompts
     '.a11y-g{display:inline-block;vertical-align:middle}',   // (no CSS filter: the glyph's own dark body is its contrast)
     '#keystrip kbd.pad,#ctxprompt b.pad,html.a11y-hc #keystrip kbd.pad,html.a11y-hc #ctxprompt b.pad{background:none !important;border:0 !important;padding:0 !important;box-shadow:none !important;min-width:0}',
-    '#a11ybump{position:absolute;pointer-events:none;display:none;z-index:5}',
+    '#a11ybump{position:absolute;pointer-events:none;display:none;z-index:5;transition:opacity .35s}',
     '#a11ybump.on{display:block}#a11ybump .l,#a11ybump .r{position:absolute;top:0}',
   ].join('\n');
   let cssOn = false, bump = null;
@@ -305,7 +305,9 @@
       bump.innerHTML = '<span class="l">' + A.glyph(4) + '</span><span class="r">' + A.glyph(5) + '</span>';
       (hb.parentNode || document.body).appendChild(bump);
     }
-    const on = A.padMode() && g.state === 'play' && !(g.ui && g.ui.screen) && hb.offsetWidth > 0;
+    const op = +getComputedStyle(hb).opacity;   // (the HUD fades the hotbar: the bumpers go with it)
+    const on = A.padMode() && g.state === 'play' && !(g.ui && g.ui.screen) && hb.offsetWidth > 0 && op > 0.05;
+    bump.style.opacity = on ? String(op) : '';
     bump.classList.toggle('on', on);
     if (on) { const r = hb.getBoundingClientRect(), pr = (hb.offsetParent || document.body).getBoundingClientRect(); bump.style.left = (r.left - pr.left - 36) + 'px'; bump.style.top = (r.top - pr.top + r.height / 2 - 9) + 'px'; bump.style.width = (r.width + 72) + 'px'; bump.querySelector('.r').style.left = (r.width + 42) + 'px'; }
   }
