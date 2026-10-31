@@ -23,7 +23,7 @@
   // the places, in world coordinates of the dim (the same for every seed: the game and the tests read them)
   const PLACES = [
     { spawn: [0.5, FY, 6.5, 0], berth: [-16.5, FY, -31.5], pad: [17.5, FY, -31.5], hold: 1, counter: [28, FY, 6], board: [26, FY, 9],
-      cabins: [], hall: [0, FY, 4], window: { z: -7, x0: -20, x1: 20, y0: FY, y1: FY + 8 }, garden: [0, FY, 22], control: [28, FY, 18] },
+      cabins: [], hall: [0, FY, 4], window: { z: -7, x0: -20, x1: 20, y0: FY, y1: FY + 8 }, garden: [0, FY, 22], control: [28, FY, 18], echo: [0.5, FY, -1.0] },
     { spawn: [0.5, FY, 3.5, 0], berth: [-9.5, FY, -26.5], pad: [9.5, FY, -26.5], hold: 1, counter: [7, FY, 4], board: [6, FY, 6],
       cabins: [], hall: [0, FY, 2], window: { z: -7, x0: -10, x1: 10, y0: FY, y1: FY + 6 }, garden: null, control: [-6, FY, 4] },
   ];
@@ -198,6 +198,53 @@
     void G;
     return Object.assign(K.grid, { meta: { front: 0, doors: [], floors: [FY], station: k } });
   });
+  // ---------------------------------------------------------------- u-stations2: the dressed hall (sgen 2)
+  // A save's station generator version (meta.universe.sgen, src/main/stations.js STN.stampS): sgen 1 is the hall as
+  // v0.54 built it (byte-identical: saved chunks of a station a save stood in stay the same); sgen 2 dresses the
+  // Ringstation's hall: an oak floor with sand rugs instead of the white hex tiles (the gravity plates' cross stays), a
+  // café in the west back corner (a counter with the drinks behind it, two tables with stools), warm floor lamps by the
+  // sofas, tall plants along the side walls, crates on the deck by the airlock. The places the deck life uses
+  // (STN.deckLife) stand on this. The outposts are not dressed.
+  STA.CAFE = { counter: { x0: -18, x1: -15, z: 11 }, tables: [[-16, 8], [-12, 8]], crates: [[-3, -13], [-2, -13], [-3, -12], [-1, -13], [-2, -12]] };
+  STA.dress = function (gr, k) {
+    if (k) return gr;
+    const B = BOX[0], R = VR.R, F0 = FY - 1;
+    const sid = (n, pr) => { const t = R && R.byName[n]; return t ? (pr ? t.state(pr) : t.defaultState) : 0; };
+    const idx = (x, y, z) => { const gx = x - B.x0, gy = y - B.y0, gz = z - B.z0; return gx < 0 || gy < 0 || gz < 0 || gx >= gr.sx || gy >= gr.sy || gz >= gr.sz ? -1 : (gy * gr.sz + gz) * gr.sx + gx; };
+    const get = (x, y, z) => { const i = idx(x, y, z); return i < 0 ? 0 : gr.blocks[i]; };
+    const S = (x, y, z, s) => { const i = idx(x, y, z); if (i >= 0 && s) gr.blocks[i] = s; };
+    const nameOf = (s) => (s && R ? R.types[R.T.type[s]].name : '');
+    const HEX = sid('vx_tech_hex_white'), OAK = sid('vx_floor_oak'), RUG = sid('vx_rug_sand');
+    // the floor: oak where the white tiles were
+    for (let x = -20; x <= 20; x++) for (let z = -6; z <= 14; z++) if (get(x, F0, z) === HEX) S(x, F0, z, OAK);
+    const rug = (x0, z0, x1, z1) => { for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) if (!get(x, FY, z) && get(x, F0, z) === OAK) S(x, FY, z, RUG); };
+    rug(-11, 5, -5, 11); rug(5, 5, 11, 11); rug(-18, 6, -10, 10);
+    // the café: the counter, the drinks behind it, the tables and their stools
+    const C = STA.CAFE, CNT = sid('vx_counter'), POT = sid('vx_potplant'), TB = sid('vx_table'), ST = sid('vx_stool'), STO = sid('vx_stool_orange'), FR = sid('vx_shop_fridge_drinks', { facing: 2 });
+    for (let x = C.counter.x0; x <= C.counter.x1; x++) S(x, FY, C.counter.z, CNT);
+    S(C.counter.x0, FY + 1, C.counter.z, POT);
+    for (const x of [-18, -17, -16]) S(x, FY, 14, FR);
+    C.tables.forEach(([x, z], i) => { S(x, FY, z, TB); S(x - 1, FY, z, i ? STO : ST); S(x + 1, FY, z, i ? STO : ST); });
+    S(-12, FY + 1, 8, POT);
+    // warm floor lamps by the sofas and the café, tall plants along the side walls
+    const LMP = sid('vx_floorlamp'), TP = sid('vx_tall_plant');
+    for (const [x, z] of [[-10, 6], [-10, 10], [11, 6], [11, 10], [-19, 11]]) S(x, FY, z, LMP);
+    for (const [x, z] of [[-20, -4], [-20, -1], [-20, 5], [20, -4], [20, -1], [20, 5], [20, 7], [20, 11]]) if (!get(x, FY, z)) S(x, FY, z, TP);
+    // crates on the deck by the airlock (the dock worker's)
+    const CR = sid('vx_crate');
+    for (const [x, z] of C.crates) S(x, FY, z, CR);
+    S(-3, FY + 1, -13, CR);
+    void nameOf;
+    return gr;
+  };
+  // the station's grid as a save of version v builds it (cached per thread)
+  const GRIDS = {};
+  STA.grid = function (k, v) {
+    const key = (k ? 1 : 0) + ':' + (v >= 2 && !k ? 2 : 1);
+    if (GRIDS[key]) return GRIDS[key];
+    const gr = Forge.build(STA.dna(k));
+    return (GRIDS[key] = v >= 2 && !k ? STA.dress(gr, k ? 1 : 0) : gr);
+  };
   // (a kind the stations' generator builds, not one for the Forge's catalogue: off the list the Studio and the text parser
   // walk, in TYPES and gens for Forge.build)
   { const i = Forge.types.indexOf(Forge.TYPES.station); if (i >= 0) Forge.types.splice(i, 1); Forge.TYPES.station.hidden = true; }
