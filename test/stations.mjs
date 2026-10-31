@@ -222,12 +222,13 @@ async function stationRun(P, hi, Rr, tag) {
   for (let i = 0; i < 2400; i++) {
     const draw = i % 30 === 0;
     const f = await P.ev((draw) => { const g = VR.game, t0 = performance.now(); window.__norender = !draw; g.last = t0 - 33; g.loop(t0); if (draw) window.__sync(); window.__norender = true; return +(performance.now() - t0).toFixed(1); }, draw);
-    (draw ? drawn : frames).push(f);
     s = await S_(P);
+    (draw ? drawn : frames).push(f); if (!draw) (Rr.dockWhy || (Rr.dockWhy = [])).push(s.dock ? s.dock.ph + (s.dock.hold ? '/hold' : '') : s.state);
     if (s.dock) ph.add(s.dock.ph);
-    if (hi && !shot && s.dock && s.dock.ph === 'corridor' && s.dock.s > s.dock.dur * 0.55) {
-      const bp = await P.ev(() => VR.game.flight.b.pos.slice());
-      await fixCam(P, [bp[0] + 170, bp[1] + 250, bp[2] + 40], [bp[0], bp[1] + 40, bp[2]]); await P.step(1, 0); await keep(P, '__Fd');
+    if (hi && !shot && s.dock && s.dock.ph === 'corridor' && s.dock.s > s.dock.dur * 0.6) {
+      // from above the ring, beside the berth, down the corridor: the guide rings, the ship coming up, Herzwelt below
+      const dk = await P.ev(() => { const g = VR.game, a = g.flight.asc, D = VR.Stations.deck('ring', 0, a.st.t, {}), p = [0, 0, 0], v = [0, 0, 0]; VR.Universe.home.inertialToChart('herz', D.p, D.v, a.st.t, p, v); return p; });
+      await fixCam(P, [dk[0] - 260, dk[1] + 300, dk[2] + 220], [dk[0], dk[1] - 420, dk[2]]); await P.step(1, 0); await keep(P, '__Fd');
       const m = await picture(P, '__Fd', SH('docking.png'), K, true); shot = true; await freeCam(P);
       console.log(`  docking: the corridor at ${s.dock.s} s (${m.err || m.draws + ' draws'}, L ${m.mean} ± ${m.sd}) (${secs()})`);
       await chase(P, 0.1, 0);
@@ -236,7 +237,8 @@ async function stationRun(P, hi, Rr, tag) {
   }
   Rr.dockDrawn = drawn;
   console.log(`  the docking's drawn frames: ${drawn.map(Math.round).join(' ')} ms`);
-  const dockF = frames.slice(5), dm = med(dockF), dx = Math.max(...dockF);
+  const dockF = frames.slice(5), dm = med(dockF), dx = Math.max(...dockF), ix = frames.indexOf(dx);
+  console.log(`  the dearest game frame: ${dx} ms at #${ix} (${(Rr.dockWhy || [])[ix]}); over 8 ms: ${frames.map((f, i) => f > 8 ? i + ':' + f + ':' + (Rr.dockWhy || [])[i] : null).filter(Boolean).join(' ')}`);
   Rr.dockFrames = { median: dm, max: dx, n: dockF.length };
   check(['transfer', 'corridor', 'align', 'clamp'].every(p => ph.has(p)), 'the phases flown: ' + [...ph].join(' → '));
   console.log(`  the docking's game frames (logic): median ${dm} ms, max ${dx} ms over ${dockF.length} (${secs()})`);
@@ -269,7 +271,7 @@ async function stationRun(P, hi, Rr, tag) {
     const vt = await P.ev(() => { const g = VR.game, Lf = g.stnLife; if (!Lf) return null; const pad = Lf.actor.pads.get('stn'), T = VR.Stations.visits('ring', g.meta.seed | 0, Lf.actor.clock, Lf.actor.clock + 400); const Tn = T[1] || T[0]; Lf.actor.clock = Tn - 9; return { T: Tn, pad: [pad.x, pad.y, pad.z] }; });
     if (vt) { for (let i = 0; i < 30; i++) { await P.step(2); const c = await P.ev(() => { const L = VR.game.stnLife.actor; return L.st.visible + L.st.crafts; }); if (c) break; await P.wait(150); } }
     await P.ev(() => { const L = VR.game.stnLife.actor; L.clock -= 0.5; });
-    await look(8.5, 65.4, -5.4, -0.42, 0.04, 'station_traffic', 'a shuttle coming down on the deck through the window');
+    await look(10.5, 65.8, -1.5, -0.36, 0.06, 'station_traffic', 'a shuttle coming down on the deck through the window');
     Rr.traffic = await P.ev(() => Object.assign({}, VR.game.stnLife.actor.st));
     console.log(`  the deck's PadLife: ${JSON.stringify(Rr.traffic)}`);
     // the shop: the counter, and its panel

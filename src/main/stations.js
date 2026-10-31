@@ -269,10 +269,10 @@
   function grid(sx, sy, sz) { const b = new Uint16Array(sx * sy * sz); return { sx, sy, sz, blocks: b, set(x, y, z, s) { if (x >= 0 && y >= 0 && z >= 0 && x < sx && y < sy && z < sz) b[(y * sz + z) * sx + x] = s; } }; }
   // the Ringstation: 96 × 32 × 96 blocks of 4 m — the ring (radius 40, a 5 × 5 tube), four spokes, the hub, the mast with
   // the red beacon, two solar wings, four decks on the ring's planet side (y 0 … 3)
-  STN.ringGrid = function () {
-    const Gd = grid(96, 32, 96), C = 48;
+  STN.ringGrid = function (Gd0, z0, z1) {
+    const Gd = Gd0 || grid(96, 32, 96), C = 48, za = z0 === undefined ? 0 : z0, zb = z1 === undefined ? 96 : z1;
     const W = st('hull_plating'), GR = st('hull_plating_gray'), DK = st('hull_plating_dark'), CY = st('neon_cyan'), AM = st('neon_amber'), WIN = st('window_warm'), VP = st('viewport'), BM = st('black_metal'), SOL = st('blue_stained_glass'), RED = st('beacon_red'), ANT = st('antenna'), HZ = st('hazard_stripes'), TT = st('vx_tech_trim');
-    for (let z = 0; z < 96; z++) for (let x = 0; x < 96; x++) {
+    for (let z = za; z < zb; z++) for (let x = 0; x < 96; x++) {
       const dx = x + 0.5 - C, dz = z + 0.5 - C, r = Math.hypot(dx, dz), a = Math.atan2(dz, dx);
       if (r >= 37.5 && r <= 42.5) for (let y = 4; y <= 8; y++) {
         let s = W;
@@ -297,6 +297,7 @@
         }
       }
     }
+    if (zb < 96) return Gd;
     // the mast, its beacon, the wings on their boom
     for (let y = 15; y <= 29; y++) Gd.set(C, y, C, y === 29 ? ANT : BM);
     Gd.set(C, 30, C, RED); Gd.set(C - 1, 30, C, RED);
@@ -342,15 +343,27 @@
   };
   const MESH = { ring: { grid: 'ringGrid', piv: [48, 6, 48], s: STN.SCALE }, outpost: { grid: 'outpostGrid', piv: [14, 3.5, 14], s: STN.SCALE }, gate: { grid: 'gateGrid', piv: [4.5, 0.5, 4.5], s: 3.2 }, shuttle: { grid: 'shuttleGrid', piv: [2.5, 1.5, 5.5], s: 1.6 } };
   const M = STN.meshes = {};
+  // (the ring's grid is filled a few rows a frame — 12 of 96 — so no frame pays for all of it; then the worker meshes it)
   function meshOf(g, key) {
-    const m = M[key]; if (m) return m.gpu ? m : null;
+    const m = M[key]; if (m && m.gpu) return m;
+    if (m && !m.rows) return null;
     if (!g.pool || !g.renderer || !g.renderer.uploadShip) return null;
-    const rec = M[key] = { gpu: null, modelMat: new Float32Array(16), normalMat: new Float32Array(9), clipNear: 0 };
-    const Gd = STN[MESH[key].grid](), copy = Gd.blocks.slice();
+    const rec = m || (M[key] = { gpu: null, modelMat: new Float32Array(16), normalMat: new Float32Array(9), clipNear: 0, rows: key === 'ring' ? { Gd: null, z: 0 } : null });
+    let Gd;
+    if (rec.rows) { const R0 = rec.rows; R0.Gd = STN.ringGrid(R0.Gd, R0.z, Math.min(96, R0.z + 12)); R0.z += 12; if (R0.z < 96) return null; Gd = R0.Gd; rec.rows = null; }
+    else Gd = STN[MESH[key].grid]();
+    const copy = Gd.blocks.slice();
     let wi = 0; g.pool.workers.forEach((wk, i) => { if (wk.inflight < g.pool.workers[wi].inflight) wi = i; });
     g.pool.direct(wi, { type: 'shipmesh', sx: Gd.sx, sy: Gd.sy, sz: Gd.sz, blocks: copy }, [copy.buffer], (msg) => { if (msg.type === 'shipmesh') { rec.gpu = g.renderer.uploadShip(msg.sections); STN.stats.meshes++; } });
     return null;
   }
+  // the meshes asked for from the frame (not the draw: a frame may be drawn rarely) while a station's world is near
+  STN.prepare = function (g) {
+    const a = g.flight && g.flight.asc; if (!a || !on(g)) return;
+    const L = STN.atBody(a.st.frame); if (!L) return;
+    const P = STN.place(L.id, a.st.t, _P), d = Math.hypot(P.r[0] - a.st.r[0], P.r[1] - a.st.r[1], P.r[2] - a.st.r[2]);
+    if (d < 200000) { meshOf(g, L.kind === 0 ? 'ring' : 'outpost'); meshOf(g, 'gate'); meshOf(g, 'shuttle'); }
+  };
   // the camera's place (body-inertial) and its local frame (row-major local → inertial; columns east, up, south)
   const _M = new Float64Array(9), _cr = [0, 0, 0], _cv = [0, 0, 0];
   function camInertial(g, cam, st0, b) {
@@ -736,6 +749,7 @@
   G0.prototype.playFrame = function (dt) {
     try {
       const fl = this.flight;
+      if (fl && SF.inSpace(this)) STN.prepare(this);
       if (fl && fl.regime === 'space' && !fl.auto && (hintT -= dt) <= 0) {
         hintT = 1.5;
         const tg = STN.target(this, fl);
