@@ -43,7 +43,8 @@
     const parts = new Float32Array(np * 3); for (let i = 0; i < np; i++) { parts[i * 3] = r() * TAU; parts[i * 3 + 1] = r(); parts[i * 3 + 2] = 0.4 + r() * 0.6; }
     const craters = new Float32Array(22 * 3); for (let i = 0; i < 22; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 0.85; craters[i * 3] = Math.cos(a) * d; craters[i * 3 + 1] = Math.sin(a) * d; craters[i * 3 + 2] = 0.03 + r() * 0.12; }
     const hills = new Float32Array(3 * 9); for (let i = 0; i < hills.length; i++) hills[i] = r();
-    return { stars, clouds, parts, craters, hills, r };
+    const nd = Math.round(64 * Math.max(0.35, q)), deck = new Float32Array(nd * 4); for (let i = 0; i < nd; i++) { deck[i * 4] = r() * 2 - 1; deck[i * 4 + 1] = r(); deck[i * 4 + 2] = 0.6 + r() * 0.8; deck[i * 4 + 3] = r(); }   // (e-portal2: the cloud sea: lateral, depth, size, shade)
+    return { stars, clouds, parts, craters, hills, deck, r };
   }
   // a soft cloud puff, drawn once into a small canvas and stamped many times
   let PUFF = null;
@@ -57,6 +58,25 @@
       x.fillStyle = g; x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
     }
     return (PUFF = c);
+  }
+
+  // e-portal2: a cumulus with depth — lit, bulging tops, a flat blue-grey underside, drawn once and stamped
+  let CUMU = null;
+  function cumulus() {
+    if (CUMU || typeof document === 'undefined') return CUMU;
+    const c = document.createElement('canvas'); c.width = 192; c.height = 112;
+    const x = c.getContext('2d'); if (!x) return null;
+    const lobes = [[40, 70, 30], [70, 52, 36], [104, 44, 40], [138, 58, 32], [160, 74, 24], [92, 76, 34], [124, 78, 30], [56, 82, 24]];
+    for (const [cx, cy, rr] of lobes) {
+      const g = x.createRadialGradient(cx - rr * 0.25, cy - rr * 0.35, rr * 0.1, cx, cy, rr);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(244,247,252,.96)'); g.addColorStop(0.85, 'rgba(214,224,238,.75)'); g.addColorStop(1, 'rgba(200,212,230,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
+    }
+    x.globalCompositeOperation = 'source-atop';   // the shaded underside: the light comes from above
+    const sh = x.createLinearGradient(0, 40, 0, 104); sh.addColorStop(0, 'rgba(120,135,165,0)'); sh.addColorStop(0.6, 'rgba(120,135,165,.35)'); sh.addColorStop(1, 'rgba(92,104,135,.7)');
+    x.fillStyle = sh; x.fillRect(0, 0, 192, 112);
+    x.globalCompositeOperation = 'source-over';
+    return (CUMU = c);
   }
 
   // ---------------------------------------------------------------- the painters' tools
@@ -152,23 +172,35 @@
     glow(X, cx, cy, M * (0.2 + k * 1.3), mix(c, [255, 255, 255], 0.6), clamp(k * 1.2, 0, 1));
     if (k > 0.72) { X.fillStyle = css([255, 252, 240], (k - 0.72) / 0.28); X.fillRect(0, 0, W, H); }
   };
-  // up through the clouds: the sky deepens to space, puffs rush past and under you, the first stars
+  // up through the clouds (e-portal2: with depth): the sky deepens to space; a sea of shaded cumulus falls away under
+  // you in perspective — far ones small and paling into the air, near ones rushing past —, a breath of white inside one,
+  // the sun's glow through the haze, the first stars
   SHOT.clouds = function (X, W, H, k, v, S) {
-    const sk = SKIES[v % 3], up = ease(k), top = mix(sk.top, [3, 4, 16], up), mid = mix(sk.mid, sk.top, up * 0.9);
-    vgrad(X, W, H, 0, H, [[0, css(top)], [0.6, css(mid)], [1, css(mix(sk.low, sk.mid, up * 0.6))]]);
-    starfield(X, W, H, S.P, clamp((up - 0.45) * 2, 0, 1), 0, S.t);
-    glow(X, W * (0.25 + 0.5 * (v / 2)), H * (0.75 + up * 0.3), W * 0.35, sk.sun, 0.6 * (1 - up * 0.5));
-    const pf = puff(); if (!pf) return;
-    const C = S.P.clouds, n = C.length / 4;
-    for (let i = 0; i < n; i++) {
-      const z = (C[i * 4 + 3] + k * 1.6) % 1, sc = 0.5 + z * z * 5, x = (C[i * 4] - 0.5) * W * (1 + z * 2) + W / 2, y = H * (0.15 + C[i * 4 + 1] * 0.5) + z * z * H * 1.4;
-      const w = W * 0.22 * sc * C[i * 4 + 2];
-      X.globalAlpha = clamp(Math.sin(z * PI) * 1.2, 0, 0.92) * (1 - up * 0.55);
-      X.drawImage(pf, x - w / 2, y - w * 0.3, w, w * 0.6);
+    const sk = SKIES[v % 3], up = ease(k), top = mix(sk.top, [3, 4, 16], up), mid = mix(sk.mid, sk.top, up * 0.9), low = mix(sk.low, sk.mid, up * 0.6);
+    const hor = H * lerp(0.5, 0.74, up);   // the deck's far edge: lower as you climb
+    vgrad(X, W, H, 0, H, [[0, css(top)], [hor / H * 0.92, css(mid)], [Math.min(1, hor / H + 0.02), css(low)], [1, css(mix(low, [235, 240, 248], 0.5))]]);
+    starfield(X, W, H, S.P, clamp((up - 0.5) * 2.2, 0, 1), 0, S.t);
+    const sx = W * (0.22 + 0.28 * v), sy = hor - H * lerp(0.12, 0.02, up);
+    glow(X, sx, sy, W * 0.42, sk.sun, 0.55 * (1 - up * 0.4));
+    glow(X, sx, sy, W * 0.06, [255, 255, 250], 0.9);
+    const cu = cumulus(); if (!cu) return;
+    const D = S.P.deck, n = D.length / 4, camH = lerp(0.12, 1.35, up), aw = cu.width / cu.height;
+    // three passes, far → near (no sorting a frame): depth z 0 far … 1 near, moving toward you as k runs
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < n; i++) {
+        const z = (D[i * 4 + 1] + k * 0.85) % 1, bin = z < 0.45 ? 0 : z < 0.8 ? 1 : 2; if (bin !== pass) continue;
+        const dist = lerp(9, 0.55, z), px = W / 2 + D[i * 4] * W * 1.6 / dist, py = hor + camH * H * 0.55 / dist;
+        const w = W * 0.5 * D[i * 4 + 2] / dist; if (w < 3 || px < -w || px > W + w || py - w * 0.5 > H) continue;
+        const near = clamp((z - 0.86) / 0.14, 0, 1), haze = clamp(1 - z * 1.3, 0, 1);
+        X.globalAlpha = clamp((0.25 + z) * (1 - near), 0, 1) * (0.92 - 0.25 * haze);
+        X.drawImage(cu, px - w / 2, py - w / aw * 0.62, w, w / aw);
+        if (haze > 0.05) { X.globalAlpha = haze * 0.45 * (1 - near); X.fillStyle = css(low); X.fillRect(px - w / 2, py - w / aw * 0.62, w, w / aw * 0.9); }
+      }
     }
     X.globalAlpha = 1;
-    const fog = Math.max(0, 1 - Math.abs(k - 0.42) / 0.14);   // through a cloud: everything white for a breath
-    if (fog > 0) { X.fillStyle = 'rgba(250,252,255,' + (fog * 0.85).toFixed(3) + ')'; X.fillRect(0, 0, W, H); }
+    // a high wisp you pass through: white for a breath (k ≈ 0.42), lit from the sun's side
+    const fog = Math.max(0, 1 - Math.abs(k - 0.42) / 0.12);
+    if (fog > 0) { const g = X.createLinearGradient(sx, 0, W - sx, H); g.addColorStop(0, 'rgba(255,252,244,' + (fog * 0.8).toFixed(3) + ')'); g.addColorStop(1, 'rgba(225,232,245,' + (fog * 0.7).toFixed(3) + ')'); X.fillStyle = g; X.fillRect(0, 0, W, H); }
   };
   // off an airless ground: the grey horizon falls away under you, dust drifts, the stars are there at once
   SHOT.rise = function (X, W, H, k, v, S) {
@@ -247,9 +279,11 @@
   };
   // a station's wheel turns closer, its red beacon blinking
   SHOT.station = function (X, W, H, k, v, S) {
-    X.fillStyle = '#03040a'; X.fillRect(0, 0, W, H);
-    starfield(X, W, H, S.P, 1, 0.01 * k, S.t);
-    disc(X, W * (0.15 + v * 0.3), H * 1.35, H * 0.8, S.curveFrom ? S.curveFrom.b : hex('#4a7ab8'), hex('#bfe0ff'), 0, -1, hex('#9ad0ff'));
+    if (!S.gl) {   // (e-portal2: under a 3-D shot Herzwelt's limb is the space renderer's; only the wheel is painted)
+      X.fillStyle = '#03040a'; X.fillRect(0, 0, W, H);
+      starfield(X, W, H, S.P, 1, 0.01 * k, S.t);
+      disc(X, W * (0.15 + v * 0.3), H * 1.35, H * 0.8, S.curveFrom ? S.curveFrom.b : hex('#4a7ab8'), hex('#bfe0ff'), 0, -1, hex('#9ad0ff'));
+    }
     const R = lerp(H * 0.08, H * 0.6, Math.pow(k, 1.4)), cx = W / 2, cy = H * 0.46, rot = S.t * 0.4 + v;
     X.save(); X.translate(cx, cy); X.scale(1, 0.42 + 0.1 * v); X.rotate(rot);
     X.strokeStyle = '#cfd8e6'; X.lineWidth = Math.max(2, R * 0.12); X.beginPath(); X.arc(0, 0, R, 0, TAU); X.stroke();
@@ -289,7 +323,7 @@
       for (let i = 0; i <= 24; i++) { const x = i / 24 * W; X.lineTo(x, yy - H * (0.07 - Lr * 0.015) * (Math.sin(i * 0.7 + h[Lr] * 9 + k * (Lr + 1)) * 0.5 + 0.5)); }
       X.lineTo(W, H); X.closePath(); X.fill();
     }
-    if (k > 0.8) { X.fillStyle = css(air ? sk.low : [255, 255, 255], (k - 0.8) / 0.2 * 0.85); X.fillRect(0, 0, W, H); }
+    if (k > 0.8) { X.fillStyle = css(lo, (k - 0.8) / 0.2 * 0.35); X.fillRect(0, 0, W, H); }   // (e-portal2: the land's own light, no white wash — the reveal fades into the real world)
   };
   F.SHOT = SHOT;
 
@@ -307,22 +341,48 @@
       len, film, S,
       shotAt: (t) => film.shots[which(t)].id,
       // t: s since the start; hold: the arrival's last look stays while the world still loads
+      // e-portal2: o.gl(id, k, v, i) draws a 3-D shot with the space renderer under this canvas (true when it did): the
+      // canvas is then cleared and only the letterbox, the station's wheel and a 2-D neighbour's cross-fade go on it
+      gl: false,
       draw(X, W, H, t) {
         S.t = t;
         const tt = Math.min(t, len - 0.001), i = which(tt), s = film.shots[i], k = clamp((tt - starts[i]) / s.dur, 0, 1);
-        const f = SHOT[s.id] || SHOT.arrive;
+        const p = i > 0 ? film.shots[i - 1] : null, fade = !!p && tt - starts[i] < F.FADE, fk = fade ? (tt - starts[i]) / F.FADE : 1;
+        const G = o.gl, f = SHOT[s.id] || SHOT.arrive;
+        let gCur = false, gPrev = false;
+        if (G && GL3[s.id]) gCur = !!G(s.id, k, s.v, i);
+        if (G && !gCur && fade && GL3[p.id]) gPrev = !!G(p.id, 1, p.v, i - 1);
+        this.gl = gCur || gPrev;
         X.save(); X.globalAlpha = 1;
-        if (i > 0 && tt - starts[i] < F.FADE) {   // the cross-fade: the shot before, then this one over it
-          const p = film.shots[i - 1]; (SHOT[p.id] || SHOT.arrive)(X, W, H, 1, p.v, S);
-          X.globalAlpha = (tt - starts[i]) / F.FADE;
-          X.save(); f(X, W, H, k, s.v, S); X.restore();
-        } else f(X, W, H, k, s.v, S);
+        if (gCur) {
+          X.clearRect(0, 0, W, H);
+          if (fade && GL3[p.id]) { X.fillStyle = 'rgba(0,0,0,' + ((1 - fk) * 0.85).toFixed(3) + ')'; X.fillRect(0, 0, W, H); }   // two 3-D shots: a short dip
+          else if (fade) layer(X, W, H, p, 1, 1 - fk);
+          S.gl = true; if (s.id === 'station') f(X, W, H, k, s.v, S); S.gl = false;
+        } else if (gPrev) { X.clearRect(0, 0, W, H); layer(X, W, H, s, k, fk); }
+        else if (fade) { const pf = SHOT[p.id] || SHOT.arrive; pf(X, W, H, 1, p.v, S); layer(X, W, H, s, k, fk); }   // the cross-fade: the shot before, then this one over it
+        else f(X, W, H, k, s.v, S);
         X.restore();
         // the letterbox: it is a film
         if (i > 0 || k > 0.3) { const b = Math.round(H * F.LETTERBOX * (i === 0 ? clamp((k - 0.3) / 0.4, 0, 1) : 1)); X.fillStyle = '#000'; X.fillRect(0, 0, W, b); X.fillRect(0, H - b, W, b); }
       },
     };
+    // a shot drawn whole into a second canvas, then laid over at alpha a (the shots set their own alphas inside)
+    function layer(X, W, H, sh, k, a) {
+      if (a <= 0.01) return;
+      const L = layerCv(W, H); if (!L) { X.globalAlpha = a; (SHOT[sh.id] || SHOT.arrive)(X, W, H, k, sh.v, S); X.globalAlpha = 1; return; }
+      L.x.globalAlpha = 1; L.x.clearRect(0, 0, W, H); (SHOT[sh.id] || SHOT.arrive)(L.x, W, H, k, sh.v, S); L.x.globalAlpha = 1;
+      X.globalAlpha = a; X.drawImage(L.c, 0, 0); X.globalAlpha = 1;
+    }
   };
+  const GL3 = { curve: 1, ring: 1, moon: 1, station: 1 };   // (VR.PortalSpace.GL: the shots the space renderer can draw)
+  let LAYER = null;
+  function layerCv(W, H) {
+    if (typeof document === 'undefined') return null;
+    if (!LAYER) { const c = document.createElement('canvas'); const x = c.getContext('2d'); if (!x) return null; LAYER = { c, x }; }
+    if (LAYER.c.width !== W || LAYER.c.height !== H) { LAYER.c.width = W; LAYER.c.height = H; }
+    return LAYER;
+  }
 
   // ---------------------------------------------------------------- the picker's postcards
   F.card = function (X, W, H, kind, pal, t, seed) {
