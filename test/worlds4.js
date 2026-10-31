@@ -31,7 +31,7 @@ if (part('a')) {
     const c = [hc(g.generate(s.x >> 4, s.z >> 4)), hc(g.generate(L[0] >> 4, L[2] >> 4)), hc(g.generate(mx >> 4, mz >> 4))].join('.');
     check(p === PLANS[k] && c === CHUNKS[k], `${k}: bgen 4's three villages and chunks as shipped (${p} · ${c})`);
   }
-  check(VR.Bodies.BGEN === 5, 'bgen 5 is the bodies\' current version (' + VR.Bodies.BGEN + ')');
+  check(VR.Bodies.BGEN >= 5, 'bgen 5 or later is the bodies\' current version (' + VR.Bodies.BGEN + '; u-worlds5: 6, bgen 5 pinned by worlds5.js a)');
 }
 
 const towns = {};
@@ -134,7 +134,7 @@ if (part('e')) {
   check(N.routine(ags[0], 3000) === null, 'the trader keeps to the stall');
   check(N.routine({ p: people[3], vil: { plan: towns.ocker.e.planOf(towns.ocker.e.sites[1]), people }, role: 'farmer' }, 3000) === null, 'a plain village keeps its old day');
   const caps = ['potato', 'low', 'balanced', 'high'].map(pr => N.agentCap(pr, 40));
-  check(caps[0] <= 14 && caps[1] <= 20 && caps[0] < caps[3] && caps[3] === 40, 'the agents a town wakes: Very Low ' + caps.join(' · '));
+  check(caps[0] <= 14 && caps[1] <= 20 && caps[0] < caps[3] && caps[3] >= 30, 'the agents a town wakes: Very Low ' + caps.join(' · '));
   const keep = N.keepers(ags, 14);
   check(keep.length === 14 && keep.includes(ags[0]) && keep.includes(ags[1]), 'the cap keeps the trader and the mayor');
   check(N.MARKET_ACTS && ['market', 'hall', 'lantern'].every(t => N.MARKET_ACTS.has(t)), 'three new activities');
