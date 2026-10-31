@@ -84,6 +84,22 @@
   FJ.count = function (S, k, t) { S.n++; S.by[k] = (S.by[k] || 0) + 1; if (S.log.length < 200) S.log.push([k, t || 0]); return S; };
   FJ.distinct = (S) => Object.keys(S.by).length;
   FJ.stats = FJ.newStats();
+  // the children of a town without any: a modern or tech town's flats have two beds (Herzwelt's first town among them),
+  // or one (Herzwelt's first town: eleven single flats), so no child lived there — no hand in hand, no story, no tag. From Low up, some grown-ups' child (a couple's or a single parent's, (H-picked, at most
+  // VISIT_MAX, two at least) lives with them; the roster appends them after everyone else (nobody's name, job or clothes change).
+  // Very Low: none (no more people to draw). Returns the families' indices.
+  FJ.VISIT_MAX = 4;
+  FJ.visitKids = function (fams, style, seed, tier) {
+    if (!(tier >= 1) || !/^(modern|tech)$/.test(style || '')) return [];
+    if (fams.some(f => f.members.some(m => m.age === 'child'))) return [];
+    const out = [], ok = (f) => f.members.length >= 1 && f.members.length <= 2 && f.members.every(m => m.age === 'adult');
+    for (let i = 0; i < fams.length && out.length < FJ.VISIT_MAX; i++) {
+      const f = fams[i]; if (!ok(f)) continue;
+      if ((((seed >>> 0) * 2654435761 + i * 40503) >>> 0) % 5 < 2) out.push(i);
+    }
+    for (let i = 0; i < fams.length && out.length < 2; i++) if (!out.includes(i) && ok(fams[i])) out.push(i);   // (two at least: a pair to play)
+    return out;
+  };
   FJ.TEXT_KEYS = ['g.joy.forYouFlower', 'g.joy.forYouSnack', 'g.joy.dance', 'g.joy.hide', 'g.joy.found', 'g.joy.here', 'g.joy.enjoy', 'g.joy.danceThanks'];
 
   // ============================================================== the game glue
@@ -181,7 +197,8 @@
     for (const a of vil.agents) { if (!free(a)) continue; const d2 = d2xz(a, p); if (d2 > 40 * 40) continue; (a.kid ? kids : a.elder ? elders : adults).push([a, d2]); }
     // hand in hand: a free adult and a free child of the same family, both within 35 m
     for (const [a] of adults) { const k = kids.find(([b]) => b.p.fam === a.p.fam && d2xz(b, a.pos) < 20 * 20); if (k) { c.hand = true; W.hand = [a, k[0]]; break; } }
-    if (elders.length && kids.length >= 2) { c.story = true; W.story = [elders[0][0], kids.slice(0, 4).map(k => k[0])]; }
+    // (a grandparent tells; a town without one — the flats — a parent)
+    if ((elders.length || adults.length) && kids.length >= 2) { c.story = true; W.story = [(elders[0] || adults[0])[0], kids.slice(0, 4).map(k => k[0])]; }
     const nearA = adults.concat(elders).filter(([, d2]) => d2 < 11 * 11).sort((x, y) => x[1] - y[1]);
     if (J.still >= 2.5 && nearA.length) { c.offer = true; W.offer = nearA[0][0]; }
     if (nearA.length && adults.length + elders.length >= 3 && !J.dance) { c.dance = true; W.dance = nearA[0][0]; }

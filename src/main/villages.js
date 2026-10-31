@@ -104,6 +104,20 @@
     vil.people = [];
     for (const f of fams) for (const m of f.members) vil.people.push(m);
     if (Folk.unlike) Folk.unlike(vil.people, 3);   // t-folk: no two neighbours dressed alike (villagers.js)
+    // ---- u-folk2: a modern or tech town's couples' children (FolkJoy.visitKids; Low and up), appended after everyone
+    // else — nobody's name, job or clothes change; they sleep in their parents' flat
+    if (VR.FolkJoy && VR.FolkJoy.visitKids) {
+      const tier = VR.LifeKit && VR.LifeKit.tierOf && VR.game && VR.game.settings ? VR.LifeKit.tierOf(VR.game.settings) : 2;
+      for (const fi of VR.FolkJoy.visitKids(fams, P.style, P.seed, tier)) {
+        const f = fams[fi], k = f.members.length, seed = H(H(P.seed, f.home, 101), k, 7), par = f.members[0];
+        const m = { id: P.id + ':' + f.home + ':' + k, fam: fi, home: f.home, idx: k, age: 'child', role: 'child', seed, newHome: false, visit: true,
+          years: 5 + H(seed, 4, 9) % 8, name: nameFor(seed, true), bed: (homes[f.home] && homes[f.home].beds[0]) || null,
+          trait: Folk.TRAITS[H(seed, 1, 9) % Folk.TRAITS.length], likes: Folk.LIKES[H(seed, 2, 9) % Folk.LIKES.length], look: null };
+        m.parentLook = par.look; m.look = Folk.look(seed, 'child', 'child', m.parentLook, P.style);
+        f.members.push(m); vil.people.push(m);
+      }
+    }
+    // ---- u-folk2 end
     vil.homes = homes;
   }
 
@@ -369,7 +383,8 @@
       makeRoster(vil);
       if (vil.active) {
         const tod = g.env.timeOfDay;
-        for (let k = oldCount; k < vil.people.length; k++) { const person = vil.people[k]; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(TL('g.folk.newHome')[k === oldCount ? 0 : 1] || '', 5); }
+        const had = new Set(vil.agents.map(a => a.p.id)); let nk = 0;   // (u-folk2: the new ones by id — a town's visiting children stay last)
+        for (const person of vil.people) { if (had.has(person.id)) continue; const k = oldCount + nk++; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(TL('g.folk.newHome')[k === oldCount ? 0 : 1] || '', 5); }
         // re-link existing agents to (possibly re-ordered) roster entries
         for (const a of vil.agents) { const np = vil.people.find(pp => pp.id === a.p.id); if (np) a.p = np; }
       }

@@ -130,5 +130,20 @@ console.log('f · the counter and the texts');
   void de;
 }
 
+console.log('g · the children of a town without any (the flats of a tech town have two beds: no child lived there)');
+{
+  const fams = []; for (let i = 0; i < 8; i++) fams.push({ id: i, members: i === 3 ? [{ age: 'adult' }] : [{ age: 'adult', seed: 10 + i }, { age: 'adult', seed: 20 + i }] });
+  const v = FJ.visitKids(fams, 'tech', 77, 2);
+  check(v.length >= 2 && v.length <= FJ.VISIT_MAX, `children visit (${v.length}, at most ${FJ.VISIT_MAX})`);
+  check(v.every(f => fams[f].members.every(m => m.age === 'adult')), 'only to grown-ups');
+  const singles = []; for (let i = 0; i < 11; i++) singles.push({ id: i, members: [{ age: 'adult' }] });
+  const vs = FJ.visitKids(singles, 'tech', 5, 2); check(vs.length >= 2 && vs.length <= FJ.VISIT_MAX, `a town of single flats: ${vs.length} single parents' children`);
+  check(JSON.stringify(v) === JSON.stringify(FJ.visitKids(fams, 'tech', 77, 2)), 'the same town, the same families');
+  check(FJ.visitKids(fams, 'tech', 77, 0).length === 0, 'Very Low: none (no more people to draw)');
+  const withKid = fams.map((f, i) => (i === 5 ? { id: 5, members: f.members.concat([{ age: 'child' }]) } : f));
+  check(FJ.visitKids(withKid, 'tech', 77, 2).length === 0, 'a town with a child of its own: none');
+  check(FJ.visitKids(fams, 'classic', 77, 2).length === 0, 'a classic village (its budget let them go): none');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
