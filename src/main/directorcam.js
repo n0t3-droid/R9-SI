@@ -249,4 +249,181 @@
     const L = c.look || { yaw: 0, pitch: 0 };
     return Object.assign({}, base, { x: cu.x, y: cu.y, z: cu.z, yaw: cu.yaw + L.yaw, pitch: clamp(cu.pitch + L.pitch, -1.5, 1.5), roll: cu.roll, fov: cu.fov, fixed: true, far: (base.far || 1000) + 60, shot: seq.kind });
   };
+  // ============================================================================ e-cam · die Highlight-Rolle, the pure part
+  // (docs/superpowers/plans/2026-10-31-e-cam.md; erlebnis §5): the track, the highlights, the plan, the shots, the save.
+  // Cost 🟢: the track is a compare and seven stores at 5 Hz; everything else runs only when the reel is built or plays.
+  // ---------------------------------------------------------------- the track: pose, look, time of day and world at 5 Hz
+  const TK = 7;
+  D.TRACK_HZ = 5; D.TRACK_N = 6000;   // (20 minutes: 6,000 × 7 floats = 168 KB)
+  D.Track = function (cap) { this.cap = cap || D.TRACK_N; this.a = new Float32Array(this.cap * TK); this.n = 0; this.i = 0; this.last = -1e9; this.bytes = this.a.byteLength; };
+  D.Track.prototype.rec = function (t, x, y, z, yaw, tod, dim) {
+    if (t - this.last < 1 / D.TRACK_HZ - 1e-3) return false;
+    this.last = t; const a = this.a, o = this.i * TK;
+    a[o] = t; a[o + 1] = x; a[o + 2] = y; a[o + 3] = z; a[o + 4] = yaw; a[o + 5] = tod; a[o + 6] = dim;
+    this.i = (this.i + 1) % this.cap; if (this.n < this.cap) this.n++;
+    return true;
+  };
+  D.Track.prototype.clear = function () { this.n = 0; this.i = 0; this.last = -1e9; };
+  D.Track.prototype.off = function (k) { return (((this.n < this.cap ? 0 : this.i) + k) % this.cap) * TK; };   // (the k-th oldest)
+  D.Track.prototype.first = function () { return this.n ? this.a[this.off(0)] : null; };
+  // the pose at t (interpolated; the yaw the short way; never across a change of world): {t, x, y, z, yaw, tod, dim} or null
+  D.Track.prototype.at = function (t) {
+    const n = this.n, a = this.a; if (!n) return null;
+    const t0 = a[this.off(0)], tN = a[this.off(n - 1)];
+    if (t < t0 - 1e-3 || t > tN + 0.25) return null;
+    let lo = 0, hi = n - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (a[this.off(m)] <= t) lo = m; else hi = m - 1; }
+    const p = this.off(lo), q = lo < n - 1 ? this.off(lo + 1) : p;
+    const P = (o) => ({ t: a[o], x: a[o + 1], y: a[o + 2], z: a[o + 3], yaw: a[o + 4], tod: a[o + 5], dim: a[o + 6] });
+    if (p === q || a[p + 6] !== a[q + 6]) return P(p);
+    const u = clamp((t - a[p]) / Math.max(1e-6, a[q] - a[p]), 0, 1), L = (k) => a[p + k] + (a[q + k] - a[p + k]) * u;
+    return { t, x: L(1), y: L(2), z: L(3), yaw: wrapA(a[p + 4] + wrapA(a[q + 4] - a[p + 4]) * u), tod: L(5), dim: a[p + 6] };
+  };
+
+  // ---------------------------------------------------------------- the highlights (pure)
+  D.REEL_TARGET = 60; D.REEL_MIN = 30; D.REEL_MAX = 90; D.REEL_HL = 12;
+  const shotLen = (h) => (h.card ? 4 : h.w >= 5 ? 7 : h.w >= 4 ? 6 : 5);
+  D.shotLen = shotLen;
+  // events of weight ≥ 3 and the golden hours read from the 1-Hz samples (≥ 8 s of a low sun) → the reel's highlights,
+  // in the order they happened: every peak (≤ 4), then by score (10 w, +3 seen, +2 a postcard, +4 the first of its sub,
+  // +2 a long look, +5 a kind not yet in, +3 a sub not yet in), ≤ 2 of a sub and ≤ 3 of a kind, until the reel is ~60 s
+  D.pick = function (events, samples, opts) {
+    opts = opts || {};
+    const cand = [];
+    for (const e of events || []) if (e && e.w >= 3) cand.push(Object.assign({}, e));
+    let run = null;
+    const endRun = () => { if (run && run.n >= 8) { const s = run.mid; cand.push({ t: s.t, kind: 'sky', sub: s.tod > 6000 && s.tod < 18000 ? 'sunset' : 'sunrise', w: 3, x: s.x, y: null, z: s.z, r: 6, inView: true, long: true, tod: s.tod, dim: opts.dimAt ? opts.dimAt(s.t) : 'overworld', src: 'sample' }); } run = null; };
+    for (const s of samples || []) {
+      if (s && s.sky === 'low_sun') { if (!run) run = { n: 0, list: [] }; run.n++; run.list.push(s); run.mid = run.list[run.list.length >> 1]; }
+      else endRun();
+    }
+    endRun();
+    cand.sort((a, b) => a.t - b.t);
+    const merged = [];
+    for (const c of cand) {
+      const m = merged.find((h) => h.sub === c.sub && Math.abs(h.t - c.t) <= 45 && Math.hypot(h.x - c.x, h.z - c.z) <= 60);
+      if (m) { if (c.w > m.w) Object.assign(m, c); continue; }
+      merged.push(c);
+    }
+    const seenSub = {};
+    for (const h of merged) { h.score = 10 * h.w + (h.inView ? 3 : 0) + (h.card ? 2 : 0) + (seenSub[h.sub] ? 0 : 4) + (h.long ? 2 : 0); seenSub[h.sub] = 1; }
+    const out = [], nSub = {}, nKind = {}, take = (h) => { out.push(h); nSub[h.sub] = (nSub[h.sub] || 0) + 1; nKind[h.kind] = (nKind[h.kind] || 0) + 1; h._in = true; };
+    let time = 6;   // (the two cards)
+    merged.filter((h) => h.w >= 5).sort((a, b) => b.score - a.score).slice(0, 4).forEach((h) => { take(h); time += shotLen(h); });
+    for (;;) {
+      if (out.length >= D.REEL_HL) break;
+      let best = null, bs = -1;
+      for (const h of merged) {
+        if (h._in || (nSub[h.sub] || 0) >= 2 || (nKind[h.kind] || 0) >= 3 || time + shotLen(h) > D.REEL_TARGET + 0.01) continue;
+        const s = h.score + (nKind[h.kind] ? 0 : 5) + (nSub[h.sub] ? 0 : 3);
+        if (s > bs) { bs = s; best = h; }
+      }
+      if (!best) break;
+      take(best); time += shotLen(best);
+    }
+    for (const h of merged) delete h._in;
+    return out.sort((a, b) => a.t - b.t);
+  };
+
+  // ---------------------------------------------------------------- the plan: cards, shots, framings, captions (pure)
+  const FRAME_SUB = { freed: 'crane', boss: 'orbit', site_done: 'orbit', life_done: 'orbit', showcase: 'orbit', arrive: 'compose', ferry_arrive: 'compose', landing: 'compose', sunset: 'sun', sunrise: 'sun', wonder: 'push', outpost: 'push' };
+  const FRAME_KIND = { milestone: 'crane', discovery: 'push', build: 'orbit', travel: 'compose', sky: 'compose', story: 'push', encounter: 'orbit', wow: 'push', social: 'compose' };
+  const ALT = ['orbit', 'push', 'compose', 'crane'];
+  D.REEL_CAPS = ['freed', 'boss', 'moon_land', 'star_jump', 'site_done', 'life_done', 'arrive', 'ferry_arrive', 'sunset', 'sunrise', 'wonder', 'outpost', 'skyray', 'rays', 'murm', 'fireworks', 'showcase'];
+  D.capKey = (h) => 'g.reel.c.' + (D.REEL_CAPS.indexOf(h.sub) >= 0 ? h.sub : 'k_' + (FRAME_KIND[h.kind] || h.kind === 'space' ? h.kind : 'other'));
+  D.reelPlan = function (hl, opts) {
+    opts = opts || {};
+    const list = (hl || []).slice();
+    const build = (stretch) => {
+      const shots = [{ frame: 'title', dur: 3, cap: 'g.reel.title', tod: list.length ? list[0].tod : undefined }];
+      for (const h of list) {
+        let f = h.card ? 'card' : FRAME_SUB[h.sub] || FRAME_KIND[h.kind] || 'compose';
+        const prev = shots[shots.length - 1].frame;
+        if (f === prev) f = f === 'card' ? 'cardpan' : f === 'sun' ? 'compose' : ALT.find((a) => a !== prev);
+        if (f === 'cardpan' && prev === 'cardpan') f = 'card';
+        shots.push({ h, frame: f, dur: stretch ? 8 : shotLen(h), tod: h.tod, cap: D.capKey(h) });
+      }
+      shots.push({ frame: 'end', dur: 3, cap: 'g.reel.end', tod: list.length ? list[list.length - 1].tod : undefined });
+      let dur = 0; for (const s of shots) dur += s.dur;
+      return { shots, dur };
+    };
+    let pl = build(false);
+    while (pl.dur > D.REEL_MAX && list.length > 1) { let wi = 0; for (let i = 1; i < list.length; i++) if ((list[i].score || 0) < (list[wi].score || 0)) wi = i; list.splice(wi, 1); pl = build(false); }
+    if (pl.dur < D.REEL_MIN && list.length) pl = build(true);
+    pl.short = pl.dur < D.REEL_MIN; pl.n = list.length;
+    return pl;
+  };
+
+  // ---------------------------------------------------------------- staging one shot (pure): a camera function of t
+  D.sunAz = (tod) => (((tod || 0) % 24000) / 24000) * TAU + 0.4;   // (env.js: the sun's azimuth; x = cos, z = sin)
+  const look = (o, C, P) => { const dx = P[0] - C[0], dy = P[1] - C[1], dz = P[2] - C[2]; o.yaw = Math.atan2(-dx, -dz); o.pitch = Math.atan2(dy, Math.hypot(dx, dz)); return o; };
+  // ctx: {target [x, y, z], r, avatar(t) → {x, y, z, yaw} | null, ground(x, z), sunAz}
+  D.stage = function (shot, ctx) {
+    const dur = shot.dur, T = ctx.target, r = Math.max(2, ctx.r || 6), gnd = ctx.ground || null, f = shot.frame;
+    const gy = (x, z, d) => { const v = gnd ? gnd(x, z) : null; return v === null || v === undefined || !Number.isFinite(v) ? d : v; };
+    const A0 = ctx.avatar ? ctx.avatar(dur / 2) : null;
+    // the side the camera comes from: behind the avatar (it between us and the place), else a fixed quarter
+    let ux = 0.6, uz = 0.8;
+    if (A0) { const dx = A0.x - T[0], dz = A0.z - T[2], L = Math.hypot(dx, dz); if (L > 1) { ux = dx / L; uz = dz / L; } }
+    const fov = (f === 'push' ? 50 : f === 'orbit' ? 55 : 58) * DEG;
+    let subj = T, pos, S = null;   // pos(t) → [x, y, z] before the lift; then the camera looks at subj (or along the sun)
+    if (f === 'compose') {
+      S = A0 ? [A0.x, A0.y + 1, A0.z] : [T[0] + ux * (r * 2 + 15), gy(T[0] + ux * (r * 2 + 15), T[2] + uz * (r * 2 + 15), T[1] - 4) + 1, T[2] + uz * (r * 2 + 15)];
+      const c0 = D.compose(T, S, { fov, size: 2, back: 26, ground: gnd }), c1 = D.compose(T, S, { fov, size: 2, back: 21, ground: gnd });
+      pos = (t) => { const u = t / dur; return [c0.x + (c1.x - c0.x) * u, c0.y + (c1.y - c0.y) * u, c0.z + (c1.z - c0.z) * u]; };
+    } else if (f === 'orbit') {
+      const R = r * 2.2 + 12, a0 = Math.atan2(uz, ux), sw = 30 * DEG * (shot.h && (shot.h.t | 0) % 2 ? -1 : 1);
+      pos = (t) => { const a = a0 + sw * (t / dur - 0.5), x = T[0] + Math.cos(a) * R, z = T[2] + Math.sin(a) * R; return [x, Math.max(T[1] + R * 0.35, gy(x, z, T[1]) + 3), z]; };
+    } else if (f === 'crane') {
+      const R = r * 1.8 + 14, x = T[0] + ux * R, z = T[2] + uz * R, y0 = gy(x, z, T[1] - 2) + 2, y1 = Math.max(y0 + 6, T[1] + R * 0.8);
+      pos = (t) => { const u = t / dur; return [T[0] + ux * R * (1 + 0.15 * u), y0 + (y1 - y0) * u, T[2] + uz * R * (1 + 0.15 * u)]; };
+    } else if (f === 'sun') {
+      const az = ctx.sunAz !== undefined ? ctx.sunAz : 0, sx = Math.cos(az), sz = Math.sin(az), Ap = A0 ? [A0.x, A0.y, A0.z] : [T[0], gy(T[0], T[2], T[1]), T[2]];
+      subj = [Ap[0] + sx * 40, Ap[1] + 1, Ap[2] + sz * 40];   // (the low sun's side of the land, ahead of you)
+      pos = (t) => { const k = 9 - 0.6 * t, x = Ap[0] - sx * k, z = Ap[2] - sz * k; return [x, Math.max(Ap[1] + 2.6, gy(x, z, Ap[1]) + 2), z]; };
+    } else {   // push (and any other): a slow push-in from the avatar's side
+      const R0 = r * 2.6 + 20;
+      pos = (t) => { const k = R0 * (1 - 0.15 * t / dur), x = T[0] + ux * k, z = T[2] + uz * k; return [x, T[1] + R0 * 0.25, z]; };
+    }
+    // the lift: one offset for the whole shot (the largest need at five moments), so the camera never hops
+    let need = 0;
+    for (let i = 0; i <= 4; i++) { const t = (dur * i) / 4, C = pos(t), y0 = C[1]; D.lift(gnd, C, subj); if (C[1] - y0 > need) need = C[1] - y0; }
+    if (need > 0) need += 0.3;
+    const out = { subject: subj, dur, frame: f };
+    out.cam = (t) => {
+      const C = pos(clamp(t, 0, dur)); C[1] += need;
+      const o = { x: C[0], y: C[1], z: C[2], yaw: 0, pitch: 0, roll: 0, fov };
+      look(o, C, subj);
+      if (S) {   // compose: the place on the upper third, the avatar on the lower one (compose's own rule, after the lift)
+        const dT = Math.hypot(T[0] - C[0], T[2] - C[2]), dS = Math.hypot(S[0] - C[0], S[2] - C[2]), aT = Math.atan2(T[1] - C[1], dT), aS = Math.atan2(S[1] - C[1], dS);
+        o.pitch = (aT + aS) / 2; o.fov = clamp(2 * Math.atan(3 * Math.tan(Math.max(0.05, aT - aS) / 2)), 30 * DEG, 80 * DEG);
+      }
+      else if (f === 'sun') o.pitch = Math.max(o.pitch, -0.12);
+      return o;
+    };
+    return out;
+  };
+
+  // ---------------------------------------------------------------- what the reel takes and gives back (pure on the game)
+  D.reelSave = function (g) {
+    const p = g.player, q = g.renderer && g.renderer.q;
+    return { ticks: g.env ? g.env.ticks : undefined, freeze: g.zenFreezeTime, camMode: g.camMode, hideHud: g.hideHud,
+      pos: p ? p.pos.slice() : null, yaw: p && p.yaw, pitch: p && p.pitch, flying: p && p.flying, bob: p && p.bob, bobAmt: p && p.bobAmt,
+      scale: q ? q.scale : undefined, pad: g.padLife ? g.padLife.clock : undefined, tram: g.trams ? g.trams.clock : undefined };
+  };
+  // the clock-driven actors (the pads' visitors, the trams) wound back to `ago` seconds before the reel began
+  D.reelRewind = function (g, s, ago) {
+    ago = Math.max(0, ago || 0);
+    if (g.padLife && s.pad !== undefined) g.padLife.clock = Math.max(0, s.pad - ago);
+    if (g.trams && s.tram !== undefined) g.trams.clock = Math.max(0, s.tram - ago);
+  };
+  D.reelRestore = function (g, s) {
+    if (!s) return;
+    if (g.env && s.ticks !== undefined) { if (g.env.setTime) g.env.setTime(s.ticks); else g.env.ticks = s.ticks; }
+    g.zenFreezeTime = s.freeze; g.camMode = s.camMode; g.hideHud = s.hideHud;
+    const p = g.player; if (p && s.pos) { p.pos = s.pos.slice(); p.yaw = s.yaw; p.pitch = s.pitch; p.flying = s.flying; p.bob = s.bob; p.bobAmt = s.bobAmt; if (p.vel) p.vel = [0, 0, 0]; }
+    const q = g.renderer && g.renderer.q; if (q && s.scale !== undefined) q.scale = s.scale;
+    if (g.padLife && s.pad !== undefined) g.padLife.clock = s.pad;
+    if (g.trams && s.tram !== undefined) g.trams.clock = s.tram;
+  };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
