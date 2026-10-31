@@ -217,7 +217,7 @@
     aqua: { floor6: ['pale_moss_block', 'sand'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'lily_of_the_valley', 'blue_orchid'], deck6: 'mangrove_planks', postp6: 'stripped_mangrove_log', rail6: 'bamboo_fence' },
     ocker: { floor6: ['coarse_dirt', 'packed_mud'], bed6: 'podzol', plants6: ['dead_bush', 'short_grass', 'orange_tulip'] },
     zinn: { floor6: ['basalt', 'smooth_basalt'], bed6: 'tuff', plants6: ['dead_bush', 'torchflower', 'dead_bush'] },
-    basalt: { floor6: ['regolith', 'regolith_dark'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'azure_bluet'] },
+    basalt: { floor6: ['regolith', 'andesite'], bed6: 'moss_block', plants6: ['fern', 'short_grass', 'azure_bluet'] },
     opal: { floor6: ['snow_block', 'packed_ice'], bed6: 'snow_block', plants6: ['fern', 'short_grass', 'white_tulip'] },
   };
   E.K6 = K6;
@@ -599,7 +599,7 @@
           for (let y = gy + 1; y < F; y++) blocks[(y << 8) | c] = D.fill;
           // the floor: two tones in blotches, beds of the species' plants in a quarter of the 4 × 4 cells
           const bed = !box && vn(x, z, this.s ^ 0x6b1, 5) > 0.66;
-          blocks[(F << 8) | c] = bed ? D.bed : D.floor[vn(x, z, this.s ^ 0x6b2, 3) > 0.62 ? 1 : 0];
+          blocks[(F << 8) | c] = bed ? D.bed : D.floor[vn(x, z, this.s ^ 0x6b2, 4) > 0.66 ? 1 : 0];
           const hp = h01(x, z, this.s ^ 0x6b3);
           if (!box && (bed ? hp < 0.55 : hp < 0.04)) blocks[((F + 1) << 8) | c] = D.plants[Math.floor(h01(x, z, this.s ^ 0x6b4) * D.plants.length)];
           tops[c] = -1;

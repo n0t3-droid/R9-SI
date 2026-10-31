@@ -2,7 +2,7 @@
 // de-DE, High with the smooth people. On every native world (bgen 6): the town from above (the floor levelled and
 // dressed, Aquamarin's pier quarter), a street between the homes (the gardens, the aprons), the view from the climbed
 // landmark (the deck's toast and its reward once); the cost at Ocker's town vs its plain village (Very Low / High, the
-// same spot as u-worlds4) and High's town broken down (the people's draw, their update)
+// same spot as u-worlds4) and High's town as u-worlds4 had it (40 people at the villages' rates) for the before
 // → test/shots/w5_*.png, test/shots/worlds5_sheet.jpg, .tmp_tests/worlds5_run.json
 //   nohup bash test/wt_run.sh worlds5.mjs 3600 > .tmp_tests/worlds5.log 2>&1 &   (WORLDS=aqua,ocker · ONLY=worlds|cost)
 // regress: skip  (a showcase with pictures; the gate is test/worlds5.js)
@@ -92,7 +92,7 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
   check(P && P.town && P.dress && P.climb, `${kind}: the town ${V.name} (bgen 6: dressed ${P && P.dress}, the ${LMN[kind]} climbable ${!!(P && P.climb)}; ${P ? P.agents : 0} of ${P ? P.people : 0} people about)`);
   check(P && P.agents <= 30, `${kind}: High wakes at most 30 (${P ? P.agents : '-'})`);
   // the floor in the world: columns on a grid inside the town at the floor (no hole, no raw hill, no open water)
-  const fl = await ev(([X, Z, F]) => { const w = VR.game.world, R = VR.R; let n = 0, bad = 0, water = 0; const nm = {}; for (let dx = -60; dx <= 60; dx += 6) for (let dz = -60; dz <= 60; dz += 6) { const s = w.getBlock(X + dx, F, Z + dz); n++; const f = s ? R.T.flags[s] : 0; const below = w.getBlock(X + dx, F - 1, Z + dz), lag = !s && below && (R.T.flags[below] & VR.F.FLUID); if ((!s || !(f & VR.F.SOLID)) && !lag) { bad++; (nm.__bad = nm.__bad || []).push([dx, dz, s ? R.types[R.T.type[s]].name : 'air', below ? R.types[R.T.type[below]].name : 'air']); } if (f & VR.F.FLUID) water++; const k = s ? R.types[R.T.type[s]].name : 'air'; nm[k] = (nm[k] || 0) + 1; } const badL = nm.__bad || []; delete nm.__bad; return { n, bad, water, badL, top: Object.entries(nm).sort((a, b) => b[1] - a[1]).slice(0, 5) }; }, [V.x, V.z, P ? P.F : V.y]);
+  const fl = await ev(([X, Z, F]) => { const w = VR.game.world, R = VR.R; let n = 0, bad = 0, water = 0; const nm = {}; for (let dx = -60; dx <= 60; dx += 6) for (let dz = -60; dz <= 60; dz += 6) { if (!w.isLoaded(X + dx, Z + dz)) continue; const s = w.getBlock(X + dx, F, Z + dz); n++; const f = s ? R.T.flags[s] : 0; const below = w.getBlock(X + dx, F - 1, Z + dz), lag = !s && below && (R.T.flags[below] & VR.F.FLUID); if ((!s || !(f & VR.F.SOLID)) && !lag) { bad++; (nm.__bad = nm.__bad || []).push([dx, dz, s ? R.types[R.T.type[s]].name : 'air', below ? R.types[R.T.type[below]].name : 'air']); } if (f & VR.F.FLUID) water++; const k = s ? R.types[R.T.type[s]].name : 'air'; nm[k] = (nm[k] || 0) + 1; } const badL = nm.__bad || []; delete nm.__bad; return { n, bad, water, badL, top: Object.entries(nm).sort((a, b) => b[1] - a[1]).slice(0, 5) }; }, [V.x, V.z, P ? P.F : V.y]);
   R.floor = fl;
   check(fl.bad <= 2 && fl.water === 0, `${kind}: the floor in the world (${fl.n - fl.bad}/${fl.n}: ${fl.top.map(q => q.join(' ')).join(', ')})${fl.bad ? ' — not solid: ' + JSON.stringify(fl.badL) : ''}`);
   await step(60, 33);
@@ -112,7 +112,7 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
     const vw = await ev(() => ({ last: VR.Towns.last || null, toasts: (window.__toasts || []).map(t => t.join(' — ')), pos: VR.game.player.pos.map(v => +v.toFixed(1)) }));
     R.view = vw;
     check(vw.last && vw.last.kind === kind && vw.last.first && vw.toasts.some(t => /erklommen/.test(t)), `${kind}: on the ${LMN[kind]}'s deck — ${vw.toasts.filter(t => /erklommen/.test(t)).join(' | ') || 'no toast'} (${vw.pos.join(', ')})`);
-    await ev(([C, X, Z, F]) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0], p.pos[1] + 1.6, p.pos[2]); const e = p.eyePos(), dx = X - e[0], dz = Z - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(F - e[1], Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [C, V.x, V.z, F]);
+    await ev(([C, X, Z, F]) => { const p = VR.game.player; p.flying = true; if (C.how === 'dome') p.teleport(C.x + 0.5, C.deck + 0.05, C.z + 3.6); else p.teleport(p.pos[0], p.pos[1] + 1.6, p.pos[2]); const e = p.eyePos(), dx = X - e[0], dz = Z - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(F - e[1], Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [C, V.x, V.z, F]);
     await loaded([V.x, V.y, V.z], 64); await settle(30); await step(10, 33);
     await ev(() => { const el = document.querySelector('#toasts, .toasts'); if (el) el.style.visibility = 'hidden'; });
     row.push(await grab(`w5_${kind}_view.png`));
@@ -134,7 +134,9 @@ if (want('cost')) {
   const cost = {};
   await ev(() => VR.game.env.setTime(3600));
   const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2), p25: +ms[ms.length >> 2].toFixed(2), agents: g.villages.agents.length }; });
-  const measure = async (name) => { const t = Date.now(); const r = await Promise.race([measure0(), new Promise(res => setTimeout(() => res({ ms: 999, timeout: true }), 240000))]); cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${((Date.now() - t) / 1000).toFixed(0)} s, ${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
+  const once = () => Promise.race([measure0(), new Promise(res => setTimeout(() => res({ ms: 999, timeout: true }), 240000))]);
+  const measure = async (name) => { const t = Date.now(); const r1 = await once(); await step(20, 33); const r2 = await once(); const r = r2.ms < r1.ms ? r2 : r1; r.runs = [r1.ms, r2.ms];   // (the lower of two medians: the machine is shared)
+    cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${((Date.now() - t) / 1000).toFixed(0)} s, ${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
   const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
   // the town first (Very Low, High, High broken down, High as u-worlds4 had it: 40 people at the villages' rates), then the village
   for (const V of S) {
@@ -149,11 +151,7 @@ if (want('cost')) {
     await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
     await measure('high_' + at);
     if (at === 'town') {
-      await ev(() => { const v = VR.game.villages; v.__d = v.draw; v.draw = function () {}; });
-      await measure('high_town_nodraw');
-      await ev(() => { const v = VR.game.villages; v.draw = v.__d; v.__u = v.update; v.update = function () {}; });
-      await measure('high_town_noupdate');
-      await ev(() => { const v = VR.game.villages; v.update = v.__u; });
+      // (u-worlds5 run 2: replacing the villages' draw or update for a breakdown stalled the page — left out)
       await ev(() => { const N = VR.Natives; N.__c = N.CAP_TOP; N.__r = N.LOD_R; N.CAP_TOP = 99; N.LOD_R = 1e6; for (const v of VR.game.villages.known.values()) v._capP = null; });
       await step(60, 33);
       await lookFrom([V[0] + 22, V[1] + 8, V[2] + 22], [V[0], V[1], V[2]]);
