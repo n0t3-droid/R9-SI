@@ -24,7 +24,7 @@ console.log('a · Aquamarin\'s night');
   if (dusk && deep && day) {
     check(dusk.expo < 1.2, `at dusk (Helia ${(dusk.light.sunEl * D).toFixed(1)}°) the eye still the day's (exposure ${dusk.expo.toFixed(2)}, was ≈ 2.5: a golden day)`);
     const a = deep.light.ambSky, m = deep.light.moonColor;
-    check(deep.expo > 2 && a[2] > 1.8 * a[0] && m[2] > 2 * m[0], `the deep night: the eye open (${deep.expo.toFixed(2)}), the shade and Herzwelt's shine lean blue (${a.map(v => v.toFixed(3))} · ${m.map(v => v.toFixed(3))})`);
+    check(deep.expo > 1.2 && deep.expo < 1.7 && a[2] > 1.8 * a[0] && m[2] > 2 * m[0], `the deep night: the eye opens, but less (${deep.expo.toFixed(2)}), the shade and Herzwelt's shine lean blue (${a.map(v => v.toFixed(3))} · ${m.map(v => v.toFixed(3))})`);
     const lumN = (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]) * deep.expo, lumD = (0.2126 * day.light.ambSky[0] + 0.7152 * day.light.ambSky[1] + 0.0722 * day.light.ambSky[2]) * day.expo;
     check(lumN < lumD * 0.15, `… and dark: the shade's light at the eye ${lumN.toFixed(3)} against the day's ${lumD.toFixed(3)}`);
     check(day.expo === 0.8 && day.light.night === 0, 'the day untouched (exposure 0.8)');

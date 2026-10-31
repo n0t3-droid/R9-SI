@@ -100,6 +100,7 @@ try {
     g.zenFreezeWeather = true; g.env.wx.force('klar');
     const st = document.createElement('style'); st.textContent = '#hints,#lockhint,#toasts,.toast{display:none !important}'; document.head.appendChild(st);
     const A = VR.Adventure; A.setOn(true); A.setEnc('normal');
+    window.__ft0 = (x, y, z) => { const b = g.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !b || !(VR.R.T.flags[b] & VR.F.SOLID); };
     window.__c = { sceneT: (t) => { const s = g.story; return !s || !s.scene || s.scene.t >= t; } };
   });
   await settle(20, 'the world opened');
@@ -124,7 +125,7 @@ try {
       await off6(false); await play('c7.b2', 12.5, 'c7_window_before'); await skipScene();
       await off6(true); await ev(() => { VR.StoryPlay.stats.arrowTrue = 0; VR.StoryPlay.debug.reach('c7.b2'); });
       const r7 = await play('c7.b2', 12.5, 'c7_window');
-      N.c7 = await ev(() => ({ visible: VR.StoryPlay.stats.arrow6, trueFrames: VR.StoryPlay.stats.arrowTrue || 0, beams: VR.StoryPlay.stats.beams || 0 }));
+      N.c7 = await ev(() => ({ visible: VR.StoryPlay.stats.arrow6, trueFrames: VR.StoryPlay.stats.arrowTrue || 0, near: VR.StoryPlay.stats.arrowNear || 0, cos: VR.StoryPlay.stats.arrowCos, beams: VR.StoryPlay.stats.beams || 0, fr: !!(VR.SpaceFlight && VR.SpaceFlight.cur && VR.SpaceFlight.cur.axes), sky: VR.StoryPlay.station ? 1 : 0 }));
       console.log('     c7 ' + JSON.stringify(N.c7));
       check(r7.st && r7.st.fx === 'beacons', 'c7.b2 plays');
       check(N.c7.visible >= 3 ? N.c7.trueFrames > 0 : true, 'the arrow on the true beacons when three or more show in the window (' + N.c7.visible + ' visible)');
@@ -155,20 +156,19 @@ try {
       check(s2.st && s2.st.fx === 'flimmi', 'c9.b2 plays (Flimmi)');
       // mid-motion: the same shot 4 s later (the camera trucked 7 m and craned)
       await sceneTo(15); await draw(T); await shot('c9_flimmi_mid'); N.c9m = await lum();
-      // the costs in the scene: High and Very Low, the switch off and on (ms a drawn frame, SwiftShader)
-      N.cost = {};
-      for (const pr of ['high', 'potato']) {
-        await preset(pr);
-        await off6(false); await frameMs(1); N.cost[pr + '_before'] = await frameMs(3);
-        await off6(true); await frameMs(1); N.cost[pr + '_after'] = await frameMs(3);
-        if (pr === 'potato') { await draw(T); await shot('c9_flimmi_vl'); N.c9vl = await lum(); }
-      }
-      console.log('     costs in the scene ' + JSON.stringify(N.cost));
       await skipScene();
-      // outside the scene (the switch must cost nothing there)
-      N.costOut = {};
-      for (const pr of ['high', 'potato']) { await preset(pr); await off6(false); await frameMs(1); N.costOut[pr + '_before'] = await frameMs(3); await off6(true); await frameMs(1); N.costOut[pr + '_after'] = await frameMs(3); }
-      console.log('     costs outside ' + JSON.stringify(N.costOut));
+      // Very Low's picture, and the costs in the scene (ms a drawn frame, SwiftShader: warmed up, the switch off and on
+      // twice in turn, the lower of each) and outside it
+      const both = async () => { await frameMs(4); const r = { before: 1e9, after: 1e9 }; for (let k = 0; k < 2; k++) { await off6(false); await frameMs(1); r.before = Math.min(r.before, await frameMs(3)); await off6(true); await frameMs(1); r.after = Math.min(r.after, await frameMs(3)); } return r; };
+      N.cost = {}; N.costOut = {};
+      for (const pr of ['potato', 'high']) {
+        await preset(pr);
+        await ev(() => VR.StoryPlay.debug.reach('c9.b2')); await off6(true); await play('c9.b2', 11, pr === 'potato' ? 'c9_flimmi_vl' : 'c9_flimmi_high', T);
+        if (pr === 'potato') N.c9vl = await lum();
+        N.cost[pr] = await both(); await skipScene();
+        N.costOut[pr] = await both();
+      }
+      console.log('     costs in the scene ' + JSON.stringify(N.cost) + ' · outside ' + JSON.stringify(N.costOut));
       await preset('balanced');
       console.log('     lum ' + JSON.stringify({ a0: N.c9a0, a: N.c9a, b0: N.c9b0, b: N.c9b, m: N.c9m, vl: N.c9vl }));
       save();
@@ -195,7 +195,10 @@ try {
         console.log('     lamplighters ' + JSON.stringify(a).slice(0, 300));
         check(a && a.n >= 2, 'in Aquamarin\'s night the lamplighters walk (' + (a && a.n) + ')');
         // the street wide (the night itself), then the lamplighter close: before (the old night, no halo) and after
-        const look = async (close) => ev((close) => { const g = VR.game, o = window.__lampA, p = g.player; if (!o) return; const fx = Math.sin(o.yaw), fz = Math.cos(o.yaw), d = close ? 2.8 : 9; p.flying = true; p.noclip = true; const e = [o.pos[0] + fx * d - fz * (close ? 1.0 : 3), o.pos[1] + (close ? 1.6 : 3.2), o.pos[2] + fz * d + fx * (close ? 1.0 : 3)]; p.teleport(e[0], e[1] - 1.62, e[2]); const dx = o.pos[0] - e[0], dy = o.pos[1] + 0.8 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, close);
+        const look = async (close) => ev((close) => { const g = VR.game, o = window.__lampA, p = g.player; if (!o) return; const d = close ? 2.8 : 10, h = close ? 1.6 : 3.4; let e = null;
+          for (let k = 0; k < 16 && !e; k++) { const yw = o.yaw + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 8, c = [o.pos[0] + Math.sin(yw) * d, o.pos[1] + h, o.pos[2] + Math.cos(yw) * d]; let ok = true; for (let s = 0; s <= 20 && ok; s++) { const u = s / 20 * 0.9; ok = window.__ft0(c[0] + (o.pos[0] - c[0]) * u, c[1] + (o.pos[1] + 1 - c[1]) * u, c[2] + (o.pos[2] - c[2]) * u); } if (ok) e = c; }
+          if (!e) { const fx = Math.sin(o.yaw), fz = Math.cos(o.yaw); e = [o.pos[0] + fx * d, o.pos[1] + h, o.pos[2] + fz * d]; }
+          p.flying = true; p.noclip = true; p.teleport(e[0], e[1] - 1.62, e[2]); const dx = o.pos[0] - e[0], dy = o.pos[1] + 0.8 - e[1], dz = o.pos[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, close);
         if (a && a.n) {
           for (const tag of ['before', 'after']) {
             await ev((on) => { VR.BodySky.night6 = on; VR.Natives.lant6Off = !on; }, tag === 'after');
@@ -216,7 +219,7 @@ check(errs.length === 0, 'no page error' + (errs.length ? ': ' + errs.slice(0, 2
 save();
 try {
   const P = (n) => SHOTS + 's6_' + n + '.png', ex = (n) => fs.existsSync(P(n));
-  const rows = [['Kapitel 9 · im Nebel (9.1, der Stern noch im Kokon) — vorher · nachher', ['c9_nebula_before', 'c9_nebula']], ['Kapitel 9 · Flimmi — vorher · nachher', ['c9_flimmi_before', 'c9_flimmi']], ['Flimmi in Bewegung (4 s später: Kamera gefahren) · Sehr niedrig', ['c9_flimmi_mid', 'c9_flimmi_vl']], ['Kapitel 7 · das Fenster: der Film-Pfeil · die wahren Leuchtfeuer', ['c7_window_before', 'c7_window']], ['Aquamarins Nacht — vorher · nachher', ['aqua_night_before', 'aqua_night']], ['der Laternenanzünder — vorher · nachher (der Schein)', ['lamplighter_before', 'lamplighter']]]
+  const rows = [['Kapitel 9 · im Nebel (9.1, der Stern noch im Kokon) — vorher · nachher', ['c9_nebula_before', 'c9_nebula']], ['Kapitel 9 · Flimmi — vorher · nachher', ['c9_flimmi_before', 'c9_flimmi']], ['Flimmi in Bewegung (4 s später: Kamera gefahren) · Sehr niedrig · Hoch', ['c9_flimmi_mid', 'c9_flimmi_vl', 'c9_flimmi_high']], ['Kapitel 7 · das Fenster: der Film-Pfeil · die wahren Leuchtfeuer', ['c7_window_before', 'c7_window']], ['Aquamarins Nacht — vorher · nachher', ['aqua_night_before', 'aqua_night']], ['der Laternenanzünder — vorher · nachher (der Schein)', ['lamplighter_before', 'lamplighter']]]
     .map(([label, ns]) => ({ label, imgs: ns.filter(ex).map(P) })).filter(r => r.imgs.length);
   fs.writeFileSync(ROOT + '.tmp_tests/story6_sheet.json', JSON.stringify({ w: 620, rows }));
   execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'story6_sheet.jpg', ROOT + '.tmp_tests/story6_sheet.json']);

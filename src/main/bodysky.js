@@ -37,7 +37,7 @@
     // less muddy (the bounce less yellow, the day's eye a little more open)
     zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.93, 0.72], bounce: 0.34, floor: 0.06, expoDay: 0.7, expoNight: 1.1, plume: 1, shape: 1, farHue: [1.0, 0.8, 0.45] },
     ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 8, ambK: 1.8 },
-    aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2, nightBlue: [0.5, 0.72, 1.3] },
+    aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2, nightBlue: [0.55, 0.8, 1.5] },
   };
   BS.KIND = KIND; BS.SUN = SUN;
 
@@ -167,7 +167,7 @@
     // and the night's light leans blue (the shade, Herzwelt's shine, the far sea); the day untouched
     if (K.nightBlue && BS.night6 !== false) {   // (BS.night6 = false: the old night, for the pictures before/after)
       const dk = ss(-1 * Math.PI / 180, -10 * Math.PI / 180, sEl), B = K.nightBlue;
-      if (expo > K.expoDay) expo = K.expoDay + (expo - K.expoDay) * dk;
+      if (expo > K.expoDay) expo = K.expoDay + (expo * (1 - 0.45 * dk) - K.expoDay) * dk;   // (and opens less: run 1's night at 2.6 blew the lamp-lit street to a golden day)
       if (dk > 0) for (let i = 0; i < 3; i++) { const m = 1 + (B[i] - 1) * dk; amb[i] *= m; parLight[i] *= m; far[i] *= m; }
     }
     const exE = o.expo > 0 ? o.expo : expo;

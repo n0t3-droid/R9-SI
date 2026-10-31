@@ -64,8 +64,8 @@ void main() {
   col += ce * gas * (0.05 + 0.45 * rose + 1.8 * cav + 0.5 * exp(-abs(D.y - 0.22) / 0.16));   // (a glowing wall behind the pillars)
   // the dust: dark lanes (thicker toward the land), rim-lit at their edge, thinned in the cavity
   float dk = clamp(smoothstep(0.42, 0.66, du) * (1.0 - 0.7 * cav) + 0.8 * smoothstep(0.02, -0.15, D.y), 0.0, 1.0);
-  float rim = (smoothstep(0.45, 0.48, du) - smoothstep(0.48, 0.53, du)) * (0.03 + 0.35 * rose + 3.0 * cav);
-  col = col * (1.0 - 0.94 * dk) + vec3(0.012, 0.03, 0.04) * dk + mix(MAG, GOLD, smoothstep(0.0, 0.6, cav)) * rim * 0.6;
+  float rim = (smoothstep(0.42, 0.48, du) - smoothstep(0.48, 0.58, du)) * (0.02 + 0.3 * rose + 2.4 * cav);
+  col = col * (1.0 - 0.94 * dk) + vec3(0.012, 0.03, 0.04) * dk + mix(MAG, GOLD, smoothstep(0.0, 0.6, cav)) * rim * 0.22;
   // the shafts from the star, broken by the dust
   float sh = pow(vn(vec3(cos(phi) * 9.0, sin(phi) * 9.0, 0.3 + u_k.z * 0.02)), 4.0) * exp(-th / 0.4) * smoothstep(0.03, 0.12, th) * 0.6;
   col += GOLD * sh * (1.0 - 0.6 * dk) * (Q > 0 ? 1.0 : 0.7);
@@ -127,15 +127,15 @@ void main() {
     bool pl = k < 3.5;
     float s = pl ? pillar(v_c, sd) : cloud(v_c, sd);
     if (s < 0.004) discard;
-    float s2 = pl ? pillar(v_c + u_ld * 0.07, sd) : cloud(v_c + u_ld * 0.07, sd);
+    float s2 = pl ? pillar(v_c + u_ld * 0.05, sd) : cloud(v_c + u_ld * 0.05, sd);
     float rim = s * (1.0 - s2) * (pl ? 0.12 + 0.88 * smoothstep(0.0, 0.65, v_c.y) : 0.05);
     vec3 body = u_col2 * (0.7 + 0.6 * vn2(v_c * 6.0 + sd)) + u_col * 0.05 * smoothstep(0.0, 1.0, dot(v_c, u_ld));
-    o = vec4((body * s + u_col * rim * 2.2) * a, s * a);
+    o = vec4((body * s + u_col * rim * 1.5) * a, s * a);
     return;
   }
   if (k < 5.5) {   // Flimmi
     float pu = 1.0 + 0.06 * sin(t * 2.1), rr = r / pu, an = atan(v_c.y, v_c.x);
-    vec3 c = vec3(1.0, 0.97, 0.9) * exp(-rr * rr * 90.0) * 7.0 + vec3(1.0, 0.78, 0.40) * exp(-rr * 9.0) * 2.0 + vec3(1.0, 0.50, 0.22) * exp(-rr * 3.2) * 0.45;
+    vec3 c = vec3(1.0, 0.97, 0.9) * exp(-rr * rr * 90.0) * 4.5 + vec3(1.0, 0.78, 0.40) * exp(-rr * 9.0) * 2.0 + vec3(1.0, 0.50, 0.22) * exp(-rr * 3.2) * 0.45;
     float st = vn2(vec2(cos(an), sin(an)) * 2.5 + vec2(t * 0.15, rr * 2.0 - t * 0.4));
     c += vec3(1.0, 0.6, 0.3) * pow(st, 3.0) * exp(-rr * 2.6) * 1.4 * smoothstep(0.08, 0.2, rr);   // (the corona's slow streamers)
     float ca = cos(t * 0.1), sa = sin(t * 0.1); vec2 q = mat2(ca, -sa, sa, ca) * v_c;
@@ -144,10 +144,10 @@ void main() {
     // the face: two eyes that blink now and then, a small smile
     float bl = 0.08 + 0.92 * smoothstep(0.0, 0.04, abs(fract(t * 0.27 + 0.3) - 0.5) - 0.02);
     vec2 e1 = (v_c - vec2(-0.052, 0.018)) * vec2(1.0, 1.0 / bl), e2 = (v_c - vec2(0.052, 0.018)) * vec2(1.0, 1.0 / bl);
-    float eye = max(1.0 - smoothstep(0.017, 0.025, length(e1 * vec2(1.25, 0.8))), 1.0 - smoothstep(0.017, 0.025, length(e2 * vec2(1.25, 0.8))));
-    float mo = (1.0 - smoothstep(0.004, 0.008, abs(length(v_c - vec2(0.0, 0.03)) - 0.058))) * step(v_c.y, -0.012) * step(abs(v_c.x), 0.034);
+    float eye = max(1.0 - smoothstep(0.021, 0.028, length(e1 * vec2(1.25, 0.8))), 1.0 - smoothstep(0.021, 0.028, length(e2 * vec2(1.25, 0.8))));
+    float mo = (1.0 - smoothstep(0.005, 0.01, abs(length(v_c - vec2(0.0, 0.03)) - 0.058))) * step(v_c.y, -0.012) * step(abs(v_c.x), 0.034);
     float fa = max(eye, mo * 0.85) * u_face;
-    o = vec4(c * a * (1.0 - fa) + vec3(0.32, 0.12, 0.03) * fa, fa);
+    o = vec4(c * a * (1.0 - fa) + vec3(0.2, 0.07, 0.02) * fa, fa);
     return;
   }
   if (k < 6.5) {   // a soft glow (the motes round Flimmi)

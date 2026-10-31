@@ -1246,6 +1246,7 @@ body.storyon #storychoice { visibility: hidden !important; }
       const v = [hb.p[0] + n[0] * R - fr.pos[0], hb.p[1] + n[1] * R - fr.pos[1], hb.p[2] + n[2] * R - fr.pos[2]], L = Math.hypot(v[0], v[1], v[2]);
       if (!(L > 0) || dt(n, v) > -0.02 * L) continue;   // (the far side, the limb)
       const d = [dt(A[0], v) / L, dt(A[1], v) / L, dt(A[2], v) / L];
+      P.stats.arrowNear = (P.stats.arrowNear || 0) + 1; P.stats.arrowCos = dt(d, F || d);
       if (F && dt(d, F) < cc) continue;
       out.push({ d, n: [dt(A[0], n), dt(A[1], n), dt(A[2], n)], id: q[2] });
     }
