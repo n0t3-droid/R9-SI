@@ -986,7 +986,8 @@ body.storyon #storychoice { visibility: hidden !important; }
   // (while a chapter-9 scene plays on a nebula world: the sky's cosmic veil raised — one uniform, nothing drawn more)
   // (and its glow: the sky's stops turned to the nebula's own — a violet top, rose in the middle, a warm pink horizon —
   // by day or night alike, eased in over the scene's first seconds; fixed arrays, nothing allocated per frame)
-  const NEB_Z = [0.10, 0.035, 0.17], NEB_M = [0.42, 0.13, 0.36], NEB_H = [0.80, 0.36, 0.46], NZ = [0, 0, 0], NM = [0, 0, 0], NH = [0, 0, 0], NF = [0, 0, 0];
+  const NEB_Z = [0.05, 0.015, 0.11], NEB_M = [0.24, 0.05, 0.22], NEB_H = [0.46, 0.12, 0.24],   // (f-polish4: deeper — the old stops washed the frame pale pink)
+    NZ = [0, 0, 0], NM = [0, 0, 0], NH = [0, 0, 0], NF = [0, 0, 0];
   const mixTo = (o, a, b, k) => { for (let i = 0; i < 3; i++) o[i] = a[i] + (b[i] - a[i]) * k; return o; };
   { const BS = VR.BodySky; if (BS && BS.env && !BS._story4) { BS._story4 = true; const env0 = BS.env; BS.env = function (E) { const r = env0.apply(this, arguments); try { const g = game(), s = g && pl(g), sc = s && s.scene; if (E && sc && sc.b.ch === 9 && E.bodySky && E.zenith && E.horizon) { const k = smooth(sc.t / 2.5) * 0.85; E.nebula = 1.6; E.zenith = mixTo(NZ, E.zenith, NEB_Z, k); E.skyMid = mixTo(NM, E.skyMid || E.zenith, NEB_M, k); E.horizon = mixTo(NH, E.horizon, NEB_H, k); if (E.fogColor) E.fogColor = mixTo(NF, E.fogColor, NEB_H, k * 0.7); P.stats.nebSky = (P.stats.nebSky || 0) + 1; } } catch (e) { /* the sky */ } return r; }; } }
 
@@ -1031,21 +1032,28 @@ body.storyon #storychoice { visibility: hidden !important; }
     if (sc.b.ch === 9) {
       const k = smooth(t / 2.5), at = S.shotAt(sc.b, t);
       const dir = (az, el, D) => [e[0] - Math.sin(az) * Math.cos(el) * D, e[1] + Math.sin(el) * D, e[2] - Math.cos(az) * Math.cos(el) * D];
-      const PAL = [[[1.0, 0.28, 0.52], [0.3, 0.7, 0.9]], [[0.7, 0.25, 0.95], [1.0, 0.4, 0.62]], [[1.0, 0.42, 0.4], [0.5, 0.28, 0.9]], [[0.95, 0.3, 0.7], [0.25, 0.85, 0.8]]];
-      const nW = low ? 6 : 14;
+      // (f-polish4: deeper colours — Hα crimson, violet, a teal rim — and fainter sheets: fourteen of them added up to a
+      // white-pink middle; with Flimmi in the sky the walls within ~30° of it dim, so Flimmi is the brightest thing there)
+      const PAL = [[[0.95, 0.12, 0.36], [0.2, 0.6, 0.85]], [[0.55, 0.14, 0.9], [0.95, 0.22, 0.5]], [[0.9, 0.2, 0.26], [0.4, 0.16, 0.85]], [[0.85, 0.14, 0.6], [0.15, 0.75, 0.72]]];
+      const nW = low ? 6 : 14, flim = id === 'c9.b2' || id === 'c9.b3' || (at && at.shot.fx === 'flimmi'), FD = P._fd || (P._fd = [0, 0, 0]);
+      if (flim && sc.tg.sky) { const q = sc.tg.sky, L = Math.hypot(q[0] - e[0], q[1] - e[1], q[2] - e[2]) || 1; FD[0] = (q[0] - e[0]) / L; FD[1] = (q[1] - e[1]) / L; FD[2] = (q[2] - e[2]) / L; }
+      const nearF = (az, el) => { if (!flim || !sc.tg.sky) return 1; const c = -Math.sin(az) * Math.cos(el) * FD[0] + Math.sin(el) * FD[1] - Math.cos(az) * Math.cos(el) * FD[2]; return 0.3 + 0.7 * smooth((Math.acos(clamp(c, -1, 1)) / DEG - 12) / 24); };
       for (let i = 0; i < nW; i++) {   // the walls: most of them ahead and high, a few all round
         const az = y0 + (i < nW * 0.65 ? (r5(i, 1) - 0.5) * 2.4 : r5(i, 1) * TAU), el = (4 + 46 * r5(i, 2) * r5(i, 2)) * DEG, D = 700 + 900 * r5(i, 3);
         const sx = D * (0.35 + 0.45 * r5(i, 4)), pal = PAL[i % PAL.length];
-        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.32 + 0.2 * r5(i, 7)) * k, kind: 1, far: true, seed: i * 1.37 + 0.5 });
+        out.push({ p: dir(az, el, D), s: [sx, sx * (0.35 + 0.45 * r5(i, 5))], rot: (r5(i, 6) - 0.5) * 1.3 + t * 0.004, col: pal[0], col2: pal[1], a: (0.2 + 0.14 * r5(i, 7)) * k * nearF(az, el), kind: 1, far: true, seed: i * 1.37 + 0.5 });
       }
       // a hot young star with its teal rim, ahead and up
       const hs = dir(y0 - 0.35, 28 * DEG, 1500);
-      out.push({ p: hs, s: [420, 360], rot: 0.3, col: [0.35, 0.95, 0.95], col2: [0.25, 0.45, 0.95], a: 0.24 * k, kind: 1, far: true, seed: 9.1 });
-      out.push({ p: hs, s: [70, 70], col: [0.85, 0.97, 1.0], a: 0.9 * k, kind: 0, far: true });
-      for (let i = 0; i < (low ? 2 : 5); i++) {   // the dust lanes in front of the glow
+      out.push({ p: hs, s: [420, 360], rot: 0.3, col: [0.3, 0.85, 0.9], col2: [0.2, 0.35, 0.9], a: 0.2 * k * nearF(y0 - 0.35, 28 * DEG), kind: 1, far: true, seed: 9.1 });
+      out.push({ p: hs, s: [70, 70], col: [0.85, 0.97, 1.0], a: (flim ? 0.4 : 0.9) * k, kind: 0, far: true });   // (f-polish4: dimmer while Flimmi shows)
+      for (let i = 0; i < (low ? 2 : 7); i++) {   // the dust lanes in front of the glow (f-polish4: more, wider, darker)
+        if (low && flim && i === 1) break;   // (Very Low: the second lane is the one behind Flimmi — no more draws)
         const D = 650 + 300 * r5(i, 11), sx = D * (0.45 + 0.3 * r5(i, 12));
-        out.push({ p: dir(y0 + (r5(i, 13) - 0.5) * 2.0, (6 + 20 * r5(i, 14)) * DEG, D), s: [sx, sx * 0.09], rot: (r5(i, 15) - 0.5) * 0.6, col: [1, 1, 1], a: 0.55 * k, kind: 2, far: true, seed: 20 + i });
+        out.push({ p: dir(y0 + (r5(i, 13) - 0.5) * 2.0, (6 + 24 * r5(i, 14)) * DEG, D), s: [sx, sx * (0.1 + 0.06 * r5(i, 16))], rot: (r5(i, 15) - 0.5) * 0.6, col: [1, 1, 1], a: 0.82 * k, kind: 2, far: true, seed: 20 + i });
       }
+      // a dark lane of dust right behind Flimmi (far out along its line of sight): the newborn star against the dark
+      if (flim && sc.tg.sky) { const q = [e[0] + FD[0] * 900, e[1] + FD[1] * 900, e[2] + FD[2] * 900]; out.push({ p: q, s: [520, 150], rot: -0.18, col: [1, 1, 1], a: 0.9 * k, kind: 2, far: true, seed: 31.7 }); }
       for (let i = 0; i < (low ? 6 : 18); i++) {   // newborn stars, twinkling in the walls
         const D = 1300, tw = 0.6 + 0.4 * Math.sin(t * (1.5 + 3 * r5(i, 21)) + i);
         out.push({ p: dir(y0 + (r5(i, 22) - 0.5) * 3.0, (5 + 55 * r5(i, 23)) * DEG, D), s: [D * 0.007 * (1 + r5(i, 24)), D * 0.007 * (1 + r5(i, 24))], col: i % 3 ? [1.0, 0.92, 0.97] : [0.7, 0.9, 1.0], a: 1.1 * tw * k, kind: 0, far: true });
@@ -1053,9 +1061,10 @@ body.storyon #storychoice { visibility: hidden !important; }
       // Flimmi: a star being born, where the sky shot looks (its disc nearly edge on, a warm halo, the bright point)
       if (id === 'c9.b2' || id === 'c9.b3' || (at && at.shot.fx === 'flimmi')) {
         const F0 = sc.tg.sky, pu = 0.8 + 0.2 * Math.sin(t * 7) * Math.sin(t * 2.3);
-        out.push({ p: F0, s: [18, 18], col: [1.0, 0.6, 0.3], a: 0.85 * pu, kind: 0 });
-        out.push({ p: F0, s: [12, 1.8], rot: -0.18, col: [1.0, 0.82, 0.55], a: 0.9, kind: 0 });
-        out.push({ p: F0, s: [4.2, 4.2], col: [1.0, 0.97, 0.9], a: 1.8 * pu, kind: 0 });
+        // (f-polish4: twice the halo, a longer disc, a hot white core — the brightest thing in the frame)
+        out.push({ p: F0, s: [34, 34], col: [1.0, 0.62, 0.28], a: 1.1 * pu, kind: 0 });
+        out.push({ p: F0, s: [24, 3.0], rot: -0.18, col: [1.0, 0.84, 0.55], a: 1.4, kind: 0 });
+        out.push({ p: F0, s: [8, 8], col: [1.0, 0.98, 0.92], a: 3.2 * pu, kind: 0 });
       }
       return out;
     }
@@ -1127,7 +1136,7 @@ body.storyon #storychoice { visibility: hidden !important; }
     P.stats.glows = (P.stats.glows || 0) + n;
   };
   // the air sky of a ch.-9 scene: the three stops (not the LUT), turned to the nebula's colours at the sky's own brightness
-  const NEB3 = [[0.30, 0.10, 0.50], [0.80, 0.36, 0.46], [1.0, 0.55, 0.50]], NEBK = [0.2, 0.38, 0.5];   // (darker than the day's air: run 1's c9 by day was a white-pink wash — the walls and Flimmi need a dusk to glow in)
+  const NEB3 = [[0.22, 0.05, 0.42], [0.62, 0.12, 0.40], [0.80, 0.26, 0.36]], NEBK = [0.10, 0.2, 0.28];   // (f-polish4: deeper and darker still — a dusk the walls and Flimmi glow in)   // (darker than the day's air: run 1's c9 by day was a white-pink wash — the walls and Flimmi need a dusk to glow in)
   P.tintAir = function (U, k) {
     if (!U || !U.airK || !(U.airK[0] > 0.5) || !U.air3 || !(k > 0)) return false;
     const A = U.air3, lu = (v, o) => 0.2126 * v[o] + 0.7152 * v[o + 1] + 0.0722 * v[o + 2];

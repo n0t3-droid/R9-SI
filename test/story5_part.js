@@ -31,7 +31,7 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
   const l0 = [0, 3, 6].map(o => lum(U.air3, o));
   check(SP.tintAir(U, 0.9) && U.airK[2] === 0, 'ch. 9 on an airy world: the air sky drawn from its three stops (not the LUT) while the scene plays');
   check(U.air3[3] > U.air3[4] && U.air3[5] > U.air3[4] && U.air3[2] > U.air3[1], `… turned to the nebula's colours: a pink horizon (${U.air3.slice(3, 6).map(v => v.toFixed(2))}), a violet top`);
-  check(Math.abs(lum(U.air3, 3) / l0[1] - 0.38) < 0.1, '… darker than the day\'s air: a dusk for the walls to glow in (the horizon ×' + (lum(U.air3, 3) / l0[1]).toFixed(2) + ')');
+  check(lum(U.air3, 3) / l0[1] <= 0.48, '… darker than the day\'s air: a dusk for the walls to glow in (the horizon ×' + (lum(U.air3, 3) / l0[1]).toFixed(2) + '; f-polish4 darker still)');
   check(!SP.tintAir({ airK: [0, 0, 1, 0], air3: null }, 0.9), '… an airless world keeps its veil (E.nebula)');
   // 10.3: the beam over the beacon, bending toward home
   { const o = mk('c10.b3', 6); o.sc.homeDir = [0.6, 0, -0.8]; const B = SP.beamList(o.g, o.sc);

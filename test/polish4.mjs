@@ -141,21 +141,23 @@ try {
   // ---------------------------------------------------------------- the café, ch. 7's window
   if (want('cafe') && await trip('stn.ring')) {
     console.log('cafe · the Ringstation');
-    // who spawns particles here (the column of white orbs): the spawner's caller, counted
-    await ev(() => { const P = VR.game.particles; if (P.__sp0) return; P.__sp0 = P.spawn; window.__who = {}; P.spawn = function () { const s = (new Error().stack || '').split('\n')[2] || '?'; const k = s.trim().replace(/\(.*\//, '(').slice(0, 90); window.__who[k] = (window.__who[k] || 0) + 1; return P.__sp0.apply(this, arguments); }; });
-    await ev(() => { const g = VR.game, p = g.player; g.camMode = 0; p.flying = true; p.noclip = true; p.teleport(-5.5, 65.4 - 1.62, 3.0); p.yaw = p.viewYaw = Math.atan2(9.5, -5.5); p.pitch = -0.16; g.settings.fov = 75; window.__who = {}; });
-    await settle(14, 'the café');
-    const d = await ev(() => { const g = VR.game, E = g.env.E || {}, P = g.particles, w = g.world, R = VR.R, L = P.lamps || [], ln = []; for (let i = 0; i < L.length && ln.length < 24; i += 4) ln.push([L[i], L[i + 1], L[i + 2], R.types[R.T.type[L[i + 3]]].name].join(' ')); return { night: +(E.night || 0).toFixed(2), count: P.count, who: window.__who, lamps: ln, falls: (g.waterFalls || []).length, funke: !!(g.funke && g.funke.on && g.funke.on()), wayT: g.funke ? g.funke.wayT : null }; });
-    N.cafe = d; console.log('     ' + JSON.stringify(d).slice(0, 2400));
-    await draw(); await shot('cafe');
-    N.cafeLum = await lum(); console.log('     café ' + JSON.stringify(N.cafeLum));
     // c7.b2 (the window: the beacons' arrow)
-    await ev(() => { const p = VR.game.player; p.noclip = false; VR.game.story.rec.choices.c6 = 'lumi'; VR.StoryPlay.debug.reach('c7.b2'); });
+    await ev(() => { VR.game.story.rec.choices.c6 = 'lumi'; VR.StoryPlay.debug.reach('c7.b2'); });
     const r7 = await play('c7.b2', 12.5, 'c7_window');
     N.c7 = await ev(() => ({ beams: VR.StoryPlay.stats.beams || 0, at: VR.StoryPlay.stats.beamAt || null }));
     console.log('     c7 ' + JSON.stringify(N.c7));
     check(r7.st && r7.st.fx === 'beacons', 'c7.b2 plays (the beacons\' arrow)');
     await skipScene();
+    await ev(() => { const p = VR.game.player; p.flying = false; p.noclip = false; });
+    // who spawns particles here (the column of white orbs): the spawner's caller, counted
+    await ev(() => { const P = VR.game.particles; if (P.__sp0) return; P.__sp0 = P.spawn; window.__who = {}; P.spawn = function () { const s = (new Error().stack || '').split('\n')[2] || '?'; const k = s.trim().replace(/\(.*\//, '(').slice(0, 90); window.__who[k] = (window.__who[k] || 0) + 1; return P.__sp0.apply(this, arguments); }; });
+    await ev(() => { const g = VR.game, p = g.player; g.camMode = 0; p.flying = true; p.noclip = true; p.teleport(-5.5, 65.4, 3.0); p.yaw = p.viewYaw = Math.atan2(9.5, -5.5); p.pitch = -0.16; g.settings.fov = 75; window.__who = {}; });
+    await settle(14, 'the café');
+    const d = await ev(() => { const g = VR.game, E = g.env.E || {}, P = g.particles, w = g.world, R = VR.R, L = P.lamps || [], ln = []; for (let i = 0; i < L.length && ln.length < 24; i += 4) ln.push([L[i], L[i + 1], L[i + 2], R.types[R.T.type[L[i + 3]]].name].join(' ')); return { night: +(E.night || 0).toFixed(2), count: P.count, who: window.__who, lamps: ln, falls: (g.waterFalls || []).length, funke: !!(g.funke && g.funke.on && g.funke.on()), wayT: g.funke ? g.funke.wayT : null }; });
+    N.cafe = d; console.log('     ' + JSON.stringify(d).slice(0, 2400));
+    check(!Object.keys(d.who || {}).some(k => /Vents/.test(k)), 'no citadel sparks in the station (the white orbs): ' + Object.keys(d.who || {}).map(k => k.replace(/^at /, '').replace(/ \(.*/, '')).join(', '));
+    await draw(); await shot('cafe');
+    N.cafeLum = await lum(); console.log('     café ' + JSON.stringify(N.cafeLum));
     save();
   }
 
