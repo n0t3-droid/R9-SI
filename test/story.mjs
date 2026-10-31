@@ -414,6 +414,7 @@ try {
       const s1 = await play('c9.b1', 10, 'c9_nebula', td === null ? undefined : td);
       check(s1 && s1.fx === 'nebin' && /lumi/.test(s1.who), 'c9.b1: the nebula from inside; Lumi is there (her branch)');
       check(await ev(() => (VR.StoryPlay.stats.nebSky || 0) > 0), 'c9.b1: the sky turned to the nebula\'s own glow while the scene plays');
+      { const q = await ev(() => ({ glows: VR.StoryPlay.stats.glows || 0, air: VR.StoryPlay.stats.nebAir || 0, ms: VR.StoryGlow ? +VR.StoryGlow.stats.ms.toFixed(1) : -1, draws: VR.StoryGlow ? VR.StoryGlow.stats.draws : -1 })); check(q.glows > 20, 'a-story5 · c9.b1: the nebula\'s walls as 3-D lights in the world (' + JSON.stringify(q) + ')'); }
       await ev(() => VR.StoryPlay.debug.reach('c9.b2'));
       const s2 = await play('c9.b2', 11, 'c9_flimmi', td === null ? undefined : td);
       check(s2 && s2.fx === 'flimmi' && /flimmi/.test(s2.who), 'c9.b2: Flimmi — the star being born, the one the beacons were calling');
@@ -443,6 +444,7 @@ try {
       const w11 = await why('c11.b1');
       check(w11 === null, 'c11.b1 holds at the Ringstation (' + w11 + ')');
       const s1 = await play('c11.b1', 9, 'c11_echo');
+      { const q = await ev(() => ({ peoples: VR.StoryPlay.stats.peoples || 0, glows: VR.StoryPlay.stats.glows || 0, ms: VR.StoryGlow ? +VR.StoryGlow.stats.ms.toFixed(1) : -1 })); check(q.peoples >= 5, 'a-story5 · c11.b1: the five peoples stand round Echo (' + JSON.stringify(q) + ')'); }
       check(s1 && s1.fx === 'echo' && ['solgani', 'dumarin', 'ylosenis', 'anselm'].every(w => s1.who.indexOf(w) >= 0), 'c11.b1: the peoples gather round Echo');
       const s2 = await play('c11.b2', 4, 'c11_plan');
       check(s2 && /lumi/.test(s2.who), 'c11.b2: the plan — answer Echo your way (Lumi\'s branch)');
@@ -465,7 +467,7 @@ try {
       const s3 = await play('c11.b3', 9, 'c11_wake', 6000);
       check(s3 && s3.fx === 'wake' && /\.build\./.test(s3.keys) && /echo/.test(s3.who), 'c11.b3: Echo wakes — and speaks of the beacon you built');
       // 12 · home: everyone; at night every beacon at once; the epilogue
-      const s4 = await play('c12.b1', 9, 'c12_home', 6000);
+      const s4 = await play('c12.b1', 3, 'c12_home', 6000);   // (a-story5: the first shot — the skyline toward the Tortempel)
       check(s4 && /ilka/.test(s4.who) && /lumi/.test(s4.who), 'c12.b1: everyone on the square (Lumi in her branch)');
       await ev(() => VR.game.env.setTime(16500)); await run(40);
       const w12 = await why('c12.b2');
@@ -562,7 +564,7 @@ const R4 = [
   ['Kapitel 11 · Echo und die fünf Völker · der Plan · das selbst gebaute Leuchtfeuer · Echo erwacht', ['c11_echo', 'c11_plan', 'c11_built', 'c11_wake']],
   ['Kapitel 12 · Heimkehr · jedes Leuchtfeuer auf einmal · der Himmel · der Epilog', ['c12_home', 'c12_finale', 'c12_sky', 'c12_epilogue']]];
 sheet('story4_sheet', [['a-story3s offene Punkte · c5 das Lied (Weitwinkel) · c7 das Fenster: 3-D-Strahlen · c8 zwei Sonnen am Tag', ['c5_song', 'c7_window', 'c8_twin']]].concat(R4));
-sheet('story5_sheet', [['a-story5 · das Fenster: der Pfeil der Leuchtfeuer', ['c7_window']]].concat(R4));
+sheet('story5_sheet', R4);
 save();
 await browser.close();
 console.log((fails ? 'FAILED ' + fails : 'ALL OK') + ' (' + secs() + ')');
