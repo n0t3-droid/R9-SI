@@ -4,7 +4,7 @@
 //  2 · the murmuration (R55-03): none in a new world's first minute, in over the next 30 s; from afar thinner (depth ×
 //      murmFar ≤ 0.25 beyond 240 m) and an impostor's depth capped — no black blot over the horizon
 //  3 · the hand (R55-13): the held block 30 % darker, the kit's slot 5 a calm block (not a neon)
-//  4 · the spawn (R55-12): a vista start's feet on the walk's mouth facing the view, the centre third clear ≥ 3 m
+//  4 · the spawn (R55-12): a vista start's feet on the open way 1 m before the walk's mouth, facing the view
 require('./dom_stub.js');
 const V = require('./load_shared.js');
 globalThis.VR = V;
@@ -29,8 +29,8 @@ if (FK && FK.keepClear) {
   // a place already clear stays where it is
   const far = place(0.4, 3, 2.5, 0), kept = FK.keepClear(eye, 0.4, far.slice(), 1);
   check(Math.hypot(kept[0] - far[0], kept[1] - far[1], kept[2] - far[2]) < 1e-9, 'a place 3.9 m away beside the view stays');
-  const share = FK.screenShare(2.5, 0.35, 70, 16 / 9);
-  check(share <= 0.02, `his 35 cm at 2.5 m: ${(share * 100).toFixed(2)} % of the frame (≤ 2 %; at 0.86 m it was ${(FK.screenShare(0.86, 0.35, 70, 16 / 9) * 100).toFixed(1)} %)`);
+  const share = FK.screenShare(2.5, 0.64, 75, 16 / 9);
+  check(share <= 0.02, `his 64 cm (the rotors' span) at 2.5 m: ${(share * 100).toFixed(2)} % of the frame (≤ 2 %; at 0.86 m it was ${(FK.screenShare(0.86, 0.64, 75, 16 / 9) * 100).toFixed(1)} %)`);
 }
 
 // ---------------------------------------------------------------- 2 · the murmuration
@@ -59,7 +59,7 @@ check(!!d5 && !/neon|magenta|crystal|glow/.test(k5), 'the kit\'s slot 5: ' + k5 
 
 // ---------------------------------------------------------------- 4 · the spawn
 console.log('4 · the spawn on the walk\'s mouth');
-check(FI && FI.WALK_T <= 1.5 && FI.WALK_T >= 1, 'the feet 1–1.5 blocks out on the walk (FI.WALK_T ' + (FI && FI.WALK_T) + ')');
+check(FI && FI.WALK_T === -1, 'the feet on the open way, 1 m before the walk\'s mouth (FI.WALK_T ' + (FI && FI.WALK_T) + ')');
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
