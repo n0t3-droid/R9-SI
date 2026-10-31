@@ -222,6 +222,8 @@
   }
   const at = (g, x, z, dy) => { const y = ground(g, x, z); return [x, (y === null ? 0 : y) + (dy || 0), z]; };
   const off = (s, a, r) => [s.x + Math.cos(s.yaw + a) * r, s.z + Math.sin(s.yaw + a) * r];
+  const look = (dx, dz) => Math.atan2(-dx, -dz);   // a model's yaw to face the way (dx, dz) (the models face −z)
+  const faceIn = (s, a) => look(-Math.cos(s.yaw + a), -Math.sin(s.yaw + a));   // turned towards a place's centre from angle a
   // a place's parts and folk (their ground read once)
   function build(g, s) {
     const seed = seedOf(g), P = s.parts = [], folk = s.folk = [], add = (m, pos, yaw, o) => P.push({ m, pos, yaw: yaw || 0, o: o || {} });
@@ -235,18 +237,18 @@
       s.wishes = [0, 1, 2].map((i) => { const [x, z] = off(s, Math.PI + (i - 1) * 0.55, 6.2); const p = at(g, x, z, 0); add('fy_crystal_' + (i === 1 ? 2 : i), p, 0, { scale: 1.3 }); return { i, pos: p }; });
       const [zx, zz] = off(s, 1.9, 6.5); sprite('zwirbel', 'cheeky', 1, at(g, zx, zz, 0.1), { hat: true });
     } else if (s.kind === 'tree') {
-      add('fy_tree', at(g, s.x, s.z, -0.4), s.yaw);
+      add('fy_tree', at(g, s.x, s.z, -0.4), look(Math.cos(s.yaw), Math.sin(s.yaw)));
       const [dx, dz] = off(s, 0, 4.2); s.door = at(g, dx, dz, 0);
-      for (let i = 0; i < 6; i++) { const [x, z] = off(s, 0.9 + i * 0.85, 8.5 + h(seed, i, 9) * 3); add('fy_house_' + (i % 3), at(g, x, z, -0.05), s.yaw + i * 0.85 + Math.PI / 2); }
+      for (let i = 0; i < 6; i++) { const [x, z] = off(s, 0.9 + i * 0.85, 8.5 + h(seed, i, 9) * 3); add('fy_house_' + (i % 3), at(g, x, z, -0.05), faceIn(s, 0.9 + i * 0.85) + Math.PI); }
       for (let i = 0; i < 8; i++) { const [x, z] = off(s, 0.75 + i * 0.62, 7); add('fy_lamp', at(g, x, z, 0), 0); }
       const [bx, bz] = off(s, 0.25, 5.4); sprite('borke', 'wise', 3, at(g, bx, bz, 0.1));
       const [tx, tz] = off(s, 1.6, 9.5); sprite('tuepfel', 'shy', 0, at(g, tx, tz, 0.1));
       for (let i = 0; i < 2; i++) { const [x, z] = off(s, 2.6 + i * 1.7, 10); sprite('folk' + i, 'busy', (i + 2) % 5, at(g, x, z, 0.1)); }
       s.lanterns = F.lanternSpots(seed, s).map(([x, z], i) => ({ i, pos: at(g, x, z, 0.1) }));
     } else if (s.kind === 'circle') {
-      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 8); add('fy_stone', at(g, x, z, -0.3), s.yaw + i * TAU / 9 + Math.PI / 2, { scale: 0.85 + h(seed, i, 5) * 0.4 }); }
+      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 8); add('fy_stone', at(g, x, z, -0.3), faceIn(s, i * TAU / 9), { scale: 0.85 + h(seed, i, 5) * 0.4 }); }
       add('fy_altar', at(g, s.x, s.z, -0.1), s.yaw);
-      s.answers = [0, 1, 2].map((j) => { const [x, z] = off(s, Math.PI + (j - 1) * 0.7, 4.6); const p = at(g, x, z, -0.1); add('fy_tablet', p, s.yaw + Math.PI + (j - 1) * 0.7 + Math.PI / 2); return { j, pos: p }; });
+      s.answers = [0, 1, 2].map((j) => { const [x, z] = off(s, Math.PI + (j - 1) * 0.7, 4.6); const p = at(g, x, z, -0.1); add('fy_tablet', p, faceIn(s, Math.PI + (j - 1) * 0.7)); return { j, pos: p }; });
       const [sx, sz] = off(s, 0.4, 1.8); sprite('silbrin', 'wise', 2, at(g, sx, sz, 0.55));
     } else if (s.kind === 'garden') {
       s.top = s.y + 24;
