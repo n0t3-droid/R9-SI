@@ -145,7 +145,7 @@
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'hum' }, { cam: 'orbit', target: 'player', dur: 7, fx: 'song', swell: true }, { cam: 'wide', target: 'vista', dur: 6, fx: 'redsun' }], music: 'warm' },
       who: ['ylosenis:happy', 'ylosenis', 'funke:surprised', 'dumarin:happy'], task: { kind: 'listen', target: 'village' }, reward: { xp: 180 }, act: { kind: 'scan', target: 'village', dim: ['x.*'], max: 250, cone: 22 } }),
     B(10, 3, { when: { after: 'c10.b2', adv: true, dim: ['x.*'], red: true },
-      scene: { shots: [{ cam: 'up', target: 'sky', dur: 7, fx: 'beam', swell: true }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 7, fx: 'beam' }], music: 'tense' },
+      scene: { shots: [{ cam: 'skyline', target: 'lit', dur: 7, fx: 'beam', swell: true }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'wide', target: 'player', dur: 7, fx: 'beam' }], music: 'tense' },   // (a-story5: the skyline from the Dunelin village, the 3-D beam over its beacon)
       who: ['funke:happy', 'dumarin:worried', 'ylosenis:worried', 'funke:worried'], task: { kind: 'station', target: 'station' }, reward: { xp: 220 }, act: { kind: 'photo', target: 'sky', dim: ['x.*'], pitch: 10 } }),
     // 11 · Echo — five peoples in the Ringstation's heart; the answer Echo can see, given your own way
     B(11, 1, { when: { after: 'c10.b3', adv: true, dim: ['stn.*'] },
@@ -159,7 +159,7 @@
       alt: { build: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], fly: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], free: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'], calm: ['funke:surprised', 'echo:surprised', 'echo', 'funke:happy', 'echo:happy'] }, task: { kind: 'home', target: 'home' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 15 } }),
     // 12 · Heimkehr — everyone on the square; at night every freed beacon lights at once; free play and a new signal
     BV(12, 1, { when: { after: 'c11.b3', adv: true, dim: ['overworld'] }, vary: 'c6',
-      scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'orbit', target: 'player', dur: 7, fx: 'gather', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
+      scene: { shots: [{ cam: 'skyline', target: 'temple', dur: 6 }, { cam: 'orbit', target: 'player', dur: 7, fx: 'gather', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
       alt: { wellari: ['ilka:happy', 'oskar:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'oskar:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'night', target: 'night' }, reward: { xp: 200 }, act: { kind: 'look', target: 'vista', max: 600, cone: 22, hold: 1.5 } }),
     B(12, 2, { when: { after: 'c12.b1', adv: true, dim: ['overworld'], hours: ['dusk', 'night'] },
       scene: { shots: [{ cam: 'up', target: 'sky', dur: 8, fx: 'finale', swell: true }, { cam: 'skyline', target: 'vista', dur: 9, fx: 'finale' }, { cam: 'close', target: 'funke', dur: 6, fx: 'finale', swell: true }], music: 'rise' },

@@ -2724,6 +2724,8 @@
     'story.guest': '📖 New chapter at the host\'s: {title}',
     'g.set.storyOffer': 'Story: Funke announces chapters',
     'g.set.storyOffer.tip': 'When you have been calm for a while, Funke picks up a signal — [V] plays a short scene. Never while building or in a fight. Off: the chapters wait in the journal.',
+    'g.set.storyLights': 'Story: lights in the world',
+    'g.set.storyLights.tip': "The story's scenes show the nebula's walls, Echo's light and the beams as real lights in the world. Only during a scene. Off: the film's own pictures alone (faster on weak PCs).",
     // ---- a-story end
     // ---- a-story2 (the deeds between the beats, the story's [V] words)
     'story.act.c1.b1': 'Take a good look at the view.',

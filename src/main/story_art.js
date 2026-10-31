@@ -456,6 +456,8 @@
       for (let i = 0; i < (low ? 6 : 16); i++) { const q = fr(t * 0.05 + rnd(i, 12)), x = rnd(i, 13) * w, y = h * (0.2 + 0.7 * rnd(i, 14)) - q * h * 0.1; glow(c, x, y, S0 * 0.008, i % 2 ? '255,210,140' : '255,160,150', 0.5 * Math.sin(q * Math.PI)); }   // (dust in the two lights)
     } else if (kind === 'beam') {
       // the nebula (pink, violet, a teal edge) and the beam swinging to it from below
+      // (a-story5: where the world draws the beam itself — 10.3 — only a few motes rise along the frame)
+      if (o.beam3d) { for (let i = 0; i < (low ? 4 : 10); i++) { const q = fr(t * 0.12 + rnd(i, 61)); glow(c, w * (0.3 + 0.4 * rnd(i, 62)), h * (1 - q), S0 * 0.006, '160,245,255', 0.6 * Math.sin(q * Math.PI)); } c.restore(); return true; }
       const nx = w * 0.78, ny = h * 0.2;
       for (let i = 0; i < (low ? 4 : 8); i++) glow(c, nx + (rnd(i, 9) - 0.5) * S0 * 0.4, ny + (rnd(i, 10) - 0.5) * S0 * 0.2, S0 * (0.12 + 0.1 * rnd(i, 11)), i % 3 === 0 ? '90,200,220' : i % 2 ? '220,90,190' : '150,90,230', 0.18);
       const k = ease(u * 1.3), bx = w * 0.42, by = h * 1.0, tx = bx + (nx - bx) * k + (1 - k) * w * -0.2, ty = by + (ny - by) * (0.4 + 0.6 * k);
@@ -465,17 +467,18 @@
     } else if (kind === 'nebin') {
       // a-story4 · the nebula from inside: walls of Hα pink and violet, a teal rim round a hot young star, dark dust lanes
       // in front of them, newborn stars twinkling; strongest high in the frame, fading to the land
-      const n = low ? 5 : 11, drift = t * 0.006;
+      const n = o.neb3d ? 0 : low ? 5 : 11, drift = t * 0.006;   // (a-story5: o.neb3d — the walls, the young star and the dust are 3-D in the sky: story_glow.js)
       for (let i = 0; i < n; i++) { const x = (rnd(i, 21) + drift * (rnd(i, 22) - 0.5)) * w, y = h * (0.05 + 0.5 * rnd(i, 23)), r = S0 * (0.25 + 0.3 * rnd(i, 24)); glow(c, x, y, r, i % 4 === 0 ? '150,80,220' : i % 3 === 0 ? '255,110,150' : '235,70,120', 0.16 + 0.08 * rnd(i, 25)); }
-      const hx = w * 0.68, hy = h * 0.2; glow(c, hx, hy, S0 * 0.42, '60,210,200', 0.16); glow(c, hx, hy, S0 * 0.06, '220,250,255', 0.6); glow(c, hx, hy, S0 * 0.015, '255,255,255', 1);
+      const hx = w * 0.68, hy = h * 0.2; if (!o.neb3d) glow(c, hx, hy, S0 * 0.42, '60,210,200', 0.16); if (!o.neb3d) { glow(c, hx, hy, S0 * 0.06, '220,250,255', 0.6); glow(c, hx, hy, S0 * 0.015, '255,255,255', 1); }
       c.globalCompositeOperation = 'source-over';
-      for (let i = 0; i < (low ? 3 : 6); i++) { const x = w * (0.1 + 0.15 * i + 0.05 * Math.sin(t * 0.05 + i)), y = h * (0.28 + 0.12 * rnd(i, 26)); const g = c.createRadialGradient(x, y, 0, x, y, S0 * 0.22); g.addColorStop(0, 'rgba(40,12,40,0.26)'); g.addColorStop(1, 'rgba(40,12,40,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, S0 * 0.34, S0 * 0.08, -0.25 + 0.2 * rnd(i, 27), 0, Math.PI * 2); c.fill(); }   // (the dust lanes)
+      for (let i = 0; i < (o.neb3d ? 0 : low ? 3 : 6); i++) { const x = w * (0.1 + 0.15 * i + 0.05 * Math.sin(t * 0.05 + i)), y = h * (0.28 + 0.12 * rnd(i, 26)); const g = c.createRadialGradient(x, y, 0, x, y, S0 * 0.22); g.addColorStop(0, 'rgba(40,12,40,0.26)'); g.addColorStop(1, 'rgba(40,12,40,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, S0 * 0.34, S0 * 0.08, -0.25 + 0.2 * rnd(i, 27), 0, Math.PI * 2); c.fill(); }   // (the dust lanes)
       c.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < (low ? 10 : 28); i++) { const x = rnd(i, 28) * w, y = h * 0.62 * rnd(i, 29), tw = 0.55 + 0.45 * Math.sin(t * (1.5 + rnd(i, 30) * 3) + i); glow(c, x, y, S0 * 0.008 * (1 + rnd(i, 31)), i % 3 ? '255,240,250' : '180,230,255', 0.7 * tw); }
+      for (let i = 0; i < (o.neb3d ? (low ? 4 : 10) : low ? 10 : 28); i++) { const x = rnd(i, 28) * w, y = h * 0.62 * rnd(i, 29), tw = 0.55 + 0.45 * Math.sin(t * (1.5 + rnd(i, 30) * 3) + i); glow(c, x, y, S0 * 0.008 * (1 + rnd(i, 31)), i % 3 ? '255,240,250' : '180,230,255', 0.7 * tw); }
     } else if (kind === 'flimmi') {
       // Flimmi: a star being born — a bright point in a flat glowing disc, two thin jets out of its poles, sparks round it;
       // it pulses as it speaks
       const x = w * 0.5, y = h * 0.3, pu = 0.8 + 0.2 * Math.sin(t * 7) * Math.sin(t * 2.3);
+      if (o.flimmi3d) { for (let i = 0; i < (low ? 5 : 12); i++) { const a = t * (0.4 + 0.3 * rnd(i, 32)) + i * 2.1, rr = S0 * (0.1 + 0.14 * rnd(i, 33)); glow(c, w * 0.5 + Math.cos(a) * rr, h * 0.36 + Math.sin(a) * rr * 0.3, S0 * 0.005, '255,230,170', 0.6); } c.restore(); return true; }   // (a-story5: Flimmi itself shines in the sky — story_glow.js — the film adds only its sparks)
       glow(c, x, y, S0 * 0.3, '255,170,90', 0.22 * pu);
       c.save(); c.translate(x, y); c.rotate(-0.18); c.scale(1, 0.18); glow(c, 0, 0, S0 * 0.22, '255,200,120', 0.5); c.restore();   // (the disc, seen nearly edge on)
       for (const sg of [-1, 1]) { const g = c.createLinearGradient(x, y, x + sg * S0 * 0.05, y - sg * S0 * 0.32); g.addColorStop(0, 'rgba(160,220,255,0.6)'); g.addColorStop(1, 'rgba(160,220,255,0)'); c.strokeStyle = g; c.lineWidth = Math.max(1, S0 * 0.006); c.beginPath(); c.moveTo(x, y); c.lineTo(x + sg * S0 * 0.05, y - sg * S0 * 0.32); c.stroke(); }   // (the jets)
@@ -494,6 +497,7 @@
       // brightens to cyan and rings of light run outward
       const x = w * 0.5, y = h * 0.42, wk = kind === 'wake' ? ease(u * 1.4) : 0, br = 0.5 + 0.5 * Math.sin(t * (0.8 + wk * 2));
       const col = wk > 0.5 ? '120,235,255' : '170,150,255';
+      if (o.echo3d) { for (let i = 0; i < (low ? 5 : 10); i++) { const q = fr(t * 0.07 + rnd(i, 63)); glow(c, w * (0.2 + 0.6 * rnd(i, 64)), h * (0.85 - 0.6 * q), S0 * 0.005, Fx.FOLK[i % 5], 0.7 * Math.sin(q * Math.PI)); } c.restore(); return true; }   // (a-story5: Echo's light and the five peoples stand in the hall itself; motes in their colours rise)
       c.lineWidth = Math.max(2, S0 * (0.016 + 0.01 * wk)); c.strokeStyle = 'rgba(' + col + ',' + (0.4 + 0.2 * br + 0.35 * wk) + ')'; c.beginPath(); c.ellipse(x, y, S0 * 0.24, S0 * 0.24 * 0.55, 0, 0, Math.PI * 2); c.stroke();
       glow(c, x, y, S0 * (0.12 + 0.1 * wk), col, 0.2 + 0.15 * br + 0.5 * wk);
       if (wk > 0) for (let i = 0; i < (low ? 3 : 6); i++) { const q = fr(t * 0.45 + i / 6), rr = S0 * (0.24 + q * 0.7); c.strokeStyle = 'rgba(140,240,255,' + (0.5 * (1 - q) * wk) + ')'; c.lineWidth = Math.max(1, S0 * 0.004); c.beginPath(); c.ellipse(x, y, rr, rr * 0.55, 0, 0, Math.PI * 2); c.stroke(); }
@@ -515,7 +519,15 @@
         const per = 2.4 + rnd(b, 43), q = fr(t / per + rnd(b, 44)), cyc = Math.floor(t / per + rnd(b, 44)), bx = w * (0.12 + 0.76 * rnd(b + cyc * 7, 45)), by = h * (0.12 + 0.3 * rnd(b + cyc * 7, 46));
         if (q < 0.15) { glow(c, bx, by + (0.15 - q) * h * 2, S0 * 0.008, '255,230,180', 0.9); continue; }   // (the rocket rising)
         const e = (q - 0.15) / 0.85, col = Fx.FOLK[(b + cyc) % 5], a = (1 - e) * 0.9, pn = low ? 10 : 22;
-        for (let i = 0; i < pn; i++) { const an = i / pn * Math.PI * 2, rr = S0 * 0.16 * ease(e * 1.6); glow(c, bx + Math.cos(an) * rr, by + Math.sin(an) * rr + e * e * S0 * 0.05, S0 * 0.012, col, a); }
+        // (a-story5: streaked sparks — each a fading trail from where it was a moment ago, drooping as it slows)
+        const e0 = Math.max(0, e - 0.12), rr = S0 * 0.17 * ease(e * 1.6), r0 = S0 * 0.17 * ease(e0 * 1.6), dr = e * e * S0 * 0.07, d0 = e0 * e0 * S0 * 0.07;
+        c.lineCap = 'round';
+        for (let i = 0; i < pn; i++) {
+          const an = i / pn * Math.PI * 2 + rnd(b + cyc, 47) * 0.4, ca = Math.cos(an), sa = Math.sin(an), x1 = bx + ca * rr, y1 = by + sa * rr + dr, x0 = bx + ca * r0, y0 = by + sa * r0 + d0;
+          const gr = c.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, 'rgba(' + col + ',0)'); gr.addColorStop(1, 'rgba(' + col + ',' + a + ')');
+          c.strokeStyle = gr; c.lineWidth = Math.max(1, S0 * 0.006 * (1 - e * 0.6)); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+          if (!low && (i & 1) === 0) glow(c, x1, y1, S0 * 0.008, '255,250,235', a * 0.9);   // (the hot tip)
+        }
         if (e < 0.25) glow(c, bx, by, S0 * 0.09, '255,250,230', 0.5 * (1 - e * 4));
       }
     } else if (kind === 'blink3') {

@@ -435,6 +435,7 @@ console.log('15 · a-story3: the player — the choice card, the variant lines, 
 }
 
 require(path.join(__dirname, '../test/story4_part.js'))(S, SP, tr, calm, check, rnd);
+require(path.join(__dirname, '../test/story5_part.js'))(S, SP, tr, calm, check, rnd);   // a-story5
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

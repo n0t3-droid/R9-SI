@@ -2724,6 +2724,8 @@
     'story.guest': '📖 Neues Kapitel beim Gastgeber: {title}',
     'g.set.storyOffer': 'Geschichte: Funke meldet Kapitel',
     'g.set.storyOffer.tip': 'Bist du eine Weile in Ruhe, meldet Funke ein Signal — [V] spielt eine kurze Szene. Nie beim Bauen oder in einem Kampf. Aus: die Kapitel warten im Tagebuch.',
+    'g.set.storyLights': 'Geschichte: Lichter in der Welt',
+    'g.set.storyLights.tip': 'Die Szenen der Geschichte zeigen Nebelwände, Echos Licht und die Strahlen als echte Lichter in der Welt. Nur während einer Szene. Aus: die Bilder des Films allein (schneller auf schwachen PCs).',
     // ---- a-story end
     // ---- a-story2 (the deeds between the beats, the story's [V] words)
     'story.act.c1.b1': 'Schau dir den Ausblick in Ruhe an.',
