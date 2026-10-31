@@ -19,7 +19,6 @@
   const hasDoc = typeof document !== 'undefined';
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : de);
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
   // ---------------------------------------------------------------- a · a new world: the HUD up
   H.fresh = function (g, doc) {
@@ -141,16 +140,15 @@
     }
     // the jolt (read only with the switch on)
     g.hf = { shake: H.SHAKE_T, amp: strong ? 1 : 0.6, seed: H.stats.hits * 1.37 };
-    if (f.st === 'down' || f.hp <= 0) H.downAt = { pos: [m.pos[0], m.pos[1] + (K.h || 1) + 0.3, m.pos[2]], t: now() };
   };
-  // a machine calmed by the beam (not a hit) pops too
+  // the machine gone (its power-down over, or calmed by the beam's light): its place for the award's pop
   if (Fo && Fo.gone && !Fo.gone.__hf) {
     const og = Fo.gone;
-    Fo.gone = function (En, m) { const f = m && m.foe; if (f && !f.remote && (f.why === 'hit' || f.why === 'light' || f.why === 'calm') && !(H.downAt && now() - H.downAt.t < 3000)) { const K = Fo.KINDS[f.k] || {}; H.downAt = { pos: [m.pos[0], m.pos[1] + (K.h || 1) + 0.3, m.pos[2]], t: now() }; } return og.apply(this, arguments); };
+    Fo.gone = function (En, m) { const f = m && m.foe; if (f && !f.remote && (f.why === 'hit' || f.why === 'light')) { const K = Fo.KINDS[f.k] || {}; H.downAt = { pos: [m.pos[0], m.pos[1] + (K.h || 1) + 0.3, m.pos[2]], gt: (En.game && En.game.time) || 0 }; } return og.apply(this, arguments); };
     Fo.gone.__hf = true;
   }
   // the XP pop where the machine stood (the award of its power-down comes within a few seconds)
-  H.POP_MS = 6000;
+  H.POP_T = 4;   // s of play between the machine gone and its award
   H.project = function (g, P) {
     const r = g.renderer, cam = g.cam; if (!r || !r.viewProj || !cam) return null;
     const vp = r.viewProj, x = P[0] - cam.x, y = P[1] - cam.y, z = P[2] - cam.z, cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
@@ -162,7 +160,7 @@
   };
   H.pop = function (g, xp, tl) {
     if (!hasDoc || !(xp > 0 || tl > 0) || g.hideHud) return false;
-    const D = H.downAt; if (!D || now() - D.t > H.POP_MS) return false;
+    const D = H.downAt; if (!D || Math.abs((g.time || 0) - D.gt) > H.POP_T) return false;
     const s = H.project(g, D.pos) || [((g.renderer && g.renderer.canvas && g.renderer.canvas.clientWidth) || 1280) / 2, ((g.renderer && g.renderer.canvas && g.renderer.canvas.clientHeight) || 720) * 0.4];
     H.css();
     const el = document.createElement('div'); el.className = 'hfpop';

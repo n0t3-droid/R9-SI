@@ -65,7 +65,7 @@ async function run(tag, url, fight) {
     console.log('  hits: ' + JSON.stringify(OUT.hit));
     check(OUT.hit.stats && OUT.hit.stats.hits >= 3 && OUT.hit.clank >= 3, tag + ': three hits felt (' + JSON.stringify(OUT.hit.stats) + ', clank ' + OUT.hit.clank + ')');
     await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 60, g.player.pos); });
-    await until(() => document.querySelector('.hfpop') || (VR.HitFeel && VR.HitFeel.stats.pops > 0), 60000); await shot('pop');
+    await until(() => document.querySelector('.hfpop') || (VR.HitFeel && VR.HitFeel.stats.pops > 0), 400000); await shot('pop');
     OUT.pop = await ev(() => ({ pops: VR.HitFeel.stats.pops, el: [...document.querySelectorAll('.hfpop')].map(e => e.textContent) }));
     console.log('  pop: ' + JSON.stringify(OUT.pop));
     check(OUT.pop.pops >= 1, tag + ': the XP pop where it stood');

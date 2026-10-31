@@ -198,6 +198,20 @@ if (!process.env.NO_ADV) {
   check(OUT.advHud25 && (!OUT.advHud25.funkeVis || OUT.advHud25.funkeD >= 0.6 || OUT.advHud25.funkeCull), 'Abenteuer: Funke not drawn in the camera\'s face (closer than 0.6 m: culled; ' + (OUT.advHud25 && OUT.advHud25.funkeD) + ' m ≥ 0.6)');
   check(OUT.advHud25 && (!OUT.advHud25.moved || OUT.advHud25.moved.phase !== 'after'), 'Abenteuer: the spawn\'s settle move under the arrival\'s white (' + JSON.stringify(OUT.advHud25 && OUT.advHud25.moved) + ')');
   await offerCheck('18');
+  // f-hud: the first fight — a Wächter 4 m ahead, three hits (the sparks where it is struck, the rock back, the clank), the
+  // power-down (the „+EP" pop where it stood)
+  await ev(() => { const u = VR.game.ui; if (u && u.screen && u.show) u.show(null); }).catch(() => {}); await untilClosed();
+  OUT.foe = await ev(() => { const g = VR.game, p = g.player, En = g.entities, F = VR.Foes; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.pos[0] + fx * 4, z = p.pos[2] + fz * 4;
+    let y = Math.floor(p.pos[1]) + 3; while (y > p.pos[1] - 6 && !(VR.R.T.flags[g.world.getBlock(Math.floor(x), y - 1, Math.floor(z))] & VR.F.SOLID)) y--;
+    const m = En.summon('foe_sentry', x, y, z); if (!m) return null; m.foe = F.make('sentry', m.id, [x, y, z]); m.yaw = p.yaw + Math.PI; window.__m = m; p.pitch = -0.08; return [x, y, z].map(Math.round); }).catch(e => String(e));
+  for (let i = 1; i <= 3; i++) { await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 3, g.player.pos); }).catch(() => {}); const f0 = await ev(() => VR.game.frame).catch(() => 0); const t = Date.now(); while (Date.now() - t < 60000 && (await ev(() => VR.game.frame).catch(() => f0 + 1)) < f0 + 1) await wait(200); if (i === 2) await shot('19_adv_hit'); }
+  OUT.hits = await ev(() => ({ stats: VR.HitFeel && Object.assign({}, VR.HitFeel.stats), clank: VR.HitFeel && VR.HitFeel.clankN, shake: VR.game.settings.hitShake })).catch(() => null);
+  check(OUT.hits && OUT.hits.stats && OUT.hits.stats.hits >= 3 && OUT.hits.clank >= 3 && OUT.hits.shake !== true, 'the first fight: three hits felt (sparks, clank, rock back), the shake off by default: ' + JSON.stringify(OUT.hits));
+  await ev(() => { const g = VR.game; g.entities.hurtMob(window.__m, 60, g.player.pos); }).catch(() => {});
+  { const t = Date.now(); while (Date.now() - t < 400000 && !(await ev(() => !!document.querySelector('.hfpop') || VR.HitFeel.stats.pops > 0).catch(() => false))) await wait(500); }
+  await shot('20_adv_pop');
+  OUT.pop = await ev(() => ({ pops: VR.HitFeel.stats.pops, el: [...document.querySelectorAll('.hfpop')].map(e => e.textContent) })).catch(() => null);
+  check(OUT.pop && OUT.pop.pops >= 1, 'the power-down: the EP pop where it stood: ' + JSON.stringify(OUT.pop));
 }
 OUT.errors = errs; OUT.ms = Date.now() - t0;
 fs.writeFileSync(SHOTS + 'critic_ux' + (TAG ? '_' + TAG.slice(0, -1) : '') + '.json', JSON.stringify(OUT, null, 1));
