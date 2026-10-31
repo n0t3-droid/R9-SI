@@ -100,7 +100,7 @@ async function costHere() {
   for (const preset of ['potato', 'high']) {
     await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, preset);
     await settle(12);
-    for (const on of [false, true, false, true]) {
+    for (const on of [false, true, false, true, false, true]) {
       const r = await ev(([on]) => { const g = VR.game; g.settings.fairy = on; window.__norender = false; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws, js: +VR.Fairy.debug.cost().ms.toFixed(3) }; }, [on]);
       const k = preset + (on ? '_on' : '_off'); (cost[k] || (cost[k] = [])).push(r);
     }
@@ -115,7 +115,7 @@ async function costHere() {
 
 // ---------------------------------------------------------------- 1 · the places at their hours
 if (want('places')) {
-  const H = { tree: [5200, 30, 4, 12, 0.5], shroom: [12700, 15, 1.5, 2.5, 0.3], spring: [11400, 11, 2.5, 0.8, 0.6], circle: [18000, 15, 3, 1.5, 0.2], garden: [23700, 38, 5, 0, 0.35] };
+  const H = { tree: [5200, 30, 4, 12, 0.5], shroom: [12700, 23, 3, 2.5, 0.3], spring: [11400, 11, 2.5, 0.8, 0.6], circle: [18000, 15, 3, 1.5, 0.2], garden: [23700, 38, 5, 0, 0.35] };
   for (const kind of ['tree', 'shroom', 'spring', 'circle', 'garden']) {
     try {
       const s = await goTo(kind);

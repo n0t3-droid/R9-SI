@@ -70,12 +70,12 @@
   // the wood's mushrooms: {x, z, h (m tall), v (0 teal · 1 violet · 2 rose), yaw}
   F.shrooms = function (seed, site) {
     const out = [], s0 = strH(site.id);
-    for (let k = 0; out.length < 14 && k < 80; k++) {
+    for (let k = 0; out.length < 18 && k < 90; k++) {
       const a = h(seed, s0, k, 1) * TAU, r = 2 + Math.sqrt(h(seed, s0, k, 2)) * 13.5;
       const x = Math.round((site.x + Math.cos(a) * r) * 10) / 10, z = Math.round((site.z + Math.sin(a) * r) * 10) / 10;
-      if (out.some((m) => Math.hypot(m.x - x, m.z - z) < 2.6)) continue;
-      const big = out.length < 3;
-      out.push({ x, z, h: Math.round((big ? 5.5 + h(seed, s0, k, 3) * 2.5 : 1.8 + h(seed, s0, k, 3) * 2.8) * 10) / 10, v: Math.floor(h(seed, s0, k, 4) * 3), yaw: Math.round(h(seed, s0, k, 5) * 628) / 100 });
+      if (out.some((m) => Math.hypot(m.x - x, m.z - z) < 2.4)) continue;
+      const big = out.length < 4;
+      out.push({ x, z, h: Math.round((big ? 6 + h(seed, s0, k, 3) * 2.4 : 1.8 + h(seed, s0, k, 3) * 3.2) * 10) / 10, v: Math.floor(h(seed, s0, k, 4) * 3), yaw: Math.round(h(seed, s0, k, 5) * 628) / 100 });
     }
     return out;
   };
@@ -217,32 +217,43 @@
   // a spot's land: 'wait' while a column is not loaded, else true when the centre and eight points round it at R are
   // natural, dry and within `step` m of each other
   const RAD = { tree: 12, shroom: 14, spring: 8, circle: 10, garden: 17 };
-  F.SETTLE_TRIES = 24;
+  F.SETTLE_TRIES = 18;   // (a spiral out to ~120 m: what a player standing at the planned spot has loaded)
+  // 2 · the centre and eight points round it at R natural, dry and within `step` m of each other · 1 · natural and dry
+  // only · 0 · not · 'wait' while a column is not loaded; 3 · also room round it: natural ground on a ring at 2·R
   function landOk(g, x, z, R, step) {
-    let lo = 1e9, hi = -1e9;
+    let lo = 1e9, hi = -1e9, dry = true;
     for (let k = 0; k < 9; k++) {
       const a = k * TAU / 8, px = k ? x + Math.cos(a) * R : x, pz = k ? z + Math.sin(a) * R : z, y = ground(g, px, pz);
       if (y === null) return 'wait';
       const st = g.world.getBlock(Math.floor(px), y - 1, Math.floor(pz));
-      if (!natural(st) || wet(g, px, y, pz)) return false;
+      if (!natural(st) || wet(g, px, y, pz)) { if (!k) return 0; dry = false; }
       lo = Math.min(lo, y); hi = Math.max(hi, y);
     }
-    return hi - lo <= step;
+    if (!dry) return 0;
+    if (hi - lo > step) return 1;
+    for (let k = 0; k < 12; k++) {
+      const a = k * TAU / 12 + 0.26, px = x + Math.cos(a) * R * 2, pz = z + Math.sin(a) * R * 2, y = ground(g, px, pz);
+      if (y === null) return 'wait';
+      if (!natural(g.world.getBlock(Math.floor(px), y - 1, Math.floor(pz)))) return 2;
+    }
+    return 3;
   }
   // settle: the first spot of a deterministic spiral round the planned one whose land is open, natural and dry (no
-  // town, no road, no water); then its parts
+  // town, no road, no water); none in the spiral: its best spot (the first of the highest grade); then its parts
   function settle(g, s) {
-    if (s.y !== null || s.tries >= F.SETTLE_TRIES) return s.y !== null;
+    if (s.y !== null) return true;
     const x0 = s.x0 === undefined ? (s.x0 = s.x) : s.x0, z0 = s.z0 === undefined ? (s.z0 = s.z) : s.z0;
+    const put = (x, z) => { s.x = x; s.z = z; s.y = ground(g, x, z); build(g, s); return true; };
     for (let k = s.tries; k < F.SETTLE_TRIES; k++) {
-      const a = s.yaw + k * 0.93, r = k * 12, x = Math.round(x0 + Math.cos(a) * r), z = Math.round(z0 + Math.sin(a) * r);
+      const a = s.yaw + k * 0.93, r = k * 7, x = Math.round(x0 + Math.cos(a) * r), z = Math.round(z0 + Math.sin(a) * r);
       if (S.sites.some((o) => o !== s && o.y !== null && Math.hypot(o.x - x, o.z - z) < F.APART)) { s.tries = k + 1; continue; }
       const ok = landOk(g, x, z, RAD[s.kind] || 10, s.kind === 'garden' ? 8 : 5);
       if (ok === 'wait') return false;
-      if (ok) { s.x = x; s.z = z; s.y = ground(g, x, z); build(g, s); return true; }
+      if (ok === 3) return put(x, z);
+      if (ok > (s.bestG || 0)) { s.bestG = ok; s.best = [x, z]; }
       s.tries = k + 1;
     }
-    return false;
+    return put(s.best ? s.best[0] : x0, s.best ? s.best[1] : z0);
   }
   const at = (g, x, z, dy) => { const y = ground(g, x, z); return [x, (y === null ? 0 : y) + (dy || 0), z]; };
   const off = (s, a, r) => [s.x + Math.cos(s.yaw + a) * r, s.z + Math.sin(s.yaw + a) * r];
@@ -253,18 +264,18 @@
     const seed = seedOf(g), P = s.parts = [], folk = s.folk = [], add = (m, pos, yaw, o) => P.push({ m, pos, yaw: yaw || 0, o: o || {} });
     const sprite = (who, mood, v, pos, o) => folk.push(Object.assign({ who, mood, v, pos: pos.slice(), home: pos.slice(), yaw: s.yaw, t: h(seed, strH(who)) * 10, sx: 0 }, o || {}));
     if (s.kind === 'shroom') {
-      for (const m of F.shrooms(seed, s)) add('fy_shroom_' + m.v, at(g, m.x, m.z, -0.1), m.yaw, { scale: m.h / 4.6, glow: 1, h: m.h });
+      F.shrooms(seed, s).forEach((m, i) => add('fy_shroom_' + m.v, at(g, m.x, m.z, -0.1), m.yaw, { scale: m.h / 4.6, glow: 1, h: m.h, lite: i < 8 }));
       const [fx, fz] = off(s, 0.6, 5); sprite('flocke', 'lost', 4, at(g, fx, fz, 0.1));
     } else if (s.kind === 'spring') {
       add('fy_pool', at(g, s.x, s.z, -0.05), s.yaw);
-      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 4.4); add(i % 3 === 0 ? 'fy_crystal_1' : 'fy_crystal_0', at(g, x, z, -0.1), i * 1.3, { scale: 0.45 + h(seed, i, 3) * 0.45 }); }
+      for (let i = 0; i < 9; i++) { const [x, z] = off(s, i * TAU / 9, 4.4); add(i % 3 === 0 ? 'fy_crystal_1' : 'fy_crystal_0', at(g, x, z, -0.1), i * 1.3, { scale: 0.45 + h(seed, i, 3) * 0.45, lite: i % 3 === 0 }); }
       s.wishes = [0, 1, 2].map((i) => { const [x, z] = off(s, Math.PI + (i - 1) * 0.55, 6.2); const p = at(g, x, z, 0); add('fy_crystal_' + (i === 1 ? 2 : i), p, 0, { scale: 0.75 }); return { i, pos: p }; });
       const [zx, zz] = off(s, 1.9, 6.5); sprite('zwirbel', 'cheeky', 1, at(g, zx, zz, 0.1), { hat: true });
     } else if (s.kind === 'tree') {
       add('fy_tree', at(g, s.x, s.z, -0.4), look(Math.cos(s.yaw), Math.sin(s.yaw)));
       const [dx, dz] = off(s, 0, 4.2); s.door = at(g, dx, dz, 0);
-      for (let i = 0; i < 6; i++) { const [x, z] = off(s, 0.9 + i * 0.85, 8.5 + h(seed, i, 9) * 3); add('fy_house_' + (i % 3), at(g, x, z, -0.05), faceIn(s, 0.9 + i * 0.85) + Math.PI); }
-      for (let i = 0; i < 8; i++) { const [x, z] = off(s, 0.75 + i * 0.62, 7); add('fy_lamp', at(g, x, z, 0), 0); }
+      for (let i = 0; i < 6; i++) { const [x, z] = off(s, 0.9 + i * 0.85, 8.5 + h(seed, i, 9) * 3); add('fy_house_' + (i % 3), at(g, x, z, -0.05), faceIn(s, 0.9 + i * 0.85) + Math.PI, { lite: i % 2 === 0 }); }
+      for (let i = 0; i < 8; i++) { const [x, z] = off(s, 0.75 + i * 0.62, 7); add('fy_lamp', at(g, x, z, 0), 0, { lite: i % 4 === 0 }); }
       const [bx, bz] = off(s, 0.25, 5.4); sprite('borke', 'wise', 3, at(g, bx, bz, 0.1));
       const [tx, tz] = off(s, 1.6, 9.5); sprite('tuepfel', 'shy', 0, at(g, tx, tz, 0.1));
       for (let i = 0; i < 2; i++) { const [x, z] = off(s, 2.6 + i * 1.7, 10); sprite('folk' + i, 'busy', (i + 2) % 5, at(g, x, z, 0.1)); }
@@ -690,7 +701,9 @@
     let prog = null; const P = () => prog || (prog = ent.beginVox(r, E));
     const c = S.cam; let n = 0;
     if (s && s.parts) {
+      const vl = tier(g) === 0;
       for (const part of s.parts) {
+        if (vl && part.o.lite === false) continue;   // Very Low: the decor's every other piece
         const dx = part.pos[0] - c.x, dz = part.pos[2] - c.z, d2 = dx * dx + dz * dz;
         if (d2 > (part.o.big || part.m === 'fy_tree' ? 230 * 230 : 120 * 120)) continue;
         let pos = part.pos, sc = part.o.scale || 1, yaw = part.yaw;
