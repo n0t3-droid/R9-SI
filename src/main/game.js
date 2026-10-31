@@ -211,7 +211,7 @@
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
-      if (this.audio) { this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient, voice: S.volVoice === undefined ? 0.8 : S.volVoice, calm: !!S.calmMusic }); if (this.audio.setLowEnd) this.audio.setLowEnd(S.preset === 'potato' || (S.preset === 'custom' && !S.shadows && !S.particles)); }   // (e-music: Stimmen, Ruhige Musik, Very Low)
+      if (this.audio) { this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient, voice: S.volVoice === undefined ? 0.8 : S.volVoice, calm: !!S.calmMusic }); { const vl = S.preset === 'potato' || (S.preset === 'custom' && !S.shadows && !S.particles); if (this.audio.setTier) this.audio.setTier(vl ? 0 : S.preset === 'low' ? 1 : S.preset === 'balanced' ? 2 : S.preset === 'custom' ? ((S.shadows | 0) >= 2 ? 3 : (S.shadows | 0) >= 1 ? 2 : 1) : 3); else if (this.audio.setLowEnd) this.audio.setLowEnd(vl); } }   // (e-music2: the music's tier — the room on Balanced+, chorus and vibrato on High)   // (e-music: Stimmen, Ruhige Musik, Very Low)
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
@@ -1428,7 +1428,7 @@
       if (this.cockpit) this.cockpit.updateHud(dt);
       // audio
       // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
-      if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: (p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0) + (this.flightWind || 0) * 40, underwater: underwater || inLava });
+      if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: (p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0) + (this.flightWind || 0) * 40, underwater: underwater || inLava, space: !!(this.flight && this.flight.regime === 'space') });   // (e-music2: above the air, the cabin's hum)
       this.audio.listen(eye, p.yaw, w, underwater || inLava);   // the ear: where it is and which way it faces (F4 · Klang)
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
       this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true, day: this.env.day, mobs: this.entities ? this.entities.mobs : null, agents: this.villages ? this.villages.agents : null });

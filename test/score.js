@@ -155,6 +155,7 @@ function makeCtx() {
   ctx.createStereoPanner = () => node('panner', { pan: param(0) });
   ctx.createOscillator = () => node('osc', { type: 'sine', frequency: param(440), detune: param(0) });
   ctx.createConvolver = () => node('convolver', { buffer: null });
+  ctx.createDelay = () => node('delay', { delayTime: param(0) });   // e-music2: the room, the chorus
   ctx.createDynamicsCompressor = () => node('comp', { threshold: param(-24), ratio: param(12), knee: param(30), attack: param(0.003), release: param(0.25) });
   return ctx;
 }
@@ -192,6 +193,87 @@ console.log('audio');
   const t1 = process.hrtime.bigint(); for (let i = 0; i < 6000; i++) { c6.currentTime += 0.016; h.updateMusic(0.016, MUS); } const ms = Number(process.hrtime.bigint() - t1) / 1e6;
   console.log('    (' + (ms / 6000).toFixed(4) + ' ms per updateMusic frame with the music playing, node stub)');
   check(ms / 6000 < 0.2, 'updateMusic stays cheap per frame');
+}
+
+// ---- 6. e-music2: endings, B-sections, seeded variation, colours, the tiers
+console.log('e-music2');
+{
+  const plan = K.musicPlan(12);
+  // a synth stub: when does every note of a cue really end (its release included)?
+  const ends = (evs, tier) => { const c = makeCtx(), d = c.createGain(); let last = 0, on = 0; for (const e of evs) { const r = VR.ScoreSynth.note(c, d, e, e.t, { tier: tier === undefined ? 3 : tier }); last = Math.max(last, r.end); on = Math.max(on, e.t); } return { last, on }; };
+  let worst = 99, worstName = '', tonic = true;
+  for (const [id, variant, lv] of [['home', 'day', 1], ['home', 'night', 0], ['home', 'story', 1], ['space', 'cruise', 1], ['space', 'map', 0], ['adventure', 'fight', 1], ['adventure', 'boss3', 2], ['adventure', 'tense', 0], ['wonder', 'day', 0], ['funke', 'day', 0], ['wander', 'day', 0], ['wander', 'cave', 0]]) {
+    for (const seed of [0, 5, 77]) {
+      const evs = S.events(id, { plan, lv, variant, seed }), r = ends(evs);
+      const tail = r.last - r.on; if (tail < worst) { worst = tail; worstName = id + '/' + variant + '/' + seed; }
+      if (id !== 'wonder' && id !== 'funke') {
+        const k = id === 'wander' ? plan.root % 12 : S.keyOf(id, plan).root % 12;
+        const ring = evs.filter(e => e.tail && e.midi), lowest = ring.reduce((m, e) => (!m || e.midi < m.midi ? e : m), null);   // the lowest ringing note: the bass, or the pad's root
+        if (!lowest || lowest.midi % 12 !== k) tonic = false;
+        const len = S.cueLen(id, variant, seed);
+        if (Math.max(...evs.map(e => e.t)) > len) tonic = false;
+      }
+    }
+  }
+  check(worst >= 2.5, 'every ending rings ≥ 2.5 s after its last onset (shortest ' + worst.toFixed(2) + ' s: ' + worstName + ')');
+  check(tonic, 'the outro lands the bass on the tonic, within the cue\'s length');
+  check(S.OUTRO && ['home', 'space', 'adventure'].every(id => S.OUTRO[id] && S.parseLine(S.OUTRO[id].chords).beats === 4), 'a written outro bar for Heimat, Weite and Aufbruch');
+  check(S.cueLen('wonder', 'day') <= 10 && S.cueLen('funke', 'day') <= 5, 'the stings keep their length (the tail rings past it)');
+  // B-sections: whole bars, and the forms
+  let badB = [];
+  for (const id of ['home', 'space', 'adventure']) {
+    const B = S.THEMES[id].B; if (!B) { badB.push(id + ' none'); continue; }
+    for (const [name, txt] of [['chords', B.chords]].concat(Object.entries(B.lines || {}))) { const p = S.parseLine(txt); if (p.barBeats.length !== 8 || p.barBeats.some(b => Math.abs(b - 4) > 1e-6)) badB.push(id + '.B.' + name); }
+  }
+  check(badB.length === 0, 'B-sections for Heimat, Weite, Aufbruch: eight whole bars each line' + (badB.length ? ': ' + badB.join(' ') : ''));
+  const forms = new Set(); for (let sd = 1; sd <= 40; sd++) forms.add(S.formOf('home', sd));
+  check(forms.has('A') && [...forms].some(f => f.includes('B')) && S.formOf('home', 0) === 'A', 'the forms vary by seed (' + [...forms].join(' ') + '), no seed: the plain A');
+  check(Math.abs(S.cueLen('home', 'day', 3) - (S.formOf('home', 3).length * 8 + 1) * 4 * 60 / 84) < 1e-6, 'a cue\'s length follows its form (+ the outro bar)');
+  // variation stays in the key: 20 seeds × the colours
+  let out = 0, n = 0, rng = true;
+  for (const col of ['', 'moon', 'ocker', 'aqua', 'shore', 'dry', 'snow', 'exo:3300', 'exo:4500', 'exo:5600', 'exo:9000']) for (let sd = 1; sd <= 20; sd++) for (const id of ['home', 'space', 'adventure', 'wonder', 'funke']) {
+    const set = S.scaleOf(id, plan, col);
+    for (const e of S.events(id, { plan, lv: 2, variant: 'day', seed: sd * 131, colour: col })) { n++; if (e.midi && !set.has(e.midi % 12)) out++; if (e.midi && (e.midi < 28 || e.midi > 100)) rng = false; if (!(e.gain > 0 && e.gain <= 0.25)) rng = false; }
+  }
+  check(out === 0, 'seeded variation and every colour: all ' + n + ' notes in their key');
+  check(rng, 'and within E1 … E7, gains sane');
+  const plain = JSON.stringify(S.events('home', { plan })), v1 = JSON.stringify(S.events('home', { plan, seed: 9 })), v1b = JSON.stringify(S.events('home', { plan, seed: 9 }));
+  check(plain !== v1 && v1 === v1b, 'a seed varies the theme, the same seed gives the same notes');
+  // no exact 8-bar repeat within ten minutes of mixed play (the fight loops too)
+  const sig = (evs, a, b) => evs.filter(e => e.t >= a - 1e-6 && e.t < b - 1e-6).map(e => [Math.round((e.t - a) * 100), e.midi, e.inst, Math.round(e.dur * 100)].join(':')).join(',');
+  for (const seed of [1, 7, 99]) {
+    const D = new S.Director({ seed }); let t = 0; const c = Object.assign({}, BASE);
+    for (const [secs, ctx] of [[200, {}], [100, { danger: true }], [60, { night: 1 }], [90, { space: 'cruise' }], [150, {}]]) { Object.assign(c, BASE, ctx); for (let k = 0; k < secs * 4; k++) { D.step(t, c); t += 0.25; } }
+    const seen = new Map(); let dup = 0, wins = 0;
+    for (const l of D.log) {
+      if (l.id === 'wonder' || l.id === 'funke') continue;
+      const evs = S.events(l.id, { plan, lv: l.lv, variant: l.variant, seed: l.seed, colour: l.colour }), bar = l.id === 'wander' ? S.cueLen('wander', l.variant, l.seed) / 9 : 4 * 60 / (S.THEMES[l.id].bpm * ((S.VARIANTS[l.variant] || {}).bpm || 1));
+      const len = l.t1 - l.t0;
+      for (let b = 0; (b + 8) * bar <= len + 1e-6; b += 8) { const s = l.id + '|' + sig(evs, b * bar, (b + 8) * bar); wins++; if (seen.has(s)) dup++; else seen.set(s, 1); }
+    }
+    check(dup === 0 && wins >= 10, 'seed ' + seed + ': ' + wins + ' eight-bar windows in ' + (t / 60).toFixed(0) + ' min, no exact repeat (' + dup + ')');
+  }
+  // the colours
+  check(S.colourOf({ body: 'basalt' }) === 'moon' && S.colourOf({ body: 'opal' }) === 'moon' && S.colourOf({ body: 'ocker' }) === 'ocker' && S.colourOf({ body: 'aqua' }) === 'aqua', 'the moons glassy, Ocker dusty, Aquamarin watery');
+  check(S.colourOf({ starT: 3300 }) === 'exo:3300' && S.keyOf('home', plan, 'exo:3300').mode === 'aeolian' && S.keyOf('home', plan, 'exo:9000').mode === 'lydian' && S.keyOf('home', plan, 'exo:5600').mode === 'mixolydian', 'an exo world: the star\'s colour picks the mode (red aeolian, yellow mixolydian, blue lydian)');
+  const moon = S.events('home', { plan, lv: 1, colour: 'moon' }), ock = S.events('home', { plan, lv: 1, colour: 'ocker' }), aq = S.events('home', { plan, lv: 0, colour: 'aqua' }), home0 = S.events('home', { plan, lv: 1 });
+  const avg = (evs) => { const m = evs.filter(e => e.layer === 'mel'); return m.reduce((a, e) => a + e.midi, 0) / m.length; };
+  check(moon.some(e => e.inst === 'glass') && !moon.some(e => e.inst === 'pluck' || e.inst === 'strings'), 'on a moon: glass voices, no plucks or bowed strings');
+  check(avg(ock) <= avg(home0) - 6 && ock.some(e => e.inst === 'reed'), 'on Ocker: the tune an octave low on a reed');
+  check(aq.some(e => e.inst === 'drop' && e.layer === 'drops'), 'on Aquamarin: watery arps (drops)');
+  check(S.colourOf({ biome: { ocean: 1 } }) === 'shore' && S.colourOf({ biome: { temp: 2, down: 0 } }) === 'dry' && S.colourOf({ biome: { temp: 0, down: 0.5 } }) === 'snow' && S.colourOf({ biome: { temp: 0.8, down: 0.4 } }) === '', 'at home the biome: shore, dry, snow, else plain');
+  // the director carries the colour and the seed into the cue
+  { const D = new S.Director({ seed: 4 }); const a = D.step(0, Object.assign({}, BASE, { colour: 'moon' })); check(a && a.colour === 'moon' && a.seed > 0 && D.log[0].seed === a.seed, 'the director starts the cue with its colour and seed'); }
+  // the tiers in audio.js
+  const tierRun = (tier) => { const c = makeCtx(), a = new VR.Audio(); a.init(c); a.setTier(tier); a.listen([0, 66, 0], 0, W15, false); const pk = run(a, c, 40, MUS); return { a, c, pk, lfo: c.nodes.filter(n => n.kind === 'osc' && n.frequency.value < 20).length, delays: c.nodes.filter(n => n.kind === 'delay').length, osc: c.nodes.filter(n => n.kind === 'osc').length }; };
+  const t3 = tierRun(3), t2 = tierRun(2), t1 = tierRun(1), t0 = tierRun(0);
+  check(t3.lfo >= 1 && t2.lfo === 0 && t0.lfo === 0, 'vibrato: one shared LFO per cue on High only (' + t3.lfo + ' / ' + t2.lfo + ' / ' + t0.lfo + ')');
+  check(t3.delays >= 5 && t2.delays >= 4 && t1.delays === 0 && t0.delays === 0, 'the room (four combs) on Balanced+, the chorus on High (delays ' + t3.delays + ' / ' + t2.delays + ' / ' + t1.delays + ' / ' + t0.delays + ')');
+  check(t0.a.musCap() === 10 && t0.pk <= 10 && t3.pk <= t3.a.musCap(), 'Very Low keeps its cap of 10 (peak ' + t0.pk + '), High stays under ' + t3.a.musCap() + ' (peak ' + t3.pk + ')');
+  check(VR.ScoreSynth.voicesOf('pad', true) === 1 && VR.ScoreSynth.voicesOf('strings', true) === 1 && VR.ScoreSynth.voicesOf('pad', false, 3) === 3, 'Very Low: one oscillator per pad/strings voice; High: a warm third');
+  check(t0.osc < t1.osc && t1.osc <= t3.osc, 'oscillators for the same 40 s: Very Low ' + t0.osc + ' < Low ' + t1.osc + ' ≤ High ' + t3.osc);
+  const g = makeCtx(), ga = new VR.Audio(); ga.init(g); ga.setTier(3); ga.listen([0, 66, 0], 0, W15, false); run(ga, g, 3, Object.assign({}, MUS, { colour: 'moon' }));
+  check(ga.roomOut && ga.roomOut.gain.value < 0.01, 'a moon: the room is dry (airless)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

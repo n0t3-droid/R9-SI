@@ -69,8 +69,8 @@ const before = ctx.nodes.length;
 const amb = new VR.Ambience(audio);
 amb.init(ctx);
 const built = ctx.nodes.length - before;
-check(built <= 12, 'at most 12 persistent Web Audio nodes (' + built + ' built)');
-check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets'].every(k => amb.L[k] && amb.L[k].src && amb.L[k].g), 'each layer has a source and a gain');
+check(built <= 16, 'at most 16 persistent Web Audio nodes (' + built + ' built; e-music2: surf and the cabin)');
+check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets', 'surf', 'cabin'].every(k => amb.L[k] && amb.L[k].src && amb.L[k].g), 'each layer has a source and a gain');
 {
   let ok = true, rmsAll = [];
   for (const k of ['wind', 'rain', 'water', 'birds', 'crickets']) {
@@ -185,6 +185,25 @@ check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets'].every(k => amb.L[k
   const ctxS = { w: makeWorld({ lake: 4, trees: true }), eye: [0.5, 66, 0.5], E: env({ night: 0.5, rain: 0.4 }), biome: B('meadow'), speed: 2, dim: 'overworld', underwater: false };
   run(amb, 60, ctxS);
   check(ctx.nodes.length === n0, 'a minute of play adds no nodes (' + (ctx.nodes.length - n0) + ' more)');
+}
+// ---- e-music2: surf at the open sea, the cabin in space, birds by the biome
+{
+  const sea = { w: makeWorld({ lake: 14 }), eye: [0.5, 71, 0.5], E: env({ night: 0 }), biome: B('beach') || B('ocean'), speed: 0, dim: 'overworld', underwater: false };
+  run(amb, 3, sea);
+  check(gainOf(amb, 'surf') > 0.05, 'by the open sea: the surf breaks (gain ' + gainOf(amb, 'surf').toFixed(3) + ')');
+  const lake = { w: makeWorld({ lake: 6 }), eye: [0.5, 66, 0.5], E: env({ night: 0 }), biome: B('meadow'), speed: 0, dim: 'overworld', underwater: false };
+  run(amb, 3, lake);
+  check(gainOf(amb, 'surf') < 0.01 && gainOf(amb, 'water') > 0.05, 'a small lake laps but has no surf');
+  const sp = { w: makeWorld({ trees: true, lake: 6 }), eye: [0.5, 66, 0.5], E: env({ night: 0, wind: 3 }), biome: B('forest'), speed: 30, dim: 'overworld', underwater: false, space: true };
+  run(amb, 3, sp);
+  check(['wind', 'rain', 'water', 'birds', 'crickets', 'surf'].every(k => gainOf(amb, k) < 0.001) && gainOf(amb, 'cabin') > 0.1, 'in space: no air, no wind — only the cockpit\'s hum (cabin ' + gainOf(amb, 'cabin').toFixed(3) + ')');
+  const forest = { w: makeWorld({ trees: true }), eye: [0.5, 66, 0.5], E: env({ night: 0 }), biome: B('forest'), speed: 0, dim: 'overworld', underwater: false };
+  run(amb, 3, forest); const bf = gainOf(amb, 'birds');
+  check(gainOf(amb, 'cabin') < 0.001, 'back on the ground the cabin is silent');
+  run(amb, 3, Object.assign({}, forest, { biome: B('desert') })); const bd = gainOf(amb, 'birds');
+  check(bd < bf * 0.5, 'a desert sings less than a forest (birds ' + bd.toFixed(3) + ' vs ' + bf.toFixed(3) + ')');
+  const L = amb.L, ok = ['surf', 'cabin'].every(k => { const d = L[k].src.buffer.getChannelData(0); let m = 0, q = 0; for (let i = 0; i < d.length; i++) { m = Math.max(m, Math.abs(d[i])); q += d[i] * d[i]; } return m <= 1 && Math.sqrt(q / d.length) > 0.05; });
+  check(ok, 'surf and cabin are synthesized, neither silent nor clipped');
 }
 // ---- the context is sampled, not every frame: the world is read about twice a second
 {

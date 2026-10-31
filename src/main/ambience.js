@@ -2,7 +2,8 @@
 // Ambience (A1 Atmosphäre): the sound of the place and the weather — wind, rain and thunder, birds by day among the
 // trees, crickets at night in warm places, water near water. All of it is synthesized when the audio starts (no audio
 // files). The layers ride one bus; indoors (sky light under 4) and under water the bus is muffled: lowpass 800 Hz and
-// −9 dB. Ten layer nodes and the bus make twelve persistent Web Audio nodes; a thunder adds three for a few seconds.
+// −9 dB. Fourteen layer nodes and the bus make sixteen persistent Web Audio nodes; a thunder adds three for a few seconds.
+// e-music2: surf at open water, the cabin's hum in space (where every air layer is silent), birds weighted by the biome.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -73,6 +74,36 @@
     return normalize(x, 0.7);
   }
 
+  // e-music2 · surf: two waves in a 9 s loop — the swell rises (dark, under 500 Hz), breaks (a broad burst) and washes
+  // up the sand (a hiss above 1.5 kHz that fades); the envelope wraps, so the loop closes
+  function genSurf(r) {
+    const T = 9, n = RATE * T, lo = lowpass(white(n, r), 500), hi = highpass(white(n, r), 1500), mid = highpass(lowpass(white(n, r), 2500), 200), x = new Float32Array(n);
+    for (const [t0, a] of [[0, 1], [4.4 + r() * 0.5, 0.8]]) {
+      for (let i = 0; i < n; i++) {
+        let t = i / RATE - t0; if (t < 0) t += T;
+        const swell = t < 1.8 ? Math.pow(t / 1.8, 2) : Math.exp(-(t - 1.8) / 0.9);
+        const crash = t < 1.8 ? 0 : Math.exp(-(t - 1.8) / 0.6) * Math.min(1, (t - 1.8) * 30);
+        const wash = t < 2.1 ? 0 : Math.exp(-(t - 2.1) / 1.4) * Math.min(1, (t - 2.1) * 4);
+        x[i] += a * (0.8 * swell * lo[i] + 0.6 * crash * mid[i] + 0.35 * wash * hi[i]);
+      }
+    }
+    for (let i = 0; i < n; i++) x[i] += 0.12 * lo[i];   // the sea is never quite still
+    return normalize(x, 0.8);
+  }
+  // e-music2 · the cabin: in space the air outside is gone; what remains is the cockpit's (or the suit's) own sound —
+  // the fans' hum (60 and 90 Hz with their overtones, whole cycles in the loop) and the air moving through the vents
+  function genCabin(r) {
+    const T = 4, n = RATE * T, air = lowpass(lowpass(white(n, r), 700), 700), x = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / RATE, p = i / n;
+      x[i] = 0.32 * Math.sin(2 * Math.PI * 60 * t) + 0.12 * Math.sin(2 * Math.PI * 120 * t) + 0.16 * Math.sin(2 * Math.PI * 90 * t) + 0.05 * Math.sin(2 * Math.PI * 240 * t)
+        + air[i] * 2.2 * (0.8 + 0.2 * Math.sin(2 * Math.PI * p));
+    }
+    return normalize(x, 0.7);
+  }
+  // e-music2 · the beds by biome: how much a land sings by day (birds) — a desert little, the snow little, a jungle much
+  function birdK(b) { if (!b) return 1; if (b.temp >= 1.5 && b.down <= 0.05) return 0.25; if (b.temp < 0.15) return 0.4; if (/jungle/.test(b.key || '')) return 1.3; return 1; }
+
   // the leaves of the registry (for "near trees"), built once: one flag per block state
   let LEAF = null;
   const isLeaf = (s) => { if (!LEAF) { LEAF = new Uint8Array(R.stateCount); for (let k = 0; k < R.stateCount; k++) { const t = R.types[R.T.type[k]]; LEAF[k] = t && /leaves|leaf/.test(t.name) ? 1 : 0; } } return LEAF[s] === 1; };
@@ -98,7 +129,7 @@
       this.busGain = ctx.createGain(); this.busGain.gain.value = 1;
       this.muffle.connect(this.busGain); this.busGain.connect(this.audio.amb);
       const birds = genBirds(r);
-      const bufs = { wind: mkBuf([genWind(r)]), rain: mkBuf([genRain(r)]), water: mkBuf([genWater(r)]), birds: mkBuf(birds), crickets: mkBuf([genCrickets(r)]) };
+      const bufs = { wind: mkBuf([genWind(r)]), rain: mkBuf([genRain(r)]), water: mkBuf([genWater(r)]), birds: mkBuf(birds), crickets: mkBuf([genCrickets(r)]), surf: mkBuf([genSurf(r)]), cabin: mkBuf([genCabin(r)]) };   // (e-music2: surf, cabin)
       this.L = {};
       for (const k of Object.keys(bufs)) {
         const src = ctx.createBufferSource(); src.buffer = bufs[k]; src.loop = true;
@@ -116,7 +147,7 @@
       this.timer -= dt;
       if (this.timer > 0) return;
       this.timer = EVERY;
-      if (this.opt.nature || this.opt.weather) this.sample(o);   // both switches off: nothing to read, the gains just fall silent
+      if ((this.opt.nature || this.opt.weather) && !o.space) this.sample(o);   // (e-music2: in space there is no place to read)   // both switches off: nothing to read, the gains just fall silent
       this.mix(o);
     }
     sample(o) {
@@ -150,13 +181,17 @@
       const g = {
         wind: nat ? (0.06 + 0.16 * windK + 0.12 * high + 0.1 * speed) * (1 - 0.5 * snow) : 0,
         water: nat ? clamp01(S.water / 8) * 0.35 : 0,
-        birds: nat && dryAir ? day * clamp01(S.trees / 5) * 0.45 : 0,
+        birds: nat && dryAir ? Math.min(0.5, day * clamp01(S.trees / 5) * 0.45 * birdK(b)) : 0,
+        // e-music2: surf where the water is open (a coast: much water around, or the sea's biome)
+        surf: nat ? clamp01((S.water - (b.ocean || /beach|shore/.test(b.key || '') ? 6 : 18)) / 16) * 0.4 : 0,
+        cabin: 0,
         crickets: nat && night > 0.4 && warm && dryAir ? night * clamp01(0.3 + S.trees / 6) * 0.3 : 0,
         rain: wx && !(b.down <= 0) ? rain * 0.5 : 0,                     // no rain sound in a desert
       };
-      if (b.moon) for (const k in g) g[k] = 0;   // u-moons1: no air on a moon — no wind, no birds, nothing carries (the suit's own sound: bodylife.js)
+      if (b.moon || o.space) for (const k in g) g[k] = 0;
+      if (o.space) g.cabin = 0.2;   // e-music2: space is silent — only the cockpit's hum and air (or the suit's: bodylife.js)   // u-moons1: no air on a moon — no wind, no birds, nothing carries (the suit's own sound: bodylife.js)
       for (const k in g) L[k].g.gain.setTargetAtTime(g[k], t, 0.4);
-      const muffled = S.indoors;
+      const muffled = S.indoors && !o.space;
       this.muffle.frequency.setTargetAtTime(muffled ? 800 : 20000, t, 0.3);
       this.busGain.gain.setTargetAtTime(muffled ? 0.355 : 1, t, 0.3);   // −9 dB indoors
     }
