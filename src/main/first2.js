@@ -265,11 +265,16 @@
   F.vistaBack = function (g, v0) {
     const m = g && g.meta, A = g && g.arrival, v = v0 || (A && A.v), p = g && g.player;
     if (!m || m.guest || m.f4back || !m.vistaId || !v || !Array.isArray(v.u) || !p || !g.world || !Array.isArray(p.spawn)) return null;
+    // f-polish4: the back cell's column not loaded yet (the loading screen's first call came before it) → asked again at
+    // the next call (the arrival's settle), not given up; F.backWhy says why a start stayed where it was
+    const w = g.world, bx = Math.floor(p.pos[0] - v.u[0] * F.STEP_BACK), bz = Math.floor(p.pos[2] - v.u[1] * F.STEP_BACK);
+    if (w.isLoaded && !w.isLoaded(bx, bz)) { F.backWhy = 'unloaded'; return null; }
     m.f4back = 1;
-    if (Math.hypot(p.pos[0] - p.spawn[0], p.pos[2] - p.spawn[2]) > 0.5) return null;
-    const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : 1, w = g.world;
+    if (Math.hypot(p.pos[0] - p.spawn[0], p.pos[2] - p.spawn[2]) > 0.5) { F.backWhy = 'moved'; return null; }
+    const R = VR.R, T = R.T.flags, S = VR.F ? VR.F.SOLID : 1;
     const r = F.stepBack(p.pos, v.u, (x, y, z) => w.getBlock(x, y, z), (b) => !!b && F.PAVE_RE.test((R.types[R.T.type[b]] || {}).name || ''), (b) => !!(T[b] & S));
-    if (!r) return null;
+    if (!r) { const b = w.getBlock(bx, Math.floor(p.pos[1] + 0.01) - 1, bz); F.backWhy = 'stays:' + (b ? (R.types[R.T.type[b]] || {}).name : 'air'); return null; }
+    F.backWhy = 'back';
     p.teleport(r[0], r[1], r[2]); p.spawn = r.slice(); if (Array.isArray(m.worldSpawn)) m.worldSpawn = r.slice();
     F.backed = r; return r;
   };

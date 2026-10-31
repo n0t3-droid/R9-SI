@@ -46,7 +46,7 @@ if (want('spawn')) {
     const pr = await ev(() => {
       const g = VR.game, m = g.meta, F = VR.First2, p = g.player, A = g.arrival, v = (A && A.v) || null, R = VR.R, w = g.world;
       const nm = (x, y, z) => { const b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return b ? R.types[R.T.type[b]].name : 'air'; };
-      const o = { vistaId: m.vistaId || null, f4back: m.f4back || 0, backed: F && F.backed || null, moved: F && F.moved ? F.moved.pos : null, pos: p.pos.map(x => +x.toFixed(2)), spawn: p.spawn, u: v && v.u, yaw: +p.yaw.toFixed(3), first: window.__sp.slice(0, 3), last: window.__sp.slice(-1) };
+      const o = { vistaId: m.vistaId || null, f4back: m.f4back || 0, backed: F && F.backed || null, why: F && F.backWhy || null, moved: F && F.moved ? F.moved.pos : null, pos: p.pos.map(x => +x.toFixed(2)), spawn: p.spawn, u: v && v.u, yaw: +p.yaw.toFixed(3), first: window.__sp.slice(0, 3), last: window.__sp.slice(-1) };
       if (v && v.u && p.spawn) { const s = p.spawn, cells = []; for (let k = 0; k <= 4; k++) { const x = s[0] - v.u[0] * k, z = s[2] - v.u[1] * k; cells.push([k, nm(x, s[1] - 1, z), nm(x, s[1], z), nm(x, s[1] + 1, z)]); } o.behind = cells; }
       return o;
     }).catch(e => ({ err: String(e).slice(0, 200) }));

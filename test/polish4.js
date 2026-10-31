@@ -35,5 +35,19 @@ if (part('a')) {
   check(N.carryLantern(a, false) && a.p.look === L0 && a.p.look.tool === L0.tool, 'by day the own thing back (' + a.p.look.tool + ')');
   check(!N.carryLantern({ p: { look: L0 }, kid: true }, true), 'a child carries none');
 }
+if (part('b')) {
+  console.log('b · the spawn\'s step back: not given up while the cell behind is not loaded');
+  require('../src/main/first2.js');
+  const F = VR.First2, R = VR.R;
+  const pave = (() => { for (let s = 1; s < R.T.type.length; s++) if (F.PAVE_RE.test((R.types[R.T.type[s]] || {}).name || '') && (R.T.flags[s] & VR.F.SOLID)) return s; return 0; })();
+  let loaded = false;
+  const world = { isLoaded: () => loaded, getBlock: (x, y, z) => (y === 70 ? pave : 0) };
+  const p = { pos: [10.5, 71, 20.5], spawn: [10.5, 71, 20.5], teleport(x, y, z) { this.pos = [x, y, z]; } };
+  const g = { meta: { vistaId: 'v1' }, arrival: { v: { u: [0, 1] } }, player: p, world };
+  check(pave > 0 && F.vistaBack(g) === null && !g.meta.f4back && F.backWhy === 'unloaded', 'the loading screen\'s call before the cell is there: asked again later (' + F.backWhy + ')');
+  loaded = true;
+  const r = F.vistaBack(g);
+  check(r && g.meta.f4back === 1 && Math.abs(p.pos[2] - 19.5) < 1e-9 && F.backWhy === 'back', 'the next call steps back on the way (' + JSON.stringify(r) + ', ' + F.backWhy + ')');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
