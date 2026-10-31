@@ -6,6 +6,8 @@
 //      start's view (W.stageAside: turned about the spawn, its distance kept); a stage already aside stays
 //  3 · the spawn picture: a vista start steps one block further back on the way when that cell is paving with air for
 //      the body (First2.stepBack) — the walk's first wall cells smaller in the frame's lower corners
+//  4 · the landmark first: a horizon tile near a vista start's landmark (the arrival's aim) is asked for and uploaded before
+//      the coarse ring and the nearer tiles (Horizon.prio) — under a starved machine the far landmark is the first far thing
 // usage: bash test/wt_run.sh first4.js 300
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -53,6 +55,22 @@ if (F2 && F2.stepBack) {
   cells.delete(key(10, 71, 19)); cells.set(key(10, 70, 19), GRASS);
   check(F2.stepBack(feet, u, get, isPave, solid) === null, 'grass, not the way, behind → stays');
   check(F2.STEP_BACK === 1, 'the step: 1 block (FI.WALK_T −1 → −2 where the way allows): ' + F2.STEP_BACK);
+}
+
+console.log('4 · the landmark\'s horizon tiles first');
+try { require(__dirname + '/../src/main/horizon.js'); } catch (e) { console.log('  (horizon.js: ' + e.message + ')'); }
+const HZ = V.Horizon;
+check(HZ && typeof HZ.prio === 'function' && typeof HZ.focusD === 'function', 'VR.Horizon.prio and focusD');
+if (HZ && HZ.prio) {
+  const S = (L) => 32 * (4 << L), F = [-420, 380];
+  // without a focus: the old order (coarse and near first, relative to the tile's size)
+  check(HZ.prio(300, 1, Infinity) === 300 / S(1) - 0.6 && HZ.prio(0, 4, Infinity) === -2.4, 'no focus: d / S − 0.6 L, as before');
+  // the landmark's tile at 300 m (level 1, 256 wide, holding the aim) and its siblings before the coarse ring and a near tile
+  const fd = HZ.focusD(F, 1, Math.floor(-420 / S(1)), Math.floor(380 / S(1))), fs = HZ.focusD(F, 1, Math.floor(-420 / S(1)) + 1, Math.floor(380 / S(1)));
+  check(fd === 0 && fs < S(1), 'the tile holding the aim is 0 from it, its sibling within one tile (' + fs.toFixed(0) + ')');
+  const lm = HZ.prio(300, 1, fd), sib = HZ.prio(330, 1, fs), coarse = HZ.prio(0, 4, HZ.focusD(F, 4, 5, 5)), near0 = HZ.prio(40, 0, HZ.focusD(F, 0, -3, 0));
+  check(lm < coarse && lm < near0 && sib < coarse && sib < near0, `the landmark's tile ${lm.toFixed(2)} and its sibling ${sib.toFixed(2)} before the coarse ring ${coarse.toFixed(2)} and a near tile ${near0.toFixed(2)}`);
+  check(HZ.focusD(null, 1, 0, 0) === Infinity, 'no landmark → no focus');
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
