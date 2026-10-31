@@ -55,6 +55,7 @@
     { id: 'hud', group: 'view', names: ['F1'], def: ['F1', ''] },
     { id: 'shot', group: 'view', names: ['F2'], def: ['F2', ''] },
     { id: 'debug', group: 'view', names: ['F3'], def: ['F3', ''] },
+    { id: 'reel', group: 'view', names: ['F9'], def: ['F9', ''] },   // e-cam: 🎬 the highlight reel (reel.js)
     { id: 'cam', group: 'view', names: ['F5'], def: ['F5', ''] },
   ];
   for (let i = 1; i <= 9; i++) ACTIONS.push({ id: 'slot' + i, group: 'hotbar', names: ['Digit' + i], def: ['Digit' + i, ''] });

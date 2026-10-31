@@ -228,6 +228,7 @@
           <button type="button" class="btn studio pro" data-act="studiolive" id="studiolive" data-t="g.pause.studio" data-tt="g.pause.studioTip"></button>
           <button type="button" class="btn pro" data-act="codex" data-t="g.pause.codex"></button>
           <button type="button" class="btn" data-act="photo" data-t="g.pause.photo"></button>
+          <button type="button" class="btn" data-act="reel" data-t="g.pause.reel" data-tt="g.pause.reelTip"></button>   <!-- e-cam: 🎬 the highlight reel (reel.js) -->
         </div>
         <div class="pgrp pbottom">
           <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>

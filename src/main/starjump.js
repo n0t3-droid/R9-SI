@@ -527,6 +527,7 @@ void main() {
       return;
     }
     SJ.enter(g, to, { quiet: false });
+    if (VR.EventLog && VR.EventLog.emit) VR.EventLog.emit('space', 'star_jump', 4, null, 'stars');   // e-cam: a highlight (the reel's postcard of the new sky)
   }
   // V: Landen — the focus world's dim (an existing world kind with this star's light)
   SJ.land = function (g) {
