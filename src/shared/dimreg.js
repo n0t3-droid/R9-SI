@@ -33,6 +33,11 @@
     g(id) { const d = DimReg.get(id); return d && d.g > 0 ? d.g : G_HOME; },
     // the player's gravity there: the genre's 30 at home, every world in its true ratio (spec §4.3)
     gravity(id) { return GRAV_HOME * (DimReg.g(id) / G_HOME); },
+    // u-worlds: the player's own gravity — Herzwelt's on every world (the owner: „Schwerkraft gleich, ohne Einschränkungen")
+    // unless ⚙ „Echte Schwerkraft der Welten" (realGrav, default off) asks for the real one; ships keep g()/gravity()
+    realGrav: false,
+    walkG(id) { return DimReg.realGrav ? DimReg.g(id) : G_HOME; },
+    walkGravity(id) { return GRAV_HOME * (DimReg.walkG(id) / G_HOME); },
     actorsHome(id) { const d = DimReg.get(id); return !!(d && d.actors === 'home'); },
     horizon(id) { const d = DimReg.get(id); return !!(d && d.horizon); },
     mp(id) { const d = DimReg.get(id); return d ? d.mp : 'none'; },

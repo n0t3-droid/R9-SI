@@ -64,8 +64,9 @@
       S.id = null;
       return;
     }
-    const p = g.player, w = g.world, prof = VR.Bodies.profile(id), grav = VR.DimReg.gravity(g.dim);
-    BL.vacuum = !prof.air || id === 'ocker'; BL.thin = id === 'ocker';   // u-moons2: Aquamarin's air carries sound; Ocker's 6 mbar barely
+    const p = g.player, w = g.world, prof = VR.Bodies.profile(id), grav = (VR.DimReg.walkGravity || VR.DimReg.gravity)(g.dim);
+    const real = VR.DimReg.realGrav !== false;   // u-worlds: no suit, no muffled vacuum unless ⚙ „Echte Schwerkraft der Welten"
+    const vac = real && (!prof.air || id === 'ocker'); if (BL.vacuum && !vac) suitOff(g); BL.vacuum = vac; BL.thin = real && id === 'ocker';   // u-moons2: Aquamarin's air carries sound; Ocker's 6 mbar barely
     const t = VR.Universe.worldSeconds(g.env.day | 0, g.env.ticks);
     if (S.id !== id) {   // arrived
       S.id = id; S.landY = null; S.wasGround = true; S.impactSlot = Math.floor(t / 180); S.parUp = null;

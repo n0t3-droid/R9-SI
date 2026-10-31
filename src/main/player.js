@@ -232,7 +232,7 @@
         const accel = this.onGround ? 14 : 3.2;
         const a = 1 - Math.exp(-dt * accel);
         v[0] += (wx * sp - v[0]) * a; v[2] += (wz * sp - v[2]) * a;
-        v[1] -= (this.grav || (this.grav = VR.DimReg.gravity(this.game.dim))) * dt;   // u-dims: 30 × g / 9.81 of this world (VR.DimReg; 30 at home)
+        v[1] -= (this.grav || (this.grav = (VR.DimReg.walkGravity || VR.DimReg.gravity)(this.game.dim))) * dt;   // u-dims: 30 × g / 9.81 of this world (VR.DimReg; 30 at home)
         if (v[1] < -78) v[1] = -78;
         this.jumpCooldown -= dt;
         // auto-jump: walking into a one-block step lifts you over it (F5), a wall never does
@@ -290,7 +290,7 @@
         // a landing after a fall dips the eye (presence.js: from 0.6 blocks on, up to 0.14)
         if (this.fallStart !== null) { const amp = VR.Presence.landingDip(this.fallStart - this.pos[1]); if (amp > 0) { this.dipAmp = amp; this.dipT = 0; } }
         if (this.fallStart !== null && !this.creative) {
-          const d = (this.fallStart - this.pos[1]) * (VR.DimReg ? VR.DimReg.g(this.game.dim) / 9.81 : 1);   // u-moons1: a fall counts by its landing speed (U§4.3: 25 m on Opal = 1.25 m at home)
+          const d = (this.fallStart - this.pos[1]) * (VR.DimReg ? (VR.DimReg.walkG || VR.DimReg.g)(this.game.dim) / 9.81 : 1);   // u-moons1: a fall counts by its landing speed (U§4.3: 25 m on Opal = 1.25 m at home)
           const below = get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2]));
           const soft = TF[below] & (F.BOUNCY) || (R.types[R.T.type[below]] && /hay|slime|honey|bed/.test(R.types[R.T.type[below]].name));
           if (d > 3.4 && !this.inWater) this.damage(Math.floor(d - 3) * (soft ? 0.2 : 1), 'fall');

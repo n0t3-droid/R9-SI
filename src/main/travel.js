@@ -34,6 +34,39 @@
   Travel.dimName = (id) => { const n = D.name(id); return VR.I18N ? VR.I18N.tx(n[0], null, n[1], n[2]) : n[1]; };
   // the place kept for a dim: [x, y, z, yaw, pitch] or null
   Travel.posOf = (meta, dim) => { const a = meta && meta.pos && meta.pos[dim]; return finite(a, 3) ? [a[0], a[1], a[2], r3(a[3]), r3(a[4])] : null; };
+  // u-worlds · every world one can stand on — the owner: „Im Kreativmodus alle Planeten ohne Freischalten": Herzwelt (or
+  // the flat land), the old dims, the five bodies of Helia and, in Kreativ (or with cheats), the small Spaltmond and one
+  // world of each kind under the nearest other stars → [{dim, name, kind, exo}] (Travel.canGo lets every one through)
+  Travel.creative = (g) => !!(g && ((g.player && g.player.mode === 'creative') || (g.meta && (g.meta.mode === 'creative' || g.meta.cheats))));
+  const EXO = new Map();
+  Travel.exoPicks = (seed) => {
+    seed = (seed >>> 0) || 0x5eed;
+    if (EXO.has(seed)) return EXO.get(seed);
+    const G = VR.Galaxy, out = [], seen = new Set();
+    if (G && G.build) {
+      try {
+        const N = G.build(seed);
+        for (let i = 1; i < Math.min(N.list.length, 160) && seen.size < 5; i++) {
+          const def = G.system(N, i); if (!def) continue;
+          for (const b of def.bodies) if (b.landable && b.dim && !seen.has(b.base) && D.has(b.dim)) { seen.add(b.base); out.push({ dim: b.dim, sys: i, kind: b.base, star: def.name, name: b.name }); }
+        }
+      } catch (e) { /* (no galaxy: no exo worlds in the list) */ }
+    }
+    EXO.set(seed, out);
+    return out;
+  };
+  Travel.worlds = (g) => {
+    const meta = g && g.meta, out = [], seen = new Set();
+    const add = (dim, exo) => { if (seen.has(dim) || !D.has(dim)) return; seen.add(dim); const d = D.get(dim); out.push({ dim, name: Travel.dimName(dim), kind: (d && d.body) || null, exo: exo || null }); };
+    add(D.home(meta));
+    for (const id of D.travelable(meta)) add(id);
+    for (const id of ['basalt', 'opal', 'zinn', 'ocker', 'aqua']) add(id);
+    if (Travel.creative(g)) {
+      add('rock.m');
+      for (const e of Travel.exoPicks(meta && meta.seed)) add(e.dim, e);
+    }
+    return out;
+  };
   // the gate of a dim leads there — or home, when you are in that dim already
   Travel.gateTarget = (cur, portalDim, meta) => (cur === portalDim ? D.home(meta) : portalDim);
   // Herzwelt's spawn and bed (spawnOnly: the world's own spawn, /spawn) — 🌍's target, and Heimkehr's for the home there
