@@ -44,23 +44,6 @@ check(await ev(() => VR.game.state) === 'play', 'the world plays');
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; if (g.env) { g.env.rain = 0; g.env.rainTarget = 0; } const h = document.getElementById('hints'); if (h) h.style.display = 'none'; });
 await wait(6000);
 
-// ---------------------------------------------------------------- the star map (O) for a new player: its first frame
-{
-  const t0 = Date.now();
-  await ev(() => { window.__norender = true; VR.StarMap.open(VR.game); });
-  rec.mapOpenMs = Date.now() - t0;
-  // the map's own canvas, as it is right after the open (a page picture can wait long on a held frame: run 1 timed out)
-  const durl = await ev(() => { const c = document.getElementById('smCv'); return c ? c.toDataURL('image/png') : null; });
-  if (durl) fs.writeFileSync(SHOTS + 'p2_starmap_' + TAG + '.png', Buffer.from(durl.split(',')[1], 'base64'));
-  try { await page.screenshot({ path: SHOTS + 'p2_starmap_page_' + TAG + '.png', timeout: 60000 }); } catch (e) { console.log('  (no page picture of the map: ' + e.message.slice(0, 60) + ')'); }
-  rec.mapMs = Date.now() - t0;
-  rec.map = Object.assign(luma(SHOTS + 'p2_starmap_' + TAG + '.png', [0.3, 0.2, 0.7, 0.8]), { st: await ev(() => VR.StarMap.stats()) });
-  await ev(() => { VR.StarMap.close(VR.game); window.__norender = false; });
-  console.log('  star map: ' + JSON.stringify(rec.map));
-  if (!BEFORE) check(rec.map.sd > 15 && rec.map.st.labels >= 20, 'the star map\'s first frame: centre luma sd ' + rec.map.sd + ' > 15, ' + rec.map.st.labels + ' labels ≥ 20');
-}
-save();
-
 // ---------------------------------------------------------------- the films (dry: the film only), every shot
 const stn = await ev(() => { const S = VR.Stations; return S && S.IDS && S.IDS.length ? S.LIST[S.IDS[0]].dim : null; });
 const filmWith = (o) => ev((o) => { const C = VR.PortalCore; for (let s = 1; s < 600; s++) { const F = C.film(C.rec({}), s, o.from, o.to, { low: !!o.low }); if (o.need.every(n => F.shots.some(q => q.id === n))) return F; } return null; }, o);
@@ -181,6 +164,28 @@ if (!BEFORE) {
   rec.flyMp = await ev(() => { const g = VR.game, mp = g.mp, was = mp.role; mp.role = 'host'; g.settings.flyFast = 8; g.playFrame(0.016); const v = g.player.flySpeed; mp.role = was; return v; });
   check(rec.flyMp === 1, 'as a multiplayer host: ×1 (' + rec.flyMp + ')');
 }
+// (last: in the base build the page hung once the map was open)
+// ---------------------------------------------------------------- the star map (O) for a new player: its first frame
+{
+  const t0 = Date.now();
+  const evT = (fn, ms) => Promise.race([ev(fn), new Promise((r) => setTimeout(() => r('timeout'), ms))]);
+  await ev(() => { const g = VR.game; if (g.ui.screen) g.ui.resume(); });
+  const op = await evT(() => { window.__norender = true; const t = performance.now(); VR.StarMap.open(VR.game); return performance.now() - t; }, 120000);
+  console.log('  star map open: ' + (typeof op === 'number' ? op.toFixed(0) + ' ms' : op));
+  rec.mapOpenMs = Date.now() - t0;
+  // the map's own canvas, as it is right after the open (a page picture can wait long on a held frame: run 1 timed out)
+  const durl = await evT(() => { const c = document.getElementById('smCv'); return c ? c.toDataURL('image/png') : null; }, 120000);
+  if (durl && durl !== 'timeout') fs.writeFileSync(SHOTS + 'p2_starmap_' + TAG + '.png', Buffer.from(durl.split(',')[1], 'base64'));
+  try { await page.screenshot({ path: SHOTS + 'p2_starmap_page_' + TAG + '.png', timeout: 60000 }); } catch (e) { console.log('  (no page picture of the map: ' + e.message.slice(0, 60) + ')'); }
+  rec.mapMs = Date.now() - t0;
+  rec.map = Object.assign(luma(SHOTS + 'p2_starmap_' + TAG + '.png', [0.3, 0.2, 0.7, 0.8]), { st: await evT(() => VR.StarMap.stats(), 60000) });
+  await evT(() => { VR.StarMap.close(VR.game); window.__norender = false; }, 60000);
+  console.log('  star map: ' + JSON.stringify(rec.map));
+  if (!BEFORE) check(rec.map.sd > 15 && (rec.map.st.labels || 0) >= 20, 'the star map\'s first frame: centre luma sd ' + rec.map.sd + ' > 15, ' + (rec.map.st && rec.map.st.labels) + ' labels ≥ 20');
+}
+save();
+
+save();
 const errs = logs.filter(l => l.startsWith('[pageerror]'));
 check(errs.length === 0, 'no page error' + (errs.length ? ': ' + errs[0] : ''));
 if (logs.length) console.log('  logs: ' + logs.slice(0, 4).join(' | '));
