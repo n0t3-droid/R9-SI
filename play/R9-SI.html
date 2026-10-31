@@ -38005,6 +38005,8 @@ gravity(id){return GRAV_HOME*(DimReg.g(id)/G_HOME);},
 realGrav:false,
 walkG(id){return DimReg.realGrav?DimReg.g(id):G_HOME;},
 walkGravity(id){return GRAV_HOME*(DimReg.walkG(id)/G_HOME);},
+
+gravKey(k){if(DimReg.realGrav)return k;const I=VR.I18N,h=k+'.home';return I&&I.dict&&((I.dict[I.lang]||{})[h]!==undefined||(I.dict.en||{})[h]!==undefined)?h:k;},
 actorsHome(id){const d=DimReg.get(id);return!!(d&&d.actors==='home');},
 horizon(id){const d=DimReg.get(id);return!!(d&&d.horizon);},
 mp(id){const d=DimReg.get(id);return d?d.mp:'none';},
@@ -52926,7 +52928,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="a17ad976c5a00c4c";
+VR.TEX_SRC_HASH="a46dfca965efb2d8";
 
 
 
@@ -55495,6 +55497,15 @@ VR.I18N.add('en',{
 'g.moon.hello.zinn':'Almost a fifth of the gravity. No air – above you Amarant, huge. To the north the Glow Lake burns.',
 'g.moon.hello.ocker':'A good third of the gravity and a breath of air full of dust. To the south the Rust Gorge drops 145 m deep.',
 'g.moon.hello.aqua':'A fifth of the gravity, thick air, an ocean full of islands. Heartworld stands large above you.',
+
+'g.moon.hello.basalt.home':'Dark lava plains, bright highlands, craters of every size. Amarant rises on the horizon, and a day lasts only an hour.',
+'g.moon.hello.opal.home':'Ice brighter than fresh snow, streaked red-brown. In the south the geysers erupt.',
+'g.moon.hello.zinn.home':'Yellow and red sulfur plains, above you Amarant, huge. To the north the Glow Lake burns.',
+'g.moon.hello.ocker.home':'A butterscotch sky, dust devils on the plain. To the south the Rust Gorge drops 145 m deep.',
+'g.moon.hello.aqua.home':'An ocean full of islands and atolls, tall, slow waves. Heartworld stands large above you.',
+'g.codex.moon.basalt.home':['Basalt','A moon of rock: dark lava plains, the maria, bright old highlands and craters of every size. A day lasts an hour. With ⚙ "Real gravity of the worlds" a jump here carries you six times as high as at home.','Travel with /dim basalt (cheats on) – soon by shuttle.'],
+'g.codex.moon.jump.home':['The big jump','Without air nothing slows you: even the dust flies in clean arcs and hangs for a long time. With ⚙ "Real gravity of the worlds" a jump on Opal carries you higher than a house.','Turn on ⚙ "Real gravity of the worlds" and jump 20 metres high on Opal.'],
+'g.codex.moon.aqua.home':['Aquamarine','An ocean moon circling Heartworld. Islands, atolls and tall, slow waves that swing leisurely. Heartworld always hangs in the same spot in the sky.','Fly there with the cruise drive (G) and land (V).'],
 'g.codex.moon.zinn':['Cinnabar','A volcanic moon. Amarant\'s tides knead it so hard that it melts inside: lava lakes, sulfur plains in yellow, orange, red and white, rugged mountain blocks. The real Jupiter moon Io has more than 400 volcanoes.','Fly there with the cruise drive (G) and land (V).'],
 'g.codex.moon.ocker':['Ochre','A dust moon with thin air of carbon dioxide. The dust turns the sky butterscotch, dust devils draw dark tracks, and a gorge tears the land open. It is much like Mars.','Fly there with the cruise drive (G) and land (V).'],
 'g.codex.moon.aqua':['Aquamarine','An ocean moon circling Heartworld. Islands, atolls and tall, slow waves – with so little gravity the sea swings leisurely. Heartworld always hangs in the same spot in the sky.','Fly there with the cruise drive (G) and land (V).'],
@@ -56621,12 +56632,12 @@ VR.I18N.add('en',{
 "g.pt.hook.isles.2":"Lumi flew her first kite here. It is still flying.",
 "g.pt.hook.isles.3":"Don't jump too far — or do, the next island will catch you.",
 "g.pt.hook.moon.1":"This is where Lumi's grandpa found the Ice Keeper …",
-"g.pt.hook.moon.2":"So light! One hop and you almost fly to Amaranth.",
+"g.pt.hook.moon.2":"Here Amaranth stands so large in the sky you almost want to touch it.",
 "g.pt.hook.moon.3":"The dust here is older than any town on Heartworld.",
 "g.pt.hook.moon.4":"Oskar swears the craters sing here at night.",
 "g.pt.hook.world.1":"A whole sky in a new colour — just for you.",
 "g.pt.hook.world.2":"Selma once saw a beacon flicker here. Only for a moment.",
-"g.pt.hook.world.3":"The ground is heavy, the view is wide. Welcome!",
+"g.pt.hook.world.3":"Strange ground, a wide view. Welcome!",
 "g.pt.hook.station.1":"In the hydro garden, tomatoes grow in a circle round the planet.",
 "g.pt.hook.station.2":"Up here blinks the red beacon — the first one Funke found again.",
 "g.pt.hook.station.3":"Through the window the whole world turns. Very slowly.",
@@ -59238,6 +59249,15 @@ VR.I18N.add('de',{
 'g.moon.hello.zinn':'Fast ein Fünftel der Schwerkraft. Keine Luft – über dir Amarant, riesig. Im Norden glüht der Glutsee.',
 'g.moon.hello.ocker':'Gut ein Drittel der Schwerkraft und ein Hauch Luft voller Staub. Im Süden fällt die Rostschlucht 145 m tief ab.',
 'g.moon.hello.aqua':'Ein Fünftel der Schwerkraft, dichte Luft, ein Ozean voller Inseln. Herzwelt steht groß über dir.',
+
+'g.moon.hello.basalt.home':'Dunkle Lavaebenen, helles Hochland, Krater in allen Größen. Am Horizont steigt Amarant auf, und ein Tag dauert nur eine Stunde.',
+'g.moon.hello.opal.home':'Eis, heller als frischer Schnee, mit rotbraunen Streifen. Im Süden brechen die Geysire aus.',
+'g.moon.hello.zinn.home':'Gelbe und rote Schwefelebenen, über dir Amarant, riesig. Im Norden glüht der Glutsee.',
+'g.moon.hello.ocker.home':'Ein butterbrauner Himmel, Staubteufel auf der Ebene. Im Süden fällt die Rostschlucht 145 m tief ab.',
+'g.moon.hello.aqua.home':'Ein Ozean voller Inseln und Atolle, hohe, langsame Wellen. Herzwelt steht groß über dir.',
+'g.codex.moon.basalt.home':['Basalt','Ein Mond aus Gestein: dunkle Lavaebenen, die Maria, helles altes Hochland und Krater in allen Größen. Ein Tag dauert eine Stunde. Mit ⚙ „Echte Schwerkraft der Welten" trägt dich hier ein Sprung sechsmal so hoch wie zu Hause.','Reise mit /dim basalt (Cheats an) – bald mit dem Shuttle.'],
+'g.codex.moon.jump.home':['Der große Sprung','Ohne Luft bremst nichts: Selbst der Staub fliegt in sauberen Bögen und schwebt lange. Mit ⚙ „Echte Schwerkraft der Welten" trägt dich auf Opal ein Sprung höher als ein Haus.','Schalte ⚙ „Echte Schwerkraft der Welten" an und spring auf Opal 20 Meter hoch.'],
+'g.codex.moon.aqua.home':['Aquamarin','Ein Ozeanmond, der Herzwelt umkreist. Inseln, Atolle und hohe, langsame Wellen, die gemächlich schwingen. Herzwelt hängt immer am selben Fleck am Himmel.','Fliege mit dem Reiseantrieb (G) hin und lande (V).'],
 'g.codex.moon.zinn':['Zinnober','Ein Vulkanmond. Amarants Gezeiten kneten ihn so stark, dass er innen schmilzt: Lavaseen, Schwefelebenen in Gelb, Orange, Rot und Weiß, schroffe Gebirgsblöcke. Auf dem echten Jupitermond Io gibt es über 400 Vulkane.','Fliege mit dem Reiseantrieb (G) hin und lande (V).'],
 'g.codex.moon.ocker':['Ocker','Ein Staubmond mit dünner Luft aus Kohlendioxid. Der Staub färbt den Himmel butterbraun, Staubteufel ziehen dunkle Spuren, und eine Schlucht reißt das Land auf. Er ähnelt dem Mars.','Fliege mit dem Reiseantrieb (G) hin und lande (V).'],
 'g.codex.moon.aqua':['Aquamarin','Ein Ozeanmond, der Herzwelt umkreist. Inseln, Atolle und hohe, langsame Wellen – bei so wenig Schwerkraft schwingt das Meer gemächlich. Herzwelt hängt immer am selben Fleck am Himmel.','Fliege mit dem Reiseantrieb (G) hin und lande (V).'],
@@ -60364,12 +60384,12 @@ VR.I18N.add('de',{
 "g.pt.hook.isles.2":"Lumi hat hier ihren ersten Drachen steigen lassen. Er fliegt noch immer.",
 "g.pt.hook.isles.3":"Spring nicht zu weit — oder doch, die nächste Insel fängt dich auf.",
 "g.pt.hook.moon.1":"Hier hat Lumis Opa den Eiswächter gefunden …",
-"g.pt.hook.moon.2":"So leicht! Ein Hüpfer, und du fliegst fast bis zu Amarant.",
+"g.pt.hook.moon.2":"Hier steht Amarant so groß am Himmel, dass du ihn fast anfassen willst.",
 "g.pt.hook.moon.3":"Der Staub hier ist älter als jede Stadt auf Herzwelt.",
 "g.pt.hook.moon.4":"Oskar schwört, nachts singen hier die Krater.",
 "g.pt.hook.world.1":"Ein ganzer Himmel in einer neuen Farbe — nur für dich.",
 "g.pt.hook.world.2":"Selma hat hier einmal ein Leuchtfeuer flackern sehen. Ganz kurz.",
-"g.pt.hook.world.3":"Der Boden ist schwer, der Blick ist weit. Willkommen!",
+"g.pt.hook.world.3":"Fremder Boden, weiter Blick. Willkommen!",
 "g.pt.hook.station.1":"Im Hydrogarten wachsen Tomaten im Kreis um den Planeten.",
 "g.pt.hook.station.2":"Hier oben blinkt das rote Leuchtfeuer — das erste, das Funke wiedergefunden hat.",
 "g.pt.hook.station.3":"Durch das Fenster dreht sich die ganze Welt. Ganz langsam.",
@@ -83143,7 +83163,10 @@ mat4.translate(L,L,fist[0]-0.03,fist[1]+0.1,fist[2]-0.02);
 mat4.rotY(L,L,-1.35);mat4.rotZ(L,L,def&&def.tool?0.62:0.25);mat4.rotX(L,L,-sw*1.1);
 mat4.scale(L,L,0.44,0.44,0.44);
 }
-this.drawMesh(r,p,mesh,L,light,true);
+
+const hk=mesh.block&&VR.First2&&VR.First2.HAND_DIM?VR.First2.HAND_DIM:1,HL=this.handL||(this.handL={sky:0,bl:[0,0,0]});
+HL.sky=light.sky*hk;HL.bl[0]=light.bl[0]*hk;HL.bl[1]=light.bl[1]*hk;HL.bl[2]=light.bl[2]*hk;
+this.drawMesh(r,p,mesh,L,HL,true);
 gl.enable(gl.CULL_FACE);
 }
 onColumnLoaded(c){
@@ -97662,7 +97685,7 @@ const catKey=b.moon?'moons':b.realm?'realm':b.cave?'caves':b.forge?'forge':b.hol
 add('b:'+b.key,catKey,null,()=>{const name=T('g.biome.'+b.key,null,b.name);return{name,desc:T('g.codex.foundBiome',{name}),hint:T(catKey==='caves'?'g.codex.biomeHintCave':catKey==='moons'?'g.codex.biomeHintMoon':'g.codex.biomeHint')};});
 }
 
-if(VR.BodyLife)for(const id of VR.BodyLife.PAGES)add('moon:'+id,'moons',null,()=>{const L=TL('g.codex.moon.'+id);return{name:L[0]||id,desc:L[1]||'',hint:L[2]||''};});
+if(VR.BodyLife)for(const id of VR.BodyLife.PAGES)add('moon:'+id,'moons',null,()=>{const L=TL(VR.DimReg&&VR.DimReg.gravKey?VR.DimReg.gravKey('g.codex.moon.'+id):'g.codex.moon.'+id);return{name:L[0]||id,desc:L[1]||'',hint:L[2]||''};});
 
 const IV=VR.Inventions;
 if(IV)for(const c of IV.LIST)add('i:'+c.k,'inventions',c.id,()=>{const x=IV.text(c.k);return{name:x.name,desc:x.line,hint:T('g.codex.inventHint')};},()=>IV.has(c.k));
@@ -102514,6 +102537,18 @@ return out;
 W.PUFF={R:2.2,tau0:1.0,gam:2.0,dref:9,base:0.15,nRef:720,kFar:[90,150],kMin:2,fog:0.55,cut:1.2,grain:[5,0.4,1.6]};
 
 W.puffGrain=function(cx,cy,seed){const G=W.PUFF.grain,v=Math.sin(cx*12.9898+cy*78.233+seed*61.7)*43758.5453;return v-Math.floor(v)<0.5?G[1]:G[2];};
+
+
+
+
+W.MURM_FAR=[60,240];W.MURM_FAR_MIN=0.22;W.MURM_QUIET=60;W.MURM_FADE=30;W.MURM_TAU_MAX=1.4;
+W.murmFar=function(d){const F=W.MURM_FAR;if(d<=F[0])return 1;if(d>=F[1])return W.MURM_FAR_MIN;const t=(d-F[0])/(F[1]-F[0]);return 1+(W.MURM_FAR_MIN-1)*t*t*(3-2*t);};
+
+
+
+W.FRESH_MS=5*60*1000;
+W.freshWorld=function(g,now){const m=g&&g.meta;return!!(g&&g.f2new)|| !!(m&&Number.isFinite(m.created)&&now-m.created>=0&&now-m.created<W.FRESH_MS);};
+W.murmStart=function(age,fresh){if(!fresh)return 1;return age<=W.MURM_QUIET?0:Math.min(1,(age-W.MURM_QUIET)/W.MURM_FADE);};
 W.birdsVisible=function(d){
 const P=W.PUFF,K=W.MURM_K;
 if(d<=P.kFar[0])return K;
@@ -103256,7 +103291,8 @@ float gm = fract(sin(dot(gc, vec2(12.9898, 78.233)) + v_l.z * 61.7) * 43758.5453
 float a = 1.0 - exp(-v_l.y * gm * exp(-2.2 * q2));
 if (a < 0.004) discard;
 vec3 c = v_col * (u_ambSky * 0.55 + 0.02);
-c = applyFog(c, v_rel * u_fogK, length(v_rel) * u_fogK);
+float fk = mix(u_fogK, 1.0, smoothstep(60.0, 240.0, length(v_rel)));
+c = applyFog(c, v_rel * fk, length(v_rel) * fk);
 o = vec4(c, a);
 return;
 }
@@ -103642,6 +103678,7 @@ if(!this.on){if(this.live)this.reset();if(g.airLife&&g.airLife.noButterflies)g.a
 if(!(dt>0))return;
 dt=Math.min(dt,0.1);
 this.live=true;this.time+=dt;
+if(this.ageW!==g.world){this.ageW=g.world;this.age=0;this.fresh=W.freshWorld(g,Date.now());}this.age+=dt;
 const clock=this.tick(dt),E=(g.env&&g.env.E)||{},tod=g.env?g.env.timeOfDay:6000,day=g.env?(g.env.day|0):0;
 const p=g.player.pos,eye=this.eye||(this.eye=[0,0,0]);eye[0]=p[0];eye[1]=p[1]+1.62;eye[2]=p[2];
 const sc=W.sched(this.seed,day,tod),wet=(E.rain||0)>0.15||(E.snow||0)>0.15,cap=this.b.cap;
@@ -103674,6 +103711,7 @@ this.updHerons(dt,ctx,cap.heron);
 updMurm(dt,ctx,n){
 const g=this.g,ph=W.murmPhase(ctx.tod);
 if(!n||ph==='off'||ctx.wet){this.murm=null;return;}
+this.murmK=W.murmStart(this.age||0,!!this.fresh);if(this.murmK<=0){this.murm=null;return;}
 
 const t=ctx.tod,key=(t<2000?ctx.day-1:ctx.day);
 let Mu=this.murm;
@@ -104386,7 +104424,7 @@ const sv=Math.sqrt(vx*vx+vy*vy+vz*vz)+1e-6,fx=vx/sv,fy=vy/sv,fz=vz/sv,hl=Math.sq
 
 const ux= -rz*fy,uy=rz*fx-rx*fz,uz=rx*fy,b=fl.bank[i],b2=b*b,cb=1-b2*(0.5-b2/24),sb=b*(1-b2*(1/6-b2/120));
 const nx=ux*cb+rx*sb,ny=uy*cb,nz=uz*cb+rz*sb,ndv=Math.abs(nx*x+ny*y+nz*z)/d;
-const tau=W.puffTau(fl.dens[i],ndv,kv,KB,Mu.n);
+const tau=Math.min(W.MURM_TAU_MAX,W.puffTau(fl.dens[i],ndv,kv,KB,Mu.n))*W.murmFar(d)*(this.murmK===undefined?1:this.murmK);
 if(tau<0.004)continue;
 
 const q=n++ *WS;D[q]=x;D[q+1]=y;D[q+2]=z;D[q+3]=R;D[q+8]=0.022;D[q+9]=0.02;D[q+10]=0.026;D[q+11]=tau;D[q+16]=(i*0.618034)%1;
@@ -110026,7 +110064,7 @@ giveKit(meta){
 const inv=this.player.inv;
 if(meta.mode!=='survival'){
 const noCry=(meta.vgen|0)>=9;
-const kit=['grass_block','oak_planks','stone_bricks','glass',noCry?'neon_magenta':'violet_crystal_block','hull_plating','neon_cyan','lantern','oak_log'];
+const kit=['grass_block','oak_planks','stone_bricks','glass',noCry?((VR.First2&&VR.First2.KIT5)||'neon_magenta'):'violet_crystal_block','hull_plating','neon_cyan','lantern','oak_log'];
 kit.forEach((id,i)=>{if(R.byName[id]||VR.ITEMS[id])inv.slots[i]={id,n:64};});
 const extra=['builder_wand','laser_blaster','jetpack','hoverbike','shuttle_beacon','torch',noCry?'vx_lamppost':'azure_crystal_cluster','water_bucket','tech_panel','landing_pad','cherry_leaves','quartz_block'];
 extra.forEach((id,i)=>{if(R.byName[id]||VR.ITEMS[id])inv.slots[9+i]={id,n:VR.maxStack(id)};});
@@ -111454,7 +111492,10 @@ return A;
 };
 
 
-FI.WALK_T=2.5;
+
+
+
+FI.WALK_T= -1;
 FI.feet=(v)=>{const u=v.u||[0,0];return[v.x+0.5+u[0]*FI.WALK_T,v.y+1,v.z+0.5+u[1]*FI.WALK_T];};
 FI.spawn=(v)=>(v?{pos:FI.feet(v),yaw:v.yaw,pitch:v.pitch,vista:v}:null);
 
@@ -112075,6 +112116,33 @@ F.SEAT_SCALE=0.45;
 
 F.NEAR=0.6;
 F.camNear=(dx,dy,dz)=>dx*dx+dy*dy+dz*dz<F.NEAR*F.NEAR;
+
+
+
+
+
+F.CLEAR_D=2.5;F.CLEAR_K=0.6;
+F.keepClear=function(eye,yaw,A,side){
+const fx= -Math.sin(yaw),fz= -Math.cos(yaw),rx=Math.cos(yaw),rz= -Math.sin(yaw);
+const dx=A[0]-eye[0],dy=A[1]-eye[1],dz=A[2]-eye[2];
+let ah=dx*fx+dz*fz,ac=dx*rx+dz*rz,up=dy;
+if(ah>0&&Math.abs(ac)<F.CLEAR_K*ah)ac=(ac>0.02?1:ac< -0.02? -1:(side||1))*F.CLEAR_K*ah;
+let L=Math.sqrt(ah*ah+ac*ac+up*up);
+if(L<1e-3){ac=side||1;L=1;}
+if(L<F.CLEAR_D){const k=F.CLEAR_D/L;ah*=k;ac*=k;up*=k;if(up>1.2){const h=Math.sqrt(Math.max(0,F.CLEAR_D*F.CLEAR_D-1.44)),hl=Math.hypot(ah,ac)||1;up=1.2;ah=ah/hl*h;ac=ac/hl*h;if(Math.hypot(ah,ac)<1e-3)ac=h*(side||1);}}
+A[0]=eye[0]+fx*ah+rx*ac;A[1]=eye[1]+up;A[2]=eye[2]+fz*ah+rz*ac;
+return A;
+};
+
+
+F.inAim=function(yaw,pitch,dx,dy,dz){
+const cp=Math.cos(pitch||0),sp=Math.sin(pitch||0),fx= -Math.sin(yaw)*cp,fy=sp,fz= -Math.cos(yaw)*cp,rx=Math.cos(yaw),rz= -Math.sin(yaw);
+const ah=dx*fx+dy*fy+dz*fz;if(ah<=0||dx*dx+dy*dy+dz*dz>=F.CLEAR_D*F.CLEAR_D*0.81)return false;
+const ux= -rz*fy,uy=rz*fx-rx*fz,uz=rx*fy,ac=Math.abs(dx*rx+dz*rz),up=Math.abs(dx*ux+dy*uy+dz*uz);
+return ac<0.415*ah&&up<0.256*ah;
+};
+
+F.screenShare=(d,size,fov,aspect)=>{const t=Math.tan((fov||70)*Math.PI/360),h=size/(2*d*t),w=h/(aspect||16/9);return h*w;};
 F.SPARK_NEAR=2.5;
 F.sparkOk=(dx,dy,dz)=>dx*dx+dy*dy+dz*dz>=F.SPARK_NEAR*F.SPARK_NEAR;
 F.camHidden=(g)=> !!(g&&((g.wow&&g.wow.active)||(g.director&&g.director.active)||(g.arrival&&g.arrival.phase==='moment')));
@@ -112635,6 +112703,18 @@ const mx=2*hx-A[0],mz=2*hz-A[2];
 if(!blocked(mx,A[1],mz)){A[0]=mx;A[2]=mz;}
 else{A[0]=P[0]-fx*0.2;A[1]=P[1]+2.3+bob;A[2]=P[2]-fz*0.2;if(this.solid(A[0],A[1],A[2])){A[0]=hx-fx*0.5;A[1]=hy+0.1;A[2]=hz-fz*0.5;}}
 }
+
+
+if(firstPerson&&cam){
+const E=this.kcE||(this.kcE=[0,0,0]),Q=this.kcQ||(this.kcQ=[0,0,0]);E[0]=cam.x;E[1]=cam.y;E[2]=cam.z;
+const free=(q)=> !this.solid(q[0],q[1],q[2])&& !this.solid(q[0],q[1]+0.3,q[2])&& !this.solid((q[0]+E[0])/2,(q[1]+E[1])/2,(q[2]+E[2])/2);
+for(const sd of[1,-1]){
+Q[0]=A[0];Q[1]=A[1];Q[2]=A[2];
+if(sd<0){Q[0]=2*E[0]-A[0];Q[2]=2*E[2]-A[2];const ah=(Q[0]-E[0])*fx+(Q[2]-E[2])*fz;Q[0]-=2*ah*fx;Q[2]-=2*ah*fz;}
+F.keepClear(E,yaw,Q,sd);
+if(free(Q)){A[0]=Q[0];A[1]=Q[1];A[2]=Q[2];break;}
+}
+}
 }
 
 attitude(dt,T){
@@ -113007,6 +113087,7 @@ OPTS.baseMat=M;OPTS.scale=F.SEAT_SCALE;
 const dx=P[0]-cam.x,dy=P[1]-cam.y,dz=P[2]-cam.z,R0=0.32*OPTS.scale/F.SCALE;
 if(!m4.boxInFrustum(r.planes,dx-R0,dy-R0,dz-R0,dx+R0,dy+R0,dz+R0))return;
 if(!OPTS.baseMat&&F.camNear(dx,dy,dz))return;
+if(!OPTS.baseMat&&(this.g.camMode|0)===0&& !(this.g.photoCam&&this.g.photoCam.on)&&F.inAim(cam.yaw,cam.pitch,dx,dy,dz))return;
 const prog=ent.beginVox(r,E);
 if(prog.u.u_clipNear)gl.uniform1f(prog.u.u_clipNear,0);
 POSE.rotor_l[1]=this.spin;POSE.rotor_r[1]= -this.spin;
@@ -118595,7 +118676,7 @@ const t=VR.Universe.worldSeconds(g.env.day|0,g.env.ticks);
 if(S.id!==id){
 S.id=id;S.landY=null;S.wasGround=true;S.impactSlot=Math.floor(t/180);S.parUp=null;
 unlock(g,'moon:'+id);
-if(!S.said[id]&&g.ui){S.said[id]=true;if(VR.EventLog&&VR.EventLog.emit)VR.EventLog.emit('space','moon_land',4,null,'moon');g.ui.toast(T('g.moon.hello',{name:T('g.dim.'+id,null,prof.name.de)}),T('g.moon.hello.'+id));}
+if(!S.said[id]&&g.ui){S.said[id]=true;if(VR.EventLog&&VR.EventLog.emit)VR.EventLog.emit('space','moon_land',4,null,'moon');g.ui.toast(T('g.moon.hello',{name:T('g.dim.'+id,null,prof.name.de)}),T(VR.DimReg.gravKey?VR.DimReg.gravKey('g.moon.hello.'+id):'g.moon.hello.'+id));}
 }
 const BS=VR.BodySky;
 
@@ -134484,6 +134565,9 @@ const game=()=>VR.game||null;
 
 F.HAND_OLD={off:[-0.035,0.115,-0.06],ry:0.78,rx: -0.18,s:0.235};
 F.HAND={off:[0.01,0.045,-0.02],ry:0.78,rx: -0.22,s:0.15};
+
+
+F.HAND_DIM=0.7;F.KIT5='sandstone';
 F.FOV=70;
 
 F.fistRest=()=>{
@@ -134890,6 +134974,7 @@ const pv=document.createElement('div');pv.className='pvwrap f2pv';
 pv.innerHTML='<canvas class="pv" width="320" height="180"></canvas>';
 body.appendChild(pv);
 ui.previewCtx=pv.querySelector('canvas').getContext('2d');
+if(F.paintThumb)F.paintThumb(ui.previewCtx);
 const row=(lab,tip,val,min,max,step,show,set)=>{
 const d=document.createElement('div');d.className='setrow f2row';
 d.innerHTML='<div class="sethead"><label></label><span class="val"></span></div>';
@@ -134906,7 +134991,7 @@ row(tx('g.first2.gfx',null,'Grafik','Graphics'),tx('g.first2.gfxTip',null,'Links
 row(tx('g.first2.bright',null,'Helligkeit','Brightness'),tx('g.first2.brightTip',null,'Heller oder dunkler — für deinen Bildschirm.','Lighter or darker — for your screen.'),S.bright||1,F.BRIGHT.min,F.BRIGHT.max,F.BRIGHT.step,(v)=>Math.round(v*100)+' %',(v)=>{S.bright=v;F.applyBright(g);});
 const X=VR.UX;
 row(tx('g.first2.scale',null,'UI-Größe','UI size'),tx('g.first2.scaleTip',null,'Knöpfe und Schrift größer oder kleiner.','Buttons and text bigger or smaller.'),S.uiScale||1,X?X.SCALE_MIN:0.9,X?X.SCALE_MAX:1.4,0.05,(v)=>Math.round(v*100)+' %',(v)=>{if(X&&X.setScale)X.setScale(v);else S.uiScale=v;});
-if(g.requestPreview)g.requestPreview();
+if(g.requestPreview){g.requestPreview();g.previewAt=g.frame+1;}
 return true;
 };
 if(UI&&UI.prototype.showSettings&& !UI.prototype.showSettings.__f2){
@@ -134925,6 +135010,37 @@ b.onclick=()=>{this.setAll=false;this.showSettings();};tabs.insertBefore(b,tabs.
 return r;
 };
 UI.prototype.showSettings.__f2=true;
+}
+
+
+
+
+F.thumb=null;F.thumbOk=false;
+F.keepThumb=function(g){
+if(!hasDoc|| !g|| !g.canvas|| !g.canvas.width)return false;
+const T=F.thumb||(F.thumb=document.createElement('canvas'));if(T.width!==320){T.width=320;T.height=180;}
+const c=T.getContext('2d');let ok=false;
+try{c.drawImage(g.canvas,0,0,T.width,T.height);ok=F.lit(c);}catch(e){ok=false;}
+if(!ok){try{ok=F.readBack(g,c);}catch(e){ok=false;}}
+F.thumbOk=ok;return ok;
+};
+F.paintThumb=function(ctx){if(!F.thumbOk|| !F.thumb|| !ctx|| !ctx.canvas)return false;try{ctx.drawImage(F.thumb,0,0,ctx.canvas.width,ctx.canvas.height);return true;}catch(e){return false;}};
+if(G&&G.prototype.capturePreview&& !G.prototype.capturePreview.__f3){
+const oc=G.prototype.capturePreview;
+G.prototype.capturePreview=function(){
+if(this.thumbAt&&this.frame>=this.thumbAt){this.thumbAt=0;if(!F.keepThumb(this)&&(this.thumbTries=(this.thumbTries||0)+1)<6)this.thumbAt=this.frame+1;else this.thumbTries=0;}
+return oc.apply(this,arguments);
+};
+G.prototype.capturePreview.__f3=true;
+}
+if(UI&&UI.prototype.show&& !UI.prototype.show.__f3){
+const osh=UI.prototype.show;
+UI.prototype.show=function(id){
+const g=this.game,was=this.screen;
+if(g&&g.state==='play'&&id&&(!was||was==='hud')&&(id==='pause'||id==='settings'))g.thumbAt=g.frame;
+return osh.apply(this,arguments);
+};
+UI.prototype.show.__f3=true;
 }
 
 if(UI&&UI.prototype.resume&& !UI.prototype.resume.__f2){const orr=UI.prototype.resume;UI.prototype.resume=function(){this.setAll=false;return orr.apply(this,arguments);};UI.prototype.resume.__f2=true;}
