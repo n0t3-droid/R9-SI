@@ -227,6 +227,16 @@
   // ---- end u-moons2
 
   // ---------------------------------------------------------------- the env (env.js calls this at the end of update)
+  // a-story6: Aquamarin's night on the ground — the lamps make pools (their reach shorter, still warm), the shade
+  // between them blue (the grade); the day, the sunset's first degree and the other worlds untouched. → on (0 = off)
+  BS.nightGrade = function (id, sEl, base, out) {
+    const K = KIND[id]; if (!K || !K.nightBlue || BS.night6 === false) return 0;
+    const dk = ss(-1 * Math.PI / 180, -10 * Math.PI / 180, sEl); if (dk <= 0) return 0;
+    for (let i = 0; i < 3; i++) out.bt[i] = base[i] * (1 - 0.42 * dk);
+    out.grade[0] = 1 - 0.07 * dk; out.grade[1] = 1 - 0.01 * dk; out.grade[2] = 1 + 0.07 * dk;
+    return dk;
+  };
+  const NG = { bt: [1, 0.84, 0.64], grade: [1, 1, 1] };
   BS.env = function (E, env, o, dt) {
     const D = VR.DimReg && VR.DimReg.get(o && o.dim), id = D && D.body;
     if (!id) { BS.want = false; BS.cur = null; E.bodySky = null; return E; }
@@ -265,6 +275,7 @@
     if (id === 'aqua') E.wind = 2.6;   // u-moons2: Aquamarin's swell taller than home's (the water's storm factor)
     E.emissiveBoost = id === 'zinn' ? 0.3 + L.night * 0.45 : 0.45 + L.night * 1.1;   // (u-moons3: Zinnober's lava orange at night, not blown to white — the Glutsee fills the view)
     E.grade = [1, 1, 1];
+    if (BS.nightGrade(id, L.sunEl, E.blockTint === NG.bt ? NG.base : (NG.base = E.blockTint), NG)) { E.blockTint = NG.bt; E.grade = NG.grade; }
     E.bloomThreshold = 1.25; E.bloomStrength = 0.08;
     // the eye adapts in a few seconds (slower into the dark)
     const target = r.expo * (o.exposureMul || 1);

@@ -62,5 +62,15 @@ console.log('c · the lantern\'s halo');
   check(N.lanternHalos(far, 0.016, [200, 64, 0], 0.9) === 0, 'none beyond 48 m');
   check(!!(VR.Particles && VR.Particles.prototype._lant6), 'drawn where the lamps\' halos are (Particles.lampGlows: Balanced and up)');
 }
+console.log('d · the lamps make pools, the shade between them blue (BS.nightGrade)');
+{
+  const D2 = Math.PI / 180, base = [1.0, 0.84, 0.64];
+  const g = (id, el) => { const o = { bt: [0, 0, 0], grade: [1, 1, 1] }; const on = BS.nightGrade && BS.nightGrade(id, el * D2, base, o); return Object.assign(o, { on }); };
+  const dn = g('aqua', -20), dy = g('aqua', 20), du = g('aqua', -0.5), oc = g('ocker', -20);
+  check(!!dn.on && dn.bt[0] < 0.75 * base[0] && dn.bt[0] > 0.45 && dn.bt[0] / dn.bt[2] >= base[0] / base[2] * 0.98, `the deep night: the lamps' reach shorter, still warm (${dn.bt.map(v => v.toFixed(2))})`);
+  check(dn.grade[2] > dn.grade[0] + 0.08 && Math.max(...dn.grade) < 1.12, `… the grade leans blue (${dn.grade.map(v => v.toFixed(2))})`);
+  check(!dy.on && !du.on && !oc.on, 'the day, the sunset\'s first degree and Ocker untouched');
+  BS.night6 = false; check(!g('aqua', -20).on, 'BS.night6 = false: the old night'); BS.night6 = undefined;
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
