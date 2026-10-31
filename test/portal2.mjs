@@ -67,17 +67,17 @@ async function filmShot(dest, F, id, k, name) {
 const F1 = await filmWith({ from: 'overworld', to: 'opal', need: ['clouds', 'curve', 'ring', 'moon'] }) || await filmWith({ from: 'overworld', to: 'opal', need: ['clouds', 'curve', 'moon'] });
 const F2 = await filmWith({ from: 'overworld', to: 'x.2.1.1', need: ['tunnel'] });
 const F3 = stn ? await filmWith({ from: 'overworld', to: stn, need: ['station'] }) : null;
-const F4 = await filmWith({ from: 'opal', to: 'overworld', need: ['moon'] });
-const want = [['swallow', F1, 'opal', 0.55], ['clouds', F1, 'opal', 0.3], ['curve', F1, 'opal', 0.75], ['ring', F1, 'opal', 0.5], ['moon', F1, 'opal', 0.8], ['arrive', F1, 'opal', 0.55], ['tunnel', F2, 'x.2.1.1', 0.6], ['station', F3, stn, 0.7], ['home', F4, 'overworld', 0.8]];
+const F4 = await filmWith({ from: 'overworld', to: 'zinn', need: ['moon'] });
+const want = [['swallow', F1, 'opal', 0.55], ['clouds', F1, 'opal', 0.3], ['curve', F1, 'opal', 0.75], ['ring', F1, 'opal', 0.5], ['moon', F1, 'opal', 0.8], ['arrive', F1, 'opal', 0.55], ['tunnel', F2, 'x.2.1.1', 0.6], ['station', F3, stn, 0.7], ['zinn', F4, 'zinn', 0.8]];
 rec.shots = {};
 for (const [id, F, to, k] of want) {
   if (!F) { console.log('  (no film with ' + id + ')'); continue; }
-  const sid = id === 'home' ? 'moon' : id;
+  const sid = id === 'zinn' ? 'moon' : id;
   if (!F.shots.some(s => s.id === sid)) { console.log('  (film ' + F.id + ' has no ' + sid + ')'); continue; }
   const r = await filmShot({ dim: to }, F, sid, k, 'p2_' + id + '_' + TAG + '.png');
   rec.shots[id] = { film: F.id, shot: r.sh, gl: r.gl, luma: r.l };
   console.log('  ' + id + ': ' + JSON.stringify(rec.shots[id]));
-  if (!BEFORE && ['curve', 'ring', 'moon', 'home'].includes(id)) check(r.gl === true && r.l.sd > 12, id + ': drawn by the space renderer (' + r.gl + '), centre sd ' + r.l.sd);
+  if (!BEFORE && ['curve', 'ring', 'moon', 'zinn'].includes(id)) check(r.gl === true && r.l.sd > 12, id + ': drawn by the space renderer (' + r.gl + '), centre sd ' + r.l.sd);
 }
 save();
 
@@ -193,7 +193,7 @@ save();
 if (!BEFORE) try {
   const p = (n, t) => SHOTS + 'p2_' + n + '_' + t + '.png', ex = (f) => fs.existsSync(f);
   const rows = [];
-  for (const [id, lab] of [['swallow', 'Das Tor verschluckt dich'], ['clouds', 'Durch die Wolken'], ['curve', 'Die Krümmung der Herzwelt'], ['ring', 'Amarants Ring und sein Schatten'], ['moon', 'Opal schwillt an, Amarant dahinter'], ['home', 'Heimkehr: die Herzwelt schwillt an'], ['station', 'Die Station'], ['tunnel', 'Der Sternensprung-Tunnel'], ['arrive', 'Ankunft im Licht des Ziels'], ['starmap', 'Die Sternkarte (O), erstes Bild']]) {
+  for (const [id, lab] of [['swallow', 'Das Tor verschluckt dich'], ['clouds', 'Durch die Wolken'], ['curve', 'Die Krümmung der Herzwelt'], ['ring', 'Amarants Ring und sein Schatten'], ['moon', 'Opal schwillt an, Amarant dahinter'], ['zinn', 'Zinnober schwillt an, Amarant dahinter'], ['station', 'Die Station'], ['tunnel', 'Der Sternensprung-Tunnel'], ['arrive', 'Ankunft im Licht des Ziels'], ['starmap', 'Die Sternkarte (O), erstes Bild']]) {
     const imgs = [p(id, 'before'), p(id, 'after')].filter(ex); if (imgs.length) rows.push({ label: lab + ' — vorher · nachher', imgs });
   }
   const tail = [p('reveal', 'after'), p('fly_x8', 'after')].filter(ex); if (tail.length) rows.push({ label: 'Die Enthüllung zur besten Stunde · Kreativ-Flug ×8', imgs: tail });
