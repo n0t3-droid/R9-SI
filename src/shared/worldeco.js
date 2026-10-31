@@ -70,17 +70,17 @@
     ocker: {
       liquid: 'ice',
       biomes: [
-        { key: 'ocker_lichen', de: 'Rostflechtenfeld', en: 'Rust Lichen Field', col: 0xb04a3a, surf: 'crimson_mycel' },
+        { key: 'ocker_lichen', de: 'Rostflechtenfeld', en: 'Rust Lichen Field', col: 0x8a6448, surf: 'podzol' },
         { key: 'ocker_thorn', de: 'Dornsteppe', en: 'Thorn Steppe', col: 0x9a8a50, surf: 'coarse_dirt' },
         { key: 'ocker_amber', de: 'Bernsteingarten', en: 'Amber Garden', col: 0xd89a40, surf: 'red_sand' },
       ],
       base: null,
       flora: [
-        { id: 'rustcap', de: 'Rostschirm', en: 'Rust Cap', shape: 'umbrella', bio: [0], p: 0.35, stem: 'stripped_crimson_stalk', cap: 'crimson_wart_block', under: 'lantern', h: [3, 6], r: [2, 3] },
+        { id: 'rustcap', de: 'Rostschirm', en: 'Rust Cap', shape: 'umbrella', bio: [0], p: 0.35, stem: 'mushroom_stem', cap: 'brown_mushroom_block', under: 'lantern', h: [3, 6], r: [2, 3] },
         { id: 'thornpillar', de: 'Dornsäule', en: 'Thorn Pillar', shape: 'spire', bio: [1], p: 0.4, base: 'cactus', tip: 'cactus_flower', h: [2, 4] },
         { id: 'ambernadel', de: 'Bernsteinnadel', en: 'Amber Needle', shape: 'spire', bio: [2], p: 0.35, base: 'amber_crystal_block', tip: 'amber_crystal_cluster', h: [1, 4] },
-        { id: 'dusttuft', de: 'Staubgras', en: 'Dust Grass', shape: 'tuft', bio: [0, 1, 2], p: 0.12, b: ['dead_bush', 'crimson_roots', 'short_grass'] },
-        { id: 'rustbulb', de: 'Rostknolle', en: 'Rust Bulb', shape: 'bulb', bio: [0, 1], p: 0.18, stem: 'stripped_crimson_stalk', head: 'orange_terracotta', h: [1, 2] },
+        { id: 'dusttuft', de: 'Staubgras', en: 'Dust Grass', shape: 'tuft', bio: [0, 1, 2], p: 0.12, b: ['dead_bush', 'short_grass', 'dead_bush'] },
+        { id: 'rustbulb', de: 'Rostknolle', en: 'Rust Bulb', shape: 'bulb', bio: [0, 1], p: 0.18, stem: 'mushroom_stem', head: 'brown_terracotta', h: [1, 2] },
       ],
       fauna: [
         { id: 'dune_trotter', de: 'Dünentraber', en: 'Dune Trotter', does: 'graze' },
@@ -293,7 +293,7 @@
     near(x, z, pad) { for (const m of this.marks) if (Math.abs(m.x - x) < m.r + pad && Math.abs(m.z - z) < m.r + pad) return true; return false; }
     // ---------------------------------------------------------------- the sites and their plans
     build() {
-      const g = this.gen, L = this.land, rings = [[110, 170], [420, 620], [880, 1150]];
+      const g = this.gen, L = this.land, rings = [[75, 105], [420, 620], [880, 1150]]   // (u-worlds2: the first village closer — in the arrival's view);
       const rot = h01(this.s, 1, 7) * Math.PI * 2;
       rings.forEach(([r0, r1], ri) => {
         let best = null, bs = 1e9;
@@ -481,6 +481,17 @@
         // (inside the chunk the real ground decides: a pond, a crater's boulder — no plant there)
         if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
         plant(f, x, y0 + 1, z, h01(i, j, this.s ^ 0xf5), put);
+      }
+      // ---- (u-worlds2) the landing's garden: seven of the world's big plants on a ring 8–13 m round the landing, so
+      // the first look shows the world's life whatever biome the landing lies in
+      const L = this.land;
+      if (big.length && Math.abs(L[0] - x0 - 8) < 32 && Math.abs(L[2] - z0 - 8) < 32) for (let k = 0; k < 7; k++) {
+        const a = k / 7 * Math.PI * 2 + h01(k, 3, this.s ^ 0xfa) * 0.5, r = 8 + h01(k, 4, this.s ^ 0xfa) * 5;
+        const x = Math.round(L[0] + Math.cos(a) * r), z = Math.round(L[2] + Math.sin(a) * r);
+        if (x < x0 - 4 || x > x0 + 19 || z < z0 - 4 || z > z0 + 19 || this.near(x, z, 2)) continue;
+        const y0 = this.groundAt(x, z); if (y0 < 0) continue;
+        if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
+        plant(big[k % big.length], x, y0 + 1, z, h01(k, 5, this.s ^ 0xfa), put);
       }
       // ---- the tufts and the corals: per column, inside the chunk
       for (let c = 0; c < 256; c++) {
@@ -677,16 +688,53 @@
     put(cx + 1 + (u > 0.5 ? 0 : -2), F + 1, cz + dz + s, S(Kit.light));
     return { kind: 'home', ops: W.ops, door: [cx, F + 1, cz + dz], outside: [cx, F + 1, cz + dz + s], inside: [cx, F + 1, cz + dz - 2 * s], beds, seats: [], work: [], chimney: null, table: null, lights: [[cx, F + top, cz]], box: [cx - R, F, cz - R, cx + R, F + 9, cz + R] };
   }
+  // u-worlds2 · the species' monument in the middle of the plaza (5 × 5 at its foot, 13–20 high: it tells the village
+  // from 100 m and more) — our own forms: the Wellari's spiral shell tower, the Dunelin's tapering sand tower with its
+  // lantern, the Glutani's sulfur spire with a glowing amber crown, the Regoli's crater dome with its signal mast, the
+  // Nivari's pointed ice vault with a rose crystal. E.CENTRE: the monuments' heights (test/worlds2.js)
+  E.CENTRE = { aqua: 14, ocker: 18, zinn: 20, basalt: 13, opal: 15 };
+  function centrepiece(kind, put, X, F, Z) {
+    const S = (n, p) => st(n, p), H = E.CENTRE[kind] || 10;
+    const ring = (y, r, f) => { for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { const d = Math.hypot(dx, dz); if (d <= r) { const v = f(dx, dz, d); if (v) put(X + dx, F + y, Z + dz, v); } } };
+    if (kind === 'aqua') {
+      const wall = S('calcite'), band = S('cyan_terracotta'), cap = S('tube_coral_block');
+      for (let y = 1; y <= H - 2; y++) { const r = 2.9 - y * 0.15, a0 = y * 0.7; ring(y, r, (dx, dz, d) => { if (d < r - 1.1) return 0; const a = Math.atan2(dz, dx); return Math.abs(((a - a0) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI) < 0.6 ? band : wall; }); }
+      put(X, F + H - 1, Z, cap); put(X, F + H, Z, S('tide_lantern'));
+    } else if (kind === 'ocker') {
+      const wall = S('terracotta'), band = S('red_sandstone'), win = S('orange_stained_glass');
+      for (let y = 1; y <= H - 3; y++) { const r = y < 7 ? 2 : y < 13 ? 1.5 : 1; for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { if (Math.max(Math.abs(dx), Math.abs(dz)) > Math.floor(r + 0.5) || (r === 1.5 && Math.abs(dx) === 2 && Math.abs(dz) === 2)) continue; const edge = Math.max(Math.abs(dx), Math.abs(dz)) === Math.floor(r + 0.5); put(X + dx, F + y, Z + dz, y % 4 === 0 ? band : edge && y % 4 === 2 && (dx === 0 || dz === 0) ? win : wall); } }
+      put(X, F + H - 2, Z, band); put(X, F + H - 1, Z, S('lantern')); put(X, F + H, Z, S('amber_crystal_block'));
+    } else if (kind === 'zinn') {
+      const base = S('polished_basalt'), br = S('sulfur_bricks'), ps = S('polished_sulfur'), core = S('magma_block');
+      for (let y = 1; y <= H - 3; y++) { const r = y <= 2 ? 2.6 : 2.2 * (1 - (y - 2) / (H - 2)) + 0.4; ring(y, r, (dx, dz, d) => (dx === 0 && dz === 0 && y > 2 && y % 3 === 0 ? core : y <= 2 ? base : (y + Math.round(Math.atan2(dz, dx) * 2)) % 3 === 0 ? ps : br)); }
+      put(X, F + H - 2, Z, S('amber_crystal_block')); put(X, F + H - 1, Z, S('amber_crystal_block')); put(X, F + H, Z, S('spirit_lantern'));
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(X + dx, F + H - 2, Z + dz, S('amber_crystal_block'));
+    } else if (kind === 'basalt') {
+      const rim = S('smooth_basalt'), glass = S('light_blue_stained_glass'), mast = S('polished_andesite');
+      for (let y = 1; y <= 4; y++) ring(y, 3.2, (dx, dz, d) => { if (y === 1) return d > 2.4 ? rim : 0; const R = Math.sqrt(Math.max(0, 9.6 - (y - 1) * (y - 1) * 1.1)); return d <= R && d > R - 1.1 ? glass : 0; });
+      for (let y = 4; y <= H - 1; y++) put(X, F + y, Z, mast);
+      put(X - 1, F + H - 3, Z, mast); put(X + 1, F + H - 3, Z, mast); put(X, F + H, Z, S('azure_crystal_block')); put(X, F + 2, Z, S('lantern'));
+    } else {
+      const ice = S('packed_ice'), blue = S('blue_ice'), snow = S('snow_block');
+      // two pillars and a pointed vault between them (the way under it open), a rose crystal at the point
+      for (let y = 1; y <= H - 2; y++) for (const sx of [-2, 2]) for (let dz = -1; dz <= 1; dz++) {
+        const lean = Math.max(0, y - 6) / (H - 8) * 2; const x = Math.round(sx - Math.sign(sx) * lean);
+        put(X + x, F + y, Z + dz, y % 4 === 1 ? snow : dz === 0 ? blue : ice);
+      }
+      for (let dz = -1; dz <= 1; dz++) { put(X, F + H - 2, Z + dz, blue); put(X, F + H - 1, Z + dz, ice); }
+      put(X, F + H, Z, S('rose_crystal_block'));
+    }
+  }
   const HOMES = [[-13, -14], [0, -15], [13, -14], [-13, 14], [0, 15], [13, 14]];
   function villagePlan(eco, site) {
     const Kit = eco.W.species.kit, g = eco.gen, F = site.y | 0, X = site.x, Z = site.z, kind = eco.kind;
     const ground = (x, z) => g.surfaceY(x, z);
     const seed = strHash(site.id + ':' + (eco.s >>> 0)) >>> 0;
-    const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, x: X, y: F + 1, z: Z, seed, rad: 30, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
+    const P = { id: site.id, name: site.name, style: 'sp:' + kind, kind, x: X, y: F + 1, z: Z, seed, rad: 30, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: { x: X, y: F + 1, z: Z, r: 6 }, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null, ops: [], names: E.names(kind), species: kind };
     const W = writer(ground, F, Kit), put = W.put, pav = st(Kit.paving), mark = st(Kit.mark);
     // the plaza: 13 × 13 paving, the species' mark stone in its middle (a pillar with its light), the ways to the homes
     for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) { W.level(X + dx, Z + dz); put(X + dx, F, Z + dz, (dx + dz) % 4 === 0 && Math.abs(dx) < 5 && Math.abs(dz) < 5 ? st(Kit.band) : pav); }
-    put(X, F + 1, Z, mark); put(X, F + 2, Z, mark); put(X, F + 3, Z, st(Kit.light));
+    centrepiece(kind, put, X, F, Z);   // (u-worlds2: the species' own monument in the plaza's middle, seen from 100 m)
     for (const [dx, dz] of HOMES) {
       const s = dz > 0 ? -1 : 1;
       for (let k = 6; k < Math.abs(dz) - 4; k++) { W.level(X + dx, Z + k * Math.sign(dz)); put(X + dx, F, Z + k * Math.sign(dz), pav); if (dx) for (let q = Math.min(0, dx); q <= Math.max(0, dx); q++) { W.level(X + q, Z + 7 * Math.sign(dz)); put(X + q, F, Z + 7 * Math.sign(dz), pav); } }

@@ -54,7 +54,7 @@ if (part('b')) {
   console.log('b · the species\' own body plans');
   require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
   require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
-  require('../src/main/villages.js'); require('../src/main/worldlife.js');
+  require('../src/main/villages.js'); require('../src/main/festival.js'); require('../src/main/worldlife.js');
   const Folk = VR.Folk, KINDS = ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
   // a grid's voxels as model-space points (the rig's layout: the parts' pivots; the head on the body's joint)
   const stats = (def) => {
@@ -89,6 +89,51 @@ if (part('b')) {
   const walk = P0(); VR.WorldLife.idle(walk, 'aqua', 1.0, 1, 'idle');
   check(new Set(idl).size === 5 && JSON.stringify(walk) === JSON.stringify(P0()), 'five idles of their own, none while walking');
 }
+if (part('c')) {
+  console.log('c · the worlds\' look: quieter Ocker, the landing\'s garden, the monuments, the first village in view');
+  const E = VR.WorldEco, D = VR.DimReg, R = VR.R, SEED = 4242;
+  const ok = E.KINDS.ocker.flora.concat([{ cap: E.KINDS.ocker.biomes[0].surf }]).every(f => !/crimson_wart|crimson_mycel|crimson_roots|orange_terracotta/.test(JSON.stringify(f)));
+  check(ok, 'Ocker: no crimson caps, mycel or roots, no orange bulbs');
+  for (const k of ['aqua', 'ocker', 'zinn', 'basalt', 'opal']) {
+    const g = D.get(k).gen(SEED, { bgen: { [k]: 3 } }), eco = E.of(g), L = eco.land, s0 = eco.sites[0];
+    // the plants within 16 m of the landing (the chunks round it)
+    const plantIds = new Set(E.floraStates(k));
+    let plants = 0;
+    for (let cz = (L[2] >> 4) - 1; cz <= (L[2] >> 4) + 1; cz++) for (let cx = (L[0] >> 4) - 1; cx <= (L[0] >> 4) + 1; cx++) {
+      const c = g.generate(cx, cz);
+      for (let i = 0; i < c.blocks.length; i++) { const b = c.blocks[i]; if (!b || !plantIds.has(b)) continue; const x = cx * 16 + (i & 15), z = cz * 16 + ((i >> 4) & 15); if (Math.hypot(x - L[0], z - L[2]) < 16) plants++; }
+    }
+    const d0 = Math.hypot(s0.x - L[0], s0.z - L[2]);
+    // the monument: its top block over the plaza's middle
+    const P = eco.plan(s0.id), c = g.generate(P.x >> 4, P.z >> 4), H = E.CENTRE[k];
+    const at = (y) => c.blocks[(y << 8) | ((P.z & 15) << 4) | (P.x & 15)];
+    let top = 0; for (let y = P.y; y < P.y + 30; y++) if (at(y)) top = y - P.y + 1;
+    check(plants >= 6 && d0 < 110 && top >= 12 && top >= H - 1, `${k}: ${plants} plant blocks within 16 m of the landing, the first village ${d0.toFixed(0)} m off, its monument ${top} high (${H}), the plaza ring ${P.plaza.r}`);
+  }
+}
+
+if (part('d')) {
+  console.log('d · the culture moments');
+  require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
+  require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
+  require('../src/main/villages.js'); require('../src/main/festival.js'); require('../src/main/worldlife.js');
+  const WL = VR.WorldLife, E = VR.WorldEco;
+  check(!!(WL && WL.CULTURE && WL.cultJoin), 'WorldLife.CULTURE and cultJoin');
+  for (const k of ['aqua', 'ocker', 'zinn', 'basalt', 'opal']) {
+    const C = WL.CULTURE[k];
+    const items = C.gift.every(([id, n]) => !!VR.itemDef(id) && n > 0);
+    const inv = { got: {}, add(id, n) { this.got[id] = (this.got[id] || 0) + n; return n; } };
+    const g = { player: { inv }, meta: {}, ui: { toast() {} } }, vil = { id: 'eco:' + k + ':0', name: 'X', plan: { species: k, plaza: { x: 0, y: 70, z: 0, r: 6 } }, agents: [] }, F = {};
+    let given = false;
+    for (let i = 0; i < 20; i++) given = WL.cultJoin(g, vil, F, 1, i % 4 !== 3) || given;   // (stepping out now and then)
+    const again = WL.cultJoin(g, vil, F, 30, true);
+    const de = VR.I18N.t('g.eco.cult.' + k);
+    check(items && given && !again && Object.keys(inv.got).length === C.gift.length && g.meta.ecoCult[vil.id] === 1, `${k}: „${de}" — joined after ${WL.JOIN_S} s in the ring, the gift ${JSON.stringify(inv.got)}, once`);
+  }
+  const Vs = VR.Villages && VR.Villages.prototype;
+  check(Vs && Vs.festivalDay.call({ g: { env: { day: 1 } } }, { id: 'eco:aqua:0', plan: { species: 'aqua' } }) === true, 'a native village holds its moment every evening');
+}
+
 function E2(k) { return VR.WorldEco.KINDS[k].species.de; }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
