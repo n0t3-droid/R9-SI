@@ -89,12 +89,14 @@ for (const kind of WORLDS) {
   for (let i = 0; i < 30; i++) { await step(20, 33); V = await ev((vid) => { const vil = VR.game.villages.sites.find(s => s.id === vid); return vil ? { x: vil.x, y: vil.y, z: vil.z, name: vil.name } : null; }, vid); if (V) break; await wait(200); }
   if (!V) { check(false, `${kind}: the village on the map`); continue; }
   // 2 · the village from 100 m (from the landing's side, 14 m up)
+  if (!process.env.NATIVE) {
   const fx = ar.land ? ar.land[0] - V.x : 1, fz = ar.land ? ar.land[2] - V.z : 0, fl = Math.hypot(fx, fz) || 1;
   await ev(([V, ux, uz]) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + ux * 100, V.y + 14, V.z + uz * 100); }, [V, fx / fl, fz / fl]);
   for (let i = 0; i < 60; i++) { await step(10, 33); if (await ev((V) => VR.game.world.isLoaded(V.x, V.z), V)) break; await wait(200); }
   await settle(60);
   await lookAt([V.x, V.y + 6, V.z]); await step(10);
   row.push(await grab(`w2_${kind}_far.png`));
+  }
   // 3 · close by: every column round the village shown (the u-worlds bug on Zinnober)
   await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 22, V.y + 11, V.z + 20); }, V);
   for (let i = 0; i < 90; i++) { await step(10, 33); const ok = await ev((V) => { const w = VR.game.world; for (const dx of [-24, 0, 24]) for (const dz of [-24, 0, 24]) if (!w.isLoaded(V.x + dx, V.z + dz)) return false; return true; }, V); if (ok) break; await wait(300); }
@@ -105,10 +107,24 @@ for (const kind of WORLDS) {
   // 4 · a native up close (the face and the body plan)
   let vs = null;
   for (let i = 0; i < 30; i++) { await step(20, 33); vs = await ev((vid) => { const v = VR.game.villages.known.get(vid); return v ? { active: v.active, agents: v.agents.length } : null; }, vid); if (vs && vs.active && vs.agents > 0) break; await wait(150); }
-  // (the native stepped out to the open west side of the plaza, facing the camera; the camera 2.4 m in front, a little aside)
-  const nat = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); if (!v) return null; const pz = v.plan.plaza; const ag = v.agents.filter(o => !o.kid && o.pose !== 'sleep' && o.pose !== 'sit'); const a = ag[0] || v.agents[0]; if (!a) return null; const sc = VR.Folk.SPECIES_BODY[vid.split(':')[1]].scale; a.pos[0] = pz.x - 8.5; a.pos[1] = pz.y; a.pos[2] = pz.z + 0.5; a.yaw = Math.PI / 2; a.vel && (a.vel[0] = a.vel[2] = 0); a.freeze = 8; a.steer = null; const p = g.player; p.flying = true; p.teleport(a.pos[0] - 2.4, a.pos[1] + 1.55 * sc - 1.5, a.pos[2] + 0.8); return { pos: a.pos.slice(), sc, name: a.name, species: a.p.look.species }; }, vid);
+  // (one native posed and photographed in the same call — the village's life moves them between two calls: placed in
+  // the open west of the plaza, standing, facing the camera 2.3 m off at a three-quarter angle; then from the side)
+  const pose1 = (vid, side) => ev(([vid, side]) => { const g = VR.game, v = g.villages.known.get(vid); if (!v) return null; const pz = v.plan.plaza; const ag = v.agents.filter(o => !o.kid && o.pose !== 'sleep' && o.pose !== 'sit'); const a = ag[1] || ag[0] || v.agents[0]; if (!a) return null; const sc = VR.Folk.SPECIES_BODY[vid.split(':')[1]].scale;
+    a.act = null; a.steer = null; a.pose = 'stand'; if (a.vel) { a.vel[0] = 0; a.vel[2] = 0; } a.walkAmt = 0; a.lookAt = null;
+    a.pos[0] = pz.x - 8.5; a.pos[1] = pz.y; a.pos[2] = pz.z + 0.5; a.yaw = Math.PI / 2;
+    const p = g.player, d = side ? 2.6 : 2.3, ang = side ? -Math.PI / 2 + 0.25 : 0.38;   // (the camera's bearing from the native's front)
+    const fx = -Math.sin(a.yaw + ang), fz = -Math.cos(a.yaw + ang), hy = a.pos[1] + (side ? 1.0 : 1.45) * sc;
+    p.flying = true; p.teleport(a.pos[0] + fx * d, hy - 1.62 + 0.15, a.pos[2] + fz * d);
+    const e = p.eyePos(), dx = a.pos[0] - e[0], dy = hy - e[1], dz = a.pos[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw;
+    window.__norender = false; for (let i = 0; i < 3; i++) { a.pos[0] = pz.x - 8.5; a.pos[2] = pz.z + 0.5; a.yaw = Math.PI / 2; a.act = null; a.steer = null; g.last = performance.now() - 33; g.loop(performance.now()); }
+    const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true;
+    return { url: u, name: a.name, sc, species: a.p.look.species };
+  }, [vid, side]);
+  const nat = await pose1(vid, false);
   check(nat && nat.species === kind, `${kind}: a native, ${nat ? nat.name : '?'} (×${nat ? nat.sc : '?'})`);
-  if (nat) { await lookAt([nat.pos[0], nat.pos[1] + 1.15 * nat.sc, nat.pos[2]]); await step(8); row.push(await grab(`w2_${kind}_native.png`)); }
+  for (const [n, side] of [['native', false], ['native_side', true]]) { const r = side ? await pose1(vid, true) : nat; if (r && r.url && r.url.length > 2000) { fs.writeFileSync(SHOTS + `w2_${kind}_${n}.png`, Buffer.from(r.url.split(',')[1], 'base64')); row.push(SHOTS + `w2_${kind}_${n}.png`); console.log('  📷 w2_' + kind + '_' + n + '.png'); } }
+  if (nat) delete nat.url;
+  if (process.env.NATIVE) { run[kind] = { native: nat }; save(); continue; }
   // 5 · the culture moment at dusk: the villagers gather in the ring round the monument; the player joins
   await ev(() => VR.game.env.setTime(12500));
   await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 0.5, V.y + 2.4, V.z + 10.5); }, V);
@@ -122,7 +138,7 @@ for (const kind of WORLDS) {
   const joined = await ev((vid) => { const g = VR.game; return { n: g.meta.ecoCult ? g.meta.ecoCult[vid] : 0, inv: VR.WorldLife.CULTURE[vid.split(':')[1]].gift.map(([id]) => g.player.inv.count ? g.player.inv.count(id) : -1) }; }, vid);
   check(joined.n === 1, `${kind}: joined the moment, the gift in the bag (${JSON.stringify(joined)})`);
   await ev(() => VR.game.env.setTime(5200));
-  sheet.push({ label: `${kind}: arrival · village from 100 m · a native · the culture moment`, imgs: row.filter(Boolean) });
+  sheet.push({ label: `${kind}: arrival · village from 100 m · a native · its side · the culture moment`, imgs: row.filter(Boolean) });
   run[kind] = { arrive: dy, cols: us, native: nat, fest, joined };
   save();
 }
@@ -150,6 +166,7 @@ if (want('cost')) {
 
 check(!logs.some(l => /pageerror/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 3).join(' · ') : ''));
 save();
+if (process.env.NATIVE) { sheet.length = 0; for (const k of WORLDS) { const imgs = ['arrive', 'far', 'native', 'native_side', 'culture'].map(n => SHOTS + `w2_${k}_${n}.png`).filter(f => fs.existsSync(f)); sheet.push({ label: `${k}: arrival · village from 100 m · a native · its side · the culture moment`, imgs }); } }
 if (sheet.length) { fs.writeFileSync(ROOT + '/.tmp_tests/worlds2_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'worlds2_species_sheet.jpg', ROOT + '/.tmp_tests/worlds2_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } }
 await browser.close();
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

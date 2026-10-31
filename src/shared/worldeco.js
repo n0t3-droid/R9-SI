@@ -489,6 +489,9 @@
         const a = k / 7 * Math.PI * 2 + h01(k, 3, this.s ^ 0xfa) * 0.5, r = 8 + h01(k, 4, this.s ^ 0xfa) * 5;
         const x = Math.round(L[0] + Math.cos(a) * r), z = Math.round(L[2] + Math.sin(a) * r);
         if (x < x0 - 4 || x > x0 + 19 || z < z0 - 4 || z > z0 + 19 || this.near(x, z, 2)) continue;
+        // (none in the arrival's view of the first village: ±35° round its bearing stays open)
+        const s0 = this.sites && this.sites[0];
+        if (s0) { let da = Math.abs(Math.atan2(z - L[2], x - L[0]) - Math.atan2(s0.z - L[2], s0.x - L[0])); if (da > Math.PI) da = 2 * Math.PI - da; if (da < 0.61) continue; }
         const y0 = this.groundAt(x, z); if (y0 < 0) continue;
         if (x >= x0 && x < x0 + 16 && z >= z0 && z < z0 + 16) { const t = tops[(z - z0) * 16 + x - x0]; if (t < 0 || Math.abs(t - y0) > 1) continue; }
         plant(big[k % big.length], x, y0 + 1, z, h01(k, 5, this.s ^ 0xfa), put);
