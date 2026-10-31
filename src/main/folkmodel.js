@@ -445,6 +445,7 @@
           for (let x = -4; x <= 4; x++) { const h = Math.round(4 - (x * x) / 4); a.set(x, fy - 5 + h, -1, 0x8A6A40); }
           a.ell(-1.5, fy - 5, -1, 2.2, 1.2, 1.4, 0xD89A50); a.ell(2, fy - 5.5, 1, 1.3, 1.3, 1.3, 0xD8402E); a.ell(0.5, fy - 5.5, 1.5, 1.2, 1.2, 1.2, 0x6AB04A);
         }
+        else if (speciesItem((x, y, z, c, e) => a.set(x, y, z, c, e), tool, fy, -3)) { /* u-worlds3: a native's own thing */ }
         else if (tool === 'can') { a.box(-2, fy - 7, -3, 2, fy - 2, 2, (x, y, z) => mul(0x5A9AC0, 0.92 + H3(x, y, z, 25) * 0.1)); for (let k = 0; k < 5; k++) a.set(0, fy - 5 + k, -4 - k, 0x5A9AC0); a.box(-1, fy - 1, -1, 1, fy, 1, 0x3A6A8A); }
       }
       if (!right && elder && role.tool === 'cane') { for (let y = -armLen - 22; y <= fy + 1; y++) a.set(0, y, -3, mul(0x8A5A3A, 0.9 + ((y & 1) ? 0.08 : 0))); a.set(0, fy + 2, -4, 0x8A5A3A); a.set(0, fy + 2, -5, 0x8A5A3A); a.set(0, fy + 1, -5, 0x8A5A3A); }
@@ -597,6 +598,44 @@
       arm: { L1: -S.elbow, L2: S.fore, x: S.armX, y: S.sh - S.hip }, hw: S.hw, legX: S.legX, wide: fam === 'robe' || fam === 'gown' ? 1 : 0,
       carry, cane: !kid && L.age === 'elder' && role.tool === 'cane', item: tool, skirt: SKIRT[fam] || 0 });
   };
+  // ============================== u-worlds3 · the natives' own things in the hand (instead of the role's hoe and bag)
+  // our own designs: the Wellari's shell staff, the Dunelin's lantern pole, the Glutani's ember tongs, the Regoli's crystal
+  // finder, the Nivari's frost chime. set(x, y, z, c, e): y up the shaft from the fist (fy), z forward (z0 the shaft's)
+  V.SPECIES_TOOL = { aqua: 'shellstaff', ocker: 'lanternpole', zinn: 'tongs', basalt: 'finder', opal: 'chime' };
+  const SP_TOOLS = new Set(Object.values(V.SPECIES_TOOL));
+  function speciesItem(set, t, fy, z0) {
+    if (!SP_TOOLS.has(t)) return false;
+    const wood = (y) => mul(0x7A5236, (y & 1) ? 0.95 : 1.03);
+    if (t === 'shellstaff') {
+      for (let y = fy - 13; y <= fy + 11; y++) set(0, y, z0, mul(0xD8C8A0, (y & 1) ? 0.94 : 1.02), 0);
+      for (let y = fy + 12; y <= fy + 16; y++) for (let z = z0 - 2; z <= z0 + 2; z++) for (let x = -2; x <= 2; x++) {
+        const d = x * x + (y - fy - 14) * (y - fy - 14) * 0.9 + (z - z0) * (z - z0); if (d > 5.2) continue;
+        set(x, y, z, (x + y + z) % 3 === 0 ? 0x5ACCC8 : mix(0xF4B4A0, 0xFFF0E0, (y - fy - 12) / 5), 0);
+      }
+      set(0, fy + 17, z0, 0xFFF0E0, 0);
+    } else if (t === 'lanternpole') {
+      for (let y = fy - 12; y <= fy + 13; y++) set(0, y, z0, wood(y), 0);
+      for (let z = z0 - 4; z <= z0; z++) set(0, fy + 13, z, 0x3A2A20, 0);
+      set(0, fy + 12, z0 - 4, 0x3A2A20, 0);
+      for (let y = fy + 7; y <= fy + 11; y++) for (let z = z0 - 5; z <= z0 - 3; z++) for (let x = -1; x <= 1; x++) {
+        const edge = y === fy + 7 || y === fy + 11, core = !edge && x === 0 && z === z0 - 4;
+        set(x, y, z, edge ? 0x3A2A20 : core ? 0xFFE6A0 : 0xFFB040, edge ? 0 : 1);
+      }
+    } else if (t === 'tongs') {
+      for (let z = z0 - 10; z <= z0; z++) for (const x of [-1, 1]) set(z < z0 - 2 ? x : 0, fy, z, mul(0x50545C, (z & 1) ? 0.92 : 1.05), 0);
+      for (let z = z0 - 12; z <= z0 - 10; z++) for (let y = fy - 1; y <= fy + 1; y++) set(0, y, z, y === fy && z === z0 - 11 ? 0xFFE080 : 0xFF7A2A, 1);
+    } else if (t === 'finder') {
+      for (let z = z0 - 6; z <= z0; z++) set(0, fy, z, 0x8A92A0, 0);
+      for (let y = fy - 2; y <= fy + 2; y++) for (let x = -2; x <= 2; x++) if (Math.abs(x) + Math.abs(y - fy) >= 2 && Math.abs(x) + Math.abs(y - fy) <= 3) set(x, y, z0 - 7, 0xB8C0CC, 0);
+      for (let z = z0 - 9; z <= z0 - 7; z++) set(0, fy, z, 0x7AD8FF, 1);
+      set(0, fy + 1, z0 - 8, 0xC8F0FF, 1);
+    } else {
+      for (let y = fy - 4; y <= fy + 12; y++) set(0, y, z0, 0xD8E8F4, 0);
+      for (let x = -3; x <= 3; x++) set(x, fy + 12, z0, 0xB8D0E4, 0);
+      for (const x of [-3, 0, 3]) for (let k = 1; k <= (x ? 3 : 4); k++) set(x, fy + 12 - k, z0, k >= (x ? 3 : 4) ? 0xE8F8FF : 0x9AD4F4, k >= (x ? 3 : 4) ? 1 : 0);
+    }
+    return true;
+  }
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
   // (3 cm) fades into the skin of the smooth head — the eyes thin slits, the lips gone. The smooth path takes the head at
@@ -671,6 +710,71 @@
     const both = (X, Y, c, t, over) => { paint(X, Y, c, t, over); paint(mir(X), Y, c, t, over); };
     const Ye = 2 * C.eyeY + 1, eL = bL - 2;      // the eye row; the left iris's column (the eye: eL − 1 … eL + 1)
     const LASH = 0x2A1D1C, PINK = 0xFF7E86;
+    // ---- u-worlds3 · a native's own face (friendly, cartoon-warm, our own designs) instead of a person's: no brows, no
+    // nose, no lips — the Wellari's big round eyes and a small smile with gill marks, the Dunelin's amber eyes with a
+    // slit pupil and the nose pad on the muzzle, the Glutani's glowing ember eyes under a rock brow, the Regoli's huge
+    // glinting eyes and a little round mouth with rosy dots, the Nivari's almond ice-blue eyes with frost lashes and a
+    // rose crystal on the brow. The lids close what the eyes cover; the mouth darkens before its line.
+    if (C.species) {
+      const sp = C.species, O = TG.other, EY = TG.eye, HR = TG.hair, fc = C.featC || 0xffffff, SKE = (c, t) => (SK(c, t) | (1 << 24)) >>> 0;
+      const eyeAt2 = [], mouthAt = [];
+      const put = (X, Y, c, t, em, list) => { const Z = frontZ(X, Y); if (Z === null) return; F.c[idx(F, X, Y, Z)] = em ? SKE(c, t) : SK(c, t); if (list) list.push([X, Y, Z]); };
+      const pair = (X, Y, c, t, em, list) => { put(X, Y, c, t, em, list); put(mir(X), Y, c, t, em, list); };
+      // an eye round (cx, cy) with radii rx, ry: col(u, v) gives the colour at the offsets (−1 … 1), the eye stays left of
+      // the bridge (X ≤ eL + 1) — the right one mirrored
+      const eye = (cx, cy, rx, ry, col, em) => {
+        for (let Y = Math.floor(cy - ry); Y <= Math.ceil(cy + ry); Y++) for (let X = Math.floor(cx - rx); X <= Math.min(eL + 1, Math.ceil(cx + rx)); X++) {
+          const u = (X - cx) / rx, v = (Y - cy) / ry; if (u * u + v * v > 1.05) continue;
+          const c = col(u, v); if (c === null) continue;
+          pair(X, Y, c, EY, em && em(u, v), eyeAt2);
+        }
+      };
+      const dark = 0x0E1018, glint = 0xFFFFFF;
+      let mouthY = Ye - 5;
+      if (sp === 'aqua') {
+        const ir = mix(C.eye, 0x0A0806, 0.45), rim = mix(C.eye, fc, 0.5);
+        eye(eL - 0.5, Ye - 0.5, 2.15, 2.15, (u, v) => (u < -0.25 && v > 0.25 && u > -0.8 ? glint : u * u + v * v > 0.62 ? rim : ir));
+        for (const X of [bL - 1, bL]) pair(X, Ye - 5, mul(skin, 0.5), O, 0, mouthAt);
+        pair(bL - 2, Ye - 4, mul(skin, 0.6), O);
+        for (const Y of [Ye - 3, Ye - 4]) pair(eL - 3, Y, mix(skin, fc, 0.55), O);
+        pair(eL - 2, Ye - 4, mix(skin, fc, 0.4), O);
+      } else if (sp === 'ocker') {
+        const amber = mix(0xE8A030, C.eye, 0.2);
+        eye(eL - 0.5, Ye, 2.1, 1.35, (u) => (Math.abs(u) < 0.3 ? dark : u < -0.6 ? mix(amber, 0xFFF0C0, 0.5) : amber));
+        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 2, mix(skin, 0x3A2010, 0.55), HR);
+        pair(eL - 3, Ye + 2, mix(skin, 0x3A2010, 0.35), HR);
+        // the nose pad on the muzzle's front, the mouth under it
+        for (const Y of [Ye - 2, Ye - 3]) pair(bL, Y, 0x2A1A14, O);
+        pair(bL, Ye - 5, mul(skin, 0.45), O, 0, mouthAt); pair(bL - 1, Ye - 4, mul(skin, 0.55), O);
+        mouthY = Ye - 5;
+      } else if (sp === 'zinn') {
+        const ember = mix(fc, 0xFFFFFF, 0.3), brow = mul(skin, 0.62);
+        for (let X = eL - 3; X <= eL + 1; X++) pair(X, Ye + 2, brow, O);
+        eye(eL - 0.5, Ye - 0.3, 2.1, 1.35, (u, v) => (Math.abs(u) < 0.3 && Math.abs(v) < 0.5 ? 0x2A0A04 : v > 0.35 && u < 0 ? mix(ember, 0xFFFFFF, 0.6) : ember), (u, v) => !(Math.abs(u) < 0.3 && Math.abs(v) < 0.5));
+        for (let X = bL - 2; X <= bL; X++) pair(X, Ye - 5, X === bL ? mix(fc, 0x401000, 0.5) : mul(skin, 0.45), O, 0, mouthAt);
+        pair(bL - 3, Ye - 4, mul(skin, 0.55), O);
+      } else if (sp === 'basalt') {
+        const ir = mix(C.eye, 0x101828, 0.3);
+        eye(eL - 0.5, Ye - 0.5, 2.7, 2.7, (u, v) => (u < -0.15 && u > -0.75 && v > 0.15 && v < 0.75 ? glint : (u > 0.25 && u < 0.7 && v < -0.3 && v > -0.75) ? mix(ir, 0xBFE6FF, 0.6) : ir), (u, v) => u < -0.15 && v > 0.15 && u > -0.75 && v < 0.75);
+        pair(bL, Ye - 5, 0x3A1E24, O, 0, mouthAt); pair(bL, Ye - 6, mul(skin, 0.6), O);
+        for (const X of [eL - 2, eL - 1]) pair(X, Ye - 4, mix(skin, 0xFF7E86, 0.45), O);
+        mouthY = Ye - 5;
+      } else {
+        const ice = mix(0x9FD8FF, C.eye, 0.25), lash = 0xE8F6FF;
+        eye(eL - 0.5, Ye - 0.5, 2.1, 1.1, (u) => (Math.abs(u + 0.1) < 0.25 ? mix(ice, 0x101828, 0.75) : Math.abs(u) < 0.6 ? ice : 0xF4F8FC));
+        for (let X = eL - 2; X <= eL + 1; X++) pair(X, Ye + 1, lash, HR);
+        pair(eL - 3, Ye + 2, lash, HR);
+        for (const X of [bL]) for (const Y of [Ye + 3, Ye + 4]) pair(X, Y, 0xF4A0C8, O, 1);
+        pair(bL, Ye - 5, mix(skin, 0x5A6AA0, 0.55), O, 0, mouthAt);
+        for (const [X, Y] of [[eL - 2, Ye - 3], [eL - 1, Ye - 4], [eL - 3, Ye - 4]]) pair(X, Y, mix(skin, 0xFFFFFF, 0.45), O);
+      }
+      const lids = grid(), mouth = grid();
+      for (const [X, Y, Z] of eyeAt2) fset(lids, X, Y, Z - 1, mul(skin, 0.9));
+      for (const [X, Y, Z] of mouthAt) { fset(mouth, X, Y, Z - 1, 0x3A1418); fset(mouth, X, Y - 1, Z - 1, 0x3A1418); }
+      const hu = (X) => (X + 0.5) / 2;
+      F.face = { kind: sp, eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / 2, mouthX: (bL + 1) / 2, mouthY: (mouthY + 1) / 2 + 0.25, noseY: (Ye - 2) / 2 + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2) };
+      return { head: F, lids, mouth };
+    }
     // the eyes: the white, the iris, the white, in the face's plane (sunk a voxel into a socket they went dark whenever
     // the light came from behind: the socket's occlusion and its shadow — in the game the eyes read as slits); the iris dark
     // enough to read on every skin, the outer white a shade greyer (the eye's round). The lids close them from before
@@ -874,9 +978,13 @@
     // skin — a clear line under dark hair, a faint one under fair hair: a solid hair voxel there read as a second, bigger
     // eye on the smooth face
     const brow = mix(skin, elder ? mix(hc, 0xE0E0E0, 0.3) : mul(hc, 0.7), elder ? 0.32 : 0.45);
-    for (const ex of A.eyes) { head.del(ex, eyeY, A.z0); head.set(ex, eyeY, A.z0 + 1, iris, 0, TG.eye); F(ex, eyeY + 1, brow, TG.skin); }
+    // (u-worlds3: a native has no person's brows, nose and lips — a soft mouth line of the species instead, skin-tagged:
+    // the smooth path wipes it and draws the species' own face, fineFace)
+    const SPF = !!(L.species && !L.hero);
+    for (const ex of A.eyes) { head.del(ex, eyeY, A.z0); head.set(ex, eyeY, A.z0 + 1, iris, 0, TG.eye); if (!SPF) F(ex, eyeY + 1, brow, TG.skin); }
     // the nose stands out a voxel (the child's is small: a shade only), the lips, the chin
-    if (!kid) { head.set(0, 2, A.z0 - 1, mul(skin, 1.02), 0, TG.skin); F(0, my, mix(skin, LIP, 0.85)); F(-1, my, mix(skin, LIP, 0.4)); F(1, my, mix(skin, LIP, 0.4)); }
+    if (SPF) { const mc = mul(skin, 0.6); if (L.species === 'basalt') F(0, my, mc); else if (L.species !== 'ocker') { F(-1, my, mc); F(0, my, mc); F(1, my, mul(skin, 0.7)); } }
+    else if (!kid) { head.set(0, 2, A.z0 - 1, mul(skin, 1.02), 0, TG.skin); F(0, my, mix(skin, LIP, 0.85)); F(-1, my, mix(skin, LIP, 0.4)); F(1, my, mix(skin, LIP, 0.4)); }
     else { F(-1, 2, mul(skin, 0.98)); F(0, 2, mul(skin, 0.98)); F(-1, my, mix(skin, LIP, 0.6)); F(0, my, mix(skin, LIP, 0.6)); }
     // cheeks, freckles, an elder's lines
     const pink = 0xFF7E86;
@@ -1364,6 +1472,7 @@
         P.ell(-1.5, 3.6, 2.5, 1.4, 0.5, 1.4, 0xF4F2EC, null, TG.other); P.box(-2, 4, 2, -1, 5, 3, 0xF4F2EC); P.set(0, 5, 2, 0xF4F2EC);
         P.tray = true;
       }
+      else if (speciesItem((x, y, z, c, e) => P.set(x, y, z, c, e, TG.other), t, 0, -2)) { /* u-worlds3 */ }
       else if (t === 'cane') {
         // (the crook over the fist, the stick straight down to the floor: as long as the grip stands over it at rest)
         const len = Math.round(caneLen);
@@ -1446,7 +1555,7 @@
     const hipY = S.hip, headY = S.head + (SPB && SPB.neck || 0), shY = S.sh, hx = S.hx;
     const legXl = -S.legX - (kid ? 0 : 0), legXr = S.legX;
     // (the smooth path: the head, its lids and its talking mouth at 64 a block — fineFace)
-    const fine = opts && opts.fine ? fineFace({ head: head.g, A, eyeY, skin, hair: hc, eye: L.eye, kid, elder, beard: !!(L.beard && !kid), glasses, frame: frameC, freckles: !!L.freckles, lashes: !!L.lashes, bald }) : null;
+    const fine = opts && opts.fine ? fineFace({ head: head.g, A, eyeY, skin, hair: hc, eye: L.eye, kid, elder, beard: !!(L.beard && !kid), glasses, frame: frameC, freckles: !!L.freckles, lashes: !!L.lashes, bald, species: SPB ? L.species : null, featC: L.featC || 0xffffff }) : null;
     const def = {
       // stride: the largest swing of a thigh (rad) the outfit allows — a robe's or a coat's legs stay inside its hem
       unit: 32, h: kid ? 1.1 : 1.8, w: 0.3, gait: 'biped', kid, eyeY, person: true, fam, stride: STRIDE[fam] || 0.6,

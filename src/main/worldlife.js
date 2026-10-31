@@ -113,6 +113,7 @@
     L.shirt = Lk.garb[r(33) % Lk.garb.length]; L.pants = Lk.garb[(r(34) + 2) % Lk.garb.length]; L.dressCol = Lk.garb[r(35) % Lk.garb.length]; L.dress = false;
     if (L.garb === 'cape') L.cape = Lk.garb[(r(37) + 1) % Lk.garb.length];
     L.trim = L.featC; L.town = 'sp';
+    if (age !== 'child' && Folk.SPECIES_TOOL) L.tool = Folk.SPECIES_TOOL[kind];   // u-worlds3: the species' own thing in the hand
     return L;
   };
 
