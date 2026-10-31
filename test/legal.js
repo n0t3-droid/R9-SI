@@ -122,7 +122,7 @@ check(!/<[a-z][^>]*>/i.test(all), 'the copied text has no HTML');
 console.log('7 · bundled into the game and the Studio');
 const bj = read('build.js');
 check(/src\/main\/legal\.js/.test(bj) && /src\/ui\/legal\.css/.test(bj), 'build.js reads src/main/legal.js and src/ui/legal.css');
-check(/\$\{legal\}\s*\n<script>\$\{guard\(mainSrc\)\}<\/script>/.test(bj) && /<script>\$\{guard\(studioLibs\)\}<\/script>\s*\n\$\{legal\}/.test(bj), 'in the game before its own scripts (its Esc comes first), in the Studio after the libraries');
+check(/\$\{legal\}\s*\n<script(?: id=\"r9-shared\")?>\$\{guard\((?:mainSrc|shared)\)\}<\/script>/.test(bj) && /<script>\$\{guard\(studioLibs\)\}<\/script>\s*\n\$\{legal\}/.test(bj), 'in the game before its own scripts (its Esc comes first), in the Studio after the libraries');
 
 console.log('8 · the share hint at every export (one line, no dialog)');
 const br = read('src/studio/bridge.js'), wb = read('src/studio/workbench.js'), crf = read('src/studio/crafter.js');

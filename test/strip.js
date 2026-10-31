@@ -17,8 +17,9 @@ const ROOT = path.join(__dirname, '..');
 if (process.argv[2] === '--forge') {
   const html = fs.readFileSync(process.argv[3], 'utf8');
   const m = /<script type="text\/js-worker" id="worker-src">([\s\S]*?)<\/script>/.exec(html);
+  const sh = /<script id="r9-shared">([\s\S]*?)<\/script>/.exec(html);   // (f-slim: the shared code once, before the worker's own part)
   globalThis.self = globalThis; let last = null; globalThis.postMessage = (x) => { last = x; };
-  (0, eval)(m[1].replace(/<\\\/script/gi, '</script'));
+  (0, eval)(((sh ? sh[1] + '\n' : '') + m[1]).replace(/<\\\/script/gi, '</script'));
   self.onmessage({ data: { type: 'textures', id: 1, bevel: 1, bevelAll: true } });
   const h = crypto.createHash('sha256');
   for (const a of [...last.albedo, ...last.material, last.avgColor, last.noise]) h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength));
@@ -268,8 +269,8 @@ const scriptsOf = (html) => [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/scr
     check(lines(dbg) === lines(idx), `the same line count (${lines(idx)}): an error's line in the player page is the line in the debug page`);
     check(/\/\/ /.test(scriptsOf(dbg).join('\n')) && !/^\s*\/\/ /m.test(scriptsOf(idx).join('\n')), 'the debug page keeps the comments, the player page has no comment line left');
     const size = fs.statSync(path.join(DIST, 'index.html')).size, dsize = fs.statSync(path.join(DIST, 'index.debug.html')).size;
-    // (v0.54.5: 9.0 → 9.3 MB while the f-slim front cuts the page back; raise again only with a reason)
-    check(size <= 9300000, `dist/index.html ${(size / 1e6).toFixed(2)} MB ≤ 9.3 MB (debug ${(dsize / 1e6).toFixed(2)} MB, −${((1 - size / dsize) * 100).toFixed(1)} %)`);
+    // (v0.54.5: 9.0 → 9.3 MB for a while; f-slim: the shared code once in the page — back to 9.0 MB; raise only with a reason)
+    check(size <= 9000000, `dist/index.html ${(size / 1e6).toFixed(2)} MB ≤ 9.0 MB (debug ${(dsize / 1e6).toFixed(2)} MB, −${((1 - size / dsize) * 100).toFixed(1)} %)`);
     for (const f of ['index.html', 'artifact.html', 'studio.html', 'studio_artifact.html']) {
       const html = fs.readFileSync(path.join(DIST, f), 'utf8'), S = scriptsOf(html), errs = [];
       S.forEach((s, i) => { try { new vm.Script(s.replace(/<\\\/script/gi, '<\\/script'), { filename: f + '#' + i }); } catch (e) { errs.push(i + ': ' + e.message); } });

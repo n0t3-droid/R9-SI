@@ -69,7 +69,10 @@ const shared = js('shared', SHARED);
 const WORKER_MAIN = ['voxmodels', 'villagers', 'folkmodel'];
 // (t-material · hero textures: the texture modules are kept as one function, VR.TEX_MODS, run once here as before — the
 // hero forge, tex_hi.js, runs them again on a namespace of its own with VR.TEX_N = 64)
-const workerSrc = shared + '\nVR.TEX_MODS = function (VR) {\n' + js('main', TEX) + '\n};\nVR.TEX_MODS(VR);\n' + js('main', WORKER_MAIN) + '\n' + read('src/worker/worker_main.js');
+// (f-slim, R55-06) the shared code is in the game page once: a script of its own (id="r9-shared", run on the main
+// thread) whose text the worker pool puts before the worker's own part (game.js makePool) — before, the page carried
+// it twice, once in the worker's text and once in the main script (−2 MB). workerOwn is the worker's part after the shared code.
+const workerOwn = '\nVR.TEX_MODS = function (VR) {\n' + js('main', TEX) + '\n};\nVR.TEX_MODS(VR);\n' + js('main', WORKER_MAIN) + '\n' + read('src/worker/worker_main.js');
 // the texture cache's key (tex_cache.js): a hash of the worker's bundle (the shared code the block registry and the
 // recipes come from, the recipes, the forge) and of the cache itself. Any change there forges the textures again, once;
 // a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
@@ -82,7 +85,7 @@ const uiShared = js('main', LANG) + '\n' + js('shared', UI_SHARED);
 // the browser parses lazily: nothing runs on a start that never opens the wizard); the block colours read the game's textures
 const GENIE_LAZY = ['colors', 'housekit', 'genie_brain', 'genie'];
 const genieLazy = `VR.GenieLazy = function () {\n  if (VR.GenieLazy.done) return !!VR.GenieBrain; VR.GenieLazy.done = true;\n  if (!window.__studioCore) window.__r9TexHost = { texInfo: function () { var t = VR.game && VR.game.tex; return t && t.albedo ? t : null; } };\n  try {\n${js('studio', GENIE_LAZY)}\n  } catch (e) { console.warn('Genie', e); }\n  return !!VR.GenieBrain;\n};\n`;
-const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('main', MAIN) + '\n' + genieLazy + `
+const mainOwn = js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('main', MAIN) + '\n' + genieLazy + `
 window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.game.boot(); } catch (e) { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:fixed;top:0;left:0;z-index:99">' + (e && e.stack || e) + '</pre>'); } });
 `;
 const uiCss = ['start', 'bauhand', 'wizard', 'controls', 'invent'].filter(f => exists('src/ui/' + f + '.css')).map(f => read('src/ui/' + f + '.css')).join('\n');   // (W1 + W2 + F5: both pages)
@@ -95,9 +98,10 @@ const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embe
 // (VR.Legal.open(section)); in the game before its own scripts, so its Esc comes first
 const legal = `<style>${read('src/ui/legal.css')}</style>\n<script>${guard(read('src/main/legal.js'))}</script>`;
 const body = `<div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"></div></div>
-<script type="text/js-worker" id="worker-src">${guard(workerSrc)}</script>
+<script type="text/js-worker" id="worker-src">${guard(workerOwn)}</script>
 ${legal}
-<script>${guard(mainSrc)}</script>`;
+<script id="r9-shared">${guard(shared)}</script>
+<script>${guard(mainOwn)}</script>`;
 const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>R9-SI</title>${fonts}<style>${css}\n${uxCss}</style>`;
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 // (f-build, R50-09) the player pages go out without comments and indentation — src/build/strip.js, test/strip.js — and

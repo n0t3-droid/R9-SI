@@ -458,7 +458,9 @@
     // between the frames (loadPump)
     makePool() {
       const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
-      const src = document.getElementById('worker-src').textContent;
+      // (f-slim: the shared code is the page's own script r9-shared, once — the worker's text goes after it; build.js)
+      const sh = document.getElementById('r9-shared');
+      const src = (sh ? sh.textContent + '\n' : '') + document.getElementById('worker-src').textContent;
       const pool = new VR.WorkerPool(src, n);
       pool.maxInflight = 2;
       pool.onAnswer = () => this.loadPump();
