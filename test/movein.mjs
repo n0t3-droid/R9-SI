@@ -100,7 +100,7 @@ const build = (spec) => ev((spec) => {
   set(cx - 2, y0, cz - 1, bt.state({ facing: 0, part: 0 })); set(cx - 2, y0, cz - 2, bt.state({ facing: 0, part: 1 }));
   if (spec.bed2) { set(cx - 1, y0, cz - 1, bt.state({ facing: 0, part: 0 })); set(cx - 1, y0, cz - 2, bt.state({ facing: 0, part: 1 })); }
   set(cx + 2, y0, cz - 2, st('vx_chair'));
-  set(cx + 2, y0 + 2, cz + 2, st('torch'));
+  set(cx + 2, y0, cz + 2, st('lantern'));   // (a torch in the air falls off: the lantern stands on the floor)
   return { c: [cx, y0, cz], door: [cx, y0, cz + 3], bed: [cx - 2, y0, cz - 1] };
 }, spec);
 const H1 = await build({ c: [far[0], far[1]], bed2: true });
@@ -109,6 +109,7 @@ await step(80, 33);
 let D = await dbg();
 check(D.homes.length === 1 && D.homes[0].st === 'wait', 'it is noticed as a home, waiting for dawn: ' + JSON.stringify(D.homes));
 run.d1 = D;
+if (!D.homes.length) { console.log('  DEBUG ' + JSON.stringify({ watch: D.watch, why: D.why })); console.log(logs.slice(0, 12).join('\n')); await browser.close(); console.log('FAILED ' + fails); process.exit(1); }
 // ---------------------------------------------------------------- sleep to dawn
 const day0 = await ev(() => VR.game.env.day || 0);
 await ev((b) => { const g = VR.game; g.env.setTime(15000); if (g.sleep) g.sleep(b[0], b[1], b[2]); else { g.env.setTime(0); g.env.day = (g.env.day || 0) + 1; } }, H1.bed);
@@ -139,7 +140,7 @@ for (let i = 0; i < 260; i++) {
 check(sawJob, 'at dawn the family comes up the way: ' + JSON.stringify((arrived || D).agents.map(a => a.slice(0, 3))));
 check(!!pics.arrive, 'the arrival is pictured');
 check(!!greet, 'they greet you by your name: ' + greet);
-check(!!arrived && arrived.homes[0].st === 'home' && arrived.agents.length >= 2, 'they moved in (' + (arrived ? arrived.agents.length : 0) + ' people)');
+check(!!arrived && arrived.homes[0] && arrived.homes[0].st === 'home' && arrived.agents.length >= 2, 'they moved in (' + (arrived ? arrived.agents.length : 0) + ' people)');
 run.arrived = arrived;
 // the first-time Kreativ prompt
 D = await dbg();
@@ -149,9 +150,10 @@ await shotDom('ask', 'movein_ask.png');
 await page.click('#mi_card button').catch(() => ev(() => VR.MoveIn.answerDecor(VR.game, true)));
 await step(10, 33);
 const after = await ev((H) => { const w = VR.game.world, out = []; for (let x = H.c[0] - 3; x <= H.c[0] + 3; x++) for (let y = H.c[1] - 1; y <= H.c[1] + 5; y++) for (let z = H.c[2] - 3; z <= H.c[2] + 3; z++) out.push(w.getBlock(x, y, z)); return out; }, H1);
-let changed = 0, overwrote = 0; for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) { changed++; if (before[i] !== 0) overwrote++; }
+const isDoor = await ev(() => { const R = VR.R, out = {}; for (let s = 1; s < R.T.type.length; s++) { const t = R.types[R.T.type[s]]; if (t && t.o && t.o.kind === 'door') out[s] = 1; } return out; });
+let changed = 0, overwrote = 0; for (let i = 0; i < before.length; i++) if (before[i] !== after[i] && !(isDoor[before[i]] && isDoor[after[i]])) { changed++; if (before[i] !== 0) overwrote++; }
 D = await dbg();
-check(D.decor === true && D.homes[0].decor > 0 && changed === D.homes[0].decor, `Ja: they decorate a little (${D.homes[0].decor} pieces, ${changed} cells changed)`);
+check(D.homes[0] && D.decor === true && D.homes[0].decor > 0 && changed === D.homes[0].decor, `Ja: they decorate a little (${D.homes[0].decor} pieces, ${changed} cells changed)`);
 check(overwrote === 0, 'not one of your blocks was replaced');
 // inside
 await stand([H1.c[0] + 1.5, H1.c[1] + 0.2, H1.c[2] + 2.2], [H1.c[0] - 1.5, H1.c[1] + 0.6, H1.c[2] - 2.5]);

@@ -283,6 +283,7 @@
       set.x = pz.x; set.y = pz.y; set.z = pz.z;
       V.addVillage(MI.planFor(set, rec, tierOf(g)));
       vil = V.known.get(set.id);
+      if (vil) vil.visited = true;   // your own settlement: no „Willkommen in …“ toast
     }
     return vil;
   };
@@ -373,6 +374,7 @@
       const a = M.watch[i]; if (!a[3]) continue; a[3] = 0;
       if (!MI.kindOf(R, get(a[0], a[1], a[2]))) { M.watch.splice(i, 1); continue; }
       const room = MI.detect(get, a[0], a[1], a[2], R);
+      M.lastWhy = room.ok ? 'ok' : room.why;
       if (!room.ok) { if (room.why && (M.hintT || 0) < V.time) { M.hintT = V.time + 25; note(g, T('g.mi.hint', { why: T('g.mi.why.' + room.why) }), 'mi:hint'); } continue; }
       M.watch.splice(i, 1);
       MI.register(V, room);
@@ -776,6 +778,7 @@
       homes: rec.homes.map(h => ({ st: h.st, due: h.due, set: h.set, fam: h.fam, decor: (h.decor || []).length, door: h.door, beds: h.beds.length })),
       sets: rec.sets.map(s => ({ id: s.id, name: s.name, named: s.named, market: s.market, stall: s.stall, fest: s.fest })),
       job: J ? { fam: J.fam, phases: J.agents.map(a => (a.act && a.act.type === 'arrive' ? a.act.phase : 'done')), cart: J.cart.map(v => +v.toFixed(1)) } : null,
+      watch: V && V._mi ? V._mi.watch.length : -1, why: V && V._mi ? V._mi.lastWhy || null : null,
       gifts: rec.gifts.slice(), mem: rec.mem, decor: rec.decor, card: hasDoc && document.getElementById('mi_card') ? document.getElementById('mi_card').textContent : null,
       agents: V ? V.agents.filter(a => a.vil.plan && a.vil.plan.mine).map(a => [a.p.name, a.vil.fams[a.p.fam].surname, a.p.role, a.act && a.act.type, a.pos.map(Math.round), a.bubble ? a.bubble.text : null]) : [],
     };
