@@ -100,7 +100,7 @@ console.log('c · the settlement');
 
 console.log('d · blocks and texts');
 {
-  const R = V.R, last = R.types.slice(-2).map(t => t.name).join(', ');
+  const R = V.R, last = R.types.filter(t => !/^stn_/.test(t.name)).slice(-2).map(t => t.name).join(', ');   // (u-stations: its two after them)
   check(last === 'ferry_dock, grow_lamp', 'the last blocks: ' + last);
   check(R.T.emit[R.byName.grow_lamp.defaultState] > 0 && R.T.emit[R.byName.ferry_dock.defaultState] > 0, 'the grow lamp and the dock glow');
   const path = require('path'), de = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'lang_de.js'), 'utf8'), en = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'lang_en.js'), 'utf8');

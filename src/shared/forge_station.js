@@ -43,7 +43,7 @@
     params: [{ k: 'k', label: 'Art', min: 0, max: 1, def: 0, names: ['Ringstation', 'Außenposten'] }],
     styles: [{ id: 'hell', name: 'Hell' }],
     lot: (P) => { const B = BOX[P.params.k ? 1 : 0]; return [B.sx, B.sz]; },
-    title: (P) => (P.params.k ? tx('g.fg.stnOutpost', null, 'Außenposten', 'Outpost') : tx('g.fg.stnRing', null, 'Ringstation', 'Ring station')),
+    title: (P) => (P.params.k ? tx('g.fg.stnOutpost', null, 'Außenposten', 'Outpost') : tx('g.fg.stnRing', null, 'Ringstation', 'Ringstation')),
     describe: (P) => (P.params.k ? [tx('g.fg.stnDeck2', null, 'Andockdeck, zwei Plätze', 'docking deck, two berths'), tx('g.fg.stnBunks', null, 'vier Kojen', 'four bunks')]
       : [tx('g.fg.stnHall', null, 'Panoramahalle', 'panorama hall'), tx('g.fg.stnDeck3', null, 'Andockdeck, drei Plätze', 'docking deck, three berths'), tx('g.fg.stnShop', null, 'Laden', 'shop'), tx('g.fg.stnCabins', null, 'acht Quartiere', 'eight cabins'), tx('g.fg.stnGarden', null, 'Hydrogarten', 'hydro garden')]),
   }, function (P) {

@@ -39,7 +39,7 @@
   STN.GATES = [1000, 750, 500, 250, 100];   // m: the guide frames on the corridor
   STN.MAST = 92;               // m: the beacon at the mast's top over the ring's middle
   STN.LIST = {
-    ring: { id: 'ring', dim: 'stn.ring', body: 'herz', kind: 0, decks: 4, name: ['g.stn.ring', 'Ringstation', 'Ring Station'] },
+    ring: { id: 'ring', dim: 'stn.ring', body: 'herz', kind: 0, decks: 4, name: ['g.stn.ring', 'Ringstation', 'Ringstation'] },
     basalt: { id: 'basalt', dim: 'stn.basalt', body: 'basalt', kind: 1, decks: 1, alt: 3200, ph0: 0.6, name: ['g.stn.basalt', 'Außenposten Basalt', 'Basalt Outpost'] },
     opal: { id: 'opal', dim: 'stn.opal', body: 'opal', kind: 1, decks: 1, alt: 2400, ph0: 2.1, name: ['g.stn.opal', 'Außenposten Opal', 'Opal Outpost'] },
   };
@@ -240,5 +240,5 @@
   STN.keys = () => ['g.stn.ring', 'g.stn.basalt', 'g.stn.opal', 'g.dim.stnRing', 'g.dim.stnBasalt', 'g.dim.stnOpal', 'g.stn.dockGo', 'g.stn.corridor', 'g.stn.align', 'g.stn.clamp', 'g.stn.docked',
     'g.stn.tooFar', 'g.stn.undock', 'g.stn.undockGo', 'g.stn.site', 'g.stn.hud', 'g.stn.shop', 'g.stn.board', 'g.stn.jobs', 'g.stn.job.bring', 'g.stn.job.photo', 'g.stn.job.done', 'g.stn.job.need',
     'g.stn.job.take', 'g.stn.job.hand', 'g.stn.job.open', 'g.stn.welcome', 'g.stn.first', 'g.shop.name.station', 'g.set.stations', 'g.set.stations.tip', 'g.fg.stnRing', 'g.fg.stnOutpost', 'g.fg.stnHall',
-    'g.fg.stnDeck3', 'g.fg.stnDeck2', 'g.fg.stnShop', 'g.fg.stnCabins', 'g.fg.stnGarden', 'g.fg.stnBunks', 'g.stn.shuttle', 'g.stn.beacon'];
+    'g.fg.stnDeck3', 'g.fg.stnDeck2', 'g.fg.stnShop', 'g.fg.stnCabins', 'g.fg.stnGarden', 'g.fg.stnBunks', 'g.stn.shuttle', 'g.stn.beacon', 'g.stn.dockHint', 'g.stn.need'];
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

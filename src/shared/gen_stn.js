@@ -41,7 +41,7 @@
   }
   VR.StationGen2 = StationGen;
   const add = (id, name, veil) => D.add(id, { sky: true, code: 5, travel: true, mp: 'convoy', station: true, gen: (seed) => new StationGen(seed, id), name, veil });
-  add('stn.ring', ['g.dim.stnRing', 'Ringstation', 'Ring Station'], ['#eaf6ff', '#7fc8ff', '#0a1230']);
+  add('stn.ring', ['g.dim.stnRing', 'Ringstation', 'Ringstation'], ['#eaf6ff', '#7fc8ff', '#0a1230']);
   add('stn.basalt', ['g.dim.stnBasalt', 'Außenposten Basalt', 'Basalt Outpost'], ['#f1efe9', '#9b9892', '#0c0c11']);
   add('stn.opal', ['g.dim.stnOpal', 'Außenposten Opal', 'Opal Outpost'], ['#ffffff', '#cfe4f6', '#0f1a2e']);
 })(VR);
