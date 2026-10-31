@@ -280,6 +280,10 @@
   }
   function draw(J) {
     const t0 = now(), W = J.cv.width, H = J.cv.height;
+    // e-portal2: while the land loads under a 3-D last shot (a still picture), one space frame a second — the loading
+    // gets the frame's time (under SwiftShader a space frame cost seconds and the land came late)
+    if (J.t >= J.P.len && !J.arrived && J.P.gl && t0 - (J.holdT || 0) < 1000) return;
+    if (J.t >= J.P.len && !J.arrived) J.holdT = t0;
     J.P.draw(J.x, W, H, J.t); if (J.P.gl) J.glN = (J.glN || 0) + 1;
     glClass(!J.covered && J.P.gl);
     // the arrival waits for the land: a soft breathing light over the last look
