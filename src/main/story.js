@@ -1099,7 +1099,7 @@ body.storyon #storychoice { visibility: hidden !important; }
     // the far side first, then the sides, and only free floor near Echo's own height is taken)
     const ok = (x, z) => { const gy = sc.ground ? sc.ground(x, z) : null; if (gy === null || gy === undefined) return !sc.ground; return Math.abs(gy - E0[1]) < 1.6 && (!sc.free || (sc.free([x, gy + 0.5, z]) && sc.free([x, gy + 1.5, z]))); };
     const spots = [];
-    for (const R of [3.7, 4.3, 3.2]) for (const d of [0, -0.6, 0.6, -1.2, 1.2, -1.8, 1.8, -2.4, 2.4]) { if (spots.length >= 5) break; const a = a0 + d, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R; if (ok(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 1.6)) spots.push([x, z]); }
+    for (const R of [3.7, 4.3, 3.2]) for (const d of [-0.33, 0.33, -0.95, 0.95, 1.45, -1.45, 0, -2.2, 2.2]) {   /* (u-stations2: nobody straight behind Echo's light) */ if (spots.length >= 5) break; const a = a0 + d, x = E0[0] + Math.cos(a) * R, z = E0[2] + Math.sin(a) * R; if (ok(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 1.6)) spots.push([x, z]); }
     for (let j = 0; spots.length < 5 && j < 5; j++) { const a = a0 + (j - 2) * 0.62; spots.push([E0[0] + Math.cos(a) * 4.3, E0[2] + Math.sin(a) * 4.3]); }
     spots.sort((p0, p1) => Math.atan2(p0[1] - E0[2], p0[0] - E0[0]) - Math.atan2(p1[1] - E0[2], p1[0] - E0[0]));
     for (let i = 0; i < 5; i++) {
