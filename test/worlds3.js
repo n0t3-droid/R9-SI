@@ -99,6 +99,8 @@ if (part('c')) {
   // the hush: others near the player step back to 7–9 m
   const pl = [0, 0, 0], spot = N.hushSpot([2, 0, 1], pl);
   check(Math.hypot(spot[0], spot[2]) >= 7 && Math.hypot(spot[0], spot[2]) <= 9.01, 'the others make room (' + Math.hypot(spot[0], spot[2]).toFixed(1) + ' m)');
+  const pz0 = { x: 10, y: 64, z: 20 }, om = N.offMonument([11, 64, 21], pz0, 'basalt');
+  check(om && Math.abs(Math.hypot(om[0] - 10.5, om[1] - 20.5) - 4.5) < 0.01 && N.offMonument([11, 64, 21], pz0, 'opal') === null && N.offMonument([15, 64, 20], pz0, 'zinn') === null, 'someone stuck in the monument is put back on the ring');
   // the lang keys
   const miss = N.keys().filter(key => !(key in VR.I18N.dict.de) || !(key in VR.I18N.dict.en));
   check(miss.length === 0, 'the lang keys in both tables' + (miss.length ? ': ' + miss.slice(0, 5).join(', ') : ''));

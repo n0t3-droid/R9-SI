@@ -127,6 +127,15 @@
     if (d < 0.05) { dx = 1; dz = 0; } else { dx /= d; dz /= d; }
     return [pl[0] + dx * N.HUSH_D, pos[1], pl[2] + dz * N.HUSH_D];
   };
+  // someone inside the monument (a stuck villager is put back on its goal — the plaza's middle — in the monument's
+  // solid shell; the Nivari's vault has an open way under it): out on the ring, 4.5 m from the middle → [x, z] or null
+  N.offMonument = function (pos, pz, kind) {
+    if (kind === 'opal' || !pz) return null;
+    const cx = pz.x + 0.5, cz = pz.z + 0.5, dx = pos[0] - cx, dz = pos[2] - cz, d = Math.hypot(dx, dz);
+    if (d >= 2.4 || Math.abs(pos[1] - pz.y) > 3) return null;
+    const an = d > 0.05 ? Math.atan2(dz, dx) : 0.7;
+    return [cx + Math.cos(an) * 4.5, cz + Math.sin(an) * 4.5];
+  };
   // the quest's text for the talk panel
   N.status = function (meta, kind) {
     const r = N.rec(meta, kind), sp = T('g.eco.sp.' + kind), Q = N.CHAIN[kind];
@@ -220,6 +229,7 @@
       }
       // the plaza's ring: round the monument, not in it (4–6 m from the middle)
       const act = a.act, pz = vil.plan.plaza;
+      { const o = N.offMonument(a.pos, pz, kind); if (o) { a.pos[0] = o[0]; a.pos[2] = o[1]; a.pos[1] = pz.y; a.path = null; } }
       if (act && act.type === 'plaza' && act.spot && act.spot.length === 3 && pz) {
         const dx = act.spot[0] + 0.5 - (pz.x + 0.5), dz = act.spot[2] + 0.5 - (pz.z + 0.5), d = Math.hypot(dx, dz);
         if (d < 3.9) { const an = d > 0.1 ? Math.atan2(dz, dx) : (H(a.p.id) % 628) / 100, r = 4 + (H(a.p.id + 'r') % 20) / 10; act.spot[0] = Math.floor(pz.x + 0.5 + Math.cos(an) * r); act.spot[2] = Math.floor(pz.z + 0.5 + Math.sin(an) * r); }
