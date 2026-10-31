@@ -30,7 +30,7 @@
       this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false;
     }
     // the Heartland's own world: a generated (not flat) overworld of vgen 3 and up (quests.js heartOn)
-    static heartOn(g) { const m = g && g.meta; return !!(m && (m.vgen | 0) >= 3 && m.type !== 'flat' && (g.dim || 'overworld') === 'overworld'); }
+    static heartOn(g) { const m = g && g.meta; return !!g && (g.dim || 'overworld') === 'overworld' && (!m || ((m.vgen | 0) >= 3 && m.type !== 'flat')); }   // (no record: a test's stand-in game, the overworld)
     reset() { this.list.clear(); this.beacons.clear(); this.mists.clear(); this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false; }
     // the chunk's spawn records: the vents, beacons and mists among them (other kinds belong to other modules)
     absorb(spawns) {
