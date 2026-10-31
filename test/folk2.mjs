@@ -102,12 +102,21 @@ await settle(30);
 // ---------------------------------------------------------------- Herzwelt's nearest village
 let HV = null, HP = null;
 if (want('herz') || want('walk') || want('cost')) {
-  for (let i = 0; i < 40 && !HV; i++) { await step(20, 33); HV = await ev(() => { const g = VR.game, p = g.player.pos; let b = null, bd = 1e18; for (const s of g.villages.sites) { if (/^eco:/.test(s.id)) continue; const d = (s.x - p[0]) ** 2 + (s.z - p[2]) ** 2; if (d < bd) { bd = d; b = s; } } return b ? { id: b.id, x: b.x, y: b.y, z: b.z, name: b.name, d: Math.round(Math.sqrt(bd)) } : null; }); }
-  check(!!HV, `Herzwelt's nearest village ${HV ? HV.name + ' (' + HV.d + ' m)' : '-'}`);
-  if (HV) {
+  // (the towns that budget their people let the children go first: a village WITH children is looked for — the classic
+  // styles first, nearest first, up to three tried)
+  let list = null;
+  for (let i = 0; i < 40 && !(list && list.length); i++) { await step(20, 33); list = await ev(() => { const g = VR.game, p = g.player.pos; return g.villages.sites.filter(s => !/^eco:/.test(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y, z: s.z, name: s.name, style: s.style, d: Math.round(Math.hypot(s.x - p[0], s.z - p[2])) })).sort((a, b) => (/^(modern|tech|hall)$/.test(a.style) ? 1 : 0) - (/^(modern|tech|hall)$/.test(b.style) ? 1 : 0) || a.d - b.d).slice(0, 3); }); }
+  for (const cand of list || []) {
+    HV = cand; HP = null;
     await lookFrom([HV.x + 20, HV.y + 14, HV.z + 20], [HV.x, HV.y, HV.z]);
     await loaded([HV.x, HV.y, HV.z], 48); await settle(60);
     for (let i = 0; i < 40 && !HP; i++) { await step(20, 33); HP = await villageOf(HV.id); }
+    const kids = HP ? await ev((vid) => VR.game.villages.known.get(vid).agents.filter(a => a.kid).length, HV.id) : 0;
+    console.log(`  · ${HV.name} (${HV.style}, ${HV.d} m): ${HP ? HP.agents : 0} people, ${kids} children`);
+    if (HP && kids >= 2) break;
+  }
+  check(!!HV, `Herzwelt's village ${HV ? HV.name + ' (' + HV.d + ' m)' : '-'}`);
+  if (HV) {
     check(!!HP && HP.agents > 4, `${HV.name} lives (${HP ? HP.agents : 0} people about)`);
     await ev(() => { window.__rEvery = 10; VR.game.env.setTime(7000); });   // (the afternoon: the children out of school)   // (from here 1 frame in 10 drawn: the people's moments need them seen)
     await step(240, 33);   // the morning's walk out
@@ -176,7 +185,7 @@ if (want('herz') && HP) {
     sheet.push({ label: 'Herzwelt: the grandparent\'s story by the fire at dusk / the dance round the player', imgs: herzRows.splice(0) });
   } catch (e) { check(false, 'Herzwelt story/dance: ' + String(e && e.stack || e).slice(0, 300)); if (herzRows.length) sheet.push({ label: 'Herzwelt: story / dance', imgs: herzRows.splice(0).filter(Boolean) }); }
   try {
-    await step(600, 33);   // the dance ends (30 s)
+    await ev(() => { const D = VR.game.villages.joy && VR.game.villages.joy.dance; if (D) D.t = D.len + 1; }); await step(20, 33);   // the dance ends (its 30 s cut short)
     // a pet
     await ev(() => VR.game.env.setTime(3600));
     const pet = await ev(() => { const J = VR.game.villages.joy; const q = J && J.pets[0]; return q ? { kind: q.kind, pos: q.pos.slice(), owner: q.owner.p.name, n: J.pets.length } : null; });
@@ -298,7 +307,7 @@ for (const kind of (want('worlds') ? ['aqua', 'ocker'] : [])) {
     check(!!D && D.dancing >= 2, `${kind}: the natives dance round the player (${D ? D.dancing + ' of ' + D.n : 'no dance'})`);
     if (D) { await lookFrom([D.c[0] + 5.5, D.c[1] + 3.2, D.c[2] + 5.5], [D.c[0], D.c[1] + 0.9, D.c[2]]); await step(4, 33); row.push(await grab(`f2_${kind}_dance.png`)); }
     sheet.push({ label: `${kind}: a native in joy / dancing round the player`, imgs: row.filter(Boolean) });
-    await step(700, 33);
+    await ev(() => { const D = VR.game.villages.joy && VR.game.villages.joy.dance; if (D) D.t = D.len + 1; }); await step(20, 33);
   } catch (e) { check(false, kind + ': ' + String(e && e.stack || e).slice(0, 500)); }
   save(); writeSheet();
 }
