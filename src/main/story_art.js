@@ -331,7 +331,7 @@
   const glow = (c, x, y, r, col, a) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + col + ',' + a + ')'); g.addColorStop(1, 'rgba(' + col + ',0)'); c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r); };
   const ease = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
   // the arrow the beacons draw (normalised, on the planet below the window), lit one after another
-  Fx.ARROW = (() => { const out = []; for (let i = 0; i < 9; i++) out.push([0.22 + i * 0.055, 0.86 - i * 0.035]); for (let i = 1; i < 4; i++) { out.push([0.66 - i * 0.045, 0.545 + i * 0.012]); out.push([0.66 - i * 0.012, 0.545 + i * 0.05]); } return out; })();
+  Fx.ARROW = (() => { const out = []; for (let i = 0; i < 9; i++) out.push([0.26 + i * 0.045, 0.66 - i * 0.03]); for (let i = 1; i < 4; i++) { out.push([0.62 - i * 0.04, 0.42 + i * 0.006]); out.push([0.62 - i * 0.008, 0.42 + i * 0.045]); } return out; })();   // (on the planet's face in the window: the frame's middle band)
   Fx.draw = function (c, kind, t, u, w, h, o) {
     o = o || {}; const low = !!o.low, S0 = Math.min(w, h);
     c.clearRect(0, 0, w, h);
@@ -392,10 +392,11 @@
       glow(c, x, y, S0 * 0.14 * on, '90,230,255', 0.55); glow(c, x, y, S0 * 0.025, '230,255,255', on);
       c.strokeStyle = 'rgba(180,250,255,' + (0.6 * on) + ')'; c.lineWidth = Math.max(1, S0 * 0.003); c.beginPath(); c.moveTo(x - S0 * 0.1 * on, y); c.lineTo(x + S0 * 0.1 * on, y); c.moveTo(x, y - S0 * 0.06 * on); c.lineTo(x, y + S0 * 0.06 * on); c.stroke();
     } else if (kind === 'twin') {
-      const d = 0.06 + 0.02 * u, y = h * 0.22;
-      glow(c, w * (0.5 - d), y, S0 * 0.28, '255,190,90', 0.35); glow(c, w * (0.5 - d), y, S0 * 0.05, '255,245,215', 0.95);
-      glow(c, w * (0.5 + d), y + S0 * 0.02, S0 * 0.22, '255,130,80', 0.3); glow(c, w * (0.5 + d), y + S0 * 0.02, S0 * 0.038, '255,225,200', 0.9);
-      for (let i = 1; i <= (low ? 2 : 4); i++) glow(c, w * (0.5 - d) + (w * 0.5 - w * (0.5 - d)) * i * 0.6, y + (h * 0.6 - y) * i * 0.25, S0 * 0.02 * (1 + i * 0.4), '200,220,255', 0.12);   // (a soft flare toward the frame's middle)
+      // two suns' light: a gold wash from the upper left, a rose one from the upper right (the real suns are in the sky)
+      const k = 0.16 + 0.04 * Math.sin(t * 0.7);
+      let g0 = c.createRadialGradient(0, 0, 0, 0, 0, S0 * 1.3); g0.addColorStop(0, 'rgba(255,200,110,' + k + ')'); g0.addColorStop(1, 'rgba(255,200,110,0)'); c.fillStyle = g0; c.fillRect(0, 0, w, h);
+      g0 = c.createRadialGradient(w, 0, 0, w, 0, S0 * 1.1); g0.addColorStop(0, 'rgba(255,120,110,' + (k * 0.9) + ')'); g0.addColorStop(1, 'rgba(255,120,110,0)'); c.fillStyle = g0; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < (low ? 6 : 16); i++) { const q = fr(t * 0.05 + rnd(i, 12)), x = rnd(i, 13) * w, y = h * (0.2 + 0.7 * rnd(i, 14)) - q * h * 0.1; glow(c, x, y, S0 * 0.008, i % 2 ? '255,210,140' : '255,160,150', 0.5 * Math.sin(q * Math.PI)); }   // (dust in the two lights)
     } else if (kind === 'beam') {
       // the nebula (pink, violet, a teal edge) and the beam swinging to it from below
       const nx = w * 0.78, ny = h * 0.2;

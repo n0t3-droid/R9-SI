@@ -78,13 +78,13 @@
   // a-story3: the village near (villages.js's site list: the natives' villages on every world), the suns over it
   P.village = function (g) { const V = g.villages, p = g.player.pos; try { const n = V && V.nearestSite ? V.nearestSite(p[0], p[2]) : null; return n && n.site ? { s: n.site, d: n.dist } : null; } catch (e) { return null; } };
   const sunsC = new Map();
-  P.suns = function (dim) {
+  P.suns = function (dim, seed) {   // (the world's own neighbourhood of stars: starjump.js's hood, by the world's seed)
     const m = /^x\.(\d+)\./.exec(String(dim || '')); if (!m) return 1;
-    if (sunsC.has(dim)) return sunsC.get(dim);
-    let n = 1; try { const G = VR.Galaxy, N = G && (G.cur || (G.build && G.build(0))), st = N && N.list ? N.list[+m[1]] : null; n = st && st.bin && st.bin.close ? 2 : 1; } catch (e) { /* one sun */ }
-    sunsC.set(dim, n); return n;
+    const key = (seed >>> 0) + ':' + dim; if (sunsC.has(key)) return sunsC.get(key);
+    let n = 1; try { const G = VR.Galaxy, N = G && G.build ? G.build((seed >>> 0) || 0x5eed) : null, st = N && N.list ? N.list[+m[1]] : null; n = st && st.bin && st.bin.close ? 2 : 1; } catch (e) { /* one sun */ }
+    sunsC.set(key, n); return n;
   };
-  P.ctx3 = (g) => ({ suns: P.suns(g.dim) });
+  P.ctx3 = (g) => ({ suns: P.suns(g.dim, g.meta && g.meta.seed) });
 
   // a-story2: what the view sees for a deed (→ Story.actCheck): the angle and the distance to its target, the pitch, the
   // height, the moon, the eclipse, the ground (the frame's camera: on foot, in a ship, in the photo mode alike)
@@ -369,9 +369,11 @@
           return lookAt(C, [E2[0], E2[1] - 0.7, E2[2]], 36, base);   // (the eye on the upper third, its face and shoulders under it)
         }
         case 'window': {
-          // a-story3 · the Ringstation's window: from just behind the player's shoulder out into space, a slow push in
-          const C = [pe[0] - f[0] * (1.2 - 0.6 * smooth(u)), pe[1] + 0.25, pe[2] - f[2] * (1.2 - 0.6 * smooth(u))];
-          return lookAt(C, [pe[0] + f[0] * 40, pe[1] + 40 * Math.tan(-12 * DEG), pe[2] + f[2] * 40], 72 - 6 * smooth(u), base);
+          // a-story3 · the Ringstation's window: walked up close to the glass ahead (the first solid block along the view,
+          // stopped 1.6 m short; fixed at the scene's start), looking out over the planet; a slow push in
+          if (!sc.winC) { let d = 1; for (; d < 16; d += 0.5) if (!sc.free([e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d])) break; d = Math.max(0, d - 1.6); sc.winC = [e[0] + f[0] * d, e[1] + 0.2, e[2] + f[2] * d]; }
+          const W0 = sc.winC, C = [W0[0] - f[0] * 0.6 * (1 - smooth(u)), W0[1], W0[2] - f[2] * 0.6 * (1 - smooth(u))];
+          return lookAt(C, [C[0] + f[0] * 40, C[1] - 40 * Math.tan(6 * DEG), C[2] + f[2] * 40], 70 - 6 * smooth(u), base);
         }
         default: return null;
       }

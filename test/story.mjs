@@ -315,7 +315,7 @@ try {
       await ev((v) => { const p = VR.game.player; p.flying = true; p.safeTeleport(v.x + 30.5, 120, v.z + 24.5); }, v);
       for (let i = 0; i < 60; i++) { await run(4); await wait(250); if (await ev((v) => VR.game.world.isLoaded(Math.floor(v.x + 30), Math.floor(v.z + 24)) && !VR.game.player.hold, v)) break; }
       await ev((v) => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(v.x + 30), Math.floor(v.z + 24)) + 1; p.flying = false; p.teleport(v.x + 30.5, y, v.z + 24.5); window.__ft.aim([v.x, y + 2, v.z]); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, v);
-      await run(40);
+      await settle(14, 'the village');
       return v;
     };
     // 5 · Zinnober: the glass beacon's song
@@ -337,7 +337,8 @@ try {
       const r = await run(900, 33, 'choice');
       const cu = await ev(() => { const el = document.getElementById('storychoice'); return { up: VR.StoryPlay.choiceUp(VR.game), vis: !!el && el.style.display === 'flex', n: el ? el.querySelectorAll('button').length : 0 }; });
       check(r.hit && cu.up === 'c6' && cu.vis && cu.n === 2, 'the choice card on a calm screen after ' + (r.n * 0.033).toFixed(0) + ' s (' + JSON.stringify(cu) + ')');
-      await draw(4200); await shot('c6_choice');
+      for (let i = 0; i < 40 && await ev(() => { const a = document.getElementById('advup'); return !!a && a.offsetParent !== null && getComputedStyle(a).opacity !== '0'; }); i++) await run(30);   // (the level-up banner gone first: the card alone)
+      await draw(2600); await shot('c6_choice');
       await page.keyboard.press('Digit2'); await run(10);
       const ch = await ev(() => ({ c: VR.game.meta.story.choices, up: VR.StoryPlay.choiceUp(VR.game) }));
       check(ch.c && ch.c.c6 === 'lumi' && !ch.up, '[2]: Lumi comes along — kept in the world\'s record (' + JSON.stringify(ch) + ')');
@@ -350,7 +351,7 @@ try {
       check(st && st.fx === 'beacons' && /lumi/.test(st.who) && /anselm/.test(st.who), 'c7.b2: from the window the beacons draw an arrow; Lumi meets Opa Anselm');
     }
     // 8 · a close double star: two suns; the beam to the nebula
-    const bin = await ev(() => { const G = VR.Galaxy, N = G.cur || G.build(0); for (let i = 1; i < N.list.length; i++) { const st = N.list[i]; if (!st || !st.bin || !st.bin.close) continue; const sy = G.system(i), p = sy && sy.bodies.find(b => b.landable && !b.locked && /aqua|ocker|basalt/.test(b.dim || '')); if (p) return p.dim; } return null; });
+    const bin = await ev(() => { const G = VR.Galaxy, N = G.build((VR.game.meta.seed >>> 0) || 0x5eed); for (let i = 1; i < N.list.length; i++) { const st = N.list[i]; if (!st || !st.bin || !st.bin.close) continue; const sy = G.system(N, i), p = sy && sy.bodies.find(b => b.landable && !b.locked && /aqua|ocker|basalt/.test(b.dim || '')); if (p) return p.dim; } return null; });
     check(!!bin, 'a landable world of a close double star: ' + bin);
     if (bin && await trip(bin)) {
       await ev(() => VR.StoryPlay.debug.reach('c7.b3'));
@@ -359,7 +360,7 @@ try {
       await ev(() => { const g = VR.game, p = g.player, y = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; p.flying = false; p.teleport(p.pos[0], Math.max(y, p.pos[1]), p.pos[2]); p.pitch = 0; });
       await play('c7.b3', 8.0, 'c7_blink');
       await ev(() => VR.StoryPlay.debug.reach('c8.b1'));
-      const st = await play('c8.b1', 9.5, 'c8_twin');
+      const st = await play('c8.b1', 4.5, 'c8_twin');
       check(st && st.fx === 'twin' && /selkatun/.test(st.who), 'c8.b1: two suns, Selkatun of the Regoli');
       await ev(() => VR.StoryPlay.debug.reach('c8.b3'));
       const s3 = await play('c8.b3', 4.5, 'c8_beam');

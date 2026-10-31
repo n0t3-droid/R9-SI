@@ -118,7 +118,7 @@
       who: ['funke:surprised', 'anselm', 'funke:worried', 'funke:happy'], task: { kind: 'jump', target: 'binary' }, reward: { xp: 150 }, act: { kind: 'scan', target: 'sky', dim: ['x.*'], pitch: 25 } }),
     // 8 · Zwei Sonnen — the Regoli who stayed to wait; the answer, given by the helper you chose; the beam to the nebula
     B(8, 1, { when: { after: 'c7.b3', adv: true, dim: ['x.*'], suns: 2 },
-      scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'twin' }, { cam: 'up', target: 'sky', dur: 6, fx: 'twin', swell: true }, { cam: 'close', target: 'funke', dur: 5 }], music: 'wide' },
+      scene: { shots: [{ cam: 'wide', target: 'player', dur: 7, fx: 'twin' }, { cam: 'up', target: 'sky', dur: 6, swell: true }, { cam: 'close', target: 'funke', dur: 5 }], music: 'wide' },
       who: ['funke:surprised', 'selkatun:happy', 'selkatun'], task: { kind: 'go', target: 'village' }, reward: { xp: 120 }, act: { kind: 'look', target: 'village', dim: ['x.*'], max: 400, cone: 18, hold: 1.5 } }),
     BV(8, 2, { when: { after: 'c8.b1', adv: true, dim: ['x.*'], suns: 2 }, vary: 'c6',
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'song' }, { cam: 'orbit', target: 'player', dur: 6, fx: 'song', swell: true }, { cam: 'wide', target: 'vista', dur: 6, fx: 'twin' }], music: 'rise' },
