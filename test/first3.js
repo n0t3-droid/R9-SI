@@ -39,12 +39,30 @@ check(W && typeof W.murmFar === 'function' && typeof W.murmStart === 'function',
 if (W && W.murmFar) {
   check(W.murmStart(0, true) === 0 && W.murmStart(59, true) === 0 && W.murmStart(75, true) > 0 && W.murmStart(75, true) < 1 && W.murmStart(95, true) === 1, `a new world: none in the first minute, in over 30 s (${W.murmStart(75, true).toFixed(2)} at 75 s)`);
   check(W.murmStart(0, false) === 1, 'a world opened again: the flock as it is');
+  const now = 1.8e12;
+  check(W.freshWorld({ meta: { created: now - 70000, player: {} } }, now) && W.freshWorld({ f2new: true, meta: {} }, now) && !W.freshWorld({ meta: { created: now - 3600e3 } }, now) && !W.freshWorld({ meta: {} }, now) && !W.freshWorld(null, now), 'a fresh world: made within 5 minutes (meta.created) or no player record yet; an old one or none: not');
   check(W.murmFar(30) === 1 && W.murmFar(60) === 1 && W.murmFar(150) < 0.7 && W.murmFar(240) <= 0.25 && W.murmFar(600) <= 0.25, `from afar thinner: 1 · ${W.murmFar(150).toFixed(2)} · ${W.murmFar(240).toFixed(2)} at 60 · 150 · 240 m`);
   let mono = true; for (let d = 0; d < 400; d += 5) if (W.murmFar(d + 5) > W.murmFar(d) + 1e-12) mono = false;
   check(mono, 'murmFar never grows with the distance');
   // the darkest a far impostor can be: its depth capped, × the grain's 1.6 at most
   const aMax = 1 - Math.exp(-W.MURM_TAU_MAX * W.murmFar(260) * W.PUFF.grain[2]);
   check(W.MURM_TAU_MAX <= 1.6 && aMax < 0.45, `a far impostor covers the sky behind it by ${(aMax * 100).toFixed(0)} % at most (< 45 %; before: up to ${(100 * (1 - Math.exp(-W.puffTau(30, 1, 2, W.MURM_K, W.CAPS.murm[2]) * W.PUFF.grain[2]))).toFixed(0)} %)`);
+}
+
+// the actor itself: a world made just now at dusk — no flock in its first minute, a flock in its second; an old one at once
+{
+  for (const f of ['wildgpu', 'wildlife']) require(__dirname + '/../src/main/' + f + '.js');
+  const R = V.R, st = (n) => R.byName[n].defaultState, SEA = V.C.SEA, GRASS = st('grass_block'), STONE = st('stone'), WATER = st('water');
+  const lake = (x) => x >= 60;
+  const world = { getBlock: (x, y, z) => { y = Math.floor(y); if (lake(Math.floor(x))) return y <= 58 ? STONE : y <= SEA ? WATER : 0; return y < 80 ? STONE : y === 80 ? GRASS : 0; }, topAt: (x) => lake(Math.floor(x)) ? SEA : 80, isLoaded: () => true, getLight: () => 0xf000 };
+  const mk = (created) => { const S = { preset: 'high' }; for (const k of W.KEYS) S[k] = true; return { state: 'play', dim: 'overworld', settings: S, meta: { seed: 53, vgen: 11, type: 'default', created, player: {} }, time: 0,
+    env: { day: 4, ticks: 11300, get timeOfDay() { return ((this.ticks % 24000) + 24000) % 24000; }, E: { sunDir: [0.4, 0.1, -0.9], night: 0, rain: 0, snow: 0 } },
+    player: { pos: [56, 81, 0], vel: [0, 0, 0], yaw: 0 }, world, particles: { spawn() { return 0; } }, airLife: { noButterflies: false },
+    entities: { land: { anchors: new Map() }, beginVox: () => ({ u: {} }), drawModel() {}, lightAt: () => ({ sky: 1, bl: [0, 0, 0] }), sunShade: () => 0 } }; };
+  const run = (A, g, secs) => { for (let t = 0; t < secs; t += 0.1) { g.time += 0.1; g.env.ticks += 2; A.update(0.1); } };
+  const gN = mk(Date.now()), AN = new W.Actor(gN); run(AN, gN, 40); const at40 = !!AN.murm; run(AN, gN, 60); const at100 = !!AN.murm;
+  const gO = mk(Date.now() - 864e5), AO = new W.Actor(gO); run(AO, gO, 20);
+  check(!at40 && at100 && !!AO.murm, `a world made now: no flock at 40 s, a flock at 100 s (${at40} · ${at100}); a world made yesterday: a flock at once (${!!AO.murm})`);
 }
 
 // ---------------------------------------------------------------- 3 · the hand

@@ -268,7 +268,7 @@
       if (!(dt > 0)) return;
       dt = Math.min(dt, 0.1);
       this.live = true; this.time += dt;
-      if (this.ageW !== g.world) { this.ageW = g.world; this.age = 0; } this.age += dt;   // f-first3: the seconds played on this world (W.murmStart)
+      if (this.ageW !== g.world) { this.ageW = g.world; this.age = 0; this.fresh = W.freshWorld(g, Date.now()); } this.age += dt;   // f-first3: the seconds played on this world, and whether it was just made (W.murmStart)
       const clock = this.tick(dt), E = (g.env && g.env.E) || {}, tod = g.env ? g.env.timeOfDay : 6000, day = g.env ? (g.env.day | 0) : 0;
       const p = g.player.pos, eye = this.eye || (this.eye = [0, 0, 0]); eye[0] = p[0]; eye[1] = p[1] + 1.62; eye[2] = p[2];
       const sc = W.sched(this.seed, day, tod), wet = (E.rain || 0) > 0.15 || (E.snow || 0) > 0.15, cap = this.b.cap;
@@ -301,7 +301,7 @@
     updMurm(dt, ctx, n) {
       const g = this.g, ph = W.murmPhase(ctx.tod);
       if (!n || ph === 'off' || ctx.wet) { this.murm = null; return; }
-      this.murmK = W.murmStart(this.age || 0, !!g.f2new); if (this.murmK <= 0) { this.murm = null; return; }   // f-first3 (R55-03): not in a new world's first minute
+      this.murmK = W.murmStart(this.age || 0, !!this.fresh); if (this.murmK <= 0) { this.murm = null; return; }   // f-first3 (R55-03): not in a new world's first minute
       // the cycle: the dusk of a day and the dawn after it are one flock (after midnight it is still yesterday's)
       const t = ctx.tod, key = (t < 2000 ? ctx.day - 1 : ctx.day);
       let Mu = this.murm;
