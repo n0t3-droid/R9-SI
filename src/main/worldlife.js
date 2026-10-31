@@ -100,7 +100,13 @@
     L.eye = Lk.eye; L.feat = Lk.feat; L.featC = Lk.featC[r(32) % Lk.featC.length]; L.glow = !!Lk.glow;
     L.species = kind;
     // the garb in the species' colours (the trade's own tools stay)
-    if (!L.garb) { L.shirt = Lk.garb[r(33) % Lk.garb.length]; L.pants = Lk.garb[(r(34) + 2) % Lk.garb.length]; L.dressCol = Lk.garb[r(35) % Lk.garb.length]; }
+    // the garb: the species' own cut (a robe, a coat, a tunic, a gown, a cape — folkmodel.js's families) in its colours,
+    // the trims in the feature's colour; the children in tunics
+    const cut = Lk.cut || ['tunic'];
+    L.garb = age === 'child' ? null : cut[r(36) % cut.length];
+    L.shirt = Lk.garb[r(33) % Lk.garb.length]; L.pants = Lk.garb[(r(34) + 2) % Lk.garb.length]; L.dressCol = Lk.garb[r(35) % Lk.garb.length]; L.dress = false;
+    if (L.garb === 'cape') L.cape = Lk.garb[(r(37) + 1) % Lk.garb.length];
+    L.trim = L.featC; L.town = 'sp';
     return L;
   };
 

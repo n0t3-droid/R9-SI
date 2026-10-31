@@ -88,7 +88,7 @@ for (const dim of WORLDS) {
   if (!ok) continue;
   await ev(() => { const g = VR.game; g.env.setTime(5200); if (g.ui && g.ui.screen && g.ui.show) g.ui.show(null); });
   await settle(40);
-  const gr = await ev(() => ({ grav: VR.game.player.grav, real: VR.DimReg.gravity(VR.game.dim), kind: VR.WorldLife.kindOf(VR.game) }));
+  const gr = await ev(() => ({ grav: VR.game.player.grav || VR.DimReg.walkGravity(VR.game.dim), real: VR.DimReg.gravity(VR.game.dim), kind: VR.WorldLife.kindOf(VR.game) }));
   check(Math.abs(gr.grav - 30) < 1e-6 && gr.kind, `${dim}: Herzwelt's gravity (${gr.grav}; real ${gr.real.toFixed(2)}), the ecosystem ${gr.kind}`);
   const kind = gr.kind || dim.split('.').pop();
   // the landing's land
@@ -102,8 +102,10 @@ for (const dim of WORLDS) {
   for (let i = 0; i < 30; i++) { await step(20, 33); V = await ev((vid) => { const vil = VR.game.villages.sites.find(s => s.id === vid); return vil ? { x: vil.x, y: vil.y, z: vil.z, name: vil.name } : null; }, vid); if (V) break; await wait(200); }
   check(!!V, `${dim}: the village ${V ? V.name : '?'} on the map`);
   if (!V) continue;
-  await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 26, V.y + 14, V.z + 24); }, V);
-  await settle(40);
+  await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 22, V.y + 11, V.z + 20); }, V);
+  // (the village's columns loaded and meshed before the picture: the far land alone shows nothing of it)
+  for (let i = 0; i < 90; i++) { await step(10, 33); const ok = await ev((V) => { const w = VR.game.world; for (const dx of [-24, 0, 24]) for (const dz of [-24, 0, 24]) if (!w.isLoaded(V.x + dx, V.z + dz)) return false; return true; }, V); if (ok) break; await wait(300); }
+  await settle(60);
   let vs = null;
   for (let i = 0; i < 30; i++) { await step(20, 33); vs = await ev((vid) => { const v = VR.game.villages.known.get(vid); return v ? { active: v.active, agents: v.agents.length, homes: v.plan.homes.length, style: v.plan.style, people: v.people ? v.people.length : 0, name: v.name, first: v.people && v.people[0] ? v.people[0].name : '' } : null; }, vid); if (vs && vs.active && vs.agents > 0) break; await wait(150); }
   check(vs && vs.active && vs.agents >= 4 && vs.style === 'sp:' + kind, `${dim}: ${vs ? vs.name : '?'} — ${vs ? vs.homes : 0} homes, ${vs ? vs.agents : 0} people about (${vs ? vs.first : ''} …), style ${vs ? vs.style : ''}`);
@@ -111,7 +113,7 @@ for (const dim of WORLDS) {
   await step(30);
   const vshot = await grab(`world_${kind}${dim.startsWith('x.') ? '_exo' : ''}_village.png`);
   // a native up close
-  const nat = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); const a = v && v.agents.find(o => !o.kid && o.pose !== 'sleep') || (v && v.agents[0]); if (!a) return null; const p = g.player; const yaw = a.yaw || 0; p.flying = true; p.teleport(a.pos[0] - Math.sin(yaw) * 2.6, a.pos[1] + 0.2, a.pos[2] - Math.cos(yaw) * 2.6); a.freeze = 3; return { pos: a.pos.slice(), name: a.name, feat: a.p.look && a.p.look.feat, skin: a.p.look && a.p.look.skin }; }, vid);
+  const nat = await ev((vid) => { const g = VR.game, v = g.villages.known.get(vid); const P = v.plan; const far = (o) => Math.hypot(o.pos[0] - P.x, o.pos[2] - P.z); const ag = v ? v.agents.filter(o => !o.kid && o.pose !== 'sleep').sort((a, b) => far(b) - far(a)) : []; const a = ag[0] || (v && v.agents[0]); if (!a) return null; const p = g.player; const yaw = a.yaw || 0; p.flying = true; p.teleport(a.pos[0] - Math.sin(yaw) * 2.6, a.pos[1] + 0.2, a.pos[2] - Math.cos(yaw) * 2.6); a.freeze = 3; return { pos: a.pos.slice(), name: a.name, feat: a.p.look && a.p.look.feat, skin: a.p.look && a.p.look.skin }; }, vid);
   check(nat && nat.feat, `${dim}: a native, ${nat ? nat.name : '?'} (feature ${nat ? nat.feat : '-'})`);
   let nshot = null;
   if (nat) { await lookAt([nat.pos[0], nat.pos[1] + 1.4, nat.pos[2]]); await step(6); nshot = await grab(`world_${kind}${dim.startsWith('x.') ? '_exo' : ''}_native.png`); }
@@ -119,13 +121,14 @@ for (const dim of WORLDS) {
   const fa = await ev((kind) => {
     const g = VR.game, p = g.player, E = VR.WorldEco.KINDS[kind].fauna, out = [];
     for (const m of g.entities.mobs.slice()) if (m.def && m.def.eco) m.dead = true;
-    p.flying = true; const e = p.pos; const yaw = p.yaw;
-    E.forEach((f, i) => { const s = (i - (E.length - 1) / 2) * 2.2, fx = -Math.sin(yaw) * 5 + Math.cos(yaw) * s, fz = -Math.cos(yaw) * 5 - Math.sin(yaw) * s; const m = g.entities.summon(f.id, e[0] + fx, e[1] + 0.6 + (f.does === 'fly' ? 1.2 : 0), e[2] + fz); if (m) { m.alt = m.pos[1]; m.home = { x: m.pos[0] - 0.5, z: m.pos[2] - 0.5, r: 0.5 }; m.waterY = m.pos[1]; m.vel = [0, 0, 0]; out.push(f.id); } });
+    // (an open place 40 m off the plaza, the eye 2.5 m over the ground looking a little down; the creatures in a row 5 m ahead on the ground)
+    const v = g.villages.known.get('eco:' + kind + ':0'), P = v.plan, w = g.world; const ax = P.x + 40, az = P.z + 6; const gy = w.topAt(ax, az);
+    p.flying = true; p.teleport(ax + 0.5, gy + 1.6, az + 0.5); p.yaw = 0; p.pitch = -0.22; const e = p.pos; const yaw = 0;
+    E.forEach((f, i) => { const s = (i - (E.length - 1) / 2) * 2.4, fx = -Math.sin(yaw) * 5.5 + Math.cos(yaw) * s, fz = -Math.cos(yaw) * 5.5 - Math.sin(yaw) * s; const gx = Math.floor(e[0] + fx), gz = Math.floor(e[2] + fz), ty = w.topAt(gx, gz); const m = g.entities.summon(f.id, e[0] + fx, (f.does === 'fly' ? e[1] + 0.8 : ty + 1.05), e[2] + fz); if (m) { m.ai.t = 30; m.ai.state = 'idle'; } if (m) { m.alt = m.pos[1]; m.home = { x: m.pos[0] - 0.5, z: m.pos[2] - 0.5, r: 0.5 }; m.waterY = m.pos[1]; m.vel = [0, 0, 0]; out.push(f.id); } });
     return out;
   }, kind);
   check(fa.length >= 2, `${dim}: its creatures ${fa.join(', ')}`);
-  await ev(() => { const p = VR.game.player; p.pitch = 0.05; });
-  await step(4);
+  await step(3);
   const fshot = await grab(`world_${kind}${dim.startsWith('x.') ? '_exo' : ''}_fauna.png`);
   // the spawner keeps life round the player
   await ev(() => { for (const m of VR.game.entities.mobs) if (m.def && m.def.eco) m.dead = true; VR.WorldLife.st.t = 0; });

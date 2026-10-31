@@ -56,7 +56,7 @@
       ],
       species: {
         de: 'Wellari', en: 'Wellari',
-        look: { skin: [0x4fa8b8, 0x5cb8c0, 0x3e96a8, 0x6ac0c4], feat: 'fins', featC: [0x2a6a9a, 0x1f7a8a, 0x3a5aa8], garb: [0xf2eedc, 0xe8d8b0, 0xf0a890, 0xd86a5a, 0xf4f0f4, 0x7ad0c8], eye: 0x1a3a5a },
+        look: { skin: [0x4fa8b8, 0x5cb8c0, 0x3e96a8, 0x6ac0c4], cut: ['tunic', 'gown', 'tunic'], feat: 'fins', featC: [0x2a6a9a, 0x1f7a8a, 0x3a5aa8], garb: [0xf2eedc, 0xe8d8b0, 0xf0a890, 0xd86a5a, 0xf4f0f4, 0x7ad0c8], eye: 0x1a3a5a },
         kit: { shape: 'round', wall: 'calcite', band: 'cyan_terracotta', roof: 'dried_kelp_block', floor: 'bamboo_planks', fill: 'sandstone', window: 'light_blue_stained_glass', door: 'bamboo_door', bed: 'cyan_bed', light: 'tide_lantern', paving: 'smooth_quartz', lamp: 'vx_lamppost_crystal', canopy: 'cyan_wool', mark: 'tube_coral_block' },
         goods: ['dried_kelp_block', 'kelp', 'sea_pickle', 'tube_coral_block', 'brain_coral_block', 'sponge', 'tide_lantern', 'lily_pad'],
         syl: ['wa', 'li', 'nel', 'sa', 'ri', 'mo', 'thi', 'lu', 'na', 've', 'ar', 'io', 'ma', 'el', 'sha', 'ne'], end: ['i', 'a', 'el', 'en'],
@@ -89,7 +89,7 @@
       ],
       species: {
         de: 'Dunelin', en: 'Dunelin',
-        look: { skin: [0xc8783a, 0xb86a30, 0xd8904a, 0xa85e2c], feat: 'horns', featC: [0xf0e2c0, 0xd8c8a0, 0xe8d0a8], garb: [0xe8d8b8, 0x9a4a2a, 0x5a6a7a, 0xd8b060, 0x7a3a2a, 0x3a6a6a], eye: 0x2a1a10 },
+        look: { skin: [0xc85a2a, 0xb84e22, 0xd06a34, 0xa84a20], cut: ['robe', 'cape', 'robe'], feat: 'horns', featC: [0xf0e2c0, 0xd8c8a0, 0xe8d0a8], garb: [0xe8d8b8, 0x9a4a2a, 0x5a6a7a, 0xd8b060, 0x7a3a2a, 0x3a6a6a], eye: 0x2a1a10 },
         kit: { shape: 'terrace', wall: 'terracotta', band: 'red_sandstone', roof: 'smooth_red_sandstone', floor: 'acacia_planks', fill: 'red_sandstone', window: 'orange_stained_glass', door: 'acacia_door', bed: 'orange_bed', light: 'lantern', paving: 'smooth_red_sandstone', lamp: 'vx_lamppost_black', canopy: 'orange_wool', mark: 'amber_crystal_block' },
         goods: ['red_sand', 'terracotta', 'orange_terracotta', 'cactus', 'red_sandstone', 'amber_crystal_block', 'lantern', 'iron_ingot'],
         syl: ['du', 'ne', 'ka', 'ro', 'tes', 'ul', 'mar', 'ze', 'om', 'ra', 'bek', 'sim', 'ta', 'ho', 'gal', 'ir'], end: ['in', 'ek', 'a', 'ur'],
@@ -122,7 +122,7 @@
       ],
       species: {
         de: 'Glutani', en: 'Glutani',
-        look: { skin: [0x3a3036, 0x4a3a3a, 0x2e2830, 0x54403c], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
+        look: { skin: [0x3a3036, 0x4a3a3a, 0x2e2830, 0x54403c], cut: ['coat', 'robe', 'coat'], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
         kit: { shape: 'tower', wall: 'polished_basalt', band: 'sulfur_bricks', roof: 'amber_crystal_block', floor: 'crimson_planks', fill: 'basalt', window: 'yellow_stained_glass', door: 'crimson_door', bed: 'red_bed', light: 'spirit_lantern', paving: 'polished_sulfur', lamp: 'vx_lamppost_crystal', canopy: 'yellow_wool', mark: 'magma_block' },
         goods: ['sulfur', 'obsidian', 'magma_block', 'amber_crystal_block', 'polished_sulfur', 'glowing_obsidian', 'sulfur_bricks', 'gold_ingot'],
         syl: ['glu', 'ta', 'ni', 'ber', 'os', 'kai', 'rum', 'ze', 'fa', 'lo', 'tir', 'ga', 'van', 'ur', 'pe', 'sol'], end: ['an', 'i', 'or', 'et'],
@@ -153,7 +153,7 @@
       ],
       species: {
         de: 'Regoli', en: 'Regoli',
-        look: { skin: [0xb8bcc4, 0xa8acb8, 0xc8cad0, 0x9aa0ac], feat: 'antennae', featC: [0x7af0ff, 0xb0ff9a, 0xffe07a], garb: [0x3a4a6a, 0x6a7a9a, 0xe8e8f0, 0x2a3a4a, 0x8a5a9a], eye: 0x101828, glow: true },
+        look: { skin: [0x8a8cc0, 0x7a80b4, 0x9a98cc, 0x8484b8], cut: ['tunic', 'coat', 'tunic'], feat: 'antennae', featC: [0x7af0ff, 0xb0ff9a, 0xffe07a], garb: [0x3a4a6a, 0x6a7a9a, 0xe8e8f0, 0x2a3a4a, 0x8a5a9a], eye: 0x101828, glow: true },
         kit: { shape: 'dome', wall: 'polished_andesite', band: 'smooth_basalt', roof: 'vx_dome_glass', floor: 'smooth_stone', fill: 'andesite', window: 'vx_dome_glass', door: 'door_glass_white', bed: 'gray_bed', light: 'lantern', paving: 'polished_andesite', lamp: 'vx_lamppost_tech', canopy: 'gray_wool', mark: 'azure_crystal_block' },
         goods: ['regolith', 'basalt', 'smooth_basalt', 'azure_crystal_block', 'lantern', 'diorite', 'andesite', 'iron_ingot'],
         syl: ['re', 'go', 'li', 'mun', 'sel', 'ka', 'tor', 'vi', 'den', 'ul', 'pa', 'so', 'ren', 'ix', 'ma', 'thel'], end: ['i', 'o', 'un', 'is'],
@@ -185,7 +185,7 @@
       ],
       species: {
         de: 'Nivari', en: 'Nivari',
-        look: { skin: [0xe8f2fa, 0xd8e8f4, 0xf4f8fc, 0xc8dcec], feat: 'antlers', featC: [0x9ad8ff, 0xc8f0ff, 0x7ac0f0], garb: [0x2a4a7a, 0x7a2a4a, 0xe8e0d0, 0x3a6a5a, 0xc84a4a], eye: 0x2a3a6a },
+        look: { skin: [0x9ac8f0, 0x8abce8, 0xaad4f4, 0x7ab0e0], cut: ['coat', 'cape', 'coat'], feat: 'antlers', featC: [0x9ad8ff, 0xc8f0ff, 0x7ac0f0], garb: [0x2a4a7a, 0x7a2a4a, 0xe8e0d0, 0x3a6a5a, 0xc84a4a], eye: 0x2a3a6a },
         kit: { shape: 'vault', wall: 'packed_ice', band: 'snow_block', roof: 'blue_ice', floor: 'spruce_planks', fill: 'packed_ice', window: 'light_blue_stained_glass', door: 'spruce_door', bed: 'light_blue_bed', light: 'lantern', paving: 'snow_block_cut', lamp: 'vx_lamppost_crystal', canopy: 'light_blue_wool', mark: 'rose_crystal_block' },
         goods: ['packed_ice', 'blue_ice', 'ice_crystal', 'snow_block', 'tholin_ice', 'rose_crystal_block', 'azure_crystal_cluster', 'lantern'],
         syl: ['ni', 'va', 'ri', 'is', 'fel', 'ka', 'ylo', 'sen', 'mi', 'tor', 'al', 'kel', 'su', 'vin', 'ha', 'ren'], end: ['i', 'a', 'el', 'is'],
@@ -266,7 +266,7 @@
       this.nCE = new F(s ^ 0x203, 1, 1 / 160, 0.5);
       this.baseOk = this.W.base ? new Set(this.W.base.map(k => VR.BIOME[k])) : null;
       this.land = gen.findSpawn(gen.prof.spawn.x, gen.prof.spawn.z);
-      this.sites = []; this.plans = new Map(); this.buckets = new Map(); this.marks = [];
+      this.sites = []; this.plans = new Map(); this.buckets = new Map(); this.marks = [{ x: this.land[0], z: this.land[2], r: 5 }];   // (the landing kept clear)
       this.build();
     }
     // the eco biome (an index of W.biomes, or -1) at a column: pure noise, so neighbours agree

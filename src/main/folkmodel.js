@@ -899,7 +899,7 @@
       }
     }
     // ---- hats (at the head's scale; H1 is the first row over the hair)
-    const hat = kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);
+    const hat = L.feat ? null : kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);   // (u-worlds: a native's feature, never under a hat)
     const H1 = A.top + (bald ? 1 : 2);
     const disc = (y, r, c, hole, t) => { for (let z = Math.floor(zc - r - 1); z <= Math.ceil(zc + r + 1); z++) for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) { const d = (x - cx) * (x - cx) + (z - zc) * (z - zc); if (d > r * r + 0.3) continue; if (hole && d < hole * hole) continue; head.set(x, y, z, c, 0, t || TG.cloth); } };
     if (hat === 'straw') {
