@@ -98,7 +98,7 @@
     return out;
   };
   N.lanternHalos = function (P, dt, eye, night) {
-    if (!(night > 0.35)) return 0;
+    if (!(night > 0.35) || N.lant6Off) return 0;   // (N.lant6Off: the pictures before/after)
     const g = P.game, V = g && g.villages; if (!V || !V.known) return 0;
     P.lantT = (P.lantT || 0) - dt;
     if (P.lantT <= 0 || !P.lantL) {

@@ -165,7 +165,7 @@
     // a-story6: Aquamarin's night reads as night — the eye opens with the dusk's depth (Helia 1°…10° under the horizon),
     // not when its disc sets (at −2° the air is still bright: the open eye made the lamplighters' round a golden day),
     // and the night's light leans blue (the shade, Herzwelt's shine, the far sea); the day untouched
-    if (K.nightBlue) {
+    if (K.nightBlue && BS.night6 !== false) {   // (BS.night6 = false: the old night, for the pictures before/after)
       const dk = ss(-1 * Math.PI / 180, -10 * Math.PI / 180, sEl), B = K.nightBlue;
       if (expo > K.expoDay) expo = K.expoDay + (expo - K.expoDay) * dk;
       if (dk > 0) for (let i = 0; i < 3; i++) { const m = 1 + (B[i] - 1) * dk; amb[i] *= m; parLight[i] *= m; far[i] *= m; }
