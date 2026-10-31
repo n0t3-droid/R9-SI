@@ -18646,7 +18646,8 @@ VR.BL.late.push(()=>{if(VM._K)VM.registerLate(NAMES3);});
 (function(VR){
 'use strict';
 const L=64;
-const BGEN=5;
+const BGEN=6;
+
 
 
 
@@ -49502,15 +49503,27 @@ basalt:{pave5:['polished_andesite','polished_deepstone'],road5:'polished_tuff',b
 opal:{pave5:['smooth_stone','stone_bricks'],road5:'spruce_planks',bridge5:'spruce_planks'},
 };
 E.K5=K5;
+
+
+
+const K6={
+aqua:{floor6:['pale_moss_block','sand'],bed6:'moss_block',plants6:['fern','short_grass','lily_of_the_valley','blue_orchid'],deck6:'mangrove_planks',postp6:'stripped_mangrove_log',rail6:'bamboo_fence'},
+ocker:{floor6:['coarse_dirt','packed_mud'],bed6:'podzol',plants6:['dead_bush','short_grass','orange_tulip']},
+zinn:{floor6:['basalt','smooth_basalt'],bed6:'tuff',plants6:['dead_bush','torchflower','dead_bush']},
+basalt:{floor6:['regolith','andesite'],bed6:'moss_block',plants6:['fern','short_grass','azure_bluet']},
+opal:{floor6:['snow_block','packed_ice'],bed6:'snow_block',plants6:['fern','short_grass','white_tulip']},
+};
+E.K6=K6;
 E.DARK=new Set(['packed_mud','brown_terracotta','polished_deepstone','smooth_basalt','stone_bricks','mud_bricks','tuff_bricks','polished_tuff']);
 const KIT5={};
 E.kit=function(kind,bgen){
 const k0=K[kind].species.kit;
 if(!(bgen>=5))return k0;
-if(KIT5[kind])return KIT5[kind];
-const k5=Object.assign({},k0,K5[kind]);
+const ck=bgen>=6?kind+':6':kind;
+if(KIT5[ck])return KIT5[ck];
+const k5=Object.assign({},k0,K5[kind],bgen>=6?K6[kind]:null);
 k5.pave4=k5.pave5;if(k5.bench5)k5.bench4=k5.bench5;else k5.bench5=k5.bench4;if(k5.post5)k5.post4=k5.post5;else k5.post5=k5.post4;
-return(KIT5[kind]=k5);
+return(KIT5[ck]=k5);
 };
 
 E.blockNames=function(kind){
@@ -49518,6 +49531,7 @@ const W=K[kind],out=new Set(),add=(v)=>{if(typeof v==='string')out.add(v);else i
 for(const b of W.biomes)add(b.surf);
 for(const f of W.flora)for(const k of['stem','leaf','cap','under','b','base','tip','head'])add(f[k]);
 for(const k in W.species.kit)if(k!=='shape')add(W.species.kit[k]);
+for(const k in K6[kind])add(K6[kind][k]);
 for(const o of W.ores)add(o.b);
 for(const l of W.landmarks)add([l.b,l.b2,l.b3]);
 if(W.liquid)add(W.liquid==='ice'?['water','ice']:W.liquid);
@@ -49638,6 +49652,7 @@ this.marks.push({x,z,r:16});
 return o;
 });
 for(const s of this.sites)this.addOps(this.planOf(s).ops);
+{const P0=this.sites[0]&&this.planOf(this.sites[0]);if(P0&&P0.dress)this.dress=P0.dress;}
 for(const l of this.landmarks)this.addOps(landmarkOps(l,this.W));
 if(T5)this.buildWays();
 }
@@ -49758,6 +49773,8 @@ this.ores(blocks,cx,cz,tops);
 
 if(W.liquid)this.ponds(blocks,x0,z0,tops);
 
+if(this.dress)this.dressTown(blocks,x0,z0,tops);
+
 this.flora(blocks,x0,z0,tops,ebio);
 
 if(this.wayB)this.layWays(blocks,cx,cz);
@@ -49839,6 +49856,59 @@ tops[c]= -1;
 }
 }
 }
+
+
+
+
+
+inTown(x,z,pad){const D=this.dress;return!!D&&Math.max(Math.abs(x-D.x),Math.abs(z-D.z))<=D.r1+pad;}
+dressTown(blocks,x0,z0,tops){
+const D=this.dress,X=D.x,Z=D.z,F=D.F,R=VR.R;
+if(x0+15<X-D.r1||x0>X+D.r1||z0+15<Z-D.r1||z0>Z+D.r1)return;
+const inBox=(x,z)=>{for(const b of D.boxes)if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])return true;return false;};
+const nearBox=(x,z,p)=>{for(const b of D.boxes)if(x>=b[0]-p&&x<=b[2]+p&&z>=b[1]-p&&z<=b[3]+p)return true;return false;};
+
+const vn=(x,z,salt,k)=>{const fx=x/k,fz=z/k,i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,a=h01(i,j,salt),b=h01(i+1,j,salt),c2=h01(i,j+1,salt),d2=h01(i+1,j+1,salt);return(a*(1-u)+b*u)*(1-v)+(c2*(1-u)+d2*u)*v;};
+const sol=(s)=>s&&(R.T.flags[s]&VR.F.SOLID)&& !(R.T.flags[s]&VR.F.FLUID);
+for(let c=0;c<256;c++){
+const x=x0+(c&15),z=z0+(c>>4),d=Math.max(Math.abs(x-X),Math.abs(z-Z));
+if(d>D.r1)continue;
+let gy=250;while(gy>1&& !sol(blocks[(gy<<8)|c]))gy--;
+const wet=isFluid(blocks[((gy+1)<<8)|c]),hi=Math.min(254,Math.max(gy,F)+8);
+if(d<=D.r0){
+const box=inBox(x,z);
+if(wet&&D.pier&& !box){
+
+
+for(let y=F;y<=hi;y++)blocks[(y<<8)|c]=0;
+if(nearBox(x,z,3)){
+blocks[(F<<8)|c]=D.deck;
+if(((x-X)&3)===0&&((z-Z)&3)===0)for(let y=gy+1;y<F;y++)blocks[(y<<8)|c]=D.post;
+if(!nearBox(x,z,2))blocks[((F+1)<<8)|c]=D.rail;
+}
+tops[c]= -1;continue;
+}
+for(let y=F+1;y<=hi;y++)blocks[(y<<8)|c]=0;
+for(let y=gy+1;y<F;y++)blocks[(y<<8)|c]=D.fill;
+
+const bed= !box&&vn(x,z,this.s^0x6b1,5)>0.68;
+blocks[(F<<8)|c]=bed?D.bed:D.floor[vn(x,z,this.s^0x6b2,4)>0.66?1:0];
+const hp=h01(x,z,this.s^0x6b3);
+if(!box&&(bed?hp<0.28:hp<0.01))blocks[((F+1)<<8)|c]=D.plants[Math.floor(h01(x,z,this.s^0x6b4)*D.plants.length)];
+tops[c]= -1;
+}else{
+
+if(wet&&D.pier)continue;
+const u=(d-D.r0)/(D.r1-D.r0),sm=u*u*(3-2*u),th=Math.round(F+(gy-F)*sm);
+if(th===gy)continue;
+const surf=blocks[(gy<<8)|c];
+for(let y=Math.min(th,gy)+1;y<=hi;y++)blocks[(y<<8)|c]=0;
+for(let y=gy;y<th;y++)blocks[(y<<8)|c]=D.fill;
+blocks[(th<<8)|c]=surf;
+tops[c]=th;
+}
+}
+}
 flora(blocks,x0,z0,tops,ebio){
 const g=this.gen,W=this.W,C=5;
 const put=(x,y,z,s)=>{const lx=x-x0,lz=z-z0;if(lx<0||lx>15||lz<0||lz>15||y<1||y>254)return;const p=(y<<8)|(lz*16+lx);if(!blocks[p])blocks[p]=s;};
@@ -49851,7 +49921,7 @@ const b=this.bioAt(x,z);if(b<0||W.biomes[b].under)continue;
 const opts=big.filter(f=>f.bio.indexOf(b)>=0);if(!opts.length)continue;
 const f=opts[Math.floor(h01(i,j,this.s^0xf3)*opts.length)];
 if(h01(i,j,this.s^0xf4)>f.p)continue;
-if(this.near(x,z,4)||(this.ways&&this.onWay(x,z,3)))continue;
+if(this.near(x,z,4)||(this.ways&&this.onWay(x,z,3))||(this.dress&&this.inTown(x,z,3)))continue;
 const y0=this.groundAt(x,z);if(y0<0)continue;
 
 if(x>=x0&&x<x0+16&&z>=z0&&z<z0+16){const t=tops[(z-z0)*16+x-x0];if(t<0||Math.abs(t-y0)>1)continue;}
@@ -50191,7 +50261,8 @@ const GM=new Map(),ground=(x,z)=>{const k=x*65536+z;let v=GM.get(k);if(v===undef
 const seed=strHash(site.id+':'+(eco.s>>>0))>>>0;
 const P={id:site.id,name:site.name,style:'sp:'+kind,kind,town:true,x:X,y:F+1,z:Z,seed,rad:64,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:X,y:F+1,z:Z,r:6},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,ops:[],names:E.names(kind),species:kind};
 const W=writer(ground,F,Kit),put=W.put,pa=st(Kit.pave4[0]),pb=st(Kit.pave4[1]);
-const pave=(x,z,s)=>{W.level(x,z);put(x,F,z,s);};
+const v6=g.bgen>=6,paved=v6?new Set():null;
+const pave=(x,z,s)=>{W.level(x,z);put(x,F,z,s);if(paved)paved.add(x*65536+z);};
 
 for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++){const d=Math.hypot(dx,dz);pave(X+dx,Z+dz,d>=4.4&&d<5.5?pb:pa);}
 centrepiece(kind,put,X,F,Z);
@@ -50214,6 +50285,8 @@ else{const step=Math.sign(Z-cz);for(let z=o[2];Math.abs(z-Z)>1;z+=step)pave(o[0]
 P.homes.push(h);for(const q of h.ops)homeOps.push(q);delete h.ops;
 });
 
+if(v6)for(const h of P.homes){const b=h.box;for(let x=b[0]-1;x<=b[3]+1;x++)for(let z=b[2]-1;z<=b[5]+1;z++)if((x<b[0]||x>b[3]||z<b[2]||z>b[5])&& !paved.has(x*65536+z))pave(x,z,pb);}
+
 const hall=hallOps(Kit,ground,F,X-22,Z,kind);
 for(const q of hall.ops)homeOps.push(q);
 P.hall={box:hall.box,door:hall.door,inside:hall.inside,seats:hall.seats,speaker:hall.speaker};
@@ -50229,9 +50302,19 @@ const gx=X,gz=Z+60;
 for(let dx= -3;dx<=3;dx++)for(let dz= -4;dz<=4;dz++){pave(gx+dx,gz+dz,Math.abs(dx)===1||Math.abs(dx)===3?st('moss_block'):pa);if(Math.abs(dx)===1||Math.abs(dx)===3)put(gx+dx,F+1,gz+dz,st('vm_crop_rows'));}
 P.work.push({kind:'garden',spot:[gx,F+1,gz]});
 
-const lm=landmark5(kind,Kit,ground,F,X,Z-64);
+const lm=landmark5(kind,Kit,ground,F,X,Z-64,v6);
 for(const q of lm.ops)homeOps.push(q);
 P.landmark={kind,shape:E.LANDMARK5[kind],h:lm.h,x:X,y:F+1,z:Z-64,box:lm.box};
+if(lm.climb)P.landmark.climb=lm.climb;
+
+
+if(v6){
+const boxes=P.homes.map(h=>[h.box[0],h.box[2],h.box[3],h.box[5]]);
+for(const b of[P.hall.box,P.market.box,lm.box])boxes.push([b[0],b[2],b[3],b[5]]);
+boxes.push([X-7,Z-7,X+7,Z+7],[gx-4,gz-5,gx+4,gz+5]);
+for(const[ux,uz,k0,len]of AV)boxes.push(ux?[Math.min(X+ux*k0,X+ux*len),Z-2,Math.max(X+ux*k0,X+ux*len),Z+2]:[X-2,Math.min(Z+uz*k0,Z+uz*len),X+2,Math.max(Z+uz*k0,Z+uz*len)]);
+P.dress={x:X,z:Z,F,r0:72,r1:84,boxes,floor:Kit.floor6.map(n=>st(n)),bed:st(Kit.bed6),plants:Kit.plants6.map(n=>st(n)),fill:st(Kit.fill),pier: !!Kit.deck6,deck:Kit.deck6?st(Kit.deck6): -1,post:Kit.postp6?st(Kit.postp6):0,rail:Kit.rail6?st(Kit.rail6):0};
+}
 for(const o of W.ops)P.ops.push(o);
 for(const o of homeOps)P.ops.push(o);
 return P;
@@ -50288,7 +50371,7 @@ for(const[dx,dz]of[[-8,-8],[7,-8],[-8,8],[7,8]]){put(cx+dx,F+1,cz+dz,S(Kit.post4
 return{ops:W.ops,box:[cx-8,F,cz-8,cx+7,F+9,cz+8],spots,work};
 }
 
-function landmark5(kind,Kit,ground,F,X,Z){
+function landmark5(kind,Kit,ground,F,X,Z,v6){
 const W=writer(ground,F,Kit),put=W.put,S=(n,p)=>st(n,p);
 for(let dx= -6;dx<=6;dx++)for(let dz= -6;dz<=6;dz++)if(Math.hypot(dx,dz)<=6.5){W.level(X+dx,Z+dz);put(X+dx,F,Z+dz,S(Kit.pave4[(Math.hypot(dx,dz)>5)?1:0]));}
 const disc=(y,r,f)=>{const R=Math.ceil(r);for(let dx= -R;dx<=R;dx++)for(let dz= -R;dz<=R;dz++){const d=Math.hypot(dx,dz);if(d<=r){const v=f(dx,dz,d);if(v!==undefined)put(X+dx,F+y,Z+dz,v);}}};
@@ -50334,7 +50417,48 @@ for(const[dx,dz]of[[2,0],[-2,0],[0,2],[0,-2]]){put(X+dx,F+14,Z+dz,S('lantern'));
 }
 
 for(const[dx,dz]of[[-5,-5],[5,-5],[-5,5],[5,5]]){put(X+dx,F+1,Z+dz,S(Kit.post4));put(X+dx,F+2,Z+dz,S(Kit.lamp4));}
-return{ops:W.ops,h,box:[X-6,F,Z-6,X+6,F+h,Z+6]};
+const climb=v6?climbOps(kind,put,disc,S,F,X,Z):null;
+return{ops:W.ops,h,box:[X-6,F,Z-6,X+6,F+h,Z+6],climb};
+}
+
+
+
+
+const CLIMB6={aqua:[23,'top','calcite'],ocker:[23,'top','terracotta'],zinn:[18,'collar','polished_basalt'],basalt:[15,'dome','polished_andesite'],opal:[14,'collar','packed_ice']};
+function climbOps(kind,put,disc,S,F,X,Z){
+const[yd,how,pil]=CLIMB6[kind],lad=S('ladder',{facing:2}),pillar=S(pil),DOOR=4;
+for(let y=1;y<=yd;y++){put(X,F+y,Z,lad);put(X,F+y,Z-1,pillar);}
+for(let y=1;y<=2;y++)for(let k=1;k<=DOOR;k++)put(X,F+y,Z+k,0);
+put(X,F+yd+1,Z,0);put(X,F+yd+2,Z,0);
+if(kind==='aqua'){
+
+disc(yd+1,2.2,(dx,dz,d)=>(d>1.5?S('bamboo_fence'):0));
+for(const[dx,dz]of[[2,0],[-2,0],[0,-2]])put(X+dx,F+yd+2,Z+dz,S('tide_lantern'));
+}else if(kind==='ocker'){
+
+for(let dx= -3;dx<=3;dx++)for(let dz= -3;dz<=3;dz++){
+const rim=Math.abs(dx)===3||Math.abs(dz)===3,corner=Math.abs(dx)===3&&Math.abs(dz)===3;
+put(X+dx,F+yd+1,Z+dz,corner?S('amber_crystal_block'):rim?S('acacia_fence'):0);
+if(corner)put(X+dx,F+yd+2,Z+dz,S('lantern'));
+}
+put(X,F+yd+2,Z,0);
+}else if(kind==='basalt'){
+put(X,F+yd+1,Z,0);
+put(X-2,F+yd+1,Z-2,S('lantern'));
+for(let dx= -1;dx<=1;dx++)for(let dz=3;dz<=5;dz++)for(let y=1;y<=2;y++)put(X+dx,F+yd+y,Z+dz,0);
+}else{
+
+const R=kind==='zinn'?3:4;
+for(let dx= -R;dx<=R;dx++)for(let dz= -R;dz<=R;dz++){
+const d=kind==='zinn'?Math.max(Math.abs(dx),Math.abs(dz)):Math.hypot(dx,dz);
+if(d>R+0.01||(dx===0&&dz===0))continue;
+put(X+dx,F+yd,Z+dz,kind==='zinn'?S('polished_basalt'):S('snow_block'));
+if(d>R-0.8)put(X+dx,F+yd+1,Z+dz,kind==='zinn'?S('polished_deepstone_wall'):S('spruce_fence'));
+}
+for(const[dx,dz]of[[R,0],[-R,0],[0,-R]])put(X+dx,F+yd+2,Z+dz,kind==='zinn'?S('spirit_lantern'):S('lantern'));
+for(let y=yd+1;y<=yd+2;y++)for(let k=0;k<=2;k++)put(X,F+y,Z+k,0);
+}
+return{x:X,z:Z,y0:F+1,y1:F+yd,deck:F+yd+1,door:DOOR,how};
 }
 
 
@@ -53244,7 +53368,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="78af6898146097a9";
+VR.TEX_SRC_HASH="542b78533c866d30";
 
 
 
@@ -57113,6 +57237,16 @@ VR.I18N.add('en',{
 "g.pt.skipWait":"Almost there — the world is still being built …",
 "g.pt.bestHour":"at the golden hour",
 
+
+"g.shop.title.sp_aqua":"🏺 Wellari Market","g.shop.title.sp_ocker":"🏺 Dunelin Market","g.shop.title.sp_zinn":"🏺 Glutani Market","g.shop.title.sp_basalt":"🏺 Regoli Market","g.shop.title.sp_opal":"🏺 Nivari Market",
+"g.shop.btn.sp_aqua":"🏺 To the market","g.shop.btn.sp_ocker":"🏺 To the market","g.shop.btn.sp_zinn":"🏺 To the market","g.shop.btn.sp_basalt":"🏺 To the market","g.shop.btn.sp_opal":"🏺 To the market",
+"g.shop.kit.sp_aqua":"Wellari building set","g.shop.kit.sp_ocker":"Dunelin building set","g.shop.kit.sp_zinn":"Glutani building set","g.shop.kit.sp_basalt":"Regoli building set","g.shop.kit.sp_opal":"Nivari building set",
+"g.town.lm.aqua":"Lighthouse","g.town.lm.ocker":"Windcatcher","g.town.lm.zinn":"Obelisk","g.town.lm.basalt":"Observatory","g.town.lm.opal":"Frost spire",
+"g.town.view":"{lm} climbed — the view over {town}",
+"g.town.reward":"A thank-you for the climb: {n} × {item}",
+"g.town.rewardAdv":"For the climb: +{xp} XP, +{t} Heliataler",
+"g.town.again":"The view is as lovely as the first time.",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -60865,6 +60999,16 @@ VR.I18N.add('de',{
 
 "g.pt.skipWait":"Gleich da — die Welt wird noch gebaut …",
 "g.pt.bestHour":"zur goldenen Stunde",
+
+
+"g.shop.title.sp_aqua":"🏺 Markt der Wellari","g.shop.title.sp_ocker":"🏺 Markt der Dunelin","g.shop.title.sp_zinn":"🏺 Markt der Glutani","g.shop.title.sp_basalt":"🏺 Markt der Regoli","g.shop.title.sp_opal":"🏺 Markt der Nivari",
+"g.shop.btn.sp_aqua":"🏺 Zum Markt","g.shop.btn.sp_ocker":"🏺 Zum Markt","g.shop.btn.sp_zinn":"🏺 Zum Markt","g.shop.btn.sp_basalt":"🏺 Zum Markt","g.shop.btn.sp_opal":"🏺 Zum Markt",
+"g.shop.kit.sp_aqua":"Bauset der Wellari","g.shop.kit.sp_ocker":"Bauset der Dunelin","g.shop.kit.sp_zinn":"Bauset der Glutani","g.shop.kit.sp_basalt":"Bauset der Regoli","g.shop.kit.sp_opal":"Bauset der Nivari",
+"g.town.lm.aqua":"Leuchtturm","g.town.lm.ocker":"Windfänger","g.town.lm.zinn":"Obelisk","g.town.lm.basalt":"Sternwarte","g.town.lm.opal":"Frostturm",
+"g.town.view":"{lm} erklommen — der Blick über {town}",
+"g.town.reward":"Als Dank für den Aufstieg: {n} × {item}",
+"g.town.rewardAdv":"Für den Aufstieg: +{xp} EP, +{t} Heliataler",
+"g.town.again":"Der Blick ist so schön wie beim ersten Mal.",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -134075,7 +134219,17 @@ N.GREET_S=2.4;N.HUSH_R=7;N.HUSH_D=8;N.PHOTO_R=14;N.PHOTO_S=20;
 
 N.MARKET_ACTS=new Set(['market','hall','lantern']);
 N.CAP={potato:14,low:20,medium:30,balanced:30};
-N.agentCap=(preset,n)=>Math.min(n,N.CAP[preset]!==undefined?N.CAP[preset]:n);
+N.CAP_TOP=30;
+N.agentCap=(preset,n)=>Math.min(n,N.CAP[preset]!==undefined?N.CAP[preset]:N.CAP_TOP);
+
+
+
+N.LOD_R=40;
+N.lod=function(d2,town){
+if(!town)return null;
+const base=d2<24*24?1:d2<56*56?2:d2<100*100?3:6,mul=d2>N.LOD_R*N.LOD_R?2:1;
+return{every:base*mul,mul,far:d2>24*24};
+};
 const KEEP={trader:0,mayor:0,cashier:0};
 const u01=(s,salt)=>{let h=Math.imul((s|0)^Math.imul((salt|0)+0x632BE5AB,0x9E3779B1),0x85EBCA6B);h=Math.imul(h^(h>>>15),0xC2B2AE35);h^=h>>>13;return(h>>>0)/4294967296;};
 
@@ -134329,6 +134483,12 @@ if(a.greetT>0)a.greetT-=dt;
 const vil=a.vil,kind=vil&&vil.plan&&vil.plan.species;
 if(!kind)return ua.call(this,a,dt,tod);
 const g=this.g,pl=g.player.pos;
+
+if(vil.plan.town&&this.talking!==a){
+const L=N.lod((a.pos[0]-pl[0])**2+(a.pos[2]-pl[2])**2,true);
+if(L.mul>1&&((a.lodN=(a.lodN|0)+1)%L.mul)!==0){a.lodAcc=(a.lodAcc||0)+dt;return;}
+if(a.lodAcc){dt=Math.min(0.45,dt+a.lodAcc);a.lodAcc=0;}
+}
 const still=()=>{a.t+=dt;if(a.bubble){a.bubble.t-=dt;if(a.bubble.t<=0)a.bubble=null;}a.vel[0]=0;a.vel[2]=0;a.walkAmt+=(0-a.walkAmt)*Math.min(1,dt*6);};
 
 if(this.talking===a){
@@ -134466,6 +134626,133 @@ b.setAttribute('data-natgive','1');box.insertBefore(b,box.children[1]||null);
 return r;
 };
 }
+})(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k),nm=(id)=>(VR.itemName?VR.itemName(id):id);
+const TW=VR.Towns={};
+const KINDS=TW.KINDS=['aqua','ocker','zinn','basalt','opal'];
+
+TW.GOODS={
+aqua:[['tide_lantern',30],['tube_coral_block',18],['sea_pickle',12]],
+ocker:[['amber_crystal_block',35],['orange_terracotta',10],['cactus',8]],
+zinn:[['glowing_obsidian',40],['sulfur_bricks',18],['polished_sulfur',15]],
+basalt:[['azure_crystal_block',35],['regolith_dark',10],['regolith',8]],
+opal:[['rose_crystal_block',35],['tholin_ice',16],['ice_crystal',14]],
+};
+TW.SET_PRICE=120;
+
+TW.setParts=function(kind){
+const E=VR.WorldEco,K=E&&E.kit(kind,6);if(!K)return[];
+const want=[[K.wall,32],[K.band,16],[K.roof,24],[K.floor,24],[K.window,8],[K.door,2],[K.light,4],[K.pave4[0],24],[K.pave4[1],24]];
+const m=new Map();for(const[id,n]of want)if(id&&VR.R&&VR.R.byName[id])m.set(id,(m.get(id)||0)+n);
+return[...m.entries()];
+};
+TW.REWARD={aqua:{id:'tide_lantern',n:2},ocker:{id:'amber_crystal_block',n:2},zinn:{id:'glowing_obsidian',n:2},basalt:{id:'azure_crystal_block',n:2},opal:{id:'rose_crystal_block',n:2}};
+TW.VIEW_TALER=30;
+TW.shopId=(kind)=>'sp_'+kind;
+
+TW.shopFor=function(a){
+const P=a&&a.vil&&a.vil.plan,role=a&&(a.role||(a.p&&a.p.role));
+return P&&P.town&&role==='trader'&&KINDS.indexOf(P.species)>=0?TW.shopId(P.species):null;
+};
+
+
+const S=VR.Shop;
+if(S&& !S.__towns){
+S.__towns=true;
+for(const k of KINDS){S.SHOPS.push(TW.shopId(k));S.ICON[TW.shopId(k)]='🏺';}
+const cat0=S.catalog,cache={};
+S.catalog=function(shop){
+const k=typeof shop==='string'&&shop.slice(0,3)==='sp_'?shop.slice(3):null;
+if(!k|| !TW.GOODS[k])return cat0.apply(this,arguments);
+if(cache[shop])return cache[shop];
+const out=[];
+for(const[id,price]of TW.GOODS[k])if(VR.R&&VR.R.byName[id])out.push({key:'item:'+id,kind:'item',id,price,cat:'item'});
+const parts=TW.setParts(k);
+if(parts.length)out.push({key:'kit:'+shop,kind:'kit',id:shop,price:TW.SET_PRICE,parts,cat:'kit'});
+return(cache[shop]=out);
+};
+
+const tb=S.talkButtons;
+S.talkButtons=function(mgr,a,box){
+const sh=TW.shopFor(a);
+if(!sh|| !box|| !(VR.Adventure&&VR.Adventure.on&&VR.Adventure.on()))return tb.apply(this,arguments);
+const b=document.createElement('button');
+b.className='btn small shopbtn';b.textContent=T('g.shop.btn.'+sh);b.setAttribute('data-shop',sh);
+b.onclick=()=>{if(mgr&&mgr.chirp)mgr.chirp(a);S.open(sh,a,mgr);};
+if(box.insertBefore&&box.firstChild)box.insertBefore(b,box.firstChild);else box.appendChild(b);
+return 1;
+};
+}
+
+
+
+TW.onDeck=function(P,pos){
+const C=P&&P.landmark&&P.landmark.climb;if(!C|| !pos)return false;
+return Math.max(Math.abs(pos[0]-C.x-0.5),Math.abs(pos[2]-C.z-0.5))<=4.5&&pos[1]>=C.deck-0.3&&pos[1]<=C.deck+2.5;
+};
+TW.rec=function(meta,kind){
+const m=meta.towns&&typeof meta.towns==='object'?meta.towns:(meta.towns={});
+const r=m[kind]&&typeof m[kind]==='object'?m[kind]:(m[kind]={});
+return r;
+};
+
+TW.view=function(meta,kind){
+const r=TW.rec(meta,kind);
+if(r.view)return{first:false};
+r.view=1;
+return{first:true,reward:TW.REWARD[kind]};
+};
+TW.reward=function(g,kind,P){
+const A=VR.Adventure,inv=g.player&&g.player.inv,rw=TW.REWARD[kind],id='view:'+kind+':'+(P.id||'');
+let sub='';
+if(A&&A.on&&A.on()){
+const a=A.award('wow',{id}),b=A.award('chest',{id,taler:TW.VIEW_TALER});
+sub=T('g.town.rewardAdv',{xp:(a&&a.xp)|0,t:(b&&b.taler)|0});
+}else if(inv&&rw){inv.add(rw.id,rw.n);sub=T('g.town.reward',{n:rw.n,item:nm(rw.id)});if(g.ui&&g.ui.updateHUD)g.ui.updateHUD(true);}
+return sub;
+};
+const Vs=VR.Villages;
+if(Vs&& !Vs.prototype.__towns){
+const VP=Vs.prototype;VP.__towns=true;
+const up=VP.update;
+VP.update=function(dt){
+const r=up.apply(this,arguments);
+const g=this.g,p=g&&g.player;if(!p|| !g.meta)return r;
+for(const vil of this.known.values()){
+const P=vil.active&&vil.plan;if(!P|| !P.town|| !P.landmark|| !P.landmark.climb)continue;
+if(!TW.onDeck(P,p.pos)){vil._deckT=0;continue;}
+if((vil._deckT=(vil._deckT||0)+dt)<0.6||vil._viewed)continue;
+vil._viewed=true;
+const kind=P.species,v=TW.view(g.meta,kind);
+const title='🔭 '+T('g.town.view',{lm:T('g.town.lm.'+kind),town:P.name||vil.name||''});
+if(g.ui&&g.ui.toast)g.ui.toast(title,v.first?TW.reward(g,kind,P):T('g.town.again'),null);
+TW.last={kind,first:v.first,t:Date.now()};
+}
+return r;
+};
+}
+
+TW.keys=function(){
+const k=['g.town.view','g.town.reward','g.town.rewardAdv','g.town.again'];
+for(const kind of KINDS)k.push('g.shop.title.sp_'+kind,'g.shop.btn.sp_'+kind,'g.shop.kit.sp_'+kind,'g.town.lm.'+kind);
+return k;
+};
 })(VR);
 
 
