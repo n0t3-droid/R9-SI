@@ -57985,6 +57985,18 @@ VR.I18N.add('en',{
 "g.photo.noFace":"📷 Nobody near for a portrait",
 "g.photo.more3":" · H: portrait",
 
+
+"g.fairy.tw.lanterns":"Oh! The smallest lantern has lost its light seed – the wind carried it off. Will you come? I'll show you the way!",
+"g.fairy.tw.lost":"Home! But … my little bell light blew away on the way. Will you help me look for it? I'll come too!",
+"g.fairy.tw.bridge":"The bridge sings! Only one light seed is missing, the last note – the wind blew it away. Shall we fetch it together?",
+"g.fairy.tw.riddle":"How clever you are! One last riddle: what glows, flies and has no wings? … A light seed! And one is dancing out there. Come!",
+"g.fairy.tw.hat":"My hat! Thank you! But the feather … the wind took the light seed from my hat's feather. Shall we catch it?",
+"g.fairy.tw.near":"There! Can you see it glow? Very carefully …",
+"g.fairy.tw.hop":"Hee hee, it hops on! After it!",
+"g.fairy.tw.got":"You've got it! Now quickly home with it.",
+"g.fairy.tw.still":"The light seed is still out there – I'll stay with you.",
+"g.fairy.tw.note":"✨ One more thing: a light seed blown away by the wind – together with your Flausel",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -62140,6 +62152,18 @@ VR.I18N.add('de',{
 "g.photo.portrait":"📷 Porträt: {n} — H: der Nächste · G: goldene Stunde",
 "g.photo.noFace":"📷 Niemand in der Nähe für ein Porträt",
 "g.photo.more3":" · H: Porträt",
+
+
+"g.fairy.tw.lanterns":"Oh! Die kleinste Laterne hat ihren Lichtsamen verloren – der Wind hat ihn fortgetragen. Kommst du mit? Ich zeig dir den Weg!",
+"g.fairy.tw.lost":"Zuhause! Aber … mein Glöckchenlicht ist unterwegs davongeweht. Hilfst du mir, es zu suchen? Ich geh mit!",
+"g.fairy.tw.bridge":"Die Brücke singt! Nur ein Lichtsamen fehlt, der letzte Ton – der Wind hat ihn verweht. Holen wir ihn zusammen?",
+"g.fairy.tw.riddle":"Klug bist du! Ein letztes Rätsel noch: Was leuchtet, fliegt und hat keine Flügel? … Ein Lichtsamen! Und dort draußen tanzt einer. Komm!",
+"g.fairy.tw.hat":"Mein Hut! Danke! Aber die Feder … der Wind hat den Lichtsamen von meiner Hutfeder mitgenommen. Fangen wir ihn?",
+"g.fairy.tw.near":"Da! Siehst du ihn leuchten? Ganz vorsichtig …",
+"g.fairy.tw.hop":"Hihi, er hüpft weiter! Hinterher!",
+"g.fairy.tw.got":"Du hast ihn! Jetzt schnell nach Hause damit.",
+"g.fairy.tw.still":"Der Lichtsamen ist noch dort draußen – ich bleib bei dir.",
+"g.fairy.tw.note":"✨ Noch eins: ein Lichtsamen, vom Wind verweht – zusammen mit deinem Flausel",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -141555,6 +141579,83 @@ return out;
 };
 
 
+
+
+
+W.PACE={space:10,lo:15,hi:23,look:4,beat:27,hard:31};
+W.Pacer=class{
+constructor(seed){this.seed=seed|0;this.last= -1e9;this.n=0;this.tgt=this.jit(0);}
+jit(n){const P=W.PACE;return P.lo+(P.hi-P.lo)*h(this.seed,n,0x9ace);}
+seen(t,w){if(!(w>=2))return;if(t>this.last){this.last=t;this.n++;this.tgt=this.jit(this.n);}}
+since(t){return t-this.last;}
+scout(t){const s=t-this.last;return s>=this.tgt-W.PACE.look&&s<this.tgt;}
+
+
+want(t,o){
+const s=t-this.last,P=W.PACE;if(s<P.space)return null;
+const foot= !o||o.foot!==false,busy= !!(o&&(o.busy||o.coming)),stage= !o||o.stage!==false;
+if(s>=this.tgt&&foot&&stage&& !busy)return'moment';
+if(s>=P.beat&&(!busy||s>=P.hard))return'beat';
+return null;
+}
+};
+
+
+W.paceSim=function(seed,dur,ext,opt){
+opt=opt||{};
+const P=new W.Pacer(seed),starts=[],all=[];
+const E=(ext||[]).map(e=>(typeof e==='number'?{t:e,ask:false}:{t:e.t,ask: !!e.ask})).sort((a,b)=>a.t-b.t);
+let i=0,lastOurs= -1e9;P.seen(0,2);all.push(0);
+for(let t=0;t<=dur;t+=0.25){
+while(i<E.length&&E[i].t<=t){const e=E[i++];if(e.ask&&t-lastOurs<W.PACE.space-2){e.t=lastOurs+W.PACE.space-2;E.splice(i,0,e);E.sort((a,b)=>a.t-b.t);i=E.indexOf(e);if(e.t>t)continue;}all.push(+e.t.toFixed(2));P.seen(e.t,2);}
+const k=P.want(t,{foot:opt.foot?opt.foot(t):true,stage:opt.stage?opt.stage(t):true});
+if(k){starts.push({t,kind:k});all.push(t);P.seen(t,2);lastOurs=t;}
+}
+all.sort((a,b)=>a-b);
+return{starts,all};
+};
+
+
+
+W.STAGE={near:8,far:15,cone:0.42,share:0.07,fov:70*Math.PI/180,animal:1.35};
+W.share=(hgt,d,fov)=>hgt/(2*Math.max(0.1,d)*Math.tan((fov||W.STAGE.fov)/2));
+W.stageRange=function(hgt,fov){
+const S=W.STAGE,dmax=hgt/(S.share*2*Math.tan((fov||S.fov)/2));
+return[S.near,Math.max(S.near,Math.min(S.far,dmax))];
+};
+
+W.stageCands=function(R){
+const S=W.STAGE,a=R[0],b=R[1],mid=a+(b-a)*0.35,out=[];
+for(const d of[mid,mid+(b-mid)*0.6,a+(mid-a)*0.4,b,a])for(const s of[0.18,-0.18,0,0.34,-0.34,S.cone,-S.cone])out.push([Math.max(a,Math.min(b,d)),s]);
+return out;
+};
+
+
+W.clearLine=function(solidAt,a,b){
+const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz);if(L<1.5)return true;
+const n=Math.ceil(L/0.35);
+for(let i=1;i<n;i++){const u=i/n,s=u*L;if(s<0.5||s>L-0.9)continue;if(solidAt(a[0]+dx*u,a[1]+dy*u,a[2]+dz*u))return false;}
+return true;
+};
+
+const FIG={traveller:1.8,caravan:2.2,pet:0.75,picnic:1.3,musician:1.8,kites:1.8,crossing:0.75,rainbow:9,glade:1.1,cairn:1.5,shrine:2.2,ruins:3.6,scrap:1.1,sign:2.4,stargazer:1.8,lanterns:1.8,well:2.4};
+for(const n of W.NAMES)W.KINDS[n].fig=FIG[n]||1.6;
+
+W.BEATS={
+bird:{tier:0,dur:11,fly:false,fig:0.45,hours:DAYD,ico:'🐦'},
+flutter:{tier:0,dur:10,fly:false,fig:0.5,hours:MID,dry:1,ico:'🦋'},
+breeze:{tier:0,dur:9,fly:false,fig:0.9,hours:DAYD,ico:'🌼'},
+song:{tier:0,dur:13,fly:false,fig:1.8,hours:ALL,ico:'🎵'},
+flock:{tier:0,dur:12,fly:true,fig:1.6,hours:DAYD,ico:'🕊'},
+glow:{tier:0,dur:11,fly:true,fig:1.2,hours:['dusk','night'],ico:'✨'},
+};
+W.beatFor=function(seed,n,ctx,flying){
+const L=Object.keys(W.BEATS).filter(b=>{const B=W.BEATS[b];if(flying&& !B.fly)return false;if(!flying&&B.fly&&b!=='glow')return false;if(B.hours.indexOf(ctx.hour)<0)return false;if(B.dry&&ctx.wet)return false;return true;});
+if(!L.length)return flying?'glow':'song';
+return L[Math.floor(h(seed,n,0xbea7)*L.length)%L.length];
+};
+
+
 W.PAGES=['places','people','creatures','stickers','recipes'];
 W.SOFT={places:20,people:12,creatures:8,stickers:W.NAMES.length,recipes:6};
 W.RECIPES=['applecake','herbsoup','honeybread','berrypancake','mushroompie','flowertea'];
@@ -141699,6 +141800,20 @@ dist(p){const e=this.pos;return Math.hypot(p[0]-e[0],p[2]-e[2]);}
 
 spot(d,side,flat){
 const f=this.fwd,a0=Math.atan2(f[1],f[0]),p=this.pos;let fb=null;
+
+
+if(this.stg){
+const K=W.KINDS[this.stg],R=W.stageRange(K.fig*(K.fam==='animal'?W.STAGE.animal:1),this.fov());
+for(const[dd,aa]of W.stageCands(R)){
+const a=a0+aa,x=p[0]+Math.cos(a)*dd,z=p[2]+Math.sin(a)*dd;
+const y=this.ground(x,z,p[1]);if(y===null)continue;
+if(flat){let ok=true;for(const[ox,oz]of[[flat,0],[-flat,0],[0,flat],[0,-flat]]){const y2=this.ground(x+ox,z+oz,y);if(y2===null||Math.abs(y2-y)>1){ok=false;break;}}if(!ok)continue;}
+const q=[x,y+Math.min(1.4,K.fig*0.6),z];
+if(!this.clear(q)|| !this.inSight(q))continue;
+return[x,y,z];
+}
+return null;
+}
 for(const dd of[d,d+6,d-5,d+12])for(const aa of[side,-side,side*0.4,0,side*1.4]){
 if(dd<8)continue;
 const a=a0+aa,x=p[0]+Math.cos(a)*dd,z=p[2]+Math.sin(a)*dd;
@@ -141712,7 +141827,9 @@ return fb;
 }
 inSight(q){const L=VR.EventLog;if(!L|| !L.inView)return true;try{return!!L.inView(q,1.2,this.g).inView;}catch(e){return true;}}
 
+fov(){const S=this.g.settings;return S&&Number.isFinite(S.fov)?S.fov*Math.PI/180:W.STAGE.fov;}
 high(d){
+if(this.stg)d=12;
 const f=this.fwd,a0=Math.atan2(f[1],f[0]),p=this.pos;let best=null;
 for(const dd of[d,d+10,d+20])for(const aa of[-0.5,-0.25,0,0.25,0.5]){
 const a=a0+aa,x=p[0]+Math.cos(a)*dd,z=p[2]+Math.sin(a)*dd,y=this.ground(x,z,p[1]+6);
@@ -141797,6 +141914,126 @@ if(!p||g.flight||g.photo||g.studioOpen||(g.ui&&g.ui.screen&&g.ui.screen!=='hud')
 if(p.flying){const gy=this.ground(p.pos[0],p.pos[2],p.pos[1]-4);if(gy===null||p.pos[1]-gy>18)return false;}
 return true;
 }
+
+get now(){const t=this.g.time;return Number.isFinite(t)?t:this.time;}
+
+airborne(){
+const g=this.g,p=g.player;
+if(!p||g.photo||g.studioOpen||(g.ui&&g.ui.screen&&g.ui.screen!=='hud'))return false;
+return!!(g.flight||p.flying);
+}
+readLog(){
+const L=VR.EventLog;if(!L|| !L.events)return;
+if(this.logN===undefined)this.logN=L.count|0;
+if((L.count|0)===this.logN)return;
+const E=L.events(this.logN);this.logN=L.count|0;
+for(const e of E)if(e.w>=2&&e.inView&&e.src!=='wander'){this.pacer.seen(e.t,e.w);this.st.outside=(this.st.outside|0)+1;}
+}
+pace(dt,walking){
+const g=this.g,now=this.now;
+const P=this.pacer||(this.pacer=new W.Pacer(this.seed));
+if(P.last< -1e8)P.seen(now-8,2);
+if((this.logT=(this.logT||0)-dt)<=0){this.logT=0.25;this.readLog();}
+if(this.auto===false||(VR.StoryPlay&&VR.StoryPlay.holds&&VR.StoryPlay.holds(g)))return;
+const air= !walking&&this.airborne();
+if(!walking&& !air)return;
+
+if(walking&&P.scout(now)&&(!this.plan||this.plan.n!==P.n))this.plan={n:P.n,order:W.order(this.seed,1000+P.n,this.ctx||(this.ctx=this.context()),this.recent)};
+if(now<(this.tryT||0))return;
+const RG=VR.Regie,busy= !!(RG&&RG.busy&&RG.busy(g));
+const want=P.want(now,{foot:walking,busy,coming:this.coming(now)});
+if(!want)return;
+this.tryT=now+1;
+if(want==='moment'){
+const order=this.plan&&this.plan.n===P.n?this.plan.order:W.order(this.seed,1000+P.n,this.ctx||(this.ctx=this.context()),this.recent);
+for(let i=0;i<order.length&&i<5;i++)if(this.start(order[i],1000+P.n))return;
+this.st.quiet++;
+return;
+}
+this.beat(air);
+}
+
+
+coming(now){
+const g=this.g,RG=VR.Regie,RS=RG&&RG.of?RG.of(g):null,P=this.pacer;
+if(RS&&RS.sched&&RS.sched.lastStart>P.last+0.5&&now-RS.sched.lastStart<15)return true;
+const Tr=g.traffic,e=this.pos;if(!Tr|| !Tr.ships)return false;
+const M=this.shipD||(this.shipD=new Map());
+let soon=false;
+for(const s of Tr.ships){
+if(!s||s.wing||s._elDone|| !s.pos)continue;
+const d=Math.hypot(s.pos[0]-e[0],s.pos[1]-e[1],s.pos[2]-e[2]),d0=M.get(s);
+M.set(s,d);
+if(d0!==undefined&&d<d0&&d<260&&(d-60)/Math.max(6,s.speed||20)<9)soon=true;
+}
+if(M.size>64)M.clear();
+return soon;
+}
+
+beat(air){
+if(this.b)this.b=null;
+const g=this.g,P=this.pacer,ctx=this.ctx||(this.ctx=this.context());
+const kind=W.beatFor(this.seed,P.n,ctx,air),B=W.BEATS[kind];
+const c=g.cam,eye=c&&Number.isFinite(c.x)?[c.x,c.y,c.z]:this.eye,f=this.fwd,a0=Math.atan2(f[1],f[0]);
+const b={kind,age:0,dur:B.dur,seed:(h(this.seed,P.n,0xbea7)*0x7fffffff)|0,pos:null,vel:[0,0,0],F:null,y0:0};
+const side=(h(b.seed,1,3)-0.5)*0.5;
+if(B.fly){
+const d=kind==='flock'?15:11,a=a0+side*1.4;
+b.pos=[eye[0]+Math.cos(a)*d,eye[1]+(kind==='glow'? -2:0.5),eye[2]+Math.sin(a)*d];
+b.vel=[f[0]*(kind==='flock'?6:0.4),kind==='glow'?0.8:0,f[1]*(kind==='flock'?6:0.4)];
+}else{
+const R=kind==='song'?[12,16]:kind==='breeze'?[7,10]:[6,9];
+for(const[d,s]of W.stageCands(R)){
+const a=a0+s+side*0.2,x=this.pos[0]+Math.cos(a)*d,z=this.pos[2]+Math.sin(a)*d,y=this.ground(x,z,this.pos[1]);
+if(y===null)continue;
+const q=[x,y+(kind==='flutter'?1.2:0.4),z];
+if(!this.clear(q)|| !this.inSight(q))continue;
+b.pos=[x,y,z];break;
+}
+if(!b.pos)return false;
+if(kind==='song'){b.F=this.fig(b.seed,b.pos,'farmer');this.face(b.F,this.pos);b.F.state='cheer';b.F.talking=true;}
+if(kind==='bird'){b.y0=b.pos[1];b.pos[1]+=6;}
+}
+b.yaw=LK.yawOf(this.pos[0]-b.pos[0],this.pos[2]-b.pos[2]);
+this.b=b;P.seen(this.now,2);this.st.beats=(this.st.beats|0)+1;
+let seen=null;
+if(VR.EventLog&&VR.EventLog.emit){try{const R=VR.EventLog.emit('ambient','wb:'+kind,2,[b.pos[0],b.pos[1]+(kind==='song'?1:0.3),b.pos[2]],'wander',1.2);seen=R? !!R.inView:null;}catch(e){}}
+if(VR.Regie&&VR.Regie.note)VR.Regie.note(g,2,'ambient','wb:'+kind);
+this.timeline.push({t:Math.round(this.time*10)/10,kind:'b:'+kind,d:Math.round(Math.hypot(b.pos[0]-eye[0],b.pos[2]-eye[2])),x:Math.round(this.pos[0]),z:Math.round(this.pos[2]),seen,share: +W.share(B.fig,Math.hypot(b.pos[0]-eye[0],b.pos[1]-eye[1],b.pos[2]-eye[2])).toFixed(3)});
+if(this.timeline.length>400)this.timeline.shift();
+if(kind==='song')this.songN=0;
+return true;
+}
+beatUpdate(dt){
+const b=this.b;if(!b)return;
+b.age+=dt;const u=b.age/b.dur,A=this.audio;
+if(u>=1){this.b=null;return;}
+if(b.kind==='bird'){
+
+if(b.age<1.6)b.pos[1]=b.y0+6*Math.pow(1-b.age/1.6,2);
+else if(u>0.82){b.pos[1]+=dt*5;b.pos[0]+=Math.sin(b.yaw)* -dt*4;b.pos[2]+=Math.cos(b.yaw)* -dt*4;}
+else{b.pos[1]=b.y0+Math.abs(Math.sin(b.age*3.1))*0.12;if(Math.floor(b.age*1.3)!==Math.floor((b.age-dt)*1.3)&&Math.floor(b.age)%3===0&&A&&A.ctx&&A.tone){A.tone(2400,0.02,0.07,'sine',true);A.tone(2900,0.018,0.09,'sine',true,(A.ctx.currentTime||0)+0.1);}}
+}else if(b.kind==='flock'||b.kind==='glow'){
+b.pos[0]+=b.vel[0]*dt;b.pos[1]+=b.vel[1]*dt;b.pos[2]+=b.vel[2]*dt;
+if(b.kind==='flock'){const e=this.g.cam;if(e&&Number.isFinite(e.x))b.pos[1]+=((e.y+0.5)-b.pos[1])*Math.min(1,dt);}
+}else if(b.kind==='song'){
+if(b.F){b.F.talking=Math.sin(b.age*2.2)> -0.2;this.face(b.F,this.pos);}
+const S=[392,440,523.3,440,392,349.2,392,0],i=Math.floor(b.age*1.6);
+if(A&&A.ctx&&A.tone&&i!==this.songN&&i<16){this.songN=i;const f0=S[i%S.length];if(f0)A.tone(f0,0.03*Math.max(0,1-this.dist(b.pos)/40),0.5,'triangle',true);}
+}
+}
+drawBeat(r,cam,prog){
+const b=this.b,g=this.g;if(!b)return;
+const t=this.time,flap=Math.sin(t*22)*0.8;
+if(b.kind==='bird'){BEAT_O.scale=1.6;BEAT_O.pose=birdPose(b.age<1.6||b.age/b.dur>0.82?flap:0);LK.drawModel(g,r,prog(),'wander_bird',b.pos,b.yaw+Math.sin(t*1.7)*0.4,cam,BEAT_O);BEAT_O.pose=null;}
+else if(b.kind==='flock'){BEAT_O.scale=2.2;BEAT_O.pose=birdPose(flap);const yaw=Math.atan2(-b.vel[0],-b.vel[2]);for(let i=0;i<3;i++){const q=FLOCK_P[i];q[0]=b.pos[0]+(i-1)*1.6;q[1]=b.pos[1]+(i===1?0.8:0)+Math.sin(t*2+i)*0.2;q[2]=b.pos[2]+(i===1? -1:0.6);LK.drawModel(g,r,prog(),'wander_bird',q,yaw,cam,BEAT_O);}BEAT_O.pose=null;}
+else if(b.kind==='flutter'){BEAT_O.scale=1.5;for(let i=0;i<2;i++){const q=FLOCK_P[i],a=t*1.3+i*2.6;q[0]=b.pos[0]+Math.cos(a)*0.9;q[1]=b.pos[1]+1.1+Math.sin(t*3.1+i)*0.3;q[2]=b.pos[2]+Math.sin(a)*0.9;BEAT_O.pose=flyPose(Math.sin(t*18+i)*0.9);LK.drawModel(g,r,prog(),'wander_fly'+i,q,-a,cam,BEAT_O);}BEAT_O.pose=null;}
+else if(b.kind==='breeze'){BEAT_O.scale=1;BEAT_O.pose=swayPose(Math.sin(t*2.4)*0.22+Math.sin(t*5.3)*0.06);LK.drawModel(g,r,prog(),'wander_flowers',b.pos,b.yaw,cam,BEAT_O);BEAT_O.pose=null;if(this.tier>=1&&this.P&&Math.random()<0.15)this.P.spawn(b.pos[0],b.pos[1]+0.8,b.pos[2],1.2,0.3,0.4,{life:2,size:0.08,grav:0.02,col:[1,0.8,0.9],emis:0,drag:0.6,collide:false});}
+else if(b.kind==='song'){if(b.F)LK.drawFolk(g,r,prog(),b.F,cam,t);}
+else if(b.kind==='glow'){BEAT_O.scale=2.4;LK.drawModel(g,r,prog(),'wander_hlamp',b.pos,t*0.3,cam,BEAT_O);}
+}
+
+clear(q){const e=this.eye;return W.clearLine((x,y,z)=>this.solid(this.get(x,y,z)),e,q);}
 update(dt){
 const g=this.g,S=g.settings||{},t0=typeof performance!=='undefined'?performance.now():0;
 this.time+=dt;
@@ -141809,16 +142046,9 @@ if((this.placeT-=dt)<=0){this.placeT=4;this.refreshPlaces();this.visit();}
 if((this.ctxT-=dt)<=0){this.ctxT=1;this.ctx=this.context();}
 const walking=this.onFoot();
 if(walking)this.clock+=dt;
-const k=W.slotAt(this.seed,this.clock);
-if(this.lastK===null)this.lastK=k-1;
-if(k>this.lastK&&walking&&this.auto!==false){this.lastK=k;const t1=Math.max(this.time,(this.lastStart|| -1e9)+12);this.retry={k,until:t1+8,nextT:t1};}
 
 
-if(!this.retry&&walking&&this.auto!==false&&this.time-(this.lastStart||0)>W.FILL)this.retry={k:500000+(this.fillN=(this.fillN||0)+1),until:this.time+6,nextT:0};
-if(this.retry&&this.time>=this.retry.nextT){
-if(this.time>this.retry.until){this.retry=null;this.st.quiet++;}
-else{this.retry.nextT=this.time+1;if(this.slot(this.retry.k))this.retry=null;}
-}
+this.pace(dt,walking);
 
 const cap=this.tier===0?1:this.tier===1?2:3;
 while(this.ms.length>cap)this.end(this.ms[0]);
@@ -141831,6 +142061,7 @@ if(alive){try{alive=A.update(this,m,dt)!==false&&m.age<m.dur;}catch(err){alive=f
 if(alive)this.hello(m,dt);
 if(!alive)this.end(m);
 }
+this.beatUpdate(dt);
 this.mapUpdate(dt);
 this.beaconUpdate(dt,walking);
 if(t0)this.st.cost=this.st.cost*0.95+(performance.now()-t0)*0.05;
@@ -141846,20 +142077,24 @@ start(kind,k,force){
 const A=ACT[kind];if(!A)return null;
 if(!force&&this.ms.some(m=>m.kind===kind))return null;
 const m={kind,k,seed:(h(this.seed,k,NH[kind])*0x7fffffff)|0,age:0,dur:W.KINDS[kind].dur,pos:null,found:false};
-let ok=false;try{ok=A.start(this,m)!==false;}catch(err){ok=false;if(!this.warnedS){this.warnedS=true;console.warn('wander start',kind,err);}}
+let ok=false;this.stg=force?null:kind;try{ok=A.start(this,m)!==false;}catch(err){ok=false;if(!this.warnedS){this.warnedS=true;console.warn('wander start',kind,err);}}
+this.stg=null;
 if(!ok)return null;
+if(this.pacer)this.pacer.seen(this.now,2);
+if(VR.Regie&&VR.Regie.note)VR.Regie.note(this.g,2,'ambient','wd:'+kind);
 
 if(STAGE_SPOT[kind]&&m.pos&&Number.isFinite(m.yaw))m.yaw=W.stageYaw(m.yaw,LK.yawOf(this.pos[0]-m.pos[0],this.pos[2]-m.pos[2]));
 this.ms.push(m);this.recent.push(kind);if(this.recent.length>24)this.recent.shift();
 this.st.started++;this.st.kinds[kind]=(this.st.kinds[kind]||0)+1;this.lastStart=this.time;
 const p=this.pos;let seen=null;
 if(VR.EventLog&&VR.EventLog.emit){try{const R=VR.EventLog.emit('ambient','wd:'+kind,2,m.pos?[m.pos[0],m.pos[1]+1,m.pos[2]]:null,'wander',3);seen=R? !!R.inView:null;}catch(e){}}
-this.timeline.push({t:Math.round(this.time*10)/10,kind,d:m.pos?Math.round(this.dist(m.pos)):0,x:Math.round(p[0]),z:Math.round(p[2]),seen});
+const dd=m.pos?Math.hypot(m.pos[0]-p[0],m.pos[1]+1-p[1]-1.62,m.pos[2]-p[2]):0,K=W.KINDS[kind];
+this.timeline.push({t:Math.round(this.time*10)/10,kind,d:m.pos?Math.round(this.dist(m.pos)):0,x:Math.round(p[0]),z:Math.round(p[2]),seen,share:m.pos? +W.share(K.fig*(K.fam==='animal'?W.STAGE.animal:1),dd,this.fov()).toFixed(3):0});
 if(this.timeline.length>400)this.timeline.shift();
 return m;
 }
 end(m){const A=ACT[m.kind];if(A&&A.end){try{A.end(this,m);}catch(e){}}const i=this.ms.indexOf(m);if(i>=0)this.ms.splice(i,1);}
-endAll(){while(this.ms.length)this.end(this.ms[0]);}
+endAll(){while(this.ms.length)this.end(this.ms[0]);this.b=null;}
 
 mapUpdate(){
 const B=W.book(this.g.meta),M=B&&B.map;if(!M){this.mapChest=null;return;}
@@ -141892,11 +142127,13 @@ if(this.tier>=2&&this.P&&(this.bcGlow=(this.bcGlow||0)-dt)<=0){this.bcGlow=0.5;t
 }
 draw(r,E,layer,cam){
 if(!this.on||layer!=='opaque')return;
-if(!this.ms.length&& !this.bcOn&& !this.mapChest)return;
+if(!this.ms.length&& !this.bcOn&& !this.mapChest&& !this.b)return;
 const g=this.g,ent=g.entities;if(!ent)return;
 let p=null;const prog=()=>p||(p=ent.beginVox(r,E));
 cam=cam||r.cam;
 for(const m of this.ms){const A=ACT[m.kind];if(A.draw){try{A.draw(this,m,r,E,cam,prog);}catch(e){if(!this.warnedD){this.warnedD=true;console.warn('wander draw',m.kind,e);}}}}
+if(this.b){try{this.drawBeat(r,cam,prog);}catch(e){}}
+if(this.tier===0)this.drawLamp(r,cam,prog);
 if(this.bcOn)LK.drawModel(g,r,prog(),'wander_balloon',this.bcPos,this.time*0.2,cam,BAL_O);
 if(this.mapChest)LK.drawModel(g,r,prog(),'wander_chest',this.mapChest,0.4,cam,{});
 if(this.tier>=1&&g.settings.wonderGlow!==false&&VR.StoryGlow&&VR.StoryGlow.draw)this.drawCues(r,cam);
@@ -141904,6 +142141,8 @@ if(this.tier>=1&&g.settings.wonderGlow!==false&&VR.StoryGlow&&VR.StoryGlow.draw)
 
 hello(m,dt){
 const L=m.F?(Array.isArray(m.F)?m.F:[m.F]):null;if(!L|| !L.length|| !m.pos)return;
+
+if(this.dist(m.pos)<20)for(const F of L)if(F&& !F.walkAmt&&F.state!=='sit'){const want=LK.yawOf(this.pos[0]-F.pos[0],this.pos[2]-F.pos[2]);let d=(want-F.yaw)%TAU;if(d>Math.PI)d-=TAU;if(d< -Math.PI)d+=TAU;F.yaw+=d*Math.min(1,dt*3);}
 if(!m.hi){const d=this.dist(m.pos);if(d<25&&d>6)m.hi=2.6;else return;}
 if(m.hi<0)return;
 m.hi-=dt;
@@ -141932,7 +142171,15 @@ q.s[0]=q.s[1]=3.4;q.col[0]=1;q.col[1]=0.68;q.col[2]=0.36;q.a=k*(0.32+0.33*night)
 for(let i=n;i<CUES.length;i++)CUES[i].a=0;
 if(n)this.st.cues=VR.StoryGlow.draw(r,cam,CUES);
 }
-stats(){return{on:this.on,tier:this.tier,started:this.st.started,quiet:this.st.quiet,found:this.st.found,kinds:Object.assign({},this.st.kinds),active:this.ms.map(m=>m.kind),timeline:this.timeline.slice(),next:this.next?this.next.name:null,beacon:this.bcOn?this.bcPos.slice():null,cost:this.st.cost,places:this.places.length,ctx:this.ctx,chests:this.st.chests||0};}
+
+drawLamp(r,cam,prog){
+const E=(this.g.env&&this.g.env.E)||{};if((E.night||0)<0.3)return;
+let m=null,md=1e9;for(const q of this.ms){if(!q.pos||q.found||W.KINDS[q.kind].fam==='sky')continue;const d=this.dist(q.pos);if(d<md&&d>3){md=d;m=q;}}
+if(!m||md>40)return;
+LAMP_P[0]=m.pos[0]+1.2;LAMP_P[1]=m.pos[1]+1.5;LAMP_P[2]=m.pos[2]+0.4;
+LK.drawModel(this.g,r,prog(),'wander_hlamp',LAMP_P,0,cam,LAMP_O);
+}
+stats(){return{beats:this.st.beats|0,outside:this.st.outside|0,beat:this.b?this.b.kind:null,since:this.pacer? +this.pacer.since(this.now).toFixed(1):null,on:this.on,tier:this.tier,started:this.st.started,quiet:this.st.quiet,found:this.st.found,kinds:Object.assign({},this.st.kinds),active:this.ms.map(m=>m.kind),timeline:this.timeline.slice(),next:this.next?this.next.name:null,beacon:this.bcOn?this.bcPos.slice():null,cost:this.st.cost,places:this.places.length,ctx:this.ctx,chests:this.st.chests||0};}
 destroy(){this.endAll();}
 };
 
@@ -141941,6 +142188,12 @@ const CUES=[0,1,2,3].map(()=>({p:[0,0,0],s:[1,1],col:[1,1,1],a:0,kind:0}));
 const CUE_COL={folk:[1,0.78,0.45],animal:[1,0.9,0.72],spot:[0.72,0.95,1]};
 const STAGE_SPOT={glade:1,cairn:1,scrap:1,well:1};
 const BAL_O={scale:2.6};
+
+const BEAT_O={scale:1,pose:null},FLOCK_P=[[0,0,0],[0,0,0],[0,0,0]],LAMP_P=[0,0,0],LAMP_O={scale:1.6};
+const BP={body:[0,0,0],wl:[0,0,0],wr:[0,0,0]},FP={body:[0,0,0],wl:[0,0,0],wr:[0,0,0]},SP={stems:[0,0,0]};
+const birdPose=(a)=>{BP.wl[2]=a;BP.wr[2]= -a;return BP;};
+const flyPose=(a)=>{FP.wl[2]=a;FP.wr[2]= -a;return FP;};
+const swayPose=(a)=>{SP.stems[2]=a;return SP;};
 
 const rnd=(m,i)=>h(m.seed,i,0x77);
 const pt=(m)=>m.pos;
@@ -142044,7 +142297,7 @@ if(od>1){q.pos[0]+=ox/od*3*dt;q.pos[2]+=oz/od*3*dt;q.yaw=LK.yawOf(ox,oz);}
 if(m.age-m.oT>9)return false;
 }
 },
-draw(D,m,r,E,cam,prog){LK.drawQuad(D.g,r,prog(),m.q,cam,D.time);if(m.owner)LK.drawFolk(D.g,r,prog(),m.owner,cam,D.time);},
+draw(D,m,r,E,cam,prog){LK.drawModel(D.g,r,prog(),m.q.kind,m.q.pos,m.q.yaw,cam,{pose:LK.quadPose(m.q,D.time),scale:W.STAGE.animal});if(m.owner)LK.drawFolk(D.g,r,prog(),m.owner,cam,D.time);},
 };
 
 ACT.picnic={
@@ -142149,7 +142402,7 @@ q.dy=m.cr==='rabbit'?Math.abs(Math.sin(D.time*7+q.hop))*0.25:0;
 m.pos=m.Q[0].pos;
 if(!m.found&&D.dist(m.pos)<30){m.found=true;const first=W.note(D.g.meta,'creatures',m.cr);W.note(D.g.meta,'stickers','crossing');if(first)D.note(W.KINDS.crossing.ico+' '+T('g.wd.k.crossing'),T('g.wd.cr.'+m.cr));D.st.found++;}
 },
-draw(D,m,r,E,cam,prog){for(const q of m.Q){const y=q.pos[1];q.pos[1]=y+(q.dy||0);LK.drawModel(D.g,r,prog(),q.kind,q.pos,q.yaw,cam,{pose:LK.quadPose(q,D.time)});q.pos[1]=y;}},
+draw(D,m,r,E,cam,prog){for(const q of m.Q){const y=q.pos[1];q.pos[1]=y+(q.dy||0);LK.drawModel(D.g,r,prog(),q.kind,q.pos,q.yaw,cam,{pose:LK.quadPose(q,D.time),scale:W.STAGE.animal});q.pos[1]=y;}},
 };
 
 ACT.rainbow={
@@ -142288,6 +142541,32 @@ gr.set(x,y,z,y===3?0xE8603A:band?0xFFE6B0:0xFFC878,1);
 }
 gr.box(5,0,5,6,1,6,0xFFF2A0,{emis:1});
 });
+
+
+const pt=(sx,sy,sz,pv,fn)=>part(sx,sy,sz,pv,fn);
+M.wander_bird=()=>({unit:16,radius:0.5,parts:{
+body:pt(5,6,9,[2.5,0,4.5],(gr)=>{
+gr.ell(2.5,2.4,4.8,2.2,2,3.2,(x,y,z)=>(z<4&&y<3?0xF08A3A:0x8A5A3A));
+gr.ell(2.5,4.3,2.2,1.6,1.6,1.6,0x7A4E30);gr.set(2,4,0,0xE8C040);gr.set(1,5,1,0x101010);gr.set(3,5,1,0x101010);
+gr.box(2,2,8,2,3,8,0x5A3A22);gr.set(1,0,4,0x6A4A2A);gr.set(3,0,4,0x6A4A2A);
+}),
+wl:pt(4,1,5,[4,0,2.5],(gr)=>gr.box(0,0,0,3,0,4,(x)=>(x===0?0x5A3A22:0x7A4E30))),
+wr:pt(4,1,5,[0,0,2.5],(gr)=>gr.box(0,0,0,3,0,4,(x)=>(x===3?0x5A3A22:0x7A4E30))),
+},layout:{body:[0,0,0],wl:[-2,3.2,0.3],wr:[2,3.2,0.3]}});
+[[0xF0A030,0x3A2A1E],[0x7AB0F0,0xF4F0E6]].forEach((c,i)=>{
+M['wander_fly'+i]=()=>({unit:16,radius:0.3,parts:{
+body:pt(1,1,4,[0.5,0,2],(gr)=>gr.box(0,0,0,0,0,3,0x2A2018)),
+wl:pt(4,1,4,[4,0,2],(gr)=>gr.box(0,0,0,3,0,3,(x,y,z)=>((x+z)%3===0?c[1]:c[0]))),
+wr:pt(4,1,4,[0,0,2],(gr)=>gr.box(0,0,0,3,0,3,(x,y,z)=>((x+z)%3===0?c[1]:c[0]))),
+},layout:{body:[0,0,0],wl:[-0.5,0.5,0],wr:[0.5,0.5,0]}});
+});
+M.wander_flowers=()=>({unit:8,radius:1.4,parts:{
+base:pt(16,1,16,[8,0,8],(gr)=>{for(let z=0;z<16;z++)for(let x=0;x<16;x++)if(Math.hypot(x-7.5,z-7.5)<7.6&&h(x,z,41)<0.75)gr.set(x,0,z,h(x,z,42)<0.5?0x5A9A3A:0x4A8A32);}),
+stems:pt(16,9,16,[8,0,8],(gr)=>{
+const FL=[0xF08AB0,0xFFF0A0,0xC070E0,0xF4F4F0,0xF0A030,0x7AA0F0];
+for(let k=0;k<26;k++){const a=h(k,1,77)*TAU,rr=h(k,2,77)*6.8,x=Math.round(7.5+Math.cos(a)*rr),z=Math.round(7.5+Math.sin(a)*rr),ht=3+Math.floor(h(k,3,77)*5);for(let y=0;y<ht;y++)gr.set(x,y,z,0x4A8A32);gr.set(x,ht,z,FL[k%FL.length]);if(k%2)gr.set(Math.min(15,x+1),ht,z,FL[k%FL.length]);}
+}),
+},layout:{base:[0,0,0],stems:[0,1,0]}});
 
 const KC=[[0xE8483A,0xF6D24A],[0x3A7AD8,0xF4F0E6],[0x5ABF6A,0xF08A2A],[0xC070E0,0x40C0C0]];
 KC.forEach((c,i)=>{
@@ -143398,6 +143677,7 @@ JY.cost=(g,n)=>{const t0=now();for(let i=0;i<n;i++){M.cartT=0;idle(g,0.016);}ret
 
 
 
+
 (function(VR){
 'use strict';
 const M=VR.VOXMODELS,Grid=VR.VoxGrid;
@@ -143660,31 +143940,63 @@ const FOLK=[
 {body:0xa8e0b8,belly:0xe4fae8,cap:0x9a6a3a,cap2:0x7a4e28},
 {body:0xe4f2ff,belly:0xffffff,cap:0xd8ecff,cap2:0xb8d8f4},
 ];
-const flausel=(C,glow,hat)=>()=>({
-unit:16,radius:0.6,parts:{
-body:part(9,10,9,[4.5,0,4.5],(gr)=>{
-gr.ell(4.5,4.8,4.5,3.9,4.6,3.6,(x,y,z)=>(z<=2&&y>=2&&y<=5&&Math.abs(x+0.5-4.5)<2.4?C.belly:C.body),glow?{emis:1}:null);
 
-for(const ex of[2,5]){gr.box(ex,5,0,ex+1,6,1,0x1e1628);gr.set(ex+1,6,0,0xffffff);}
-for(const ex of[1,7])gr.set(ex,4,1,0xff9aa8);
-gr.set(4,3,0,0x8a4a4a);gr.set(3,3,1,0x8a4a4a);gr.set(5,3,1,0x8a4a4a);
-gr.box(2,0,3,3,0,5,0x8a6a4a);gr.box(6,0,3,7,0,5,0x8a6a4a);
-gr.set(0,4,4,C.body);gr.set(8,4,4,C.body);
+
+
+const shadeC=(c,k)=>{const r=Math.min(255,((c>>16)&255)*k)|0,g=Math.min(255,((c>>8)&255)*k)|0,b=Math.min(255,(c&255)*k)|0;return(r<<16)|(g<<8)|b;};
+const flausel=(C,glow,hat)=>()=>({
+unit:32,radius:0.75,parts:{
+body:part(19,21,18,[9.5,0,9],(gr)=>{
+const cx=9.5,cy=10,cz=9,rx=8.4,ry=9.4,rz=7.8;
+gr.ell(cx,cy,cz,rx,ry,rz,(x,y,z,d)=>(d>0.72?shadeC(C.body,hs(x,y,z,3)<0.5?1.06:0.92):C.body),glow?{emis:1}:null);
+
+for(let y=0;y<21;y++)for(let z=0;z<18;z++)for(let x=0;x<19;x++){
+const d=((x+0.5-cx)/(rx+1))**2+((y+0.5-cy)/(ry+1))**2+((z+0.5-cz)/(rz+1))**2;
+if(d<=1&& !gr.get(x,y,z)&&hs(x,y,z,5)<0.33&&y>2)gr.set(x,y,z,shadeC(C.body,1.1),glow?1:0);
+}
+
+const front=(x,y)=>{for(let z=0;z<18;z++)if(gr.get(x,y,z))return z;return-1;};
+for(let y=0;y<21;y++)for(let x=0;x<19;x++){
+const z=front(x,y);if(z<0)continue;
+let c=null;
+for(const ex of[cx-3.4,cx+3.4]){
+const ux=(x+0.5-ex)/2.1,uy=(y+0.5-11.6)/2.7;
+if(ux*ux+uy*uy<=1){c=0x1e1628;if(Math.abs(x+0.5-(ex-0.7))<0.6&&Math.abs(y+0.5-12.9)<1.1)c=0xffffff;else if(Math.abs(x+0.5-(ex+0.8))<0.6&&Math.abs(y+0.5-10.3)<0.6)c=0xd8e8ff;else if(uy< -0.45)c=0x3a2a58;}
+}
+if(c===null&&Math.abs(y+0.5-8.6)<1.1&&Math.abs(Math.abs(x+0.5-cx)-6.0)<1.2)c=0xff9aa8;
+if(c===null&&((y===7&&Math.abs(x+0.5-cx)<1.6)||(y===8&&Math.abs(Math.abs(x+0.5-cx)-2.0)<0.6)))c=0x8a3a4a;
+if(c===null&&y>1&&y<6&&Math.abs(x+0.5-cx)<3.6)c=mix(C.body,C.belly,0.55);
+if(c!==null)gr.set(x,y,z,c,glow&&c!==0x1e1628?1:0);
+}
 }),
-cap:part(11,7,11,[5.5,0,5.5],(gr)=>{
-gr.ell(5.5,0.8,5.5,4.6,1.8,4.9,(x,y,z)=>(y<1?null:(Math.abs(x+0.5-5.5)<0.6?C.cap2:C.cap)));
-gr.ell(5.5,1.5,1.0,1.6,1,1.4,C.cap);
-gr.box(5,3,7,5,4,7,0x6a4a2a);
-gr.set(4,3,4,0x7a6a50);gr.set(4,4,4,0x7a6a50);gr.set(4,5,3,0xfff0a0,1);gr.set(4,6,3,0xfff0a0,1);
-if(hat){gr.ell(5.5,3.2,5.5,3.2,1.6,3.2,(x,y,z)=>((x+z)&1?0x8a5a2a:0x6a4220));gr.box(5,4,5,6,5,6,0x5a3a1a);}
+arm_l:part(3,6,3,[1.5,6,1.5],(gr)=>{gr.box(0,1,0,2,5,2,shadeC(C.body,0.95));gr.box(0,0,0,2,0,2,C.belly);}),
+arm_r:part(3,6,3,[1.5,6,1.5],(gr)=>{gr.box(0,1,0,2,5,2,shadeC(C.body,0.95));gr.box(0,0,0,2,0,2,C.belly);}),
+leg_l:part(4,4,6,[2,4,3],(gr)=>{gr.box(0,1,1,3,3,4,shadeC(C.body,0.9));gr.box(0,0,0,3,0,4,0x8a6a4a);}),
+leg_r:part(4,4,6,[2,4,3],(gr)=>{gr.box(0,1,1,3,3,4,shadeC(C.body,0.9));gr.box(0,0,0,3,0,4,0x8a6a4a);}),
+cap:part(21,14,21,[10.5,0,10.5],(gr)=>{
+gr.ell(10.5,1.6,10.5,9,3.6,9.4,(x,y,z)=>(y<2?null:(Math.abs(x+0.5-10.5)<1?C.cap2:(hs(x,y,z,8)<0.2?shadeC(C.cap,1.12):C.cap))));
+gr.ell(10.5,3,2,3,2,2.6,C.cap);
+gr.box(10,5,14,11,8,15,0x6a4a2a);
+for(let y=5;y<11;y++)gr.set(8+((y-5)>>2),y,8-((y-5)>>1),0x7a6a50);
+gr.box(9,11,4,10,12,5,0xfff0a0,{emis:1});
+if(hat){gr.ell(10.5,6.4,10.5,6.4,3.2,6.4,(x,y,z)=>((x+z)&1?0x8a5a2a:0x6a4220));gr.box(9,9,9,12,11,12,0x5a3a1a);}
 }),
-wing_l:part(1,6,5,[0,1,0],(gr)=>gr.box(0,0,0,0,5,4,(x,y,z)=>(y===5||z===4?0xb8e4ff:0xe4f6ff),{emis:glow?1:0})),
-wing_r:part(1,6,5,[0,1,0],(gr)=>gr.box(0,0,0,0,5,4,(x,y,z)=>(y===5||z===4?0xb8e4ff:0xe4f6ff),{emis:glow?1:0})),
+wing_l:part(1,12,10,[0,2,0],(gr)=>gr.box(0,0,0,0,11,9,(x,y,z)=>(y===11||z===9||(y+z)%7===0?0xb8e4ff:0xe4f6ff),{emis:glow?1:0})),
+wing_r:part(1,12,10,[0,2,0],(gr)=>gr.box(0,0,0,0,11,9,(x,y,z)=>(y===11||z===9||(y+z)%7===0?0xb8e4ff:0xe4f6ff),{emis:glow?1:0})),
 },
-layout:{body:[0,1,0],cap:[0,8.6,0],wing_l:[-3.6,5,2],wing_r:[3.6,5,2]},
+layout:{body:[0,3,0],arm_l:[-8.6,12,0.5],arm_r:[8.6,12,0.5],leg_l:[-3.4,4,0],leg_r:[3.4,4,0],cap:[0,20.5,0],wing_l:[-6.5,14,5],wing_r:[6.5,14,5]},
 });
 FOLK.forEach((C,v)=>{M['fy_sprite_'+v]=flausel(C,v===4,false);});
 M.fy_sprite_hat=flausel(FOLK[1],false,true);
+
+M.fy_glow=()=>({unit:2,radius:8,parts:{body:part(31,1,31,[15.5,0,15.5],(gr)=>{
+for(let z=0;z<31;z++)for(let x=0;x<31;x++){const d=Math.hypot(x-15,z-15);if(d>15||d<6)continue;const k=hs(x,0,z,11);if(k<0.3)gr.set(x,0,z,k<0.1?0xffd890:k<0.2?0xb8f0d0:0xffb0d0,1);}
+})},layout:{body:[0,0,0]}});
+
+M.fy_seed=()=>({unit:16,radius:0.5,parts:{body:part(9,12,9,[4.5,0,4.5],(gr)=>{
+gr.box(4,0,4,4,4,4,0x8a9a6a);
+gr.ell(4.5,8,4.5,3.6,3.6,3.6,(x,y,z,d)=>(d<0.25?0xfff0a0:d>0.7&&hs(x,y,z,2)<0.55?0xf4f8ff:null),{emis:1});
+})},layout:{body:[0,0,0]}});
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 
@@ -143792,7 +144104,11 @@ return 1-0.5*night;
 
 
 F.AVOID=40;
-F.clearOf=function(x,z,avoid){if(avoid)for(const o of avoid)if(Math.hypot(o.x-x,o.z-z)<(o.r||0)+F.AVOID)return false;return true;};
+F.clearOf=function(x,z,avoid,extra){if(avoid)for(const o of avoid)if(Math.hypot(o.x-x,o.z-z)<(o.r||0)+F.AVOID+(extra||0))return false;return true;};
+
+F.EXTRA={tree:40,shroom:10};
+
+F.clearance=function(x,z,avoid){let c=Infinity;if(avoid)for(const o of avoid)c=Math.min(c,Math.hypot(o.x-x,o.z-z)-(o.r||0));return c;};
 
 
 
@@ -143895,6 +144211,19 @@ Q.tag=function(q){if(!q||q.s!==1)return'idle';q.n++;if(q.n>=3){q.s=2;return'done
 
 F.SET=['b:lumishroom','b:spirit_lantern','b:pink_petals','b:wildflowers','b:moss_carpet','b:rose_crystal_cluster','b:glow_berry_vine','b:vm_light_table_mushroom_white','b:spore_blossom','b:azure_crystal_cluster'];
 F.GIFT={lanterns:['b:spirit_lantern',6],lost:['b:lumishroom',8],bridge:['b:pink_petals',16],riddle:['b:rose_crystal_cluster',6],hat:['b:wildflowers',16]};
+
+
+
+Q.twist=function(q){if(!q||q.s!==2)return'idle';if(!q.tw){q.tw=1;q.h=0;return'twist';}return q.tw===2?'ready':'still';};
+Q.fetch=function(q){if(!q||q.tw!==1)return'idle';q.h=(q.h|0)+1;if(q.h>=3){q.tw=2;return'got';}return'hop';};
+F.TW={near:120,far:150,hop:[12,16],home:8};
+
+F.twistSpot=function(seed,site){const a=h(seed,strH(site.id+'#tw'))*TAU,r=F.TW.near+(F.TW.far-F.TW.near)*h(seed,strH(site.id+'#twr'));return[site.x+Math.cos(a)*r,site.z+Math.sin(a)*r];};
+F.hopSpot=function(seed,id,n,from,player){let dx=from[0]-player[0],dz=from[1]-player[2];const L=Math.hypot(dx,dz)||1;dx/=L;dz/=L;const a=(h(seed,strH(id+'#hop'),n)-0.5)*1.2,c=Math.cos(a),sn=Math.sin(a),d=F.TW.hop[0]+(F.TW.hop[1]-F.TW.hop[0])*h(seed,strH(id+'#hd'),n);return[from[0]+(dx*c-dz*sn)*d,from[1]+(dx*sn+dz*c)*d];};
+
+
+F.BUD={right:1.1,ahead:1.3,down:0.35};
+F.budPos=function(eye,yaw,out){const B=F.BUD,fx= -Math.sin(yaw),fz= -Math.cos(yaw),rx=Math.cos(yaw),rz= -Math.sin(yaw);out=out||[0,0,0];out[0]=eye[0]+rx*B.right+fx*B.ahead;out[1]=eye[1]-B.down;out[2]=eye[2]+rz*B.right+fz*B.ahead;return out;};
 Q.finish=function(rec,id,k){
 const q=rec&&rec.q[id];if(!q||q.s!==2||rec.done.indexOf(id)>=0)return null;
 q.s=3;rec.done.push(id);
@@ -143990,17 +144319,21 @@ s.x=x;s.z=z;s.y=ground(g,x,z);
 if(s.kind==='garden'&&s.y!==null){const y0=s.y;s.yaw=F.gardenYaw((px,pz)=>{const y=ground(g,px,pz);return y===null?y0:y;},x,z,y0+24,s.yaw);}
 build(g,s);return true;
 };
-for(let k=s.tries;k<F.SETTLE_TRIES;k++){
+
+
+const N=s.best?F.SETTLE_TRIES:30;
+for(let k=s.tries;k<N;k++){
 const a=s.yaw+k*0.93,r=k*7,x=Math.round(x0+Math.cos(a)*r),z=Math.round(z0+Math.sin(a)*r);
 if(S.sites.some((o)=>o!==s&&o.y!==null&&Math.hypot(o.x-x,o.z-z)<F.APART)){s.tries=k+1;continue;}
-if(!F.clearOf(x,z,avoidOf(g))){s.tries=k+1;continue;}
+if(!F.clearOf(x,z,avoidOf(g),F.EXTRA[s.kind])){const c=F.clearance(x,z,avoidOf(g));if(!(c<=(s.farC===undefined? -1e9:s.farC))){s.farC=c;s.far=[x,z];}s.tries=k+1;continue;}
 const ok=landOk(g,x,z,RAD[s.kind]||10,s.kind==='garden'?8:5);
 if(ok==='wait')return false;
 if(ok===3)return put(x,z);
 if(ok>(s.bestG||0)){s.bestG=ok;s.best=[x,z];}
 s.tries=k+1;
 }
-return put(s.best?s.best[0]:x0,s.best?s.best[1]:z0);
+if(!s.best&&s.tries<30)return false;
+return put(s.best?s.best[0]:s.far?s.far[0]:x0,s.best?s.best[1]:s.far?s.far[1]:z0);
 }
 const at=(g,x,z,dy)=>{const y=ground(g,x,z);return[x,(y===null?0:y)+(dy||0),z];};
 const off=(s,a,r)=>[s.x+Math.cos(s.yaw+a)*r,s.z+Math.sin(s.yaw+a)*r];
@@ -144080,6 +144413,7 @@ if(s.kind==='garden')gardenLife(g,s,dt,p,T0,b);
 }
 if(LATER.length)for(let i=LATER.length-1;i>=0;i--)if(S.t>=LATER[i].t){const L=LATER.splice(i,1)[0];try{L.fn();}catch(e){}}
 if(S.escort)escort(g,dt,p);
+if(S.tw)twistFrame(g,dt,p);
 if(s&&s.kind==='garden')F.hold(g.player);
 if(S.bubble)bubbleFrame(g);
 if(recOf(g).buddy&&g.settings.fairyBuddy!==false)buddy(g,dt,eye);
@@ -144116,7 +144450,11 @@ for(let k=0;k<3;k++)mote(g,x0+k*dx*0.3,p[1]+1.4,z0+k*dz*0.3,dx*3.2,0.15,dz*3.2,F
 
 function think(g,s,f,dt,p){
 f.t+=dt;
-if(f===S.escort||f.away)return;
+if(f===S.escort||f.away||(S.tw&&S.tw.f===f))return;
+
+if(f.talkT>S.t){stepTo(g,f,talkSpot(g,f),dt,2.6);f.yaw=Math.atan2(-(p[0]-f.pos[0]),-(p[2]-f.pos[2]));return;}
+if(f.talkT&&f.talkT<=S.t){f.talkT=0;f.back=1;}
+if(f.back){if(stepTo(g,f,f.home,dt,1.6))f.back=0;else return;}
 const dx=p[0]-f.pos[0],dz=p[2]-f.pos[2],d=Math.hypot(dx,dz);
 const face=Math.atan2(-dx,-dz);
 if(f.mood==='shy'){
@@ -144142,6 +144480,55 @@ if(Math.random()<dt*0.8&&g.particles)mote(g,f.pos[0],f.pos[1]+0.5,f.pos[2],0,-0.
 }else{f.yaw=face;f.hop=0;}
 }
 
+
+function stepTo(g,f,q,dt,sp){
+const dx=q[0]-f.pos[0],dz=q[2]-f.pos[2],d=Math.hypot(dx,dz);
+if(d<0.25){f.walkAmt=Math.max(0,(f.walkAmt||0)-dt*4);f.hop=0;return true;}
+const st=Math.min(d,sp*dt);f.pos[0]+=dx/d*st;f.pos[2]+=dz/d*st;
+f.walk=(f.walk||0)+st*3.2;f.walkAmt=Math.min(1,(f.walkAmt||0)+dt*4);f.hop=Math.abs(Math.sin(f.walk))*0.12;
+f.yaw=Math.atan2(-dx,-dz);
+if((f.gT=(f.gT||0)-dt)<=0){f.gT=0.2;const y=ground(g,f.pos[0],f.pos[2]);if(y!==null&&Math.abs(y-f.pos[1])<3)f.pos[1]=y;}
+return false;
+}
+function talkSpot(g,f){
+const pl=g.player,yaw=pl.yaw,q=f._ts||(f._ts=[0,0,0]);
+q[0]=pl.pos[0]-Math.sin(yaw)*2.1;q[2]=pl.pos[2]-Math.cos(yaw)*2.1;q[1]=f.pos[1];
+
+const hx=q[0]-f.home[0],hz=q[2]-f.home[2],hd=Math.hypot(hx,hz);if(hd>6){q[0]=f.home[0]+hx/hd*6;q[2]=f.home[2]+hz/hd*6;}
+return q;
+}
+
+function twistBegin(g,s,f,k){
+const sp=F.twistSpot(seedOf(g),s);
+S.tw={s,f,k,pos:[sp[0],null,sp[1]],said:0,t:0};
+say(g,f,T('g.fairy.tw.'+k));
+note(g,T('g.fairy.tw.note'),2,'fy-tw');
+}
+function twistFrame(g,dt,p){
+const W0=S.tw;if(!W0)return;
+const rec=recOf(g),q=rec.q[W0.s.id];if(!q||q.s!==2){S.tw=null;return;}
+W0.t+=dt;
+const f=W0.f,pl=g.player,yaw=pl.yaw;
+
+const tx=p[0]-Math.cos(yaw)*1.2-Math.sin(yaw)*1.6,tz=p[2]+Math.sin(yaw)*1.2-Math.cos(yaw)*1.6;
+const far=Math.hypot(tx-f.pos[0],tz-f.pos[2]);
+if(far>18){f.pos[0]=tx;f.pos[2]=tz;const y=ground(g,tx,tz);if(y!==null)f.pos[1]=y;}
+if(stepTo(g,f,[tx,0,tz],dt,Math.min(9,2+far*1.6)))f.yaw=yaw+Math.PI+Math.sin(W0.t*0.7)*0.5;
+if(q.tw===1){
+if(W0.pos[1]===null){const y=ground(g,W0.pos[0],W0.pos[2]);if(y!==null)W0.pos[1]=y+0.9;}
+const d=Math.hypot(W0.pos[0]-p[0],W0.pos[2]-p[2]);
+if(d<22&& !(W0.said&1)){W0.said|=1;say(g,f,T('g.fairy.tw.near'));}
+if(W0.pos[1]!==null&&d<2.4){
+const r=F.Q.fetch(q);save(g);
+if(g.particles)for(let i=0;i<14;i++)mote(g,W0.pos[0],W0.pos[1],W0.pos[2],Math.cos(i)*0.8,0.6+(i%3)*0.3,Math.sin(i)*0.8,[1,0.92,0.6],0.06,1.4,0.3);
+chime(g,r==='got'?[784,988,1175]:[659,880],0.07,0.08);
+if(r==='hop'){const n=F.hopSpot(seedOf(g),W0.s.id,q.h,[W0.pos[0],W0.pos[2]],p);W0.pos[0]=n[0];W0.pos[2]=n[1];W0.pos[1]=null;say(g,f,T('g.fairy.tw.hop'));}
+else if(r==='got')say(g,f,T('g.fairy.tw.got'));
+}
+}else if(q.tw===2){
+if(Math.hypot(W0.s.x-p[0],W0.s.z-p[2])<F.TW.home+(RAD[W0.s.kind]||10)){const s0=W0.s;S.tw=null;finish(g,s0,f);if(!f.away)f.back=1;}
+}
+}
 
 function fireflies(g,s,dt,p,T0,b){
 const N=[8,14,20,26,32][T0]||20,inWood=Math.hypot(p[0]-s.x,p[2]-s.z)<24;
@@ -144288,8 +144675,9 @@ for(let k=0;k<2;k++){PM.wind=0;mote(g,p[0]+(Math.random()-0.5)*0.7,p[1]+0.06,p[2
 function buddy(g,dt,eye){
 const B=S.bud||(S.bud={pos:[eye[0],eye[1],eye[2]],t:0}),pl=g.player,yaw=pl.yaw;
 B.t+=dt;
-const d=pl.lookDir?pl.lookDir():[-Math.sin(yaw),0,-Math.cos(yaw)],tx=eye[0]+Math.cos(yaw)*1.0+d[0]*1.7,tz=eye[2]-Math.sin(yaw)*1.0+d[2]*1.7,ty=eye[1]-0.2+d[1]*1.7+Math.sin(B.t*2.1)*0.1;
-const k=Math.min(1,dt*3);B.pos[0]+=(tx-B.pos[0])*k;B.pos[1]+=(ty-B.pos[1])*k;B.pos[2]+=(tz-B.pos[2])*k;
+
+const BP=F.budPos(eye,yaw,S.budT||(S.budT=[0,0,0])),tx=BP[0],tz=BP[2],ty=BP[1]+Math.sin(B.t*2.1)*0.08;
+const k=Math.min(1,dt*6);B.pos[0]+=(tx-B.pos[0])*k;B.pos[1]+=(ty-B.pos[1])*k;B.pos[2]+=(tz-B.pos[2])*k;
 if(Math.hypot(tx-B.pos[0],tz-B.pos[2])>12){B.pos[0]=tx;B.pos[1]=ty;B.pos[2]=tz;}
 if(g.particles){dot(g,B.pos[0],B.pos[1],B.pos[2],[1,0.9,0.6],0.09);if(Math.random()<dt*(tier(g)?8:2))mote(g,B.pos[0],B.pos[1],B.pos[2],0,-0.1,0,[1,0.85,0.55],0.03,0.8,0);}
 }
@@ -144314,6 +144702,7 @@ const giver={tree:'tuepfel',shroom:'flocke',spring:'zwirbel',circle:'silbrin',ga
 function talk(g,s,f){
 const rec=recOf(g),k=F.ADV[s.kind],q=rec.q[s.id],done=rec.done.indexOf(s.id)>=0;
 f.yaw=Math.atan2(-(g.player.pos[0]-f.pos[0]),-(g.player.pos[2]-f.pos[2]));
+if(!(S.tw&&S.tw.f===f))f.talkT=S.t+7;
 if(f.mood==='sleepy'&& !(f.wakeT>S.t)){f.wakeT=S.t+25;say(g,f,T('g.fairy.dusel.yawn'));return true;}
 if(f.who!==giver[s.kind]){say(g,f,T('g.fairy.chat.'+f.who+'.'+(Math.floor(S.t)%3)));return true;}
 if(done){say(g,f,T('g.fairy.thanks.'+k));return true;}
@@ -144328,7 +144717,7 @@ if(k==='bridge')hum(g,s);
 if(k==='riddle')say(g,f,riddleLine(g,s,q||rec.q[s.id]));
 return true;
 }
-if(q.s===2){finish(g,s,f);return true;}
+if(q.s===2){if(q.tw===1&&S.tw){say(g,f,T('g.fairy.tw.still'));return true;}finish(g,s,f);return true;}
 
 if(k==='lost'&& !S.escort)S.escort={f,from:s,to:homeOf(s)};
 if(k==='hat'&& !S.chase)S.chase={f,hop:false};
@@ -144340,7 +144729,13 @@ return true;
 
 function homeOf(s){const c=S.sites.find((x)=>x.kind==='circle'&&x.y!==null);if(c)return c;let b=null,bd=1e9;for(const x of S.sites){if(x===s)continue;const d=Math.hypot(x.x-s.x,x.z-s.z);if(d<bd){bd=d;b=x;}}return b||s;}
 function riddleLine(g,s,q){const R=F.Q.riddles(seedOf(g),s.id),r=R[q?q.n:0];return r?T('g.fairy.rid.'+r.rid+'.q'):'';}
+
 function finish(g,s,f){
+const rec=recOf(g),k=F.ADV[s.kind],q=rec.q[s.id];
+if(q&&q.s===2&&q.tw!==2){if(!q.tw)F.Q.twist(q);save(g);if(f)f.talkT=0;if(!S.tw&&f)twistBegin(g,s,f,k);return;}
+reward(g,s,f);
+}
+function reward(g,s,f){
 const rec=recOf(g),k=F.ADV[s.kind],r=F.Q.finish(rec,s.id,k);
 if(!r)return;
 save(g);
@@ -144492,25 +144887,32 @@ const mname=part.o.lawn&& !vl?'fy_garden_lawn':part.m;
 if(LK.drawModel(g,r,P(),mname,pos,yaw,c,MP))n++;
 MP.pose=null;
 }
-for(const f of s.folk)if(!f.away||f===S.escort)n+=drawSprite(g,r,P,f,c);
+for(const f of s.folk)if(!f.away||f===S.escort||(S.tw&&S.tw.f===f))n+=drawSprite(g,r,P,f,c);
 if(s.kind==='tree'&&s.lanterns){const q=recOf(g).q[s.id];if(q&&q.s===1)for(const L of s.lanterns)if(!(q.m&(1<<L.i))){MP.scale=1;LK.drawModel(g,r,P(),'fy_lantern',L.pos,S.t*0.3,c,MP);n++;}}
 }
 if(S.escort&&(!s||s.folk.indexOf(S.escort.f)<0))n+=drawSprite(g,r,P,S.escort.f,c);
+if(S.tw){if(!s||s.folk.indexOf(S.tw.f)<0)n+=drawSprite(g,r,P,S.tw.f,c);const q=recOf(g).q[S.tw.s.id];if(q&&q.tw===1&&S.tw.pos[1]!==null){MP.scale=2.2+Math.sin(S.t*3)*0.1;MP.pose=null;const sp=S.tw.pos,y=sp[1];sp[1]=y+Math.sin(S.t*1.7)*0.15;if(LK.drawModel(g,r,P(),'fy_seed',sp,S.t*0.6,c,MP))n++;sp[1]=y;}}
+
+if(s&&s.parts&&vlOf(g)&&S.E&&(S.E.night||0)>0.3&&s.y!==null){MP.scale=1;MP.pose=null;const gp=S.gp||(S.gp=[0,0,0]);gp[0]=s.x;gp[1]=s.y+0.05;gp[2]=s.z;if(LK.drawModel(g,r,P(),'fy_glow',gp,0,c,MP))n++;}
 if(S.bud&&recOf(g).buddy&&g.settings.fairyBuddy!==false&&g.player){const B=S.bud;MP.scale=0.42;MP.pose=wings(B,'bud');LK.drawModel(g,r,P(),'fy_sprite_0',[B.pos[0],B.pos[1]-0.2,B.pos[2]],g.player.yaw,c,MP);MP.pose=null;n++;}
 S.cost.parts=n;
 if(s&&s.parts&& !vlOf(g))S.cost.halos=halos(g,r,s,c);
 };
-function wings(f,k){const p=f._pose||(f._pose={wing_l:[0,0,0],wing_r:[0,0,0],cap:[0,0,0,0,0,0],body:[0,0,0,0,0,0]});const a=Math.sin(S.t*(f.mood==='sleepy'?3:14)+(f.v||0))*(f.sleep?0.1:0.55);p.wing_l[1]=0.4+a;p.wing_r[1]= -0.4-a;void k;return p;}
+function wings(f,k){const p=f._pose||(f._pose={wing_l:[0,0,0],wing_r:[0,0,0],cap:[0,0,0,0,0,0],body:[0,0,0,0,0,0],arm_l:[0,0,0],arm_r:[0,0,0],leg_l:[0,0,0],leg_r:[0,0,0]});const a=Math.sin(S.t*(f.mood==='sleepy'?3:14)+(f.v||0))*(f.sleep?0.1:0.55);p.wing_l[1]=0.4+a;p.wing_r[1]= -0.4-a;void k;return p;}
 function drawSprite(g,r,P,f,c){
 const pz=f.pos,pos=f._dp||(f._dp=[0,0,0]);
 pos[0]=pz[0];pos[1]=pz[1]+(f.hop||0)+Math.sin(S.t*2+(f.v||0))*0.05;pos[2]=pz[2];
 const pose=wings(f);
 pose.body[0]=f.sleep?0.35:0;pose.cap[0]=f.sleep?0.35:0;
-MP.scale=f.who==='borke'?1.25:f.who==='flocke'?0.8:1;MP.pose=pose;
+
+const sw=Math.sin(f.walk||0)*0.8*(f.walkAmt||0),talking=f.talkT>S.t;
+pose.leg_l[0]=sw;pose.leg_r[0]= -sw;pose.arm_l[0]= -sw*0.7;pose.arm_r[0]=sw*0.7;
+pose.arm_r[2]=talking? -2.2+Math.sin(S.t*6)*0.35:0;pose.arm_l[2]=f.sleep?0:Math.sin(S.t*1.3+(f.v||0))*0.08;
+MP.scale=(f.who==='borke'?1.25:f.who==='flocke'?0.85:1)*(talking?1.3:1.12);MP.pose=pose;
 const m='fy_sprite_'+(f.hat?'hat':f.v);
 const ok=LK.drawModel(g,r,P(),m,pos,f.yaw,c,MP);
 MP.pose=null;
-if(ok&&g.particles)dot(g,pos[0]-Math.sin(f.yaw)*0.02,pos[1]+0.78*MP.scale+0.02,pos[2],[1,0.9,0.55],0.06);
+if(ok&&g.particles)dot(g,pos[0]-Math.sin(f.yaw)*0.12*MP.scale,pos[1]+0.92*MP.scale,pos[2]-Math.cos(f.yaw)*0.12*MP.scale,[1,0.9,0.55],0.05);
 return ok?1:0;
 }
 
@@ -144534,6 +144936,8 @@ talk:(who)=>{const g=VR.game,s=S.near;const f=s&&s.folk.find((x)=>x.who===who);r
 play:(i)=>(S.near?play(VR.game,S.near,i):false),answer:(j)=>(S.near?answer(VR.game,S.near,j):false),wish:(i)=>(S.near?wish(VR.game,S.near,i):false),knock:()=>(S.near?knock(VR.game,S.near):false),
 melody:()=>(S.near?F.Q.melody(seedOf(VR.game),S.near.id):null),riddles:()=>(S.near?F.Q.riddles(seedOf(VR.game),S.near.id):null),
 escort:()=>(S.escort?{pos:S.escort.f.pos.slice(),to:[S.escort.to.x,S.escort.to.y,S.escort.to.z]}:null),chase:()=>(S.chase?{pos:S.chase.f.pos.slice(),hop:S.chase.hop}:null),
+clear:()=>S.sites.filter((s)=>s.y!==null).map((s)=>({kind:s.kind,c:Math.round(F.clearance(s.x,s.z,avoidOf(VR.game)))})),
+twist:()=>(S.tw?{pos:S.tw.pos.slice(),home:[S.tw.s.x,S.tw.s.y,S.tw.s.z],k:S.tw.k,who:S.tw.f.who,f:S.tw.f.pos.slice(),tw:(recOf(VR.game).q[S.tw.s.id]||{}).tw}:null),bud:()=>(S.bud?S.bud.pos.slice():null),
 wake:()=>{S.awake=S.t+240;},rec:()=>recOf(VR.game),ride:()=>(S.ride?S.ride.u: -1),bridge:()=>(S.near&&S.near.bridge)||0,
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -144754,8 +145158,19 @@ MI.frameK=function(t){const F=MI.FRAME;return t<=0||t>=F.dur?0:t<F.rise?smoother
 MI.frameSkip=function(t){const F=MI.FRAME;return t<F.rise?F.dur-F.fall*Math.max(0,t)/F.rise:t<F.rise+F.hold?F.rise+F.hold:t;};
 
 
-MI.framePose=function(lead,door,out,side){
+
+
+MI.FRAME_NEAR={d:4.0,ahead:1.2,up:1.9};
+MI.framePose=function(lead,door,out,side,cart){
 out=out||{};
+if(cart){
+let dx=lead[0]-door[0],dz=lead[2]-door[2];const L=Math.hypot(dx,dz)||1;dx/=L;dz/=L;
+const N=MI.FRAME_NEAR,sd=side||1,mx=(lead[0]+cart[0])/2,mz=(lead[2]+cart[2])/2,my=Math.max(lead[1],cart[1]);
+out.x=cart[0]-dx*N.ahead-dz*N.d*sd;out.z=cart[2]-dz*N.ahead+dx*N.d*sd;out.y=my+N.up;
+const ex=mx-out.x,ez=mz-out.z,ty=my+0.9;
+out.yaw=Math.atan2(-ex,-ez);out.pitch=Math.atan2(ty-out.y,Math.hypot(ex,ez));
+return out;
+}
 let dx=lead[0]-door[0],dz=lead[2]-door[2];const L=Math.hypot(dx,dz)||1;dx/=L;dz/=L;
 const sd=side||1,ah=Math.min(6,L*0.5);
 out.x=lead[0]-dx*ah-dz*6*sd;out.z=lead[2]-dz*ah+dx*6*sd;out.y=lead[1]+2.6;
@@ -145174,8 +145589,17 @@ if(dl>34||dl<12||Math.hypot(p[0]-o[0],p[2]-o[2])>45)return;
 
 const dx=(L.pos[0]-o[0])/dl,dz=(L.pos[2]-o[2])/dl,mx=o[0]+dx*dl*0.5,mz=o[2]+dz*dl*0.5,w=g.world;
 const hA=w.topAt?w.topAt(Math.floor(mx-dz*9),Math.floor(mz+dx*9)):0,hB=w.topAt?w.topAt(Math.floor(mx+dz*9),Math.floor(mz-dx*9)):0;
-J.frame={t:0,side:hA<=hB?1: -1,pose:{},hh: !!g.hideHud};
+let side=hA<=hB?1: -1;
+
+if(J.cart&&VR.MoveIn.lineClear){const ok=(sd)=>{const P=MI.framePose(L.pos,o,{},sd,J.cart);return MI.lineClear(w,[P.x,P.y,P.z],[J.cart[0],J.cart[1]+1,J.cart[2]]);};if(!ok(side)&&ok(-side))side= -side;}
+J.frame={t:0,side,pose:{},hh: !!g.hideHud};
 g.hideHud=true;
+};
+
+MI.lineClear=function(w,a,b){
+const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz),n=Math.ceil(L/0.4),R=VR.R,F=VR.F;
+for(let i=1;i<n;i++){const u=i/n;if(u*L>L-1)break;const st=w.getBlock(Math.floor(a[0]+dx*u),Math.floor(a[1]+dy*u),Math.floor(a[2]+dz*u));if(st&&R&&R.T&&(R.T.flags[st]&F.SOLID))return false;}
+return true;
 };
 MI.frameEnd=function(g,J){if(!J|| !J.frame)return;g.hideHud=J.frame.hh;J.frame=null;J.frameDone=true;};
 const wrapA=(a)=>{a=(a+Math.PI)%(Math.PI*2);if(a<0)a+=Math.PI*2;return a-Math.PI;};
@@ -145184,7 +145608,7 @@ MI.cam=function(g,base){
 const V=g.villages,J=V&&V._mi&&V._mi.job,F=J&&J.frame;if(!F)return null;
 const L=J.agents[0];if(!L)return null;
 const k=MI.frameK(F.t);if(k<=0.001)return null;
-const P=MI.framePose(L.pos,J.h.outside,F.pose,F.side);
+const P=MI.framePose(L.pos,J.h.outside,F.pose,F.side,J.cart||null);
 const gy=g.world.topAt?g.world.topAt(Math.floor(P.x),Math.floor(P.z))+2.2:P.y;if(P.y<gy)P.y=gy;
 return Object.assign({},base,{x:base.x+(P.x-base.x)*k,y:base.y+(P.y-base.y)*k,z:base.z+(P.z-base.z)*k,yaw:base.yaw+wrapA(P.yaw-base.yaw)*k,pitch:base.pitch+(P.pitch-base.pitch)*k,roll:(base.roll||0)*(1-k),fixed:true});
 };
@@ -145932,8 +146356,48 @@ const[st,gl]=NB[id];
 gr.box(2,0,2,6,1,6,st);gr.box(3,2,3,5,7,5,st);gr.ell(4,8.5,4,3.6,1.5,3.6,st);
 gr.ell(4,10.5,4,2.2,2.4,2.2,gl,{emis:1});
 }));
+
+
+
+const pole=(gr,h0,col)=>gr.box(4,0,4,4,h0,4,col);
+M.ss_np_gezeiten=()=>one(8,2.6,part(12,34,9,[4,0,4],(gr)=>{
+pole(gr,30,0xd8d0b0);gr.ell(4,31.5,4,2.2,1.6,2.2,(x,y)=>(y&1?0xf4e8d8:0xe8c8b0));
+for(let y=18;y<29;y++){const w=Math.round(3+Math.sin((y-18)*0.7)*2.5);for(let x=5;x<5+Math.max(1,w);x++)gr.set(Math.min(11,x),y,4,(x+y)%4===0?0xf4f8ff:y<23?0x2a9ad8:0x5ae0f0,(x+y)%4===0?1:0);}
+}));
+M.ss_np_sandstern=()=>one(8,2.6,part(11,36,11,[5,0,5],(gr)=>{
+gr.box(5,0,5,5,27,5,0x8a6a3a);gr.box(3,0,3,7,1,7,0xd8a860);
+for(let k=0;k<8;k++){const a=k/8*Math.PI*2,L=k&1?2.5:4.5;for(let r=0;r<=L;r+=0.5)gr.set(Math.round(5+Math.cos(a)*r),Math.round(31+Math.sin(a)*r),5,r<1.5?0xfff4c0:0xffd860,1);}
+}));
+M.ss_np_funkel=()=>one(8,2.4,part(12,30,12,[6,0,6],(gr)=>{
+for(const[x,z,hh,c]of[[6,6,28,0xe0a0ff],[3,5,16,0xc080f0],[8,3,19,0xa0c0ff],[8,8,13,0xf0b0ff],[4,9,10,0xb0d0ff]])for(let y=0;y<hh;y++){const w=Math.max(0,Math.round((1-y/hh)*1.6));gr.box(x-w,y,z-w,x+w,y,z+w,(xx,yy)=>((xx+yy)%5===0?0xfff0ff:c),{emis:1});}
+}));
+M.ss_np_steinglut=()=>one(8,2,part(14,16,14,[7,0,7],(gr)=>{
+for(let y=0;y<10;y++)for(let z=0;z<14;z++)for(let x=0;x<14;x++){const r=Math.hypot(x-6.5,z-6.5),R0=y<3?3.5-y*0.3:3+(y-3)*0.55;if(r<=R0&&(r>R0-1.4||y<2))gr.set(x,y,z,(x*3+y+z)%5===0?0x5a5a62:0x3a3a40);}
+gr.ell(6.5,10.5,6.5,5,2.4,5,(x,y,z)=>((x+z+y)%3===0?0xffd040:0xff7a2a),{emis:1});
+}));
+M.ss_np_eisbluete=()=>one(8,2.4,part(19,28,19,[9,0,9],(gr)=>{
+gr.box(9,0,9,9,18,9,0xbfe4f4);
+for(let k=0;k<6;k++){const a=k/6*Math.PI*2;for(let r=1;r<9;r++){const y=19+Math.round(Math.sin(r/9*Math.PI)*4)-(r>6?r-6:0);gr.set(Math.round(9+Math.cos(a)*r),y,Math.round(9+Math.sin(a)*r),r>6?0xf4fbff:0x8ad0ff,r<3?1:0);gr.set(Math.round(9+Math.cos(a+0.18)*r*0.8),y,Math.round(9+Math.sin(a+0.18)*r*0.8),0xd8f0ff);}}
+gr.ell(9,20,9,1.6,1.6,1.6,0xf4fbff,{emis:1});
+}));
+
+M.ss_tether=()=>one(32,4.5,part(1,256,1,[0,0,0],(gr)=>{for(let y=0;y<256;y++)gr.set(0,y,0,y%32<3?0xf4f0e6:0xd8d0c0);}));
 }
 SF.KC=4;
+
+SF.LOOK={
+gezeiten:{prop:'ss_np_gezeiten',dance:'wave'},
+sandstern:{prop:'ss_np_sandstern',dance:'reach'},
+funkel:{prop:'ss_np_funkel',dance:'hop'},
+steinglut:{prop:'ss_np_steinglut',dance:'stomp'},
+eisbluete:{prop:'ss_np_eisbluete',dance:'twirl'},
+};
+
+SF.tether=function(hand,kite,out){
+out=out||{};const dx=kite[0]-hand[0],dy=kite[1]-hand[1],dz=kite[2]-hand[2],L=Math.hypot(dx,dy,dz)||1;
+out.yaw=Math.atan2(dx,dz);out.pitch=Math.acos(Math.max(-1,Math.min(1,dy/L)));out.scale=L/8;out.len=L;
+return out;
+};
 
 
 const isRec=(o)=> !!o&&typeof o==='object';
@@ -145985,6 +146449,8 @@ for(let z=b[2]+1;z<b[5]&&m<3;z++)for(const[x,nx]of[[b[0]+1,-1],[b[3]-1,1]])if(m<
 }
 }else if(S.FESTS[id]&&S.FESTS[id].sp){
 for(let k=0;k<6;k++){const a=k*TAU/6+0.3,r=PR+1.2;add('ss_bowl_'+id,cx+Math.cos(a)*r,y,cz+Math.sin(a)*r,-a,k===0?{act:'native'}:null);}
+const L=SF.LOOK[id];
+if(L){for(let k=0;k<4;k++){const a=k*TAU/4+0.82,r=PR+3.4;add(L.prop,cx+Math.cos(a)*r,y,cz+Math.sin(a)*r,-a);}add(L.prop,cx,y,cz,0.4,{scale:1.6,big:true});}
 }
 return D;
 };
@@ -146013,6 +146479,15 @@ return base.runAct.call(this,a,dt,tod);
 };
 P.festPose=function(a,t,Q){
 if(base.festPose)base.festPose.call(this,a,t,Q);
+
+const fs=a.vil&&a.vil.ss,L=fs&&fs.phase==='fest'?SF.LOOK[fs.id]:null;
+if(L&&a.festRole==='dance'&&Q){
+const k=a.p.seed%7,ph=t*3+k,set=(part,rx,ry,rz)=>{const o=Q[part]||[0,0,0,0,0,0];Q[part]=[rx,ry,rz,0,o[4]||0,0];};
+if(L.dance==='wave'){set('arm_l',1.6,0,-1.2-Math.sin(ph)*0.6);set('arm_r',1.6,0,1.2-Math.sin(ph)*0.6);a.drawOffY=0;}
+else if(L.dance==='reach'){set('arm_l',3.0+Math.sin(ph*0.5)*0.15,0,-0.25);set('arm_r',3.0-Math.sin(ph*0.5)*0.15,0,0.25);a.drawOffY=0;}
+else if(L.dance==='stomp'){set('arm_l',0.9,0,-0.9);set('arm_r',0.9,0,0.9);set('leg_l',Math.max(0,Math.sin(ph*1.6))*0.9,0,0);set('leg_r',Math.max(0,-Math.sin(ph*1.6))*0.9,0,0);a.drawOffY=0;}
+else if(L.dance==='twirl'){set('arm_l',1.55,0,-1.5);set('arm_r',1.55,0,1.5);set('body',0,Math.sin(ph*0.7)*0.6,0);a.drawOffY=0;}
+}
 if(a.ssSit&&Q&&Q.arm_r){Q.arm_r=[1.1+Math.sin(t*2.2+(a.p.seed%5))*0.35,0,0.25,0,Q.arm_r[4]||0,0];}
 };
 const pose0=P.pose;
@@ -146121,6 +146596,10 @@ const lift=K.back?Math.min(1,K.back.t/6):1;
 K.pos[0]=sx+Math.sin(t*0.7+ph)*1.2;K.pos[2]=sz+Math.cos(t*0.6+ph)*1.2;
 K.pos[1]=y+1+lift*(14+(K.k%3)*3+Math.sin(t*0.9+ph)*1.0);
 K.yaw=yawW+Math.sin(t*0.8+ph)*0.25;K.pitch=0.35+Math.sin(t*1.1+ph)*0.08;
+
+const hr=PR*0.85+(K.k%2)*1.2;if(!K.hand)K.hand=[0,0,0];K.hand[0]=cx+Math.cos(ang)*hr;K.hand[1]=y+1.25;K.hand[2]=cz+Math.sin(ang)*hr;
+if(!K.holder&&LK&&LK.folk){const sd=((vil.plan.seed|0)^(K.k*7919))>>>0;K.holder={look:LK.folk(sd,'farmer',K.k%3===0?'adult':'child'),pos:[K.hand[0],y,K.hand[2]],yaw:0,state:'point',walk:0,walkAmt:0,seed:(K.k%97)/97,kid:K.k%3!==0};if(K.holder.kid)K.hand[1]=y+0.85;}
+if(K.holder){K.holder.pos[0]=K.hand[0];K.holder.pos[1]=y;K.holder.pos[2]=K.hand[2];K.holder.yaw=Math.atan2(-(K.pos[0]-K.hand[0]),-(K.pos[2]-K.hand[2]));}
 }
 s.looseT-=dt;
 if(s.looseT<=0&& !s.kites.some(K=>K.fall)){
@@ -146186,7 +146665,7 @@ return true;
 };
 
 
-const MP={scale:1,pose:null,shade:0,noShade:true,pitch:0};
+const MP={scale:1,pose:null,shade:0,noShade:true,pitch:0},TQ={};
 const DUMMY=[0,0,0];
 P.draw=function(r,E,cam){
 const res=base.draw.apply(this,arguments);
@@ -146222,6 +146701,12 @@ if(d.act==='lantern'){const hh=1.6+(j*0.53)%6.2,a=j*2.1+0.4,rr=(1-(hh+0.2)/10)*2
 else{const ca=Math.cos(d.yaw),sa=Math.sin(d.yaw),off= -1.3+(j%7)*0.43;p=[d.pos[0]+ca*off,d.pos[1]+2.5+Math.sin(Math.PI*(off+1.6)/3.3)*0.5-(j>=7?0.5:0),d.pos[2]-sa*off];}
 MP.scale=1;if(LK.drawModel(g,r,PG(),d.act==='lantern'?'ss_lantern':'ss_wreath',p,d.yaw,c,MP))n++;
 }
+}
+
+if(s.kites&&s.phase==='fest'&&this.festivalOn(vil,tod))for(const K of s.kites){
+if(K.fall|| !K.hand)continue;
+const Tq=SF.tether(K.hand,K.pos,TQ);MP.scale=Tq.scale;MP.pitch=Tq.pitch;if(LK.drawModel(g,r,PG(),'ss_tether',K.hand,Tq.yaw,c,MP))n++;MP.pitch=0;
+if(K.holder&&tier>0){LK.drawFolk(g,r,PG(),K.holder,c,this.time);n++;}
 }
 if(s.kites&&s.phase==='fest'&&this.festivalOn(vil,tod))for(const K of s.kites){MP.scale=1;MP.pitch=K.pitch;if(LK.drawModel(g,r,PG(),'ss_kite_'+(K.k%SF.KC),K.pos,K.yaw,c,MP))n++;MP.pitch=0;}
 }
