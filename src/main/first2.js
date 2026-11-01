@@ -25,10 +25,10 @@
   // sandstone, not the neon magenta that pulled the eye (game.giveKit, a vgen ≥ 9 world's new kit)
   F.HAND_DIM = 0.7; F.KIT5 = 'sandstone';
   // (Very Low's mesh program has no u_desat: the hand's lights tinted by handTint(mean, keep) — per channel the factor that
-  //  moves the block's mean colour to luma + keep × (colour − luma), within 0.5 … 2; pure, test/polish6.js)
+  //  moves the block's mean colour to luma + keep × (colour − luma), within 0.4 … 2.5; pure, test/polish6.js)
   F.handTint = function (c, keep) {
     const L = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], out = [1, 1, 1];
-    for (let i = 0; i < 3; i++) { const want = L + keep * (c[i] - L); out[i] = c[i] > 1e-4 ? Math.max(0.5, Math.min(2, want / c[i])) : 1; }
+    for (let i = 0; i < 3; i++) { const want = L + keep * (c[i] - L); out[i] = c[i] > 1e-4 ? Math.max(0.4, Math.min(2.5, want / c[i])) : 1; }
     return out;
   };
   F.HAND_SAT = 0.7;   // f-polish6 (R56-13: sandstone at 0.604, the goal ≤ 0.55): the held block keeps 70 % of its chroma (≈ 20 % less HSV saturation) (entities.drawHand, u_desat)

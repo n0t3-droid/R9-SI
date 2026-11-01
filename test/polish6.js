@@ -56,7 +56,7 @@ check(V.First2.HAND_SAT === 0.7, 'VR.First2.HAND_SAT 0.7 (70 % of its chroma: ab
 { const F2 = V.First2, sat = (c) => (Math.max(...c) - Math.min(...c)) / Math.max(...c), lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
   let ok = true, worst = 1; for (const c of [[0.42, 0.33, 0.2], [0.2, 0.45, 0.12], [0.5, 0.5, 0.5], [0.6, 0.2, 0.1]]) { const t = F2.handTint(c, F2.HAND_SAT), o = c.map((v, i) => v * t[i]); if (Math.abs(lum(o) - lum(c)) > 0.01) ok = false; if (sat(c) > 0.01) worst = Math.min(worst, 1 - sat(o) / sat(c)); }
   check(ok && worst >= 0.15, 'Very Low: handTint moves a block\'s mean colour toward its luma (saturation ≥ 15 % lower, the luma kept) — least ' + (worst * 100).toFixed(0) + ' %'); }
-check(/F2\.handTint\(mesh\.meanCol/.test(src('entities.js')) && /m\.meanCol = /.test(src('entities.js')), 'drawHand tints Very Low\'s hand lights by the block\'s mean colour');
+check(/F2\.handTint\(mesh\.meanCol/.test(src('entities.js')) && /mesh\.meanCol = this\.meanCol\(mesh\)/.test(src('entities.js')), 'drawHand tints Very Low\'s hand lights by the block\'s mean colour');
 const sh = src('shaders.js'), mesh = sh.slice(sh.indexOf('S.MESH_FS'), sh.indexOf('// ------------------------------------------------------------ particles'));
 check(/#ifdef LIGHT2\nuniform float u_desat;/.test(mesh) && /#ifdef LIGHT2\n  if \(u_desat > 0\.0\)/.test(mesh), 'the mesh program\'s desaturation sits behind LIGHT2 (Very Low\'s program unchanged: test/vl_programs.js)');
 const en = src('entities.js');
