@@ -4117,5 +4117,32 @@
     "g.ss.act.nativeDone": "The {sp} are delighted: you celebrate {f} with them!",
     "g.ss.thanks": ["Thank you!", "How lovely!", "You belong here!", "Hooray!"],
     // ---- w-seasons end
+    // ---- o-seamless (journey.js): the Sky Ladder, the light bridges, the caravans
+    "g.jy.lift.name": "Sky Ladder",
+    "g.jy.lift.sub": "to the Ring Station · 52 km above Herzwelt",
+    "g.jy.lift.cabin": "🛗 Sky Ladder to the Ring Station — step into the cabin",
+    "g.jy.lift.alt": "{m} m",
+    "g.jy.lift.space": "Above the air — the Ring Station waits up there",
+    "g.jy.bridge.name": "Light bridge to {place}",
+    "g.jy.bridge.walk": "W walk · S slower · Space skip",
+    "g.jy.ride.offer": "🛒 Caravan to {place} · {d} m — [V] climb on",
+    "g.jy.ride.board": "🛒 On the way to {place} — look around with the mouse, Shift gets off",
+    "g.jy.ride.off": "You get off.",
+    "g.jy.ride.arrive": "🛒 {place} — the caravan stops here.",
+    "g.jy.ride.who": "Driver",
+    "g.jy.arrive": "Arrived: {place}",
+    "g.set.journeys": "Journeys on foot",
+    "g.set.journeys.tip": "Gates become light bridges you walk along; the Sky Ladder rides up to the Ring Station; caravans take you along. Off: the short travel films.",
+    "g.jy.line.0": "Look, the slope over there is in bloom — a little earlier every year.",
+    "g.jy.line.1": "Hold on tight, it gets bumpy here. Just kidding, we're floating!",
+    "g.jy.line.2": "I've driven this way for years, and it's never the same twice.",
+    "g.jy.line.3": "They're baking honey bread in the village ahead today. Can you smell it?",
+    "g.jy.line.4": "If you're lucky you'll see the deer by the brook on the way.",
+    "g.jy.line.5": "My grandmother still walked this way. With songs.",
+    "g.jy.line.6": "See those clouds? Tomorrow there'll be rain for the fields.",
+    "g.jy.line.7": "You always meet someone on the way. That's the best part.",
+    "g.jy.line.8": "In the evening the lanterns light the whole way.",
+    "g.jy.line.9": "We're almost there. Stay a while, the people are friendly.",
+    // ---- o-seamless end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

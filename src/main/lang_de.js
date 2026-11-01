@@ -4117,5 +4117,32 @@
     "g.ss.act.nativeDone": "Die {sp} freuen sich: du feierst {f} mit!",
     "g.ss.thanks": ["Danke dir!", "Wie schön!", "Du gehörst dazu!", "Juhu!"],
     // ---- w-seasons end
+    // ---- o-seamless (journey.js): die Himmelsleiter, die Lichtbrücken, die Karawanen
+    "g.jy.lift.name": "Himmelsleiter",
+    "g.jy.lift.sub": "zur Ringstation · 52 km über Herzwelt",
+    "g.jy.lift.cabin": "🛗 Himmelsleiter zur Ringstation — stell dich in die Kabine",
+    "g.jy.lift.alt": "{m} m",
+    "g.jy.lift.space": "Über der Luft — die Ringstation wartet oben",
+    "g.jy.bridge.name": "Lichtbrücke nach {place}",
+    "g.jy.bridge.walk": "W gehen · S langsamer · Leertaste überspringen",
+    "g.jy.ride.offer": "🛒 Karawane nach {place} · {d} m — [V] aufsitzen",
+    "g.jy.ride.board": "🛒 Unterwegs nach {place} — Umsehen mit der Maus, Shift steigt ab",
+    "g.jy.ride.off": "Du steigst ab.",
+    "g.jy.ride.arrive": "🛒 {place} — die Karawane hält hier.",
+    "g.jy.ride.who": "Kutscherin",
+    "g.jy.arrive": "Angekommen: {place}",
+    "g.set.journeys": "Reisen zu Fuß",
+    "g.set.journeys.tip": "Tore werden Lichtbrücken, die du entlanggehst; die Himmelsleiter fährt zur Ringstation; Karawanen nehmen dich mit. Aus: die kurzen Reisefilme.",
+    "g.jy.line.0": "Schau, da drüben blüht der Hang — jedes Jahr ein bisschen früher.",
+    "g.jy.line.1": "Halt dich gut fest, hier wird's holprig. Nur ein Spaß, wir schweben ja!",
+    "g.jy.line.2": "Ich fahre diese Strecke seit Jahren, und sie ist nie zweimal gleich.",
+    "g.jy.line.3": "Im Dorf vorne backen sie heute Honigbrot. Riechst du's schon?",
+    "g.jy.line.4": "Wenn du Glück hast, siehst du unterwegs die Rehe am Bach.",
+    "g.jy.line.5": "Meine Großmutter hat diesen Weg noch zu Fuß gemacht. Mit Liedern.",
+    "g.jy.line.6": "Siehst du die Wolken dort? Morgen gibt's bestimmt Regen fürs Feld.",
+    "g.jy.line.7": "Unterwegs trifft man immer jemanden. Das ist das Schönste daran.",
+    "g.jy.line.8": "Am Abend leuchten die Laternen den ganzen Weg entlang.",
+    "g.jy.line.9": "Gleich sind wir da. Bleib doch eine Weile, die Leute sind freundlich.",
+    // ---- o-seamless end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
