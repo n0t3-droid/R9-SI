@@ -88,14 +88,6 @@ const closeUp = async (vid, pick, expr, name) => {
 const stats = () => ev(() => { const S = VR.FolkJoy.stats; return { n: S.n, by: Object.assign({}, S.by) }; });
 const resetStats = () => ev(() => { const FJ = VR.FolkJoy; FJ.stats = FJ.newStats(); const J = VR.game.villages.joy; if (J) J.stats = FJ.stats; });
 
-for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.smoothFolk = true; g.applySettings('*'); });
-await ev(`VR.game.createWorld({name:'Bewohner',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
-for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
-check(await ev(() => VR.game.state) === 'play', 'a new world');
-await ev(() => { window.__home = VR.game.dim; if (VR.Portal) VR.Portal.GATE_S = 1e9; });   // (run 2: the plaza's gate opened its picker under the walk — the game stood still)
-await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(3000); if (g.ui && g.ui.show) g.ui.show(null); });
-await settle(30);
 const GOLD = 11450;
 // the photo mode on, its time held at tick
 const photoOn = (tick) => ev((tick) => { const g = VR.game; if (!g.photoCam || !g.photoCam.on) g.photoMode(true); const pc = g.photoCam; pc.first = false; if (tick !== null && tick !== undefined) { pc.held = tick; g.env.setTime(tick); } return !!(pc && pc.on); }, tick);
