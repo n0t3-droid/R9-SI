@@ -67,7 +67,7 @@ console.log('2 · the Himmelsleiter\'s space phase');
     if (stationFrom === null && Math.PI / 2 <= topE - 0.03) stationFrom = k;
   }
   console.log('    the limb in view to ' + (limbTo * 100).toFixed(0) + ' %, the station from ' + (stationFrom * 100).toFixed(0) + ' %, the largest step ' + jump.toFixed(3) + ' rad / 1 %');
-  check(limbTo >= 0.6, 'the planet\'s limb in view (the lower half) until ≥ 60 % of the space phase (' + (limbTo * 100).toFixed(0) + ' %; was ≈ 15 %)');
+  check(limbTo >= 0.6, 'the planet\'s limb in view (the lower half) until ≥ 60 % of the space phase (' + (limbTo * 100).toFixed(0) + ' %; was 18 %, the station from 37 % as a dot)');
   check(stationFrom !== null && stationFrom <= 0.72 && stationFrom - limbTo <= 0.1, 'the station in view from ≤ 72 % (' + (stationFrom * 100).toFixed(0) + ' %), the gap between ≤ 10 % (≈ 3 s, the tether\'s lights lead up)');
   check(jump < 0.13 && Math.abs(K.liftLook(0, p0) - p0) < 1e-9 && K.liftLook(1, p0) > 1.2, 'continuous (your pitch at the switch; a step ≤ 0.13 rad per 1 %), the berth looked up at (' + K.liftLook(1, p0).toFixed(2) + ' rad)');
   const src = fs.readFileSync(__dirname + '/../src/main/journey.js', 'utf8');

@@ -162,7 +162,8 @@ for (const TAG of BUILDS) {
         const shots = [];
         let seen = await ev(() => VR.game.wanderer ? VR.game.wanderer.timeline.length : 0);
         for (let s = 0; s < dur; s++) {
-          await step(30, 33);
+          const ts = Date.now(); await step(30, 33); const tw = Date.now() - ts;
+          if (tw > 8000) console.log('    slow second ' + s + ': ' + tw + ' ms ' + JSON.stringify(await ev(() => { const D = VR.game.wanderer, T = D && D.__t7; return { n: window.__w7 && window.__w7.n, upd: T ? +T.max.toFixed(1) : null, pend: VR.game.world.pending.size, busy: VR.game.pool.busy, ms: D ? D.ms.map(m => m.kind) : null, ofs: D && D.ofs, pos: VR.game.player.pos.map(Math.round) }; })));
           if (!pics) continue;
           const tl = await ev(() => VR.game.wanderer.timeline.length);
           if (tl > seen) {
@@ -181,7 +182,7 @@ for (const TAG of BUILDS) {
         return { T, frame, shots };
       };
       if (want('woods')) {
-        const hi = await walkWood('high', 52, 5);
+        const hi = process.env.SKIP_HIGH ? { T: null, frame: null, shots: [] } : await walkWood('high', 52, 5);
         R.woodsHigh = { T: hi.T, frame: hi.frame, shots: hi.shots.map(s => ({ s: s.s, kind: s.kind, sh: s.sh })) };
         console.log('  High: the director ' + JSON.stringify(hi.T) + ', frame median ' + hi.frame + ' ms');
         where = 'woods: Very Low walk';

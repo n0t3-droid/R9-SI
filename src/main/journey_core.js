@@ -180,7 +180,7 @@
   // a dot). Now: the planet's limb and its glow held in the lower third until ≈ 64 % (the pitch follows the dip of the
   // horizon as you rise), then a sweep up the tether (≈ 3 s, the view a little wider meanwhile) to the station, which
   // is in view from ≈ 70 % on and grows to the berth (78°). K.LIFT.R: Herzwelt's radius (spacescene.js BODIES.herz)
-  K.LIFT.R = 99550; K.LOOK = { hold: 0.3, in: 0.12, up0: 0.54, upDur: 0.22, top: 1.36, wide: 16 * Math.PI / 180, w0: 0.5, w1: 0.86 };
+  K.LIFT.R = 99550; K.LOOK = { hold: 0.4, in: 0.12, up0: 0.58, upDur: 0.2, top: 1.36, wide: 16 * Math.PI / 180, w0: 0.5, w1: 0.86 };
   K.liftK = (t) => clamp((t - K.LIFT.ground) / (K.LIFT.len - K.LIFT.ground), 0, 1);
   K.dip = (alt, R) => { R = R || K.LIFT.R; return Math.acos(R / (R + Math.max(0, +alt || 0))); };
   K.dipAt = (k, top, R) => K.dip(K.liftAlt(K.LIFT.ground + clamp(k, 0, 1) * (K.LIFT.len - K.LIFT.ground), top), R);
