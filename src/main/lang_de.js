@@ -4144,5 +4144,17 @@
     "g.jy.line.8": "Am Abend leuchten die Laternen den ganzen Weg entlang.",
     "g.jy.line.9": "Gleich sind wir da. Bleib doch eine Weile, die Leute sind freundlich.",
     // ---- o-seamless end
+    // ---- o-wander2 start
+    "g.fairy.tw.lanterns": "Oh! Die kleinste Laterne hat ihren Lichtsamen verloren – der Wind hat ihn fortgetragen. Kommst du mit? Ich zeig dir den Weg!",
+    "g.fairy.tw.lost": "Zuhause! Aber … mein Glöckchenlicht ist unterwegs davongeweht. Hilfst du mir, es zu suchen? Ich geh mit!",
+    "g.fairy.tw.bridge": "Die Brücke singt! Nur ein Lichtsamen fehlt, der letzte Ton – der Wind hat ihn verweht. Holen wir ihn zusammen?",
+    "g.fairy.tw.riddle": "Klug bist du! Ein letztes Rätsel noch: Was leuchtet, fliegt und hat keine Flügel? … Ein Lichtsamen! Und dort draußen tanzt einer. Komm!",
+    "g.fairy.tw.hat": "Mein Hut! Danke! Aber die Feder … der Wind hat den Lichtsamen von meiner Hutfeder mitgenommen. Fangen wir ihn?",
+    "g.fairy.tw.near": "Da! Siehst du ihn leuchten? Ganz vorsichtig …",
+    "g.fairy.tw.hop": "Hihi, er hüpft weiter! Hinterher!",
+    "g.fairy.tw.got": "Du hast ihn! Jetzt schnell nach Hause damit.",
+    "g.fairy.tw.still": "Der Lichtsamen ist noch dort draußen – ich bleib bei dir.",
+    "g.fairy.tw.note": "✨ Noch eins: ein Lichtsamen, vom Wind verweht – zusammen mit deinem Flausel",
+    // ---- o-wander2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

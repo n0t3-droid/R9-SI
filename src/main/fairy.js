@@ -102,7 +102,11 @@
   // ---------------------------------------------------------------- f-polish5: the places' manners (pure)
   // a place keeps AVOID m off the game's own things: villages, outposts, wonders ({x, z, r}) and machines (r ≈ 6)
   F.AVOID = 40;
-  F.clearOf = function (x, z, avoid) { if (avoid) for (const o of avoid) if (Math.hypot(o.x - x, o.z - z) < (o.r || 0) + F.AVOID) return false; return true; };
+  F.clearOf = function (x, z, avoid, extra) { if (avoid) for (const o of avoid) if (Math.hypot(o.x - x, o.z - z) < (o.r || 0) + F.AVOID + (extra || 0)) return false; return true; };
+  // o-wander2: the Slumber Tree (the lost lanterns round it) keeps a wider berth from towns — no alley between towers
+  F.EXTRA = { tree: 40, shroom: 10 };
+  // how far a point is beyond every footprint (m; Infinity with none)
+  F.clearance = function (x, z, avoid) { let c = Infinity; if (avoid) for (const o of avoid) c = Math.min(c, Math.hypot(o.x - x, o.z - z) - (o.r || 0)); return c; };
   // the Schwebegarten's bridge side (where you see it from): the garden against the lowest land behind it, never from
   // ground higher than its top − 4 m (you would look down on it); flat land keeps the planned yaw (yaw0).
   // hAt(x, z) → the ground's height
@@ -205,6 +209,19 @@
   // the reward, once a place: {coins, size, page, set}
   F.SET = ['b:lumishroom', 'b:spirit_lantern', 'b:pink_petals', 'b:wildflowers', 'b:moss_carpet', 'b:rose_crystal_cluster', 'b:glow_berry_vine', 'b:vm_light_table_mushroom_white', 'b:spore_blossom', 'b:azure_crystal_cluster'];
   F.GIFT = { lanterns: ['b:spirit_lantern', 6], lost: ['b:lumishroom', 8], bridge: ['b:pink_petals', 16], riddle: ['b:rose_crystal_cluster', 6], hat: ['b:wildflowers', 16] };
+  // o-wander2 · the twist (every adventure's second stage): back at the giver after the main task, one more thing — a
+  // glow seed the wind carried off 110–140 m away; the giver walks with you; the seed flits ahead twice before it is
+  // caught (tw: 1 away · 2 caught; h the catches); home again (within 8 m of the place) the adventure ends
+  Q.twist = function (q) { if (!q || q.s !== 2) return 'idle'; if (!q.tw) { q.tw = 1; q.h = 0; return 'twist'; } return q.tw === 2 ? 'ready' : 'still'; };
+  Q.fetch = function (q) { if (!q || q.tw !== 1) return 'idle'; q.h = (q.h | 0) + 1; if (q.h >= 3) { q.tw = 2; return 'got'; } return 'hop'; };
+  F.TW = { near: 110, far: 140, hop: [12, 16], home: 8 };
+  // the seed's first spot (pure: seed, the place) and each hop (away from the player, along the same bearing)
+  F.twistSpot = function (seed, site) { const a = h(seed, strH(site.id + '#tw')) * TAU, r = F.TW.near + (F.TW.far - F.TW.near) * h(seed, strH(site.id + '#twr')); return [site.x + Math.cos(a) * r, site.z + Math.sin(a) * r]; };
+  F.hopSpot = function (seed, id, n, from, player) { let dx = from[0] - player[0], dz = from[1] - player[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; const a = (h(seed, strH(id + '#hop'), n) - 0.5) * 1.2, c = Math.cos(a), sn = Math.sin(a), d = F.TW.hop[0] + (F.TW.hop[1] - F.TW.hop[0]) * h(seed, strH(id + '#hd'), n); return [from[0] + (dx * c - dz * sn) * d, from[1] + (dx * sn + dz * c) * d]; };
+  // o-wander2: the companion light beside your shoulder — 1.1 m right, 1.3 m ahead, 0.35 m down (≈ 1.74 m from the eye,
+  // ≈ 40° off the view's centre): seen at the edge, never in the face
+  F.BUD = { right: 1.1, ahead: 1.3, down: 0.35 };
+  F.budPos = function (eye, yaw, out) { const B = F.BUD, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw); out = out || [0, 0, 0]; out[0] = eye[0] + rx * B.right + fx * B.ahead; out[1] = eye[1] - B.down; out[2] = eye[2] + rz * B.right + fz * B.ahead; return out; };
   Q.finish = function (rec, id, k) {
     const q = rec && rec.q[id]; if (!q || q.s !== 2 || rec.done.indexOf(id) >= 0) return null;
     q.s = 3; rec.done.push(id);
@@ -300,17 +317,21 @@
       if (s.kind === 'garden' && s.y !== null) { const y0 = s.y; s.yaw = F.gardenYaw((px, pz) => { const y = ground(g, px, pz); return y === null ? y0 : y; }, x, z, y0 + 24, s.yaw); }
       build(g, s); return true;
     };
-    for (let k = s.tries; k < F.SETTLE_TRIES; k++) {
+    // o-wander2: the spiral reaches on (to ~210 m) while no spot has been clear of the towns; the last resort is the spot
+    // farthest beyond their footprints, never the planned one inside a town
+    const N = s.best ? F.SETTLE_TRIES : 30;
+    for (let k = s.tries; k < N; k++) {
       const a = s.yaw + k * 0.93, r = k * 7, x = Math.round(x0 + Math.cos(a) * r), z = Math.round(z0 + Math.sin(a) * r);
       if (S.sites.some((o) => o !== s && o.y !== null && Math.hypot(o.x - x, o.z - z) < F.APART)) { s.tries = k + 1; continue; }
-      if (!F.clearOf(x, z, avoidOf(g))) { s.tries = k + 1; continue; }   // (f-polish5: off villages, outposts, wonders, machines)
+      if (!F.clearOf(x, z, avoidOf(g), F.EXTRA[s.kind])) { const c = F.clearance(x, z, avoidOf(g)); if (!(c <= (s.farC === undefined ? -1e9 : s.farC))) { s.farC = c; s.far = [x, z]; } s.tries = k + 1; continue; }   // (f-polish5: off villages, outposts, wonders, machines)
       const ok = landOk(g, x, z, RAD[s.kind] || 10, s.kind === 'garden' ? 8 : 5);
       if (ok === 'wait') return false;
       if (ok === 3) return put(x, z);
       if (ok > (s.bestG || 0)) { s.bestG = ok; s.best = [x, z]; }
       s.tries = k + 1;
     }
-    return put(s.best ? s.best[0] : x0, s.best ? s.best[1] : z0);
+    if (!s.best && s.tries < 30) return false;
+    return put(s.best ? s.best[0] : s.far ? s.far[0] : x0, s.best ? s.best[1] : s.far ? s.far[1] : z0);
   }
   const at = (g, x, z, dy) => { const y = ground(g, x, z); return [x, (y === null ? 0 : y) + (dy || 0), z]; };
   const off = (s, a, r) => [s.x + Math.cos(s.yaw + a) * r, s.z + Math.sin(s.yaw + a) * r];
@@ -390,6 +411,7 @@
     }
     if (LATER.length) for (let i = LATER.length - 1; i >= 0; i--) if (S.t >= LATER[i].t) { const L = LATER.splice(i, 1)[0]; try { L.fn(); } catch (e) { /* a nicety */ } }
     if (S.escort) escort(g, dt, p);
+    if (S.tw) twistFrame(g, dt, p);
     if (s && s.kind === 'garden') F.hold(g.player);
     if (S.bubble) bubbleFrame(g);
     if (recOf(g).buddy && g.settings.fairyBuddy !== false) buddy(g, dt, eye);
@@ -426,7 +448,11 @@
   // ---- the folk: their moods
   function think(g, s, f, dt, p) {
     f.t += dt;
-    if (f === S.escort || f.away) return;
+    if (f === S.escort || f.away || (S.tw && S.tw.f === f)) return;
+    // o-wander2: talking, the Flausel steps out to you — 2.1 m in front of your view, facing you, a little hop
+    if (f.talkT > S.t) { stepTo(g, f, talkSpot(g, f), dt, 2.6); f.yaw = Math.atan2(-(p[0] - f.pos[0]), -(p[2] - f.pos[2])); return; }
+    if (f.talkT && f.talkT <= S.t) { f.talkT = 0; f.back = 1; }
+    if (f.back) { if (stepTo(g, f, f.home, dt, 1.6)) f.back = 0; else return; }
     const dx = p[0] - f.pos[0], dz = p[2] - f.pos[2], d = Math.hypot(dx, dz);
     const face = Math.atan2(-dx, -dz);
     if (f.mood === 'shy') {
@@ -452,6 +478,55 @@
     } else { f.yaw = face; f.hop = 0; }
   }
 
+  // o-wander2: a Flausel walks (a hop gait: f.walk the phase, f.walkAmt how much) toward a point; true when there
+  function stepTo(g, f, q, dt, sp) {
+    const dx = q[0] - f.pos[0], dz = q[2] - f.pos[2], d = Math.hypot(dx, dz);
+    if (d < 0.25) { f.walkAmt = Math.max(0, (f.walkAmt || 0) - dt * 4); f.hop = 0; return true; }
+    const st = Math.min(d, sp * dt); f.pos[0] += dx / d * st; f.pos[2] += dz / d * st;
+    f.walk = (f.walk || 0) + st * 3.2; f.walkAmt = Math.min(1, (f.walkAmt || 0) + dt * 4); f.hop = Math.abs(Math.sin(f.walk)) * 0.12;
+    f.yaw = Math.atan2(-dx, -dz);
+    if ((f.gT = (f.gT || 0) - dt) <= 0) { f.gT = 0.2; const y = ground(g, f.pos[0], f.pos[2]); if (y !== null && Math.abs(y - f.pos[1]) < 3) f.pos[1] = y; }
+    return false;
+  }
+  function talkSpot(g, f) {
+    const pl = g.player, yaw = pl.yaw, q = f._ts || (f._ts = [0, 0, 0]);
+    q[0] = pl.pos[0] - Math.sin(yaw) * 2.1; q[2] = pl.pos[2] - Math.cos(yaw) * 2.1; q[1] = f.pos[1];
+    // (not further than 6 m from home: the shy one stays near its door)
+    const hx = q[0] - f.home[0], hz = q[2] - f.home[2], hd = Math.hypot(hx, hz); if (hd > 6) { q[0] = f.home[0] + hx / hd * 6; q[2] = f.home[2] + hz / hd * 6; }
+    return q;
+  }
+  // ---- o-wander2 · the twist: the giver walks with you to the glow seed, it flits ahead twice, home again
+  function twistBegin(g, s, f, k) {
+    const sp = F.twistSpot(seedOf(g), s);
+    S.tw = { s, f, k, pos: [sp[0], null, sp[1]], said: 0, t: 0 };
+    say(g, f, T('g.fairy.tw.' + k));
+    note(g, T('g.fairy.tw.note'), 2, 'fy-tw');
+  }
+  function twistFrame(g, dt, p) {
+    const W0 = S.tw; if (!W0) return;
+    const rec = recOf(g), q = rec.q[W0.s.id]; if (!q || q.s !== 2) { S.tw = null; return; }
+    W0.t += dt;
+    const f = W0.f, pl = g.player, yaw = pl.yaw;
+    // the giver beside you: 1.4 m to your left, a little ahead — it hops along, looks round, chirps near the seed
+    const tx = p[0] - Math.cos(yaw) * 1.4 - Math.sin(yaw) * 0.6, tz = p[2] + Math.sin(yaw) * 1.4 - Math.cos(yaw) * 0.6;
+    const far = Math.hypot(tx - f.pos[0], tz - f.pos[2]);
+    if (far > 18) { f.pos[0] = tx; f.pos[2] = tz; const y = ground(g, tx, tz); if (y !== null) f.pos[1] = y; }
+    if (stepTo(g, f, [tx, 0, tz], dt, Math.min(9, 2 + far * 1.6))) f.yaw = yaw + Math.PI + Math.sin(W0.t * 0.7) * 0.5;
+    if (q.tw === 1) {
+      if (W0.pos[1] === null) { const y = ground(g, W0.pos[0], W0.pos[2]); if (y !== null) W0.pos[1] = y + 0.9; }
+      const d = Math.hypot(W0.pos[0] - p[0], W0.pos[2] - p[2]);
+      if (d < 22 && !(W0.said & 1)) { W0.said |= 1; say(g, f, T('g.fairy.tw.near')); }
+      if (W0.pos[1] !== null && d < 2.4) {
+        const r = F.Q.fetch(q); save(g);
+        if (g.particles) for (let i = 0; i < 14; i++) mote(g, W0.pos[0], W0.pos[1], W0.pos[2], Math.cos(i) * 0.8, 0.6 + (i % 3) * 0.3, Math.sin(i) * 0.8, [1, 0.92, 0.6], 0.06, 1.4, 0.3);
+        chime(g, r === 'got' ? [784, 988, 1175] : [659, 880], 0.07, 0.08);
+        if (r === 'hop') { const n = F.hopSpot(seedOf(g), W0.s.id, q.h, [W0.pos[0], W0.pos[2]], p); W0.pos[0] = n[0]; W0.pos[2] = n[1]; W0.pos[1] = null; say(g, f, T('g.fairy.tw.hop')); }
+        else if (r === 'got') say(g, f, T('g.fairy.tw.got'));
+      }
+    } else if (q.tw === 2) {
+      if (Math.hypot(W0.s.x - p[0], W0.s.z - p[2]) < F.TW.home + (RAD[W0.s.kind] || 10)) { const s0 = W0.s; S.tw = null; finish(g, s0, f); if (!f.away) f.back = 1; }
+    }
+  }
   // ---- the fireflies of the wood: they drift round its mushrooms and follow you while you walk in it
   function fireflies(g, s, dt, p, T0, b) {
     const N = [8, 14, 20, 26, 32][T0] || 20, inWood = Math.hypot(p[0] - s.x, p[2] - s.z) < 24;
@@ -598,8 +673,9 @@
   function buddy(g, dt, eye) {
     const B = S.bud || (S.bud = { pos: [eye[0], eye[1], eye[2]], t: 0 }), pl = g.player, yaw = pl.yaw;
     B.t += dt;
-    const d = pl.lookDir ? pl.lookDir() : [-Math.sin(yaw), 0, -Math.cos(yaw)], tx = eye[0] + Math.cos(yaw) * 1.0 + d[0] * 1.7, tz = eye[2] - Math.sin(yaw) * 1.0 + d[2] * 1.7, ty = eye[1] - 0.2 + d[1] * 1.7 + Math.sin(B.t * 2.1) * 0.1;   // ahead and to the right, at the edge of the view
-    const k = Math.min(1, dt * 3); B.pos[0] += (tx - B.pos[0]) * k; B.pos[1] += (ty - B.pos[1]) * k; B.pos[2] += (tz - B.pos[2]) * k;
+    // o-wander2: beside your shoulder (F.budPos: ≈ 1.7 m from the eye, ≈ 40° off the centre), never in the face
+    const BP = F.budPos(eye, yaw, S.budT || (S.budT = [0, 0, 0])), tx = BP[0], tz = BP[2], ty = BP[1] + Math.sin(B.t * 2.1) * 0.08;
+    const k = Math.min(1, dt * 6); B.pos[0] += (tx - B.pos[0]) * k; B.pos[1] += (ty - B.pos[1]) * k; B.pos[2] += (tz - B.pos[2]) * k;
     if (Math.hypot(tx - B.pos[0], tz - B.pos[2]) > 12) { B.pos[0] = tx; B.pos[1] = ty; B.pos[2] = tz; }
     if (g.particles) { dot(g, B.pos[0], B.pos[1], B.pos[2], [1, 0.9, 0.6], 0.09); if (Math.random() < dt * (tier(g) ? 8 : 2)) mote(g, B.pos[0], B.pos[1], B.pos[2], 0, -0.1, 0, [1, 0.85, 0.55], 0.03, 0.8, 0); }
   }
@@ -624,6 +700,7 @@
   function talk(g, s, f) {
     const rec = recOf(g), k = F.ADV[s.kind], q = rec.q[s.id], done = rec.done.indexOf(s.id) >= 0;
     f.yaw = Math.atan2(-(g.player.pos[0] - f.pos[0]), -(g.player.pos[2] - f.pos[2]));
+    if (!(S.tw && S.tw.f === f)) f.talkT = S.t + 7;   // (o-wander2: it steps out to you while it talks)
     if (f.mood === 'sleepy' && !(f.wakeT > S.t)) { f.wakeT = S.t + 25; say(g, f, T('g.fairy.dusel.yawn')); return true; }
     if (f.who !== giver[s.kind]) { say(g, f, T('g.fairy.chat.' + f.who + '.' + (Math.floor(S.t) % 3))); return true; }
     if (done) { say(g, f, T('g.fairy.thanks.' + k)); return true; }
@@ -638,7 +715,7 @@
       if (k === 'riddle') say(g, f, riddleLine(g, s, q || rec.q[s.id]));
       return true;
     }
-    if (q.s === 2) { finish(g, s, f); return true; }
+    if (q.s === 2) { if (q.tw === 1 && S.tw) { say(g, f, T('g.fairy.tw.still')); return true; } finish(g, s, f); return true; }
     // under way: a reminder of what to do
     if (k === 'lost' && !S.escort) S.escort = { f, from: s, to: homeOf(s) };
     if (k === 'hat' && !S.chase) S.chase = { f, hop: false };
@@ -650,7 +727,13 @@
   // where Flöckchen lives: the stone circle of this world, else the nearest other place
   function homeOf(s) { const c = S.sites.find((x) => x.kind === 'circle' && x.y !== null); if (c) return c; let b = null, bd = 1e9; for (const x of S.sites) { if (x === s) continue; const d = Math.hypot(x.x - s.x, x.z - s.z); if (d < bd) { bd = d; b = x; } } return b || s; }
   function riddleLine(g, s, q) { const R = F.Q.riddles(seedOf(g), s.id), r = R[q ? q.n : 0]; return r ? T('g.fairy.rid.' + r.rid + '.q') : ''; }
+  // o-wander2: the main task done — first the twist (one more thing, together: twistBegin), then the reward
   function finish(g, s, f) {
+    const rec = recOf(g), k = F.ADV[s.kind], q = rec.q[s.id];
+    if (q && q.s === 2 && q.tw !== 2) { if (!q.tw) F.Q.twist(q); save(g); if (f) f.talkT = 0; if (!S.tw && f) twistBegin(g, s, f, k); return; }
+    reward(g, s, f);
+  }
+  function reward(g, s, f) {
     const rec = recOf(g), k = F.ADV[s.kind], r = F.Q.finish(rec, s.id, k);
     if (!r) return;
     save(g);
@@ -802,25 +885,32 @@
         if (LK.drawModel(g, r, P(), mname, pos, yaw, c, MP)) n++;
         MP.pose = null;
       }
-      for (const f of s.folk) if (!f.away || f === S.escort) n += drawSprite(g, r, P, f, c);
+      for (const f of s.folk) if (!f.away || f === S.escort || (S.tw && S.tw.f === f)) n += drawSprite(g, r, P, f, c);
       if (s.kind === 'tree' && s.lanterns) { const q = recOf(g).q[s.id]; if (q && q.s === 1) for (const L of s.lanterns) if (!(q.m & (1 << L.i))) { MP.scale = 1; LK.drawModel(g, r, P(), 'fy_lantern', L.pos, S.t * 0.3, c, MP); n++; } }
     }
     if (S.escort && (!s || s.folk.indexOf(S.escort.f) < 0)) n += drawSprite(g, r, P, S.escort.f, c);
+    if (S.tw) { if (!s || s.folk.indexOf(S.tw.f) < 0) n += drawSprite(g, r, P, S.tw.f, c); const q = recOf(g).q[S.tw.s.id]; if (q && q.tw === 1 && S.tw.pos[1] !== null) { MP.scale = 1.1 + Math.sin(S.t * 3) * 0.06; MP.pose = null; const sp = S.tw.pos, y = sp[1]; sp[1] = y + Math.sin(S.t * 1.7) * 0.15; if (LK.drawModel(g, r, P(), 'fy_seed', sp, S.t * 0.6, c, MP)) n++; sp[1] = y; } }
+    // o-wander2: Very Low's night glow — a warm ring of light on the ground at the place (one emissive draw)
+    if (s && s.parts && vlOf(g) && S.E && (S.E.night || 0) > 0.3 && s.y !== null) { MP.scale = 1; MP.pose = null; const gp = S.gp || (S.gp = [0, 0, 0]); gp[0] = s.x; gp[1] = s.y + 0.05; gp[2] = s.z; if (LK.drawModel(g, r, P(), 'fy_glow', gp, 0, c, MP)) n++; }
     if (S.bud && recOf(g).buddy && g.settings.fairyBuddy !== false && g.player) { const B = S.bud; MP.scale = 0.42; MP.pose = wings(B, 'bud'); LK.drawModel(g, r, P(), 'fy_sprite_0', [B.pos[0], B.pos[1] - 0.2, B.pos[2]], g.player.yaw, c, MP); MP.pose = null; n++; }
     S.cost.parts = n;
     if (s && s.parts && !vlOf(g)) S.cost.halos = halos(g, r, s, c);
   };
-  function wings(f, k) { const p = f._pose || (f._pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], cap: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0] }); const a = Math.sin(S.t * (f.mood === 'sleepy' ? 3 : 14) + (f.v || 0)) * (f.sleep ? 0.1 : 0.55); p.wing_l[1] = 0.4 + a; p.wing_r[1] = -0.4 - a; void k; return p; }
+  function wings(f, k) { const p = f._pose || (f._pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], cap: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0], arm_l: [0, 0, 0], arm_r: [0, 0, 0], leg_l: [0, 0, 0], leg_r: [0, 0, 0] }); const a = Math.sin(S.t * (f.mood === 'sleepy' ? 3 : 14) + (f.v || 0)) * (f.sleep ? 0.1 : 0.55); p.wing_l[1] = 0.4 + a; p.wing_r[1] = -0.4 - a; void k; return p; }
   function drawSprite(g, r, P, f, c) {
     const pz = f.pos, pos = f._dp || (f._dp = [0, 0, 0]);
     pos[0] = pz[0]; pos[1] = pz[1] + (f.hop || 0) + Math.sin(S.t * 2 + (f.v || 0)) * 0.05; pos[2] = pz[2];
     const pose = wings(f);
     pose.body[0] = f.sleep ? 0.35 : 0; pose.cap[0] = f.sleep ? 0.35 : 0;
-    MP.scale = f.who === 'borke' ? 1.25 : f.who === 'flocke' ? 0.8 : 1; MP.pose = pose;
+    // o-wander2: the tiny limbs — legs and arms swing with the hop gait, an arm waves while it talks to you
+    const sw = Math.sin(f.walk || 0) * 0.8 * (f.walkAmt || 0), talking = f.talkT > S.t;
+    pose.leg_l[0] = sw; pose.leg_r[0] = -sw; pose.arm_l[0] = -sw * 0.7; pose.arm_r[0] = sw * 0.7;
+    pose.arm_r[2] = talking ? -2.2 + Math.sin(S.t * 6) * 0.35 : 0; pose.arm_l[2] = f.sleep ? 0 : Math.sin(S.t * 1.3 + (f.v || 0)) * 0.08;
+    MP.scale = (f.who === 'borke' ? 1.25 : f.who === 'flocke' ? 0.85 : 1) * (talking ? 1.3 : 1.12); MP.pose = pose;
     const m = 'fy_sprite_' + (f.hat ? 'hat' : f.v);
     const ok = LK.drawModel(g, r, P(), m, pos, f.yaw, c, MP);
     MP.pose = null;
-    if (ok && g.particles) dot(g, pos[0] - Math.sin(f.yaw) * 0.02, pos[1] + 0.78 * MP.scale + 0.02, pos[2], [1, 0.9, 0.55], 0.06);   // the feeler's light
+    if (ok && g.particles) dot(g, pos[0] - Math.sin(f.yaw) * 0.12 * MP.scale, pos[1] + 0.92 * MP.scale, pos[2] - Math.cos(f.yaw) * 0.12 * MP.scale, [1, 0.9, 0.55], 0.05);   // the feeler's light
     return ok ? 1 : 0;
   }
 
@@ -844,6 +934,7 @@
     play: (i) => (S.near ? play(VR.game, S.near, i) : false), answer: (j) => (S.near ? answer(VR.game, S.near, j) : false), wish: (i) => (S.near ? wish(VR.game, S.near, i) : false), knock: () => (S.near ? knock(VR.game, S.near) : false),
     melody: () => (S.near ? F.Q.melody(seedOf(VR.game), S.near.id) : null), riddles: () => (S.near ? F.Q.riddles(seedOf(VR.game), S.near.id) : null),
     escort: () => (S.escort ? { pos: S.escort.f.pos.slice(), to: [S.escort.to.x, S.escort.to.y, S.escort.to.z] } : null), chase: () => (S.chase ? { pos: S.chase.f.pos.slice(), hop: S.chase.hop } : null),
+    twist: () => (S.tw ? { pos: S.tw.pos.slice(), home: [S.tw.s.x, S.tw.s.y, S.tw.s.z], k: S.tw.k, who: S.tw.f.who, f: S.tw.f.pos.slice(), tw: (recOf(VR.game).q[S.tw.s.id] || {}).tw } : null), bud: () => (S.bud ? S.bud.pos.slice() : null),
     wake: () => { S.awake = S.t + 240; }, rec: () => recOf(VR.game), ride: () => (S.ride ? S.ride.u : -1), bridge: () => (S.near && S.near.bridge) || 0,
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

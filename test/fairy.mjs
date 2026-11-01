@@ -91,6 +91,21 @@ const view = async (s, d, up, lookY, side) => {
 };
 const walkTo = async (P, frames = 12) => { await ev((P) => { const p = VR.game.player; p.flying = false; p.teleport(P[0], P[1] + 0.05, P[2]); }, P); await step(frames, 33); };
 const rec = () => ev(() => JSON.parse(JSON.stringify(VR.Fairy.debug.rec())));
+// o-wander2: every adventure's twist — the glow seed out there (it flits ahead twice), then home with your Flausel
+const twistLog = [];
+async function twistDone() {
+  let W = await ev(() => VR.Fairy.debug.twist()); if (!W) return false;
+  const t0 = await ev(() => VR.game.time || 0);
+  for (let k = 0; k < 12 && W && W.tw === 1; k++) {
+    if (W.pos[1] === null) { const p = W.pos; await ev((p) => { const pl = VR.game.player; pl.flying = true; pl.teleport(p[0] + 6, 140, p[2]); }, p); await settle(4); await step(12, 33); }
+    else await walkTo([W.pos[0] + 0.6, W.pos[1] - 0.9, W.pos[2]], 10);
+    W = await ev(() => VR.Fairy.debug.twist());
+  }
+  if (!W) return false;
+  await walkTo([W.home[0] + 2, W.home[1], W.home[2] + 2], 14);
+  twistLog.push({ k: W.k, ok: !(await ev(() => VR.Fairy.debug.twist())) });
+  void t0; return true;
+}
 const said = () => ev(() => VR.Fairy.debug.said());
 const pics = {};
 
@@ -157,6 +172,7 @@ if (want('adv')) {
     for (const p of L) { await walkTo(p, 10); }
     r = await rec(); check(r.q[id].s === 2 && r.q[id].m === 7, 'lanterns: three found by walking to them (mask ' + r.q[id].m + ')');
     await walkTo([tf.pos[0] + 2.5, tf.pos[1], tf.pos[2] + 1]); await ev(() => VR.Fairy.debug.talk('tuepfel'));
+    await twistDone();
     r = await rec();
     const inv = await ev(() => VR.game.player.inv.count('b:spirit_lantern'));
     check(r.done.includes(id) && r.pages.includes('lanterns') && r.buddy && inv >= 6, `lanterns: done — a Wanderbuch page, the companion light, ${inv} spirit lanterns`);
@@ -168,6 +184,7 @@ if (want('adv')) {
     await walkTo([z.pos[0] + 4, z.pos[1], z.pos[2]]);
     await ev(() => VR.Fairy.debug.talk('zwirbel')); await ev(() => VR.Fairy.debug.talk('zwirbel'));
     for (let k = 0; k < 3; k++) { const c = await ev(() => VR.Fairy.debug.chase()); if (!c) break; await walkTo([c.pos[0] + 0.8, c.pos[1] - 0.1, c.pos[2]], 6); await step(40, 33); }
+    await twistDone();
     const r = await rec();
     check(r.done.includes('overworld:spring'), 'hat: Zwirbel caught three times, the hat given back');
     await ev(() => VR.Fairy.debug.wish(2)); const r2 = await rec();
@@ -183,6 +200,7 @@ if (want('adv')) {
     await step(120, 33);
     for (const n of mel) { await ev((n) => VR.Fairy.debug.play(n), n); await step(8, 33); }
     await step(120, 33);
+    await twistDone(); await goTo('garden');
     let r = await rec();
     check(r.done.includes('overworld:garden'), 'bridge: the melody ' + mel.join('-') + ' played on the singing stones, the bridge wakes');
     await walkTo(s.foot, 4);
@@ -205,6 +223,7 @@ if (want('adv')) {
     const q1 = await said();
     const wrong = await ev((j) => VR.Fairy.debug.answer(j), (R[0].order.indexOf(0) + 1) % 3);
     for (let k = 0; k < 3; k++) await ev((j) => VR.Fairy.debug.answer(j), R[k].order.indexOf(0));
+    await twistDone();
     const r = await rec();
     check(r.done.includes('overworld:circle'), 'riddle: three answered (the first: „' + (q1 && q1.text.slice(0, 60)) + '…")');
   } catch (e) { check(false, 'riddle: ' + e.message.slice(0, 300)); }
@@ -222,10 +241,12 @@ if (want('adv')) {
       if (k === 6) pics.escort = await grab('fairy_escort.png', 3);
       E = await ev(() => VR.Fairy.debug.escort());
     }
+    await twistDone();
     const r = await rec();
     check(r.done.includes('overworld:shroom'), 'lost: Flöckchen brought home to the stone circle');
   } catch (e) { check(false, 'lost: ' + e.message.slice(0, 300)); }
   const r = await rec(); run.rec = r;
+  check(twistLog.length === 5 && twistLog.every(x => x.ok), 'every adventure had its twist, the glow seed brought home (' + twistLog.map(x => x.k + (x.ok ? '✓' : '✗')).join(' ') + ')');
   check(r.done.length === 5 && r.pages.length === 5, 'all five adventures done, five Wanderbuch pages: ' + r.pages.join(', '));
 }
 

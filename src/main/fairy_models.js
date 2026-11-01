@@ -7,8 +7,9 @@
 //   fy_pool, fy_crystal_0/1/2   the Wishing Spring's glowing pool and its crystal shards
 //   fy_stone, fy_altar, fy_tablet   the Moonstone Circle's stones with faint runes
 //   fy_garden, fy_puff, fy_note_0…4 the Floating Garden, a cloud of the bridge, the five singing stones
-//   fy_sprite_0…4, fy_sprite_hat     the Flausel (a seed-round body, big eyes, rosy cheeks, a leaf cap, a glowing feeler,
-//                    two small wings: parts body, cap, wing_l, wing_r)
+//   fy_sprite_0…4, fy_sprite_hat     the Flausel (a round fluffy body, big eyes, rosy cheeks, a leaf cap, a glowing feeler,
+//                    two small wings, tiny arms and legs: parts body, cap, wing_l, wing_r, arm_l, arm_r, leg_l, leg_r)
+//   fy_seed          o-wander2: the glow seed of an adventure's twist (a dandelion puff of light)
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -272,29 +273,61 @@
     { body: 0xa8e0b8, belly: 0xe4fae8, cap: 0x9a6a3a, cap2: 0x7a4e28 },   // Dusel, Mutter Borke: mint, a bark-brown cap
     { body: 0xe4f2ff, belly: 0xffffff, cap: 0xd8ecff, cap2: 0xb8d8f4 },   // Flöckchen: snow-blue (a little spirit: glows)
   ];
+  // o-wander2: the Flausel as real little figures (1 voxel = 1/32 m: ≈ 0.97 m to the feeler) — a round fluffy body
+  // (a fur shell: tufts and two shades), big eyes with two glints, rosy cheeks, a smile, tiny arms and legs that move
+  // (parts arm_l/arm_r/leg_l/leg_r: rotX swings them), the leaf cap with its glowing feeler, two small wings
+  const shadeC = (c, k) => { const r = Math.min(255, ((c >> 16) & 255) * k) | 0, g = Math.min(255, ((c >> 8) & 255) * k) | 0, b = Math.min(255, (c & 255) * k) | 0; return (r << 16) | (g << 8) | b; };
   const flausel = (C, glow, hat) => () => ({
-    unit: 16, radius: 0.6, parts: {
-      body: part(9, 10, 9, [4.5, 0, 4.5], (gr) => {
-        gr.ell(4.5, 4.8, 4.5, 3.9, 4.6, 3.6, (x, y, z) => (z <= 2 && y >= 2 && y <= 5 && Math.abs(x + 0.5 - 4.5) < 2.4 ? C.belly : C.body), glow ? { emis: 1 } : null);
-        // the face (−z): big dark eyes with a glint, rosy cheeks, a small smile
-        for (const ex of [2, 5]) { gr.box(ex, 5, 0, ex + 1, 6, 1, 0x1e1628); gr.set(ex + 1, 6, 0, 0xffffff); }
-        for (const ex of [1, 7]) gr.set(ex, 4, 1, 0xff9aa8);
-        gr.set(4, 3, 0, 0x8a4a4a); gr.set(3, 3, 1, 0x8a4a4a); gr.set(5, 3, 1, 0x8a4a4a);
-        gr.box(2, 0, 3, 3, 0, 5, 0x8a6a4a); gr.box(6, 0, 3, 7, 0, 5, 0x8a6a4a);   // two little feet
-        gr.set(0, 4, 4, C.body); gr.set(8, 4, 4, C.body);   // two little arms
+    unit: 32, radius: 0.75, parts: {
+      body: part(19, 21, 18, [9.5, 0, 9], (gr) => {
+        const cx = 9.5, cy = 10, cz = 9, rx = 8.4, ry = 9.4, rz = 7.8;
+        gr.ell(cx, cy, cz, rx, ry, rz, (x, y, z, d) => (d > 0.72 ? shadeC(C.body, hs(x, y, z, 3) < 0.5 ? 1.06 : 0.92) : C.body), glow ? { emis: 1 } : null);
+        // the fur: tufts a voxel out on a third of the shell
+        for (let y = 0; y < 21; y++) for (let z = 0; z < 18; z++) for (let x = 0; x < 19; x++) {
+          const d = ((x + 0.5 - cx) / (rx + 1)) ** 2 + ((y + 0.5 - cy) / (ry + 1)) ** 2 + ((z + 0.5 - cz) / (rz + 1)) ** 2;
+          if (d <= 1 && !gr.get(x, y, z) && hs(x, y, z, 5) < 0.33 && y > 2) gr.set(x, y, z, shadeC(C.body, 1.1), glow ? 1 : 0);
+        }
+        // the face (−z): paint the frontmost voxel of each column
+        const front = (x, y) => { for (let z = 0; z < 18; z++) if (gr.get(x, y, z)) return z; return -1; };
+        for (let y = 0; y < 21; y++) for (let x = 0; x < 19; x++) {
+          const z = front(x, y); if (z < 0) continue;
+          let c = null;
+          for (const ex of [cx - 3.4, cx + 3.4]) {
+            const ux = (x + 0.5 - ex) / 2.1, uy = (y + 0.5 - 11.6) / 2.7;
+            if (ux * ux + uy * uy <= 1) { c = 0x1e1628; if (Math.abs(x + 0.5 - (ex - 0.7)) < 0.6 && Math.abs(y + 0.5 - 12.9) < 1.1) c = 0xffffff; else if (Math.abs(x + 0.5 - (ex + 0.8)) < 0.6 && Math.abs(y + 0.5 - 10.3) < 0.6) c = 0xd8e8ff; else if (uy < -0.45) c = 0x3a2a58; }
+          }
+          if (c === null && Math.abs(y + 0.5 - 8.6) < 1.1 && Math.abs(Math.abs(x + 0.5 - cx) - 6.0) < 1.2) c = 0xff9aa8;   // cheeks
+          if (c === null && ((y === 7 && Math.abs(x + 0.5 - cx) < 1.6) || (y === 8 && Math.abs(Math.abs(x + 0.5 - cx) - 2.0) < 0.6))) c = 0x8a3a4a;   // a small smile
+          if (c === null && y > 2 && y < 7 && Math.abs(x + 0.5 - cx) < 4.5) c = C.belly;
+          if (c !== null) gr.set(x, y, z, c, glow && c !== 0x1e1628 ? 1 : 0);
+        }
       }),
-      cap: part(11, 7, 11, [5.5, 0, 5.5], (gr) => {
-        gr.ell(5.5, 0.8, 5.5, 4.6, 1.8, 4.9, (x, y, z) => (y < 1 ? null : (Math.abs(x + 0.5 - 5.5) < 0.6 ? C.cap2 : C.cap)));
-        gr.ell(5.5, 1.5, 1.0, 1.6, 1, 1.4, C.cap);   // the leaf's tip over the brow
-        gr.box(5, 3, 7, 5, 4, 7, 0x6a4a2a);          // its stalk
-        gr.set(4, 3, 4, 0x7a6a50); gr.set(4, 4, 4, 0x7a6a50); gr.set(4, 5, 3, 0xfff0a0, 1); gr.set(4, 6, 3, 0xfff0a0, 1);   // the feeler and its light
-        if (hat) { gr.ell(5.5, 3.2, 5.5, 3.2, 1.6, 3.2, (x, y, z) => ((x + z) & 1 ? 0x8a5a2a : 0x6a4220)); gr.box(5, 4, 5, 6, 5, 6, 0x5a3a1a); }
+      arm_l: part(3, 6, 3, [1.5, 6, 1.5], (gr) => { gr.box(0, 1, 0, 2, 5, 2, shadeC(C.body, 0.95)); gr.box(0, 0, 0, 2, 0, 2, C.belly); }),
+      arm_r: part(3, 6, 3, [1.5, 6, 1.5], (gr) => { gr.box(0, 1, 0, 2, 5, 2, shadeC(C.body, 0.95)); gr.box(0, 0, 0, 2, 0, 2, C.belly); }),
+      leg_l: part(4, 4, 6, [2, 4, 3], (gr) => { gr.box(0, 1, 1, 3, 3, 4, shadeC(C.body, 0.9)); gr.box(0, 0, 0, 3, 0, 4, 0x8a6a4a); }),
+      leg_r: part(4, 4, 6, [2, 4, 3], (gr) => { gr.box(0, 1, 1, 3, 3, 4, shadeC(C.body, 0.9)); gr.box(0, 0, 0, 3, 0, 4, 0x8a6a4a); }),
+      cap: part(21, 14, 21, [10.5, 0, 10.5], (gr) => {
+        gr.ell(10.5, 1.6, 10.5, 9, 3.6, 9.4, (x, y, z) => (y < 2 ? null : (Math.abs(x + 0.5 - 10.5) < 1 ? C.cap2 : (hs(x, y, z, 8) < 0.2 ? shadeC(C.cap, 1.12) : C.cap))));
+        gr.ell(10.5, 3, 2, 3, 2, 2.6, C.cap);            // the leaf's tip over the brow
+        gr.box(10, 5, 14, 11, 8, 15, 0x6a4a2a);           // its stalk
+        for (let y = 5; y < 11; y++) gr.set(8 + ((y - 5) >> 2), y, 8 - ((y - 5) >> 1), 0x7a6a50);   // the feeler…
+        gr.box(9, 11, 4, 10, 12, 5, 0xfff0a0, { emis: 1 });                                          // …and its light
+        if (hat) { gr.ell(10.5, 6.4, 10.5, 6.4, 3.2, 6.4, (x, y, z) => ((x + z) & 1 ? 0x8a5a2a : 0x6a4220)); gr.box(9, 9, 9, 12, 11, 12, 0x5a3a1a); }
       }),
-      wing_l: part(1, 6, 5, [0, 1, 0], (gr) => gr.box(0, 0, 0, 0, 5, 4, (x, y, z) => (y === 5 || z === 4 ? 0xb8e4ff : 0xe4f6ff), { emis: glow ? 1 : 0 })),
-      wing_r: part(1, 6, 5, [0, 1, 0], (gr) => gr.box(0, 0, 0, 0, 5, 4, (x, y, z) => (y === 5 || z === 4 ? 0xb8e4ff : 0xe4f6ff), { emis: glow ? 1 : 0 })),
+      wing_l: part(1, 12, 10, [0, 2, 0], (gr) => gr.box(0, 0, 0, 0, 11, 9, (x, y, z) => (y === 11 || z === 9 || (y + z) % 7 === 0 ? 0xb8e4ff : 0xe4f6ff), { emis: glow ? 1 : 0 })),
+      wing_r: part(1, 12, 10, [0, 2, 0], (gr) => gr.box(0, 0, 0, 0, 11, 9, (x, y, z) => (y === 11 || z === 9 || (y + z) % 7 === 0 ? 0xb8e4ff : 0xe4f6ff), { emis: glow ? 1 : 0 })),
     },
-    layout: { body: [0, 1, 0], cap: [0, 8.6, 0], wing_l: [-3.6, 5, 2], wing_r: [3.6, 5, 2] },
+    layout: { body: [0, 3, 0], arm_l: [-8.6, 12, 0.5], arm_r: [8.6, 12, 0.5], leg_l: [-3.4, 4, 0], leg_r: [3.4, 4, 0], cap: [0, 20.5, 0], wing_l: [-6.5, 14, 5], wing_r: [6.5, 14, 5] },
   });
   FOLK.forEach((C, v) => { M['fy_sprite_' + v] = flausel(C, v === 4, false); });
   M.fy_sprite_hat = flausel(FOLK[1], false, true);
+  // o-wander2: Very Low's night glow at a fairy place (1/4 m): a ring of glowing moss and tiny warm lights, 9 m across
+  M.fy_glow = () => ({ unit: 4, radius: 5, parts: { body: part(37, 1, 37, [18.5, 0, 18.5], (gr) => {
+    for (let z = 0; z < 37; z++) for (let x = 0; x < 37; x++) { const d = Math.hypot(x - 18, z - 18); if (d > 18 || d < 6) continue; const k = hs(x, 0, z, 11); if (k < 0.16) gr.set(x, 0, z, k < 0.05 ? 0xffd890 : k < 0.1 ? 0xb8f0d0 : 0xffb0d0, 1); }
+  }) }, layout: { body: [0, 0, 0] } });
+  // o-wander2: the glow seed (1/16 m): a pale puff on a short stalk, a warm glowing heart
+  M.fy_seed = () => ({ unit: 16, radius: 0.5, parts: { body: part(9, 12, 9, [4.5, 0, 4.5], (gr) => {
+    gr.box(4, 0, 4, 4, 4, 4, 0x8a9a6a);
+    gr.ell(4.5, 8, 4.5, 3.6, 3.6, 3.6, (x, y, z, d) => (d < 0.25 ? 0xfff0a0 : d > 0.7 && hs(x, y, z, 2) < 0.55 ? 0xf4f8ff : null), { emis: 1 });
+  }) }, layout: { body: [0, 0, 0] } });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
