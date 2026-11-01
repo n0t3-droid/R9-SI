@@ -171,7 +171,8 @@
           // o-seamless2: the heading you had at the switch (from the sun's side, as in the voxel sky), the pitch easing up
           // toward the tether's top (K.liftLook: the station in view from 40 % of the phase)
           const sun = norm(sub(eph.bodies.helia.p, Hc)), hs = perp(sun, Nn), hd = rot(hs, Nn, J.rel === undefined ? Math.PI / 2 : J.rel);
-          const fov = 70 * D2R, pt = K.liftLook(ks, J.pitch0 || 0), fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
+          // (f-polish7: the limb held in the lower third while you rise, then the sweep up to the station, a little wider)
+          const fov = K.liftFov ? K.liftFov(ks, 70 * D2R) : 70 * D2R, pt = K.liftLook(ks, J.pitch0 || 0, K.dip ? K.dip(alt, R) : undefined), fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
           view = { pos: add(Hc, mul(Nn, R + alt)), fwd, up: perp(Nn, fwd), fov, ref: 'herz', body: 'herz' };
         }
         let drawn = false;
@@ -189,9 +190,11 @@
         // the station: a wheel of our own, growing above (projected from its true place)
         if (view && St) {
           const f = view.fwd, u = view.up, r = cross(f, u), rel = sub(St, view.pos), z = dot(rel, f), d = len(rel);
+          tetherUp(X, W, H, view, Nn, st.t, z > 1);   // (f-polish7: the tether's lights receding up toward the station)
           if (z > 1) {
             const fpx = H / 2 / Math.tan(view.fov / 2), sx = W / 2 + dot(rel, r) / z * fpx, sy = H / 2 - dot(rel, u) / z * fpx;
-            const rad = Math.max(2.5 + 9 * ks * ks, 160 / d * fpx), tilt = Math.max(0.18, Math.abs(dot(norm(rel), Nn)));
+            // (f-polish7: once in view a lit wheel, not a dot — at least 1.8 % of the frame's height)
+            const rad = Math.max(2.5 + 9 * ks * ks, ks > 0.55 ? H * 0.018 : 0, 160 / d * fpx), tilt = Math.max(0.18, Math.abs(dot(norm(rel), Nn)));
             const gk = K.greet(ks); if (gk > 0 && !J.greeted) { J.greeted = true; note(g, T('g.jy.lift.greet'), 5000); if (g.audio && g.audio.play) g.audio.play('twinkle'); }
             wheel(X, sx, sy, rad, tilt, st.t, gk);
             // the tether up to it
@@ -202,6 +205,29 @@
         if (ks < 0.18) { X.fillStyle = 'rgba(255,240,215,' + (0.8 * (1 - ks / 0.18)).toFixed(2) + ')'; X.font = Math.round(clamp(H * 0.026, 12, 20)) + 'px sans-serif'; X.textAlign = 'center'; X.fillText(T('g.jy.lift.space'), W / 2, H * 0.12); X.textAlign = 'left'; }
       },
     };
+  }
+  // f-polish7: the tether seen from the cabin, up toward its vanishing point (the zenith, or the frame's edge toward it):
+  // a pale line and its marker lights, closer together and smaller with the distance, coming down toward you as you rise
+  function tetherUp(X, W, H, view, Nn, t, toStation) {
+    const f = view.fwd, u = view.up, r = cross(f, u), fpx = H / 2 / Math.tan(view.fov / 2), x0 = W * 0.83, y0 = H * 0.88;
+    const z = dot(Nn, f), sxr = dot(Nn, r), syu = dot(Nn, u);
+    let vx, vy;
+    if (z > 0.02) { vx = W / 2 + sxr / z * fpx; vy = H / 2 - syu / z * fpx; }
+    else { const l = Math.hypot(sxr, syu) || 1; vx = W / 2 + sxr / l * W * 2; vy = H / 2 - syu / l * W * 2; }
+    if (toStation && Math.hypot(vx - x0, vy - y0) < H * 0.05) return;
+    X.save();
+    X.strokeStyle = 'rgba(255,236,190,0.42)'; X.lineWidth = Math.max(1, W * 0.002); X.beginPath(); X.moveTo(x0, y0); X.lineTo(vx, vy); X.stroke();
+    X.globalCompositeOperation = 'lighter';
+    const ph = (t * 0.9) % 1;
+    for (let i = 0; i < 14; i++) {
+      const q = i + 1 - ph, w = 1 / (1 + q * 0.45);   // (w: 1 at the cabin … → 0 at the vanishing point)
+      const px = vx + (x0 - vx) * w, py = vy + (y0 - vy) * w;
+      if (px < -20 || py < -20 || px > W + 20 || py > H + 20) continue;
+      const rr = Math.max(1, W * 0.006 * w), a = Math.min(1, 0.25 + 0.75 * w) * (i === 0 ? 1 - ph : 1);
+      X.fillStyle = 'rgba(255,206,130,' + (0.85 * a).toFixed(2) + ')'; X.beginPath(); X.arc(px, py, rr, 0, Math.PI * 2); X.fill();
+      X.fillStyle = 'rgba(255,200,120,' + (0.18 * a).toFixed(2) + ')'; X.beginPath(); X.arc(px, py, rr * 3, 0, Math.PI * 2); X.fill();
+    }
+    X.restore();
   }
   // the Ringstation, painted: the hull lit from one side, the rim with its windows, six spokes, the hub, two solar wings,
   // the red beacon; far away a blinking star with a halo; o-seamless2: at the top its lights greet you (gk 0…1) — a wave
@@ -566,9 +592,9 @@
         else if (y > 1 && y < 23 && d > 8.6 && d < 10) { const post = Math.abs(Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) * (Math.PI / 4) - Math.atan2(dz, dx)) < 0.09; if (post || y === 12) gr.set(x, y, z, 0xd8b46a, 0); else if ((x + y + z) % 7 === 0) gr.set(x, y, z, 0xbfe8ff, 1); }
       }
     }) }, layout: { cab: [0, 0, 0] } });
-    // o-seamless2: the cart you ride — the caravan's own, its canopy pulled back over the rear half (a sunshade behind
-    // you), so the bench in front has the open sky and the road ahead
-    VM.jy_cart_seat = () => { const m = VM.life_cart(), gr = m.parts.body.grid; for (let y = 7; y < gr.sy; y++) for (let z = 0; z <= 12; z++) for (let x = 0; x < gr.sx; x++) gr.c[gr.i(x, y, z)] = 0; return m; };
+    // o-seamless2 / f-polish7: the cart you ride — the caravan's own, its canopy only over the bench and behind (a striped
+    // fringe at the frame's top), the road ahead open (K.cartSeat, test/polish7.js)
+    VM.jy_cart_seat = () => K.cartSeat(VM.life_cart());
     // the tether (1 voxel = 1/4 m): a slim pale gold line 160 m up, a marker light every 8 m
     VM.jy_tether = () => ({ unit: 4, radius: 80, parts: { line: part(1, 640, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 640; y++) gr.set(0, y, 0, y % 32 < 2 ? 0xffc870 : 0xfff0c8, 1); }) }, layout: { line: [0, 0, 0] } });
   }

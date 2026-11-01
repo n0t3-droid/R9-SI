@@ -142,9 +142,9 @@ console.log('h · o-seamless2: the bridge on Very Low, the heading across the sw
   check(bad === 0, 'the heading across the switch: turning the sun\'s azimuth by relAz about the up axis gives the look (' + bad + ' off)');
   const L = K.liftLook;
   check(typeof L === 'function' && Math.abs(L(0, -0.3) + 0.3) < 1e-9 && Math.abs(L(0.01, -0.3) - L(0, -0.3)) < 0.03, 'the look up: continuous at the switch (your pitch kept)');
-  let mono = typeof L === 'function'; if (mono) for (let k = 0; k < 1; k += 0.02) if (L(k + 0.02, -0.3) < L(k, -0.3) - 1e-9) mono = false;
-  const fov2 = 35 * Math.PI / 180;
-  check(mono && L(0.4, -0.3) >= Math.PI / 2 - fov2 + 0.05 && L(1, 0.2) >= Math.PI / 2 - fov2 + 0.2 && L(1, 0.2) < Math.PI / 2, 'it eases up: the station (straight up) in view from 40 % of the space phase on (' + (mono ? L(0.4, -0.3).toFixed(2) + ' rad at 40 %' : 'not monotone') + ')');
+  // (f-polish7: no longer monotone — the limb held in the lower third while you rise, then the sweep up; test/polish7.js §2)
+  const fov2 = 35 * Math.PI / 180, fovAt = (k) => (K.liftFov ? K.liftFov(k, 2 * fov2) / 2 : fov2);
+  check(typeof L === 'function' && L(0.72, -0.3) + fovAt(0.72) >= Math.PI / 2 && L(1, 0.2) >= Math.PI / 2 - fov2 + 0.2 && L(1, 0.2) < Math.PI / 2, 'it eases up: the station (straight up) in view from 72 % of the space phase on (' + (typeof L === 'function' ? L(0.72, -0.3).toFixed(2) + ' rad at 72 %' : '–') + ')');
   check(typeof K.greet === 'function' && K.greet(0.5) === 0 && K.greet(0.8) === 0 && K.greet(0.92) > 0 && K.greet(0.92) < 1 && K.greet(1) === 1, 'the ring\'s lights greet you at the top (from 82 %)');
   check(typeof K.chimes === 'function' && K.chimes(0, 1.8, 1.85) === 0 && K.chimes(1.8, 1.9, 1.85) === 1 && K.chimes(0, 10, 1.85) === 5 && K.chimes(5, 5, 1.85) === 0, 'a chime for every tile crossed');
   const S = K.seat;
