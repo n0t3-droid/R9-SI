@@ -435,6 +435,11 @@
 
   // ---------------------------------------------------------------- the calm ring ([V] at a stray)
   L.calmSt = null;
+  // a-adventure (R56-02): [V] reaches a stray where it likes to stand — its far keep distance + 1 m (a Wächter keeps 8–13 m
+  // and backs off from anyone nearer than 8: the old 6-m box never listed it), 6 m at least, 16 at most; the ring holds
+  // while the player stays within reach + 2 m
+  L.calmReach = (k) => { const K = F() && F().KINDS[k]; return !K ? 6 : K.fixed ? 7 : Math.max(6, Math.min(16, K.keep[1] + 1)); };
+  L.calmHold = (k) => L.calmReach(k) + 2;
   L.calmBegin = function (g, m) {
     if (!m || !m.foe || m.foe.gone || L.calmSt) return false;
     const f = m.foe; if (f.st === 'down' || f.st === 'calm' || f.st === 'helper' || f.st === 'leave' || f.st === 'strike') return false;
@@ -457,7 +462,7 @@
   };
   L.stepCalm = function (g, dt) {
     const S = L.calmSt, m = S.m, p = g.player.pos;
-    if (!m.foe || m.foe.gone || m.foe.st === 'down' || Math.hypot(m.pos[0] - p[0], m.pos[2] - p[2]) > 7) { L.calmEnd(g, false); return; }
+    if (!m.foe || m.foe.gone || m.foe.st === 'down' || Math.hypot(m.pos[0] - p[0], m.pos[2] - p[2]) > L.calmHold(m.foe.k)) { L.calmEnd(g, false); return; }   // (a-adventure: the kind's reach + 2 m; was 7)
     m.vel[0] = 0; m.vel[2] = 0; m.foe.cool = Math.max(m.foe.cool, 1.5);
     if (S.flash > 0) S.flash -= dt;
     L.calmUi(g, true);
@@ -858,10 +863,10 @@
     if (L.calmSt) { const k = L.calmSt.m.foe ? L.calmSt.m.foe.k : 'driller'; return { kind: 'machine', name: T('g.foe.name.' + k), pos: [eye[0] + dir[0] * 2, eye[1] + dir[1] * 2, eye[2] + dir[2] * 2], r: 1.2, act: (gg) => L.calmTap(gg) }; }
     const En = g.entities, list = NEAR; list.length = 0;
     if (En) for (const m of En.mobs) {
-      const f = m.foe; if (!f || f.gone || f.remote || Math.abs(m.pos[0] - eye[0]) > 6 || Math.abs(m.pos[2] - eye[2]) > 6) continue;
+      const f = m.foe; if (!f || f.gone || f.remote) continue; const rr = f.trader ? 6 : L.calmReach(f.k); if (Math.abs(m.pos[0] - eye[0]) > rr || Math.abs(m.pos[2] - eye[2]) > rr) continue;   // (a-adventure: a stray's calm reach)
       if (f.trader) { list.push({ kind: 'shop', name: T('g.lib.trader'), pos: [m.pos[0], m.pos[1] + 0.7, m.pos[2]], r: 0.9, act: (gg) => L.trade(gg, m) }); continue; }
       if (F().STRAYS.indexOf(f.k) < 0 || f.helper || f.st === 'calm' || f.st === 'down' || f.st === 'leave' || f.st === 'strike') continue;
-      list.push({ kind: 'machine', name: T('g.foe.name.' + f.k), pos: [m.pos[0], m.pos[1] + F().KINDS[f.k].h * 0.55, m.pos[2]], r: Math.max(0.7, F().KINDS[f.k].w * 1.6), act: (gg) => L.calmBegin(gg, m) });
+      list.push({ kind: 'machine', name: T('g.foe.name.' + f.k), pos: [m.pos[0], m.pos[1] + F().KINDS[f.k].h * 0.55, m.pos[2]], r: Math.max(0.7, F().KINDS[f.k].w * 1.6), reach: rr, act: (gg) => L.calmBegin(gg, m) });
     }
     for (const s of W0.sites.values()) {
       const b = s.beacon; if (!s.known || !b || Math.abs(b[0] - eye[0]) > 6 || Math.abs(b[2] - eye[2]) > 6) continue;

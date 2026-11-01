@@ -727,7 +727,7 @@
       const home = h && h.dim === g.dim && Array.isArray(h.pos) ? h.pos : (Array.isArray(p.spawn) && p.spawn.every(Number.isFinite) ? p.spawn : g.worldSpawn ? g.worldSpawn() : [0.5, 100, 0.5]);
       const wk = F.wake({ freed, home }); S.why = wk.why;
       // (a-foes2) on the ground out there: the hold's nearest floor would else be the beacon's own top (the lost run's black wake)
-      if (Number.isFinite(wk.yaw) && g.world && g.world.isLoaded(Math.floor(wk.pos[0]), Math.floor(wk.pos[2]))) wk.pos[1] = g.world.topAt(Math.floor(wk.pos[0]), Math.floor(wk.pos[2])) + 1;
+      if (Number.isFinite(wk.yaw) && g.world && g.world.isLoaded(Math.floor(wk.pos[0]), Math.floor(wk.pos[2]))) wk.pos[1] = F.floorAt(g.world, Math.floor(wk.pos[0]), Math.floor(wk.pos[2])) + 1;   // (a-adventure: the floor under a crown)
       try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2], Number.isFinite(wk.yaw) ? { yaw: wk.yaw, pitch: wk.pitch } : undefined); } catch (e) { p.pos = wk.pos.slice(); }
       if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; S.look = wk.at; }   // (a-foes2: up the cyan beam)
       if (p.mode === 'survival') { p.health = 20; if (g.ui && g.ui.updateHUD) g.ui.updateHUD(true); }
@@ -879,12 +879,21 @@
     }
   };
   const mine = (En, siteId, pred) => { let n = 0; for (const m of En.mobs) { const f = m.foe; if (f && !f.gone && !f.remote && f.site === siteId && (!pred || pred(f))) n++; } return n; };
+  // a-adventure (R56-02): the floor of a column — world.topAt is the rain's height and counts leaves, so a forest outpost's
+  // guardians stood on the canopy, out of reach of the hand and of [V]; down through leaves and air to the first solid
+  // that is no leaf (24 blocks at most; none: the top as before)
+  F.floorAt = function (w, x, z) {
+    const top = w.topAt(x, z), R = VR.R, Fl = VR.F, T = R && R.T;
+    if (!T || !T.flags) return top;
+    for (let y = top; y > top - 24 && y > 0; y--) { const b = w.getBlock(x, y, z), fl = b ? T.flags[b] : 0; if (b && (fl & Fl.SOLID) && !(fl & Fl.LEAVES)) return y; if (b && (fl & Fl.FLUID)) return y; }
+    return top;
+  };
   F.spot = function (g, x, z, r, rnd, rmin) {
     const w = g.world, r0 = rmin || 0;
     for (let k = 0; k < 10; k++) {
       const a = rnd() * TAU, d = r0 + (r - r0) * Math.sqrt(rnd()), xx = Math.floor(x + Math.cos(a) * d), zz = Math.floor(z + Math.sin(a) * d);
       if (!w.isLoaded(xx, zz)) continue;
-      const y = w.topAt(xx, zz), b = w.getBlock(xx, y, zz), R = VR.R, Fl = VR.F;
+      const y = F.floorAt(w, xx, zz), b = w.getBlock(xx, y, zz), R = VR.R, Fl = VR.F;   // (a-adventure: the floor, not the crown)
       if (!b || !(R.T.flags[b] & Fl.SOLID) || (R.T.flags[b] & Fl.FLUID)) continue;
       if (w.getBlock(xx, y + 1, zz) || w.getBlock(xx, y + 2, zz)) continue;
       return [xx + 0.5, y + 1, zz + 0.5];
