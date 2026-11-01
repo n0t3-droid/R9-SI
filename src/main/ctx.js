@@ -157,7 +157,7 @@
       const q = things[i]; if (!q || !q.pos) continue;
       const dx = q.pos[0] - eye[0], dy = q.pos[1] - eye[1], dz = q.pos[2] - eye[2], d = Math.hypot(dx, dy, dz) || 1e-6;
       const r = q.r || 0.4, surf = Math.max(0, d - r);
-      if (surf > reach) continue;
+      if (surf > (q.reach > reach ? q.reach : reach)) continue;   // (a-adventure: a thing may reach farther — a stray's calm reach)
       const cos = (dx * dir[0] + dy * dir[1] + dz * dir[2]) / (d * dl);
       if (cos <= 0) continue;
       const ang = Math.acos(Math.min(1, cos)), eff = Math.max(0, ang - Math.asin(Math.min(1, r / d)));

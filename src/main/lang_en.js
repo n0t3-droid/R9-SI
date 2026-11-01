@@ -4162,5 +4162,30 @@
     "g.fairy.tw.still": "The light seed is still out there – I'll stay with you.",
     "g.fairy.tw.note": "✨ One more thing: a light seed blown away by the wind – together with your Flausel",
     // ---- o-wander2 end
+    // ---- a-adventure (src/main/liberate_fest.js): das Fest am Leuchtfeuer — das Ziel, die Truhe, die Wanderbuch-Seite, der Jubel, das nächste Ziel
+    "g.lf.goal": "Outpost {name}: {n} of {of} machines at rest",
+    "g.lf.goal.how": "[{key}] on a machine: calm it",
+    "g.lf.goal.ready": "The beacon of {name} is ready",
+    "g.lf.goal.readyHow": "[{key}] at the beacon: repair it",
+    "g.lf.page": "📖 A new Wanderbuch page: “{name} shines again”",
+    "g.lf.pages": "Beacon pages",
+    "g.lf.pageLine": "Day {day} · {name}",
+    "g.lf.how.peace": "The machines listened to me and went to sleep. Without a single blow the fire burns again.",
+    "g.lf.how.brave": "I bravely held my ground until the machines rested. Now the fire burns again.",
+    "g.lf.how.both": "Some machines calmed, some bravely stopped – the fire burns cyan again.",
+    "g.lf.chest": "There is a chest for you beside the beacon!",
+    "g.lf.next.out": "On we go: the outpost {name}, {d} m to the {dir}. I’ll show you the way.",
+    "g.lf.next.vil": "On we go: the village {name}, {d} m to the {dir}. They’ll be glad to see you.",
+    "g.lf.cheer": "The people of {v} cheer for you: the beacon of {o} burns again!",
+    "g.lf.cheer.vil": "this village",
+    "g.lf.dir.n": "north",
+    "g.lf.dir.no": "north-east",
+    "g.lf.dir.o": "east",
+    "g.lf.dir.so": "south-east",
+    "g.lf.dir.s": "south",
+    "g.lf.dir.sw": "south-west",
+    "g.lf.dir.w": "west",
+    "g.lf.dir.nw": "north-west",
+    // ---- a-adventure end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

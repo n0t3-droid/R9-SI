@@ -140,7 +140,9 @@ function pageHelpers(win, VRx) {
   S.groundY = function (x, z, y0, sky) {
     const g = VR.game, w = g.world, T = VR.R.T, F = VR.F, X = Math.floor(x), Z = Math.floor(z);
     const solid = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
+    const soft = (b) => !!(b && (T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))));   // a-adventure (R56-11): never a stand on a crown, never one in water
     for (let y = Math.floor(y0) + 8; y > y0 - 24; y--) if (solid(w.getBlock(X, y, Z)) && !solid(w.getBlock(X, y + 1, Z)) && !solid(w.getBlock(X, y + 2, Z))) {
+      if (soft(w.getBlock(X, y, Z)) || soft(w.getBlock(X, y + 1, Z)) || soft(w.getBlock(X, y + 2, Z))) continue;
       if (sky) { let open = true; for (let k = 3; k < 16 && open; k++) if (solid(w.getBlock(X, y + k, Z))) open = false; if (!open) continue; }
       return y + 1;
     }
@@ -166,6 +168,27 @@ function pageHelpers(win, VRx) {
       for (let t = 0.25; t <= 1.5; t += 0.25) if (S.solidAt(c.x + dx * t, c.y + dy * t, c.z + dz * t)) { hit++; break; }
     }
     return hit / n;
+  };
+  // a-adventure (R56-11): the eye inside leaves or water (0.6 s), or the view within 1.5 m over 70 % blocked (1.2 s) → back
+  // out to the last clear stand (where the eye was free and ≤ 15 % of the view near) with its heading; checked 5 times a second
+  S.eyeSoft = function () {
+    const g = VR.game, c = g.cam, T = VR.R.T, F = VR.F; if (!c || !g.world || !T || !T.flags) return false;
+    const b = g.world.getBlock(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
+    return !!(b && (T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))));
+  };
+  S.guard = function (dt) {
+    const g = VR.game, p = g.player; if (!p || !g.cam || (g.wow && g.wow.active) || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g)) || (VR.Liberate && (VR.Liberate.mcam || VR.Liberate.puz))) return;
+    const G = S.gd || (S.gd = { t: 0, bad: 0, clear: null, n: 0 });
+    G.t -= dt; if (G.t > 0) return; G.t = 0.2;
+    const soft = S.eyeSoft(), occ = soft ? 1 : S.occ();
+    if (!soft && occ <= 0.15 && p.onGround !== false) { G.clear = [p.pos[0], p.pos[1], p.pos[2], p.yaw, p.pitch]; G.bad = 0; return; }
+    const near6 = G.clear && Math.hypot(G.clear[0] - p.pos[0], G.clear[2] - p.pos[2]) < 6;
+    if (soft) G.bad += 0.2; else if (occ > 0.7 && near6) G.bad += 0.1; else G.bad = Math.max(0, G.bad - 0.1);   // (run 2: backing out of every near trunk undid the forest walk — 16 backouts, 122 of 210 m: only the eye in leaves or water, or the view held shut 1.6 s)
+    if (G.bad >= 0.6 && G.clear) {
+      const q = G.clear; p.pos[0] = q[0]; p.pos[1] = q[1]; p.pos[2] = q[2]; p.yaw = q[3] + Math.PI * 0.5 * ((G.n & 1) ? 1 : -1) * 0.5; p.pitch = Math.max(-0.2, Math.min(0.1, q[4])); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
+      if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; }
+      G.bad = 0; G.n++; S.stat.backouts = (S.stat.backouts | 0) + 1; S.log.push(['backout', soft ? 'soft' : 'occ ' + occ.toFixed(2), Math.round(q[0]), Math.round(q[2])]);
+    }
   };
   S.set = function (mode) {
     S.mode = mode || { kind: 'idle' }; S.done = false; S.t = 0;
@@ -290,6 +313,48 @@ function pageHelpers(win, VRx) {
     pts.push([x0 + dx / d * L, z0 + dz / d * L]);
     return pts;
   };
+  // a-adventure (R56-02, run 1's trace: the walker stood 100 s against the parked ship's hull on its straight line to the
+  // beacon, and fought a driller 3 m above it from below the pad's edge): a way on foot — A* over the stands round the
+  // player (a solid that is no leaf with two free above; up 1, down 3; never through a ship's or a vehicle's box), to
+  // any stand within `near` of the target; null when there is none (the straight line then)
+  S.standAt = function (X, Z, y0) {
+    const g = VR.game, w = g.world, T = VR.R.T, F = VR.F;
+    if (w.isLoaded && !w.isLoaded(X, Z)) return null;
+    const ok = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
+    for (let y = Math.floor(y0) + 4; y > y0 - 8; y--) { const b = w.getBlock(X, y, Z); if (ok(b) && !(T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))) && !ok(w.getBlock(X, y + 1, Z)) && !ok(w.getBlock(X, y + 2, Z)) && !(T.flags[w.getBlock(X, y + 1, Z)] & (F.FLUID || 0))) return y + 1; }
+    return null;
+  };
+  S.astar = function (tx, tz, near, maxR) {
+    const g = VR.game, p = g.player, x0 = Math.floor(p.pos[0]), z0 = Math.floor(p.pos[2]), y0 = Math.floor(p.pos[1] + 0.2);
+    const R = Math.min(maxR || 56, Math.ceil(Math.hypot(tx - x0, tz - z0)) + 14), N = 2 * R + 1, idx = (x, z) => (z - z0 + R) * N + (x - x0 + R);
+    const boxes = [];
+    const SS = g.starships; if (SS && SS.ships) for (const v of SS.ships) { if (v.hitbox && v.state !== 'flying' && !v.hidden) { try { boxes.push(v.hitbox()); } catch (e) { /* none */ } } }
+    if (g.entities && g.entities.vehicles) for (const v of g.entities.vehicles) { if (v.hitbox) { try { boxes.push(v.hitbox()); } catch (e) { /* none */ } } }
+    const inBox = (x, z) => { for (const b of boxes) if (x + 0.5 > b[0] - 0.4 && x + 0.5 < b[3] + 0.4 && z + 0.5 > b[2] - 0.4 && z + 0.5 < b[5] + 0.4) return true; return false; };
+    const H = new Float32Array(N * N).fill(NaN), G = new Float32Array(N * N).fill(Infinity), FROM = new Int32Array(N * N).fill(-1);
+    const stand = (x, z, yr) => { const i = idx(x, z); if (Number.isNaN(H[i])) { const y = inBox(x, z) ? null : S.standAt(x, z, yr); H[i] = y === null ? -1e9 : y; } return H[i] > -1e8 ? H[i] : null; };
+    const ys = stand(x0, z0, y0); if (ys === null) H[idx(x0, z0)] = y0;
+    const open = [idx(x0, z0)]; G[idx(x0, z0)] = 0;
+    const hd = (i) => { const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0; return Math.max(0, Math.hypot(x + 0.5 - tx, z + 0.5 - tz) - near); };
+    const D = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+    let goal = -1, it = 0, best = idx(x0, z0), bh = hd(best);
+    while (open.length && it++ < 9000) {
+      let bi = 0, bf = Infinity; for (let k = 0; k < open.length; k++) { const f = G[open[k]] + hd(open[k]); if (f < bf) { bf = f; bi = k; } }
+      const i = open[bi]; open[bi] = open[open.length - 1]; open.pop();
+      if (hd(i) <= 0) { goal = i; break; }
+      if (hd(i) < bh) { bh = hd(i); best = i; }
+      const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0, y = H[i];
+      for (const [dx, dz, c] of D) {
+        const nx = x + dx, nz = z + dz; if (Math.abs(nx - x0) > R || Math.abs(nz - z0) > R) continue;
+        const ny = stand(nx, nz, y); if (ny === null || ny - y > 1 || y - ny > 3) continue;
+        if (dx && dz) { const a = stand(x + dx, z, y), b = stand(x, z + dz, y); if (a === null || b === null || a - y > 1 || b - y > 1) continue; }
+        const j = idx(nx, nz), ng = G[i] + c + (ny > y ? 0.6 : 0); if (ng < G[j]) { if (G[j] === Infinity) open.push(j); G[j] = ng; FROM[j] = i; }
+      }
+    }
+    if (goal < 0) { if (hd(idx(x0, z0)) - bh < 5) return null; goal = best; }   // (run 2: a target beyond the grid — the stand nearest to it, ≥ 5 m on)
+    const pts = []; for (let i = goal; i >= 0 && i !== idx(x0, z0); i = FROM[i]) pts.push([(i % N) - R + x0 + 0.5, Math.floor(i / N) - R + z0 + 0.5]);
+    pts.reverse(); return pts;
+  };
   const OFF = { down: 1, calm: 1, leave: 1, helper: 1 };
   const aim = (p, q, dt, rate) => { const e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = q[0] - e[0], dy = q[1] - e[1], dz = q[2] - e[2]; const d = wrap(Math.atan2(-dx, -dz) - p.yaw); p.yaw += Math.max(-rate * dt, Math.min(rate * dt, d)); const pt = Math.atan2(dy, Math.hypot(dx, dz)); p.pitch += (pt - p.pitch) * Math.min(1, dt * 5); if (p.viewYaw !== undefined) p.viewYaw = p.yaw; return Math.abs(d); };
   // a screen box [x0, y0, x1, y1] (0..1, y down) of a world box round c (half sizes rx, ry), or null behind the eye
@@ -329,9 +394,13 @@ function pageHelpers(win, VRx) {
     // walking to a spot: W while it faces it, a jump when stuck
     const go = (x, z, near) => {
       const d = Math.hypot(x - p.pos[0], z - p.pos[2]); if (d <= near) { I.keys.delete('KeyW'); return true; }
-      const off = turnTo(p, x, z, dt, 4); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
+      // a-adventure: along A*'s way (replanned when the target moved 2 m, every 4 s, or when stuck); straight when none
+      const W = A.way; if (!W || Math.hypot(W.tx - x, W.tz - z) > 2 || S.t - W.t > 4 || W.stuck) { const pts = S.astar(x, z, Math.max(0.8, near - 0.3)); A.way = { tx: x, tz: z, t: S.t, pts: pts || [], i: 0, ok: !!pts }; A.plans = (A.plans | 0) + 1; if (!pts) A.noway = (A.noway | 0) + 1; }
+      let sx = x, sz = z; const Wy = A.way; while (Wy.ok && Wy.i < Wy.pts.length - 1 && Math.hypot(Wy.pts[Wy.i][0] - p.pos[0], Wy.pts[Wy.i][1] - p.pos[2]) < 0.9) Wy.i++;
+      if (Wy.ok && Wy.pts.length) { const q = Wy.pts[Math.min(Wy.i + 1, Wy.pts.length - 1)]; sx = q[0]; sz = q[1]; }
+      const off = turnTo(p, sx, sz, dt, 5); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
       const lm = A.last; if (Math.hypot(p.pos[0] - lm[0], p.pos[2] - lm[1]) > 0.6) { lm[0] = p.pos[0]; lm[1] = p.pos[2]; lm[2] = S.t; }
-      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; }
+      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; if (A.way) A.way.stuck = true; }
       return false;
     };
     if (!site) { const o = g.meta && g.meta.advStart && g.meta.advStart.out; if (o) go(o[0], o[2], 12); if (A.t > 40) { A.why = 'no site'; S.done = true; } return; }
@@ -363,9 +432,13 @@ function pageHelpers(win, VRx) {
     const strays = En.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === site.id && !m.foe.wave && !m.foe.helper);
     const active = strays.filter(m => !OFF[m.foe.st]);
     A.sites = strays.length;
+    if (S.t - (A.trT || -9) >= 1) { A.trT = S.t; const P0 = p.pos, tg = A.tg, ui = g.ui; (A.trace || (A.trace = [])).push([Math.round(S.t), A.ph, P0.map(v => Math.round(v)).join(','), strays.length + '/' + active.length, L.state(site) + ':' + site.res + '/' + site.strays, tg ? tg.foe.k + ':' + tg.foe.st + ':' + Math.round(tg.foe.hp) + ':d' + Math.hypot(tg.pos[0] - P0[0], tg.pos[2] - P0[2]).toFixed(1) + ':dy' + (tg.pos[1] - P0[1]).toFixed(1) : '-', 'hp' + (p.hp | 0) + (p.dead ? 'D' : '') + (Fo.fainting ? 'F' : '') + (ui && ui.blocking ? 'B' : '') + (p.target ? ':bt' + p.target.dist.toFixed(1) : ''), A.hits + 'h' + (A.hitAsk | 0)]); if (A.trace.length > 160) A.trace.shift(); }   // (a-adventure: the diagnostic trace)
     // ready: to the beacon, [V] — the Lichtleiter
     if (L.state(site) === 'bereit' || (site.strays !== null && site.strays !== undefined && !active.length && strays.length)) {
+      if (A.ph !== 'beacon') A.beacon0 = S.t;
       A.ph = 'beacon';
+      const db = Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]);
+      if (S.t - (A.beacon0 || S.t) > 20 && db < 8 && !L.puz && A.beaconT === undefined) { fall('beacon unreachable ' + db.toFixed(1)); L.openPuzzle(g, site); A.tgT = A.t; A.beaconT = S.t + 99; return; }   // (a-adventure: logged; the Lichtleiter as [V] would open it)
       if (!go(b[0], b[2], 3.0)) { p.pitch += (-0.1 - p.pitch) * Math.min(1, dt * 3); return; }
       aim(p, b, dt, 4);
       if (A.beaconT === undefined) A.beaconT = S.t;
@@ -374,7 +447,7 @@ function pageHelpers(win, VRx) {
       return;
     }
     // the strays not there yet: closer to the beacon (they stand up as their outpost is near)
-    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 60) { A.why = 'no strays'; S.done = true; } return; }
+    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 150 || (A.t > 60 && Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]) < 60)) { A.why = 'no strays'; S.done = true; } return; }   // (a-adventure: the way there first)
     // the target: the first one fought (a walker before a sentry, never the crane on its tower), the others calmed
     if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
@@ -387,6 +460,7 @@ function pageHelpers(win, VRx) {
     if (A.ph === 'fight') {
       A.fightT += dt;
       if (A.fightT > 35) { A.ph = 'calmgo'; fall('fight timeout'); return; }
+      if (A.fightT > 8 && d > 3.6 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
       // to its side (its core is the weak point from the side and behind), then strikes at a player's rhythm
       const sx = Math.cos(m.yaw), sz = -Math.sin(m.yaw), side = ((p.pos[0] - m.pos[0]) * sx + (p.pos[2] - m.pos[2]) * sz) >= 0 ? 1 : -1;
       const spot = [m.pos[0] + sx * side * 2.4, m.pos[2] + sz * side * 2.4];
@@ -400,7 +474,8 @@ function pageHelpers(win, VRx) {
     }
     // calm: close, face it, [V]; the ring did not start → the direct call (logged); a Kranarm on its tower from its foot
     if (A.t - A.tgT > 12) { A.tgT = A.t; A.tout = (A.tout | 0) + 1; if (A.tout >= 2) { fall('powerdown direct ' + m.foe.k); En.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 2, m.pos[1] + 0.6, m.pos[2] + Math.cos(m.yaw) * 2]); A.tout = 0; } else { fall('calm direct ' + m.foe.k); L.calmBegin(g, m); } return; }
-    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? 5.5 : 3.0) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
+    const cr = L.calmReach ? Math.max(3, L.calmReach(m.foe.k) - 3) : 3.0;   // (a-adventure: [V] reaches a stray where it likes to stand)
+    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? Math.min(cr, 6) : cr) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
     aim(p, c, dt, 5);
     if (A.vTry === 0 || (S.t - A.vTry > 1.4)) { if (A.vTry && !L.calmSt) { fall('calmBegin'); L.calmBegin(g, m); } tapV(); A.vTry = S.t; }
   }
@@ -408,6 +483,7 @@ function pageHelpers(win, VRx) {
     const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
     S.t += dt;
     if (p.hold) { release(I); return; }
+    if (M.kind !== 'idle' && M.kind !== 'bauhand' && M.kind !== 'showcase') S.guard(dt);   // a-adventure (R56-11)
     if (M.kind === 'look') { release(I); p.yaw += (M.speed || 0.3) * dt; p.pitch += ((M.pitch || 0) - p.pitch) * Math.min(1, dt * 2); if (S.t >= (M.sec || 1)) S.done = true; return; }
     if (M.kind === 'walk') { walk(g, p, I, dt); return; }
     if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
@@ -421,18 +497,53 @@ function pageHelpers(win, VRx) {
     }
     release(I);
   };
+  // a-adventure: the outpost's moments in pictures with the HUD re-drawn over them (page.screenshot times out here): the
+  // goal line, the timing ring, the beam, the banner, Funke's next goal, the village's cheer — each once, the frame drawn
+  S.hud = []; S.hudTaken = {};
+  S.hudWant = function () {
+    const L = VR.Liberate, LF = VR.LibFest, M = L && L.moment, vis = (id) => { const e = typeof document !== 'undefined' && document.getElementById(id); return !!(e && e.style.display !== 'none' && e.offsetParent !== null && (e.textContent || '').trim()); };
+    const W = {
+      goal: vis('libgoal') && S.mode.kind === 'outpost' && S.t > 2,
+      calm: !!(L && L.calmSt) && (VR.game.time - (L.calmSt.t0 || 0)) > 0.6,
+      beam: !!M && M.t > 0.9 && M.t < 2.3,
+      banner: !!M && M.t > 3.0 && M.t < 6,
+      after: !M && !!(S.ad && S.ad.freed) && S.t - (S.ad.freeT || 0) > 1.5 && S.t - (S.ad.freeT || 0) < 4,
+      next: !!(LF && LF.next) && vis('funkebub'),
+      cheer: !!(LF && LF.cheered) && vis('funkebub'),
+    };
+    for (const k in W) if (W[k] && !S.hudTaken[k]) return k;
+    return null;
+  };
+  S.captureHud = function (k) {
+    const g = VR.game, src = g.canvas || document.getElementById('gl'); if (!src || !src.width) return;
+    const c = document.createElement('canvas'); c.width = 960; c.height = 540; const x = c.getContext('2d');
+    try { x.drawImage(src, 0, 0, 960, 540); } catch (e) { return; }
+    const W = src.clientWidth || src.width, H = src.clientHeight || src.height, sx = 960 / W, sy = 540 / H;
+    for (const id of ['libgoal', 'libcalm', 'libban', 'funkebub', 'libring']) {
+      const e = document.getElementById(id); if (!e || e.style.display === 'none' || e.offsetParent === null) continue;
+      const r = e.getBoundingClientRect(), t = (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim(); if (!t || r.width < 2) continue;
+      const big = id === 'libban', fs = big ? 30 : 15, bx = Math.max(4, r.left * sx), by = Math.max(4, r.top * sy);
+      x.font = `600 ${fs}px sans-serif`; const tw = Math.min(940, x.measureText(t).width + 24);
+      x.fillStyle = big ? 'rgba(20,40,70,0.55)' : 'rgba(14,22,40,0.7)'; x.fillRect(big ? (960 - tw) / 2 : Math.min(bx, 956 - tw), by, tw, fs + 14);
+      x.fillStyle = big ? '#7ff6ff' : id === 'libgoal' ? '#e8f6ff' : '#fff8e0'; x.fillText(t, (big ? (960 - tw) / 2 : Math.min(bx, 956 - tw)) + 12, by + fs + 3);
+      if (id === 'libcalm') { x.strokeStyle = '#7ff6ff'; x.lineWidth = 4; x.beginPath(); x.arc(480, 270, 60, 0, Math.PI * 2); x.stroke(); }
+    }
+    S.hudTaken[k] = true; S.hud.push({ k, t: +(+g.time).toFixed(1), url: c.toDataURL('image/jpeg', 0.82) });
+  };
   // n frames of 1/30 s, the last one drawn and captured when asked
   S.frames = function (n, render) {
     const g = VR.game; if (!g || g.state !== 'play') return { t: g ? g.time : 0, state: g ? g.state : 'none', done: S.done };
     let rms = 0;
     for (let i = 0; i < n; i++) {
       const last = !!render && i === n - 1;
-      win.__norender = !last;
+      const hk = typeof document !== 'undefined' && (i % 5 === 4) ? S.hudWant() : null;   // (a-adventure)
+      win.__norender = !last && !hk;
       S.control(1 / 30);
       if (S.acceptStory && VR.Story && VR.Story.offer && VR.Story.offer(g)) VR.Story.watch(g);   // a-story: the adventurer takes a beat Funke offers ([V])
       const t0 = performance.now();
       g.last = t0 - 1000 / 30; g.loop(t0);
       if (last) { try { g.renderer.gl.finish(); } catch (e) { /* no GL in a stand-in */ } rms = performance.now() - t0; S.capture(); }
+      if (hk) S.captureHud(hk);
     }
     win.__norender = true;
     const p = g.player;
@@ -457,7 +568,7 @@ function pageHelpers(win, VRx) {
     return { miss, dirty };
   };
   S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
-  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx } : null }; };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { plans: S.ad.plans | 0, noway: S.ad.noway | 0, ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, trace: S.ad.trace || [] } : null }; };
   return S;
 }
 
@@ -732,6 +843,7 @@ async function session(type, setup, script) {
       if (r.last.state) P.why = 'the game left play: ' + r.last.state;
     } catch (e) { P.failed = String(e && e.message || e).slice(0, 300); P.t1 = +tNow.toFixed(2); tNow = (await ev(() => VR.game.time).catch(() => t0 + tNow)) - t0; }
     rec.parts.push(P);
+    if (P.status && P.status.ad && P.status.ad.trace) { if (part.name === 'outpost') console.log(`  trace ${part.name}: ` + P.status.ad.trace.map(q => q.join(' ')).join(' | ') + ` · plans ${P.status.ad.plans} noway ${P.status.ad.noway}`); delete P.status.ad.trace; }
     console.log(`  · ${part.name} ${P.t0}–${P.t1} s${P.failed ? ' FAILED ' + P.failed : ''} ${JSON.stringify(P.status && { stat: P.status.stat, route: P.status.route, B: P.status.B && { phase: P.status.B.phase, ding: P.status.B.ding, tries: P.status.B.tries, whys: P.status.B.whys.slice(-4), site: !!P.status.B.site } })} (${secs()})`);
   }
   if (tNow < DUR - 0.25 && !overBudget) {
@@ -770,6 +882,14 @@ async function session(type, setup, script) {
     const q15 = await ev((ts) => window.__S.picsAt(ts), ts), dir = `${SHOTS}session_${type}/`; fs.mkdirSync(dir, { recursive: true });
     rec.every15 = [];
     q15.forEach((q, k) => { if (!q || !q.url) return; const f = `${dir}f_${String(k * 15).padStart(3, '0')}.jpg`; fs.writeFileSync(f, Buffer.from(q.url.split(',')[1], 'base64')); rec.every15.push({ t: k * 15, pic: +(q.t - t0).toFixed(1), occ: q.occ, file: f.replace(ROOT, '') }); });
+  }
+  if (type === 'adventurer') {   // a-adventure: the outpost's moments with the HUD (test/shots/adventure_<moment>.jpg)
+    const H = await ev(() => { const h = window.__S.hud || []; window.__S.hud = []; return h; });
+    rec.hudShots = H.map(q => { const f = `${SHOTS}adventure_${q.k}.jpg`; fs.writeFileSync(f, Buffer.from(q.url.split(',')[1], 'base64')); return { k: q.k, t: +(q.t - t0).toFixed(1), file: f.replace(ROOT, '') }; });
+    console.log(`  the outpost's moments: ${rec.hudShots.map(q => q.k + '@' + q.t).join(', ') || 'none'}`);
+    const LF = await ev(() => { const F = VR.LibFest, L = VR.Liberate; return F ? { cost: F.cost, err: F.err || '', next: F.next ? F.next.name : null, cheered: F.cheered | 0, pages: Object.keys(F.pages()).length, Lcost: L && L.cost } : null; });
+    console.log(`  das Fest: ${JSON.stringify(LF)}`);
+    rec.fest = LF;
   }
   await ev(() => { window.__S.pics = []; });
   let sheet = null;
@@ -845,8 +965,8 @@ try {
     recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the minimap 4 s after the start: luma sd ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
       { name: 'arrive', de: 'Ankunft: umsehen', mode: { kind: 'look', sec: 8, speed: 0.12 }, max: 8 },
       { name: 'to_outpost', de: 'Funkes Weg: [V] zum Außenposten', mode: { kind: 'intent', prefix: 'out:', direct: true }, max: 120 },
-      { name: 'to_outpost2', de: 'Zu Fuß: die letzten Meter', mode: { kind: 'walk', toSite: 26 }, max: 60 },
-      { name: 'outpost', de: 'Am Außenposten: kämpfen, beruhigen, Lichtleiter', mode: { kind: 'outpost' }, max: 150 },
+      // (a-adventure, run 2: the straight walk of the last metres ran into the forest's cliffs; the outpost's own walker plans its way on foot)
+      { name: 'outpost', de: 'Am Außenposten: beruhigen, mutig sein, Lichtleiter', mode: { kind: 'outpost' }, max: 210 },
       { name: 'after', de: 'Befreit: umsehen', mode: { kind: 'look', sec: 15, speed: 0.3 }, max: 15 },
       { name: 'onward', de: 'Weiter: [V] zum nächsten Dorf', mode: { kind: 'intent', pick: 'village', direct: true }, max: DUR },
       { name: 'onward2', de: 'Zu Fuß weiter', mode: { kind: 'walk', toVillage: 12 }, max: DUR },

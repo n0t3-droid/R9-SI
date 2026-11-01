@@ -46,7 +46,7 @@
   const BV = (ch, n, o) => { const alt = {}; for (const k of Object.keys(o.alt)) alt[k] = LA(ch, n, k, o.alt[k]); const b = B(ch, n, Object.assign({}, o, { who: [] })); b.scene.alt = alt; b.scene.lines = alt[Object.keys(alt)[0]]; delete b.alt; return b; };
   S.BEATS = [
     // 1 · Funke — the drone flickers awake on a console; the first vista at the golden hour
-    B(1, 1, { when: { after: null, place: ['hangar'], anyAfter: 240, adv: false },
+    B(1, 1, { when: { after: null, place: ['hangar'], anyAfter: 240, advAfter: 40, adv: false },   // (a-adventure: an Abenteuer world starts in the wild, 240 m before its outpost — chapter 1 there after 40 s)
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 5 }, { cam: 'shoulder', target: 'funke', dur: 5 }, { cam: 'wide', target: 'player', dur: 5 }], music: 'warm' },
       who: ['funke:surprised', 'funke:worried', 'ilka:happy', 'funke:happy'], task: { kind: 'follow', target: 'vista' }, reward: { xp: 30 }, act: { kind: 'look', target: 'vista', max: 450, cone: 14, hold: 1.5 } }),
     B(1, 2, { when: { after: 'c1.b1', place: ['plaza', 'street', 'hills', 'isles', 'water', 'wild'], adv: false },   // (by day the land, by night its dark hills: the lines fit both)
@@ -226,7 +226,7 @@
     if (w.adv && !ctx.adv) return 'adv';
     if (w.dim && !S.dimIn(w.dim, ctx.dim || 'overworld')) return 'dim';
     if (!w.dim && ctx.dim && ctx.dim !== 'overworld' && !ctx.orbit) return 'dim';   // (a beat without dims plays on Herzwelt or above it)
-    if (w.place && w.place.indexOf(ctx.place) < 0 && !(w.anyAfter && (ctx.played || 0) >= w.anyAfter)) return 'place';
+    if (w.place && w.place.indexOf(ctx.place) < 0 && !(w.anyAfter && (ctx.played || 0) >= (ctx.adv && w.advAfter ? w.advAfter : w.anyAfter))) return 'place';   // (a-adventure: advAfter — an Abenteuer world's own start)
     if (w.hours && ctx.hour && w.hours.indexOf(ctx.hour) < 0) return 'hour';
     if (w.near) for (const k of Object.keys(w.near)) { const d = ctx.near && ctx.near[k]; if (!(d <= w.near[k])) return 'near'; }
     if (w.freed && !((ctx.freed || 0) >= w.freed)) return 'freed';

@@ -235,6 +235,22 @@ for (const smooth of [false, true]) {
   fs.writeFileSync(path.join(OUT, 'folk_sheet_sit.png'), cv.png());
   check(cv.drawn > 30000, `seated at a café table and on a chair (${cv.drawn} pixels)`);
 }
+// a-adventure (R56-07): a real village's first 14 people (seed 4242), dressed as before (Folk.VARY off), by family and
+// trade in summer, and in winter — test/shots/folk_vary_before.png, folk_vary_summer.png, folk_vary_winter.png
+{
+  require('../src/main/villages.js'); try { require('../src/main/folklife.js'); } catch (e) { /* optional */ }
+  const VG = V.VillageGen, Vs = V.Villages, gen = new V.OverworldGen(4242, { worldType: 'default' });
+  let plan = null; for (let k = 0; k < 40 && !plan; k++) { const st = VG.site(gen, (k % 7) - 3, Math.floor(k / 7) - 3); if (!st) continue; const pl = VG.summary(VG.plan(gen, st)); if (pl && pl.style !== 'hall' && pl.homes && pl.homes.length >= 5) plan = pl; }
+  if (plan && Vs && Vs.makeRoster) for (const [name, vary, season] of [['before', false, 1], ['summer', true, 1], ['winter', true, 3]]) {
+    Folk.VARY = vary; Folk.SEASON = season; const v = { plan, st: {} }; Vs.makeRoster(v);
+    const ppl = v.people.slice(0, 14).map(m => ({ L: m.look, def: Folk.buildFine(m.look), kid: m.age === 'child' }));
+    const cv = new Canvas(1280, 720, BG); cv.cam([0, 1.45, -6.4], [0, 1.0, 0], 50);
+    ppl.forEach((q, i) => drawPerson(cv, q.def, partMeshes(q.def, true), (i - (ppl.length - 1) / 2) * 0.58, (i & 1) * 0.4, 0.18 * ((i % 3) - 1), idle, q.kid ? 0.82 : 1, { lids: true, mouth: true }));
+    fs.writeFileSync(path.join(OUT, `folk_vary_${name}.png`), cv.png());
+    check(cv.drawn > 50000, `the village of seed 4242, ${name} (${cv.drawn} pixels)`);
+  }
+  Folk.VARY = true; Folk.SEASON = undefined;
+}
 console.log(`    ${tParts} parts, ${meshCache.size} meshes built (${hits} shared), smooth meshing ${tMs.toFixed(0)} ms`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

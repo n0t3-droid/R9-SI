@@ -4162,5 +4162,30 @@
     "g.fairy.tw.still": "Der Lichtsamen ist noch dort draußen – ich bleib bei dir.",
     "g.fairy.tw.note": "✨ Noch eins: ein Lichtsamen, vom Wind verweht – zusammen mit deinem Flausel",
     // ---- o-wander2 end
+    // ---- a-adventure (src/main/liberate_fest.js): das Fest am Leuchtfeuer — das Ziel, die Truhe, die Wanderbuch-Seite, der Jubel, das nächste Ziel
+    "g.lf.goal": "Außenposten {name}: {n} von {of} Maschinen zur Ruhe gebracht",
+    "g.lf.goal.how": "[{key}] auf eine Maschine: beruhigen",
+    "g.lf.goal.ready": "Das Leuchtfeuer von {name} ist bereit",
+    "g.lf.goal.readyHow": "[{key}] am Leuchtfeuer: reparieren",
+    "g.lf.page": "📖 Neue Wanderbuch-Seite: „{name} leuchtet wieder“",
+    "g.lf.pages": "Leuchtfeuer-Seiten",
+    "g.lf.pageLine": "Tag {day} · {name}",
+    "g.lf.how.peace": "Die Maschinen hörten mir zu und legten sich schlafen. Ohne einen einzigen Schlag brennt das Feuer wieder.",
+    "g.lf.how.brave": "Ich hielt mutig stand, bis die Maschinen ruhten. Jetzt brennt das Feuer wieder.",
+    "g.lf.how.both": "Einige Maschinen beruhigt, einige mutig aufgehalten – das Feuer brennt wieder cyan.",
+    "g.lf.chest": "Neben dem Leuchtfeuer steht eine Truhe für dich!",
+    "g.lf.next.out": "Weiter geht’s: der Außenposten {name}, {d} m im {dir}. Ich zeige dir den Weg.",
+    "g.lf.next.vil": "Weiter geht’s: das Dorf {name}, {d} m im {dir}. Dort freut man sich auf dich.",
+    "g.lf.cheer": "Die Leute von {v} jubeln dir zu: das Leuchtfeuer von {o} brennt wieder!",
+    "g.lf.cheer.vil": "diesem Dorf",
+    "g.lf.dir.n": "Norden",
+    "g.lf.dir.no": "Nordosten",
+    "g.lf.dir.o": "Osten",
+    "g.lf.dir.so": "Südosten",
+    "g.lf.dir.s": "Süden",
+    "g.lf.dir.sw": "Südwesten",
+    "g.lf.dir.w": "Westen",
+    "g.lf.dir.nw": "Nordwesten",
+    // ---- a-adventure end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

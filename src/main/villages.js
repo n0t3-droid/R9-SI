@@ -104,6 +104,7 @@
     vil.fams = fams;
     vil.people = [];
     for (const f of fams) for (const m of f.members) vil.people.push(m);
+    if (Folk.vary && Folk.VARY !== false) Folk.vary(fams, P.style, P.seed, Folk.seasonNow());   // a-adventure (R56-07): dressed by family, trade, age and season
     if (Folk.unlike) Folk.unlike(vil.people, 3);   // t-folk: no two neighbours dressed alike (villagers.js)
     // ---- u-folk2: a modern or tech town's couples' children (FolkJoy.visitKids; Low and up), appended after everyone
     // else — nobody's name, job or clothes change; they sleep in their parents' flat
