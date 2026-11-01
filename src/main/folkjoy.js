@@ -29,7 +29,8 @@
   // the world clock's windows (env.timeOfDay: villages.js schedule — sleep 13000–23300, dusk 10600–12300)
   FJ.WHEN = { hand: [900, 12300], story: [10400, 12700], offer: [900, 11800], dance: [8800, 12500], hide: [1200, 10600], follow: [900, 12000] };
   // moments at once (the people a moment borrows from their day) by cost tier 0 Very Low … 4 Ultra
-  FJ.budget = (tier) => [2, 3, 4, 5, 6][Math.max(0, Math.min(4, tier | 0))];
+  FJ.budget = (tier) => [1, 3, 4, 5, 6][Math.max(0, Math.min(4, tier | 0))];
+  FJ.thinkEvery = (tier) => (tier >= 1 ? 0.25 : 1);   // s: Very Low thinks once a second (one moment at a time)
   FJ.petsOn = (tier) => tier >= 2;
   FJ.fireOn = (tier) => tier >= 2;
   const inWin = (k, tod) => { const w = FJ.WHEN[k]; return !!w && tod >= w[0] && tod < w[1]; };
@@ -151,7 +152,7 @@
     if (J.dance) this.joyDanceTick(dt);
     if (FJ.petsOn(this.joyTier())) this.joyPets(dt); else if (J.pets.length) J.pets.length = 0;
     J.tick -= dt;
-    if (J.tick <= 0) { J.tick = 0.25; this.joyThink(); }
+    if (J.tick <= 0) { J.tick = FJ.thinkEvery(this.joyTier()); this.joyThink(); }
   };
 
   // the nearest living village (its middle within 90 m, someone of it within 40 m)
