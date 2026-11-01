@@ -296,6 +296,8 @@ if (want('movein')) {
     await step(8, 33);
     await grab('fest_night', 8);
     if (want('cost')) await costHere('fest_night');
+    // (v0.55 review) the same frame with the move-in switch off (settings.movein = false): what the festival night itself costs
+    if (want('cost') && process.env.FEST_OFF !== '0') { await ev(() => { VR.game.settings.movein = false; }); await step(4, 33); await costHere('fest_night_moveinOff'); await ev(() => { VR.game.settings.movein = true; }); }
   } catch (e) { check(false, 'movein: ' + e.message.slice(0, 300)); }
 }
 check(!logs.some(l => /pageerror/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 4).join(' · ') : ''));
