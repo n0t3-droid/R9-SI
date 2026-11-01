@@ -98,7 +98,7 @@ console.log('director');
   // stings
   r = sim([[10, {}], [10, {}, 'wonder']]);
   const w = r.D.log.find(l => l.id === 'wonder');
-  check(w && w.t0 - 10 <= 1.6 && r.D.log[0].t1 <= 10 + 1.21, 'a vista: the theme fades (1.2 s) and Staunen sounds');
+  check(w && w.t0 - 10 <= 1.61 && r.D.log[0].t1 <= 10 + 1.61, 'a vista: the theme fades and Staunen sounds on its beat (e-score2: within 1.6 s)');
   r = sim([[10, {}, 'wonder'], [50, {}, 'wonder'], [30, {}, 'wonder']]);
   check(r.D.log.filter(l => l.id === 'wonder').length === 2, 'Staunen at most once a minute');
   r = sim([[5, {}, 'funke'], [60, {}, 'funke']]); check(r.D.log.filter(l => l.id === 'funke').length === 1, 'Funke\'s motif at most every three minutes');

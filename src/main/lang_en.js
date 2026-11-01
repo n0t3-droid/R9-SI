@@ -730,6 +730,8 @@
     'g.set.volVoice.tip': 'Funke\'s chirps and the villagers\' chatter.',
     'g.set.calmMusic': 'Calm music',
     'g.set.calmMusic.tip': 'Longer silence between pieces, no drums, softer in a fight.',
+    'g.set.musicLess': 'Music less often',   // e-score2
+    'g.set.musicLess.tip': 'Pauses between pieces more than twice as long – in between you hear nature.',
     'g.set.wx': 'Weather',
     'g.set.wx.tip': 'How often rain, fog and storms come.',
     'g.set.wx.normal': 'Normal',

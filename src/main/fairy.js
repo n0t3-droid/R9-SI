@@ -701,6 +701,7 @@
     const rec = recOf(g), k = F.ADV[s.kind], q = rec.q[s.id], done = rec.done.indexOf(s.id) >= 0;
     f.yaw = Math.atan2(-(g.player.pos[0] - f.pos[0]), -(g.player.pos[2] - f.pos[2]));
     if (!(S.tw && S.tw.f === f)) f.talkT = S.t + 7;   // (o-wander2: it steps out to you while it talks)
+    if (g.audio && g.audio.cue) { try { g.audio.cue('friend'); } catch (e) { /* the music */ } }   // e-score2: a Flausel greets you (the friend stinger, at most every 90 s)
     if (f.mood === 'sleepy' && !(f.wakeT > S.t)) { f.wakeT = S.t + 25; say(g, f, T('g.fairy.dusel.yawn')); return true; }
     if (f.who !== giver[s.kind]) { say(g, f, T('g.fairy.chat.' + f.who + '.' + (Math.floor(S.t) % 3))); return true; }
     if (done) { say(g, f, T('g.fairy.thanks.' + k)); return true; }

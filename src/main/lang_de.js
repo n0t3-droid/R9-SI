@@ -730,6 +730,8 @@
     'g.set.volVoice.tip': 'Funkes Piepsen und das Plaudern der Dorfleute.',
     'g.set.calmMusic': 'Ruhige Musik',
     'g.set.calmMusic.tip': 'Längere Stille zwischen den Stücken, keine Trommeln, leiser im Kampf.',
+    'g.set.musicLess': 'Musik seltener',   // e-score2
+    'g.set.musicLess.tip': 'Mehr als doppelt so lange Pausen zwischen den Stücken – dazwischen hörst du die Natur.',
     'g.set.wx': 'Wetter',
     'g.set.wx.tip': 'Wie oft Regen, Nebel und Gewitter kommen.',
     'g.set.wx.normal': 'Normal',
