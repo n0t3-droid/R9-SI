@@ -48,7 +48,7 @@ console.log('2 · when');
 const calm = (o) => Object.assign({ calm: 30, place: 'hangar', hour: 'noon', played: 60, adv: true, dim: 'overworld', near: { outpost: 9999 }, freed: 0, high: 0, orbit: false, eclipse: 0 }, o || {});
 const rec0 = S.fresh(), b1 = S.byId('c1.b1');
 check(S.why(b1, calm(), rec0) === null, 'c1.b1 is offered in the Hangar Hall after 20 s of calm');
-const reasons = [['calm', { calm: 19.9, adv: false }], ['calm', { calm: 7.9, adv: true }], ['building', { building: true }], ['fight', { fighting: true }], ['menu', { menu: true }], ['studio', { studio: true }], ['landing', { landing: true }], ['scene', { scene: true }], ['guest', { guest: true }], ['place', { place: 'plaza', played: 100 }], ['dim', { dim: 'basalt' }]];
+const reasons = [['calm', { calm: 19.9, adv: false }], ['calm', { calm: 7.9, adv: true }], ['building', { building: true }], ['fight', { fighting: true }], ['menu', { menu: true }], ['studio', { studio: true }], ['landing', { landing: true }], ['scene', { scene: true }], ['guest', { guest: true }], ['place', { place: 'plaza', played: 100, adv: false }], ['place', { place: 'plaza', played: 30 }], ['dim', { dim: 'basalt' }]];
 for (const [r, o] of reasons) check(S.why(b1, calm(o), rec0) === r, `c1.b1 not offered: ${r}`);
 check(S.why(b1, calm({ place: 'plaza', played: 260 }), rec0) === null, 'c1.b1 anywhere after 4 minutes in a world without a Hangar Hall');
 check(S.why(b1, calm({ adv: false }), rec0) === null, 'chapter 1 begins in a builder world too (an offer only)');

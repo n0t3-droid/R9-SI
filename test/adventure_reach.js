@@ -54,8 +54,8 @@ if (F.floorAt) {
 console.log('3 · [V] reaches every stray where it likes to stand');
 check(typeof L.calmReach === 'function', 'Liberate.calmReach exists');
 if (L.calmReach) for (const k of ['driller', 'sentry', 'crane']) {
-  const K = F.KINDS[k], r = L.calmReach(k), far = k === 'crane' ? 6 : K.keep[1];
-  check(r >= Math.min(far + 1, 16) && r >= 6 && r <= 16, `${k}: the calm reach ${r} m (keeps ${K.keep.join('–')} m)`);
+  const K = F.KINDS[k], r = L.calmReach(k), far = k === 'crane' ? 17 : K.keep[1];
+  check(r >= Math.min(far + 1, 16) && r >= 6 && r <= (k === 'crane' ? 22 : 16), `${k}: the calm reach ${r} m (keeps ${K.keep.join('–')} m)`);
   check(L.calmHold(k) >= r + 2, `${k}: the ring holds to ${L.calmHold(k)} m`);
 }
 // the [V] pick (ctx.js pickNear): a thing's own reach counts — a Wächter 11 m ahead in the crosshair is picked

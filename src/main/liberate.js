@@ -436,9 +436,10 @@
   // ---------------------------------------------------------------- the calm ring ([V] at a stray)
   L.calmSt = null;
   // a-adventure (R56-02): [V] reaches a stray where it likes to stand — its far keep distance + 1 m (a Wächter keeps 8–13 m
-  // and backs off from anyone nearer than 8: the old 6-m box never listed it), 6 m at least, 16 at most; the ring holds
+  // and backs off from anyone nearer than 8: the old 6-m box never listed it), 6 m at least, 16 at most (a Kranarm on its
+  // tower 20 m: it is called from the tower's foot); the ring holds
   // while the player stays within reach + 2 m
-  L.calmReach = (k) => { const K = F() && F().KINDS[k]; return !K ? 6 : K.fixed ? 7 : Math.max(6, Math.min(16, K.keep[1] + 1)); };
+  L.calmReach = (k) => { const K = F() && F().KINDS[k]; return !K ? 6 : K.fixed ? 20 : Math.max(6, Math.min(16, K.keep[1] + 1)); };   // (a Kranarm stands on its tower's roof: from its foot)
   L.calmHold = (k) => L.calmReach(k) + 2;
   L.calmBegin = function (g, m) {
     if (!m || !m.foe || m.foe.gone || L.calmSt) return false;

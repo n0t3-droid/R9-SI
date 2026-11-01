@@ -81,5 +81,13 @@ console.log('5 · the glue');
   check(miss.length === 0, `every text in both tables (${keys.size} keys${miss.length ? '; missing ' + miss.join(', ') : ''})`);
   void de; void en;
 }
+console.log('6 · the story in an Abenteuer world that starts in the wild (R56-02: 0 story beats in 300 s)');
+{
+  if (!V.Story || !V.Story.BEATS) require('../src/shared/story.js');
+  const St = V.Story, b = St && St.BEATS && St.BEATS[0], base = { calm: 30, place: 'wild', dim: 'overworld' };
+  check(!!b && St.why(b, Object.assign({ adv: true, played: 45 }, base), { done: {}, later: {}, acts: {} }) !== 'place', 'an adventurer in the wild: chapter 1 after 40 s');
+  check(!!b && St.why(b, Object.assign({ adv: true, played: 30 }, base), { done: {}, later: {}, acts: {} }) === 'place', 'not before');
+  check(!!b && St.why(b, Object.assign({ adv: false, played: 45 }, base), { done: {}, later: {}, acts: {} }) === 'place', 'a builder\'s world: the Hangar Hall or 240 s, as before');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(0);

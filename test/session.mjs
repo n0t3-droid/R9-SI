@@ -312,6 +312,47 @@ function pageHelpers(win, VRx) {
     pts.push([x0 + dx / d * L, z0 + dz / d * L]);
     return pts;
   };
+  // a-adventure (R56-02, run 1's trace: the walker stood 100 s against the parked ship's hull on its straight line to the
+  // beacon, and fought a driller 3 m above it from below the pad's edge): a way on foot — A* over the stands round the
+  // player (a solid that is no leaf with two free above; up 1, down 3; never through a ship's or a vehicle's box), to
+  // any stand within `near` of the target; null when there is none (the straight line then)
+  S.standAt = function (X, Z, y0) {
+    const g = VR.game, w = g.world, T = VR.R.T, F = VR.F;
+    if (w.isLoaded && !w.isLoaded(X, Z)) return null;
+    const ok = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
+    for (let y = Math.floor(y0) + 4; y > y0 - 8; y--) { const b = w.getBlock(X, y, Z); if (ok(b) && !(T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))) && !ok(w.getBlock(X, y + 1, Z)) && !ok(w.getBlock(X, y + 2, Z)) && !(T.flags[w.getBlock(X, y + 1, Z)] & (F.FLUID || 0))) return y + 1; }
+    return null;
+  };
+  S.astar = function (tx, tz, near, maxR) {
+    const g = VR.game, p = g.player, x0 = Math.floor(p.pos[0]), z0 = Math.floor(p.pos[2]), y0 = Math.floor(p.pos[1] + 0.2);
+    const R = Math.min(maxR || 56, Math.ceil(Math.hypot(tx - x0, tz - z0)) + 14), N = 2 * R + 1, idx = (x, z) => (z - z0 + R) * N + (x - x0 + R);
+    const boxes = [];
+    const SS = g.starships; if (SS && SS.ships) for (const v of SS.ships) { if (v.hitbox && v.state !== 'flying' && !v.hidden) { try { boxes.push(v.hitbox()); } catch (e) { /* none */ } } }
+    if (g.entities && g.entities.vehicles) for (const v of g.entities.vehicles) { if (v.hitbox) { try { boxes.push(v.hitbox()); } catch (e) { /* none */ } } }
+    const inBox = (x, z) => { for (const b of boxes) if (x + 0.5 > b[0] - 0.4 && x + 0.5 < b[3] + 0.4 && z + 0.5 > b[2] - 0.4 && z + 0.5 < b[5] + 0.4) return true; return false; };
+    const H = new Float32Array(N * N).fill(NaN), G = new Float32Array(N * N).fill(Infinity), FROM = new Int32Array(N * N).fill(-1);
+    const stand = (x, z, yr) => { const i = idx(x, z); if (Number.isNaN(H[i])) { const y = inBox(x, z) ? null : S.standAt(x, z, yr); H[i] = y === null ? -1e9 : y; } return H[i] > -1e8 ? H[i] : null; };
+    const ys = stand(x0, z0, y0); if (ys === null) H[idx(x0, z0)] = y0;
+    const open = [idx(x0, z0)]; G[idx(x0, z0)] = 0;
+    const hd = (i) => { const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0; return Math.max(0, Math.hypot(x + 0.5 - tx, z + 0.5 - tz) - near); };
+    const D = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+    let goal = -1, it = 0;
+    while (open.length && it++ < 9000) {
+      let bi = 0, bf = Infinity; for (let k = 0; k < open.length; k++) { const f = G[open[k]] + hd(open[k]); if (f < bf) { bf = f; bi = k; } }
+      const i = open[bi]; open[bi] = open[open.length - 1]; open.pop();
+      if (hd(i) <= 0) { goal = i; break; }
+      const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0, y = H[i];
+      for (const [dx, dz, c] of D) {
+        const nx = x + dx, nz = z + dz; if (Math.abs(nx - x0) > R || Math.abs(nz - z0) > R) continue;
+        const ny = stand(nx, nz, y); if (ny === null || ny - y > 1 || y - ny > 3) continue;
+        if (dx && dz) { const a = stand(x + dx, z, y), b = stand(x, z + dz, y); if (a === null || b === null || a - y > 1 || b - y > 1) continue; }
+        const j = idx(nx, nz), ng = G[i] + c + (ny > y ? 0.6 : 0); if (ng < G[j]) { if (G[j] === Infinity) open.push(j); G[j] = ng; FROM[j] = i; }
+      }
+    }
+    if (goal < 0) return null;
+    const pts = []; for (let i = goal; i >= 0 && i !== idx(x0, z0); i = FROM[i]) pts.push([(i % N) - R + x0 + 0.5, Math.floor(i / N) - R + z0 + 0.5]);
+    pts.reverse(); return pts;
+  };
   const OFF = { down: 1, calm: 1, leave: 1, helper: 1 };
   const aim = (p, q, dt, rate) => { const e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = q[0] - e[0], dy = q[1] - e[1], dz = q[2] - e[2]; const d = wrap(Math.atan2(-dx, -dz) - p.yaw); p.yaw += Math.max(-rate * dt, Math.min(rate * dt, d)); const pt = Math.atan2(dy, Math.hypot(dx, dz)); p.pitch += (pt - p.pitch) * Math.min(1, dt * 5); if (p.viewYaw !== undefined) p.viewYaw = p.yaw; return Math.abs(d); };
   // a screen box [x0, y0, x1, y1] (0..1, y down) of a world box round c (half sizes rx, ry), or null behind the eye
@@ -351,9 +392,13 @@ function pageHelpers(win, VRx) {
     // walking to a spot: W while it faces it, a jump when stuck
     const go = (x, z, near) => {
       const d = Math.hypot(x - p.pos[0], z - p.pos[2]); if (d <= near) { I.keys.delete('KeyW'); return true; }
-      const off = turnTo(p, x, z, dt, 4); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
+      // a-adventure: along A*'s way (replanned when the target moved 2 m, every 4 s, or when stuck); straight when none
+      const W = A.way; if (!W || Math.hypot(W.tx - x, W.tz - z) > 2 || S.t - W.t > 4 || W.stuck) { const pts = S.astar(x, z, Math.max(0.8, near - 0.3)); A.way = { tx: x, tz: z, t: S.t, pts: pts || [], i: 0, ok: !!pts }; A.plans = (A.plans | 0) + 1; if (!pts) A.noway = (A.noway | 0) + 1; }
+      let sx = x, sz = z; const Wy = A.way; while (Wy.ok && Wy.i < Wy.pts.length - 1 && Math.hypot(Wy.pts[Wy.i][0] - p.pos[0], Wy.pts[Wy.i][1] - p.pos[2]) < 0.9) Wy.i++;
+      if (Wy.ok && Wy.pts.length) { const q = Wy.pts[Math.min(Wy.i + 1, Wy.pts.length - 1)]; sx = q[0]; sz = q[1]; }
+      const off = turnTo(p, sx, sz, dt, 5); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
       const lm = A.last; if (Math.hypot(p.pos[0] - lm[0], p.pos[2] - lm[1]) > 0.6) { lm[0] = p.pos[0]; lm[1] = p.pos[2]; lm[2] = S.t; }
-      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; }
+      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; if (A.way) A.way.stuck = true; }
       return false;
     };
     if (!site) { const o = g.meta && g.meta.advStart && g.meta.advStart.out; if (o) go(o[0], o[2], 12); if (A.t > 40) { A.why = 'no site'; S.done = true; } return; }
@@ -410,6 +455,7 @@ function pageHelpers(win, VRx) {
     if (A.ph === 'fight') {
       A.fightT += dt;
       if (A.fightT > 35) { A.ph = 'calmgo'; fall('fight timeout'); return; }
+      if (A.fightT > 8 && d > 3.6 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
       // to its side (its core is the weak point from the side and behind), then strikes at a player's rhythm
       const sx = Math.cos(m.yaw), sz = -Math.sin(m.yaw), side = ((p.pos[0] - m.pos[0]) * sx + (p.pos[2] - m.pos[2]) * sz) >= 0 ? 1 : -1;
       const spot = [m.pos[0] + sx * side * 2.4, m.pos[2] + sz * side * 2.4];
@@ -423,7 +469,8 @@ function pageHelpers(win, VRx) {
     }
     // calm: close, face it, [V]; the ring did not start → the direct call (logged); a Kranarm on its tower from its foot
     if (A.t - A.tgT > 12) { A.tgT = A.t; A.tout = (A.tout | 0) + 1; if (A.tout >= 2) { fall('powerdown direct ' + m.foe.k); En.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 2, m.pos[1] + 0.6, m.pos[2] + Math.cos(m.yaw) * 2]); A.tout = 0; } else { fall('calm direct ' + m.foe.k); L.calmBegin(g, m); } return; }
-    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? 5.5 : 3.0) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
+    const cr = L.calmReach ? Math.max(3, L.calmReach(m.foe.k) - 3) : 3.0;   // (a-adventure: [V] reaches a stray where it likes to stand)
+    if (!go(m.pos[0], m.pos[2], m.foe.k === 'crane' ? Math.min(cr, 6) : cr) && !(m.foe.k === 'crane' && d < 6.5 && A.t - A.tgT > 6)) { aim(p, c, dt, 0); return; }
     aim(p, c, dt, 5);
     if (A.vTry === 0 || (S.t - A.vTry > 1.4)) { if (A.vTry && !L.calmSt) { fall('calmBegin'); L.calmBegin(g, m); } tapV(); A.vTry = S.t; }
   }
