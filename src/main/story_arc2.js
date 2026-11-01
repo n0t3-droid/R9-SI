@@ -87,7 +87,33 @@
     a.dist = L; a.ang = Math.acos(Math.max(-1, Math.min(1, (v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / L))) / DEG;
     return a;
   };
-  // the arc's lower skyline: your home on the lower third, the sky over it (story.js's skyline treats 'home' as low)
+  // the arc's own framing for a place (the fairy place, your home's plaza, the new place) in a wide, shoulder or orbit
+  // shot: from the place's edge at a standing person's eye height, the camera on a free arc round it with nothing
+  // between (the tree's roots and its folk, the dancers on the plaza: faces, not walls), a slow drift
+  A2.RING = { fairy: [11, 0.7, -0.3], home: [10, 0.2, -0.6], place: [14, 1.2, -0.5] };   // [r, the eye over the target, the look over it] (the targets stand 1.5–2 m over the ground)
+  A2.ringA0 = function (sc, Q, r, h) {
+    const key = 'ra' + sc.shot; if (sc[key] !== undefined) return sc[key];
+    const e = sc.eye0 || [Q[0], Q[1], Q[2] + 1], base = Math.atan2(e[0] - Q[0], e[2] - Q[2]);
+    const at = (a) => [Q[0] + Math.sin(a) * r, Q[1] + h, Q[2] + Math.cos(a) * r];
+    const clear = (C) => { if (!sc.free(C)) return false; for (let s = 1; s < 10; s++) { const u = s / 10; if (!sc.free([C[0] + (Q[0] - C[0]) * u, C[1] + (Q[1] + 1 - C[1]) * u, C[2] + (Q[2] - C[2]) * u])) return false; } return true; };
+    let best = null;
+    if (sc.free) for (const d of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) if ([-0.25, 0, 0.25].every(k => clear(at(base + d + k)))) { best = base + d; break; }
+    return (sc[key] = best);
+  };
+  const pose00 = Pr.pose0;
+  Pr.pose0 = function (sc, sh, u, base) {
+    const R = sc.b.ch >= 13 && (sh.cam === 'wide' || sh.cam === 'shoulder' || sh.cam === 'orbit') ? A2.RING[sh.target] : null;
+    if (R) {
+      const Q = this.target(sc, sh.target), a0 = A2.ringA0(sc, Q, R[0], R[1]);
+      if (a0 !== null) {
+        const a = a0 + (u - 0.5) * 0.35, C = [Q[0] + Math.sin(a) * R[0], Q[1] + R[1], Q[2] + Math.cos(a) * R[0]], L = [Q[0], Q[1] + R[2], Q[2]];
+        const dx = L[0] - C[0], dy = L[1] - C[1], dz = L[2] - C[2];
+        A2.stats.ring = (A2.stats.ring || 0) + 1;
+        return Object.assign({}, base, { x: C[0], y: C[1], z: C[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), roll: 0, fov: 58 * DEG, fixed: true });
+      }
+    }
+    return pose00.apply(this, arguments);
+  };
 
   // ---------------------------------------------------------------- the deeds: trip and sign
   A2.signNow = function (g, base) {

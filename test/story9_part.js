@@ -171,5 +171,14 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
   const nb0 = A2.signNow(g); g.meta.movein.homes.push({ st: 'home' });
   check(S.styleWay(nb0, A2.signNow(g, nb0)) === 'build', 'a builder\'s sign: a family moves into a home you built');
   g.dim = 'aqua'; check(A2.homeNear(g) === null, 'home is on Herzwelt'); g.dim = 'overworld';
+  // the arc's framing of a place: from its edge at eye height, on a free arc, looking at it
+  g.dim = 'overworld'; g.player.pos = [90, 70, 0]; g.meta.movein = { homes: [], sets: [] };
+  SP.debug.play('c13.b2'); run(0.2);
+  const sc2 = pl.scene, Qf = sc2 && sc2.tg.fairy, cw = sc2 && pl.pose0(sc2, sc2.b.scene.shots[0], 0.5, {});
+  const dq = cw && Math.hypot(cw.x - Qf[0], cw.z - Qf[2]), look = cw && Math.abs(((Math.atan2(-(Qf[0] - cw.x), -(Qf[2] - cw.z)) - cw.yaw) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+  check(cw && Math.abs(dq - 11) < 0.01 && look < 0.01 && Math.abs(cw.y - (Qf[1] + 0.7)) < 0.01 && cw.fixed, 'the fairy place framed from its edge, 11 m out at eye height, looking at it (' + (dq && dq.toFixed(1)) + ' m)');
+  const blk = sc2.free; sc2.free = () => false; for (const k of Object.keys(sc2)) if (/^ra/.test(k)) delete sc2[k]; const cb = pl.pose0(sc2, { cam: 'wide', target: 'fairy', dur: 6 }, 0.5, {}); sc2.free = blk;
+  check(cb && Math.abs(Math.hypot(cb.x - Qf[0], cb.z - Qf[2]) - 11) > 0.5, 'no free arc (walls all round): the film\'s own wide shot instead');
+  while (SP.holds(g)) { run(1); pl.skip(); }
   delete VR.Fairy; delete VR.MoveIn; delete VR.Villages; delete VR.Wander; delete VR.Journey;
 };

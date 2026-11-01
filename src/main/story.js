@@ -681,7 +681,7 @@ body.storyon #storychoice { visibility: hidden !important; }
     if (Po && Po.ops) {
       const cv = mk('canvas', 'por ' + who); s.appendChild(cv);
       const q = sc.tl.lines[i] || { t0: sc.t, t1: sc.t + 3 };
-      sc.por = { cv, who, mood: ln.mood || 'neutral', t0: q.t0, len: q.t1 - q.t0, key: '' };
+      sc.por = { cv, who, mood: ln.mood || 'neutral', t0: q.t0, len: q.t1 - q.t0, key: null };   // (a-story7: null — a line that began with the mouth shut and the eyes open was never painted)
       P.porTick(sc);
     } else sc.por = null;
     const tx = mk('div', 'tx'); tx.appendChild(mk('b', who, T('story.who.' + who))); tx.appendChild(mk('span', '', sc.texts[i])); s.appendChild(tx);
