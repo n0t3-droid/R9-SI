@@ -377,7 +377,7 @@
     const hAccC = Math.max(-6, Math.min(6, hAcc));
     if (G.skirt && P.hips && P.body) {
       Rb.pendulum(S.hem, aF, 5.2, 0.2, d); Rb.pendulum(S.hemZ, aR + hAccC, 5.2, 0.2, d);
-      const hp = Math.max(-0.12, Math.min(0.12, S.hem.x * 0.6)), hr = Math.max(-0.08, Math.min(0.08, S.hemZ.x * 0.6));
+      const hp = Math.max(-0.16, Math.min(0.16, S.hem.x * 0.75)), hr = Math.max(-0.1, Math.min(0.1, S.hemZ.x * 0.75));
       P.hips[0] += hp; P.hips[2] += hr; P.body[0] -= hp; P.body[2] -= hr;   // (the torso turned back: only the skirt swings)
     }
     if (G.carry && HANG[G.carry] && P.item_r) {

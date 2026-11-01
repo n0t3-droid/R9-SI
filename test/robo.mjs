@@ -7,7 +7,7 @@
 //   stop     a skirted / robed villager walks and stops before the eye: 0.25 s after the stop, the hem and the torso —
 //            robo_stop_<tag>.png
 //   fest     the festival at dusk from test/festival.mjs's camera — robo_fest_<tag>.png
-// and the people's CPU time a frame (VR.Villages update + draw, the least of three rounds), Very Low and Balanced,
+// and the people's CPU time a frame (VR.Villages update + the poses in view, the least of three rounds), Very Low and Balanced,
 // Robo off / on. Checks: every picture, no page error, the crowd's closest approach with Robo ≥ 0.45 b, Very Low's
 // people not costlier with Robo on (+0.1 ms slack, swiftshader on a shared machine).
 // usage: nohup bash test/wt_run.sh robo.mjs 3600 > .tmp_tests/robo.log 2>&1 &
@@ -96,14 +96,16 @@ const stairRun = async (tag) => {
   await setRobo(tag === 'before');
   const ok = await ev(([x0, y, z0]) => {
     const V = VR.game.villages, vil = window.__vil;
-    const a = window.__stairA || (window.__stairA = vil.agents.find(a => !a.kid && a.pose !== 'sleep' && a.gait !== null));
+    const a = window.__stairA || (window.__stairA = vil.agents.find(a => !a.kid && a.pose !== 'sleep' && a.p.look && a.p.look.role !== 'hero' && !a.p.look.species && a !== window.__stopA));
     if (!a) return false;
     a.__robo = { t: [x0 + 7.5, z0 + 0.5] }; a.pos = [x0 - 3.5, y, z0 + 0.5]; a.vel = [0, 0, 0]; a.path = null; a.yaw = -Math.PI / 2; a.walk = 0; a.walkAmt = 0;
     return true;
   }, S0);
   if (!ok) return false;
-  await cam(S0[0] + 1.6, S0[1] + 1.1, S0[2] + 3.6, 0, -0.12);
+  await cam(S0[0] + 1.7, S0[1] - 0.2, S0[2] + 3.2, 0, -0.2);
   // walk on until the person's middle is over the second step
+  await live(1); await wait(4000); await live(1);   // (the person's smooth body asked for and made by the worker)
+  await ev(([x0, y, z0]) => { const a = window.__stairA; a.pos = [x0 - 3.5, y, z0 + 0.5]; a.vel = [0, 0, 0]; }, S0);
   // (the game steps undrawn; the last 0.4 s drawn, so the drawn root's spring and the feet are those of a walk)
   for (let i = 0; i < 240; i++) { await step(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75 - 0.5) break; }
   for (let i = 0; i < 12; i++) { await live(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75) break; }
@@ -117,7 +119,7 @@ check(await stairRun('after'), 'stairs: after');
 // ---------------------------------------------------------------- crowd
 const crowdRun = async (tag) => {
   await setRobo(tag === 'before');
-  await cam(PX + 0.5, PY + 15, PZ + 0.5 + 6, 0, -1.2);
+  await cam(PX + 2.5, PY + 13, PZ + 0.5 + 5, 0, -1.25);
   await ev(([px, y, pz]) => {
     const vil = window.__vil, A = vil.agents.filter(a => a.pose !== 'sleep' && a.pose !== 'sit' && !a.inBoat && a !== window.__stairA).slice(0, 14);
     window.__crowd = A; window.__trail = A.map(() => []);
@@ -171,22 +173,24 @@ await step(200);
 const festCam = () => cam(PX + 0.5 + PR + 7, PY + 4, PZ + 0.5 + 3, Math.atan2(-(-(PR + 7)), -(-3)), -0.28);
 await ev(() => VR.game.env.setTime(12650));
 for (const tag of ['before', 'after']) { await setRobo(tag === 'before'); await festCam(); await step(60); await live(8); await shot('robo_fest_' + tag); }
-const cost = async (preset, off) => ev(async ([preset, off]) => {
+// the people's CPU time a frame in the page: the villages' update and a pose for each person in view, no GPU (the
+// draw's GL calls are the same with Robo on or off) — the least of three rounds of 60 frames, off and on interleaved
+const cost = (preset, off) => ev(([preset, off]) => {
   const g = VR.game, V = g.villages; VR.Robo.off = off;
-  if (g.settings.preset !== preset) { g.applyPreset(preset); g.settings.dynRes = false; if (preset !== 'potato') g.settings.renderDist = 6; g.applySettings('*'); }
-  let ms = 0; const u = V.update, d = V.draw;
-  V.update = function () { const t = performance.now(); const r = u.apply(this, arguments); ms += performance.now() - t; return r; };
-  V.draw = function () { const t = performance.now(); const r = d.apply(this, arguments); ms += performance.now() - t; return r; };
-  window.__norender = false; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true;
-  V.update = u; V.draw = d;
-  return ms / 12;
+  const S = g.settings; S.preset = preset; S.anim = preset !== 'potato';
+  const A = V.agents.filter(a => (a.pos[0] - g.player.pos[0]) ** 2 + (a.pos[2] - g.player.pos[2]) ** 2 < 24 * 24);
+  for (const a of A) a.d2v = (a.pos[0] - g.player.pos[0]) ** 2 + (a.pos[2] - g.player.pos[2]) ** 2;
+  const t0 = performance.now();
+  for (let i = 0; i < 60; i++) { g.time += 1 / 30; V.update(1 / 30); for (const a of A) V.pose(a, g.time); }
+  return (performance.now() - t0) / 60;
 }, [preset, off]);
 const C = {};
+await festCam();
 for (const pre of ['potato', 'balanced']) {
   for (const off of [true, false]) C[pre + (off ? '_off' : '_on')] = 1e9;
-  for (let r = 0; r < 3; r++) for (const off of [true, false]) { await cost(pre, off); const v = await cost(pre, off); const k = pre + (off ? '_off' : '_on'); C[k] = Math.min(C[k], v); }
+  for (let r = 0; r < 3; r++) for (const off of [true, false]) { const v = await cost(pre, off); const k = pre + (off ? '_off' : '_on'); C[k] = Math.min(C[k], v); }
 }
-console.log('costs (ms a frame, the villages\' update + draw): ' + JSON.stringify(Object.fromEntries(Object.entries(C).map(([k, v]) => [k, +v.toFixed(3)]))));
+console.log('costs (ms a frame, the villages\' update + poses): ' + JSON.stringify(Object.fromEntries(Object.entries(C).map(([k, v]) => [k, +v.toFixed(3)]))));
 check(C.potato_on <= C.potato_off + 0.1, `Very Low: the people's frame with Robo ${C.potato_on.toFixed(3)} ms ≤ without ${C.potato_off.toFixed(3)} + 0.1`);
 const errs = logs.filter(l => /pageerror|TypeError|ReferenceError/.test(l));
 check(!errs.length, `no page error (${errs.length})`);
