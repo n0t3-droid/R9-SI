@@ -141,7 +141,9 @@
   F3.farFace = (d) => d >= F3.FAR_FACE;
   // the draw's options for a smooth person (villages.js draw → here, then FolkGPU.queue): the far face with a little
   // hysteresis, the lids of a mood (folkgpu.js lifts the lids part by o.lidUp head units: the eye half covered)
+  F3.off = false;   // the switch (the measurement's): no far face, no moods, no play poses — the dance's ring stays
   F3.drawOpts = function (a, o, d2) {
+    if (F3.off) { o.far = false; return o; }
     a.ffar = a.ffar ? d2 > 5.5 * 5.5 : d2 > F3.FAR_FACE * F3.FAR_FACE;
     o.far = a.ffar;
     const m = a.mood;
@@ -211,6 +213,9 @@
     a.dance = true; a.ringDance = a.ringDance || { chord: D.chord };
     if (act.idx % 2 === 0 && !a.bubble && Math.random() < dt * 0.12) icon(a, '♪', 1.6);
   };
+  // (natives.js: the people near the photo camera hold still — not the dancers: the dance goes on in the picture)
+  const ua = VP.updateAgent;
+  VP.updateAgent = function (a, dt, tod) { if (a.act && a.act.type === 'joy' && a.act.kind === 'dancer') a.photoT = 1e9; return ua.call(this, a, dt, tod); };
   const je = VP.joyEnd;
   VP.joyEnd = function (a) { if (a) { a.ringDance = null; a.drawOffY = 0; } return je.apply(this, arguments); };
 
@@ -226,7 +231,7 @@
       return P;
     }
     const act = a.act;
-    if (a.kid && act && act.type === 'play' && tierOf(this.g) >= 1) {
+    if (a.kid && act && act.type === 'play' && !F3.off && tierOf(this.g) >= 1) {
       const G = a.vil && a.vil.game, s = Math.sin(t * 7.5 + (a.p.seed || 0));
       const set = (j, rx, ry, rz) => { const q = P[j]; if (q) { q[0] = rx; q[1] = ry; q[2] = rz; } };
       if (G && G.type === 'hide' && G.seeker === a && G.phase === 'count') {
@@ -253,7 +258,7 @@
   const up = VP.update;
   VP.update = function (dt) {
     up.call(this, dt);
-    const g = this.g, p = g.player; if (!p || tierOf(g) < 1) return;
+    const g = this.g, p = g.player; if (!p || F3.off || tierOf(g) < 1) return;
     this.f3T = (this.f3T || 0) - dt; if (this.f3T > 0) return;
     this.f3T = 0.5;
     const tod = g.env ? g.env.timeOfDay : 6000;
@@ -290,14 +295,30 @@
     list.sort((x, y) => x[0] - y[0]);
     if (!list.length) { if (PM) PM.note(tx('g.photo.noFace', null, '📷 Niemand in der Nähe für ein Porträt', '📷 Nobody near for a portrait'), 2200); return false; }
     pc.f3i = pc.f3Last && pc.f3T > performance.now() - 8000 ? (pc.f3i + 1) % Math.min(6, list.length) : 0;
-    const a = list[pc.f3i][1], f = F3.frame(solidW(g.world), F3.subject(a), { sun: F3.sunAngle(g) });
+    const a = list[pc.f3i][1];
     pc.f3Last = a; pc.f3T = performance.now();
-    if (!f) return false;
+    return F3.portraitOf(pc, a);
+  };
+  // a portrait of a: o {d, dMin, dMax} (the default 3.8 m), the sun's side
+  F3.portraitOf = function (pc, a, o) {
+    const g = pc.g, s = pc.s; if (!s || !g.world || !a) return null;
+    const f = F3.frame(solidW(g.world), F3.subject(a), Object.assign({ sun: F3.sunAngle(g) }, o || {}));
+    if (!f) return null;
     s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
     if (pc.orbit) pc.orbit = null;
     if (PM) PM.note(tx('g.photo.portrait', { n: a.p.name || '' }, '📷 Porträt: {n} — H: der Nächste · G: goldene Stunde', '📷 Portrait: {n} — H: the next one · G: golden hour'), 2600);
-    return true;
+    return f;
   };
+  // a group (the dance, a family, the children at play): the camera set on pc for the frame round C of radius r
+  F3.groupShot = function (pc, C, r, o) {
+    const g = pc.g, s = pc.s; if (!s || !g.world) return null;
+    const f = F3.frameGroup(solidW(g.world), C, r, Object.assign({ sun: F3.sunAngle(g) }, o || {}));
+    if (!f) return null;
+    s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
+    if (pc.orbit) pc.orbit = null;
+    return f;
+  };
+  F3.solidW = solidW;
   if (PM && PM.Photo) {
     const PP = PM.Photo.prototype, pu = PP.update, pe = PP.enter;
     PP.update = function (dt, I) {
