@@ -105,6 +105,10 @@ const portrait = async (vid, pick, name, o) => {
     if (o && o.expr !== undefined) { a.expr = o.expr; a.exprT = o.expr ? 40 : 0; }
     const f = VR.Folk3.portraitOf(g.photoCam, a, o && o.frame);
     if (!f) return { who: a.p.name, f: null };
+    // (run 2/3: the people came to greet the player beside the subject and stood in the picture — the player waits 16 m
+    // behind the subject, away from the camera; the photo camera is free)
+    const p = g.player, bx = a.pos[0] - f.P[0], bz = a.pos[2] - f.P[2], bl = Math.hypot(bx, bz) || 1; p.flying = true; p.teleport(a.pos[0] + bx / bl * 16, a.pos[1] + 6, a.pos[2] + bz / bl * 16); p.vel[0] = p.vel[1] = p.vel[2] = 0;
+    for (const o2 of a.vil.agents) if (o2 !== a && Math.hypot(o2.pos[0] - a.pos[0], o2.pos[2] - a.pos[2]) < 2.5 && !o2.kid) { o2.waveT = 0; }
     window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]];
     return { who: a.p.name + ' (' + a.role + (a.p.look && a.p.look.species ? ', ' + a.p.look.species : '') + ')', d: +f.d.toFixed(2), off: +(f.score || 0).toFixed(2) };
   }, [vid, pick, o || null]);

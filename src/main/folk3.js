@@ -87,7 +87,7 @@
 
   // the lens (vertical field of view, radians) for a portrait at d (the head and shoulders, ~1.3 m of height) and for a
   // group of radius r (its width and 2.4 m of height in the picture)
-  F3.portraitFov = (d, kid) => clamp(2 * Math.atan((kid ? 1.0 : 1.3) / 2 / Math.max(0.5, d)), 14 * Math.PI / 180, 60 * Math.PI / 180);
+  F3.portraitFov = (d, kid) => clamp(2 * Math.atan((kid ? 1.2 : 1.55) / 2 / Math.max(0.5, d)), 14 * Math.PI / 180, 60 * Math.PI / 180);
   F3.groupFov = (d, r, aspect) => clamp(Math.max(2 * Math.atan(Math.tan(Math.atan((r + 0.9) / Math.max(0.5, d))) / (aspect || 16 / 9)), 2 * Math.atan(1.25 / Math.max(0.5, d))), 24 * Math.PI / 180, 75 * Math.PI / 180);
 
   // ---------------------------------------------------------------- the circle dance
@@ -323,7 +323,7 @@
     if (!f) return null;
     // a portrait's lens: the head and the shoulders fill the picture (the aim a little under the eyes, the head in the
     // upper third); o.fov === false keeps the game's own (the far face's picture)
-    if (!(o && o.fov === false)) { f.T[1] -= a.kid ? 0.15 : 0.22; Object.assign(f, look(f.P, f.T)); pc.f3Fov = F3.portraitFov(f.d, a.kid); } else pc.f3Fov = null;
+    if (!(o && o.fov === false)) { f.T[1] -= a.kid ? 0.2 : 0.3; Object.assign(f, look(f.P, f.T)); pc.f3Fov = F3.portraitFov(f.d, a.kid); } else pc.f3Fov = null;
     s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
     if (pc.orbit) pc.orbit = null;
     if (PM) PM.note(tx('g.photo.portrait', { n: a.p.name || '' }, '📷 Porträt: {n} — H: der Nächste · G: goldene Stunde', '📷 Portrait: {n} — H: the next one · G: golden hour'), 2600);
