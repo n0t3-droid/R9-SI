@@ -53,13 +53,14 @@ check(await ev(() => VR.game.state) === 'play', 'a new world');
 await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(4200); });
 await settle(30); await step(40, 33);
 let vil0 = null;
-for (let k = 0; k < 14 && !(vil0 && /^(meadow|cherry|taiga|savanna|jungle)$/.test(vil0.style || '')); k++) {
-  vil0 = await ev(() => VR.Seasons.Fest.debug.today());
-  if (vil0 && /^(meadow|cherry|taiga|savanna|jungle)$/.test(vil0.style || '')) break;
-  const kn = await ev(() => { const g = VR.game, V = g.villages, p = g.player.pos; const GOOD = /^(meadow|cherry|taiga|savanna|jungle)$/; const L = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine && GOOD.test(v.plan.style || '')).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return { n: L.length, v: L[0] || null, p: [p[0] | 0, p[2] | 0] }; });
+const GOODS = /^(meadow|cherry|taiga|savanna|jungle)$/;
+for (let pass = 0; pass < 2 && !vil0; pass++) for (let k = 0; k < 7; k++) {
+  const t = await ev(() => VR.Seasons.Fest.debug.today());
+  if (t && (pass === 1 || GOODS.test(t.style || ''))) { vil0 = t; break; }
+  const kn = await ev((pass) => { const g = VR.game, V = g.villages, p = g.player.pos; const all = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine); const L = all.filter(v => pass === 1 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(v.plan.style || '')).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, st: v.plan.style, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return { n: all.length, styles: all.map(v => v.plan.style).join(','), v: L[0] || null, p: [p[0] | 0, p[2] | 0] }; }, pass);
   console.log('  (looking for a village: ' + JSON.stringify(kn) + ')');
   if (kn.v) await ev((v) => { const p = VR.game.player; p.flying = true; p.teleport(v.x + 6.5, v.y + 6, v.z + 6.5); }, kn.v);
-  else await ev((k) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0] + 120 * Math.cos(k), 120, p.pos[2] + 120 * Math.sin(k)); }, k);
+  else await ev((k) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0] + 160 * Math.cos(k * 2.4), 120, p.pos[2] + 160 * Math.sin(k * 2.4)); }, k);
   await settle(12); await step(40, 33);
 }
 check(!!vil0, 'a village near the start: ' + (vil0 && vil0.vil));

@@ -233,8 +233,9 @@
         const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 13;
         const x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r), y0 = Math.floor(p[1]) + 2 + Math.floor(Math.random() * 8);
         let y = -1; for (let k = 0; k < 4; k++) if (isLeaf(w, x, y0 + k, z)) { y = y0 + k; break; }
-        if (y < 0) continue;
         const pet = petals > leaves;
+        // (petals ride the spring wind from anywhere; leaves only fall where leaves are)
+        if (y < 0) { if (!pet || tries < 2) continue; y = Math.floor(p[1]) + 4 + Math.floor(Math.random() * 4); }
         const col = pet ? PETAL_COL[(Math.random() * 3) | 0] : LEAF_COL[(Math.random() * 4) | 0];
         const wd = g.env && g.env.E && g.env.E.windDir ? g.env.E.windDir : [0.7, 0.7];
         pa.spawn(x + Math.random(), y - 0.05, z + Math.random(), wd[0] * 0.6 + (Math.random() - 0.5) * 0.5, -0.2, wd[1] * 0.6 + (Math.random() - 0.5) * 0.5,
