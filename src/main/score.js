@@ -291,8 +291,11 @@
     if (OU) { const och = parseLine(OU.chords).notes; for (const L of layers) emit(L, body, 'O', och, null, true); }
     // the phrase breathes (arc: a gain per bar; the outro a little softer), and the ending rings: the notes of the last
     // chord that reach the end get a long release (tail)
-    const end = (body + (OU ? MB : 0)) * B, lastCh = OU ? parseLine(OU.chords).notes.pop() : parseLine(th.chords).notes.pop();
-    const lastAt = (OU ? body + lastCh.b : lastCh.b) * B, tail = OU ? OU.tail : STING_TAIL;
+    // (e-score2: without an outro the last chord is the LAST section's — a form AB / BA no longer holds its pads from the
+    // first section's end)
+    const lastSec = form[form.length - 1], end = (body + (OU ? MB : 0)) * B;
+    const lastCh = OU ? parseLine(OU.chords).notes.pop() : parseLine(lastSec === 'B' && th.B ? th.B.chords : th.chords).notes.pop();
+    const lastAt = (OU ? body + lastCh.b : body - secBeats + lastCh.b) * B, tail = OU ? OU.tail : STING_TAIL;
     for (const e of out) {
       if (th.arc) e.gain *= e.sec === 'O' ? th.arc[th.arc.length - 1] * 0.9 : th.arc[Math.min(th.arc.length - 1, Math.floor((e.t / B - 0) / MB + 1e-6) % th.len)];
       if (e.midi && e.t >= lastAt - 1e-6 && (e.t + e.dur >= end - B * 1.01 || e.layer === 'pad' || e.layer === 'bass' || e.layer === 'str')) { e.dur = Math.max(e.dur, end - e.t); e.tail = tail; }

@@ -56,6 +56,14 @@ console.log('themes');
   const B = 60 / S.THEMES.waltz.bpm, comp = waltz.filter(e => e.layer === 'comp');
   check(comp.length > 0 && comp.every(e => Math.abs(((e.t / B) % 3) - 1) < 1e-6 || Math.abs(((e.t / B) % 3) - 2) < 1e-6), 'the Mondstein waltz: its accompaniment on beats two and three (oom-pah-pah)');
   check(S.cueLen('waltz', 'day', 0) > 0 && Math.abs(S.cueLen('waltz', 'day', 0) - 8 * 3 * B) < 1e-6, 'a 3/4 cue is eight bars of three beats long');
+  // the ringing ending belongs to the last section only: in a form AB no pad or bass is held across the sections
+  let held = [];
+  for (const id of ['harbour', 'waltz', 'd_drachen', 'd_lichter', 'meadow', 'fairy']) for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const th = S.THEMES[id], f = S.formOf(id, seed), B = 60 / th.bpm, sec = th.len * (th.meter || 4) * B;
+    if (f.length < 2) continue;
+    for (const e of S.events(id, { plan: K.musicPlan(12), lv: 1, seed })) if (e.dur > sec * 0.6 && e.t < sec * (f.length - 1)) held.push(id + ':' + f + ' ' + e.layer + '@' + e.t.toFixed(1));
+  }
+  check(held.length === 0, 'no pad or bass held from one section to the end of the form' + (held.length ? ': ' + held.slice(0, 4).join(' ') : ''));
   const own = S.events('p_basalt', { plan: K.musicPlan(12), lv: 1, colour: 'moon' });
   check(own.some(e => e.inst === 'hum') && !own.some(e => e.inst === 'glass'), 'a people\'s own theme keeps its instruments on its world (Regoli: the hums, no moon glass)');
 }
