@@ -51,6 +51,8 @@ async function trip(to) {
   for (let i = 0; i < 600; i++) { await step(10, 33); const s = await ev(() => ({ st: VR.game.state, dim: VR.game.dim, busy: VR.Travel.busy(VR.game) })); if (s.dim === to && s.st === 'play' && !s.busy) return true; await wait(20); }
   return false;
 }
+// the camera pulled in front of the first wall between the subject and it (run 2: the hand-in-hand shot sat in a wall)
+const clearP = (P, T) => ev(([P, T]) => { const w = VR.game.world, d = [P[0] - T[0], P[1] - T[1], P[2] - T[2]], L = Math.hypot(d[0], d[1], d[2]); let k = L; for (let s = 0.5; s < L; s += 0.25) { const x = T[0] + d[0] * s / L, y = T[1] + d[1] * s / L, z = T[2] + d[2] * s / L, b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (b && (VR.R.T.flags[b] & VR.F.OPAQUE)) { k = Math.max(1.2, s - 0.6); break; } } return [T[0] + d[0] * k / L, T[1] + d[1] * k / L, T[2] + d[2] * k / L]; }, [P, T]);
 const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(P[0], P[1] - (p.eye || 1.62), P[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; const e = p.eyePos(), dx = T[0] - e[0], dy = T[1] - e[1], dz = T[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [P, T]);
 const loaded = async (C, r) => { for (let i = 0; i < 120; i++) { await step(10, 33); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (!w.isLoaded(C[0] + dx, C[2] + dz)) return false; return true; }, [C, r]); if (ok) return true; await wait(25); } return false; };
 const prewarm = (maxMs = 120000) => ev(async (maxMs) => {
@@ -96,7 +98,7 @@ await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes
 await ev(`VR.game.createWorld({name:'Bewohner',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
 for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a new world');
-await ev(() => { window.__home = VR.game.dim; });
+await ev(() => { window.__home = VR.game.dim; if (VR.Portal) VR.Portal.GATE_S = 1e9; });   // (run 2: the plaza's gate opened its picker under the walk — the game stood still)
 await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(3000); if (g.ui && g.ui.show) g.ui.show(null); });
 await settle(30);
 
@@ -146,7 +148,7 @@ if ((want('herz') || want('hand')) && HP) {
     check(!!hand && held >= 2, `hand in hand: ${hand ? hand.lead + ' and ' + hand.kid : '-'} (${held} checks holding)`);
     const hv = await ev(() => { const [a] = window.__hand; const fx = -Math.sin(a.yaw), fz = -Math.cos(a.yaw), rx = Math.cos(a.yaw), rz = -Math.sin(a.yaw); return { P: [a.pos[0] + fx * 4.2 + rx * 1.6, a.pos[1] + 1.7, a.pos[2] + fz * 4.2 + rz * 1.6], T: [a.pos[0] + rx * 0.3, a.pos[1] + 0.9, a.pos[2] + rz * 0.3] }; });
     await ev(() => { for (const a of window.__hand) a.holdT = 3; });
-    await lookFrom(hv.P, hv.T); await step(4, 33);
+    await lookFrom(await clearP(hv.P, hv.T), hv.T); await step(4, 33);
     herzRows.push(await grab('f2_herz_hand.png'));
     // applause: four blocks placed before five people
     await ev(([x, y, z]) => { const p = VR.game.player; p.flying = false; p.noclip = false; p.teleport(x + 3, y + 1, z + 3); }, HP.plaza);
