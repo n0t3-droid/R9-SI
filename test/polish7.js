@@ -4,8 +4,8 @@
 //  2 · the Himmelsleiter's space phase: the planet's limb in view until ≈ 62 %, the station from 72 %, the black gap short
 //  3 · the Wanderregisseur on Very Low: ≤ 0.05 ms a frame, no frame with a big staging search (getBlock calls a frame)
 //      — a forest of trunks, leaves and tall grass, a 2-minute walk (node)
-//  4 · moments in woods staged on open ground (no trunk, no low leaves, little tall grass about the figure; the line to
-//      its head and feet free of leaves and plants); animals and the map scrap ≥ 6 % of the frame where staged
+//  4 · moments in woods staged on open ground (no trunk, no low leaves, little tall plants about the figure; the line to
+//      its head free of leaves and plants' lower halves, to its feet free of solids); animals and the scrap ≥ 6 % of the frame
 //  5 · R56-13: the held block on Very Low — each face's tint toward its grey (First2.faceTint)
 //   bash test/wt_run.sh polish7.js 300
 const V = require('./load_shared.js');
