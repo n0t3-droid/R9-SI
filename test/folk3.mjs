@@ -113,7 +113,7 @@ const portrait = async (vid, pick, name, o) => {
     window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]];
     return { who: a.p.name + ' (' + a.role + (a.p.look && a.p.look.species ? ', ' + a.p.look.species : '') + ')', d: +f.d.toFixed(2), off: +(f.score || 0).toFixed(2) };
   }, [vid, pick, o || null]);
-  if (!who || who.f === null) { check(false, `${name}: a person and a frame`); return null; }
+  if (!who || who.f === null) { check(false, `${name}: a person and a frame (${who ? who.who + ' found, no frame' : 'nobody'})`); return null; }
   // its smooth mesh made and waited for
   await ev(async () => { const g = VR.game, FG = VR.FolkGPU, a = window.__cu; if (!FG || !FG.on(g)) return; const rec = a.fg || (a.fg = FG.recFor(a.p.look)); const P0 = FG.PER_FRAME, I0 = FG.INFLIGHT; FG.PER_FRAME = 1e9; FG.INFLIGHT = 1e9; if (rec.state === 0) FG.want(g, rec, 0); g.world.pool.pump(); const t0 = performance.now(); while (rec.state !== 2 && performance.now() - t0 < 90000) { await new Promise(r => setTimeout(r, 250)); g.world.pool.pump(); } FG.PER_FRAME = P0; FG.INFLIGHT = I0; });
   await step(12, 33);
@@ -144,7 +144,7 @@ const danceAt = async (vid, plaza, off) => {
 const endDance = () => ev(() => { const D = VR.game.villages.joy && VR.game.villages.joy.dance; if (D) D.t = D.len + 1; });
 const sheet = [];
 const writeSheet = () => { for (const r of sheet) r.imgs = r.imgs.filter(Boolean); for (let i = sheet.length - 1; i >= 0; i--) if (!sheet[i].imgs.length) sheet.splice(i, 1); if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/folk3_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'folk3_sheet.jpg', ROOT + '/.tmp_tests/folk3_sheet.json']).toString().trim()); } catch (e) { console.log('  (no sheet: ' + String(e.message).slice(0, 200) + ')'); } };
-const ADULT = `(v) => v.agents.filter(a => !a.kid && !a.elder && a.pose !== 'sleep' && a.pose !== 'sit' && !(a.act && a.act.type === 'joy')).sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0]`;
+const ADULT = `(v) => v.agents.filter(a => !a.kid && !a.elder && a.pose !== 'sleep' && a.pose !== 'sit' && !(a.act && a.act.type === 'joy')).sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0] || v.agents.filter(a => !a.kid && a.pose !== 'sleep').sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0]`;
 const portraits = [], moods = [], farRow = [], famRow = [], danceRow = [];
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }

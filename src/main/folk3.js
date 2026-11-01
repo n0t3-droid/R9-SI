@@ -53,10 +53,14 @@
         let P = null;
         for (; d >= dMin; d -= 0.2) {
           const q = [T[0] + u[0] * d, T[1] + h * d / o.d, T[2] + u[2] * d];
-          if (F3.clearAt(solid, q[0], q[1], q[2], o.lens) && F3.lineFirst(solid, T, q) === Infinity) { P = q; break; }
+          if (!F3.clearAt(solid, q[0], q[1], q[2], o.lens) || F3.lineFirst(solid, T, q) !== Infinity) continue;
+          if (o.avoid && o.avoid.length && blockedBy(o.avoid, T, q)) continue;
+          // (the picture's width: the lines from beside the subject's shoulders clear too — run 3's native had a wall
+          // over a third of the frame)
+          if (o.side) { const sx = -u[2] * o.side, sz = u[0] * o.side; if (F3.lineFirst(solid, [T[0] + sx, T[1] - 0.3, T[2] + sz], q) !== Infinity || F3.lineFirst(solid, [T[0] - sx, T[1] - 0.3, T[2] - sz], q) !== Infinity) continue; }
+          P = q; break;
         }
         if (!P) continue;
-        if (o.avoid && o.avoid.length && blockedBy(o.avoid, T, P)) continue;
         const sc = pen + Math.abs(d - o.d) * 0.6 + (dMin < o.mins[0] ? 1.5 : 0);
         if (!win || sc < win.score) win = { P, T: T.slice(), d, score: sc, clear: true, a };
         break;
@@ -83,10 +87,14 @@
   F3.OFFS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.9, -1.9, 2.5, -2.5, Math.PI];
   F3.frame = function (solid, S, o) {
     o = o || {};
-    const op = { d: o.d || 3.8, dMax: o.dMax || 5, mins: [o.dMin || 3, 2, 1.2], lens: o.lens || F3.LENS, avoid: o.avoid || null };
+    const op = { d: o.d || 3.8, dMax: o.dMax || 5, mins: [o.dMin || 3, 2, 1.2], lens: o.lens || F3.LENS, avoid: o.avoid || null, side: o.side === undefined ? 0.45 : o.side };
     const f = Math.atan2(-Math.cos(S.yaw), -Math.sin(S.yaw)), rays = [];
     for (const off of F3.OFFS) for (const h of [0.2, 0.55, 1.1]) rays.push([f + off, h, Math.abs(off) * 1.1 + h * 0.4 + sunPen(f + off, o.sun) * 2]);
-    return best(solid, S.head, rays, op);
+    // (the wishes given up one by one where the place is tight: the width beside the shoulders, then the people)
+    let w = best(solid, S.head, rays, op);
+    if (!w && op.side) { op.side = 0; w = best(solid, S.head, rays, op); }
+    if (!w && op.avoid) { op.avoid = null; w = best(solid, S.head, rays, op); }
+    return w;
   };
   // a group round C (feet) of radius r: farther and raised; o: {pref (an angle to prefer), sun}
   F3.frameGroup = function (solid, C, r, o) {
@@ -181,7 +189,7 @@
     if (!PROPT) { PROPT = new Uint8Array(R.types.length + 1); R.types.forEach((t, i) => { if (t && t.o && (t.o.prop || t.o.propStem)) PROPT[i] = 1; }); }
     return (x, y, z) => {
       const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), s = w.getBlock(X, Y, Z);
-      if (s && (R.T.flags[s] & (FL.SOLID | FL.OPAQUE))) return true;
+      if (s) return true;   // (any block: glass, a gate's glowing frame, leaves, water — run 3 shot through the Sternentor's frame)
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (propAt(w, X + dx, Y, Z + dz)) return true;
       return false;
     };
