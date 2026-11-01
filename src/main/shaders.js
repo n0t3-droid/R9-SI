@@ -1164,7 +1164,8 @@ void main() {
   // v-look2 · Wiesenruhe (look.js): a green-tinted face (grass, moss, leaves on an opaque block) calmed like a painted
   // field — part of each texel's lime/dark noise replaced by the texture's own mean (its 1 × 1 mip: one coarse tap), and
   // large soft patches over tens of metres, deeper and cooler or lighter and warmer (the low frequencies post can't give)
-  if (u_lvMeadow.w > 0.0 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5)) {
+  // (never in the Klassisch look: its crisp 16-texel ground and the block grid stay — classic_v2)
+  if (u_lvMeadow.w > 0.0 && u_blockVar < 0.5 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5)) {
 #ifdef TEXHI
     vec3 mean = hiOn ? textureLod(u_albedoHi, vec3(fu, float(hiK - 1)), 6.0).rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb;
 #else

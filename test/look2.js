@@ -131,6 +131,7 @@ console.log('d · the shaders');
   let ok = 0;
   for (const s of [['FADE', 'LV_MEADOW'], ['FADE', 'LV_MEADOW', 'TEXHI', 'LIGHT2']]) { try { const t = pre(S1.TERRAIN_FS, s); if (t.includes('u_lvMeadow') && /textureLod\(/.test(t)) ok++; } catch (e) { console.log('    ' + e.message); } }
   check(ok === 2, 'the meadow branch preprocesses (with and without the hero textures)');
+  check(/u_lvMeadow\.w > 0\.0 && u_blockVar < 0\.5/.test(S1.TERRAIN_FS), 'never in the Klassisch look (its crisp 16-texel ground and block grid stay — classic_v2)');
   try { const t = pre(S1.COMPOSITE_FS, ['GRADE2', 'LV_TONE', 'LOOKV']); check(/lvTone\(c\)/.test(t) && t.includes('vec3 lvTone('), 'the tone runs in the composite (display space)'); } catch (e) { check(false, 'the tone preprocesses: ' + e.message); }
   const g = L.glslComposite();
   check(['0.04, 0.55', '0.12, 0.4', '0.15, 0.5'].every(s => g.includes(s)), 'the GLSL uses the tone mirror\'s constants');
