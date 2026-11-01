@@ -169,8 +169,8 @@ function pageHelpers(win, VRx) {
     }
     return hit / n;
   };
-  // a-adventure (R56-11): the eye inside leaves or water, or the view within 1.5 m mostly blocked → back out to the last
-  // clear stand (where the eye was free and ≤ 15 % of the view near) with its heading; checked 5 times a second
+  // a-adventure (R56-11): the eye inside leaves or water (0.6 s), or the view within 1.5 m over 70 % blocked (1.2 s) → back
+  // out to the last clear stand (where the eye was free and ≤ 15 % of the view near) with its heading; checked 5 times a second
   S.eyeSoft = function () {
     const g = VR.game, c = g.cam, T = VR.R.T, F = VR.F; if (!c || !g.world || !T || !T.flags) return false;
     const b = g.world.getBlock(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
@@ -182,7 +182,8 @@ function pageHelpers(win, VRx) {
     G.t -= dt; if (G.t > 0) return; G.t = 0.2;
     const soft = S.eyeSoft(), occ = soft ? 1 : S.occ();
     if (!soft && occ <= 0.15 && p.onGround !== false) { G.clear = [p.pos[0], p.pos[1], p.pos[2], p.yaw, p.pitch]; G.bad = 0; return; }
-    if (soft || occ > 0.5) G.bad += 0.2; else G.bad = Math.max(0, G.bad - 0.1);
+    const near6 = G.clear && Math.hypot(G.clear[0] - p.pos[0], G.clear[2] - p.pos[2]) < 6;
+    if (soft) G.bad += 0.2; else if (occ > 0.7 && near6) G.bad += 0.1; else G.bad = Math.max(0, G.bad - 0.1);   // (run 2: backing out of every near trunk undid the forest walk — 16 backouts, 122 of 210 m: only the eye in leaves or water, or the view held shut 1.6 s)
     if (G.bad >= 0.6 && G.clear) {
       const q = G.clear; p.pos[0] = q[0]; p.pos[1] = q[1]; p.pos[2] = q[2]; p.yaw = q[3] + Math.PI * 0.5 * ((G.n & 1) ? 1 : -1) * 0.5; p.pitch = Math.max(-0.2, Math.min(0.1, q[4])); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
       if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; }
@@ -336,11 +337,12 @@ function pageHelpers(win, VRx) {
     const open = [idx(x0, z0)]; G[idx(x0, z0)] = 0;
     const hd = (i) => { const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0; return Math.max(0, Math.hypot(x + 0.5 - tx, z + 0.5 - tz) - near); };
     const D = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
-    let goal = -1, it = 0;
+    let goal = -1, it = 0, best = idx(x0, z0), bh = hd(best);
     while (open.length && it++ < 9000) {
       let bi = 0, bf = Infinity; for (let k = 0; k < open.length; k++) { const f = G[open[k]] + hd(open[k]); if (f < bf) { bf = f; bi = k; } }
       const i = open[bi]; open[bi] = open[open.length - 1]; open.pop();
       if (hd(i) <= 0) { goal = i; break; }
+      if (hd(i) < bh) { bh = hd(i); best = i; }
       const x = (i % N) - R + x0, z = Math.floor(i / N) - R + z0, y = H[i];
       for (const [dx, dz, c] of D) {
         const nx = x + dx, nz = z + dz; if (Math.abs(nx - x0) > R || Math.abs(nz - z0) > R) continue;
@@ -349,7 +351,7 @@ function pageHelpers(win, VRx) {
         const j = idx(nx, nz), ng = G[i] + c + (ny > y ? 0.6 : 0); if (ng < G[j]) { if (G[j] === Infinity) open.push(j); G[j] = ng; FROM[j] = i; }
       }
     }
-    if (goal < 0) return null;
+    if (goal < 0) { if (hd(idx(x0, z0)) - bh < 5) return null; goal = best; }   // (run 2: a target beyond the grid — the stand nearest to it, ≥ 5 m on)
     const pts = []; for (let i = goal; i >= 0 && i !== idx(x0, z0); i = FROM[i]) pts.push([(i % N) - R + x0 + 0.5, Math.floor(i / N) - R + z0 + 0.5]);
     pts.reverse(); return pts;
   };
@@ -433,7 +435,10 @@ function pageHelpers(win, VRx) {
     if (S.t - (A.trT || -9) >= 1) { A.trT = S.t; const P0 = p.pos, tg = A.tg, ui = g.ui; (A.trace || (A.trace = [])).push([Math.round(S.t), A.ph, P0.map(v => Math.round(v)).join(','), strays.length + '/' + active.length, L.state(site) + ':' + site.res + '/' + site.strays, tg ? tg.foe.k + ':' + tg.foe.st + ':' + Math.round(tg.foe.hp) + ':d' + Math.hypot(tg.pos[0] - P0[0], tg.pos[2] - P0[2]).toFixed(1) + ':dy' + (tg.pos[1] - P0[1]).toFixed(1) : '-', 'hp' + (p.hp | 0) + (p.dead ? 'D' : '') + (Fo.fainting ? 'F' : '') + (ui && ui.blocking ? 'B' : '') + (p.target ? ':bt' + p.target.dist.toFixed(1) : ''), A.hits + 'h' + (A.hitAsk | 0)]); if (A.trace.length > 160) A.trace.shift(); }   // (a-adventure: the diagnostic trace)
     // ready: to the beacon, [V] — the Lichtleiter
     if (L.state(site) === 'bereit' || (site.strays !== null && site.strays !== undefined && !active.length && strays.length)) {
+      if (A.ph !== 'beacon') A.beacon0 = S.t;
       A.ph = 'beacon';
+      const db = Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]);
+      if (S.t - (A.beacon0 || S.t) > 20 && db < 8 && !L.puz && A.beaconT === undefined) { fall('beacon unreachable ' + db.toFixed(1)); L.openPuzzle(g, site); A.tgT = A.t; A.beaconT = S.t + 99; return; }   // (a-adventure: logged; the Lichtleiter as [V] would open it)
       if (!go(b[0], b[2], 3.0)) { p.pitch += (-0.1 - p.pitch) * Math.min(1, dt * 3); return; }
       aim(p, b, dt, 4);
       if (A.beaconT === undefined) A.beaconT = S.t;
@@ -442,7 +447,7 @@ function pageHelpers(win, VRx) {
       return;
     }
     // the strays not there yet: closer to the beacon (they stand up as their outpost is near)
-    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 60) { A.why = 'no strays'; S.done = true; } return; }
+    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 150 || (A.t > 60 && Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]) < 60)) { A.why = 'no strays'; S.done = true; } return; }   // (a-adventure: the way there first)
     // the target: the first one fought (a walker before a sentry, never the crane on its tower), the others calmed
     if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
@@ -960,8 +965,8 @@ try {
     recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the minimap 4 s after the start: luma sd ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
       { name: 'arrive', de: 'Ankunft: umsehen', mode: { kind: 'look', sec: 8, speed: 0.12 }, max: 8 },
       { name: 'to_outpost', de: 'Funkes Weg: [V] zum Außenposten', mode: { kind: 'intent', prefix: 'out:', direct: true }, max: 120 },
-      { name: 'to_outpost2', de: 'Zu Fuß: die letzten Meter', mode: { kind: 'walk', toSite: 26 }, max: 60 },
-      { name: 'outpost', de: 'Am Außenposten: kämpfen, beruhigen, Lichtleiter', mode: { kind: 'outpost' }, max: 150 },
+      // (a-adventure, run 2: the straight walk of the last metres ran into the forest's cliffs; the outpost's own walker plans its way on foot)
+      { name: 'outpost', de: 'Am Außenposten: beruhigen, mutig sein, Lichtleiter', mode: { kind: 'outpost' }, max: 210 },
       { name: 'after', de: 'Befreit: umsehen', mode: { kind: 'look', sec: 15, speed: 0.3 }, max: 15 },
       { name: 'onward', de: 'Weiter: [V] zum nächsten Dorf', mode: { kind: 'intent', pick: 'village', direct: true }, max: DUR },
       { name: 'onward2', de: 'Zu Fuß weiter', mode: { kind: 'walk', toVillage: 12 }, max: DUR },
