@@ -641,6 +641,11 @@
       gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 52, 36);
       gl.bindVertexArray(null);
       m.count = verts.length / 13;
+      // f-polish6 (R56-13): the block's mean colour (linear: its faces' texture means × their tints) — Very Low's hand light
+      { const A = this.game && this.game.tex && this.game.tex.avgColor; if (A && verts.length) { let r0 = 0, g0 = 0, b0 = 0, n = 0;
+        for (let q = 0; q < verts.length; q += 13) { const l = verts[q + 5] | 0, sh = verts[q + 12]; if (l * 4 + 3 >= A.length || Math.abs(sh) > 1.5) continue; const k = sh < 0 ? A[l * 4 + 3] : 1;
+          r0 += A[l * 4] * (1 + (verts[q + 9] - 1) * k); g0 += A[l * 4 + 1] * (1 + (verts[q + 10] - 1) * k); b0 += A[l * 4 + 2] * (1 + (verts[q + 11] - 1) * k); n++; }
+        if (n) m.meanCol = [r0 / n, g0 / n, b0 / n]; } }
       this.meshCache.set(id, m);
       return m;
     }
@@ -764,11 +769,17 @@
       // f-first3 (R55-13): the held block 30 % darker than the light at the eye (VR.First2.HAND_DIM) — the eye stays on the world
       const hk = mesh.block && VR.First2 && VR.First2.HAND_DIM ? VR.First2.HAND_DIM : 1, HL = this.handL || (this.handL = { sky: 0, bl: [0, 0, 0] });
       HL.sky = light.sky * hk; HL.bl[0] = light.bl[0] * hk; HL.bl[1] = light.bl[1] * hk; HL.bl[2] = light.bl[2] * hk;
-      // f-polish6 (R56-13): and 20 % less saturated (VR.First2.HAND_SAT: the share of its colour kept)
-      const hDs = mesh.block && p.u.u_desat && VR.First2 && Number.isFinite(VR.First2.HAND_SAT) ? 1 - VR.First2.HAND_SAT : 0;
+      // f-polish6 (R56-13): and 20 % less saturated (VR.First2.HAND_SAT: the share of its colour kept) — Low and up in the
+      // mesh program (u_desat); Very Low's program unchanged: its lights tinted for this one draw toward the block's grey
+      // (VR.First2.handTint: the block's mean colour × the tint = that mean 20 % nearer its luma), the same per-pixel work
+      const F2 = VR.First2, hk2 = mesh.block && F2 && Number.isFinite(F2.HAND_SAT) ? 1 - F2.HAND_SAT : 0;
+      const hDs = hk2 > 0 && p.u.u_desat ? hk2 : 0, hT = hk2 > 0 && !p.u.u_desat && mesh.meanCol && F2.handTint ? F2.handTint(mesh.meanCol, F2.HAND_SAT) : null;
       if (hDs > 0) gl.uniform1f(p.u.u_desat, hDs);
+      if (hT) { const t = hT, a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0] * t[0], a[1] * t[1], a[2] * t[2]); gl.uniform3f(p.u.u_sunColor, sc[0] * t[0], sc[1] * t[1], sc[2] * t[2]); gl.uniform3f(p.u.u_moonColor, mc[0] * t[0], mc[1] * t[1], mc[2] * t[2]);
+        const e = 1 / 1.7; HL.bl[0] *= Math.pow(t[0], e); HL.bl[1] *= Math.pow(t[1], e); HL.bl[2] *= Math.pow(t[2], e); }
       this.drawMesh(r, p, mesh, L, HL, true);
       if (hDs > 0) gl.uniform1f(p.u.u_desat, 0);
+      if (hT) { const a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0], a[1], a[2]); gl.uniform3f(p.u.u_sunColor, sc[0], sc[1], sc[2]); gl.uniform3f(p.u.u_moonColor, mc[0], mc[1], mc[2]); }
       gl.enable(gl.CULL_FACE);
     }
     onColumnLoaded(c) {

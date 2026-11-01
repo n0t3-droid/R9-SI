@@ -27,7 +27,7 @@ const stats = (file, box) => { try { return JSON.parse(execFileSync('python3', [
 import sys, json
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('RGB'); W, H = im.size
-b = json.loads(sys.argv[2]) if sys.argv[2] != 'null' else [0, 0, W, H]
+b = json.loads(sys.argv[2]) if sys.argv[2] != 'null' else [0, 0, 1, 1]
 b = [int(b[0] * W), int(b[1] * H), int(b[2] * W), int(b[3] * H)]
 px = list(im.crop(b).getdata()); n = len(px)
 L = [0.299 * r + 0.587 * g + 0.114 * bb for r, g, bb in px]
@@ -151,7 +151,7 @@ if (parts.includes('flock')) {
     if (f0) { OUT.flock[D].none = stats(f0, [0.2, 0.1, 0.8, 0.6]); OUT.flock[D].blob = +(OUT.flock[D].dark - OUT.flock[D].none.dark).toFixed(4); }
     console.log('  flock ' + D + ' m ' + JSON.stringify(OUT.flock[D]));
   }
-  if (AFTER && OUT.flock[180]) check(OUT.flock[90].blob < 0.005 && OUT.flock[180].blob < 0.005, `R56-05: the dusk flock adds no dark blob (dark share ${OUT.flock[90].blob} · ${OUT.flock[180].blob} < 0.005)`);
+  if (tag === 'after' && OUT.flock[180]) check(OUT.flock[90].blob < 0.005 && OUT.flock[180].blob < 0.005, `R56-05: the dusk flock adds no dark blob (dark share ${OUT.flock[90].blob} · ${OUT.flock[180].blob} < 0.005)`);
   save();
 }
 

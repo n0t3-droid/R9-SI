@@ -52,12 +52,16 @@ check(/c = skyFloor\(c, v_rel\);/.test(wg) && /if \(u_mode == 2\) col = skyFloor
 
 // ---------------------------------------------------------------- 4 · the held block
 console.log('4 · the held block');
-check(V.First2.HAND_SAT === 0.8, 'VR.First2.HAND_SAT 0.8 (20 % less saturated)');
+check(V.First2.HAND_SAT === 0.7, 'VR.First2.HAND_SAT 0.7 (70 % of its chroma: about 20 % less saturated on the screen)');
+{ const F2 = V.First2, sat = (c) => (Math.max(...c) - Math.min(...c)) / Math.max(...c), lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  let ok = true, worst = 1; for (const c of [[0.42, 0.33, 0.2], [0.2, 0.45, 0.12], [0.5, 0.5, 0.5], [0.6, 0.2, 0.1]]) { const t = F2.handTint(c, F2.HAND_SAT), o = c.map((v, i) => v * t[i]); if (Math.abs(lum(o) - lum(c)) > 0.01) ok = false; if (sat(c) > 0.01) worst = Math.min(worst, 1 - sat(o) / sat(c)); }
+  check(ok && worst >= 0.15, 'Very Low: handTint moves a block\'s mean colour toward its luma (saturation ≥ 15 % lower, the luma kept) — least ' + (worst * 100).toFixed(0) + ' %'); }
+check(/F2\.handTint\(mesh\.meanCol/.test(src('entities.js')) && /m\.meanCol = /.test(src('entities.js')), 'drawHand tints Very Low\'s hand lights by the block\'s mean colour');
 const sh = src('shaders.js'), mesh = sh.slice(sh.indexOf('S.MESH_FS'), sh.indexOf('// ------------------------------------------------------------ particles'));
 check(/#ifndef LITE\nuniform float u_desat;/.test(mesh) && /#ifndef LITE\n  if \(u_desat > 0\.0\)/.test(mesh), 'the mesh program\'s desaturation sits behind LITE (Very Low unchanged)');
 check(/P\.mesh = GL\.program\(S\.MESH_VS, S\.MESH_FS, 'mesh', this\.q\.lite \? \['LITE'\] : \[\]\)/.test(src('renderer.js')), 'the mesh program gets LITE on Very Low');
 const en = src('entities.js');
-check(/u_desat, hs\)/.test(en) && /u_desat, 0\)/.test(en), 'drawHand sets the held block\'s desaturation and resets it');
+check(/u_desat, hDs\)/.test(en) && /u_desat, 0\)/.test(en), 'drawHand sets the held block\'s desaturation and resets it');
 
 // ---------------------------------------------------------------- 5 · the Very Low ring
 console.log('5 · the Very Low ring');
@@ -67,7 +71,10 @@ check(/F\.VL_LIFT = 0\.\d+/.test(fl) && /lift: tier === 0 \? F\.VL_LIFT : 0/.tes
 // ---------------------------------------------------------------- 6 · seasons on Very Low
 console.log('6 · seasons on Very Low');
 const sf = src('seasons_fest.js');
-check(/P6_VL/.test(sf), 'seasons_fest: Very Low draws no festival models (the gate)');
+{ const d = sf.slice(sf.indexOf('P.ssDraw = function')), gate = d.indexOf('if (tier <= 0) { SF.cost.models = 0; return; }'), draw = d.indexOf('LK.drawModel(');
+  check(/P6_VL/.test(sf) && gate > 0 && draw > gate, 'seasons_fest.ssDraw: on Very Low (tier 0) it returns before any festival model is drawn'); }
+{ const fr = sf.slice(sf.indexOf('P.ssAir = function')); check(/if \(tier <= 0 \|\| dPl > 140 \|\| !pa\) return;/.test(fr), 'and its air (petals, lights) stays off on Very Low'); }
+{ const ss = src('seasons.js'); check(/if \(tier <= 0\) return;   \/\/ Very Low: the tint only/.test(ss), 'seasons.frame: Very Low the tint only (no leaves, petals, breath)'); }
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
