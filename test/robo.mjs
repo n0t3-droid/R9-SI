@@ -15,6 +15,7 @@
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = path.join(ROOT, 'test', 'shots');
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
@@ -31,13 +32,39 @@ const ev = (fn, arg) => page.evaluate(fn, arg);
 // game steps without drawing (the people's poses are drawn ones: `live` draws)
 const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(5); } };
 const live = (n, dtms = 33) => ev(([n, d]) => { window.__norender = false; const g = VR.game; for (let i = 0; i < n; i++) { g.last = performance.now() - d; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, [n, dtms]);
-const shot = async (name, clip) => { await wait(100); await page.screenshot({ path: path.join(SHOTS, name + '.png'), clip, timeout: 120000 }); console.log('  shot ' + name); };
+// a picture straight from the game's canvas, in the same task as its frame (page.screenshot waits for a compositor
+// frame, which a machine of three browsers may not give within minutes); trails: [[[x, y, z], …], …] drawn over it
+const shot = async (name, clip, trails) => {
+  const url = await ev(([clip, trails]) => {
+    window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); window.__norender = true;
+    const r = g.renderer, cv = r.canvas, sx = cv.width / cv.clientWidth, sy = cv.height / cv.clientHeight;
+    const C = clip || { x: 0, y: 0, width: cv.clientWidth, height: cv.clientHeight };
+    const o = document.createElement('canvas'); o.width = C.width; o.height = C.height;
+    const x = o.getContext('2d'); x.drawImage(cv, C.x * sx, C.y * sy, C.width * sx, C.height * sy, 0, 0, C.width, C.height);
+    if (trails) {
+      const vp = r.viewProj, c = g.cam, W = cv.clientWidth, H = cv.clientHeight;
+      const pr = (p) => { const X = p[0] - c.x, Y = p[1] - c.y, Z = p[2] - c.z, w = vp[3] * X + vp[7] * Y + vp[11] * Z + vp[15]; return [((vp[0] * X + vp[4] * Y + vp[8] * Z + vp[12]) / w * 0.5 + 0.5) * W - C.x, (1 - ((vp[1] * X + vp[5] * Y + vp[9] * Z + vp[13]) / w * 0.5 + 0.5)) * H - C.y]; };
+      x.lineWidth = 2.5;
+      trails.forEach((T, i) => { x.strokeStyle = i < 7 ? 'rgba(255,154,46,0.9)' : 'rgba(56,214,255,0.9)'; x.beginPath(); T.forEach((p, k) => { const q = pr(p); if (k) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]); }); x.stroke(); });
+    }
+    return o.toDataURL('image/png');
+  }, [clip || null, trails || null]);
+  fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(url.split(',')[1], 'base64'));
+  console.log('  shot ' + name);
+};
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.renderDist = 6; g.settings.dynRes = false; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Robo',mode:'creative',difficulty:'peaceful',type:'default',seed:'424242',cheats:true,kit:false})`);
 for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.env.setTime(8000); g.zenFreezeTime = true; window.requestAnimationFrame = () => 0; g.hideHud = true; g.env.rain = 0; g.env.rainTarget = 0; });
-for (let i = 0; i < 15; i++) { await step(10); await wait(80); }
+for (let i = 0; i < 90; i++) {
+  await step(10); await wait(120);
+  const st = await ev((i) => { const g = VR.game, V = g.villages; if (!V) return 'none'; if ([...V.known.values()].some(v => v.active)) return 'ok';
+    // (no village woke near the spawn yet: go to the nearest known site)
+    if (i === 30 && V.sites && V.sites.length) { const p = g.player.pos; const X = (s) => s.plaza ? s.plaza.x : s.x, Z = (s) => s.plaza ? s.plaza.z : s.z; const s = V.sites.slice().sort((a, b) => Math.hypot(X(a) - p[0], Z(a) - p[2]) - Math.hypot(X(b) - p[0], Z(b) - p[2]))[0]; g.player.teleport(X(s) + 0.5, 140, Z(s) + 0.5); g.player.flying = true; return 'moved ' + X(s) + ',' + Z(s); }
+    return 'wait'; }, i);
+  if (st === 'ok') break; if (st.startsWith('moved')) console.log('  ' + st);
+}
 // the puppets: a person with __robo walks to its target by the game's own steering (move(): ORCA, physics), nothing else
 const info = await ev(() => {
   const g = VR.game, V = g.villages, vil = [...V.known.values()].find(v => v.active); if (!vil) return null;
@@ -77,8 +104,9 @@ const stairRun = async (tag) => {
   if (!ok) return false;
   await cam(S0[0] + 1.6, S0[1] + 1.1, S0[2] + 3.6, 0, -0.12);
   // walk on until the person's middle is over the second step
-  for (let i = 0; i < 120; i++) { await live(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75) break; }
-  await live(2);
+  // (the game steps undrawn; the last 0.4 s drawn, so the drawn root's spring and the feet are those of a walk)
+  for (let i = 0; i < 240; i++) { await step(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75 - 0.5) break; }
+  for (let i = 0; i < 12; i++) { await live(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75) break; }
   await shot('robo_stairs_' + tag, { x: 340, y: 110, width: 600, height: 560 });
   await ev(() => { window.__stairA.__robo = null; });
   return true;
@@ -97,23 +125,15 @@ const crowdRun = async (tag) => {
   }, [PX, PY, PZ]);
   let closest = 1e9;
   for (let f = 0; f < 300; f++) {
-    if (f % 10 === 0) await live(1); else await step(1);
+    await step(1);
     const c = await ev(() => { const A = window.__crowd; let m = 1e9; A.forEach((a, i) => { window.__trail[i].push([a.pos[0], a.pos[1] + 0.05, a.pos[2]]); for (let j = i + 1; j < A.length; j++) m = Math.min(m, Math.hypot(a.pos[0] - A[j].pos[0], a.pos[2] - A[j].pos[2])); }); return m; });
     closest = Math.min(closest, c);
-    if (f === 150) { await live(2); await shot('robo_crowdmid_' + tag); }
+    if (f === 140) { await live(6); await shot('robo_crowdmid_' + tag); }
   }
   await live(2);
-  // the trails over the picture (projected with the frame's own matrix)
-  await ev(() => {
-    const g = VR.game, r = g.renderer, vp = r.viewProj, c = g.cam, W = r.canvas.clientWidth, H = r.canvas.clientHeight;
-    const pr = (p) => { const x = p[0] - c.x, y = p[1] - c.y, z = p[2] - c.z, w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15]; return [((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w * 0.5 + 0.5) * W, (1 - ((vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w * 0.5 + 0.5)) * H]; };
-    let svg = `<svg id="rbtr" xmlns="http://www.w3.org/2000/svg" style="position:fixed;left:0;top:0;z-index:99999;pointer-events:none" width="${W}" height="${H}">`;
-    window.__trail.forEach((T, i) => { svg += `<polyline fill="none" stroke="${i < 7 ? '#ff9a2e' : '#38d6ff'}" stroke-width="2.5" stroke-opacity="0.9" points="${T.filter((_, k) => k % 3 === 0).map(p => pr(p).map(v => v.toFixed(1)).join(',')).join(' ')}"/>`; });
-    svg += '</svg>';
-    const d = document.createElement('div'); d.innerHTML = svg; document.body.appendChild(d.firstChild);
-  });
-  await shot('robo_crowd_' + tag);
-  await ev(() => { const e = document.getElementById('rbtr'); if (e) e.remove(); for (const a of window.__crowd) a.__robo = null; });
+  const trails = await ev(() => window.__trail.map(T => T.filter((_, k) => k % 3 === 0)));
+  await shot('robo_crowd_' + tag, null, trails);
+  await ev(() => { for (const a of window.__crowd) a.__robo = null; });
   console.log(`  crowd ${tag}: the closest two came ${closest.toFixed(2)} b`);
   return closest;
 };
@@ -135,7 +155,8 @@ const stopRun = async (tag) => {
   await cam(PX + 0.5 + 0.5, PY + 1.0, PZ + 0.5 + 3.2, 0.15, -0.05);
   // walk until standing, then 0.25 s
   let stoppedAt = -1;
-  for (let i = 0; i < 160; i++) { await live(1); const v = await ev(() => Math.hypot(window.__stopA.vel[0], window.__stopA.vel[2])); if (i > 20 && v < 0.35) { stoppedAt = i; break; } }
+  for (let i = 0; i < 240; i++) { await step(1); const d = await ev(() => Math.hypot(window.__stopA.pos[0] - window.__stopA.__robo.t[0], window.__stopA.pos[2] - window.__stopA.__robo.t[1])); if (d < 1.3) break; }
+  for (let i = 0; i < 40; i++) { await live(1); const v = await ev(() => Math.hypot(window.__stopA.vel[0], window.__stopA.vel[2])); if (v < 0.35) { stoppedAt = i; break; } }
   await live(7);
   await shot('robo_stop_' + tag, { x: 290, y: 60, width: 700, height: 640 });
   await ev(() => { window.__stopA.__robo = null; });
@@ -149,16 +170,16 @@ await ev(() => VR.game.env.setTime(11250));
 await step(200);
 const festCam = () => cam(PX + 0.5 + PR + 7, PY + 4, PZ + 0.5 + 3, Math.atan2(-(-(PR + 7)), -(-3)), -0.28);
 await ev(() => VR.game.env.setTime(12650));
-for (const tag of ['before', 'after']) { await setRobo(tag === 'before'); await festCam(); await step(60); await live(12); await shot('robo_fest_' + tag); }
+for (const tag of ['before', 'after']) { await setRobo(tag === 'before'); await festCam(); await step(60); await live(8); await shot('robo_fest_' + tag); }
 const cost = async (preset, off) => ev(async ([preset, off]) => {
   const g = VR.game, V = g.villages; VR.Robo.off = off;
   if (g.settings.preset !== preset) { g.applyPreset(preset); g.settings.dynRes = false; if (preset !== 'potato') g.settings.renderDist = 6; g.applySettings('*'); }
   let ms = 0; const u = V.update, d = V.draw;
   V.update = function () { const t = performance.now(); const r = u.apply(this, arguments); ms += performance.now() - t; return r; };
   V.draw = function () { const t = performance.now(); const r = d.apply(this, arguments); ms += performance.now() - t; return r; };
-  window.__norender = false; for (let i = 0; i < 30; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true;
+  window.__norender = false; for (let i = 0; i < 12; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true;
   V.update = u; V.draw = d;
-  return ms / 30;
+  return ms / 12;
 }, [preset, off]);
 const C = {};
 for (const pre of ['potato', 'balanced']) {
