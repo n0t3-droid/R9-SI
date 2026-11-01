@@ -100,8 +100,10 @@ if (want('spawn')) {
   }
 }
 
+// the world part (TAG's build; BASE=<dist url>: the flock and the ring on the base build first, in this run)
+const worldRun = async (dist, tag, parts) => {
 // ---------------------------------------------------------------- the seasons' village world (seasons.mjs's)
-const A = await open(), { page, ev, wait } = A;
+const A = await open(dist), { page, ev, wait } = A;
 const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(3); } };
 const settle = async (max = 50) => {
   for (let i = 0; i < max; i++) {
@@ -125,8 +127,36 @@ check(await ev(() => VR.game.state) === 'play', 'a creative world (seed 424242)'
 await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(4200); g.hideHud = true; });
 await settle(30); await step(40, 33);
 
+// ---------------------------------------------------------------- 3 · R56-05: the murmuration at dusk, from 90 and 180 m
+if (parts.includes('flock')) {
+  await preset('balanced'); await settle(10);
+  await ev(() => { const g = VR.game; g.env.day = 4; g.env.setTime(12100); const w = g.wild; if (w) { w.age = 1000; w.fresh = false; } });
+  let m = null;
+  for (let i = 0; i < 30 && !m; i++) { await step(20, 50); m = await ev(() => { const r = VR.game.wild && VR.game.wild.report(); return r && r.murm && r.murm.state === 'fly' ? r.murm : null; }); }
+  OUT.murm = m;
+  check(!!m, 'the murmuration flies at dusk ' + JSON.stringify(m && { n: m.n, ctr: m.ctr }));
+  OUT['flock_' + tag] = {}; OUT.flock = OUT['flock_' + tag];
+  if (m) for (const D of [90, 180]) {
+    const c = m.ctr;
+    await ev(([c, D]) => { const p = VR.game.player; p.flying = true; p.noclip = true; const W = VR.game.world; let y = 0; for (let k = 200; k > 0; k--) if (W.getBlock(Math.floor(c[0] + D), k, Math.floor(c[2]))) { y = k; break; } p.teleport(c[0] + D, Math.max(y + 3, c[1] - 12), c[2]); }, [c, D]);
+    await settle(8); await step(10, 33);
+    const c2 = await ev(() => VR.game.wild.report().murm.ctr);
+    await lookAt([c2[0], c2[1] + 2, c2[2]]); await step(4, 33);
+    const f = await grab(`p6_flock${D}_${tag}.png`, 4);
+    OUT.flock[D] = f ? stats(f, [0.2, 0.1, 0.8, 0.6]) : null;
+    // the same view without the birds: the dark share the flock adds
+    await ev(() => { VR.game.settings.wildBirds = false; }); await step(2, 33);
+    const f0 = await grab(`p6_flock${D}_none_${tag}.png`, 4);
+    await ev(() => { VR.game.settings.wildBirds = true; }); await step(2, 33);
+    if (f0) { OUT.flock[D].none = stats(f0, [0.2, 0.1, 0.8, 0.6]); OUT.flock[D].blob = +(OUT.flock[D].dark - OUT.flock[D].none.dark).toFixed(4); }
+    console.log('  flock ' + D + ' m ' + JSON.stringify(OUT.flock[D]));
+  }
+  if (AFTER && OUT.flock[180]) check(OUT.flock[90].blob < 0.005 && OUT.flock[180].blob < 0.005, `R56-05: the dusk flock adds no dark blob (dark share ${OUT.flock[90].blob} · ${OUT.flock[180].blob} < 0.005)`);
+  save();
+}
+
 // ---------------------------------------------------------------- 2 · R56-01: Very Low, the winter light night
-if (want('cost')) {
+if (parts.includes('cost')) {
   // (seasons.mjs's village: a meadow, cherry, taiga, savanna or jungle one — its festival decor stands on the plaza)
   let vil = null;
   for (let k = 0; k < 9 && !vil; k++) {
@@ -147,7 +177,7 @@ if (want('cost')) {
     const cost = {};
     // off · on · deco (on, the festival's models drawn as before f-polish6: ssDraw with the tier read as Low)
     const MODES = ['off', 'on', 'deco'];
-    for (const pr of ['potato', 'high']) {
+    for (const pr of (process.env.NO_HIGH ? ['potato'] : ['potato', 'high'])) {
       await preset(pr); await settle(12);
       for (let round = 0; round < (pr === 'potato' ? 4 : 1); round++) for (const mode of (pr === 'potato' ? (round % 2 ? MODES.slice().reverse() : MODES) : ['off', 'on'])) {
         const r = await ev((mode) => {
@@ -169,47 +199,19 @@ if (want('cost')) {
         (cost[pr + '_' + mode] || (cost[pr + '_' + mode] = [])).push(r);
       }
       console.log('  cost ' + pr + ' ' + JSON.stringify(Object.fromEntries(Object.entries(cost).filter(([k]) => k.startsWith(pr)))));
-      if (pr === 'potato') { await ev(() => { VR.game.settings.seasons = true; }); await step(6, 33); OUT.vlNight = await grab(`p6_vl_night_${TAG}.png`, 6); }
+      if (pr === 'potato') { await ev(() => { VR.game.settings.seasons = true; }); await step(6, 33); OUT.vlNight = await grab(`p6_vl_night_${tag}.png`, 6); }
     }
     const best = (k) => cost[k] ? Math.min(...cost[k].map(x => x.ms)) : null;
-    OUT.cost = { raw: cost, best: Object.fromEntries(Object.keys(cost).map(k => [k, best(k)])) };
+    OUT['cost_' + tag] = OUT.cost = { raw: cost, best: Object.fromEntries(Object.keys(cost).map(k => [k, best(k)])) };
     console.log('  best ' + JSON.stringify(OUT.cost.best));
-    if (AFTER) check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `R56-01: Very Low winter light night: on ${best('potato_on')} ms ≤ off ${best('potato_off')} ms × 1.1 + 0.5`);
+    if (tag === 'after') check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `R56-01: Very Low winter light night: on ${best('potato_on')} ms ≤ off ${best('potato_off')} ms × 1.1 + 0.5`);
   }
   await ev(() => { VR.game.settings.seasons = true; });
   save();
 }
 
-// ---------------------------------------------------------------- 3 · R56-05: the murmuration at dusk, from 90 and 180 m
-if (want('flock')) {
-  await preset('balanced'); await settle(10);
-  await ev(() => { const g = VR.game; g.env.day = 4; g.env.setTime(12100); const w = g.wild; if (w) { w.age = 1000; w.fresh = false; } });
-  let m = null;
-  for (let i = 0; i < 30 && !m; i++) { await step(20, 50); m = await ev(() => { const r = VR.game.wild && VR.game.wild.report(); return r && r.murm && r.murm.state === 'fly' ? r.murm : null; }); }
-  OUT.murm = m;
-  check(!!m, 'the murmuration flies at dusk ' + JSON.stringify(m && { n: m.n, ctr: m.ctr }));
-  OUT.flock = {};
-  if (m) for (const D of [90, 180]) {
-    const c = m.ctr;
-    await ev(([c, D]) => { const p = VR.game.player; p.flying = true; p.noclip = true; const W = VR.game.world; let y = 0; for (let k = 200; k > 0; k--) if (W.getBlock(Math.floor(c[0] + D), k, Math.floor(c[2]))) { y = k; break; } p.teleport(c[0] + D, Math.max(y + 3, c[1] - 12), c[2]); }, [c, D]);
-    await settle(8); await step(10, 33);
-    const c2 = await ev(() => VR.game.wild.report().murm.ctr);
-    await lookAt([c2[0], c2[1] + 2, c2[2]]); await step(4, 33);
-    const f = await grab(`p6_flock${D}_${TAG}.png`, 4);
-    OUT.flock[D] = f ? stats(f, [0.2, 0.1, 0.8, 0.6]) : null;
-    // the same view without the birds: the dark share the flock adds
-    await ev(() => { VR.game.settings.wildBirds = false; }); await step(2, 33);
-    const f0 = await grab(`p6_flock${D}_none_${TAG}.png`, 4);
-    await ev(() => { VR.game.settings.wildBirds = true; }); await step(2, 33);
-    if (f0) { OUT.flock[D].none = stats(f0, [0.2, 0.1, 0.8, 0.6]); OUT.flock[D].blob = +(OUT.flock[D].dark - OUT.flock[D].none.dark).toFixed(4); }
-    console.log('  flock ' + D + ' m ' + JSON.stringify(OUT.flock[D]));
-  }
-  if (AFTER && OUT.flock[180]) check(OUT.flock[90].blob < 0.005 && OUT.flock[180].blob < 0.005, `R56-05: the dusk flock adds no dark blob (dark share ${OUT.flock[90].blob} · ${OUT.flock[180].blob} < 0.005)`);
-  save();
-}
-
 // ---------------------------------------------------------------- 4 · R56-10: Very Low in the ring
-if (want('ring')) {
+if (parts.includes('ring')) {
   await preset('potato'); await settle(10);
   await ev(() => { const g = VR.game; g.hideHud = true; g.env.day = 2; g.env.ticks = 6000; if (VR.Fields) VR.Fields.fixH = 2; g.chat('/raum ring'); });
   const t1 = Date.now();
@@ -220,14 +222,19 @@ if (want('ring')) {
     if (Date.now() - t1 > 300000) break;
     await wait(40);
   }
-  const f = await grab(`p6_vl_ring_${TAG}.png`, 3);
-  OUT.ring = f ? stats(f) : null;
+  const f = await grab(`p6_vl_ring_${tag}.png`, 3);
+  OUT.ring = OUT['ring_' + tag] = f ? stats(f) : null;
+  if (tag === 'after') { OUT.ringSweep = {}; for (const k of [0.35, 0.8]) { await ev((k) => { VR.Fields.__l0 = VR.Fields.__l0 || VR.Fields.VL_LIFT; VR.Fields.VL_LIFT = k; }, k); const f2 = await grab(`p6_vl_ring_${tag}_${k}.png`, 3); OUT.ringSweep[k] = f2 ? stats(f2) : null; } await ev(() => { VR.Fields.VL_LIFT = VR.Fields.__l0; }); console.log('  ring sweep ' + JSON.stringify(OUT.ringSweep)); }
   OUT.ringStats = await ev(() => VR.Fields && VR.Fields.stats ? Object.assign({}, VR.Fields.stats) : null).catch(() => null);
   console.log('  ring ' + JSON.stringify(OUT.ring) + ' ' + JSON.stringify(OUT.ringStats));
-  if (AFTER) check(OUT.ring && OUT.ring.sd > 25, 'R56-10: Very Low ring luma sd ' + (OUT.ring && OUT.ring.sd) + ' > 25');
+  if (tag === 'after') check(OUT.ring && OUT.ring.sd > 25, 'R56-10: Very Low ring luma sd ' + (OUT.ring && OUT.ring.sd) + ' > 25');
   save();
 }
 
+  await A.ctx.close();
+};
+if (process.env.BASE) await worldRun(process.env.BASE, 'base', ['flock', 'ring']);
+await worldRun(DIST, TAG, ['flock', 'cost', 'ring'].filter(want));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 check(!logs.some(l => /pageerror|Shader|compile|Link failed/i.test(l)), 'no page or shader errors');
 save();
