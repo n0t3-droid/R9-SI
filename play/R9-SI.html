@@ -54660,6 +54660,8 @@ VR.I18N.add('en',{
 'g.set.volVoice.tip':'Funke\'s chirps and the villagers\' chatter.',
 'g.set.calmMusic':'Calm music',
 'g.set.calmMusic.tip':'Longer silence between pieces, no drums, softer in a fight.',
+'g.set.musicLess':'Music less often',
+'g.set.musicLess.tip':'Pauses between pieces more than twice as long – in between you hear nature.',
 'g.set.wx':'Weather',
 'g.set.wx.tip':'How often rain, fog and storms come.',
 'g.set.wx.normal':'Normal',
@@ -58853,6 +58855,8 @@ VR.I18N.add('de',{
 'g.set.volVoice.tip':'Funkes Piepsen und das Plaudern der Dorfleute.',
 'g.set.calmMusic':'Ruhige Musik',
 'g.set.calmMusic.tip':'Längere Stille zwischen den Stücken, keine Trommeln, leiser im Kampf.',
+'g.set.musicLess':'Musik seltener',
+'g.set.musicLess.tip':'Mehr als doppelt so lange Pausen zwischen den Stücken – dazwischen hörst du die Natur.',
 'g.set.wx':'Wetter',
 'g.set.wx.tip':'Wie oft Regen, Nebel und Gewitter kommen.',
 'g.set.wx.normal':'Normal',
@@ -80941,12 +80945,13 @@ const cd=colourDef(colour);if(cd&&cd.mode)mode=cd.mode;
 return{root,mode};
 }
 const beatLen=(id,variant)=>60/(THEMES[id].bpm*((VARIANTS[variant]&&VARIANTS[variant].bpm)||1));
+const meterOf=(id)=>(THEMES[id]&&THEMES[id].meter)||4;
 
 
 function cueLen(id,variant,seed){
 if(id==='wander')return 9*4*WANDER_BEAT[variant==='night'?'night':variant==='cave'?'cave':'day'];
 const th=THEMES[id];if(!th)return 0;
-return(formOf(id,seed).length*th.len+(OUTRO[id]?1:0))*4*beatLen(id,variant);
+return(formOf(id,seed).length*th.len+(OUTRO[id]?1:0))*meterOf(id)*beatLen(id,variant);
 }
 const WANDER_BEAT={day:0.56,night:0.7,cave:0.8};
 
@@ -80988,13 +80993,18 @@ return{b:c.b,len:c.len,degs:[opts[Math.floor(r()*opts.length)]]};
 
 function events(id,o){
 o=o||{};
-if(id==='wander')return wanderEvents(o.plan||(VR.Klang&&VR.Klang.musicPlan(0)),o.variant,o.seed,o.colour);
+if(id==='wander')return wanderEvents(o.plan||(VR.Klang&&VR.Klang.musicPlan(0)),o.variant,o.seed,o.colour,o.season);
 const th=THEMES[id];if(!th)return[];
+
+
+if(th.own&&o.colour)o=Object.assign({},o,{colour:''});
+const MB=th.meter||4,SE=o.season>=0&& !th.sting&&VR.Score.SEASONS?VR.Score.SEASONS[o.season]:null;
 const V=VARIANTS[o.variant]||{},B=beatLen(id,o.variant),key=keyOf(id,o.plan,o.colour),seed=o.seed>>>0;
-const col=colourDef(o.colour)||{},CI=col.inst||{};
-let lv=o.lv!==undefined?o.lv:V.lv!==undefined?V.lv:0;if(o.calm)lv=Math.min(lv,1);
+const col=colourDef(o.colour)||{},CI=SE&&SE.inst&& !th.own?Object.assign({},SE.inst,col.inst):col.inst||{};
+let lv=o.lv!==undefined?o.lv:V.lv!==undefined?V.lv:0;if(SE&&SE.lv)lv=Math.min(2,lv+SE.lv);if(o.calm)lv=Math.min(lv,1);
+const TONE=(col.tone||1)*(SE&&SE.tone?SE.tone:1);
 const G=(V.gain||1)*(o.calm?0.8:1),out=[];
-const form=th.sting?'A':formOf(id,seed),secBeats=th.len*4,OU=th.sting?null:OUTRO[id];
+const form=th.sting?'A':formOf(id,seed),secBeats=th.len*MB,OU=th.sting?null:OUTRO[id];
 const layers=th.layers.slice();
 if(col.drops&& !th.sting)layers.push({id:'drops',kind:'arp',inst:'drop',oct:12,gain:col.drops,lv:0,pri:1,drops:true});
 const midiOf=(d,L)=>degMidi(key.root,key.mode,d)+(L.oct||0)+(L.id==='mel'&&col.melOct?col.melOct:0);
@@ -81002,10 +81012,10 @@ const emit=(L,off,sec,chords,r,outro)=>{
 if(L.lv>lv)return;
 if(o.calm&&L.kind==='drum')return;
 if(o.lowEnd&&L.pri<2&&L.kind!=='line')return;
-const vi=(V.inst&&V.inst[L.id])||L.inst,inst=CI[vi]||vi,act=id==='adventure';
+const vi=(!th.own&&V.inst&&V.inst[L.id])||L.inst,inst=CI[vi]||vi,act=id==='adventure';
 const lg=L.gain*G*(L.kind==='bass'&&col.bassG?col.bassG:1)*(L.kind==='drum'&&col.drumG?col.drumG:1);
 const push=(b,len,midi,g2)=>out.push({t:(off+b)*B,dur:len*B,midi,inst,gain:g2===undefined?lg:g2,pri:L.pri,act,layer:L.id,sec:outro?'O':sec});
-const total=outro?4:secBeats,alt=th.alt&&th.alt[L.id];
+const total=outro?MB:secBeats,alt=th.alt&&th.alt[L.id];
 const chordAt=(b)=>{for(const c of chords)if(b>=c.b-1e-6&&b<c.b+c.len-1e-6)return c;return chords[chords.length-1];};
 if(L.kind==='line'){
 const txt=outro?OU.lines[L.id]:sec==='B'?th.B.lines[L.id]:L.notes;if(!txt)return;
@@ -81015,14 +81025,16 @@ for(const n of notes)for(const d of n.degs)push(n.b,n.len,midiOf(d,L));
 else if(L.kind==='bass'){
 if(outro){for(const c of chords)push(c.b,c.len,midiOf(c.degs[0],L));return;}
 const pp=alt&&r&&r()<0.5?alt[Math.floor(r()*alt.length)]:{pat:L.pat,plen:L.plen};
-for(let b=0;b<total;b+=4)for(const p of pp.pat){const c=chordAt(b+p);push(b+p,pp.plen,midiOf(c.degs[0],L));}
+for(let b=0;b<total;b+=MB)for(const p of pp.pat){const c=chordAt(b+p);push(b+p,pp.plen,midiOf(c.degs[0],L));}
 }else if(L.kind==='arp'||L.kind==='osti'){
-const osti=L.kind==='osti',pat=alt&&r&&r()<0.5?alt[Math.floor(r()*alt.length)]:osti?L.pat:L.drops?[0,2,4,7,4,2]:[0,2,4,2];
-const step=L.drops?0.75:0.5,lim=outro?2:total;
-for(let b=0,k=0;b<lim-1e-6;b+=step,k++){const c=chordAt(b);push(b,osti?0.45:L.drops?1.2:0.9,midiOf(c.degs[0]+pat[k%pat.length],L));}
+const osti=L.kind==='osti',pat=alt&&r&&r()<0.5?alt[Math.floor(r()*alt.length)]:osti||L.pat?L.pat:L.drops?[0,2,4,7,4,2]:[0,2,4,2];
+const step=L.step||(L.drops?0.75:0.5),lim=outro?2:total,nl=L.nlen||(osti?0.45:L.drops?1.2:0.9);
+for(let b=0,k=0;b<lim-1e-6;b+=step,k++){const c=chordAt(b);push(b,nl,midiOf(c.degs[0]+pat[k%pat.length],L));}
+}else if(L.kind==='comp'){
+for(let b=0;b<total;b+=MB)for(const p of L.beats){const c=chordAt(b+p);for(const d of[0,2,4])push(b+p,L.nlen||0.6,midiOf(c.degs[0]+d,L),lg*(d?0.8:1));}
 }else if(L.kind==='drum'){
 if(outro){if(L.inst==='kick')push(0,0.4,0);return;}
-for(let b=0;b<total;b+=0.5){const k=Math.round(b*2)%8;if(L.hits[k]==='x')push(b,0.4,0);}
+for(let b=0;b<total;b+=0.5){const k=Math.round(b*2)%(2*MB);if(L.hits[k]==='x')push(b,0.4,0);}
 }
 };
 for(let si=0;si<form.length;si++){
@@ -81034,12 +81046,15 @@ const body=form.length*secBeats;
 if(OU){const och=parseLine(OU.chords).notes;for(const L of layers)emit(L,body,'O',och,null,true);}
 
 
-const end=(body+(OU?4:0))*B,lastCh=OU?parseLine(OU.chords).notes.pop():parseLine(th.chords).notes.pop();
-const lastAt=(OU?body+lastCh.b:lastCh.b)*B,tail=OU?OU.tail:STING_TAIL;
+
+
+const lastSec=form[form.length-1],end=(body+(OU?MB:0))*B;
+const lastCh=OU?parseLine(OU.chords).notes.pop():parseLine(lastSec==='B'&&th.B?th.B.chords:th.chords).notes.pop();
+const lastAt=(OU?body+lastCh.b:body-secBeats+lastCh.b)*B,tail=OU?OU.tail:STING_TAIL;
 for(const e of out){
-if(th.arc)e.gain*=e.sec==='O'?th.arc[th.arc.length-1]*0.9:th.arc[Math.min(th.arc.length-1,Math.floor((e.t/B-0)/4+1e-6)%th.len)];
+if(th.arc)e.gain*=e.sec==='O'?th.arc[th.arc.length-1]*0.9:th.arc[Math.min(th.arc.length-1,Math.floor((e.t/B-0)/MB+1e-6)%th.len)];
 if(e.midi&&e.t>=lastAt-1e-6&&(e.t+e.dur>=end-B*1.01||e.layer==='pad'||e.layer==='bass'||e.layer==='str')){e.dur=Math.max(e.dur,end-e.t);e.tail=tail;}
-if(col.tone&&(e.inst==='pad'||e.inst==='strings'||e.inst==='glasspad'))e.tone=col.tone;
+if(TONE!==1&&(e.inst==='pad'||e.inst==='strings'||e.inst==='glasspad'||e.inst==='choir'||e.inst==='harp'))e.tone=TONE;
 delete e.sec;
 }
 out.sort((a,b)=>a.t-b.t||b.pri-a.pri);
@@ -81047,9 +81062,10 @@ return out;
 }
 
 
-function wanderEvents(plan,variant,seed,colour){
+function wanderEvents(plan,variant,seed,colour,season){
 const K=VR.Klang,r=K.rng((seed>>>0)||(K.seedOf(plan.day)^0x51ed)),out=[];
-const CI=(colourDef(colour)||{}).inst||{};
+const SE=season>=0&&VR.Score.SEASONS?VR.Score.SEASONS[season]:null;
+const CI=Object.assign({},SE&&SE.inst,(colourDef(colour)||{}).inst);
 const beat=WANDER_BEAT[variant==='night'?'night':variant==='cave'?'cave':'day'],bar=beat*4;
 const density=variant==='cave'?0.25:variant==='night'?0.4:0.6,padG=variant==='cave'?0.03:0.045;
 for(let k=0;k<8;k++){
@@ -81088,6 +81104,9 @@ class Director{
 constructor(o){
 o=o||{};
 this.seed=(o.seed>>>0)||1;this.r=VR.Klang.rng(this.seed);this.calm= !!o.calm;
+
+
+this.less= !!o.less;this.grid=null;this.qAt=0;this.pkT=0;this.xf=false;this.lastPk=undefined;this.season= -1;
 this.cue=null;
 this.restUntil=0;this.queue=[];this.lastSting={};this.rot=0;this.after=null;this.loops=0;
 this.nCue=0;this.colour='';
@@ -81113,9 +81132,10 @@ restFor(cue,c){
 const len=cue.t1-cue.t0;
 if(cue.id==='adventure'&&(c.danger||c.boss>0))return++this.loops%3===0?4:0.5;
 this.loops=0;
+if(c.festival&&cue.pk==='fest')return 0.4;
 const k=c.space?REST.space:c.cave?REST.cave:c.story?REST.story:c.building?REST.build:c.night>0.5?REST.night:cue.id==='wander'?REST.wander:REST.day;
 const jit=0.8+0.4*this.r();
-return Math.max(cue.sting?6:12,len*k*jit)*(this.calm?1.7:1);
+return Math.max(cue.sting?6:12,len*k*jit)*(this.calm?1.7:1)*(this.less?2.2:1);
 }
 
 
@@ -81123,7 +81143,10 @@ event(name,now,until){
 if(name==='hold'||name==='freeing'){
 this.restUntil=Math.max(this.restUntil,until||now+4);
 if(this.cue&& !this.cue.fading)this.fade(now,STING_FADE);
-if(name==='freeing')this.after={id:'home',variant:'bright',lv:1};
+if(name==='freeing'){
+this.after={id:'home',variant:'bright',lv:1};
+if(THEMES.freed){this.queue.length=0;this.queue.push('freed');this.qAt=until||now+4;this.lastSting.freed=now;}
+}
 return true;
 }
 if(!THEMES[name]|| !THEMES[name].sting)return false;
@@ -81132,8 +81155,21 @@ if(this.calm&&name==='funke')return false;
 if(this.cue&&this.cue.id==='adventure'&& !this.cue.fading)return false;
 this.lastSting[name]=now;
 this.queue.length=0;this.queue.push(name);
-if(this.cue&& !this.cue.fading&& !this.cue.sting)this.fade(now,STING_FADE);
+
+
+let qt=this.quant(now);if(this.cue&&this.cue.sting&& !this.cue.fading)qt=Math.max(qt,this.cue.t1);
+if(this.cue&&this.cue.fading)qt=Math.max(qt,Math.min(this.cue.t1,now+0.3));
+this.qAt=qt;
+if(this.cue&& !this.cue.fading&& !this.cue.sting)this.fade(now,Math.max(0.3,qt-now));
 return true;
+}
+quant(now){
+const G=this.cue&& !this.cue.fading?this.cue:this.grid,lead=now+0.3;
+if(!G|| !(G.B>0))return now+0.05;
+const bar=G.B*G.MB,kb=Math.max(0,Math.ceil((lead-G.t0)/bar-1e-9)),qb=G.t0+kb*bar;
+if(qb-now<=1.6&&qb>=lead-1e-9)return qb;
+const k=Math.max(0,Math.ceil((lead-G.t0)/G.B-1e-9)),q=G.t0+k*G.B;
+return q>=lead-1e-9?q:lead;
 }
 fade(now,len){
 const cu=this.cue;cu.fading=true;cu.t1=Math.min(cu.t1,now+len);
@@ -81143,41 +81179,59 @@ this.out={type:'fade',at:now,len};
 
 
 step(now,c){
-this.colour=c.colour||'';
+this.colour=c.colour||'';this.season=c.season>=0?c.season|0: -1;
 const a=this.decide(now,c);
 this.duckT=c.dialogue?0.35:c.hostile&& !(this.cue&&this.cue.id==='adventure')?0.25:1;
 return a;
 }
 decide(now,c){
 this.out=null;
+
+if(this.queue.length&&this.qAt&&now>=this.qAt-0.5){
+const at=Math.max(this.qAt,now+0.05);this.qAt=0;
+if(this.cue&&this.cue.t1>at)this.fade(now,at-now);
+if(this.cue&& !this.cue.fading)this.rot++;
+this.cue=null;
+return this.start(now,{id:this.queue.shift(),variant:'day',lv:0,sting:true},at);
+}
 const cu=this.cue;
 if(cu){
 if(now>=cu.t1){
 this.cue=null;
 if(!cu.fading)this.rot++;
-const rest=cu.fading?(this.queue.length?0:1.5):this.restFor(cu,c);
+const rest=cu.fading?(this.queue.length?0:this.xf?0.3:1.5):cu.sting&&this.after?0.5:this.restFor(cu,c);
 this.restUntil=Math.max(this.restUntil,now+rest);
 }else{
 const w=this.want(c);
+
+if(!cu.fading&& !cu.sting&& !w.urgent&&w.pk!==undefined&&cu.pk!==undefined&&w.pk!==cu.pk&&cu.id!=='adventure'&&cu.id!=='space'){
+if(!this.pkT)this.pkT=now;else if(now-this.pkT>=3-1e-6){this.pkT=0;this.xf=w.id!=='none';this.fade(now,3.5);return this.out;}
+}else this.pkT=0;
 if(!cu.fading&& !cu.sting&&w.urgent&&w.id===cu.id&&((w.lv|0)>cu.lv||(/^boss/.test(cu.variant)&&w.variant!==cu.variant))){this.fade(now,1.0);return this.out;}
 if(!cu.fading&& !cu.sting&&w.id!==cu.id&&(w.urgent||cu.id==='adventure'||(cu.id==='space'&& !c.space))){this.fade(now,cu.id==='adventure'?3:FADE);if(w.urgent)this.restUntil=0;}
 return this.out;
 }
 }
-if(this.queue.length)return this.start(now,{id:this.queue.shift(),variant:'day',lv:0,sting:true});
+if(this.queue.length&& !this.qAt)return this.start(now,{id:this.queue.shift(),variant:'day',lv:0,sting:true});
 const w=this.want(c);
-if(w.id==='festival')return null;
+if(w.id==='festival'||w.id==='none')return null;
+
+if(w.pk!==undefined&&this.lastPk!==undefined&&w.pk!==this.lastPk)this.restUntil=Math.min(this.restUntil,now+4);
 const last=this.log.length?this.log[this.log.length-1].id:'';
 if(now<this.restUntil&& !(w.urgent&&last!==w.id))return null;
 if(this.after){const a=this.after;this.after=null;return this.start(now,a);}
 return this.start(now,w);
 }
-start(now,w){
+start(now,w,at){
 const seed=((Math.imul(this.seed,0x9e3779b1)^Math.imul(++this.nCue,0x85ebca6b))>>>0)||1,colour=this.colour;
-const t0=now+0.05,dur=cueLen(w.id,w.variant,seed),lv=this.calm?Math.min(1,w.lv|0):w.lv|0;
-this.cue={id:w.id,variant:w.variant,lv,t0,t1:t0+dur,fading:false,sting: !!w.sting};
-this.log.push({id:w.id,variant:w.variant,lv,seed,colour,t0,t1:t0+dur});if(this.log.length>64)this.log.shift();
-return(this.out={type:'start',id:w.id,variant:w.variant,lv,at:t0,dur,sting: !!w.sting,seed,colour});
+const t0=at!==undefined?at:now+0.05,dur=cueLen(w.id,w.variant,seed),lv=this.calm?Math.min(1,w.lv|0):w.lv|0;
+
+const B=w.id==='wander'?WANDER_BEAT[w.variant==='night'?'night':w.variant==='cave'?'cave':'day']:THEMES[w.id]?beatLen(w.id,w.variant):0.5;
+const pk=w.sting?(this.lastPk):w.pk,fadeIn=this.xf&& !w.sting?2.5:0;this.xf=false;if(!w.sting)this.lastPk=w.pk;
+this.cue={id:w.id,variant:w.variant,lv,t0,t1:t0+dur,fading:false,sting: !!w.sting,pk,B,MB:meterOf(w.id)};
+this.grid=this.cue;
+this.log.push({id:w.id,variant:w.variant,lv,seed,colour,t0,t1:t0+dur,pk});if(this.log.length>64)this.log.shift();
+return(this.out={type:'start',id:w.id,variant:w.variant,lv,at:t0,dur,sting: !!w.sting,seed,colour,fadeIn,season:this.season});
 }
 }
 
@@ -81354,6 +81408,441 @@ VR.ScoreSynth={note,noise,hz,VOICES,voicesOf};
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const S=VR.Score,SY=VR.ScoreSynth;
+if(!S|| !SY)return;
+S.MODES.phrygian=[0,1,3,5,7,8,10];
+Object.assign(S.VARIANTS,{
+dance:{lv:2},pdance:{bpm:1.3,lv:2},dusk:{bpm:0.9,gain:0.85},rain:{bpm:0.9,lv:0,gain:0.75},snow:{bpm:0.85,lv:0,gain:0.8},
+});
+
+
+S.SEASONS=[
+{inst:{bell:'celesta'},tone:1.15},
+{lv:1,tone:1.05},
+{inst:{pluck:'harp',bell:'musicbox'},tone:0.8},
+{inst:{pluck:'celesta',bell:'glass',strings:'glasspad'},tone:0.7},
+];
+
+S.COLOURS.fairy={inst:{pluck:'celesta',bell:'musicbox'}};
+S.COLOURS.harbour={inst:{pluck:'mallet'}};
+const L=(id,kind,inst,oct,gain,lv,pri,x)=>Object.assign({id,kind,inst,oct,gain,lv,pri},x);
+const T={
+
+meadow:{
+bpm:92,meter:3,mode:'major',len:8,arc:[0.75,0.8,0.88,0.82,0.9,1,0.95,0.85],
+chords:'0:3 | 3:3 | 0:3 | 4:3 | 5:3 | 3:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','flute',0,0.06,0,3,{notes:'4:2 5 | 7:2 5 | 4 2 4 | 1:3 | 2:2 4 | 5:1.5 4:.5 3 | 2 1 2 | 0:3'}),
+L('harp','arp','harp',-12,0.03,0,2,{pat:[0,2,4,7,4,2],step:0.5,nlen:1.4}),
+L('bass','bass','bass',-24,0.06,0,2,{pat:[0],plen:3}),
+L('pad','chord','pad',-12,0.03,1,1),
+L('bird','line','celesta',12,0.025,1,1,{notes:'r:2 9:.5 11:.5 | r:3 | r:3 | r:2 8 | r:2 9:.5 11:.5 | r:3 | r:3 | r:2 7'}),
+],
+B:{chords:'5:3 | 3:3 | 0:3 | 4:3 | 5:3 | 1:3 | 4:3 | 4:3',lines:{mel:'7:2 9 | 7:2 5 | 7 5 4 | 4:3 | 5:2 7 | 8:1.5 7:.5 5 | 4 3 1 | 1:3'}},
+alt:{bass:[{pat:[0,2],plen:1}]},
+},
+
+lullaby:{
+bpm:66,meter:3,mode:'major',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.85,0.95,0.9,0.8],
+chords:'0:3 | 3:3 | 0:3 | 4:3 | 0:3 | 3:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','musicbox',12,0.05,0,3,{notes:'4:2 2 | 5:2 3 | 4 2 0 | 1:3 | 4:2 2 | 5 7 5 | 4 1 2 | 0:3'}),
+L('harp','arp','harp',-12,0.025,0,2,{pat:[0,4,7],step:1,nlen:2.4}),
+L('pad','chord','pad',-12,0.028,0,2),
+L('bass','bass','bass',-24,0.04,1,2,{pat:[0],plen:3}),
+],
+},
+
+harbour:{
+bpm:112,mode:'major',len:8,own:true,arc:[0.85,0.88,0.95,0.9,0.9,1,1,0.9],
+chords:'0:4 | 4:4 | 5:4 | 3:4 | 0:4 | 4:4 | 3:2 4:2 | 0:4',
+layers:[
+L('mel','line','mallet',0,0.07,0,3,{notes:'0:.5 2:.5 4 4:.5 5:.5 4 | 6:.5 4:.5 1 4:2 | 5:.5 7:.5 9 7:.5 5:.5 4 | 3 5 7:2 | 0:.5 2:.5 4 4:.5 5:.5 7 | 8:.5 6:.5 4 1:2 | 3:.5 5:.5 7 4:.5 6:.5 8 | 7:3 r'}),
+L('osti','osti','pluck',-12,0.032,0,2,{pat:[0,4,2,4,0,4,2,4]}),
+L('bass','bass','bass',-24,0.065,0,2,{pat:[0,1.5,2,3],plen:0.5}),
+L('shaker','drum','shaker',0,0.03,1,1,{hits:'.x.x.x.x'}),
+L('tom','drum','tom',0,0.07,1,2,{hits:'x...x.x.'}),
+L('pad','chord','pad',-12,0.026,1,1),
+],
+B:{chords:'3:4 | 4:4 | 2:4 | 5:4 | 3:4 | 4:4 | 1:2 4:2 | 4:4',lines:{mel:'7:1.5 8:.5 7 5 | 4:1.5 6:.5 8:2 | 9:.5 7:.5 6 4 2 | 5:3 r | 7:1.5 8:.5 9 7 | 8 6 4 6 | 5 3 8 6 | 4:4'}},
+alt:{osti:[[0,2,4,7,4,2,0,2]]},
+},
+
+fairy:{
+bpm:76,mode:'lydian',len:8,own:true,arc:[0.75,0.8,0.9,0.85,0.9,1,0.9,0.8],
+chords:'0:4 | 1:4 | 0:4 | 1:4 | 5:4 | 2:4 | 1:4 | 0:4',
+layers:[
+L('mel','line','celesta',12,0.055,0,3,{notes:'4:.5 3:.5 4:.5 7:.5 6:2 | 5:.5 3:.5 1:.5 3:.5 5:2 | 4:.5 6:.5 7:.5 9:.5 11:2 | 10:3 r | 9:.5 7:.5 5:.5 4:.5 2:2 | 4:.5 6:.5 9:.5 8:.5 6:2 | 5 3 1 3 | 0:3 r'}),
+L('box','osti','musicbox',0,0.022,1,2,{pat:[0,4,7,9,7,4,2,4]}),
+L('pad','chord','pad',-12,0.034,0,2),
+L('bass','bass','bass',-24,0.045,1,2,{pat:[0],plen:4}),
+L('spark','line','celesta',12,0.02,1,1,{notes:'r:3 9:.5 11:.5 | r:4 | r:3 11 | r:4 | r:3 9:.5 11:.5 | r:4 | r:4 | r:2 7:2'}),
+],
+B:{chords:'5:4 | 1:4 | 6:4 | 2:4 | 5:4 | 1:4 | 1:4 | 1:4',lines:{mel:'9:2 7:.5 5:.5 4 | 5:2 3:2 | 6:.5 8:.5 10:.5 8:.5 6:2 | 4:3 r | 7:.5 9:.5 11:.5 9:.5 7:2 | 8:.5 6:.5 5:.5 3:.5 1:2 | 3 5 8 10 | 8:4'}},
+},
+
+waltz:{
+bpm:132,meter:3,mode:'dorian',len:8,own:true,arc:[0.75,0.8,0.85,0.8,0.9,1,0.95,0.8],
+chords:'0:3 | 3:3 | 6:3 | 2:3 | 0:3 | 3:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','musicbox',12,0.05,0,3,{notes:'4:2 2 | 3:2 5 | 6:2 4 | 2:3 | 4:1.5 5:.5 7 | 7:2 5 | 6 4 1 | 0:3'}),
+L('bass','bass','bass',-24,0.055,0,2,{pat:[0],plen:1}),
+L('comp','comp','harp',-12,0.016,0,2,{beats:[1,2],nlen:0.7}),
+L('choir','chord','choir',-12,0.022,1,1),
+],
+B:{chords:'2:3 | 6:3 | 3:3 | 0:3 | 2:3 | 6:3 | 3:3 | 4:3',lines:{mel:'6:2 4 | 8:2 6 | 5:2 3 | 4:3 | 9:2 6 | 8:2 6 | 7 5 3 | 4:3'}},
+},
+
+p_aqua:{
+bpm:80,mode:'mixolydian',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.9,1,0.95,0.85],
+chords:'0:4 | 6:4 | 3:4 | 0:4 | 0:4 | 6:4 | 4:2 3:2 | 0:4',
+layers:[
+L('mel','line','bell',0,0.06,0,3,{notes:'0 2 4:2 | 6 4 3:2 | 3 5 7:2 | 4:3 r | 7 9 7 4 | 6:2 8:2 | 6 4 3 5 | 4:3 r'}),
+L('drops','arp','drop',12,0.02,0,1,{pat:[0,2,4,7,4,2],step:0.75,nlen:1.2}),
+L('pad','chord','pad',-12,0.034,0,2),
+L('bass','bass','bass',-24,0.055,1,2,{pat:[0,2.5],plen:1.5}),
+L('tom','drum','tom',0,0.07,2,2,{hits:'x..x..x.'}),
+L('shaker','drum','shaker',0,0.028,2,1,{hits:'.x.x.x.x'}),
+],
+},
+
+p_ocker:{
+bpm:96,mode:'phrygian',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.9,1,1,0.85],
+chords:'0:4 | 1:4 | 0:4 | 6:4 | 0:4 | 1:4 | 6:2 1:2 | 0:4',
+layers:[
+L('mel','line','reed',0,0.055,0,3,{notes:'0 1 2:2 | 3 2 1:2 | 2 4 3 2 | 1:3 r | 4:1.5 3:.5 2 1 | 3:1.5 2:.5 1 3 | 2 1 -1:.5 0:.5 1 | 0:4'}),
+L('str','chord','strings',-12,0.03,0,2),
+L('bass','bass','bass',-24,0.065,0,2,{pat:[0,1.5],plen:1}),
+L('tom','drum','tom',0,0.07,0,2,{hits:'x..x.x..'}),
+L('shaker','drum','shaker',0,0.025,1,1,{hits:'..x...x.'}),
+L('tom2','drum','tom',0,0.045,2,1,{hits:'.x...x.x'}),
+],
+},
+
+p_zinn:{
+bpm:90,mode:'major',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.9,1,0.95,0.9],
+chords:'0:4 | 3:4 | 4:4 | 0:4 | 5:4 | 3:4 | 1:2 4:2 | 0:4',
+layers:[
+L('mel','line','brass',0,0.055,0,3,{notes:'0:1.5 4:.5 4:2 | 5 3 0:2 | 1:1.5 4:.5 6:2 | 4:3 r | 5:1.5 7:.5 9:2 | 7 5 3:2 | 3 1 4 6 | 7:3 r'}),
+L('spark','line','celesta',12,0.022,1,1,{notes:'r:3 7 | r:4 | r:3 8 | r:4 | r:3 9 | r:4 | r:4 | r:2 7:2'}),
+L('pad','chord','pad',-12,0.034,0,2),
+L('bass','bass','bass',-24,0.06,0,2,{pat:[0,2],plen:2}),
+L('tom','drum','tom',0,0.06,2,2,{hits:'x...x.x.'}),
+L('shaker','drum','shaker',0,0.025,2,1,{hits:'.x.x.x.x'}),
+],
+},
+
+p_basalt:{
+bpm:60,mode:'aeolian',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.9,1,0.95,0.85],
+chords:'0:4 | 5:4 | 3:4 | 4:4 | 0:4 | 5:4 | 6:2 4:2 | 0:4',
+layers:[
+L('hum','chord','hum',-12,0.045,0,2),
+L('mel','line','bell',0,0.055,0,3,{notes:'0:2 2:2 | 2:3 r | 3:2 2 0 | 1:3 r | 0:2 4:2 | 2:2 0:2 | -1:2 1:2 | 0:4'}),
+L('bass','bass','hum',-24,0.055,0,2,{pat:[0],plen:4}),
+L('tom','drum','tom',0,0.055,1,2,{hits:'x.......'}),
+L('tom2','drum','tom',0,0.05,2,1,{hits:'....x.x.'}),
+],
+},
+
+p_opal:{
+bpm:64,mode:'lydian',len:8,own:true,arc:[0.8,0.85,0.9,0.85,0.9,1,0.95,0.85],
+chords:'0:4 | 1:4 | 6:4 | 2:4 | 0:4 | 1:4 | 5:2 1:2 | 0:4',
+layers:[
+L('pad','chord','glasspad',-12,0.042,0,2),
+L('mel','line','glass',12,0.05,0,3,{notes:'4:2 6 7 | 8:2 5:2 | 6 8 10 8 | 9:3 r | 7:2 9 11 | 12:2 8:2 | 7 5 8:2 | 7:4'}),
+L('flake','arp','celesta',12,0.016,1,1,{pat:[0,4,2,7],step:1,nlen:1.5}),
+L('bass','bass','bass',-24,0.045,1,2,{pat:[0],plen:4}),
+L('shaker','drum','shaker',0,0.028,2,1,{hits:'x.x.x.x.'}),
+L('tom','drum','tom',0,0.05,2,2,{hits:'...x...x'}),
+],
+},
+
+bridge:{
+bpm:60,mode:'lydian',len:8,own:true,arc:[0.75,0.8,0.88,0.85,0.92,1,0.95,0.85],
+chords:'0:4 | 1:4 | 5:4 | 1:4 | 0:4 | 2:4 | 1:4 | 0:4',
+layers:[
+L('choir','chord','choir',0,0.034,0,2),
+L('mel','line','bell',12,0.045,0,3,{notes:'0 4 7:2 | 8 5 3:2 | 2 5 7 9 | 8:4 | 7 9 11:2 | 9:2 6:2 | 5 3 8:2 | 7:4'}),
+L('hi','line','choir',12,0.022,1,2,{notes:'4:4 | 5:4 | 7:4 | 8:4 | 9:4 | 6:2 9:2 | 8:4 | 7:4'}),
+L('spark','arp','celesta',12,0.012,1,1,{pat:[0,2,4,7,4,2],step:0.5,nlen:1}),
+L('bass','bass','hum',-24,0.04,1,2,{pat:[0],plen:4}),
+],
+},
+
+ladder:{
+bpm:100,mode:'major',len:8,own:true,arc:[0.75,0.8,0.85,0.88,0.9,0.95,1,0.95],
+chords:'0:4 | 4:4 | 5:4 | 3:4 | 0:4 | 4:4 | 3:2 4:2 | 0:4',
+layers:[
+L('arp','arp','harp',-12,0.026,0,2,{pat:[0,2,4,7,9,11,14,16],step:0.5,nlen:1.5}),
+L('mel','line','flute',0,0.05,0,3,{notes:'0:2 2:2 | 4:4 | 5:2 7:2 | 10:4 | 7:2 9:2 | 11:4 | 10:2 11:2 | 7:4'}),
+L('pad','chord','pad',-12,0.03,1,1),
+L('bass','bass','bass',-24,0.05,0,2,{pat:[0,2],plen:2}),
+],
+},
+
+d_bluete:{
+bpm:150,meter:3,mode:'major',len:4,own:true,
+chords:'0:3 | 3:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','flute',12,0.05,0,3,{notes:'4 5 7 | 5:2 3 | 1 2 4 | 2:2 0'}),
+L('comp','comp','harp',-12,0.016,0,2,{beats:[1,2],nlen:0.5}),
+L('bass','bass','bass',-24,0.06,0,2,{pat:[0],plen:1}),
+L('tom','drum','tom',0,0.06,1,2,{hits:'x.....'}),
+L('shaker','drum','shaker',0,0.025,1,1,{hits:'..x.x.'}),
+],
+B:{chords:'5:3 | 3:3 | 4:3 | 0:3',lines:{mel:'7 9 7 | 5:2 7 | 6 4 1 | 0:3'}},
+},
+d_drachen:{
+bpm:132,mode:'major',len:4,own:true,
+chords:'0:4 | 4:4 | 5:2 3:2 | 4:2 0:2',
+layers:[
+L('mel','line','mallet',12,0.06,0,3,{notes:'0:.5 2:.5 4:.5 2:.5 4:.5 5:.5 7 | 6:.5 4:.5 6:.5 8:.5 6 4 | 7:.5 5:.5 2:.5 0:.5 3:.5 5:.5 7 | 6:.5 4:.5 1:.5 4:.5 2 0'}),
+L('osti','osti','pluck',-12,0.03,0,2,{pat:[0,4,2,4,0,4,2,4]}),
+L('bass','bass','bass',-24,0.065,0,2,{pat:[0,2],plen:0.5}),
+L('kick','drum','kick',0,0.14,1,2,{hits:'x...x...'}),
+L('shaker','drum','shaker',0,0.03,1,1,{hits:'.x.x.x.x'}),
+L('clap','drum','clap',0,0.05,2,1,{hits:'..x...x.'}),
+],
+B:{chords:'3:4 | 0:4 | 1:2 4:2 | 0:4',lines:{mel:'5:.5 7:.5 5:.5 3:.5 0 3 | 4:.5 2:.5 4:.5 7:.5 4 2 | 1:.5 3:.5 5:.5 3:.5 4:.5 6:.5 8 | 7:3 r'}},
+},
+d_tafel:{
+bpm:138,meter:3,mode:'major',len:4,own:true,
+chords:'0:3 | 4:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','reed',0,0.05,0,3,{notes:'2 4 2 | 1 6:2 | 1 4 6 | 7:2 r'}),
+L('comp','comp','harp',-12,0.018,0,2,{beats:[1,2],nlen:0.5}),
+L('bass','bass','bass',-24,0.07,0,2,{pat:[0],plen:1}),
+L('tom','drum','tom',0,0.07,1,2,{hits:'x.....'}),
+L('shaker','drum','shaker',0,0.025,1,1,{hits:'..x.x.'}),
+],
+B:{chords:'3:3 | 0:3 | 4:3 | 0:3',lines:{mel:'3 5 7 | 4 2:2 | 1 4 6 | 0:2 r'}},
+},
+d_lichter:{
+bpm:108,meter:3,mode:'major',len:4,own:true,
+chords:'0:3 | 5:3 | 4:3 | 0:3',
+layers:[
+L('mel','line','celesta',12,0.05,0,3,{notes:'4:2 7 | 9:2 7 | 6 4 1 | 2:2 r'}),
+L('comp','comp','musicbox',0,0.014,0,2,{beats:[1,2],nlen:0.6}),
+L('bass','bass','bass',-24,0.055,0,2,{pat:[0],plen:3}),
+L('bell','line','bell',12,0.02,1,1,{notes:'r:2 7 | r:3 | r:3 | r:2 7'}),
+],
+B:{chords:'3:3 | 0:3 | 4:3 | 0:3',lines:{mel:'5:2 3 | 4:2 2 | 1 4 6 | 7:2 r',bell:'r:2 5 | r:3 | r:3 | r:2 7'}},
+},
+
+glimpse:{
+bpm:96,mode:'lydian',len:2,sting:true,own:true,
+chords:'1:4 | 0:4',
+layers:[
+L('mel','line','celesta',12,0.05,0,3,{notes:'3:.5 5:.5 8:.5 10:.5 12:2 | 11:.5 9:.5 7:3'}),
+L('pad','chord','pad',-12,0.026,0,2),
+],
+},
+friend:{
+bpm:140,mode:'major',len:2,sting:true,own:true,
+chords:'0:4 | 4:2 0:2',
+layers:[
+L('mel','line','musicbox',12,0.06,0,3,{notes:'4:.5 2:.5 4:.5 7:.5 r 9:.5 r:.5 | 8:.5 6:.5 4 7:2'}),
+L('bass','bass','harp',-12,0.035,0,2,{pat:[0,2],plen:1}),
+],
+},
+welcome:{
+bpm:92,mode:'major',len:2,sting:true,own:true,
+chords:'0:2 3:2 | 4:2 0:2',
+layers:[
+L('mel','line','flute',0,0.055,0,3,{notes:'4 5 7:2 | 6 8 7:2'}),
+L('str','chord','strings',-12,0.03,0,2),
+L('bell','line','bell',0,0.025,0,1,{notes:'r:2 12:2 | r:2 14:2'}),
+],
+},
+freed:{
+bpm:84,mode:'major',len:3,sting:true,own:true,
+chords:'5:4 | 3:4 | 0:4',
+layers:[
+L('mel','line','brass',0,0.055,0,3,{notes:'0:.5 2:.5 4:.5 5:.5 7:2 | 10:1.5 9:.5 7:2 | 7:4'}),
+L('choir','chord','choir',-12,0.03,0,2),
+L('bass','bass','bass',-24,0.055,0,2,{pat:[0],plen:4}),
+],
+},
+};
+Object.assign(S.THEMES,T);
+for(const id of['meadow','harbour','fairy','waltz'])S.FORMS[id]=['A','AB','BA','AB'];
+for(const id of['d_bluete','d_drachen','d_tafel','d_lichter'])S.FORMS[id]=['AB','ABA','BA','ABAB'];
+Object.assign(S.GAP,{glimpse:45,friend:90,welcome:60,freed:20});
+
+
+const SEASON_DANCE=['d_bluete','d_drachen','d_tafel','d_lichter'];
+const PEOPLE_FEST={gezeiten:'aqua',sandstern:'ocker',funkel:'zinn',steinglut:'basalt',eisbluete:'opal'};
+S.danceOf=function(festId,season){
+if(festId&&T['d_'+festId])return{id:'d_'+festId,variant:'dance'};
+if(festId&&PEOPLE_FEST[festId])return{id:'p_'+PEOPLE_FEST[festId],variant:'pdance'};
+return{id:SEASON_DANCE[season>=0?season&3:1],variant:'dance'};
+};
+S.PEOPLES={aqua:'Wellari',ocker:'Dunelin',zinn:'Glimari',basalt:'Regoli',opal:'Isveli'};
+
+
+const P=S.Director.prototype,want0=P.want;
+const ROT_DAY=['home','wander','meadow','wander'],ROT_NIGHT=['lullaby','wander','home'];
+const ROT={harbour:['harbour','wander'],fairy:['fairy','wander'],circle:['waltz','wander']};
+P.want=function(c){
+if(!c.aware||c.boss>0||c.danger)return want0.call(this,c);
+if(c.journey)return{id:c.journey==='lift'?'ladder':'bridge',variant:'day',lv:1,urgent:true,pk:'j:'+c.journey};
+if(c.festival){const d=S.danceOf(c.festId,c.season);return{id:d.id,variant:d.variant,lv:this.calm?1:2,urgent:false,pk:'fest'};}
+const w=want0.call(this,c);
+if((w.id!=='home'&&w.id!=='wander')||c.story||c.cave)return w;
+if(c.storm)return{id:'none',pk:'storm'};
+const night=c.night>0.5,v=c.building?'build':night?'night':c.dusk?'dusk':c.snowing?'snow':c.rain?'rain':'day';
+const rot=ROT[c.place]||(c.people&&T['p_'+c.people]?['p_'+c.people,'wander']:night?ROT_NIGHT:ROT_DAY);
+const pk=c.place||(c.people?'p:'+c.people:'home');
+const id=this.lastPk!==undefined&&this.lastPk!==pk?rot[0]:rot[this.rot%rot.length];
+return{id,variant:v,lv:v==='day'&&id!=='wander'?1:0,urgent:false,pk};
+};
+
+
+const HARBOUR=[0,-140,95];
+const PEOPLE={aqua:1,ocker:1,zinn:1,basalt:1,opal:1};
+const gather0=S.gather;
+S.gather=function(g,s,out){
+out=gather0(g,s,out);
+out.aware=true;out.place='';out.people='';out.season= -1;out.rain=false;out.snowing=false;out.storm=false;out.dusk=false;out.journey='';out.festId='';
+if(!g)return out;
+try{
+const p=g.player&&g.player.pos,E=g.env,dim=g.dim||'overworld',m=g.meta;
+if(E){
+const tod= +E.timeOfDay||0;out.dusk=tod>10800&&tod<13200;
+out.storm=(E.thunder|0)>0;out.rain=(+E.rain||0)>0.3;out.snowing=(+E.snow||0)>0.3;
+}
+const SS=VR.Seasons;if(SS&&SS.cur&&(!SS.on||SS.on(g)))out.season=SS.cur.idx|0;
+if(p&&dim==='overworld'&&m&&(m.vgen|0)>=3&&m.type!=='flat'){
+const dx=p[0]-HARBOUR[0],dz=p[2]-HARBOUR[1];if(dx*dx+dz*dz<HARBOUR[2]*HARBOUR[2])out.place='harbour';
+}
+const FS=VR.Fairy&&VR.Fairy.state;
+if(!out.place&&FS&&FS.near&&FS.nearD<55)out.place=FS.near.kind==='circle'?'circle':'fairy';
+if(out.place==='fairy'||out.place==='circle')out.colour='fairy';else if(out.place==='harbour')out.colour='harbour';
+const D=VR.DimReg&&VR.DimReg.get&&VR.DimReg.get(dim);if(D&&PEOPLE[D.body])out.people=D.body;
+const JY=VR.Journey;if(JY&&JY.stats){const k=JY.stats().kind;if(k==='lift'||k==='bridge')out.journey=k;}
+if(out.festival){
+const V=g.villages,vil=V&&V.festivalNear?V.festivalNear():null,ss=vil&&V.ssToday?V.ssToday(vil):null;
+out.festId=ss&&ss.phase==='fest'?ss.id||'':'';
+}
+}catch(e){}
+return out;
+};
+
+
+const hz=SY.hz;
+function env(g,t,a,peak,end){const p=g.gain;p.setValueAtTime(0.0001,t);p.linearRampToValueAtTime(peak,t+a);p.exponentialRampToValueAtTime(0.0001,end);}
+function envHold(g,t,a,peak,rel,end){const p=g.gain;p.setValueAtTime(0.0001,t);p.linearRampToValueAtTime(peak,t+a);if(end-rel>t+a)p.setValueAtTime(peak,end-rel);p.exponentialRampToValueAtTime(0.0001,end);}
+function osc(c,type,f,t,end,det){const o=c.createOscillator();o.type=type;o.frequency.value=f;if(det)o.detune.value=det;o.start(t);o.stop(end+0.05);return o;}
+function partial(c,dest,f,t,end,amp,dec){const g=c.createGain();g.gain.setValueAtTime(amp,t);g.gain.exponentialRampToValueAtTime(0.001,t+dec);g.connect(dest);osc(c,'sine',f,t,Math.min(end,t+dec+0.05)).connect(g);}
+const LUSH={celesta:1,musicbox:1,harp:1,choir:1,hum:1,flute:1};
+const EXTRA={
+
+celesta(c,g,ev,t,d,G,tl,lo){const end=t+Math.max(1.0,d*1.2)+tl;env(g,t,0.003,G,end);osc(c,'sine',ev.f,t,end).connect(g);if(lo)return{n:1,end};partial(c,g,ev.f*4,t,end,0.25,0.25);return{n:2,end};},
+
+musicbox(c,g,ev,t,d,G,tl,lo){const end=t+1.6+tl;env(g,t,0.002,G,end);osc(c,'sine',ev.f,t,end).connect(g);if(lo)return{n:1,end};partial(c,g,ev.f*5.93,t,end,0.3,0.14);return{n:2,end};},
+
+mallet(c,g,ev,t,d,G,tl,lo){const end=t+Math.min(0.9,d+0.4)+tl;env(g,t,0.003,G,end);osc(c,'sine',ev.f,t,end).connect(g);if(lo)return{n:1,end};partial(c,g,ev.f*3.99,t,end,0.3,0.08);return{n:2,end};},
+
+harp(c,g,ev,t,d,G,tl,lo,hi){
+const end=t+Math.max(1.4,d)+tl;env(g,t,0.004,G,end);
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=0.8;lp.frequency.setValueAtTime(Math.min(9000,ev.f*6*ev.tn),t);lp.frequency.exponentialRampToValueAtTime(Math.max(300,ev.f*2*ev.tn),t+0.6);lp.connect(g);
+osc(c,'triangle',ev.f,t,end).connect(lp);if(!hi)return{n:1,end};
+partial(c,g,ev.f*2,t,end,0.15,0.5);return{n:2,end};
+},
+
+flute(c,g,ev,t,d,G,tl,lo,hi,vib){const end=t+d+(tl||0.15);envHold(g,t,0.07,G,tl||Math.min(0.3,d*0.4),end);vib(osc(c,'sine',ev.f,t,end,3)).connect(g);if(lo)return{n:1,end};const g2=c.createGain();g2.gain.value=0.2;g2.connect(g);osc(c,'triangle',ev.f,t,end).connect(g2);return{n:2,end};},
+
+choir(c,g,ev,t,d,G,tl,lo,hi,vib){
+const rel=tl||Math.min(1.2,d*0.4),end=t+d+(tl||rel*0.8);envHold(g,t,Math.min(0.6,d*0.3),G,rel,end);
+if(lo){const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(3000,ev.f*3);lp.connect(g);osc(c,'triangle',ev.f,t,end).connect(lp);return{n:1,end};}
+const mix=c.createGain();mix.gain.value=1;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(4000,2600*ev.tn);lp.connect(g);
+const f1=c.createBiquadFilter();f1.type='bandpass';f1.frequency.value=660;f1.Q.value=2.5;const f2=c.createBiquadFilter();f2.type='bandpass';f2.frequency.value=1100;f2.Q.value=3.5;
+const g2=c.createGain();g2.gain.value=0.6;mix.connect(f1);mix.connect(f2);f1.connect(lp);f2.connect(g2);g2.connect(lp);
+let n=0;for(const det of hi?[-11,0,10]:[-9,9]){vib(osc(c,'sawtooth',ev.f,t,end,det)).connect(mix);n++;}
+return{n,end};
+},
+
+brass(c,g,ev,t,d,G,tl,lo,hi,vib){
+const end=t+d+(tl||0.12);envHold(g,t,0.06,G,tl||Math.min(0.3,d*0.4),end);
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.Q.value=0.8;lp.frequency.setValueAtTime(ev.f*1.2,t);lp.frequency.linearRampToValueAtTime(Math.min(6000,ev.f*4),t+0.12);lp.frequency.exponentialRampToValueAtTime(Math.min(4000,ev.f*2.6),t+Math.max(0.2,d));lp.connect(g);
+vib(osc(c,'sawtooth',ev.f,t,end,-4)).connect(lp);if(lo)return{n:1,end};vib(osc(c,'sawtooth',ev.f,t,end,6)).connect(lp);return{n:2,end};
+},
+
+hum(c,g,ev,t,d,G,tl,lo,hi){
+const rel=tl||Math.min(1.5,d*0.5),end=t+d+(tl||rel*0.8);envHold(g,t,Math.min(0.5,d*0.3),G,rel,end);
+const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(1200,ev.f*5);lp.Q.value=0.7;lp.connect(g);
+osc(c,'sine',ev.f,t,end).connect(lp);if(lo)return{n:1,end};osc(c,'triangle',ev.f,t,end,4).connect(lp);return{n:2,end};
+},
+
+tom(c,g,ev,t,d,G,tl,lo){
+const end=t+0.45;g.gain.setValueAtTime(G,t);g.gain.exponentialRampToValueAtTime(0.0005,end);
+const o=osc(c,'sine',160,t,end);o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(82,t+0.2);o.connect(g);
+if(lo)return{n:1,end};
+const s=c.createBufferSource();s.buffer=SY.noise(c);const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=520;bp.Q.value=1;
+const g2=c.createGain();g2.gain.setValueAtTime(0.5,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.06);s.connect(bp);bp.connect(g2);g2.connect(g);s.start(t,((t*5)%0.3+0.3)%0.3,0.08);
+return{n:2,end};
+},
+
+shaker(c,g,ev,t,d,G){
+const end=t+0.09;const s=c.createBufferSource();s.buffer=SY.noise(c);
+const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=5200;bp.Q.value=0.9;s.connect(bp);bp.connect(g);
+g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(G,t+0.012);g.gain.exponentialRampToValueAtTime(0.0005,end);s.start(t,((t*3)%0.3+0.3)%0.3,0.11);
+return{n:1,end};
+},
+};
+const note0=SY.note;
+SY.note=function(c,dest,ev,t,o){
+const fn=EXTRA[ev.inst];if(!fn)return note0(c,dest,ev,t,o);
+o=o||{};
+const tier=o.tier!==undefined?o.tier:o.lowEnd?0:1,lo= !!o.lowEnd||tier===0,hi=tier>=3&& !lo;
+const g=c.createGain();g.connect(dest);
+if(o.rev&& !lo&&LUSH[ev.inst])g.connect(o.rev);
+if(o.room&&tier>=2&& !lo&&ev.inst!=='tom'&&ev.inst!=='shaker')g.connect(o.room);
+if(o.chorus&&hi&&(ev.inst==='choir'||ev.inst==='hum'))g.connect(o.chorus);
+const vib=(x)=>{if(hi&&o.lfo)o.lfo.connect(x.detune);return x;};
+const e2={f:ev.midi?hz(ev.midi):0,tn:ev.tone||1};
+return fn(c,g,e2,t,Math.max(0.05,ev.dur),ev.gain,ev.tail||0,lo,hi,vib);
+};
+Object.assign(SY.VOICES,{celesta:2,musicbox:2,mallet:2,harp:1,flute:2,choir:2,brass:2,hum:2,tom:2,shaker:1});
+const voices0=SY.voicesOf,ONE={celesta:1,musicbox:1,mallet:1,harp:1,flute:1,choir:1,brass:1,hum:1,tom:1,shaker:1};
+SY.voicesOf=function(inst,lowEnd,tier){
+if(!EXTRA[inst])return voices0(inst,lowEnd,tier);
+if(lowEnd||tier===0)return ONE[inst];
+if(tier>=3)return inst==='choir'?3:inst==='harp'?2:SY.VOICES[inst];
+return inst==='harp'?1:SY.VOICES[inst];
+};
+})(VR);
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,K=VR.Klang;
@@ -81389,6 +81878,7 @@ for(const[tt,g]of taps){const i=Math.floor(tt*sr)+(ch?37:0);if(i<n)d[i]+=ch? -0.
 return buf;
 }
 
+const SCORE2_KEYS=['aware','place','people','season','festId','journey','storm','rain','snowing','dusk'];
 class Audio{
 constructor(){
 this.ctx=null;this.enabled=true;
@@ -81422,7 +81912,8 @@ this.sfx.connect(this.sfxMuffle);this.sfxMuffle.connect(this.master);
 this.worldIn=c.createGain();this.worldIn.connect(this.sfx);
 this.room=c.createGain();this.room.gain.value=0;
 this.worldIn.connect(this.room);
-this.amb=c.createGain();this.amb.gain.value=this.vol.ambient;this.amb.connect(this.master);
+this.amb=c.createGain();this.amb.gain.value=this.vol.ambient;
+this.ambLift=c.createGain();this.ambLift.gain.value=1;this.amb.connect(this.ambLift);this.ambLift.connect(this.master);
 this.mus=c.createGain();this.mus.gain.value=this.vol.music;this.mus.connect(this.master);
 this.musTalk=c.createGain();this.musTalk.gain.value=1;this.musTalk.connect(this.mus);
 this.musDuck=c.createGain();this.musDuck.gain.value=1;this.musDuck.connect(this.musTalk);
@@ -81444,6 +81935,8 @@ if(c.state==='suspended')c.resume();
 resume(){if(!this.ctx)this.init();else if(this.ctx.state==='suspended')this.ctx.resume();}
 setVolumes(v){
 Object.assign(this.vol,v);if(v&&v.calm!==undefined&&this.score)this.score.calm= !!v.calm;
+if(v&&v.less!==undefined&&this.score)this.score.less= !!v.less;
+if(this.vol.music<=0&&this.run){this.run.stopAt=0;this.run=null;if(this.score)this.score.cue=null;}
 if(!this.ctx)return;this.master.gain.value=this.vol.master;this.sfx.gain.value=this.vol.sfx;this.mus.gain.value=this.vol.music;this.amb.gain.value=this.vol.ambient;
 if(this.vox)this.vox.gain.value=this.vol.voice===undefined?0.8:this.vol.voice;
 }
@@ -81947,6 +82440,7 @@ const day=s.day|0;
 if(this.scoreDay!==day){this.scoreDay=day;M.plan=K.musicPlan(day);if(D.log.length===0)D.reseed(K.seedOf(day)^0x5c0e);}
 const x=SC.gather(s.g||VR.game,s,this.sc);
 x.hostile=M.hostile;if(s.colour!==undefined)x.colour=s.colour;if(s.dialogue)x.dialogue=true;if(s.boss)x.boss=s.boss;if(s.outpost)x.outpost=true;
+for(let i=0;i<SCORE2_KEYS.length;i++){const k=SCORE2_KEYS[i];if(s[k]!==undefined)x[k]=s[k];}
 const act=D.step(now,x);
 M.mood=x.festival?'festival':D.cue?D.cue.id:'quiet';
 if(act&&act.type==='start')this.startCue(act);
@@ -81955,7 +82449,8 @@ const duck=(M.hostile||s.danger)?0.25:1;
 if(duck!==M.duckT){M.duckT=duck;this.musDuck.gain.setTargetAtTime(duck,now,duck<1?0.6:2.5);}
 const talk=x.dialogue?0.35:1;
 if(talk!==M.talkT){M.talkT=talk;this.musTalk.gain.setTargetAtTime(talk,now,talk<1?0.15:0.8);}
-if(x.festival&&now+0.2>=M.next)this.festivalBar(now);
+if(x.festival&& !x.aware&&now+0.2>=M.next)this.festivalBar(now);
+const lift=D.cue?1:1.25;if(lift!==M.ambQ&&this.ambLift){M.ambQ=lift;this.ambLift.gain.setTargetAtTime(lift,now,3);}
 }
 const r=this.run;if(!r)return;
 this.pump(r,now,now+0.5);
@@ -81978,12 +82473,15 @@ this.mvEnd.push(out.end);this.mvN.push(v);
 }
 startCue(a){
 const c=this.ctx,SC=VR.Score,D=this.score;
-if(this.run){this.run.bus.gain.setTargetAtTime(0.0001,c.currentTime,0.3);if(this.run.wet)this.run.wet.gain.setTargetAtTime(0.0001,c.currentTime,0.3);this.run.stopAt=Math.min(this.run.stopAt,c.currentTime);}
+
+const cut=Math.max(c.currentTime,a.at-0.06);
+if(this.run){this.run.bus.gain.setTargetAtTime(0.0001,cut,0.12);if(this.run.wet)this.run.wet.gain.setTargetAtTime(0.0001,cut,0.3);this.run.stopAt=Math.min(this.run.stopAt,Math.max(c.currentTime,a.at));}
 const bus=c.createGain();bus.gain.value=1;bus.connect(a.id==='adventure'?this.musAct:this.musDuck);
+if(a.fadeIn>0){bus.gain.setValueAtTime(0.0001,a.at);bus.gain.linearRampToValueAtTime(1,a.at+a.fadeIn);}
 
 
 const seed=a.seed!==undefined?a.seed>>>0:(K.seedOf(this.scoreDay)^(0x51ed+977*this.wanders++))>>>0;
-const evs=SC.events(a.id,{plan:this.music.plan||K.musicPlan(0),lv:a.lv,variant:a.variant,calm:D.calm,lowEnd:this.lowEnd,seed,colour:a.colour||''});
+const evs=SC.events(a.id,{plan:this.music.plan||K.musicPlan(0),lv:a.lv,variant:a.variant,calm:D.calm,lowEnd:this.lowEnd,seed,colour:a.colour||'',season:a.season===undefined? -1:a.season});
 let wet=null,lfo=null;
 if(this.roomIn){wet=c.createGain();wet.gain.value=1;wet.connect(this.roomIn);this.roomOut.gain.setTargetAtTime(a.colour==='moon'?0.0001:0.2,c.currentTime,0.4);}
 if(this.tier>=3&& !this.lowEnd){const o=c.createOscillator();o.type='sine';o.frequency.value=5.1;lfo=c.createGain();lfo.gain.value=7;o.connect(lfo);o.start(a.at);o.stop(a.at+a.dur+6);}
@@ -102477,6 +102975,7 @@ const ITEMS=[
 {key:'volAmbient',g:'snd',sec:'vol',t:'slider',lab:'g.set.volAmbient',tip:'g.set.volAmbient.tip',def:0.6,min:0,max:1,step:0.05,fmt:'pct'},
 {key:'volVoice',g:'snd',sec:'vol',t:'slider',lab:'g.set.volVoice',tip:'g.set.volVoice.tip',def:0.8,min:0,max:1,step:0.05,fmt:'pct'},
 {key:'calmMusic',g:'snd',sec:'vol',t:'switch',lab:'g.set.calmMusic',tip:'g.set.calmMusic.tip',def:false},
+{key:'musicLess',g:'snd',sec:'vol',t:'switch',lab:'g.set.musicLess',tip:'g.set.musicLess.tip',def:false},
 {key:'wx',g:'snd',sec:'air',t:'choice',lab:'g.set.wx',tip:'g.set.wx.tip',def:'normal',opts:[['normal','g.set.wx.normal','g.set.wx.normal.tip'],['calm','g.set.wx.calm','g.set.wx.calm.tip'],['off','g.set.wx.off','g.set.wx.off.tip']]},
 {key:'natSound',g:'snd',sec:'air',t:'choice',lab:'g.set.natSound',tip:'g.set.natSound.tip',def:'synth',opts:[['synth','g.set.natSound.synth','g.set.natSound.synth.tip'],['off','g.set.natSound.off','g.set.natSound.off.tip']]},
 
@@ -112042,7 +112541,7 @@ const MAT_SW=['pbr','water','texHi'];
 
 
 
-const DEFAULTS=Object.assign({preset:'balanced',fov:75,sens:1,invertY:false,viewBob:true,airLife:true,turnInertia:false,mouseSteer:false,camShake:true,volMaster:0.8,volSfx:0.9,volMusic:0.45,volAmbient:0.6,volVoice:0.8,calmMusic:false,showFps:false,showCoords:false,minimap:true,toasts:true,look:'seamless',wx:'normal',natSound:'synth',wetGround:true},PRESETS.balanced);
+const DEFAULTS=Object.assign({preset:'balanced',fov:75,sens:1,invertY:false,viewBob:true,airLife:true,turnInertia:false,mouseSteer:false,camShake:true,volMaster:0.8,volSfx:0.9,volMusic:0.45,volAmbient:0.6,volVoice:0.8,calmMusic:false,musicLess:false,showFps:false,showCoords:false,minimap:true,toasts:true,look:'seamless',wx:'normal',natSound:'synth',wetGround:true},PRESETS.balanced);
 
 const AQ_G=['g.aq.g1','g.aq.g2','g.aq.g3','g.aq.g4','g.aq.g5','g.aq.g6','g.aq.g7','g.aq.g8','g.aq.g9','g.aq.g10'];
 const AQ_C=['g.aq.c1','g.aq.c2','g.aq.c3','g.aq.c4','g.aq.c5'];
@@ -112189,7 +112688,7 @@ if(this.horizon&&this.horizon.setFar)this.horizon.setFar(S.far||0);
 if(this.aq&&this.aq.stack.length)this.aqApply(this.aq,S,this.world);
 if(this.world){this.world.renderDist=Math.max(5,S.renderDist-(this.aq&&this.aq.over&&this.aq.over.rd||0));if(key==='fancyLeaves'||key==='*'){this.world.fancyLeaves=S.fancyLeaves;this.remeshAll();}}
 if(this.input){this.input.sensitivity=0.0024*S.sens;this.input.invertY=S.invertY;this.input.raw=S.rawInput!==false;this.input.smooth= !!S.mouseSmooth;}
-if(this.audio){this.audio.setVolumes({master:S.volMaster,sfx:S.volSfx,music:S.volMusic,ambient:S.volAmbient,voice:S.volVoice===undefined?0.8:S.volVoice,calm: !!S.calmMusic});{const vl=S.preset==='potato'||(S.preset==='custom'&& !S.shadows&& !S.particles);if(this.audio.setTier)this.audio.setTier(vl?0:S.preset==='low'?1:S.preset==='balanced'?2:S.preset==='custom'?((S.shadows|0)>=2?3:(S.shadows|0)>=1?2:1):3);else if(this.audio.setLowEnd)this.audio.setLowEnd(vl);}}
+if(this.audio){this.audio.setVolumes({master:S.volMaster,sfx:S.volSfx,music:S.volMusic,ambient:S.volAmbient,voice:S.volVoice===undefined?0.8:S.volVoice,calm: !!S.calmMusic,less: !!S.musicLess});{const vl=S.preset==='potato'||(S.preset==='custom'&& !S.shadows&& !S.particles);if(this.audio.setTier)this.audio.setTier(vl?0:S.preset==='low'?1:S.preset==='balanced'?2:S.preset==='custom'?((S.shadows|0)>=2?3:(S.shadows|0)>=1?2:1):3);else if(this.audio.setLowEnd)this.audio.setLowEnd(vl);}}
 
 if(this.env&&this.env.wx)this.env.wx.setMode(S.wx);
 if(this.ambience)this.ambience.setOptions({nature:S.natSound!=='off',weather:S.wx!=='off'});
@@ -144959,6 +145458,7 @@ function talk(g,s,f){
 const rec=recOf(g),k=F.ADV[s.kind],q=rec.q[s.id],done=rec.done.indexOf(s.id)>=0;
 f.yaw=Math.atan2(-(g.player.pos[0]-f.pos[0]),-(g.player.pos[2]-f.pos[2]));
 if(!(S.tw&&S.tw.f===f))f.talkT=S.t+7;
+if(g.audio&&g.audio.cue){try{g.audio.cue('friend');}catch(e){}}
 if(f.mood==='sleepy'&& !(f.wakeT>S.t)){f.wakeT=S.t+25;say(g,f,T('g.fairy.dusel.yawn'));return true;}
 if(f.who!==giver[s.kind]){say(g,f,T('g.fairy.chat.'+f.who+'.'+(Math.floor(S.t)%3)));return true;}
 if(done){say(g,f,T('g.fairy.thanks.'+k));return true;}
@@ -147574,6 +148074,32 @@ for(const id of ids){const q=P[id],s=L0.siteOf(id)||{id};h+=`<div>✦ ${esc(T('g
 return h+'</div>';
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const cue=(g,name)=>{try{const a=g&&g.audio;if(a&&a.cue)a.cue(name);}catch(e){}};
+const W=VR.Wander;
+if(W&&W.Actor&&W.Actor.prototype.start){
+const start0=W.Actor.prototype.start;
+W.Actor.prototype.start=function(kind,k,force){const m=start0.call(this,kind,k,force);if(m&& !force)cue(this.g,'glimpse');return m;};
+}
+if(W){
+const found0=W.found;
+W.found=function(src,id){if(src==='fairy')cue(VR.game,'friend');return found0?found0.apply(this,arguments):undefined;};
+}
+const MI=VR.MoveIn;
+if(MI&&MI.startArrival){
+const arr0=MI.startArrival;
+MI.startArrival=function(V,h){const r=arr0.apply(this,arguments);cue((V&&V.g)||VR.game,'welcome');return r;};
+}
+})(VR);
 
 VR.GenieLazy=function(){
 if(VR.GenieLazy.done)return!!VR.GenieBrain;VR.GenieLazy.done=true;
