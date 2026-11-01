@@ -110,10 +110,11 @@
     seen(t, w) { if (!(w >= 2)) return; if (t > this.last) { this.last = t; this.n++; this.tgt = this.jit(this.n); } }
     since(t) { return t - this.last; }
     scout(t) { const s = t - this.last; return s >= this.tgt - W.PACE.look && s < this.tgt; }
-    // null · 'moment' · 'beat' — o: {foot (on foot: a moment may start), stage (its stage is clear), busy (the Regie)}
+    // null · 'moment' · 'beat' — o: {foot (on foot: a moment may start), stage (its stage is clear), busy (the Regie),
+    // coming (something another source started is about to be seen: a craft closing in, a start not seen yet)}
     want(t, o) {
       const s = t - this.last, P = W.PACE; if (s < P.space) return null;
-      const foot = !o || o.foot !== false, busy = !!(o && o.busy), stage = !o || o.stage !== false;
+      const foot = !o || o.foot !== false, busy = !!(o && (o.busy || o.coming)), stage = !o || o.stage !== false;
       if (s >= this.tgt && foot && stage && !busy) return 'moment';
       if (s >= P.beat && (!busy || s >= P.hard)) return 'beat';
       return null;
@@ -136,8 +137,8 @@
   };
 
   // ---- o-wander2 · the staging (R56-03): 8–18 m ahead inside the view cone, the main figure's height ≥ 6 % of the
-  // frame's (W.share); a small figure stages nearer (animals are drawn × STAGE.animal); a clear voxel line from the eye
-  W.STAGE = { near: 8, far: 18, cone: 0.42, share: 0.06, fov: 70 * Math.PI / 180, animal: 1.35 };
+  // frame's (W.share; staged for 7 %: a margin for the figure's own way); a small figure stages nearer (animals are drawn × STAGE.animal); a clear voxel line from the eye
+  W.STAGE = { near: 8, far: 18, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.35 };
   W.share = (hgt, d, fov) => hgt / (2 * Math.max(0.1, d) * Math.tan((fov || W.STAGE.fov) / 2));
   W.stageRange = function (hgt, fov) {
     const S = W.STAGE, dmax = hgt / (S.share * 2 * Math.tan((fov || S.fov) / 2));
@@ -461,7 +462,7 @@
       if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
       if (now < (this.tryT || 0)) return;
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g));
-      const want = P.want(now, { foot: walking, busy });
+      const want = P.want(now, { foot: walking, busy, coming: this.coming(now) });
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {
@@ -471,6 +472,23 @@
         return;
       }
       this.beat(air);
+    }
+    // o-wander2: is something of another source about to be seen? — a start the Regie noted that no event has shown yet
+    // (≤ 15 s), or a craft of the sky traffic closing in (its nearest pass within ≈ 9 s): ours waits, no pair
+    coming(now) {
+      const g = this.g, RG = VR.Regie, RS = RG && RG.of ? RG.of(g) : null, P = this.pacer;
+      if (RS && RS.sched && RS.sched.lastStart > P.last + 0.5 && now - RS.sched.lastStart < 15) return true;
+      const Tr = g.traffic, e = this.pos; if (!Tr || !Tr.ships) return false;
+      const M = this.shipD || (this.shipD = new Map());
+      let soon = false;
+      for (const s of Tr.ships) {
+        if (!s || s.wing || s._elDone || !s.pos) continue;
+        const d = Math.hypot(s.pos[0] - e[0], s.pos[1] - e[1], s.pos[2] - e[2]), d0 = M.get(s);
+        M.set(s, d);
+        if (d0 !== undefined && d < d0 && d < 260 && (d - 60) / Math.max(6, s.speed || 20) < 9) soon = true;
+      }
+      if (M.size > 64) M.clear();
+      return soon;
     }
     // a beat: small and close (6–16 m ahead in the cone), one or two draws, silent on screen (no toast)
     beat(air) {
