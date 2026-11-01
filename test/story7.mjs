@@ -124,6 +124,7 @@ try {
     if (!e) { const top = g.world.topAt(Math.floor(x + d), Math.floor(z)); e = [x + d, top + 1, z]; }
     p.flying = false; p.noclip = false; p.teleport(e[0], e[1], e[2]); const dx = x - e[0], dz = z - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = 0; return e.map(v => +v.toFixed(1)); }, [x, y, z, d, h]);
   const fairyAt = async (kind) => { for (let i = 0; i < 40; i++) { const s = await ev((k) => { const F = VR.Fairy, S0 = F && F.state; const s = S0 && S0.sites.find(q => (!k || q.kind === k || q.id === k) && q.y !== null); return s ? { id: s.id, kind: s.kind, x: s.x, y: s.y, z: s.z } : (S0 && S0.sites[0] ? { far: S0.sites.map(q => q.id + '@' + q.x + ',' + q.z).join(' ') } : null); }, kind); if (s && s.id) return s; if (s && s.far && i % 5 === 0) { const m = /@(-?\d+),(-?\d+)/.exec(s.far); if (m) await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.teleport(+x + 20, 120, +z); }, [m[1], m[2]]); } await run(20); await wait(300); } return null; };
+  await ev(() => { if (VR.game.funke) VR.game.funke.fresh = false; });   // (a fresh world hides Funke for its first 75 s of game time — an Arc-2 player is hours in)
   await ev(() => { const g = VR.game, r = g.story.rec; r.choices.c6 = 'lumi'; r.choices.how = 'build'; VR.StoryPlay.debug.reach('c13.b1'); });
 
   // ---------------------------------------------------------------- Herzwelt by night: 13 and 15
@@ -169,7 +170,7 @@ try {
       await ev((V) => { const p = VR.game.player; p.flying = true; p.teleport(V.x + 10, V.y + 30, V.z + 10); }, V); await settle(20, 'the village');
       const pz = await ev(() => { const H = VR.StoryArc2.homeNear(VR.game); return H ? { x: H.at.x, y: H.at.y, z: H.at.z } : null; });
       console.log('     stand ' + JSON.stringify(await toward(pz.x, pz.y, pz.z, 18, 0)));
-      await ev((t) => VR.game.env.setTime(t), DUSK - 600); await run(300); await ev((t) => VR.game.env.setTime(t), DUSK); await settle(10, 'nightfall');
+      await ev((t) => VR.game.env.setTime(t), DUSK - 600); await run(300); await ev((t) => VR.game.env.setTime(t), DUSK - 400); await settle(30, 'nightfall: the village gathers'); await ev((t) => VR.game.env.setTime(t), DUSK);
       const fs0 = await ev(() => { const g = VR.game, v = [...g.villages.known.values()][0]; return { fest: v ? g.villages.festivalDay(v) : null, day: g.env.day, gift: g.story.rec.gift && g.story.rec.gift.fest, home: Math.round(VR.StoryPlay.ctxOf(g, g.story).near.home) }; });
       console.log('     festival ' + JSON.stringify(fs0));
       check(fs0.fest === true, 'the village celebrates the Dreilichterfest tonight');
@@ -196,8 +197,8 @@ try {
   if (want('cost')) {
     console.log('cost · Very Low and High, outside a scene and in one (' + secs() + ')');
     for (const pr of ['potato', 'high']) {
-      await preset(pr); console.log('     preset ' + pr + ' (' + secs() + ')'); await draw(null); N['out_' + pr] = await frameMs(12); console.log('     out ' + N['out_' + pr] + ' ms (' + secs() + ')');
-      await ev(() => VR.StoryPlay.debug.play('c16.b1')); await sceneTo(4); N['in_' + pr] = await frameMs(12); console.log('     in ' + N['in_' + pr] + ' ms (' + secs() + ')'); await skipScene();
+      await preset(pr); console.log('     preset ' + pr + ' (' + secs() + ')'); await draw(null); await frameMs(8); N['out_' + pr] = await frameMs(16); console.log('     out ' + N['out_' + pr] + ' ms (' + secs() + ')');
+      await ev(() => VR.StoryPlay.debug.play('c16.b1')); await sceneTo(4); await frameMs(8); N['in_' + pr] = await frameMs(16); console.log('     in ' + N['in_' + pr] + ' ms (' + secs() + ')'); await skipScene();
     }
     N.brainMs = await ev(() => { const S0 = VR.StoryPlay.stats; return +(S0.brainMs / Math.max(1, S0.brains)).toFixed(3); });
     N.arc2 = await ev(() => VR.StoryArc2.stats);

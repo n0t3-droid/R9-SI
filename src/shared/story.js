@@ -237,7 +237,7 @@
       alt: { stay: ['wiegelind:happy', 'funke:surprised', 'borke:happy', 'borke:happy'], sow: ['wiegelind:happy', 'funke:surprised', 'tauli:happy', 'borke:happy'] }, task: { kind: 'fest', target: 'home' }, reward: { xp: 250 }, act: { kind: 'look', target: 'place', max: 220, cone: 22, hold: 1.5 } }),
     // 16 · Das Dreilichterfest — your settlement celebrates; the quiet last picture
     BV(16, 1, { when: { after: 'c15.b3', adv: true, dim: ['overworld'], hours: NIGHT, near: { home: 80 } }, vary: 'c6',
-      scene: { shots: [{ cam: 'skyline', target: 'home', dur: 7, fx: 'lanterns3' }, { cam: 'orbit', target: 'player', dur: 7, fx: 'lanterns3', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'warm' },
+      scene: { shots: [{ cam: 'skyline', target: 'home', dur: 7, fx: 'lanterns3' }, { cam: 'wide', target: 'home', dur: 7, fx: 'lanterns3', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'warm' },
       alt: { wellari: ['ilka:happy', 'tauli:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'tauli:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'quiet', target: 'home' }, reward: { xp: 300 }, act: { kind: 'look', target: 'home', max: 140, cone: 26, hold: 2 } }),
     BV(16, 2, { when: { after: 'c16.b1', adv: true, dim: ['overworld'] }, vary: 'c15',
       scene: { shots: [{ cam: 'up', target: 'wiege', dur: 8, fx: 'lanterns3', swell: true }, { cam: 'skyline', target: 'home', dur: 8, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'wide' },
