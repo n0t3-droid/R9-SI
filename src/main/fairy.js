@@ -99,6 +99,44 @@
     return 1 - 0.5 * night;                                                  // the spring and the tree: by day (lovely at night too)
   };
 
+  // ---------------------------------------------------------------- f-polish5: the places' manners (pure)
+  // a place keeps AVOID m off the game's own things: villages, outposts, wonders ({x, z, r}) and machines (r ≈ 6)
+  F.AVOID = 40;
+  F.clearOf = function (x, z, avoid) { if (avoid) for (const o of avoid) if (Math.hypot(o.x - x, o.z - z) < (o.r || 0) + F.AVOID) return false; return true; };
+  // the Schwebegarten's bridge side (where you see it from): the garden against the lowest land behind it, never from
+  // ground higher than its top − 4 m (you would look down on it); flat land keeps the planned yaw (yaw0).
+  // hAt(x, z) → the ground's height
+  F.gardenYaw = function (hAt, cx, cz, topY, yaw0) {
+    const score = (a) => {
+      const c = Math.cos(a), s = Math.sin(a);
+      const hv = Math.max(hAt(cx + c * 30, cz + s * 30), hAt(cx + c * 38, cz + s * 38));
+      if (hv > topY - 4) return Infinity;
+      const hb = Math.max(hAt(cx - c * 40, cz - s * 40), hAt(cx - c * 80, cz - s * 80));
+      return hb - 0.25 * hv;
+    };
+    const y0 = yaw0 || 0, s0 = score(y0);
+    let best = y0, bs = s0;
+    for (let k = 0; k < 12; k++) { const a = k * TAU / 12, sc = score(a); if (sc < bs - (s0 === Infinity ? 0 : 1.5)) { bs = sc; best = a; } }
+    return best;
+  };
+  // the garden's soft flowers (their own small model, 1/8 m a voxel): {x, z, v (0 rose · 1 butter · 2 lilac), yaw, sc}
+  // on the lawn (≤ 6.4 m out), off the blossom tree's trunk, the fountain and the two lamps (the model's own spots,
+  // turned with the garden: the models face −z, world = (x·cos + z·sin, −x·sin + z·cos))
+  const GARDEN_KEEP = [[3.5, 3, 1.1], [-2.25, -1.75, 1.9], [-4.25, 2.75, 0.6], [4.25, -3.75, 0.6]];
+  F.blooms = function (seed, site) {
+    const out = [], s0 = strH(site.id + '#bloom'), c = Math.cos(site.yaw || 0), sn = Math.sin(site.yaw || 0);
+    for (let k = 0; out.length < 16 && k < 120; k++) {
+      const a = h(seed, s0, k, 1) * TAU, r = 1.2 + Math.sqrt(h(seed, s0, k, 2)) * 5.2, lx = Math.cos(a) * r, lz = Math.sin(a) * r;
+      if (GARDEN_KEEP.some(([kx, kz, kr]) => Math.hypot(lx - kx, lz - kz) < kr)) continue;
+      const x = site.x + lx * c + lz * sn, z = site.z - lx * sn + lz * c;
+      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 0.9)) continue;
+      out.push({ x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, v: Math.floor(h(seed, s0, k, 3) * 3), yaw: Math.round(h(seed, s0, k, 4) * 628) / 100, sc: Math.round((0.8 + h(seed, s0, k, 5) * 0.45) * 100) / 100 });
+    }
+    return out;
+  };
+  // a halo's strength by the dark (night 0 … 1): faint by day, full at night
+  F.haloA = (night) => 0.3 + 0.7 * Math.max(0, Math.min(1, night || 0));
+
   // ---------------------------------------------------------------- the save (pure)
   // meta.fairy = {v: 1, o: {[dim]: [x, z]}, seen: {[siteId]: 1}, q: {[siteId]: {k, s, n, m, …}}, done: [siteId],
   //               pages: [kind], buddy: bool, wish: {[siteId]: day}, trail: s left}
@@ -210,6 +248,17 @@
     hideBubble();
     if (VR.Wander && VR.Wander.register) { try { VR.Wander.register({ id: 'fairy', kind: 'places', places: () => S.sites.filter((s) => s.y !== null).map((s) => ({ id: s.id, kind: s.kind, name: placeName(s.kind), pos: [s.x, s.y, s.z], seen: !!recOf(g).seen[s.id], best: F.best(s.kind, tod(g), clear(g)) })), pages: () => recOf(g).pages.slice() }); } catch (e) { /* the director is theirs */ } }
   }
+  // f-polish5: what a place keeps off (F.clearOf) — the villages, the outposts' zones, Herzwelt's wonders, the machines
+  function avoidOf(g) {
+    if (S.avoid && S.avoidT > S.t) return S.avoid;
+    const out = [], V = g.villages, L = VR.Liberate, En = g.entities, Lnd = VR.Land, m = g.meta || {};
+    if (V && V.sites) for (const v of V.sites) if (v && Number.isFinite(v.x)) out.push({ x: v.x, z: v.z, r: Math.min(90, v.rad || 50) });
+    if (L && L.zones) { try { for (const q of L.zones(g) || []) if (q && Number.isFinite(q.x)) out.push({ x: q.x, z: q.z, r: Math.min(80, q.r || 30) }); } catch (e) { /* no zones */ } }
+    if (En && En.mobs) for (const q of En.mobs) if (q && q.foe && !q.foe.gone && q.pos) out.push({ x: q.pos[0], z: q.pos[2], r: 6 });
+    if ((g.dim || 'overworld') === 'overworld' && Lnd && Lnd.SITES && (m.vgen | 0) >= (Lnd.VGEN || 10) && m.type !== 'flat') for (const q of Lnd.SITES) if (q[1] || q[2]) out.push({ x: q[1], z: q[2], r: 30 });
+    S.avoid = out; S.avoidT = S.t + 2;
+    return out;
+  }
   // natural ground: what the generator lays (grass, earth, sand, snow, rock, moss, leaves …), never a roof or a road
   const NAT = /(^|_)(grass|dirt|sand|snow|podzol|moss|mud|gravel|stone|regolith|basalt|ice|ash|dust|clay|mycel|tuff|andesite|granite|diorite|calcite|soil|rubble|leaves|log|sandstone|rock|obsidian|frost|sulfur|scoria|nodule)/;
   const ART = /brick|plank|concrete|^vx_|^vm_|glass|wool|path|slab|stairs|polished|smooth|tile|cobble|wall|fence|chiseled|cut_|_cut$|lamp|temple|spire|stacked|stucco|bossed|paver|panorama|door|vollton|button|pressure|logic|stonecutter|block_of/;
@@ -244,10 +293,16 @@
   function settle(g, s) {
     if (s.y !== null) return true;
     const x0 = s.x0 === undefined ? (s.x0 = s.x) : s.x0, z0 = s.z0 === undefined ? (s.z0 = s.z) : s.z0;
-    const put = (x, z) => { s.x = x; s.z = z; s.y = ground(g, x, z); build(g, s); return true; };
+    const put = (x, z) => {
+      s.x = x; s.z = z; s.y = ground(g, x, z);
+      // f-polish5: the garden is seen from the side that shows it against open land (F.gardenYaw)
+      if (s.kind === 'garden' && s.y !== null) { const y0 = s.y; s.yaw = F.gardenYaw((px, pz) => { const y = ground(g, px, pz); return y === null ? y0 : y; }, x, z, y0 + 24, s.yaw); }
+      build(g, s); return true;
+    };
     for (let k = s.tries; k < F.SETTLE_TRIES; k++) {
       const a = s.yaw + k * 0.93, r = k * 7, x = Math.round(x0 + Math.cos(a) * r), z = Math.round(z0 + Math.sin(a) * r);
       if (S.sites.some((o) => o !== s && o.y !== null && Math.hypot(o.x - x, o.z - z) < F.APART)) { s.tries = k + 1; continue; }
+      if (!F.clearOf(x, z, avoidOf(g))) { s.tries = k + 1; continue; }   // (f-polish5: off villages, outposts, wonders, machines)
       const ok = landOk(g, x, z, RAD[s.kind] || 10, s.kind === 'garden' ? 8 : 5);
       if (ok === 'wait') return false;
       if (ok === 3) return put(x, z);
@@ -288,7 +343,9 @@
       const [sx, sz] = off(s, 0.4, 1.8); sprite('silbrin', 'wise', 2, at(g, sx, sz, 0.55));
     } else if (s.kind === 'garden') {
       s.top = s.y + 24;
-      add('fy_garden', [s.x, s.top - 7, s.z], s.yaw, { big: 1 });
+      add('fy_garden', [s.x, s.top - 7, s.z], s.yaw, { big: 1, lawn: 1 });
+      // f-polish5: the lawn's soft flowers, their own small model (Low and up; Very Low keeps the garden's own voxel flowers)
+      F.blooms(seed, s).forEach((b) => add('fy_bloom_' + b.v, [b.x, s.top - 0.02, b.z], b.yaw, { scale: b.sc, lite: false, bloom: 1 }));
       const [fx, fz] = off(s, 0, 15); s.foot = at(g, fx, fz, 0);
       // the cloud bridge: a gentle arc from the foot up to the garden's rim (12 puffs)
       s.arc = []; for (let i = 0; i <= 12; i++) { const u = i / 12, x = s.foot[0] + (s.x + Math.cos(s.yaw) * 7 - s.foot[0]) * u, z = s.foot[2] + (s.z + Math.sin(s.yaw) * 7 - s.foot[2]) * u; s.arc.push([x, s.foot[1] + (s.top - s.foot[1]) * (u * u * (3 - 2 * u)) - 0.3 + Math.sin(u * Math.PI) * 2, z]); }
@@ -412,8 +469,9 @@
     if (T0 > 0 && Math.random() < dt * 6 * b) { const m = s.parts[Math.floor(Math.random() * s.parts.length)]; if (m && m.o.h) mote(g, m.pos[0] + (Math.random() - 0.5) * m.o.h * 0.6, m.pos[1] + m.o.h * 0.75, m.pos[2] + (Math.random() - 0.5) * m.o.h * 0.6, 0, -0.12, 0, m.m === 'fy_shroom_1' ? [0.8, 0.55, 1] : m.m === 'fy_shroom_2' ? [1, 0.6, 0.8] : [0.45, 1, 0.9], 0.05, 3.5, 0.05); }
   }
   // ---- the circle's spirits: a slow round dance on clear nights, a soft arpeggio
+  const DP = [];
   function dancers(g, s, dt, T0, b) {
-    if (b < 0.05 || !g.particles) return;
+    if (b < 0.05 || !g.particles) { if (S.dancePos) S.dancePos.length = 0; return; }
     const N = [4, 5, 7, 7, 9][T0] || 7, R0 = 5;
     S.danceT = (S.danceT || 0) + dt * 0.45;
     const col = [0.75, 0.9, 1], c2 = [1, 0.85, 1];
@@ -422,8 +480,9 @@
       const x = s.x + Math.cos(a) * r, z = s.z + Math.sin(a) * r;
       const cc = S.dance[i] || (S.dance[i] = [0, 0, 0]), k = b * (0.8 + 0.2 * Math.sin(S.t * 5 + i)), base = i & 1 ? c2 : col;
       cc[0] = base[0] * k; cc[1] = base[1] * k; cc[2] = base[2] * k;
-      dot(g, x, y, z, cc, 0.16);
-      dot(g, x, y + 0.02, z, [k, k, k], 0.07);
+      dot(g, x, y, z, cc, T0 ? 0.16 : 0.26);   // (f-polish5: Very Low has no halo — a rounder dot instead, the same count)
+      dot(g, x, y + 0.02, z, [k, k, k], T0 ? 0.07 : 0.1);
+      const dp = S.dancePos || (S.dancePos = []); if (i === 0) dp.length = 0; dp.push(DP[i] || (DP[i] = [0, 0, 0])); DP[i][0] = x; DP[i][1] = y; DP[i][2] = z;
       if (T0 > 0 && Math.random() < dt * 9) mote(g, x, y, z, -Math.sin(a) * 0.3, -0.05, Math.cos(a) * 0.3, base, 0.05, 1.1, 0);
     }
     if ((S.arpT = (S.arpT || 0) - dt) <= 0 && Math.hypot(g.player.pos[0] - s.x, g.player.pos[2] - s.z) < 30) { S.arpT = 7; chime(g, [523, 659, 784, 659, 880], 0.05 * b, 0.22); }
@@ -440,7 +499,7 @@
     const q = recOf(g).q[s.id];
     if (q && q.s === 1 && s.lanterns) for (const L of s.lanterns) {
       if (q.m & (1 << L.i)) continue;
-      dot(g, L.pos[0], L.pos[1] + 0.35 + Math.sin(S.t * 2 + L.i) * 0.05, L.pos[2], [1, 0.8, 0.4], 0.22);
+      dot(g, L.pos[0], L.pos[1] + 0.35 + Math.sin(S.t * 2 + L.i) * 0.05, L.pos[2], [1, 0.8, 0.4], T0 ? 0.22 : 0.34);
       if (Math.random() < dt * 2) mote(g, L.pos[0], L.pos[1] + 0.5, L.pos[2], 0, 0.6, 0, [1, 0.85, 0.5], 0.05, 1.5, 0);
       if (Math.hypot(p[0] - L.pos[0], p[2] - L.pos[2]) < 1.8 && Math.abs(p[1] - L.pos[1]) < 2.5) {
         const r = F.Q.lantern(q, L.i); save(g);
@@ -697,6 +756,23 @@
 
   // ---------------------------------------------------------------- drawing (game.js drawOpaque)
   const MP = { scale: 1, pose: null, shade: 0, noShade: true };
+  // ---- f-polish5: soft halos (story_glow.js's kind 0) round the dancers, the lost lanterns, the feelers and the
+  // companion at night — Low and up, ⚙ „Sanfte Lichthöfe" (wonderGlow); one small draw a halo, ≤ 14
+  const vlOf = (g) => tier(g) === 0;
+  const HL = []; for (let i = 0; i < 14; i++) HL.push({ p: [0, 0, 0], s: [1, 1], col: [0, 0, 0], a: 0, kind: 0 });
+  function halos(g, r, s, c) {
+    if (g.settings.wonderGlow === false || !VR.StoryGlow || !VR.StoryGlow.draw) return 0;
+    const E = S.E || (g.env && g.env.E) || {}, night = Math.max(0, Math.min(1, E.night || 0)), A = F.haloA(night);
+    let n = 0;
+    const put = (x, y, z, sz, cr, cg, cb, a) => { if (n >= HL.length || a < 0.02) return; const q = HL[n++]; q.p[0] = x; q.p[1] = y; q.p[2] = z; q.s[0] = q.s[1] = sz; q.col[0] = cr; q.col[1] = cg; q.col[2] = cb; q.a = a; };
+    if (s.kind === 'circle' && S.dancePos && (s.b || 0) > 0.05) for (const d of S.dancePos) put(d[0], d[1], d[2], 0.95, 0.55, 0.7, 1, 0.55 * s.b * A);
+    if (s.kind === 'tree' && s.lanterns) { const q = recOf(g).q[s.id]; if (q && q.s === 1) for (const L of s.lanterns) if (!(q.m & (1 << L.i))) put(L.pos[0], L.pos[1] + 0.4, L.pos[2], 1.6 + 0.1 * Math.sin(S.t * 1.3 + L.i), 1, 0.66, 0.3, 0.75 * A); }
+    if (night > 0.3) for (const f of s.folk) if (!f.away && n < 12) { const dx = f.pos[0] - c.x, dz = f.pos[2] - c.z; if (dx * dx + dz * dz < 900) put(f.pos[0], f.pos[1] + 0.85, f.pos[2], 0.45, 1, 0.85, 0.5, 0.45 * night); }
+    if (S.bud && night > 0.3 && recOf(g).buddy && g.settings.fairyBuddy !== false) put(S.bud.pos[0], S.bud.pos[1] - 0.1, S.bud.pos[2], 0.5, 0.8, 0.9, 1, 0.4 * night);
+    if (!n) return 0;
+    for (let i = n; i < HL.length; i++) HL[i].a = 0;   // (the rest skipped: story_glow draws only a > 0)
+    return VR.StoryGlow.draw(r, c, HL);
+  }
   const poses = {};
   F.draw = function (g, r, E, cam) {
     S.cam = cam || r.cam;
@@ -711,12 +787,17 @@
         const dx = part.pos[0] - c.x, dz = part.pos[2] - c.z, d2 = dx * dx + dz * dz;
         if (d2 > (part.o.big || part.m === 'fy_tree' ? 230 * 230 : 120 * 120)) continue;
         let pos = part.pos, sc = part.o.scale || 1, yaw = part.yaw;
-        if (part.o.puff) { const b = s.bridge || 0; if (b < 0.04) continue; sc = b * (0.8 + 0.25 * Math.sin(S.t * 0.7 + part.o.puff)); }
+        if (part.o.puff) {
+          const b = s.bridge || 0; if (b < 0.04) continue; sc = b * (0.8 + 0.25 * Math.sin(S.t * 0.7 + part.o.puff));
+          // f-polish5: a cloud right at the eye melts away (the ride's view is never inside a puff)
+          const dd = Math.hypot(dx, part.pos[1] - c.y, dz); if (dd < 4.5) { const k = (dd - 2.2) / 2.3; if (k <= 0.05) continue; sc *= k; }
+        }
         if (part.o.note !== undefined && s.lit && s.lit.i === part.o.note && S.t < s.lit.t) sc = 1.25;
         if (part.m === 'fy_tree') { const br = 1 + Math.sin(S.t * 0.5) * 0.012; sc = br; }   // the slow breath of the sleeping tree
         MP.scale = sc; MP.pose = null;
         if (part.m === 'fy_tree' && s.doorT > S.t) MP.pose = poses.door || (poses.door = { door: [0, -1.2, 0] });
-        if (LK.drawModel(g, r, P(), part.m, pos, yaw, c, MP)) n++;
+        const mname = part.o.lawn && !vl ? 'fy_garden_lawn' : part.m;   // (f-polish5: Low and up the lawn without its 0.5 m flower voxels)
+        if (LK.drawModel(g, r, P(), mname, pos, yaw, c, MP)) n++;
         MP.pose = null;
       }
       for (const f of s.folk) if (!f.away || f === S.escort) n += drawSprite(g, r, P, f, c);
@@ -725,6 +806,7 @@
     if (S.escort && (!s || s.folk.indexOf(S.escort.f) < 0)) n += drawSprite(g, r, P, S.escort.f, c);
     if (S.bud && recOf(g).buddy && g.settings.fairyBuddy !== false && g.player) { const B = S.bud; MP.scale = 0.42; MP.pose = wings(B, 'bud'); LK.drawModel(g, r, P(), 'fy_sprite_0', [B.pos[0], B.pos[1] - 0.2, B.pos[2]], g.player.yaw, c, MP); MP.pose = null; n++; }
     S.cost.parts = n;
+    if (s && s.parts && !vlOf(g)) S.cost.halos = halos(g, r, s, c);
   };
   function wings(f, k) { const p = f._pose || (f._pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], cap: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0] }); const a = Math.sin(S.t * (f.mood === 'sleepy' ? 3 : 14) + (f.v || 0)) * (f.sleep ? 0.1 : 0.55); p.wing_l[1] = 0.4 + a; p.wing_r[1] = -0.4 - a; void k; return p; }
   function drawSprite(g, r, P, f, c) {
@@ -748,6 +830,8 @@
   }
   if (VR.Settings && VR.Settings.add) {
     VR.Settings.add({ key: 'fairy', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.fairy', tip: 'g.set.fairy.tip', cost: 'low', def: true });
+    // f-polish5: the wonders' soft halos and far cues (fairy.js, wander.js, movein.js) — Low and up
+    if (!(VR.Settings.byKey && VR.Settings.byKey('wonderGlow'))) VR.Settings.add({ key: 'wonderGlow', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.wonderGlow', tip: 'g.set.wonderGlow.tip', cost: 'low', def: true });
     VR.Settings.add({ key: 'fairyBuddy', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.fairyBuddy', tip: 'g.set.fairyBuddy.tip', cost: 'low', def: true });
   }
   // the pictures' and the tests' handles

@@ -4035,5 +4035,11 @@
     "g.mi.greet.giftedN": "Thanks again for the {what}!",
     "g.mi.greet.helpedN": "Good to see you — thank you for your help!",
     // ---- u-movein end
+    // ---- f-polish5 (the wonders on screen)
+    "g.set.wonderGlow": "Soft halos",
+    "g.set.wonderGlow.tip": "Soft halos round fairy dancers, lost lanterns, festival lanterns and the guide balloon, a gentle shimmer over wander moments far off. From Low up.",
+    "g.set.moveinCam": "Arrival in view",
+    "g.set.moveinCam.tip": "When a family comes to your house, the camera calmly shows them on the way for a few seconds. Any key ends it.",
+    // ---- f-polish5 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

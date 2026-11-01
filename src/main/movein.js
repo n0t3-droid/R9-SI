@@ -191,6 +191,53 @@
     return { x: Math.round(x / hs.length), y: Math.round(y / hs.length), z: Math.round(z / hs.length) };
   };
 
+  // ---------------------------------------------------------------- f-polish5: the arrival on screen (pure)
+  // the way in: 40–60 m out toward the nearest village (≤ 900 m; else out from the door): [[x, z], …] in the order to try
+  MI.approach = function (door, out, villages) {
+    let a0 = Math.atan2(out[1], out[0]), bd = 900;
+    for (const v of villages || []) { const d = Math.hypot(v.x - door[0], v.z - door[2]); if (d < bd && d > 1) { bd = d; a0 = Math.atan2(v.z - door[2], v.x - door[0]); } }
+    const res = [];
+    for (const k of [0, 1, -1, 2, -2, 3, -3]) for (const r of [50, 42, 58]) { const a = a0 + k * Math.PI / 8; res.push([Math.round(door[0] + Math.cos(a) * r), Math.round(door[2] + Math.sin(a) * r)]); }
+    return res;
+  };
+  // the waypoints from there to the doorstep (≤ 9 m apart; the last the doorstep): [[x, z], …]
+  MI.wayPoints = function (a, b) {
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(d / 9)), out = [];
+    for (let i = 1; i <= n; i++) out.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
+    return out;
+  };
+  // the gentle framing (⚙ moveinCam): in RISE s, held, out FALL s — no jolt (smootherstep); a key eases out from where it is
+  MI.FRAME = { rise: 1.5, hold: 1.8, fall: 1.5 }; MI.FRAME.dur = MI.FRAME.rise + MI.FRAME.hold + MI.FRAME.fall;
+  const smoother = (t) => { const u = t <= 0 ? 0 : t >= 1 ? 1 : t; return u * u * u * (u * (u * 6 - 15) + 10); };
+  MI.frameK = function (t) { const F = MI.FRAME; return t <= 0 || t >= F.dur ? 0 : t < F.rise ? smoother(t / F.rise) : t < F.rise + F.hold ? 1 : smoother((F.dur - t) / F.fall); };
+  MI.frameSkip = function (t) { const F = MI.FRAME; return t < F.rise ? F.dur - F.fall * Math.max(0, t) / F.rise : t < F.rise + F.hold ? F.rise + F.hold : t; };
+  // the framing camera: beside the way (9 m to the side, 3.5 m up), looking at the family a little before the doorstep
+  MI.framePose = function (lead, door, out, side) {
+    out = out || {};
+    let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    const sd = side || 1, mx = door[0] + dx * L * 0.5, mz = door[2] + dz * L * 0.5;
+    out.x = mx - dz * 9 * sd - dx * 1.5; out.z = mz + dx * 9 * sd - dz * 1.5; out.y = lead[1] + 3.5;
+    const tx = door[0] + dx * L * 0.7, tz = door[2] + dz * L * 0.7, ty = lead[1] + 1.0;
+    const ex = tx - out.x, ez = tz - out.z;
+    out.yaw = Math.atan2(-ex, -ez); out.pitch = Math.atan2(ty - out.y, Math.hypot(ex, ez));
+    return out;
+  };
+  // the festival night of a settlement: lantern strings between the doorsteps (in their order round the plaza; a ring
+  // from three homes; none longer than 32 m), each sagging a little under its lanterns (~2.4 m apart, 2.9 m up at the
+  // doors), and the fire ring on the plaza: {strings: [[i, j]], lamps: [[x, y, z, string, colour]], fire: [x, y, z]}
+  MI.festLights = function (doors, pz) {
+    const D = doors.map((d, i) => ({ d, a: Math.atan2(d[2] - pz.z, d[0] - pz.x), i })).sort((p, q) => p.a - q.a);
+    const pairs = []; if (D.length >= 2) for (let k = 0; k < D.length; k++) { if (D.length === 2 && k === 1) break; pairs.push([D[k], D[(k + 1) % D.length]]); }
+    const strings = [], lamps = [];
+    for (const [A, B] of pairs) {
+      const a = A.d, b = B.d, L = Math.hypot(b[0] - a[0], b[2] - a[2]); if (L > 32 || L < 2) continue;
+      const si = strings.length; strings.push([A.i, B.i]);
+      const n = Math.max(2, Math.round(L / 2.4)), sag = Math.min(1.2, L * 0.05);
+      for (let j = 0; j < n; j++) { const u = (j + 0.5) / n; lamps.push([a[0] + (b[0] - a[0]) * u + 0.5, a[1] + (b[1] - a[1]) * u + 2.9 - sag * 4 * u * (1 - u), a[2] + (b[2] - a[2]) * u + 0.5, si, (j + si) % 4]); }
+    }
+    return { strings, lamps, fire: [pz.x, pz.y, pz.z] };
+  };
+
   // ---------------------------------------------------------------- decor (pure): only into air, never over your blocks
   MI.DECOR = { corner: ['vx_potplant', 'flower_pot', 'vx_lantern'], middle: ['vx_rug_red', 'vx_rug_blue', 'vx_rug_green', 'vx_rug_sand'] };
   MI.planDecor = function (get, room, R, opts) {

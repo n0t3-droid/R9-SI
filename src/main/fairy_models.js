@@ -198,7 +198,7 @@
   });
 
   // ---------------------------------------------------------------- the Floating Garden (1 voxel = 1/2 m: 16 m across), its clouds, the singing stones
-  M.fy_garden = () => ({
+  const garden = (flowers) => ({
     unit: 2, radius: 10, parts: {
       body: part(34, 28, 34, [17, 0, 17], (gr) => {
         for (let y = 0; y <= 13; y++) for (let z = 0; z < 34; z++) for (let x = 0; x < 34; x++) {
@@ -211,7 +211,9 @@
         for (let k = 0; k < 18; k++) { const a = k * 2.4, r = 3 + (k % 5) * 2.2, x = Math.floor(17 + Math.cos(a) * r), z = Math.floor(17 + Math.sin(a) * r), L = 2 + (k % 4); let y0 = 0; while (y0 < 13 && !gr.get(x, y0, z)) y0++; for (let y = y0 - L; y < y0; y++) gr.set(x, y, z, 0x6a4a2a); if (k % 3 === 0) gr.set(x, y0 - L - 1, z, 0x9affc8, 1); }
         // flowers on the lawn
         const FL = [0xff9ac8, 0xffe08a, 0xffffff, 0xc8a0ff, 0xff8a7a];
-        for (let z = 0; z < 34; z++) for (let x = 0; x < 34; x++) if (gr.get(x, 13, z) && hs(x, 14, z, 3) < 0.16) gr.set(x, 14, z, FL[Math.floor(hs(x, 14, z, 4) * 5)], hs(x, 14, z, 5) < 0.2 ? 1 : 0);
+        if (flowers) for (let z = 0; z < 34; z++) for (let x = 0; x < 34; x++) if (gr.get(x, 13, z) && hs(x, 14, z, 3) < 0.16) gr.set(x, 14, z, FL[Math.floor(hs(x, 14, z, 4) * 5)], hs(x, 14, z, 5) < 0.2 ? 1 : 0);
+        // (f-polish5: without the 0.5 m flower voxels the lawn gets a few soft tufts of a lighter green instead)
+        if (!flowers) for (let z = 0; z < 34; z++) for (let x = 0; x < 34; x++) if (gr.get(x, 13, z) && hs(x, 14, z, 3) < 0.3) gr.set(x, 13, z, hs(x, 14, z, 4) < 0.5 ? 0x7ad466 : 0x86dc74);
         // a blossom tree, a little fountain, two lamps
         gr.box(23, 14, 22, 24, 19, 23, 0x6a4428);
         gr.ell(23.5, 22, 22.5, 4.6, 3.6, 4.6, (x, y, z) => (hs(x, y, z, 6) < 0.08 ? 0xffffff : hs(x, y, z, 7) < 0.5 ? 0xf4a8c8 : 0xf0b8d4));
@@ -219,6 +221,29 @@
         for (const [x, z] of [[8, 22], [25, 9]]) { gr.box(x, 14, z, x, 16, z, 0x4a3a2a); gr.set(x, 17, z, 0xffd27a, 1); }
       }),
     }, layout: { body: [0, 0, 0] },
+  });
+  M.fy_garden = () => garden(true);         // (Very Low: the garden as it was, its flowers in its own voxels)
+  M.fy_garden_lawn = () => garden(false);   // (f-polish5, Low and up: the lawn, its flowers the soft fy_bloom clumps)
+  // f-polish5 · a clump of soft flowers (1 voxel = 1/8 m, ~0.7 m across): thin stems, leaves, round petal heads with a
+  // warm heart — rose · butter · lilac
+  const BLOOM = [[0xf6a2c4, 0xffd6e6, 0xffe27a], [0xffe08a, 0xfff2c4, 0xf2a03a], [0xc6a6ff, 0xe8dcff, 0xfff0a0]];
+  BLOOM.forEach((B, v) => {
+    M['fy_bloom_' + v] = () => ({
+      unit: 8, radius: 0.6, parts: {
+        body: part(7, 6, 7, [3, 0, 3], (gr) => {
+          const leaf = 0x5cb048, leaf2 = 0x76c45a;
+          for (const [x, z] of [[1, 2], [5, 4], [2, 5], [4, 1], [3, 3]]) gr.set(x, 0, z, hs(x, 0, z, 9 + v) < 0.5 ? leaf : leaf2);
+          const heads = [[3, 4, 3], [1, 3, 2], [5, 3, 4], [2, 2, 5], [5, 2, 1]];
+          heads.forEach(([x, y, z], i) => {
+            for (let k = 1; k < y; k++) gr.set(x, k, z, leaf);
+            if (i > 2 && hs(x, y, z, v) < 0.3) return;
+            gr.set(x, y, z, B[2], 1);   // the heart (a soft glow at dusk)
+            for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (x + dx >= 0 && x + dx < 7 && z + dz >= 0 && z + dz < 7) gr.set(x + dx, y, z + dz, (dx + dz + i) & 1 ? B[0] : B[1]);
+            if (y + 1 < 6) gr.set(x, y + 1, z, B[1]);
+          });
+        }),
+      }, layout: { body: [0, 0, 0] },
+    });
   });
   M.fy_puff = () => ({
     unit: 4, radius: 2.4, parts: {
