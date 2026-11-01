@@ -56,6 +56,12 @@
   // drone's 35 cm at 2.5 m is ≈ 0.6 % of the frame. eye [x, y, z], yaw, A the place (changed in place), side ±1 (the
   // shoulder when it stands dead ahead). Pure: test/first3.js
   F.CLEAR_D = 2.5; F.CLEAR_K = 0.6;
+  // f-polish6 (R56-18, critic_ux_v055_07_t45 / _08_t60: a flat translucent cyan chevron on the grass — his way ribbon,
+  // started by the story's first task, bending round the player — and a white cloud-creature on the wall — the drone
+  // itself): in a new world's first FIRST_QUIET s the first look is the land. The ribbon is not drawn and the drone is
+  // not drawn in the first-person view; his lines still come (the bubble). Pure: test/polish6.js
+  F.FIRST_QUIET = 75;
+  F.firstQuiet = (age, fresh) => !!fresh && Number.isFinite(age) && age >= 0 && age < F.FIRST_QUIET;
   F.keepClear = function (eye, yaw, A, side) {
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const dx = A[0] - eye[0], dy = A[1] - eye[1], dz = A[2] - eye[2];
@@ -578,7 +584,7 @@ void main() {
       if (!this.on()) { this.visible = false; this.wayT = 0; this.scanT = 0; this.scanJob = null; if (this.line) this.endLine(); if (this.ph) this.photoEnd(); return; }
       dt = clamp(dt || 0, 0, 0.1);
       const T = g.time || 0, p = g.player;
-      const first = this.startT === null; if (first) this.startT = T;
+      const first = this.startT === null; if (first) { this.startT = T; this.fresh = !!(VR.Wild && VR.Wild.freshWorld && VR.Wild.freshWorld(g, Date.now())); }
       this.feel(T);
       if (this.buildFocus()) this.budget.build(T);
       this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds()) && !F.camHidden(g);   // (f-hud: no cinematic camera's foreground)
@@ -1001,8 +1007,11 @@ void main() {
     cam(base) { const s = this.shot; if (!s) return null; return Object.assign({}, base, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: s.pitch, roll: 0, fov: s.fov, fixed: true }); }
 
     // ---- drawing: the drone (opaque, after the scene's models)
+    // (f-polish6) a new world's first seconds: no ribbon, no drone in the first-person view
+    quietNow() { return this.startT !== null && F.firstQuiet((this.g.time || 0) - this.startT, this.fresh); }
     draw(r, E, cam) {
       if (!this.visible || this.shot || !this.on()) return;
+      if (!this.seat && (this.g.camMode | 0) === 0 && !(this.g.photoCam && this.g.photoCam.on) && this.quietNow()) return;
       const g = this.g, ent = g.entities, gl = r.gl; if (!ent || !r.planes || !VR.getVoxModel) return;
       const t0 = now(), T0 = g.time || 0, m4 = VR.mat4;
       const model = VR.getVoxModel(gl, 'funke'); if (!model) return;
@@ -1038,7 +1047,7 @@ void main() {
       const gl = r.gl, t0 = now(), g = this.g, T0 = g.time || 0;
       gl.useProgram(p.p); gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-      if (this.wayT > 0 && this.wayPts > 1) this.drawWay(gl, p, cam);
+      if (this.wayT > 0 && this.wayPts > 1 && !this.quietNow()) this.drawWay(gl, p, cam);
       if (this.scanT > 0 && this.scanData) this.drawScan(gl, p, cam, T0);
       gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.bindVertexArray(null);
       F.cost.drawMs += now() - t0;

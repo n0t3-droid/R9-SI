@@ -641,6 +641,8 @@
       gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 52, 36);
       gl.bindVertexArray(null);
       m.count = verts.length / 13;
+      // f-polish6 (R56-13): what the block's mean colour is made of (layer, tint, shade a face; Entities.meanCol)
+      { const lt = []; for (let q = 0; q < verts.length; q += 13 * 6) lt.push(verts[q + 5], verts[q + 9], verts[q + 10], verts[q + 11], verts[q + 12]); m.lt = lt; }
       this.meshCache.set(id, m);
       return m;
     }
@@ -651,7 +653,17 @@
       if (p.u.u_avgLum && r.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, r.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, r.texAlbedo); gl.uniform1i(p.u.u_albedo, 0);
       gl.uniform1f(p.u.u_flash, 0);
+      if (p.u.u_desat) gl.uniform1f(p.u.u_desat, 0);
       return p;
+    }
+    // f-polish6 (R56-13): an item mesh's mean colour (linear: its faces' texture means × their tints), once the textures'
+    // means are there (null before)
+    meanCol(mesh) {
+      const A = this.game && this.game.tex && this.game.tex.avgColor, L = mesh.lt; if (!A || !L || !L.length) return null;
+      let r0 = 0, g0 = 0, b0 = 0, n = 0;
+      for (let q = 0; q < L.length; q += 5) { const l = L[q] | 0, sh = L[q + 4]; if (l * 4 + 3 >= A.length || Math.abs(sh) > 1.5) continue; const k = sh < 0 ? A[l * 4 + 3] : 1;
+        r0 += A[l * 4] * (1 + (L[q + 1] - 1) * k); g0 += A[l * 4 + 1] * (1 + (L[q + 2] - 1) * k); b0 += A[l * 4 + 2] * (1 + (L[q + 3] - 1) * k); n++; }
+      return n ? [r0 / n, g0 / n, b0 / n] : null;
     }
     drawMesh(r, p, mesh, M, light, noFog) {
       const gl = r.gl;
@@ -763,7 +775,19 @@
       // f-first3 (R55-13): the held block 30 % darker than the light at the eye (VR.First2.HAND_DIM) — the eye stays on the world
       const hk = mesh.block && VR.First2 && VR.First2.HAND_DIM ? VR.First2.HAND_DIM : 1, HL = this.handL || (this.handL = { sky: 0, bl: [0, 0, 0] });
       HL.sky = light.sky * hk; HL.bl[0] = light.bl[0] * hk; HL.bl[1] = light.bl[1] * hk; HL.bl[2] = light.bl[2] * hk;
+      // f-polish6 (R56-13): and 20 % less saturated (VR.First2.HAND_SAT: the share of its colour kept) — Low and up in the
+      // mesh program (u_desat); Very Low's program unchanged: its lights tinted for this one draw toward the block's grey
+      // (VR.First2.handTint: the block's mean colour × the tint = that mean nearer its luma; keep² — polish6.mjs run 3 measured
+      // keep 0.7 on the screen as only 2.6 % less saturation: the faces differ from their mean and the grade re-saturates)
+      const F2 = VR.First2, hk2 = mesh.block && F2 && Number.isFinite(F2.HAND_SAT) ? 1 - F2.HAND_SAT : 0;
+      if (hk2 > 0 && !p.u.u_desat && !mesh.meanCol) mesh.meanCol = this.meanCol(mesh);
+      const hDs = hk2 > 0 && p.u.u_desat ? hk2 : 0, hT = hk2 > 0 && !p.u.u_desat && mesh.meanCol && F2.handTint ? F2.handTint(mesh.meanCol, F2.HAND_SAT * F2.HAND_SAT) : null;
+      if (hDs > 0) gl.uniform1f(p.u.u_desat, hDs);
+      if (hT) { const t = hT, a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0] * t[0], a[1] * t[1], a[2] * t[2]); gl.uniform3f(p.u.u_sunColor, sc[0] * t[0], sc[1] * t[1], sc[2] * t[2]); gl.uniform3f(p.u.u_moonColor, mc[0] * t[0], mc[1] * t[1], mc[2] * t[2]);
+        const e = 1 / 1.7; HL.bl[0] *= Math.pow(t[0], e); HL.bl[1] *= Math.pow(t[1], e); HL.bl[2] *= Math.pow(t[2], e); }
       this.drawMesh(r, p, mesh, L, HL, true);
+      if (hDs > 0) gl.uniform1f(p.u.u_desat, 0);
+      if (hT) { const a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0], a[1], a[2]); gl.uniform3f(p.u.u_sunColor, sc[0], sc[1], sc[2]); gl.uniform3f(p.u.u_moonColor, mc[0], mc[1], mc[2]); }
       gl.enable(gl.CULL_FACE);
     }
     onColumnLoaded(c) {

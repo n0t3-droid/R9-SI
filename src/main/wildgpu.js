@@ -258,6 +258,8 @@
   // ---------------------------------------------------------------- the program
   // (f-wild2: the impostor's cut radius and the ray's wing pivot, as GLSL literals)
   const PCUT = (VR.Wild && VR.Wild.PUFF ? VR.Wild.PUFF.cut : 1.6), CUT = PCUT.toFixed(3), PG = (VR.Wild && VR.Wild.PUFF && VR.Wild.PUFF.grain) || [5, 0.4, 1.6], GCELL = PG[0].toFixed(3), GLO = PG[1].toFixed(3), GHI = PG[2].toFixed(3), CUT2 = (PCUT * PCUT).toFixed(3), PIVOT = WG.RAY_SHAPE.body.toFixed(3);
+  // (f-polish6, R56-05: the far flock's sky floor — VR.Wild.MURM_SKY, MURM_SKYK — as literals)
+  const MSK = (VR.Wild && VR.Wild.MURM_SKY) || [40, 120], SKY0 = MSK[0].toFixed(1), SKY1 = MSK[1].toFixed(1), SKYK = ((VR.Wild && VR.Wild.MURM_SKYK) || 0.7).toFixed(3);
   const WILD_VS = `
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_nrm;
@@ -370,6 +372,13 @@ uniform int u_mode;
 uniform float u_fogK;               // (f-wild2) the share of the distance the air counts (the flock: a dark mass stays dark)
 uniform float u_under;              // (f-wild2) the ray's lit underside and its backlit wings
 out vec4 o;
+// (f-polish6, R56-05) the flock from afar never darker than SKYK × the sky band behind it (the air's colour that way)
+vec3 skyFloor(vec3 c, vec3 rel) {
+  float L = length(rel), k = ${SKYK} * smoothstep(${SKY0}, ${SKY1}, L);
+  if (k <= 0.0) return c;
+  vec3 band = mix(hazeColor(rel / max(L, 0.001)), u_fogColor, 0.35);   // (the far air's colour that way, as applyFog's)
+  return max(c, band * k);
+}
 void main() {
   if (u_mode == 3) {
     // f-wild2 · an impostor: the optical depth v_l.y at its middle, falling off as e^(−2.2 q²); over the others it
@@ -385,6 +394,7 @@ void main() {
     vec3 c = v_col * (u_ambSky * 0.55 + 0.02);
     float fk = mix(u_fogK, 1.0, smoothstep(60.0, 240.0, length(v_rel)));   // (f-first3: from afar the air counts in full — the far flock pales, R55-03)
     c = applyFog(c, v_rel * fk, length(v_rel) * fk);
+    c = skyFloor(c, v_rel);
     o = vec4(c, a);
     return;
   }
@@ -420,6 +430,7 @@ void main() {
   // the glow: the rays' lines (brighter at dusk and at night: the instance's glow)
   else col = mix(col, mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));
   col = applyFog(col, v_rel * u_fogK, length(v_rel) * u_fogK);
+  if (u_mode == 2) col = skyFloor(col, v_rel);   // (f-polish6: the party's bird dashes too)
   o = vec4(col, 1.0);
 }`;
   WG.program = function (r) {

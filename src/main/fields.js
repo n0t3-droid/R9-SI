@@ -18,6 +18,7 @@
   // ---------------------------------------------------------------- the ring (U§7.1, R§4.2)
   F.COUNT = [300, 1000, 3000, 10000];                  // chunks drawn by spaceDetail tier (Very Low … High)
   F.count = (tier) => F.COUNT[clamp(tier | 0, 0, 3)];
+  F.VL_LIFT = 0.55;   // f-polish6 (R56-10): Very Low's chunks, the sunward side's light (the far side 0.38 of it)
   F.H = 10;                                            // the sheet's thickness, m
   F.DMIN = 0.3; F.DMAX = 4; F.Q = 3;                   // chunk diameters 0.3–4 m, n(D) ∝ D^−q
   // a diameter from u ∈ [0, 1) on the power law q (inverse CDF)
@@ -141,6 +142,7 @@ void main() {
 }`;
   const CHUNK_FS = `
 uniform vec3 u_sunDir, u_sunCol, u_plDir, u_plCol, u_tint;
+uniform float u_lift;   // f-polish6 (R56-10): Very Low's two-tone light (VR.Fields.VL_LIFT; 0 on the other tiers)
 in vec3 v_p;
 in vec3 v_alb;
 in float v_sunT;
@@ -155,6 +157,9 @@ void main() {
   float sp = pow(max(dot(reflect(-V, N), L), 0.0), 24.0) * 0.35;
   vec3 col = alb * u_sunCol * (dl * v_sunT + 0.03) + u_sunCol * sp * v_sunT + alb * u_plCol * max(dot(N, u_plDir) * 0.7 + 0.3, 0.0);
   col += vec3(0.35, 0.6, 1.0) * v_glow * v_glow * 0.03;
+  // (Very Low: no sheet light worth the name reaches the chunks — a flat two-tone, the sunward side light, the other a
+  //  mid grey, so the ring reads as ice in space and not as a grey murk)
+  if (u_lift > 0.0) col = max(col, alb * u_lift * (dot(N, L) > 0.0 ? 1.0 : 0.38));
   o = vec4(col, 1.0);
 }`;
   const FULL_VS = `
@@ -500,7 +505,7 @@ void main() {
         const c = Math.pow(Math.PI * R * R * F.H / N, 1 / 3), NW = Math.max(1, Math.ceil(F.H / c)), Sg = Math.max(2, Math.floor(Math.sqrt(N / NW)));
         const p = Math.min(1, nd * c * c * c);
         const iu = Math.floor(rho / c), iv = Math.floor(vArc / c);
-        fr.draws.push({ prog: 'fields_chunks', fn: drawChunks, n: Sg * Sg * NW, k: { er: toS(er), et: toS(et), en: toS(en), cell: [c, Sg, NW, p], camCell: [((iu % 1048576) + 1048576) % 1048576, ((iv % 1048576) + 1048576) % 1048576, 0], camIn: [rho - iu * c, vArc - iv * c, h], size: [F.DMIN, F.DMAX, F.Q, R], sheet: [F.H / 2, dot(sunW, en), tau / F.H, eph.t % 10000], sun: sunS, sunCol, plDir: toS(toA), plCol, tint: [1, 1, 1] } });
+        fr.draws.push({ prog: 'fields_chunks', fn: drawChunks, n: Sg * Sg * NW, k: { er: toS(er), et: toS(et), en: toS(en), cell: [c, Sg, NW, p], camCell: [((iu % 1048576) + 1048576) % 1048576, ((iv % 1048576) + 1048576) % 1048576, 0], camIn: [rho - iu * c, vArc - iv * c, h], size: [F.DMIN, F.DMAX, F.Q, R], sheet: [F.H / 2, dot(sunW, en), tau / F.H, eph.t % 10000], sun: sunS, sunCol, plDir: toS(toA), plCol, tint: [1, 1, 1], lift: tier === 0 ? F.VL_LIFT : 0 } });
         F.stats.chunks = Sg * Sg * NW; F.stats.where = 'ring'; F.stats.tau = +tau.toFixed(2); F.stats.cell = +c.toFixed(2);
       }
     }
@@ -545,7 +550,7 @@ void main() {
     const k = d.k;
     begin(gl, p, r);
     setU(gl, p, 'u_er', k.er); setU(gl, p, 'u_et', k.et); setU(gl, p, 'u_en', k.en); setU(gl, p, 'u_cell', k.cell); setU(gl, p, 'u_camCell', k.camCell); setU(gl, p, 'u_camIn', k.camIn);
-    setU(gl, p, 'u_size', k.size); setU(gl, p, 'u_sheet', k.sheet); setU(gl, p, 'u_sunDir', k.sun); setU(gl, p, 'u_sunCol', k.sunCol); setU(gl, p, 'u_plDir', k.plDir); setU(gl, p, 'u_plCol', k.plCol); setU(gl, p, 'u_tint', k.tint);
+    setU(gl, p, 'u_size', k.size); setU(gl, p, 'u_sheet', k.sheet); setU(gl, p, 'u_sunDir', k.sun); setU(gl, p, 'u_sunCol', k.sunCol); setU(gl, p, 'u_plDir', k.plDir); setU(gl, p, 'u_plCol', k.plCol); setU(gl, p, 'u_tint', k.tint); setU(gl, p, 'u_lift', k.lift || 0);
     gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(r.emptyVAO);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 60, d.n);

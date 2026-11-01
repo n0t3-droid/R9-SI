@@ -401,7 +401,7 @@
     hudText() {
       const s = this.pilot; if (!s || !s.d.meta || !s.flight) return null;
       const fl = s.flight, I = fl.info(), A = I.auto;
-      const ap = A ? `<br><b style="color:#9affd8">AUTOPILOT → ${A.site.name.toUpperCase()} · ${(A.dist / 1000).toFixed(2)} km</b>` : '';
+      const ap = A ? `<br><b style="color:#9affd8">AUTOPILOT → ${(VR.Names && VR.Names.shown ? VR.Names.shown(A.site.name) : A.site.name).toUpperCase()} · ${(A.dist / 1000).toFixed(2)} km</b>` : '';
       const st = I.state === 'landed' ? ' · <b>LANDED</b>' : I.state === 'landing' ? ' · <b>LANDING</b>' : '';
       return `<b>${Math.round(I.speed)} m/s</b> · ALT ${Math.round(I.alt)} · HDG ${Math.round(I.heading)}° · THR ${Math.round(I.throttle * 100)}%${I.boost ? ' · <b style="color:#7ad8ff">BOOST</b>' : ''} · ${s.d.meta.name}${st}${ap}<br><small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · right mouse steers · C view · F gear · <b>G autopilot</b> · <b>V land</b></small>`;
     }

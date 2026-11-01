@@ -263,7 +263,7 @@
   // ================================================================ the targets
   // the Heartland's landmarks: id, x, z, base, top, r (eventlog.js keeps the same table for its samples)
   const HEART = [['temple', 0, -15, 80, 167, 52], ['citadel', -420, 380, 112, 249, 30], ['isles', 330, 140, 130, 175, 110], ['nova', 0, -140, 80, 100, 95], ['station', -380, -150, 150, 230, 30], ['hills', 0, -322, 90, 125, 150]];
-  const NAMES = { temple: ['Der Tor-Tempel', 'The Gate Temple'], citadel: ['Die Turmzitadelle', 'The Spire Citadel'], isles: ['Die Himmelsinseln', 'The Sky Isles'], lighthouse: ['Der Leuchtturm am fernen Ufer', 'The Lighthouse on the Far Shore'], falls: ['Der Wasserfall', 'The Waterfall'], nova: ['Nova Haven', 'Nova Haven'], station: ['Die Bergstation', 'The Mountain Station'], lookout: ['Der Aussichtsturm auf dem Grat', 'The Lookout on the Ridge'], hills: ['Die Kuppelhügel', 'The Pod Hills'] };
+  const NAMES = { temple: ['Der Tor-Tempel', 'The Gate Temple'], citadel: ['Die Turmzitadelle', 'The Spire Citadel'], isles: ['Die Himmelsinseln', 'The Sky Isles'], lighthouse: ['Der Leuchtturm am fernen Ufer', 'The Lighthouse on the Far Shore'], falls: ['Der Wasserfall', 'The Waterfall'], nova: ['Palmenhafen', 'Nova Haven'], station: ['Die Bergstation', 'The Mountain Station'], lookout: ['Der Aussichtsturm auf dem Grat', 'The Lookout on the Ridge'], hills: ['Die Kuppelhügel', 'The Pod Hills'] };
   const tx = (key, vars, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(key, vars || null, de, en) : de);
   const lmName = (id) => { const n = NAMES[id]; return n ? tx('g.wow.' + id, null, n[0], n[1]) : id; };
   I.sources = [];
