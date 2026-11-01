@@ -383,7 +383,7 @@
           // a-story4: low behind the player, looking out over the land and up into the sky (the beams, the arcs, the stars)
           const dx = Q[0] - pe[0], dz = Q[2] - pe[2], L = Math.hypot(dx, dz), ux = L > 2 ? dx / L : f[0], uz = L > 2 ? dz / L : f[2];
           const C = [pe[0] - ux * 4 + rt[0] * 1.2, pe[1] + 0.6 + 0.4 * u, pe[2] - uz * 4 + rt[2] * 1.2];
-          const lo = sh.target === 'lit' || sh.target === 'temple';   // (a-story5: the village or the Tortempel on the lower third, the sky over it)
+          const lo = sh.target === 'lit' || sh.target === 'temple' || sh.target === 'home';   // (a-story7: your settlement's festival too)   // (a-story5: the village or the Tortempel on the lower third, the sky over it)
           return lookAt(lift(C, pe), [pe[0] + ux * 100, pe[1] + (lo ? 13 : 30) + 6 * u, pe[2] + uz * 100], 72, base);
         }
         case 'limb': {

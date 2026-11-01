@@ -2,7 +2,7 @@
 // set piece (the way you answer Echo), the finale, the epilogue's star book. Required by test/story.js.
 module.exports = function (S, SP, tr, calm, check, rnd) {
   console.log('16 · a-story4: chapters 9–12 written in full');
-  const nb = S.BEATS.filter(b => b.ch >= 9);
+  const nb = S.BEATS.filter(b => b.ch >= 9 && b.ch <= 12);   // (a-story7: Arc 2 is story9_part's)
   check(nb.length === 12 && [9, 10, 11, 12].every(c => S.ofChapter(c).length === 3), 'twelve new beats, three a chapter (' + nb.length + ')');
   check(nb.every(b => S.sceneLen(b) <= 25 && S.sceneLen(b) >= 12), 'every scene 12–25 s (' + nb.map(b => S.sceneLen(b)).join(' ') + ')');
   check(nb.every(b => b.when.adv === true), 'chapters 9–12 play in Abenteuer worlds');
@@ -62,7 +62,7 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
     if (opt === 'wellari' && k++ % 2) continue;
     const r = S.fresh(); let path = [], bad = 0; for (const b of S.BEATS) if (b.ch <= 8) S.mark(r, b.id); r.choices.c6 = opt; S.visit(r, 'zinn'); S.visit(r, 'aqua');
     for (let i = 0; i < 60; i++) {
-      const b = S.open(r); if (!b) break;
+      const b = S.open(r); if (!b || b.ch > 12) break;
       if (S.choicePending(r)) S.choose(r, 'c6', opt);
       const c = ctxFor(b);
       if (b.when.deed) S.answer(r, way);
@@ -84,7 +84,7 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
     const rec = S.fresh(), n = 24 + Math.floor(rnd() * 12); for (let j = 0; j < n; j++) S.mark(rec, S.BEATS[j].id);
     rec.choices.c6 = rnd() < 0.5 ? 'lumi' : 'wellari'; if (rnd() < 0.5) S.answer(rec, S.WAYS[Math.floor(rnd() * 4)]);
     const c = { calm: rnd() * 60, building: rnd() < 0.3, fighting: rnd() < 0.3, menu: rnd() < 0.1, landing: rnd() < 0.1, adv: true, dim: DM[Math.floor(rnd() * 4)], neb: rnd() < 0.5, red: rnd() < 0.5, hour: rnd() < 0.5 ? 'night' : 'noon', near: { village: rnd() * 200, outpost: 999 } };
-    for (const b of S.BEATS) if (b.ch >= 9 && S.ready(b, c, rec)) { rd3++; if (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV) bad3++; }
+    for (const b of S.BEATS) if (b.ch >= 9 && b.ch <= 12 && S.ready(b, c, rec)) { rd3++; if (c.building || c.fighting || c.menu || c.landing || c.calm < S.CALM_ADV) bad3++; }
   }
   check(rd3 > 50 && !bad3, `3,000 contexts on 9–12: ${rd3} ready, ${bad3} while busy`);
   // the fx and the faces

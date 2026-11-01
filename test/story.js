@@ -28,7 +28,7 @@ const S = VR.Story, I = VR.I18N;
 const tab = (l) => (I.dict && I.dict[l]) || null;
 
 console.log('1 · the book');
-check(S.CHAPTERS.length === 12, 'twelve chapters (' + S.CHAPTERS.length + ')');
+check(S.CHAPTERS.filter(c => !c.arc).length === 12, 'twelve chapters in the first book (' + S.CHAPTERS.length + ' in all, a-story7)');
 for (let c = 1; c <= 8; c++) { const bs = S.ofChapter(c); check(bs.length === 3 && bs.every((b, i) => b.n === i + 1), `chapter ${c}: three beats in order`); }
 check(S.BEATS.every(b => b.when && b.scene && b.scene.shots.length && b.scene.lines.length && b.task && b.reward && b.reward.xp > 0), 'every beat: when, scene (shots, lines), task, reward');
 check(S.BEATS.every(b => S.sceneLen(b) <= S.SCENE_MAX && S.sceneLen(b) >= 8), 'every scene 8–30 s (' + S.BEATS.map(b => S.sceneLen(b)).join(' ') + ')');
@@ -42,7 +42,7 @@ check(!missDe.length, keys.length + ' keys in the German table' + (missDe.length
 check(!missEn.length, 'and in the English one' + (missEn.length ? ': missing ' + missEn.slice(0, 6).join(', ') : ''));
 const same = keys.filter(k => /\.b\d\.\d$/.test(k) && tr('de', k) === tr('en', k));
 check(!same.length, 'every German line is German (not the English) ' + (same.length ? same.join(', ') : ''));
-check(keys.every(k => !/\bEcho\b/.test(tr('de', k) || '') || /c1[012]|choice\.how|who\.echo/.test(k)), 'Echo is named only from chapter 10 on (a-story4)');
+check(keys.every(k => !/\bEcho\b/.test(tr('de', k) || '') || /c1[0-6]|choice\.how|who\.echo/.test(k)), 'Echo is named only from chapter 10 on (a-story4)');
 
 console.log('2 · when');
 const calm = (o) => Object.assign({ calm: 30, place: 'hangar', hour: 'noon', played: 60, adv: true, dim: 'overworld', near: { outpost: 9999 }, freed: 0, high: 0, orbit: false, eclipse: 0 }, o || {});
@@ -196,7 +196,7 @@ check(moodsUsed.size === 4, 'the book uses all four moods (' + [...moodsUsed].jo
 if (!fs.existsSync(SRC + 'main/story_art.js')) check(false, 'src/main/story_art.js missing');
 else {
   if (!VR.M) VR.M = { hash3: (x, y, z, s) => (((x * 73856093) ^ (y * 19349663) ^ (z * 83492791) ^ (s * 2654435761)) >>> 0) };
-  require(SRC + 'main/voxmodels.js'); require(SRC + 'main/story_art.js');
+  require(SRC + 'main/voxmodels.js'); require(SRC + 'main/story_art.js'); require(SRC + 'main/story_fx2.js');   // (a-story7: Arc 2's pictures)
   const Po = VR.Portrait;
   check(!!Po && typeof Po.ops === 'function' && typeof Po.paint === 'function', 'VR.Portrait.ops / paint');
   const N = Po.N || 24; let inGrid = true, okCol = true, moodDiff = true, blinkDiff = true, mouthDiff = true;
@@ -244,9 +244,9 @@ else {
 }
 
 console.log('10 · the deeds between the beats');
-const KINDS = ['look', 'scan', 'touch', 'photo', 'feat'];
-check(S.BEATS.every(b => b.act && KINDS.includes(b.act.kind) && (b.act.target || b.act.kind === 'feat')), 'every beat of chapters 1–4 has one deed (look · scan · touch · photo)');
-const kindsUsed = new Set(S.BEATS.map(b => b.act.kind));
+const KINDS = ['look', 'scan', 'touch', 'photo', 'feat', 'trip', 'sign'];   // (a-story7: trip, sign)
+check(S.BEATS.every(b => b.act && KINDS.includes(b.act.kind) && (b.act.target || b.act.kind === 'feat' || b.act.kind === 'sign')), 'every beat of chapters 1–4 has one deed (look · scan · touch · photo)');
+const kindsUsed = new Set(S.BEATS.filter(b => b.ch <= 12).map(b => b.act.kind));
 check(kindsUsed.size === 5, 'all five kinds are used (' + [...kindsUsed].join(', ') + ')');
 const actKeys = S.BEATS.map(b => 'story.act.' + b.id).concat(['story.act.done', 'story.ctx.scan', 'story.ctx.touch', 'story.act.scanning']);
 check(actKeys.every(k => tr('de', k) && tr('en', k) && tr('de', k) !== tr('en', k)), 'every deed\'s words in both tables (German first)');
