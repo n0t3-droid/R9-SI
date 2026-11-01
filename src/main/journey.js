@@ -152,7 +152,7 @@
       len: film.len, film, gl: false, shotAt: (t) => (t < 0.05 ? 'up' : 'top'),
       draw(X, W, H, t) {
         const a = K.at(st), alt = a.alt, ks = a.ks;
-        const PJ = VR.Portal.J(), noGL = !PS || !SS || (PJ && PJ.noGL) || ctxOf(g).potato;
+        const PJ = VR.Portal.J(), noGL = !PS || !SS || (PJ && PJ.noGL && !JY.forceGL) || ctxOf(g).potato;
         const eph = PS && PS.eph ? PS.eph(J.tw + ks * 30) : null;
         let view = null, Nn = null, Hc = null, R = 1e5, St = null;
         if (eph && eph.bodies && eph.bodies.herz && S && S.place && SS.BODIES) {
@@ -251,7 +251,7 @@
     return {
       len: film.len, film, gl: false, shotAt: (t) => (t < K.BRIDGE.depart ? 'step' : 'walk'),
       draw(X, W, H, t) {
-        const k = clamp(t / film.len, 0, 1), PJ = VR.Portal.J(), noGL = !PS || (PJ && PJ.noGL) || ctxOf(g).potato;
+        const k = clamp(t / film.len, 0, 1), PJ = VR.Portal.J(), noGL = !PS || (PJ && PJ.noGL && !JY.forceGL) || ctxOf(g).potato;
         let drawn = false;
         if (!noGL && PS.eph && PS.renderView) { const eph = PS.eph(J.tw + k * 30), v = bridgeView(J, k, eph); if (v) { drawn = !!PS.renderView(g, v, eph); if (drawn) J.shots++; } }
         this.gl = drawn;
@@ -416,6 +416,8 @@
   JY.carts = () => M.carts.map(c => ({ id: c.id, x: c.x, y: c.y, z: c.z, name: c.place.name }));
   JY.pause = (on) => { M.paused = !!on; };
   JY.skip = () => { M.skipReq = true; };
+  // the test's reload: the running ride let go as a closed page would, then resumed from meta.journey
+  JY.reload = function (g) { const J = M.J; if (!J || J.kind !== 'ride') return false; save(g, snap(J)); restore(J); M.J = null; M.resumed = {}; resume(g); return !!M.J; };
   JY.offerFor = function (g) {
     const p = g.player; if (!p || M.J) return null;
     let best = null, bd = 4.2;
