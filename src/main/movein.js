@@ -138,7 +138,7 @@
   };
 
   // ---------------------------------------------------------------- the record (meta.movein)
-  MI.fresh = () => ({ v: MI.V, n: 0, homes: [], sets: [], mem: {}, gifts: [], decor: null, last: {} });
+  MI.fresh = () => ({ v: MI.V, n: 0, homes: [], sets: [], mem: {}, gifts: [], decor: null, last: {}, cart: null });
   MI.load = function (o) {
     const r = MI.fresh();
     if (!o || typeof o !== 'object') return r;
@@ -152,6 +152,7 @@
     for (const g of arr(o.gifts)) if (g && pt(g.at)) r.gifts.push({ at: g.at, item: String(g.item || 'bread'), n: Math.max(1, g.n | 0), fam: String(g.fam || ''), name: String(g.name || '') });
     r.decor = o.decor === true ? true : o.decor === false ? false : null;
     r.last = o.last && typeof o.last === 'object' ? Object.assign({}, o.last) : {};
+    r.cart = o.cart && pt(o.cart.at) && Number.isFinite(o.cart.until) ? { at: o.cart.at.slice(0, 4), until: o.cart.until, set: String(o.cart.set || '') } : null;
     return r;
   };
   MI.save = (rec) => JSON.parse(JSON.stringify(rec));
@@ -568,7 +569,6 @@
     const creative = g.player && g.player.creative;
     if (creative && rec.decor !== true) {
       if (rec.decor === null && !quiet) { const fam = (V.known.get(h.set) || { fams: [] }).fams[h.fam]; MI.askDecor(g, h, fam ? fam.surname : ''); }
-      else if (rec.decor === null) h.decorLater = true;
       return;
     }
     MI.placeDecor(V, h);
@@ -759,7 +759,7 @@
     if (!cssDone) {
       cssDone = true;
       const s = document.createElement('style');
-      s.textContent = '#mi_card{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);max-width:min(520px,86vw);background:rgba(26,22,18,.78);color:#fdf3df;border:1px solid rgba(255,220,160,.35);border-radius:12px;padding:10px 14px;font:14px/1.4 inherit;z-index:30;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}#mi_card button{margin:8px 5px 0;padding:5px 12px;border-radius:8px;border:1px solid rgba(255,220,160,.5);background:rgba(255,220,160,.14);color:#fdf3df;cursor:pointer}#mi_card input{margin-top:8px;padding:5px 8px;border-radius:7px;border:1px solid rgba(255,220,160,.5);background:rgba(0,0,0,.3);color:#fff;width:70%}#mi_card .ft{opacity:.7;font-size:12px;margin-top:4px}';
+      s.textContent = '#mi_card{position:absolute;left:50%;top:14%;transform:translateX(-50%);max-width:min(520px,86vw);background:rgba(26,22,18,.78);color:#fdf3df;border:1px solid rgba(255,220,160,.35);border-radius:12px;padding:10px 14px;font:14px/1.4 inherit;z-index:30;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}#mi_card button{margin:8px 5px 0;padding:5px 12px;border-radius:8px;border:1px solid rgba(255,220,160,.5);background:rgba(255,220,160,.14);color:#fdf3df;cursor:pointer}#mi_card input{margin-top:8px;padding:5px 8px;border-radius:7px;border:1px solid rgba(255,220,160,.5);background:rgba(0,0,0,.3);color:#fff;width:70%}#mi_card .ft{opacity:.7;font-size:12px;margin-top:4px}';
       document.head.appendChild(s);
     }
     if (!el) { el = document.createElement('div'); el.id = 'mi_card'; el.setAttribute('role', 'dialog'); (document.getElementById('ui') || document.body).appendChild(el); }

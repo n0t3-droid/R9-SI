@@ -131,6 +131,7 @@ function house(o) {
   MI.remember(rec, 'mi:1:0', 'built', 24100, '');
   MI.remember(rec, 'mi:1:0', 'gifted', 30000, 'Brot');
   rec.gifts.push({ at: [1.5, 61, 6.5], item: 'bread', n: 2, fam: 'Berger', name: 'Lina' });
+  rec.cart = { at: [3.5, 61, 7.5, 1.57], until: 36500, set: 'mi:1' }; rec.last.giftDay = 1;
   rec.decor = false; s.named = true; s.name = 'Lindenhain'; s.market = true; s.stall = [3, 61, 9]; s.fest = 5;
   const json = JSON.stringify(MI.save(rec));
   const back = MI.load(JSON.parse(json));
