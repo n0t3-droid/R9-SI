@@ -138,7 +138,26 @@
 
   // ---- o-wander2 · the staging (R56-03): 8–15 m ahead (the proof walk: at 12–16 m grass and trunks hid too much) inside the view cone, the main figure's height ≥ 6 % of the
   // frame's (W.share; staged for 7 %: a margin for the figure's own way); a small figure stages nearer (animals are drawn × STAGE.animal); a clear voxel line from the eye
-  W.STAGE = { near: 8, far: 15, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.35 };
+  W.STAGE = { near: 8, far: 15, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.5 };
+  // f-polish7: the staging spread over frames — at most BUDGET[tier] candidates a frame (Very Low 3), a column's ground
+  // cached for 1.5 s; the director's own bookkeeping (pacing, the map's chest) every EVERY[tier] frames on Very Low;
+  // a stage on open ground (W.openAt: no trunk, no low leaves, little tall grass within OPEN.r m) with the line to the
+  // figure's feet and head free of leaves and plants too (W.clearLine with an occluder test)
+  W.BUDGET = [3, 5, 8, 8, 8]; W.EVERY = [3, 1, 1, 1, 1];
+  W.OPEN = { r: 1.5, plants: 2 };
+  // the open-ground rule (pure): occ(x, y, z) → 0 free, 1 a plant / low leaves, 2 solid (a trunk, a wall); the figure's
+  // own column and eight around it at r, three cells from the ground up: no solid (one step around is fine), plants in
+  // ≤ OPEN.plants columns
+  W.openAt = function (occ, x, y, z, r) {
+    r = r || W.OPEN.r; let plants = 0;
+    for (let k = -1; k < 8; k++) {
+      const a = k * Math.PI / 4, px = k < 0 ? x : x + Math.cos(a) * r, pz = k < 0 ? z : z + Math.sin(a) * r;
+      let pl = 0;
+      for (let dy = 0; dy < 3; dy++) { const o = occ(px, y + dy, pz); if (o === 2 && (k < 0 || dy > 0)) return false; if (o === 1) pl = 1; }   // (a step of one block around is fine)
+      plants += pl;
+    }
+    return plants <= W.OPEN.plants;
+  };
   W.share = (hgt, d, fov) => hgt / (2 * Math.max(0.1, d) * Math.tan((fov || W.STAGE.fov) / 2));
   W.stageRange = function (hgt, fov) {
     const S = W.STAGE, dmax = hgt / (S.share * 2 * Math.tan((fov || S.fov) / 2));
@@ -159,8 +178,13 @@
     return true;
   };
   // each moment's main figure (its height in m, what has to read in the frame)
-  const FIG = { traveller: 1.8, caravan: 2.2, pet: 0.75, picnic: 1.3, musician: 1.8, kites: 1.8, crossing: 0.75, rainbow: 9, glade: 1.1, cairn: 1.5, shrine: 2.2, ruins: 3.6, scrap: 1.1, sign: 2.4, stargazer: 1.8, lanterns: 1.8, well: 2.4 };
+  // (f-polish7: the animals' true model heights — the dog / the pup 1.0 m to the ears, the fox ≈ 0.7 m — drawn × STAGE.animal
+  // (1.5, was 1.35); the scrap a parchment pinned to a stake, 0.95 m, drawn × SCRAP_S)
+  W.SCRAP_S = 1.4;
+  const FIG = { traveller: 1.8, caravan: 2.2, pet: 1.0, picnic: 1.3, musician: 1.8, kites: 1.8, crossing: 0.7, rainbow: 9, glade: 1.1, cairn: 1.5, shrine: 2.2, ruins: 3.6, scrap: 0.95 * 1.4, sign: 2.4, stargazer: 1.8, lanterns: 1.8, well: 2.4 };
   for (const n of W.NAMES) W.KINDS[n].fig = FIG[n] || 1.6;
+  // the drawn height of a moment's main figure (m)
+  W.figH = (n) => { const K = W.KINDS[n]; return K ? K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1) : 1.6; };
   // the ambient beats (fill a gap; tier 0, one or two draws, ≤ 14 s): fly — also in flight / on the Sky Isles
   W.BEATS = {
     bird: { tier: 0, dur: 11, fly: false, fig: 0.45, hours: DAYD, ico: '🐦' },
@@ -306,10 +330,20 @@
     get(x, y, z) { return this.g.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); }
     solid(b) { const R = VR.R, F = VR.F; return !!(b && (R.T.flags[b] & F.SOLID) && !(R.T.flags[b] & F.REPLACE)); }
     wet(b) { const R = VR.R, F = VR.F; return !!(b && (R.T.flags[b] & F.WATER)); }
-    // the walkable ground near y0 at a column (two free cells over a solid one, no water), or null
+    // f-polish7: what hides a figure — 2 solid, 1 leaves or a plant (tall grass, ferns, flowers), 0 free
+    occ(x, y, z) { const b = this.get(x, y, z); if (!b) return 0; const f = VR.R.T.flags[b], F = VR.F; if (f & F.LEAVES) return 1; if ((f & F.SOLID) && !(f & F.REPLACE)) return 2; return (f & (F.PLANT | F.REPLACE)) ? 1 : 0; }
+    // the walkable ground near y0 at a column (two free cells over a solid one, no water), or null — f-polish7: a column's
+    // answer kept 1.5 s (the staging asks the same columns frame after frame)
     ground(x, z, y0) {
+      const C = this.gc || (this.gc = new Map()), key = (Math.floor(x) * 73856093) ^ (Math.floor(z) * 19349663) ^ (Math.floor(y0) * 83492791);
+      if (this.time > (this.gcT || 0)) { C.clear(); this.gcT = this.time + 1.5; }
+      const c = C.get(key); if (c !== undefined) return c;
+      const y = this.ground0(x, z, y0); if (C.size < 4096) C.set(key, y); return y;
+    }
+    ground0(x, z, y0) {
       for (let y = Math.floor(y0) + 6; y > y0 - 12; y--) {
         const b = this.get(x, y, z); if (!this.solid(b)) continue;
+        if (VR.R.T.flags[b] & VR.F.LEAVES) return null;   // (f-polish7: a tree's crown is no ground — the cairn stood on one)
         const a1 = this.get(x, y + 1, z), a2 = this.get(x, y + 2, z);
         if (this.solid(a1) || this.solid(a2) || this.wet(a1)) return null;
         return y + 1;
@@ -324,15 +358,23 @@
       // o-wander2: while a moment is staged — 8–18 m ahead where its main figure reads, inside the cone, a clear voxel
       // line from the eye; no hidden fallback (no clear spot: it waits)
       if (this.stg) {
-        const K = W.KINDS[this.stg], R = W.stageRange(K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1), this.fov());
-        for (const [dd, aa] of W.stageCands(R)) {
-          const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
+        // (f-polish7: at most W.BUDGET[tier] candidates a frame — the search goes on next frame from where it stopped; open
+        // ground only, the line to the figure's head and feet free of trunks, leaves and tall grass)
+        const K = W.KINDS[this.stg], fh = W.figH(this.stg), R = W.stageRange(fh, this.fov()), cands = W.stageCands(R);
+        const cur = this.cur || (this.cur = {});
+        for (let i = cur[this.stg] || 0; i < cands.length; i++) {
+          if (this.sb <= 0) { cur[this.stg] = i; this.more = true; return null; }
+          this.sb--;
+          const dd = cands[i][0], a = a0 + cands[i][1], x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
           const y = this.ground(x, z, p[1]); if (y === null) continue;
           if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) continue; }
-          const q = [x, y + Math.min(1.4, K.fig * 0.6), z];
-          if (!this.clear(q) || !this.inSight(q)) continue;
+          if (!W.openAt(this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz)), x, y, z)) continue;
+          const q = [x, y + Math.min(1.4, fh * 0.75), z];
+          if (!this.clear(q, true) || !this.clear([x, y + Math.min(0.35, fh * 0.3), z], true) || !this.inSight(q)) continue;
+          cur[this.stg] = 0;
           return [x, y, z];
         }
+        cur[this.stg] = 0;
         return null;
       }
       for (const dd of [d, d + 6, d - 5, d + 12]) for (const aa of [side, -side, side * 0.4, 0, side * 1.4]) {
@@ -352,10 +394,18 @@
     high(d) {
       if (this.stg) d = 12;   // (o-wander2: the hilltop within the stage's reach — 12 … 32 m was 26 … 46)
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let best = null;
-      for (const dd of [d, d + 10, d + 20]) for (const aa of [-0.5, -0.25, 0, 0.25, 0.5]) {
-        const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd, y = this.ground(x, z, p[1] + 6);
-        if (y !== null && (!best || y > best[1])) best = [x, y, z];
+      // (f-polish7: while staged within 9–15 m, on open ground, in sight — the stage's own rules)
+      const st = !!this.stg, occ = this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz));
+      const DS = st ? HI_D : [d, d + 10, d + 20], AS = st ? HI_A : HI_A0, hc = st && this.hiC && this.hiC.n === (this.pacer && this.pacer.n) ? this.hiC : null;
+      let i0 = 0; if (hc) { i0 = hc.i; best = hc.best; }
+      for (let i = i0; i < DS.length * AS.length; i++) {
+        if (st) { if (this.sb <= 0) { this.hiC = { n: this.pacer && this.pacer.n, i, best }; this.more = true; return null; } this.sb--; }   // (budgeted as spot)
+        const dd = DS[Math.floor(i / AS.length)], a = a0 + AS[i % AS.length], x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd, y = this.ground(x, z, p[1] + 6);
+        if (y === null || (best && y <= best[1])) continue;
+        if (st && (!W.openAt(occ, x, y, z) || !this.clear([x, y + 1.1, z], true) || !this.clear([x, y + 0.3, z], true))) continue;
+        best = [x, y, z];
       }
+      this.hiC = null;
       return best;
     }
     folk(seed, role, age) {
@@ -461,13 +511,20 @@
       // the scout: PACE.look s before the moment is due, its kind is chosen and its stage tried along the heading
       if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
       if (now < (this.tryT || 0)) return;
+      if (this.ofs && this.ofs.n !== P.n) { this.ofs = null; this.cur = null; }
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g));
       const want = P.want(now, { foot: walking, busy, coming: this.coming(now) });
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {
         const order = this.plan && this.plan.n === P.n ? this.plan.order : W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent);
-        for (let i = 0; i < order.length && i < 5; i++) if (this.start(order[i], 1000 + P.n)) return;
+        // (f-polish7: a search the frame's budget stopped goes on next frame with the same kind)
+        for (let i = this.ofs ? this.ofs.i : 0; i < order.length && i < 5; i++) {
+          this.more = false;
+          if (this.start(order[i], 1000 + P.n)) { this.ofs = null; return; }
+          if (this.more) { this.ofs = { n: P.n, i }; this.tryT = 0; return; }
+        }
+        this.ofs = null;
         this.st.quiet++;   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
         return;
       }
@@ -503,14 +560,18 @@
         b.pos = [eye[0] + Math.cos(a) * d, eye[1] + (kind === 'glow' ? -2 : 0.5), eye[2] + Math.sin(a) * d];
         b.vel = [f[0] * (kind === 'flock' ? 6 : 0.4), kind === 'glow' ? 0.8 : 0, f[1] * (kind === 'flock' ? 6 : 0.4)];
       } else {
-        const R = kind === 'song' ? [12, 16] : kind === 'breeze' ? [7, 10] : [6, 9];
-        for (const [d, s] of W.stageCands(R)) {
+        const R = kind === 'song' ? [12, 16] : kind === 'breeze' ? [7, 10] : [6, 9], cands = W.stageCands(R);
+        for (let i = this.bi || 0; i < cands.length; i++) {
+          if (this.sb <= 0) { this.bi = i; this.tryT = 0; return false; }   // (f-polish7: on next frame)
+          this.sb--;
+          const d = cands[i][0], s = cands[i][1];
           const a = a0 + s + side * 0.2, x = this.pos[0] + Math.cos(a) * d, z = this.pos[2] + Math.sin(a) * d, y = this.ground(x, z, this.pos[1]);
           if (y === null) continue;
           const q = [x, y + (kind === 'flutter' ? 1.2 : 0.4), z];
           if (!this.clear(q) || !this.inSight(q)) continue;
           b.pos = [x, y, z]; break;
         }
+        this.bi = 0;
         if (!b.pos) return false;
         if (kind === 'song') { b.F = this.fig(b.seed, b.pos, 'farmer'); this.face(b.F, this.pos); b.F.state = 'cheer'; b.F.talking = true; }
         if (kind === 'bird') { b.y0 = b.pos[1]; b.pos[1] += 6; }
@@ -554,7 +615,7 @@
       else if (b.kind === 'glow') { BEAT_O.scale = 2.4; LK.drawModel(g, r, prog(), 'wander_hlamp', b.pos, t * 0.3, cam, BEAT_O); }
     }
     // o-wander2: the voxel line from the eye to a point is clear (W.clearLine over the world's blocks)
-    clear(q) { const e = this.eye; return W.clearLine((x, y, z) => this.solid(this.get(x, y, z)), e, q); }
+    clear(q, soft) { const e = this.eye; return W.clearLine(soft ? (this.occS || (this.occS = (x, y, z) => this.occ(x, y, z) > 0)) : (this.solF || (this.solF = (x, y, z) => this.solid(this.get(x, y, z)))), e, q); }
     update(dt) {
       const g = this.g, S = g.settings || {}, t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       this.time += dt;
@@ -569,7 +630,11 @@
       if (walking) this.clock += dt;
       // ---- o-wander2: the pacer — one clock over every weighted event seen (the event log), ours deferred off clumps,
       // a moment due 15–23 s after the last (its stage scouted ahead), a beat filling from 27 s on foot or in flight
-      this.pace(dt, walking);
+      // (f-polish7: Very Low runs it every W.EVERY frames with their time; the staging's candidates budgeted a frame)
+      const ti = Math.max(0, Math.min(4, this.tier | 0)), every = W.EVERY[ti] || 1;
+      this.fr = (this.fr | 0) + 1; this.acc = (this.acc || 0) + dt;
+      const book = this.fr % every === 0 || this.ofs || this.bi;
+      if (book) { this.sb = W.BUDGET[ti] || 8; this.pace(this.acc, walking); }
       // the moments
       const cap = this.tier === 0 ? 1 : this.tier === 1 ? 2 : 3;
       while (this.ms.length > cap) this.end(this.ms[0]);
@@ -583,9 +648,9 @@
         if (!alive) this.end(m);
       }
       this.beatUpdate(dt);
-      this.mapUpdate(dt);
+      if (book) { this.mapUpdate(this.acc); this.acc = 0; }
       this.beaconUpdate(dt, walking);
-      if (t0) this.st.cost = this.st.cost * 0.95 + (performance.now() - t0) * 0.05;
+      if (t0) { const e = performance.now() - t0; this.st.cost = this.st.cost * 0.95 + e * 0.05; this.st.ms = (this.st.ms || 0) + e; this.st.n = (this.st.n | 0) + 1; if (e > (this.st.max || 0)) this.st.max = e; }
     }
     // slot k: the order of the moments, the first that finds its stage starts
     slot(k) {
@@ -708,6 +773,7 @@
   const CUES = [0, 1, 2, 3].map(() => ({ p: [0, 0, 0], s: [1, 1], col: [1, 1, 1], a: 0, kind: 0 }));
   const CUE_COL = { folk: [1, 0.78, 0.45], animal: [1, 0.9, 0.72], spot: [0.72, 0.95, 1] };
   const STAGE_SPOT = { glade: 1, cairn: 1, scrap: 1, well: 1 };
+  const HI_D = [9, 12, 15], HI_A = [-0.34, -0.18, 0, 0.18, 0.34], HI_A0 = [-0.5, -0.25, 0, 0.25, 0.5];   // (f-polish7: Actor.high's candidates)
   const BAL_O = { scale: 2.6 };
   // o-wander2: the beats' draw options and poses (reused)
   const BEAT_O = { scale: 1, pose: null }, FLOCK_P = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], LAMP_P = [0, 0, 0], LAMP_O = { scale: 1.6 };
@@ -715,6 +781,7 @@
   const birdPose = (a) => { BP.wl[2] = a; BP.wr[2] = -a; return BP; };
   const flyPose = (a) => { FP.wl[2] = a; FP.wr[2] = -a; return FP; };
   const swayPose = (a) => { SP.stems[2] = a; return SP; };
+  const SCP = { sheet: [0, 0, 0] }, SCRAP_O = { scale: 1.4, pose: null }, scrapPose = (a) => { SCP.sheet[0] = a; return SCP; };   // (f-polish7)
   // ================================================================ the moments' actors
   const rnd = (m, i) => h(m.seed, i, 0x77);
   const pt = (m) => m.pos;
@@ -910,7 +977,7 @@
       if (!VR.VOXMODELS || !VR.VOXMODELS[kind]) return false;
       m.cr = fox ? 'fox' : 'rabbit'; m.dir = [nx, nz];
       m.Q = []; const n = fox ? 1 : 3;
-      for (let i = 0; i < n; i++) m.Q.push({ kind, pos: [s[0] - nx * (9 + i * 1.6), s[1], s[2] - nz * (9 + i * 1.6) + (i - 1) * 0.8], yaw: LK.yawOf(nx, nz), state: 'walk', hop: i * 0.7 });
+      for (let i = 0; i < n; i++) m.Q.push({ kind, pos: [s[0] - nx * (4.5 + i * 1.2), s[1], s[2] - nz * (4.5 + i * 1.2) + (i - 1) * 0.8], yaw: LK.yawOf(nx, nz), state: 'walk', hop: i * 0.7 });   // (f-polish7: 4.5 m to the side, was 9 — in the frame as it starts)
       m.pos = s; m.sp = fox ? 3.2 : 2.6;
       return true;
     },
@@ -997,7 +1064,8 @@
       }
       if (D.dist(m.pos) > 80) return false;
     },
-    draw(D, m, r, E, cam, prog) { const y = m.pos[1]; m.pos[1] = y + 0.02 + Math.abs(Math.sin(D.time * 3)) * 0.04; LK.drawModel(D.g, r, prog(), 'wander_scrap', m.pos, m.yaw + Math.sin(D.time * 2) * 0.1, cam, {}); m.pos[1] = y; },
+    // (f-polish7: pinned to a stake, turned toward you, fluttering a little — drawn × W.SCRAP_S)
+    draw(D, m, r, E, cam, prog) { SCRAP_O.scale = W.SCRAP_S; SCRAP_O.pose = scrapPose(Math.sin(D.time * 2.3) * 0.12 + Math.sin(D.time * 5.1) * 0.04); LK.drawModel(D.g, r, prog(), 'wander_scrap', m.pos, LK.yawOf(D.pos[0] - m.pos[0], D.pos[2] - m.pos[2]), cam, SCRAP_O); SCRAP_O.pose = null; },
   };
   // a signpost: the next places, how far, which way
   ACT.sign = {
@@ -1136,11 +1204,17 @@
       gr.box(0, 0, 0, 7, 4, 5, (x, y, z) => (x === 0 || x === 7 || x === 3 ? 0xE8B830 : (y + z) & 1 ? 0x8A5A30 : 0x7A4E28));
       gr.box(0, 5, 0, 7, 6, 5, (x) => (x === 0 || x === 7 || x === 3 ? 0xE8B830 : 0x9A6A3A)); gr.set(3, 4, 0, 0xFFE070, 1); gr.box(1, 5, 0, 6, 5, 0, 0xFFE8A0, { emis: 1 });
     });
-    // a map scrap (1 voxel = 1/16 m): torn parchment with a dotted way and a red X
-    M.wander_scrap = () => one(16, 0.4, 8, 1, 7, [4, 0, 3], (gr) => {
-      gr.box(0, 0, 0, 7, 0, 6, (x, y, z) => ((x === 0 && z > 4) || (x === 7 && z < 1) ? 0 : 0xE8D8A8));
-      for (const [x, z] of [[1, 1], [2, 2], [3, 2], [4, 3]]) gr.set(x, 0, z, 0x8A6A3A); gr.set(5, 0, 4, 0xC8302A); gr.set(6, 0, 5, 0xC8302A); gr.set(6, 0, 3, 0xC8302A); gr.set(4, 0, 5, 0xC8302A);
-    });
+    // a map scrap (1 voxel = 1/16 m): torn parchment with a dotted way and a red X — f-polish7: pinned to a hazel stake
+    // 0.94 m high (it was flat on the ground: 1 % of the frame), the sheet hanging from the stake's top, a red ribbon
+    M.wander_scrap = () => ({ unit: 16, radius: 0.8, parts: {
+      body: part(3, 16, 3, [1, 0, 1], (gr) => { gr.box(1, 0, 1, 1, 14, 1, (x, y) => (y % 5 === 0 ? 0x6A4A2A : 0x8A6A3A)); gr.set(1, 15, 1, 0x7A5A32); gr.set(0, 14, 1, 0xC8302A); gr.set(2, 14, 1, 0xC8302A); gr.set(0, 13, 1, 0xC8302A); }),
+      sheet: part(9, 8, 1, [4, 7, 1], (gr) => {
+        gr.box(0, 0, 0, 8, 7, 0, (x, y) => ((x === 0 && y < 2) || (x === 8 && y > 6) || (x === 4 && y === 0) ? null : (x + y * 3) % 11 === 0 ? 0xD8C690 : 0xEEDFAE));
+        for (const [x, y] of [[1, 5], [2, 4], [3, 4], [4, 3], [5, 3]]) gr.set(x, y, 0, 0x8A6A3A);
+        gr.set(6, 2, 0, 0xC8302A); gr.set(7, 1, 0, 0xC8302A); gr.set(7, 3, 0, 0xC8302A); gr.set(5, 1, 0, 0xC8302A); gr.set(6, 2, 0, 0xE0402A, 1);
+        gr.set(4, 7, 0, 0x9A9AA0);
+      }),
+    }, layout: { body: [0, 0, 0], sheet: [0, 14.5, -0.6] } });
     // a signpost (1 voxel = 1/8 m): a post with three arrow boards pointing different ways, a little roof
     M.wander_sign = () => one(8, 1.6, 20, 20, 20, [10, 0, 10], (gr) => {
       gr.box(9, 0, 9, 10, 17, 10, 0x7A4E28);

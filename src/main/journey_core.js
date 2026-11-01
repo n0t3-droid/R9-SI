@@ -175,7 +175,22 @@
   // the lift's look in the space phase (pitch over the horizon, rad): your pitch at the switch, easing up so the station
   // (straight up the tether) is in view from 40 % of the phase (the fov's top at 35°), 78° at the berth
   const sm = (t) => t * t * (3 - 2 * t);
-  K.liftLook = (k, p0) => { k = clamp(+k || 0, 0, 1); const tg = 1.03 + 0.33 * sm(clamp((k - 0.4) / 0.6, 0, 1)); return p0 + (tg - p0) * sm(clamp(k / 0.4, 0, 1)); };
+  K.liftLookOld = (k, p0) => { k = clamp(+k || 0, 0, 1); const tg = 1.03 + 0.33 * sm(clamp((k - 0.4) / 0.6, 0, 1)); return p0 + (tg - p0) * sm(clamp(k / 0.4, 0, 1)); };
+  // ---- f-polish7: the space phase was mostly black (the look went up at once: the planet below the frame, the station
+  // a dot). Now: the planet's limb and its glow held in the lower third until ≈ 64 % (the pitch follows the dip of the
+  // horizon as you rise), then a sweep up the tether (≈ 3 s, the view a little wider meanwhile) to the station, which
+  // is in view from ≈ 70 % on and grows to the berth (78°). K.LIFT.R: Herzwelt's radius (spacescene.js BODIES.herz)
+  K.LIFT.R = 99550; K.LOOK = { hold: 0.3, in: 0.12, up0: 0.54, upDur: 0.22, top: 1.36, wide: 16 * Math.PI / 180, w0: 0.5, w1: 0.86 };
+  K.liftK = (t) => clamp((t - K.LIFT.ground) / (K.LIFT.len - K.LIFT.ground), 0, 1);
+  K.dip = (alt, R) => { R = R || K.LIFT.R; return Math.acos(R / (R + Math.max(0, +alt || 0))); };
+  K.dipAt = (k, top, R) => K.dip(K.liftAlt(K.LIFT.ground + clamp(k, 0, 1) * (K.LIFT.len - K.LIFT.ground), top), R);
+  K.liftFov = (k, base) => { const L = K.LOOK, b = base || 70 * Math.PI / 180; k = clamp(+k || 0, 0, 1); return b + L.wide * sm(clamp((k - L.w0) / 0.1, 0, 1)) * (1 - sm(clamp((k - L.w1) / 0.12, 0, 1))); };
+  K.liftLook = (k, p0, dip) => {
+    const L = K.LOOK; k = clamp(+k || 0, 0, 1); p0 = +p0 || 0;
+    const d = Number.isFinite(dip) ? dip : K.dipAt(k), hold = -d + L.hold;
+    const a = p0 + (hold - p0) * sm(clamp(k / L.in, 0, 1));
+    return a + (L.top - a) * sm(clamp((k - L.up0) / L.upDur, 0, 1));
+  };
   // the ring's lights greeting you at the top: 0 until 82 % of the space phase, 1 from 97 %
   K.greet = (k) => (k <= 0.82 ? 0 : k >= 0.97 ? 1 : sm((k - 0.82) / 0.15));
   // footsteps chime: the tiles crossed from s0 to s1
@@ -183,6 +198,22 @@
   // the caravan's seat: on the bench between the crate rows (the front crates and rail the frame's lower edge), right of the driver (he sits left), eye ~2 m over the cart's floor (under the
   // canopy's fringe at 2.36 m), a gentle sway (roll ≤ 0.032 rad; none with Weniger Bewegung). y0 = the cart's floor
   K.SEAT = { fwd: 0.75, side: 0.62, eye: 1.98, stand: 1.62 };   // (the bench between the crate rows)
+  // f-polish7: the cart you ride (VR.VOXMODELS.jy_cart_seat = K.cartSeat(life_cart)): the canopy raised one voxel (0.38 m
+  // over the eye, was 0.21) and only over the bench and behind — its front edge CANOPY.z0 voxels from the bow, a scalloped
+  // valance there: a striped fringe in the frame's top ≈ 8 %; the posts at the middle and the stern (none in the view);
+  // the crates and their produce the frame's lower edge (test/polish7.js casts the rider's view through the voxels)
+  K.CANOPY = { z0: 6, y: 14, posts: [13, 24] };
+  K.cartSeat = function (m) {
+    const gr = m && m.parts && m.parts.body && m.parts.body.grid; if (!gr) return m;
+    const C = K.CANOPY, get = (x, y, z) => gr.c[gr.i(x, y, z)], set = (x, y, z, v) => { if (y < gr.sy) gr.c[gr.i(x, y, z)] = v; };
+    const post = get(1, 9, 24), cw = get(0, 13, 0), co = get(0, 13, 4), fr = get(0, 12, 0);
+    for (let y = 7; y < gr.sy; y++) for (let z = 0; z < gr.sz; z++) for (const x of [1, 12]) if (y >= 9 || z === 1 || z === 24) set(x, y, z, 0);   // (the old posts)
+    for (let y = 12; y < gr.sy; y++) for (let z = 0; z < gr.sz; z++) for (let x = 0; x < gr.sx; x++) set(x, y, z, 0);   // (the old canopy)
+    for (let z = C.z0; z < gr.sz; z++) for (let x = 0; x < gr.sx; x++) set(x, C.y, z, ((z >> 2) & 1) ? co : cw);
+    for (let x = 0; x < gr.sx; x++) { set(x, C.y - 1, C.z0, (x & 1) ? fr : 0); set(x, C.y - 1, gr.sz - 1, fr); }   // (the valance; the stern's strip)
+    for (const z of C.posts) for (const x of [1, 12]) for (let y = 7; y < C.y; y++) set(x, y, z, post);
+    return m;
+  };
   K.seat = function (at, y0, t, sway) {
     const S = K.SEAT, fx = -Math.sin(at.yaw), fz = -Math.cos(at.yaw), rx = Math.cos(at.yaw), rz = -Math.sin(at.yaw);
     const roll = sway ? 0.02 * Math.sin(t * 1.3) + 0.011 * Math.sin(t * 3.1 + 1) : 0, bob = sway ? Math.sin(t * 2.1) * 0.035 : 0;

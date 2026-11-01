@@ -656,6 +656,28 @@
       if (p.u.u_desat) gl.uniform1f(p.u.u_desat, 0);
       return p;
     }
+    // f-polish7 (R56-13, Very Low): the held block's mesh with every face's tint moved toward its grey (VR.First2.faceTint)
+    // — one more small vertex buffer per held block, built once the textures' means are there; the same program
+    vlHand(mesh) {
+      if (mesh.vl !== undefined) return mesh.vl;
+      const A = this.game && this.game.tex && this.game.tex.avgColor, F2 = VR.First2, v = mesh.verts;
+      if (!A || !F2 || !F2.faceTint || !v || !v.length) return null;
+      const out = new Float32Array(v), keep = F2.HAND_KEEP_VL, t = [1, 1, 1];
+      for (let q = 0; q + 13 <= out.length; q += 13) {
+        t[0] = v[q + 9]; t[1] = v[q + 10]; t[2] = v[q + 11];
+        const n = F2.faceTint(A, v[q + 5] | 0, t, v[q + 12], keep); out[q + 9] = n[0]; out[q + 10] = n[1]; out[q + 11] = n[2];
+      }
+      const gl = this.game.renderer.gl, m = { block: true, count: mesh.count };
+      m.vao = gl.createVertexArray(); m.vbo = gl.createBuffer();
+      gl.bindVertexArray(m.vao); gl.bindBuffer(gl.ARRAY_BUFFER, m.vbo); gl.bufferData(gl.ARRAY_BUFFER, out, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 52, 0);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12);
+      gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24);
+      gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, 52, 36);
+      gl.bindVertexArray(null);
+      mesh.vl = m;
+      return m;
+    }
     // f-polish6 (R56-13): an item mesh's mean colour (linear: its faces' texture means × their tints), once the textures'
     // means are there (null before)
     meanCol(mesh) {
@@ -781,11 +803,13 @@
       // keep 0.7 on the screen as only 2.6 % less saturation: the faces differ from their mean and the grade re-saturates)
       const F2 = VR.First2, hk2 = mesh.block && F2 && Number.isFinite(F2.HAND_SAT) ? 1 - F2.HAND_SAT : 0;
       if (hk2 > 0 && !p.u.u_desat && !mesh.meanCol) mesh.meanCol = this.meanCol(mesh);
-      const hDs = hk2 > 0 && p.u.u_desat ? hk2 : 0, hT = hk2 > 0 && !p.u.u_desat && mesh.meanCol && F2.handTint ? F2.handTint(mesh.meanCol, F2.HAND_SAT * F2.HAND_SAT) : null;
+      // (f-polish7: on Very Low each face's own tint toward its grey — vlHand — instead of the lights' tint, when it is built)
+      const vlm = hk2 > 0 && !p.u.u_desat && F2.faceTint ? this.vlHand(mesh) : null;
+      const hDs = hk2 > 0 && p.u.u_desat ? hk2 : 0, hT = !vlm && hk2 > 0 && !p.u.u_desat && mesh.meanCol && F2.handTint ? F2.handTint(mesh.meanCol, F2.HAND_SAT * F2.HAND_SAT) : null;
       if (hDs > 0) gl.uniform1f(p.u.u_desat, hDs);
       if (hT) { const t = hT, a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0] * t[0], a[1] * t[1], a[2] * t[2]); gl.uniform3f(p.u.u_sunColor, sc[0] * t[0], sc[1] * t[1], sc[2] * t[2]); gl.uniform3f(p.u.u_moonColor, mc[0] * t[0], mc[1] * t[1], mc[2] * t[2]);
         const e = 1 / 1.7; HL.bl[0] *= Math.pow(t[0], e); HL.bl[1] *= Math.pow(t[1], e); HL.bl[2] *= Math.pow(t[2], e); }
-      this.drawMesh(r, p, mesh, L, HL, true);
+      this.drawMesh(r, p, vlm || mesh, L, HL, true);
       if (hDs > 0) gl.uniform1f(p.u.u_desat, 0);
       if (hT) { const a = E.ambSky, sc = E.sunColor, mc = E.moonColor; gl.uniform3f(p.u.u_ambSky, a[0], a[1], a[2]); gl.uniform3f(p.u.u_sunColor, sc[0], sc[1], sc[2]); gl.uniform3f(p.u.u_moonColor, mc[0], mc[1], mc[2]); }
       gl.enable(gl.CULL_FACE);

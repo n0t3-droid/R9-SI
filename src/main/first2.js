@@ -31,6 +31,19 @@
     for (let i = 0; i < 3; i++) { const want = L + keep * (c[i] - L); out[i] = c[i] > 1e-4 ? Math.max(0.4, Math.min(2.5, want / c[i])) : 1; }
     return out;
   };
+  // f-polish7 (R56-13 on Very Low: the shared light tint moved the screen's saturation only 0.691 → 0.679): each face of
+  // the held block its own tint — the face's mean colour (its texture's mean A[l] × its tint, as far as the texture's
+  // tint mask k reaches) moved to its luma + keep × (colour − luma); the new per-vertex tint (pure, test/polish7.js).
+  // A = the textures' mean colours (rgba per layer, a = the mask's share), l = the layer, t = the face's tint, sh its
+  // shade (< 0: an opaque texture whose alpha is the tint mask)
+  F.HAND_KEEP_VL = 0.45;
+  F.faceTint = function (A, l, t, sh, keep) {
+    const o = [t[0], t[1], t[2]]; if (!A || l * 4 + 3 >= A.length) return o;
+    const k = sh < 0 ? A[l * 4 + 3] : 1; if (!(k > 0.08)) return o;
+    const c = [0, 1, 2].map(i => A[l * 4 + i] * (1 + (t[i] - 1) * k)), L = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+    for (let i = 0; i < 3; i++) { const a = A[l * 4 + i]; if (!(a > 1e-4)) continue; const want = L + keep * (c[i] - L); o[i] = Math.max(0, Math.min(3, 1 + (want / a - 1) / k)); }
+    return o;
+  };
   F.HAND_SAT = 0.7;   // f-polish6 (R56-13: sandstone at 0.604, the goal ≤ 0.55): the held block keeps 70 % of its chroma (≈ 20 % less HSV saturation) (entities.drawHand, u_desat)
   F.FOV = 70;   // the hand's own projection (entities.drawHand)
   // the fist at rest (no bob, no swing), a block held — drawHand's S, F and d·0.9
