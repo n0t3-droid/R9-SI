@@ -117,6 +117,10 @@ const NAMES = [
   { de: 'Funkelreigen', en: 'Sparkle Round', what: "the Glimari's festival (w-seasons)", checked: '2026-11-01', by: 'w-seasons', found: 'no game, product or brand of either name' },
   { de: 'Steinglut', en: 'Stone Ember', what: "the Regoli's festival (w-seasons)", checked: '2026-11-01', by: 'w-seasons', found: 'no game or brand; Noita has an item „Glowing Stone“ — a different name' },
   { de: 'Eisblütennacht', en: 'Ice Bloom Night', what: "the Isveli's festival (w-seasons; not „Frostlicht“ — a D&D one-shot „Frostlight Festival“, a card game's „Frostfestival“)", checked: '2026-11-01', by: 'w-seasons', found: 'no game or brand of either name' },
+  // a-story7: Arc 2's names (docs/superpowers/plans/2026-11-01-a-story7.md)
+  { de: 'Wiegelind', en: 'Wiegelind', role: 'speaker', what: 'the tiny wandering moon that carried the Flausel to every world as seeds and blinks three times (story ch. 13–16, a-story7; from „Wiege", cradle, and „lind", gentle)', checked: '2026-11-01', by: 'a-story7', found: 'no game, toy, character or brand (WebSearch „Wiegelind": only the surnames Wiegel / Weigel)' },
+  { de: 'Dreilichterfest', en: 'Festival of Three Lights', role: 'festival', what: 'the festival every 7th night after Wiegelind answered (a-story7)', checked: '2026-11-01', by: 'a-story7', found: 'no game or brand (WebSearch „Dreilichterfest": only „Dreiländerfest", „Dreikönigsfest", Lichterfeste — other words)' },
+  { de: 'Wiegelinds Saatwiese', en: "Wiegelind's Seed Meadow", role: 'place', what: 'the new place where she sowed the far Flausel (a-story7; instead of „Sternsaatwiese / Starseed Meadow": „Starseed Pilgrim" is a game)', checked: '2026-11-01', by: 'a-story7', found: 'WebSearch „Starseed Meadow" OR „Festival of Three Lights" game: Starseed Pilgrim, Starseed — so the name carries hers' },
 ];
 // the words that went: never again in a table, an item name or a string the game writes
 const RETIRED = [

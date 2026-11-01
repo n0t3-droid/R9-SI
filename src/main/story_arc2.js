@@ -9,7 +9,7 @@
 //   · the deeds: trip (a journey of that kind taken — die Himmelsleiter, eine Lichtbrücke, eine Karawane: journey.js
 //     counted into rec.trips) and sign (your way: S.styleWay on what you build, help or travel)
 //   · the choice c15 → the gifts: the new place (a fairy place of its own near your settlement: Wiegelinds Ruh — the
-//     stone circle where she rests — or the Sternsaatwiese — glowing mushrooms where the far Flausel live), the
+//     stone circle where she rests — or Wiegelinds Saatwiese — glowing mushrooms where the far Flausel live), the
 //     Dreilichterfest (every 7th night every village and your settlement celebrate: VR.Villages festivalDay), the
 //     Wanderbuch's pages (places, people)
 //   · the music: a scene of the arc starts with the score's story hook (audio.storyCue(id, mood) when e-score2 gives

@@ -65,7 +65,7 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
   const rg = S.fresh();
   check(!S.found(rg, { opt: 'nope', x: 1, z: 2 }, 3) && S.found(rg, { opt: 'stay', x: 10.4, z: -7.6 }, 12) && !S.found(rg, { opt: 'sow', x: 0, z: 0 }, 1) && rg.gift.place.kind === 'circle' && rg.gift.place.x === 10 && rg.gift.fest === 12, 'founded once: the place (stay → the stone circle) and the festival\'s day');
   check(S.festDay(rg, 12) && !S.festDay(rg, 13) && S.festDay(rg, 19) && S.festDay(rg, 26) && !S.festDay(rg, 5) && !S.festDay(S.fresh(), 12), 'the Dreilichterfest: the founding night and every 7th after');
-  const rgs = S.fresh(); S.found(rgs, { opt: 'sow', x: 0, z: 0 }, 0); check(rgs.gift.place.kind === 'shroom', 'sow → the Sternsaatwiese (the glowing wood)');
+  const rgs = S.fresh(); S.found(rgs, { opt: 'sow', x: 0, z: 0 }, 0); check(rgs.gift.place.kind === 'shroom', 'sow → Wiegelinds Saatwiese (the glowing wood)');
   const junk = S.load({ v: 1, beats: {}, trips: { lift: 3, boat: 4, ride: 'x' }, gift: { place: { opt: 'stay', x: 'a', z: 2 }, fest: 3 }, choices: { style: 'dance', c15: 'sow' } });
   check(JSON.stringify(junk.trips) === '{"lift":3}' && junk.gift === null && !junk.choices.style && junk.choices.c15 === 'sow', 'the record sanitises the journeys, the gift and the choices');
 

@@ -191,7 +191,7 @@
   // three blinks are the Flausel's greeting („Ich bin da"); Echo learned its blink from her, and the lullabies of all
   // the peoples are her one song. The arc: 13 the blink comes back and the Flausel answer · 14 the journey (the
   // Himmelsleiter, a Lichtbrücke, a caravan) to gather every people's light · 15 a sign your own way (build · quest ·
-  // roam, S.styleWay) and a choice (c15: she stays — Wiegelinds Ruh — or sows on — the Sternsaatwiese, the far
+  // roam, S.styleWay) and a choice (c15: she stays — Wiegelinds Ruh — or sows on — Wiegelinds Saatwiese, the far
   // Flausel move in) · 16 the Dreilichterfest at your own settlement (u-movein; else the village near).
   //   rules: near.fairy (m to a fairy place), near.home (m to your settlement's plaza, else the village near);
   //   deeds: 'trip' (a journey of that kind taken since the beat: rec.trips) · 'sign' (the style deed, rec.choices.style)
