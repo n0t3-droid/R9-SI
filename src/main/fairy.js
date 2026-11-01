@@ -187,7 +187,7 @@
   const tod = (g) => (g.env ? g.env.timeOfDay : 6000);
   const clear = (g) => { const e = g.env, w = e && e.wx; if (!e) return true; const k = w && (w.forced || w.kind); return (e.rain || 0) < 0.15 && k !== 'nebel' && k !== 'gewitter' && k !== 'regen'; };
   const nameKey = (who) => 'g.fairy.who.' + who;
-  const whoName = (f) => f.nm || whoName(f);   // n-names: the tree village's folk have their own Flausel names (VR.Names.flausel)
+  const whoName = (f) => f.nm || T(nameKey(f.who));   // n-names: the tree village's folk have their own Flausel names (VR.Names.flausel)
   const placeName = (kind) => T('g.fairy.place.' + kind);
   let saveT = 0;
   const save = (g) => { const now = Date.now(); if (now - saveT < 4000) return; saveT = now; try { if (g.saveMeta && g.meta && !g.meta.guest) g.saveMeta(); } catch (e) { /* the next save takes it */ } };
