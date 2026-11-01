@@ -29,13 +29,14 @@
   const norm = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const perp = (v, n) => { const d = dot(v, n); return norm([v[0] - n[0] * d, v[1] - n[1] * d, v[2] - n[2] * d]); };
+  const rot = (v, k, a) => { const c = Math.cos(a), s = Math.sin(a), d = dot(k, v), x = cross(k, v); return [v[0] * c + x[0] * s + k[0] * d * (1 - c), v[1] * c + x[1] * s + k[1] * d * (1 - c), v[2] * c + x[2] * s + k[2] * d * (1 - c)]; };
   const perm = (v) => [v[1], v[2], v[0]];   // (VR.Universe's axes → the space scene's, as stations.js)
   const D2R = Math.PI / 180;
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'journeys', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.journeys', tip: 'g.set.journeys.tip', cost: 'low', def: true });
 
   const M = { J: null, carts: [], cartT: 0, offer: null, saveT: 0, resumed: {}, paused: false, alive: null, log: [], cab: null, keyHeld: false, lastSkip: false };
   JY.M = M;
-  const ctxOf = (g) => ({ off: !!(g.settings && g.settings.journeys === false), potato: !!(g.settings && g.settings.preset === 'potato'), guest: !!(g.mp && g.mp.guest), flight: !!(g.flight && g.flight.regime && g.flight.regime !== 'air') || !!(g.gadgets && g.gadgets.riding && g.gadgets.riding.type !== 'journey') });
+  const ctxOf = (g) => ({ off: !!(g.settings && g.settings.journeys === false), potato: !!(g.settings && g.settings.preset === 'potato'), preset: g.settings && g.settings.preset, guest: !!(g.mp && g.mp.guest), flight: !!(g.flight && g.flight.regime && g.flight.regime !== 'air') || !!(g.gadgets && g.gadgets.riding && g.gadgets.riding.type !== 'journey') });
   const palOf = (dim) => { const d = dim && VR.DimReg && VR.DimReg.get(dim); return (d && d.veil) || ['#ffffff', '#c8d8ff', '#202850']; };
   const hex = (s) => { const n = parseInt(String(s).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a.toFixed(3) + ')';
@@ -140,6 +141,9 @@
     const L = K.LIFT, sl = L.len - L.ground;
     const film = { id: 'lift', len: sl, low: false, from: g.dim, to: J.dest.dim, shots: [{ id: 'up', v: 0, dur: 0.05 }, { id: 'top', v: 0, dur: sl - 0.05 }] };
     J.ph = 'space'; J.tw = worldT(g);
+    // o-seamless2: your look carried across the switch (the heading from the sun's azimuth, the pitch)
+    const sd = g.env && g.env.E && g.env.E.sunDir;
+    J.rel = p && sd ? K.relAz(sd, p.yaw) : Math.PI / 2; J.pitch0 = p ? clamp(p.pitch, -1.2, 1.2) : 0;
     const P = liftPlayer(J, film);
     const adv = (PJ, wall) => {
       if (PJ.t > (J.lastT || 0) + 1e-6 && PJ.t >= sl - 1e-6) { J.st.t = Math.max(J.st.t, L.len); }   // (the Leuchtpfad's skip)
@@ -164,9 +168,10 @@
         if (eph && eph.bodies && eph.bodies.herz && S && S.place && SS.BODIES) {
           R = SS.BODIES.herz.R; Hc = eph.bodies.herz.p;
           const P = S.place('ring', J.tw + ks * 30); Nn = norm(perm(P.r)); St = add(Hc, perm(P.r));
-          const sun = norm(sub(eph.bodies.helia.p, Hc)), hs = perp(sun, Nn), hd = norm(cross(Nn, hs));
-          const dip = Math.acos(R / (R + alt)), fov = 70 * D2R, up0 = -dip + 0.24 * fov, look = ease(clamp((ks - 0.62) / 0.38, 0, 1));
-          const pt = up0 + (80 * D2R - up0) * look, fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
+          // o-seamless2: the heading you had at the switch (from the sun's side, as in the voxel sky), the pitch easing up
+          // toward the tether's top (K.liftLook: the station in view from 40 % of the phase)
+          const sun = norm(sub(eph.bodies.helia.p, Hc)), hs = perp(sun, Nn), hd = rot(hs, Nn, J.rel === undefined ? Math.PI / 2 : J.rel);
+          const fov = 70 * D2R, pt = K.liftLook(ks, J.pitch0 || 0), fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
           view = { pos: add(Hc, mul(Nn, R + alt)), fwd, up: perp(Nn, fwd), fov, ref: 'herz', body: 'herz' };
         }
         let drawn = false;
@@ -186,8 +191,9 @@
           const f = view.fwd, u = view.up, r = cross(f, u), rel = sub(St, view.pos), z = dot(rel, f), d = len(rel);
           if (z > 1) {
             const fpx = H / 2 / Math.tan(view.fov / 2), sx = W / 2 + dot(rel, r) / z * fpx, sy = H / 2 - dot(rel, u) / z * fpx;
-            const rad = Math.max(2.5, 160 / d * fpx), tilt = Math.max(0.18, Math.abs(dot(norm(rel), Nn)));
-            wheel(X, sx, sy, rad, tilt, st.t);
+            const rad = Math.max(2.5 + 9 * ks * ks, 160 / d * fpx), tilt = Math.max(0.18, Math.abs(dot(norm(rel), Nn)));
+            const gk = K.greet(ks); if (gk > 0 && !J.greeted) { J.greeted = true; note(g, T('g.jy.lift.greet'), 5000); if (g.audio && g.audio.play) g.audio.play('twinkle'); }
+            wheel(X, sx, sy, rad, tilt, st.t, gk);
             // the tether up to it
             X.strokeStyle = 'rgba(255,236,190,0.55)'; X.lineWidth = Math.max(1, W * 0.0025); X.beginPath(); X.moveTo(W * 0.83, H * 0.88); X.lineTo(sx, sy + rad * tilt); X.stroke();
           }
@@ -197,22 +203,42 @@
       },
     };
   }
-  // the Ringstation, painted: the rim with its windows lit, six spokes, the hub, two solar wings, the red beacon
-  function wheel(X, x, y, r, tilt, t) {
+  // the Ringstation, painted: the hull lit from one side, the rim with its windows, six spokes, the hub, two solar wings,
+  // the red beacon; far away a blinking star with a halo; o-seamless2: at the top its lights greet you (gk 0…1) — a wave
+  // of warm lights running round the rim, the berth lights coming on in a row toward you
+  function wheel(X, x, y, r, tilt, t, gk) {
+    gk = gk || 0;
     X.save(); X.translate(x, y);
-    const glow = X.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.8); glow.addColorStop(0, 'rgba(255,240,220,0.18)'); glow.addColorStop(1, 'rgba(255,240,220,0)');
-    X.fillStyle = glow; X.fillRect(-r * 2, -r * 2, r * 4, r * 4);
-    X.scale(1, tilt);
-    X.strokeStyle = '#d9dde6'; X.lineWidth = Math.max(1.5, r * 0.14); X.beginPath(); X.arc(0, 0, r, 0, Math.PI * 2); X.stroke();
+    X.globalCompositeOperation = 'lighter';
+    const hr = r * (1.8 + 1.2 * gk) + 10, glow = X.createRadialGradient(0, 0, 0, 0, 0, hr); glow.addColorStop(0, 'rgba(255,236,200,' + (0.28 + 0.2 * gk).toFixed(2) + ')'); glow.addColorStop(1, 'rgba(255,236,200,0)');
+    X.fillStyle = glow; X.fillRect(-hr, -hr, hr * 2, hr * 2);
+    X.globalCompositeOperation = 'source-over';
+    if (r < 7) {   // far: a star with a cross of light, the beacon blinking beside it
+      X.fillStyle = 'rgba(255,248,232,0.95)'; X.beginPath(); X.arc(0, 0, Math.max(1.2, r * 0.5), 0, Math.PI * 2); X.fill();
+      X.strokeStyle = 'rgba(255,240,215,0.45)'; X.lineWidth = 1; X.beginPath(); X.moveTo(-r * 2.5 - 4, 0); X.lineTo(r * 2.5 + 4, 0); X.moveTo(0, -r * 2.5 - 4); X.lineTo(0, r * 2.5 + 4); X.stroke();
+    }
+    X.save(); X.scale(1, tilt);
+    const hull = X.createLinearGradient(-r, -r, r, r); hull.addColorStop(0, '#fbfcff'); hull.addColorStop(0.55, '#aab2c2'); hull.addColorStop(1, '#3a4252');
+    X.strokeStyle = hull; X.lineWidth = Math.max(1.5, r * 0.15); X.beginPath(); X.arc(0, 0, r, 0, Math.PI * 2); X.stroke();
     X.strokeStyle = 'rgba(255,214,140,0.9)'; X.lineWidth = Math.max(1, r * 0.03); X.setLineDash([Math.max(1, r * 0.05), Math.max(1, r * 0.07)]); X.beginPath(); X.arc(0, 0, r * 1.0, t * 0.05, t * 0.05 + Math.PI * 2); X.stroke(); X.setLineDash([]);
     X.strokeStyle = '#9aa3b2'; X.lineWidth = Math.max(1, r * 0.035);
     for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.05; X.beginPath(); X.moveTo(Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16); X.lineTo(Math.cos(a) * r * 0.93, Math.sin(a) * r * 0.93); X.stroke(); }
     X.fillStyle = '#eef0f4'; X.beginPath(); X.arc(0, 0, r * 0.17, 0, Math.PI * 2); X.fill();
-    X.restore(); X.save(); X.translate(x, y);
+    if (gk > 0 && r > 6) {   // the greeting: a wave of warm lights round the rim, the berth lights toward you
+      X.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 36; i++) {
+        const a = i * Math.PI / 18 + t * 0.05, w = Math.max(0, Math.cos(a - t * 2.4)), b = gk * (0.25 + 0.75 * w * w);
+        X.fillStyle = 'rgba(255,' + (190 + 50 * w | 0) + ',120,' + b.toFixed(2) + ')'; X.beginPath(); X.arc(Math.cos(a) * r, Math.sin(a) * r, Math.max(1.2, r * 0.035) * (1 + w), 0, Math.PI * 2); X.fill();
+      }
+      const n = 8, on = gk * n;
+      for (let i = 0; i < n; i++) { const b = clamp(on - i, 0, 1), yy = r * (0.2 + 0.1 * i); if (b <= 0) continue; X.fillStyle = 'rgba(150,255,190,' + (0.9 * b).toFixed(2) + ')'; X.beginPath(); X.arc(-r * 0.06, yy, Math.max(1, r * 0.022), 0, Math.PI * 2); X.arc(r * 0.06, yy, Math.max(1, r * 0.022), 0, Math.PI * 2); X.fill(); }
+      X.globalCompositeOperation = 'source-over';
+    }
+    X.restore();
     X.fillStyle = '#2b4a8a'; X.strokeStyle = '#8fb0ff'; X.lineWidth = 1;
-    for (const s of [-1, 1]) { X.fillRect(s > 0 ? r * 0.2 : -r * 0.75, -r * 0.06, r * 0.55, r * 0.12); X.strokeRect(s > 0 ? r * 0.2 : -r * 0.75, -r * 0.06, r * 0.55, r * 0.12); }
+    if (r > 6) for (const s of [-1, 1]) { X.fillRect(s > 0 ? r * 0.2 : -r * 0.75, -r * 0.06, r * 0.55, r * 0.12); X.strokeRect(s > 0 ? r * 0.2 : -r * 0.75, -r * 0.06, r * 0.55, r * 0.12); }
     const u = ((t % 1.6) + 1.6) % 1.6, bl = u < 0.42 ? 1 : 0.15;
-    X.fillStyle = 'rgba(255,40,30,' + bl + ')'; X.beginPath(); X.arc(0, -r * 0.32 * tilt - r * 0.1, Math.max(1.5, r * 0.04), 0, Math.PI * 2); X.fill();
+    X.fillStyle = 'rgba(255,40,30,' + bl + ')'; X.beginPath(); X.arc(r < 7 ? r + 3 : 0, r < 7 ? -2 : -r * 0.32 * tilt - r * 0.1, Math.max(1.6, r * 0.04), 0, Math.PI * 2); X.fill();
     X.restore();
   }
 
@@ -251,52 +277,182 @@
     const pos = sub(Bp, mul(dir, D)), fwd = norm(sub(dir, mul(up0, 0.16)));
     return { pos, fwd, up: perp(up0, fwd), fov: 62 * D2R, ref: tb, body: null };
   }
+  // o-seamless2: the bridge's look made once per trip — a glow sprite per colour, the nebula in the destination's colours
+  function sprite(c, n) {
+    const cv = doc.createElement('canvas'); cv.width = cv.height = n; const x = cv.getContext('2d'), r = n / 2;
+    const gr = x.createRadialGradient(r, r, 0, r, r, r); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, rgba(c, 0.9)); gr.addColorStop(0.5, rgba(c, 0.25)); gr.addColorStop(1, rgba(c, 0));
+    x.fillStyle = gr; x.fillRect(0, 0, n, n); return cv;
+  }
+  function nebula(pal, seed) {
+    const cv = doc.createElement('canvas'); cv.width = 256; cv.height = 144; const x = cv.getContext('2d');
+    const rnd = (i) => { const a = Math.sin((i + seed * 0.001) * 91.7) * 43758.5453; return a - Math.floor(a); };
+    x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 14; i++) {
+      const cx = 20 + rnd(i) * 216, cy = 10 + rnd(i + 40) * 100, r = 22 + rnd(i + 80) * 60, c = i % 3 === 0 ? [120, 70, 190] : i % 3 === 1 ? pal[1] : pal[0];
+      const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, rgba(c, 0.16 + rnd(i + 9) * 0.1)); gr.addColorStop(1, rgba(c, 0));
+      x.fillStyle = gr; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    for (let i = 0; i < 260; i++) { const a = rnd(i + 300); x.fillStyle = 'rgba(240,244,255,' + (0.15 + 0.6 * a * a).toFixed(2) + ')'; x.fillRect(rnd(i + 700) * 256, rnd(i + 1100) * 144, a > 0.93 ? 1.3 : 0.7, a > 0.93 ? 1.3 : 0.7); }
+    return cv;
+  }
   function bridgePlayer(J, film) {
     const g = J.g, st = J.st, PS = VR.PortalSpace, pal = palOf(J.dest.dim).map(hex), deep = pal[2];
-    const sparks = []; for (let i = 0; i < 46; i++) sparks.push([(i * 7.31) % 1, (i * 0.618) % 1, (i * 3.7) % 1]);
+    const FX = K.fx(ctxOf(g)), L = [Math.round(pal[0][0] * 0.4 + 150 * 0.6), Math.round(pal[0][1] * 0.4 + 225 * 0.6), Math.round(pal[0][2] * 0.4 + 255 * 0.6)];
+    const look = { pal, L, FX, cL: rgba(L, 1), cM: rgba(pal[1], 1), cW: 'rgb(255,250,235)', cA: 'rgb(110,255,200)', cA2: rgba(pal[0], 1), cU: 'rgb(26,34,74)',
+      spr: sprite(L, 32), warm: sprite([255, 214, 140], 32), neb: nebula(pal, (st.seed | 0) & 1023),
+      sp: new Float32Array(FX.sparks * 4), near: new Float32Array(FX.sparks ? 3 * 60 : 0), lastS: st.s };
+    for (let i = 0; i < FX.sparks; i++) { look.sp[i * 4] = ((i * 7.31) % 1) * 60; look.sp[i * 4 + 1] = (i * 0.618) % 1 < 0.5 ? -1 : 1; look.sp[i * 4 + 2] = (i * 3.7) % 1; look.sp[i * 4 + 3] = 0.12 + ((i * 1.93) % 1) * 0.2; }
+    for (let i = 0; i < look.near.length / 3; i++) { const a = i * 2.399, r = 4 + ((i * 0.37) % 1) * 30; look.near[i * 3] = Math.cos(a) * r; look.near[i * 3 + 1] = Math.sin(a) * r * 0.6; look.near[i * 3 + 2] = 5 + ((i * 0.713) % 1) * 95; }
     return {
-      len: film.len, film, gl: false, shotAt: (t) => (t < K.BRIDGE.depart ? 'step' : 'walk'),
+      len: film.len, film, gl: false, look, shotAt: (t) => (t < K.BRIDGE.depart ? 'step' : 'walk'),
       draw(X, W, H, t) {
-        const k = clamp(t / film.len, 0, 1), PJ = VR.Portal.J(), noGL = !PS || (PJ && PJ.noGL && !JY.forceGL) || ctxOf(g).potato;
+        const k = clamp(t / film.len, 0, 1), PJ = VR.Portal.J(), noGL = !PS || J.paint || (PJ && PJ.noGL && !JY.forceGL) || ctxOf(g).potato;
         let drawn = false;
         if (!noGL && PS.eph && PS.renderView) { const eph = PS.eph(J.tw + k * 30), v = bridgeView(J, k, eph); if (v) { drawn = !!PS.renderView(g, v, eph); if (drawn) J.shots++; } }
-        this.gl = drawn;
-        if (drawn) X.clearRect(0, 0, W, H); else { paintSpace(X, W, H, deep); const r0 = H * (0.03 + 0.5 * Math.pow(k, 3)); const gg = X.createRadialGradient(W / 2, H * 0.36, r0 * 0.1, W / 2, H * 0.36, r0); gg.addColorStop(0, rgba(pal[0], 1)); gg.addColorStop(0.8, rgba(pal[1], 1)); gg.addColorStop(1, rgba(pal[1], 0)); X.fillStyle = gg; X.beginPath(); X.arc(W / 2, H * 0.36, r0, 0, Math.PI * 2); X.fill(); }
-        path(X, W, H, t, k, pal, sparks, J.fwd);
+        this.gl = drawn; this.cover = !drawn;   // (painted: opaque — the 3-D world under it is not drawn)
+        if (drawn) X.clearRect(0, 0, W, H);
+        else { paintSpace(X, W, H, deep); world(X, W, H, k, pal); }
+        sky(X, W, H, t, look, drawn);
+        path(X, W, H, t, k, pal, look, J.fwd, st.t);
+        if (J.fwd && t > look.lastS) chime(g, look.lastS, t);
+        look.lastS = t;
       },
     };
   }
-  // the shining path: light tiles in perspective toward the vanishing point, its rails, sparks rising, the gate at the end
-  function path(X, W, H, s, k, pal, sparks, walking) {
-    const B = K.BRIDGE, rem = Math.max(0.01, B.len - s), f = H * 0.95, eye = 1.6, hw = 1.25;
+  // the destination painted (no space frame): lit from Helia's side — a terminator, the night side deep, the air's rim
+  function world(X, W, H, k, pal) {
+    const r0 = H * (0.03 + 0.5 * Math.pow(k, 3)), cx = W / 2, cy = H * 0.36;
+    X.save();
+    const halo = X.createRadialGradient(cx, cy, r0 * 0.9, cx, cy, r0 * 1.5); halo.addColorStop(0, rgba(pal[0], 0.35)); halo.addColorStop(1, rgba(pal[0], 0));
+    X.fillStyle = halo; X.beginPath(); X.arc(cx, cy, r0 * 1.5, 0, Math.PI * 2); X.fill();
+    const gg = X.createRadialGradient(cx - r0 * 0.38, cy - r0 * 0.32, r0 * 0.05, cx - r0 * 0.1, cy - r0 * 0.05, r0 * 1.12);
+    gg.addColorStop(0, rgba(pal[0], 1)); gg.addColorStop(0.45, rgba(pal[1], 1)); gg.addColorStop(0.78, rgba(pal[2].map(v => v * 0.8 | 0), 1)); gg.addColorStop(1, 'rgba(4,6,16,1)');
+    X.fillStyle = gg; X.beginPath(); X.arc(cx, cy, r0, 0, Math.PI * 2); X.fill();
+    X.globalCompositeOperation = 'lighter'; X.strokeStyle = rgba(pal[0].map(v => Math.min(255, v + 60)), 0.5); X.lineWidth = Math.max(1, r0 * 0.05);
+    X.beginPath(); X.arc(cx, cy, r0 * 0.99, Math.PI * 0.62, Math.PI * 1.75); X.stroke();
+    X.restore();
+  }
+  // the sky's depth: the nebula hint, near stars drifting past as you go, the travellers (Flausel lights, the Sternwal)
+  function sky(X, W, H, s, look, gl) {
+    X.save(); X.globalCompositeOperation = 'lighter';
+    X.globalAlpha = gl ? 0.35 : 0.8; const ox = (s * 0.6) % 64;
+    X.drawImage(look.neb, -ox - 32, -H * 0.04, W + 128, H * 0.9);
+    X.globalAlpha = 1;
+    const f = H * 0.95, vx = W / 2, vy = H * 0.5, n = look.near;
+    for (let i = 0; i < n.length; i += 3) {
+      let z = n[i + 2] - (s * 0.9) % 100; if (z < 3) z += 100;
+      const x = vx + n[i] / z * f, y = vy + n[i + 1] / z * f, r = Math.min(3, 18 / z);
+      if (x < 0 || x > W || y < 0 || y > H) continue;
+      X.globalAlpha = clamp(1.2 - z / 90, 0.15, 1); X.drawImage(look.spr, x - r * 2, y - r * 2, r * 4, r * 4);
+    }
+    X.globalAlpha = 1;
+    if (look.FX.travellers) { flausel(X, W, H, s, look); whale(X, W, H, s, look); }
+    X.restore();
+  }
+  // Flausel lights: a little flock of warm lights travelling with you a way off the path, wings flickering
+  function flausel(X, W, H, s, look) {
+    const tt = now() / 1000, f = H * 0.95, cx = -7 + 2.5 * Math.sin(tt * 0.21), cy = 3.2 + 0.8 * Math.sin(tt * 0.33), cz = 22 + 6 * Math.sin(tt * 0.13);
+    for (let i = 0; i < 6; i++) {
+      const a = tt * (0.7 + i * 0.11) + i * 1.7, x = cx + Math.cos(a) * (0.6 + i * 0.12), y = cy + Math.sin(a * 1.3) * 0.4, z = cz + Math.sin(a) * 0.8;
+      const px = W / 2 + x / z * f, py = H * 0.56 + (1.6 - y) / z * f, r = (0.5 / z * f) * (0.8 + 0.3 * Math.sin(tt * 14 + i * 2));
+      X.globalAlpha = 0.85; X.drawImage(look.warm, px - r, py - r, r * 2, r * 2);
+    }
+    X.globalAlpha = 1;
+  }
+  // the Sternwal (our own creature): a long soft body far away, a row of lights along its back, two fins of light,
+  // gliding across the sky once, its tail beating slowly
+  function whale(X, W, H, s, look) {
+    const u = (s - 30) / 90; if (u <= 0 || u >= 1) return;
+    const tt = now() / 1000, sc = H * 0.016, hx = W * (1.12 - 1.35 * u), hy = H * (0.17 + 0.05 * Math.sin(u * Math.PI * 1.6)), N = 16;
+    const fade = clamp(Math.min(u, 1 - u) * 8, 0, 1);
+    X.globalCompositeOperation = 'source-over'; X.fillStyle = look.cU;
+    for (let i = 0; i < N; i++) {
+      const x = hx + i * sc * 1.5, y = hy + Math.sin(tt * 1.1 - i * 0.42) * sc * 0.55 * (i / N), r = sc * (0.5 + 1.1 * Math.sin(Math.PI * (i + 1.2) / (N + 1)));
+      X.globalAlpha = 0.5 * fade; X.beginPath(); X.ellipse(x, y, r * 1.2, r, 0, 0, Math.PI * 2); X.fill();
+    }
+    X.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < N; i += 1) {
+      const x = hx + i * sc * 1.5, y = hy + Math.sin(tt * 1.1 - i * 0.42) * sc * 0.55 * (i / N), r = sc * (0.5 + 1.1 * Math.sin(Math.PI * (i + 1.2) / (N + 1)));
+      X.globalAlpha = fade * (0.55 + 0.35 * Math.sin(tt * 2 + i)); const q = sc * 0.9; X.drawImage(look.spr, x - q, y - r * 0.8 - q, q * 2, q * 2);
+      if (i % 3 === 1) { X.globalAlpha = fade * 0.35; X.drawImage(look.spr, x - q * 0.6, y + r * 0.3 - q * 0.6, q * 1.2, q * 1.2); }
+    }
+    const fx = hx + 4 * sc * 1.5, fy = hy, fl = Math.sin(tt * 0.9) * 0.5;
+    X.strokeStyle = look.cA; X.lineWidth = Math.max(1, sc * 0.25); X.globalAlpha = 0.45 * fade;
+    for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(fx, fy); X.quadraticCurveTo(fx + sc * 2, fy + sd * sc * (2.4 + fl), fx + sc * 4.2, fy + sd * sc * (3.2 + fl * 1.5)); X.stroke(); }
+    const tx = hx + N * sc * 1.5, ty = hy + Math.sin(tt * 1.1 - N * 0.42) * sc * 0.55;
+    for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(tx - sc, ty); X.quadraticCurveTo(tx + sc, ty + sd * sc * 0.6, tx + sc * 2.2, ty + sd * sc * 1.8); X.stroke(); }
+    X.globalAlpha = 1;
+  }
+  // footsteps chime: a soft bell for every tile crossed while you walk, rising through a pentatonic scale along the path
+  const PENTA = [0, 2, 4, 7, 9];
+  function chime(g, s0, s1) {
+    const n = K.chimes(s0, s1, 1.85), A = g.audio; if (!n || !A || !A.ctx || !A.tone) return;
+    try { const i = Math.floor(s1 / 1.85), m = 72 + PENTA[i % 5] + 12 * (Math.floor(i / 5) % 2), f = 440 * Math.pow(2, (m - 69) / 12); A.tone(f, 0.035, 0.9, 'sine', true, A.ctx.currentTime); A.tone(f * 2.01, 0.01, 0.5, 'sine', false, A.ctx.currentTime + 0.01); } catch (e) { /* no sound */ }
+  }
+  // the shining path: glass tiles of light in perspective (a soft inner glow, a bright rim, a pulse running ahead from your
+  // feet), the light spilling under it, the rails, aurora ribbons swaying along it, sparkles drifting up, the gate
+  function path(X, W, H, s, k, pal, look, walking, tc) {
+    const B = K.BRIDGE, rem = Math.max(0.01, B.len - s), f = H * 0.95, eye = 1.6, hw = 1.25, FX = look.FX;
     const bob = walking ? Math.sin(s * 2.4) * H * 0.004 : 0, vx = W / 2, vy = H * 0.56 + bob;
-    const P = (z, x, y) => [vx + x / z * f, vy + (eye - y) / z * f];
-    const L = [Math.round(pal[0][0] * 0.4 + 150 * 0.6), Math.round(pal[0][1] * 0.4 + 225 * 0.6), Math.round(pal[0][2] * 0.4 + 255 * 0.6)], Lm = pal[1];   // (the light's own glow: a cool shine tinted by the destination)
+    const px = (z, x) => vx + x / z * f, py = (z, y) => vy + (eye - y) / z * f;
+    const tl = 1.85, ph = s % tl, zMax = Math.min(rem, 80), zp = 0.6 + ((tc || 0) * 9) % 70;
     X.save();
     X.globalCompositeOperation = 'lighter';
+    // the light spilling under the path into space
+    X.fillStyle = look.cL; X.globalAlpha = 0.07;
+    X.beginPath(); X.moveTo(px(zMax, -hw * 3), py(zMax, -0.4)); X.lineTo(px(zMax, hw * 3), py(zMax, -0.4)); X.lineTo(px(0.7, hw * 4), py(0.7, -1.2)); X.lineTo(px(0.7, -hw * 4), py(0.7, -1.2)); X.fill();
+    // aurora ribbons (High): two soft curtains swaying along the path
+    if (FX.ribbons) for (let sd = -1; sd <= 1; sd += 2) {
+      let pX = 0, pB = 0, pT = 0;
+      for (let z = 3, i = 0; z <= zMax + 4; z += 4, i++) {
+        const zz = Math.min(z, zMax), x = sd * (hw + 2.4 + 0.9 * Math.sin(zz * 0.09 + s * 0.05 + sd)), yb = 0.4 + 0.5 * Math.sin(zz * 0.05 + tc * 0.4 + sd), yt = yb + 2.6 + 1.3 * Math.sin(zz * 0.07 - tc * 0.3);
+        const cx = px(zz, x), cb = py(zz, yb), ct = py(zz, yt);
+        if (i > 0) {
+          const a = clamp(0.2 - zz / 500, 0.04, 0.2) * (0.6 + 0.4 * Math.sin(zz * 0.21 - tc * 1.3));
+          X.globalAlpha = a; X.fillStyle = (i & 1) ? look.cA : look.cA2;
+          X.beginPath(); X.moveTo(pX, pB); X.lineTo(cx, cb); X.lineTo(cx, ct); X.lineTo(pX, pT); X.fill();
+          X.globalAlpha = a * 1.6; X.strokeStyle = look.cA; X.lineWidth = 1; X.beginPath(); X.moveTo(pX, pT); X.lineTo(cx, ct); X.stroke();
+        }
+        pX = cx; pB = cb; pT = ct;
+      }
+    }
     // the tiles, far to near (1.6 m long, 0.25 m apart, sliding toward you as you walk)
-    const tl = 1.85, ph = s % tl, zMax = Math.min(rem, 80);
     for (let z = zMax - ((zMax + ph) % tl); z > 0.55; z -= tl) {
-      const z0 = Math.max(0.55, z - 1.6), a = clamp(1.2 - z / 70, 0.12, 0.9);
-      const p0 = P(z, -hw, 0), p1 = P(z, hw, 0), p2 = P(z0, hw, 0), p3 = P(z0, -hw, 0);
-      const tg = X.createLinearGradient(p3[0], p3[1], p0[0], p0[1]); tg.addColorStop(0, rgba(L, a * 0.75)); tg.addColorStop(1, rgba(L, a * 0.3));
-      X.fillStyle = tg; X.beginPath(); X.moveTo(p0[0], p0[1]); X.lineTo(p1[0], p1[1]); X.lineTo(p2[0], p2[1]); X.lineTo(p3[0], p3[1]); X.fill();
-      X.strokeStyle = rgba([255, 250, 235], a * 0.8); X.lineWidth = 1; X.beginPath(); X.moveTo(p3[0], p3[1]); X.lineTo(p2[0], p2[1]); X.stroke();
+      const z0 = Math.max(0.55, z - 1.6), zm = (z + z0) / 2, pu = Math.exp(-(zm - zp) * (zm - zp) / 6), a = clamp(1.2 - z / 70, 0.15, 0.95);
+      const xa = px(z, -hw), xb = px(z, hw), ya = py(z, 0), xc = px(z0, hw), xd = px(z0, -hw), yb = py(z0, 0);
+      X.fillStyle = look.cL; X.globalAlpha = a * (0.3 + 0.35 * pu);
+      X.beginPath(); X.moveTo(xa, ya); X.lineTo(xb, ya); X.lineTo(xc, yb); X.lineTo(xd, yb); X.fill();
+      const ia = px(z - 0.4, -hw * 0.6), ib = px(z - 0.4, hw * 0.6), iy = py(z - 0.4, 0), ic = px(z0 + 0.4, hw * 0.6), id = px(z0 + 0.4, -hw * 0.6), iy2 = py(z0 + 0.4, 0);
+      if (z - z0 > 1) { X.globalAlpha = a * (0.22 + 0.3 * pu); X.fillStyle = look.cW; X.beginPath(); X.moveTo(ia, iy); X.lineTo(ib, iy); X.lineTo(ic, iy2); X.lineTo(id, iy2); X.fill(); }
+      X.strokeStyle = look.cL; X.globalAlpha = a * 0.28; X.lineWidth = Math.max(2, 0.12 / z * f);
+      X.beginPath(); X.moveTo(xa, ya); X.lineTo(xb, ya); X.lineTo(xc, yb); X.lineTo(xd, yb); X.closePath(); X.stroke();
+      X.strokeStyle = look.cW; X.globalAlpha = a * (0.7 + 0.3 * pu); X.lineWidth = 1;
+      X.beginPath(); X.moveTo(xa, ya); X.lineTo(xb, ya); X.lineTo(xc, yb); X.lineTo(xd, yb); X.closePath(); X.stroke();
     }
-    // the rails
-    for (const sd of [-1, 1]) { const a = P(zMax, sd * hw * 1.05, 0.05), b = P(0.6, sd * hw * 1.05, 0.05); const gr = X.createLinearGradient(a[0], a[1], b[0], b[1]); gr.addColorStop(0, rgba(Lm, 0.15)); gr.addColorStop(1, rgba(L, 0.95)); X.strokeStyle = gr; X.lineWidth = Math.max(1.5, H * 0.006); X.beginPath(); X.moveTo(a[0], a[1]); X.lineTo(b[0], b[1]); X.stroke(); }
-    // the sparks rising beside the path
-    for (const q of sparks) {
-      const z = 1 + ((q[0] * 60 - s) % 60 + 60) % 60; if (z > zMax) continue;
-      const side = q[1] < 0.5 ? -1 : 1, y = ((q[2] + s * 0.01) % 1) * 2.4, p = P(z, side * hw * (1.2 + q[2] * 0.6), y), rr = Math.min(H * 0.006, Math.max(0.8, 0.05 / z * f));
-      X.fillStyle = rgba(L, clamp(0.9 - z / 60, 0.1, 0.9)); X.beginPath(); X.arc(p[0], p[1], rr, 0, Math.PI * 2); X.fill();
+    // the rails: a wide faint glow and a bright core
+    for (let sd = -1; sd <= 1; sd += 2) {
+      const ax = px(zMax, sd * hw * 1.05), ay = py(zMax, 0.05), bx = px(0.6, sd * hw * 1.05), by = py(0.6, 0.05);
+      X.strokeStyle = look.cL; X.globalAlpha = 0.25; X.lineWidth = Math.max(4, H * 0.018); X.beginPath(); X.moveTo(ax, ay); X.lineTo(bx, by); X.stroke();
+      X.strokeStyle = look.cW; X.globalAlpha = 0.85; X.lineWidth = Math.max(1.5, H * 0.005); X.beginPath(); X.moveTo(ax, ay); X.lineTo(bx, by); X.stroke();
     }
+    // sparkles drifting up from the path's edges (none on Very Low)
+    const sp = look.sp;
+    for (let i = 0; i < sp.length; i += 4) {
+      const z = 1 + ((sp[i] - s) % 60 + 60) % 60; if (z > zMax) continue;
+      const u = (sp[i + 2] + tc * sp[i + 3]) % 1, y = u * 3.2, x = sp[i + 1] * hw * (1.0 + sp[i + 2] * 0.5) + Math.sin(tc * 1.3 + i) * 0.15;
+      const r = Math.min(H * 0.02, Math.max(1.5, 0.16 / z * f));
+      X.globalAlpha = clamp(1 - z / 60, 0.1, 1) * (1 - u) * (0.6 + 0.4 * Math.sin(tc * 5 + i)); X.drawImage(look.spr, px(z, x) - r, py(z, y) - r, r * 2, r * 2);
+    }
+    X.globalAlpha = 1;
     // the gate at the path's end: a ring of the destination's light, its glow filling the view as you come near
+    const L = look.L, Lm = pal[1];
     if (rem < 80) {
-      const gp = P(rem, 0, 2.0), gr = 2.0 / rem * f, a = clamp(1.1 - rem / 80, 0.15, 1);
-      const gl = X.createRadialGradient(gp[0], gp[1], gr * 0.1, gp[0], gp[1], gr * 1.6); gl.addColorStop(0, rgba(L, 0.75 * a)); gl.addColorStop(0.6, rgba(Lm, 0.35 * a)); gl.addColorStop(1, rgba(Lm, 0));
-      X.fillStyle = gl; X.beginPath(); X.arc(gp[0], gp[1], gr * 1.6, 0, Math.PI * 2); X.fill();
-      X.strokeStyle = rgba(L, a); X.lineWidth = Math.max(1.5, gr * 0.09); X.beginPath(); X.arc(gp[0], gp[1], gr, 0, Math.PI * 2); X.stroke();
+      const gx = px(rem, 0), gy = py(rem, 2.0), gr = 2.0 / rem * f, a = clamp(1.1 - rem / 80, 0.15, 1);
+      const gl = X.createRadialGradient(gx, gy, gr * 0.1, gx, gy, gr * 1.8); gl.addColorStop(0, rgba(L, 0.75 * a)); gl.addColorStop(0.6, rgba(Lm, 0.35 * a)); gl.addColorStop(1, rgba(Lm, 0));
+      X.fillStyle = gl; X.beginPath(); X.arc(gx, gy, gr * 1.8, 0, Math.PI * 2); X.fill();
+      X.strokeStyle = look.cW; X.globalAlpha = a; X.lineWidth = Math.max(1.5, gr * 0.06); X.beginPath(); X.arc(gx, gy, gr, 0, Math.PI * 2); X.stroke();
+      X.strokeStyle = look.cL; X.globalAlpha = a * 0.4; X.lineWidth = Math.max(3, gr * 0.2); X.beginPath(); X.arc(gx, gy, gr, 0, Math.PI * 2); X.stroke();
+      X.globalAlpha = 1;
     }
     X.restore();
     if (rem < 7) { X.fillStyle = rgba(L, clamp((7 - rem) / 7, 0, 1) * 0.85); X.fillRect(0, 0, W, H); }
@@ -349,6 +505,7 @@
     M.J = { kind: 'ride', g, st, place, y: y0, ty: y0, yT: 0, at: P0, F: driver(st.seed ^ 0x51, [P0.x, y0, P0.z]), t0: now(), lines: 0, moments: 0, slowK: 0 };
     if (g.gadgets) g.gadgets.riding = { type: 'journey' };
     p.flying = false;
+    if (!o.st) { p.yaw = P0.yaw; p.pitch = -0.1; }   // (o-seamless2: on boarding you look ahead along the road)
     note(g, T('g.jy.ride.board', { place: st.name || place.name || '' }), 5000);
     save(g, snap(M.J)); ev('ride ' + st.to + ' ' + Math.round(st.len) + 'm');
     return true;
@@ -364,9 +521,12 @@
     J.at = K.rideAt(st.path, st.s, J.at);
     if ((J.yT -= dt) <= 0) { J.yT = 0.2; const y = groundAt(g, J.at.x, J.at.z, J.y - 2); if (y !== null) J.ty = y; }   // (from just under the cart: never up onto a tree's crown)
     J.y += clamp(J.ty - J.y, -4 * dt, 4 * dt);
-    const fx = -Math.sin(J.at.yaw), fz = -Math.cos(J.at.yaw), bobY = Math.sin(st.t * 2.1) * 0.05;
-    if (p && st.ph !== 'done') { p.pos[0] = J.at.x - fx * 0.55; p.pos[1] = J.y + 0.75 + bobY; p.pos[2] = J.at.z - fz * 0.55; p.vel[0] = p.vel[1] = p.vel[2] = 0; p.fallStart = null; p.onGround = true; }
-    const F = J.F; F.pos[0] = J.at.x + fx * 1.15; F.pos[1] = J.y + 0.55 + bobY; F.pos[2] = J.at.z + fz * 1.15; F.yaw = J.at.yaw;
+    // o-seamless2: you sit on the bench beside the driver (not behind him): the road ahead clear, the crates and the
+    // canopy's fringe the frame; a gentle sway (none with Weniger Bewegung)
+    const fx = -Math.sin(J.at.yaw), fz = -Math.cos(J.at.yaw), less = !!(VR.A11y && VR.A11y.less && VR.A11y.less(g.settings));
+    const S = K.seat(J.at, J.y + 0.1, st.t, !less); J.roll = S.roll; J.bob = S.bob;
+    if (p && st.ph !== 'done') { p.pos[0] = S.p[0]; p.pos[1] = S.p[1]; p.pos[2] = S.p[2]; p.vel[0] = p.vel[1] = p.vel[2] = 0; p.fallStart = null; p.onGround = true; }
+    const F = J.F; F.pos[0] = S.d[0]; F.pos[1] = S.d[1]; F.pos[2] = S.d[2]; F.yaw = J.at.yaw; F.state = 'sit';
     for (const e of evs) {
       ev('ride ' + e);
       if (e.indexOf('line:') === 0) { J.lines++; note(g, T('g.jy.ride.who') + ': „' + T(e.slice(5)) + '"', 6000); if (g.audio && g.audio.cue) g.audio.cue('funke'); save(g, snap(J)); }
@@ -512,11 +672,20 @@
   // the Leuchtpfad: the Ringstation from Herzwelt is the Himmelsleiter, every other world a Lichtbrücke (Low and up)
   if (VR.Portal) VR.Portal.route = function (g, dest, o) {
     void o;
-    if (!dest || K.mode(ctxOf(g)) === 'film' || dest.dim === g.dim || M.J) return null;
+    if (!dest || K.mode(ctxOf(g), 'bridge') === 'film' || dest.dim === g.dim || M.J) return null;
     if (K.ok(ctxOf(g), 'bridge')) return null;
-    if (g.dim === 'overworld' && dest.dim === 'stn.ring' && STN()) return JY.lift(g, Object.assign(JY.liftDest() || {}, dest)) ? { id: 'lift' } : null;
+    if (g.dim === 'overworld' && dest.dim === 'stn.ring' && STN()) return K.mode(ctxOf(g), 'lift') === 'film' ? null : JY.lift(g, Object.assign(JY.liftDest() || {}, dest)) ? { id: 'lift' } : null;
     return JY.bridge(g, dest) || null;
   };
+  // o-seamless2: the cart's gentle sway in the camera (a roll; Portal.cam is the last word on the camera, so after it)
+  if (VR.Portal && VR.Portal.cam && !VR.Portal.__jyCam) {
+    const pc0 = VR.Portal.cam; VR.Portal.__jyCam = true;
+    VR.Portal.cam = function (g, cam) {
+      const out = pc0.apply(this, arguments), J = M.J;
+      if (J && J.kind === 'ride' && J.g === g && J.roll) { const c = out || cam; c.roll = (c.roll || 0) + J.roll; return c; }
+      return out;
+    };
+  }
   // [V] by a cart: climb on (before the game's own V: a ferry's dock, a seat)
   window.addEventListener('keydown', (e) => {
     const g = VR.game; if (!g || g.state !== 'play' || (g.ui && (g.ui.screen || g.ui.typing))) return;
@@ -535,7 +704,7 @@
         cam = cam || r.cam;
         let p = null; const prog = () => p || (p = ent.beginVox(r, E));
         const J = M.J;
-        if (J && J.kind === 'ride' && J.g === g) { LK.drawModel(g, r, prog(), 'life_cart', [J.at.x, J.y + 0.1 + Math.sin(J.st.t * 2.1) * 0.05, J.at.z], J.at.yaw, cam, CART_O); LK.drawFolk(g, r, prog(), J.F, cam, g.time || 0); }
+        if (J && J.kind === 'ride' && J.g === g) { LK.drawModel(g, r, prog(), 'life_cart', [J.at.x, J.y + 0.1 + (J.bob || 0), J.at.z], J.at.yaw, cam, CART_O); LK.drawFolk(g, r, prog(), J.F, cam, g.time || 0); }
         for (const c of M.carts) {
           if (J && J.kind === 'ride' && J.st.t < 4 && Math.hypot(c.x - J.at.x, c.z - J.at.z) < 3) continue;
           LK.drawModel(g, r, prog(), 'life_cart', [c.x, c.y + 0.1, c.z], c.yaw, cam, CART_O);
@@ -548,6 +717,17 @@
       return out;
     };
   }
+  // o-seamless2 (the test): the journey mode here per kind; the painted bridge's own cost — n frames along the path into
+  // a canvas of the film's size (Very Low 0.4, else 0.75) → ms a frame (Portal.bench's twin: never slower than the film)
+  JY.mode = (g, kind) => K.mode(ctxOf(g), kind);
+  JY.bench = function (g, n, lowP, dim) {
+    const c = doc.createElement('canvas'), sc = lowP ? 0.4 : 0.75; c.width = Math.max(320, Math.round(innerWidth * sc)); c.height = Math.max(180, Math.round(innerHeight * sc));
+    const x = c.getContext('2d'), st = K.start('bridge', { from: g.dim, to: dim || 'aqua', seed: 7 }), J = { kind: 'bridge', g, st, dest: { dim: dim || 'aqua' }, tw: 0, from: g.dim, shots: 0, fwd: false, paint: true };
+    const film = { id: 'bridge', len: K.BRIDGE.len, shots: [] }, P = bridgePlayer(J, film);
+    P.draw(x, c.width, c.height, 1); x.getImageData(0, 0, 1, 1);
+    const t0 = now(); for (let i = 0; i < n; i++) { st.t = 2 + i * 0.4; P.draw(x, c.width, c.height, (i + 0.5) / n * K.BRIDGE.len); } x.getImageData(0, 0, 1, 1);
+    return (now() - t0) / n;
+  };
   // the idle cost (the test): n looks, ms each
   JY.cost = (g, n) => { const t0 = now(); for (let i = 0; i < n; i++) { M.cartT = 0; idle(g, 0.016); } return (now() - t0) / n; };
 })(VR);

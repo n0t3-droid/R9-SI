@@ -180,14 +180,14 @@
   K.greet = (k) => (k <= 0.82 ? 0 : k >= 0.97 ? 1 : sm((k - 0.82) / 0.15));
   // footsteps chime: the tiles crossed from s0 to s1
   K.chimes = (s0, s1, tile) => Math.max(0, Math.floor(s1 / tile) - Math.floor(s0 / tile));
-  // the caravan's seat: on the front bench, right of the driver (he sits left), eye ~2 m over the cart's floor (under the
+  // the caravan's seat: on the bench between the crate rows (the front crates and rail the frame's lower edge), right of the driver (he sits left), eye ~2 m over the cart's floor (under the
   // canopy's fringe at 2.36 m), a gentle sway (roll ≤ 0.032 rad; none with Weniger Bewegung). y0 = the cart's floor
-  K.SEAT = { fwd: 1.25, side: 0.62, eye: 1.98, stand: 1.62 };
+  K.SEAT = { fwd: 0.75, side: 0.62, eye: 1.98, stand: 1.62 };   // (the bench between the crate rows)
   K.seat = function (at, y0, t, sway) {
     const S = K.SEAT, fx = -Math.sin(at.yaw), fz = -Math.cos(at.yaw), rx = Math.cos(at.yaw), rz = -Math.sin(at.yaw);
     const roll = sway ? 0.02 * Math.sin(t * 1.3) + 0.011 * Math.sin(t * 3.1 + 1) : 0, bob = sway ? Math.sin(t * 2.1) * 0.035 : 0;
     return { p: [at.x + fx * S.fwd + rx * S.side, y0 + S.eye - S.stand + bob, at.z + fz * S.fwd + rz * S.side], d: [at.x + fx * S.fwd - rx * S.side, y0 + 0.72 + bob, at.z + fz * S.fwd - rz * S.side], roll, eye: S.eye, bob };
   };
-  K.keys = () => ['g.jy.lift.name', 'g.jy.lift.sub', 'g.jy.lift.cabin', 'g.jy.lift.alt', 'g.jy.lift.space', 'g.jy.bridge.name', 'g.jy.bridge.walk',
+  K.keys = () => ['g.jy.lift.name', 'g.jy.lift.sub', 'g.jy.lift.cabin', 'g.jy.lift.alt', 'g.jy.lift.space', 'g.jy.lift.greet', 'g.jy.bridge.name', 'g.jy.bridge.walk',
     'g.jy.ride.offer', 'g.jy.ride.board', 'g.jy.ride.off', 'g.jy.ride.arrive', 'g.jy.ride.who', 'g.jy.arrive', 'g.set.journeys', 'g.set.journeys.tip'].concat(K.LINES);
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

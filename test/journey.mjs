@@ -32,7 +32,7 @@ setInterval(() => console.log('    … ' + secs() + ' at ' + where), 60000).unre
 const shot = async (name) => { await ev(() => VR.Journey.pause(true)); await wait(150); try { await page.screenshot({ path: SHOTS + name, type: 'jpeg', quality: 82, timeout: 240000 }); console.log('  📷 ' + name); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => VR.Journey.pause(false)); return SHOTS + name; };
 const stats = () => ev(() => Object.assign(VR.Journey.stats(), { dim: VR.game.dim, state: VR.game.state, pj: !!VR.Portal.J() }));
 const sheet = [];
-const writeSheet = () => { if (!sheet.length) return; const spec = ROOT + '/.tmp_tests/seamless_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + PFX + (process.env.SHEET || 'seamless_sheet.jpg'), spec]).toString().trim()); } catch (e) { console.log('  (no sheet: ' + e.message.slice(0, 100) + ')'); } };
+const writeSheet = () => { if (!sheet.length) return; const spec = ROOT + '/.tmp_tests/seamless_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + PFX + (process.env.SHEET || 'seamless2_sheet.jpg'), spec]).toString().trim()); } catch (e) { console.log('  (no sheet: ' + e.message.slice(0, 100) + ')'); } };
 const strip = (label, imgs) => { for (let i = 0; i < imgs.length; i += 6) sheet.push({ label: label + (imgs.length > 6 ? ' ' + (i / 6 + 1) : ''), imgs: imgs.slice(i, i + 6) }); };
 // a journey's picture strip: every 5 s of its own clock, until it ends (or maxS of the wall clock)
 async function follow(tag, maxS, each) {
@@ -173,7 +173,12 @@ if (want('cost')) {
       out[preset + (on ? '_on' : '_off')] = { frame: +times[Math.floor(times.length / 2)].toFixed(1), idle: on ? +VR.Journey.cost(g, 300).toFixed(4) : 0 };
     }
     g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
-    out.potatoRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
+    out.potatoBridge = VR.Journey.mode(g, 'bridge'); out.potatoLift = VR.Journey.mode(g, 'lift');
+    // (o-seamless2: Very Low walks the painted bridge — its frame against the film's, both at Very Low's 0.4 canvas)
+    const C = VR.PortalCore, F = C.film(C.rec({}), 7, 'stn.ring', 'aqua', { low: true });
+    out.vlFilm = +VR.Portal.bench(F, 40, true).toFixed(2); out.vlBridge = +VR.Journey.bench(g, 40, true, 'aqua').toFixed(2);
+    g.applyPreset('high'); g.settings.dynRes = false; g.applySettings('*');
+    out.hiFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', {}), 40, false).toFixed(2); out.hiBridgePaint = +VR.Journey.bench(g, 40, false, 'aqua').toFixed(2);
     g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
     out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
     g.settings.journeys = true; g.applySettings('*');
@@ -181,7 +186,9 @@ if (want('cost')) {
   });
   run.cost = r;
   console.log('  ' + JSON.stringify(r));
-  check(r.potatoRoute === null && r.offRoute === null, 'Very Low and the switch off: the Leuchtpfad\'s film as before (no journey)');
+  check(r.potatoBridge === 'walk' && r.potatoLift === 'film' && r.offRoute === null, 'Very Low walks the painted Lichtbrücke (its lift stays the film); the switch off: the films as before');
+  check(r.vlBridge <= r.vlFilm * 1.15 + 0.3, 'Very Low: the painted bridge ' + r.vlBridge + ' ms a frame, the film ' + r.vlFilm + ' ms (never slower)');
+  console.log('  High painted: bridge ' + r.hiBridgePaint + ' ms, film ' + r.hiFilm + ' ms');
   check(r.potato_on.idle < 0.05 && r.high_on.idle < 0.05, 'the idle look: Very Low ' + r.potato_on.idle + ' ms, High ' + r.high_on.idle + ' ms');
   saveRun();
 }

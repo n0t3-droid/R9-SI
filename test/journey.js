@@ -153,7 +153,7 @@ console.log('h · o-seamless2: the bridge on Very Low, the heading across the sw
     const at = { x: 10, z: 20, yaw: 0.8 }, s = S(at, 64, 3.0, true), fx = -Math.sin(at.yaw), fz = -Math.cos(at.yaw);
     const dx = s.d[0] - s.p[0], dz = s.d[2] - s.p[2], dd = Math.hypot(dx, dz), cosA = (dx * fx + dz * fz) / (dd || 1);
     const fwdOff = (s.p[0] - at.x) * fx + (s.p[2] - at.z) * fz;
-    check(dd > 0.6 && Math.abs(cosA) < 0.35 && fwdOff > 0.8, 'the seat: on the front bench beside the driver, not behind him (' + dd.toFixed(2) + ' m apart, cos ' + cosA.toFixed(2) + ', ' + fwdOff.toFixed(2) + ' m forward)');
+    check(dd > 0.6 && Math.abs(cosA) < 0.35 && fwdOff > 0.5, 'the seat: on the bench ahead of the middle beside the driver, not behind him (' + dd.toFixed(2) + ' m apart, cos ' + cosA.toFixed(2) + ', ' + fwdOff.toFixed(2) + ' m forward)');
     let mx = 0; for (let t = 0; t < 30; t += 0.07) mx = Math.max(mx, Math.abs(S(at, 64, t, true).roll));
     check(mx > 0.005 && mx <= 0.04 && S(at, 64, 3.0, false).roll === 0, 'a gentle sway (≤ ' + mx.toFixed(3) + ' rad), none with Weniger Bewegung');
     check(s.eye > 1.7 && s.eye < 2.25, 'the eye ' + (s && s.eye) + ' m over the cart\'s floor: under the canopy (2.36 m), over the crates');
