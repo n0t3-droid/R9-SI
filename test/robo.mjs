@@ -84,11 +84,11 @@ const S0 = [PX + PR + 3, PY, PZ - 1];   // the stair's foot (x rising by half a 
 await ev(([x0, y, z0]) => {
   const g = VR.game, w = g.world, B = VR.R.byName, slab = B.oak_slab.defaultState, pl = B.oak_planks.defaultState;
   for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -4; dx <= 9; dx++) for (let yy = y; yy <= y + 4; yy++) w.setBlock(x0 + dx, yy, z0 + dz, 0);   // a clear lane
-    w.setBlock(x0, y, z0 + dz, slab);
-    w.setBlock(x0 + 1, y, z0 + dz, pl);
-    w.setBlock(x0 + 2, y, z0 + dz, pl); w.setBlock(x0 + 2, y + 1, z0 + dz, slab);
-    for (let dx = 3; dx <= 9; dx++) { w.setBlock(x0 + dx, y, z0 + dz, pl); w.setBlock(x0 + dx, y + 1, z0 + dz, pl); }
+    for (let dx = -4; dx <= 9; dx++) { w.setBlock(x0 + dx, y - 1, z0 + dz, B.stone.defaultState, 4); for (let yy = y; yy <= y + 4; yy++) w.setBlock(x0 + dx, yy, z0 + dz, 0, 4); }   // a clear lane on a stone floor
+    w.setBlock(x0, y, z0 + dz, slab, 4);
+    w.setBlock(x0 + 1, y, z0 + dz, pl, 4);
+    w.setBlock(x0 + 2, y, z0 + dz, pl, 4); w.setBlock(x0 + 2, y + 1, z0 + dz, slab, 4);
+    for (let dx = 3; dx <= 9; dx++) { w.setBlock(x0 + dx, y, z0 + dz, pl, 4); w.setBlock(x0 + dx, y + 1, z0 + dz, pl, 4); }
   }
 }, S0);
 await step(20);
