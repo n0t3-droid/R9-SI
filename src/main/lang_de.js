@@ -4045,5 +4045,11 @@
     "g.mi.greet.giftedN": "Danke noch mal für {what}!",
     "g.mi.greet.helpedN": "Gut, dass du da bist — danke für deine Hilfe!",
     // ---- u-movein end
+    // ---- f-polish5 (the wonders on screen)
+    "g.set.wonderGlow": "Sanfte Lichthöfe",
+    "g.set.wonderGlow.tip": "Weiche Lichthöfe um Feentänzer, verlorene Laternen, Festlaternen und den Wegballon, ein sanfter Schimmer über Wandermomenten in der Ferne. Ab „Niedrig“.",
+    "g.set.moveinCam": "Einzug im Bild",
+    "g.set.moveinCam.tip": "Kommt eine Familie zu deinem Haus, zeigt die Kamera sie für ein paar Sekunden ruhig auf dem Weg. Jede Taste beendet es.",
+    // ---- f-polish5 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

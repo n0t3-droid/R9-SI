@@ -191,6 +191,54 @@
     return { x: Math.round(x / hs.length), y: Math.round(y / hs.length), z: Math.round(z / hs.length) };
   };
 
+  // ---------------------------------------------------------------- f-polish5: the arrival on screen (pure)
+  // the way in: 40–60 m out toward the nearest village (≤ 900 m; else out from the door): [[x, z], …] in the order to try
+  MI.approach = function (door, out, villages) {
+    let a0 = Math.atan2(out[1], out[0]), bd = 900;
+    for (const v of villages || []) { const d = Math.hypot(v.x - door[0], v.z - door[2]); if (d < bd && d > 1) { bd = d; a0 = Math.atan2(v.z - door[2], v.x - door[0]); } }
+    const res = [];
+    for (const k of [0, 1, -1, 2, -2, 3, -3]) for (const r of [50, 42, 58]) { const a = a0 + k * Math.PI / 8; res.push([Math.round(door[0] + Math.cos(a) * r), Math.round(door[2] + Math.sin(a) * r)]); }
+    return res;
+  };
+  // the waypoints from there to the doorstep (≤ 9 m apart; the last the doorstep): [[x, z], …]
+  MI.wayPoints = function (a, b) {
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(d / 9)), out = [];
+    for (let i = 1; i <= n; i++) out.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
+    return out;
+  };
+  // the gentle framing (⚙ moveinCam): in RISE s, held, out FALL s — no jolt (smootherstep); a key eases out from where it is
+  MI.FRAME = { rise: 1.5, hold: 1.8, fall: 1.5 }; MI.FRAME.dur = MI.FRAME.rise + MI.FRAME.hold + MI.FRAME.fall;
+  const smoother = (t) => { const u = t <= 0 ? 0 : t >= 1 ? 1 : t; return u * u * u * (u * (u * 6 - 15) + 10); };
+  MI.frameK = function (t) { const F = MI.FRAME; return t <= 0 || t >= F.dur ? 0 : t < F.rise ? smoother(t / F.rise) : t < F.rise + F.hold ? 1 : smoother((F.dur - t) / F.fall); };
+  MI.frameSkip = function (t) { const F = MI.FRAME; return t < F.rise ? F.dur - F.fall * Math.max(0, t) / F.rise : t < F.rise + F.hold ? F.rise + F.hold : t; };
+  // the framing camera: beside the way a little ahead of the family (6 m toward the door, 6 m to the side, 2.6 m up),
+  // looking at the group (the lead, the cart behind) — they walk toward the frame's side, the land behind them
+  MI.framePose = function (lead, door, out, side) {
+    out = out || {};
+    let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    const sd = side || 1, ah = Math.min(6, L * 0.5);
+    out.x = lead[0] - dx * ah - dz * 6 * sd; out.z = lead[2] - dz * ah + dx * 6 * sd; out.y = lead[1] + 2.6;
+    const tx = lead[0] + dx * 1.0, tz = lead[2] + dz * 1.0, ty = lead[1] + 0.9;
+    const ex = tx - out.x, ez = tz - out.z;
+    out.yaw = Math.atan2(-ex, -ez); out.pitch = Math.atan2(ty - out.y, Math.hypot(ex, ez));
+    return out;
+  };
+  // the festival night of a settlement: lantern strings between the doorsteps (in their order round the plaza; a ring
+  // from three homes; none longer than 32 m), each sagging a little under its lanterns (~2.4 m apart, 2.9 m up at the
+  // doors), and the fire ring on the plaza: {strings: [[i, j]], lamps: [[x, y, z, string, colour]], fire: [x, y, z]}
+  MI.festLights = function (doors, pz) {
+    const D = doors.map((d, i) => ({ d, a: Math.atan2(d[2] - pz.z, d[0] - pz.x), i })).sort((p, q) => p.a - q.a);
+    const pairs = []; if (D.length >= 2) for (let k = 0; k < D.length; k++) { if (D.length === 2 && k === 1) break; pairs.push([D[k], D[(k + 1) % D.length]]); }
+    const strings = [], lamps = [];
+    for (const [A, B] of pairs) {
+      const a = A.d, b = B.d, L = Math.hypot(b[0] - a[0], b[2] - a[2]); if (L > 32 || L < 2) continue;
+      const si = strings.length; strings.push([A.i, B.i]);
+      const n = Math.max(2, Math.round(L / 2.4)), sag = Math.min(1.2, L * 0.05);
+      for (let j = 0; j < n; j++) { const u = (j + 0.5) / n; lamps.push([a[0] + (b[0] - a[0]) * u + 0.5, a[1] + (b[1] - a[1]) * u + 2.9 - sag * 4 * u * (1 - u), a[2] + (b[2] - a[2]) * u + 0.5, si, (j + si) % 4]); }
+    }
+    return { strings, lamps, fire: [pz.x, pz.y, pz.z] };
+  };
+
   // ---------------------------------------------------------------- decor (pure): only into air, never over your blocks
   MI.DECOR = { corner: ['vx_potplant', 'flower_pot', 'vx_lantern'], middle: ['vx_rug_red', 'vx_rug_blue', 'vx_rug_green', 'vx_rug_sand'] };
   MI.planDecor = function (get, room, R, opts) {
@@ -263,6 +311,7 @@
   const host = (g) => !(g.mp && g.mp.isClient);
   // the switch: settings.movein === false — no homes noticed, no arrivals, nothing drawn (the families who live here stay)
   MI.on = (g) => !(g && g.settings && g.settings.movein === false);
+  if (VR.Settings && VR.Settings.add && !(VR.Settings.byKey && VR.Settings.byKey('moveinCam'))) VR.Settings.add({ key: 'moveinCam', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.moveinCam', tip: 'g.set.moveinCam.tip', def: true });   // (f-polish5)
   const tierOf = (g) => (VR.LifeKit && VR.LifeKit.tierOf ? VR.LifeKit.tierOf(g.settings) : 2);
   const now = (g) => (g.env.day || 0) * MI.DAY + g.env.timeOfDay;
   const playerName = (g) => { const n = g.settings && g.settings.playerName; return n && String(n).trim() ? String(n).trim().slice(0, 24) : ''; };
@@ -312,6 +361,7 @@
   const baseUpdate = P.update;
   P.update = function (dt) {
     baseUpdate.call(this, dt);
+    this._miDt = dt;   // (f-polish5: the festival's one-frame lanterns live a frame)
     try { MI.init(this); MI.tick(this, dt); } catch (e) { if (!MI.warned) { MI.warned = true; console.warn('movein', e); } }
   };
   const baseThink = P.think;
@@ -453,7 +503,12 @@
     // the way in: out from the door 26 blocks (the first of eight headings with ground), the family one after another
     const nx = h.outside[0] - h.inside[0], nz = h.outside[2] - h.inside[2];
     const base = Math.atan2(nz, nx);
-    let start = null;
+    let start = null, way = null;
+    // f-polish5: they come along the way from the nearest village, 40–60 m out (the path's blocks preferred)
+    { const vs = (V.sites || []).filter(v => v && Number.isFinite(v.x)), C = MI.approach(h.outside, [nx, nz], vs);
+      for (const [sx, sz] of C) { if (!w.isLoaded(sx, sz)) continue; const y = MI.groundAt(w, sx, h.outside[1] + 16, sz, 36); if (y === null) continue; start = [sx + 0.5, y, sz + 0.5]; break; }
+      if (start) way = MI.wayPoints([start[0], start[2]], [h.outside[0] + 0.5, h.outside[2] + 0.5]).map(([x, z], i, A) => MI.wayAt(w, x, z, i === A.length - 1 ? h.outside[1] : start[1] + (h.outside[1] - start[1]) * (i + 1) / A.length, i === A.length - 1));
+      if (way && way.some(q => !q)) { start = null; way = null; } }
     for (let k = 0; k < 8 && !start; k++) {
       const an = base + (k ? ((k + 1) >> 1) * (k & 1 ? 1 : -1) * Math.PI / 6 : 0);
       const sx = Math.round(h.outside[0] + Math.cos(an) * 26), sz = Math.round(h.outside[2] + Math.sin(an) * 26);
@@ -468,7 +523,7 @@
       a.vel = [0, 0, 0]; a.path = null; a.goal = null; a.pose = 'stand'; a.bubble = null;
       a.act = { type: 'arrive', phase: 'walk', t: 0, lead: i === 0, i, home: h.fam };
     });
-    V._mi.job = { h, vil, fam: fam ? fam.surname : '', agents, t: 0, start, cart: [start[0] - (dir[0] / dl) * 0.2, start[1], start[2], Math.atan2(-dir[0], -dir[1]) + Math.PI], parked: false, greeted: false, done: false };
+    V._mi.job = { h, vil, fam: fam ? fam.surname : '', agents, t: 0, start, way, frame: null, frameDone: false, cart: [start[0] - (dir[0] / dl) * 0.2, start[1], start[2], Math.atan2(-dir[0], -dir[1]) + Math.PI], parked: false, greeted: false, done: false };
     card(g, T('g.mi.coming', { fam: fam ? fam.surname : '' }), [[T('g.mi.skipBtn'), () => MI.skip(g)]], T('g.mi.skip'));
   };
   MI.groundAt = function (w, x, yTop, z, span) {
@@ -479,6 +534,22 @@
     }
     return null;
   };
+  // f-polish5: a waypoint on the ground (a path, gravel or road block within 3 m preferred): [x, y, z] or null
+  const WAYN = /path|gravel|cobble|road|paver|brick/;
+  MI.wayAt = function (w, x, z, y0, exact) {
+    const R = VR.R, xi = Math.floor(x), zi = Math.floor(z);
+    if (!exact) {
+      let best = null, bd = 99;
+      for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+        const d = dx * dx + dz * dz; if (d >= bd || d > 9) continue;
+        const y = MI.groundAt(w, xi + dx, Math.round(y0) + 8, zi + dz, 18); if (y === null) continue;
+        const t = R.types[R.T.type[w.getBlock(xi + dx, y - 1, zi + dz)]]; if (t && WAYN.test(t.name)) { bd = d; best = [xi + dx + 0.5, y, zi + dz + 0.5]; }
+      }
+      if (best) return best;
+    }
+    const y = MI.groundAt(w, xi, Math.round(y0) + 8, zi, 18);
+    return y === null ? null : [xi + 0.5, y, zi + 0.5];
+  };
   // one family member's walk in: up the way to the doorstep, the first greets you, all unpack a little, then inside
   MI.runArrive = function (V, a, dt) {
     const act = a.act, J = V._mi && V._mi.job, g = V.g;
@@ -487,9 +558,17 @@
     const h = J.h, o = h.outside, p = g.player.pos;
     if (act.phase === 'walk') {
       if (act.t < act.i * 0.9) return;
+      // f-polish5: along the way's waypoints first (each in ≤ 25 s, else a step to it), then to the doorstep
+      const Wy = J.way; if (Wy && (act.wi | 0) < Wy.length - 1) {
+        const q = Wy[act.wi | 0]; act.wt = (act.wt || 0) + dt;
+        if (V.goTo(a, q[0] - 0.5, q[1], q[2] - 0.5, 1.6) || act.wt > 25) { if (act.wt > 25) { a.pos = q.slice(); a.path = null; } act.wi = (act.wi | 0) + 1; act.wt = 0; }
+        act.tw = act.t;
+        return;
+      }
+      const tl = act.t - (act.tw || 0);
       const tx = o[0] + (act.i ? ((act.i & 1) ? 1 : -1) * Math.min(2, (act.i + 1) >> 1) : 0), tz = o[2];
-      if (V.goTo(a, tx, o[1], tz, 1.3) || act.t > 75) {
-        if (act.t > 75) { a.pos = [tx + 0.5, o[1], tz + 0.5]; a.path = null; }
+      if (V.goTo(a, tx, o[1], tz, 1.3) || tl > 75) {
+        if (tl > 75) { a.pos = [tx + 0.5, o[1], tz + 0.5]; a.path = null; }
         act.phase = act.lead ? 'greet' : 'unpack'; act.t = 0;
         if (act.lead && !J.parked) { J.parked = true; MI.parkCart(V, J); }
       }
@@ -532,7 +611,41 @@
       J.cart[0] += (bx - J.cart[0]) * Math.min(1, dt * 4); J.cart[2] += (bz - J.cart[2]) * Math.min(1, dt * 4); J.cart[1] += (L.pos[1] - J.cart[1]) * Math.min(1, dt * 4);
       const dx = L.pos[0] - J.cart[0], dz = L.pos[2] - J.cart[2]; if (dx * dx + dz * dz > 0.05) J.cart[3] = Math.atan2(-dx, -dz);
     }
-    if ((!left.length && J.t > 2) || J.t > 160) MI.finish(V);
+    MI.frameTick(V, J, dt);
+    if ((!left.length && J.t > 2) || J.t > (J.way ? 300 : 160)) MI.finish(V);
+  };
+  // ---- f-polish5: the gentle framing — once an arrival, when the family is ~30 m from the door and you are near it
+  // (⚙ Spiel „Einzug im Bild" moveinCam; never with Weniger Bewegung, a menu, the Studio, a guest; any key: out now)
+  MI.frameTick = function (V, J, dt) {
+    const g = V.g, L = J.agents[0], o = J.h.outside;
+    if (J.frame) {
+      const F = J.frame; F.t += dt;
+      const I = g.input, any = !!I && ((I.pressed && I.pressed.size > 0) || (I.mouse && I.mouse.clicked && I.mouse.clicked.some(Boolean)) || (I.padPressed && I.padPressed.size > 0));
+      if (any && F.t > 0.1) F.t = Math.max(F.t, MI.frameSkip(F.t));
+      if (F.t >= MI.FRAME.dur || !L || !L.act) MI.frameEnd(g, J);
+      return;
+    }
+    if (J.frameDone || !L || !L.act || L.act.phase !== 'walk' || !J.way) return;
+    if (g.settings && (g.settings.moveinCam === false || g.settings.travelCam === false)) return;
+    if ((VR.A11y && VR.A11y.less && VR.A11y.less(g.settings)) || g.studioOpen || g.photo || (g.ui && g.ui.screen && g.ui.screen !== 'hud') || (g.director && g.director.active) || (g.wow && g.wow.active)) return;
+    const p = g.player.pos, dl = Math.hypot(L.pos[0] - o[0], L.pos[2] - o[2]);
+    if (dl > 34 || dl < 12 || Math.hypot(p[0] - o[0], p[2] - o[2]) > 45) return;
+    // the side of the way with the lower ground (the camera never in a hill)
+    const dx = (L.pos[0] - o[0]) / dl, dz = (L.pos[2] - o[2]) / dl, mx = o[0] + dx * dl * 0.5, mz = o[2] + dz * dl * 0.5, w = g.world;
+    const hA = w.topAt ? w.topAt(Math.floor(mx - dz * 9), Math.floor(mz + dx * 9)) : 0, hB = w.topAt ? w.topAt(Math.floor(mx + dz * 9), Math.floor(mz - dx * 9)) : 0;
+    J.frame = { t: 0, side: hA <= hB ? 1 : -1, pose: {}, hh: !!g.hideHud };
+    g.hideHud = true;   // (the held item is not in the shot)
+  };
+  MI.frameEnd = function (g, J) { if (!J || !J.frame) return; g.hideHud = J.frame.hh; J.frame = null; J.frameDone = true; };
+  const wrapA = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
+  // the camera while it frames (game.js: after the wow moment's): base → the framing pose by MI.frameK, the HUD kept
+  MI.cam = function (g, base) {
+    const V = g.villages, J = V && V._mi && V._mi.job, F = J && J.frame; if (!F) return null;
+    const L = J.agents[0]; if (!L) return null;
+    const k = MI.frameK(F.t); if (k <= 0.001) return null;
+    const P = MI.framePose(L.pos, J.h.outside, F.pose, F.side);
+    const gy = g.world.topAt ? g.world.topAt(Math.floor(P.x), Math.floor(P.z)) + 2.2 : P.y; if (P.y < gy) P.y = gy;
+    return Object.assign({}, base, { x: base.x + (P.x - base.x) * k, y: base.y + (P.y - base.y) * k, z: base.z + (P.z - base.z) * k, yaw: base.yaw + wrapA(P.yaw - base.yaw) * k, pitch: base.pitch + (P.pitch - base.pitch) * k, roll: (base.roll || 0) * (1 - k), fixed: true });
   };
   MI.parkCart = function (V, J) {
     const g = V.g, h = J.h, w = g.world;
@@ -553,6 +666,7 @@
   };
   MI.finish = function (V) {
     const g = V.g, J = V._mi.job; if (!J || J.done) return;
+    MI.frameEnd(g, J);   // (f-polish5)
     J.done = true; V._mi.job = null;
     card(g, null);
     const rec = MI.rec(g), set = setById(rec, J.h.set);
@@ -694,6 +808,7 @@
     const rec = g.meta.movein, J = V._mi && V._mi.job;
     const cart = J ? J.cart : rec.cart && rec.cart.at;
     const sets = rec.sets.filter(s => s.market && s.stall);
+    MI.drawFest(V, r, E, cam);   // (f-polish5: a settlement's festival night — lantern strings, the fire ring)
     if (!cart && !rec.gifts.length && !sets.length) return;
     const FD2 = 120 * 120, near = (q) => (q[0] - cam.x) ** 2 + (q[2] - cam.z) ** 2 < FD2;
     let prog = null; const P0 = () => prog || (prog = ent.beginVox(r, E));
@@ -702,10 +817,71 @@
     for (const s of sets) { const q = [s.stall[0] + 0.5, s.stall[1], s.stall[2] + 0.5]; if (near(q)) { LK.drawModel(g, r, P0(), 'movein_stall', q, 0, cam, {}); LK.drawModel(g, r, P0(), 'life_goods', [q[0], q[1] + 0.95, q[2]], 0, cam, {}); } }
   };
 
+  // ---- f-polish5: the festival night of your settlement, readable — lanterns strung between the doorsteps and a fire
+  // ring on the plaza (presentation only; no block). Very Low: the lanterns as warm one-frame dots (one batch), the fire as
+  // embers; Low and up: the paper lanterns, the fire's flames, soft halos (⚙ wonderGlow; ≤ 10 halos).
+  const FPO = { col: [1, 0.7, 0.35], size: 0.2, force: true, grav: 0, drag: 0, collide: false, fade: false, life: 0.05, emis: 1 };
+  const FFL = { col: [1, 0.6, 0.2], size: 0.22, grav: -1.4, drag: 0.6, collide: false, life: 0.7, emis: 1, wind: 0.2 };
+  const LCOL = [[1, 0.62, 0.3], [1, 0.82, 0.42], [1, 0.5, 0.42], [0.95, 0.75, 0.5]];
+  const FH = []; for (let i = 0; i < 10; i++) FH.push({ p: [0, 0, 0], s: [1, 1], col: [1, 0.7, 0.4], a: 0, kind: 0 });
+  const LAMPO = { scale: 1 };
+  MI.drawFest = function (V, r, E, cam) {
+    const g = V.g, rec = g.meta.movein, tod = g.env.timeOfDay, LK = VR.LifeKit;
+    if (!rec || !rec.sets.length || !V.festivalOn) return;
+    const T0 = tierOf(g), dt = Math.min(0.1, V._miDt || 0.033);
+    for (const set of rec.sets) {
+      const vil = V.known.get(set.id); if (!vil || !vil.active || !V.festivalOn(vil, tod)) continue;
+      const pz = vil.plan.plaza; if ((pz.x - cam.x) ** 2 + (pz.z - cam.z) ** 2 > 140 * 140) continue;
+      const hs = MI.homesOf(rec, set); if (hs.length < 2) continue;
+      const key = hs.map(h => h.outside.join(',')).join('|');
+      if (!set._fl || set._flKey !== key) { set._fl = MI.festLights(hs.map(h => h.outside), MI.plazaOf(rec, set)); set._flKey = key; }
+      const FL = set._fl, P = g.particles, dusk = Math.max(0, Math.min(1, (tod - 11400) / 900));
+      let prog = null; const P0 = () => prog || (prog = g.entities.beginVox(r, E));
+      // the lanterns
+      for (let i = 0; i < FL.lamps.length; i++) {
+        const q = FL.lamps[i], c = LCOL[q[4]], sw = Math.sin(V.time * 1.3 + i) * 0.04;
+        if (T0 >= 1 && LK) { LAMPO.scale = 1; LK.drawModel(g, r, P0(), 'movein_lantern', [q[0] + sw, q[1] - 0.3, q[2]], i * 0.7, cam, LAMPO); }
+        else if (P) { FPO.col = c; FPO.size = 0.22; FPO.life = dt * 1.5 + 1e-4; P.spawn(q[0], q[1], q[2], 0, 0, 0, FPO); }
+      }
+      // the fire ring
+      const f = FL.fire;
+      if (LK && T0 >= 1) LK.drawModel(g, r, P0(), 'movein_firering', [f[0] + 0.5, f[1], f[2] + 0.5], 0, cam, LAMPO);
+      else if (P) { FPO.col = LCOL[0]; FPO.size = 0.5; FPO.life = dt * 1.5 + 1e-4; P.spawn(f[0] + 0.5, f[1] + 0.25, f[2] + 0.5, 0, 0, 0, FPO); }   // (Very Low: the embers as one warm dot — no model, no vox pass)
+      if (P && Math.random() < dt * (T0 >= 1 ? 26 : 8)) { FFL.col = Math.random() < 0.5 ? [1, 0.55, 0.15] : [1, 0.8, 0.3]; P.spawn(f[0] + 0.5 + (Math.random() - 0.5) * 0.6, f[1] + 0.3, f[2] + 0.5 + (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.3, 1.2 + Math.random() * 0.8, (Math.random() - 0.5) * 0.3, FFL); }
+      // the halos: the fire and the lanterns nearest you
+      if (T0 >= 1 && g.settings.wonderGlow !== false && VR.StoryGlow && VR.StoryGlow.draw) {
+        const night = Math.max(dusk, Math.min(1, (E && E.night) || 0)), A = 0.35 + 0.65 * night;
+        let n = 0; const H0 = FH[n++]; H0.p[0] = f[0] + 0.5; H0.p[1] = f[1] + 0.9; H0.p[2] = f[2] + 0.5; H0.s[0] = H0.s[1] = 2.6 + Math.sin(V.time * 7) * 0.08; H0.col[0] = 1; H0.col[1] = 0.55; H0.col[2] = 0.22; H0.a = 0.8 * A;
+        for (let i = 0; i < FL.lamps.length && n < FH.length; i += (FL.lamps.length > 18 ? 2 : 1)) { const q = FL.lamps[i], c = LCOL[q[4]], H = FH[n++]; H.p[0] = q[0]; H.p[1] = q[1] - 0.15; H.p[2] = q[2]; H.s[0] = H.s[1] = 0.9; H.col[0] = c[0]; H.col[1] = c[1]; H.col[2] = c[2]; H.a = 0.5 * A; }
+        for (let i = n; i < FH.length; i++) FH[i].a = 0;
+        VR.StoryGlow.draw(r, cam, FH);
+      }
+    }
+  };
   // the models (our own; 1 voxel = 1/8 m)
   const MOD = VR.VOXMODELS, Grid = VR.VoxGrid;
   if (MOD && Grid) {
     const part = (sx, sy, sz, pv, fn) => { const gr = new Grid(sx, sy, sz, pv[0], pv[1], pv[2]); fn(gr); return { grid: gr, pivot: [0, 0, 0] }; };
+    // f-polish5 · a paper festival lantern (0.4 m): a warm round body with ribs, a dark cap and a tassel
+    MOD.movein_lantern = () => ({
+      unit: 8, radius: 0.5, parts: {
+        body: part(5, 6, 5, [2, 0, 2], (gr) => {
+          gr.ell(2.5, 2.5, 2.5, 2.4, 2.1, 2.4, (x, y) => (y === 2 ? 0xffc070 : 0xffa04a), { emis: 1 });
+          gr.box(2, 5, 2, 2, 5, 2, 0x3a2a1a); gr.box(1, 4, 1, 3, 4, 3, 0x5a3a20); gr.set(2, 0, 2, 0xd04a30);
+        }),
+      }, layout: { body: [0, 0, 0] },
+    });
+    // f-polish5 · the fire ring: nine field stones round a small stack of logs, glowing embers
+    MOD.movein_firering = () => ({
+      unit: 8, radius: 1.4, parts: {
+        body: part(22, 6, 22, [11, 0, 11], (gr) => {
+          for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2, x = 11 + Math.cos(a) * 8.6, z = 11 + Math.sin(a) * 8.6; gr.ell(x, 0.5, z, 1.8, 1.6, 1.8, (k & 1) ? 0x8a8478 : 0x6e6a62); }
+          gr.ell(11, 0, 11, 5.4, 0.8, 5.4, 0x3a2a20);
+          gr.ell(11, 1, 11, 3.6, 1, 3.6, (x, y, z) => ((x + z) & 1 ? 0xff7a2a : 0xffb040), { emis: 1 });
+          gr.box(7, 1, 10, 15, 2, 11, 0x6a4428); gr.box(10, 2, 7, 11, 3, 15, 0x7a5030); gr.box(9, 3, 9, 13, 3, 12, 0x5a3a22);
+        }),
+      }, layout: { body: [0, 0, 0] },
+    });
     // the hand cart: a plank bed 2 m long on two big spoked wheels, a canvas over the bundles, a potted plant, two shafts
     MOD.movein_cart = () => ({
       unit: 8, radius: 2, parts: {
@@ -777,7 +953,7 @@
     return {
       homes: rec.homes.map(h => ({ st: h.st, due: h.due, set: h.set, fam: h.fam, decor: (h.decor || []).length, door: h.door, beds: h.beds.length })),
       sets: rec.sets.map(s => ({ id: s.id, name: s.name, named: s.named, market: s.market, stall: s.stall, fest: s.fest })),
-      job: J ? { fam: J.fam, phases: J.agents.map(a => (a.act && a.act.type === 'arrive' ? a.act.phase : 'done')), cart: J.cart.map(v => +v.toFixed(1)) } : null,
+      job: J ? { fam: J.fam, phases: J.agents.map(a => (a.act && a.act.type === 'arrive' ? a.act.phase : 'done')), cart: J.cart.map(v => +v.toFixed(1)), start: J.start && J.start.map(v => Math.round(v)), way: J.way ? J.way.length : 0, framing: J.frame ? +MI.frameK(J.frame.t).toFixed(2) : 0 } : null,
       watch: V && V._mi ? V._mi.watch.length : -1, why: V && V._mi ? V._mi.lastWhy || null : null,
       gifts: rec.gifts.slice(), mem: rec.mem, decor: rec.decor, card: hasDoc && document.getElementById('mi_card') ? document.getElementById('mi_card').textContent : null,
       agents: V ? V.agents.filter(a => a.vil.plan && a.vil.plan.mine).map(a => [a.p.name, a.vil.fams[a.p.fam].surname, a.p.role, a.act && a.act.type, a.pos.map(Math.round), a.bubble ? a.bubble.text : null]) : [],

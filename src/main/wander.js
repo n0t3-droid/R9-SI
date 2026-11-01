@@ -174,6 +174,18 @@
   };
   const DIRS = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
   W.dirOf = (dx, dz) => DIRS[((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8];   // (north is −z)
+  // ---- f-polish5: moments read from afar (pure)
+  // the far cue's strength at d m (night 0 … 1): nothing within 16 m (you see the moment itself), a soft glow from ~16 to
+  // 32 m, gone past the moment's range; calm — never above 0.7
+  const smS = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  W.cue = function (d, night) {
+    if (!(d >= 16) || d > 140) return 0;
+    return smS(16, 32, d) * (1 - smS(110, 140, d)) * (0.5 + 0.2 * Math.max(0, Math.min(1, night || 0)));   // (by day a little more: an additive glow fades on a bright meadow)
+  };
+  // a spot's front (a well, a cairn, a map scrap, a glade): turned toward the walker, its own small turn kept (≤ 18°)
+  W.stageYaw = function (rnd, face) { let d = (rnd - face + Math.PI) % TAU; if (d < 0) d += TAU; return face + (d - Math.PI) * 0.1; };
+  // the Wegballon's glow: a slow, gentle breath (5.5 s, ± 0.1)
+  W.balloonPulse = (t) => 0.85 + 0.1 * Math.sin((t || 0) * TAU / 5.5);
   W.signLines = function (places, pos, n) {
     const L = [];
     for (const P of places || []) { const dx = P.x - pos[0], dz = P.z - pos[2], d = Math.hypot(dx, dz); if (d >= 40 && d <= 2000) L.push({ place: P, d: Math.round(d / 10) * 10, dir: W.dirOf(dx, dz) }); }
@@ -361,6 +373,7 @@
         m.age += dt;
         let alive = W.KINDS[m.kind].tier <= this.tier && !(m.pos && Math.hypot(e[0] - m.pos[0], e[2] - m.pos[2]) > 160);
         if (alive) { try { alive = A.update(this, m, dt) !== false && m.age < m.dur; } catch (err) { alive = false; if (!this.warned) { this.warned = true; console.warn('wander', m.kind, err); } } }
+        if (alive) this.hello(m, dt);   // (f-polish5)
         if (!alive) this.end(m);
       }
       this.mapUpdate(dt);
@@ -380,6 +393,8 @@
       const m = { kind, k, seed: (h(this.seed, k, NH[kind]) * 0x7fffffff) | 0, age: 0, dur: W.KINDS[kind].dur, pos: null, found: false };
       let ok = false; try { ok = A.start(this, m) !== false; } catch (err) { ok = false; if (!this.warnedS) { this.warnedS = true; console.warn('wander start', kind, err); } }
       if (!ok) return null;
+      // f-polish5: a spot's front turned toward the walker (its own small turn kept)
+      if (STAGE_SPOT[kind] && m.pos && Number.isFinite(m.yaw)) m.yaw = W.stageYaw(m.yaw, LK.yawOf(this.pos[0] - m.pos[0], this.pos[2] - m.pos[2]));
       this.ms.push(m); this.recent.push(kind); if (this.recent.length > 24) this.recent.shift();
       this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1; this.lastStart = this.time;
       const p = this.pos; let seen = null;
@@ -427,13 +442,50 @@
       let p = null; const prog = () => p || (p = ent.beginVox(r, E));
       cam = cam || r.cam;
       for (const m of this.ms) { const A = ACT[m.kind]; if (A.draw) { try { A.draw(this, m, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('wander draw', m.kind, e); } } } }
-      if (this.bcOn) LK.drawModel(g, r, prog(), 'wander_balloon', this.bcPos, this.time * 0.2, cam, { scale: 2.6 });
+      if (this.bcOn) LK.drawModel(g, r, prog(), 'wander_balloon', this.bcPos, this.time * 0.2, cam, BAL_O);
       if (this.mapChest) LK.drawModel(g, r, prog(), 'wander_chest', this.mapChest, 0.4, cam, {});
+      if (this.tier >= 1 && g.settings.wonderGlow !== false && VR.StoryGlow && VR.StoryGlow.draw) this.drawCues(r, cam);
+    }
+    // ---- f-polish5: a moment greets you as you come near — its people turn and wave once (25 m … 6 m)
+    hello(m, dt) {
+      const L = m.F ? (Array.isArray(m.F) ? m.F : [m.F]) : null; if (!L || !L.length || !m.pos) return;
+      if (!m.hi) { const d = this.dist(m.pos); if (d < 25 && d > 6) m.hi = 2.6; else return; }
+      if (m.hi < 0) return;
+      m.hi -= dt;
+      for (const F of L) if (F && !F.walkAmt && (F.state === 'idle' || F._hi)) { F.state = 'wave'; F._hi = 1; this.face(F, this.pos); }
+      if (m.hi <= 0) { m.hi = -1; for (const F of L) if (F && F._hi) { F._hi = 0; if (F.state === 'wave') F.state = 'idle'; } }
+    }
+    // ---- f-polish5: the far cues — a soft glow over a moment not yet found, seen from 16 m out (stronger at night,
+    // never bright); the Wegballon's own calm halo. Low and up, ⚙ „Sanfte Lichthöfe" (wonderGlow); ≤ 4 small draws
+    drawCues(r, cam) {
+      const g = this.g, E = (g.env && g.env.E) || {}, night = Math.max(0, Math.min(1, E.night || 0));
+      let n = 0;
+      for (const m of this.ms) {
+        if (n >= 3 || !m.pos || m.found) continue;
+        const fam = W.KINDS[m.kind].fam; if (fam === 'sky') continue;
+        const d = this.dist(m.pos), a = W.cue(d, night); if (a <= 0.01) continue;
+        const q = CUES[n++], c = CUE_COL[fam] || CUE_COL.spot;
+        q.p[0] = m.pos[0]; q.p[1] = m.pos[1] + 2.3; q.p[2] = m.pos[2];
+        q.s[0] = q.s[1] = 1.0 + d * 0.028; q.col[0] = c[0]; q.col[1] = c[1]; q.col[2] = c[2];
+        q.a = a * (0.9 + 0.1 * Math.sin(this.time * 1.1 + n));
+      }
+      if (this.bcOn) {
+        const q = CUES[n++], k = W.balloonPulse(this.time);
+        q.p[0] = this.bcPos[0]; q.p[1] = this.bcPos[1] + 1.1; q.p[2] = this.bcPos[2];
+        q.s[0] = q.s[1] = 3.4; q.col[0] = 1; q.col[1] = 0.68; q.col[2] = 0.36; q.a = k * (0.32 + 0.33 * night);
+      }
+      for (let i = n; i < CUES.length; i++) CUES[i].a = 0;
+      if (n) this.st.cues = VR.StoryGlow.draw(r, cam, CUES);
     }
     stats() { return { on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0 }; }
     destroy() { this.endAll(); }
   };
 
+  // f-polish5: the far cues' list (reused), their colours by family, the spots that turn their front to you
+  const CUES = [0, 1, 2, 3].map(() => ({ p: [0, 0, 0], s: [1, 1], col: [1, 1, 1], a: 0, kind: 0 }));
+  const CUE_COL = { folk: [1, 0.78, 0.45], animal: [1, 0.9, 0.72], spot: [0.72, 0.95, 1] };
+  const STAGE_SPOT = { glade: 1, cairn: 1, scrap: 1, well: 1 };
+  const BAL_O = { scale: 2.6 };
   // ================================================================ the moments' actors
   const rnd = (m, i) => h(m.seed, i, 0x77);
   const pt = (m) => m.pos;

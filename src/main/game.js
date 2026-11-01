@@ -1369,6 +1369,7 @@
       if (VR.Intent) { const ic = VR.Intent.cam(this, cam); if (ic) cam = ic; }   // e-ctx: the travel camera on foot (directorcam.js)
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
+      if (VR.MoveIn && VR.MoveIn.cam) { const mc = VR.MoveIn.cam(this, cam); if (mc) cam = mc; }   // f-polish5: the arrival's short gentle framing (movein.js; ⚙ moveinCam)
       if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }
       if (VR.Ferries && VR.Ferries.camOn) { const fc = VR.Ferries.cam(this, cam); if (fc) cam = fc; }   // a-life: the ferry ride's chase view (ferries.js)   // a-foes2: the freeing's swing over the land and back (any key: back now)
       if (VR.StoryPlay && VR.StoryPlay.holds(this)) { const sc = VR.StoryPlay.cam(this, cam); if (sc) cam = sc; }   // a-story: the scene's shots (story.js)
