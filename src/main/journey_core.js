@@ -200,17 +200,20 @@
   K.SEAT = { fwd: 0.75, side: 0.62, eye: 1.98, stand: 1.62 };   // (the bench between the crate rows)
   // f-polish7: the cart you ride (VR.VOXMODELS.jy_cart_seat = K.cartSeat(life_cart)): the canopy raised one voxel (0.38 m
   // over the eye, was 0.21) and only over the bench and behind — its front edge CANOPY.z0 voxels from the bow, a scalloped
-  // valance there: a striped fringe in the frame's top ≈ 8 %; the posts at the middle and the stern (none in the view);
-  // the crates and their produce the frame's lower edge (test/polish7.js casts the rider's view through the voxels)
-  K.CANOPY = { z0: 6, y: 14, posts: [13, 24] };
+  // valance there (over the driver's side 0.34 m further back): a striped fringe in the frame's top ≈ 6 %; the posts at
+  // the middle and the stern (none in the view); the front crates' tops cut (the produce right under the eye read as slabs);
+  // the crates the frame's lower edge (test/polish7.js casts the rider's view through the voxels)
+  K.CANOPY = { z0: 6, slant: 6, y: 14, posts: [13, 24] };
   K.cartSeat = function (m) {
     const gr = m && m.parts && m.parts.body && m.parts.body.grid; if (!gr) return m;
     const C = K.CANOPY, get = (x, y, z) => gr.c[gr.i(x, y, z)], set = (x, y, z, v) => { if (y < gr.sy) gr.c[gr.i(x, y, z)] = v; };
     const post = get(1, 9, 24), cw = get(0, 13, 0), co = get(0, 13, 4), fr = get(0, 12, 0);
     for (let y = 7; y < gr.sy; y++) for (let z = 0; z < gr.sz; z++) for (const x of [1, 12]) if (y >= 9 || z === 1 || z === 24) set(x, y, z, 0);   // (the old posts)
     for (let y = 12; y < gr.sy; y++) for (let z = 0; z < gr.sz; z++) for (let x = 0; x < gr.sx; x++) set(x, y, z, 0);   // (the old canopy)
-    for (let z = C.z0; z < gr.sz; z++) for (let x = 0; x < gr.sx; x++) set(x, C.y, z, ((z >> 2) & 1) ? co : cw);
-    for (let x = 0; x < gr.sx; x++) { set(x, C.y - 1, C.z0, (x & 1) ? fr : 0); set(x, C.y - 1, gr.sz - 1, fr); }   // (the valance; the stern's strip)
+    for (let y = 7; y < 12; y++) for (let z = 0; z < C.posts[0]; z++) for (let x = 2; x < 12; x++) set(x, y, z, 0);   // (the front crates' tops: the produce right under the eye read as big slabs)
+    const zf = (x) => C.z0 + (x < C.slant ? 2 : 0);   // (over the driver's side it starts 0.34 m further back)
+    for (let x = 0; x < gr.sx; x++) for (let z = zf(x); z < gr.sz; z++) set(x, C.y, z, ((z >> 2) & 1) ? co : cw);
+    for (let x = 0; x < gr.sx; x++) { set(x, C.y - 1, zf(x), (x & 1) ? fr : 0); set(x, C.y - 1, gr.sz - 1, fr); }   // (the valance; the stern's strip)
     for (const z of C.posts) for (const x of [1, 12]) for (let y = 7; y < C.y; y++) set(x, y, z, post);
     return m;
   };

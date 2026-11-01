@@ -112,14 +112,18 @@ for (const TAG of BUILDS) {
   if (want('woods') || want('hand')) {
     where = 'woods';
     await ev(() => { window.__raf = window.__raf || window.requestAnimationFrame; window.requestAnimationFrame = () => 0; });
-    // a land spot for the corridor: firm ground, no water, ≤ 6 m of relief along 150 m
-    let base = null;
-    for (const [x, z] of [[150, 40], [-60, 160], [220, -120], [-240, 60], [60, -260], [320, 200]]) {
-      await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.teleport(x + 0.5, 140, z + 0.5); }, [x, z]);
-      await settle(30);
-      const r = await ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; const ys = []; for (let dx = 0; dx <= 150; dx += 10) { const t = w.topAt(x + dx, z); const b = w.getBlock(x + dx, t, z); if (!b || (R.T.flags[b] & F.WATER) || t < 64) return null; ys.push(t); } return Math.max(...ys) - Math.min(...ys) <= 8 ? ys[0] : null; }, [x, z]);
-      if (r !== null) { base = [x, r, z]; break; }
+    // a land spot for the corridor: firm ground, no water, ≤ 8 m of relief along 120 m (render distance 7 meanwhile, the
+    // player over the corridor's middle: all of it loaded)
+    let base = null; const tried = [];
+    await ev(() => { const g = VR.game; g.settings.renderDist = 7; g.applySettings('*'); });
+    for (const [x, z] of [[150, 40], [-60, 160], [220, -120], [-240, 60], [60, -260], [320, 200], [-20, -200], [400, -40]]) {
+      await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.teleport(x + 60.5, 140, z + 0.5); }, [x, z]);
+      await settle(60);
+      const r = await ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; const ys = []; for (let dx = 0; dx <= 120; dx += 10) { const t = w.topAt(x + dx, z); const b = t > 0 ? w.getBlock(x + dx, t, z) : 0; if (!b) return 'unloaded ' + dx; if ((R.T.flags[b] & F.WATER) || t < 63) return 'water ' + dx; ys.push(t); } return Math.max(...ys) - Math.min(...ys) <= 8 ? ys[0] : 'relief ' + (Math.max(...ys) - Math.min(...ys)); }, [x, z]);
+      tried.push(x + ',' + z + ': ' + r);
+      if (typeof r === 'number') { base = [x, r, z]; break; }
     }
+    console.log('  corridor: ' + tried.join(' · '));
     check(!!base, TAG + ': a land corridor for the wood ' + JSON.stringify(base));
     if (base) {
       const info = await ev(([x0, y0, z0]) => {
@@ -128,17 +132,17 @@ for (const TAG of BUILDS) {
         const gy = (x, z) => { for (let y = 160; y > 30; y--) { const s = w.getBlock(x, y, z); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return -1; };
         const list = [], put = (x, y, z, s) => list.push([x, y, z, s]), log = st('oak_log'), lv = st('oak_leaves'), gr = st('short_grass');
         let trees = 0;
-        for (let x = x0 - 10; x < x0 + 170; x += 5) for (let z = z0 - 22; z <= z0 + 22; z += 5) {
+        for (let x = x0 - 6; x < x0 + 126; x += 5) for (let z = z0 - 22; z <= z0 + 22; z += 5) {
           const tx = x + Math.floor(hh(x, z, 3) * 3), tz = z + Math.floor(hh(x, z, 4) * 3);
           if (Math.abs(tz - z0) < 3 || hh(x, z, 1) > 0.72) continue;   // (the path free)
-          if (tx > x0 + 70 && tx < x0 + 84 && Math.abs(tz - z0) < 9) continue;   // (a clearing on the way)
+          if (tx > x0 + 62 && tx < x0 + 76 && Math.abs(tz - z0) < 9) continue;   // (a clearing on the way)
           const y = gy(tx, tz); if (y < 0) continue; const h = 4 + Math.floor(hh(x, z, 5) * 3);
           for (let k = 1; k <= h; k++) put(tx, y + k, tz, log);
           for (let dy = -2; dy <= 1; dy++) { const r = dy === 1 ? 1 : 2; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { if (Math.abs(dx) === r && Math.abs(dz) === r) continue; if (dx === 0 && dz === 0 && dy < 1) continue; put(tx + dx, y + h + dy, tz + dz, lv); } }
           trees++;
         }
         const set = new Set(list.map(e => e[0] + ',' + e[1] + ',' + e[2]));
-        for (let x = x0 - 10; x < x0 + 170; x++) for (let z = z0 - 22; z <= z0 + 22; z++) { if (hh(x, z, 2) > 0.35) continue; const y = gy(x, z); if (y < 0 || set.has(x + ',' + (y + 1) + ',' + z) || w.getBlock(x, y + 1, z)) continue; put(x, y + 1, z, gr); }
+        for (let x = x0 - 6; x < x0 + 126; x++) for (let z = z0 - 22; z <= z0 + 22; z++) { if (hh(x, z, 2) > 0.35) continue; const y = gy(x, z); if (y < 0 || set.has(x + ',' + (y + 1) + ',' + z) || w.getBlock(x, y + 1, z)) continue; put(x, y + 1, z, gr); }
         w.bulkSet(list, false);
         return { trees, blocks: list.length };
       }, base);
@@ -147,7 +151,7 @@ for (const TAG of BUILDS) {
       // the walker: along the corridor at 2.2 m/s, gently weaving; the director's update timed every frame
       const walkWood = async (preset, dur, pics) => {
         await ev(([p0, preset]) => {
-          const g = VR.game; g.applyPreset(preset); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.wander = true; g.applySettings('*');
+          const g = VR.game; g.applyPreset(preset); g.settings.dynRes = false; g.settings.renderDist = 7; g.settings.wander = true; g.applySettings('*');
           const pl = g.player; pl.flying = false; pl.teleport(p0[0] + 0.5, p0[1] + 1.05, p0[2] + 0.5);
           const D = g.wanderer; if (D && !D.__t7) { const u = D.update.bind(D); D.__t7 = { n: 0, ms: 0, max: 0, fr: [] }; D.update = function (dt) { const t0 = performance.now(); const r = u(dt); const e = performance.now() - t0; const T = this.__t7; T.n++; T.ms += e; if (e > T.max) T.max = e; if (T.fr.length < 20000) T.fr.push(e); return r; }; }
           if (D) { D.__t7.n = 0; D.__t7.ms = 0; D.__t7.max = 0; D.__t7.fr = []; }
@@ -177,10 +181,10 @@ for (const TAG of BUILDS) {
         return { T, frame, shots };
       };
       if (want('woods')) {
-        const hi = await walkWood('high', 70, 5);
+        const hi = await walkWood('high', 52, 5);
         R.woodsHigh = { T: hi.T, frame: hi.frame, shots: hi.shots.map(s => ({ s: s.s, kind: s.kind, sh: s.sh })) };
         console.log('  High: the director ' + JSON.stringify(hi.T) + ', frame median ' + hi.frame + ' ms');
-        const vl = await walkWood('potato', 45, 0);
+        const vl = await walkWood('potato', 40, 0);
         R.woodsVL = { T: vl.T, frame: vl.frame };
         console.log('  Very Low: the director ' + JSON.stringify(vl.T) + ', frame median ' + vl.frame + ' ms');
         const inv = hi.shots.filter(s => s.sh && s.sh.inView), big = hi.shots.filter(s => s.sh && s.sh.share >= 0.06);
@@ -195,7 +199,7 @@ for (const TAG of BUILDS) {
       // ---------------------------------------------------------------- 3 · the held block on Very Low
       if (want('hand')) {
         where = 'hand';
-        await ev(([p0]) => { const g = VR.game; window.__each = null; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); const pl = g.player; pl.teleport(p0[0] + 76.5, p0[1] + 1.05, p0[2] + 0.5); pl.yaw = -Math.PI / 2; pl.pitch = -0.35; pl.viewYaw = pl.yaw; }, [base]);
+        await ev(([p0]) => { const g = VR.game; window.__each = null; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); const pl = g.player; pl.teleport(p0[0] + 69.5, p0[1] + 1.05, p0[2] + 0.5); pl.yaw = -Math.PI / 2; pl.pitch = -0.35; pl.viewYaw = pl.yaw; }, [base]);
         await settle(20);
         const H = {};
         for (const id of ['sandstone', 'grass_block']) {
@@ -216,7 +220,7 @@ for (const TAG of BUILDS) {
         saveRun(); writeSheet();
       }
     }
-    await ev(() => { window.__each = null; if (window.__raf) window.requestAnimationFrame = window.__raf; const g = VR.game; g.last = performance.now(); requestAnimationFrame((t) => g.loop(t)); });
+    await ev(() => { window.__each = null; window.__norender = false; if (window.__raf) window.requestAnimationFrame = window.__raf; const g = VR.game; g.last = performance.now(); requestAnimationFrame((t) => g.loop(t)); });
     await wait(3000);
   }
 
