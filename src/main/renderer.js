@@ -935,6 +935,7 @@
       if (u.u_storm) { const st = E.storm || [1, 0, 0, 0]; gl.uniform4f(u.u_storm, st[0], st[1], st[2], st[3]); }
       if (u.u_bolt) { const b = E.bolt || [1, 0, 0, 0]; gl.uniform4f(u.u_bolt, b[0], b[1], b[2], b[3]); }
       if (u.u_snowCover) gl.uniform1f(u.u_snowCover, E.snowCover || 0);
+      if ((u.u_season || u.u_seasonFx) && VR.Seasons && VR.Seasons.setUniforms) VR.Seasons.setUniforms(gl, u, E);   // w-seasons: the season's tints, the ice, the leaves and petals (seasons.js)
       this.uCurve = E.climb ? E.climb.curve || 0 : 0; if (u.u_curve) gl.uniform1f(u.u_curve, this.uCurve); if (u.u_climbCut) gl.uniform2f(u.u_climbCut, E.climb ? E.climb.cut0 || 0 : 0, E.climb ? E.climb.cut1 || 0 : 0);   // u-ascent: the world's bend and the tiles' far edge in the climb (ascent.js)
       if (u.u_dip) gl.uniform1f(u.u_dip, E.climb ? E.climb.dip || 0 : 0);   // u-orbitlod: the sky's band on the dipped horizon (ascent.js)
       // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons

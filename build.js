@@ -59,7 +59,8 @@ MAIN.push('portal_core', 'portal_film', 'portal_space', 'portal');   // e-portal
 MAIN.push('quiet');   // f-quiet: VR.Quiet (src/main/quiet.js) — one quiet message channel, ⚙ Hinweise, Funke's budget and bubble at the edge (last: it wraps ui.js, funke.js, the hints, first2's Einfach page)
 MAIN.push('wander');   // o-wander: VR.Wander (src/main/wander.js) — the Wanderregisseur, the Wegballon, the Wanderbuch (after lifedirector, first2, quests, quiet: it wraps them)
 MAIN.push('fairy_models', 'fairy');   // a-fairy: the enchanted places' models (src/main/fairy_models.js) and VR.Fairy (src/main/fairy.js: the places, the Flausel folk, their adventures — after ctx, lifekit, quiet, settings: it uses them)
-MAIN.push('movein');   // u-movein: VR.MoveIn (src/main/movein.js) — build a home, a family moves in; your settlement grows (after homes, festival, lifekit, quiet: it wraps VR.Villages)
+MAIN.push('movein');
+MAIN.push('seasons', 'seasons_fest');   // w-seasons: VR.Seasons (src/main/seasons.js: the calendar, the tints, the snow, the air's leaves; wraps env, game, mp, wander) and the festivals (seasons_fest.js: wraps VR.Villages after festival.js and movein.js)   // u-movein: VR.MoveIn (src/main/movein.js) — build a home, a family moves in; your settlement grows (after homes, festival, lifekit, quiet: it wraps VR.Villages)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

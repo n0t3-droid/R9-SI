@@ -750,6 +750,10 @@ out float v_sky;
 out vec3 v_block;
 out float v_ao;
 out vec3 v_tint;
+#ifdef SEASON
+uniform vec4 u_season;     // w-seasons: the weights of spring, summer, autumn, winter (seasons.js; 0 off Herzwelt)
+flat out float v_seasonG;  // an open green top: the fallen leaves' and petals' ground (TERRAIN_FS)
+#endif
 out vec3 v_localPos;
 #ifdef FADE
 flat out float v_fade;
@@ -847,6 +851,24 @@ void main() {
   v_block = vec3(float((a_light >> 8u) & 15u), float((a_light >> 4u) & 15u), float(a_light & 15u)) / 15.0;
   v_ao = float((a_w5 >> 3u) & 3u);
   v_tint = pow(vec3(float((a_tint >> 11u) & 31u) / 31.0, float((a_tint >> 5u) & 63u) / 63.0, float(a_tint & 31u) / 31.0), vec3(2.2));
+#ifdef SEASON
+  // w-seasons (seasons.js S.tint mirrors this): the season shifts the green tints — spring fresh, a third of the trees in
+  // blossom; summer gold; autumn red, orange, gold tree by tree (a 5 × 6 × 5 cell), the grass dry; winter frosted
+  // leaves, the open grass white. Never water, never a colour that is not green.
+  v_seasonG = 0.0;
+  float ssum = u_season.x + u_season.y + u_season.z + u_season.w;
+  if (ssum > 0.001 && !ctmFace && kind != 1u && kind != 6u && v_tint.g > v_tint.r * 1.05 && v_tint.g > v_tint.b * 1.05) {
+    bool sLeaf = leaf > 0u && sway == 0u, sTop = face == 2u && !sLeaf && sway == 0u;
+    float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(5.0, 6.0, 5.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    vec3 c = v_tint;
+    vec3 sSp = sLeaf && sh < 0.38 ? mix(vec3(0.92, 0.5, 0.64), vec3(0.95, 0.86, 0.9), sh / 0.38) : c * vec3(0.88, 1.12, 0.78);
+    vec3 sSu = c * vec3(1.2, 1.04, 0.66);
+    vec3 sAu = !sLeaf ? c * vec3(1.45, 0.92, 0.5) : sh < 0.3 ? vec3(0.6, 0.09, 0.04) : sh < 0.58 ? mix(vec3(0.82, 0.3, 0.05), vec3(0.6, 0.09, 0.04), (0.58 - sh) / 0.28 * 0.3) : sh < 0.86 ? vec3(0.84, 0.6, 0.08) : c * vec3(1.6, 0.95, 0.45);
+    vec3 sWi = sLeaf ? mix(c, vec3(0.78, 0.83, 0.9), 0.7) : sTop ? mix(c, vec3(0.86, 0.9, 0.97), 0.86) : mix(c * vec3(1.0, 0.86, 0.7), vec3(0.78, 0.83, 0.9), 0.32);
+    v_tint = c * (1.0 - ssum) + sSp * u_season.x + sSu * u_season.y + sAu * u_season.z + sWi * u_season.w;
+    if (sTop) v_seasonG = 1.0;
+  }
+#endif
 #ifdef SHADOWS
   vec3 n = face == 0u ? vec3(1,0,0) : face == 1u ? vec3(-1,0,0) : face == 2u ? vec3(0,1,0) : face == 3u ? vec3(0,-1,0) : face == 4u ? vec3(0,0,1) : vec3(0,0,-1);
 #ifdef MODEL
@@ -903,6 +925,10 @@ in float v_sky;
 in vec3 v_block;
 in float v_ao;
 in vec3 v_tint;
+#ifdef SEASON
+flat in float v_seasonG;   // w-seasons: an open green top (TERRAIN_VS)
+uniform vec4 u_seasonFx;   // w-seasons: [snow cover, petals, ice, fallen leaves] (seasons.js)
+#endif
 in vec3 v_localPos;
 #ifdef FADE
 flat in float v_fade;
@@ -1158,6 +1184,19 @@ void main() {
     vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
     float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);
     alb.rgb = mix(alb.rgb, vec3(0.9, 0.92, 0.97), u_snowCover * patchy * smoothstep(0.86, 1.0, v_sky));
+  }
+#endif
+#if defined(SEASON) && !defined(LITE)
+  // w-seasons (seasons.js): fallen leaves in autumn, petals in spring, in drifts over the open green ground (two noise
+  // taps on a green top while they lie; Very Low keeps the tint alone)
+  if (v_seasonG > 0.5 && u_seasonFx.y + u_seasonFx.w > 0.001) {
+    vec2 sq = v_localPos.xz + vec2(u_camInt.xz);
+    float n1 = texture(u_noise, sq / 1.3).r, n2 = texture(u_noise, sq / 13.0).g;
+    float pile = smoothstep(0.62, 0.78, n1 * 0.5 + n2 * 0.7) * u_seasonFx.w;
+    vec3 lc2 = mix(vec3(0.55, 0.1, 0.03), vec3(0.85, 0.48, 0.07), fract(n1 * 7.0));
+    float pet = smoothstep(0.8, 0.92, n1 * 0.8 + n2 * 0.35) * u_seasonFx.y;
+    alb.rgb = mix(alb.rgb, lc2, pile * 0.85);
+    alb.rgb = mix(alb.rgb, vec3(0.96, 0.74, 0.82), pet * 0.75);
   }
 #endif
   if (((v_w3 >> 15u) & 1u) == 1u) {
@@ -1836,6 +1875,9 @@ uniform float u_reflUp;               // 1: the mirror is a quarter size and rea
 uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
 uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
 uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
+#ifdef SEASON
+uniform vec4 u_seasonFx;      // w-seasons: [snow cover, petals, ice, fallen leaves] (seasons.js)
+#endif
 #ifdef PBR
 uniform sampler2D u_pbr;      // t-material: the material table (tex_pbr.js; a: 1 a window pane, 2 glass, 4 glows only when tinted)
 uniform float u_glassRefr;    // t-material: 1 when the scene copy holds this frame's opaque world (pbr 2): window panes filter it
@@ -2146,6 +2188,18 @@ void main() {
     float foam = (1.0 - smoothstep(0.0, 0.2, thick)) * smoothstep(0.45, 0.7, foamN);
     col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.28 * float(face == 2u));
 #ifndef LITE
+    }
+#endif
+#ifdef SEASON
+    // w-seasons (seasons.js): winter freezes the shallow still water — ponds, the lakes' and the sea's edges — into pale
+    // ice with frosted cracks (opaque where it is frozen)
+    float iceK = face == 2u && kind == 1u ? u_seasonFx.z * (1.0 - smoothstep(10.0, 22.0, thick)) : 0.0;
+    if (iceK > 0.001) {
+      float cr = texture(u_noise, wp.xz / 7.0).r * 0.6 + texture(u_noise, wp.xz / 1.9).g * 0.4;
+      vec3 ice = mix(vec3(0.6, 0.72, 0.84), vec3(0.9, 0.94, 0.98), smoothstep(0.35, 0.75, cr)) * (u_ambSky * skyL + blockL + lc * 0.75 * v_sky + 0.03);
+      col = applyFog(mix(col, ice, iceK), v_rel, dist);
+      o_col = vec4(col, max(mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)), iceK));
+      return;
     }
 #endif
     col = applyFog(col, v_rel, dist);
