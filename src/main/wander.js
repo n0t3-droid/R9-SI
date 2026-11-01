@@ -180,7 +180,7 @@
   const smS = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   W.cue = function (d, night) {
     if (!(d >= 16) || d > 140) return 0;
-    return smS(16, 32, d) * (1 - smS(110, 140, d)) * (0.4 + 0.3 * Math.max(0, Math.min(1, night || 0)));
+    return smS(16, 32, d) * (1 - smS(110, 140, d)) * (0.5 + 0.2 * Math.max(0, Math.min(1, night || 0)));   // (by day a little more: an additive glow fades on a bright meadow)
   };
   // a spot's front (a well, a cairn, a map scrap, a glade): turned toward the walker, its own small turn kept (≤ 18°)
   W.stageYaw = function (rnd, face) { let d = (rnd - face + Math.PI) % TAU; if (d < 0) d += TAU; return face + (d - Math.PI) * 0.1; };

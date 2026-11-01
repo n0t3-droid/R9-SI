@@ -249,13 +249,14 @@
     if (VR.Wander && VR.Wander.register) { try { VR.Wander.register({ id: 'fairy', kind: 'places', places: () => S.sites.filter((s) => s.y !== null).map((s) => ({ id: s.id, kind: s.kind, name: placeName(s.kind), pos: [s.x, s.y, s.z], seen: !!recOf(g).seen[s.id], best: F.best(s.kind, tod(g), clear(g)) })), pages: () => recOf(g).pages.slice() }); } catch (e) { /* the director is theirs */ } }
   }
   // f-polish5: what a place keeps off (F.clearOf) — the villages, the outposts' zones, Herzwelt's wonders, the machines
+  const SITE_R = { city: 90, temple: 60, citadel: 70, station: 40 };   // (Herzwelt's wonders: how far they reach)
   function avoidOf(g) {
     if (S.avoid && S.avoidT > S.t) return S.avoid;
     const out = [], V = g.villages, L = VR.Liberate, En = g.entities, Lnd = VR.Land, m = g.meta || {};
     if (V && V.sites) for (const v of V.sites) if (v && Number.isFinite(v.x)) out.push({ x: v.x, z: v.z, r: Math.min(90, v.rad || 50) });
     if (L && L.zones) { try { for (const q of L.zones(g) || []) if (q && Number.isFinite(q.x)) out.push({ x: q.x, z: q.z, r: Math.min(80, q.r || 30) }); } catch (e) { /* no zones */ } }
     if (En && En.mobs) for (const q of En.mobs) if (q && q.foe && !q.foe.gone && q.pos) out.push({ x: q.pos[0], z: q.pos[2], r: 6 });
-    if ((g.dim || 'overworld') === 'overworld' && Lnd && Lnd.SITES && (m.vgen | 0) >= (Lnd.VGEN || 10) && m.type !== 'flat') for (const q of Lnd.SITES) if (q[1] || q[2]) out.push({ x: q[1], z: q[2], r: 30 });
+    if ((g.dim || 'overworld') === 'overworld' && Lnd && Lnd.SITES && (m.vgen | 0) >= (Lnd.VGEN || 10) && m.type !== 'flat') for (const q of Lnd.SITES) if (q[1] || q[2]) out.push({ x: q[1], z: q[2], r: SITE_R[q[3]] || 30 });
     S.avoid = out; S.avoidT = S.t + 2;
     return out;
   }
@@ -765,7 +766,7 @@
     const E = S.E || (g.env && g.env.E) || {}, night = Math.max(0, Math.min(1, E.night || 0)), A = F.haloA(night);
     let n = 0;
     const put = (x, y, z, sz, cr, cg, cb, a) => { if (n >= HL.length || a < 0.02) return; const q = HL[n++]; q.p[0] = x; q.p[1] = y; q.p[2] = z; q.s[0] = q.s[1] = sz; q.col[0] = cr; q.col[1] = cg; q.col[2] = cb; q.a = a; };
-    if (s.kind === 'circle' && S.dancePos && (s.b || 0) > 0.05) for (const d of S.dancePos) put(d[0], d[1], d[2], 0.95, 0.55, 0.7, 1, 0.55 * s.b * A);
+    if (s.kind === 'circle' && S.dancePos && (s.b || 0) > 0.05) for (const d of S.dancePos) { const e = Math.hypot(d[0] - c.x, d[1] - c.y, d[2] - c.z); put(d[0], d[1], d[2], 0.95, 0.55, 0.7, 1, 0.55 * s.b * A * Math.min(1, Math.max(0, (e - 1.5) / 3))); }   // (calm: a dancer passing right by the eye fades)
     if (s.kind === 'tree' && s.lanterns) { const q = recOf(g).q[s.id]; if (q && q.s === 1) for (const L of s.lanterns) if (!(q.m & (1 << L.i))) put(L.pos[0], L.pos[1] + 0.4, L.pos[2], 1.6 + 0.1 * Math.sin(S.t * 1.3 + L.i), 1, 0.66, 0.3, 0.75 * A); }
     if (night > 0.3) for (const f of s.folk) if (!f.away && n < 12) { const dx = f.pos[0] - c.x, dz = f.pos[2] - c.z; if (dx * dx + dz * dz < 900) put(f.pos[0], f.pos[1] + 0.85, f.pos[2], 0.45, 1, 0.85, 0.5, 0.45 * night); }
     if (S.bud && night > 0.3 && recOf(g).buddy && g.settings.fairyBuddy !== false) put(S.bud.pos[0], S.bud.pos[1] - 0.1, S.bud.pos[2], 0.5, 0.8, 0.9, 1, 0.4 * night);
@@ -790,7 +791,8 @@
         if (part.o.puff) {
           const b = s.bridge || 0; if (b < 0.04) continue; sc = b * (0.8 + 0.25 * Math.sin(S.t * 0.7 + part.o.puff));
           // f-polish5: a cloud right at the eye melts away (the ride's view is never inside a puff)
-          const dd = Math.hypot(dx, part.pos[1] - c.y, dz); if (dd < 4.5) { const k = (dd - 2.2) / 2.3; if (k <= 0.05) continue; sc *= k; }
+          const dd = Math.hypot(dx, part.pos[1] - c.y, dz), R1 = S.ride && part.o.puff > S.ride.u * 12 - 1 ? 10 : 4.5;   // (riding: the clouds still ahead of you thin out sooner — the garden stays in view)
+          if (dd < R1) { const k = (dd - 2.2) / (R1 - 2.2); if (k <= 0.05) continue; sc *= k; }
         }
         if (part.o.note !== undefined && s.lit && s.lit.i === part.o.note && S.t < s.lit.t) sc = 1.25;
         if (part.m === 'fy_tree') { const br = 1 + Math.sin(S.t * 0.5) * 0.012; sc = br; }   // the slow breath of the sleeping tree
