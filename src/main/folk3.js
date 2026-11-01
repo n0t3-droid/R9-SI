@@ -56,6 +56,7 @@
           if (F3.clearAt(solid, q[0], q[1], q[2], o.lens) && F3.lineFirst(solid, T, q) === Infinity) { P = q; break; }
         }
         if (!P) continue;
+        if (o.avoid && o.avoid.length && blockedBy(o.avoid, T, P)) continue;
         const sc = pen + Math.abs(d - o.d) * 0.6 + (dMin < o.mins[0] ? 1.5 : 0);
         if (!win || sc < win.score) win = { P, T: T.slice(), d, score: sc, clear: true, a };
         break;
@@ -64,13 +65,25 @@
     if (win) Object.assign(win, look(win.P, win.T));
     return win;
   }
+  // someone else standing in the picture: within 0.5 m of the line from the subject to the lens (not by the subject's
+  // own side), or within 0.9 m of the lens
+  function blockedBy(avoid, T, P) {
+    const dx = P[0] - T[0], dz = P[2] - T[2], L2 = dx * dx + dz * dz || 1;
+    for (const q of avoid) {
+      const ex = q[0] - T[0], ez = q[1] - T[2], k = Math.max(0, Math.min(1, (ex * dx + ez * dz) / L2));
+      const hx = ex - dx * k, hz = ez - dz * k;
+      if (k * Math.sqrt(L2) > 0.7 && hx * hx + hz * hz < 0.25) return true;
+      if ((q[0] - P[0]) ** 2 + (q[1] - P[2]) ** 2 < 0.81) return true;
+    }
+    return false;
+  }
   const sunPen = (a, sun) => (sun === null || sun === undefined ? 0 : (1 - Math.cos(a - sun)) * 1.1);
   // a face: S = {head: [x, y, z], yaw} (the person faces −z turned by yaw); o: {d (3.8), dMin (3), dMax (5), sun (the
   // sun's angle atan2(z, x) — the camera goes to that side), lens}
   F3.OFFS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.9, -1.9, 2.5, -2.5, Math.PI];
   F3.frame = function (solid, S, o) {
     o = o || {};
-    const op = { d: o.d || 3.8, dMax: o.dMax || 5, mins: [o.dMin || 3, 2, 1.2], lens: o.lens || F3.LENS };
+    const op = { d: o.d || 3.8, dMax: o.dMax || 5, mins: [o.dMin || 3, 2, 1.2], lens: o.lens || F3.LENS, avoid: o.avoid || null };
     const f = Math.atan2(-Math.cos(S.yaw), -Math.sin(S.yaw)), rays = [];
     for (const off of F3.OFFS) for (const h of [0.2, 0.55, 1.1]) rays.push([f + off, h, Math.abs(off) * 1.1 + h * 0.4 + sunPen(f + off, o.sun) * 2]);
     return best(solid, S.head, rays, op);
@@ -81,7 +94,7 @@
     const d = clamp(2.2 * r + 1.5, 3.5, 9), T = [C[0], C[1] + 0.9, C[2]];
     const op = { d, dMax: d + 1.5, mins: [Math.max(3, d - 2.5), 2.2, 1.4], lens: o.lens || F3.LENS };
     const rays = [];
-    for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; for (const h of [0.8 + 0.4 * r, 1.6 + 0.5 * r, 0.5]) rays.push([a, h, (o.pref !== undefined ? (1 - Math.cos(a - o.pref)) * 0.8 : 0) + sunPen(a, o.sun) * 1.5 + Math.abs(h - 0.8 - 0.4 * r) * 0.3]); }
+    for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; for (const h of [0.8 + 0.4 * r, 1.6 + 0.5 * r, 0.5]) rays.push([a, h, (o.pref !== undefined ? (1 - Math.cos(a - o.pref)) * 1.6 : 0) + sunPen(a, o.sun) * 1.5 + Math.abs(h - 0.8 - 0.4 * r) * 0.3]); }
     return best(solid, T, rays, op);
   };
 
@@ -319,11 +332,12 @@
   // a portrait of a: o {d, dMin, dMax} (the default 3.8 m), the sun's side
   F3.portraitOf = function (pc, a, o) {
     const g = pc.g, s = pc.s; if (!s || !g.world || !a) return null;
-    const f = F3.frame(solidW(g.world), F3.subject(a), Object.assign({ sun: F3.sunAngle(g) }, o || {}));
+    const avoid = []; if (a.vil) for (const q of a.vil.agents) if (q !== a && (q.pos[0] - a.pos[0]) ** 2 + (q.pos[2] - a.pos[2]) ** 2 < 100) avoid.push([q.pos[0], q.pos[2]]);
+    const f = F3.frame(solidW(g.world), F3.subject(a), Object.assign({ sun: F3.sunAngle(g), avoid }, o || {}));
     if (!f) return null;
     // a portrait's lens: the head and the shoulders fill the picture (the aim a little under the eyes, the head in the
     // upper third); o.fov === false keeps the game's own (the far face's picture)
-    if (!(o && o.fov === false)) { f.T[1] -= a.kid ? 0.2 : 0.3; Object.assign(f, look(f.P, f.T)); pc.f3Fov = F3.portraitFov(f.d, a.kid); } else pc.f3Fov = null;
+    if (!(o && o.fov === false)) { f.T[1] -= a.kid ? 0.12 : 0.18; Object.assign(f, look(f.P, f.T)); pc.f3Fov = F3.portraitFov(f.d, a.kid); } else pc.f3Fov = null;
     s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
     if (pc.orbit) pc.orbit = null;
     if (PM) PM.note(tx('g.photo.portrait', { n: a.p.name || '' }, '📷 Porträt: {n} — H: der Nächste · G: goldene Stunde', '📷 Portrait: {n} — H: the next one · G: golden hour'), 2600);

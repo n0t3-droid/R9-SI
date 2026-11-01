@@ -62,6 +62,10 @@ console.log('a · the camera director');
     if (!lens(so, q.P, 0.35) || !line(so, q.P, [0.5, 65.6, 0.5])) { bad++; if (bad === 1) console.log('    (bad: ' + q.P.map(v => v.toFixed(2)).join(', ') + ' · ' + JSON.stringify(L) + ')'); }
   }
   check(bad === 0, `400 random cluttered places: never in a wall, the face always in view (${bad} bad, ${none} without a frame)`);
+  // someone standing before the face: the lens goes round them
+  const fa = F3.frame(open, { head: [0.5, 65.6, 0.5], yaw: 0 }, { avoid: [[0.5, -1.6]] });
+  const seg = fa ? (() => { const dx = fa.P[0] - 0.5, dz = fa.P[2] - 0.5, L2 = dx * dx + dz * dz, k = Math.max(0, Math.min(1, (0 * dx + -2.1 * dz) / L2)); return Math.hypot(0 - dx * k, -2.1 - dz * k); })() : 0;
+  check(!!fa && seg > 0.5, `someone before the face: the line goes round them (${seg.toFixed(2)} m off)`);
   // the sun: the camera on the sun's side (the faces lit)
   const fs = F3.frame(open, { head: [0.5, 65.6, 0.5], yaw: 0 }, { sun: 0 });   // the sun toward +x (the angle atan2(z, x))
   check(!!fs && fs.P[0] > 0.5 + 0.5, `the golden hour: the camera on the sun's side (x ${fs ? (fs.P[0] - 0.5).toFixed(2) : '-'})`);

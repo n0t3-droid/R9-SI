@@ -95,7 +95,8 @@ const photoOff = () => ev(() => { const g = VR.game; if (g.photoCam && g.photoCa
 // is the photo camera in the open, the face in view?
 const camCheck = () => ev(() => { const g = VR.game, F3 = VR.Folk3, s = g.photoCam.s, so = F3.solidW(g.world); const f = window.__shotT; return { clear: F3.clearAt(so, s.x, s.y, s.z, 0.35), line: f ? F3.lineFirst(so, f, [s.x, s.y, s.z]) === Infinity : null, d: f ? +Math.hypot(s.x - f[0], s.y - f[1], s.z - f[2]).toFixed(2) : 0 }; });
 let walls = 0, shots = 0;
-const shoot = async (name, frames = 4) => { const c = await camCheck(); shots++; if (!c.clear || c.line === false) { walls++; console.log(`  !! ${name}: the camera clear ${c.clear}, line ${c.line}`); } const r = await grab(name, frames); return r; };
+const shoot = async (name, frames = 4) => { await ev(() => { const g = VR.game, s = g.photoCam.s; for (const a of g.villages.agents) if ((a.pos[0] - s.x) ** 2 + (a.pos[2] - s.z) ** 2 < 400) { a.waveT = 0; if (!(a === window.__cu && a.expr === 'wow')) a.stretchT = 0; } });   // (the steps draw nothing, so the greeting's wave never ran out: run 3 had everyone waving)
+  const c = await camCheck(); shots++; if (!c.clear || c.line === false) { walls++; console.log(`  !! ${name}: the camera clear ${c.clear}, line ${c.line}`); } const r = await grab(name, frames); return r; };
 // a portrait of the person `pick` picks (a function's source) in village vid: held still, smiling, the director's frame
 const portrait = async (vid, pick, name, o) => {
   const who = await ev(([vid, pick, o]) => {
@@ -190,7 +191,7 @@ if (want('herz') && HP) {
     // the far face: the same person at 9 m (Folk3 on / off)
     await ev((t) => { const g = VR.game; g.photoCam.held = t; g.env.setTime(t); }, GOLD);
     for (const off of [true, false]) {
-      await ev((off) => { VR.Folk3.off = off; const g = VR.game, a = window.__cu; a.expr = null; const f = VR.Folk3.portraitOf(g.photoCam, a, { d: 9, dMin: 7, dMax: 10, fov: false }); if (f) window.__shotT = f.T; }, off);
+      await ev((off) => { VR.Folk3.off = off; const g = VR.game, a = window.__cu; a.expr = null; const f = VR.Folk3.portraitOf(g.photoCam, a, { d: 7, dMin: 6.2, dMax: 8, fov: false }); if (f) window.__shotT = f.T; }, off);
       await step(3, 33);
       farRow.push(await shoot(`f3_herz_far_${off ? 'off' : 'on'}.png`));
     }
@@ -200,7 +201,7 @@ if (want('herz') && HP) {
     let held = 0;
     if (hand) for (let i = 0; i < 30; i++) { await step(20, 33); const h = await ev(() => { const [a, k] = window.__hand; return { k: k.joyHand, a: a.joyHand }; }); if (h.k === 'hold' && h.a === 'lead') held++; if (held >= 3) break; }
     check(!!hand && held >= 2, `a family hand in hand: ${hand ? hand.lead + ' and ' + hand.kid : '-'} (${held} checks holding)`);
-    if (hand) { const C = await ev(() => { const [a, k] = window.__hand; a.holdT = 4; k.holdT = 4; a.expr = 'joy'; a.exprT = 5; k.expr = 'joy'; k.exprT = 5; return [(a.pos[0] + k.pos[0]) / 2, a.pos[1], (a.pos[2] + k.pos[2]) / 2]; }); famRow.push(await group(C, 0.9, 'f3_herz_family.png')); }
+    if (hand) { const C = await ev(() => { const [a, k] = window.__hand; a.holdT = 4; k.holdT = 4; a.expr = 'joy'; a.exprT = 5; k.expr = 'joy'; k.exprT = 5; return [(a.pos[0] + k.pos[0]) / 2, a.pos[1], (a.pos[2] + k.pos[2]) / 2]; }); famRow.push(await group(C, 0.9, 'f3_herz_family.png', { pref: await ev(() => { const a = window.__hand[0]; return Math.atan2(-Math.cos(a.yaw), -Math.sin(a.yaw)); }) })); }
     // the children at play: four set to play, two games
     await ev(() => { const g = VR.game; g.photoCam.held = 7000; g.env.setTime(7000); });
     const kids = await ev((vid) => { const M = VR.game.villages, v = M.known.get(vid); const ks = v.agents.filter(a => a.kid && a.pose !== 'sleep').slice(0, 5); for (const k of ks) { M.joyEnd(k); M.setAct(k, { type: 'play' }); } v.game = null; window.__kids = ks; return ks.length; }, HV.id);
