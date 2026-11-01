@@ -893,7 +893,7 @@
     for (let Y = Ye - 2; Y <= Ye + 1; Y++) for (let X0 = eL - 2; X0 <= eL + 1; X0++) {
       const corner = (Y === Ye - 2 || Y === Ye + 1) && (X0 === eL - 2 || X0 === eL + 1); if (corner) continue;
       const c = X0 === eL - 1 && Y === Ye ? glint : farIris;
-      on(faceFar, X0, Y, c, TG.eye); on(faceFar, mir(X0), Y, X0 === eL - 1 && Y === Ye ? glint : farIris, TG.eye);
+      on(faceFar, X0, Y, c, TG.other); on(faceFar, mir(X0), Y, c, TG.other);
     }
     if (!C.beard) { for (let X = bL - 1; X <= bL + 2; X++) on(faceFar, X, by, farMouth); for (const X of [bL - 2, bL + 3]) on(faceFar, X, by + 1, farMouth); }
     // where the features are (the head's units)

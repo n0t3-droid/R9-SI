@@ -304,7 +304,7 @@ console.log('§3 one draw for the crowd');
     const base = m4.create(); m4.translate(base, base, 10 + (i % 8) * 1.3 - cam.x, 64 - cam.y, 5 + ((i / 8) | 0) * 2 - cam.z); m4.rotY(base, base, 0.3 * i);
     const s = (q.L.age === 'child' ? 0.82 : 1) / 32; m4.scale(base, base, s, s, s);
     const M = FS.rigMats(q.rec.def, base, poses[i], {}), D = calls.tex.data, row = i * V.FolkGPU.BW * 4;
-    q.rec.def.order.forEach((n, b) => { if (n === 'lids' || n === 'mouth' || n === 'joy' || n === 'wow') return;   /* (u-folk2: the expressions hidden unless shown) */ for (let k = 0; k < 16; k++) worst = Math.max(worst, Math.abs(D[row + b * 16 + k] - M[n][k])); });
+    q.rec.def.order.forEach((n, b) => { if (n === 'lids' || n === 'mouth' || n === 'joy' || n === 'wow' || n === 'faceFar') return;   /* (u-folk2: the expressions hidden unless shown; u-folk3: the far face too) */ for (let k = 0; k < 16; k++) worst = Math.max(worst, Math.abs(D[row + b * 16 + k] - M[n][k])); });
   });
   check(calls.tex.w === V.FolkGPU.BW && calls.tex.h === 40 && worst < 1e-5, `the bones' texture: a row a person, the rig's matrices (worst difference ${worst.toExponential(1)})`);
   // without the extension: one draw a person
