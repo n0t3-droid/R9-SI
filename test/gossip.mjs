@@ -70,11 +70,18 @@ const st1 = await ev(() => { const r = VR.Gossip.test.rec(); return { deeds: r.d
 run.free = free; run.st1 = st1;
 check(st1.deeds.some(d => d[0] === 'freed'), `the outpost freed (${free.real ? 'its own moment' : 'the test API'}): the stream holds ${JSON.stringify(st1.deeds)}`);
 // ---------------------------------------------------------------- 2 · a far village, three days later
-const tgt = await ev((F) => {
+// (the Heartland keeps 720 m round its middle free of villages: look from farther out when none is in the list)
+const pickFar = () => ev((F) => {
   const V = VR.game.villages; let best = null;
-  for (const s of V.sites) { const d = Math.hypot(s.x - F.x, s.z - F.z); if (d > 480 && d < 950 && (!best || Math.abs(d - 700) < Math.abs(best.d - 700))) best = { id: s.id, x: s.x, y: s.y, z: s.z, d: Math.round(d), name: s.name }; }
+  for (const s of V.sites) { const d = Math.hypot(s.x - F.x, s.z - F.z); if (d > 480 && d < 1900 && Math.hypot(s.x, s.z + 140) > 200 && (!best || d < best.d)) best = { id: s.id, x: s.x, y: s.y, z: s.z, d: Math.round(d), name: s.name }; }
   return best;
 }, free);
+let tgt = await pickFar();
+for (const [dx, dz] of [[900, 0], [0, 900], [-900, 0], [0, -1000]]) {
+  if (tgt) break;
+  await stand([free.x + dx, 160, free.z + dz], [free.x + dx, 100, free.z + dz - 30]);
+  for (let i = 0; i < 10 && !tgt; i++) { await step(20, 50); await wait(300); tgt = await pickFar(); }
+}
 check(!!tgt, 'a far village: ' + JSON.stringify(tgt));
 if (tgt) {
   await ev((d) => { const g = VR.game; g.env.day = d + 3; g.env.setTime(3200); }, st1.day);
@@ -105,14 +112,14 @@ if (tgt) {
   check(Object.values(byWho).every(n => n === 1), `no repeats: ${L2.length} lines, ${JSON.stringify(byWho)} (${L2.map(l => l.what).join(', ')})`);
 }
 // ---------------------------------------------------------------- 3 · Palmenhafen by day and night
-const city = await ev(() => { const V = VR.game.villages; for (const v of V.known.values()) if (v.plan.nova) return { id: v.id }; const s = V.sites.find(q => Math.hypot(q.x, q.z + 140) < 20); return s ? { id: s.id } : null; });
+const city = await ev(() => { const V = VR.game.villages; for (const v of V.known.values()) if (v.town) return { id: v.id }; const s = V.sites.find(q => Math.hypot(q.x, q.z + 140) < 20); return s ? { id: s.id } : null; });
 const PZ = [0.5, 81, -49.5];
 await ev(() => { const g = VR.game; g.env.setTime(3600); });
-await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] + 14], [PZ[0], PZ[1] + 1.5, PZ[2] - 20]);
+await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]);
 await ev(() => { VR.game.player.flying = false; });
 for (let i = 0; i < 12; i++) { await settle(6); await step(20, 33); if (await ev(() => { for (const v of VR.game.villages.known.values()) if (v.plan.nova && v.active) return true; return false; })) break; }
 const census = async () => ev(() => {
-  const g = VR.game, V = g.villages, p = g.player.pos; let vil = null; for (const v of V.known.values()) if (v.plan.nova) vil = v; if (!vil) return null;
+  const g = VR.game, V = g.villages, p = g.player.pos; let vil = null; for (const v of V.known.values()) if (v.town) vil = v; if (!vil) return null;
   const near = vil.agents.filter(a => Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < 45 && a.pose !== 'sleep');
   return { all: vil.agents.length, town: (vil.town || []).length, near: near.length, pos: near.map(a => [a.pos[0], a.pos[2]]), acts: near.map(a => (a.act && a.act.type) || '-').join(','), drawn: vil.agents.filter(a => a.drawn).length };
 });
@@ -122,23 +129,23 @@ const movers = (a, b) => { if (!a || !b) return 0; let n = 0; for (const q of a.
 run.city = { id: city && city.id, c1, c2 };
 check(c1 && c1.town >= 10 && c1.near >= 3, `Palmenhafen by day: ${c1 && c1.all} people (${c1 && c1.town} townsfolk), ${c1 && c1.near} within 45 m of you (${c1 && c1.acts})`);
 check(movers(c1, c2) >= 2, `they move: ${movers(c1, c2)} of ${c1 && c1.near} walked on in 6 s`);
-await stand([PZ[0] + 3, PZ[1] + 3.5, PZ[2] + 20], [PZ[0], PZ[1] + 1.2, PZ[2] - 14]);
+await stand([PZ[0] + 4, PZ[1] + 3.2, PZ[2] - 1], [PZ[0] - 3, PZ[1] + 0.8, PZ[2] - 30]);
 await step(6, 33);
 await shotDom('day', 'gossip_city_day.png');
 await grab('day3d', 'gossip_city_day_3d.png', 6);
 await ev(() => { VR.game.env.setTime(14200); });
-await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] + 14], [PZ[0], PZ[1] + 1.5, PZ[2] - 20]); await ev(() => { VR.game.player.flying = false; });
+await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; });
 for (let i = 0; i < 16; i++) await step(20, 33);
 const cn = await census();
 run.city.night = cn;
 check(cn && cn.near >= 1 && /stroll/.test(cn.acts), `Palmenhafen by night: ${cn && cn.near} out within 45 m (${cn && cn.acts})`);
-await stand([PZ[0] + 3, PZ[1] + 3.5, PZ[2] + 20], [PZ[0], PZ[1] + 1.2, PZ[2] - 14]);
+await stand([PZ[0] + 4, PZ[1] + 3.2, PZ[2] - 1], [PZ[0] - 3, PZ[1] + 0.8, PZ[2] - 30]);
 await step(6, 33);
 await shotDom('night', 'gossip_city_night.png');
 // ---------------------------------------------------------------- 4 · the cost at the plaza by day; the record
 await ev(() => { VR.game.env.setTime(3600); });
 const cost = {};
-const pull = (on) => ev((on) => { const V = VR.game.villages; let vil = null; for (const v of V.known.values()) if (v.plan.nova) vil = v; if (!vil || !vil.active) return 0;
+const pull = (on) => ev((on) => { const V = VR.game.villages; let vil = null; for (const v of V.known.values()) if (v.town) vil = v; if (!vil || !vil.active) return 0;
   if (!on) { window.__gsTown = vil.agents.filter(a => a.p.town); for (const a of window.__gsTown) { vil.agents.splice(vil.agents.indexOf(a), 1); V.agents.splice(V.agents.indexOf(a), 1); } return window.__gsTown.length; }
   const L = window.__gsTown || []; for (const a of L) { vil.agents.push(a); V.agents.push(a); } window.__gsTown = null; return L.length; }, on);
 for (const preset of ['potato', 'high']) {

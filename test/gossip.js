@@ -95,7 +95,7 @@ console.log('6 · Palmenhafen');
   check(CL.schedule('stroll', 8, 3500) !== 'home' && CL.schedule('kid', 3, 3000) === null, 'by day the strollers are out, the children play (their village games)');
   // the real city
   const VG = V.VillageGen, g = V.makeGen('overworld', 4242, { vgen: 14 }), site = VG.sitesFor(g, 0, -9).find(x => x.home), P = VG.plan(g, site);
-  check(CL.isCity(P), `the home city is Nova Haven's plan (${P.homes.length} homes)`);
+  check(CL.isCity(P) && CL.isCity(VG.summary(P)), `the home city is Nova Haven's plan (${P.homes.length} homes), the worker's summary of it too`);
   for (const [preset, tier] of [['potato', 0], ['high', 3]]) {
     const vil = { id: P.id, plan: P, st: { built: [], custom: [] } };
     V.Villages.makeRoster(vil);
@@ -115,9 +115,17 @@ console.log('7 · cost and words');
 {
   const r = G.fresh(); for (let i = 0; i < 40; i++) G.note(r, ['freed', 'gift', 'home', 'fest', 'helped', 'fairy'][i % 6], { t: i * 500, x: i * 37, z: -i * 11, key: 'c' + i });
   const t0 = process.hrtime.bigint(); let n = 0;
-  for (let k = 0; k < 200; k++) { const H = G.heard(r, { id: 'v' + (k % 4), x: 200, z: 50 }, 40 * 500); for (let a = 0; a < 120; a++) if (G.greetFor(r, 'p' + a, { id: 'v' + (k % 4), x: 200, z: 50 }, 40 * 500)) n++; void H; }
+  // one look as the glue does it: four active villages, each its heard list, the nearest person's greeting, the
+  // neighbours' search over 120 people (distances)
+  const ppl = []; for (let a = 0; a < 120; a++) ppl.push([Math.sin(a) * 40, Math.cos(a * 1.3) * 40]);
+  for (let k = 0; k < 200; k++) for (let v = 0; v < 4; v++) {
+    const site = { id: 'v' + v, x: 200 + v, z: 50 }, H = G.heard(r, site, 40 * 500);
+    let best = -1, bd = 49; for (let a = 0; a < ppl.length; a++) { const q = ppl[a][0] ** 2 + ppl[a][1] ** 2; if (q < bd) { bd = q; best = a; } }
+    if (G.greetFor(r, 'p' + ((best + k) % 120), site, 40 * 500)) n++;
+    void H;
+  }
   const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 200;
-  check(ms < 1.5, `one look (40 deeds × 120 people, the worst case) ${ms.toFixed(3)} ms at 2 Hz → ${(ms / 30).toFixed(4)} ms a frame`);
+  check(ms < 1.0, `one look (40 deeds, four villages, 120 people) ${ms.toFixed(3)} ms at 2 Hz → ${(ms / 30).toFixed(4)} ms a frame`);
   const de = V.I18N.dict.de, en = V.I18N.dict.en, miss = [...G.KEYS, ...CL.KEYS].filter(k => !de[k] || !en[k]);
   check(!miss.length, `every key in both tables (${G.KEYS.length + CL.KEYS.length})${miss.length ? ' missing ' + miss.slice(0, 4).join(', ') : ''}`);
 }

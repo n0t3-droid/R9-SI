@@ -18,7 +18,9 @@
   CL.COUNT = [6, 10, 16, 22, 26];
   CL.count = (tier) => CL.COUNT[Math.max(0, Math.min(CL.COUNT.length - 1, tier | 0))];
   const h32 = (a, b) => { let x = (Math.imul(a | 0, 0x2c1b3c6d) ^ Math.imul((b | 0) + 0x9e37, 0x297a2d39)) >>> 0; x = Math.imul(x ^ (x >>> 15), 0x85ebca6b) >>> 0; x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0; return (x ^ (x >>> 16)) >>> 0; };
-  CL.isCity = (plan) => !!(plan && plan.nova && plan.style === 'tech' && plan.homes && plan.homes.length);
+  // the home city: the full plan carries plan.nova; the worker's summary (VG.summary) does not — then the Heartland's city
+  // spot (VR.Heart.CITY) tells it
+  CL.isCity = (plan) => { if (!plan || plan.style !== 'tech' || !plan.homes || !plan.homes.length) return false; if (plan.nova) return true; const C = VR.Heart && VR.Heart.CITY; return !!(C && Math.hypot(plan.x - C.x, plan.z - C.z) < 4); };
   // the townsfolk of a city plan: [{k, kind: 'vendor' | 'stroll' | 'owl' | 'kid', fam}] — fixed by the plan's seed
   CL.plan = function (plan, nFams, tier) {
     const n = CL.count(tier), out = [];
@@ -54,7 +56,7 @@
   P.addVillage = function (plan) {
     const had = this.known.has(plan.id);
     const out = baseAdd.apply(this, arguments);
-    try { if (!had && on(this.g) && CL.isCity(plan)) CL.populate(this, this.known.get(plan.id)); } catch (e) { if (!CL.warned) { CL.warned = true; console.warn('citylife', e); } }
+    try { if (!had && on(this.g) && (this.g.dim || 'overworld') === 'overworld' && CL.isCity(plan)) CL.populate(this, this.known.get(plan.id)); } catch (e) { if (!CL.warned) { CL.warned = true; console.warn('citylife', e); } }
     return out;
   };
   CL.populate = function (V, vil) {
@@ -77,6 +79,23 @@
     for (const rd of P0.roads || []) for (const q of rd) if (Math.hypot(q[0] - pz.x, q[2] - pz.z) < 46 || Math.hypot(q[0] - c[0], q[2] - c[2]) < 40) pts.push(q);
     vil.townPts = pts;
     CL.cost.people = vil.town.length;
+  };
+  // where a townsperson is when you arrive: out on the streets near the plaza (the vendors at their spots), the night
+  // owls too after dark — the others at home
+  const baseSpawn = P.spawnPos;
+  P.spawnPos = function (vil, person, tod) {
+    const k = person && person.town, L = vil.townPts;
+    if (k && L && L.length) {
+      const s = CL.schedule(k, person.seed, tod) || 'stroll';
+      if (s === 'stroll' || s === 'plaza' || s === 'vend') { const q = L[h32(person.seed, 9) % L.length]; return [q[0] + 0.5, q[1], q[2] + 0.5]; }
+    }
+    return baseSpawn.call(this, vil, person, tod);
+  };
+  const baseActivate = P.activate;
+  P.activate = function (vil, tod) {
+    const out = baseActivate.apply(this, arguments);
+    if (vil.town) for (const a of vil.agents) if (a.p.town && a.pose === 'sleep' && CL.schedule(a.p.town, a.p.seed, tod) !== 'home') { a.act = null; a.pose = 'stand'; }
+    return out;
   };
   const baseSched = P.schedule;
   P.schedule = function (a, tod) {
