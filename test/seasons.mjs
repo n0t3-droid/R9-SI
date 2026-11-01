@@ -148,7 +148,7 @@ for (const id of NAT) {
   await ev((sp) => { const V = VR.game.villages; const vil = VR.Seasons.Fest.debug.vil(); vil.plan.species = sp; }, SP[id]);
   await setDay(2, 13600); await step(80, 33);
   const t = await ev(() => VR.Seasons.Fest.debug.today());
-  check(t.id === id && t.phase === 'fest' && t.deco === 6, `${id}: the ${SP[id]} people's festival (${t.deco} bowls)`);
+  check(t.id === id && t.phase === 'fest' && t.deco === 11, `${id}: the ${SP[id]} people's festival (${t.deco}: six bowls and their own five props)`);
   check(await ev(() => VR.Seasons.Fest.debug.act('native')), id + ': [V] celebrate with them');
   await viewAt(1, 6, 0.3, 1);
   natPics.push(await grab('ss_fest_' + id + '.png', 6));

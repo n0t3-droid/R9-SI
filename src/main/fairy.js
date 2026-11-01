@@ -934,6 +934,7 @@
     play: (i) => (S.near ? play(VR.game, S.near, i) : false), answer: (j) => (S.near ? answer(VR.game, S.near, j) : false), wish: (i) => (S.near ? wish(VR.game, S.near, i) : false), knock: () => (S.near ? knock(VR.game, S.near) : false),
     melody: () => (S.near ? F.Q.melody(seedOf(VR.game), S.near.id) : null), riddles: () => (S.near ? F.Q.riddles(seedOf(VR.game), S.near.id) : null),
     escort: () => (S.escort ? { pos: S.escort.f.pos.slice(), to: [S.escort.to.x, S.escort.to.y, S.escort.to.z] } : null), chase: () => (S.chase ? { pos: S.chase.f.pos.slice(), hop: S.chase.hop } : null),
+    clear: () => S.sites.filter((s) => s.y !== null).map((s) => ({ kind: s.kind, c: Math.round(F.clearance(s.x, s.z, avoidOf(VR.game))) })),
     twist: () => (S.tw ? { pos: S.tw.pos.slice(), home: [S.tw.s.x, S.tw.s.y, S.tw.s.z], k: S.tw.k, who: S.tw.f.who, f: S.tw.f.pos.slice(), tw: (recOf(VR.game).q[S.tw.s.id] || {}).tw } : null), bud: () => (S.bud ? S.bud.pos.slice() : null),
     wake: () => { S.awake = S.t + 240; }, rec: () => recOf(VR.game), ride: () => (S.ride ? S.ride.u : -1), bridge: () => (S.near && S.near.bridge) || 0,
   };
