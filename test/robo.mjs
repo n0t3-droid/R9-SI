@@ -108,14 +108,14 @@ const stairRun = async (tag) => {
     return true;
   }, S0);
   if (!ok) return false;
-  await cam(S0[0] + 1.7, S0[1] - 0.2, S0[2] + 3.2, 0, -0.2);
+  await cam(S0[0] + 2.0, S0[1] - 0.3, S0[2] + 5.5, 0, -0.04);
   // walk on until the person's middle is over the second step
   await live(1); await wait(4000); await live(1);   // (the person's smooth body asked for and made by the worker)
   await ev(([x0, y, z0]) => { const a = window.__stairA; a.pos = [x0 - 3.5, y, z0 + 0.5]; a.vel = [0, 0, 0]; }, S0);
   // (the game steps undrawn; the last 0.4 s drawn, so the drawn root's spring and the feet are those of a walk)
   for (let i = 0; i < 240; i++) { await step(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75 - 0.5) break; }
   for (let i = 0; i < 12; i++) { await live(1); const x = await ev(() => window.__stairA.pos[0]); if (x >= S0[0] + 1.75) break; }
-  await shot('robo_stairs_' + tag, { x: 340, y: 110, width: 600, height: 560 });
+  await shot('robo_stairs_' + tag, { x: 290, y: 40, width: 700, height: 640 });
   await ev(() => { window.__stairA.__robo = null; });
   return true;
 };
