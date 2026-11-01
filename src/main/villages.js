@@ -1453,7 +1453,7 @@
           if (shMode === 'ellipse') FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
           else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.24 : 0.31), 0.34 + 0.12 * light.sky);
         }
-        if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
+        if (sm) { if (VR.Folk3) VR.Folk3.drawOpts(a, opts, d2); FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }   // (u-folk3: the far face, a mood's lids)
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
       if (shMode !== 'none') FG.drawShadows(r, E);

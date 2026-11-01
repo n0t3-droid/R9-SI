@@ -886,10 +886,20 @@
     for (const X of [bL, bL + 1]) for (const Y of [ty, by, by - 1]) on(wow, X, Y, 0x3A1418);
     for (const X of [bL - 1, bL + 2]) on(wow, X, by, 0x4A1820);
     for (let X = eL - 2; X <= eL + 1; X++) { on(wow, X, Ye + 4, browC, TG.hair); on(wow, mir(X), Ye + 4, browC, TG.hair); on(wow, X, Ye + 3, skin, TG.skin); on(wow, mir(X), Ye + 3, skin, TG.skin); }
+    // u-folk3: the far face (folk3.js shows it from 6 m, where the 3-cm eyes read as dots): a fine voxel before the face,
+    // each eye a dark oval four wide and four high with a catch-light, a smile six wide with its corners up (not on a
+    // beard) — the read of a friendly face at gameplay distance, on the head's bone like the expressions
+    const faceFar = grid(), farIris = mix(C.eye, 0x0A0806, 0.55), farMouth = mix(mul(skin, 0.5), 0x7A2A36, 0.5);
+    for (let Y = Ye - 2; Y <= Ye + 1; Y++) for (let X0 = eL - 2; X0 <= eL + 1; X0++) {
+      const corner = (Y === Ye - 2 || Y === Ye + 1) && (X0 === eL - 2 || X0 === eL + 1); if (corner) continue;
+      const c = X0 === eL - 1 && Y === Ye ? glint : farIris;
+      on(faceFar, X0, Y, c, TG.eye); on(faceFar, mir(X0), Y, X0 === eL - 1 && Y === Ye ? glint : farIris, TG.eye);
+    }
+    if (!C.beard) { for (let X = bL - 1; X <= bL + 2; X++) on(faceFar, X, by, farMouth); for (const X of [bL - 2, bL + 3]) on(faceFar, X, by + 1, farMouth); }
     // where the features are (the head's units)
     const hu = (X) => (X + 0.5) / RES, hv = (Y) => Y / RES;
     F.face = { eyesX: [hu(eL - 0.5), hu(mir(eL) + 0.5)], eyeY: hv(Ye), mouthX: hv(bL + 1), mouthY: hv(by + 1) + 0.25, noseY: hv(Ye - 2) + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2), scale: HS };
-    return { head: F, lids, mouth, joy, wow };
+    return { head: F, lids, mouth, joy, wow, faceFar };
   }
   // ============================== u-worlds2 · the natives' body plans
   // Five plans of our own on the person's rig (no new bones: the tail hangs on the hips, the plates on the upper arms,
@@ -1615,6 +1625,7 @@
     if (fine) def.fine = fine;
     // (u-folk2: the expressions hang on the head like the lids — the smooth path only; folkjoy.js shows them)
     if (fine && fine.joy) { def.parts.joy = def.parts.mouth; def.parts.wow = def.parts.mouth; def.rig.joy = ['head', [0, 0, 0]]; def.rig.wow = ['head', [0, 0, 0]]; def.layout.joy = def.layout.head; def.layout.wow = def.layout.head; def.order.splice(def.order.indexOf('mouth') + 1, 0, 'joy', 'wow'); }
+    if (fine && fine.faceFar) { def.parts.faceFar = def.parts.mouth; def.rig.faceFar = ['head', [0, 0, 0]]; def.layout.faceFar = def.layout.head; def.order.splice(def.order.indexOf('wow') + 1, 0, 'faceFar'); }   // (u-folk3: the far face, folk3.js shows it)
     if (SPB) { def.species = L.species; def.h *= SPB.scale; }
     // (t-folk2: the smooth path's hands at the wrists and what they hold at the grips — their own bones: the wrist bends,
     // a bag hangs straight down; the voxel people keep them in the forearm)
@@ -1647,6 +1658,25 @@
     return o;
   }
 
+  // u-folk3: the far LOD keeps its eyes — the averaging washed the one-voxel eyes into the skin (a blank face from 16 m on
+  // Very Low and Low): each dark eye voxel of the head (tag eye) darkens the frontmost half-res voxel of its column; where
+  // both eyes would meet in neighbouring columns the inner ones stay skin (two eyes, not a band). The same model: no cost.
+  function lodEyes(g, o) {
+    const cols = new Map();
+    for (let Y = 0; Y < g.sy; Y++) for (let Z = 0; Z < g.sz; Z++) for (let X = 0; X < g.sx; X++) {
+      const v = g.c[g.i(X, Y, Z)]; if (!v || ((v >>> 26) & 7) !== TG.eye) continue;
+      const c = v & 0xffffff, lum = ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11;
+      if (lum >= 90) continue;
+      const k = (X >> 1) + ',' + (Y >> 1), q = cols.get(k);
+      if (!q || lum < q[2]) cols.set(k, [X >> 1, Y >> 1, lum, c]);
+    }
+    const list = [...cols.values()]; if (!list.length) return;
+    const mid = list.reduce((s, q) => s + q[0], 0) / list.length;
+    for (const [x, y, , c] of list) {
+      if (list.some(q => q[1] === y && Math.abs(q[0] - mid) > Math.abs(x - mid) && Math.abs(q[0] - x) === 1)) continue;   // (the inner of two touching columns)
+      for (let z = 0; z < o.sz; z++) if (o.get(x, y, z)) { o.set(x, y, z, ((((c >> 16) & 255) * 0.55) << 16) | ((((c >> 8) & 255) * 0.55) << 8) | ((c & 255) * 0.55), false); break; }
+    }
+  }
   const parts = (P) => { const o = {}; for (const k in P) o[k] = { grid: P[k].g || P[k], pivot: [0, 0, 0] }; return o; };
   V.JOINTS = ['body', 'head', 'arm_l', 'arm_r', 'fore_l', 'fore_r', 'leg_l', 'leg_r', 'shin_l', 'shin_r'];
   // the villagers: buildPerson (t-folk); the trailer heroes: their own build
@@ -1658,6 +1688,7 @@
   V.buildLow = function (L) {
     const m = buildFor(L);
     const out = {}; for (const k in m.parts) out[k] = { grid: downsample(m.parts[k].g || m.parts[k]), pivot: [0, 0, 0] };
+    if (out.head && m.person) lodEyes(m.parts.head.g || m.parts.head, out.head.grid);   // (u-folk3)
     const lay = {}; for (const k in m.layout) lay[k] = m.layout[k].map(v => v / 2);
     const rig = {}; for (const k in m.rig) rig[k] = [m.rig[k][0], m.rig[k][1].map(v => v / 2)];
     return Object.assign({}, m, { unit: 16, parts: out, layout: lay, rig });

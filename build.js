@@ -60,6 +60,7 @@ MAIN.push('quiet');   // f-quiet: VR.Quiet (src/main/quiet.js) — one quiet mes
 MAIN.push('wander');   // o-wander: VR.Wander (src/main/wander.js) — the Wanderregisseur, the Wegballon, the Wanderbuch (after lifedirector, first2, quests, quiet: it wraps them)
 MAIN.push('fairy_models', 'fairy');   // a-fairy: the enchanted places' models (src/main/fairy_models.js) and VR.Fairy (src/main/fairy.js: the places, the Flausel folk, their adventures — after ctx, lifekit, quiet, settings: it uses them)
 MAIN.push('movein');   // u-movein: VR.MoveIn (src/main/movein.js) — build a home, a family moves in; your settlement grows (after homes, festival, lifekit, quiet: it wraps VR.Villages)
+MAIN.push('folk3');   // u-folk3: VR.Folk3 (src/main/folk3.js) — the camera director (📷 H), the circle dance, the far face, the moods (after natives, photomode, showcase: it wraps their openTalk and the photo mode)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

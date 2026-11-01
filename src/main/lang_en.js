@@ -4045,5 +4045,10 @@
     "g.mi.greet.giftedN": "Thanks again for the {what}!",
     "g.mi.greet.helpedN": "Good to see you — thank you for your help!",
     // ---- u-movein end
+    // ---- u-folk3 (folk3.js: the photo mode's portrait)
+    "g.photo.portrait": "📷 Portrait: {n} — H: the next one · G: golden hour",
+    "g.photo.noFace": "📷 Nobody near for a portrait",
+    "g.photo.more3": " · H: portrait",
+    // ---- u-folk3 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -357,7 +357,8 @@ void main() {
         // its pivot
         // (u-folk2: the expressions `joy` and `wow` are hidden unless o.expr names one — every other caller stays as it was)
         const nm = order[b];
-        if ((hide && hide[nm]) || ((nm === 'joy' || nm === 'wow') && o.expr !== nm)) for (let q = 0; q < 12; q++) D[off + q] = 0;
+        if ((hide && hide[nm]) || ((nm === 'joy' || nm === 'wow') && o.expr !== nm) || (nm === 'faceFar' && !o.far)) for (let q = 0; q < 12; q++) D[off + q] = 0;
+        else if (nm === 'lids' && o.lidUp) { D[off + 12] += M[4] * o.lidUp; D[off + 13] += M[5] * o.lidUp; D[off + 14] += M[6] * o.lidUp; }   // (u-folk3: a mood's lids — lifted, the eye half covered; the far face from 6 m)
       }
       const L = row + (BW - 2) * 4;
       D[L] = it.sky; D[L + 1] = o.shade || 0; D[L + 2] = o.flash || 0; D[L + 3] = o.noFog ? 1 : 0;
