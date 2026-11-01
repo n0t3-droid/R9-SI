@@ -172,6 +172,7 @@
   // a-story3 · the choices: one at the end of a beat (b.choice), made once, kept in the record (rec.choices)
   S.CHOICES = { c6: { at: 'c6.b3', opts: ['wellari', 'lumi'] }, how: { at: null, opts: ['build', 'fly', 'free', 'calm'], deed: 'c11.b2' } };   // (a-story4: how — no card: the way you answered Echo, made by the deed itself)
   S.WAYS = S.CHOICES.how.opts;
+  S.CHOICES.c15 = { at: 'c15.b2', opts: ['stay', 'sow'] }; S.CHOICES.style = { at: null, opts: ['build', 'quest', 'roam'], deed: 'c15.b1' };   // a-story7
   S.byId = (id) => S.BEATS.find(b => b.id === id) || null;
   S.ofChapter = (ch) => S.BEATS.filter(b => b.ch === ch);
   S.sceneLen = (b) => b.scene.shots.reduce((s, q) => s + q.dur, 0);
@@ -184,6 +185,65 @@
     return out;
   };
 
+  // ================================================================ a-story7 · Arc 2 — „Das Lied der Wiegelind" (chapters 13–16,
+  // plan docs/superpowers/plans/2026-11-01-a-story7.md). Who blinks three times: Wiegelind, a tiny wandering moon — the
+  // cradle that once carried the Flausel to every world as seeds (that is why every world has its fairy places). Her
+  // three blinks are the Flausel's greeting („Ich bin da"); Echo learned its blink from her, and the lullabies of all
+  // the peoples are her one song. The arc: 13 the blink comes back and the Flausel answer · 14 the journey (the
+  // Himmelsleiter, a Lichtbrücke, a caravan) to gather every people's light · 15 a sign your own way (build · quest ·
+  // roam, S.styleWay) and a choice (c15: she stays — Wiegelinds Ruh — or sows on — Wiegelinds Saatwiese, the far
+  // Flausel move in) · 16 the Dreilichterfest at your own settlement (u-movein; else the village near).
+  //   rules: near.fairy (m to a fairy place), near.home (m to your settlement's plaza, else the village near);
+  //   deeds: 'trip' (a journey of that kind taken since the beat: rec.trips) · 'sign' (the style deed, rec.choices.style)
+  //   rewards (rec.gift): {place: {dim, x, z, kind, opt, id}, fest: the founding day} — S.found, S.festDay
+  for (let n = 13; n <= 16; n++) S.CHAPTERS.push({ n, arc: 2, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: true });
+  S.WHO.push('wiegelind', 'borke', 'saemli');
+  S.TRIPS = ['lift', 'bridge', 'ride'];
+  S.STYLES = ['build', 'quest', 'roam'];
+  S.FEST_EVERY = 7;
+  S.PLACE_KIND = { stay: 'circle', sow: 'shroom' };
+  const FAR = ['aqua', 'zinn', 'ocker', 'basalt', 'opal', 'x.*'];   // (the peoples' worlds and the strange ones)
+  const NIGHT = ['dusk', 'night'];
+  S.BEATS.push(
+    // 13 · Dreimal — the blink is back, closer; the Flausel blink back; Mutter Borke's secret
+    B(13, 1, { when: { after: 'c12.b3', adv: true, dim: ['overworld'], hours: NIGHT },
+      scene: { shots: [{ cam: 'skyline', target: 'wiege', dur: 7, fx: 'wiege' }, { cam: 'up', target: 'wiege', dur: 7, fx: 'wiege', swell: true }, { cam: 'close', target: 'funke', dur: 6, fx: 'feelers' }], music: 'wide' },
+      who: ['funke:surprised', 'selma:surprised', 'funke:happy'], task: { kind: 'fairy', target: 'fairy' }, reward: { xp: 150 }, act: { kind: 'scan', target: 'sky', pitch: 25 } }),
+    B(13, 2, { when: { after: 'c13.b1', adv: true, dim: ['overworld'], near: { fairy: 45 } },
+      scene: { shots: [{ cam: 'wide', target: 'fairy', dur: 6, fx: 'feelers' }, { cam: 'shoulder', target: 'fairy', dur: 7, fx: 'feelers', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
+      who: ['borke:surprised', 'funke:surprised', 'borke:happy', 'borke:worried'], task: { kind: 'borke', target: 'fairy' }, reward: { xp: 160 }, act: { kind: 'look', target: 'fairy', max: 90, cone: 22, hold: 1.5 } }),
+    B(13, 3, { when: { after: 'c13.b2', adv: true, dim: ['overworld'] },
+      scene: { shots: [{ cam: 'close', target: 'funke', dur: 6, fx: 'lullaby' }, { cam: 'wide', target: 'fairy', dur: 7, fx: 'lullaby', swell: true }, { cam: 'up', target: 'wiege', dur: 6, fx: 'wiege' }], music: 'rise' },
+      who: ['funke:surprised', 'borke:happy', 'funke:surprised', 'borke:happy'], task: { kind: 'lift', target: 'station' }, reward: { xp: 200 }, act: { kind: 'trip', target: 'lift' } }),
+    // 14 · Der Weg der Laternen — the Ringstation's window; a Lichtbrücke to a people; a caravan to their Flausel
+    B(14, 1, { when: { after: 'c13.b3', adv: true, dim: ['stn.*'] },
+      scene: { shots: [{ cam: 'shoulder', target: 'player', dur: 5 }, { cam: 'window', target: 'window', dur: 9, fx: 'wiege', swell: true }, { cam: 'close', target: 'funke', dur: 7 }], music: 'wide' },
+      who: ['jonte:happy', 'funke:worried', 'anselm', 'anselm:happy'], task: { kind: 'bridge', target: 'world' }, reward: { xp: 180 }, act: { kind: 'trip', target: 'bridge' } }),
+    BV(14, 2, { when: { after: 'c14.b1', adv: true, dim: FAR }, vary: 'c6',
+      scene: { shots: [{ cam: 'wide', target: 'village', dur: 7, fx: 'lanterns3' }, { cam: 'shoulder', target: 'village', dur: 6, fx: 'lullaby' }, { cam: 'close', target: 'funke', dur: 6, swell: true }], music: 'warm' },
+      alt: { wellari: ['ariveli:happy', 'ariveli', 'funke:surprised', 'ariveli:happy'], lumi: ['lumi:happy', 'lumi', 'funke:surprised', 'lumi:happy'] }, task: { kind: 'ride', target: 'fairy' }, reward: { xp: 200 }, act: { kind: 'trip', target: 'ride' } }),
+    B(14, 3, { when: { after: 'c14.b2', adv: true, dim: FAR, near: { fairy: 50 } },
+      scene: { shots: [{ cam: 'wide', target: 'fairy', dur: 6, fx: 'feelers' }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'shoulder', target: 'fairy', dur: 7, fx: 'lanterns3', swell: true }], music: 'rise' },
+      who: ['saemli:surprised', 'funke:happy', 'saemli:happy', 'funke:happy'], task: { kind: 'homeward', target: 'home' }, reward: { xp: 220 }, act: { kind: 'look', target: 'fairy', max: 90, cone: 22, hold: 1.5 } }),
+    // 15 · Ein Zeichen für Wiegelind — your way (the deed), her answer, the choice; the new place appears
+    B(15, 1, { when: { after: 'c14.b3', adv: true, dim: ['overworld'], hours: NIGHT },
+      scene: { shots: [{ cam: 'skyline', target: 'wiege', dur: 7, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 6, fx: 'feelers' }, { cam: 'up', target: 'wiege', dur: 7, fx: 'wiege', swell: true }], music: 'tense' },
+      who: ['funke:worried', 'borke:worried', 'funke:happy'], task: { kind: 'sign', target: 'sign' }, reward: { xp: 200 }, act: { kind: 'sign' } }),
+    BV(15, 2, { when: { after: 'c15.b1', adv: true, deed: 'c15.b1', dim: ['overworld'] }, vary: 'style', choice: 'c15',
+      scene: { shots: [{ cam: 'skyline', target: 'sign', dur: 7, fx: 'answer3', swell: true }, { cam: 'up', target: 'wiege', dur: 7, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 6, fx: 'feelers' }], music: 'rise' },
+      alt: { build: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'], quest: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'], roam: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'] }, task: { kind: 'choose', target: 'c15' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 25 } }),
+    BV(15, 3, { when: { after: 'c15.b2', adv: true, choice: 'c15', dim: ['overworld'] }, vary: 'c15',
+      scene: { shots: [{ cam: 'up', target: 'wiege', dur: 6, fx: 'descend' }, { cam: 'wide', target: 'place', dur: 8, fx: 'bloom', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
+      alt: { stay: ['wiegelind:happy', 'funke:surprised', 'borke:happy', 'borke:happy'], sow: ['wiegelind:happy', 'funke:surprised', 'saemli:happy', 'borke:happy'] }, task: { kind: 'fest', target: 'home' }, reward: { xp: 250 }, act: { kind: 'look', target: 'place', max: 220, cone: 22, hold: 1.5 } }),
+    // 16 · Das Dreilichterfest — your settlement celebrates; the quiet last picture
+    BV(16, 1, { when: { after: 'c15.b3', adv: true, dim: ['overworld'], hours: NIGHT, near: { home: 80 } }, vary: 'c6',
+      scene: { shots: [{ cam: 'skyline', target: 'home', dur: 7, fx: 'lanterns3' }, { cam: 'wide', target: 'home', dur: 7, fx: 'lanterns3', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'warm' },
+      alt: { wellari: ['ilka:happy', 'saemli:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'saemli:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'quiet', target: 'home' }, reward: { xp: 300 }, act: { kind: 'look', target: 'home', max: 140, cone: 26, hold: 2 } }),
+    BV(16, 2, { when: { after: 'c16.b1', adv: true, dim: ['overworld'] }, vary: 'c15',
+      scene: { shots: [{ cam: 'up', target: 'wiege', dur: 8, fx: 'lanterns3', swell: true }, { cam: 'skyline', target: 'home', dur: 8, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'wide' },
+      alt: { stay: ['wiegelind:happy', 'funke:happy', 'borke:happy', 'funke:happy'], sow: ['wiegelind:happy', 'funke:happy', 'borke:happy', 'funke:happy'] }, task: { kind: 'play', target: 'free' }, reward: { xp: 500 }, act: { kind: 'photo', target: 'sky', pitch: 20 } }),
+  );
+  for (const b of S.BEATS) delete b.who;
   // ---------------------------------------------------------------- the record (meta.story)
   S.fresh = () => ({ v: 1, beats: {}, later: {}, acts: {}, choices: {}, places: {} });   // (a-story4: places — the dims a beat was seen in: the epilogue's star book)   // (a-story3: choices — {id: option})   // (a-story2: acts — the deeds done, {id: 1})
   S.load = function (m) {
@@ -345,6 +405,54 @@
   S.placeOk = (d) => /^(overworld|aqua|zinn|ocker|basalt|opal|stn\.[a-z0-9_]+|x\.\d+\.\d+\.[a-z]+)$/.test(String(d));
   S.visit = function (rec, dim) { if (!rec || !S.placeOk(dim)) return false; rec.places = rec.places || {}; if (rec.places[dim]) return false; rec.places[dim] = 1; return true; };
   S.free = (rec) => S.isDone(rec, 'c12.b3');   // the epilogue: the book read, free play with the star book
+
+  // ================================================================ a-story7 · Arc 2's rules, deeds, record and gifts (pure)
+  // the chapter in play: past the last written one when every beat is seen
+  S.chapter = function (rec) { for (const b of S.BEATS) if (!S.isDone(rec, b.id)) return b.ch; return S.CHAPTERS.length + 1; };
+  S.arc = (ch) => (ch >= 13 ? 2 : 1);
+  S.free2 = (rec) => S.isDone(rec, 'c16.b2');
+  S.ACT_KINDS.push('trip', 'sign');
+  // the style deed (pure): b0 the watch's start, n now — {placed, span, homes (moved in), freed, calms, fairy (fairy
+  // adventures finished), trips (journeys taken), places (fairy places seen), dims (worlds of the story's book)}
+  S.SIGN_PLACES = 2;
+  S.styleWay = function (b0, n) {
+    if (!b0 || !n) return null;
+    if (((n.placed || 0) - (b0.placed || 0) >= S.BUILD_N && (n.span || 0) >= S.BUILD_SPAN) || (n.homes || 0) > (b0.homes || 0)) return 'build';
+    if ((n.freed || 0) > (b0.freed || 0) || (n.calms || 0) > (b0.calms || 0) || (n.fairy || 0) > (b0.fairy || 0)) return 'quest';
+    if ((n.trips || 0) > (b0.trips || 0) || (n.places || 0) - (b0.places || 0) >= S.SIGN_PLACES || (n.dims || 0) > (b0.dims || 0)) return 'roam';
+    return null;
+  };
+  S.sign = function (rec, way) {
+    if (!rec || S.STYLES.indexOf(way) < 0) return false;
+    rec.choices = rec.choices || {}; if (rec.choices.style) return false;
+    rec.choices.style = way; S.markAct(rec, 'c15.b1'); return true;
+  };
+  S.trip = function (rec, kind) { if (!rec || S.TRIPS.indexOf(kind) < 0) return false; rec.trips = rec.trips || {}; rec.trips[kind] = Math.min(9999, (rec.trips[kind] | 0) + 1); return true; };
+  { const ac0 = S.actCheck; S.actCheck = function (act, a) {
+    if (!act || (act.kind !== 'trip' && act.kind !== 'sign')) return ac0(act, a);
+    a = a || {};
+    if (act.dim && !S.dimIn(act.dim, a.dim || 'overworld')) return 'dim';
+    if (act.kind === 'trip') return a.trip && a.trip.indexOf(act.target) >= 0 ? 'ok' : 'armed';
+    return S.STYLES.indexOf(a.sign) >= 0 ? 'ok' : 'armed';
+  }; }
+  // the gifts: the new place (where the glue found room) and the festival, founded once
+  S.found = function (rec, place, day) {
+    if (!rec || rec.gift || !place || S.CHOICES.c15.opts.indexOf(place.opt) < 0 || !Number.isFinite(place.x) || !Number.isFinite(place.z)) return false;
+    rec.gift = { place: { dim: 'overworld', x: Math.round(place.x), z: Math.round(place.z), kind: S.PLACE_KIND[place.opt], opt: place.opt, id: 'overworld:wiege' }, fest: Math.max(0, day | 0) };
+    return true;
+  };
+  S.festDay = function (rec, day) { const g = rec && rec.gift; return !!(g && g.fest !== null && g.fest !== undefined && day >= g.fest && (day - g.fest) % S.FEST_EVERY === 0); };
+
+  { const fresh0 = S.fresh; S.fresh = () => Object.assign(fresh0(), { trips: {}, gift: null }); }
+  { const load0 = S.load; S.load = function (m) {
+    const r = load0(m);
+    if (!m || typeof m !== 'object') return r;
+    const tr = m.trips && typeof m.trips === 'object' ? m.trips : {};
+    for (const k of S.TRIPS) { const n = tr[k] | 0; if (n > 0) r.trips[k] = Math.min(9999, n); }
+    const gf = m.gift, pc = gf && typeof gf === 'object' ? gf.place : null;
+    if (pc && typeof pc === 'object' && S.CHOICES.c15.opts.indexOf(pc.opt) >= 0 && Number.isFinite(pc.x) && Number.isFinite(pc.z) && Number.isFinite(gf.fest) && gf.fest >= 0) S.found(r, pc, gf.fest);
+    return r;
+  }; }
 
   if (typeof module !== 'undefined' && module.exports) module.exports = S;
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

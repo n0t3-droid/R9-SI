@@ -383,7 +383,7 @@
           // a-story4: low behind the player, looking out over the land and up into the sky (the beams, the arcs, the stars)
           const dx = Q[0] - pe[0], dz = Q[2] - pe[2], L = Math.hypot(dx, dz), ux = L > 2 ? dx / L : f[0], uz = L > 2 ? dz / L : f[2];
           const C = [pe[0] - ux * 4 + rt[0] * 1.2, pe[1] + 0.6 + 0.4 * u, pe[2] - uz * 4 + rt[2] * 1.2];
-          const lo = sh.target === 'lit' || sh.target === 'temple';   // (a-story5: the village or the Tortempel on the lower third, the sky over it)
+          const lo = sh.target === 'lit' || sh.target === 'temple' || sh.target === 'home';   // (a-story7: your settlement's festival too)   // (a-story5: the village or the Tortempel on the lower third, the sky over it)
           return lookAt(lift(C, pe), [pe[0] + ux * 100, pe[1] + (lo ? 13 : 30) + 6 * u, pe[2] + uz * 100], 72, base);
         }
         case 'limb': {
@@ -681,7 +681,7 @@ body.storyon #storychoice { visibility: hidden !important; }
     if (Po && Po.ops) {
       const cv = mk('canvas', 'por ' + who); s.appendChild(cv);
       const q = sc.tl.lines[i] || { t0: sc.t, t1: sc.t + 3 };
-      sc.por = { cv, who, mood: ln.mood || 'neutral', t0: q.t0, len: q.t1 - q.t0, key: '' };
+      sc.por = { cv, who, mood: ln.mood || 'neutral', t0: q.t0, len: q.t1 - q.t0, key: null };   // (a-story7: null — a line that began with the mouth shut and the eyes open was never painted)
       P.porTick(sc);
     } else sc.por = null;
     const tx = mk('div', 'tx'); tx.appendChild(mk('b', who, T('story.who.' + who))); tx.appendChild(mk('span', '', sc.texts[i])); s.appendChild(tx);
