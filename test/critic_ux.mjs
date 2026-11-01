@@ -243,6 +243,23 @@ OUT.hand180 = await handProbe();
 check(OUT.hand180 && (!OUT.hand180.block || OUT.hand180.cover <= 0.03), 'at 180 s the held block covers ≤ 3 %: ' + JSON.stringify(OUT.hand180));
 { const last = OUT.hints3[OUT.hints3.length - 1], sp = await ev(() => VR.game.player.spawn).catch(() => null); OUT.away180 = last && last.pos && sp ? Math.round(Math.hypot(last.pos[0] - sp[0], last.pos[2] - sp[2])) : -1;
   check(OUT.away180 >= 20, 'after ' + (OUT.wHolds || 0) + ' W holds (3 minutes) the player is ' + OUT.away180 + ' m from the spawn (≥ 20)'); }
+// (v0.55 review) the first FIVE minutes on foot (the owner, 31 Oct: „selbst nur rumlaufen nie langweilig"): two more
+// samples at 240 s and 300 s, then the Wanderregisseur's timeline (o-wander: a moment every 20–40 s) and the event log's
+// count over the whole walk — the moments, the longest gap between them, the kinds; WALK5=0 skips it
+if (process.env.WALK5 !== '0') {
+  for (const [tEnd, name] of [[240000, '08d_t240'], [300000, '08e_t300']]) {
+    for (let i = 0; i < WALK_HOLDS; i++) { await holdWalk(); await page.mouse.move(640 + (i % 2 ? 50 : -50), 360, { steps: 6 }); await page.keyboard.press('Space'); await wait(800); OUT.wHolds = (OUT.wHolds || 0) + 1; }
+    await wait(Math.max(0, tEnd - (Date.now() - tPlay))); await shot(name);
+    OUT.hints3.push({ name, s: Math.round((Date.now() - tPlay) / 1000), pos: await ev(() => VR.game.player.pos.map(v => Math.round(v))).catch(() => null), hud: await ev(() => [...document.querySelectorAll('#hud *, .toast, #hint')].filter(e => e.offsetParent !== null && e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim().slice(0, 60)).slice(0, 30)).catch(() => []) });
+  }
+  OUT.walk5 = await ev(() => { const g = VR.game, D = g.wanderer, L = VR.EventLog, sp = g.player.spawn, p = g.player.pos;
+    const st = D && D.stats ? D.stats() : null, tl = st ? st.timeline : [], ts = tl.map(e => e.t).filter(Number.isFinite).sort((a, b) => a - b);
+    let gap = 0; for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i] - ts[i - 1]);
+    const evs = L && L.events ? L.events(0) : [], kinds = {}; for (const e of evs) { const k = e.kind + ':' + e.sub; kinds[k] = (kinds[k] || 0) + 1; }
+    return { away: sp ? Math.round(Math.hypot(p[0] - sp[0], p[2] - sp[2])) : -1, wander: st ? { on: st.on, tier: st.tier, started: st.started, found: st.found, kinds: st.kinds, n: tl.length, longestGapS: Math.round(gap), time: D.time, timeline: tl.slice(0, 24) } : null, events: evs.length, eventKinds: kinds }; }).catch(e => ({ err: String(e).slice(0, 200) }));
+  console.log('  walk5: ' + JSON.stringify(OUT.walk5).slice(0, 1600));
+  check(OUT.walk5 && OUT.walk5.wander && OUT.walk5.wander.started >= 5, 'the first five minutes on foot: ≥ 5 wander moments started (' + (OUT.walk5 && OUT.walk5.wander ? OUT.walk5.wander.started : '?') + ')');
+}
 OUT.calm = await ev(() => { clearInterval(window.__calmIv); const C = window.__calm; return C ? { samples: C.n, msgSecs: C.secs, perMin: +(C.secs / Math.max(1, C.n) * 60).toFixed(1), centreShare: +(C.centre / Math.max(1, C.n)).toFixed(3), funke: C.funke, distinct: Object.keys(C.msgs).length, top: Object.entries(C.msgs).sort((a, b) => b[1] - a[1]).slice(0, 12) } : null; }).catch(() => null);
 console.log('  calm: ' + JSON.stringify(OUT.calm).slice(0, 1400));
 check(OUT.calm && OUT.calm.samples > 20 && !OUT.calm.funke, 'the first three minutes: no standing „Funke fragen" (' + (OUT.calm ? OUT.calm.funke : '?') + ' samples)');
