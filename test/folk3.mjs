@@ -145,7 +145,7 @@ const endDance = () => ev(() => { const D = VR.game.villages.joy && VR.game.vill
 const sheet = [];
 const writeSheet = () => { for (const r of sheet) r.imgs = r.imgs.filter(Boolean); for (let i = sheet.length - 1; i >= 0; i--) if (!sheet[i].imgs.length) sheet.splice(i, 1); if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/folk3_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'folk3_sheet.jpg', ROOT + '/.tmp_tests/folk3_sheet.json']).toString().trim()); } catch (e) { console.log('  (no sheet: ' + String(e.message).slice(0, 200) + ')'); } };
 const ADULT = `(v) => v.agents.filter(a => !a.kid && !a.elder && a.pose !== 'sleep' && a.pose !== 'sit' && !(a.act && a.act.type === 'joy')).sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0] || v.agents.filter(a => !a.kid && a.pose !== 'sleep').sort((x, y) => Math.hypot(x.pos[0] - v.plan.plaza.x, x.pos[2] - v.plan.plaza.z) - Math.hypot(y.pos[0] - v.plan.plaza.x, y.pos[2] - v.plan.plaza.z))[0]`;
-const portraits = [], moods = [], farRow = [], famRow = [], danceRow = [];
+const danceNames = [], pNames = [], portraits = [], moods = [], farRow = [], famRow = [], danceRow = [];
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.smoothFolk = true; g.applySettings('*'); });
@@ -177,7 +177,7 @@ if (want('herz') && HP) {
   try {
     await ev(([x, y, z]) => { const p = VR.game.player; p.teleport(x + 4, y + 2, z + 4); }, HP.plaza);
     await photoOn(GOLD);
-    portraits.push(await portrait(HV.id, ADULT, 'f3_herz_portrait.png', { expr: 'joy' }));
+    { const im = await portrait(HV.id, ADULT, 'f3_herz_portrait.png', { expr: 'joy' }); if (im) { portraits.push(im); pNames.push('Herzwelt'); } }
     // the moods of the same person: dawn, noon, dusk (the mood's own face — no expression forced)
     for (const [tick, nm] of [[600, 'dawn'], [6000, 'noon'], [GOLD, 'dusk']]) {
       await ev((t) => { const g = VR.game, pc = g.photoCam; pc.held = t; g.env.setTime(t); const a = window.__cu; a.expr = null; a.exprT = 0; a.mood = VR.Folk3.mood(t, a.p.seed); if (a.mood.k === 'cheer') { a.expr = 'joy'; a.exprT = 30; } }, tick);
@@ -220,7 +220,7 @@ if (want('herz') && HP) {
     const D = dz.D;
     run.herzDance = D;
     check(dz.asked && !!D && D.ring >= Math.min(5, D.n), `Herzwelt: the circle dance — ${dz.inv} asks, ${D ? D.ring + ' of ' + D.n + ' in the ring (r ' + (+D.r).toFixed(2) + ')' : 'no dance'}`);
-    if (D) { await photoOn(GOLD); await step(30, 33); danceRow.push(await group([D.c[0], D.c[1], D.c[2]], D.r + 0.4, 'f3_herz_dance.png')); }
+    if (D) { await photoOn(GOLD); await step(30, 33); { const im = await group([D.c[0], D.c[1], D.c[2]], D.r + 0.4, 'f3_herz_dance.png'); if (im) { danceRow.push(im); danceNames.push('Herzwelt'); } } }
     await endDance(); await photoOff(); await step(20, 33);
   } catch (e) { check(false, 'Herzwelt: ' + String(e && e.stack || e).slice(0, 500)); }
   save();
@@ -249,21 +249,21 @@ for (const kind of (want('worlds') ? WORLDS : [])) {
     await ev(([x, y, z]) => { const p = VR.game.player; p.teleport(x + 5, y + 2, z + 5); }, P.plaza);
     console.log('  · prewarm ' + JSON.stringify(await prewarm()));
     await photoOn(GOLD);
-    portraits.push(await portrait(vid, ADULT, `f3_${kind}_portrait.png`, { expr: 'joy' }));
+    { const im = await portrait(vid, ADULT, `f3_${kind}_portrait.png`, { expr: 'joy' }); if (im) { portraits.push(im); pNames.push({ aqua: 'Aquamarin', ocker: 'Ocker', zinn: 'Zinnober', basalt: 'Basalt', opal: 'Opal' }[kind]); } }
     await ev(() => { const a = window.__cu; if (a) { a.holdT = 0; a.expr = null; a.lookAt = null; } window.__cu = null; });
     if (kind === 'aqua' || kind === 'ocker') {
       await ev(() => VR.game.env.setTime(9800));
       const dz = await danceAt(vid, P.plaza, 3.5);
       const D = dz.D; run[kind + 'Dance'] = D;
       check(dz.asked && !!D && D.ring >= Math.min(5, D.n), `${kind}: the natives' circle dance — ${D ? D.ring + ' of ' + D.n + ' in the ring' + (D.ok ? '' : ' (no open ring)') : 'no dance'}`);
-      if (D) { await photoOn(GOLD); await step(30, 33); danceRow.push(await group([D.c[0], D.c[1], D.c[2]], D.r + 0.4, `f3_${kind}_dance.png`)); }
+      if (D) { await photoOn(GOLD); await step(30, 33); { const im = await group([D.c[0], D.c[1], D.c[2]], D.r + 0.4, `f3_${kind}_dance.png`); if (im) { danceRow.push(im); danceNames.push(kind === 'aqua' ? 'Aquamarin' : 'Ocker'); } } }
       await endDance(); await photoOff(); await step(20, 33);
     }
   } catch (e) { check(false, kind + ': ' + String(e && e.stack || e).slice(0, 500)); }
   save();
 }
 await photoOff();
-const rows = () => { sheet.length = 0; const pr = portraits.filter(Boolean); if (pr.length) sheet.push({ label: 'portraits at the golden hour (the camera director): Herzwelt, Aquamarin, Ocker', imgs: pr.slice(0, 3) }); if (pr.length > 3) sheet.push({ label: 'portraits: Zinnober, Basalt, Opal', imgs: pr.slice(3) }); sheet.push({ label: 'the moods of one person: sleepy at dawn / cheerful at noon / cosy at dusk', imgs: moods }); sheet.push({ label: 'the far face at 9 m: off / on', imgs: farRow }); sheet.push({ label: 'a family hand in hand / the children at play', imgs: famRow }); sheet.push({ label: 'the circle dance: Herzwelt / Aquamarin / Ocker', imgs: danceRow }); };
+const rows = () => { sheet.length = 0; for (let i = 0; i < portraits.length; i += 3) sheet.push({ label: 'portraits at the golden hour (the camera director): ' + pNames.slice(i, i + 3).join(', '), imgs: portraits.slice(i, i + 3) }); sheet.push({ label: 'the moods of one person: sleepy at dawn / cheerful at noon / cosy at dusk', imgs: moods }); sheet.push({ label: 'the far face at 7 m: off / on', imgs: farRow }); sheet.push({ label: 'a family hand in hand / the children at play', imgs: famRow }); sheet.push({ label: 'the circle dance: ' + danceNames.join(' / '), imgs: danceRow }); };
 rows(); writeSheet();
 check(walls === 0, `the camera never inside a wall (${walls} of ${shots} shots)`);
 
@@ -278,9 +278,9 @@ if (want('cost') && HP) {
     const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
     await ev(() => VR.game.env.setTime(4000));
     const V0 = [HP.plaza[0], HP.plaza[1], HP.plaza[2]], CP = [V0[0] + 8, V0[1] + 3, V0[2] + 8];
-    for (const pr of ['potato', 'high']) {
+    for (const pr of (process.env.COST ? process.env.COST.split(',') : ['potato', 'high'])) {
       await preset(pr); await settle(20); await step(60, 33);
-      for (const off of [true, false, true, false]) {
+      for (const off of (process.env.COST ? [true, false] : [true, false, true, false])) {
         await ev((off) => { VR.Folk3.off = off; }, off);
         await lookFrom(CP, V0); await step(10, 33);
         await measure(`${pr}_${off ? 'off' : 'on'}${cost[pr + '_' + (off ? 'off' : 'on')] ? '2' : ''}`);
