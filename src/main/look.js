@@ -19,7 +19,7 @@
   const L = VR.Look = VR.Look || {};
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
-  const mix = (a, b, t) => a + (b - a) * t;
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
   // ---------------------------------------------------------------- the switches
   L.SW = ['lvHaze', 'lvPal', 'lvSoft', 'lvWrap'];
@@ -73,7 +73,7 @@
   // soft — where the far softening starts and is full (m), its strength; wrap — its strength
   const MOOD = {
     day: { half: 260, sunK: 0.32, skyK: 0.18, warm: [1.0, 0.92, 0.78], cool: [0.78, 0.86, 1.0], calm: 0.32, lean: 0.03, teal: 0.035, s0: 70, s1: 220, sK: 0.55, wK: 0.5 },
-    gold: { half: 170, sunK: 0.55, skyK: 0.2, warm: [1.0, 0.78, 0.5], cool: [0.72, 0.74, 1.0], calm: 0.38, lean: 0.06, teal: 0.05, s0: 60, s1: 200, sK: 0.6, wK: 0.75 },
+    gold: { half: 170, sunK: 0.45, skyK: 0.2, warm: [1.0, 0.8, 0.58], cool: [0.72, 0.76, 1.0], calm: 0.38, lean: 0.06, teal: 0.05, s0: 60, s1: 200, sK: 0.6, wK: 0.75 },
     dusk: { half: 150, sunK: 0.42, skyK: 0.26, warm: [1.0, 0.66, 0.5], cool: [0.55, 0.68, 1.0], calm: 0.3, lean: 0.035, teal: 0.07, s0: 55, s1: 180, sK: 0.6, wK: 0.65 },
     night: { half: 200, sunK: 0.0, skyK: 0.22, warm: [0.8, 0.85, 1.0], cool: [0.62, 0.74, 1.0], calm: 0.22, lean: 0.0, teal: 0.04, s0: 50, s1: 170, sK: 0.5, wK: 0.55 },
   };
@@ -93,14 +93,16 @@
     const rain = clamp(E.rain || 0, 0, 1), dim = E.dimId === 0 ? 1 : 0;
     o.haze[0] = blend(m, 'half'); o.haze[1] = blend(m, 'sunK') * (1 - rain * 0.7) * dim; o.haze[2] = blend(m, 'skyK') * dim; o.haze[3] = E.sunDir[1] > -0.05 ? 1 : 0;
     const w = blend(m, 'warm'), c = blend(m, 'cool');
-    for (let i = 0; i < 3; i++) { o.warm[i] = w[i] * sc[i] / Math.max(0.2, sl) * Math.min(1, sl) * 1.1; o.cool[i] = c[i] * fc[i]; }
+    // (both colours at luma 1: the veil's brightness is the land's own, lifted a little — the far land lighter, never darker)
+    for (let i = 0; i < 3; i++) { o.warm[i] = w[i] * sc[i]; o.cool[i] = c[i] * fc[i]; }
+    const lw = Math.max(1e-3, lum(o.warm)), lc = Math.max(1e-3, lum(o.cool));
+    for (let i = 0; i < 3; i++) { o.warm[i] /= lw; o.cool[i] /= lc; }
     o.pal[0] = blend(m, 'calm'); o.pal[1] = blend(m, 'lean') * (1 - rain); o.pal[2] = blend(m, 'teal'); o.pal[3] = dim;
     o.soft[0] = blend(m, 's0'); o.soft[1] = blend(m, 's1'); o.soft[2] = blend(m, 'sK') * dim; o.soft[3] = blend(m, 'wK') * dim;
     return o;
   };
 
   // ---------------------------------------------------------------- the JS mirrors (node test: the GLSL's arithmetic)
-  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   // the greens' weight of a display colour: hue within the yellow-green … green band, by its chroma
   L.greenW = function (c) {
     const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]), ch = mx - mn;
@@ -172,12 +174,12 @@ vec3 lvHdr(vec3 c, vec2 uv) {
     vec3 rd = lvRay(uv);
     float f = 1.0 - exp2(-z / u_lvHaze.x);
     float toward = pow(max(dot(rd, u_lvSun), 0.0), 6.0) * u_lvHaze.w;
-    float lc = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
-    // (the veil carries the light of the land under it: its colour times the land's own brightness, eased — a dark far
-    // ridge gets a lighter veil than its own shade, a bright one keeps its light)
-    float veil = clamp(lc * 0.6 + 0.25, 0.25, 1.6);
-    c = mix(c, u_lvWarm * veil * 1.25, f * u_lvHaze.y * toward);
-    c = mix(c, u_lvCool * veil * 1.1, f * u_lvHaze.z * (1.0 - toward * 0.6));
+    float lc = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    // (the veil carries the light of the land under it, lifted: its colour (luma 1) times the land's own brightness — the
+    // far land lighter and bluer (warmer toward the sun), never darker; a dark far ridge gets at least a soft veil)
+    float veil = min(max(lc, 0.3), 4.0);
+    c = mix(c, u_lvWarm * (veil * 1.3 + 0.1), f * u_lvHaze.y * toward);
+    c = mix(c, u_lvCool * (veil * 1.15 + 0.06), f * u_lvHaze.z * (1.0 - toward * 0.6));
   }
 #endif
   return c;

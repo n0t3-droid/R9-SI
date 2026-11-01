@@ -68,7 +68,7 @@ const config = (c) => ev((c) => {
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.applySettings('*'); }, p);
 // K drawn frames at the held time, then the canvas → a PNG
 const grab = async (name, tod, K = 4) => {
-  const url = await ev(([tod, K]) => { const g = VR.game; window.__norender = false; for (let i = 0; i < K; i++) { if (tod !== null) { g.env.setTime(tod); if (g.photoCam && g.photoCam.on) g.photoCam.held = tod; } g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
+  const url = await ev(([tod, K]) => { const g = VR.game; if (tod !== null) { g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } } window.__norender = false; for (let i = 0; i < K; i++) { if (tod !== null) { g.env.setTime(tod); if (g.photoCam && g.photoCam.on) g.photoCam.held = tod; } g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
   if (!url || url.length < 2000) { check(false, 'a picture ' + name); return null; }
   const f = SHOTS + 'lv_' + name + '_' + TAG + '.png'; fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64'));
   N.pics[name] = f; save(); console.log('     📷 ' + name + ' (' + secs() + ')'); return f;
@@ -90,6 +90,7 @@ const shots = async (view, tod) => {
   await config('on');
   return out;
 };
+const photoOff = () => ev(() => { const g = VR.game; if (g.photoCam && g.photoCam.on) g.photoMode(false); });
 const top = (x, z) => ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [x, z]);
 
 try {
@@ -103,7 +104,7 @@ try {
   await ev(() => {
     const g = VR.game, L0 = Object.getPrototypeOf(g).loop;
     window.__step = (t) => L0.call(g, t); g.loop = function (t) { if (window.__live) return L0.call(this, t); };
-    g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar');
+    g.zenFreezeWeather = true; g.zenFreezeTime = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar');
     window.__c = { sceneT: (t) => { const s = g.story; return !s || !s.scene || s.scene.t >= t; } };
   });
   if (!(await ev(() => !!(VR.Look && VR.Look.SW)))) CONFIGS = ['off'];
@@ -159,9 +160,15 @@ try {
   // ---------------------------------------------------------------- the forest at noon: the densest crowns near the spawn
   if (want('forest')) {
     const NOON = 6000;
-    const F = await ev((S0) => { const g = VR.game, w = g.world, R = VR.R, F = VR.F; let best = null, bn = 0;
-      for (let gx = -160; gx <= 160; gx += 16) for (let gz = -160; gz <= 160; gz += 16) { const x0 = Math.floor(S0[0] + gx), z0 = Math.floor(S0[2] + gz); if (!w.isLoaded(x0, z0)) continue; let n = 0; for (let dx = 0; dx < 16; dx += 2) for (let dz = 0; dz < 16; dz += 2) { const y = w.topAt(x0 + dx, z0 + dz); const s = w.getBlock(x0 + dx, y, z0 + dz); if (s && (R.T.flags[s] & F.LEAVES)) n++; } if (n > bn) { bn = n; best = [x0 + 8, z0 + 8]; } }
+    const findWood = (S0) => ev((S0) => { const g = VR.game, w = g.world, R = VR.R, F = VR.F; let best = null, bn = 0;
+      for (let gx = -112; gx <= 112; gx += 16) for (let gz = -112; gz <= 112; gz += 16) { const x0 = Math.floor(S0[0] + gx), z0 = Math.floor(S0[2] + gz); if (!w.isLoaded(x0, z0)) continue; let n = 0; for (let dx = 0; dx < 16; dx += 2) for (let dz = 0; dz < 16; dz += 2) { const y = w.topAt(x0 + dx, z0 + dz); const s = w.getBlock(x0 + dx, y, z0 + dz); if (s && (R.T.flags[s] & F.LEAVES)) n++; } if (n > bn) { bn = n; best = [x0 + 8, z0 + 8]; } }
       return best ? { c: best, n: bn } : null; }, S0);
+    let F = null; await photoOff();
+    for (const [ox, oz] of [[0, 0], [-200, 0], [200, 0], [0, 200], [0, -200]]) {
+      const c0 = [S0[0] + ox, S0[1], S0[2] + oz];
+      if (ox || oz) { await ev((c) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(c[0], 150, c[2]); }, c0); await settle(40); }
+      const f = await findWood(c0); if (f && (!F || f.n > F.n)) F = f; if (F && F.n >= 36) break;
+    }
     console.log('     forest ' + JSON.stringify(F));
     if (F) {
       await camAt([F.c[0], 140, F.c[1]], [F.c[0] + 10, 130, F.c[1]], NOON); await settle(40);
@@ -179,11 +186,18 @@ try {
   // ---------------------------------------------------------------- the coast: a shore over open water, afternoon
   if (want('coast')) {
     const AFT = 9000;
-    const C = await ev((S0) => { const g = VR.game, w = g.world, R = VR.R, F = VR.F; const wet = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z); return s && (R.T.flags[s] & F.FLUID) ? 1 : 0; };
+    const findCoast = (S0) => ev((S0) => { const g = VR.game, w = g.world, R = VR.R, F = VR.F; const wet = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z); return s && (R.T.flags[s] & F.FLUID) ? 1 : 0; };
       let best = null, bs = 0;
-      for (let gx = -200; gx <= 200; gx += 8) for (let gz = -200; gz <= 200; gz += 8) { const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz); if (!w.isLoaded(x, z) || wet(x, z)) continue;
-        for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; let n = 0; for (let d = 4; d <= 40; d += 4) n += wet(Math.floor(x + Math.cos(a) * d), Math.floor(z + Math.sin(a) * d)); if (n >= 9 && wet(Math.floor(x + Math.cos(a) * 3), Math.floor(z + Math.sin(a) * 3))) { const sc = n * 10 - Math.hypot(gx, gz) * 0.05; if (sc > bs) { bs = sc; best = { x: x + 0.5, z: z + 0.5, a }; } } } }
+      for (let gx = -120; gx <= 120; gx += 8) for (let gz = -120; gz <= 120; gz += 8) { const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz); if (!w.isLoaded(x, z) || wet(x, z)) continue;
+        for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; let n = 0; for (let d = 4; d <= 40; d += 4) n += wet(Math.floor(x + Math.cos(a) * d), Math.floor(z + Math.sin(a) * d)); if (n >= 8 && wet(Math.floor(x + Math.cos(a) * 3), Math.floor(z + Math.sin(a) * 3))) { const sc = n * 10 - Math.hypot(gx, gz) * 0.05; if (sc > bs) { bs = sc; best = { x: x + 0.5, z: z + 0.5, a }; } } } }
       return best; }, S0);
+    let C = null; await photoOff();
+    for (const [ox, oz] of [[0, 0], [240, 0], [0, 240], [-240, 0], [0, -240]]) {
+      const c0 = [S0[0] + ox, S0[1], S0[2] + oz];
+      if (ox || oz) { await ev((c) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(c[0], 150, c[2]); }, c0); await settle(40); }
+      C = await findCoast(c0); if (C) break;
+    }
+
     console.log('     coast ' + JSON.stringify(C));
     if (C) {
       const y = (await top(C.x, C.z)) + 1;
@@ -198,7 +212,7 @@ try {
   // ---------------------------------------------------------------- a fairy place at night (Mondsteinkreis)
   if (want('fairy')) {
     const NIGHT = 18000;
-    let s = null;
+    let s = null; await photoOff();
     for (let i = 0; i < 30; i++) {
       s = (await ev(() => VR.Fairy && VR.Fairy.debug ? VR.Fairy.debug.sites() : [])).find(x => x.kind === 'circle');
       if (!s) break;

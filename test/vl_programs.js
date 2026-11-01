@@ -17,7 +17,7 @@ if (process.argv[2] === '--dump') {
   const V = require(root + '/test/load_shared.js');
   global.self = global;
   const M = root + '/src/main/';
-  for (const f of ['gl', 'light2', 'water_fx', 'shaders', 'skybodies', 'clouds', 'props', 'props2', 'ultralite', 'ipu', 'tex_pbr', 'bench', 'renderer', 'light2_gl']) if (fs.existsSync(M + f + '.js')) { try { require(M + f + '.js'); } catch (e) { console.error(f + ': ' + e.message); } }
+  for (const f of ['gl', 'light2', 'look', 'water_fx', 'shaders', 'skybodies', 'clouds', 'props', 'props2', 'ultralite', 'ipu', 'tex_pbr', 'bench', 'renderer', 'light2_gl', 'look_gl']) if (fs.existsSync(M + f + '.js')) { try { require(M + f + '.js'); } catch (e) { console.error(f + ': ' + e.message); } }
   const consts = {}, progs = [];
   const gl = new Proxy({}, { get(t, k) {
     if (k in t) return t[k];
@@ -26,7 +26,7 @@ if (process.argv[2] === '--dump') {
   } });
   V.GL.gl = gl; V.GL.ext = { multiDraw: null, cbf: {}, cbhf: null, aniso: null };
   const L2 = V.Light2, lite = preset === 'potato';
-  const q = Object.assign({ zPre: false, shadows: lite ? 0 : 1024, hshadow: !lite, lite }, L2 ? L2.defaults(preset) : {});
+  const q = Object.assign({ zPre: false, shadows: lite ? 0 : 1024, hshadow: !lite, lite }, L2 ? L2.defaults(preset) : {}, V.Look ? V.Look.defaults(preset) : {});
   const r = Object.create(V.Renderer.prototype); r.gl = gl; r.multi = false; r.q = q;
   r.buildPrograms();
   fs.writeFileSync(outFile, JSON.stringify(progs));
