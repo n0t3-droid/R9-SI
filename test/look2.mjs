@@ -16,7 +16,9 @@ import { execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '').replace(/\/\.tmp_tests$/, '');
 const DIST = process.env.DIST || 'file://' + ROOT + '/dist/index.html', SHOTS = ROOT + '/test/shots/';
 const TAG = process.env.TAG || 'after', PRESET = process.env.PRESET || 'high';
-const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, want = (s) => !ONLY || ONLY.includes(s);
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, want = (s) => (!ONLY && s !== 'cost') || (ONLY && ONLY.includes(s));
+// (run 3: the costs inside the showcase — every High switch a full program rebuild — ran past the hour and the GPU
+// process died on a loaded machine: they run alone now, ONLY=cost, with R9_EXCLUSIVE when the machine is quiet)
 const CONFIGS = ['before', 'after'];
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
