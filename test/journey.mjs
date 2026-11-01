@@ -19,13 +19,15 @@ const run = {};
 const saveRun = () => { try { fs.writeFileSync(ROOT + '/.tmp_tests/journey_run.json', JSON.stringify(run, null, 1)); } catch (e) { /* a convenience */ } };
 fs.mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
+const ctx = await browser.newContext({ viewport: { width: 800, height: 450 }, locale: 'de-DE' });
 const page = await ctx.newPage();
 const logs = [];
 page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /journey/i.test(s)) logs.push(`[${t}] ${s.slice(0, 400)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
 const wait = (ms) => page.waitForTimeout(ms);
-const ev = (fn, a) => page.evaluate(fn, a);
+let where = 'boot';
+const ev = (fn, a) => Promise.race([page.evaluate(fn, a), new Promise((_, rej) => setTimeout(() => rej(new Error('evaluate timeout at ' + where)), 120000))]);
+setInterval(() => console.log('    … ' + secs() + ' at ' + where), 60000).unref();
 const shot = async (name) => { await ev(() => VR.Journey.pause(true)); await wait(150); try { await page.screenshot({ path: SHOTS + name, type: 'jpeg', quality: 82, timeout: 240000 }); console.log('  📷 ' + name); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => VR.Journey.pause(false)); return SHOTS + name; };
 const stats = () => ev(() => Object.assign(VR.Journey.stats(), { dim: VR.game.dim, state: VR.game.state, pj: !!VR.Portal.J() }));
 const sheet = [];
@@ -36,7 +38,7 @@ async function follow(tag, maxS, each) {
   const imgs = [], t0 = Date.now(); let next = 0, last = null, lines = 0;
   while ((Date.now() - t0) / 1000 < maxS) {
     await wait(300);
-    const s = await stats(); lines = Math.max(lines, s.lines || 0);
+    where = tag + ' follow'; const s = await stats(); lines = Math.max(lines, s.lines || 0);
     if (!s.kind && !s.pj) { last = s; break; }
     if (each) await each(s);
     if (s.kind && s.t >= next) { if (each) await each(s, true); imgs.push(await shot(`jy_${tag}_${String(Math.round(next)).padStart(3, '0')}.jpg`)); console.log(`    ${tag} t ${s.t} s · ${s.ph} · alt ${s.alt} · s ${s.s} · k ${s.k} · gl ${s.shots} · ${s.dim}${s.portal ? ' · pt ' + JSON.stringify(s.portal) : ''}`); next += 5; }
@@ -51,7 +53,7 @@ async function alive(tag) {
 
 await page.goto(DIST);
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('*'); });
+await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.applySettings('*'); });
 await ev(() => VR.game.createWorld({ name: 'Unterwegs', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true }));
 for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a new world');
@@ -72,7 +74,7 @@ if (want('cost')) {
     }
     g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
     out.potatoRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
-    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.journeys = false; g.applySettings('*');
+    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
     out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
     g.settings.journeys = true; g.applySettings('*');
     return out;
@@ -88,15 +90,16 @@ if (want('lift')) {
   console.log('1 · die Himmelsleiter');
   await ev(() => { const p = VR.game.player; p.flying = true; p.safeTeleport(-283.5, 120, -126.5); });
   let base = null;
-  for (let i = 0; i < 90 && !base; i++) { await wait(1000); base = await ev(() => { const b = VR.Journey.M.base; return b && b.y !== null ? { x: b.x, y: b.y, z: b.z } : null; }); }
+  where = 'lift: the base';
+  for (let i = 0; i < 90 && !base; i++) { await wait(1000); if (i % 10 === 0) console.log('    base? ' + i + ' ' + JSON.stringify(await ev(() => ({ p: VR.game.player.pos.map(Math.round), hold: !!VR.game.player.hold, scr: VR.game.ui.screen, st: VR.game.state, pend: VR.game.world.pending.size, D: !!VR.game.wanderer })))); base = await ev(() => { const b = VR.Journey.M.base; return b && b.y !== null ? { x: b.x, y: b.y, z: b.z } : null; }); }
   check(!!base, 'the cabin stands at the Bergstation ' + JSON.stringify(base));
   const lift = [];
-  if (base) {
-    await ev((b) => { const p = VR.game.player; p.pos = [b.x + 7, b.y + 2, b.z + 9]; p.yaw = Math.atan2(7, 9); p.pitch = 0.18; p.flying = true; }, base);
-    await wait(5000);
-    lift.push(await shot('jy_lift_base.jpg'));
-    await ev((b) => { const p = VR.game.player; p.flying = false; p.pos = [b.x, b.y + 0.2, b.z]; p.vel = [0, 0, 0]; p.yaw = 0.6; p.pitch = -0.12; }, base);
-    let started = false; for (let i = 0; i < 30 && !started; i++) { await wait(500); started = (await stats()).kind === 'lift'; }
+  if (!base) { await ev(() => { const p = VR.game.player; p.flying = false; p.safeTeleport(0.5, 90, 0.5); }); await wait(8000); }
+  if (true) {
+    if (base) await ev((b) => { const p = VR.game.player; p.pos = [b.x + 7, b.y + 2, b.z + 9]; p.yaw = Math.atan2(7, 9); p.pitch = 0.18; p.flying = true; }, base);
+    if (base) { await wait(5000); lift.push(await shot('jy_lift_base.jpg')); where = 'lift: stand in the cabin';
+      await ev((b) => { const p = VR.game.player; p.flying = false; p.pos = [b.x, b.y + 0.2, b.z]; p.vel = [0, 0, 0]; p.yaw = 0.6; p.pitch = -0.12; }, base); }
+    let started = false; for (let i = 0; i < 30 && !started && base; i++) { await wait(500); started = (await stats()).kind === 'lift'; }
     check(started, 'standing in the cabin starts the Himmelsleiter');
     if (!started) await ev(() => VR.Journey.lift(VR.game));
     const t0 = Date.now();
