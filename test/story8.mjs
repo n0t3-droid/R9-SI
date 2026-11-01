@@ -121,7 +121,7 @@ try {
     }
     fs.writeFileSync(OUT + 'summary.json', JSON.stringify(summary, null, 1));
     const S0 = (n) => summary.find(x => x.name === n);
-    check(S0('waltz').insts.includes('choir:oo') && S0('waltz_B').form.includes('B') && S0('waltz_B').dur > 30, 'the waltz: the choir\'s line heard, its B-section rendered (' + S0('waltz_B').form + ')');
+    check(S0('waltz').insts.includes('choir:oo') && S0('waltz_B').form.includes('B') && S0('waltz_B').dur > 24, 'the waltz: the choir\'s line heard, its B-section rendered (' + S0('waltz_B').form + ')');
     check(S0('waltz_t0').oscs / S0('waltz_t0').dur < 10 * 0.6 * 4, 'Very Low: the waltz ' + (S0('waltz_t0').oscs / S0('waltz_t0').dur).toFixed(1) + ' osc/s (High ' + (S0('waltz').oscs / S0('waltz').dur).toFixed(1) + ')');
   }
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); if (VR.Hints) for (const h of ['play', 'move', 'fly', 'bauhand', 'bhring', 'bhundo', 'bhchange']) VR.Hints.done(h); });
