@@ -16,9 +16,9 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
   check([13, 14, 15, 16].every(c => S.ofChapter(c).length >= 2 && S.ofChapter(c).length <= 4 && S.ofChapter(c).every((b, i) => b.n === i + 1)), 'each chapter 2–4 beats in order (' + [13, 14, 15, 16].map(c => S.ofChapter(c).length).join(' ') + ')');
   check(nb.every(b => S.sceneLen(b) <= 25 && S.sceneLen(b) >= 12 && b.scene.shots.every(q => q.dur <= 9)), 'every scene 12–25 s (' + nb.map(b => S.sceneLen(b)).join(' ') + ')');
   check(nb.every(b => b.when.adv === true) && S.byId('c13.b1').when.after === 'c12.b3', 'Arc 2 follows the finale\'s epilogue, in Abenteuer worlds');
-  check(nb.every(b => all(b).length >= 3 && all(b).every(l => S.WHO.includes(l.who))) && ['wiegelind', 'borke', 'tauli'].every(w => nb.some(b => all(b).some(l => l.who === w))), 'three to five lines a scene; the new speakers Wiegelind, Mutter Borke, Tauli speak');
+  check(nb.every(b => all(b).length >= 3 && all(b).every(l => S.WHO.includes(l.who))) && ['wiegelind', 'borke', 'saemli'].every(w => nb.some(b => all(b).some(l => l.who === w))), 'three to five lines a scene; the new speakers Wiegelind, Mutter Borke, Tauli speak');
   check(nb.every(b => b.scene.shots.some(q => q.fx)) && nb.filter(b => b.scene.shots.some(q => q.swell)).length >= 9, 'every scene has the film\'s own pictures; a swell in each');
-  const ck = S.keys().filter(k => /story\.(c1[3-6]\.|choice\.(c15|style)|who\.(wiegelind|borke|tauli))/.test(k));
+  const ck = S.keys().filter(k => /story\.(c1[3-6]\.|choice\.(c15|style)|who\.(wiegelind|borke|saemli))/.test(k));
   const miss = ck.filter(k => !tr('de', k) || !tr('en', k)), same = ck.filter(k => /\.\d$|\.j$|\.after$/.test(k) && tr('de', k) === tr('en', k));
   check(ck.length > 100 && !miss.length, ck.length + ' Arc-2 keys in both tables' + (miss.length ? ': missing ' + miss.slice(0, 6).join(', ') : ''));
   check(!same.length, 'every new German line is German' + (same.length ? ': ' + same.slice(0, 4).join(', ') : ''));
@@ -100,7 +100,7 @@ module.exports = function (S, SP, tr, calm, check, rnd) {
 
   // ---- the faces and the pictures
   const Po = VR.Portrait;
-  if (Po) for (const w of ['wiegelind', 'borke', 'tauli']) { const o = Po.ops(w, 'happy', false, true); check(Po.WHO.includes(w) && o.length > 25 && JSON.stringify(o) !== JSON.stringify(Po.ops('flimmi', 'happy', false, true)) && JSON.stringify(Po.ops(w, 'worried', false, false)) !== JSON.stringify(Po.ops(w, 'happy', false, false)), 'a face of its own: ' + w); }
+  if (Po) for (const w of ['wiegelind', 'borke', 'saemli']) { const o = Po.ops(w, 'happy', false, true); check(Po.WHO.includes(w) && o.length > 25 && JSON.stringify(o) !== JSON.stringify(Po.ops('flimmi', 'happy', false, true)) && JSON.stringify(Po.ops(w, 'worried', false, false)) !== JSON.stringify(Po.ops(w, 'happy', false, false)), 'a face of its own: ' + w); }
   const Fx = VR.StoryFx;
   if (Fx) {
     const used = new Set(); for (const b of nb) for (const q of b.scene.shots) if (q.fx) used.add(q.fx);

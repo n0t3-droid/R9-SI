@@ -4268,7 +4268,7 @@
     "story.c16.b2.sow.4": "Weißt du was, Partner? Zuhause ist da, wo jemand zurückblinkt.",
     "story.who.wiegelind": "Wiegelind",
     "story.who.borke": "Mutter Borke",
-    "story.who.tauli": "Tauli",
+    "story.who.saemli": "Sämli",
     "story.choice.c15.q": "Was soll Wiegelind tun?",
     "story.choice.c15.stay": "🌙 Bleib bei uns",
     "story.choice.c15.stay.d": "Sie ruht auf einer Wiese bei deinem Zuhause — ein neuer Ort für alle.",

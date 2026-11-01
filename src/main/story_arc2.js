@@ -173,7 +173,7 @@
     if (!S.found(s.rec, { opt, x: xz[0], z: xz[1] }, day)) return false;
     A2.stats.found++;
     const W = VR.Wander, nm = T('story.place.' + opt);
-    if (W && W.note && g.meta) { try { W.note(g.meta, 'places', 'story:wiege', nm); W.note(g.meta, 'people', 'story:wiegelind', T('story.who.wiegelind')); W.note(g.meta, 'people', 'story:tauli', T('story.who.tauli')); } catch (e) { /* the book */ } }
+    if (W && W.note && g.meta) { try { W.note(g.meta, 'places', 'story:wiege', nm); W.note(g.meta, 'people', 'story:wiegelind', T('story.who.wiegelind')); W.note(g.meta, 'people', 'story:saemli', T('story.who.saemli')); } catch (e) { /* the book */ } }
     const F = VR.Fairy; if (F && F.state && (g.dim || 'overworld') === 'overworld') F.state.key = '';   // (the fairy places set up again: the new one with them)
     s.save();
     return true;

@@ -197,7 +197,7 @@
   //   deeds: 'trip' (a journey of that kind taken since the beat: rec.trips) · 'sign' (the style deed, rec.choices.style)
   //   rewards (rec.gift): {place: {dim, x, z, kind, opt, id}, fest: the founding day} — S.found, S.festDay
   for (let n = 13; n <= 16; n++) S.CHAPTERS.push({ n, arc: 2, title: 'story.c' + n + '.title', where: 'story.c' + n + '.where', log: 'story.c' + n + '.log', written: true });
-  S.WHO.push('wiegelind', 'borke', 'tauli');
+  S.WHO.push('wiegelind', 'borke', 'saemli');
   S.TRIPS = ['lift', 'bridge', 'ride'];
   S.STYLES = ['build', 'quest', 'roam'];
   S.FEST_EVERY = 7;
@@ -224,7 +224,7 @@
       alt: { wellari: ['ariveli:happy', 'ariveli', 'funke:surprised', 'ariveli:happy'], lumi: ['lumi:happy', 'lumi', 'funke:surprised', 'lumi:happy'] }, task: { kind: 'ride', target: 'fairy' }, reward: { xp: 200 }, act: { kind: 'trip', target: 'ride' } }),
     B(14, 3, { when: { after: 'c14.b2', adv: true, dim: FAR, near: { fairy: 50 } },
       scene: { shots: [{ cam: 'wide', target: 'fairy', dur: 6, fx: 'feelers' }, { cam: 'close', target: 'funke', dur: 6 }, { cam: 'shoulder', target: 'fairy', dur: 7, fx: 'lanterns3', swell: true }], music: 'rise' },
-      who: ['tauli:surprised', 'funke:happy', 'tauli:happy', 'funke:happy'], task: { kind: 'homeward', target: 'home' }, reward: { xp: 220 }, act: { kind: 'look', target: 'fairy', max: 90, cone: 22, hold: 1.5 } }),
+      who: ['saemli:surprised', 'funke:happy', 'saemli:happy', 'funke:happy'], task: { kind: 'homeward', target: 'home' }, reward: { xp: 220 }, act: { kind: 'look', target: 'fairy', max: 90, cone: 22, hold: 1.5 } }),
     // 15 · Ein Zeichen für Wiegelind — your way (the deed), her answer, the choice; the new place appears
     B(15, 1, { when: { after: 'c14.b3', adv: true, dim: ['overworld'], hours: NIGHT },
       scene: { shots: [{ cam: 'skyline', target: 'wiege', dur: 7, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 6, fx: 'feelers' }, { cam: 'up', target: 'wiege', dur: 7, fx: 'wiege', swell: true }], music: 'tense' },
@@ -234,11 +234,11 @@
       alt: { build: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'], quest: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'], roam: ['funke:surprised', 'wiegelind:surprised', 'borke:happy', 'wiegelind:happy'] }, task: { kind: 'choose', target: 'c15' }, reward: { xp: 300 }, act: { kind: 'scan', target: 'sky', pitch: 25 } }),
     BV(15, 3, { when: { after: 'c15.b2', adv: true, choice: 'c15', dim: ['overworld'] }, vary: 'c15',
       scene: { shots: [{ cam: 'up', target: 'wiege', dur: 6, fx: 'descend' }, { cam: 'wide', target: 'place', dur: 8, fx: 'bloom', swell: true }, { cam: 'close', target: 'funke', dur: 6 }], music: 'warm' },
-      alt: { stay: ['wiegelind:happy', 'funke:surprised', 'borke:happy', 'borke:happy'], sow: ['wiegelind:happy', 'funke:surprised', 'tauli:happy', 'borke:happy'] }, task: { kind: 'fest', target: 'home' }, reward: { xp: 250 }, act: { kind: 'look', target: 'place', max: 220, cone: 22, hold: 1.5 } }),
+      alt: { stay: ['wiegelind:happy', 'funke:surprised', 'borke:happy', 'borke:happy'], sow: ['wiegelind:happy', 'funke:surprised', 'saemli:happy', 'borke:happy'] }, task: { kind: 'fest', target: 'home' }, reward: { xp: 250 }, act: { kind: 'look', target: 'place', max: 220, cone: 22, hold: 1.5 } }),
     // 16 · Das Dreilichterfest — your settlement celebrates; the quiet last picture
     BV(16, 1, { when: { after: 'c15.b3', adv: true, dim: ['overworld'], hours: NIGHT, near: { home: 80 } }, vary: 'c6',
       scene: { shots: [{ cam: 'skyline', target: 'home', dur: 7, fx: 'lanterns3' }, { cam: 'wide', target: 'home', dur: 7, fx: 'lanterns3', swell: true }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'warm' },
-      alt: { wellari: ['ilka:happy', 'tauli:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'tauli:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'quiet', target: 'home' }, reward: { xp: 300 }, act: { kind: 'look', target: 'home', max: 140, cone: 26, hold: 2 } }),
+      alt: { wellari: ['ilka:happy', 'saemli:happy', 'ariveli:happy', 'funke:happy'], lumi: ['ilka:happy', 'saemli:happy', 'lumi:happy', 'funke:happy'] }, task: { kind: 'quiet', target: 'home' }, reward: { xp: 300 }, act: { kind: 'look', target: 'home', max: 140, cone: 26, hold: 2 } }),
     BV(16, 2, { when: { after: 'c16.b1', adv: true, dim: ['overworld'] }, vary: 'c15',
       scene: { shots: [{ cam: 'up', target: 'wiege', dur: 8, fx: 'lanterns3', swell: true }, { cam: 'skyline', target: 'home', dur: 8, fx: 'wiege' }, { cam: 'close', target: 'funke', dur: 7, fx: 'lanterns3' }], music: 'wide' },
       alt: { stay: ['wiegelind:happy', 'funke:happy', 'borke:happy', 'funke:happy'], sow: ['wiegelind:happy', 'funke:happy', 'borke:happy', 'funke:happy'] }, task: { kind: 'play', target: 'free' }, reward: { xp: 500 }, act: { kind: 'photo', target: 'sky', pitch: 20 } }),

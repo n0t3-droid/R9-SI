@@ -45,10 +45,10 @@
     echo: { skin: ['#d8d0ff', '#a898f0', '#7a6ad0'], iris: '#1c1640', lash: '#2a2260', brow: '#5a4ab0', mouth: '#3a2a80', tongue: '#e08ad0', glow: ['#e8fcff', '#8ae8ff', '#3ab0d8'], deep: '#241c58', ring: '#b8a8ff' },
     funke: { shell: ['#ffffff', '#e9eff5', '#bcc7d3'], visor: '#16202e', visor2: '#22324a', eye: '#62f2ff', eye2: '#bffaff', ring: '#8fe4ff' },
     // a-story7 · Wiegelind (a tiny wandering moon, pearl and lilac, a seed-tail), Mutter Borke (the Flausel's elder: a
-    // round seed-body, a moss cap, a glowing feeler), Tauli (a little Flausel from the far worlds: a leaf cap, a teal glow)
+    // round seed-body, a moss cap, a glowing feeler), Sämli (a little Flausel from the far worlds: a leaf cap, a teal glow)
     wiegelind: { skin: ['#fbf6ff', '#e6dcf6', '#c2b2e2'], iris: '#4a3a7a', lash: '#5a4a8a', brow: '#b8a4dc', mouth: '#9a6ab0', tongue: '#f0a0c8', halo: ['#fff8e8', '#d8c8ff', '#9a88e0'], seed: '#fff4c8', blush: '#ffc0dc', ring: '#d8c8ff' },
     borke: { skin: ['#c89a64', '#a87c4a', '#86603a'], iris: '#2a1c10', lash: '#3a2614', brow: '#5a7a3a', mouth: '#5a2e1c', tongue: '#d07060', moss: ['#8ac860', '#5e9a3e', '#3e6e2a'], feel: '#ffe08a', beard: ['#d8e8c0', '#b0c898', '#88a070'], ring: '#a8e070' },
-    tauli: { skin: ['#f4d8a8', '#e0b880', '#c09460'], iris: '#1a3a40', lash: '#2a4a50', brow: '#a07040', mouth: '#8a3a2a', tongue: '#f08070', leaf: ['#9ae8b0', '#5ac088', '#3a9066'], feel: '#7af0e0', blush: '#ff9a9a', ring: '#7af0e0' },
+    saemli: { skin: ['#f4d8a8', '#e0b880', '#c09460'], iris: '#1a3a40', lash: '#2a4a50', brow: '#a07040', mouth: '#8a3a2a', tongue: '#f08070', leaf: ['#9ae8b0', '#5ac088', '#3a9066'], feel: '#7af0e0', blush: '#ff9a9a', ring: '#7af0e0' },
   };
   Po.LOOK = LOOK;
 
@@ -108,8 +108,8 @@
       R(7, 16, 10, 5, L.beard[1]); R(8, 21, 8, 2, L.beard[1]); R(7, 16, 3, 4, L.beard[0]); R(15, 17, 2, 5, L.beard[2]);   // (the beard)
       mouthOf(R, L, m, mo, 10, 16);
     },
-    // Tauli: a small round Flausel child, a big leaf cap, a teal feeler, rosy cheeks, two tiny wings
-    tauli(R, L, m, bl, mo) {
+    // Sämli: a small round Flausel child, a big leaf cap, a teal feeler, rosy cheeks, two tiny wings
+    saemli(R, L, m, bl, mo) {
       R(12, 0, 2, 2, L.feel); R(12, 0, 1, 1, '#e8fffb'); R(12, 2, 1, 2, L.leaf[2]);
       R(4, 3, 16, 4, L.leaf[1]); R(6, 2, 10, 2, L.leaf[1]); R(5, 3, 6, 2, L.leaf[0]); R(16, 5, 4, 2, L.leaf[2]); R(11, 3, 1, 4, L.leaf[2]);   // (the leaf cap and its vein)
       R(0, 12, 3, 4, '#d8f4ff'); R(21, 12, 3, 4, '#b8dcf0');   // (the wings)

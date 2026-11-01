@@ -4268,7 +4268,7 @@
     "story.c16.b2.sow.4": "You know what, partner? Home is where someone blinks back.",
     "story.who.wiegelind": "Wiegelind",
     "story.who.borke": "Mother Bark",
-    "story.who.tauli": "Tauli",
+    "story.who.saemli": "Sämli",
     "story.choice.c15.q": "What should Wiegelind do?",
     "story.choice.c15.stay": "🌙 Stay with us",
     "story.choice.c15.stay.d": "She rests on a meadow near your home — a new place for everyone.",
