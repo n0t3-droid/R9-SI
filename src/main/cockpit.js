@@ -211,7 +211,7 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
         const q = toS(v.x, v.z), sel = I.auto && I.auto.site.id === v.id;
         x.fillStyle = sel ? '#9affd8' : '#ffd88a';
         if (q[2]) { x.beginPath(); x.arc(q[0], q[1], 2.5, 0, TAU); x.fill(); }
-        else { x.fillRect(q[0] - 2.5, q[1] - 2.5, 5, 5); x.fillText(v.name.slice(0, 10).toUpperCase(), q[0], q[1] - 7); }
+        else { x.fillRect(q[0] - 2.5, q[1] - 2.5, 5, 5); x.fillText((VR.Names && VR.Names.shown ? VR.Names.shown(v.name) : v.name).slice(0, 10).toUpperCase(), q[0], q[1] - 7); }
       }
       // the Heartland's landmarks: the Gate Temple, the sky isles, the Spire Citadel and the Mountain Station
       const H = VR.Heart;
@@ -232,12 +232,12 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
         const A = I.auto, t = A.spot || [A.site.x, 0, A.site.z], q = toS(t[0], t[2]);
         x.setLineDash([3, 3]); x.strokeStyle = '#9affd8'; x.beginPath(); x.moveTo(cx, cy); x.lineTo(q[0], q[1]); x.stroke(); x.setLineDash([]);
         const eta = Math.round(A.eta || 0);
-        x.fillStyle = '#9affd8'; x.font = 'bold 9px monospace'; x.fillText('▸ ' + A.site.name.slice(0, 14).toUpperCase(), cx, 7);
+        x.fillStyle = '#9affd8'; x.font = 'bold 9px monospace'; x.fillText('▸ ' + (VR.Names && VR.Names.shown ? VR.Names.shown(A.site.name) : A.site.name).slice(0, 14).toUpperCase(), cx, 7);
         x.font = '8px monospace'; x.fillText((A.dist / 1000).toFixed(2) + ' km' + (eta > 0 ? ' · ' + Math.floor(eta / 60) + ':' + String(eta % 60).padStart(2, '0') : ''), cx, TH - 6);
       } else {
         let best = null, bd = 1e18; for (const v of V) { const d = (v.x - p[0]) ** 2 + (v.z - p[2]) ** 2; if (d < bd && d > 140 * 140) { bd = d; best = v; } }
         x.fillStyle = '#9ad8ff'; x.font = '8px monospace';
-        if (best) x.fillText('⌂ ' + best.name.slice(0, 12).toUpperCase() + ' ' + (Math.sqrt(bd) / 1000).toFixed(1) + ' km', cx, TH - 6);
+        if (best) x.fillText('⌂ ' + (VR.Names && VR.Names.shown ? VR.Names.shown(best.name) : best.name).slice(0, 12).toUpperCase() + ' ' + (Math.sqrt(bd) / 1000).toFixed(1) + ' km', cx, TH - 6);
         x.fillText('KURS ' + String(Math.round(I.heading) % 360).padStart(3, '0'), cx, 7);
       }
       x.textAlign = 'right'; x.fillStyle = 'rgba(154,216,255,0.7)'; x.fillText(span + ' m', TW - 4, TH - 6);
@@ -748,7 +748,7 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
       else if (SS && SS.list) {
         let best = null, bd = 1e18;
         for (const vv of SS.list()) { const d = (vv.x - pos[0]) ** 2 + (vv.z - pos[2]) ** 2; if (d > 140 * 140 && d < bd) { bd = d; best = vv; } }
-        if (best) { dest = [best.x, best.y + 8, best.z]; line = `⌂ ${best.name.toUpperCase()} ${(Math.sqrt(bd) / 1000).toFixed(1)} km · G AUTOPILOT`; }
+        if (best) { dest = [best.x, best.y + 8, best.z]; line = `⌂ ${(VR.Names && VR.Names.shown ? VR.Names.shown(best.name) : best.name).toUpperCase()} ${(Math.sqrt(bd) / 1000).toFixed(1)} km · G AUTOPILOT`; }
       }
       if (line) { x.fillStyle = ap ? mint : dim; x.fillText(line, 0, ty + 52 * S); }
       x.setTransform(1, 0, 0, 1, 0, 0);

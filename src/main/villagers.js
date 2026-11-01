@@ -319,7 +319,7 @@
   V.lines = function (key) { const I = VR.I18N; const arr = I && I.list ? I.list('g.folk.' + key) : []; return arr.length ? arr : (I && I.list ? I.list('g.folk.hello') : ['Hello!']); };
   V.say = function (key, h, vars) {
     let s = pick(V.lines(key), h);
-    if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
+    if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? (VR.Names && VR.Names.shown ? VR.Names.shown(vars[k]) : vars[k]) : m);   // (f-polish6: a village's name as shown)
     return s;
   };
   // a text of the tables (a role's title, a trait, a like): the English word when the key is unknown

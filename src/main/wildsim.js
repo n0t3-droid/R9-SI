@@ -366,6 +366,12 @@
   // (1 within FAR[0], FAR_MIN beyond FAR[1]), the air counted in full there (wildgpu's impostor fog) — and a new world's
   // first QUIET seconds have none (it comes in over FADE s): the first look is the land, not a smudge. Pure: test/first3.js
   W.MURM_PALE = [60, 240]; W.MURM_FAR_MIN = 0.22; W.MURM_QUIET = 60; W.MURM_FADE = 30; W.MURM_TAU_MAX = 1.4; W.MURM_ASIDE = 60;   // (an impostor's depth at most: its core a dark grey through which the sky shows, not ink)
+  // f-polish6 (R56-05: at dusk the far flock still a ragged oval of dark dithered specks over a hill — u-movein's and
+  // f-polish5's arrival): from MURM_SKY[0] m out the flock's colour (its impostors and its bird dashes) is lifted toward
+  // the sky band behind it — never darker than MURM_SKYK × that band beyond MURM_SKY[1] m (wildgpu.js): a pale veil of
+  // birds against the evening, not soot. murmSky(d): the floor's share at d (0 near, MURM_SKYK far). Pure: test/polish6.js
+  W.MURM_SKY = [40, 120]; W.MURM_SKYK = 0.7;
+  W.murmSky = function (d) { const A = W.MURM_SKY; if (d <= A[0]) return 0; if (d >= A[1]) return W.MURM_SKYK; const t = (d - A[0]) / (A[1] - A[0]); return W.MURM_SKYK * t * t * (3 - 2 * t); };
   W.murmFar = function (d) { const F = W.MURM_PALE;   // (f-first4: its own name — W.MURM_FAR is the step rate's distance, 120)
     if (d <= F[0]) return 1; if (d >= F[1]) return W.MURM_FAR_MIN; const t = (d - F[0]) / (F[1] - F[0]); return 1 + (W.MURM_FAR_MIN - 1) * t * t * (3 - 2 * t); };
   // a new world's flock: 0 within its first QUIET s (age: the seconds played on it; fresh: a world just made), then in over FADE

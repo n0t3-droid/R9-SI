@@ -651,6 +651,7 @@
       if (p.u.u_avgLum && r.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, r.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, r.texAlbedo); gl.uniform1i(p.u.u_albedo, 0);
       gl.uniform1f(p.u.u_flash, 0);
+      if (p.u.u_desat) gl.uniform1f(p.u.u_desat, 0);
       return p;
     }
     drawMesh(r, p, mesh, M, light, noFog) {
@@ -763,7 +764,11 @@
       // f-first3 (R55-13): the held block 30 % darker than the light at the eye (VR.First2.HAND_DIM) — the eye stays on the world
       const hk = mesh.block && VR.First2 && VR.First2.HAND_DIM ? VR.First2.HAND_DIM : 1, HL = this.handL || (this.handL = { sky: 0, bl: [0, 0, 0] });
       HL.sky = light.sky * hk; HL.bl[0] = light.bl[0] * hk; HL.bl[1] = light.bl[1] * hk; HL.bl[2] = light.bl[2] * hk;
+      // f-polish6 (R56-13): and 20 % less saturated (VR.First2.HAND_SAT: the share of its colour kept)
+      const hs = mesh.block && p.u.u_desat && VR.First2 && Number.isFinite(VR.First2.HAND_SAT) ? 1 - VR.First2.HAND_SAT : 0;
+      if (hs > 0) gl.uniform1f(p.u.u_desat, hs);
       this.drawMesh(r, p, mesh, L, HL, true);
+      if (hs > 0) gl.uniform1f(p.u.u_desat, 0);
       gl.enable(gl.CULL_FACE);
     }
     onColumnLoaded(c) {

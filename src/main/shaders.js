@@ -3399,6 +3399,9 @@ uniform float u_sky;
 uniform vec3 u_blockLight;
 uniform float u_flash;
 uniform float u_noFog;
+#ifndef LITE
+uniform float u_desat;   // f-polish6 (R56-13): the held block's colour toward its grey (VR.First2.HAND_SAT; 0 elsewhere)
+#endif
 ${'__COMMON__'}
 ${LOOK}
 in vec3 v_uvl;
@@ -3428,6 +3431,9 @@ void main() {
   vec3 col = a.rgb * light * min(shK, 1.0);
   if (shK > 1.5 && shK < 2.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)
   col = mix(col, vec3(1.0, 0.25, 0.2), u_flash * 0.55);
+#ifndef LITE
+  if (u_desat > 0.0) col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), u_desat);
+#endif
   if (u_noFog < 0.5) col = applyFog(col, v_rel, length(v_rel));
   o = vec4(col, 1.0);
 }`;

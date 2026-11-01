@@ -24,6 +24,7 @@
   // f-first3 (R55-13): the held block 30 % darker (entities.drawHand scales its light), and the kit's slot 5 a calm
   // sandstone, not the neon magenta that pulled the eye (game.giveKit, a vgen ≥ 9 world's new kit)
   F.HAND_DIM = 0.7; F.KIT5 = 'sandstone';
+  F.HAND_SAT = 0.8;   // f-polish6 (R56-13: sandstone at 0.604, the goal ≤ 0.55): the held block keeps 80 % of its colour (entities.drawHand, u_desat)
   F.FOV = 70;   // the hand's own projection (entities.drawHand)
   // the fist at rest (no bob, no swing), a block held — drawHand's S, F and d·0.9
   F.fistRest = () => {

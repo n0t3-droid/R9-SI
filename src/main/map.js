@@ -184,7 +184,7 @@
           const a = Math.atan2(nv.site.x - p.pos[0], -(nv.site.z - p.pos[2]));
           const rel = ((Math.round((a + p.yaw) * 180 / Math.PI) % 360) + 540) % 360 - 180;
           const arrow = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((Math.round(rel / 45) % 8) + 8) % 8];
-          s += `<br><span style="color:#ffd166">⌂</span> ${nv.site.name} ${Math.round(nv.dist)}m ${arrow}`;
+          s += `<br><span style="color:#ffd166">⌂</span> ${(VR.Names && VR.Names.shown ? VR.Names.shown(nv.site.name) : nv.site.name)} ${Math.round(nv.dist)}m ${arrow}`;
         }
       }
       if (VR.NewLife) s += VR.NewLife.compassLine(g);   // u-home: 🏠 the way home on its world, ↑ to the ship on any other
@@ -231,7 +231,7 @@
         if (sx < -40 || sy < -20 || sx > W + 40 || sy > H + 20) continue;
         ctx.fillStyle = '#ffd166'; ctx.strokeStyle = '#1a1206'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(sx - 7, sy + 6); ctx.lineTo(sx - 7, sy - 1); ctx.lineTo(sx, sy - 8); ctx.lineTo(sx + 7, sy - 1); ctx.lineTo(sx + 7, sy + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.strokeStyle = '#000'; ctx.strokeText(v.name, sx + 11, sy); ctx.fillStyle = '#ffe6a8'; ctx.fillText(v.name, sx + 11, sy);
+        ctx.strokeStyle = '#000'; const vn = (VR.Names && VR.Names.shown ? VR.Names.shown(v.name) : v.name); ctx.strokeText(vn, sx + 11, sy); ctx.fillStyle = '#ffe6a8'; ctx.fillText(vn, sx + 11, sy);
       }
       // ✨ wonders: the found ones with their names, the ones not found yet within 1 km as „?"
       if (g.wonders) for (const m of g.wonders.marks()) {

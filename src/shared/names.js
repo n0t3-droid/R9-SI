@@ -24,14 +24,20 @@
   // ---------------------------------------------------------------- the renames (display only)
   // [regex, new] per language, applied in this order. The ids stay (amarant, zinn, opal, the keys g.eco.sp.*).
   N.RENAME = {
-    de: [[/\bAmarant(?!h)/g, 'Turmalin'], [/\bGlutani/g, 'Glimari'], [/\bNivari/g, 'Isveli']],
+    // (f-polish6, R56-14: the trailer's city — the first name a new player reads — German in a German HUD; English keeps it)
+    de: [[/\bAmarant(?!h)/g, 'Turmalin'], [/\bGlutani/g, 'Glimari'], [/\bNivari/g, 'Isveli'], [/\bNova Haven\b/g, 'Palmenhafen']],
     en: [[/\bAmaranth\b/g, 'Tourmaline'], [/\bAmarant(?!h)/g, 'Tourmaline'], [/\bGlutani/g, 'Glimari'], [/\bNivari/g, 'Isveli']],
   };
-  const ANY = /\bAmarant|\bGlutani|\bNivari/;
+  const ANY = /\bAmarant|\bGlutani|\bNivari|\bNova Haven\b/;
   N.fixText = function (lang, s) {
     if (typeof s !== 'string' || !ANY.test(s)) return s;
     for (const [re, to] of (N.RENAME[lang] || N.RENAME.en)) s = s.replace(re, to);
     return s;
+  };
+  // a name shown as it is stored (a village's site name, a place label): in the language of the moment
+  N.shown = function (s, lang) {
+    if (typeof s !== 'string' || !ANY.test(s)) return s;
+    const I = VR.I18N; return N.fixText(lang || (I && I.lang === 'de' ? 'de' : 'en'), s);
   };
   N.fixTable = function (lang, table) {
     for (const k in table) {

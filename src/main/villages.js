@@ -1219,7 +1219,7 @@
       const add = (label, fn) => { const b = document.createElement('button'); b.className = 'btn small'; b.textContent = label; b.onclick = () => { this.chirp(a); fn(); }; box.appendChild(b); };
       for (const site of list) {
         const d = Math.hypot(site.x - p[0], site.z - p[2]);
-        add(`${site.name} · ${(d / 1000).toFixed(1)} km ${this.compass(site.x - p[0], site.z - p[2])}`, () => {
+        add(`${(VR.Names && VR.Names.shown ? VR.Names.shown(site.name) : site.name)} · ${(d / 1000).toFixed(1)} km ${this.compass(site.x - p[0], site.z - p[2])}`, () => {
           const S = g.starships;
           this.closeTalk();
           a.say(T('g.folk.hopIn', { s: site.name }), 4);

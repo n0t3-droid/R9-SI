@@ -19,7 +19,8 @@
   I.add = function (lang, table) { if (VR.Names && VR.Names.fixTable) VR.Names.fixTable(lang, table); Object.assign(I.dict[lang] || (I.dict[lang] = {}), table); };
   // n-names: a fallback text written at the call gets VR.Names' renames too (an old word in a new line still shows new)
   const fx = (s) => (VR.Names && VR.Names.fixText && typeof s === 'string' ? VR.Names.fixText(I.lang === 'de' ? 'de' : 'en', s) : s);
-  const fill = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : String(s));
+  // (f-polish6: a name passed in — a village's, a place's — gets the renames too, so a line and the minimap agree)
+  const fill = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? fx(v[k]) : m)) : String(s));
   I.t = function (key, vars, fallback) {
     let s;
     const d = I.dict[I.lang]; if (d) s = d[key];
