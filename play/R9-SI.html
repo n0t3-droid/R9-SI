@@ -4947,10 +4947,10 @@ const hash=(a,b,c)=>{let h=(a*374761393+b*668265263+(c|0)*1274126177)|0;h=Math.i
 V.hash=hash;
 
 
-const FIRST=['Mira','Oren','Talia','Juno','Kael','Suri','Nilo','Aven','Lio','Rhea','Tomas','Ayla','Bram','Cora','Dax','Elin','Faro','Gia','Hale','Ivo','Jora','Kiri','Luca','Mae','Nox','Opal','Pax','Quin','Rosa','Sol','Tev','Uma','Vesper','Wren','Yara','Zeph','Ansel','Bea','Cyrus','Dara','Emil','Fern','Gus','Hana','Iris','Jasper','Kaia','Leo','Maya','Nico','Olive','Rune','Sage','Theo','Una','Willa','Yuki','Zara','Arlo','Clem','Eli','Finn','Hugo','Ines','Lulu','Nell','Otto','Ria','Tully','Wynn','Ada','Bodhi','Cleo','Esme','Idris','Mika','Noor','Orla','Remy','Selma'];
-const KIDS=['Pip','Dot','Bo','Kip','Poppy','Tink','Moss','Sprout','Bean','Lark','Pebble','Button','Fizz','Juniper','Nova','Sunny','Twig','Wiggles','Mochi','Pico','Rue','Sky','Taro','Ziggy'];
-const SUR=['Oakhart','Brightwater','Stonefield','Skylark','Emberly','Mossgrove','Starling','Vale','Quill','Thornbury','Amberly','Fairwind','Hollis','Larkspur','Meadows','Nightingale','Pennywhistle','Rivers','Tinsley','Willowby','Ashdown','Bellweather','Copperfield','Dawnbrook','Evergreen','Fernsby','Goldleaf','Honeywell','Ironwood','Juniper','Kettleby','Lumen','Marlow','Northwind','Orchard','Puddlefoot','Quinby','Rosewood','Sunderly','Thistle'];
-V.FIRST=FIRST;V.KIDS=KIDS;V.SUR=SUR;
+
+
+const HZ=VR.Names.pool('herz');
+V.FIRST=HZ.first;V.KIDS=HZ.kids;V.ELDERS=HZ.elders;V.SUR=HZ.sur;
 
 
 const ROLES=V.ROLES={
@@ -8164,6 +8164,280 @@ clear(){this.items.length=0;this.pri.length=0;}
 }
 VR.Heap=Heap;
 })(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const N=VR.Names={};
+const h01=(a,b,c)=>{let h=Math.imul((a|0)^0x3c6ef372,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b)^Math.imul((c|0)+0x1b873593,0xc2b2ae35);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;return(h>>>0)/4294967296;};
+const pick=(L,seed,i,salt)=>L[Math.floor(h01(seed,i,salt)*L.length)];
+const cap=(s)=>s.charAt(0).toUpperCase()+s.slice(1);
+
+
+
+N.RENAME={
+de:[[/\bAmarant(?!h)/g,'Turmalin'],[/\bGlutani/g,'Glimari'],[/\bNivari/g,'Isveli']],
+en:[[/\bAmaranth\b/g,'Tourmaline'],[/\bAmarant(?!h)/g,'Tourmaline'],[/\bGlutani/g,'Glimari'],[/\bNivari/g,'Isveli']],
+};
+const ANY= /\bAmarant|\bGlutani|\bNivari/;
+N.fixText=function(lang,s){
+if(typeof s!=='string'|| !ANY.test(s))return s;
+for(const[re,to]of(N.RENAME[lang]||N.RENAME.en))s=s.replace(re,to);
+return s;
+};
+N.fixTable=function(lang,table){
+for(const k in table){
+const v=table[k];
+if(typeof v==='string'){if(ANY.test(v))table[k]=N.fixText(lang,v);}
+else if(Array.isArray(v))for(let i=0;i<v.length;i++)if(typeof v[i]==='string'&&ANY.test(v[i]))v[i]=N.fixText(lang,v[i]);
+}
+return table;
+};
+
+
+
+
+const EXACT=('nemo dory paul elsa anna olaf ariel simba nala moana maui merida belle aurora jasmine mulan rapunzel bambi dumbo '+
+'stitch lilo wall eve buzz woody yoda luke leia han rey finn poe kylo vader frodo sam bilbo gandalf arwen legolas harry ron '+
+'hermine hermione dobby link zelda mario luigi peach yoshi toad sonic tails pikachu eevee ash misty brock kirby samus lara '+
+'geralt ciri aloy kratos sora riku cloud tifa aerith zidane garnet vivi eiko quina freya steiner leon ada chell glados shrek '+
+'fiona momo ronja pippi michel emil karlsson heidi maja willi flip pumuckl urmel jim lukas nils alfons benjamin bibi tina elmo '+
+'ernie bert grobi oscar kermit piggy gonzo barbie ken lego haribo milka nutella kinder duplo pixar disney marvel thor loki hulk '+
+'groot rocket gamora drax thanos vision wanda natasha tony steve bucky peter miles gwen bruce clark diana barry batman joker '+
+'robin alfred lois lana kara zod nova vega tesla apple google amazon alexa siri cortana halo pac steam valve sega atari nike '+
+'adidas puma audi opel bmw mini fanta sprite kia seat skoda dacia lada volvo saab ikea aldi lidl rewe edeka osram bosch miele '+
+'braun nivea tempo tesa uhu persil lenor dove axe canon nikon sony asus acer dell otto lyra arya sansa bran jon tyrion khal '+
+'aang katara sokka zuko toph korra naruto sasuke goku vegeta totoro kiki chihiro haku ponyo luna neville draco severus albus '+
+'sirius remus tonks pumba timon rafiki zazu scar kovu kiara sven kristoff hans tiana mowgli baloo bagheera kaa raya sisu '+
+'mirabel bruno lotte lotti fiete pelle thea bendix wolfram hedwig moritz till linus wilma smilla hanni nanni krümel puck '+
+'kalle pauli nuki kuddel wuschel knopf hummel pusteblume rosenheim rosenthal silbersee sternberg amarant amaranth glutani '+
+'zippel purzel fussel wispel hörbe hoerbe nivari nivarian sylvari ussr seven eleven sesy kira light ryuk dune mars luna terra gaia sol eden zeus hera odin').split(' ');
+
+const SUB=['nazi','hitler','sex','fuck','shit','fick','hure','nutte','kack','scheis','piss','penis','porn','mord',
+'kill','satan','teufel','bitch','cock','dick','fotze','spast','ussr','isis','kkk','arsch','dumm','doof','blöd',
+'kotz','sau','tod','tot','mist','pups','furz','ass','gay','neger','pipi','popo','kaka','pupu','homo','mami','papi','mama','papa','baby','oma','opa','jude','hass','nigg','krieg','gift','blut',
+'kot','cum','tit','anal','slut','whore','rape','hell','damn','god','gott','jesus','allah','pimp','drug','koks',
+'amarant','glutan','nivar'];
+const EX=new Set(EXACT),SUBRE=new RegExp(SUB.join('|'));
+N.blocked=function(w){
+const l=String(w).toLowerCase();
+if(EX.has(l)||SUBRE.test(l))return true;
+return!!(VR.Galaxy&&VR.Galaxy.blocked&&VR.Galaxy.blocked(w));
+};
+
+const RES=new Set(('funke lumi ilka oskar selma jonte anselm solgani ariveli selkatun dumarin ylosenis flimmi echo helia '+
+'herzwelt heartworld turmalin tourmaline aquamarin aquamarine zinnober cinnabar opal basalt ocker ochre bernstein amber '+
+'cölestin celestine wellari dunelin glimari regoli isveli weißstadt heliataler sternglut ringstation spaltmond glutsee '+
+'rostschlucht nordwiese kupferhang sternwiese frühlicht silbergrat funkenfeld weitblick glimmerhöhe abendtau wolkenrast '+
+'lichtung steinbogen bernsteinkamm himmelsau westhain taufeld rosenschleier glutwiege türkisherz lichtwiege '+
+'flausel tüpfel zwirbel dusel silbrin flöckchen borke mohnbühl lerchenbühl sonnenhof kleehof lindenhof mohnhof hallklamm morgenhain').split(' '));
+N.reserved=(w)=>RES.has(String(w).toLowerCase());
+const ok=(w)=>w.length>=2&& !N.blocked(w)&& !N.reserved(w)&& !/(.)\1\1/.test(w)&& !/[^aeiouyäöü]{3}/.test(w.toLowerCase().replace(/^(sch|ch|th|sh)/,''));
+
+
+
+N.PEOPLES={
+
+
+herz:{
+de:'Herzweltler',en:'Heartworlders',sound:'warm, homely German: Greta Lindenblatt, Hannes Moosbach',
+first:['Alma','Anton','Arvid','Benno','Berta','Birte','Carla','Dora','Edda','Emmi','Enno','Fenja','Finja',
+'Frida','Frido','Fritz','Gesa','Greta','Gustav','Hanne','Hannes','Hauke','Henni','Henrik','Hinnerk','Ida',
+'Imke','Jakob','Janne','Jannis','Johanna','Joris','Juna','Karl','Kasimir','Konrad','Lorin','Lene','Leopold',
+'Liesel','Lisbeth','Lorenz','Malin','Marta','Mats','Matti','Merle','Mila','Minna','Nele','Niklas','Ole','Paula',
+'Quirin','Rieke','Romy','Ruben','Svea','Tilda','Tjark','Torben','Ulla','Valentin','Veit','Wendelin','Wiebke',
+'Xaver','Annik','Jorinde','Hedda'],
+kids:['Bo','Bommel','Fine','Fips','Floh','Fritzi','Hannchen','Jule','Juli','Lenchen','Lillo','Lu','Ludi',
+'Matz','Mieke','Mimi','Mo','Paule','Pips','Sternchen','Tilli','Tobi','Tupfi','Wichtel','Wim','Zippi','Ebbi',
+'Nelli','Kerlchen','Mausi'],
+elders:['Adalbert','Adelheid','Amalie','Bertram','Eberhard','Friedhelm','Gisela','Gerhild','Gebhard','Hildegard',
+'Hubertus','Ingeborg','Irmgard','Kunigunde','Leberecht','Luitpold','Mechthild','Ottilie','Philippa','Reinhold',
+'Rosemarie','Theodora','Ulrich','Vinzenz','Waltraud','Wendula','Wilhelmine','Notburga'],
+sur:['Apfelgrün','Birkenhain','Brombeer','Distelfink','Eichenlaub','Eschenhain','Fliederbusch','Glockenblum',
+'Goldammer','Hagebutt','Haselnuss','Heckenrose','Holunder','Honigtau','Kirschbaum','Kleeblatt','Lerchenfeld',
+'Lindenblatt','Mohnfeld','Moosbach','Morgentau','Mühlbach','Nussbaum','Quellenhof','Rosenhag','Silberbach',
+'Sommerfeld','Sonnenkamp','Sonnentau','Tannenzapf','Wacholder','Weidenkorb','Weißdorn','Wiesengrund','Wolkenstein',
+'Zaunkönig','Ahornblatt','Blauberg','Steinbach','Ringelblum'],
+},
+
+
+
+
+
+aqua:{
+de:'Wellari',en:'Wellari',sound:'soft and flowing: l m n w s and open vowels — waves on sand',
+A:['Li','Ma','Ne','Wa','Sa','Mi','Lu','Na','Ise','Ari','Ela','Ori','Sha','The','Ve','Io'],
+B:['wen','rel','lia','mar','sel','na','rin','lis','ruel','sa','mira','wa'],
+K:['li','mi','lu','ni','po','wi'],E:['mareth','veliar','thamar','meriel','sorine','lune','wanne','resa'],
+F:['nami','rasel','loweth','marin','shalu','venor','wellin','sira'],L:['mar','lune','wel','sela','thal','nore'],
+},
+
+ocker:{
+de:'Dunelin',en:'Dunelin',sound:'warm and earthy: d b m r k h and round a o u — footsteps on warm sand',
+A:['Da','Du','Ba','Bo','Ka','Ko','Ru','Mu','Ra','Ha','Ho','Ta','Za','Om','Ur','Ame'],
+B:['rin','mar','dun','bek','sim','hal','kar','tem','ra','nu','bo','rik'],
+K:['bu','ko','mo','ti','pu','ki'],E:['mirun','barak','hadem','oruk','kemar','sabir','tumar','dahar'],
+F:['bekar','dunar','hadin','oshir','rumab','kesim','talun','barun'],L:['kar','dun','mesa','barra','hum','tob'],
+},
+
+
+zinn:{
+de:'Glimari',en:'Glimari',sound:'bright and crackling: f l r s t k and quick i a o — sparks over embers',
+A:['Fi','Fa','Ri','So','Te','Va','Zi','Ar','Or','Gli','Fla','Ti','Pi','Sol','Kir','Tal'],
+B:['ra','ven','kan','lis','ro','zar','fen','tari','lo','kai','vio','sen'],
+K:['fi','ki','zi','pi','ti','pa'],E:['ombar','varis','elgor','riska','koran','tefar','sulvan','farion'],
+F:['vash','korr','fell','rast','tix','renn','zarin','lohr'],L:['flar','zor','kesh','rion','vel','fira'],
+},
+
+basalt:{
+de:'Regoli',en:'Regoli',sound:'deep and round: m n g d b and o u — a hum inside a stone dome',
+A:['Re','Ro','Go','Gu','Mo','Do','Be','No','Nu','Lo','Tu','Ul','Bu','Gom','Dro','Mur'],
+B:['mun','dor','bel','gon','mo','lun','kum','rod','tun','bo','nem','gol'],
+K:['bo','mu','po','pu','nu','lo'],E:['moram','undor','belkun','gorrel','umbor','degon','tarun','lomund'],
+F:['dom','gor','mund','bel','rod','goth','berun','kolm'],L:['krat','dom','mund','olm','ruk','bom'],
+},
+
+
+opal:{
+de:'Isveli',en:'Isveli',sound:'clear and crisp: s v l k f and bright i e y — frost singing on glass',
+A:['I','Is','Ve','Vi','Sel','Sil','Ly','Yl','Fe','Ni','Ki','Se','Ys','El','Sy','Eli'],
+B:['vi','ka','sen','lin','ris','vel','ya','fen','kis','vie','ra','sil'],
+K:['li','fi','pi','ni','ki','sy'],E:['velvar','syren','sande','korvel','skil','vane','lisvin','frida'],
+F:['vik','fjel','sen','dal','skar','kel','lind','vist'],L:['frost','krist','ven','lys','mir','skel'],
+},
+
+
+
+
+
+flausel:{
+de:'Flausel',en:'Flausel',sound:'tiny and whispery: -el, -i, beards and roots — the forest floor',
+first:['Tummel','Huschel','Trippel','Wuppel','Bimmel','Tröpfel','Flitzel','Krispel','Nuppel','Kribbel',
+'Zwinkel','Glimpel','Rupfel','Dimpel','Lupfel','Moosel','Knöpfel','Pimsel','Wimmel','Hupsel','Lirpel',
+'Schwirrel','Summsel','Tapsel','Nimmel','Silpel','Brummsel','Pelzel','Sprenkel'],
+kids:['Flitz','Hupfi','Wipsi','Tropfi','Nuppi','Wurzli','Sprossi','Knospi','Tauli','Perli','Farni',
+'Pilzi','Beerli','Halmi','Flaumi','Sämi'],
+elders:['Murmelbart','Flechtenbart','Rindenhold','Moosgrau','Wurzelweis','Farnwalt','Eichelgrau','Knorzel',
+'Nebelbart','Silberflaum','Tannengrau','Harzwalt','Pilzhold','Zapfenweis','Mooswalt','Steinflaum'],
+sur:['Moostupf','Tauperle','Pilzhut','Kleestiel','Eichelhut','Distelflaum','Farnwedel','Beerenkorb',
+'Wurzelzopf','Blütenstaub','Mooskissen','Nebeltropf','Glühwurm','Haselkern','Rindenmoos','Tannenzopf',
+'Blattgrün','Fingerhut','Wiesenflaum','Butterblum'],
+},
+};
+
+N.PEOPLE_ORDER=['herz','flausel','aqua','zinn','opal','basalt','ocker'];
+
+N.flausel=function(seed,i){const L=N.pool('flausel').first,a=Math.floor(h01(seed|0,0,0x91)*L.length);return L[(a+(i|0)*7)%L.length];};
+
+N.sample=function(kind,seed){
+const P=N.pool(kind);if(!P)return[];
+const s=seed|0,a=pick(P.first,s,1,0xa1),b=pick(P.first,s,2,0xa2),e=pick(P.elders,s,3,0xa3);
+return[a+' '+pick(P.sur,s,4,0xa4),(b===a?P.first[(P.first.indexOf(b)+1)%P.first.length]:b)+' '+pick(P.sur,s,5,0xa5),pick(P.kids,s,6,0xa6),e];
+};
+
+
+
+
+
+N.SITES={hills_w:'Mohnbühl',hills_e:'Lerchenbühl',farm_c:'Sonnenhof',farm_w:'Kleehof',farm_n:'Lindenhof',
+farm_e:'Mohnhof',canyon:'Hallklamm',east:'Morgenhain'};
+
+
+const TAIL={first:'B',kid:'K',elder:'E',sur:'F',place:'L'};
+N.word=function(kind,seed,form,n){
+const P=N.PEOPLES[kind];if(!P|| !P.A)return'';
+const join=(w,t)=>{const l=w.toLowerCase();if(t.indexOf(l.slice(-2))===0||t.indexOf(l)===0)return null;return l.slice(-1)===t.charAt(0)?w+t.slice(1):w+t;};
+let w=pick(P.A,seed,0,0x61);
+if(form==='place'&&((n||2)>=3||h01(seed,3,0x62)<0.4))w=join(w,pick(P.B,seed,2,0x63));
+if(w)w=join(w,pick(P[TAIL[form]||'B'],seed,7,0x6a));
+if(!w)return'';
+
+w=w.replace(/([aeiouy])\1/g,'$1').replace(/([^aeiouy])\1\1/g,'$1$1');
+return cap(w.slice(0,12).toLowerCase());
+};
+
+const POOLS={};
+const salt=(s)=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h|0;};
+N.pool=function(kind){
+if(POOLS[kind])return POOLS[kind];
+const P=N.PEOPLES[kind];if(!P)return null;
+if(!P.A)return(POOLS[kind]={first:P.first,kids:P.kids,elders:P.elders,sur:P.sur});
+const seen=new Set();
+const gen=(form,n,s0)=>{const out=[];for(let k=0;out.length<n&&k<n*60;k++){const w=N.word(kind,s0*977+k*7919,form);if(w.length>=3&&w.length<=12&&ok(w)&& !seen.has(w)){seen.add(w);out.push(w);}}return out;};
+const s=salt(kind);
+return(POOLS[kind]={first:gen('first',48,s^0x11),kids:gen('kid',24,s^0x22),elders:gen('elder',24,s^0x44),sur:gen('sur',32,s^0x33)});
+};
+N.place=function(kind,seed,n){
+if(kind==='herz'||kind==='flausel')return N.village(seed);
+for(let k=0;k<24;k++){const w=N.word(kind,(seed|0)+k*104729,'place',n||2);if(w.length>=4&&ok(w))return w;}
+return N.PEOPLES[kind]?N.PEOPLES[kind].A[0]+N.PEOPLES[kind].L[0]:'';
+};
+
+
+
+
+const VPRE=['Linden','Rosen','Birken','Erlen','Mohn','Klee','Sonnen','Stern','Moos','Bienen','Apfel','Eichen',
+'Weiden','Lerchen','Glocken','Silber','Honig','Wiesen','Tannen','Kirsch','Quell','Hasel','Flieder','Ahorn',
+'Lilien','Finken','Sommer','Morgen','Rotdorn','Holler'];
+const VSUF=['au','bach','brunn','feld','hain','tal','furt','hof','heim','dorf','grund','born','winkel','berg',
+'see','steg','bühl','wald','wiese','mühle'];
+N.VPRE=VPRE;N.VSUF=VSUF;
+N.village=function(seed){
+for(let k=0;k<16;k++){
+const a=pick(VPRE,seed,k,0x71),b=pick(VSUF,seed,k,0x72);
+const w=a+b;
+if(w.length<=12&& !/eee/.test(w)&&a.toLowerCase().indexOf(b)<0&& !N.blocked(w)&& !N.reserved(w))return w;
+}
+return'Lindenau';
+};
+
+
+const SON=['A','Ae','Be','Ca','Da','E','Fa','Fe','Ha','I','Ka','La','Le','Li','Lo','Lu','Ma','Me','Mi',
+'Na','Ne','No','O','Pe','Ri','Ro','Sa','Se','Si','Ta','Te','Ti','U','Va','Ve','Vi','Ya','Za','Ze'];
+const SMID=['l','r','n','m','s','v','th','nd','ld','ll','nn','sh','r','l'];
+const SVOW=['a','e','i','o','ia','ei','ae','a','e','i'];
+const SEND=['n','ra','ris','nor','lan','mir','dis','ven','rin','sa','na','va','wen','lia','mara','lis','ne',
+'thea','sel','dra','la','mel','vane','rys','tis','lon','l','s'];
+
+
+let GIVEN=null,PLACE_RE=null;
+const peopleLike=(w)=>{
+if(!GIVEN){GIVEN=new Set();for(const k in N.PEOPLES){const P=N.pool(k);for(const x of P.first.concat(P.kids,P.elders))GIVEN.add(x.toLowerCase());}}
+const l=w.toLowerCase();if(GIVEN.has(l))return true;
+if(!PLACE_RE)PLACE_RE=Object.keys(N.PEOPLES).filter(k=>N.PEOPLES[k].A).map(k=>new RegExp('^(?:'+N.PEOPLES[k].A.map(a=>a.toLowerCase()).join('|')+').*(?:'+N.PEOPLES[k].L.join('|')+')$'));
+for(const re of PLACE_RE)if(re.test(l))return true;
+return false;
+};
+N.peopleLike=peopleLike;
+N.star=function(seed,used){
+for(let k=0;k<40;k++){
+const s=(seed|0)^Math.imul(k+1,0x9e3779b1),f=h01(s,0,0x81);
+const on=pick(SON,s,1,0x82),m=pick(SMID,s,2,0x83),v=pick(SVOW,s,3,0x84),e=pick(SEND,s,4,0x85);
+let w=f<0.75?on+m+v+e:on+m+v+pick(['l','n','r','v','m'],s,5,0x86)+pick(SVOW,s,6,0x87)+e;
+w=cap(w.toLowerCase());
+if(w.length<4||w.length>(f<0.75?11:9)|| !/^[A-Z][a-z]+$/.test(w)||N.blocked(w)||N.reserved(w)||peopleLike(w)||(used&&used.has(w)))continue;
+if(used)used.add(w);
+return w;
+}
+return null;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 
 
@@ -19395,7 +19669,7 @@ item('scanner',{cat:'tech',stack:1,use:'scan',name:'Geo Scanner'});
 VR.MOB_EGGS=['glimmer_deer','moss_boar','sky_ray','crystal_crab','ember_husk','void_stalker','shard_wisp','bloom_sheep','hover_drone','glimmer_fox','moss_cat','crystal_pup'];
 
 
-const EGG_NAME={sky_ray:'Cloud Ray'};
+const EGG_NAME={sky_ray:'Cloud Ray',void_stalker:'Void Slinker'}
 for(const m of VR.MOB_EGGS)item('egg_'+m,{cat:'spawn',stack:64,use:'spawn',mob:m,texKey:'egg:'+m,name:(EGG_NAME[m]||title(m))+' Egg'});
 
 
@@ -19447,8 +19721,8 @@ P.LIMIT=3e7;
 
 
 P.KINDS={
-glimmer_fox:{name:'Glimmerfuchs',treat:'glow_berries',names:['Funke','Lumi','Feuerle','Glimmi','Flitze','Sonnu','Lichtle','Fuchsi','Mondi','Schimmi']},
-moss_cat:{name:'Mooskätzchen',treat:'raw_cod',names:['Moosi','Flocke','Samtpfote','Mümmel','Tatze','Wolli','Grünauge','Puschel','Fellchen','Tüpfel']},
+glimmer_fox:{name:'Glimmerfuchs',treat:'glow_berries',names:['Flämmchen','Leuchti','Feuerle','Glimmi','Flitze','Sonnu','Lichtle','Fuchsi','Mondi','Schimmi']},
+moss_cat:{name:'Mooskätzchen',treat:'raw_cod',names:['Moosi','Flocke','Samtpfote','Mümmel','Tatze','Wolli','Grünauge','Puschel','Fellchen','Tupfen']},
 crystal_pup:{name:'Kristallwelpe',treat:'bone',names:['Kiesel','Splitter','Klinke','Bergi','Prisma','Glitzi','Fünkchen','Quarzi','Schnuffel','Eisi']},
 };
 P.STATES=['follow','sit','sleep'];
@@ -24675,7 +24949,7 @@ const PRE=['Bright','Oak','Star','Moss','Lumen','Amber','Willow','Crystal','Silv
 const SUF=['water','hollow','fall','vale','ford','haven','brook','rest','meadow','field','crest','glen','wick','shire','stead','reach','mere','bloom'];
 VG.dbg=null;
 VG.fail=(why)=>{if(VG.dbg)VG.dbg[why]=(VG.dbg[why]||0)+1;return null;};
-VG.name=(seed)=>{const r=new VR.RNG(M.hash2(seed,0x7a11,3));r.next();return r.pick(PRE)+r.pick(SUF);};
+VG.name=(seed)=>(VR.Names?VR.Names.village(M.hash2(seed,0x7a11,3)):PRE[0]+SUF[0]);
 
 
 
@@ -47359,7 +47633,7 @@ id:'helia',name:name('Helia','Helia'),
 star:{type:'F5 V',T:6550,L:3.6,M:1.33,R:1.5,color:'#dddeff'},
 bodies:[
 {id:'helia',kind:'star',name:name('Helia','Helia'),R:1.5*R_SUN,mu:1.33*MU_SUN,spin:{tilt:0,T:3*86400/8}},
-{id:'amarant',kind:'giant',name:name('Amarant','Amaranth'),parent:'helia',R:60000e3,f:0.098,mu:MU_JUP,air:'H₂/He',landable:false,
+{id:'amarant',kind:'giant',name:name('Turmalin','Tourmaline'),parent:'helia',R:60000e3,f:0.098,mu:MU_JUP,air:'H₂/He',landable:false,
 orbit:{a:1.9*AU,e:0,i:0,node:0,peri:0,start:{sunOverEquator:12,falling:true}},
 
 spin:{tilt:14,toward:0,T:5.8*3600/8},
@@ -48845,7 +49119,7 @@ const CACHE=new Map();
 function build(seed){
 seed=(seed>>>0)||0x5eed;
 if(CACHE.has(seed))return CACHE.get(seed);
-const list=[],used=new Set(['Helia']);
+const list=[],used=new Set(['Helia']),used2=new Set(['Helia']);
 const home={idx:0,home:true,p:[0,0,0],name:'Helia',cls:'F',sub:'F5 V',T:6550,L:3.6,R:1.5,M:1.33,color:'#dddeff',bin:null,neb: -1,np:9};
 list.push(home);
 const nx=Math.ceil(2*DISC_R/SECTOR),ny=Math.ceil(2*DISC_H/SECTOR);
@@ -48859,6 +49133,7 @@ const sr=rng(hash(seed,Math.floor(h*4294967296),ix*31+iy*7+iz,0x57a5)),st=starOf
 const s={idx:list.length,home:false,p:[+x.toFixed(3),+y.toFixed(3),+z.toFixed(3)],seed:hash(seed,Math.floor(h*4294967296),k,0x5157)};
 Object.assign(s,st);
 s.name=nameOf(sr,used);
+if(VR.Names)s.name=VR.Names.star(s.seed,used2)||s.name;
 
 s.bin=null;
 if(sr()<0.30){
@@ -49344,7 +49619,7 @@ flora:[
 ],
 fauna:[
 {id:'reef_glider',de:'Riffgleiter',en:'Reef Glider',does:'swim'},
-{id:'shell_strider',de:'Muschelschreiter',en:'Shell Strider',does:'graze'},
+{id:'shell_strider',de:'Muschelschreiter',en:'Shell Wader',does:'graze'},
 {id:'spray_sailor',de:'Gischtsegler',en:'Spray Sailor',does:'fly'},
 ],
 species:{
@@ -49414,7 +49689,7 @@ fauna:[
 {id:'sulfur_beetle',de:'Schwefelkäfer',en:'Sulfur Beetle',does:'hop'},
 ],
 species:{
-de:'Glutani',en:'Glutani',
+de:'Glimari',en:'Glimari',
 look:{skin:[0x4a2a3a,0x542e3e,0x3e2434,0x5a3440],cut:['coat','robe','coat'],feat:'crest',featC:[0xffb02a,0xff7a2a,0xffd050],garb:[0xd84a2a,0xf0c040,0x2a2a30,0xe8e0d0,0x8a2a1a],eye:0xffa030,glow:true},
 kit:{lamp4:'spirit_lantern',post4:'crimson_fence',pave4:['polished_basalt','smooth_basalt'],bench4:'crimson_slab',flower4:'torchflower',shape:'tower',wall:'polished_basalt',band:'sulfur_bricks',roof:'amber_crystal_block',floor:'crimson_planks',fill:'basalt',window:'yellow_stained_glass',door:'crimson_door',bed:'red_bed',light:'spirit_lantern',paving:'polished_sulfur',lamp:'vx_lamppost_crystal',canopy:'yellow_wool',mark:'magma_block'},
 goods:['sulfur','obsidian','magma_block','amber_crystal_block','polished_sulfur','glowing_obsidian','sulfur_bricks','gold_ingot'],
@@ -49477,7 +49752,7 @@ fauna:[
 {id:'ice_wisp',de:'Eisflimmer',en:'Ice Shimmer',does:'fly'},
 ],
 species:{
-de:'Nivari',en:'Nivari',
+de:'Isveli',en:'Isveli',
 look:{skin:[0x9ac8f0,0x8abce8,0xaad4f4,0x7ab0e0],cut:['coat','cape','coat'],feat:'antlers',featC:[0x9ad8ff,0xc8f0ff,0x7ac0f0],garb:[0x2a4a7a,0x7a2a4a,0xe8e0d0,0x3a6a5a,0xc84a4a],eye:0x2a3a6a},
 kit:{lamp4:'lantern',post4:'spruce_fence',pave4:['smooth_stone','snow_block_cut'],bench4:'spruce_slab',flower4:'white_tulip',shape:'vault',wall:'packed_ice',band:'snow_block',roof:'blue_ice',floor:'spruce_planks',fill:'packed_ice',window:'light_blue_stained_glass',door:'spruce_door',bed:'light_blue_bed',light:'lantern',paving:'snow_block_cut',lamp:'vx_lamppost_crystal',canopy:'light_blue_wool',mark:'rose_crystal_block'},
 goods:['packed_ice','blue_ice','ice_crystal','snow_block','tholin_ice','rose_crystal_block','azure_crystal_cluster','lantern'],
@@ -49549,19 +49824,10 @@ VR.BIOMES.push(e);VR.BIOME[b.key]=e.id;
 
 
 const cap=(s)=>s.charAt(0).toUpperCase()+s.slice(1);
-E.word=function(kind,seed,n){
-const S=K[kind].species,L=S.syl;
-let w='';
-for(let i=0;i<n;i++)w+=L[Math.floor(h01(seed,i,0x51)*L.length)];
-if(h01(seed,9,0x52)<0.5)w+=S.end[Math.floor(h01(seed,10,0x53)*S.end.length)];
-return cap(w.slice(0,10));
-};
-const NAMES={};
-E.names=function(kind){
-if(NAMES[kind])return NAMES[kind];
-const pick=(salt,n,syl)=>{const out=[],seen=new Set();for(let k=0;out.length<n&&k<n*8;k++){const w=E.word(kind,salt*977+k,syl+(h01(salt,k,3)<0.3?1:0));if(w.length>=3&& !seen.has(w)){seen.add(w);out.push(w);}}return out;};
-return(NAMES[kind]={first:pick(strHash(kind)^0x11,32,2),kids:pick(strHash(kind)^0x22,16,2),sur:pick(strHash(kind)^0x33,16,3)});
-};
+
+
+E.word=function(kind,seed,n){return VR.Names.place(kind,seed,n);};
+E.names=function(kind){return VR.Names.pool(kind);};
 
 
 const SC=new Map();
@@ -53368,7 +53634,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="542b78533c866d30";
+VR.TEX_SRC_HASH="b2521273ede9729d";
 
 
 
@@ -53388,17 +53654,19 @@ const I=VR.I18N=VR.I18N||{dict:{}};
 I.langs=LANGS;
 I.dict=I.dict||{};
 I.listeners=I.listeners||[];
-I.add=function(lang,table){Object.assign(I.dict[lang]||(I.dict[lang]={}),table);};
+I.add=function(lang,table){if(VR.Names&&VR.Names.fixTable)VR.Names.fixTable(lang,table);Object.assign(I.dict[lang]||(I.dict[lang]={}),table);};
+
+const fx=(s)=>(VR.Names&&VR.Names.fixText&&typeof s==='string'?VR.Names.fixText(I.lang==='de'?'de':'en',s):s);
 const fill=(s,v)=>(v?String(s).replace(/\{(\w+)\}/g,(m,k)=>(v[k]!==undefined?v[k]:m)):String(s));
 I.t=function(key,vars,fallback){
 let s;
 const d=I.dict[I.lang];if(d)s=d[key];
 if(s===undefined&&I.lang!=='en'&&I.dict.en)s=I.dict.en[key];
-if(s===undefined)s=fallback!==undefined?fallback:key;
+if(s===undefined)s=fallback!==undefined?fx(fallback):key;
 return fill(s,vars);
 };
 
-I.tx=function(key,vars,de,en){const d=I.dict[I.lang];if(d&&d[key]!==undefined)return fill(d[key],vars);if(I.lang==='de')return fill(de!==undefined?de:en,vars);const e=I.dict.en&&I.dict.en[key];return fill(e!==undefined?e:(en!==undefined?en:de),vars);};
+I.tx=function(key,vars,de,en){const d=I.dict[I.lang];if(d&&d[key]!==undefined)return fill(d[key],vars);if(I.lang==='de')return fill(fx(de!==undefined?de:en),vars);const e=I.dict.en&&I.dict.en[key];return fill(e!==undefined?e:fx(en!==undefined?en:de),vars);};
 
 
 I.list=function(key){const d=I.dict[I.lang],v=d&&d[key];if(Array.isArray(v))return v;const e=I.dict.en&&I.dict.en[key];return Array.isArray(e)?e:[];};
@@ -54482,7 +54750,7 @@ VR.I18N.add('en',{
 'g.set.funkeQuiet.tip':'Funke says nothing on its own for ten minutes — you can still ask.',
 
 'g.mob.glimmer_deer':'Glimmer Deer','g.mob.moss_boar':'Moss Boar','g.mob.sky_ray':'Cloud Ray','g.mob.crystal_crab':'Crystal Crab','g.mob.ember_husk':'Ember Husk',
-'g.mob.void_stalker':'Void Stalker','g.mob.shard_wisp':'Shard Wisp','g.mob.pond_duck':'Pond Duck','g.mob.bloom_sheep':'Bloom Sheep','g.mob.hover_drone':'Hover Drone',
+'g.mob.void_stalker':'Void Slinker','g.mob.shard_wisp':'Shard Wisp','g.mob.pond_duck':'Pond Duck','g.mob.bloom_sheep':'Bloom Sheep','g.mob.hover_drone':'Hover Drone',
 'g.biome.ocean':'Ocean','g.biome.deep_ocean':'Deep Ocean','g.biome.warm_ocean':'Warm Ocean','g.biome.lukewarm_ocean':'Lukewarm Ocean','g.biome.deep_lukewarm_ocean':'Deep Lukewarm Ocean',
 'g.biome.cold_ocean':'Cold Ocean','g.biome.deep_cold_ocean':'Deep Cold Ocean','g.biome.frozen_ocean':'Frozen Ocean','g.biome.deep_frozen_ocean':'Deep Frozen Ocean','g.biome.mushroom_fields':'Mushroom Fields',
 'g.biome.jagged_peaks':'Jagged Peaks','g.biome.frozen_peaks':'Frozen Peaks','g.biome.stony_peaks':'Stony Peaks','g.biome.meadow':'Meadow','g.biome.cherry_grove':'Cherry Grove','g.biome.grove':'Grove',
@@ -57140,7 +57408,7 @@ VR.I18N.add('en',{
 "g.biome.aqua_saltmeadow":"Salt Meadow",
 "g.biome.aqua_reef":"Reef Garden",
 "g.mob.reef_glider":"Reef Glider",
-"g.mob.shell_strider":"Shell Strider",
+"g.mob.shell_strider":"Shell Wader",
 "g.mob.spray_sailor":"Spray Sailor",
 "g.eco.lm.aqua.arch":"Coral Arch",
 "g.eco.lm.aqua.shroom":"Glow Canopy",
@@ -57452,10 +57720,10 @@ VR.I18N.add('en',{
 "g.wd.s.well":"You make a wish — and find something shiny.",
 "g.wd.site.temple":"Gate Temple",
 "g.wd.site.city":"Nova Haven",
-"g.wd.site.hills":"Hill village",
-"g.wd.site.station":"Mountain station",
+"g.wd.site.hills":"Dome Hills",
+"g.wd.site.station":"Mountain Station",
 "g.wd.site.canyon":"Canyon",
-"g.wd.site.citadel":"Tower citadel",
+"g.wd.site.citadel":"Spire Citadel",
 "g.wd.site.farm":"Farm",
 "g.wd.site.lookout":"Lookout tower",
 "g.wd.site.grove":"Grove",
@@ -57465,6 +57733,65 @@ VR.I18N.add('en',{
 "g.wd.r.berrypancake":"Berry pancakes",
 "g.wd.r.mushroompie":"Mushroom pie",
 "g.wd.r.flowertea":"Blossom tea",
+
+
+"g.codex.cat.peoples":"Peoples",
+"g.codex.p.names":"Their names: {names}",
+"g.codex.p.herz":["The Heartworlders","The folk of home: farmers, bakers, fishers and stargazers in villages like Lindenau and Mohnbrunn. Their names sound warm and old-fashioned; children go by pet names, the old by their grandparents' names.","Visit a village of Heartworld."],
+"g.codex.p.flausel":["The Flausel","The little forest folk of the enchanted places, hardly taller than a mushroom. They are named after the quiet sounds of the wood, their families after moss, dew and berries; the old ones after their beards.","Find an enchanted place."],
+"g.codex.p.aqua":["The Wellari","The shell folk of Aquamarine's islands. Their names flow softly like waves on sand.","Visit Aquamarine."],
+"g.codex.p.zinn":["The Glimari","The ember folk of Cinnabar's sulfur plains. Their crests glimmer like embers, and their names crackle brightly like sparks.","Visit Cinnabar."],
+"g.codex.p.opal":["The Isveli","The frost folk in Opal's ice. Their names ring clear like frost on glass.","Visit Opal."],
+"g.codex.p.basalt":["The Regoli","The dome folk in Basalt's craters. Their names hum deep and round as in a stone dome.","Visit Basalt."],
+"g.codex.p.ocker":["The Dunelin","The earth folk of Ochre's dunes. Their names are warm and earthy like footsteps on warm sand.","Visit Ochre."],
+"g.wd.site.hills_w":"Mohnbühl",
+"g.wd.site.hills_e":"Lerchenbühl",
+"g.wd.site.farm_c":"Sonnenhof",
+"g.wd.site.farm_w":"Kleehof",
+"g.wd.site.farm_n":"Lindenhof",
+"g.wd.site.farm_e":"Mohnhof",
+"g.wd.site.canyon":"Hallklamm",
+"g.wd.site.east":"Morgenhain",
+
+
+"g.mi.found":"A home! Word gets around — maybe someone will come up the way at sunrise.",
+"g.mi.found2":"Another home! A family will surely move in within a day or two.",
+"g.mi.hint":"Almost a home — {why}.",
+"g.mi.why.walls":"the walls or the roof still have a gap",
+"g.mi.why.door":"it still needs a door",
+"g.mi.why.small":"the room is still too small (at least 3 × 3 × 2)",
+"g.mi.why.light":"it still needs a light inside",
+"g.mi.why.bed":"it still needs a bed or a seat",
+"g.mi.coming":"The {fam} family is coming up the way.",
+"g.mi.skip":"Backspace: skip",
+"g.mi.skipBtn":"Skip",
+"g.mi.movedT":"New neighbours!",
+"g.mi.moved":"The {fam} family moved into your house.",
+"g.mi.movedAway":"While you were away, the {fam} family moved into your house.",
+"g.mi.decorAsk":"The {fam} family would love to decorate their home a little — only small things in empty spots, and you can remove all of it. Allow?",
+"g.mi.yes":"Yes, please",
+"g.mi.no":"Rather not",
+"g.mi.nameAsk":"{n} families live here now — your settlement needs a name!",
+"g.mi.nameOk":"That's its name",
+"g.mi.later":"Later",
+"g.mi.named":"Welcome to {v}!",
+"g.mi.market":"{v} now has a little market.",
+"g.mi.festSoon":"Tomorrow evening {v} celebrates its first festival!",
+"g.mi.giftNote":"There is a small gift at your door.",
+"g.mi.giftT":"A gift!",
+"g.mi.giftGot":"From the {fam} family: {n} × {item}",
+"g.mi.arrive":"Hello, {name}! We're the {fam} family — is this really our new home?",
+"g.mi.arriveN":"Hello! We're the {fam} family — is this really our new home?",
+"g.mi.arriveKid":"Look, a real house!",
+"g.mi.unpack":"I'll start carrying the boxes in.",
+"g.mi.greet.none":"Hello, {name}! Good to see you.",
+"g.mi.greet.built":"{name}! Our house is so cosy — thank you for building it.",
+"g.mi.greet.gifted":"Hello, {name}! Thanks again for the {what}!",
+"g.mi.greet.helped":"{name}, good to see you — thank you for your help!",
+"g.mi.greet.noneN":"Hello! Good to see you.",
+"g.mi.greet.builtN":"Our house is so cosy — thank you for building it!",
+"g.mi.greet.giftedN":"Thanks again for the {what}!",
+"g.mi.greet.helpedN":"Good to see you — thank you for your help!",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -61434,7 +61761,7 @@ VR.I18N.add('de',{
 "g.wd.s.well":"Du wünschst dir etwas — und findest etwas Glänzendes.",
 "g.wd.site.temple":"Tor-Tempel",
 "g.wd.site.city":"Nova Haven",
-"g.wd.site.hills":"Hügeldorf",
+"g.wd.site.hills":"Kuppelhügel",
 "g.wd.site.station":"Bergstation",
 "g.wd.site.canyon":"Schlucht",
 "g.wd.site.citadel":"Turmzitadelle",
@@ -61447,6 +61774,65 @@ VR.I18N.add('de',{
 "g.wd.r.berrypancake":"Beerenpfannkuchen",
 "g.wd.r.mushroompie":"Pilzpastete",
 "g.wd.r.flowertea":"Blütentee",
+
+
+"g.codex.cat.peoples":"Völker",
+"g.codex.p.names":"So heißen sie: {names}",
+"g.codex.p.herz":["Die Herzweltler","Das Volk der Heimat: Bauern, Bäcker, Fischer und Sterngucker in Dörfern wie Lindenau und Mohnbrunn. Ihre Namen klingen warm und altmodisch; Kinder ruft man mit Kosenamen, die Alten tragen die Namen der Großeltern.","Besuche ein Dorf der Herzwelt."],
+"g.codex.p.flausel":["Die Flausel","Das kleine Waldvolk der Märchenorte, kaum größer als ein Pilz. Sie heißen wie die leisen Geräusche des Waldes, ihre Familien nach Moos, Tau und Beeren; die Alten nach ihren Bärten.","Finde einen Märchenort."],
+"g.codex.p.aqua":["Die Wellari","Das Muschelvolk der Inseln von Aquamarin. Ihre Namen fließen weich wie Wellen auf Sand.","Besuche Aquamarin."],
+"g.codex.p.zinn":["Die Glimari","Das Glutvolk der Schwefelebenen von Zinnober. Ihre Kämme glimmen wie Glut, und ihre Namen knistern hell wie Funken.","Besuche Zinnober."],
+"g.codex.p.opal":["Die Isveli","Das Frostvolk im Eis von Opal. Ihre Namen klingen klar wie Frost auf Glas.","Besuche Opal."],
+"g.codex.p.basalt":["Die Regoli","Das Kuppelvolk in den Kratern von Basalt. Ihre Namen summen tief und rund wie in einer Steinkuppel.","Besuche Basalt."],
+"g.codex.p.ocker":["Die Dunelin","Das Erdvolk der Dünen von Ocker. Ihre Namen sind warm und erdig wie Schritte auf warmem Sand.","Besuche Ocker."],
+"g.wd.site.hills_w":"Mohnbühl",
+"g.wd.site.hills_e":"Lerchenbühl",
+"g.wd.site.farm_c":"Sonnenhof",
+"g.wd.site.farm_w":"Kleehof",
+"g.wd.site.farm_n":"Lindenhof",
+"g.wd.site.farm_e":"Mohnhof",
+"g.wd.site.canyon":"Hallklamm",
+"g.wd.site.east":"Morgenhain",
+
+
+"g.mi.found":"Ein Zuhause! Das spricht sich herum — vielleicht kommt bei Sonnenaufgang jemand den Weg herauf.",
+"g.mi.found2":"Noch ein Zuhause! In ein, zwei Tagen zieht sicher eine Familie ein.",
+"g.mi.hint":"Fast ein Zuhause — {why}.",
+"g.mi.why.walls":"Wände oder Dach haben noch eine Lücke",
+"g.mi.why.door":"es fehlt noch eine Tür",
+"g.mi.why.small":"der Raum ist noch zu klein (mindestens 3 × 3 × 2)",
+"g.mi.why.light":"drinnen fehlt noch ein Licht",
+"g.mi.why.bed":"es fehlt noch ein Bett oder ein Sitzplatz",
+"g.mi.coming":"Familie {fam} kommt den Weg herauf.",
+"g.mi.skip":"Rücktaste: überspringen",
+"g.mi.skipBtn":"Überspringen",
+"g.mi.movedT":"Neue Nachbarn!",
+"g.mi.moved":"Familie {fam} ist in dein Haus eingezogen.",
+"g.mi.movedAway":"Während du unterwegs warst, ist Familie {fam} in dein Haus eingezogen.",
+"g.mi.decorAsk":"Familie {fam} würde ihr Zuhause gern ein wenig schmücken — nur kleine Dinge in freien Feldern, du kannst alles wieder abbauen. Erlauben?",
+"g.mi.yes":"Ja, gern",
+"g.mi.no":"Lieber nicht",
+"g.mi.nameAsk":"Hier wohnen jetzt {n} Familien — eure Siedlung braucht einen Namen!",
+"g.mi.nameOk":"So soll sie heißen",
+"g.mi.later":"Später",
+"g.mi.named":"Willkommen in {v}!",
+"g.mi.market":"In {v} gibt es jetzt einen kleinen Markt.",
+"g.mi.festSoon":"Morgen Abend feiert {v} sein erstes Fest!",
+"g.mi.giftNote":"Vor deiner Tür liegt ein kleines Geschenk.",
+"g.mi.giftT":"Ein Geschenk!",
+"g.mi.giftGot":"Von Familie {fam}: {n} × {item}",
+"g.mi.arrive":"Hallo, {name}! Wir sind Familie {fam} — ist das wirklich unser neues Zuhause?",
+"g.mi.arriveN":"Hallo! Wir sind Familie {fam} — ist das wirklich unser neues Zuhause?",
+"g.mi.arriveKid":"Guck mal, ein richtiges Haus!",
+"g.mi.unpack":"Ich trag schon mal die Kisten rein.",
+"g.mi.greet.none":"Hallo, {name}! Schön, dich zu sehen.",
+"g.mi.greet.built":"{name}! Unser Haus ist so gemütlich — danke, dass du es gebaut hast.",
+"g.mi.greet.gifted":"Hallo, {name}! Danke noch mal für {what}!",
+"g.mi.greet.helped":"{name}, gut, dass du da bist — danke für deine Hilfe!",
+"g.mi.greet.noneN":"Hallo! Schön, dich zu sehen.",
+"g.mi.greet.builtN":"Unser Haus ist so gemütlich — danke, dass du es gebaut hast!",
+"g.mi.greet.giftedN":"Danke noch mal für {what}!",
+"g.mi.greet.helpedN":"Gut, dass du da bist — danke für deine Hilfe!",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -92543,10 +92929,10 @@ const hash=(a,b,c)=>{let h=(a*374761393+b*668265263+(c|0)*1274126177)|0;h=Math.i
 V.hash=hash;
 
 
-const FIRST=['Mira','Oren','Talia','Juno','Kael','Suri','Nilo','Aven','Lio','Rhea','Tomas','Ayla','Bram','Cora','Dax','Elin','Faro','Gia','Hale','Ivo','Jora','Kiri','Luca','Mae','Nox','Opal','Pax','Quin','Rosa','Sol','Tev','Uma','Vesper','Wren','Yara','Zeph','Ansel','Bea','Cyrus','Dara','Emil','Fern','Gus','Hana','Iris','Jasper','Kaia','Leo','Maya','Nico','Olive','Rune','Sage','Theo','Una','Willa','Yuki','Zara','Arlo','Clem','Eli','Finn','Hugo','Ines','Lulu','Nell','Otto','Ria','Tully','Wynn','Ada','Bodhi','Cleo','Esme','Idris','Mika','Noor','Orla','Remy','Selma'];
-const KIDS=['Pip','Dot','Bo','Kip','Poppy','Tink','Moss','Sprout','Bean','Lark','Pebble','Button','Fizz','Juniper','Nova','Sunny','Twig','Wiggles','Mochi','Pico','Rue','Sky','Taro','Ziggy'];
-const SUR=['Oakhart','Brightwater','Stonefield','Skylark','Emberly','Mossgrove','Starling','Vale','Quill','Thornbury','Amberly','Fairwind','Hollis','Larkspur','Meadows','Nightingale','Pennywhistle','Rivers','Tinsley','Willowby','Ashdown','Bellweather','Copperfield','Dawnbrook','Evergreen','Fernsby','Goldleaf','Honeywell','Ironwood','Juniper','Kettleby','Lumen','Marlow','Northwind','Orchard','Puddlefoot','Quinby','Rosewood','Sunderly','Thistle'];
-V.FIRST=FIRST;V.KIDS=KIDS;V.SUR=SUR;
+
+
+const HZ=VR.Names.pool('herz');
+V.FIRST=HZ.first;V.KIDS=HZ.kids;V.ELDERS=HZ.elders;V.SUR=HZ.sur;
 
 
 const ROLES=V.ROLES={
@@ -94655,7 +95041,8 @@ const P=vil.plan,st=vil.st;
 const fams=[];
 const usedNames=new Set(),usedSur=new Set();
 const NM=P.names||null;
-const nameFor=(seed,kid)=>{const list=kid?(NM?NM.kids:Folk.KIDS):(NM?NM.first:Folk.FIRST);for(let k=0;k<40;k++){const n=list[H(seed,k,3)%list.length];if(!usedNames.has(n)){usedNames.add(n);return n;}}return list[seed%list.length];};
+
+const nameFor=(seed,kid,old)=>{const list=kid?(NM?NM.kids:Folk.KIDS):old&&(NM?NM.elders:Folk.ELDERS)?(NM?NM.elders:Folk.ELDERS):(NM?NM.first:Folk.FIRST);for(let k=0;k<40;k++){const n=list[H(seed,k,3)%list.length];if(!usedNames.has(n)){usedNames.add(n);return n;}}return list[seed%list.length];};
 const SUR=NM?NM.sur:Folk.SUR;
 const surFor=(seed)=>{for(let k=0;k<40;k++){const n=SUR[H(seed,k,5)%SUR.length];if(!usedSur.has(n)){usedSur.add(n);return n;}}return SUR[seed%SUR.length];};
 const homes=P.homes.slice();
@@ -94687,7 +95074,7 @@ const role=age==='child'?'child':age==='elder'?'elder':null;
 const person={
 id:P.id+':'+hi+':'+k,fam:fams.length,home:hi,idx:k,age,role,seed,newHome: !!home.newHome,
 years:age==='child'?5+H(seed,4,9)%8:age==='elder'?66+H(seed,4,9)%18:22+H(seed,4,9)%38,
-name:nameFor(seed,age==='child'),bed:home.beds[k]||home.beds[0]||null,
+name:nameFor(seed,age==='child',age==='elder'),bed:home.beds[k]||home.beds[0]||null,
 trait:Folk.TRAITS[H(seed,1,9)%Folk.TRAITS.length],likes:Folk.LIKES[H(seed,2,9)%Folk.LIKES.length],
 look:null,
 };
@@ -98598,7 +98985,7 @@ const MILESTONES=[
 ['spar','glowspar'],
 ['stars','exo_crystal'],
 ];
-const CATS={milestones:'g.codex.cat.milestones',wonders:'g.codex.cat.wonders',creatures:'g.codex.cat.creatures',realm:'g.codex.cat.realm',overworld:'g.codex.cat.overworld',caves:'g.codex.cat.caves',forge:'g.codex.cat.forge',hollow:'g.codex.cat.hollow',drift:'g.codex.cat.drift',moons:'g.codex.cat.moons',inventions:'g.codex.cat.inventions'};
+const CATS={peoples:'g.codex.cat.peoples',milestones:'g.codex.cat.milestones',wonders:'g.codex.cat.wonders',creatures:'g.codex.cat.creatures',realm:'g.codex.cat.realm',overworld:'g.codex.cat.overworld',caves:'g.codex.cat.caves',forge:'g.codex.cat.forge',hollow:'g.codex.cat.hollow',drift:'g.codex.cat.drift',moons:'g.codex.cat.moons',inventions:'g.codex.cat.inventions'};
 const INV_TRIGGERS={oak_log:'log',birch_log:'log',spruce_log:'log',jungle_log:'log',acacia_log:'log',dark_oak_log:'log',cherry_log:'log',mangrove_log:'log',cobblestone:'stone',iron_ingot:'iron',diamond:'diamond',crystal_shard_violet:'crystal',crystal_shard_azure:'crystal',crystal_shard_verdant:'crystal',crystal_shard_rose:'crystal',crystal_shard_amber:'crystal',aether_bucket:'aether',star_core:'star_core',laser_blaster:'blaster',crafting_table:'table',torch:'torch',furnace:'furnace',glowspar:'spar',nickel_iron:'spar',ice_nodule:'spar'};
 
 class Codex{
@@ -98624,6 +99011,10 @@ if(VR.BodyLife)for(const id of VR.BodyLife.PAGES)add('moon:'+id,'moons',null,()=
 
 const IV=VR.Inventions;
 if(IV)for(const c of IV.LIST)add('i:'+c.k,'inventions',c.id,()=>{const x=IV.text(c.k);return{name:x.name,desc:x.line,hint:T('g.codex.inventHint')};},()=>IV.has(c.k));
+
+
+const N=VR.Names;
+if(N&&N.PEOPLE_ORDER)for(const k of N.PEOPLE_ORDER)add('p:'+k,'peoples',null,()=>{const L=TL('g.codex.p.'+k);return{name:L[0]||k,desc:(L[1]||'')+' '+T('g.codex.p.names',{names:N.sample(k,7).join(' · ')}),hint:L[2]||''};});
 this.t=0;this.nightStart=null;
 this.seen=new Set();
 }
@@ -98664,6 +99055,13 @@ if(!b.cave||sky<6)this.unlock('b:'+b.key);
 }
 if(g.entities)for(const m of g.entities.mobs){const dx=m.pos[0]-p.pos[0],dz=m.pos[2]-p.pos[2];if(dx*dx+dz*dz<144&&Math.abs(m.pos[1]-p.pos[1])<12)this.unlock('c:'+m.kind);}
 if(p.mode==='survival')for(const s of p.inv.slots)if(s){const k=INV_TRIGGERS[s.id]||(/_log$/.test(s.id)?'log':null);if(k)this.unlock('m:'+k);}
+if(this.peopleT===undefined||(this.peopleT-=1)<=0){
+this.peopleT=4;
+const WL=VR.WorldLife,kd=WL&&WL.kindOf?WL.kindOf(g):null,FS=VR.Fairy&&VR.Fairy.state;
+if(kd)this.unlock('p:'+kd);
+if(FS&&FS.near&&FS.nearD<40)this.unlock('p:flausel');
+if(g.dim==='overworld'&&g.villages&&g.villages.sites)for(const s of g.villages.sites)if(s&&Math.hypot(s.x-p.pos[0],s.z-p.pos[2])<(s.rad||40)+10){this.unlock('p:herz');break;}
+}
 if(y<=6)this.unlock('m:deep');
 if(y>=200)this.unlock('m:sky');
 
@@ -98676,7 +99074,7 @@ if(p.dead)this.nightStart=null;
 }
 
 list(){
-const order=['milestones','wonders','creatures','realm','overworld','caves','forge','hollow','drift','moons','inventions'];
+const order=['milestones','wonders','peoples','creatures','realm','overworld','caves','forge','hollow','drift','moons','inventions'];
 return this.entries.map(e=>Object.assign({id:e.id,catKey:e.catKey,cat:T(CATS[e.catKey]),icon:e.icon,found:e.live? !!e.live(): !!this.found[e.id]},e.text())).sort((a,b)=>order.indexOf(a.catKey)-order.indexOf(b.catKey));
 }
 toJSON(){return this.found;}
@@ -117914,7 +118312,7 @@ const BUILD=[
 
 const THINGS={child:['ball','kite','kitten','puppy'],adult:['kitten','scarf','letter','puppy'],elder:['letter','scarf','kitten']};
 Q.THINGS=['kitten','puppy','ball','kite','scarf','letter'];
-const PETNAMES=['Flocke','Moosi','Tatze','Puschel','Samtpfote','Tüpfel'];
+const PETNAMES=['Flocke','Moosi','Tatze','Puschel','Samtpfote','Tupfen'];
 
 const REPAIR_V=['lamps','bench'],REPAIR_P=['plazalamp','bell'];
 
@@ -139939,7 +140337,7 @@ F2.renderSimple.__q=true;
 const W=VR.Wander=VR.Wander||{};
 const LK=VR.LifeKit,TAU=Math.PI*2;
 const h=(a,b,c)=>LK.h(a,b,c);
-const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
+const T=(k,v,fb)=>(VR.I18N?VR.I18N.t(k,v,fb):(fb!==undefined?fb:k));
 const hasDoc=typeof document!=='undefined'&& !!document.createElement;
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'wander',g:'img',sec:'objects',t:'switch',lab:'g.set.wander',tip:'g.set.wander.tip',cost:'low',def:true});
 
@@ -140020,6 +140418,11 @@ const B=meta.wander;
 for(const p of W.PAGES)if(!isObj(B[p]))B[p]={};
 if(!isObj(B.map)&&B.map!==undefined)delete B.map;
 return B;
+};
+
+W.placeName=function(id,stored){
+const m= /^l:(.+)$/.exec(id||''),L=VR.Land;if(!m|| !L|| !L.SITES)return stored;
+const site=L.SITES.find(x=>x[0]===m[1]);return site?T('g.wd.site.'+site[0],null,T('g.wd.site.'+site[3])):stored;
 };
 W.note=function(meta,page,id,val){
 const B=W.book(meta);if(!B|| !B[page]|| !id)return false;
@@ -140190,7 +140593,7 @@ const vs=(g.villages&&g.villages.sites)||[];
 for(const s of vs)if(s&&Number.isFinite(s.x))out.push({id:'v:'+s.id,x:s.x,z:s.z,name:s.name||T('g.q.pl.village'),rad:Math.min(70,s.rad||40),kind:'village'});
 if(g.dim==='overworld'&&Lnd&&Lnd.SITES&&(meta.vgen|0)>=(Lnd.VGEN||10)&&meta.type!=='flat'){
 const twin=new Set((Lnd.JOINED||[]).map(j=>j[1]));
-for(const[id,x,z,kind]of Lnd.SITES)if(W.SITE_KINDS.indexOf(kind)>=0&&(x||z)&& !twin.has(id))out.push({id:'l:'+id,x,z,name:T('g.wd.site.'+kind),rad:kind==='city'||kind==='temple'?60:32,kind});
+for(const[id,x,z,kind]of Lnd.SITES)if(W.SITE_KINDS.indexOf(kind)>=0&&(x||z)&& !twin.has(id))out.push({id:'l:'+id,x,z,name:T('g.wd.site.'+id,null,T('g.wd.site.'+kind)),rad:kind==='city'||kind==='temple'?60:32,kind});
 }
 const WL=VR.WorldLife,kind=WL&&WL.kindOf?WL.kindOf(g):null;
 if(kind){
@@ -140353,7 +140756,11 @@ const s=D.spot(26,0.35);if(!s)return false;
 const to=W.nextPlace(D.places,s,D.g.player.yaw,D.seen())||null;
 m.pos=s;m.to=to;
 m.F=D.fig(m.seed,s,null,'adult');m.name=(D.g.villages&&VR.Villagers&&VR.Villagers.nameFor)?VR.Villagers.nameFor(m.seed):null;
-if(!m.name){const A=['Mira','Jonas','Ilka','Ben','Tilda','Oskar','Lene','Paul','Rosa','Emil','Wanda','Fiete'];m.name=A[(m.seed>>>2)%A.length];}
+if(!m.name&&VR.Names){
+const WL=VR.WorldLife,kd=WL&&WL.kindOf?WL.kindOf(D.g):null,NP=(kd&&VR.Names.pool(kd))||VR.Names.pool('herz');
+m.name=NP.first[(m.seed>>>2)%NP.first.length]+' '+NP.sur[(m.seed>>>9)%NP.sur.length];
+}
+if(!m.name)m.name=T('g.wd.k.traveller');
 m.chatN=0;m.chatT=4;m.with=0;
 return true;
 },
@@ -140777,7 +141184,7 @@ let list='';
 if(p==='stickers')list=W.NAMES.map(n=>`<span class="wdst${B.stickers&&B.stickers[n]?' on':''}" title="${esc(B.stickers&&B.stickers[n]?T('g.wd.k.'+n):'?')}">${B.stickers&&B.stickers[n]?W.KINDS[n].ico:'·'}</span>`).join('');
 else if(p==='recipes')list=ids.map(r=>`<span class="chip">${esc(T('g.wd.r.'+r))}</span>`).join(' ');
 else if(p==='creatures')list=ids.map(c=>`<span class="chip">${esc(T('g.wd.cr.'+c))}</span>`).join(' ');
-else list=ids.slice(-14).map(id=>`<span class="chip">${esc(typeof B[p][id]==='string'?B[p][id]:id)}</span>`).join(' ');
+else list=ids.slice(-14).map(id=>`<span class="chip">${esc(p==='places'?W.placeName(id,typeof B[p][id]==='string'?B[p][id]:id):typeof B[p][id]==='string'?B[p][id]:id)}</span>`).join(' ');
 h0+=`<div class="wdsec"><h3>${esc(T('g.wd.p.'+p))} <span class="note">${P[p].n}</span></h3>${bar(p)}<div class="wdl">${list||`<span class="note">${esc(T('g.wd.none'))}</span>`}</div></div>`;
 }
 return h0;
@@ -141311,6 +141718,7 @@ const seedOf=(g)=>(g.meta&&Number.isFinite(+g.meta.seed)? +g.meta.seed|0:1);
 const tod=(g)=>(g.env?g.env.timeOfDay:6000);
 const clear=(g)=>{const e=g.env,w=e&&e.wx;if(!e)return true;const k=w&&(w.forced||w.kind);return(e.rain||0)<0.15&&k!=='nebel'&&k!=='gewitter'&&k!=='regen';};
 const nameKey=(who)=>'g.fairy.who.'+who;
+const whoName=(f)=>f.nm||whoName(f);
 const placeName=(kind)=>T('g.fairy.place.'+kind);
 let saveT=0;
 const save=(g)=>{const now=Date.now();if(now-saveT<4000)return;saveT=now;try{if(g.saveMeta&&g.meta&& !g.meta.guest)g.saveMeta();}catch(e){}};
@@ -141402,7 +141810,7 @@ for(let i=0;i<6;i++){const[x,z]=off(s,0.9+i*0.85,8.5+h(seed,i,9)*3);add('fy_hous
 for(let i=0;i<8;i++){const[x,z]=off(s,0.75+i*0.62,7);add('fy_lamp',at(g,x,z,0),0,{lite:i%4===0});}
 const[bx,bz]=off(s,0.25,5.4);sprite('borke','wise',3,at(g,bx,bz,0.1));
 const[tx,tz]=off(s,1.6,9.5);sprite('tuepfel','shy',0,at(g,tx,tz,0.1));
-for(let i=0;i<2;i++){const[x,z]=off(s,2.6+i*1.7,10);sprite('folk'+i,'busy',(i+2)%5,at(g,x,z,0.1));}
+for(let i=0;i<2;i++){const[x,z]=off(s,2.6+i*1.7,10);sprite('folk'+i,'busy',(i+2)%5,at(g,x,z,0.1),VR.Names&&VR.Names.flausel?{nm:VR.Names.flausel(seed^Math.imul(Math.round(s.x),73856093)^Math.imul(Math.round(s.z),19349663),i)}:null);}
 s.lanterns=F.lanternSpots(seed,s).map(([x,z],i)=>{for(let k=0;k<5;k++){const u=1-k*0.15,px=s.x+(x-s.x)*u,pz=s.z+(z-s.z)*u,y=ground(g,px,pz);if(y!==null&&natural(g.world.getBlock(Math.floor(px),y-1,Math.floor(pz)))&& !wet(g,px,y,pz))return{i,pos:[px,y+0.1,pz]};}return{i,pos:at(g,x,z,0.1)};});
 }else if(s.kind==='circle'){
 for(let i=0;i<9;i++){const[x,z]=off(s,i*TAU/9,8);add('fy_stone',at(g,x,z,-0.3),faceIn(s,i*TAU/9),{scale:0.85+h(seed,i,5)*0.4});}
@@ -141673,7 +142081,7 @@ if(!on(g)||S.ride)return null;
 const s=S.near;if(!s|| !s.parts)return null;
 const list=[],p=g.player.pos,rec=recOf(g),q=rec.q[s.id];
 const push=(label,pos,r,act)=>{if(Math.abs(pos[0]-eye[0])<6&&Math.abs(pos[2]-eye[2])<6)list.push({kind:'fairy',name:label,pos,r,act});};
-for(const f of s.folk)if(!f.away&&f!==S.escort)push(T('g.fairy.talk',{name:T(nameKey(f.who))}),[f.pos[0],f.pos[1]+0.4,f.pos[2]],0.9,(gg)=>talk(gg,s,f));
+for(const f of s.folk)if(!f.away&&f!==S.escort)push(T('g.fairy.talk',{name:whoName(f)}),[f.pos[0],f.pos[1]+0.4,f.pos[2]],0.9,(gg)=>talk(gg,s,f));
 if(s.kind==='spring')for(const w of s.wishes)push(T('g.fairy.wish.'+w.i),[w.pos[0],w.pos[1]+0.8,w.pos[2]],0.8,(gg)=>wish(gg,s,w.i));
 if(s.kind==='tree'&&s.door)push(T('g.fairy.knock'),[s.door[0],s.door[1]+1.3,s.door[2]],1.2,(gg)=>knock(gg,s));
 if(s.kind==='garden'&&s.stones)for(const st of s.stones)push(T('g.fairy.note.'+st.i),[st.pos[0],st.pos[1]+0.6,st.pos[2]],0.7,(gg)=>play(gg,s,st.i));
@@ -141787,9 +142195,9 @@ function say(g,f,text){
 if(!f|| !text)return;
 const B=S.bubble||(S.bubble={});B.f=f;B.text=text;B.until=S.t+Math.min(9,3+text.length/18);
 if(!B.el){B.el=document.createElement('div');B.el.className='fy-bubble';document.body.appendChild(B.el);css();}
-B.el.innerHTML='<b>'+esc(T(nameKey(f.who)))+'</b> '+esc(text);B.el.style.display='block';
+B.el.innerHTML='<b>'+esc(whoName(f))+'</b> '+esc(text);B.el.style.display='block';
 F.lastSaid={who:f.who,text};
-if(VR.A11y&&VR.A11y.subtitle){try{VR.A11y.subtitle(T(nameKey(f.who))+': '+text);}catch(e){}}
+if(VR.A11y&&VR.A11y.subtitle){try{VR.A11y.subtitle(whoName(f)+': '+text);}catch(e){}}
 tone(g.audio,f.mood==='sleepy'?392:f.mood==='cheeky'?1047:784,0.05,0.25);
 }
 const esc=(s)=>String(s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -141884,6 +142292,798 @@ escort:()=>(S.escort?{pos:S.escort.f.pos.slice(),to:[S.escort.to.x,S.escort.to.y
 wake:()=>{S.awake=S.t+240;},rec:()=>recOf(VR.game),ride:()=>(S.ride?S.ride.u: -1),bridge:()=>(S.near&&S.near.bridge)||0,
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const MI=VR.MoveIn=VR.MoveIn||{};
+const T=(k,v,fb)=>(VR.I18N?VR.I18N.t(k,v,fb):(fb!==undefined?fb:k));
+MI.V=1;MI.DAY=24000;MI.WIN=9000;MI.OVERDUE=3*24000;MI.NEAR=150;
+MI.MAXHOMES=12;MI.MAXSETS=6;MI.SETR=64;MI.MAXDECOR=3;MI.MEM=10;
+const h32=(a,b,c)=>{let h=Math.imul((a|0)^0x2c1b3c6d,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b)^Math.imul((c|0)+0x5bd1e995,0xc2b2ae35);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>13;return h>>>0;};
+MI.h=h32;
+
+
+const SEATNAME= /chair|stool|bench|sofa|couch|armchair|pilot_seat/;
+MI.kindOf=function(R,s){
+if(!s)return null;
+const t=R.types[R.T.type[s]];if(!t)return null;
+const o=t.o||{};
+if(o.kind==='door'&& !o.ironDoor)return'door';
+if(o.bed||o.kind==='bed')return'bed';
+if(o.seat||o.kind==='seat'||SEATNAME.test(t.name))return'seat';
+if(R.T.emit[s])return'light';
+return null;
+};
+
+
+let thinC=null;
+MI.thin=function(R,s){
+if(!thinC||thinC.length!==R.T.type.length)thinC=new Uint8Array(R.T.type.length);
+let v=thinC[s];
+if(!v){const t=R.types[R.T.type[s]];v=thinC[s]=t&& /carpet|rug/.test(t.name)?2:1;}
+return v===2;
+};
+
+
+
+const ORDER=['walls','door','small','light','bed'];
+MI.detect=function(get,x,y,z,R,lim){
+const T0=R.T,F=VR.F,HX=VR.HF_DX,HZ=VR.HF_DZ;
+const L=Object.assign({cells:900,wide:24,high:14},lim||{});
+const passable=(s)=> !s||(!(T0.flags[s]&F.SOLID)&& !(T0.flags[s]&F.FLUID))||MI.thin(R,s);
+const starts=[];
+const s0=get(x,y,z);
+if(passable(s0)&&MI.kindOf(R,s0)!=='door')starts.push([x,y,z]);
+const k0=MI.kindOf(R,s0);
+
+const anchors=[[x,y,z]];
+if(k0==='bed'){const t=R.types[T0.type[s0]];const f=t.get(s0,'facing'),head=t.get(s0,'part');anchors.push(head?[x-HX[f],y,z-HZ[f]]:[x+HX[f],y,z+HZ[f]]);}
+if(k0==='door'){const t=R.types[T0.type[s0]];anchors.push([x,t.get(s0,'half')?y-1:y+1,z]);}
+for(const[ax,ay,az]of anchors)for(const[dx,dy,dz]of[[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]]){
+const s=get(ax+dx,ay+dy,az+dz);
+if(passable(s)&&MI.kindOf(R,s)!=='door')starts.push([ax+dx,ay+dy,az+dz]);
+}
+const seenAll=new Set();
+let best=null;
+for(const st of starts){
+const k=st[0]+','+st[1]+','+st[2];
+if(seenAll.has(k))continue;
+const res=flood(get,st,R,L,passable,seenAll);
+if(res.ok)return res;
+if(!best||ORDER.indexOf(res.why)>ORDER.indexOf(best.why))best=res;
+}
+return best||{ok:false,why:'walls'};
+};
+function flood(get,start,R,L,passable,seenAll){
+const T0=R.T,F=VR.F,HX=VR.HF_DX,HZ=VR.HF_DZ;
+const key=(x,y,z)=>x+','+y+','+z;
+const seen=new Set([key(start[0],start[1],start[2])]),Q=[start],cells=[];
+const doors=[],beds=new Map(),seats=[],lights=[];
+let x0=1e9,x1= -1e9,y0=1e9,y1= -1e9,z0=1e9,z1= -1e9,big=false;
+const shell=(s,nx,ny,nz,cx,cz)=>{
+const kd=MI.kindOf(R,s);
+if(kd==='door'){const t=R.types[T0.type[s]];const lo=t.get(s,'half')?ny-1:ny;if(!doors.some(d=>d[0]===nx&&d[1]===lo&&d[2]===nz))doors.push([nx,lo,nz,cx,cz]);}
+else if(kd==='bed'){const t=R.types[T0.type[s]];const f=t.get(s,'facing'),head=t.get(s,'part');const fx=head?nx-HX[f]:nx,fz=head?nz-HZ[f]:nz;beds.set(fx+','+ny+','+fz,[fx,ny,fz,f]);}
+else if(kd==='seat'){if(!seats.some(q=>q[0]===nx&&q[1]===ny&&q[2]===nz))seats.push([nx,ny,nz]);}
+else if(kd==='light'){if(!lights.some(q=>q[0]===nx&&q[1]===ny&&q[2]===nz))lights.push([nx,ny,nz]);}
+};
+while(Q.length){
+const c=Q.pop();cells.push(c);
+const[x,y,z]=c;
+seenAll.add(key(x,y,z));
+if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(z<z0)z0=z;if(z>z1)z1=z;
+if(cells.length>L.cells||x1-x0>=L.wide||z1-z0>=L.wide||y1-y0>=L.high||y>300||y<1){big=true;break;}
+const sc=get(x,y,z);
+if(sc)shell(sc,x,y,z,x,z);
+for(const[dx,dy,dz]of[[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]]){
+const nx=x+dx,ny=y+dy,nz=z+dz,k=key(nx,ny,nz);
+if(seen.has(k))continue;
+const s=get(nx,ny,nz);
+if(MI.kindOf(R,s)==='door'){seen.add(k);shell(s,nx,ny,nz,x,z);continue;}
+if(!passable(s)){shell(s,nx,ny,nz,x,z);continue;}
+seen.add(k);Q.push([nx,ny,nz]);
+}
+}
+if(big)return{ok:false,why:'walls'};
+const wx=x1-x0+1,wz=z1-z0+1,hy=y1-y0+1;
+const out={ok:false,why:null,cells:cells.length,size:[wx,hy,wz]};
+if(!doors.length){out.why='door';return out;}
+if(Math.min(wx,wz)<3||Math.max(wx,wz)<3||hy<2||cells.length<12){out.why='small';return out;}
+if(!lights.length){out.why='light';return out;}
+if(!beds.size&& !seats.length){out.why='bed';return out;}
+
+doors.sort((a,b)=>a[1]-b[1]);
+const d=doors[0],ix=d[3],iz=d[4],ox=d[0]*2-ix,oz=d[2]*2-iz;
+const floor=[];
+for(const c of cells){const b=get(c[0],c[1]-1,c[2]);if(b&&(T0.flags[b]&F.SOLID)&&(T0.flags[b]&F.FULL))floor.push(c);}
+return Object.assign(out,{ok:true,why:null,door:[d[0],d[1],d[2]],inside:[ix,d[1],iz],outside:[ox,d[1],oz],beds:[...beds.values()].slice(0,6),seats:seats.slice(0,6),lights:lights.slice(0,6),box:[x0,y0,z0,x1,y1,z1],F:y0-1,floor});
+}
+MI.homeKey=(room)=>room.door.join(',');
+
+
+
+MI.dueAt=function(now,nBefore){return(Math.floor(now/MI.DAY)+1+Math.min(2,Math.max(0,nBefore|0)))*MI.DAY;};
+
+MI.ready=function(home,now,near){
+if(!home||home.st!=='wait')return null;
+if(now<home.due)return null;
+const tod=((now%MI.DAY)+MI.DAY)%MI.DAY;
+if(near&&tod<MI.WIN)return'arrive';
+if(now>=home.due+MI.OVERDUE)return'quiet';
+return null;
+};
+
+
+MI.fresh=()=>({v:MI.V,n:0,homes:[],sets:[],mem:{},gifts:[],decor:null,last:{},cart:null});
+MI.load=function(o){
+const r=MI.fresh();
+if(!o||typeof o!=='object')return r;
+if((o.v|0)>MI.V)return o;
+const arr=(a)=>(Array.isArray(a)?a:[]);
+const pt=(p)=>Array.isArray(p)&&p.length>=3&&p.every(Number.isFinite);
+r.n=Math.max(0,o.n|0);
+for(const h of arr(o.homes))if(h&&pt(h.door)&&pt(h.inside)&&pt(h.outside))r.homes.push({id:String(h.id||('h'+r.homes.length)),st:h.st==='home'?'home':'wait',due: +h.due||0,set:h.set?String(h.set):null,door:h.door,inside:h.inside,outside:h.outside,beds:arr(h.beds).filter(pt),seats:arr(h.seats).filter(pt),box:arr(h.box),F:h.F|0,floor:arr(h.floor).filter(pt).slice(0,400),fam:Number.isFinite(h.fam)?h.fam: -1,decor:arr(h.decor).filter(pt),at: +h.at||0,cr: !!h.cr});
+for(const s of arr(o.sets))if(s&&s.id&&Number.isFinite(s.x)&&Number.isFinite(s.z))r.sets.push({id:String(s.id),x:s.x,y: +s.y||64,z:s.z,seed:s.seed>>>0,name:String(s.name||''),named: !!s.named,asked: !!s.asked,market: !!s.market,fest: +s.fest||0,stall:pt(s.stall)?s.stall:null});
+if(o.mem&&typeof o.mem==='object')for(const k of Object.keys(o.mem))r.mem[k]=arr(o.mem[k]).filter(m=>m&&typeof m.k==='string').slice(-MI.MEM);
+for(const g of arr(o.gifts))if(g&&pt(g.at))r.gifts.push({at:g.at,item:String(g.item||'bread'),n:Math.max(1,g.n|0),fam:String(g.fam||''),name:String(g.name||'')});
+r.decor=o.decor===true?true:o.decor===false?false:null;
+r.last=o.last&&typeof o.last==='object'?Object.assign({},o.last):{};
+r.cart=o.cart&&pt(o.cart.at)&&Number.isFinite(o.cart.until)?{at:o.cart.at.slice(0,4),until:o.cart.until,set:String(o.cart.set||'')}:null;
+return r;
+};
+MI.save=(rec)=>JSON.parse(JSON.stringify(rec));
+
+
+MI.settlementFor=function(rec,pos,seedBase){
+let best=null,bd=MI.SETR;
+for(const s of rec.sets){const d=Math.hypot(s.x-pos[0],s.z-pos[2]);if(d<bd){bd=d;best=s;}}
+if(best)return best;
+if(rec.sets.length>=MI.MAXSETS)return null;
+rec.n++;
+const seed=h32(seedBase|0,rec.n,pos[0]*31+pos[2]);
+const s={id:'mi:'+rec.n,x:pos[0],y:pos[1],z:pos[2],seed,name:(VR.VillageGen&&VR.VillageGen.name?VR.VillageGen.name(seed):'Neuheim'),named:false,asked:false,market:false,fest:0,stall:null};
+rec.sets.push(s);
+return s;
+};
+MI.homesOf=(rec,set)=>rec.homes.filter(h=>h.set===set.id&&h.st==='home');
+
+MI.planFor=function(set,rec,tier){
+const P={id:set.id,name:set.name,style:'meadow',x:set.x,y:set.y,z:set.z,seed:set.seed,rad:30,homes:[],work:[],farms:[],lots:[],lamps:[],chimneys:[],plaza:{x:set.x,y:set.y,z:set.z,r:3},roads:[],bell:null,pad:null,shops:[],pastures:[],orchards:[],windmills:[],base:null,mine:true,folkCap:{max:tier===0?8:30}};
+MI.workFor(P,set,rec);
+return P;
+};
+MI.workFor=function(P,set,rec){
+P.work.length=0;
+const hs=MI.homesOf(rec,set);
+
+hs.forEach((h,i)=>{if(i%2===0&&P.work.length<3)P.work.push({kind:'garden',spot:[h.outside[0]+(i&2?2: -2),h.outside[1],h.outside[2]]});});
+if(set.market&&set.stall)P.work.push({kind:'stall',spot:[set.stall[0]-1,set.stall[1],set.stall[2]],keeper:[set.stall[0]+1.5,set.stall[1],set.stall[2]+0.5]});
+return P;
+};
+
+MI.plazaOf=function(rec,set){
+const hs=MI.homesOf(rec,set);if(!hs.length)return{x:set.x,y:set.y,z:set.z};
+let x=0,y=0,z=0;for(const h of hs){x+=h.outside[0];y+=h.outside[1];z+=h.outside[2];}
+return{x:Math.round(x/hs.length),y:Math.round(y/hs.length),z:Math.round(z/hs.length)};
+};
+
+
+MI.DECOR={corner:['vx_potplant','flower_pot','vx_lantern'],middle:['vx_rug_red','vx_rug_blue','vx_rug_green','vx_rug_sand']};
+MI.planDecor=function(get,room,R,opts){
+const o=Object.assign({max:MI.MAXDECOR,seed:1},opts||{}),T0=R.T,F=VR.F;
+const st=(n)=>(R.byName[n]?R.byName[n].defaultState:0);
+const solid=(s)=> !!(s&&(T0.flags[s]&F.SOLID));
+const full=(s)=> !!(s&&(T0.flags[s]&F.SOLID)&&(T0.flags[s]&F.FULL));
+const no=new Set();
+const ban=(x,y,z)=>no.add(x+','+y+','+z);
+const[ix,iy,iz]=room.inside;
+for(const[dx,dz]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){ban(ix+dx,iy,iz+dz);ban(ix+dx,iy+1,iz+dz);}
+
+for(const b of room.beds||[])for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){ban(b[0]+dx,b[1],b[2]+dz);const hx=b[0]+VR.HF_DX[b[3]],hz=b[2]+VR.HF_DZ[b[3]];ban(hx+dx,b[1],hz+dz);}
+for(const q of room.seats||[])for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]])ban(q[0]+dx,q[1],q[2]+dz);
+const corner=[],middle=[];
+for(const c of room.floor||[]){
+const[x,y,z]=c,k=x+','+y+','+z;
+if(no.has(k)||get(x,y,z)!==0||get(x,y+1,z)!==0|| !full(get(x,y-1,z)))continue;
+let walls=0;for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]])if(solid(get(x+dx,y,z+dz)))walls++;
+if(walls>=2)corner.push(c);else if(walls===0)middle.push(c);
+}
+const out=[],used=new Set();
+const take=(list,names,salt)=>{
+if(!list.length||out.length>=o.max)return;
+const c=list[h32(o.seed,salt,list.length)%list.length],k=c.join(',');
+if(used.has(k))return;
+const nm=names[h32(o.seed,salt+7,3)%names.length],s=st(nm)||st(names[0]);
+if(!s)return;
+used.add(k);out.push([c[0],c[1],c[2],s]);
+};
+take(corner,MI.DECOR.corner,1);take(middle,MI.DECOR.middle,2);
+const c2=corner.filter(c=> !used.has(c.join(','))&& !out.some(q=>Math.abs(q[0]-c[0])+Math.abs(q[2]-c[2])<2));
+take(c2,['vx_lantern','vx_potplant'],3);
+return out;
+};
+
+
+MI.remember=function(rec,fam,k,t,what){
+const L=rec.mem[fam]||(rec.mem[fam]=[]);
+const last=L[L.length-1];
+if(last&&last.k===k&&last.what===what&&t-last.t<2000)return L;
+L.push({k,t,what:what||''});
+while(L.length>MI.MEM)L.shift();
+return L;
+};
+
+MI.greetKey=function(L,now,named){
+const sfx=named?'':'N';
+if(!L|| !L.length)return'g.mi.greet.none'+sfx;
+const last=L[L.length-1];
+if(now-last.t<MI.DAY&&(last.k==='gifted'||last.k==='helped'))return'g.mi.greet.'+last.k+sfx;
+const n={built:0,gifted:0,helped:0};for(const m of L)if(n[m.k]!==undefined)n[m.k]++;
+const top=Object.keys(n).sort((a,b)=>n[b]-n[a])[0];
+return n[top]?'g.mi.greet.'+top+sfx:'g.mi.greet.none'+sfx;
+};
+
+MI.GIFTS={bread:[['bread',2],['cookie',4],['cake',1]],flowers:[['poppy',3],['dandelion',3],['cornflower',3]],fish:[['cooked_cod',2]],music:[['cookie',3]],stars:[['glowstone_dust',4],['cookie',3]],_:[['apple',3],['bread',2],['cookie',4],['poppy',3]]};
+MI.giftFor=function(likes,seed,has){
+const L=(MI.GIFTS[likes]||[]).concat(MI.GIFTS._).filter(g=> !has||has(g[0]));
+return L.length?L[seed%L.length]:['bread',1];
+};
+
+MI.KEYS=['g.mi.found','g.mi.found2','g.mi.hint','g.mi.why.walls','g.mi.why.door','g.mi.why.small','g.mi.why.light','g.mi.why.bed','g.mi.coming','g.mi.skip','g.mi.skipBtn','g.mi.movedT','g.mi.moved','g.mi.movedAway','g.mi.decorAsk','g.mi.yes','g.mi.no','g.mi.nameAsk','g.mi.nameOk','g.mi.later','g.mi.named','g.mi.market','g.mi.festSoon','g.mi.giftNote','g.mi.giftT','g.mi.giftGot','g.mi.arrive','g.mi.arriveN','g.mi.arriveKid','g.mi.unpack','g.mi.greet.none','g.mi.greet.built','g.mi.greet.gifted','g.mi.greet.helped','g.mi.greet.noneN','g.mi.greet.builtN','g.mi.greet.giftedN','g.mi.greet.helpedN'];
+
+
+const Vs=VR.Villages;
+if(!Vs|| !Vs.prototype||Vs.prototype.__movein)return;
+const P=Vs.prototype;P.__movein=true;
+const hasDoc=typeof document!=='undefined';
+const host=(g)=> !(g.mp&&g.mp.isClient);
+
+MI.on=(g)=> !(g&&g.settings&&g.settings.movein===false);
+const tierOf=(g)=>(VR.LifeKit&&VR.LifeKit.tierOf?VR.LifeKit.tierOf(g.settings):2);
+const now=(g)=>(g.env.day||0)*MI.DAY+g.env.timeOfDay;
+const playerName=(g)=>{const n=g.settings&&g.settings.playerName;return n&&String(n).trim()?String(n).trim().slice(0,24):'';};
+const note=(g,text,key)=>{if(VR.Quiet&&VR.Quiet.note){try{VR.Quiet.note(text,2,key);return;}catch(e){}}if(g.ui)g.ui.hint(text,5000);};
+MI.rec=function(g){
+if(!g.meta)return MI.fresh();
+if(!g.meta.movein|| !g._miLoaded||g._miLoaded!==g.meta){g.meta.movein=MI.load(g.meta.movein);g._miLoaded=g.meta;}
+return g.meta.movein;
+};
+const famKey=(set,fam)=>set.id+':'+fam;
+const setById=(rec,id)=>rec.sets.find(s=>s.id===id)||null;
+
+
+MI.villageOf=function(V,set){
+const g=V.g,rec=MI.rec(g);
+let vil=V.known.get(set.id);
+if(!vil){
+const pz=MI.plazaOf(rec,set);
+set.x=pz.x;set.y=pz.y;set.z=pz.z;
+V.addVillage(MI.planFor(set,rec,tierOf(g)));
+vil=V.known.get(set.id);
+if(vil)vil.visited=true;
+}
+return vil;
+};
+MI.init=function(V){
+const g=V.g;if(!g.meta||V._miInit===g.meta)return;
+V._miInit=g.meta;
+const rec=MI.rec(g);
+for(const s of rec.sets)if(MI.homesOf(rec,s).length)MI.villageOf(V,s);
+V._mi={watch:[],checkT: -1,tickT:0,job:null,greetT:new Map(),giftT:0};
+};
+
+
+
+const baseHomeVillage=P.homeVillage;
+if(baseHomeVillage)P.homeVillage=function(x,z){
+for(const vil of this.known.values()){if(!vil.active||(vil.plan&&vil.plan.mine))continue;const pz=vil.plan.plaza,RAD=vil.plan.rad||58;if(Math.hypot(x-pz.x,z-pz.z)<RAD+45)return vil;}
+return null;
+};
+const baseChanged=P.onBlockChanged;
+P.onBlockChanged=function(x,y,z,old,s){
+baseChanged.call(this,x,y,z,old,s);
+if(this.selfEdit|| !this._mi|| !host(this.g)|| !MI.on(this.g))return;
+try{MI.onChange(this,x,y,z,old,s);}catch(e){if(!MI.warned){MI.warned=true;console.warn('movein',e);}}
+};
+const baseUpdate=P.update;
+P.update=function(dt){
+baseUpdate.call(this,dt);
+try{MI.init(this);MI.tick(this,dt);}catch(e){if(!MI.warned){MI.warned=true;console.warn('movein',e);}}
+};
+const baseThink=P.think;
+P.think=function(a,tod){if(a.act&&a.act.type==='arrive')return;return baseThink.call(this,a,tod);};
+const baseRun=P.runAct;
+P.runAct=function(a,dt,tod){if(a.act&&a.act.type==='arrive')return MI.runArrive(this,a,dt);return baseRun.call(this,a,dt,tod);};
+const baseSocial=P.social;
+if(baseSocial)P.social=function(a,dt,tod){if(a.act&&a.act.type==='arrive')return;return baseSocial.call(this,a,dt,tod);};
+const baseDraw=P.draw;
+P.draw=function(r,E,cam){const out=baseDraw.call(this,r,E,cam);try{MI.draw(this,r,E,cam);}catch(e){}return out;};
+
+const baseCustom=P.onCustomHome;
+P.onCustomHome=function(vil){
+if(!vil.plan|| !vil.plan.mine|| !this.g.ui)return baseCustom.call(this,vil);
+const ui=this.g.ui,toast=ui.toast;ui.toast=()=>{};
+try{return baseCustom.call(this,vil);}finally{ui.toast=toast;}
+};
+
+const baseFestDay=P.festivalDay;
+if(baseFestDay)P.festivalDay=function(vil){
+if(!vil.plan|| !vil.plan.mine)return baseFestDay.call(this,vil);
+const rec=MI.rec(this.g),set=setById(rec,vil.id);if(!set||MI.homesOf(rec,set).length<3)return false;
+const d=this.g.env.day||0;
+return d===set.fest||(d>set.fest&&(d-set.fest)%7===0);
+};
+
+const baseGift=P.gift;
+if(baseGift)P.gift=function(a){
+const mine=a&&a.vil&&a.vil.plan&&a.vil.plan.mine;
+const held=mine&&this.g.player.inv&&this.g.player.inv.held;
+const q=mine&&a.vil.st.quests&&a.vil.st.quests[a.p.id],was=q&&q.done;
+const out=baseGift.call(this,a);
+if(mine&&held){
+const rec=MI.rec(this.g),set=setById(rec,a.vil.id);
+if(set)MI.remember(rec,famKey(set,a.p.fam),q&& !was&&q.done?'helped':'gifted',now(this.g),VR.itemName?VR.itemName(held.id):held.id);
+}
+return out;
+};
+
+
+MI.onChange=function(V,x,y,z,old,s){
+const g=V.g,R=VR.R,M=V._mi,rec=MI.rec(g);
+const kd=MI.kindOf(R,s);
+if(kd&& !V.homeVillage(x,z)&& !M.watch.some(w=>w[0]===x&&w[1]===y&&w[2]===z)){M.watch.push([x,y,z,1]);if(M.watch.length>16)M.watch.shift();}
+let near= !!kd;
+for(const w of M.watch)if(Math.abs(w[0]-x)<14&&Math.abs(w[2]-z)<14&&Math.abs(w[1]-y)<10){w[3]=1;near=true;}
+if(near)M.checkT=1.2;
+
+if(s&& !kd)for(const h of rec.homes){
+if(h.st!=='home'||Math.abs(h.outside[0]-x)>10||Math.abs(h.outside[2]-z)>10)continue;
+const set=setById(rec,h.set);if(!set)continue;
+const k=famKey(set,h.fam),L=rec.mem[k]||[],t=now(g);
+if(!L.some(m=>m.k==='helped'&&t-m.t<MI.DAY)&&h.at&&t-h.at>600)MI.remember(rec,k,'helped',t,'');
+break;
+}
+};
+MI.check=function(V){
+const g=V.g,R=VR.R,M=V._mi,rec=MI.rec(g),w=g.world;
+const get=(x,y,z)=>w.getBlock(x,y,z);
+for(let i=M.watch.length-1;i>=0;i--){
+const a=M.watch[i];if(!a[3])continue;a[3]=0;
+if(!MI.kindOf(R,get(a[0],a[1],a[2]))){M.watch.splice(i,1);continue;}
+const room=MI.detect(get,a[0],a[1],a[2],R);
+M.lastWhy=room.ok?'ok':room.why;
+if(!room.ok){if(room.why&&(M.hintT||0)<V.time){M.hintT=V.time+25;note(g,T('g.mi.hint',{why:T('g.mi.why.'+room.why)}),'mi:hint');}continue;}
+M.watch.splice(i,1);
+MI.register(V,room);
+}
+};
+MI.register=function(V,room){
+const g=V.g,rec=MI.rec(g),key=MI.homeKey(room);
+if(rec.homes.some(h=>h.door.join(',')===key||(h.box&&h.box.length===6&&room.door[0]>=h.box[0]-1&&room.door[0]<=h.box[3]+1&&room.door[2]>=h.box[2]-1&&room.door[2]<=h.box[5]+1&&Math.abs(room.door[1]-h.door[1])<4)))return null;
+if(rec.homes.length>=MI.MAXHOMES*MI.MAXSETS)return null;
+const set=MI.settlementFor(rec,room.outside,g.meta&&g.meta.seed?String(g.meta.seed).length*977+13:13);
+if(!set)return null;
+const mine=rec.homes.filter(h=>h.set===set.id);
+if(mine.length>=MI.MAXHOMES)return null;
+const t=now(g),n=rec.homes.filter(h=>h.st==='wait'||h.set===set.id).length;
+const h={id:'h'+(rec.homes.length+1)+':'+key,st:'wait',due:MI.dueAt(t,n),set:set.id,door:room.door,inside:room.inside,outside:room.outside,beds:room.beds,seats:room.seats,box:room.box,F:room.F,floor:room.floor.slice(0,400),fam: -1,decor:[],at:0,cr: !!(g.player&&g.player.creative)};
+rec.homes.push(h);
+note(g,T(n?'g.mi.found2':'g.mi.found'),'mi:found');
+if(g.audio&&g.audio.play){try{g.audio.play('pop');}catch(e){}}
+return h;
+};
+
+
+MI.tick=function(V,dt){
+const g=V.g,M=V._mi;if(!M|| !g.player|| !g.env||(!MI.on(g)&& !M.job))return;
+if(M.checkT>=0){M.checkT-=dt;if(M.checkT<0&&host(g))MI.check(V);}
+if(M.job)MI.updateJob(V,dt);
+MI.updateGifts(V,dt);
+M.tickT-=dt;if(M.tickT>0)return;
+M.tickT=0.5;
+if(!host(g))return;
+const rec=MI.rec(g),t=now(g),p=g.player.pos;
+for(const h of rec.homes){
+const near=Math.hypot(h.outside[0]-p[0],h.outside[2]-p[2])<MI.NEAR&&g.world.isLoaded(h.outside[0],h.outside[2]);
+const r=MI.ready(h,t,near&& !M.job);
+if(!r)continue;
+
+const room=MI.detect((x,y,z)=>g.world.getBlock(x,y,z),h.inside[0],h.inside[1],h.inside[2],VR.R);
+if(r==='arrive'&& !room.ok){if((M.hintT||0)<V.time){M.hintT=V.time+40;note(g,T('g.mi.hint',{why:T('g.mi.why.'+room.why)}),'mi:hint');}continue;}
+if(room.ok){h.beds=room.beds;h.seats=room.seats;h.floor=room.floor.slice(0,400);}
+if(r==='arrive'){MI.startArrival(V,h);break;}
+MI.moveIn(V,h,true);
+}
+MI.greetings(V,t);
+MI.dailyGift(V,t);
+MI.updateCart(V,t);
+};
+
+
+MI.moveIn=function(V,h,quiet){
+const g=V.g,rec=MI.rec(g),set=setById(rec,h.set);if(!set)return null;
+h.st='home';h.at=now(g);
+const vil=MI.villageOf(V,set);
+const st=vil.st;st.custom=st.custom||[];
+h.fam=st.custom.length;
+st.custom.push({kind:'home',beds:h.beds.length?h.beds:[],door:h.door,inside:h.inside,outside:h.outside,seats:[],table:null,lights:[],work:[],box:h.box&&h.box.length===6?[h.box[0]-1,h.box[1]-1,h.box[2]-1,h.box[3]+1,h.box[4]+1,h.box[5]+1]:null,F:h.F,chimney:null,mine:true});
+MI.workFor(vil.plan,set,rec);
+
+const pz=MI.plazaOf(rec,set);set.x=pz.x;set.y=pz.y;set.z=pz.z;
+Object.assign(vil.plan.plaza,{x:pz.x,y:pz.y,z:pz.z});vil.plan.x=pz.x;vil.plan.y=pz.y;vil.plan.z=pz.z;vil.center=[pz.x,pz.y,pz.z];
+if(!vil.active&&g.world.isLoaded(vil.plan.x,vil.plan.z)&&Math.hypot(g.player.pos[0]-vil.plan.x,g.player.pos[2]-vil.plan.z)<110)V.activate(vil,g.env.timeOfDay);
+const before=vil.agents.length;
+V.onCustomHome(vil);
+MI.remember(rec,famKey(set,h.fam),'built',now(g),'');
+if(VR.Adventure){try{VR.Adventure.award('home',{id:set.id+':'+h.door.join(',')});}catch(e){}}
+const fam=vil.fams[h.fam];
+if(quiet){rec.last.away={fam:fam?fam.surname:'',set:set.id};MI.decorate(V,h,true);MI.grow(V,set);}
+return{vil,fam,agents:vil.agents.slice(before)};
+};
+
+
+MI.startArrival=function(V,h){
+const g=V.g,w=g.world;
+const mv=MI.moveIn(V,h,false);if(!mv)return;
+const{vil,fam,agents}=mv;
+
+const nx=h.outside[0]-h.inside[0],nz=h.outside[2]-h.inside[2];
+const base=Math.atan2(nz,nx);
+let start=null;
+for(let k=0;k<8&& !start;k++){
+const an=base+(k?((k+1)>>1)*(k&1?1: -1)*Math.PI/6:0);
+const sx=Math.round(h.outside[0]+Math.cos(an)*26),sz=Math.round(h.outside[2]+Math.sin(an)*26);
+if(!w.isLoaded(sx,sz))continue;
+const y=MI.groundAt(w,sx,h.outside[1]+10,sz,24);if(y===null)continue;
+start=[sx+0.5,y,sz+0.5];
+}
+if(!start)start=[h.outside[0]+0.5,h.outside[1],h.outside[2]+0.5];
+const dir=[start[0]-h.outside[0],start[2]-h.outside[2]],dl=Math.hypot(dir[0],dir[1])||1;
+agents.forEach((a,i)=>{
+a.pos=[start[0]+(dir[0]/dl)*i*1.4+(i&1?0.6: -0.6)*(dir[1]/dl),start[1],start[2]+(dir[1]/dl)*i*1.4-(i&1?0.6: -0.6)*(dir[0]/dl)];
+a.vel=[0,0,0];a.path=null;a.goal=null;a.pose='stand';a.bubble=null;
+a.act={type:'arrive',phase:'walk',t:0,lead:i===0,i,home:h.fam};
+});
+V._mi.job={h,vil,fam:fam?fam.surname:'',agents,t:0,start,cart:[start[0]-(dir[0]/dl)*0.2,start[1],start[2],Math.atan2(-dir[0],-dir[1])+Math.PI],parked:false,greeted:false,done:false};
+card(g,T('g.mi.coming',{fam:fam?fam.surname:''}),[[T('g.mi.skipBtn'),()=>MI.skip(g)]],T('g.mi.skip'));
+};
+MI.groundAt=function(w,x,yTop,z,span){
+const R=VR.R,F=VR.F;
+for(let y=yTop;y>yTop-span;y--){
+const b=w.getBlock(x,y-1,z),a0=w.getBlock(x,y,z),a1=w.getBlock(x,y+1,z);
+if(b&&(R.T.flags[b]&F.SOLID)&& !(R.T.flags[b]&F.FLUID)&& !(a0&&(R.T.flags[a0]&(F.SOLID|F.FLUID)))&& !(a1&&(R.T.flags[a1]&(F.SOLID|F.FLUID))))return y;
+}
+return null;
+};
+
+MI.runArrive=function(V,a,dt){
+const act=a.act,J=V._mi&&V._mi.job,g=V.g;
+act.t+=dt;
+if(!J||J.vil!==a.vil){a.act=null;return;}
+const h=J.h,o=h.outside,p=g.player.pos;
+if(act.phase==='walk'){
+if(act.t<act.i*0.9)return;
+const tx=o[0]+(act.i?((act.i&1)?1: -1)*Math.min(2,(act.i+1)>>1):0),tz=o[2];
+if(V.goTo(a,tx,o[1],tz,1.3)||act.t>75){
+if(act.t>75){a.pos=[tx+0.5,o[1],tz+0.5];a.path=null;}
+act.phase=act.lead?'greet':'unpack';act.t=0;
+if(act.lead&& !J.parked){J.parked=true;MI.parkCart(V,J);}
+}
+return;
+}
+if(act.phase==='greet'){
+a.lookAt=[p[0],p[1]+1.4,p[2]];
+if(!J.greeted){
+J.greeted=true;
+const nm=playerName(g),near=Math.hypot(p[0]-a.pos[0],p[2]-a.pos[2])<24;
+if(near)a.say(T(nm?'g.mi.arrive':'g.mi.arriveN',{name:nm,fam:J.fam}),6);
+a.waveT=2.6;
+}
+if(act.t>3.2){act.phase='unpack';act.t=0;}
+return;
+}
+if(act.phase==='unpack'){
+const c=J.cart;
+if(V.goTo(a,c[0],c[1],c[2],1.8)||act.t>12){
+a.pose='crouch';a.lookAt=[c[0],c[1]+0.5,c[2]];
+if(!act.said&&a.kid&&act.t>1){act.said=true;a.say(T('g.mi.arriveKid'),3.5);}
+if(!act.said&&act.i===1){act.said=true;a.say(T('g.mi.unpack'),3.5);}
+act.ut=(act.ut||0)+dt;
+if(act.ut>4.5+act.i*0.7){act.phase='in';act.t=0;a.pose='stand';a.lookAt=null;}
+}
+return;
+}
+if(act.phase==='in'){
+const q=h.inside;
+if(V.goTo(a,q[0],q[1],q[2],1.6)||act.t>30){a.act=null;a.pose='stand';act.done=true;}
+}
+};
+MI.updateJob=function(V,dt){
+const J=V._mi.job;J.t+=dt;
+const left=J.agents.filter(a=>a.act&&a.act.type==='arrive'&&V.agents.includes(a));
+
+const L=J.agents[0];
+if(L&&L.act&&L.act.type==='arrive'&&L.act.phase==='walk'&& !J.parked){
+const yaw=L.yaw;const bx=L.pos[0]+Math.sin(yaw)*1.7,bz=L.pos[2]+Math.cos(yaw)*1.7;
+J.cart[0]+=(bx-J.cart[0])*Math.min(1,dt*4);J.cart[2]+=(bz-J.cart[2])*Math.min(1,dt*4);J.cart[1]+=(L.pos[1]-J.cart[1])*Math.min(1,dt*4);
+const dx=L.pos[0]-J.cart[0],dz=L.pos[2]-J.cart[2];if(dx*dx+dz*dz>0.05)J.cart[3]=Math.atan2(-dx,-dz);
+}
+if((!left.length&&J.t>2)||J.t>160)MI.finish(V);
+};
+MI.parkCart=function(V,J){
+const g=V.g,h=J.h,w=g.world;
+
+const nx=h.outside[0]-h.inside[0],nz=h.outside[2]-h.inside[2];
+for(const s of[2,-2,3,-3]){
+const x=h.outside[0]+(nz?s:0)+nx,z=h.outside[2]+(nx?s:0)+nz;
+const y=MI.groundAt(w,x,h.outside[1]+3,z,7);if(y===null)continue;
+J.cart=[x+0.5,y,z+0.5,Math.atan2(-nz,-nx)+Math.PI/2];return;
+}
+};
+MI.skip=function(g){
+const V=g.villages,J=V&&V._mi&&V._mi.job;if(!J)return false;
+for(const a of J.agents){if(!a.act||a.act.type!=='arrive')continue;const q=J.h.inside;a.pos=[q[0]+0.5,q[1],q[2]+0.5];a.path=null;a.act=null;a.pose='stand';}
+if(!J.parked){J.parked=true;MI.parkCart(V,J);}
+MI.finish(V);
+return true;
+};
+MI.finish=function(V){
+const g=V.g,J=V._mi.job;if(!J||J.done)return;
+J.done=true;V._mi.job=null;
+card(g,null);
+const rec=MI.rec(g),set=setById(rec,J.h.set);
+rec.cart={at:J.cart.slice(),until:(g.env.day||0)*MI.DAY+12500,set:J.h.set};
+MI.decorate(V,J.h,false);
+if(g.ui){g.ui.toast(T('g.mi.movedT'),T('g.mi.moved',{fam:J.fam}),null);if(g.audio){try{g.audio.play('achievement');}catch(e){}}}
+if(set)MI.grow(V,set);
+};
+
+
+MI.decorate=function(V,h,quiet){
+const g=V.g,rec=MI.rec(g),w=g.world;
+if(h.decor&&h.decor.length)return;
+const creative=g.player&&g.player.creative;
+if(creative&&rec.decor!==true){
+if(rec.decor===null&& !quiet){const fam=(V.known.get(h.set)||{fams:[]}).fams[h.fam];MI.askDecor(g,h,fam?fam.surname:'');}
+return;
+}
+MI.placeDecor(V,h);
+};
+MI.placeDecor=function(V,h){
+const g=V.g,w=g.world,get=(x,y,z)=>w.getBlock(x,y,z);
+const room={inside:h.inside,beds:h.beds,seats:h.seats,floor:h.floor};
+const ops=MI.planDecor(get,room,VR.R,{seed:h32(h.door[0],h.door[1],h.door[2])});
+h.decor=[];
+for(const[x,y,z,s]of ops){if(get(x,y,z)!==0||V.occupied(x,y,z))continue;V.setBlock(x,y,z,s);h.decor.push([x,y,z]);}
+};
+MI.askDecor=function(g,h,fam){
+card(g,T('g.mi.decorAsk',{fam}),[[T('g.mi.yes'),()=>MI.answerDecor(g,true)],[T('g.mi.no'),()=>MI.answerDecor(g,false)]],null,true);
+};
+MI.answerDecor=function(g,yes){
+const rec=MI.rec(g);rec.decor= !!yes;card(g,null);
+if(!yes|| !g.villages)return;
+for(const h of rec.homes)if(h.st==='home'&&(!h.decor|| !h.decor.length))MI.placeDecor(g.villages,h);
+};
+
+
+MI.grow=function(V,set){
+const g=V.g,rec=MI.rec(g),n=MI.homesOf(rec,set).length,vil=V.known.get(set.id);
+if(n>=2&& !set.named&& !set.asked){set.asked=true;MI.askName(g,set,n);}
+if(n>=3&& !set.market){
+const pz=MI.plazaOf(rec,set),w=g.world;
+
+for(let k=0;k<12&& !set.stall;k++){
+const an=k*0.9,r=3+(k>>2)*2,x=Math.round(pz.x+Math.cos(an)*r),z=Math.round(pz.z+Math.sin(an)*r);
+const y=MI.groundAt(w,x,pz.y+4,z,9);if(y===null)continue;
+if(rec.homes.some(h=>h.box&&h.box.length===6&&x>=h.box[0]-2&&x<=h.box[3]+2&&z>=h.box[2]-2&&z<=h.box[5]+2))continue;
+set.stall=[x,y,z];
+}
+if(set.stall){
+set.market=true;set.fest=(g.env.day||0)+1;
+if(vil){MI.workFor(vil.plan,set,rec);}
+note(g,T('g.mi.market',{v:set.name})+' '+T('g.mi.festSoon',{v:set.name}),'mi:market');
+}
+}
+};
+MI.nameSettlement=function(g,id,name){
+const rec=MI.rec(g),set=setById(rec,id);if(!set)return false;
+const nm=String(name||'').replace(/[<>]/g,'').trim().slice(0,28);if(!nm)return false;
+set.name=nm;set.named=true;
+const vil=g.villages&&g.villages.known.get(id);if(vil){vil.name=nm;vil.plan.name=nm;}
+note(g,T('g.mi.named',{v:nm}),'mi:named');
+return true;
+};
+MI.askName=function(g,set,n){
+if(!hasDoc)return;
+card(g,T('g.mi.nameAsk',{n}),[[T('g.mi.nameOk'),()=>{const el=document.getElementById('mi_name');MI.nameSettlement(g,set.id,el?el.value:set.name);card(g,null);}],[T('g.mi.later'),()=>{set.asked=false;card(g,null);}]],null,true,set.name);
+};
+
+
+MI.greetings=function(V,t){
+const g=V.g,M=V._mi,rec=MI.rec(g),p=g.player.pos;
+if(M.job)return;
+for(const a of V.agents){
+if(!a.vil.plan|| !a.vil.plan.mine||a.pose==='sleep'||a.kid||a.bubble)continue;
+const d2=(a.pos[0]-p[0])**2+(a.pos[2]-p[2])**2;if(d2>6*6)continue;
+const last=M.greetT.get(a.p.id)|| -1e9;if(V.time-last<150)continue;
+M.greetT.set(a.p.id,V.time);
+const set=setById(rec,a.vil.id);if(!set)continue;
+const nm=playerName(g),L=rec.mem[famKey(set,a.p.fam)]||[];
+const key=MI.greetKey(L,t,!!nm),m=L[L.length-1];
+a.say(T(key,{name:nm,what:m&&m.what?m.what:''}),4.5);
+a.lookAt=[p[0],p[1]+1.4,p[2]];
+break;
+}
+
+if(rec.last.away){const s=setById(rec,rec.last.away.set);if(s&&Math.hypot(s.x-p[0],s.z-p[2])<60){note(g,T('g.mi.movedAway',{fam:rec.last.away.fam}),'mi:away');rec.last.away=null;}}
+};
+
+
+MI.dailyGift=function(V,t){
+const g=V.g,rec=MI.rec(g),day=Math.floor(t/MI.DAY),tod=t-day*MI.DAY;
+if(tod<600||tod>5000||rec.last.giftDay===day||rec.gifts.length>=3)return;
+rec.last.giftDay=day;
+const homes=rec.homes.filter(h=>h.st==='home'&&h.at&&t-h.at>3000);if(!homes.length)return;
+const h=homes[h32(day,homes.length,77)%homes.length];
+if(h32(day,h.fam,91)%100>=55)return;
+MI.leaveGift(V,h);
+};
+MI.leaveGift=function(V,h){
+const g=V.g,rec=MI.rec(g),w=g.world,set=setById(rec,h.set),vil=set&&V.known.get(set.id);
+if(!vil)return null;
+
+let at=null;
+const b=g.player.spawnBed;
+if(b){
+let best=1e9;
+for(const q of rec.homes){const d=Math.hypot(q.door[0]-b[0],q.door[2]-b[2]);if(d<12&&d<best){best=d;at=q.outside;}}
+}
+at=at||h.outside;
+const y=MI.groundAt(w,at[0],at[1]+2,at[2],5);if(y===null)return null;
+const fam=vil.fams[h.fam],giver=fam&&fam.members[0];
+const has=(id)=> !!((VR.itemDef&&VR.itemDef(id))||VR.R.byName[id]);
+const[item,n]=MI.giftFor(giver?giver.likes:'_',h32(h.fam,(g.env.day||0),5),has);
+const gift={at:[at[0]+0.5,y,at[2]+0.5],item,n,fam:fam?fam.surname:'',name:giver?giver.name:''};
+rec.gifts.push(gift);
+if(Math.hypot(g.player.pos[0]-at[0],g.player.pos[2]-at[2])<80)note(g,T('g.mi.giftNote'),'mi:gift');
+return gift;
+};
+MI.updateGifts=function(V,dt){
+const g=V.g,M=V._mi;M.giftT-=dt;if(M.giftT>0)return;M.giftT=0.25;
+const rec=MI.rec(g);if(!rec.gifts.length|| !g.player.inv)return;
+const p=g.player.pos;
+for(let i=rec.gifts.length-1;i>=0;i--){
+const q=rec.gifts[i];
+if(Math.hypot(q.at[0]-p[0],q.at[2]-p[2])>1.3||Math.abs(q.at[1]-p[1])>2)continue;
+rec.gifts.splice(i,1);
+g.player.inv.add(q.item,q.n);
+if(g.ui)g.ui.toast(T('g.mi.giftT'),T('g.mi.giftGot',{fam:q.fam,n:q.n,item:VR.itemName?VR.itemName(q.item):q.item}),null);
+if(g.audio){try{g.audio.play('pop');}catch(e){}}
+if(g.particles&&g.particles.glow)for(let k=0;k<8;k++)g.particles.glow(q.at[0]+(Math.random()-0.5)*0.6,q.at[1]+0.5+Math.random()*0.5,q.at[2]+(Math.random()-0.5)*0.6,[1,0.8,0.4]);
+}
+};
+MI.updateCart=function(V,t){const rec=MI.rec(V.g);if(rec.cart&&t>rec.cart.until)rec.cart=null;};
+
+
+MI.draw=function(V,r,E,cam){
+const g=V.g,ent=g.entities,LK=VR.LifeKit;if(!ent|| !LK|| !g.meta|| !g.meta.movein|| !MI.on(g))return;
+const rec=g.meta.movein,J=V._mi&&V._mi.job;
+const cart=J?J.cart:rec.cart&&rec.cart.at;
+const sets=rec.sets.filter(s=>s.market&&s.stall);
+if(!cart&& !rec.gifts.length&& !sets.length)return;
+const FD2=120*120,near=(q)=>(q[0]-cam.x)**2+(q[2]-cam.z)**2<FD2;
+let prog=null;const P0=()=>prog||(prog=ent.beginVox(r,E));
+if(cart&&near(cart))LK.drawModel(g,r,P0(),'movein_cart',cart,cart[3]||0,cam,{});
+for(const q of rec.gifts)if(near(q.at))LK.drawModel(g,r,P0(),'movein_gift',q.at,(q.at[0]*7+q.at[2]*3)%6.28,cam,{});
+for(const s of sets){const q=[s.stall[0]+0.5,s.stall[1],s.stall[2]+0.5];if(near(q)){LK.drawModel(g,r,P0(),'movein_stall',q,0,cam,{});LK.drawModel(g,r,P0(),'life_goods',[q[0],q[1]+0.95,q[2]],0,cam,{});}}
+};
+
+
+const MOD=VR.VOXMODELS,Grid=VR.VoxGrid;
+if(MOD&&Grid){
+const part=(sx,sy,sz,pv,fn)=>{const gr=new Grid(sx,sy,sz,pv[0],pv[1],pv[2]);fn(gr);return{grid:gr,pivot:[0,0,0]};};
+
+MOD.movein_cart=()=>({
+unit:8,radius:2,parts:{
+body:part(16,16,22,[8,0,11],(gr)=>{
+const wood=0x9A6A3A,wood2=0x7A4E28,rim=0x4A3220,can=0xEDE3C8,can2=0xD8CBA8;
+gr.box(2,4,3,13,5,18,(x,y,z)=>((z>>1)&1?wood:wood2));
+gr.box(2,6,3,2,8,18,wood2);gr.box(13,6,3,13,8,18,wood2);gr.box(2,6,18,13,8,18,wood2);gr.box(2,6,3,13,7,3,wood2);
+for(const x of[0,15])for(let a=0;a<40;a++){const an=a/40*Math.PI*2;gr.set(x,Math.round(4+Math.sin(an)*3.6),Math.round(11+Math.cos(an)*3.6),rim);}
+for(const x of[0,15])for(let k= -3;k<=3;k++){gr.set(x,4+k,11,wood2);gr.set(x,4,11+k,wood2);}
+gr.box(1,4,11,14,4,11,rim);
+gr.box(3,6,4,12,10,16,(x,y,z)=>((x+z)%5===0?can2:can));
+gr.box(4,11,6,11,11,14,can2);
+gr.box(4,6,13,7,9,16,0x8A5A30);gr.box(9,6,14,11,8,16,0xB07840);
+gr.box(9,11,8,10,12,9,0xB0543A);gr.box(8,13,7,11,14,10,0x4E9A3A);gr.set(9,15,8,0xE8A0C0);gr.set(10,15,9,0xF6D24A);
+gr.box(4,5,0,4,5,2,wood);gr.box(11,5,0,11,5,2,wood);gr.box(4,5,0,11,5,0,wood2);
+gr.box(6,0,19,6,3,19,wood2);gr.box(9,0,19,9,3,19,wood2);
+}),
+},layout:{body:[0,0,0]},
+});
+
+MOD.movein_gift=()=>({
+unit:16,radius:0.5,parts:{
+body:part(8,9,8,[4,0,4],(gr)=>{
+gr.box(0,0,0,7,5,7,(x,y,z)=>(x===3||x===4||z===3||z===4?0xF4E8C8:0xC8443A));
+gr.box(0,6,0,7,6,7,(x,y,z)=>(x===3||x===4||z===3||z===4?0xF4E8C8:0xB03830));
+gr.box(2,7,3,2,8,4,0xF4E8C8);gr.box(5,7,3,5,8,4,0xF4E8C8);gr.box(3,7,3,4,7,4,0xE8D8B0);
+}),
+},layout:{body:[0,0,0]},
+});
+
+MOD.movein_stall=()=>({
+unit:8,radius:2.4,parts:{
+body:part(24,22,14,[12,0,7],(gr)=>{
+const wood=0x9A6A3A,wood2=0x7A4E28;
+for(const[x,z]of[[0,0],[23,0],[0,13],[23,13]])gr.box(x,0,z,x,18,z,wood2);
+gr.box(1,0,1,22,6,5,(x,y,z)=>(y===6?wood:(x%4===0?wood2:wood)));
+gr.box(0,19,0,23,19,13,(x)=>((x>>2)&1?0x5A9A5A:0xF4F0E6));
+gr.box(0,18,0,23,18,0,(x)=>((x>>2)&1?0x4A8A4A:0xE4E0D6));
+gr.box(2,7,2,5,8,4,0xE8483A);gr.box(18,7,2,21,8,4,0xF6D24A);
+}),
+},layout:{body:[0,0,0]},
+});
+}
+
+
+let cssDone=false;
+function card(g,txt,btns,foot,unlock,inputVal){
+if(!hasDoc)return;
+let el=document.getElementById('mi_card');
+if(!txt){if(el)el.remove();return;}
+if(!cssDone){
+cssDone=true;
+const s=document.createElement('style');
+s.textContent='#mi_card{position:absolute;left:50%;top:14%;transform:translateX(-50%);max-width:min(520px,86vw);background:rgba(26,22,18,.78);color:#fdf3df;border:1px solid rgba(255,220,160,.35);border-radius:12px;padding:10px 14px;font:14px/1.4 inherit;z-index:30;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}#mi_card button{margin:8px 5px 0;padding:5px 12px;border-radius:8px;border:1px solid rgba(255,220,160,.5);background:rgba(255,220,160,.14);color:#fdf3df;cursor:pointer}#mi_card input{margin-top:8px;padding:5px 8px;border-radius:7px;border:1px solid rgba(255,220,160,.5);background:rgba(0,0,0,.3);color:#fff;width:70%}#mi_card .ft{opacity:.7;font-size:12px;margin-top:4px}';
+document.head.appendChild(s);
+}
+if(!el){el=document.createElement('div');el.id='mi_card';el.setAttribute('role','dialog');(document.getElementById('ui')||document.body).appendChild(el);}
+el.textContent='';
+const p=document.createElement('div');p.textContent=txt;el.appendChild(p);
+if(inputVal!==undefined){const i=document.createElement('input');i.id='mi_name';i.type='text';i.maxLength=28;i.value=inputVal;i.onkeydown=(e)=>e.stopPropagation();el.appendChild(i);el.appendChild(document.createElement('br'));}
+for(const[lab,fn]of btns||[]){const b=document.createElement('button');b.textContent=lab;b.onclick=(e)=>{e.stopPropagation();fn();};el.appendChild(b);}
+if(foot){const f=document.createElement('div');f.className='ft';f.textContent=foot;el.appendChild(f);}
+if(unlock&&document.exitPointerLock&&document.pointerLockElement){try{document.exitPointerLock();}catch(e){}}
+}
+MI.card=card;
+
+MI.debug=function(g){
+const V=g.villages,rec=MI.rec(g),J=V&&V._mi&&V._mi.job;
+return{
+homes:rec.homes.map(h=>({st:h.st,due:h.due,set:h.set,fam:h.fam,decor:(h.decor||[]).length,door:h.door,beds:h.beds.length})),
+sets:rec.sets.map(s=>({id:s.id,name:s.name,named:s.named,market:s.market,stall:s.stall,fest:s.fest})),
+job:J?{fam:J.fam,phases:J.agents.map(a=>(a.act&&a.act.type==='arrive'?a.act.phase:'done')),cart:J.cart.map(v=> +v.toFixed(1))}:null,
+watch:V&&V._mi?V._mi.watch.length: -1,why:V&&V._mi?V._mi.lastWhy||null:null,
+gifts:rec.gifts.slice(),mem:rec.mem,decor:rec.decor,card:hasDoc&&document.getElementById('mi_card')?document.getElementById('mi_card').textContent:null,
+agents:V?V.agents.filter(a=>a.vil.plan&&a.vil.plan.mine).map(a=>[a.p.name,a.vil.fams[a.p.fam].surname,a.p.role,a.act&&a.act.type,a.pos.map(Math.round),a.bubble?a.bubble.text:null]):[],
+};
+};
+if(hasDoc&&typeof window!=='undefined'&&window.addEventListener)window.addEventListener('keydown',(e)=>{
+const g=VR.game;if(!g|| !g.villages|| !g.villages._mi|| !g.villages._mi.job)return;
+if(e.code==='Backspace'&& !(e.target&& /INPUT|TEXTAREA/.test(e.target.tagName))){e.preventDefault();MI.skip(g);}
+},true);
+})(VR);
 
 VR.GenieLazy=function(){
 if(VR.GenieLazy.done)return!!VR.GenieBrain;VR.GenieLazy.done=true;
