@@ -272,7 +272,9 @@ vec3 lvHdr(vec3 c, vec2 uv) {
     float zf = max(max(lvLin(texture(u_lvDepth, uv + vec2(t.x, 0.0)).r), lvLin(texture(u_lvDepth, uv - vec2(t.x, 0.0)).r)),
                    max(lvLin(texture(u_lvDepth, uv + vec2(0.0, t.y)).r), lvLin(texture(u_lvDepth, uv - vec2(0.0, t.y)).r)));
     float e = smoothstep(1.6, 4.0, zf / max(0.05, z)) * u_lvSoft.w;
-    c += max(sc - c, vec3(0.0)) * e;
+    // (v-look2: only where the light behind is clearly brighter than the edge — a bright sky, not the next leaf: the
+    // halo read as blur on ridges against a sky only a little brighter)
+    c += max(sc - c * 1.2, vec3(0.0)) * e;
   }
 #endif
 #ifdef LV_HAZE
