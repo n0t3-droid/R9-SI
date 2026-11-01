@@ -57,7 +57,10 @@ module.exports = function (S, SP, tr, calm, check) {
   check(Fs && Fs.folk.length === 14 && Math.hypot(Fs.c[0] - 330.5, Fs.c[2] - 300.5) < 6.5 && Fs.c[1] === 66 && sc.tg.home && Math.abs(sc.tg.home[0] - Fs.c[0]) < 1e-6 && sc.tg.home[1] === 68, 'c16.b1 stages the festival: 14 people at the plaza, the scene\'s home target its middle');
   vil.agents = [0, 1, 2, 3, 4].map(i => ({ festRole: 'dance', pos: [330.5 + Math.cos(i) * 3, 66, 300.5 + Math.sin(i) * 3] }));
   const sc2 = Object.assign({}, sc, { tg: {} }); A2r(g, sc2);
-  check(sc2.fest && sc2.fest.real === 5 && sc2.fest.r >= 4 + 2.6 && Math.abs(sc2.fest.c[0] - 330.5) < 1e-6, 'the village\'s own dancers on the plaza: our ring stands round theirs (r ' + (sc2.fest && sc2.fest.r.toFixed(1)) + ' m)');
+  const dC = sc2.fest ? Math.hypot(sc2.fest.c[0] - 330.5, sc2.fest.c[2] - 300.5) : 0;
+  check(sc2.fest && sc2.fest.real === 5 && Math.abs(sc2.fest.r - B.ringR(10)) < 1e-6 && dC >= 4 + 1.2 + sc2.fest.r - 1e-6, 'the village\'s own dancers hold the plaza: our ring dances beside theirs (' + dC.toFixed(1) + ' m off)');
+  const sc2b = Object.assign({}, sc, { tg: {}, ground: (x, z) => (Math.hypot(x - 330.5, z - 300.5) < 8 ? 66 : null) }); A2r(g, sc2b);
+  check(sc2b.fest && sc2b.fest.r >= 4 + 2.6 && Math.abs(sc2b.fest.c[0] - 330.5) < 1e-6, 'no room beside: round theirs (r ' + (sc2b.fest && sc2b.fest.r.toFixed(1)) + ' m)');
   g.settings.preset = 'potato'; const sc3 = Object.assign({}, sc, { tg: {} }); A2r(g, sc3); g.settings.preset = 'high';
   check(sc3.fest && sc3.fest.folk.length === 8, 'Very Low: eight people');
   const sc4 = { b: S.byId('c15.b1'), t: 0, tg: {}, eye0: sc.eye0, fwd: sc.fwd, ground: sc.ground, free: sc.free }; A2r(g, sc4);

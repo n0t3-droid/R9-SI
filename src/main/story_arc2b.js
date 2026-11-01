@@ -20,7 +20,7 @@
   'use strict';
   const P = VR.StoryPlay, A2 = VR.StoryArc2; if (!P || !P.Player || !A2 || A2._b) return;
   A2._b = true;
-  const B = VR.StoryArc2b = { stats: { stage: 0, folk: 0, glows: 0, wiege: 0, rim: 0 } };
+  const B = VR.StoryArc2b = { stats: { stage: 0, folk: 0, glows: 0, wiege: 0, rim: 0, ms: 0, draws: 0 }, off: false };   // (off: the measurement's switch)
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const smooth = (u) => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); };
@@ -112,8 +112,12 @@
     const open = (x, z) => { if (!sc.ground) return true; const gy = sc.ground(x, z); if (gy === null || gy === undefined || Math.abs(gy - y0) > 1.5) return false; return !sc.free || (sc.free([x, gy + 0.5, z]) && sc.free([x, gy + 1.6, z])); };
     let real = 0; if (sp.vil && sp.vil.agents) for (const a of sp.vil.agents) if (a.festRole === 'dance' && a.pos && Math.hypot(a.pos[0] - sp.x, a.pos[2] - sp.z) < sp.r + 5) real++;
     let r = B.ringR(N.ring), C;
-    if (real >= 4) { r = Math.max(r, sp.r + 2.6); C = [sp.x, sp.z, true]; }   // (round the village's own ring)
-    else C = B.centre(open, sp.x, sp.z, r);
+    if (real >= 4) {   // the village's own ring holds the plaza: ours beside it (hands joined), else round it (cheering)
+      const keep = sp.r + 1.2 + r, open2 = (x, z) => Math.hypot(x - sp.x, z - sp.z) > sp.r + 1.4 && open(x, z);
+      C = null;
+      for (const st of [keep, keep + 1.5, keep + 3]) { for (let k = 0; k < 12 && !C; k++) { const a = k / 12 * TAU, x = sp.x + Math.cos(a) * st, z = sp.z + Math.sin(a) * st; if (B.ringOpen(open2, x, z, r)) C = [x, z, true]; } if (C) break; }
+      if (!C) { r = Math.max(r, sp.r + 2.6); C = [sp.x, sp.z, true]; }
+    } else C = B.centre(open, sp.x, sp.z, r);
     const cy = (sc.ground && sc.ground(C[0], C[1])) || y0;
     const F = { c: [C[0], cy, C[1]], r, n: N, real, open: C[2], mid: open(C[0], C[1]), cast: B.cast(((g.meta && g.meta.seed) | 0) ^ Math.round(sp.x * 13 + sp.z * 7), low), folk: [] };
     const Lk = VR.LifeKit;
@@ -128,6 +132,14 @@
     try { const F = sc.fest = B.stage(g, sc); if (F) sc.tg.home = [F.c[0], F.c[1] + 2, F.c[2]]; } catch (e) { sc.fest = null; }
   };
 
+  // the new place where fairy.js settled it (its spiral moves a place off a road or a town): the scenes look there
+  const place0 = A2.place;
+  A2.place = function (g) {
+    const pc = place0.apply(this, arguments), st = VR.Fairy && VR.Fairy.state; if (!pc || !st || !st.sites) return pc;
+    const s = st.sites.find((q) => q.id === 'overworld:wiege' && q.y !== null && q.y !== undefined);
+    return s && String(st.key || '').split('|')[0] === pc.dim ? Object.assign({}, pc, { x: s.x, z: s.z, y: s.y }) : pc;
+  };
+
   // ---------------------------------------------------------------- drawing the festival's people
   const MPF = { scale: 1, pose: null, shade: 0, noShade: true }, FPOSE = [];
   const P0 = [0, 0, 0];
@@ -140,7 +152,8 @@
       const gy = sc.ground ? sc.ground(at[0], at[1]) : null;
       a.pos[0] = at[0]; a.pos[2] = at[1]; a.pos[1] = (gy !== null && gy !== undefined && Math.abs(gy - F.c[1]) < 2 ? gy : F.c[1]) + (q.role === 'ring' ? Math.abs(Math.sin(ph)) * 0.035 : 0);
       a.yaw = at[2];
-      if (q.role === 'ring') { a.walkAmt = 0; a.posefx = a.posefx || ((Pz) => { if (F3 && F3.ringPose) F3.ringPose(Pz, 1, B._ph, B._chord, a.kid); }); }
+      if (q.role === 'ring' && chord > 2.1) { a.walkAmt = 0; a.posefx = null; a.state = q.i % 3 === 1 ? 'wave' : 'cheer'; }   // (a ring round theirs: too wide for joined hands)
+      else if (q.role === 'ring') { a.walkAmt = 0; a.state = 'idle'; a.posefx = a.ringFx || (a.ringFx = (Pz) => { if (F3 && F3.ringPose) F3.ringPose(Pz, 1, B._ph, B._chord, a.kid); }); }
       else { a.walk = (F.r + 1.7) * B.W * 0.8 * t; a.walkAmt = 0.55; a.posefx = a.posefx || ((Pz) => { if (Pz.arm_r) { Pz.arm_r[0] = 1.15; Pz.arm_r[2] = 0.08; } if (Pz.fore_r) Pz.fore_r[0] = 0.35; }); }
       B._ph = ph; B._chord = chord; a.talking = false;
       if (Lk.drawFolk(g, r, prog, a, cam, g.time || 0)) n++;
@@ -161,7 +174,7 @@
   const ds0 = P.drawStory5;
   P.drawStory5 = function (g, r, E, cam) {
     const s = pl(g), sc = s && s.scene;
-    if (sc && sc.fest) { try { B.drawFest(g, r, E, cam, sc); } catch (e) { if (!B.warned) { B.warned = true; console.warn('story fest', e); } } }
+    if (sc && sc.fest && !B.off) { const t0 = performance.now(); try { B.drawFest(g, r, E, cam, sc); } catch (e) { if (!B.warned) { B.warned = true; console.warn('story fest', e); } } B.stats.ms = (B.stats.ms || 0) + performance.now() - t0; B.stats.draws = (B.stats.draws || 0) + 1; }
     return ds0 ? ds0.apply(this, arguments) : undefined;
   };
 
@@ -169,14 +182,14 @@
   const gl0 = P.glowList;
   P.glowList = function (g, sc) {
     const out = gl0 ? gl0.apply(this, arguments) : [];
-    if (!sc || !sc.b || sc.b.ch < 13) return out;
+    if (!sc || !sc.b || sc.b.ch < 13 || B.off) return out;
     const low = lowOf(g), n0 = out.length;
     if (sc.fest) B.festGlows(sc.fest, sc.t, low, out);
     const fk = g.funke, cam = g.cam;
     if (closeFunke(sc) && fk && fk.pos && cam) {   // a warm rim: a soft light just behind him, as the camera sees it
       const v = [fk.pos[0] - cam.x, fk.pos[1] - cam.y, fk.pos[2] - cam.z], L = Math.hypot(v[0], v[1], v[2]) || 1;
-      out.push({ p: [fk.pos[0] + v[0] / L * 0.3, fk.pos[1] + 0.1, fk.pos[2] + v[2] / L * 0.3], s: [0.6, 0.6], col: [1.0, 0.72, 0.42], a: 0.5, kind: 0 });
-      out.push({ p: [fk.pos[0] + v[0] / L * 0.35, fk.pos[1] + 0.05, fk.pos[2] + v[2] / L * 0.35], s: [1.4, 1.1], col: [0.9, 0.55, 0.35], a: 0.16, kind: 0 });
+      out.push({ p: [fk.pos[0] + v[0] / L * 0.3, fk.pos[1] + 0.1, fk.pos[2] + v[2] / L * 0.3], s: [0.45, 0.45], col: [1.0, 0.72, 0.42], a: 0.34, kind: 0 });
+      out.push({ p: [fk.pos[0] + v[0] / L * 0.35, fk.pos[1] + 0.05, fk.pos[2] + v[2] / L * 0.35], s: [1.2, 0.9], col: [0.9, 0.55, 0.35], a: 0.1, kind: 0 });
       B.stats.rim++;
     }
     const E = g.env, dim = g.dim || 'overworld';
@@ -202,6 +215,8 @@
     return pose00.apply(this, arguments);
   };
   { const Fk = VR.Funke; if (Fk && Fk.Actor && !Fk._a8) { Fk._a8 = true; const AP = Fk.Actor.prototype;
+    // (f-first3 hides him in the view's centre third nearer than 2.25 m — right where a close-up wants him)
+    const ia0 = Fk.inAim; if (ia0) Fk.inAim = function () { const s = pl(), sc = s && s.scene; if (closeFunke(sc)) return false; return ia0.apply(this, arguments); };
     const ly0 = AP.lookYaw; if (ly0) AP.lookYaw = function (T) { const s = pl(this.g), sc = s && s.scene, cam = this.g.cam; if (cam && closeFunke(sc)) return Math.atan2(-(cam.x - this.pos[0]), -(cam.z - this.pos[2])); return ly0.apply(this, arguments); };
     const rl0 = AP.relight; if (rl0) AP.relight = function () { const r = rl0.apply(this, arguments); const s = pl(this.g), sc = s && s.scene, L = this.light; if (sc && sc.b && sc.b.ch >= 13 && L && L.bl) { L.sky = Math.max(L.sky, 0.7); L.bl[0] = Math.max(L.bl[0], 0.85); L.bl[1] = Math.max(L.bl[1], 0.72); L.bl[2] = Math.max(L.bl[2], 0.62); } return r; };
   } }
