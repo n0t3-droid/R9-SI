@@ -168,12 +168,16 @@
   // the draw's options for a smooth person (villages.js draw → here, then FolkGPU.queue): the far face with a little
   // hysteresis, the lids of a mood (folkgpu.js lifts the lids part by o.lidUp head units: the eye half covered)
   F3.off = false;   // the switch (the measurement's): no far face, no moods, no play poses — the dance's ring stays
+  // the per-feature switches (folk3_cost.js, folk3.mjs's cost run toggle them one by one): the far face, a mood's lids,
+  // the moods' smiles and yawns, the children's play poses, the ring dance, the photo mode's H, the villages' draw hook
+  F3.sw = { far: true, lids: true, moods: true, play: true, dance: true, photo: true, draw: true };
+  const on = (k) => !F3.off && F3.sw[k];
   F3.drawOpts = function (a, o, d2) {
-    if (F3.off) { o.far = false; return o; }
-    a.ffar = a.ffar ? d2 > 5.5 * 5.5 : d2 > F3.FAR_FACE * F3.FAR_FACE;
+    if (!on('draw')) { o.far = false; return o; }
+    a.ffar = on('far') && (a.ffar ? d2 > 5.5 * 5.5 : d2 > F3.FAR_FACE * F3.FAR_FACE);
     o.far = a.ffar;
     const m = a.mood;
-    if (m && m.lids > 0 && !a.ffar && o.hide && o.hide.lids && a.pose !== 'sleep' && !a.blinkOn && !a.eyesClosed) { o.hide.lids = false; o.lidUp = 2 * (1 - m.lids) * (a.kid ? 0.515 : 0.54); }
+    if (m && m.lids > 0 && on('lids') && !a.ffar && o.hide && o.hide.lids && a.pose !== 'sleep' && !a.blinkOn && !a.eyesClosed) { o.hide.lids = false; o.lidUp = 2 * (1 - m.lids) * (a.kid ? 0.515 : 0.54); }
     return o;
   };
 
@@ -228,7 +232,7 @@
   const jd = VP.joy_dancer;
   VP.joy_dancer = function (a, act, dt) {
     const D = this.joyState().dance;
-    if (!D || !D.f3 || !D.ring) { a.ringDance = null; return jd.apply(this, arguments); }
+    if (!D || !D.f3 || !D.ring || !F3.sw.dance) { a.ringDance = null; return jd.apply(this, arguments); }
     const an = D.phase + act.idx * TAU / D.n + D.t * D.w, x = D.c[0] + Math.cos(an) * D.r, z = D.c[2] + Math.sin(an) * D.r;
     const d = Math.hypot(x - a.pos[0], z - a.pos[2]);
     a.hush = null;
@@ -262,14 +266,14 @@
   VP.pose = function (a, t) {
     const P = op.call(this, a, t);
     const D = this.joy && this.joy.dance;
-    if (a.ringDance && a.dance && D) {
+    if (a.ringDance && a.dance && D && F3.sw.dance) {
       const ph = D.t * Math.PI / 0.54;   // a step every two of the band's beats (0.27 s)
       F3.ringPose(P, 1, ph, a.ringDance.chord, a.kid);
       a.drawOffY = Math.abs(Math.sin(ph)) * (a.kid ? 0.05 : 0.035);
       return P;
     }
     const act = a.act;
-    if (a.kid && act && act.type === 'play' && !F3.off && tierOf(this.g) >= 1) {
+    if (a.kid && act && act.type === 'play' && on('play') && tierOf(this.g) >= 1) {
       const G = a.vil && a.vil.game, s = Math.sin(t * 7.5 + (a.p.seed || 0));
       const set = (j, rx, ry, rz) => { const q = P[j]; if (q) { q[0] = rx; q[1] = ry; q[2] = rz; } };
       if (G && G.type === 'hide' && G.seeker === a && G.phase === 'count') {
@@ -296,7 +300,7 @@
   const up = VP.update;
   VP.update = function (dt) {
     up.call(this, dt);
-    const g = this.g, p = g.player; if (!p || F3.off || tierOf(g) < 1) return;
+    const g = this.g, p = g.player; if (!p || !on('moods') || tierOf(g) < 1) return;
     this.f3T = (this.f3T || 0) - dt; if (this.f3T > 0) return;
     this.f3T = 0.5;
     const tod = g.env ? g.env.timeOfDay : 6000;
@@ -363,11 +367,13 @@
   };
   F3.solidW = solidW;
   if (PM && PM.Photo) {
+    const GLIDE = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'];
     const PP = PM.Photo.prototype, pu = PP.update, pe = PP.enter, pcm = PP.cam, pl = PP.leave;
     PP.update = function (dt, I) {
       const typing = this.g.ui && this.g.ui.typing;
+      if (!F3.sw.photo) return pu.call(this, dt, I);
       if (this.on && this.s && !this.first && !typing && I.hit('KeyH')) F3.portrait(this);
-      else if (this.f3Fov && !typing && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].some(c => I.down(c))) this.f3Fov = null;   // (gliding off: the game's lens again)
+      else if (this.f3Fov && !typing && GLIDE.some(c => I.down(c))) this.f3Fov = null;   // (gliding off: the game's lens again)
       return pu.call(this, dt, I);
     };
     PP.cam = function (base) { const c = pcm.call(this, base); if (c && this.f3Fov) c.fov = this.f3Fov; return c; };
