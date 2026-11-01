@@ -103,10 +103,12 @@ if (MI.frameK) {
   check(typeof MI.framePose === 'function', 'MI.framePose exists');
   if (MI.framePose) {
     const o = MI.framePose([10, 70, 0], [0, 70, 0], {});
-    const dl = Math.hypot(o.x - 5, o.z - 0);
-    check(dl > 6 && dl < 16 && o.y > 71 && o.y < 78, 'the camera beside the way, a little up (' + [o.x, o.y, o.z].map(v => v.toFixed(1)).join(', ') + ')');
-    const lx = -Math.sin(o.yaw), lz = -Math.cos(o.yaw), tx = 7 - o.x, tz = 0 - o.z, tl = Math.hypot(tx, tz);
-    check((lx * tx + lz * tz) / tl > 0.95 && o.pitch < 0, 'it looks at the family between the doorstep and them, a little down');
+    const dl = Math.hypot(o.x - 10, o.z - 0), side = Math.abs(o.z);
+    check(dl > 5 && dl < 12 && side > 4 && o.x < 10 && o.y > 71 && o.y < 75, 'the camera close beside the way, ahead of the family, a little up (' + [o.x, o.y, o.z].map(v => v.toFixed(1)).join(', ') + ')');
+    const lx = -Math.sin(o.yaw), lz = -Math.cos(o.yaw), tx = 10.5 - o.x, tz = 0 - o.z, tl = Math.hypot(tx, tz);
+    check((lx * tx + lz * tz) / tl > 0.97 && o.pitch < 0, 'it looks at the family (the lead, the cart behind), a little down');
+    const o2 = MI.framePose([10, 70, 0], [0, 70, 0], {}, -1);
+    check(Math.sign(o2.z) === -Math.sign(o.z), 'the other side when asked (the lower ground)');
   }
 }
 check(typeof MI.festLights === 'function', 'MI.festLights exists');

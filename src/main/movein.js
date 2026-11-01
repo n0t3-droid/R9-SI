@@ -211,13 +211,14 @@
   const smoother = (t) => { const u = t <= 0 ? 0 : t >= 1 ? 1 : t; return u * u * u * (u * (u * 6 - 15) + 10); };
   MI.frameK = function (t) { const F = MI.FRAME; return t <= 0 || t >= F.dur ? 0 : t < F.rise ? smoother(t / F.rise) : t < F.rise + F.hold ? 1 : smoother((F.dur - t) / F.fall); };
   MI.frameSkip = function (t) { const F = MI.FRAME; return t < F.rise ? F.dur - F.fall * Math.max(0, t) / F.rise : t < F.rise + F.hold ? F.rise + F.hold : t; };
-  // the framing camera: beside the way (9 m to the side, 3.5 m up), looking at the family a little before the doorstep
+  // the framing camera: beside the way a little ahead of the family (6 m toward the door, 6 m to the side, 2.6 m up),
+  // looking at the group (the lead, the cart behind) — they walk toward the frame's side, the land behind them
   MI.framePose = function (lead, door, out, side) {
     out = out || {};
     let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
-    const sd = side || 1, mx = door[0] + dx * L * 0.5, mz = door[2] + dz * L * 0.5;
-    out.x = mx - dz * 9 * sd - dx * 1.5; out.z = mz + dx * 9 * sd - dz * 1.5; out.y = lead[1] + 3.5;
-    const tx = door[0] + dx * L * 0.7, tz = door[2] + dz * L * 0.7, ty = lead[1] + 1.0;
+    const sd = side || 1, ah = Math.min(6, L * 0.5);
+    out.x = lead[0] - dx * ah - dz * 6 * sd; out.z = lead[2] - dz * ah + dx * 6 * sd; out.y = lead[1] + 2.6;
+    const tx = lead[0] + dx * 1.0, tz = lead[2] + dz * 1.0, ty = lead[1] + 0.9;
     const ex = tx - out.x, ez = tz - out.z;
     out.yaw = Math.atan2(-ex, -ez); out.pitch = Math.atan2(ty - out.y, Math.hypot(ex, ez));
     return out;
@@ -621,7 +622,7 @@
       const F = J.frame; F.t += dt;
       const I = g.input, any = !!I && ((I.pressed && I.pressed.size > 0) || (I.mouse && I.mouse.clicked && I.mouse.clicked.some(Boolean)) || (I.padPressed && I.padPressed.size > 0));
       if (any && F.t > 0.1) F.t = Math.max(F.t, MI.frameSkip(F.t));
-      if (F.t >= MI.FRAME.dur || !L || !L.act) { J.frame = null; J.frameDone = true; }
+      if (F.t >= MI.FRAME.dur || !L || !L.act) MI.frameEnd(g, J);
       return;
     }
     if (J.frameDone || !L || !L.act || L.act.phase !== 'walk' || !J.way) return;
@@ -632,8 +633,10 @@
     // the side of the way with the lower ground (the camera never in a hill)
     const dx = (L.pos[0] - o[0]) / dl, dz = (L.pos[2] - o[2]) / dl, mx = o[0] + dx * dl * 0.5, mz = o[2] + dz * dl * 0.5, w = g.world;
     const hA = w.topAt ? w.topAt(Math.floor(mx - dz * 9), Math.floor(mz + dx * 9)) : 0, hB = w.topAt ? w.topAt(Math.floor(mx + dz * 9), Math.floor(mz - dx * 9)) : 0;
-    J.frame = { t: 0, side: hA <= hB ? 1 : -1, pose: {}, out: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 } };
+    J.frame = { t: 0, side: hA <= hB ? 1 : -1, pose: {}, hh: !!g.hideHud };
+    g.hideHud = true;   // (the held item is not in the shot)
   };
+  MI.frameEnd = function (g, J) { if (!J || !J.frame) return; g.hideHud = J.frame.hh; J.frame = null; J.frameDone = true; };
   const wrapA = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
   // the camera while it frames (game.js: after the wow moment's): base → the framing pose by MI.frameK, the HUD kept
   MI.cam = function (g, base) {
@@ -663,6 +666,7 @@
   };
   MI.finish = function (V) {
     const g = V.g, J = V._mi.job; if (!J || J.done) return;
+    MI.frameEnd(g, J);   // (f-polish5)
     J.done = true; V._mi.job = null;
     card(g, null);
     const rec = MI.rec(g), set = setById(rec, J.h.set);
