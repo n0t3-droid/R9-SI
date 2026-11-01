@@ -2985,6 +2985,12 @@ def('carry',{len:1,loop:false,tracks:{arm_l:[[0,0.55,0,0.05]],arm_r:[[0,0.55,0,-
 
 
 
+def('clap',{len:0.36,loop:true,tracks:{arm_l:[[0,0.95,0,0.12],[0.18,0.95,0,0.32],[0.36,0.95,0,0.12]],arm_r:[[0,0.95,0,-0.12],[0.18,0.95,0,-0.32],[0.36,0.95,0,-0.12]],fore_l:[[0,0.95,0,0.2],[0.18,0.95,0,0.45],[0.36,0.95,0,0.2]],fore_r:[[0,0.95,0,-0.2],[0.18,0.95,0,-0.45],[0.36,0.95,0,-0.2]],head:[[0,0.08,0,0]]}});
+def('gasp',{len:1,loop:false,tracks:{arm_l:[[0,0.75,0,0.3]],arm_r:[[0,0.75,0,-0.3]],fore_l:[[0,1.9,0,0.35]],fore_r:[[0,1.9,0,-0.35]],body:[[0,0.07,0,0]],head:[[0,0.12,0,0]]}});
+def('give',{len:1,loop:false,tracks:{arm_r:[[0,1.05,0,0.06]],fore_r:[[0,0.35,-0.6,0]],hand_r:[[0,-0.2,0,0]],arm_l:[[0,0.04,0,-0.12]],fore_l:[[0,0.25,0,0]],head:[[0,-0.12,0,0]],body:[[0,-0.04,0,0]]}});
+
+
+
 const tmpA={},tmpB={},tmpW={};
 FA.play=function(a,name,fade){
 const st=a.anim||(a.anim={cur:'idle',t:Math.random()*4,prev:null,prevT:0,fade:1,fadeLen:0.25});
@@ -70368,6 +70374,16 @@ VR.I18N.add('en',{
 "g.town.again":"The view is as lovely as the first time.",
 
 
+"g.joy.forYouFlower":"For you – a flower!",
+"g.joy.forYouSnack":"Fancy something tasty?",
+"g.joy.dance":"Will you dance with us? ♪",
+"g.joy.hide":"Play hide-and-seek? Find me!",
+"g.joy.found":"You found me! Hehe!",
+"g.joy.here":"Here I am!",
+"g.joy.enjoy":"Enjoy!",
+"g.joy.danceThanks":"That was lovely – thank you!",
+
+
 "g.set.fairy":"Enchanted places",
 "g.set.fairy.tip":"The Glowing Mushroom Wood, the Wishing Spring, the Slumber Tree, the Moonstone Circle and the Floating Garden in the worlds, with their Flausels and small adventures. Costs something only near a place.",
 "g.set.fairyBuddy":"Fairy companion",
@@ -74407,6 +74423,16 @@ VR.I18N.add('de',{
 "g.town.reward":"Als Dank für den Aufstieg: {n} × {item}",
 "g.town.rewardAdv":"Für den Aufstieg: +{xp} EP, +{t} Heliataler",
 "g.town.again":"Der Blick ist so schön wie beim ersten Mal.",
+
+
+"g.joy.forYouFlower":"Für dich – eine Blume!",
+"g.joy.forYouSnack":"Magst du was Leckeres?",
+"g.joy.dance":"Tanzt du mit uns? ♪",
+"g.joy.hide":"Spielst du Verstecken? Such mich!",
+"g.joy.found":"Gefunden! Hihi!",
+"g.joy.here":"Hier bin ich!",
+"g.joy.enjoy":"Lass es dir gut gehen!",
+"g.joy.danceThanks":"Das war schön – danke!",
 
 
 "g.set.fairy":"Märchenorte",
