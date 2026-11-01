@@ -25,19 +25,24 @@
     return T.ok ? T : null;
   };
   // a switch changed: only the composite again (its defines are the switches; every other program stays)
+  // (v-look2: Wiesenruhe is the terrain's define — that switch changed, every program again)
   R.lvRebuild = function () {
-    L.use(this.q); this.lvKey = L.key(this.q);
-    if (!this.P || !this.P.composite) { this.buildPrograms(); return; }
+    const k0 = this.lvKey || '', k1 = L.key(this.q), iM = L.SW.indexOf('lvMeadow');
+    L.use(this.q); this.lvKey = k1;
+    if (!this.P || !this.P.composite || (k0 && k0[iM] !== k1[iM])) { this.buildPrograms(); return; }
     const G = GL, was = G.deferred; G.deferred = true;
     try { this.P.composite = GL.program(S.FS_VS, S.COMPOSITE_FS, 'composite'); } finally { G.deferred = was; }
   };
   // the frame's state: on (the switches, the main world, a scene depth), the soft copy made
+  // (v-look2: on Herzwelt, the five bodies and in the stations, each with its palette — L.worldOf)
+  R.lvWorldOf = function (E) { return L.worldOf(E, VR.game && VR.game.dim); };
   R.lvPre = function (F, E) {
     const q = this.q;
-    this.lvOn = !!(L.on(q) && E && E.dimId === 0 && this.sceneDepth && this.hdr);
+    this.lvWorld = this.lvWorldOf(E);
+    this.lvOn = !!(L.compOn(q) && E && this.lvWorld && this.sceneDepth && this.hdr);
     this.lvSoftOn = false;
     if (!this.lvOn) return;
-    this.lv = L.frame(E, this.lv);
+    this.lv = L.frame(E, this.lv, this.lvWorld);
     if (!L.needSoft(q) || F.underwater) return;
     const T = this.lvTarget(); if (!T) return;
     const gl = this.gl, P = this.lvP || (this.lvP = {});
@@ -53,7 +58,7 @@
   };
   const post0 = R.post;
   R.post = function (F, E) {
-    if (L.on(this.q)) { const gl = this.gl; gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND); this.lvPre(F, E); }
+    if (L.compOn(this.q)) { const gl = this.gl; gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND); this.lvPre(F, E); }
     else this.lvOn = this.lvSoftOn = false;
     return post0.call(this, F, E);
   };
@@ -70,6 +75,12 @@
     gl.uniform4f(u.u_lvPal, on ? l.pal[0] : 0, on ? l.pal[1] : 0, on ? l.pal[2] : 0, on ? l.pal[3] : 0);
     const so = on && this.lvSoftOn;
     gl.uniform4f(u.u_lvSoft, on ? l.soft[0] : 1e4, on ? l.soft[1] : 2e4, so ? l.soft[2] : 0, so ? l.soft[3] : 0);
+    if (u.u_lvToneS) {
+      // v-look2: the tone (off this frame: every strength and floor 0 — lvTone returns the colour as it is)
+      if (on) { gl.uniform4fv(u.u_lvToneS, l.toneS); gl.uniform4fv(u.u_lvToneH, l.toneH); gl.uniform4fv(u.u_lvLift, l.lift); gl.uniform4fv(u.u_lvSkyF, l.skyF); }
+      else { gl.uniform4f(u.u_lvToneS, 1, 1, 1, 0); gl.uniform4f(u.u_lvToneH, 1, 1, 1, 0); gl.uniform4f(u.u_lvLift, 0, 0, 0, 1); gl.uniform4f(u.u_lvSkyF, 0, 0, 0, 0); }
+      gl.uniform4f(u.u_lvTone, so ? l.tone[0] : 0, 0, 0, 0);
+    }
     gl.uniform3f(u.u_lvSun, E.sunDir[0], E.sunDir[1], E.sunDir[2]);
     gl.uniform2f(u.u_lvNF, 0.06, (F && F.cam && F.cam.far) || 1200);
     if (u.u_lvInvVP && this.invVPNJ) gl.uniformMatrix4fv(u.u_lvInvVP, false, this.invVPNJ);
@@ -78,4 +89,13 @@
     if (u.u_lvSoftTex) this.tex(7, so ? this.lvT.t : this.sceneCol, u.u_lvSoftTex);
     gl.activeTexture(gl.TEXTURE0);
   };
+  // v-look2 · Wiesenruhe: the terrain's uniform (common() runs for every program each frame; only the opaque terrain has
+  // it) — on at home only (no meadows on the bodies, none in a station)
+  R.lvUniforms = function (p, E) {
+    const u = p.u.u_lvMeadow; if (!u) return;
+    const M = L.MEADOW, on = !!(this.q && this.q.lvMeadow && this.lvWorldOf(E) === 'home');
+    this.gl.uniform4f(u, on ? M.calm : 0, M.scale, on ? M.k : 0, on ? 1 : 0);
+  };
+  const common0 = R.common;
+  R.common = function (p, E) { common0.call(this, p, E); if (p && p.u && p.u.u_lvMeadow) this.lvUniforms(p, E); };
 })(VR);
