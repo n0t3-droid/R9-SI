@@ -180,7 +180,7 @@ const festCam = () => cam(PX + 0.5 + PR + 7, PY + 4, PZ + 0.5 + 3, Math.atan2(-(
 await ev(() => VR.game.env.setTime(12650));
 for (const tag of ['before', 'after']) { await setRobo(tag === 'before'); await festCam(); await step(60); await live(8); await shot('robo_fest_' + tag); }
 // the people's CPU time a frame in the page: the villages' update and a pose for each person in view, no GPU (the
-// draw's GL calls are the same with Robo on or off) — the least of three rounds of 60 frames, off and on interleaved
+// draw's GL calls are the same with Robo on or off) — the least of five rounds of 60 frames, off and on interleaved (in both orders)
 const cost = (preset, off) => ev(([preset, off]) => {
   const g = VR.game, V = g.villages; VR.Robo.off = off;
   const S = g.settings; S.preset = preset; S.anim = preset !== 'potato';
@@ -194,7 +194,7 @@ const C = {};
 await festCam();
 for (const pre of ['potato', 'balanced']) {
   for (const off of [true, false]) C[pre + (off ? '_off' : '_on')] = 1e9;
-  for (let r = 0; r < 3; r++) for (const off of [true, false]) { const v = await cost(pre, off); const k = pre + (off ? '_off' : '_on'); C[k] = Math.min(C[k], v); }
+  for (let r = 0; r < 5; r++) for (const off of (r & 1 ? [false, true] : [true, false])) { const v = await cost(pre, off); const k = pre + (off ? '_off' : '_on'); C[k] = Math.min(C[k], v); }
 }
 console.log('costs (ms a frame, the villages\' update + poses): ' + JSON.stringify(Object.fromEntries(Object.entries(C).map(([k, v]) => [k, +v.toFixed(3)]))));
 check(C.potato_on <= C.potato_off + 0.1, `Very Low: the people's frame with Robo ${C.potato_on.toFixed(3)} ms ≤ without ${C.potato_off.toFixed(3)} + 0.1`);
