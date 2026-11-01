@@ -8,7 +8,8 @@
 //   the reward    a chest beside the beacon (once per outpost: the outpost loot table, crafting.js), its sparkle
 //   the page      a Wanderbuch page per freed outpost (the journal's section „Leuchtfeuer-Seiten": the day, the name, how
 //                 it was freed — calmed, brave or both), its toast
-//   the cheer     the nearest village (≤ 900 m) heard of it: when the player next stands among its people they clap
+//   the cheer     the nearest village (≤ 900 m) heard of it: when the player next stands among its people (≥ 2 within 15 m,
+//                 ≤ 150 m from its middle) they clap
 //                 (folkjoy.js joyReact) and one line says why
 //   the next goal 1.5 s after the moment Funke names the next disturbed outpost (or the nearest unvisited village) with
 //                 its distance and direction, and its Wegweiser points there (funke.js addSource) until it is reached
@@ -134,7 +135,7 @@
   // the cheer: the player among the village's people (≥ 2 within 15 m) — they clap, one line says why
   LF.lookCheer = function (g) {
     const C = LF.cheer, V = g.villages; if (!C || !V || !V.joyReact) return;
-    const p = g.player.pos; if (Math.hypot(p[0] - C.x, p[2] - C.z) > 60) return;
+    const p = g.player.pos; if (Math.hypot(p[0] - C.x, p[2] - C.z) > 150) return;   // (run 3: a town's middle lies far from its streets — 150 m)
     let n = 0; if (V.agents) for (const a of V.agents) if (a && a.pos && Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < 15 && a.pose !== 'sleep') n++;
     if (n < 2) return;
     LF.cheer = null;
