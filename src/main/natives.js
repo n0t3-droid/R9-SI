@@ -90,12 +90,55 @@
     a.mdl = null; a.fg = null; a.gait = undefined;
     return true;
   };
+  // a-story6: the lamp round's hour — on a strange world its own night (Helia 2° under the horizon: Aquamarin's day is a
+  // week of the game's clock, the round walked in broad daylight), at home the clock's evening and night
+  N.lampHour = function (tod) {
+    const BS = VR.BodySky, L = BS && BS.want && BS.cur && BS.cur.light;
+    if (L && Number.isFinite(L.sunEl)) return L.sunEl < -0.035;
+    return tod >= 13000 && tod < 23300;
+  };
+  // a-story6 · the lamplighter's lantern casts a warm light: at the hand (the right hand's place by the person's turn and
+  // size: a little out to the side, a little ahead, at the knuckles' height), the glass's glow and a wide faint warm
+  // pool round it, flickering like a flame — where the lamps' halos are drawn (Balanced and up: lampGlow) and at night;
+  // the carriers within 48 m listed every 2 s (no allocation per frame)
+  N.lanternAt = function (a, out) {
+    const k = (spBody(a.p && a.p.look && a.p.look.species).scale || 1) * (a.kid ? 0.82 : 1), s = Math.sin(a.yaw || 0), c = Math.cos(a.yaw || 0);
+    out = out || [0, 0, 0];
+    out[0] = a.pos[0] + c * 0.32 * k - s * 0.14 * k; out[1] = a.pos[1] + 0.78 * k; out[2] = a.pos[2] - s * 0.32 * k - c * 0.14 * k;
+    return out;
+  };
+  N.lanternHalos = function (P, dt, eye, night) {
+    if (!(night > 0.35) || N.lant6Off) return 0;   // (N.lant6Off: the pictures before/after)
+    const g = P.game, V = g && g.villages; if (!V || !V.known) return 0;
+    P.lantT = (P.lantT || 0) - dt;
+    if (P.lantT <= 0 || !P.lantL) {
+      P.lantT = 2; const L = P.lantL || (P.lantL = []); L.length = 0;
+      for (const v of V.known.values()) for (const a of (v.agents || [])) if (a && a.p && a.p.look && a.p.look.tool === 'lantern' && a.pos && Math.abs(a.pos[0] - eye[0]) < 48 && Math.abs(a.pos[2] - eye[2]) < 48) L.push(a);
+    }
+    const o = P._lo6 || (P._lo6 = { life: 0, size: 0.5, grav: 0, drag: 0, col: [1, 1, 1], emis: 1, collide: false, fade: false, force: true, alpha: 1 }), H = P._lh6 || (P._lh6 = [0, 0, 0]);
+    let n = 0;
+    for (const a of P.lantL) {
+      if (a.pose === 'sit' || a.pose === 'sleep') continue;
+      N.lanternAt(a, H);
+      const fl = 0.86 + 0.14 * Math.sin((P.clock || 0) * 9.1 + a.pos[0]) * Math.sin((P.clock || 0) * 5.3 + a.pos[2]);
+      o.life = dt * 1.5 + 1e-4;
+      o.size = 0.45; o.col[0] = 1.15 * fl; o.col[1] = 0.74 * fl; o.col[2] = 0.34 * fl; P.spawn(H[0], H[1], H[2], 0, 0, 0, o);
+      o.size = 1.5; o.col[0] = 0.3 * fl; o.col[1] = 0.16 * fl; o.col[2] = 0.05 * fl; P.spawn(H[0], H[1] - 0.2, H[2], 0, 0, 0, o);
+      n++;
+    }
+    P.lantN = n;
+    return n;
+  };
+  if (VR.Particles && VR.Particles.prototype.lampGlows && !VR.Particles.prototype._lant6) {
+    const PP = VR.Particles.prototype, lg0 = PP.lampGlows; PP._lant6 = true;
+    PP.lampGlows = function (dt, eye, night) { const r = lg0.apply(this, arguments); try { N.lanternHalos(this, dt, eye, night); } catch (e) { /* the lamps' halos as they were */ } return r; };
+  }
   // the activity a native of a town wants now, or null (the villages' own schedule then)
   N.routine = function (a, tod, preset) {
     const vil = a.vil, P = vil && vil.plan;
     if (!P || !P.town || a.kid || (a.role in KEEP)) return null;
     const s = a.p.seed;
-    if (tod >= 13000 && tod < 23300) return N.lamplighters(vil, N.LAMPS_N(preset)).has(a.p.id) ? 'lantern' : null;
+    if (N.lampHour(tod)) return N.lamplighters(vil, N.LAMPS_N(preset)).has(a.p.id) ? 'lantern' : null;
     if (tod >= 10600 && tod < 12800) return u01(s, 41) < (a.elder ? 0.7 : 0.55) ? 'hall' : null;
     if (tod >= 1500 && tod < 10000 && !(tod >= 5600 && tod < 6900)) return !a.elder && u01(s, 42) < 0.32 ? 'market' : null;
     return null;

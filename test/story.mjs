@@ -414,7 +414,7 @@ try {
       const s1 = await play('c9.b1', 10, 'c9_nebula', td === null ? undefined : td);
       check(s1 && s1.fx === 'nebin' && /lumi/.test(s1.who), 'c9.b1: the nebula from inside; Lumi is there (her branch)');
       check(await ev(() => (VR.StoryPlay.stats.nebSky || 0) > 0), 'c9.b1: the sky turned to the nebula\'s own glow while the scene plays');
-      { const q = await ev(() => ({ glows: VR.StoryPlay.stats.glows || 0, air: VR.StoryPlay.stats.nebAir || 0, ms: VR.StoryGlow ? +VR.StoryGlow.stats.ms.toFixed(1) : -1, draws: VR.StoryGlow ? VR.StoryGlow.stats.draws : -1 })); check(q.glows > 20, 'a-story5 · c9.b1: the nebula\'s walls as 3-D lights in the world (' + JSON.stringify(q) + ')'); }
+      { const q = await ev(() => ({ glows: VR.StoryPlay.stats.glows || 0, air: VR.StoryPlay.stats.nebAir || 0, ms: VR.StoryGlow ? +VR.StoryGlow.stats.ms.toFixed(1) : -1, draws: VR.StoryGlow ? VR.StoryGlow.stats.draws : -1, neb6: VR.StoryPlay.stats.neb6 || 0 })); check(q.glows > 20 || q.neb6 > 0, 'a-story5 · c9.b1: the nebula\'s walls as 3-D lights in the world (a-story6: story_neb\'s pillars, clouds and backdrop own the frame instead) (' + JSON.stringify(q) + ')'); }
       await ev(() => VR.StoryPlay.debug.reach('c9.b2'));
       const s2 = await play('c9.b2', 11, 'c9_flimmi', td === null ? undefined : td);
       check(s2 && s2.fx === 'flimmi' && /flimmi/.test(s2.who), 'c9.b2: Flimmi — the star being born, the one the beacons were calling');

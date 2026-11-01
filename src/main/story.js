@@ -1158,6 +1158,121 @@ body.storyon #storychoice { visibility: hidden !important; }
     return r;
   }; } }
 
+  // ---------------------------------------------------------------- a-story6 · ch. 9 owns its whole frame
+  // (plan docs/superpowers/plans/2026-10-31-a-story6.md) The pale-pink wash was the day: the air's LUT sky (its sunward
+  // stop and Helia's glare), the haze over the land and the day's exposure. While a ch.-9 scene plays (storyLights on,
+  // story_neb.js compiled) the scene takes the frame: the sky is story_neb.js's backdrop over every sky pixel; the land a
+  // night lit by the nebula — Helia set below the horizon for the scene (its colour 0: no glare, no flare, the night's
+  // grade), the light from Flimmi's side (warm gold; in 9.1 a dim rose, the star still in its cocoon), an indigo shade
+  // and haze nearer (the land fades into the dust: depth), the exposure fixed; the sky shot trucks sideways and cranes up
+  // (the near clouds, the pillars and the far gas move against each other: parallax). Eased in over 1.2 s; fixed arrays.
+  // Cost: only while those scenes play; outside them one more scene check in BodySky.env. Very Low: story_neb.js's
+  // quality 0 (fewer octaves, 3 pillars, 2 clouds, no 3-D shafts).
+  P.neb6On = (g, sc) => !!(sc && sc.b && sc.b.ch === 9 && sc.tg && sc.tg.sky && sc.eye0 && P.lightsOn(g) && VR.StoryNeb && VR.StoryNeb.ok() && !VR.StoryNeb.off && VR.StoryGlow);
+  P.neb6Seed = (g) => (((g && g.meta && g.meta.seed) >>> 0) % 997) * 0.013 + 0.37;
+  { const fx5 = P.fx3d; P.fx3d = function (g, sc, at) { const o = fx5.apply(this, arguments); if (o && P.neb6On(g, sc)) o.neb6 = true; return o; }; }
+  { const ds5 = P.drawStory5; P.drawStory5 = function (g, r, E, cam) {
+    const s = pl(g), sc = s && s.scene;
+    if (!sc || !P.neb6On(g, sc)) return ds5.apply(this, arguments);
+    const n = VR.StoryNeb.draw(r, cam, { e: sc.eye0, y0: sc.yaw0 || 0, F0: sc.tg.sky, t: sc.t, id: sc.b.id, q: VR.StoryNeb.quality(g.settings && g.settings.preset), seed: P.neb6Seed(g) });
+    P.stats.neb6 = (P.stats.neb6 || 0) + (n ? 1 : 0);
+  }; }
+  // the scene's night: E's light, haze and grade (fixed arrays — E's own arrays are never written: they may be shared)
+  const N6 = { sd: [0, -1, 0], md: [0, 1, 0], mc: [0, 0, 0], amb: [0, 0, 0], z: [0, 0, 0], m: [0, 0, 0], h: [0, 0, 0], fc: [0, 0, 0], fog: [0, 0, 0, 0], sc: [0, 0, 0] };
+  P.N6 = { moon: [0.95, 0.58, 0.34], moonB1: [0.5, 0.24, 0.3], amb: [0.05, 0.045, 0.1], zen: [0.02, 0.012, 0.05], mid: [0.06, 0.02, 0.08], hor: [0.1, 0.035, 0.09], fog: [0.03, 0.03, 0.065] };
+  P.night6 = function (E, sc) {
+    const k = smooth(sc.t / 1.2), e = sc.eye0, F = sc.tg.sky, C = P.N6;
+    let fx = F[0] - e[0], fy = F[1] - e[1], fz = F[2] - e[2]; const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+    const hl = Math.hypot(fx, fz) || 1; N6.sd[0] = -fx / hl * 0.6; N6.sd[1] = -0.8; N6.sd[2] = -fz / hl * 0.6;   // (Helia under the far horizon)
+    N6.md[0] = fx; N6.md[1] = Math.max(0.2, fy); N6.md[2] = fz;
+    const mc = sc.b.id === 'c9.b1' ? C.moonB1 : C.moon;
+    mixTo(N6.mc, E.moonColor || NZ, mc, k); mixTo(N6.amb, E.ambSky || C.amb, C.amb, k);
+    mixTo(N6.z, E.zenith || C.zen, C.zen, k); mixTo(N6.m, E.skyMid || C.mid, C.mid, k); mixTo(N6.h, E.horizon || C.hor, C.hor, k); mixTo(N6.fc, E.fogColor || C.fog, C.fog, k);
+    if (E.sunColor) for (let i = 0; i < 3; i++) N6.sc[i] = E.sunColor[i] * (1 - k);
+    E.sunDir = N6.sd; E.sunColor = N6.sc; E.moonDir = N6.md; E.moonColor = N6.mc; E.ambSky = N6.amb;
+    E.zenith = N6.z; E.skyMid = N6.m; E.horizon = N6.h; E.fogColor = N6.fc;
+    if (E.fog) { const f0 = E.fog; N6.fog[0] = f0[0] + (f0[1] * 0.3 - f0[0]) * k; N6.fog[1] = f0[1]; N6.fog[2] = f0[2] || 0; N6.fog[3] = f0[3] || 0; E.fog = N6.fog; }
+    E.night = Math.max(E.night || 0, k); E.nebula = 0;
+    E.exposure = (E.exposure || 1) + (1.05 - (E.exposure || 1)) * k;
+    E.bloomThreshold = 0.95; E.bloomStrength = 0.12; E.emissiveBoost = Math.max(E.emissiveBoost || 0, 1.0);
+    E.saturation = 1.22; E.vignette = 0.75; E.rays = 0;
+    P.stats.night6 = (P.stats.night6 || 0) + 1;
+    return E;
+  };
+  { const BS = VR.BodySky; if (BS && BS.env && !BS._story6) { BS._story6 = true; const env2 = BS.env; BS.env = function (E) {
+    const r = env2.apply(this, arguments);
+    try { const g = game(), s = g && pl(g), sc = s && s.scene; if (E && sc && sc.b.ch === 9 && E.bodySky && P.neb6On(g, sc)) P.night6(E, sc); } catch (e) { /* the sky as it was */ }
+    return r;
+  }; } }
+  // the sky shot moves: a slow truck sideways and a crane up, still aimed at the star (parallax between the layers)
+  if (P.Player && !P.Player.prototype._s6) {
+    P.Player.prototype._s6 = true;
+    const pz = P.Player.prototype.pose0;
+    P.Player.prototype.pose0 = function (sc, sh, u, base) {
+      const c = pz.apply(this, arguments);
+      try {
+        if (c && sh.cam === 'up' && P.neb6On(this.g, sc)) {
+          const f = sc.fwd, dx = (u - 0.5) * 16, Q = sc.tg.sky;
+          const x = c.x - f[2] * dx, y = c.y + 3 * smooth(u), z = c.z + f[0] * dx;
+          if (!sc.free || sc.free([x, y, z])) { const p0 = c.pitch, p1 = Math.atan2(Q[1] - c.y, Math.hypot(Q[0] - c.x, Q[2] - c.z)); c.x = x; c.y = y; c.z = z; c.yaw = Math.atan2(-(Q[0] - x), -(Q[2] - z)); c.pitch = p0 + (Math.atan2(Q[1] - y, Math.hypot(Q[0] - x, Q[2] - z)) - p1); }
+        }
+      } catch (e) { /* the shot as it was */ }
+      return c;
+    };
+  }
+
+  // ---------------------------------------------------------------- a-story6 · ch. 7's window: the arrow on the true beacons
+  // (a-story5's open item 3) The beacons the player knows on Herzwelt (the Abenteuer's record: its sites and the freed
+  // ones, by their map x, z), carried onto the planet seen from the Ringstation's window: BodyTex's chart → the sphere →
+  // Herzwelt's frame in the system (the scene's ephemeris at the frame's own time) → the view's axes (SpaceFlight.cur,
+  // the station's frame). Only those on the near side, inside the window's view; lit one after another along the view's
+  // right. Fewer than three there (the Heartland on the far side, none known yet): the film's arrow as before.
+  P.beaconXZ = function () {
+    const R0 = VR.Adventure && VR.Adventure.rec, out = [], seen = new Set();
+    try {
+      if (R0 && R0.sites) for (const id in R0.sites) { const o = R0.sites[id]; if (o && Number.isFinite(+o.x) && Number.isFinite(+o.z) && !seen.has(id)) { seen.add(id); out.push([+o.x, +o.z, id]); } }
+      if (R0 && R0.freed && VR.Liberate && VR.Liberate.freedList) for (const f of VR.Liberate.freedList(R0)) if (!seen.has(f.id)) { seen.add(f.id); out.push([f.x, f.z, f.id]); }
+    } catch (e) { /* none */ }
+    return out;
+  };
+  // fr { pos, axes } the view's frame in the system, hb { p, xb, axis } Herzwelt, pts [[x, z, id]], F the window's forward
+  // (scene), cone (rad) → [{ d (the direction, scene), n (the ground's normal there, scene), id }]
+  P.trueArrow = function (fr, hb, pts, F, cone) {
+    const BT = VR.BodyTex, SSx = VR.SpaceScene; if (!fr || !fr.axes || !hb || !BT || !SSx || !SSx.frame) return [];
+    const FF = SSx.frame(hb), R = (SSx.BODIES && SSx.BODIES.herz && SSx.BODIES.herz.R) || BT.CHART.R, A = fr.axes, out = [], cc = Math.cos(cone || Math.PI);
+    const dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    for (const q of pts) {
+      const sp = BT.toSphere(q[0], q[1]), n = SSx.toSys(FF, BT.normal(sp[0], sp[1]));
+      const v = [hb.p[0] + n[0] * R - fr.pos[0], hb.p[1] + n[1] * R - fr.pos[1], hb.p[2] + n[2] * R - fr.pos[2]], L = Math.hypot(v[0], v[1], v[2]);
+      if (!(L > 0) || dt(n, v) > -0.02 * L) { P.stats.arrowFar = (P.stats.arrowFar || 0) + 1; continue; }   // (the far side, the limb)
+      const d = [dt(A[0], v) / L, dt(A[1], v) / L, dt(A[2], v) / L];
+      P.stats.arrowNear = (P.stats.arrowNear || 0) + 1; P.stats.arrowCos = dt(d, F || d);
+      if (F && dt(d, F) < cc) continue;
+      out.push({ d, n: [dt(A[0], n), dt(A[1], n), dt(A[2], n)], id: q[2] });
+    }
+    return out;
+  };
+  P.arrow6 = function (g, sc) {
+    if (!sc.inGlass || !sc.winC) return null;
+    const at = S.shotAt(sc.b, sc.t); if (!at || at.shot.cam !== 'window') return null;
+    const SF = VR.SpaceFlight, fr = SF && SF.cur, SSx = VR.SpaceScene; if (!fr || !fr.axes || !SSx || !SSx.ephemeris || !Number.isFinite(fr.t)) return null;
+    if (!sc.eph6 || sc.eph6.t !== fr.t) sc.eph6 = SSx.ephemeris(fr.t, sc.eph6 || {});
+    const hb = sc.eph6.bodies && sc.eph6.bodies.herz, f = sc.fwd, pt = -6 * DEG, F = [f[0] * Math.cos(pt), Math.sin(pt), f[2] * Math.cos(pt)];
+    const low = !!(g.settings && g.settings.preset === 'potato');
+    const L = P.trueArrow(fr, hb, P.beaconXZ(), F, P.WIN_FOV * DEG * 0.55);
+    P.stats.arrow6 = L.length;
+    if (L.length < 3) return null;
+    const Rt = [-f[2], 0, f[0]]; L.sort((a, b) => (a.d[0] * Rt[0] + a.d[2] * Rt[2]) - (b.d[0] * Rt[0] + b.d[2] * Rt[2]));
+    const M = L.slice(0, low ? 8 : 16), lit = smooth(at.u * 1.6) * M.length, D = 85, C = sc.winC, out = [];
+    for (let i = 0; i < M.length; i++) { const q = clamp(lit - i, 0, 1); if (!q) continue; const d = M[i].d; out.push({ p: [C[0] + d[0] * D, C[1] + d[1] * D, C[2] + d[2] * D], up: M[i].n, len: 15 * q, w: 0.55, col: [0.35, 1.6, 2.0], a: 0.8 * q, true6: true }); }
+    P.stats.arrowTrue = (P.stats.arrowTrue || 0) + 1;
+    return out;
+  };
+  { const bl6 = P.beamList; P.beamList = function (g, sc) {
+    if (sc && sc.b && sc.b.id === 'c7.b2' && !(VR.StoryNeb && VR.StoryNeb.off)) { try { const o = P.arrow6(g, sc); if (o) return o; } catch (e) { /* the film's arrow */ } }
+    return bl6.apply(this, arguments);
+  }; }
+
   // ---------------------------------------------------------------- the frames the game's own frame does not run (the space views)
   const G = VR.Game;
   if (G && G.prototype && !G.prototype._story) {

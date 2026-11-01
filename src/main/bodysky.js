@@ -37,7 +37,7 @@
     // less muddy (the bounce less yellow, the day's eye a little more open)
     zinn: { alb: { zinn_patera: 0.12, zinn_lava: 0.1 }, alb0: 0.5, tint: [1.0, 0.93, 0.72], bounce: 0.34, floor: 0.06, expoDay: 0.7, expoNight: 1.1, plume: 1, shape: 1, farHue: [1.0, 0.8, 0.45] },
     ocker: { alb: {}, alb0: 0.25, tint: [1.0, 0.95, 0.9], bounce: 0.3, floor: 0.05, expoDay: 0.85, expoNight: 3.2, plume: 1, shape: 2, airK: 8, ambK: 1.8 },
-    aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2 },
+    aqua: { alb: { aqua_sea: 0.06, aqua_lagoon: 0.12 }, alb0: 0.12, tint: [1.0, 1.0, 1.0], bounce: 0.25, floor: 0.05, expoDay: 0.8, expoNight: 2.6, plume: 0, shape: 0, airK: 24, ambK: 3.2, nightBlue: [0.55, 0.8, 1.5] },
   };
   BS.KIND = KIND; BS.SUN = SUN;
 
@@ -162,6 +162,14 @@
     const xN = K.expoNight * clamp(0.05 / Math.max(nl, 0.004), 1, 1.7);
     let expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN;
     if (air && id === 'ocker') expo *= 1 + Math.max(0, air.C.air.tau - 0.6) * 0.08;   // (u-moons2: the eye opens in a storm's murk — the scene stays readable, U§12)
+    // a-story6: Aquamarin's night reads as night — the eye opens with the dusk's depth (Helia 1°…10° under the horizon),
+    // not when its disc sets (at −2° the air is still bright: the open eye made the lamplighters' round a golden day),
+    // and the night's light leans blue (the shade, Herzwelt's shine, the far sea); the day untouched
+    if (K.nightBlue && BS.night6 !== false) {   // (BS.night6 = false: the old night, for the pictures before/after)
+      const dk = ss(-1 * Math.PI / 180, -10 * Math.PI / 180, sEl), B = K.nightBlue;
+      if (expo > K.expoDay) expo = K.expoDay + (expo * (1 - 0.45 * dk) - K.expoDay) * dk;   // (and opens less: run 1's night at 2.6 blew the lamp-lit street to a golden day)
+      if (dk > 0) for (let i = 0; i < 3; i++) { const m = 1 + (B[i] - 1) * dk; amb[i] *= m; parLight[i] *= m; far[i] *= m; }
+    }
     const exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));
@@ -219,6 +227,16 @@
   // ---- end u-moons2
 
   // ---------------------------------------------------------------- the env (env.js calls this at the end of update)
+  // a-story6: Aquamarin's night on the ground — the lamps make pools (their reach shorter, still warm), the shade
+  // between them blue (the grade); the day, the sunset's first degree and the other worlds untouched. → on (0 = off)
+  BS.nightGrade = function (id, sEl, base, out) {
+    const K = KIND[id]; if (!K || !K.nightBlue || BS.night6 === false) return 0;
+    const dk = ss(-1 * Math.PI / 180, -10 * Math.PI / 180, sEl); if (dk <= 0) return 0;
+    for (let i = 0; i < 3; i++) out.bt[i] = base[i] * (1 - 0.42 * dk);
+    out.grade[0] = 1 - 0.07 * dk; out.grade[1] = 1 - 0.01 * dk; out.grade[2] = 1 + 0.07 * dk;
+    return dk;
+  };
+  const NG = { bt: [1, 0.84, 0.64], grade: [1, 1, 1] };
   BS.env = function (E, env, o, dt) {
     const D = VR.DimReg && VR.DimReg.get(o && o.dim), id = D && D.body;
     if (!id) { BS.want = false; BS.cur = null; E.bodySky = null; return E; }
@@ -257,6 +275,7 @@
     if (id === 'aqua') E.wind = 2.6;   // u-moons2: Aquamarin's swell taller than home's (the water's storm factor)
     E.emissiveBoost = id === 'zinn' ? 0.3 + L.night * 0.45 : 0.45 + L.night * 1.1;   // (u-moons3: Zinnober's lava orange at night, not blown to white — the Glutsee fills the view)
     E.grade = [1, 1, 1];
+    if (BS.nightGrade(id, L.sunEl, E.blockTint === NG.bt ? NG.base : (NG.base = E.blockTint), NG)) { E.blockTint = NG.bt; E.grade = NG.grade; }
     E.bloomThreshold = 1.25; E.bloomStrength = 0.08;
     // the eye adapts in a few seconds (slower into the dark)
     const target = r.expo * (o.exposureMul || 1);
