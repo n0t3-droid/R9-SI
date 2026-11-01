@@ -213,8 +213,19 @@
   MI.frameSkip = function (t) { const F = MI.FRAME; return t < F.rise ? F.dur - F.fall * Math.max(0, t) / F.rise : t < F.rise + F.hold ? F.rise + F.hold : t; };
   // the framing camera: beside the way a little ahead of the family (6 m toward the door, 6 m to the side, 2.6 m up),
   // looking at the group (the lead, the cart behind) — they walk toward the frame's side, the land behind them
-  MI.framePose = function (lead, door, out, side) {
+  // o-wander2 (R56-12): with the cart the shot comes close — 4 m beside the cart, a little ahead toward the door, 1.9 m
+  // up, looking between the cart and the lead: the cart ≥ 8 % of the frame, the lead beside it (MI.FRAME_NEAR)
+  MI.FRAME_NEAR = { d: 4.0, ahead: 1.2, up: 1.9 };
+  MI.framePose = function (lead, door, out, side, cart) {
     out = out || {};
+    if (cart) {
+      let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+      const N = MI.FRAME_NEAR, sd = side || 1, mx = (lead[0] + cart[0]) / 2, mz = (lead[2] + cart[2]) / 2, my = Math.max(lead[1], cart[1]);
+      out.x = cart[0] - dx * N.ahead - dz * N.d * sd; out.z = cart[2] - dz * N.ahead + dx * N.d * sd; out.y = my + N.up;
+      const ex = mx - out.x, ez = mz - out.z, ty = my + 0.9;
+      out.yaw = Math.atan2(-ex, -ez); out.pitch = Math.atan2(ty - out.y, Math.hypot(ex, ez));
+      return out;
+    }
     let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
     const sd = side || 1, ah = Math.min(6, L * 0.5);
     out.x = lead[0] - dx * ah - dz * 6 * sd; out.z = lead[2] - dz * ah + dx * 6 * sd; out.y = lead[1] + 2.6;
@@ -643,7 +654,7 @@
     const V = g.villages, J = V && V._mi && V._mi.job, F = J && J.frame; if (!F) return null;
     const L = J.agents[0]; if (!L) return null;
     const k = MI.frameK(F.t); if (k <= 0.001) return null;
-    const P = MI.framePose(L.pos, J.h.outside, F.pose, F.side);
+    const P = MI.framePose(L.pos, J.h.outside, F.pose, F.side, J.cart || null);
     const gy = g.world.topAt ? g.world.topAt(Math.floor(P.x), Math.floor(P.z)) + 2.2 : P.y; if (P.y < gy) P.y = gy;
     return Object.assign({}, base, { x: base.x + (P.x - base.x) * k, y: base.y + (P.y - base.y) * k, z: base.z + (P.z - base.z) * k, yaw: base.yaw + wrapA(P.yaw - base.yaw) * k, pitch: base.pitch + (P.pitch - base.pitch) * k, roll: (base.roll || 0) * (1 - k), fixed: true });
   };

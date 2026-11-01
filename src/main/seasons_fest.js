@@ -104,8 +104,48 @@
       gr.box(2, 0, 2, 6, 1, 6, st); gr.box(3, 2, 3, 5, 7, 5, st); gr.ell(4, 8.5, 4, 3.6, 1.5, 3.6, st);
       gr.ell(4, 10.5, 4, 2.2, 2.4, 2.2, gl, { emis: 1 });
     }));
+    // o-wander2 (R56-16) · each people's festival its own look — a prop of theirs (1/8 m), four round the plaza and a
+    // big one in the middle: the tide folk's wave pennants with a shell, the desert folk's star lanterns, the crystal
+    // folk's spires, the stone folk's ember braziers, the ice folk's frost flowers
+    const pole = (gr, h0, col) => gr.box(4, 0, 4, 4, h0, 4, col);
+    M.ss_np_gezeiten = () => one(8, 2.6, part(12, 34, 9, [4, 0, 4], (gr) => {
+      pole(gr, 30, 0xd8d0b0); gr.ell(4, 31.5, 4, 2.2, 1.6, 2.2, (x, y) => (y & 1 ? 0xf4e8d8 : 0xe8c8b0));
+      for (let y = 18; y < 29; y++) { const w = Math.round(3 + Math.sin((y - 18) * 0.7) * 2.5); for (let x = 5; x < 5 + Math.max(1, w); x++) gr.set(Math.min(11, x), y, 4, (x + y) % 4 === 0 ? 0xf4f8ff : y < 23 ? 0x2a9ad8 : 0x5ae0f0, (x + y) % 4 === 0 ? 1 : 0); }
+    }));
+    M.ss_np_sandstern = () => one(8, 2.6, part(11, 36, 11, [5, 0, 5], (gr) => {
+      gr.box(5, 0, 5, 5, 27, 5, 0x8a6a3a); gr.box(3, 0, 3, 7, 1, 7, 0xd8a860);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, L = k & 1 ? 2.5 : 4.5; for (let r = 0; r <= L; r += 0.5) gr.set(Math.round(5 + Math.cos(a) * r), Math.round(31 + Math.sin(a) * r), 5, r < 1.5 ? 0xfff4c0 : 0xffd860, 1); }
+    }));
+    M.ss_np_funkel = () => one(8, 2.4, part(12, 30, 12, [6, 0, 6], (gr) => {
+      for (const [x, z, hh, c] of [[6, 6, 28, 0xe0a0ff], [3, 5, 16, 0xc080f0], [8, 3, 19, 0xa0c0ff], [8, 8, 13, 0xf0b0ff], [4, 9, 10, 0xb0d0ff]]) for (let y = 0; y < hh; y++) { const w = Math.max(0, Math.round((1 - y / hh) * 1.6)); gr.box(x - w, y, z - w, x + w, y, z + w, (xx, yy) => ((xx + yy) % 5 === 0 ? 0xfff0ff : c), { emis: 1 }); }
+    }));
+    M.ss_np_steinglut = () => one(8, 2, part(14, 16, 14, [7, 0, 7], (gr) => {
+      for (let y = 0; y < 10; y++) for (let z = 0; z < 14; z++) for (let x = 0; x < 14; x++) { const r = Math.hypot(x - 6.5, z - 6.5), R0 = y < 3 ? 3.5 - y * 0.3 : 3 + (y - 3) * 0.55; if (r <= R0 && (r > R0 - 1.4 || y < 2)) gr.set(x, y, z, (x * 3 + y + z) % 5 === 0 ? 0x5a5a62 : 0x3a3a40); }
+      gr.ell(6.5, 10.5, 6.5, 5, 2.4, 5, (x, y, z) => ((x + z + y) % 3 === 0 ? 0xffd040 : 0xff7a2a), { emis: 1 });
+    }));
+    M.ss_np_eisbluete = () => one(8, 2.4, part(19, 28, 19, [9, 0, 9], (gr) => {
+      gr.box(9, 0, 9, 9, 18, 9, 0xbfe4f4);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; for (let r = 1; r < 9; r++) { const y = 19 + Math.round(Math.sin(r / 9 * Math.PI) * 4) - (r > 6 ? r - 6 : 0); gr.set(Math.round(9 + Math.cos(a) * r), y, Math.round(9 + Math.sin(a) * r), r > 6 ? 0xf4fbff : 0x8ad0ff, r < 3 ? 1 : 0); gr.set(Math.round(9 + Math.cos(a + 0.18) * r * 0.8), y, Math.round(9 + Math.sin(a + 0.18) * r * 0.8), 0xd8f0ff); } }
+      gr.ell(9, 20, 9, 1.6, 1.6, 1.6, 0xf4fbff, { emis: 1 });
+    }));
+    // o-wander2 · a kite's tether (1/16 m: 8 m of string, pivot at the hand; drawn scaled and tilted to the kite)
+    M.ss_tether = () => one(16, 4.5, part(1, 128, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 128; y++) gr.set(0, y, 0, y % 16 < 2 ? 0xf4f0e6 : 0xd8d0c0); }));
   }
   SF.KC = 4;
+  // o-wander2: each people's look — the prop, the colours of the air, the dance (SF.LOOK[id].dance: festPose below)
+  SF.LOOK = {
+    gezeiten: { prop: 'ss_np_gezeiten', dance: 'wave' },
+    sandstern: { prop: 'ss_np_sandstern', dance: 'reach' },
+    funkel: { prop: 'ss_np_funkel', dance: 'hop' },
+    steinglut: { prop: 'ss_np_steinglut', dance: 'stomp' },
+    eisbluete: { prop: 'ss_np_eisbluete', dance: 'twirl' },
+  };
+  // a kite's tether from the hand to the kite: the yaw and the pitch (the model's +y turned onto the line) and the scale
+  SF.tether = function (hand, kite, out) {
+    out = out || {}; const dx = kite[0] - hand[0], dy = kite[1] - hand[1], dz = kite[2] - hand[2], L = Math.hypot(dx, dy, dz) || 1;
+    out.yaw = Math.atan2(dx, dz); out.pitch = Math.acos(Math.max(-1, Math.min(1, dy / L))); out.scale = L / 8; out.len = L;
+    return out;
+  };
 
   // ---------------------------------------------------------------- what a village celebrates today
   const isRec = (o) => !!o && typeof o === 'object';
@@ -157,6 +197,8 @@
       }
     } else if (S.FESTS[id] && S.FESTS[id].sp) {
       for (let k = 0; k < 6; k++) { const a = k * TAU / 6 + 0.3, r = PR + 1.2; add('ss_bowl_' + id, cx + Math.cos(a) * r, y, cz + Math.sin(a) * r, -a, k === 0 ? { act: 'native' } : null); }
+      const L = SF.LOOK[id];   // o-wander2: their own props round the plaza and a big one in the middle
+      if (L) { for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + 0.82, r = PR + 3.4; add(L.prop, cx + Math.cos(a) * r, y, cz + Math.sin(a) * r, -a); } add(L.prop, cx, y, cz, 0.4, { scale: 1.6, big: true }); }
     }
     return D;
   };
@@ -185,6 +227,15 @@
   };
   P.festPose = function (a, t, Q) {
     if (base.festPose) base.festPose.call(this, a, t, Q);
+    // o-wander2: the peoples dance their own way
+    const fs = a.vil && a.vil.ss, L = fs && fs.phase === 'fest' ? SF.LOOK[fs.id] : null;
+    if (L && a.festRole === 'dance' && Q) {
+      const k = a.p.seed % 7, ph = t * 3 + k, set = (part, rx, ry, rz) => { const o = Q[part] || [0, 0, 0, 0, 0, 0]; Q[part] = [rx, ry, rz, 0, o[4] || 0, 0]; };
+      if (L.dance === 'wave') { set('arm_l', 1.6, 0, -1.2 - Math.sin(ph) * 0.6); set('arm_r', 1.6, 0, 1.2 - Math.sin(ph) * 0.6); a.drawOffY = 0; }
+      else if (L.dance === 'reach') { set('arm_l', 3.0 + Math.sin(ph * 0.5) * 0.15, 0, -0.25); set('arm_r', 3.0 - Math.sin(ph * 0.5) * 0.15, 0, 0.25); a.drawOffY = 0; }
+      else if (L.dance === 'stomp') { set('arm_l', 0.9, 0, -0.9); set('arm_r', 0.9, 0, 0.9); set('leg_l', Math.max(0, Math.sin(ph * 1.6)) * 0.9, 0, 0); set('leg_r', Math.max(0, -Math.sin(ph * 1.6)) * 0.9, 0, 0); a.drawOffY = 0; }
+      else if (L.dance === 'twirl') { set('arm_l', 1.55, 0, -1.5); set('arm_r', 1.55, 0, 1.5); set('body', 0, Math.sin(ph * 0.7) * 0.6, 0); a.drawOffY = 0; }
+    }
     if (a.ssSit && Q && Q.arm_r) { Q.arm_r = [1.1 + Math.sin(t * 2.2 + (a.p.seed % 5)) * 0.35, 0, 0.25, 0, Q.arm_r[4] || 0, 0]; }   // eating at the table
   };
   const pose0 = P.pose;
@@ -293,6 +344,10 @@
       K.pos[0] = sx + Math.sin(t * 0.7 + ph) * 1.2; K.pos[2] = sz + Math.cos(t * 0.6 + ph) * 1.2;
       K.pos[1] = y + 1 + lift * (14 + (K.k % 3) * 3 + Math.sin(t * 0.9 + ph) * 1.0);
       K.yaw = yawW + Math.sin(t * 0.8 + ph) * 0.25; K.pitch = 0.35 + Math.sin(t * 1.1 + ph) * 0.08;
+      // o-wander2: the hand that holds it — someone on the plaza's edge, the string up to the kite
+      const hr = PR * 0.85 + (K.k % 2) * 1.2; if (!K.hand) K.hand = [0, 0, 0]; K.hand[0] = cx + Math.cos(ang) * hr; K.hand[1] = y + 1.25; K.hand[2] = cz + Math.sin(ang) * hr;
+      if (!K.holder && LK && LK.folk) { const sd = ((vil.plan.seed | 0) ^ (K.k * 7919)) >>> 0; K.holder = { look: LK.folk(sd, 'farmer', K.k % 3 === 0 ? 'adult' : 'child'), pos: [K.hand[0], y, K.hand[2]], yaw: 0, state: 'point', walk: 0, walkAmt: 0, seed: (K.k % 97) / 97, kid: K.k % 3 !== 0 }; if (K.holder.kid) K.hand[1] = y + 0.85; }
+      if (K.holder) { K.holder.pos[0] = K.hand[0]; K.holder.pos[1] = y; K.holder.pos[2] = K.hand[2]; K.holder.yaw = Math.atan2(-(K.pos[0] - K.hand[0]), -(K.pos[2] - K.hand[2])); }
     }
     s.looseT -= dt;
     if (s.looseT <= 0 && !s.kites.some(K => K.fall)) {
@@ -358,7 +413,7 @@
   };
 
   // ---------------------------------------------------------------- drawing (villages.draw, game.js drawOpaque)
-  const MP = { scale: 1, pose: null, shade: 0, noShade: true, pitch: 0 };
+  const MP = { scale: 1, pose: null, shade: 0, noShade: true, pitch: 0 }, TQ = {};
   const DUMMY = [0, 0, 0];
   P.draw = function (r, E, cam) {
     const res = base.draw.apply(this, arguments);
@@ -391,6 +446,12 @@
           else { const ca = Math.cos(d.yaw), sa = Math.sin(d.yaw), off = -1.3 + (j % 7) * 0.43; p = [d.pos[0] + ca * off, d.pos[1] + 2.5 + Math.sin(Math.PI * (off + 1.6) / 3.3) * 0.5 - (j >= 7 ? 0.5 : 0), d.pos[2] - sa * off]; }
           MP.scale = 1; if (LK.drawModel(g, r, PG(), d.act === 'lantern' ? 'ss_lantern' : 'ss_wreath', p, d.yaw, c, MP)) n++;
         }
+      }
+      // o-wander2: each kite on its tether, held by someone on the plaza (the holders Low and up; Very Low the string only)
+      if (s.kites && s.phase === 'fest' && this.festivalOn(vil, tod)) for (const K of s.kites) {
+        if (K.fall || !K.hand) continue;
+        const Tq = SF.tether(K.hand, K.pos, TQ); MP.scale = Tq.scale; MP.pitch = Tq.pitch; if (LK.drawModel(g, r, PG(), 'ss_tether', K.hand, Tq.yaw, c, MP)) n++; MP.pitch = 0;
+        if (K.holder && tier > 0) { LK.drawFolk(g, r, PG(), K.holder, c, this.time); n++; }
       }
       if (s.kites && s.phase === 'fest' && this.festivalOn(vil, tod)) for (const K of s.kites) { MP.scale = 1; MP.pitch = K.pitch; if (LK.drawModel(g, r, PG(), 'ss_kite_' + (K.k % SF.KC), K.pos, K.yaw, c, MP)) n++; MP.pitch = 0; }
     }

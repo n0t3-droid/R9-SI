@@ -207,5 +207,16 @@ function house(o) {
   const unlisted = [...used].filter(k => !MI.KEYS.includes(k));
   check(!unlisted.length, `every key the file names is listed (${unlisted.join(' ') || 'all'})`);
 }
+{ // o-wander2: the arrival framed close — the cart ≥ 8 % of the frame, the lead in it too (a pinhole at 70°, 16:9)
+  const MI = V.MoveIn, door = [0, 64, 0], lead = [0, 64, 20], cart = [0, 64, 21.7];
+  const P = MI.framePose(lead, door, {}, 1, cart), fov = 70 * Math.PI / 180, asp = 16 / 9, ty = Math.tan(fov / 2), tx = ty * asp;
+  const proj = (q) => { const dx = q[0] - P.x, dy = q[1] - P.y, dz = q[2] - P.z; const cy = Math.cos(P.yaw), sy = Math.sin(P.yaw); const x1 = dx * cy - dz * sy, z1 = dx * sy + dz * cy; const cp = Math.cos(P.pitch), sp = Math.sin(P.pitch); const y2 = dy * cp + z1 * sp, z2 = -dy * sp + z1 * cp; const f = -z2; return [x1 / (f * tx), y2 / (f * ty), f]; };
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const ox of [-1, 1]) for (const oy of [0, 2]) for (const oz of [-1.37, 1.37]) { const q = proj([cart[0] + ox, cart[1] + oy, cart[2] + oz]); x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+  const area = (Math.min(1, x1) - Math.max(-1, x0)) * (Math.min(1, y1) - Math.max(-1, y0)) / 4, L = proj([lead[0], lead[1] + 1, lead[2]]);
+  check(area >= 0.08 && Math.abs(L[0]) < 0.95 && Math.abs(L[1]) < 0.95 && L[2] > 0, `the move-in shot: the cart ${(area * 100).toFixed(1)} % of the frame (≥ 8 %), the lead in frame (${L[0].toFixed(2)}, ${L[1].toFixed(2)})`);
+  const P0 = MI.framePose(lead, door, {}, 1);
+  check(Math.hypot(P0.x - cart[0], P0.z - cart[2]) > Math.hypot(P.x - cart[0], P.z - cart[2]) + 3, 'closer than the wide shot without a cart');
+}
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
