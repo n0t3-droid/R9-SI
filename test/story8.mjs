@@ -94,12 +94,12 @@ try {
     console.log('audio · the Mondstein waltz, Wiegelind\'s story cues (offline renders)');
     const OUT = ROOT + 'test/shots/story8_audio/'; fs.mkdirSync(OUT, { recursive: true });
     const wav = (file, i16, sr, ch) => { const b = Buffer.alloc(44 + i16.length * 2); b.write('RIFF', 0); b.writeUInt32LE(36 + i16.length * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(ch, 22); b.writeUInt32LE(sr, 24); b.writeUInt32LE(sr * ch * 2, 28); b.writeUInt16LE(ch * 2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(i16.length * 2, 40); Buffer.from(i16.buffer, i16.byteOffset, i16.byteLength).copy(b, 44); fs.writeFileSync(file, b); };
-    const R = [['waltz', 'waltz', 'night', 1, 3, 7, 1, 20], ['waltz_t0', 'waltz', 'night', 1, 0, 7, 1, 20], ['waltz_B', 'waltz', 'night', 1, 3, 2, 1, 44], ['st_warm', 'st_warm', 'day', 0, 3, 0, -1, 0], ['st_wide', 'st_wide', 'day', 0, 3, 0, -1, 0], ['st_rise', 'st_rise', 'day', 0, 3, 0, -1, 0], ['st_tense', 'st_tense', 'day', 0, 3, 0, -1, 0], ['p_zinn_B', 'p_zinn', 'day', 1, 3, 2, -1, 44], ['p_basalt', 'p_basalt', 'day', 1, 3, 11, -1, 20]];
+    const R = [['waltz', 'waltz', 'night', 1, 3, 7, 1, 20], ['waltz_t0', 'waltz', 'night', 1, 0, 7, 1, 20], ['waltz_B', 'waltz', 'night', 1, 3, 7, 1, 44], ['st_warm', 'st_warm', 'day', 0, 3, 0, -1, 0], ['st_wide', 'st_wide', 'day', 0, 3, 0, -1, 0], ['st_rise', 'st_rise', 'day', 0, 3, 0, -1, 0], ['st_tense', 'st_tense', 'day', 0, 3, 0, -1, 0], ['p_zinn_B', 'p_zinn', 'day', 1, 3, 2, -1, 44], ['p_basalt', 'p_basalt', 'day', 1, 3, 11, -1, 20]];
     const summary = [];
     for (const [name, id, variant, lv, tier, seed, season, cap] of R) {
       const r = await ev(async ([id, variant, lv, tier, seed, season, cap]) => {
         const SR = 32000, full = VR.Score.cueLen(id, variant, seed), dur = cap ? Math.min(cap, full) : full, len = Math.ceil((dur + 4) * SR);
-        const c = new OfflineAudioContext(2, len, SR);
+        const c = new OfflineAudioContext(2, len, SR); c.resume = () => Promise.resolve();   // (audio.js resumes its context: an offline one starts by rendering)
         let oscs = 0; const co = c.createOscillator.bind(c); c.createOscillator = () => { oscs++; return co(); };
         const a = new VR.Audio(); a.setTier(tier); a.init(c); a.setVolumes({ master: 1, music: 1 });
         a.music.plan = VR.Klang.musicPlan(12); a.scoreDay = 12;
@@ -121,7 +121,7 @@ try {
     }
     fs.writeFileSync(OUT + 'summary.json', JSON.stringify(summary, null, 1));
     const S0 = (n) => summary.find(x => x.name === n);
-    check(S0('waltz').insts.includes('choir:oo') && S0('waltz_B').form.includes('B'), 'the waltz: the choir\'s line heard, its B-section rendered (' + S0('waltz_B').form + ')');
+    check(S0('waltz').insts.includes('choir:oo') && S0('waltz_B').form.includes('B') && S0('waltz_B').dur > 30, 'the waltz: the choir\'s line heard, its B-section rendered (' + S0('waltz_B').form + ')');
     check(S0('waltz_t0').oscs / S0('waltz_t0').dur < 10 * 0.6 * 4, 'Very Low: the waltz ' + (S0('waltz_t0').oscs / S0('waltz_t0').dur).toFixed(1) + ' osc/s (High ' + (S0('waltz').oscs / S0('waltz').dur).toFixed(1) + ')');
   }
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); if (VR.Hints) for (const h of ['play', 'move', 'fly', 'bauhand', 'bhring', 'bhundo', 'bhchange']) VR.Hints.done(h); });

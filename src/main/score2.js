@@ -104,11 +104,11 @@
       bpm: 132, meter: 3, mode: 'dorian', len: 8, own: true, arc: [0.75, 0.8, 0.85, 0.8, 0.9, 1, 0.95, 0.8],
       chords: '0:3 | 3:3 | 6:3 | 2:3 | 0:3 | 3:3 | 4:3 | 0:3',
       layers: [
-        L('mel', 'line', 'musicbox', 12, 0.05, 0, 3, { notes: '4:2 2 | 3:2 5 | 6:2 4 | 2:3 | 4:1.5 5:.5 7 | 7:2 5 | 6 4 1 | 0:3' }),
-        L('bass', 'bass', 'bass', -24, 0.055, 0, 2, { pat: [0], plen: 1 }),
-        L('comp', 'comp', 'harp', -12, 0.026, 0, 2, { beats: [1, 2], nlen: 0.7 }),   // (a-story8: 0.016 → 0.026 — the oom-pah-pah heard)
-        L('oo', 'line', 'choir', 0, 0.026, 0, 2, { notes: '2:3 | 3:3 | 1:3 | 2:3 | 4:3 | 5:3 | 4:2 6 | 4:3' }),   // a-story8: the choir's slow 'oo' counter-line on the chords' tones
-        L('choir', 'chord', 'choir', -12, 0.022, 1, 1),
+        L('mel', 'line', 'musicbox', 12, 0.095, 0, 3, { notes: '4:2 2 | 3:2 5 | 6:2 4 | 2:3 | 4:1.5 5:.5 7 | 7:2 5 | 6 4 1 | 0:3' }),
+        L('bass', 'bass', 'bass', -24, 0.095, 0, 2, { pat: [0], plen: 1 }),
+        L('comp', 'comp', 'harp', -12, 0.05, 0, 2, { beats: [1, 2], nlen: 0.7 }),   // (a-story8: 0.016 → 0.05 — the oom-pah-pah heard; the whole waltz ×1.9: it rendered at −31 LUFS, the others −20 … −24)
+        L('oo', 'line', 'choir', 0, 0.045, 0, 2, { notes: '2:3 | 3:3 | 1:3 | 2:3 | 4:3 | 5:3 | 4:2 6 | 4:3' }),   // a-story8: the choir's slow 'oo' counter-line on the chords' tones
+        L('choir', 'chord', 'choir', -12, 0.035, 1, 1),
       ],
       B: { chords: '2:3 | 6:3 | 3:3 | 0:3 | 2:3 | 6:3 | 3:3 | 4:3', lines: { mel: '6:2 4 | 8:2 6 | 5:2 3 | 4:3 | 9:2 6 | 8:2 6 | 7 5 3 | 4:3', oo: '4:3 | 3:3 | 5:3 | 4:3 | 6:3 | 6:3 | 5:3 | 4:3' } },
     },
