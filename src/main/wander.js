@@ -153,7 +153,7 @@
     for (let k = -1; k < 8; k++) {
       const a = k * Math.PI / 4, px = k < 0 ? x : x + Math.cos(a) * r, pz = k < 0 ? z : z + Math.sin(a) * r;
       let pl = 0;
-      for (let dy = 0; dy < 3; dy++) { const o = occ(px, y + dy, pz); if (o === 2 && (k < 0 || dy > 0)) return false; if (o === 1) pl = 1; }   // (a step of one block around is fine)
+      for (let dy = 0; dy < 3; dy++) { const o = occ(px, y + dy, pz); if (o === 2 && (k < 0 || dy > 0)) return false; if (o === 1 && dy > 0) pl = 1; }   // (a step of one block around is fine; short grass at the feet is no wall — tall plants and low leaves are)
       plants += pl;
     }
     return plants <= W.OPEN.plants;
@@ -370,7 +370,7 @@
           if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) continue; }
           if (!W.openAt(this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz)), x, y, z)) continue;
           const q = [x, y + Math.min(1.4, fh * 0.75), z];
-          if (!this.clear(q, true) || !this.clear([x, y + Math.min(0.35, fh * 0.3), z], true) || !this.inSight(q)) continue;
+          if (!this.clear(q, true) || !this.clear([x, y + Math.min(0.35, fh * 0.3), z]) || !this.inSight(q)) continue;   // (the head past leaves and plants, the feet past trunks and walls)
           cur[this.stg] = 0;
           return [x, y, z];
         }
@@ -402,7 +402,7 @@
         if (st) { if (this.sb <= 0) { this.hiC = { n: this.pacer && this.pacer.n, i, best }; this.more = true; return null; } this.sb--; }   // (budgeted as spot)
         const dd = DS[Math.floor(i / AS.length)], a = a0 + AS[i % AS.length], x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd, y = this.ground(x, z, p[1] + 6);
         if (y === null || (best && y <= best[1])) continue;
-        if (st && (!W.openAt(occ, x, y, z) || !this.clear([x, y + 1.1, z], true) || !this.clear([x, y + 0.3, z], true))) continue;
+        if (st && (!W.openAt(occ, x, y, z) || !this.clear([x, y + 1.1, z], true) || !this.clear([x, y + 0.3, z]))) continue;
         best = [x, y, z];
       }
       this.hiC = null;
@@ -615,7 +615,9 @@
       else if (b.kind === 'glow') { BEAT_O.scale = 2.4; LK.drawModel(g, r, prog(), 'wander_hlamp', b.pos, t * 0.3, cam, BEAT_O); }
     }
     // o-wander2: the voxel line from the eye to a point is clear (W.clearLine over the world's blocks)
-    clear(q, soft) { const e = this.eye; return W.clearLine(soft ? (this.occS || (this.occS = (x, y, z) => this.occ(x, y, z) > 0)) : (this.solF || (this.solF = (x, y, z) => this.solid(this.get(x, y, z)))), e, q); }
+    // (soft: leaves block too, and a plant where the line passes through its lower half — short grass hides feet, not heads)
+    clear(q, soft) { const e = this.eye; return W.clearLine(soft ? (this.occS || (this.occS = (x, y, z) => { const o = this.occ(x, y, z); return o === 2 || (o === 1 && (this.leafy(x, y, z) || y - Math.floor(y) < 0.5)); })) : (this.solF || (this.solF = (x, y, z) => this.solid(this.get(x, y, z)))), e, q); }
+    leafy(x, y, z) { const b = this.get(x, y, z); return !!(b && (VR.R.T.flags[b] & VR.F.LEAVES)); }
     update(dt) {
       const g = this.g, S = g.settings || {}, t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       this.time += dt;

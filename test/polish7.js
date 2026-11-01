@@ -116,10 +116,11 @@ console.log('3 · the Wanderregisseur\'s cost (a forest, a 2-minute walk, node)'
   for (const s of all) {
     const ok = W.openAt(occ, s.pos[0], s.pos[1], s.pos[2]); if (ok) open++;
     const fh = W.figH(s.kind), hd = [s.pos[0], s.pos[1] + Math.min(1.4, fh * 0.75), s.pos[2]], ft = [s.pos[0], s.pos[1] + Math.min(0.35, fh * 0.3), s.pos[2]];
-    const ln = W.clearLine((x, y, z) => occ(x, y, z) > 0, s.eye, hd) && W.clearLine((x, y, z) => occ(x, y, z) > 0, s.eye, ft); if (ln) lines++;
+    const soft = (x, y, z) => { const o = occ(x, y, z); return o === 2 || (o === 1 && (world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)) === LEAF || y - Math.floor(y) < 0.5)); };
+    const ln = W.clearLine(soft, s.eye, hd) && W.clearLine((x, y, z) => occ(x, y, z) === 2, s.eye, ft); if (ln) lines++;
     if (!ok || !ln) bad.push(s.kind + '@' + s.pos.map(Math.round).join(','));
   }
-  check(all.length >= 6 && open === all.length && lines === all.length, `every staged moment on open ground (${open}/${all.length}), its head and feet in sight past trunks, leaves, grass (${lines}/${all.length})${bad.length ? ' — ' + bad.slice(0, 4).join(' ') : ''}`);
+  check(all.length >= 6 && open === all.length && lines === all.length, `every staged moment on open ground (${open}/${all.length}), its head in sight past trunks, leaves, tall grass, its feet past trunks (${lines}/${all.length})${bad.length ? ' — ' + bad.slice(0, 4).join(' ') : ''}`);
   const dd = all.map(s => Math.hypot(s.pos[0] - s.eye[0], s.pos[2] - s.eye[2]));
   check(dd.every(d => d >= 7.9 && d <= 15.1), 'within 8–15 m (' + dd.map(d => d.toFixed(0)).join(' ') + ')');
   const ht = (n) => { const m = VM[n](); let hy = 0; for (const p in m.parts) { const L = (m.layout && m.layout[p]) || [0, 0, 0]; hy = Math.max(hy, m.parts[p].grid.sy + Math.max(0, L[1] - m.parts[p].grid.oy)); } return hy / (m.unit || 16); };

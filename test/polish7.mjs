@@ -16,7 +16,7 @@ const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '').replace
 const SHOTS = ROOT + '/test/shots/';
 const BUILDS = (process.env.BUILDS || 'before,after').split(',');
 const DISTS = { before: 'file://' + ROOT + '/.tmp_tests/base/dist/index.html', after: 'file://' + ROOT + '/dist/index.html' };
-const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, want = (s) => !ONLY || ONLY.includes(s);
+let ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null; const want = (s) => !ONLY || ONLY.includes(s);   // (ONLY_before / ONLY_after: per build)
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg + ' (' + secs() + ')'); };
@@ -47,7 +47,7 @@ const strip = (scene, tag, label, imgs) => { imgs = imgs.filter(Boolean); for (l
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 for (const TAG of BUILDS) {
-  const R = RUN[TAG] = {};
+  const R = RUN[TAG] = {}; if (process.env['ONLY_' + TAG]) ONLY = process.env['ONLY_' + TAG].split(',');
   console.log('== ' + TAG + ' (' + DISTS[TAG] + ')');
   const ctx = await browser.newContext({ viewport: { width: 800, height: 450 }, locale: 'de-DE' });
   const page = await ctx.newPage();
@@ -62,8 +62,8 @@ for (const TAG of BUILDS) {
   const jst = () => ev(() => Object.assign(VR.Journey.stats(), { dim: VR.game.dim, state: VR.game.state, pj: !!(VR.Portal && VR.Portal.J && VR.Portal.J()) }));
   // stepped mode (no rAF): n frames of dtms, rendering skipped unless asked
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._r7) { g.renderer._r7 = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._r7(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { if (window.__each) window.__each(g, d / 1000); g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(2); } };
-  const grab = async (name, frames = 3) => {
-    const url = await ev((frames) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/jpeg', 0.9); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, frames);
+  const grab = async (name, frames = 3, dt = 33) => {
+    const url = await ev(([frames, dt]) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - dt; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/jpeg', 0.9); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, [frames, dt]);
     if (url && url.length > 2000) { const f = SHOTS + 'p7_' + TAG + '_' + name; fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); console.log('  📷 ' + name); return f; }
     console.log('  !! no picture ' + name); return null;
   };
@@ -205,11 +205,11 @@ for (const TAG of BUILDS) {
         for (const id of ['sandstone', 'grass_block']) {
           await ev((id) => { const g = VR.game, inv = g.player.inv; inv.slots[inv.sel] = { id, n: 1 }; inv.changed = true; g.hideHud = false; }, id);
           await step(10, 33);
-          const on = await grab('hand_' + id + '.jpg', 4);
-          await ev(() => { VR.game.hideHud = true; });
-          const off = await grab('hand_' + id + '_off.jpg', 4);
-          await ev(() => { VR.game.hideHud = false; });
-          H[id] = Object.assign(pystat([on, off, JSON.stringify([0.55, 0.6, 1, 1])]), pystat([on, '-', JSON.stringify([840 / 1280, 560 / 720, 990 / 1280, 700 / 720])]).box !== undefined ? { critic: pystat([on, '-', JSON.stringify([840 / 1280, 560 / 720, 990 / 1280, 700 / 720])]).box } : {});
+          // (the same instant, dt 0: the hand with the block, then the empty hand — the difference is the block alone)
+          const on = await grab('hand_' + id + '.jpg', 4, 0);
+          await ev(() => { const inv = VR.game.player.inv; inv.slots[inv.sel] = null; inv.changed = true; });
+          const off = await grab('hand_' + id + '_off.jpg', 4, 0);
+          H[id] = Object.assign(pystat([on, off, JSON.stringify([0.45, 0.55, 1, 1])]), pystat([on, '-', JSON.stringify([840 / 1280, 560 / 720, 990 / 1280, 700 / 720])]).box !== undefined ? { critic: pystat([on, '-', JSON.stringify([840 / 1280, 560 / 720, 990 / 1280, 700 / 720])]).box } : {});
           H[id].f = on;
         }
         R.hand = H;
