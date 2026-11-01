@@ -862,8 +862,9 @@ void main() {
     float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(5.0, 6.0, 5.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     vec3 c = v_tint;
     vec3 sSp = sLeaf && sh < 0.38 ? mix(vec3(0.92, 0.5, 0.64), vec3(0.95, 0.86, 0.9), sh / 0.38) : c * vec3(0.88, 1.12, 0.78);
-    vec3 sSu = c * vec3(1.2, 1.04, 0.66);
-    vec3 sAu = !sLeaf ? c * vec3(1.45, 0.92, 0.5) : sh < 0.3 ? vec3(0.6, 0.09, 0.04) : sh < 0.58 ? mix(vec3(0.82, 0.3, 0.05), vec3(0.6, 0.09, 0.04), (0.58 - sh) / 0.28 * 0.3) : sh < 0.86 ? vec3(0.84, 0.6, 0.08) : c * vec3(1.6, 0.95, 0.45);
+    float sl = dot(c, vec3(0.3, 0.59, 0.11));
+    vec3 sSu = mix(c * vec3(1.1, 1.0, 0.7), sl * vec3(1.5, 1.15, 0.3), 0.3);
+    vec3 sAu = !sLeaf ? mix(c, sl * vec3(1.9, 1.25, 0.45), 0.7) : sh < 0.3 ? vec3(0.6, 0.09, 0.04) : sh < 0.58 ? mix(vec3(0.82, 0.3, 0.05), vec3(0.6, 0.09, 0.04), (0.58 - sh) / 0.28 * 0.3) : sh < 0.86 ? vec3(0.84, 0.6, 0.08) : c * vec3(1.6, 0.95, 0.45);
     vec3 sWi = sLeaf ? mix(c, vec3(0.78, 0.83, 0.9), 0.7) : sTop ? mix(c, vec3(0.86, 0.9, 0.97), 0.86) : mix(c * vec3(1.0, 0.86, 0.7), vec3(0.78, 0.83, 0.9), 0.32);
     v_tint = c * (1.0 - ssum) + sSp * u_season.x + sSu * u_season.y + sAu * u_season.z + sWi * u_season.w;
     if (sTop) v_seasonG = 1.0;
@@ -2590,6 +2591,11 @@ out float v_shade;
 flat out uint v_face;
 flat out uint v_kind;
 flat out uint v_aux;
+#ifdef SEASON
+uniform vec4 u_season;   // w-seasons (seasons.js)
+uniform vec3 u_camFrac;
+uniform ivec3 u_camInt;
+#endif
 void main() {
   vec3 rel = u_tileOrigin + a_pos / 8.0;
   rel.y -= u_curve * dot(rel.xz, rel.xz);   // u-ascent: the far land bends away under the climb
@@ -2597,6 +2603,21 @@ void main() {
   v_col = pow(a_col.rgb, vec3(2.2));
   v_shade = a_col.a;
   v_face = a_info.x & 7u; v_kind = (a_info.x >> 3u) & 7u; v_aux = a_info.y;
+#ifdef SEASON
+  // w-seasons (seasons.js): the far tiles' green in the season's colour, as the chunks' (TERRAIN_VS), in 6-m patches
+  // for the autumn trees and the spring blossom (the tiles know no leaves)
+  float lsum = u_season.x + u_season.y + u_season.z + u_season.w;
+  if (lsum > 0.001 && v_kind != 1u && v_col.g > v_col.r * 1.05 && v_col.g > v_col.b * 1.05) {
+    vec3 c = v_col;
+    float lh = fract(sin(dot(floor((rel + u_camFrac + vec3(u_camInt)) / 6.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    vec3 lSp = lh < 0.12 ? mix(c, vec3(0.92, 0.6, 0.72), 0.5) : c * vec3(0.88, 1.12, 0.78);
+    float ll = dot(c, vec3(0.3, 0.59, 0.11));
+    vec3 lAu = mix(c, ll * vec3(1.9, 1.25, 0.45), 0.7);
+    if (lh < 0.35) lAu = mix(lAu, lh < 0.15 ? vec3(0.6, 0.09, 0.04) : vec3(0.82, 0.4, 0.06), 0.6);
+    vec3 lWi = v_face == 2u ? mix(c, vec3(0.86, 0.9, 0.97), 0.86) : mix(c * vec3(1.0, 0.86, 0.7), vec3(0.78, 0.83, 0.9), 0.32);
+    v_col = c * (1.0 - lsum) + lSp * u_season.x + mix(c * vec3(1.1, 1.0, 0.7), ll * vec3(1.5, 1.15, 0.3), 0.3) * u_season.y + lAu * u_season.z + lWi * u_season.w;
+  }
+#endif
   gl_Position = u_viewProj * vec4(rel, 1.0);
 }`;
   S.LOD_FS = `

@@ -60,12 +60,12 @@
   const mul = (c, m) => [c[0] * m[0], c[1] * m[1], c[2] * m[2]];
   const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   S.seasonTint = function (c, i, o) {
-    const h = o.h;
+    const h = o.h, lum = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
     if (i === 0) {   // spring: fresh green; a third of the trees in blossom (pink and white)
       if (o.leaf && h < 0.38) return mix(PAL.blossomA, PAL.blossomB, h / 0.38);
       return mul(c, [0.88, 1.12, 0.78]);
     }
-    if (i === 1) return mul(c, [1.2, 1.04, 0.66]);   // summer: gold
+    if (i === 1) return mix(mul(c, [1.1, 1.0, 0.7]), [lum * 1.5, lum * 1.15, lum * 0.3], 0.3);   // summer: gold (a hue shift: the saturated greens turn too)
     if (i === 2) {   // autumn: tree by tree red, orange, gold; a few stay green-brown; the grass dry
       if (o.leaf) {
         if (h < 0.3) return PAL.red.slice();
@@ -73,7 +73,7 @@
         if (h < 0.86) return PAL.gold.slice();
         return mul(c, [1.6, 0.95, 0.45]);
       }
-      return mul(c, [1.45, 0.92, 0.5]);
+      return mix(c, [lum * 1.9, lum * 1.25, lum * 0.45], 0.7);
     }
     // winter: frosted leaves, white open grass, frosty sides and plants
     if (o.leaf) return mix(c, PAL.frost, 0.7);
@@ -153,7 +153,7 @@
   // the define: the terrain's programs get SEASON while ⚙ Jahreszeiten is on (light2's, sky3's, bodysky's hooks first)
   if (VR.GL && !VR.GL.__seasons) {
     const prev = VR.GL.defineHook || null;
-    const NAMES = { terrain: 1, terrainCut: 1, trans: 1, terrainCutZ: 1 };
+    const NAMES = { terrain: 1, terrainCut: 1, trans: 1, terrainCutZ: 1, lod: 1, lodFar: 1 };
     VR.GL.defineHook = (name, defines) => {
       const d = prev ? prev(name, defines) : (defines || []);
       return S.want && NAMES[name] ? d.concat(['SEASON']) : d;

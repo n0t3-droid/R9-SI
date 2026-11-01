@@ -398,13 +398,15 @@
   };
 
   // ---------------------------------------------------------------- the tests' and the pictures' handles
+  const nearVil = () => { const g = VR.game, V = g && g.villages; if (!V || !g.player) return null; const p = g.player.pos; let best = null, bd = 1e18; for (const v of V.known.values()) { if (!v.active || !v.plan || !v.plan.plaza) continue; const d = (v.plan.plaza.x - p[0]) ** 2 + (v.plan.plaza.z - p[2]) ** 2; if (d < bd) { bd = d; best = v; } } return best; };
   SF.debug = {
-    today: () => { const V = VR.game && VR.game.villages; if (!V) return null; const vil = [...V.known.values()].find(v => v.active); if (!vil) return null; const s = V.ssToday(vil); return { vil: vil.name, phase: s.phase, id: s.id, deco: V.ssDeco(vil, s.id).length, n: s.n, kites: s.kites ? s.kites.length : 0, fallen: s.kites ? s.kites.filter(K => K.fall).length : 0, plaza: vil.plan.plaza, sp: vil.plan.species || null }; },
+    today: () => { const V = VR.game && VR.game.villages; if (!V) return null; const vil = nearVil(); if (!vil) return null; const s = V.ssToday(vil); return { vil: vil.name, phase: s.phase, id: s.id, deco: V.ssDeco(vil, s.id).length, n: s.n, kites: s.kites ? s.kites.length : 0, fallen: s.kites ? s.kites.filter(K => K.fall).length : 0, plaza: vil.plan.plaza, sp: vil.plan.species || null, style: vil.plan.style || '' }; },
     reset: () => { const V = VR.game && VR.game.villages; if (V) for (const vil of V.known.values()) { vil.ss = null; vil.fest = null; } },
-    act: (what) => { const g = VR.game, V = g.villages; const vil = [...V.known.values()].find(v => v.active); if (!vil) return false; const s = V.ssToday(vil); const d = V.ssDeco(vil, s.id).find(x => x.act === what); return d ? SF.act(g, vil, d) : false; },
-    drop: () => { const V = VR.game.villages; const vil = [...V.known.values()].find(v => v.active); const s = vil && vil.ss; if (!s || !s.kites) return false; s.looseT = 0; return true; },
-    catchAny: () => { const g = VR.game, V = g.villages; const vil = [...V.known.values()].find(v => v.active); const s = vil && vil.ss; const K = s && s.kites && s.kites.find(x => x.fall); if (!K) return false; K.fall.t = 9; return SF.catchKite(g, vil, K); },
+    act: (what) => { const g = VR.game, V = g.villages; const vil = nearVil(); if (!vil) return false; const s = V.ssToday(vil); const d = V.ssDeco(vil, s.id).find(x => x.act === what); return d ? SF.act(g, vil, d) : false; },
+    drop: () => { const vil = nearVil(); const s = vil && vil.ss; if (!s || !s.kites) return false; s.looseT = 0; return true; },
+    catchAny: () => { const g = VR.game; const vil = nearVil(); const s = vil && vil.ss; const K = s && s.kites && s.kites.find(x => x.fall); if (!K) return false; K.fall.t = 9; return SF.catchKite(g, vil, K); },
     cost: () => Object.assign({}, SF.cost),
+    vil: nearVil,
   };
   void isRec;
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
