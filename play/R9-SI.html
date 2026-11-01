@@ -5258,7 +5258,7 @@ V.pick=pick;
 V.lines=function(key){const I=VR.I18N;const arr=I&&I.list?I.list('g.folk.'+key):[];return arr.length?arr:(I&&I.list?I.list('g.folk.hello'):['Hello!']);};
 V.say=function(key,h,vars){
 let s=pick(V.lines(key),h);
-if(vars)s=s.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
+if(vars)s=s.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?(VR.Names&&VR.Names.shown?VR.Names.shown(vars[k]):vars[k]):m);
 return s;
 };
 
@@ -8256,14 +8256,20 @@ const cap=(s)=>s.charAt(0).toUpperCase()+s.slice(1);
 
 
 N.RENAME={
-de:[[/\bAmarant(?!h)/g,'Turmalin'],[/\bGlutani/g,'Glimari'],[/\bNivari/g,'Isveli']],
+
+de:[[/\bAmarant(?!h)/g,'Turmalin'],[/\bGlutani/g,'Glimari'],[/\bNivari/g,'Isveli'],[/\bNova Haven\b/g,'Palmenhafen']],
 en:[[/\bAmaranth\b/g,'Tourmaline'],[/\bAmarant(?!h)/g,'Tourmaline'],[/\bGlutani/g,'Glimari'],[/\bNivari/g,'Isveli']],
 };
-const ANY= /\bAmarant|\bGlutani|\bNivari/;
+const ANY= /\bAmarant|\bGlutani|\bNivari|\bNova Haven\b/;
 N.fixText=function(lang,s){
 if(typeof s!=='string'|| !ANY.test(s))return s;
 for(const[re,to]of(N.RENAME[lang]||N.RENAME.en))s=s.replace(re,to);
 return s;
+};
+
+N.shown=function(s,lang){
+if(typeof s!=='string'|| !ANY.test(s))return s;
+const I=VR.I18N;return N.fixText(lang||(I&&I.lang==='de'?'de':'en'),s);
 };
 N.fixTable=function(lang,table){
 for(const k in table){
@@ -53704,7 +53710,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="b355ca68d644fccb";
+VR.TEX_SRC_HASH="a0795250d82b49ce";
 
 
 
@@ -53727,7 +53733,8 @@ I.listeners=I.listeners||[];
 I.add=function(lang,table){if(VR.Names&&VR.Names.fixTable)VR.Names.fixTable(lang,table);Object.assign(I.dict[lang]||(I.dict[lang]={}),table);};
 
 const fx=(s)=>(VR.Names&&VR.Names.fixText&&typeof s==='string'?VR.Names.fixText(I.lang==='de'?'de':'en',s):s);
-const fill=(s,v)=>(v?String(s).replace(/\{(\w+)\}/g,(m,k)=>(v[k]!==undefined?v[k]:m)):String(s));
+
+const fill=(s,v)=>(v?String(s).replace(/\{(\w+)\}/g,(m,k)=>(v[k]!==undefined?fx(v[k]):m)):String(s));
 I.t=function(key,vars,fallback){
 let s;
 const d=I.dict[I.lang];if(d)s=d[key];
@@ -58086,21 +58093,21 @@ VR.I18N.add('de',{
 
 'ctl.journal':'Tagebuch',
 'g.q.kind.fetch':'Bringen','g.q.kind.build':'Bauen','g.q.kind.find':'Suchen','g.q.kind.escort':'Begleiten','g.q.kind.photo':'Fotografieren','g.q.kind.free':'Befreien','g.q.kind.travel':'Reisen','g.q.kind.repair':'Reparieren','g.q.kind.riddle':'Rätsel',
-'g.q.pl.temple':'Tor-Tempel','g.q.pl.citadel':'Turmzitadelle','g.q.pl.isles':'Himmelsinseln','g.q.pl.lake':'See unter den Himmelsinseln','g.q.pl.nova':'Nova Haven','g.q.pl.station':'Bergstation','g.q.pl.lighthouse':'Leuchtturm','g.q.pl.falls':'Wasserfall',
+'g.q.pl.temple':'Tor-Tempel','g.q.pl.citadel':'Turmzitadelle','g.q.pl.isles':'Himmelsinseln','g.q.pl.lake':'See unter den Himmelsinseln','g.q.pl.nova':'Palmenhafen','g.q.pl.station':'Bergstation','g.q.pl.lighthouse':'Leuchtturm','g.q.pl.falls':'Wasserfall',
 'g.q.pl.lookout':'Aussichtsturm','g.q.pl.hills':'Kuppelhügel','g.q.pl.dome':'Kuppelhalle','g.q.pl.mill':'Windmühle','g.q.pl.belvedere':'Belvedere-Turm','g.q.pl.monopteros':'Rundtempel','g.q.pl.view':'Aussicht',
 'g.q.pl.vista':'Aussichtspunkt · Blick auf: {lm}','g.q.pl.village':'ein Dorf','g.q.pl.wonder':'ein Wunder','g.q.pl.plaza':'Dorfplatz','g.q.pl.outpost':'Außenposten',
-'g.q.at.temple':'am Tor-Tempel','g.q.at.citadel':'an der Turmzitadelle','g.q.at.isles':'bei den Himmelsinseln','g.q.at.lake':'am See unter den Himmelsinseln','g.q.at.nova':'in Nova Haven','g.q.at.station':'an der Bergstation','g.q.at.lighthouse':'am Leuchtturm',
+'g.q.at.temple':'am Tor-Tempel','g.q.at.citadel':'an der Turmzitadelle','g.q.at.isles':'bei den Himmelsinseln','g.q.at.lake':'am See unter den Himmelsinseln','g.q.at.nova':'in Palmenhafen','g.q.at.station':'an der Bergstation','g.q.at.lighthouse':'am Leuchtturm',
 'g.q.at.falls':'am Wasserfall','g.q.at.lookout':'am Aussichtsturm','g.q.at.hills':'bei den Kuppelhügeln','g.q.at.dome':'an der Kuppelhalle','g.q.at.mill':'an der Windmühle','g.q.at.belvedere':'am Belvedere-Turm','g.q.at.monopteros':'am Rundtempel','g.q.at.view':'an der Aussicht',
 'g.q.at.village':'in {name}','g.q.at.wonder':'beim Wunder {name}','g.q.at.plaza':'am Dorfplatz','g.q.at.outpost':'am Außenposten',
 'g.q.atv.temple':'am Aussichtspunkt mit Blick auf den Tor-Tempel','g.q.atv.citadel':'am Aussichtspunkt mit Blick auf die Turmzitadelle','g.q.atv.isles':'am Aussichtspunkt mit Blick auf die Himmelsinseln','g.q.atv.lake':'am Aussichtspunkt über dem See',
-'g.q.atv.nova':'am Aussichtspunkt mit Blick auf Nova Haven','g.q.atv.station':'am Aussichtspunkt mit Blick auf die Bergstation','g.q.atv.lighthouse':'am Aussichtspunkt mit Blick auf den Leuchtturm','g.q.atv.falls':'am Aussichtspunkt mit Blick auf den Wasserfall',
+'g.q.atv.nova':'am Aussichtspunkt mit Blick auf Palmenhafen','g.q.atv.station':'am Aussichtspunkt mit Blick auf die Bergstation','g.q.atv.lighthouse':'am Aussichtspunkt mit Blick auf den Leuchtturm','g.q.atv.falls':'am Aussichtspunkt mit Blick auf den Wasserfall',
 'g.q.atv.lookout':'am Aussichtspunkt mit Blick auf den Aussichtsturm','g.q.atv.hills':'am Aussichtspunkt mit Blick auf die Kuppelhügel','g.q.atv.dome':'am Aussichtspunkt mit Blick auf die Kuppelhalle','g.q.atv.mill':'am Aussichtspunkt mit Blick auf die Windmühle',
 'g.q.atv.belvedere':'am Aussichtspunkt mit Blick auf den Belvedere-Turm','g.q.atv.monopteros':'am Aussichtspunkt mit Blick auf den Rundtempel','g.q.atv.view':'am Aussichtspunkt',
 'g.q.tov.temple':'zum Aussichtspunkt mit Blick auf den Tor-Tempel','g.q.tov.citadel':'zum Aussichtspunkt mit Blick auf die Turmzitadelle','g.q.tov.isles':'zum Aussichtspunkt mit Blick auf die Himmelsinseln','g.q.tov.lake':'zum Aussichtspunkt über dem See',
-'g.q.tov.nova':'zum Aussichtspunkt mit Blick auf Nova Haven','g.q.tov.station':'zum Aussichtspunkt mit Blick auf die Bergstation','g.q.tov.lighthouse':'zum Aussichtspunkt mit Blick auf den Leuchtturm','g.q.tov.falls':'zum Aussichtspunkt mit Blick auf den Wasserfall',
+'g.q.tov.nova':'zum Aussichtspunkt mit Blick auf Palmenhafen','g.q.tov.station':'zum Aussichtspunkt mit Blick auf die Bergstation','g.q.tov.lighthouse':'zum Aussichtspunkt mit Blick auf den Leuchtturm','g.q.tov.falls':'zum Aussichtspunkt mit Blick auf den Wasserfall',
 'g.q.tov.lookout':'zum Aussichtspunkt mit Blick auf den Aussichtsturm','g.q.tov.hills':'zum Aussichtspunkt mit Blick auf die Kuppelhügel','g.q.tov.dome':'zum Aussichtspunkt mit Blick auf die Kuppelhalle','g.q.tov.mill':'zum Aussichtspunkt mit Blick auf die Windmühle',
 'g.q.tov.belvedere':'zum Aussichtspunkt mit Blick auf den Belvedere-Turm','g.q.tov.monopteros':'zum Aussichtspunkt mit Blick auf den Rundtempel','g.q.tov.view':'zum Aussichtspunkt','g.q.to.village':'nach {name}','g.q.to.wonder':'zum Wunder {name}',
-'g.q.of.temple':'vom Tor-Tempel','g.q.of.citadel':'von der Turmzitadelle','g.q.of.isles':'von den Himmelsinseln','g.q.of.lake':'vom See unter den Himmelsinseln','g.q.of.nova':'von Nova Haven','g.q.of.station':'von der Bergstation','g.q.of.lighthouse':'vom Leuchtturm',
+'g.q.of.temple':'vom Tor-Tempel','g.q.of.citadel':'von der Turmzitadelle','g.q.of.isles':'von den Himmelsinseln','g.q.of.lake':'vom See unter den Himmelsinseln','g.q.of.nova':'von Palmenhafen','g.q.of.station':'von der Bergstation','g.q.of.lighthouse':'vom Leuchtturm',
 'g.q.of.falls':'vom Wasserfall','g.q.of.lookout':'vom Aussichtsturm','g.q.of.hills':'von den Kuppelhügeln','g.q.of.dome':'von der Kuppelhalle','g.q.of.mill':'von der Windmühle','g.q.of.belvedere':'vom Belvedere-Turm','g.q.of.monopteros':'vom Rundtempel',
 'g.q.of.village':'von {name}','g.q.of.wonder':'vom Wunder {name}',
 'g.q.hour.day':'bei Tag','g.q.hour.golden':'zur goldenen Stunde','g.q.hour.dusk':'zur blauen Stunde','g.q.hour.night':'bei Nacht','g.q.hour.dawn':'im Morgengrauen','g.q.hour.murm':'wenn die Vogelschwärme tanzen',
@@ -58908,7 +58915,7 @@ VR.I18N.add('de',{
 'g.wow.isles':'Die Himmelsinseln',
 'g.wow.lighthouse':'Der Leuchtturm am fernen Ufer',
 'g.wow.falls':'Der Wasserfall',
-'g.wow.nova':'Nova Haven',
+'g.wow.nova':'Palmenhafen',
 'g.wow.station':'Die Bergstation',
 'g.wow.lookout':'Der Aussichtsturm auf dem Grat',
 'g.wow.hills':'Die Kuppelhügel',
@@ -60492,7 +60499,7 @@ VR.I18N.add('de',{
 'g.ctx.to.isles':'zu den Himmelsinseln',
 'g.ctx.to.lighthouse':'zum Leuchtturm',
 'g.ctx.to.falls':'zum Wasserfall',
-'g.ctx.to.nova':'nach Nova Haven',
+'g.ctx.to.nova':'nach Palmenhafen',
 'g.ctx.to.station':'zur Bergstation',
 'g.ctx.to.lookout':'zum Aussichtsturm',
 'g.ctx.to.hills':'zu den Kuppelhügeln',
@@ -60678,7 +60685,7 @@ VR.I18N.add('de',{
 'story.c3.b3.3':'Dann fliegen wir hin! Die Monde haben lange genug im Dunkeln gewartet.',
 'story.c4.b1.1':'So leise hier. Kein Wind, keine Vögel. Nur der Staub unter deinen Stiefeln.',
 'story.c4.b1.2':'Und über uns hängt Amarant, riesig und still, mit seinem Ring.',
-'story.c4.b1.3':'Hallo, hier ist Lumi aus Nova Haven! Opas Notizen sagen: Unter dem Eis von Opal schläft ein Wächter.',
+'story.c4.b1.3':'Hallo, hier ist Lumi aus Palmenhafen! Opas Notizen sagen: Unter dem Eis von Opal schläft ein Wächter.',
 'story.c4.b2.1':'Psst. Schau ins Eis. Da unten … ein Wächter.',
 'story.c4.b2.2':'Sein Auge ist noch wach. Es leuchtet ganz schwach, als würde es träumen.',
 'story.c4.b2.3':'Der Eiswächter! Opa schreibt, er wacht nur auf, wenn Amarant die Sonne verschluckt.',
@@ -61955,7 +61962,7 @@ VR.I18N.add('de',{
 "g.wd.k.well":"Ein Wunschbrunnen",
 "g.wd.s.well":"Du wünschst dir etwas — und findest etwas Glänzendes.",
 "g.wd.site.temple":"Tor-Tempel",
-"g.wd.site.city":"Nova Haven",
+"g.wd.site.city":"Palmenhafen",
 "g.wd.site.hills":"Kuppelhügel",
 "g.wd.site.station":"Bergstation",
 "g.wd.site.canyon":"Schlucht",
@@ -69950,6 +69957,9 @@ uniform float u_sky;
 uniform vec3 u_blockLight;
 uniform float u_flash;
 uniform float u_noFog;
+#ifdef LIGHT2
+uniform float u_desat;
+#endif
 ${'__COMMON__'}
 ${LOOK}
 in vec3 v_uvl;
@@ -69979,6 +69989,9 @@ float shK = abs(v_color.a);
 vec3 col = a.rgb * light * min(shK, 1.0);
 if (shK > 1.5 && shK < 2.5) col = a.rgb * (1.3 + u_night * 0.6);
 col = mix(col, vec3(1.0, 0.25, 0.2), u_flash * 0.55);
+#ifdef LIGHT2
+if (u_desat > 0.0) col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), u_desat);
+#endif
 if (u_noFog < 0.5) col = applyFog(col, v_rel, length(v_rel));
 o = vec4(col, 1.0);
 }`;
@@ -84734,6 +84747,8 @@ gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,52,24);
 gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,4,gl.FLOAT,false,52,36);
 gl.bindVertexArray(null);
 m.count=verts.length/13;
+
+{const lt=[];for(let q=0;q<verts.length;q+=13*6)lt.push(verts[q+5],verts[q+9],verts[q+10],verts[q+11],verts[q+12]);m.lt=lt;}
 this.meshCache.set(id,m);
 return m;
 }
@@ -84744,7 +84759,17 @@ gl.uniformMatrix4fv(p.u.u_viewProj,false,viewProj||r.viewProj);
 if(p.u.u_avgLum&&r.texAvgLum){gl.activeTexture(gl.TEXTURE7);gl.bindTexture(gl.TEXTURE_2D,r.texAvgLum);gl.uniform1i(p.u.u_avgLum,7);}
 gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D_ARRAY,r.texAlbedo);gl.uniform1i(p.u.u_albedo,0);
 gl.uniform1f(p.u.u_flash,0);
+if(p.u.u_desat)gl.uniform1f(p.u.u_desat,0);
 return p;
+}
+
+
+meanCol(mesh){
+const A=this.game&&this.game.tex&&this.game.tex.avgColor,L=mesh.lt;if(!A|| !L|| !L.length)return null;
+let r0=0,g0=0,b0=0,n=0;
+for(let q=0;q<L.length;q+=5){const l=L[q]|0,sh=L[q+4];if(l*4+3>=A.length||Math.abs(sh)>1.5)continue;const k=sh<0?A[l*4+3]:1;
+r0+=A[l*4]*(1+(L[q+1]-1)*k);g0+=A[l*4+1]*(1+(L[q+2]-1)*k);b0+=A[l*4+2]*(1+(L[q+3]-1)*k);n++;}
+return n?[r0/n,g0/n,b0/n]:null;
 }
 drawMesh(r,p,mesh,M,light,noFog){
 const gl=r.gl;
@@ -84856,7 +84881,19 @@ mat4.scale(L,L,0.44,0.44,0.44);
 
 const hk=mesh.block&&VR.First2&&VR.First2.HAND_DIM?VR.First2.HAND_DIM:1,HL=this.handL||(this.handL={sky:0,bl:[0,0,0]});
 HL.sky=light.sky*hk;HL.bl[0]=light.bl[0]*hk;HL.bl[1]=light.bl[1]*hk;HL.bl[2]=light.bl[2]*hk;
+
+
+
+
+const F2=VR.First2,hk2=mesh.block&&F2&&Number.isFinite(F2.HAND_SAT)?1-F2.HAND_SAT:0;
+if(hk2>0&& !p.u.u_desat&& !mesh.meanCol)mesh.meanCol=this.meanCol(mesh);
+const hDs=hk2>0&&p.u.u_desat?hk2:0,hT=hk2>0&& !p.u.u_desat&&mesh.meanCol&&F2.handTint?F2.handTint(mesh.meanCol,F2.HAND_SAT*F2.HAND_SAT):null;
+if(hDs>0)gl.uniform1f(p.u.u_desat,hDs);
+if(hT){const t=hT,a=E.ambSky,sc=E.sunColor,mc=E.moonColor;gl.uniform3f(p.u.u_ambSky,a[0]*t[0],a[1]*t[1],a[2]*t[2]);gl.uniform3f(p.u.u_sunColor,sc[0]*t[0],sc[1]*t[1],sc[2]*t[2]);gl.uniform3f(p.u.u_moonColor,mc[0]*t[0],mc[1]*t[1],mc[2]*t[2]);
+const e=1/1.7;HL.bl[0]*=Math.pow(t[0],e);HL.bl[1]*=Math.pow(t[1],e);HL.bl[2]*=Math.pow(t[2],e);}
 this.drawMesh(r,p,mesh,L,HL,true);
+if(hDs>0)gl.uniform1f(p.u.u_desat,0);
+if(hT){const a=E.ambSky,sc=E.sunColor,mc=E.moonColor;gl.uniform3f(p.u.u_ambSky,a[0],a[1],a[2]);gl.uniform3f(p.u.u_sunColor,sc[0],sc[1],sc[2]);gl.uniform3f(p.u.u_moonColor,mc[0],mc[1],mc[2]);}
 gl.enable(gl.CULL_FACE);
 }
 onColumnLoaded(c){
@@ -91057,7 +91094,7 @@ void force;
 hudText(){
 const s=this.pilot;if(!s|| !s.d.meta|| !s.flight)return null;
 const fl=s.flight,I=fl.info(),A=I.auto;
-const ap=A?`<br><b style="color:#9affd8">AUTOPILOT → ${A.site.name.toUpperCase()} · ${(A.dist/1000).toFixed(2)} km</b>`:'';
+const ap=A?`<br><b style="color:#9affd8">AUTOPILOT → ${(VR.Names&&VR.Names.shown?VR.Names.shown(A.site.name):A.site.name).toUpperCase()} · ${(A.dist/1000).toFixed(2)} km</b>`:'';
 const st=I.state==='landed'?' · <b>LANDED</b>':I.state==='landing'?' · <b>LANDING</b>':'';
 return`<b>${Math.round(I.speed)} m/s</b> · ALT ${Math.round(I.alt)} · HDG ${Math.round(I.heading)}° · THR ${Math.round(I.throttle*100)}%${I.boost?' · <b style="color:#7ad8ff">BOOST</b>':''} · ${s.d.meta.name}${st}${ap}<br><small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · right mouse steers · C view · F gear · <b>G autopilot</b> · <b>V land</b></small>`;
 }
@@ -91406,7 +91443,7 @@ const d=Math.hypot(v.x-p[0],v.z-p[2]);if(d>2500)continue;
 const q=toS(v.x,v.z),sel=I.auto&&I.auto.site.id===v.id;
 x.fillStyle=sel?'#9affd8':'#ffd88a';
 if(q[2]){x.beginPath();x.arc(q[0],q[1],2.5,0,TAU);x.fill();}
-else{x.fillRect(q[0]-2.5,q[1]-2.5,5,5);x.fillText(v.name.slice(0,10).toUpperCase(),q[0],q[1]-7);}
+else{x.fillRect(q[0]-2.5,q[1]-2.5,5,5);x.fillText((VR.Names&&VR.Names.shown?VR.Names.shown(v.name):v.name).slice(0,10).toUpperCase(),q[0],q[1]-7);}
 }
 
 const H=VR.Heart;
@@ -91427,12 +91464,12 @@ if(I.auto){
 const A=I.auto,t=A.spot||[A.site.x,0,A.site.z],q=toS(t[0],t[2]);
 x.setLineDash([3,3]);x.strokeStyle='#9affd8';x.beginPath();x.moveTo(cx,cy);x.lineTo(q[0],q[1]);x.stroke();x.setLineDash([]);
 const eta=Math.round(A.eta||0);
-x.fillStyle='#9affd8';x.font='bold 9px monospace';x.fillText('▸ '+A.site.name.slice(0,14).toUpperCase(),cx,7);
+x.fillStyle='#9affd8';x.font='bold 9px monospace';x.fillText('▸ '+(VR.Names&&VR.Names.shown?VR.Names.shown(A.site.name):A.site.name).slice(0,14).toUpperCase(),cx,7);
 x.font='8px monospace';x.fillText((A.dist/1000).toFixed(2)+' km'+(eta>0?' · '+Math.floor(eta/60)+':'+String(eta%60).padStart(2,'0'):''),cx,TH-6);
 }else{
 let best=null,bd=1e18;for(const v of V){const d=(v.x-p[0])**2+(v.z-p[2])**2;if(d<bd&&d>140*140){bd=d;best=v;}}
 x.fillStyle='#9ad8ff';x.font='8px monospace';
-if(best)x.fillText('⌂ '+best.name.slice(0,12).toUpperCase()+' '+(Math.sqrt(bd)/1000).toFixed(1)+' km',cx,TH-6);
+if(best)x.fillText('⌂ '+(VR.Names&&VR.Names.shown?VR.Names.shown(best.name):best.name).slice(0,12).toUpperCase()+' '+(Math.sqrt(bd)/1000).toFixed(1)+' km',cx,TH-6);
 x.fillText('KURS '+String(Math.round(I.heading)%360).padStart(3,'0'),cx,7);
 }
 x.textAlign='right';x.fillStyle='rgba(154,216,255,0.7)';x.fillText(span+' m',TW-4,TH-6);
@@ -91943,7 +91980,7 @@ if(ap){const t=ap.spot||[ap.site.x,ap.site.y+1,ap.site.z];dest=[t[0],t[1]+3,t[2]
 else if(SS&&SS.list){
 let best=null,bd=1e18;
 for(const vv of SS.list()){const d=(vv.x-pos[0])**2+(vv.z-pos[2])**2;if(d>140*140&&d<bd){bd=d;best=vv;}}
-if(best){dest=[best.x,best.y+8,best.z];line=`⌂ ${best.name.toUpperCase()} ${(Math.sqrt(bd)/1000).toFixed(1)} km · G AUTOPILOT`;}
+if(best){dest=[best.x,best.y+8,best.z];line=`⌂ ${(VR.Names&&VR.Names.shown?VR.Names.shown(best.name):best.name).toUpperCase()} ${(Math.sqrt(bd)/1000).toFixed(1)} km · G AUTOPILOT`;}
 }
 if(line){x.fillStyle=ap?mint:dim;x.fillText(line,0,ty+52*S);}
 x.setTransform(1,0,0,1,0,0);
@@ -93625,7 +93662,7 @@ V.pick=pick;
 V.lines=function(key){const I=VR.I18N;const arr=I&&I.list?I.list('g.folk.'+key):[];return arr.length?arr:(I&&I.list?I.list('g.folk.hello'):['Hello!']);};
 V.say=function(key,h,vars){
 let s=pick(V.lines(key),h);
-if(vars)s=s.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
+if(vars)s=s.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?(VR.Names&&VR.Names.shown?VR.Names.shown(vars[k]):vars[k]):m);
 return s;
 };
 
@@ -96673,7 +96710,7 @@ box.innerHTML='';
 const add=(label,fn)=>{const b=document.createElement('button');b.className='btn small';b.textContent=label;b.onclick=()=>{this.chirp(a);fn();};box.appendChild(b);};
 for(const site of list){
 const d=Math.hypot(site.x-p[0],site.z-p[2]);
-add(`${site.name} · ${(d/1000).toFixed(1)} km ${this.compass(site.x-p[0],site.z-p[2])}`,()=>{
+add(`${(VR.Names&&VR.Names.shown?VR.Names.shown(site.name):site.name)} · ${(d/1000).toFixed(1)} km ${this.compass(site.x-p[0],site.z-p[2])}`,()=>{
 const S=g.starships;
 this.closeTalk();
 a.say(T('g.folk.hopIn',{s:site.name}),4);
@@ -100317,7 +100354,7 @@ if(nv&&nv.dist>70){
 const a=Math.atan2(nv.site.x-p.pos[0],-(nv.site.z-p.pos[2]));
 const rel=((Math.round((a+p.yaw)*180/Math.PI)%360)+540)%360-180;
 const arrow=['↑','↗','→','↘','↓','↙','←','↖'][((Math.round(rel/45)%8)+8)%8];
-s+=`<br><span style="color:#ffd166">⌂</span> ${nv.site.name} ${Math.round(nv.dist)}m ${arrow}`;
+s+=`<br><span style="color:#ffd166">⌂</span> ${(VR.Names&&VR.Names.shown?VR.Names.shown(nv.site.name):nv.site.name)} ${Math.round(nv.dist)}m ${arrow}`;
 }
 }
 if(VR.NewLife)s+=VR.NewLife.compassLine(g);
@@ -100364,7 +100401,7 @@ const[sx,sy]=toScr(v.x+0.5,v.z+0.5);
 if(sx< -40||sy< -20||sx>W+40||sy>H+20)continue;
 ctx.fillStyle='#ffd166';ctx.strokeStyle='#1a1206';ctx.lineWidth=2;
 ctx.beginPath();ctx.moveTo(sx-7,sy+6);ctx.lineTo(sx-7,sy-1);ctx.lineTo(sx,sy-8);ctx.lineTo(sx+7,sy-1);ctx.lineTo(sx+7,sy+6);ctx.closePath();ctx.fill();ctx.stroke();
-ctx.strokeStyle='#000';ctx.strokeText(v.name,sx+11,sy);ctx.fillStyle='#ffe6a8';ctx.fillText(v.name,sx+11,sy);
+ctx.strokeStyle='#000';const vn=(VR.Names&&VR.Names.shown?VR.Names.shown(v.name):v.name);ctx.strokeText(vn,sx+11,sy);ctx.fillStyle='#ffe6a8';ctx.fillText(vn,sx+11,sy);
 }
 
 if(g.wonders)for(const m of g.wonders.marks()){
@@ -104934,6 +104971,12 @@ W.puffGrain=function(cx,cy,seed){const G=W.PUFF.grain,v=Math.sin(cx*12.9898+cy*7
 
 
 W.MURM_PALE=[60,240];W.MURM_FAR_MIN=0.22;W.MURM_QUIET=60;W.MURM_FADE=30;W.MURM_TAU_MAX=1.4;W.MURM_ASIDE=60;
+
+
+
+
+W.MURM_SKY=[40,120];W.MURM_SKYK=0.7;
+W.murmSky=function(d){const A=W.MURM_SKY;if(d<=A[0])return 0;if(d>=A[1])return W.MURM_SKYK;const t=(d-A[0])/(A[1]-A[0]);return W.MURM_SKYK*t*t*(3-2*t);};
 W.murmFar=function(d){const F=W.MURM_PALE;
 if(d<=F[0])return 1;if(d>=F[1])return W.MURM_FAR_MIN;const t=(d-F[0])/(F[1]-F[0]);return 1+(W.MURM_FAR_MIN-1)*t*t*(3-2*t);};
 
@@ -105571,6 +105614,8 @@ WG.mesh=(name)=>WG.KINDS[name].make();
 
 
 const PCUT=(VR.Wild&&VR.Wild.PUFF?VR.Wild.PUFF.cut:1.6),CUT=PCUT.toFixed(3),PG=(VR.Wild&&VR.Wild.PUFF&&VR.Wild.PUFF.grain)||[5,0.4,1.6],GCELL=PG[0].toFixed(3),GLO=PG[1].toFixed(3),GHI=PG[2].toFixed(3),CUT2=(PCUT*PCUT).toFixed(3),PIVOT=WG.RAY_SHAPE.body.toFixed(3);
+
+const MSK=(VR.Wild&&VR.Wild.MURM_SKY)||[40,120],SKY0=MSK[0].toFixed(1),SKY1=MSK[1].toFixed(1),SKYK=((VR.Wild&&VR.Wild.MURM_SKYK)||0.7).toFixed(3);
 const WILD_VS=`
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_nrm;
@@ -105683,6 +105728,13 @@ uniform int u_mode;
 uniform float u_fogK;
 uniform float u_under;
 out vec4 o;
+
+vec3 skyFloor(vec3 c, vec3 rel) {
+float L = length(rel), k = ${SKYK} * smoothstep(${SKY0}, ${SKY1}, L);
+if (k <= 0.0) return c;
+vec3 band = mix(hazeColor(rel / max(L, 0.001)), u_fogColor, 0.35);
+return max(c, band * k);
+}
 void main() {
 if (u_mode == 3) {
 
@@ -105698,6 +105750,7 @@ if (a < 0.004) discard;
 vec3 c = v_col * (u_ambSky * 0.55 + 0.02);
 float fk = mix(u_fogK, 1.0, smoothstep(60.0, 240.0, length(v_rel)));
 c = applyFog(c, v_rel * fk, length(v_rel) * fk);
+c = skyFloor(c, v_rel);
 o = vec4(c, a);
 return;
 }
@@ -105733,6 +105786,7 @@ if (u_mode == 1) col += alb * v_l.y * 2.2 * step(0.45, max(alb.r, max(alb.g, alb
 
 else col = mix(col, mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));
 col = applyFog(col, v_rel * u_fogK, length(v_rel) * u_fogK);
+if (u_mode == 2) col = skyFloor(col, v_rel);
 o = vec4(col, 1.0);
 }`;
 WG.program=function(r){
@@ -106968,7 +107022,7 @@ return out;
 
 const NAMES={
 temple:['Der Tor-Tempel','The Gate Temple'],citadel:['Die Turmzitadelle','The Spire Citadel'],isles:['Die Himmelsinseln','The Sky Isles'],
-lighthouse:['Der Leuchtturm am fernen Ufer','The Lighthouse on the Far Shore'],falls:['Der Wasserfall','The Waterfall'],nova:['Nova Haven','Nova Haven'],
+lighthouse:['Der Leuchtturm am fernen Ufer','The Lighthouse on the Far Shore'],falls:['Der Wasserfall','The Waterfall'],nova:['Palmenhafen','Nova Haven'],
 station:['Die Bergstation','The Mountain Station'],lookout:['Der Aussichtsturm auf dem Grat','The Lookout on the Ridge'],hills:['Die Kuppelhügel','The Pod Hills'],
 };
 W.NAMES=NAMES;
@@ -107785,7 +107839,7 @@ return{fwd: -(dx*sy+dz*cy),str:dx*cy-dz*sy};
 
 
 const HEART=[['temple',0,-15,80,167,52],['citadel',-420,380,112,249,30],['isles',330,140,130,175,110],['nova',0,-140,80,100,95],['station',-380,-150,150,230,30],['hills',0,-322,90,125,150]];
-const NAMES={temple:['Der Tor-Tempel','The Gate Temple'],citadel:['Die Turmzitadelle','The Spire Citadel'],isles:['Die Himmelsinseln','The Sky Isles'],lighthouse:['Der Leuchtturm am fernen Ufer','The Lighthouse on the Far Shore'],falls:['Der Wasserfall','The Waterfall'],nova:['Nova Haven','Nova Haven'],station:['Die Bergstation','The Mountain Station'],lookout:['Der Aussichtsturm auf dem Grat','The Lookout on the Ridge'],hills:['Die Kuppelhügel','The Pod Hills']};
+const NAMES={temple:['Der Tor-Tempel','The Gate Temple'],citadel:['Die Turmzitadelle','The Spire Citadel'],isles:['Die Himmelsinseln','The Sky Isles'],lighthouse:['Der Leuchtturm am fernen Ufer','The Lighthouse on the Far Shore'],falls:['Der Wasserfall','The Waterfall'],nova:['Palmenhafen','Nova Haven'],station:['Die Bergstation','The Mountain Station'],lookout:['Der Aussichtsturm auf dem Grat','The Lookout on the Ridge'],hills:['Die Kuppelhügel','The Pod Hills']};
 const tx=(key,vars,de,en)=>(VR.I18N&&VR.I18N.tx?VR.I18N.tx(key,vars||null,de,en):de);
 const lmName=(id)=>{const n=NAMES[id];return n?tx('g.wow.'+id,null,n[0],n[1]):id;};
 I.sources=[];
@@ -108322,7 +108376,7 @@ const LABELS=C.LABELS={
 'g.ctx.to.isles':['zu den Himmelsinseln','to the Sky Isles'],
 'g.ctx.to.lighthouse':['zum Leuchtturm','to the lighthouse'],
 'g.ctx.to.falls':['zum Wasserfall','to the waterfall'],
-'g.ctx.to.nova':['nach Nova Haven','to Nova Haven'],
+'g.ctx.to.nova':['nach Palmenhafen','to Nova Haven'],
 'g.ctx.to.station':['zur Bergstation','to the Mountain Station'],
 'g.ctx.to.lookout':['zum Aussichtsturm','to the lookout'],
 'g.ctx.to.hills':['zu den Kuppelhügeln','to the Pod Hills'],
@@ -114535,6 +114589,12 @@ F.camNear=(dx,dy,dz)=>dx*dx+dy*dy+dz*dz<F.NEAR*F.NEAR;
 
 
 F.CLEAR_D=2.5;F.CLEAR_K=0.6;
+
+
+
+
+F.FIRST_QUIET=75;
+F.firstQuiet=(age,fresh)=> !!fresh&&Number.isFinite(age)&&age>=0&&age<F.FIRST_QUIET;
 F.keepClear=function(eye,yaw,A,side){
 const fx= -Math.sin(yaw),fz= -Math.cos(yaw),rx=Math.cos(yaw),rz= -Math.sin(yaw);
 const dx=A[0]-eye[0],dy=A[1]-eye[1],dz=A[2]-eye[2];
@@ -115057,7 +115117,7 @@ const t0=now(),g=this.g;
 if(!this.on()){this.visible=false;this.wayT=0;this.scanT=0;this.scanJob=null;if(this.line)this.endLine();if(this.ph)this.photoEnd();return;}
 dt=clamp(dt||0,0,0.1);
 const T=g.time||0,p=g.player;
-const first=this.startT===null;if(first)this.startT=T;
+const first=this.startT===null;if(first){this.startT=T;this.fresh= !!(VR.Wild&&VR.Wild.freshWorld&&VR.Wild.freshWorld(g,Date.now()));}
 this.feel(T);
 if(this.buildFocus())this.budget.build(T);
 this.visible= !(g.arrival&&g.arrival.holds&&g.arrival.holds())&& !F.camHidden(g);
@@ -115480,8 +115540,11 @@ if(img)this.say('photo.done',null,true);
 cam(base){const s=this.shot;if(!s)return null;return Object.assign({},base,{x:s.x,y:s.y,z:s.z,yaw:s.yaw,pitch:s.pitch,roll:0,fov:s.fov,fixed:true});}
 
 
+
+quietNow(){return this.startT!==null&&F.firstQuiet((this.g.time||0)-this.startT,this.fresh);}
 draw(r,E,cam){
 if(!this.visible||this.shot|| !this.on())return;
+if(!this.seat&&(this.g.camMode|0)===0&& !(this.g.photoCam&&this.g.photoCam.on)&&this.quietNow())return;
 const g=this.g,ent=g.entities,gl=r.gl;if(!ent|| !r.planes|| !VR.getVoxModel)return;
 const t0=now(),T0=g.time||0,m4=VR.mat4;
 const model=VR.getVoxModel(gl,'funke');if(!model)return;
@@ -115517,7 +115580,7 @@ const p=fxProgram(r);if(!p)return;
 const gl=r.gl,t0=now(),g=this.g,T0=g.time||0;
 gl.useProgram(p.p);gl.uniformMatrix4fv(p.u.u_viewProj,false,r.viewProj);
 gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.depthMask(false);gl.disable(gl.CULL_FACE);
-if(this.wayT>0&&this.wayPts>1)this.drawWay(gl,p,cam);
+if(this.wayT>0&&this.wayPts>1&& !this.quietNow())this.drawWay(gl,p,cam);
 if(this.scanT>0&&this.scanData)this.drawScan(gl,p,cam,T0);
 gl.depthMask(true);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.bindVertexArray(null);
 F.cost.drawMs+=now()-t0;
@@ -127381,6 +127444,7 @@ const D2R=Math.PI/180,TAU=Math.PI*2;
 
 F.COUNT=[300,1000,3000,10000];
 F.count=(tier)=>F.COUNT[clamp(tier|0,0,3)];
+F.VL_LIFT=0.55;
 F.H=10;
 F.DMIN=0.3;F.DMAX=4;F.Q=3;
 
@@ -127504,6 +127568,7 @@ gl_Position = u_viewProj * vec4(P, 1.0);
 }`;
 const CHUNK_FS=`
 uniform vec3 u_sunDir, u_sunCol, u_plDir, u_plCol, u_tint;
+uniform float u_lift;
 in vec3 v_p;
 in vec3 v_alb;
 in float v_sunT;
@@ -127518,6 +127583,9 @@ float dl = max(dot(N, L), 0.0);
 float sp = pow(max(dot(reflect(-V, N), L), 0.0), 24.0) * 0.35;
 vec3 col = alb * u_sunCol * (dl * v_sunT + 0.03) + u_sunCol * sp * v_sunT + alb * u_plCol * max(dot(N, u_plDir) * 0.7 + 0.3, 0.0);
 col += vec3(0.35, 0.6, 1.0) * v_glow * v_glow * 0.03;
+
+
+if (u_lift > 0.0) col = max(col, alb * u_lift * (dot(N, L) > 0.0 ? 1.0 : 0.38));
 o = vec4(col, 1.0);
 }`;
 const FULL_VS=`
@@ -127863,7 +127931,7 @@ const N=F.count(tier),R=F.radius(tier,tau),nd=F.density(tau);
 const c=Math.pow(Math.PI*R*R*F.H/N,1/3),NW=Math.max(1,Math.ceil(F.H/c)),Sg=Math.max(2,Math.floor(Math.sqrt(N/NW)));
 const p=Math.min(1,nd*c*c*c);
 const iu=Math.floor(rho/c),iv=Math.floor(vArc/c);
-fr.draws.push({prog:'fields_chunks',fn:drawChunks,n:Sg*Sg*NW,k:{er:toS(er),et:toS(et),en:toS(en),cell:[c,Sg,NW,p],camCell:[((iu%1048576)+1048576)%1048576,((iv%1048576)+1048576)%1048576,0],camIn:[rho-iu*c,vArc-iv*c,h],size:[F.DMIN,F.DMAX,F.Q,R],sheet:[F.H/2,dot(sunW,en),tau/F.H,eph.t%10000],sun:sunS,sunCol,plDir:toS(toA),plCol,tint:[1,1,1]}});
+fr.draws.push({prog:'fields_chunks',fn:drawChunks,n:Sg*Sg*NW,k:{er:toS(er),et:toS(et),en:toS(en),cell:[c,Sg,NW,p],camCell:[((iu%1048576)+1048576)%1048576,((iv%1048576)+1048576)%1048576,0],camIn:[rho-iu*c,vArc-iv*c,h],size:[F.DMIN,F.DMAX,F.Q,R],sheet:[F.H/2,dot(sunW,en),tau/F.H,eph.t%10000],sun:sunS,sunCol,plDir:toS(toA),plCol,tint:[1,1,1],lift:tier===0?F.VL_LIFT:0}});
 F.stats.chunks=Sg*Sg*NW;F.stats.where='ring';F.stats.tau= +tau.toFixed(2);F.stats.cell= +c.toFixed(2);
 }
 }
@@ -127908,7 +127976,7 @@ const gl=r.gl,p=prog('chunks',CHUNK_VS,CHUNK_FS);if(!p)return;
 const k=d.k;
 begin(gl,p,r);
 setU(gl,p,'u_er',k.er);setU(gl,p,'u_et',k.et);setU(gl,p,'u_en',k.en);setU(gl,p,'u_cell',k.cell);setU(gl,p,'u_camCell',k.camCell);setU(gl,p,'u_camIn',k.camIn);
-setU(gl,p,'u_size',k.size);setU(gl,p,'u_sheet',k.sheet);setU(gl,p,'u_sunDir',k.sun);setU(gl,p,'u_sunCol',k.sunCol);setU(gl,p,'u_plDir',k.plDir);setU(gl,p,'u_plCol',k.plCol);setU(gl,p,'u_tint',k.tint);
+setU(gl,p,'u_size',k.size);setU(gl,p,'u_sheet',k.sheet);setU(gl,p,'u_sunDir',k.sun);setU(gl,p,'u_sunCol',k.sunCol);setU(gl,p,'u_plDir',k.plDir);setU(gl,p,'u_plCol',k.plCol);setU(gl,p,'u_tint',k.tint);setU(gl,p,'u_lift',k.lift||0);
 gl.disable(gl.BLEND);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.disable(gl.CULL_FACE);
 gl.bindVertexArray(r.emptyVAO);
 gl.drawArraysInstanced(gl.TRIANGLES,0,60,d.n);
@@ -137825,6 +137893,14 @@ F.HAND={off:[0.01,0.045,-0.02],ry:0.78,rx: -0.22,s:0.15};
 
 
 F.HAND_DIM=0.7;F.KIT5='sandstone';
+
+
+F.handTint=function(c,keep){
+const L=0.299*c[0]+0.587*c[1]+0.114*c[2],out=[1,1,1];
+for(let i=0;i<3;i++){const want=L+keep*(c[i]-L);out[i]=c[i]>1e-4?Math.max(0.4,Math.min(2.5,want/c[i])):1;}
+return out;
+};
+F.HAND_SAT=0.7;
 F.FOV=70;
 
 F.fistRest=()=>{
@@ -146122,6 +146198,10 @@ P.ssDraw=function(r,E,c){
 const g=this.g;if(!LK|| !g.entities|| !c|| !S.on(g))return;
 let prog=null;const PG=()=>prog||(prog=g.entities.beginVox(r,E));
 const tod=g.env.timeOfDay,tier=LK.tierOf?LK.tierOf(g.settings):2;
+
+
+
+if(tier<=0){SF.cost.models=0;return;}
 let n=0;
 for(const vil of this.known.values()){
 if(!vil.active)continue;
@@ -146131,7 +146211,6 @@ const k=SF.decoK(s.phase,tod);if(k<=0)continue;
 const D=this.ssDeco(vil,s.id),N=D.length;
 for(let i=0;i<N;i++){
 const d=D[i];
-if(d.small&&tier<=0&&i%2)continue;
 const u=Math.max(0,Math.min(1,(k*N-i)*1.5));if(u<=0)continue;
 if(d.small){const ddx=d.pos[0]-c.x,ddz=d.pos[2]-c.z;if(ddx*ddx+ddz*ddz>90*90)continue;}
 MP.scale=(d.scale||1)*(u<1?0.3+0.7*u:1);MP.pitch=0;
