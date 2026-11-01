@@ -85,6 +85,11 @@
     return best(solid, T, rays, op);
   };
 
+  // the lens (vertical field of view, radians) for a portrait at d (the head and shoulders, ~1.3 m of height) and for a
+  // group of radius r (its width and 2.4 m of height in the picture)
+  F3.portraitFov = (d, kid) => clamp(2 * Math.atan((kid ? 1.0 : 1.3) / 2 / Math.max(0.5, d)), 14 * Math.PI / 180, 60 * Math.PI / 180);
+  F3.groupFov = (d, r, aspect) => clamp(Math.max(2 * Math.atan(Math.tan(Math.atan((r + 0.9) / Math.max(0.5, d))) / (aspect || 16 / 9)), 2 * Math.atan(1.25 / Math.max(0.5, d))), 24 * Math.PI / 180, 75 * Math.PI / 180);
+
   // ---------------------------------------------------------------- the circle dance
   F3.CHORD = 1.4;   // m between two neighbours' middles: the hands meet (the arms out to the side and a little down)
   F3.ringR = (n) => clamp(F3.CHORD / (2 * Math.sin(Math.PI / Math.max(3, n))), 1.0, 2.6);
@@ -155,7 +160,19 @@
   const Vs = VR.Villages;
   if (!Vs) return;
   const VP = Vs.prototype, R = VR.R, FL = VR.F;
-  const solidW = (w) => (x, y, z) => { const s = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(s && (R.T.flags[s] & (FL.SOLID | FL.OPAQUE))); };
+  // (a palm is blocks, but props.js draws its trunk leaning up to a block off its column and its fronds wide: a cell
+  // next to a palm block counts as taken — run 1's tag picture had a trunk before the lens)
+  let PROPT = null;
+  const propAt = (w, x, y, z) => { const s = w.getBlock(x, y, z); return !!(s && PROPT[R.T.type[s]]); };
+  const solidW = (w) => {
+    if (!PROPT) { PROPT = new Uint8Array(R.types.length + 1); R.types.forEach((t, i) => { if (t && t.o && (t.o.prop || t.o.propStem)) PROPT[i] = 1; }); }
+    return (x, y, z) => {
+      const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), s = w.getBlock(X, Y, Z);
+      if (s && (R.T.flags[s] & (FL.SOLID | FL.OPAQUE))) return true;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (propAt(w, X + dx, Y, Z + dz)) return true;
+      return false;
+    };
+  };
   const tierOf = (g) => (VR.LifeKit && VR.LifeKit.tierOf ? VR.LifeKit.tierOf(g.settings) : 2);
   const icon = (a, ch, t) => { a.bubble = { text: ch, t: t || 2.4, icon: true }; };
 
@@ -304,6 +321,9 @@
     const g = pc.g, s = pc.s; if (!s || !g.world || !a) return null;
     const f = F3.frame(solidW(g.world), F3.subject(a), Object.assign({ sun: F3.sunAngle(g) }, o || {}));
     if (!f) return null;
+    // a portrait's lens: the head and the shoulders fill the picture (the aim a little under the eyes, the head in the
+    // upper third); o.fov === false keeps the game's own (the far face's picture)
+    if (!(o && o.fov === false)) { f.T[1] -= a.kid ? 0.15 : 0.22; Object.assign(f, look(f.P, f.T)); pc.f3Fov = F3.portraitFov(f.d, a.kid); } else pc.f3Fov = null;
     s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
     if (pc.orbit) pc.orbit = null;
     if (PM) PM.note(tx('g.photo.portrait', { n: a.p.name || '' }, '📷 Porträt: {n} — H: der Nächste · G: goldene Stunde', '📷 Portrait: {n} — H: the next one · G: golden hour'), 2600);
@@ -314,17 +334,22 @@
     const g = pc.g, s = pc.s; if (!s || !g.world) return null;
     const f = F3.frameGroup(solidW(g.world), C, r, Object.assign({ sun: F3.sunAngle(g) }, o || {}));
     if (!f) return null;
+    pc.f3Fov = F3.groupFov(f.d, r, g.renderer ? g.renderer.W / Math.max(1, g.renderer.H) : 16 / 9);
     s.x = f.P[0]; s.y = f.P[1]; s.z = f.P[2]; s.yaw = f.yaw; s.pitch = f.pitch; s.vel[0] = s.vel[1] = s.vel[2] = 0; s.roll = 0;
     if (pc.orbit) pc.orbit = null;
     return f;
   };
   F3.solidW = solidW;
   if (PM && PM.Photo) {
-    const PP = PM.Photo.prototype, pu = PP.update, pe = PP.enter;
+    const PP = PM.Photo.prototype, pu = PP.update, pe = PP.enter, pcm = PP.cam, pl = PP.leave;
     PP.update = function (dt, I) {
-      if (this.on && this.s && !this.first && !(this.g.ui && this.g.ui.typing) && I.hit('KeyH')) F3.portrait(this);
+      const typing = this.g.ui && this.g.ui.typing;
+      if (this.on && this.s && !this.first && !typing && I.hit('KeyH')) F3.portrait(this);
+      else if (this.f3Fov && !typing && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].some(c => I.down(c))) this.f3Fov = null;   // (gliding off: the game's lens again)
       return pu.call(this, dt, I);
     };
+    PP.cam = function (base) { const c = pcm.call(this, base); if (c && this.f3Fov) c.fov = this.f3Fov; return c; };
+    PP.leave = function () { this.f3Fov = null; return pl.apply(this, arguments); };
     PP.enter = function () {
       pe.call(this);
       if (this.on && this.g.villages && this.g.villages.agents.length) setTimeout(() => { const n = document.getElementById('photonote'); if (this.on && n && n.textContent && n.style.opacity !== '0') PM.note(n.textContent + tx('g.photo.more3', null, ' · H: Porträt', ' · H: portrait'), 6000); }, 0);

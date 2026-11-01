@@ -186,7 +186,7 @@ if (want('herz') && HP) {
     // the far face: the same person at 9 m (Folk3 on / off)
     await ev((t) => { const g = VR.game; g.photoCam.held = t; g.env.setTime(t); }, GOLD);
     for (const off of [true, false]) {
-      await ev((off) => { VR.Folk3.off = off; const g = VR.game, a = window.__cu; a.expr = null; const f = VR.Folk3.portraitOf(g.photoCam, a, { d: 9, dMin: 7, dMax: 10 }); if (f) window.__shotT = f.T; }, off);
+      await ev((off) => { VR.Folk3.off = off; const g = VR.game, a = window.__cu; a.expr = null; const f = VR.Folk3.portraitOf(g.photoCam, a, { d: 9, dMin: 7, dMax: 10, fov: false }); if (f) window.__shotT = f.T; }, off);
       await step(3, 33);
       farRow.push(await shoot(`f3_herz_far_${off ? 'off' : 'on'}.png`));
     }
@@ -225,22 +225,22 @@ if (want('herz') && HP) {
 const WORLDS = process.env.WORLDS ? process.env.WORLDS.split(',') : ['aqua', 'ocker', 'zinn', 'basalt', 'opal'];
 for (const kind of (want('worlds') ? WORLDS : [])) {
   try {
-    console.log('== ' + kind + ' (' + secs() + ')');
+    console.log('== ' + kind + ' (' + secs() + ', load ' + fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0] + ')');
     await photoOff();
     const ok = await trip(kind).catch(() => false);
     check(ok, `the jump to ${kind}`);
     if (!ok) continue;
-    await ev(() => { const g = VR.game; if (g.ui && g.ui.show) g.ui.show(null); g.env.setTime(4000); });
-    await settle(40);
+    await ev(() => { const g = VR.game; if (g.ui && g.ui.show) g.ui.show(null); g.env.setTime(4000); window.__rEvery = 20; if (g.settings.renderDist !== 4) { g.settings.renderDist = 4; g.applySettings('*'); } });   // (run 2: Aquamarin's settling took over 18 min under load — a shorter view)
+    await settle(15);
     const vid = 'eco:' + kind + ':0';
     let Vt = null;
     for (let i = 0; i < 30 && !Vt; i++) { await step(20, 33); Vt = await ev((vid) => { const s = VR.game.villages.sites.find(q => q.id === vid); return s ? { x: s.x, y: s.y, z: s.z, name: s.name } : null; }, vid); }
     if (!Vt) { check(false, `${kind}: the town`); continue; }
     await lookFrom([Vt.x + 18, Vt.y + 12, Vt.z + 18], [Vt.x, Vt.y, Vt.z]);
-    await loaded([Vt.x, Vt.y, Vt.z], 40); await settle(60);
+    await loaded([Vt.x, Vt.y, Vt.z], 24); await settle(25);
     let P = null; for (let i = 0; i < 40 && !P; i++) { await step(20, 33); P = await villageOf(vid); }
     if (!P) { check(false, `${kind}: the town lives`); continue; }
-    await step(200, 33);
+    await step(120, 33);
     await ev(([x, y, z]) => { const p = VR.game.player; p.teleport(x + 5, y + 2, z + 5); }, P.plaza);
     console.log('  · prewarm ' + JSON.stringify(await prewarm()));
     await photoOn(GOLD);

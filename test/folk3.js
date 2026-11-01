@@ -68,6 +68,8 @@ console.log('a · the camera director');
   // a group: farther and raised
   const g = F3.frameGroup(cor, [0.5, 65, 0.5], 1.6, {});
   check(!!g && lens(cor, g.P, 0.4) && line(cor, g.P, g.T) && g.P[1] > 65.8, `a group in a corridor: the lens in the open, raised (${g ? g.P.map(v => v.toFixed(1)).join(', ') : '-'})`);
+  const deg = (r) => r * 180 / Math.PI, pf = deg(F3.portraitFov(3.8, false)), gf = deg(F3.groupFov(6.5, 1.6, 16 / 9));
+  check(pf > 14 && pf < 25 && gf > pf && gf <= 75, `the lens: a portrait at 3.8 m ${pf.toFixed(0)}°, a group of 1.6 m at 6.5 m ${gf.toFixed(0)}°`);
   const g2 = F3.frameGroup(open, [0.5, 65, 0.5], 1.6, {});
   const gd = g2 ? Math.hypot(g2.P[0] - 0.5, g2.P[2] - 0.5) : 0;
   check(!!g2 && gd >= 3.5 && gd <= 9, `a group in the open: ${gd.toFixed(1)} m`);
