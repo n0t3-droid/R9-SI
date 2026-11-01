@@ -61,31 +61,6 @@ await ev(() => { const g = VR.game; if (g.ui.screen) g.ui.resume(); g.zenFreezeT
 await wait(8000);
 check(await ev(() => !!VR.Journey && !!VR.JourneyCore && typeof VR.Portal.route === 'function'), 'VR.Journey routes the Leuchtpfad');
 
-if (want('cost')) {
-  console.log('0 · Very Low keeps the film; the costs');
-  const r = await ev(() => {
-    const g = VR.game, out = {};
-    for (const preset of ['potato', 'high']) for (const on of [false, true]) {
-      g.applyPreset(preset); g.settings.dynRes = false; g.settings.journeys = on; g.applySettings('*');
-      const gl = g.renderer.gl, times = [];
-      for (let i = 0; i < 14; i++) { const a = performance.now(); g.last = a - 33; g.loop(a); gl.finish(); if (i >= 4) times.push(performance.now() - a); }
-      times.sort((x, y) => x - y);
-      out[preset + (on ? '_on' : '_off')] = { frame: +times[Math.floor(times.length / 2)].toFixed(1), idle: on ? +VR.Journey.cost(g, 300).toFixed(4) : 0 };
-    }
-    g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
-    out.potatoRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
-    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
-    out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
-    g.settings.journeys = true; g.applySettings('*');
-    return out;
-  });
-  run.cost = r;
-  console.log('  ' + JSON.stringify(r));
-  check(r.potatoRoute === null && r.offRoute === null, 'Very Low and the switch off: the Leuchtpfad\'s film as before (no journey)');
-  check(r.potato_on.idle < 0.05 && r.high_on.idle < 0.05, 'the idle look: Very Low ' + r.potato_on.idle + ' ms, High ' + r.high_on.idle + ' ms');
-  saveRun();
-}
-
 if (want('lift')) {
   console.log('1 · die Himmelsleiter');
   await ev(() => { const p = VR.game.player; p.flying = true; p.safeTeleport(-283.5, 120, -126.5); });
@@ -94,6 +69,7 @@ if (want('lift')) {
   for (let i = 0; i < 90 && !base; i++) { await wait(1000); if (i % 10 === 0) console.log('    base? ' + i + ' ' + JSON.stringify(await ev(() => ({ p: VR.game.player.pos.map(Math.round), hold: !!VR.game.player.hold, scr: VR.game.ui.screen, st: VR.game.state, pend: VR.game.world.pending.size, D: !!VR.game.wanderer })))); base = await ev(() => { const b = VR.Journey.M.base; return b && b.y !== null ? { x: b.x, y: b.y, z: b.z } : null; }); }
   check(!!base, 'the cabin stands at the Bergstation ' + JSON.stringify(base));
   const lift = [];
+  for (let i = 0; i < 40; i++) { if (!(await ev(() => !!VR.game.player.hold))) break; await wait(1000); }
   if (!base) { await ev(() => { const p = VR.game.player; p.flying = false; p.safeTeleport(0.5, 90, 0.5); }); await wait(8000); }
   if (true) {
     if (base) await ev((b) => { const p = VR.game.player; p.pos = [b.x + 7, b.y + 2, b.z + 9]; p.yaw = Math.atan2(7, 9); p.pitch = 0.18; p.flying = true; }, base);
@@ -150,6 +126,7 @@ if (want('ride')) {
   await ev(() => { const p = VR.game.player; p.flying = true; p.safeTeleport(-112, 100, -90); });   // (the city: a place with a cart)
   let carts = [];
   for (let i = 0; i < 90 && !carts.length; i++) { await wait(1000); carts = await ev(() => VR.Journey.carts()); }
+  for (let i = 0; i < 40; i++) { if (!(await ev(() => !!VR.game.player.hold))) break; await wait(1000); }
   check(carts.length > 0, carts.length + ' caravan cart(s) near: ' + carts.map(c => c.name).join(', '));
   const ride = [];
   if (carts.length) {
@@ -181,6 +158,31 @@ if (want('ride')) {
     strip('Karawane (alle 5 s)', ride.filter(Boolean));
   }
   saveRun(); writeSheet();
+}
+
+if (want('cost')) {
+  console.log('0 · Very Low keeps the film; the costs');
+  const r = await ev(() => {
+    const g = VR.game, out = {};
+    for (const preset of ['potato', 'high']) for (const on of [false, true]) {
+      g.applyPreset(preset); g.settings.dynRes = false; g.settings.journeys = on; g.applySettings('*');
+      const gl = g.renderer.gl, times = [];
+      for (let i = 0; i < 14; i++) { const a = performance.now(); g.last = a - 33; g.loop(a); gl.finish(); if (i >= 4) times.push(performance.now() - a); }
+      times.sort((x, y) => x - y);
+      out[preset + (on ? '_on' : '_off')] = { frame: +times[Math.floor(times.length / 2)].toFixed(1), idle: on ? +VR.Journey.cost(g, 300).toFixed(4) : 0 };
+    }
+    g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
+    out.potatoRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
+    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
+    out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
+    g.settings.journeys = true; g.applySettings('*');
+    return out;
+  });
+  run.cost = r;
+  console.log('  ' + JSON.stringify(r));
+  check(r.potatoRoute === null && r.offRoute === null, 'Very Low and the switch off: the Leuchtpfad\'s film as before (no journey)');
+  check(r.potato_on.idle < 0.05 && r.high_on.idle < 0.05, 'the idle look: Very Low ' + r.potato_on.idle + ' ms, High ' + r.high_on.idle + ' ms');
+  saveRun();
 }
 
 const bad = logs.filter(l => /journey|pageerror/i.test(l));

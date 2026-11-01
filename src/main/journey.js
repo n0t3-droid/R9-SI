@@ -107,13 +107,19 @@
     save(g, snap(M.J)); ev('lift');
     return true;
   };
+  // the journey's own clock: the wall clock (a slow frame does not slow the trip — as the Leuchtpfad's film), capped;
+  // nothing while paused (the test's pictures)
+  function wallDt(J, dt, cap) {
+    const tn = now(), w = J.lastW ? (tn - J.lastW) / 1000 : Math.min(cap, dt || 0); J.lastW = tn;
+    return M.paused ? 0 : Math.min(cap, Math.max(0, w));
+  }
   function liftGround(J, dt) {
     const g = J.g, p = g.player, st = J.st;
     const keys = g.input && g.input.keys, sp = !!(keys && keys.has && keys.has('Space')), fresh = sp && !M.keyHeld; M.keyHeld = sp;
     if (fresh || M.skipReq) { M.skipReq = false; if (K.skip(st)) ev('skip'); }
-    const a0 = K.at(st).alt;
-    const evs = K.step(st, M.paused ? 0 : Math.min(0.1, dt), {});
-    const a = K.at(st).alt, rate = dt > 0 ? (a - a0) / dt : 0;
+    const wall = wallDt(J, dt, 2), a0 = K.at(st).alt;
+    const evs = K.step(st, wall, {});
+    const a = K.at(st).alt, rate = wall > 0 ? (a - a0) / wall : 0;
     if (p) { p.pos[0] = J.base[0]; p.pos[1] = J.base[1] + a; p.pos[2] = J.base[2]; p.vel[0] = p.vel[1] = p.vel[2] = 0; p.fallStart = null; p.flying = true; }
     const w = g.world;
     if (w) { if (a > 800 && w.renderDist !== 2) { J.rd = J.rd || w.renderDist; w.renderDist = 2; } }
@@ -137,7 +143,7 @@
     const P = liftPlayer(J, film);
     const adv = (PJ, wall) => {
       if (PJ.t > (J.lastT || 0) + 1e-6 && PJ.t >= sl - 1e-6) { J.st.t = Math.max(J.st.t, L.len); }   // (the Leuchtpfad's skip)
-      for (const e of K.step(J.st, M.paused ? 0 : Math.min(0.25, wall), { loaded: !!PJ.arrived })) ev('lift ' + e);
+      for (const e of K.step(J.st, M.paused ? 0 : Math.min(2, wall), { loaded: !!PJ.arrived })) ev('lift ' + e);
       J.lastT = clamp(J.st.t - L.ground, 0, sl);
       return J.lastT - PJ.t;
     };
@@ -222,7 +228,7 @@
       if (PJ.t > J.lastT + 1e-6) { st.s = Math.max(st.s, PJ.t); if (st.ph === 'board') st.ph = 'way'; }   // (the Leuchtpfad's skip)
       const ks = g.input && g.input.keys, has = (c) => !!(ks && ks.has && ks.has(c));
       J.fwd = has('KeyW') || has('ArrowUp'); J.back = has('KeyS') || has('ArrowDown');
-      for (const e of K.step(st, M.paused ? 0 : Math.min(0.25, wall), { fwd: J.fwd, back: J.back, loaded: !!PJ.arrived })) ev('bridge ' + e);
+      for (const e of K.step(st, M.paused ? 0 : Math.min(2, wall), { fwd: J.fwd, back: J.back, loaded: !!PJ.arrived })) ev('bridge ' + e);
       J.lastT = st.s;
       return st.s - PJ.t;
     };
@@ -350,7 +356,7 @@
     // slower where the land ahead is not built yet, or a moment is near (the driver lets you look)
     const ah = K.rideAt(st.path, st.s + 24, {}), gy = groundAt(g, ah.x, ah.z, J.y + 8), D = g.wanderer;
     let near = false; if (D && D.ms) for (const m of D.ms) if (m.pos && Math.hypot(m.pos[0] - J.at.x, m.pos[2] - J.at.z) < 30) near = true;
-    const evs = K.step(st, M.paused ? 0 : Math.min(0.1, dt), { slow: gy === null || near });
+    const evs = K.step(st, wallDt(J, dt, 1), { slow: gy === null || near });
     J.at = K.rideAt(st.path, st.s, J.at);
     if ((J.yT -= dt) <= 0) { J.yT = 0.2; const y = groundAt(g, J.at.x, J.at.z, J.y + 4); if (y !== null) J.ty = y; }
     J.y += clamp(J.ty - J.y, -4 * dt, 4 * dt);
@@ -395,8 +401,8 @@
         else if (y > 1 && y < 23 && d > 8.6 && d < 10) { const post = Math.abs(Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) * (Math.PI / 4) - Math.atan2(dz, dx)) < 0.09; if (post || y === 12) gr.set(x, y, z, 0xd8b46a, 0); else if ((x + y + z) % 7 === 0) gr.set(x, y, z, 0xbfe8ff, 1); }
       }
     }) }, layout: { cab: [0, 0, 0] } });
-    // the tether (1 voxel = 1 m): a pale gold line 160 m up, a marker light every 8 m
-    VM.jy_tether = () => ({ unit: 1, radius: 80, parts: { line: part(1, 160, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 160; y++) gr.set(0, y, 0, y % 8 === 0 ? 0xffc870 : 0xfff0c8, 1); }) }, layout: { line: [0, 0, 0] } });
+    // the tether (1 voxel = 1/4 m): a slim pale gold line 160 m up, a marker light every 8 m
+    VM.jy_tether = () => ({ unit: 4, radius: 80, parts: { line: part(1, 640, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 640; y++) gr.set(0, y, 0, y % 32 < 2 ? 0xffc870 : 0xfff0c8, 1); }) }, layout: { line: [0, 0, 0] } });
   }
   function baseOf(g) {
     const L = VR.Land; if (g.dim !== 'overworld' || !L || !L.SITES || (g.meta && g.meta.type === 'flat')) return null;
