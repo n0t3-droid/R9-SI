@@ -104,8 +104,10 @@ const contacts = (offFlag) => {
   }
   return [c, cp];
 };
-const [c0, p0] = contacts(true), [c1, p1] = contacts(false);
-console.log(`  · contacts in 60 s (walker–walker, with the player): off ${c0}, ${p0} · on ${c1}, ${p1}`);
+// (four minutes of the town interleaved — off, on, on, off: what the people do changes through the day)
+let c0 = 0, p0 = 0, c1 = 0, p1 = 0;
+for (const off of [true, false, false, true]) { const [c, cp] = contacts(off); if (off) { c0 += c; p0 += cp; } else { c1 += c; p1 += cp; } }
+console.log(`  · contacts in 2 × 60 s each (walker–walker, with the player): off ${c0}, ${p0} · on ${c1}, ${p1}`);
 check(c1 + p1 < c0 + p0 || c0 + p0 === 0, 'fewer contacts with Robo on');
 const stuck = mgr.agents.filter(a => a.fails > 3).length;
 check(stuck <= 2, `nobody stuck by the avoiding (${stuck} with > 3 failed paths)`);
