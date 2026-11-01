@@ -153,6 +153,27 @@ if (want('dusk')) {
   writeSheet();
 }
 
+if (want('cost')) {
+  console.log('== cost');
+  // the same spot, 12 rendered frames each to the GPU's end: Very Low / High, the director off / on (a moment and a beat in view)
+  const cost = run.cost = {};
+  for (const preset of ['potato', 'high']) for (const on of [false, true]) {
+    const r = await ev(([preset, on]) => {
+      const g = VR.game; g.applyPreset(preset); g.settings.dynRes = false; g.settings.wander = on; g.applySettings('*');
+      const D = g.wanderer; if (D && on && !D.ms.length) { D.ctx = D.context(); D.start('shrine', 900001, true) || D.start('sign', 900002, true); }
+      if (D && on && !D.b) D.beat(false);
+      window.__norender = false; const times = [], gl = g.renderer.gl;
+      for (let i = 0; i < 16; i++) { const a = performance.now(); g.last = a - 33; g.loop(a); gl.finish(); if (i >= 4) times.push(performance.now() - a); }
+      window.__norender = true; times.sort((x, y) => x - y);
+      return { frame: +times[Math.floor(times.length / 2)].toFixed(2), upd: D ? +D.st.cost.toFixed(3) : 0, active: D ? D.ms.map(m => m.kind).concat(D.b ? ['b:' + D.b.kind] : []) : [] };
+    }, [preset, on]);
+    cost[preset + (on ? '_on' : '_off')] = r;
+    console.log(`  ${preset} ${on ? 'on ' : 'off'}: median frame ${r.frame} ms, the director's update ${r.upd} ms (${r.active.join(',') || '–'})`);
+  }
+  check(cost.potato_on.upd < 0.5, `Very Low: the director's update stays small (${cost.potato_on.upd} ms)`);
+  await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.wander = true; g.applySettings('*'); });
+  save();
+}
 // ---------------------------------------------------------------- the Flausel
 async function goTo(kind) {
   const s0 = (await ev(() => VR.Fairy.debug.sites())).find(s => s.kind === kind); if (!s0) return null;
