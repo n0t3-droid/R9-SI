@@ -19,6 +19,11 @@
     return { labels: d.map(q => q[0]), dist: Math.max(12, Math.min(520, far * 0.95 / 0.38 + far)), far };
   };
   // ---- e-portal2 end
+  // ---- w-golden: the range sphere's radius in pixels → what is drawn: 'ring' (the outline, its fill, the equator),
+  // 'all' (wider than four screens — creative's 1e6 ly: the whole map in reach, a faint tint alone; a canvas circle
+  // millions of pixels round with a fill spun the software canvas for minutes: O hung the game), 'none' (behind the eye)
+  VR.StarMapSphere = (rp, W, H) => (!(rp > 0) ? 'none' : rp > 4 * Math.max(W, H) ? 'all' : 'ring');
+  // ---- w-golden end
   if (typeof window === 'undefined' || !VR.Game) return;
   const SM = VR.StarMap = {};
   const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
@@ -166,12 +171,15 @@
       X.stroke();
     }
     // the range sphere: its outline and its equator
-    const cq = P.to(P.c), rp = range * P.f / cq[2];
-    X.strokeStyle = '#7fd4ff88'; X.lineWidth = 1.5; X.beginPath(); X.arc(cq[0], cq[1], rp, 0, Math.PI * 2); X.stroke();
-    X.fillStyle = '#7fd4ff0d'; X.fill();
-    X.strokeStyle = '#7fd4ff44'; X.beginPath();
-    for (let k = 0; k <= 64; k++) { const a = k / 64 * Math.PI * 2, q = P.to([P.c[0] + range * Math.cos(a), P.c[1], P.c[2] + range * Math.sin(a)]); k ? X.lineTo(q[0], q[1]) : X.moveTo(q[0], q[1]); }
-    X.stroke();
+    const cq = P.to(P.c), rp = range * P.f / cq[2], sph = VR.StarMapSphere(rp, W, H);   // (w-golden: see VR.StarMapSphere)
+    if (sph === 'all') { X.fillStyle = '#7fd4ff0d'; X.fillRect(0, 0, W, H); }
+    else if (sph === 'ring') {
+      X.strokeStyle = '#7fd4ff88'; X.lineWidth = 1.5; X.beginPath(); X.arc(cq[0], cq[1], rp, 0, Math.PI * 2); X.stroke();
+      X.fillStyle = '#7fd4ff0d'; X.fill();
+      X.strokeStyle = '#7fd4ff44'; X.beginPath();
+      for (let k = 0; k <= 64; k++) { const a = k / 64 * Math.PI * 2, q = P.to([P.c[0] + range * Math.cos(a), P.c[1], P.c[2] + range * Math.sin(a)]); k ? X.lineTo(q[0], q[1]) : X.moveTo(q[0], q[1]); }
+      X.stroke();
+    }
     // the systems, far first
     const order = M.order || (M.order = new Int32Array(N.list.length).map((_, i) => i));
     order.sort((a, b) => P.z[b] - P.z[a]);

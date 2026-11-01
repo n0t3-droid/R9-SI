@@ -178,14 +178,19 @@
     // a grid for systemsNear (20-ly cells)
     const grid = new Map(), key = (a, b, c) => a + ',' + b + ',' + c;
     for (const s of list) { const k = key(Math.floor(s.p[0] / 20), Math.floor(s.p[1] / 20), Math.floor(s.p[2] / 20)); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(s); }
-    const N = { seed, list, nebs, grid, sys: new Map() };
+    // (w-golden: the cells the grid has, per axis — systemsNear walks no further: creative's 1e6-ly range walked 10¹⁵ cells)
+    const gb = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+    for (const k of grid.keys()) { const v = k.split(',').map(Number); for (let i = 0; i < 3; i++) { if (v[i] < gb[2 * i]) gb[2 * i] = v[i]; if (v[i] > gb[2 * i + 1]) gb[2 * i + 1] = v[i]; } }
+    const N = { seed, list, nebs, grid, gb, sys: new Map() };
     CACHE.set(seed, N); if (CACHE.size > 4) CACHE.delete(CACHE.keys().next().value);
     Galaxy.cur = N;
     return N;
   }
   function systemsNear(N, p, ly) {
     const out = [], c = Math.ceil(ly / 20), cx = Math.floor(p[0] / 20), cy = Math.floor(p[1] / 20), cz = Math.floor(p[2] / 20);
-    for (let a = cx - c; a <= cx + c; a++) for (let b = cy - c; b <= cy + c; b++) for (let e = cz - c; e <= cz + c; e++) {
+    const B = N.gb || [-Infinity, Infinity, -Infinity, Infinity, -Infinity, Infinity];   // (w-golden: clipped to the grid)
+    const a0 = Math.max(cx - c, B[0]), a1 = Math.min(cx + c, B[1]), b0 = Math.max(cy - c, B[2]), b1 = Math.min(cy + c, B[3]), e0 = Math.max(cz - c, B[4]), e1 = Math.min(cz + c, B[5]);
+    for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) for (let e = e0; e <= e1; e++) {
       const L = N.grid.get(a + ',' + b + ',' + e); if (!L) continue;
       for (const s of L) { const d = Math.hypot(s.p[0] - p[0], s.p[1] - p[1], s.p[2] - p[2]); if (d <= ly) out.push({ idx: s.idx, d, s }); }
     }
