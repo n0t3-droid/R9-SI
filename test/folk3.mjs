@@ -273,24 +273,51 @@ if (want('cost') && HP) {
     const home = await ev(() => window.__home); if (await ev(() => VR.game.dim) !== home && !(await trip(home).catch(() => false))) throw new Error('no way back to Herzwelt');
     await lookFrom([HP.plaza[0] + 14, HP.plaza[1] + 6, HP.plaza[2] + 14], HP.plaza); await loaded(HP.plaza, 48); await settle(40);
     const cost = {};
-    const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[ms.length >> 1].toFixed(2) }; });
+    const measure0 = () => ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let k = 0; k < 3; k++) for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); const FG = VR.FolkGPU, st = FG ? FG.stats : {}; return { ms: +ms[ms.length >> 1].toFixed(2), smooth: st.drawn, tris: st.tris, draws: g.renderer.stats ? g.renderer.stats.draws : -1, recs: FG ? [...FG.recs.values()].filter(r => r.state === 2).length : 0 }; });
     const measure = async (name) => { const r1 = await measure0(); await step(20, 33); const r2 = await measure0(); const r = r2.ms < r1.ms ? r2 : r1; r.runs = [r1.ms, r2.ms]; cost[name] = r; console.log(`  · ${name}: ${JSON.stringify(r)} (${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`); return r; };
+    const ab = async (pr, A, B) => {
+      const r = await ev(([A, B]) => {
+        const g = VR.game, F3 = VR.Folk3, gl = g.renderer.gl;
+        const set = (m) => { F3.off = m === 'off'; for (const q in F3.sw) F3.sw[q] = m === 'on' || m === 'off' || m === 'sw:' + q; };
+        window.__norender = false;
+        set(A); for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } gl.finish();
+        const a = [], b = [];
+        for (let blk = 0; blk < 12; blk++) for (const [m, arr] of [[A, a], [B, b], [B, b], [A, a]]) { set(m); for (let i = 0; i < 4; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); gl.finish(); arr.push(performance.now() - t); } }
+        window.__norender = true; set('on');
+        const med = (q) => { q.sort((x, y) => x - y); return +q[q.length >> 1].toFixed(2); };
+        const st = VR.FolkGPU ? VR.FolkGPU.stats : {};
+        return { a: med(a), b: med(b), smooth: st.drawn, tris: st.tris };
+      }, [A, B]);
+      const key = `${pr}:${A}|${B}`; cost[key] = cost[key] ? [].concat(cost[key], r) : r;
+      console.log(`  · ${pr} ${A} ${r.a} ms | ${B} ${r.b} ms (Δ ${(r.b - r.a).toFixed(2)}; smooth ${r.smooth}, ${r.tris} tris; ${secs()}, load ${fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]})`);
+      return r;
+    };
     const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
     await ev(() => VR.game.env.setTime(4000));
     const V0 = [HP.plaza[0], HP.plaza[1], HP.plaza[2]], CP = [V0[0] + 8, V0[1] + 3, V0[2] + 8];
     for (const pr of (process.env.COST ? process.env.COST.split(',') : ['potato', 'high'])) {
       await preset(pr); await settle(20); await step(60, 33);
-      for (const off of (process.env.COST ? [true, false] : [true, false, true, false])) {
-        await ev((off) => { VR.Folk3.off = off; }, off);
-        await lookFrom(CP, V0); await step(10, 33);
-        await measure(`${pr}_${off ? 'off' : 'on'}${cost[pr + '_' + (off ? 'off' : 'on')] ? '2' : ''}`);
-      }
+      // (the meshes in first: the High doubling of runs 4–5 — off measured first, on later, while the smooth people
+      // came in from the worker one by one: every one ~12 000 triangles on SwiftShader)
+      await lookFrom(CP, V0); console.log('  · prewarm ' + JSON.stringify(await prewarm())); await step(60, 33);
+      // (run 5, potato, where Folk3 changes nothing in the frame: off 3.1 / on 9.2 / off 2.7 / on 8.3 ms — measures taken
+      // four minutes apart drift with the world's streaming; so A and B now interleave in the same frames, ABBA in blocks
+      // of 4, with an A/A control showing the method's own noise)
+      await lookFrom(CP, V0); await step(10, 33);
+      await ab(pr, 'off', 'on'); await ab(pr, 'off', 'off');
+      await ab(pr, 'off', 'on');
+      if (pr === 'high' && process.env.SW !== '0') for (const k of await ev(() => Object.keys(VR.Folk3.sw || {}))) await ab(pr, 'none', 'sw:' + k);
     }
     await ev(() => { VR.Folk3.off = false; });
-    const best = (k) => Math.min(cost[k] ? cost[k].ms : 999, cost[k + '2'] ? cost[k + '2'].ms : 999);
     run.cost = cost;
-    console.log(`  cost Very Low off ${best('potato_off')} / on ${best('potato_on')} ms · High off ${best('high_off')} / on ${best('high_on')} ms`);
-    check(best('potato_on') <= best('potato_off') * 1.1 + 0.5, `Very Low not slower with Folk3 (${best('potato_off')} → ${best('potato_on')} ms)`);
+    const pick = (k) => { const v = cost[k]; return v ? (Array.isArray(v) ? v : [v]) : []; };
+    for (const pr of ['high', 'potato']) {
+      const L = pick(pr + ':off|on'); if (!L.length) continue;
+      const off = Math.min(...L.map(r => r.a)), on = Math.min(...L.map(r => r.b)), dMax = Math.max(...L.map(r => r.b - r.a));
+      console.log(`  cost ${pr}: off ${off} / on ${on} ms (the A/A control: Δ ${pick(pr + ':off|off').map(r => (r.b - r.a).toFixed(2)).join(', ')})`);
+      if (pr === 'high') check(on <= off + 1 && dMax <= 1.5, `High within 1 ms with Folk3 (${off} → ${on} ms, each pair Δ ≤ ${dMax.toFixed(2)})`);
+      else check(on <= off * 1.1 + 0.5, `Very Low not slower with Folk3 (${off} → ${on} ms)`);
+    }
   } catch (e) { check(false, 'cost: ' + String(e && e.stack || e).slice(0, 500)); }
   save();
 }
