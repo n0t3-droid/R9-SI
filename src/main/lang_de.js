@@ -3962,7 +3962,7 @@
     "g.wd.s.well": "Du wünschst dir etwas — und findest etwas Glänzendes.",
     "g.wd.site.temple": "Tor-Tempel",
     "g.wd.site.city": "Nova Haven",
-    "g.wd.site.hills": "Hügeldorf",
+    "g.wd.site.hills": "Kuppelhügel",
     "g.wd.site.station": "Bergstation",
     "g.wd.site.canyon": "Schlucht",
     "g.wd.site.citadel": "Turmzitadelle",
@@ -3976,5 +3976,24 @@
     "g.wd.r.mushroompie": "Pilzpastete",
     "g.wd.r.flowertea": "Blütentee",
     // ---- o-wander end
+    // ---- n-names (src/shared/names.js): die Völker im Kodex, die Orte des Herzlands im Wanderbuch
+    "g.codex.cat.peoples": "Völker",
+    "g.codex.p.names": "So heißen sie: {names}",
+    "g.codex.p.herz": ["Die Herzweltler", "Das Volk der Heimat: Bauern, Bäcker, Fischer und Sterngucker in Dörfern wie Lindenau und Mohnbrunn. Ihre Namen klingen warm und altmodisch; Kinder ruft man mit Kosenamen, die Alten tragen die Namen der Großeltern.", "Besuche ein Dorf der Herzwelt."],
+    "g.codex.p.flausel": ["Die Flausel", "Das kleine Waldvolk der Märchenorte, kaum größer als ein Pilz. Sie heißen wie die leisen Geräusche des Waldes, ihre Familien nach Moos, Tau und Beeren; die Alten nach ihren Bärten.", "Finde einen Märchenort."],
+    "g.codex.p.aqua": ["Die Wellari", "Das Muschelvolk der Inseln von Aquamarin. Ihre Namen fließen weich wie Wellen auf Sand.", "Besuche Aquamarin."],
+    "g.codex.p.zinn": ["Die Glimari", "Das Glutvolk der Schwefelebenen von Zinnober. Ihre Kämme glimmen wie Glut, und ihre Namen knistern hell wie Funken.", "Besuche Zinnober."],
+    "g.codex.p.opal": ["Die Isveli", "Das Frostvolk im Eis von Opal. Ihre Namen klingen klar wie Frost auf Glas.", "Besuche Opal."],
+    "g.codex.p.basalt": ["Die Regoli", "Das Kuppelvolk in den Kratern von Basalt. Ihre Namen summen tief und rund wie in einer Steinkuppel.", "Besuche Basalt."],
+    "g.codex.p.ocker": ["Die Dunelin", "Das Erdvolk der Dünen von Ocker. Ihre Namen sind warm und erdig wie Schritte auf warmem Sand.", "Besuche Ocker."],
+    "g.wd.site.hills_w": "Mohnbühl",
+    "g.wd.site.hills_e": "Lerchenbühl",
+    "g.wd.site.farm_c": "Sonnenhof",
+    "g.wd.site.farm_w": "Kleehof",
+    "g.wd.site.farm_n": "Lindenhof",
+    "g.wd.site.farm_e": "Mohnhof",
+    "g.wd.site.canyon": "Hallklamm",
+    "g.wd.site.east": "Morgenhain",
+    // ---- n-names end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

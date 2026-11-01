@@ -36,7 +36,8 @@
     const fams = [];
     const usedNames = new Set(), usedSur = new Set();
     const NM = P.names || null;   // u-worlds: a native village names its people in its own language (WorldEco.names)
-    const nameFor = (seed, kid) => { const list = kid ? (NM ? NM.kids : Folk.KIDS) : (NM ? NM.first : Folk.FIRST); for (let k = 0; k < 40; k++) { const n = list[H(seed, k, 3) % list.length]; if (!usedNames.has(n)) { usedNames.add(n); return n; } } return list[seed % list.length]; };
+    // (n-names: the elders get their own names — VR.Names' pools carry elders)
+    const nameFor = (seed, kid, old) => { const list = kid ? (NM ? NM.kids : Folk.KIDS) : old && (NM ? NM.elders : Folk.ELDERS) ? (NM ? NM.elders : Folk.ELDERS) : (NM ? NM.first : Folk.FIRST); for (let k = 0; k < 40; k++) { const n = list[H(seed, k, 3) % list.length]; if (!usedNames.has(n)) { usedNames.add(n); return n; } } return list[seed % list.length]; };
     const SUR = NM ? NM.sur : Folk.SUR;
     const surFor = (seed) => { for (let k = 0; k < 40; k++) { const n = SUR[H(seed, k, 5) % SUR.length]; if (!usedSur.has(n)) { usedSur.add(n); return n; } } return SUR[seed % SUR.length]; };
     const homes = P.homes.slice();
@@ -68,7 +69,7 @@
         const person = {
           id: P.id + ':' + hi + ':' + k, fam: fams.length, home: hi, idx: k, age, role, seed, newHome: !!home.newHome,
           years: age === 'child' ? 5 + H(seed, 4, 9) % 8 : age === 'elder' ? 66 + H(seed, 4, 9) % 18 : 22 + H(seed, 4, 9) % 38,
-          name: nameFor(seed, age === 'child'), bed: home.beds[k] || home.beds[0] || null,
+          name: nameFor(seed, age === 'child', age === 'elder'), bed: home.beds[k] || home.beds[0] || null,
           trait: Folk.TRAITS[H(seed, 1, 9) % Folk.TRAITS.length], likes: Folk.LIKES[H(seed, 2, 9) % Folk.LIKES.length],
           look: null,
         };

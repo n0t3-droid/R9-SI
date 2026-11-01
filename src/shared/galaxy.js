@@ -135,7 +135,7 @@
   function build(seed) {
     seed = (seed >>> 0) || 0x5eed;
     if (CACHE.has(seed)) return CACHE.get(seed);
-    const list = [], used = new Set(['Helia']);
+    const list = [], used = new Set(['Helia']), used2 = new Set(['Helia']);
     const home = { idx: 0, home: true, p: [0, 0, 0], name: 'Helia', cls: 'F', sub: 'F5 V', T: 6550, L: 3.6, R: 1.5, M: 1.33, color: '#dddeff', bin: null, neb: -1, np: 9 };
     list.push(home);
     const nx = Math.ceil(2 * DISC_R / SECTOR), ny = Math.ceil(2 * DISC_H / SECTOR);
@@ -149,6 +149,7 @@
         const s = { idx: list.length, home: false, p: [+x.toFixed(3), +y.toFixed(3), +z.toFixed(3)], seed: hash(seed, Math.floor(h * 4294967296), k, 0x5157) };
         Object.assign(s, st);
         s.name = nameOf(sr, used);
+        if (VR.Names) s.name = VR.Names.star(s.seed, used2) || s.name;   // n-names: a soft name of its own rng (the old draw above stays: sr's sequence)
         // binaries: 30 %, half close pairs (circumbinary planets, two shadows), half wide (a second sun as a brilliant star)
         s.bin = null;
         if (sr() < 0.30) {

@@ -317,7 +317,7 @@
       gait: 'biped',
     };
   };
-  // Void Stalker: tall dark figure, violet eyes
+  // the Void Slinker (Leerenschleicher): tall dark figure, violet eyes
   M.void_stalker = () => {
     const skin = 0x141018, eye = 0xd07aff;
     return {

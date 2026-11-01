@@ -12,10 +12,10 @@
   V.hash = hash;
 
   // ---------------------------------------------------------------- names
-  const FIRST = ['Mira', 'Oren', 'Talia', 'Juno', 'Kael', 'Suri', 'Nilo', 'Aven', 'Lio', 'Rhea', 'Tomas', 'Ayla', 'Bram', 'Cora', 'Dax', 'Elin', 'Faro', 'Gia', 'Hale', 'Ivo', 'Jora', 'Kiri', 'Luca', 'Mae', 'Nox', 'Opal', 'Pax', 'Quin', 'Rosa', 'Sol', 'Tev', 'Uma', 'Vesper', 'Wren', 'Yara', 'Zeph', 'Ansel', 'Bea', 'Cyrus', 'Dara', 'Emil', 'Fern', 'Gus', 'Hana', 'Iris', 'Jasper', 'Kaia', 'Leo', 'Maya', 'Nico', 'Olive', 'Rune', 'Sage', 'Theo', 'Una', 'Willa', 'Yuki', 'Zara', 'Arlo', 'Clem', 'Eli', 'Finn', 'Hugo', 'Ines', 'Lulu', 'Nell', 'Otto', 'Ria', 'Tully', 'Wynn', 'Ada', 'Bodhi', 'Cleo', 'Esme', 'Idris', 'Mika', 'Noor', 'Orla', 'Remy', 'Selma'];
-  const KIDS = ['Pip', 'Dot', 'Bo', 'Kip', 'Poppy', 'Tink', 'Moss', 'Sprout', 'Bean', 'Lark', 'Pebble', 'Button', 'Fizz', 'Juniper', 'Nova', 'Sunny', 'Twig', 'Wiggles', 'Mochi', 'Pico', 'Rue', 'Sky', 'Taro', 'Ziggy'];
-  const SUR = ['Oakhart', 'Brightwater', 'Stonefield', 'Skylark', 'Emberly', 'Mossgrove', 'Starling', 'Vale', 'Quill', 'Thornbury', 'Amberly', 'Fairwind', 'Hollis', 'Larkspur', 'Meadows', 'Nightingale', 'Pennywhistle', 'Rivers', 'Tinsley', 'Willowby', 'Ashdown', 'Bellweather', 'Copperfield', 'Dawnbrook', 'Evergreen', 'Fernsby', 'Goldleaf', 'Honeywell', 'Ironwood', 'Juniper', 'Kettleby', 'Lumen', 'Marlow', 'Northwind', 'Orchard', 'Puddlefoot', 'Quinby', 'Rosewood', 'Sunderly', 'Thistle'];
-  V.FIRST = FIRST; V.KIDS = KIDS; V.SUR = SUR;
+  // n-names: Herzwelt's folk are named from VR.Names (src/shared/names.js): German first, fairy-tale names, the
+  // families after the land round their houses, the children by their pet names, the elders by the old names
+  const HZ = VR.Names.pool('herz');
+  V.FIRST = HZ.first; V.KIDS = HZ.kids; V.ELDERS = HZ.elders; V.SUR = HZ.sur;
 
   // ---------------------------------------------------------------- roles
   const ROLES = V.ROLES = {

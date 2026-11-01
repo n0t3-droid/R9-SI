@@ -30,7 +30,7 @@
   const W = VR.Wander = VR.Wander || {};
   const LK = VR.LifeKit, TAU = Math.PI * 2;
   const h = (a, b, c) => LK.h(a, b, c);
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const hasDoc = typeof document !== 'undefined' && !!document.createElement;
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'wander', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.wander', tip: 'g.set.wander.tip', cost: 'low', def: true });
 
@@ -111,6 +111,11 @@
     for (const p of W.PAGES) if (!isObj(B[p])) B[p] = {};
     if (!isObj(B.map) && B.map !== undefined) delete B.map;
     return B;
+  };
+  // n-names: a Heartland site's name in the language of the moment (the book stored the word of the visit: 'l:<site id>')
+  W.placeName = function (id, stored) {
+    const m = /^l:(.+)$/.exec(id || ''), L = VR.Land; if (!m || !L || !L.SITES) return stored;
+    const site = L.SITES.find(x => x[0] === m[1]); return site ? T('g.wd.site.' + site[0], null, T('g.wd.site.' + site[3])) : stored;
   };
   W.note = function (meta, page, id, val) {
     const B = W.book(meta); if (!B || !B[page] || !id) return false;
@@ -281,7 +286,7 @@
       for (const s of vs) if (s && Number.isFinite(s.x)) out.push({ id: 'v:' + s.id, x: s.x, z: s.z, name: s.name || T('g.q.pl.village'), rad: Math.min(70, s.rad || 40), kind: 'village' });
       if (g.dim === 'overworld' && Lnd && Lnd.SITES && (meta.vgen | 0) >= (Lnd.VGEN || 10) && meta.type !== 'flat') {
         const twin = new Set((Lnd.JOINED || []).map(j => j[1]));   // (the temple's and the city's two anchors are one place)
-        for (const [id, x, z, kind] of Lnd.SITES) if (W.SITE_KINDS.indexOf(kind) >= 0 && (x || z) && !twin.has(id)) out.push({ id: 'l:' + id, x, z, name: T('g.wd.site.' + kind), rad: kind === 'city' || kind === 'temple' ? 60 : 32, kind });
+        for (const [id, x, z, kind] of Lnd.SITES) if (W.SITE_KINDS.indexOf(kind) >= 0 && (x || z) && !twin.has(id)) out.push({ id: 'l:' + id, x, z, name: T('g.wd.site.' + id, null, T('g.wd.site.' + kind)), rad: kind === 'city' || kind === 'temple' ? 60 : 32, kind });
       }
       const WL = VR.WorldLife, kind = WL && WL.kindOf ? WL.kindOf(g) : null;
       if (kind) {
@@ -444,7 +449,11 @@
       const to = W.nextPlace(D.places, s, D.g.player.yaw, D.seen()) || null;
       m.pos = s; m.to = to;
       m.F = D.fig(m.seed, s, null, 'adult'); m.name = (D.g.villages && VR.Villagers && VR.Villagers.nameFor) ? VR.Villagers.nameFor(m.seed) : null;
-      if (!m.name) { const A = ['Mira', 'Jonas', 'Ilka', 'Ben', 'Tilda', 'Oskar', 'Lene', 'Paul', 'Rosa', 'Emil', 'Wanda', 'Fiete']; m.name = A[(m.seed >>> 2) % A.length]; }
+      if (!m.name && VR.Names) {   // n-names: a wanderer of the world's own people (Herzwelt's folk at home), with the family's name
+        const WL = VR.WorldLife, kd = WL && WL.kindOf ? WL.kindOf(D.g) : null, NP = (kd && VR.Names.pool(kd)) || VR.Names.pool('herz');
+        m.name = NP.first[(m.seed >>> 2) % NP.first.length] + ' ' + NP.sur[(m.seed >>> 9) % NP.sur.length];
+      }
+      if (!m.name) m.name = T('g.wd.k.traveller');
       m.chatN = 0; m.chatT = 4; m.with = 0;
       return true;
     },
@@ -868,7 +877,7 @@
       if (p === 'stickers') list = W.NAMES.map(n => `<span class="wdst${B.stickers && B.stickers[n] ? ' on' : ''}" title="${esc(B.stickers && B.stickers[n] ? T('g.wd.k.' + n) : '?')}">${B.stickers && B.stickers[n] ? W.KINDS[n].ico : '·'}</span>`).join('');
       else if (p === 'recipes') list = ids.map(r => `<span class="chip">${esc(T('g.wd.r.' + r))}</span>`).join(' ');
       else if (p === 'creatures') list = ids.map(c => `<span class="chip">${esc(T('g.wd.cr.' + c))}</span>`).join(' ');
-      else list = ids.slice(-14).map(id => `<span class="chip">${esc(typeof B[p][id] === 'string' ? B[p][id] : id)}</span>`).join(' ');
+      else list = ids.slice(-14).map(id => `<span class="chip">${esc(p === 'places' ? W.placeName(id, typeof B[p][id] === 'string' ? B[p][id] : id) : typeof B[p][id] === 'string' ? B[p][id] : id)}</span>`).join(' ');
       h0 += `<div class="wdsec"><h3>${esc(T('g.wd.p.' + p))} <span class="note">${P[p].n}</span></h3>${bar(p)}<div class="wdl">${list || `<span class="note">${esc(T('g.wd.none'))}</span>`}</div></div>`;
     }
     return h0;

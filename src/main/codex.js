@@ -17,7 +17,7 @@
     ['spar', 'glowspar'],   // u-fields2: the rubble bodies' ores
     ['stars', 'exo_crystal'],   // u-stars2: the first system of another star (starexo.js)
   ];
-  const CATS = { milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', moons: 'g.codex.cat.moons', inventions: 'g.codex.cat.inventions' };   // u-moons1: Monde
+  const CATS = { peoples: 'g.codex.cat.peoples', milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', moons: 'g.codex.cat.moons', inventions: 'g.codex.cat.inventions' };   // u-moons1: Monde
   const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace', glowspar: 'spar', nickel_iron: 'spar', ice_nodule: 'spar' };
 
   class Codex {
@@ -43,6 +43,10 @@
       // 💡 Erfindungen (src/main/inventions.js): one entry per invention, found when the profile has made it
       const IV = VR.Inventions;
       if (IV) for (const c of IV.LIST) add('i:' + c.k, 'inventions', c.id, () => { const x = IV.text(c.k); return { name: x.name, desc: x.line, hint: T('g.codex.inventHint') }; }, () => IV.has(c.k));
+      // n-names: the page „Völker" — each people, its sound and a few of its names (VR.Names, docs/design/names.md);
+      // found where you meet them: a Herzwelt village, a Märchenort's Flausel, a native world
+      const N = VR.Names;
+      if (N && N.PEOPLE_ORDER) for (const k of N.PEOPLE_ORDER) add('p:' + k, 'peoples', null, () => { const L = TL('g.codex.p.' + k); return { name: L[0] || k, desc: (L[1] || '') + ' ' + T('g.codex.p.names', { names: N.sample(k, 7).join(' · ') }), hint: L[2] || '' }; });
       this.t = 0; this.nightStart = null;
       this.seen = new Set();
     }
@@ -83,6 +87,13 @@
       }
       if (g.entities) for (const m of g.entities.mobs) { const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2]; if (dx * dx + dz * dz < 144 && Math.abs(m.pos[1] - p.pos[1]) < 12) this.unlock('c:' + m.kind); }
       if (p.mode === 'survival') for (const s of p.inv.slots) if (s) { const k = INV_TRIGGERS[s.id] || (/_log$/.test(s.id) ? 'log' : null); if (k) this.unlock('m:' + k); }
+      if (this.peopleT === undefined || (this.peopleT -= 1) <= 0) {   // n-names: the peoples met (every 4 s)
+        this.peopleT = 4;
+        const WL = VR.WorldLife, kd = WL && WL.kindOf ? WL.kindOf(g) : null, FS = VR.Fairy && VR.Fairy.state;
+        if (kd) this.unlock('p:' + kd);
+        if (FS && FS.near && FS.nearD < 40) this.unlock('p:flausel');
+        if (g.dim === 'overworld' && g.villages && g.villages.sites) for (const s of g.villages.sites) if (s && Math.hypot(s.x - p.pos[0], s.z - p.pos[2]) < (s.rad || 40) + 10) { this.unlock('p:herz'); break; }
+      }
       if (y <= 6) this.unlock('m:deep');
       if (y >= 200) this.unlock('m:sky');
       // a full night survived
@@ -95,7 +106,7 @@
     }
     // the entries with their texts in the language of the moment: {id, cat, name, desc, hint, icon, found}
     list() {
-      const order = ['milestones', 'wonders', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift', 'moons', 'inventions'];   // u-moons1
+      const order = ['milestones', 'wonders', 'peoples', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift', 'moons', 'inventions'];   // u-moons1
       return this.entries.map(e => Object.assign({ id: e.id, catKey: e.catKey, cat: T(CATS[e.catKey]), icon: e.icon, found: e.live ? !!e.live() : !!this.found[e.id] }, e.text())).sort((a, b) => order.indexOf(a.catKey) - order.indexOf(b.catKey));
     }
     toJSON() { return this.found; }

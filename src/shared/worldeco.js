@@ -51,7 +51,7 @@
       ],
       fauna: [
         { id: 'reef_glider', de: 'Riffgleiter', en: 'Reef Glider', does: 'swim' },
-        { id: 'shell_strider', de: 'Muschelschreiter', en: 'Shell Strider', does: 'graze' },
+        { id: 'shell_strider', de: 'Muschelschreiter', en: 'Shell Wader', does: 'graze' },
         { id: 'spray_sailor', de: 'Gischtsegler', en: 'Spray Sailor', does: 'fly' },
       ],
       species: {
@@ -121,7 +121,7 @@
         { id: 'sulfur_beetle', de: 'Schwefelkäfer', en: 'Sulfur Beetle', does: 'hop' },
       ],
       species: {
-        de: 'Glutani', en: 'Glutani',
+        de: 'Glimari', en: 'Glimari',   // n-names: was Glutani (a fan wiki's word)
         look: { skin: [0x4a2a3a, 0x542e3e, 0x3e2434, 0x5a3440], cut: ['coat', 'robe', 'coat'], feat: 'crest', featC: [0xffb02a, 0xff7a2a, 0xffd050], garb: [0xd84a2a, 0xf0c040, 0x2a2a30, 0xe8e0d0, 0x8a2a1a], eye: 0xffa030, glow: true },
         kit: { lamp4: 'spirit_lantern', post4: 'crimson_fence', pave4: ['polished_basalt', 'smooth_basalt'], bench4: 'crimson_slab', flower4: 'torchflower', shape: 'tower', wall: 'polished_basalt', band: 'sulfur_bricks', roof: 'amber_crystal_block', floor: 'crimson_planks', fill: 'basalt', window: 'yellow_stained_glass', door: 'crimson_door', bed: 'red_bed', light: 'spirit_lantern', paving: 'polished_sulfur', lamp: 'vx_lamppost_crystal', canopy: 'yellow_wool', mark: 'magma_block' },
         goods: ['sulfur', 'obsidian', 'magma_block', 'amber_crystal_block', 'polished_sulfur', 'glowing_obsidian', 'sulfur_bricks', 'gold_ingot'],
@@ -184,7 +184,7 @@
         { id: 'ice_wisp', de: 'Eisflimmer', en: 'Ice Shimmer', does: 'fly' },
       ],
       species: {
-        de: 'Nivari', en: 'Nivari',
+        de: 'Isveli', en: 'Isveli',   // n-names: was Nivari (≈ Sylvari, a World Anvil species)
         look: { skin: [0x9ac8f0, 0x8abce8, 0xaad4f4, 0x7ab0e0], cut: ['coat', 'cape', 'coat'], feat: 'antlers', featC: [0x9ad8ff, 0xc8f0ff, 0x7ac0f0], garb: [0x2a4a7a, 0x7a2a4a, 0xe8e0d0, 0x3a6a5a, 0xc84a4a], eye: 0x2a3a6a },
         kit: { lamp4: 'lantern', post4: 'spruce_fence', pave4: ['smooth_stone', 'snow_block_cut'], bench4: 'spruce_slab', flower4: 'white_tulip', shape: 'vault', wall: 'packed_ice', band: 'snow_block', roof: 'blue_ice', floor: 'spruce_planks', fill: 'packed_ice', window: 'light_blue_stained_glass', door: 'spruce_door', bed: 'light_blue_bed', light: 'lantern', paving: 'snow_block_cut', lamp: 'vx_lamppost_crystal', canopy: 'light_blue_wool', mark: 'rose_crystal_block' },
         goods: ['packed_ice', 'blue_ice', 'ice_crystal', 'snow_block', 'tholin_ice', 'rose_crystal_block', 'azure_crystal_cluster', 'lantern'],
@@ -256,19 +256,10 @@
 
   // ================================================================ names (the species' own language)
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  E.word = function (kind, seed, n) {
-    const S = K[kind].species, L = S.syl;
-    let w = '';
-    for (let i = 0; i < n; i++) w += L[Math.floor(h01(seed, i, 0x51) * L.length)];
-    if (h01(seed, 9, 0x52) < 0.5) w += S.end[Math.floor(h01(seed, 10, 0x53) * S.end.length)];
-    return cap(w.slice(0, 10));
-  };
-  const NAMES = {};
-  E.names = function (kind) {
-    if (NAMES[kind]) return NAMES[kind];
-    const pick = (salt, n, syl) => { const out = [], seen = new Set(); for (let k = 0; out.length < n && k < n * 8; k++) { const w = E.word(kind, salt * 977 + k, syl + (h01(salt, k, 3) < 0.3 ? 1 : 0)); if (w.length >= 3 && !seen.has(w)) { seen.add(w); out.push(w); } } return out; };
-    return (NAMES[kind] = { first: pick(strHash(kind) ^ 0x11, 32, 2), kids: pick(strHash(kind) ^ 0x22, 16, 2), sur: pick(strHash(kind) ^ 0x33, 16, 3) });
-  };
+  // n-names: the names speak through VR.Names (src/shared/names.js — one sound per people, children and elders their
+  // own; the old syllables syl/end above stay as the kinds' data). Display only: a site keeps its id and place.
+  E.word = function (kind, seed, n) { return VR.Names.place(kind, seed, n); };
+  E.names = function (kind) { return VR.Names.pool(kind); };
 
   // ================================================================ the states (resolved once the registry is complete)
   const SC = new Map();

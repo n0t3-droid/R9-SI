@@ -134,7 +134,7 @@
   // Suchen: the lost things by the giver's age
   const THINGS = { child: ['ball', 'kite', 'kitten', 'puppy'], adult: ['kitten', 'scarf', 'letter', 'puppy'], elder: ['letter', 'scarf', 'kitten'] };
   Q.THINGS = ['kitten', 'puppy', 'ball', 'kite', 'scarf', 'letter'];
-  const PETNAMES = ['Flocke', 'Moosi', 'Tatze', 'Puschel', 'Samtpfote', 'Tüpfel'];
+  const PETNAMES = ['Flocke', 'Moosi', 'Tatze', 'Puschel', 'Samtpfote', 'Tupfen'];
   // Reparieren: at a vista (its lamps, its bench) or on the village's plaza (the lamp, the bell)
   const REPAIR_V = ['lamps', 'bench'], REPAIR_P = ['plazalamp', 'bell'];
   // the riddles: the real universe (docs/universe/REFERENCE.md; the texts g.q.rid.<id>.*, a0 the right answer)
