@@ -54580,6 +54580,14 @@ VR.I18N.add('en',{
 'g.set.l2Air.tip':'Haze in valleys and over water, morning mist, far hills fade into the colour of the horizon.',
 'g.set.l2Grade':'Colour mood',
 'g.set.l2Grade.tip':'Every hour has its colours: a warm golden hour, a violet dusk, a teal night with warm lamps; lights glow, the sun flares softly.',
+'g.set.lvHaze':'Sun haze',
+'g.set.lvHaze.tip':'The air between you and the land: a warm veil over the distance toward the sun, a cool one away from it — the hills stand behind each other like painted layers.',
+'g.set.lvPal':'Film palette',
+'g.set.lvPal.tip':'Greens like an animated film: harsh meadow green becomes a warm sap green in the light and a blue-green in the shade. Skin, wood and lamps stay as they are.',
+'g.set.lvSoft':'Soft distance',
+'g.set.lvSoft.tip':'The far land grows softer, as through a camera lens — what is near stays sharp. One small extra pass at quarter resolution.',
+'g.set.lvWrap':'Light wrap',
+'g.set.lvWrap.tip':'A bright sky behind a silhouette glows softly over its edge — trees, towers and people stand in the light, not in front of it.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -58918,6 +58926,14 @@ VR.I18N.add('de',{
 'g.set.l2Air.tip':'Dunst in Tälern und über Wasser, Morgennebel, ferne Hügel verblassen in der Farbe des Horizonts.',
 'g.set.l2Grade':'Farbstimmung',
 'g.set.l2Grade.tip':'Jede Tageszeit hat ihre Farben: die goldene Stunde warm, die Dämmerung violett, die Nacht türkis mit warmen Lampen; Leuchten glühen, die Sonne blendet sanft.',
+'g.set.lvHaze':'Sonnendunst',
+'g.set.lvHaze.tip':'Die Luft zwischen dir und dem Land: zur Sonne hin ein warmer Schleier über der Ferne, von ihr weg ein kühler — die Hügel stehen hintereinander wie gemalte Ebenen.',
+'g.set.lvPal':'Filmpalette',
+'g.set.lvPal.tip':'Die Grüntöne wie im Trickfilm: grelles Wiesengrün wird im Licht ein warmes Saftgrün, im Schatten ein Blaugrün. Haut, Holz und Lampen bleiben, wie sie sind.',
+'g.set.lvSoft':'Weite Ferne',
+'g.set.lvSoft.tip':'Das ferne Land wird weicher, wie hinter einer Kameralinse — das Nahe bleibt scharf. Eine kleine Zusatzstufe in Viertelauflösung.',
+'g.set.lvWrap':'Lichtsaum',
+'g.set.lvWrap.tip':'Heller Himmel hinter einer Silhouette strahlt sanft über ihre Kante — Bäume, Türme und Menschen stehen im Licht statt davor.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',
@@ -65848,6 +65864,231 @@ return vec4(col, cov);
 
 
 
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const L=VR.Look=VR.Look||{};
+const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
+const sstep=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
+const lum=(c)=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+
+
+L.SW=['lvHaze','lvPal','lvSoft','lvWrap'];
+const OFF={lvHaze:false,lvPal:false,lvSoft:false,lvWrap:false};
+const ALL={lvHaze:true,lvPal:true,lvSoft:true,lvWrap:true};
+const TIERS={
+potato:OFF,low:OFF,
+balanced:{lvHaze:true,lvPal:true,lvSoft:false,lvWrap:false},
+high:ALL,ultra:ALL,ultraLite:ALL,
+};
+L.defaults=(preset)=>Object.assign({},TIERS[preset]||TIERS.balanced);
+L.off=()=>Object.assign({},OFF);
+L.ROWS=[
+{key:'lvHaze',g:'img',sec:'light',t:'switch',lab:'g.set.lvHaze',tip:'g.set.lvHaze.tip',cost:'low',def:true},
+{key:'lvPal',g:'img',sec:'light',t:'switch',lab:'g.set.lvPal',tip:'g.set.lvPal.tip',cost:'low',def:true},
+{key:'lvSoft',g:'img',sec:'light',t:'switch',lab:'g.set.lvSoft',tip:'g.set.lvSoft.tip',cost:'mid',def:false},
+{key:'lvWrap',g:'img',sec:'light',t:'switch',lab:'g.set.lvWrap',tip:'g.set.lvWrap.tip',cost:'mid',def:false},
+];
+L.key=(q)=>L.SW.map(k=>(q&&q[k])?1:0).join('');
+L.on=(q)=> !!(q&&(q.lvHaze||q.lvPal||q.lvSoft||q.lvWrap));
+L.needSoft=(q)=> !!(q&&(q.lvSoft||q.lvWrap));
+L.q=OFF;
+L.use=function(q){L.q=q||OFF;return L.q;};
+L.definesFor=function(name,q){
+q=q||L.q;
+if(name!=='composite')return[];
+const out=[];
+if(q.lvHaze)out.push('LV_HAZE');
+if(q.lvPal)out.push('LV_PAL');
+if(q.lvSoft)out.push('LV_SOFT');
+if(q.lvWrap)out.push('LV_WRAP');
+if(out.length)out.push('LOOKV');
+return out;
+};
+L.hook=function(name,defines){
+const extra=L.definesFor(name);
+if(!extra.length)return defines||[];
+return(defines||[]).concat(extra.filter(d=> !(defines||[]).includes(d)));
+};
+if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>L.hook(name,prev?prev(name,defines):(defines||[]));}
+
+
+
+L.moods=function(sy){
+const wDay=sstep(-0.01,0.1,sy),wNight=1-sstep(-0.28,-0.1,sy),wDusk=(1-wDay)*(1-wNight);
+const g=1-sstep(0.1,0.3,sy);
+return{day:wDay*(1-g),gold:wDay*g,dusk:wDusk,night:wNight};
+};
+
+
+
+
+
+const MOOD={
+day:{half:320,sunK:0.24,skyK:0.18,warm:[1.0,0.92,0.78],cool:[0.78,0.86,1.0],calm:0.45,lean:0.045,teal:0.04,s0:90,s1:300,sK:0.42,wK:0.5},
+gold:{half:230,sunK:0.32,skyK:0.2,warm:[1.0,0.8,0.58],cool:[0.72,0.76,1.0],calm:0.45,lean:0.06,teal:0.055,s0:85,s1:280,sK:0.45,wK:0.75},
+dusk:{half:200,sunK:0.3,skyK:0.26,warm:[1.0,0.66,0.5],cool:[0.55,0.68,1.0],calm:0.42,lean:0.035,teal:0.09,s0:80,s1:260,sK:0.45,wK:0.65},
+night:{half:240,sunK:0.0,skyK:0.22,warm:[0.8,0.85,1.0],cool:[0.62,0.74,1.0],calm:0.3,lean:0.0,teal:0.05,s0:70,s1:240,sK:0.4,wK:0.55},
+};
+L.MOOD=MOOD;
+const MK=['day','gold','dusk','night'];
+const blend=(m,k)=>{
+const a=MOOD.day[k];
+if(Array.isArray(a)){const o=[0,0,0];for(const n of MK)for(let i=0;i<3;i++)o[i]+=MOOD[n][k][i]*m[n];return o;}
+let s=0;for(const n of MK)s+=MOOD[n][k]*m[n];return s;
+};
+
+L.frame=function(E,out){
+const o=out||{haze:[0,0,0,0],warm:[0,0,0],cool:[0,0,0],pal:[0,0,0,0],soft:[0,0,0,0]};
+const m=L.moods(E.sunDir[1]);
+const sc=E.sunColor||[1,1,1],fc=E.fogColor||[0.6,0.7,0.9];
+const sl=Math.min(1.5,0.2126*sc[0]+0.7152*sc[1]+0.0722*sc[2]);
+const rain=clamp(E.rain||0,0,1),dim=E.dimId===0?1:0;
+o.haze[0]=blend(m,'half');o.haze[1]=blend(m,'sunK')*(1-rain*0.7)*dim;o.haze[2]=blend(m,'skyK')*dim;o.haze[3]=E.sunDir[1]> -0.05?1:0;
+const w=blend(m,'warm'),c=blend(m,'cool');
+
+for(let i=0;i<3;i++){o.warm[i]=w[i]*sc[i];o.cool[i]=c[i]*fc[i];}
+const lw=Math.max(1e-3,lum(o.warm)),lc=Math.max(1e-3,lum(o.cool));
+for(let i=0;i<3;i++){o.warm[i]/=lw;o.cool[i]/=lc;}
+o.pal[0]=blend(m,'calm');o.pal[1]=blend(m,'lean')*(1-rain);o.pal[2]=blend(m,'teal');o.pal[3]=dim;
+o.soft[0]=blend(m,'s0');o.soft[1]=blend(m,'s1');o.soft[2]=blend(m,'sK')*dim;o.soft[3]=blend(m,'wK')*dim;
+return o;
+};
+
+
+
+L.greenW=function(c){
+const mx=Math.max(c[0],c[1],c[2]),mn=Math.min(c[0],c[1],c[2]),ch=mx-mn;
+if(ch<1e-4||mx!==c[1])return 0;
+const h=60*(((c[2]-c[0])/ch)+2);
+return sstep(62,85,h)*(1-sstep(150,172,h))*sstep(0.08,0.3,ch);
+};
+
+
+L.pal=function(c,p){
+const w=L.greenW(c)*p[3];if(w<=0)return c.slice();
+const l=lum(c),lit=sstep(0.18,0.62,l);
+const k=1-p[0]*w;
+const o=[l+(c[0]-l)*k,l+(c[1]-l)*k,l+(c[2]-l)*k];
+o[0]+=(p[1]*lit-p[2]*0.5*(1-lit))*w;o[2]+=(p[2]*(1-lit)-p[1]*0.6*lit)*w;o[1]+=p[2]*0.25*(1-lit)*w;
+const dl=lum(o)-l;
+return[clamp(o[0]-dl,0,1),clamp(o[1]-dl,0,1),clamp(o[2]-dl,0,1)];
+};
+
+L.hazeK=function(d,cs,h){
+const f=1-Math.pow(2,-d/h[0]);
+const toward=Math.pow(Math.max(cs,0),6)*h[3];
+return{sun:f*h[1]*toward,sky:f*h[2]*(1-toward*0.6)};
+};
+L.softK=(d,s)=>sstep(s[0],s[1],d)*s[2];
+
+L.wrapK=(zSelf,zFar,s)=>sstep(1.6,4.0,zFar/Math.max(0.05,zSelf))*s[3];
+
+
+L.glslComposite=function(){
+return`
+#ifdef LOOKV
+
+uniform vec4 u_lvHaze;
+uniform vec3 u_lvWarm;
+uniform vec3 u_lvCool;
+uniform vec4 u_lvPal;
+uniform vec4 u_lvSoft;
+uniform vec3 u_lvSun;
+uniform vec2 u_lvNF;
+uniform mat4 u_lvInvVP;
+uniform highp sampler2D u_lvDepth;
+uniform sampler2D u_lvSoftTex;
+uniform vec2 u_lvTexel;
+float lvLin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_lvNF.x * u_lvNF.y / (u_lvNF.y + u_lvNF.x - z * (u_lvNF.y - u_lvNF.x)); }
+vec3 lvRay(vec2 uv) { vec4 a = u_lvInvVP * vec4(uv * 2.0 - 1.0, -1.0, 1.0), b = u_lvInvVP * vec4(uv * 2.0 - 1.0, 1.0, 1.0); return normalize(b.xyz / b.w - a.xyz / a.w); }
+
+vec3 lvHdr(vec3 c, vec2 uv) {
+float d0 = texture(u_lvDepth, uv).r;
+if (d0 >= 0.99999) return c;
+float z = lvLin(d0);
+#if defined(LV_SOFT) || defined(LV_WRAP)
+vec3 sc = texture(u_lvSoftTex, uv).rgb;
+#endif
+#ifdef LV_SOFT
+c = mix(c, sc, smoothstep(u_lvSoft.x, u_lvSoft.y, z) * u_lvSoft.z);
+#endif
+#ifdef LV_WRAP
+{
+vec2 t = u_lvTexel * 3.0;
+float zf = max(max(lvLin(texture(u_lvDepth, uv + vec2(t.x, 0.0)).r), lvLin(texture(u_lvDepth, uv - vec2(t.x, 0.0)).r)),
+max(lvLin(texture(u_lvDepth, uv + vec2(0.0, t.y)).r), lvLin(texture(u_lvDepth, uv - vec2(0.0, t.y)).r)));
+float e = smoothstep(1.6, 4.0, zf / max(0.05, z)) * u_lvSoft.w;
+c += max(sc - c, vec3(0.0)) * e;
+}
+#endif
+#ifdef LV_HAZE
+{
+vec3 rd = lvRay(uv);
+float f = 1.0 - exp2(-z / u_lvHaze.x);
+float toward = pow(max(dot(rd, u_lvSun), 0.0), 6.0) * u_lvHaze.w;
+float lc = dot(c, vec3(0.2126, 0.7152, 0.0722));
+
+
+float veil = min(max(lc, 0.3), 4.0);
+c = mix(c, u_lvWarm * (veil * 1.3 + 0.1), f * u_lvHaze.y * toward);
+c = mix(c, u_lvCool * (veil * 1.15 + 0.06), f * u_lvHaze.z * (1.0 - toward * 0.6));
+}
+#endif
+return c;
+}
+
+vec3 lvPal(vec3 c) {
+#ifdef LV_PAL
+float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), ch = mx - mn;
+if (ch < 1e-4 || mx > c.g) return c;
+float h = 60.0 * ((c.b - c.r) / ch + 2.0);
+float w = smoothstep(62.0, 85.0, h) * (1.0 - smoothstep(150.0, 172.0, h)) * smoothstep(0.08, 0.3, ch) * u_lvPal.w;
+if (w <= 0.0) return c;
+float l = dot(c, vec3(0.2126, 0.7152, 0.0722)), lit = smoothstep(0.18, 0.62, l);
+vec3 o = vec3(l) + (c - vec3(l)) * (1.0 - u_lvPal.x * w);
+o.r += (u_lvPal.y * lit - u_lvPal.z * 0.5 * (1.0 - lit)) * w;
+o.b += (u_lvPal.z * (1.0 - lit) - u_lvPal.y * 0.6 * lit) * w;
+o.g += u_lvPal.z * 0.25 * (1.0 - lit) * w;
+o -= dot(o, vec3(0.2126, 0.7152, 0.0722)) - l;
+return clamp(o, 0.0, 1.0);
+#else
+return c;
+#endif
+}
+#endif`;
+};
+
+L.SOFT_FS=`
+uniform sampler2D u_src;
+uniform vec2 u_texel;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+vec2 t = u_texel * 2.0;
+vec3 c = texture(u_src, v_uv).rgb * 4.0;
+c += (texture(u_src, v_uv + vec2(t.x, 0.0)).rgb + texture(u_src, v_uv - vec2(t.x, 0.0)).rgb + texture(u_src, v_uv + vec2(0.0, t.y)).rgb + texture(u_src, v_uv - vec2(0.0, t.y)).rgb) * 2.0;
+c += texture(u_src, v_uv + t).rgb + texture(u_src, v_uv - t).rgb + texture(u_src, v_uv + vec2(t.x, -t.y)).rgb + texture(u_src, v_uv + vec2(-t.x, t.y)).rgb;
+o = vec4(min(c / 16.0, vec3(64.0)), 1.0);
+}`;
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const FX=VR.WaterFx={
@@ -70085,6 +70326,7 @@ uniform float u_crossing;
 uniform mat4 u_invVP;
 uniform vec3 u_shaftCol;
 ${(VR.Light2&&VR.Light2.glslComposite)?VR.Light2.glslComposite():''}
+${(VR.Look&&VR.Look.glslComposite)?VR.Look.glslComposite():''}
 in vec2 v_uv;
 out vec4 o;
 
@@ -70118,6 +70360,9 @@ vec3 w = -amp / mix(8.0, 4.6, u_sharpen);
 vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
 c = r / (1.0 - r);
 } else c = texture(u_scene, uv).rgb;
+#ifdef LOOKV
+c = lvHdr(c, uv);
+#endif
 c += texture(u_bloom, uv).rgb * u_bloomStrength;
 if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
 #ifdef L2VOL
@@ -70150,6 +70395,9 @@ if (u_portal > 0.0) c = mix(c, vec3(0.9, 0.45, 0.15), u_portal * 0.35);
 c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
 #ifdef GRADE2
 c = l2Grade(c, v_uv);
+#endif
+#ifdef LOOKV
+c = lvPal(c);
 #endif
 
 c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
@@ -73723,6 +73971,7 @@ try{this.buildProgramsNow();}finally{G.deferred=was;}
 buildProgramsNow(){
 if(VR.Light2){VR.Light2.use(this.q);this.l2Key=VR.Light2.key?VR.Light2.key(this.q):'';if(VR.GL&& !VR.GL.defineHook)VR.GL.defineHook=VR.Light2.hook;}
 if(VR.Sky3){VR.Sky3.use(this.q);this.s3Key=VR.Sky3.key(this.q);}
+if(VR.Look){VR.Look.use(this.q);this.lvKey=VR.Look.key(this.q);}
 const md=this.multi?['MULTIDRAW']:[];
 const sh=(this.q.shadows?['SHADOWS']:[]).concat(this.q.hshadow?['HSHADOW']:[]).concat(this.q.lite?['LITE']:[]).concat(this.q.motion?['MOTION']:[]).concat(this.q.cloudShadow?['CLOUDSH']:[]);
 const P=this.P={};
@@ -74051,6 +74300,7 @@ if(!!this.q.texLite!==prevT&&this.texAlbedo)this.setAniso(this.q.texLite?2:4);
 this.shadowValid=false;
 if(VR.Light2&&VR.Light2.key&&VR.Light2.key(this.q)!==this.l2Key)this.buildPrograms();
 else if(VR.Sky3&&VR.Sky3.key(this.q)!==this.s3Key)this.buildPrograms();
+else if(VR.Look&&VR.Look.key(this.q)!==this.lvKey){if(this.lvRebuild)this.lvRebuild();else this.buildPrograms();}
 if(full||this.q.shadows!==prevSize)this.ensureShadowMap();
 this.resize(full||this.q.scale!==prevScale);
 }
@@ -76672,6 +76922,89 @@ L3[0]=ld[0];L3[1]=ld[1];L3[2]=ld[2];
 const v=S3.billboardL(L3,c,this.s3L||(this.s3L=[0,0,0]));
 gl.uniform3f(u.u_c3L,v[0],v[1],v[2]);
 }
+};
+})(VR);
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const L=VR.Look,GL=VR.GL,S=VR.SHADERS;
+if(!L|| !VR.Renderer)return;
+const R=VR.Renderer.prototype;
+
+
+R.lvTarget=function(){
+const gl=this.gl,w=Math.max(1,(this.w+3)>>2),h=Math.max(1,(this.h+3)>>2);
+const T=this.lvT||(this.lvT={w:0,h:0,ok:false});
+if(T.w===w&&T.h===h)return T.ok?T:null;
+if(T.fb)gl.deleteFramebuffer(T.fb);
+if(T.t)gl.deleteTexture(T.t);
+T.fb=T.t=null;T.w=w;T.h=h;T.ok=false;
+if(!this.hdr)return null;
+gl.activeTexture(gl.TEXTURE0);
+T.t=GL.tex2D(w,h,gl.RGBA16F,gl.RGBA,gl.HALF_FLOAT,{filter:gl.LINEAR});
+T.fb=GL.fbo([T.t]);
+T.ok= !!T.fb;
+return T.ok?T:null;
+};
+
+R.lvRebuild=function(){
+L.use(this.q);this.lvKey=L.key(this.q);
+if(!this.P|| !this.P.composite){this.buildPrograms();return;}
+const G=GL,was=G.deferred;G.deferred=true;
+try{this.P.composite=GL.program(S.FS_VS,S.COMPOSITE_FS,'composite');}finally{G.deferred=was;}
+};
+
+R.lvPre=function(F,E){
+const q=this.q;
+this.lvOn= !!(L.on(q)&&E&&E.dimId===0&&this.sceneDepth&&this.hdr);
+this.lvSoftOn=false;
+if(!this.lvOn)return;
+this.lv=L.frame(E,this.lv);
+if(!L.needSoft(q)||F.underwater)return;
+const T=this.lvTarget();if(!T)return;
+const gl=this.gl,P=this.lvP||(this.lvP={});
+const p=P.soft||(P.soft=GL.program(S.FS_VS,L.SOFT_FS,'lvSoft'));
+if(!p|| !p.p)return;
+gl.useProgram(p.p);
+gl.bindFramebuffer(gl.FRAMEBUFFER,T.fb);gl.viewport(0,0,T.w,T.h);
+this.tex(0,this.sceneCol,p.u.u_src);
+gl.uniform2f(p.u.u_texel,1/this.w,1/this.h);
+this.fsMark('lvSoft',T.w,T.h,T.w*T.h*9*8,T.w*T.h*8);
+this.fs(p);
+this.lvSoftOn=true;
+};
+const post0=R.post;
+R.post=function(F,E){
+if(L.on(this.q)){const gl=this.gl;gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);this.lvPre(F,E);}
+else this.lvOn=this.lvSoftOn=false;
+return post0.call(this,F,E);
+};
+
+const l2Post0=R.l2Post;
+R.l2Post=function(p,E,pass,F){
+if(l2Post0)l2Post0.call(this,p,E,pass,F);
+if(pass!=='composite')return;
+const u=p.u;if(!u.u_lvHaze)return;
+const gl=this.gl,l=this.lv,on= !!(this.lvOn&&l);
+
+gl.uniform4f(u.u_lvHaze,on?l.haze[0]:200,on?l.haze[1]:0,on?l.haze[2]:0,on?l.haze[3]:0);
+if(on){gl.uniform3fv(u.u_lvWarm,l.warm);gl.uniform3fv(u.u_lvCool,l.cool);}
+gl.uniform4f(u.u_lvPal,on?l.pal[0]:0,on?l.pal[1]:0,on?l.pal[2]:0,on?l.pal[3]:0);
+const so=on&&this.lvSoftOn;
+gl.uniform4f(u.u_lvSoft,on?l.soft[0]:1e4,on?l.soft[1]:2e4,so?l.soft[2]:0,so?l.soft[3]:0);
+gl.uniform3f(u.u_lvSun,E.sunDir[0],E.sunDir[1],E.sunDir[2]);
+gl.uniform2f(u.u_lvNF,0.06,(F&&F.cam&&F.cam.far)||1200);
+if(u.u_lvInvVP&&this.invVPNJ)gl.uniformMatrix4fv(u.u_lvInvVP,false,this.invVPNJ);
+gl.uniform2f(u.u_lvTexel,1/this.w,1/this.h);
+this.tex(6,this.sceneDepth,u.u_lvDepth);
+if(u.u_lvSoftTex)this.tex(7,so?this.lvT.t:this.sceneCol,u.u_lvSoftTex);
+gl.activeTexture(gl.TEXTURE0);
 };
 })(VR);
 
@@ -103448,6 +103781,7 @@ for(const k of['farCache','shadowTakt','streamTakt','reflLite'])S.add({key:k,g:'
 if(VR.Light2&&VR.Light2.ROWS)for(const it of VR.Light2.ROWS)S.add(Object.assign({},it));
 
 if(VR.Sky3&&VR.Sky3.ROWS)for(const it of VR.Sky3.ROWS)S.add(Object.assign({},it));
+if(VR.Look&&VR.Look.ROWS)for(const it of VR.Look.ROWS)S.add(Object.assign({},it));
 
 
 for(const k of['hdrLite','postLite','zPre','texLite','dprLite'])S.add({key:k,g:'img',sec:'quality',t:'switch',lab:'g.set.'+k,tip:'g.set.'+k+'.tip',cost:'low',def:false});
@@ -112923,6 +113257,10 @@ const S3_SW=VR.Sky3?VR.Sky3.SW:[];
 if(VR.Sky3)for(const p in PRESETS)Object.assign(PRESETS[p],VR.Sky3.defaults(p));
 
 
+const LV_SW=VR.Look?VR.Look.SW:[];
+if(VR.Look)for(const p in PRESETS)Object.assign(PRESETS[p],VR.Look.defaults(p));
+
+
 
 
 
@@ -112988,6 +113326,8 @@ if(s.rdMax===undefined&&s.preset)out.rdMax=PRESETS[s.preset]?PRESETS[s.preset].r
 for(const k of L2_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Light2.off()[k]:PRESETS.balanced[k]);
 
 for(const k of S3_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Sky3.off()[k]:PRESETS.balanced[k]);
+
+for(const k of LV_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Look.off()[k]:PRESETS.balanced[k]);
 
 if(s.smoothFolk===undefined&&s.preset)out.smoothFolk=PRESETS[s.preset]?PRESETS[s.preset].smoothFolk:((s.vxLod|0)>=44&& !s.lite?1:0);
 
@@ -113071,6 +113411,7 @@ if(key!=='*'&&['renderDist','scale','shadows','clouds','particles','bloom','rays
 if(key!=='*'&&F9_SW.includes(key))S.preset='custom';
 if(key!=='*'&&L2_SW.includes(key))S.preset='custom';
 if(key!=='*'&&S3_SW.includes(key))S.preset='custom';
+if(key!=='*'&&LV_SW.includes(key))S.preset='custom';
 if(key!=='*'&&F10_SW.includes(key))S.preset='custom';
 if(key!=='*'&&MO_SW.includes(key))S.preset='custom';
 for(const k of MO_SW)if(S[k]===undefined)S[k]=PRESETS[S.preset]?PRESETS[S.preset][k]:(k==='cloudShadow'? +((S.clouds|0)>=2):1);
@@ -113088,6 +113429,7 @@ if(S.smoothFurn===undefined)S.smoothFurn=PRESETS[S.preset]?PRESETS[S.preset].smo
 const hDist=Math.min(160,Math.max(56,S.renderDist*16*0.75));
 if(r&&VR.Light2){const qb=r.qBase||(r.qBase={}),d=VR.Light2.off();for(const k of L2_SW)qb[k]=S[k]===undefined?d[k]:(typeof d[k]==='number'?Math.max(0,Math.min(VR.Light2.MAX[k]||3,S[k]|0)): !!S[k]);}
 if(r&&VR.Sky3){const qb=r.qBase||(r.qBase={}),d=VR.Sky3.off();for(const k of S3_SW)qb[k]=S[k]===undefined?d[k]:(typeof d[k]==='number'?Math.max(0,Math.min(VR.Sky3.MAX[k]||2,S[k]|0)): !!S[k]);}
+if(r&&VR.Look){const qb=r.qBase||(r.qBase={});for(const k of LV_SW)qb[k]= !!S[k];}
 if(r&&VR.IPU){const qb=r.qBase||(r.qBase={});for(const k of F10_SW)qb[k]= !!S[k];qb.dprCap= !!S.dprLite&&S.preset==='ultraLite';}
 if(r){const qb=r.qBase||(r.qBase={});qb.pbr=S.pbr===undefined?(S.lite?0:1):Math.max(0,Math.min(2,S.pbr|0));qb.texHi= !!S.texHi&& !S.lite;}
 if(r)r.setQuality({upload:S.upload||2.5,scale:S.scale,shadows:SHADOW_RES[S.shadows],shadowDist:SHADOW_DIST[S.shadows],shadowEvery:1,bloom:S.bloom,rays:S.rays,fxaa:S.fxaa,clouds:S.clouds,magic:S.magic,horizon:S.horizon,hshadow: !!S.sunShadows,hshadowDist:hDist,sharpen:S.sharpen?(S.lite?0.5:0.35):0,tsr: !!S.tsr,fadeIn:S.fadeIn!==false,vxLod:S.vxLod||48,smoothProps:S.smoothPlants|0,smoothFurn:S.smoothFurn?1:0,lite: !!S.lite,matTier:S.matTier||0,dropShadow: !!S.dropShadow,lampGlow: !!S.lampGlow,water:S.water===undefined?1:S.water,anim:S.anim!==false,shadowTakt: !!S.shadowTakt,farCache: !!S.farCache,reflLite: !!S.reflLite,motion: !!S.motion,cloudShadow: !!S.cloudShadow,wxDrama: !!S.wxDrama});
