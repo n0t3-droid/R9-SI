@@ -271,7 +271,7 @@
     const B = K.BRIDGE, rem = Math.max(0.01, B.len - s), f = H * 0.95, eye = 1.6, hw = 1.25;
     const bob = walking ? Math.sin(s * 2.4) * H * 0.004 : 0, vx = W / 2, vy = H * 0.56 + bob;
     const P = (z, x, y) => [vx + x / z * f, vy + (eye - y) / z * f];
-    const L = pal[0], Lm = pal[1];
+    const L = [Math.round(pal[0][0] * 0.4 + 150 * 0.6), Math.round(pal[0][1] * 0.4 + 225 * 0.6), Math.round(pal[0][2] * 0.4 + 255 * 0.6)], Lm = pal[1];   // (the light's own glow: a cool shine tinted by the destination)
     X.save();
     X.globalCompositeOperation = 'lighter';
     // the tiles, far to near (1.6 m long, 0.25 m apart, sliding toward you as you walk)
@@ -279,14 +279,16 @@
     for (let z = zMax - ((zMax + ph) % tl); z > 0.55; z -= tl) {
       const z0 = Math.max(0.55, z - 1.6), a = clamp(1.2 - z / 70, 0.12, 0.9);
       const p0 = P(z, -hw, 0), p1 = P(z, hw, 0), p2 = P(z0, hw, 0), p3 = P(z0, -hw, 0);
-      X.fillStyle = rgba(L, a * 0.42); X.beginPath(); X.moveTo(p0[0], p0[1]); X.lineTo(p1[0], p1[1]); X.lineTo(p2[0], p2[1]); X.lineTo(p3[0], p3[1]); X.fill();
+      const tg = X.createLinearGradient(p3[0], p3[1], p0[0], p0[1]); tg.addColorStop(0, rgba(L, a * 0.75)); tg.addColorStop(1, rgba(L, a * 0.3));
+      X.fillStyle = tg; X.beginPath(); X.moveTo(p0[0], p0[1]); X.lineTo(p1[0], p1[1]); X.lineTo(p2[0], p2[1]); X.lineTo(p3[0], p3[1]); X.fill();
+      X.strokeStyle = rgba([255, 250, 235], a * 0.8); X.lineWidth = 1; X.beginPath(); X.moveTo(p3[0], p3[1]); X.lineTo(p2[0], p2[1]); X.stroke();
     }
     // the rails
     for (const sd of [-1, 1]) { const a = P(zMax, sd * hw * 1.05, 0.05), b = P(0.6, sd * hw * 1.05, 0.05); const gr = X.createLinearGradient(a[0], a[1], b[0], b[1]); gr.addColorStop(0, rgba(Lm, 0.15)); gr.addColorStop(1, rgba(L, 0.95)); X.strokeStyle = gr; X.lineWidth = Math.max(1.5, H * 0.006); X.beginPath(); X.moveTo(a[0], a[1]); X.lineTo(b[0], b[1]); X.stroke(); }
     // the sparks rising beside the path
     for (const q of sparks) {
       const z = 1 + ((q[0] * 60 - s) % 60 + 60) % 60; if (z > zMax) continue;
-      const side = q[1] < 0.5 ? -1 : 1, y = ((q[2] + s * 0.01) % 1) * 2.4, p = P(z, side * hw * (1.2 + q[2] * 0.6), y), rr = Math.max(0.8, 0.05 / z * f);
+      const side = q[1] < 0.5 ? -1 : 1, y = ((q[2] + s * 0.01) % 1) * 2.4, p = P(z, side * hw * (1.2 + q[2] * 0.6), y), rr = Math.min(H * 0.006, Math.max(0.8, 0.05 / z * f));
       X.fillStyle = rgba(L, clamp(0.9 - z / 60, 0.1, 0.9)); X.beginPath(); X.arc(p[0], p[1], rr, 0, Math.PI * 2); X.fill();
     }
     // the gate at the path's end: a ring of the destination's light, its glow filling the view as you come near
