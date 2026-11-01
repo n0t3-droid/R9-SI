@@ -3068,6 +3068,7 @@ uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment,
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
 ${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
+${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -3101,6 +3102,9 @@ void main() {
     vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
     c = r / (1.0 - r);
   } else c = texture(u_scene, uv).rgb;
+#ifdef LOOKV
+  c = lvHdr(c, uv);   // v-look: the far softening, the light wrap, the sun's haze (look.js)
+#endif
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
 #ifdef L2VOL
@@ -3133,6 +3137,9 @@ void main() {
   c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
 #ifdef GRADE2
   c = l2Grade(c, v_uv);   // t-light2: the grade by the hour (display space: the curve, the split toning, the vignette)
+#endif
+#ifdef LOOKV
+  c = lvPal(c);   // v-look: the film's greens (look.js)
 #endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
