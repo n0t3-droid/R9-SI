@@ -358,7 +358,7 @@
     let near = false; if (D && D.ms) for (const m of D.ms) if (m.pos && Math.hypot(m.pos[0] - J.at.x, m.pos[2] - J.at.z) < 30) near = true;
     const evs = K.step(st, wallDt(J, dt, 1), { slow: gy === null || near });
     J.at = K.rideAt(st.path, st.s, J.at);
-    if ((J.yT -= dt) <= 0) { J.yT = 0.2; const y = groundAt(g, J.at.x, J.at.z, J.y + 4); if (y !== null) J.ty = y; }
+    if ((J.yT -= dt) <= 0) { J.yT = 0.2; const y = groundAt(g, J.at.x, J.at.z, J.y - 2); if (y !== null) J.ty = y; }   // (from just under the cart: never up onto a tree's crown)
     J.y += clamp(J.ty - J.y, -4 * dt, 4 * dt);
     const fx = -Math.sin(J.at.yaw), fz = -Math.cos(J.at.yaw), bobY = Math.sin(st.t * 2.1) * 0.05;
     if (p && st.ph !== 'done') { p.pos[0] = J.at.x - fx * 0.55; p.pos[1] = J.y + 0.75 + bobY; p.pos[2] = J.at.z - fz * 0.55; p.vel[0] = p.vel[1] = p.vel[2] = 0; p.fallStart = null; p.onGround = true; }
