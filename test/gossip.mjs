@@ -100,12 +100,15 @@ if (tgt) {
     window.__gsWho = a; return a.name;
   });
   let greet = null;
-  for (let i = 0; i < 8 && !greet; i++) { await step(10, 33); greet = await ev(() => VR.Gossip.test.log().find(l => l.what === 'greet' || l.what === 'ref') || null); }
+  // (people walk on at 2 m/s: stay beside one who has no bubble right now — as a player walks up to someone)
+const follow = () => ev(() => { const g = VR.game, a = window.__gsWho; if (!a || a.bubble || Math.hypot(a.pos[0] - g.player.pos[0], a.pos[2] - g.player.pos[2]) > 4) { const b = g.villages.agents.find(x => !x.kid && x.pose !== 'sleep' && !x.bubble && x.vil === (a && a.vil)); if (b) window.__gsWho = b; } const q = window.__gsWho; if (!q) return; g.player.teleport(q.pos[0] + 1.6, q.pos[1] + 0.2, q.pos[2] + 1.6); });
+for (let i = 0; i < 16 && !greet; i++) { await follow(); await step(10, 33); greet = await ev(() => VR.Gossip.test.log().find(l => l.what === 'greet' || l.what === 'ref') || null); }
+run.gsState = await ev(() => VR.Gossip.test.state()); console.log('  gossip state ' + JSON.stringify(run.gsState));
   if (greet) { await ev(() => { const a = window.__gsWho, p = VR.game.player, gl = VR.Gossip.log; const L = gl.find(l => l.what === 'greet' || l.what === 'ref'); let b = null; for (const q of VR.game.villages.agents) if (q.p.id === L.who) b = q; if (b) { const e = [p.pos[0], p.pos[1] + 1.6, p.pos[2]]; p.yaw = Math.atan2(-(b.pos[0] - e[0]), -(b.pos[2] - e[2])); p.viewYaw = p.yaw; if (b.bubble) b.bubble.t = 4; } void a; }); await shotDom('greet', 'gossip_greet.png'); }
   run.greet = greet;
   check(!!greet && /Leuchtfeuer|Mila/.test(greet.text), `a stranger (${who}) greets you by it: „${greet && greet.text}“`);
   // longer there: no repeat by the same person
-  for (let i = 0; i < 6; i++) { await ev(() => VR.Gossip.test.cool()); await step(20, 33); }
+  for (let i = 0; i < 6; i++) { await ev(() => VR.Gossip.test.cool()); await follow(); await step(20, 33); }
   const L2 = await ev(() => VR.Gossip.test.log());
   run.log2 = L2.map(l => [l.what, l.who, l.text]);
   const byWho = {}; for (const l of L2) if (l.what === 'greet') byWho[l.who] = (byWho[l.who] || 0) + 1;
@@ -137,7 +140,7 @@ await ev(() => { VR.game.env.setTime(14200); });
 await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; });
 for (let i = 0; i < 16; i++) await step(20, 33);
 const cn = await census();
-run.city.night = cn;
+run.city.night = cn; run.nightLog = await ev(() => VR.Gossip.test.log().map(l => [l.what, l.text])); console.log('  night lines ' + JSON.stringify(run.nightLog.slice(-4)));
 check(cn && cn.near >= 1 && /stroll/.test(cn.acts), `Palmenhafen by night: ${cn && cn.near} out within 45 m (${cn && cn.acts})`);
 await stand([PZ[0] + 4, PZ[1] + 3.2, PZ[2] - 1], [PZ[0] - 3, PZ[1] + 0.8, PZ[2] - 30]);
 await step(6, 33);

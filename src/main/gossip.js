@@ -176,11 +176,12 @@
 
   // ---------------------------------------------------------------- the 2-Hz look at the people
   G.tick = function (V, dt) {
-    const g = V.g; if (!G.on(g) || !g.player || !g.env) return;
+    const g = V.g; if (!G.on(g) || !g.player || !g.env) { G.why = 'off'; return; }
     G.acc = (G.acc || 0) + dt; if (G.acc < 0.5) return; G.acc = 0;
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     const rec = G.rec(g), t = now(g), tod = g.env.timeOfDay, day = g.env.day || 0, p = g.player.pos;
     G.t = (G.t || 0) + 0.5;
+    G.why = V.talking ? 'talk' : g.ui && g.ui.blocking ? 'ui:' + g.ui.screen : 'look';
     if (!V.talking && !(g.ui && g.ui.blocking)) {
       // a festival you are at
       const fv = V.festivalNear ? V.festivalNear() : null;
@@ -189,7 +190,7 @@
       for (const vil of V.known.values()) {
         if (!vil.active || !vil.agents.length) continue;
         const dv = Math.hypot(p[0] - vil.plan.x, p[2] - vil.plan.z); if (dv > 170) continue;
-        if (quiet) break;
+        if (quiet) { G.why = 'quiet'; break; }
         if (G.lookVillage(V, vil, rec, t, tod, day)) { G.lastSay = G.t; break; }
       }
       G.dinner(V, rec, tod, day);
@@ -200,7 +201,7 @@
   // one village: at most one moment (a greeting, the neighbours' talk, the children, the bard, the elder)
   G.lookVillage = function (V, vil, rec, t, tod, day) {
     const g = V.g, p = g.player.pos, site = siteOf(g, vil);
-    const H = G.heard(rec, site, t); if (!H.length) return false;
+    const H = G.heard(rec, site, t); if (!H.length) { G.why = 'unheard'; return false; }
     const awake = (a) => a.pose !== 'sleep' && !a.bubble && a !== V.talking && !(a.act && a.act.type === 'arrive');
     const d2 = (a) => (a.pos[0] - p[0]) ** 2 + (a.pos[2] - p[2]) ** 2;
     // the bard: a festival's musician sings a verse (once per village, day and deed)
@@ -212,6 +213,7 @@
     // the greeting: someone near you who heard of a deed and hasn't greeted you by it
     let best = null, bd = 7 * 7;
     for (const a of vil.agents) { if (!awake(a) || a.kid) continue; const q = d2(a); if (q < bd) { bd = q; best = a; } }
+    G.why = best ? 'greeted' : 'nobody';
     if (best) {
       const pid = pidOf(g, best), d = G.greetFor(rec, pid, site, t);
       if (d) {
@@ -367,5 +369,6 @@
     log: () => G.log.slice(),
     friend: (pid, pts) => G.befriend(G.rec(VR.game), pid, pts, null),
     cool: () => { G.lastSay = -1e9; },
+    state: () => { const g = VR.game; return { on: G.on(g), why: G.why || '', screen: g.ui && g.ui.screen, blocking: !!(g.ui && g.ui.blocking), ticks: G.cost.ticks, said: G.cost.said }; },
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
