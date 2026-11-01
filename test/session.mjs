@@ -140,7 +140,9 @@ function pageHelpers(win, VRx) {
   S.groundY = function (x, z, y0, sky) {
     const g = VR.game, w = g.world, T = VR.R.T, F = VR.F, X = Math.floor(x), Z = Math.floor(z);
     const solid = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
+    const soft = (b) => !!(b && (T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))));   // a-adventure (R56-11): never a stand on a crown, never one in water
     for (let y = Math.floor(y0) + 8; y > y0 - 24; y--) if (solid(w.getBlock(X, y, Z)) && !solid(w.getBlock(X, y + 1, Z)) && !solid(w.getBlock(X, y + 2, Z))) {
+      if (soft(w.getBlock(X, y, Z)) || soft(w.getBlock(X, y + 1, Z)) || soft(w.getBlock(X, y + 2, Z))) continue;
       if (sky) { let open = true; for (let k = 3; k < 16 && open; k++) if (solid(w.getBlock(X, y + k, Z))) open = false; if (!open) continue; }
       return y + 1;
     }
@@ -166,6 +168,26 @@ function pageHelpers(win, VRx) {
       for (let t = 0.25; t <= 1.5; t += 0.25) if (S.solidAt(c.x + dx * t, c.y + dy * t, c.z + dz * t)) { hit++; break; }
     }
     return hit / n;
+  };
+  // a-adventure (R56-11): the eye inside leaves or water, or the view within 1.5 m mostly blocked → back out to the last
+  // clear stand (where the eye was free and ≤ 15 % of the view near) with its heading; checked 5 times a second
+  S.eyeSoft = function () {
+    const g = VR.game, c = g.cam, T = VR.R.T, F = VR.F; if (!c || !g.world || !T || !T.flags) return false;
+    const b = g.world.getBlock(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
+    return !!(b && (T.flags[b] & ((F.LEAVES || 0) | (F.FLUID || 0))));
+  };
+  S.guard = function (dt) {
+    const g = VR.game, p = g.player; if (!p || !g.cam || (g.wow && g.wow.active) || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g)) || (VR.Liberate && (VR.Liberate.mcam || VR.Liberate.puz))) return;
+    const G = S.gd || (S.gd = { t: 0, bad: 0, clear: null, n: 0 });
+    G.t -= dt; if (G.t > 0) return; G.t = 0.2;
+    const soft = S.eyeSoft(), occ = soft ? 1 : S.occ();
+    if (!soft && occ <= 0.15 && p.onGround !== false) { G.clear = [p.pos[0], p.pos[1], p.pos[2], p.yaw, p.pitch]; G.bad = 0; return; }
+    if (soft || occ > 0.5) G.bad += 0.2; else G.bad = Math.max(0, G.bad - 0.1);
+    if (G.bad >= 0.6 && G.clear) {
+      const q = G.clear; p.pos[0] = q[0]; p.pos[1] = q[1]; p.pos[2] = q[2]; p.yaw = q[3] + Math.PI * 0.5 * ((G.n & 1) ? 1 : -1) * 0.5; p.pitch = Math.max(-0.2, Math.min(0.1, q[4])); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
+      if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; }
+      G.bad = 0; G.n++; S.stat.backouts = (S.stat.backouts | 0) + 1; S.log.push(['backout', soft ? 'soft' : 'occ ' + occ.toFixed(2), Math.round(q[0]), Math.round(q[2])]);
+    }
   };
   S.set = function (mode) {
     S.mode = mode || { kind: 'idle' }; S.done = false; S.t = 0;
@@ -363,6 +385,7 @@ function pageHelpers(win, VRx) {
     const strays = En.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === site.id && !m.foe.wave && !m.foe.helper);
     const active = strays.filter(m => !OFF[m.foe.st]);
     A.sites = strays.length;
+    if (S.t - (A.trT || -9) >= 1) { A.trT = S.t; const P0 = p.pos, tg = A.tg, ui = g.ui; (A.trace || (A.trace = [])).push([Math.round(S.t), A.ph, P0.map(v => Math.round(v)).join(','), strays.length + '/' + active.length, L.state(site) + ':' + site.res + '/' + site.strays, tg ? tg.foe.k + ':' + tg.foe.st + ':' + Math.round(tg.foe.hp) + ':d' + Math.hypot(tg.pos[0] - P0[0], tg.pos[2] - P0[2]).toFixed(1) + ':dy' + (tg.pos[1] - P0[1]).toFixed(1) : '-', 'hp' + (p.hp | 0) + (p.dead ? 'D' : '') + (Fo.fainting ? 'F' : '') + (ui && ui.blocking ? 'B' : '') + (p.target ? ':bt' + p.target.dist.toFixed(1) : ''), A.hits + 'h' + (A.hitAsk | 0)]); if (A.trace.length > 160) A.trace.shift(); }   // (a-adventure: the diagnostic trace)
     // ready: to the beacon, [V] — the Lichtleiter
     if (L.state(site) === 'bereit' || (site.strays !== null && site.strays !== undefined && !active.length && strays.length)) {
       A.ph = 'beacon';
@@ -408,6 +431,7 @@ function pageHelpers(win, VRx) {
     const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
     S.t += dt;
     if (p.hold) { release(I); return; }
+    if (M.kind !== 'idle' && M.kind !== 'bauhand' && M.kind !== 'showcase') S.guard(dt);   // a-adventure (R56-11)
     if (M.kind === 'look') { release(I); p.yaw += (M.speed || 0.3) * dt; p.pitch += ((M.pitch || 0) - p.pitch) * Math.min(1, dt * 2); if (S.t >= (M.sec || 1)) S.done = true; return; }
     if (M.kind === 'walk') { walk(g, p, I, dt); return; }
     if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
@@ -457,7 +481,7 @@ function pageHelpers(win, VRx) {
     return { miss, dirty };
   };
   S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
-  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx } : null }; };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, trace: S.ad.trace || [] } : null }; };
   return S;
 }
 
@@ -732,6 +756,7 @@ async function session(type, setup, script) {
       if (r.last.state) P.why = 'the game left play: ' + r.last.state;
     } catch (e) { P.failed = String(e && e.message || e).slice(0, 300); P.t1 = +tNow.toFixed(2); tNow = (await ev(() => VR.game.time).catch(() => t0 + tNow)) - t0; }
     rec.parts.push(P);
+    if (P.status && P.status.ad && P.status.ad.trace) { console.log(`  trace ${part.name}: ` + P.status.ad.trace.map(q => q.join(' ')).join(' | ')); delete P.status.ad.trace; }
     console.log(`  · ${part.name} ${P.t0}–${P.t1} s${P.failed ? ' FAILED ' + P.failed : ''} ${JSON.stringify(P.status && { stat: P.status.stat, route: P.status.route, B: P.status.B && { phase: P.status.B.phase, ding: P.status.B.ding, tries: P.status.B.tries, whys: P.status.B.whys.slice(-4), site: !!P.status.B.site } })} (${secs()})`);
   }
   if (tNow < DUR - 0.25 && !overBudget) {
