@@ -441,6 +441,7 @@ require(path.join(__dirname, '../test/story7_part.js'))(S, SP, tr, calm, check, 
 require(path.join(__dirname, '../test/story8_part.js'))(S, SP, tr, calm, check, rnd);   // a-story6
 require(path.join(__dirname, '../test/story8_part.js')).arrow(S, SP, check);   // a-story6
 require(path.join(__dirname, '../test/story9_part.js'))(S, SP, tr, calm, check, rnd);   // a-story7 (Arc 2)
+require(path.join(__dirname, '../test/story10_part.js'))(S, SP, tr, calm, check, rnd);   // a-story8 (Arc 2's beauty)
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

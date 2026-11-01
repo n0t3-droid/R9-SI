@@ -330,4 +330,36 @@
     gr.box(4, 0, 4, 4, 4, 4, 0x8a9a6a);
     gr.ell(4.5, 8, 4.5, 3.6, 3.6, 3.6, (x, y, z, d) => (d < 0.25 ? 0xfff0a0 : d > 0.7 && hs(x, y, z, 2) < 0.55 ? 0xf4f8ff : null), { emis: 1 });
   }) }, layout: { body: [0, 0, 0] } });
+  // a-story8 · fy_wiege — Wiegelind resting (our own design): a small pearl moon asleep in a crescent cradle of light —
+  // soft craters, closed eyes, rosy cheeks, a little smile on her front (−z); the cradle glows gold at its tips and lilac
+  // in its middle, a few light-seeds over her. 1 voxel = 1/10 m: the moon 1.3 m across, 1.9 m tall with the cradle.
+  M.fy_wiege = () => ({ unit: 10, radius: 1.2, parts: { body: part(21, 19, 21, [10.5, 0, 10.5], (gr) => {
+    const c = 10.5, cy = 9.6, R = 6.4;
+    // the cradle: a crescent in the x–y plane (a slim boat of light, 5 voxels deep) round her lower half
+    for (let y = 0; y < 12; y++) for (let z = 0; z < 21; z++) for (let x = 0; x < 21; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - cy, dz = z + 0.5 - c, d = Math.hypot(dx, dy);
+      if (Math.abs(dz) > 2.6 - Math.max(0, -dy - 5) * 0.4 || d < R + 0.6 || d > R + 2.4 - Math.abs(dx) * 0.08 || dy > 1.5 - Math.abs(dx) * 0.05) continue;
+      const tip = Math.min(1, Math.max(0, (dy + 3) / 4.5));
+      gr.set(x, y, z, hs(x, y, z, 21) < 0.12 ? 0xfff6d8 : mix(0xb89aff, 0xffd98a, tip), 1);
+    }
+    // the moon: pearl, a lilac breath at her rim, soft craters (not on her face)
+    gr.ell(c, cy, c, R, R, R, (x, y, z, d) => {
+      const fx = x + 0.5 - c, fy = y + 0.5 - cy, fz = z + 0.5 - c, face = fz < -2 && Math.abs(fx) < 4.6 && fy > -3.6 && fy < 2.8;
+      const cr = !face && hs(x >> 1, y >> 1, z >> 1, 33) < 0.16;
+      return mix(cr ? 0xe2d8d2 : 0xfbf6ee, 0xd6c8ee, Math.max(0, d - 0.55) * 1.4);
+    }, { emis: 1 });
+    // her face on the front: the frontmost voxel of each column
+    const front = (x, y) => { for (let z = 0; z < 21; z++) if (gr.get(x, y, z)) return z; return -1; };
+    const paint = (x, y, col) => { const z = front(x, y); if (z >= 0) gr.set(x, y, z, col, 1); };
+    const ey = Math.floor(cy + 1);
+    for (const sx of [-1, 1]) {
+      const ex = Math.floor(c + sx * 2.6);
+      paint(ex - 1, ey, 0x6a5a8c); paint(ex, ey - 1, 0x6a5a8c); paint(ex + 1, ey - 1, 0x6a5a8c); paint(ex + 2, ey, 0x6a5a8c);   // a closed, sleeping eye
+      for (let k = 0; k < 2; k++) { paint(Math.floor(c + sx * 3.6) + k - (sx < 0 ? 1 : 0), ey - 3, 0xf6a8be); paint(Math.floor(c + sx * 3.6) + k - (sx < 0 ? 1 : 0), ey - 4, 0xf2b4c6); }   // rosy cheeks
+    }
+    const my = Math.floor(cy - 2.4);
+    paint(Math.floor(c) - 1, my, 0xb07a96); paint(Math.floor(c), my - 1, 0xb07a96); paint(Math.floor(c) + 1, my, 0xb07a96);   // a small smile
+    // the light-seeds over her
+    for (const [x, y, z] of [[4, 17, 9], [15, 18, 11], [8, 18, 13], [17, 15, 7], [3, 14, 12]]) gr.set(x, y, z, 0xfff0b0, 1);
+  }) }, layout: { body: [0, 0, 0] } });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
