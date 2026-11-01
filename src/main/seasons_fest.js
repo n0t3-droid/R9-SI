@@ -128,8 +128,8 @@
       for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; for (let r = 1; r < 9; r++) { const y = 19 + Math.round(Math.sin(r / 9 * Math.PI) * 4) - (r > 6 ? r - 6 : 0); gr.set(Math.round(9 + Math.cos(a) * r), y, Math.round(9 + Math.sin(a) * r), r > 6 ? 0xf4fbff : 0x8ad0ff, r < 3 ? 1 : 0); gr.set(Math.round(9 + Math.cos(a + 0.18) * r * 0.8), y, Math.round(9 + Math.sin(a + 0.18) * r * 0.8), 0xd8f0ff); } }
       gr.ell(9, 20, 9, 1.6, 1.6, 1.6, 0xf4fbff, { emis: 1 });
     }));
-    // o-wander2 · a kite's tether (1/16 m: 8 m of string, pivot at the hand; drawn scaled and tilted to the kite)
-    M.ss_tether = () => one(16, 4.5, part(1, 128, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 128; y++) gr.set(0, y, 0, y % 16 < 2 ? 0xf4f0e6 : 0xd8d0c0); }));
+    // o-wander2 · a kite's tether (1/32 m: 8 m of string, pivot at the hand; drawn scaled and tilted to the kite)
+    M.ss_tether = () => one(32, 4.5, part(1, 256, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 256; y++) gr.set(0, y, 0, y % 32 < 3 ? 0xf4f0e6 : 0xd8d0c0); }));
   }
   SF.KC = 4;
   // o-wander2: each people's look — the prop, the colours of the air, the dance (SF.LOOK[id].dance: festPose below)
