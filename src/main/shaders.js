@@ -1172,8 +1172,10 @@ void main() {
 #endif
     mean = mix(mean, mean * tint, alb.a);
     alb.rgb = mix(alb.rgb, mean, u_lvMeadow.x * alb.a);
-    vec3 gp = v_localPos + vec3(u_camInt);
-    float mn = vnoise3(gp * u_lvMeadow.y) * 0.6 + vnoise3(gp * u_lvMeadow.y * 0.33 + 9.0) * 0.4;
+    // (run 1: two vnoise3 — 16 hashes a grass pixel — cost High ~7 ms on SwiftShader; the noise texture's smooth tileable
+    // value noise instead, two taps at scales 173 m and 411 m to the tile — the pattern repeats nowhere one sees)
+    vec2 gq = v_localPos.xz + vec2(u_camInt.xz);
+    float mn = texture(u_noise, gq * u_lvMeadow.y).r * 0.6 + texture(u_noise, gq * u_lvMeadow.y * 0.42 + vec2(0.37, 0.61)).g * 0.4;
     alb.rgb *= mix(vec3(1.0), mix(vec3(0.88, 0.95, 1.0), vec3(1.1, 1.05, 0.86), smoothstep(0.25, 0.75, mn)), u_lvMeadow.z * alb.a);
   }
 #endif

@@ -126,7 +126,7 @@
       night: { S: [0.86, 0.9, 1.2, 0.4], H: [1.1, 0.96, 0.82, 0.2], lift: [0.014, 0.012, 0.016], sky: [0.04, 0.035, 0.05], de: 0.25, keep: 1, glow: 0.6 } },
     zinn: { air: 0, veil: null, soft: 1,
       day: { S: [1.04, 0.92, 1.04, 0.22], H: [1.1, 1.02, 0.8, 0.22], lift: [0.012, 0.008, 0.01], sky: [0, 0, 0], de: 0, keep: 1, glow: 0.3 },
-      night: { S: [1.3, 0.78, 1.0, 0.55], H: [1.24, 0.9, 0.7, 0.35], lift: [0.03, 0.01, 0.02], sky: [0.06, 0.022, 0.04], de: 0.1, keep: 0.8, glow: 0.7 } },
+      night: { S: [1.3, 0.78, 1.0, 0.55], H: [1.24, 0.9, 0.7, 0.35], lift: [0.05, 0.018, 0.034], sky: [0.07, 0.026, 0.05], de: 0.1, keep: 0.8, glow: 0.7 } },   // (run 1: the land too black — lifted)
     opal: { air: 0, veil: null, soft: 1,
       day: { S: [0.94, 0.97, 1.1, 0.3], H: [1.03, 1.0, 1.02, 0.25], lift: [0.06, 0.06, 0.07], sky: [0, 0, 0], de: 0.2, keep: 1, glow: 0.3 },
       night: { S: [0.9, 0.95, 1.2, 0.4], H: [1.0, 1.0, 1.04, 0.25], lift: [0.04, 0.042, 0.055], sky: [0, 0, 0], de: 0.25, keep: 1, glow: 0.5 } },
@@ -168,9 +168,9 @@
     o.tone[0] = W ? mx(A.glow, B.glow) : 0; o.tone[3] = W ? 1 : 0;
     return o;
   };
-  // the meadow's values (terrain, LV_MEADOW): the texel noise's calm, the patches' scale (1/m: ~35 m and ~100 m), their
+  // the meadow's values (terrain, LV_MEADOW): the texel noise's calm, the patches' scale (the noise texture's tiles a metre), their
   // strength
-  L.MEADOW = { calm: 0.45, scale: 0.03, k: 1.0 };
+  L.MEADOW = { calm: 0.45, scale: 1 / 173, k: 1.0 };   // (scale: the noise texture's tile per metre — its cells some 20–50 m)
   // the world of this frame: Herzwelt by dimId 0; a body or a station by the game's dim (u_dim code 5); else none
   L.worldOf = function (E, dim) {
     if (!E) return null;
@@ -179,7 +179,13 @@
     const w = L.world(dim); return w === 'home' ? null : w;
   };
   // the tone on a display colour c (sky 1 for a sky pixel) — the GLSL's lvTone
-  L.warmW = function (c) { return c[0] > c[2] ? sstep(0.12, 0.4, (c[0] - c[2]) / Math.max(c[0], 1e-3)) * sstep(0.15, 0.5, c[0]) : 0; };
+  // (run 1: the plaza's cyan neon lost its colour at night — every bright saturated light is spared too, the warm ones
+  // from a lower brightness: lamp-lit ground keeps its warm pool)
+  L.warmW = function (c) {
+    const mx = Math.max(c[0], c[1], c[2]), ch = mx - Math.min(c[0], c[1], c[2]);
+    const w = c[0] > c[2] ? sstep(0.12, 0.4, (c[0] - c[2]) / Math.max(c[0], 1e-3)) * sstep(0.15, 0.5, c[0]) : 0;
+    return Math.max(w, sstep(0.3, 0.6, ch / Math.max(mx, 1e-3)) * sstep(0.55, 0.85, mx));
+  };
   L.tone = function (c, f, sky) {
     const l = lum(c), k = 1 - L.warmW(c) * f.lift[3];
     const de = f.skyF[3] * k, t = sstep(0.04, 0.55, l);
@@ -298,6 +304,8 @@ vec3 lvTone(vec3 c) {
   if (u_lvToneS.w + u_lvToneH.w + u_lvSkyF.w + u_lvLift.x + u_lvLift.y + u_lvLift.z + u_lvSkyF.x + u_lvSkyF.y + u_lvSkyF.z <= 0.0) return c;
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   float wm = c.r > c.b ? smoothstep(0.12, 0.4, (c.r - c.b) / max(c.r, 1e-3)) * smoothstep(0.15, 0.5, c.r) : 0.0;
+  float lmx = max(c.r, max(c.g, c.b));
+  wm = max(wm, smoothstep(0.3, 0.6, (lmx - min(c.r, min(c.g, c.b))) / max(lmx, 1e-3)) * smoothstep(0.55, 0.85, lmx));
   float k = 1.0 - wm * u_lvLift.w, t = smoothstep(0.04, 0.55, l);
   vec3 v = mix(c, vec3(l), u_lvSkyF.w * k);
   v = mix(v, v * mix(u_lvToneS.rgb, u_lvToneH.rgb, t), mix(u_lvToneS.w, u_lvToneH.w, t) * k);

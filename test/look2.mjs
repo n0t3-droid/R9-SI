@@ -97,6 +97,15 @@ const travel = async (dim) => {
 };
 // a time on this world: the sun at about el (sin) up, or the night (night: true)
 const pickTime = (o) => ev(async (o) => { const g = VR.game; let best = null, bs = 1e9; for (let t = 0; t < 24000; t += 1000) { g.env.setTime(t); g.last = performance.now() - 33; window.__step(performance.now()); const E = g.env.E; const sc = o.night ? -(E.night || 0) * 10 + Math.max(0, E.sunDir[1]) : Math.abs(E.sunDir[1] - o.el) + (E.night > 0.3 ? 5 : 0); if (sc < bs) { bs = sc; best = t; } } return best; }, o);
+// natural ground: a grass (or leaves, dirt, stone, snow) top
+const meadowAt = (S0, o) => ev(([S0, o]) => { const g = VR.game, w = g.world, R = VR.R; const nm = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z); return { y, n: s ? R.types[R.T.type[s]].name : '' }; };
+  let best = null, bd = 1e9;
+  for (let gx = -128; gx <= 128; gx += 8) for (let gz = -128; gz <= 128; gz += 8) { const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz), d = Math.hypot(gx, gz); if (d < 16 || d > bd || !w.isLoaded(x, z)) continue;
+    const c = nm(x, z); if (!/grass/.test(c.n)) continue; let ok = true;
+    for (let dx = -3; dx <= 3 && ok; dx++) for (let dz = -3; dz <= 3 && ok; dz++) { const q = nm(x + dx, z + dz); if (!/grass/.test(q.n) || Math.abs(q.y - c.y) > 2) ok = false; }
+    if (ok) { bd = d; best = [x + 0.5, z + 0.5]; } }
+  return best; }, [S0, o || {}]);
+const natural = (x, z) => ev(([x, z]) => { const g = VR.game, w = g.world, R = VR.R, y = w.topAt(Math.floor(x), Math.floor(z)), s = w.getBlock(Math.floor(x), y, Math.floor(z)); const n = s ? R.types[R.T.type[s]].name : ''; return /grass|leaves|dirt|stone|snow|sand|moss|podzol|log/.test(n) && !/brick|slab|stairs|polished|smooth|tile|vx_/.test(n); }, [x, z]);
 const sunNow = () => ev(() => VR.game.env.E.sunDir.slice());
 
 try {
@@ -120,8 +129,12 @@ try {
   // ---------------------------------------------------------------- a meadow at night
   if (want('meadow')) {
     await ev((t) => VR.game.env.setTime(t), NIGHT); await run(2);
-    const m = await ev(() => VR.game.env.E.moonDir.slice()), a = Math.atan2(m[2], m[0]) + 0.6, y = (await top(S0[0], S0[2])) + 1 + 2.2;
-    const P = [S0[0], y, S0[2]], T = [S0[0] + Math.cos(a) * 60, y - 4, S0[2] + Math.sin(a) * 60];
+    // (run 1: the spawn stands on a city roof — the nearest open grass instead: 7 × 7 grass tops within 2 m of height)
+    const G = await meadowAt(S0);
+    console.log('     meadow ' + JSON.stringify(G));
+    const C = G || [S0[0], S0[2]];
+    const m = await ev(() => VR.game.env.E.moonDir.slice()), a = Math.atan2(m[2], m[0]) + 0.6, y = (await top(C[0], C[1])) + 1 + 1.9;
+    const P = [C[0], y, C[1]], T = [C[0] + Math.cos(a) * 60, y - 5, C[1] + Math.sin(a) * 60];
     await camAt(P, T, NIGHT); await settle(40);
     N.cams.meadow = { P, T }; await shots('meadow', NIGHT);
   }
@@ -131,25 +144,31 @@ try {
     const sun = await sunNow(), a = Math.atan2(sun[2], sun[0]);
     // the highest ground 40 … 140 m toward the sun (a little left and right too), the eye 40 m before it and lower
     let R = null;
-    for (const da of [0, 0.25, -0.25, 0.5, -0.5]) for (let d = 40; d <= 140; d += 10) { const x = S0[0] + Math.cos(a + da) * d, z = S0[2] + Math.sin(a + da) * d, h = await top(x, z); if (!R || h > R.h) R = { x, z, h, d, da }; }
-    const ex = R.x - Math.cos(a + R.da) * 42, ez = R.z - Math.sin(a + R.da) * 42, eh = await top(ex, ez);
-    const P = [ex, Math.max(eh + 1 + 1.8, R.h - 6), ez], T = [R.x, R.h + 4, R.z];
+    // (run 1: the highest 'ridge' was the city's tower — natural tops only, from a meadow away from the city)
+    const G = (await meadowAt(S0)) || [S0[0], S0[2]];
+    for (const da of [0, 0.3, -0.3, 0.6, -0.6, 0.9, -0.9]) for (let d = 30; d <= 130; d += 10) { const x = G[0] + Math.cos(a + da) * d, z = G[1] + Math.sin(a + da) * d, h = await top(x, z); if ((!R || h > R.h) && await natural(x, z)) R = { x, z, h, d, da }; }
+    if (!R) R = { x: G[0] + Math.cos(a) * 60, z: G[1] + Math.sin(a) * 60, h: (await top(G[0], G[1])) + 10, d: 60, da: 0 };
+    const ex = R.x - Math.cos(a + R.da) * Math.min(45, R.d), ez = R.z - Math.sin(a + R.da) * Math.min(45, R.d), eh = await top(ex, ez);
+    const P = [ex, eh + 1 + 1.7, ez], T = [R.x, Math.max(R.h + 3, eh + 6), R.z];
     console.log('     ridge ' + JSON.stringify({ R, P }));
     await camAt(P, T, GOLD); await settle(40);
     N.cams.ridge = { P, T };
     if (want('ridge')) await shots('ridge', GOLD);
     if (want('cost')) {
-      const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
+      const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
       const passes = () => ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; });
       for (const pr of ['potato', 'high']) {
         await preset(pr); await camAt(P, T, GOLD); await settle(25);
         const r = { before: [], after: [] };
-        for (const c of ['before', 'after', 'after', 'before', 'before', 'after', 'after', 'before']) { await config(c); r[c].push(await ms(6)); }
+        // (run 1: a shared machine — single samples from 3.7 to 32 ms: ten alternations (A B B A …), 8 frames after 8
+        // warm-up frames each (the rebuilt programs compiled), min and median)
+        for (let i = 0; i < 10; i++) { const c = (i % 4 === 0 || i % 4 === 3) ? 'before' : 'after'; await config(c); await run(2); r[c].push(await ms(8)); }
         r.passes = {}; for (const c of CONFIGS) { await config(c); r.passes[c] = await passes(); }
         r.prog = await ev(() => { const P = VR.game.renderer.P; return { comp: P.composite && P.composite.key || null, n: Object.keys(P).length }; });
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2).toFixed(1); };
-        N.cost[pr] = { before: med(r.before), after: med(r.after), all: r };
-        console.log('     cost ' + pr + ' ' + JSON.stringify({ before: N.cost[pr].before, after: N.cost[pr].after, passes: { before: r.passes.before.n, after: r.passes.after.n, rdMB: [r.passes.before.rdMB, r.passes.after.rdMB] } }) + ' (' + secs() + ')'); save();
+        const mn = (a) => +Math.min(...a).toFixed(1);
+        N.cost[pr] = { before: med(r.before), after: med(r.after), minBefore: mn(r.before), minAfter: mn(r.after), all: r };
+        console.log('     cost ' + pr + ' ' + JSON.stringify({ before: N.cost[pr].before, after: N.cost[pr].after, min: [N.cost[pr].minBefore, N.cost[pr].minAfter], passes: { before: r.passes.before.n, after: r.passes.after.n, rdMB: [r.passes.before.rdMB, r.passes.after.rdMB] } }) + ' (' + secs() + ')'); save();
       }
       const P0 = N.cost.potato.all.passes; check(JSON.stringify(P0.before) === JSON.stringify(P0.after), 'Very Low: the same passes and bytes after (' + P0.after.n + ' passes)');
       check(await ev(() => { const L = VR.Look, d = L.defaults('potato'); return !d.lvTone && !d.lvMeadow; }), 'Very Low: neither new switch');
@@ -171,7 +190,9 @@ try {
     console.log('     fairy ' + JSON.stringify(s && { kind: s.kind, x: s.x, y: s.y, z: s.z }));
     if (s && s.y !== null) {
       await camAt([s.x + 0.5, s.y + 30, s.z + 0.5], [s.x + 6, s.y, s.z], NIGHT); await settle(30); await run(30);
-      const f = await director([s.x + 0.5, s.y, s.z + 0.5], 3.5, 1.7, 2.5);
+      // (run 1: pulled back 1.7× the camera stood behind a giant mushroom's cap — the farthest pull-back with a clear line)
+      let f = null;
+      for (const k of [1.6, 1.3, 1.0]) { f = await director([s.x + 0.5, s.y, s.z + 0.5], 3.5, k, 1.5); const clear = await ev(([P, T]) => { const F3 = VR.Folk3, so = F3.solidW(VR.game.world); return F3.lineFirst(so, T, P) === Infinity && F3.lineFirst(so, [T[0], T[1] - 1.2, T[2]], P) === Infinity; }, [f.P, f.T]); if (clear) { f.k = k; break; } }
       await camAt(f.P, f.T, NIGHT); await settle(20); await run(60);
       N.cams.fairy = f; await shots('fairy', NIGHT);
     } else check(false, 'a fairy place settled');

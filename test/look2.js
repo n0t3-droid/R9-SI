@@ -109,6 +109,9 @@ console.log('c · the tone');
   const st = L.frame(E('station', 0.5)), s0 = L.tone(mid, st, 0), s1 = L.tone(hi, st, 0), sl = L.tone([0.9, 0.6, 0.3], st, 0);
   check(s0[2] > s0[0] && s1[0] > s1[2] && sl[0] > sl[2] * 2.2, 'the station: teal shade, warm light, the café lamps warm', JSON.stringify([s0, s1].map(c => c.map(r3))));
   // the glow of warm lamps (High, from the soft copy): only warm and bright
+  const neon = L.tone([0.1, 0.85, 0.95], night, 0);
+  check(neon[1] > 0.75 && neon[2] > 0.85 && neon[0] < 0.2, 'night: a bright neon keeps its colour', JSON.stringify(neon.map(r3)));
+  check(['0.3, 0.6', '0.55, 0.85'].every(x => L.glslComposite().includes(x)), 'the GLSL spares bright lights with the mirror\'s constants');
   check(L.glowW([1.4, 0.8, 0.3]) > 0.5 && L.glowW([0.4, 0.5, 0.9]) === 0 && L.glowW([0.02, 0.012, 0.005]) < 0.1, 'the lamps\' soft glow: warm bright light only');
 }
 
