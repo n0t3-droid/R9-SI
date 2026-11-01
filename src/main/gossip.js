@@ -181,7 +181,7 @@
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     const rec = G.rec(g), t = now(g), tod = g.env.timeOfDay, day = g.env.day || 0, p = g.player.pos;
     G.t = (G.t || 0) + 0.5;
-    if (!V.talking && !(g.ui && g.ui.screen && g.ui.screen !== 'hud' && g.ui.screen !== 'game')) {
+    if (!V.talking && !(g.ui && g.ui.blocking)) {
       // a festival you are at
       const fv = V.festivalNear ? V.festivalNear() : null;
       if (fv) G.deed(g, 'fest', { x: fv.plan.x, z: fv.plan.z, pl: fv.name, key: fv.id + '@' + day });
