@@ -12,7 +12,8 @@
 //   · at(st) → {phase, alt (lift: m over the base), k (0…1)} · skip(st) (after 2 s: to the end; a ride: off the cart)
 //   · the caravan: pickRide(places, [x, z], seen) · ridePath(a, b, seed) · rideLen(path) · rideAt(path, s, out)
 //   · snap(st) → a small plain record (meta.journey); resume(rec, here) → {act: 'ride' | 'again' | 'arrived', st} or null
-//   · ok(ctx, kind) → null or why not ('off' · 'busy' · 'guest'); mode(ctx) → 'walk' or 'film' (Very Low: the film)
+//   · ok(ctx, kind) → null or why not ('off' · 'busy' · 'guest'); mode(ctx, kind) → 'walk' or 'film' (Very Low: the film, but
+//     the bridge) · o-seamless2: fx(ctx) · relAz(sun, yaw) · liftLook(k, p0) · greet(k) · chimes(s0, s1, tile) · seat(at, y0, t, sway)
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -161,7 +162,32 @@
     if (ctx.guest && kind !== 'ride') return 'guest';
     return null;
   };
-  K.mode = (ctx) => (ctx && (ctx.potato || ctx.off) ? 'film' : 'walk');
+  // (o-seamless2: Very Low walks the Lichtbrücke too — painted, cheap but bright; its lift stays the film)
+  K.mode = (ctx, kind) => (ctx && (ctx.off || (ctx.potato && kind !== 'bridge')) ? 'film' : 'walk');
+
+  // ---------------------------------------------------------------- o-seamless2: the sights (docs/superpowers/plans/2026-11-01-o-seamless2.md)
+  // the bridge's extras per tier: sparkles drifting up, aurora ribbons, the travellers (Flausel lights, the Sternwal)
+  K.fx = (ctx) => (ctx && ctx.potato ? { sparks: 0, ribbons: 0, travellers: false } : ctx && ctx.preset === 'low' ? { sparks: 16, ribbons: 0, travellers: false } : { sparks: 40, ribbons: 2, travellers: true });
+  // the heading carried into the space frame: the look's angle from the sun's azimuth about the up axis (voxel world:
+  // forward = (-sin yaw, -cos yaw), y up; turning the sun's horizontal direction by it about +y gives the look)
+  const wrap = (a) => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
+  K.relAz = (sun, yaw) => wrap(Math.atan2(-Math.sin(yaw), -Math.cos(yaw)) - Math.atan2(sun[0], sun[2]));
+  // the lift's look in the space phase (pitch over the horizon, rad): your pitch at the switch, easing up so the station
+  // (straight up the tether) is in view from 40 % of the phase (the fov's top at 35°), 78° at the berth
+  const sm = (t) => t * t * (3 - 2 * t);
+  K.liftLook = (k, p0) => { k = clamp(+k || 0, 0, 1); const tg = 1.03 + 0.33 * sm(clamp((k - 0.4) / 0.6, 0, 1)); return p0 + (tg - p0) * sm(clamp(k / 0.4, 0, 1)); };
+  // the ring's lights greeting you at the top: 0 until 82 % of the space phase, 1 from 97 %
+  K.greet = (k) => (k <= 0.82 ? 0 : k >= 0.97 ? 1 : sm((k - 0.82) / 0.15));
+  // footsteps chime: the tiles crossed from s0 to s1
+  K.chimes = (s0, s1, tile) => Math.max(0, Math.floor(s1 / tile) - Math.floor(s0 / tile));
+  // the caravan's seat: on the front bench, right of the driver (he sits left), eye ~2 m over the cart's floor (under the
+  // canopy's fringe at 2.36 m), a gentle sway (roll ≤ 0.032 rad; none with Weniger Bewegung). y0 = the cart's floor
+  K.SEAT = { fwd: 1.25, side: 0.62, eye: 1.98, stand: 1.62 };
+  K.seat = function (at, y0, t, sway) {
+    const S = K.SEAT, fx = -Math.sin(at.yaw), fz = -Math.cos(at.yaw), rx = Math.cos(at.yaw), rz = -Math.sin(at.yaw);
+    const roll = sway ? 0.02 * Math.sin(t * 1.3) + 0.011 * Math.sin(t * 3.1 + 1) : 0, bob = sway ? Math.sin(t * 2.1) * 0.035 : 0;
+    return { p: [at.x + fx * S.fwd + rx * S.side, y0 + S.eye - S.stand + bob, at.z + fz * S.fwd + rz * S.side], d: [at.x + fx * S.fwd - rx * S.side, y0 + 0.72 + bob, at.z + fz * S.fwd - rz * S.side], roll, eye: S.eye, bob };
+  };
   K.keys = () => ['g.jy.lift.name', 'g.jy.lift.sub', 'g.jy.lift.cabin', 'g.jy.lift.alt', 'g.jy.lift.space', 'g.jy.bridge.name', 'g.jy.bridge.walk',
     'g.jy.ride.offer', 'g.jy.ride.board', 'g.jy.ride.off', 'g.jy.ride.arrive', 'g.jy.ride.who', 'g.jy.arrive', 'g.set.journeys', 'g.set.journeys.tip'].concat(K.LINES);
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
