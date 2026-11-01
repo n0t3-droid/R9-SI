@@ -5070,15 +5070,16 @@ if(role==='barista'&&age!=='child')out.tool='tray';
 return out;
 };
 
-const lookKey=(L)=>['vil2',L.skin,L.hair,L.hs,L.age,L.role,L.shirt,L.pants,L.shoes,L.beard?1:0,L.freckles?1:0,L.eye,L.kidHat||'',L.elderHat||'',L.dress?L.dressCol:0,L.emblem|0,L.lashes?1:0,L.suit2|0,L.tool||''].join(':')+(L.helm?':helm':'')+(L.suit3?':w'+L.suit3:'')+(L.garb?':'+L.garb+':'+(L.trim|0):'')+(L.cape?':c'+L.cape:'')+(L.feat?':f'+L.feat+(L.featC|0)+(L.glow?'g':''):'');
+const lookKey=(L)=>['vil2',L.skin,L.hair,L.hs,L.age,L.role,L.shirt,L.pants,L.shoes,L.beard?1:0,L.freckles?1:0,L.eye,L.kidHat||'',L.elderHat||'',L.dress?L.dressCol:0,L.emblem|0,L.lashes?1:0,L.suit2|0,L.tool||''].join(':')+(L.helm?':helm':'')+(L.suit3?':w'+L.suit3:'')+(L.garb?':'+L.garb+':'+(L.trim|0):'')+(L.cape?':c'+L.cape:'')+(L.feat?':f'+L.feat+(L.featC|0)+(L.glow?'g':''):'')+V.varyKey(L);
 
 
 
-V.outfitKey=(L)=>[V.familyOf?V.familyOf(L):L.role,L.shirt,L.pants,L.dress?L.dressCol:0,L.garb||'',L.cape|0].join(':');
+V.outfitKey=(L)=>[V.familyOf?V.familyOf(L):L.role,L.shirt,L.pants,L.dress?L.dressCol:0,L.garb||'',L.cape|0].join(':')+V.varyKey(L);
 
 
 V.recolor=function(L,n){
 const R0=ROLES[L.role]||ROLES.farmer;
+if(L.pal!==undefined&& !L.garb&& !(L.dress&& !L.garb)){const FP=V.PALS[L.pal]&&V.PALS[L.pal][L.age==='child'?'kid':'ad'],i=FP?FP.indexOf(L.shirt): -1;if(i>=0){L.shirt=FP[(i+n)%FP.length];return L;}}
 if(L.dress&& !L.garb){const D=V.DRESS;L.dressCol=D[(D.indexOf(L.dressCol)+n+D.length)%D.length];return L;}
 const pal=L.garb?(L.garb==='cape'?WEISS.tunic:WEISS[L.garb]):L.town==='hall'&&L.age==='child'?WEISS.kid:R0.shirts;
 if(L.garb==='cape'&&(n&1)){const C=WEISS.cape;L.cape=C[(C.indexOf(L.cape)+1)%C.length];return L;}
@@ -5103,6 +5104,83 @@ V.recolor(L,n);if(n===1)changed++;
 }
 return changed;
 };
+
+
+
+
+
+
+
+
+
+V.PALS=[
+{id:'erde',ad:[0xB0603A,0xC8964A,0x7A5236,0xD8B888],kid:[0xE07A3A,0xF0B050,0xC86A4A,0xF4D8A0],sc:[0xB04A3A,0xC8964A]},
+{id:'meer',ad:[0x2F6A8A,0x4A90B8,0x24456A,0x8AC0D0],kid:[0x3AA0E0,0x5AC8D8,0x2F70C8,0xA8E0F0],sc:[0xE8E4D8,0x24456A]},
+{id:'beere',ad:[0x8A2F4A,0xC0506A,0x6A3A6A,0xE8A0B0],kid:[0xE85A7A,0xF08AB0,0xB050A0,0xF8C0D0],sc:[0xE8A0B0,0x6A3A6A]},
+{id:'wiese',ad:[0x6A8A4A,0xA8A860,0x4A5A3A,0xC8D090],kid:[0x7AC05A,0xC8D050,0x5AA070,0xE0EAA0],sc:[0xC8A030,0x4A5A3A]},
+{id:'sonne',ad:[0xD89A30,0xE8C060,0xC86A30,0xF0E0B0],kid:[0xF6C840,0xF8A040,0xF0D878,0xFFE8B0],sc:[0xC0443A,0x2F6A8A]},
+{id:'heide',ad:[0x7A6AA0,0x9A8AC0,0x5A5A80,0xC8B8D8],kid:[0xA080E0,0xC0A0F0,0x8070C8,0xE0D0F8],sc:[0xE8D070,0x5A5A80]},
+{id:'wolle',ad:[0xA8A49A,0x6A6A70,0x3A3A44,0xE0DCD0],kid:[0xD0CCC0,0x8A9AB0,0xF0A0A0,0xA0C0A0],sc:[0xC0443A,0x2F8C8A]},
+];
+const FREE={farmer:1,gardener:1,crafter:1,scholar:1,teacher:1,office:1,elder:1,smith:1};
+
+const HATS={
+farmer:[['straw',3],['sun',2],['flat',2],['cap',1],[null,3]],
+gardener:[['sun',3],['straw',2],[null,2],['cap',1]],
+crafter:[[null,4],['cap',2],['flat',2]],smith:[[null,4],['cap',1]],
+scholar:[[null,5],['flat',1]],teacher:[[null,5],['flat',1]],office:[[null,5],['cap',1]],elder:[[null,3],['flat',2],['sun',1]],
+};
+const ACCS={
+farmer:[['overalls',4],[null,3],['belt',2],['apron',1],['leather',1]],
+gardener:[['apron2',4],[null,2],['overalls',1]],crafter:[['belt',3],['leather',2],[null,2],['apron',1]],
+};
+const wpick=(list,h)=>{let tot=0;for(const q of list)tot+=q[1];let r=h%tot;for(const q of list){if(r<q[1])return q[0];r-=q[1];}return list[0][0];};
+V.varyKey=(L)=>(L.pal===undefined&&L.hat===undefined&&L.acc===undefined&& !L.scarf&& !L.kidAcc?'':':p'+(L.pal===undefined?'':L.pal)+':'+(L.hat===undefined?'~':L.hat)+':'+(L.acc===undefined?'~':L.acc)+':'+(L.scarf|0)+':'+(L.kidAcc||''));
+
+V.vary1=function(L,o){
+if(!L||L.garb||L.town==='hall'||L.feat||L.species||L.role==='hero'||L.suit2)return L;
+const P=V.PALS[((o.pal|0)%V.PALS.length+V.PALS.length)%V.PALS.length],h=(k)=>hash(o.seed|0,k,4243),ss=o.season|0;
+const cold=ss===3?0.75:ss===2?0.35:ss===0?0.12:0;
+const u=(k)=>(h(k)%1000)/1000;
+L.pal=(o.pal|0)%V.PALS.length;
+if(L.age==='child'){
+L.shirt=P.kid[h(1)%P.kid.length];
+L.dress=u(2)<0.3;if(L.dress)L.dressCol=P.kid[(h(3)+1)%P.kid.length];
+L.kidAcc= !L.dress&&u(4)<0.22?'overalls':null;
+L.kidHat=u(5)<cold?'beanie':wpick(ss===1?[[null,3],['kidcap',3],['bow',2]]:[[null,4],['kidcap',2],['bow',2],['beanie',1]],h(6));
+L.pants=[0x3A4A6A,0x6A4A3A,0x4A6A5A,0x5A4A6A,0x8A6A4A][h(7)%5];
+L.longSleeves=ss>=2||ss===0&&u(8)<0.5;
+}else{
+const role=L.age==='elder'?'elder':L.role;
+if(FREE[role]){
+if(u(1)<0.75)L.shirt=P.ad[h(2)%P.ad.length];
+if(L.dress)L.dressCol=P.ad[(h(3)+2)%P.ad.length];
+if(HATS[role])L.hat=u(4)<cold*0.7?(u(9)<0.6?'beanie':'flat'):wpick(ss===1?HATS[role].concat([['sun',2],['straw',1]]):HATS[role],h(5));
+if(ACCS[role])L.acc=wpick(ACCS[role],h(6));
+}else if(u(4)<cold*0.6&& !/^(chef|hard|goggles|visor|top)$/.test(String((ROLES[role]||{}).hat)))L.hat='beanie';
+}
+L.scarf=u(10)<cold*(L.age==='child'?0.6:0.55)?P.sc[h(11)&1]:0;
+if(!L.scarf)delete L.scarf;
+return L;
+};
+
+V.vary=function(fams,style,seed,season){
+if(style==='hall'||(style&&String(style).slice(0,3)==='sp:'))return 0;
+let last= -1,n=0;
+for(const f of fams){
+let pal=hash(seed|0,f.home|0,4244)%V.PALS.length;if(pal===last)pal=(pal+1+(hash(seed|0,f.home|0,4245)%(V.PALS.length-1)))%V.PALS.length;
+last=pal;
+for(const m of f.members)if(m.look){V.vary1(m.look,{pal,season,seed:m.seed});n++;}
+}
+return n;
+};
+V.seasonNow=function(){
+if(V.SEASON!==undefined)return V.SEASON;
+const g=VR.game,S=VR.Seasons;
+try{if(g&&g.env&&S&&S.at){const a=S.at(g.env.day||0,g.env.timeOfDay,S.lock?S.lock(g): -1);if(a&&a.idx>=0)return a.idx;}}catch(e){}
+return 1;
+};
+
 
 
 V.SKIN=SKIN;V.HAIR=HAIR;V.HAIR_STYLES=STYLES_H.slice(0,9);
@@ -5444,7 +5522,7 @@ const rnd=(k)=>H3(sd&0xffff,k,sd>>>16,4242);
 const skin=L.skin,hc=L.hair,shoes=L.shoes;
 let shirt=L.shirt,pants=L.pants;
 
-const acc=kid?null:L.garb?(/^(apron|apron2|sash|cross|armor)$/.test(role.acc||'')?role.acc:null):role.acc;
+const acc=kid?(L.kidAcc==='overalls'?'overalls':null):L.garb?(/^(apron|apron2|sash|cross|armor)$/.test(role.acc||'')?role.acc:null):V.accOf(L,role);
 if(acc==='overalls')pants=0x3A5A9A;
 
 
@@ -5575,7 +5653,7 @@ for(let z= -6;z<= -2;z++)head.set(s*8,eyeY+2,z,fr);
 head.set(0,eyeY+2,-7,fr);head.set(-1,eyeY+2,-7,fr);head.set(1,eyeY+2,-7,fr);
 }
 
-const hat=kid?L.kidHat:(elder?(L.elderHat||role.hat):role.hat);
+const hat=kid?L.kidHat:L.hat!==undefined?L.hat:(elder?(L.elderHat||role.hat):role.hat);
 const H1=HT+(bald?1:2);
 const disc=(y,r,c,hole)=>{for(let z= -r;z<=r;z++)for(let x= -r;x<=r;x++){const d=x*x+(z-0.5)*(z-0.5);if(d>r*r+0.5)continue;if(hole&&d<hole*hole)continue;head.set(x,y,z,typeof c==='function'?c(x,y,z):c);}};
 if(hat==='straw'){
@@ -5769,6 +5847,14 @@ else{for(let y=y0;y<=top-1;y++)front(0,y,mul(shirt,0.84));for(const y of[3,6,9,1
 }
 
 
+if(L.scarf){
+const sc=L.scarf,sk=(x,y)=>(((x+y)&1)?sc:mul(sc,0.86)),nz0= -3,nz1=2;
+for(let y=top+1;y<=top+2;y++)for(let z=nz0;z<=nz1;z++)for(let x= -3;x<=3;x++)if(Math.abs(x)===3||z===nz0||z===nz1)body.set(x,y,z,sk(x,y));
+for(let y=top-(kid?3:5);y<=top;y++){front(-2,y,sk(-2,y));front(-1,y,sk(-1,y));}
+front(-2,top-(kid?4:6),mul(sc,1.15));front(-1,top-(kid?4:6),mul(sc,1.15));
+}
+
+
 const sleeveLen=armLen-handH;
 const rolled=L.role==='smith'||L.role==='builder'||L.role==='farmer';
 const shortSl=kid&& !L.longSleeves;
@@ -5943,10 +6029,12 @@ adult:{xl: -2,xr:2,top:6,z0: -3,z1:2,eyes:[-1,1],rows:[[-1,1,-3,0],[-2,2,-3,1],[
 child:{xl: -3,xr:2,top:7,z0: -3,z1:2,eyes:[-2,1],rows:[[-2,1,-3,0],[-3,2,-3,1],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2]]},
 };
 
+
+V.accOf=(L,role)=>(L.acc!==undefined?L.acc:role.acc);
 V.FAMILIES=['shirt','overalls','apron','smith','tunic','vest','coat','frock','robe','whitecoat','suit','armor','jumpsuit','shawl','dress','tee','gown','cape'];
 V.familyOf=function(L){
-const kid=L.age==='child',role=V.ROLES[L.role]||V.ROLES.farmer,acc=role.acc||'';
-if(kid)return L.dress?'dress':'tee';
+const kid=L.age==='child',role=V.ROLES[L.role]||V.ROLES.farmer,acc=V.accOf(L,role)||'';
+if(kid)return L.kidAcc==='overalls'&& !L.dress?'overalls':L.dress?'dress':'tee';
 if(L.garb==='robe')return'robe';
 if(L.garb==='coat')return'coat';
 if(L.garb==='tunic'||L.garb==='gown'||L.garb==='cape')return L.garb;
@@ -6543,7 +6631,7 @@ for(const sx of[-1,1]){const x0=sx<0?A.xl:A.xr;for(let y=1;y<=(kid?2:4);y++)P(x0
 }
 }
 
-const hat=L.feat?null:kid?L.kidHat:(elder?(L.elderHat||role.hat):role.hat);
+const hat=L.feat?null:kid?L.kidHat:L.hat!==undefined?L.hat:(elder?(L.elderHat||role.hat):role.hat);
 const H1=A.top+(bald?1:2);
 const disc=(y,r,c,hole,t)=>{for(let z=Math.floor(zc-r-1);z<=Math.ceil(zc+r+1);z++)for(let x=Math.floor(cx-r-1);x<=Math.ceil(cx+r+1);x++){const d=(x-cx)*(x-cx)+(z-zc)*(z-zc);if(d>r*r+0.3)continue;if(hole&&d<hole*hole)continue;head.set(x,y,z,c,0,t||TG.cloth);}};
 if(hat==='straw'){
@@ -6803,6 +6891,13 @@ for(let y=top-6;y<=top-4;y++)for(let x=2;x<=3;x++)body.paint(x,y,rowOf(y)[1],mul
 collar(mul(shirt,1.12));
 }
 }
+
+if(L.scarf){
+const sc=L.scarf,sk=(x,y)=>(((x+y)&1)?sc:mul(sc,0.86)),r=rowOf(top);
+if(r)for(let y=neck0;y<=neck0+1;y++)for(let z=r[1]-1;z<=r[2]+1;z++)for(let x= -3;x<=3;x++)if(Math.abs(x)===3||z===r[1]-1||z===r[2]+1)body.set(x,y,z,sk(x,y),0,TG.cloth);
+for(let y=top-(kid?3:5);y<=top;y++){front(-2,y,sk(-2,y),TG.cloth,true);front(-1,y,sk(-1,y),TG.cloth,true);}
+}
+
 
 if(over==='sash')for(let y=beltY;y<=top-1;y++){const x=Math.round(-hw+(y/top)*(2*hw));front(x,y,0xE0B040,TG.cloth,true);}
 if(over==='cross'){front(-2,top-5,0xE04040,TG.other,true);front(-2,top-4,0xE04040,TG.other,true);front(-3,top-5,0xE04040,TG.other,true);front(-1,top-5,0xE04040,TG.other,true);front(-2,top-6,0xE04040,TG.other,true);}
@@ -57997,6 +58092,31 @@ VR.I18N.add('en',{
 "g.fairy.tw.still":"The light seed is still out there – I'll stay with you.",
 "g.fairy.tw.note":"✨ One more thing: a light seed blown away by the wind – together with your Flausel",
 
+
+"g.lf.goal":"Outpost {name}: {n} of {of} machines at rest",
+"g.lf.goal.how":"[{key}] on a machine: calm it",
+"g.lf.goal.ready":"The beacon of {name} is ready",
+"g.lf.goal.readyHow":"[{key}] at the beacon: repair it",
+"g.lf.page":"📖 A new Wanderbuch page: “{name} shines again”",
+"g.lf.pages":"Beacon pages",
+"g.lf.pageLine":"Day {day} · {name}",
+"g.lf.how.peace":"The machines listened to me and went to sleep. Without a single blow the fire burns again.",
+"g.lf.how.brave":"I bravely held my ground until the machines rested. Now the fire burns again.",
+"g.lf.how.both":"Some machines calmed, some bravely stopped – the fire burns cyan again.",
+"g.lf.chest":"There is a chest for you beside the beacon!",
+"g.lf.next.out":"On we go: the outpost {name}, {d} m to the {dir}. I’ll show you the way.",
+"g.lf.next.vil":"On we go: the village {name}, {d} m to the {dir}. They’ll be glad to see you.",
+"g.lf.cheer":"The people of {v} cheer for you: the beacon of {o} burns again!",
+"g.lf.cheer.vil":"this village",
+"g.lf.dir.n":"north",
+"g.lf.dir.no":"north-east",
+"g.lf.dir.o":"east",
+"g.lf.dir.so":"south-east",
+"g.lf.dir.s":"south",
+"g.lf.dir.sw":"south-west",
+"g.lf.dir.w":"west",
+"g.lf.dir.nw":"north-west",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -62164,6 +62284,31 @@ VR.I18N.add('de',{
 "g.fairy.tw.got":"Du hast ihn! Jetzt schnell nach Hause damit.",
 "g.fairy.tw.still":"Der Lichtsamen ist noch dort draußen – ich bleib bei dir.",
 "g.fairy.tw.note":"✨ Noch eins: ein Lichtsamen, vom Wind verweht – zusammen mit deinem Flausel",
+
+
+"g.lf.goal":"Außenposten {name}: {n} von {of} Maschinen zur Ruhe gebracht",
+"g.lf.goal.how":"[{key}] auf eine Maschine: beruhigen",
+"g.lf.goal.ready":"Das Leuchtfeuer von {name} ist bereit",
+"g.lf.goal.readyHow":"[{key}] am Leuchtfeuer: reparieren",
+"g.lf.page":"📖 Neue Wanderbuch-Seite: „{name} leuchtet wieder“",
+"g.lf.pages":"Leuchtfeuer-Seiten",
+"g.lf.pageLine":"Tag {day} · {name}",
+"g.lf.how.peace":"Die Maschinen hörten mir zu und legten sich schlafen. Ohne einen einzigen Schlag brennt das Feuer wieder.",
+"g.lf.how.brave":"Ich hielt mutig stand, bis die Maschinen ruhten. Jetzt brennt das Feuer wieder.",
+"g.lf.how.both":"Einige Maschinen beruhigt, einige mutig aufgehalten – das Feuer brennt wieder cyan.",
+"g.lf.chest":"Neben dem Leuchtfeuer steht eine Truhe für dich!",
+"g.lf.next.out":"Weiter geht’s: der Außenposten {name}, {d} m im {dir}. Ich zeige dir den Weg.",
+"g.lf.next.vil":"Weiter geht’s: das Dorf {name}, {d} m im {dir}. Dort freut man sich auf dich.",
+"g.lf.cheer":"Die Leute von {v} jubeln dir zu: das Leuchtfeuer von {o} brennt wieder!",
+"g.lf.cheer.vil":"diesem Dorf",
+"g.lf.dir.n":"Norden",
+"g.lf.dir.no":"Nordosten",
+"g.lf.dir.o":"Osten",
+"g.lf.dir.so":"Südosten",
+"g.lf.dir.s":"Süden",
+"g.lf.dir.sw":"Südwesten",
+"g.lf.dir.w":"Westen",
+"g.lf.dir.nw":"Nordwesten",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -93498,15 +93643,16 @@ if(role==='barista'&&age!=='child')out.tool='tray';
 return out;
 };
 
-const lookKey=(L)=>['vil2',L.skin,L.hair,L.hs,L.age,L.role,L.shirt,L.pants,L.shoes,L.beard?1:0,L.freckles?1:0,L.eye,L.kidHat||'',L.elderHat||'',L.dress?L.dressCol:0,L.emblem|0,L.lashes?1:0,L.suit2|0,L.tool||''].join(':')+(L.helm?':helm':'')+(L.suit3?':w'+L.suit3:'')+(L.garb?':'+L.garb+':'+(L.trim|0):'')+(L.cape?':c'+L.cape:'')+(L.feat?':f'+L.feat+(L.featC|0)+(L.glow?'g':''):'');
+const lookKey=(L)=>['vil2',L.skin,L.hair,L.hs,L.age,L.role,L.shirt,L.pants,L.shoes,L.beard?1:0,L.freckles?1:0,L.eye,L.kidHat||'',L.elderHat||'',L.dress?L.dressCol:0,L.emblem|0,L.lashes?1:0,L.suit2|0,L.tool||''].join(':')+(L.helm?':helm':'')+(L.suit3?':w'+L.suit3:'')+(L.garb?':'+L.garb+':'+(L.trim|0):'')+(L.cape?':c'+L.cape:'')+(L.feat?':f'+L.feat+(L.featC|0)+(L.glow?'g':''):'')+V.varyKey(L);
 
 
 
-V.outfitKey=(L)=>[V.familyOf?V.familyOf(L):L.role,L.shirt,L.pants,L.dress?L.dressCol:0,L.garb||'',L.cape|0].join(':');
+V.outfitKey=(L)=>[V.familyOf?V.familyOf(L):L.role,L.shirt,L.pants,L.dress?L.dressCol:0,L.garb||'',L.cape|0].join(':')+V.varyKey(L);
 
 
 V.recolor=function(L,n){
 const R0=ROLES[L.role]||ROLES.farmer;
+if(L.pal!==undefined&& !L.garb&& !(L.dress&& !L.garb)){const FP=V.PALS[L.pal]&&V.PALS[L.pal][L.age==='child'?'kid':'ad'],i=FP?FP.indexOf(L.shirt): -1;if(i>=0){L.shirt=FP[(i+n)%FP.length];return L;}}
 if(L.dress&& !L.garb){const D=V.DRESS;L.dressCol=D[(D.indexOf(L.dressCol)+n+D.length)%D.length];return L;}
 const pal=L.garb?(L.garb==='cape'?WEISS.tunic:WEISS[L.garb]):L.town==='hall'&&L.age==='child'?WEISS.kid:R0.shirts;
 if(L.garb==='cape'&&(n&1)){const C=WEISS.cape;L.cape=C[(C.indexOf(L.cape)+1)%C.length];return L;}
@@ -93531,6 +93677,83 @@ V.recolor(L,n);if(n===1)changed++;
 }
 return changed;
 };
+
+
+
+
+
+
+
+
+
+V.PALS=[
+{id:'erde',ad:[0xB0603A,0xC8964A,0x7A5236,0xD8B888],kid:[0xE07A3A,0xF0B050,0xC86A4A,0xF4D8A0],sc:[0xB04A3A,0xC8964A]},
+{id:'meer',ad:[0x2F6A8A,0x4A90B8,0x24456A,0x8AC0D0],kid:[0x3AA0E0,0x5AC8D8,0x2F70C8,0xA8E0F0],sc:[0xE8E4D8,0x24456A]},
+{id:'beere',ad:[0x8A2F4A,0xC0506A,0x6A3A6A,0xE8A0B0],kid:[0xE85A7A,0xF08AB0,0xB050A0,0xF8C0D0],sc:[0xE8A0B0,0x6A3A6A]},
+{id:'wiese',ad:[0x6A8A4A,0xA8A860,0x4A5A3A,0xC8D090],kid:[0x7AC05A,0xC8D050,0x5AA070,0xE0EAA0],sc:[0xC8A030,0x4A5A3A]},
+{id:'sonne',ad:[0xD89A30,0xE8C060,0xC86A30,0xF0E0B0],kid:[0xF6C840,0xF8A040,0xF0D878,0xFFE8B0],sc:[0xC0443A,0x2F6A8A]},
+{id:'heide',ad:[0x7A6AA0,0x9A8AC0,0x5A5A80,0xC8B8D8],kid:[0xA080E0,0xC0A0F0,0x8070C8,0xE0D0F8],sc:[0xE8D070,0x5A5A80]},
+{id:'wolle',ad:[0xA8A49A,0x6A6A70,0x3A3A44,0xE0DCD0],kid:[0xD0CCC0,0x8A9AB0,0xF0A0A0,0xA0C0A0],sc:[0xC0443A,0x2F8C8A]},
+];
+const FREE={farmer:1,gardener:1,crafter:1,scholar:1,teacher:1,office:1,elder:1,smith:1};
+
+const HATS={
+farmer:[['straw',3],['sun',2],['flat',2],['cap',1],[null,3]],
+gardener:[['sun',3],['straw',2],[null,2],['cap',1]],
+crafter:[[null,4],['cap',2],['flat',2]],smith:[[null,4],['cap',1]],
+scholar:[[null,5],['flat',1]],teacher:[[null,5],['flat',1]],office:[[null,5],['cap',1]],elder:[[null,3],['flat',2],['sun',1]],
+};
+const ACCS={
+farmer:[['overalls',4],[null,3],['belt',2],['apron',1],['leather',1]],
+gardener:[['apron2',4],[null,2],['overalls',1]],crafter:[['belt',3],['leather',2],[null,2],['apron',1]],
+};
+const wpick=(list,h)=>{let tot=0;for(const q of list)tot+=q[1];let r=h%tot;for(const q of list){if(r<q[1])return q[0];r-=q[1];}return list[0][0];};
+V.varyKey=(L)=>(L.pal===undefined&&L.hat===undefined&&L.acc===undefined&& !L.scarf&& !L.kidAcc?'':':p'+(L.pal===undefined?'':L.pal)+':'+(L.hat===undefined?'~':L.hat)+':'+(L.acc===undefined?'~':L.acc)+':'+(L.scarf|0)+':'+(L.kidAcc||''));
+
+V.vary1=function(L,o){
+if(!L||L.garb||L.town==='hall'||L.feat||L.species||L.role==='hero'||L.suit2)return L;
+const P=V.PALS[((o.pal|0)%V.PALS.length+V.PALS.length)%V.PALS.length],h=(k)=>hash(o.seed|0,k,4243),ss=o.season|0;
+const cold=ss===3?0.75:ss===2?0.35:ss===0?0.12:0;
+const u=(k)=>(h(k)%1000)/1000;
+L.pal=(o.pal|0)%V.PALS.length;
+if(L.age==='child'){
+L.shirt=P.kid[h(1)%P.kid.length];
+L.dress=u(2)<0.3;if(L.dress)L.dressCol=P.kid[(h(3)+1)%P.kid.length];
+L.kidAcc= !L.dress&&u(4)<0.22?'overalls':null;
+L.kidHat=u(5)<cold?'beanie':wpick(ss===1?[[null,3],['kidcap',3],['bow',2]]:[[null,4],['kidcap',2],['bow',2],['beanie',1]],h(6));
+L.pants=[0x3A4A6A,0x6A4A3A,0x4A6A5A,0x5A4A6A,0x8A6A4A][h(7)%5];
+L.longSleeves=ss>=2||ss===0&&u(8)<0.5;
+}else{
+const role=L.age==='elder'?'elder':L.role;
+if(FREE[role]){
+if(u(1)<0.75)L.shirt=P.ad[h(2)%P.ad.length];
+if(L.dress)L.dressCol=P.ad[(h(3)+2)%P.ad.length];
+if(HATS[role])L.hat=u(4)<cold*0.7?(u(9)<0.6?'beanie':'flat'):wpick(ss===1?HATS[role].concat([['sun',2],['straw',1]]):HATS[role],h(5));
+if(ACCS[role])L.acc=wpick(ACCS[role],h(6));
+}else if(u(4)<cold*0.6&& !/^(chef|hard|goggles|visor|top)$/.test(String((ROLES[role]||{}).hat)))L.hat='beanie';
+}
+L.scarf=u(10)<cold*(L.age==='child'?0.6:0.55)?P.sc[h(11)&1]:0;
+if(!L.scarf)delete L.scarf;
+return L;
+};
+
+V.vary=function(fams,style,seed,season){
+if(style==='hall'||(style&&String(style).slice(0,3)==='sp:'))return 0;
+let last= -1,n=0;
+for(const f of fams){
+let pal=hash(seed|0,f.home|0,4244)%V.PALS.length;if(pal===last)pal=(pal+1+(hash(seed|0,f.home|0,4245)%(V.PALS.length-1)))%V.PALS.length;
+last=pal;
+for(const m of f.members)if(m.look){V.vary1(m.look,{pal,season,seed:m.seed});n++;}
+}
+return n;
+};
+V.seasonNow=function(){
+if(V.SEASON!==undefined)return V.SEASON;
+const g=VR.game,S=VR.Seasons;
+try{if(g&&g.env&&S&&S.at){const a=S.at(g.env.day||0,g.env.timeOfDay,S.lock?S.lock(g): -1);if(a&&a.idx>=0)return a.idx;}}catch(e){}
+return 1;
+};
+
 
 
 V.SKIN=SKIN;V.HAIR=HAIR;V.HAIR_STYLES=STYLES_H.slice(0,9);
@@ -93872,7 +94095,7 @@ const rnd=(k)=>H3(sd&0xffff,k,sd>>>16,4242);
 const skin=L.skin,hc=L.hair,shoes=L.shoes;
 let shirt=L.shirt,pants=L.pants;
 
-const acc=kid?null:L.garb?(/^(apron|apron2|sash|cross|armor)$/.test(role.acc||'')?role.acc:null):role.acc;
+const acc=kid?(L.kidAcc==='overalls'?'overalls':null):L.garb?(/^(apron|apron2|sash|cross|armor)$/.test(role.acc||'')?role.acc:null):V.accOf(L,role);
 if(acc==='overalls')pants=0x3A5A9A;
 
 
@@ -94003,7 +94226,7 @@ for(let z= -6;z<= -2;z++)head.set(s*8,eyeY+2,z,fr);
 head.set(0,eyeY+2,-7,fr);head.set(-1,eyeY+2,-7,fr);head.set(1,eyeY+2,-7,fr);
 }
 
-const hat=kid?L.kidHat:(elder?(L.elderHat||role.hat):role.hat);
+const hat=kid?L.kidHat:L.hat!==undefined?L.hat:(elder?(L.elderHat||role.hat):role.hat);
 const H1=HT+(bald?1:2);
 const disc=(y,r,c,hole)=>{for(let z= -r;z<=r;z++)for(let x= -r;x<=r;x++){const d=x*x+(z-0.5)*(z-0.5);if(d>r*r+0.5)continue;if(hole&&d<hole*hole)continue;head.set(x,y,z,typeof c==='function'?c(x,y,z):c);}};
 if(hat==='straw'){
@@ -94197,6 +94420,14 @@ else{for(let y=y0;y<=top-1;y++)front(0,y,mul(shirt,0.84));for(const y of[3,6,9,1
 }
 
 
+if(L.scarf){
+const sc=L.scarf,sk=(x,y)=>(((x+y)&1)?sc:mul(sc,0.86)),nz0= -3,nz1=2;
+for(let y=top+1;y<=top+2;y++)for(let z=nz0;z<=nz1;z++)for(let x= -3;x<=3;x++)if(Math.abs(x)===3||z===nz0||z===nz1)body.set(x,y,z,sk(x,y));
+for(let y=top-(kid?3:5);y<=top;y++){front(-2,y,sk(-2,y));front(-1,y,sk(-1,y));}
+front(-2,top-(kid?4:6),mul(sc,1.15));front(-1,top-(kid?4:6),mul(sc,1.15));
+}
+
+
 const sleeveLen=armLen-handH;
 const rolled=L.role==='smith'||L.role==='builder'||L.role==='farmer';
 const shortSl=kid&& !L.longSleeves;
@@ -94371,10 +94602,12 @@ adult:{xl: -2,xr:2,top:6,z0: -3,z1:2,eyes:[-1,1],rows:[[-1,1,-3,0],[-2,2,-3,1],[
 child:{xl: -3,xr:2,top:7,z0: -3,z1:2,eyes:[-2,1],rows:[[-2,1,-3,0],[-3,2,-3,1],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2],[-3,2,-3,2]]},
 };
 
+
+V.accOf=(L,role)=>(L.acc!==undefined?L.acc:role.acc);
 V.FAMILIES=['shirt','overalls','apron','smith','tunic','vest','coat','frock','robe','whitecoat','suit','armor','jumpsuit','shawl','dress','tee','gown','cape'];
 V.familyOf=function(L){
-const kid=L.age==='child',role=V.ROLES[L.role]||V.ROLES.farmer,acc=role.acc||'';
-if(kid)return L.dress?'dress':'tee';
+const kid=L.age==='child',role=V.ROLES[L.role]||V.ROLES.farmer,acc=V.accOf(L,role)||'';
+if(kid)return L.kidAcc==='overalls'&& !L.dress?'overalls':L.dress?'dress':'tee';
 if(L.garb==='robe')return'robe';
 if(L.garb==='coat')return'coat';
 if(L.garb==='tunic'||L.garb==='gown'||L.garb==='cape')return L.garb;
@@ -94971,7 +95204,7 @@ for(const sx of[-1,1]){const x0=sx<0?A.xl:A.xr;for(let y=1;y<=(kid?2:4);y++)P(x0
 }
 }
 
-const hat=L.feat?null:kid?L.kidHat:(elder?(L.elderHat||role.hat):role.hat);
+const hat=L.feat?null:kid?L.kidHat:L.hat!==undefined?L.hat:(elder?(L.elderHat||role.hat):role.hat);
 const H1=A.top+(bald?1:2);
 const disc=(y,r,c,hole,t)=>{for(let z=Math.floor(zc-r-1);z<=Math.ceil(zc+r+1);z++)for(let x=Math.floor(cx-r-1);x<=Math.ceil(cx+r+1);x++){const d=(x-cx)*(x-cx)+(z-zc)*(z-zc);if(d>r*r+0.3)continue;if(hole&&d<hole*hole)continue;head.set(x,y,z,c,0,t||TG.cloth);}};
 if(hat==='straw'){
@@ -95231,6 +95464,13 @@ for(let y=top-6;y<=top-4;y++)for(let x=2;x<=3;x++)body.paint(x,y,rowOf(y)[1],mul
 collar(mul(shirt,1.12));
 }
 }
+
+if(L.scarf){
+const sc=L.scarf,sk=(x,y)=>(((x+y)&1)?sc:mul(sc,0.86)),r=rowOf(top);
+if(r)for(let y=neck0;y<=neck0+1;y++)for(let z=r[1]-1;z<=r[2]+1;z++)for(let x= -3;x<=3;x++)if(Math.abs(x)===3||z===r[1]-1||z===r[2]+1)body.set(x,y,z,sk(x,y),0,TG.cloth);
+for(let y=top-(kid?3:5);y<=top;y++){front(-2,y,sk(-2,y),TG.cloth,true);front(-1,y,sk(-1,y),TG.cloth,true);}
+}
+
 
 if(over==='sash')for(let y=beltY;y<=top-1;y++){const x=Math.round(-hw+(y/top)*(2*hw));front(x,y,0xE0B040,TG.cloth,true);}
 if(over==='cross'){front(-2,top-5,0xE04040,TG.other,true);front(-2,top-4,0xE04040,TG.other,true);front(-3,top-5,0xE04040,TG.other,true);front(-1,top-5,0xE04040,TG.other,true);front(-2,top-6,0xE04040,TG.other,true);}
@@ -95619,6 +95859,7 @@ for(const w of P.work){const r=WORK_ROLE[w.kind];if(r)(vil.workOf[r]||(vil.workO
 vil.fams=fams;
 vil.people=[];
 for(const f of fams)for(const m of f.members)vil.people.push(m);
+if(Folk.vary&&Folk.VARY!==false)Folk.vary(fams,P.style,P.seed,Folk.seasonNow());
 if(Folk.unlike)Folk.unlike(vil.people,3);
 
 
@@ -108488,7 +108729,7 @@ for(let i=0;i<things.length;i++){
 const q=things[i];if(!q|| !q.pos)continue;
 const dx=q.pos[0]-eye[0],dy=q.pos[1]-eye[1],dz=q.pos[2]-eye[2],d=Math.hypot(dx,dy,dz)||1e-6;
 const r=q.r||0.4,surf=Math.max(0,d-r);
-if(surf>reach)continue;
+if(surf>(q.reach>reach?q.reach:reach))continue;
 const cos=(dx*dir[0]+dy*dir[1]+dz*dir[2])/(d*dl);
 if(cos<=0)continue;
 const ang=Math.acos(Math.min(1,cos)),eff=Math.max(0,ang-Math.asin(Math.min(1,r/d)));
@@ -125689,7 +125930,7 @@ const NL=VR.NewLife,h=NL&&NL.home?NL.home(g):null;
 const home=h&&h.dim===g.dim&&Array.isArray(h.pos)?h.pos:(Array.isArray(p.spawn)&&p.spawn.every(Number.isFinite)?p.spawn:g.worldSpawn?g.worldSpawn():[0.5,100,0.5]);
 const wk=F.wake({freed,home});S.why=wk.why;
 
-if(Number.isFinite(wk.yaw)&&g.world&&g.world.isLoaded(Math.floor(wk.pos[0]),Math.floor(wk.pos[2])))wk.pos[1]=g.world.topAt(Math.floor(wk.pos[0]),Math.floor(wk.pos[2]))+1;
+if(Number.isFinite(wk.yaw)&&g.world&&g.world.isLoaded(Math.floor(wk.pos[0]),Math.floor(wk.pos[2])))wk.pos[1]=F.floorAt(g.world,Math.floor(wk.pos[0]),Math.floor(wk.pos[2]))+1;
 try{p.safeTeleport(wk.pos[0],wk.pos[1],wk.pos[2],Number.isFinite(wk.yaw)?{yaw:wk.yaw,pitch:wk.pitch}:undefined);}catch(e){p.pos=wk.pos.slice();}
 if(Number.isFinite(wk.yaw)){p.yaw=wk.yaw;p.viewYaw=wk.yaw;p.pitch=wk.pitch;S.look=wk.at;}
 if(p.mode==='survival'){p.health=20;if(g.ui&&g.ui.updateHUD)g.ui.updateHUD(true);}
@@ -125841,12 +126082,21 @@ if(ctx.enc!=='off'&&ctx.night&&d<52&&(z.kind==='ruin'||(z.kind==='outpost'&&z.si
 }
 };
 const mine=(En,siteId,pred)=>{let n=0;for(const m of En.mobs){const f=m.foe;if(f&& !f.gone&& !f.remote&&f.site===siteId&&(!pred||pred(f)))n++;}return n;};
+
+
+
+F.floorAt=function(w,x,z){
+const top=w.topAt(x,z),R=VR.R,Fl=VR.F,T=R&&R.T;
+if(!T|| !T.flags)return top;
+for(let y=top;y>top-24&&y>0;y--){const b=w.getBlock(x,y,z),fl=b?T.flags[b]:0;if(b&&(fl&Fl.SOLID)&& !(fl&Fl.LEAVES))return y;if(b&&(fl&Fl.FLUID))return y;}
+return top;
+};
 F.spot=function(g,x,z,r,rnd,rmin){
 const w=g.world,r0=rmin||0;
 for(let k=0;k<10;k++){
 const a=rnd()*TAU,d=r0+(r-r0)*Math.sqrt(rnd()),xx=Math.floor(x+Math.cos(a)*d),zz=Math.floor(z+Math.sin(a)*d);
 if(!w.isLoaded(xx,zz))continue;
-const y=w.topAt(xx,zz),b=w.getBlock(xx,y,zz),R=VR.R,Fl=VR.F;
+const y=F.floorAt(w,xx,zz),b=w.getBlock(xx,y,zz),R=VR.R,Fl=VR.F;
 if(!b|| !(R.T.flags[b]&Fl.SOLID)||(R.T.flags[b]&Fl.FLUID))continue;
 if(w.getBlock(xx,y+1,zz)||w.getBlock(xx,y+2,zz))continue;
 return[xx+0.5,y+1,zz+0.5];
@@ -126598,6 +126848,12 @@ ringEl.innerHTML=`<div class="bar"><i style="width:${pc}%"></i></div><div class=
 
 
 L.calmSt=null;
+
+
+
+
+L.calmReach=(k)=>{const K=F()&&F().KINDS[k];return!K?6:K.fixed?20:Math.max(6,Math.min(16,K.keep[1]+1));};
+L.calmHold=(k)=>L.calmReach(k)+2;
 L.calmBegin=function(g,m){
 if(!m|| !m.foe||m.foe.gone||L.calmSt)return false;
 const f=m.foe;if(f.st==='down'||f.st==='calm'||f.st==='helper'||f.st==='leave'||f.st==='strike')return false;
@@ -126620,7 +126876,7 @@ return false;
 };
 L.stepCalm=function(g,dt){
 const S=L.calmSt,m=S.m,p=g.player.pos;
-if(!m.foe||m.foe.gone||m.foe.st==='down'||Math.hypot(m.pos[0]-p[0],m.pos[2]-p[2])>7){L.calmEnd(g,false);return;}
+if(!m.foe||m.foe.gone||m.foe.st==='down'||Math.hypot(m.pos[0]-p[0],m.pos[2]-p[2])>L.calmHold(m.foe.k)){L.calmEnd(g,false);return;}
 m.vel[0]=0;m.vel[2]=0;m.foe.cool=Math.max(m.foe.cool,1.5);
 if(S.flash>0)S.flash-=dt;
 L.calmUi(g,true);
@@ -127021,10 +127277,10 @@ if(!F()|| !F().on(g))return null;
 if(L.calmSt){const k=L.calmSt.m.foe?L.calmSt.m.foe.k:'driller';return{kind:'machine',name:T('g.foe.name.'+k),pos:[eye[0]+dir[0]*2,eye[1]+dir[1]*2,eye[2]+dir[2]*2],r:1.2,act:(gg)=>L.calmTap(gg)};}
 const En=g.entities,list=NEAR;list.length=0;
 if(En)for(const m of En.mobs){
-const f=m.foe;if(!f||f.gone||f.remote||Math.abs(m.pos[0]-eye[0])>6||Math.abs(m.pos[2]-eye[2])>6)continue;
+const f=m.foe;if(!f||f.gone||f.remote)continue;const rr=f.trader?6:L.calmReach(f.k);if(Math.abs(m.pos[0]-eye[0])>rr||Math.abs(m.pos[2]-eye[2])>rr)continue;
 if(f.trader){list.push({kind:'shop',name:T('g.lib.trader'),pos:[m.pos[0],m.pos[1]+0.7,m.pos[2]],r:0.9,act:(gg)=>L.trade(gg,m)});continue;}
 if(F().STRAYS.indexOf(f.k)<0||f.helper||f.st==='calm'||f.st==='down'||f.st==='leave'||f.st==='strike')continue;
-list.push({kind:'machine',name:T('g.foe.name.'+f.k),pos:[m.pos[0],m.pos[1]+F().KINDS[f.k].h*0.55,m.pos[2]],r:Math.max(0.7,F().KINDS[f.k].w*1.6),act:(gg)=>L.calmBegin(gg,m)});
+list.push({kind:'machine',name:T('g.foe.name.'+f.k),pos:[m.pos[0],m.pos[1]+F().KINDS[f.k].h*0.55,m.pos[2]],r:Math.max(0.7,F().KINDS[f.k].w*1.6),reach:rr,act:(gg)=>L.calmBegin(gg,m)});
 }
 for(const s of W0.sites.values()){
 const b=s.beacon;if(!s.known|| !b||Math.abs(b[0]-eye[0])>6||Math.abs(b[2]-eye[2])>6)continue;
@@ -128951,7 +129207,7 @@ const LA=(ch,n,opt,who)=>who.map((w,i)=>{const q=w.split(':');return{who:q[0],ke
 const BV=(ch,n,o)=>{const alt={};for(const k of Object.keys(o.alt))alt[k]=LA(ch,n,k,o.alt[k]);const b=B(ch,n,Object.assign({},o,{who:[]}));b.scene.alt=alt;b.scene.lines=alt[Object.keys(alt)[0]];delete b.alt;return b;};
 S.BEATS=[
 
-B(1,1,{when:{after:null,place:['hangar'],anyAfter:240,adv:false},
+B(1,1,{when:{after:null,place:['hangar'],anyAfter:240,advAfter:40,adv:false},
 scene:{shots:[{cam:'close',target:'funke',dur:5},{cam:'shoulder',target:'funke',dur:5},{cam:'wide',target:'player',dur:5}],music:'warm'},
 who:['funke:surprised','funke:worried','ilka:happy','funke:happy'],task:{kind:'follow',target:'vista'},reward:{xp:30},act:{kind:'look',target:'vista',max:450,cone:14,hold:1.5}}),
 B(1,2,{when:{after:'c1.b1',place:['plaza','street','hills','isles','water','wild'],adv:false},
@@ -129131,7 +129387,7 @@ if(!((ctx.calm||0)>=(w.calm||(ctx.adv?S.CALM_ADV:S.CALM))))return'calm';
 if(w.adv&& !ctx.adv)return'adv';
 if(w.dim&& !S.dimIn(w.dim,ctx.dim||'overworld'))return'dim';
 if(!w.dim&&ctx.dim&&ctx.dim!=='overworld'&& !ctx.orbit)return'dim';
-if(w.place&&w.place.indexOf(ctx.place)<0&& !(w.anyAfter&&(ctx.played||0)>=w.anyAfter))return'place';
+if(w.place&&w.place.indexOf(ctx.place)<0&& !(w.anyAfter&&(ctx.played||0)>=(ctx.adv&&w.advAfter?w.advAfter:w.anyAfter)))return'place';
 if(w.hours&&ctx.hour&&w.hours.indexOf(ctx.hour)<0)return'hour';
 if(w.near)for(const k of Object.keys(w.near)){const d=ctx.near&&ctx.near[k];if(!(d<=w.near[k]))return'near';}
 if(w.freed&& !((ctx.freed||0)>=w.freed))return'freed';
@@ -147128,6 +147384,196 @@ if(this.on&&this.g.villages&&this.g.villages.agents.length)setTimeout(()=>{const
 };
 }
 })(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const LF=VR.LibFest=VR.LibFest||{};
+LF.on=true;LF.marks=true;
+LF.cost={looks:0,ms:0,marks:0};
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
+const Lb=()=>VR.Liberate,Fo=()=>VR.Foes;
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const now=()=>(typeof performance!=='undefined'&&performance.now?performance.now():Date.now());
+
+
+
+LF.goalOf=function(s){
+if(!s||s.st==='frei')return null;
+const of=typeof s.strays==='number'?s.strays:null,n=Math.min(of===null?0:of,s.res|0);
+return{n,of,step:of!==null&&n>=of?'beacon':'calm'};
+};
+
+LF.howOf=(s)=>{const of=typeof s.strays==='number'?s.strays:0,c=s.cal|0;return of<=0||c>=of?'peace':c<=0?'brave':'both';};
+
+LF.chestSpot=function(get,solid,b){
+for(const[dx,dz]of[[2,0],[-2,0],[0,2],[0,-2],[2,2],[-2,2],[2,-2],[-2,-2]]){
+const x=b[0]+dx,z=b[2]+dz;
+for(const y of[b[1],b[1]+1,b[1]-1])if(!get(x,y,z)&& !get(x,y+1,z)&&solid(get(x,y-1,z)))return[x,y,z];
+}
+return null;
+};
+
+LF.DIRS=['n','no','o','so','s','sw','w','nw'];
+LF.dirOf=(dx,dz)=>{const a=Math.atan2(dx,-dz);return LF.DIRS[((Math.round(a/(Math.PI/4))%8)+8)%8];};
+
+LF.nextOf=function(sites,villages,p,skip){
+let best=null,bd=1500;
+for(const s of sites){if(!s||s===skip||s.st==='frei'|| !Number.isFinite(s.x)|| !Number.isFinite(s.z))continue;const d=Math.hypot(s.x-p[0],s.z-p[2]);if(d>=60&&d<bd){bd=d;best={kind:'out',ref:s,x:s.x+0.5,z:s.z+0.5,d}};}
+if(best)return best;
+bd=2000;
+for(const v of villages){if(!v||v.visited|| !Number.isFinite(v.x))continue;const d=Math.hypot(v.x-p[0],v.z-p[2]);if(d>=60&&d<bd){bd=d;best={kind:'vil',ref:v,x:v.x+0.5,z:v.z+0.5,d};}}
+return best;
+};
+
+
+const rec=()=>(VR.Adventure&&VR.Adventure.rec)||null;
+const fest=()=>{const r=rec();if(!r)return null;if(!r.fest||typeof r.fest!=='object')r.fest={pages:{},chest:{}};if(!r.fest.pages)r.fest.pages={};if(!r.fest.chest)r.fest.chest={};return r.fest;};
+LF.pages=()=>{const f=fest();return f?f.pages:{};};
+
+
+let goalEl=null,goalKey='';
+function css(){
+if(typeof document==='undefined'||document.getElementById('lfcss'))return;
+const st=document.createElement('style');st.id='lfcss';
+st.textContent='#libgoal{position:absolute;left:50%;top:54px;transform:translateX(-50%);padding:5px 14px;border-radius:14px;background:rgba(14,22,40,.62);color:#e8f6ff;font:600 13px/1.3 inherit;letter-spacing:.2px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.25);border:1px solid rgba(127,246,255,.35);transition:opacity .4s}#libgoal b{color:#7ff6ff;font-weight:700}#libgoal i{font-style:normal;opacity:.8;margin-left:8px}#libgoal.ready{border-color:rgba(255,226,140,.7)}#libgoal.ready b{color:#ffe28c}';
+document.head.appendChild(st);
+}
+LF.goalUi=function(s,G){
+if(typeof document==='undefined'|| !document.createElement)return;
+const key=s&&G?s.id+':'+G.step+':'+G.n+'/'+G.of:'';
+if(key===goalKey)return;goalKey=key;
+if(!key){if(goalEl)goalEl.style.display='none';return;}
+if(!goalEl){css();goalEl=document.createElement('div');goalEl.id='libgoal';goalEl.setAttribute('aria-live','polite');(document.getElementById('hud')||document.body).appendChild(goalEl);}
+const k=VR.Binds&&VR.Binds.label?VR.Binds.label('KeyV',VR.I18N&&VR.I18N.lang):'V',name=Lb().nameOf(s);
+goalEl.className=G.step==='beacon'?'ready':'';
+goalEl.innerHTML=G.step==='beacon'
+?`✦ <b>${esc(T('g.lf.goal.ready',{name}))}</b><i>${esc(T('g.lf.goal.readyHow',{key:k}))}</i>`
+:`◇ <b>${esc(T('g.lf.goal',{name,n:G.n,of:G.of===null?'?':G.of}))}</b><i>${esc(T('g.lf.goal.how',{key:k}))}</i>`;
+goalEl.style.display='';
+};
+
+const busy=(L)=> !!(L.moment||L.mcam||L.puz||L.calmSt||L.ringSite);
+LF.look=function(g){
+const t0=now(),L=Lb(),F=Fo();if(!LF.on|| !L|| !F|| !g.player)return;
+const p=g.player.pos,P=g.particles,En=g.entities;
+let near=null,nd=76;
+for(const s of L.sites().values()){if(!s.known||s.st==='frei')continue;const d=Math.hypot(p[0]-s.x,p[2]-s.z);if(d<nd){nd=d;near=s;}}
+const G=near&&F.advOn&&F.advOn(g)?LF.goalOf(near):null;
+LF.goalUi(G&& !busy(L)?near:null,G);
+const lite= !!(g.settings&&(g.settings.preset==='potato'||g.settings.ultraLite));
+if(G&&LF.marks&& !lite&&P&&P.glow&& !busy(L)){
+if(G.step==='beacon'&&near.beacon){const b=near.beacon;P.glow(b[0]+0.5,b[1]+2.4+Math.random()*0.4,b[2]+0.5,[1,0.9,0.55],1.4,0.05,0.5);LF.cost.marks++;}
+else if(En){let k=0;for(const m of En.mobs){const f=m.foe;if(!f||f.gone||f.site!==near.id||f.wave||f.helper||f.st==='down'||f.st==='calm'||f.st==='leave'||k>=4)continue;const K=F.KINDS[f.k];P.glow(m.pos[0],m.pos[1]+K.h+0.55,m.pos[2],[0.65,0.95,1],0.55,0.02,0.32);k++;LF.cost.marks++;}}
+}
+LF.lookCheer(g);
+if(LF.nextAt&&(g.time||0)>=LF.nextAt){LF.nextAt=0;LF.pointNext(g,LF.lastFreed);}
+if(LF.next&&Math.hypot(p[0]-LF.next.x,p[2]-LF.next.z)<(LF.next.kind==='out'?70:40))LF.next=null;
+LF.cost.looks++;LF.cost.ms+=now()-t0;
+};
+
+
+LF.celebrate=function(g,s){
+const f=fest(),L=Lb();if(!f|| !s)return;
+const day=g.env?g.env.day|0:0,how=LF.howOf(s),first= !f.pages[s.id];
+if(first)f.pages[s.id]={day,how,n:typeof s.strays==='number'?s.strays:0,c:s.cal|0};
+
+const b=s.beacon,w=g.world,R=VR.R;
+if(b&&w&& !f.chest[s.id]&&R&&R.byName.chest){
+const solid=(st)=> !!(st&&(R.T.flags[st]&VR.F.SOLID)&& !(R.T.flags[st]&VR.F.LEAVES));
+const q=LF.chestSpot((x,y,z)=>w.getBlock(x,y,z),solid,b);
+if(q){
+let st=R.byName.chest.defaultState;
+try{const ty=R.byName.chest;if(ty.has&&ty.has('facing')&&ty.state)st=ty.state({facing:Math.abs(q[0]-b[0])>Math.abs(q[2]-b[2])?(q[0]>b[0]?'west':'east'):(q[2]>b[2]?'north':'south')});}catch(e){st=R.byName.chest.defaultState;}
+w.setBlock(q[0],q[1],q[2],st,4);
+const c=w.col(q[0]>>4,q[2]>>4);
+if(c&&c.blockEntities)c.blockEntities.set((q[1]<<8)|((q[2]&15)<<4)|(q[0]&15),{type:'chest',loot:'outpost',items:null});
+f.chest[s.id]=q;LF.chestAt=q;
+if(g.particles)g.particles.spark(q[0]+0.5,q[1]+1,q[2]+0.5,[1,0.88,0.45],30,3.2,1);
+if(g.audio&&g.audio.play)g.audio.play('twinkle');
+}
+}
+
+if(first&&g.ui&&g.ui.hint)setTimeout(()=>{try{g.ui.hint(T('g.lf.page',{name:L.nameOf(s)}),3200);}catch(e){}},4400);
+
+const V=g.villages;let best=null,bd=900;
+if(V&&V.sites)for(const v of V.sites){const d=Math.hypot(v.x-s.x,v.z-s.z);if(d<bd){bd=d;best=v;}}
+if(best){const kn=V.known&&V.known.get?V.known.get(best.id):null;LF.cheer={id:best.id,x:best.x+0.5,z:best.z+0.5,name:(kn&&kn.name)||best.name||'',out:L.nameOf(s),t:g.time||0};}
+LF.lastFreed=s;
+};
+
+LF.lookCheer=function(g){
+const C=LF.cheer,V=g.villages;if(!C|| !V|| !V.joyReact)return;
+const p=g.player.pos;if(Math.hypot(p[0]-C.x,p[2]-C.z)>150)return;
+let n=0;if(V.agents)for(const a of V.agents)if(a&&a.pos&&Math.hypot(a.pos[0]-p[0],a.pos[2]-p[2])<15&&a.pose!=='sleep')n++;
+if(n<2)return;
+LF.cheer=null;
+try{V.joyReact('applaud');}catch(e){}
+LF.cheered=(LF.cheered|0)+1;
+const txt=T('g.lf.cheer',{v:C.name||T('g.lf.cheer.vil'),o:C.out});
+const fk=g.funke;if(fk&&fk.on&&fk.on()&&fk.show)fk.show(txt);else if(g.ui&&g.ui.hint)g.ui.hint(txt,4200);
+};
+
+LF.pointNext=function(g,s){
+const L=Lb(),V=g.villages,p=g.player.pos;if(!L)return null;
+const vils=[];if(V&&V.sites)for(const v of V.sites){const kn=V.known&&V.known.get?V.known.get(v.id):null;vils.push({x:v.x,z:v.z,visited: !!(kn&&kn.visited),name:(kn&&kn.name)||v.name||'',y:v.y});}
+const n=LF.nextOf([...L.sites().values()],vils,p,s);if(!n)return null;
+const name=n.kind==='out'?L.nameOf(n.ref):n.ref.name,dir=T('g.lf.dir.'+LF.dirOf(n.x-p[0],n.z-p[2]));
+const y=n.kind==='out'?(n.ref.beacon?n.ref.beacon[1]+4:Number.isFinite(n.ref.y)?n.ref.y+4:p[1]):(Number.isFinite(n.ref.y)?n.ref.y+2:p[1]);
+LF.next={kind:n.kind,x:n.x,z:n.z,pos:[n.x,y,n.z],name,t:g.time||0};
+const key=(VR.Binds&&VR.Binds.label?VR.Binds.label('KeyV',VR.I18N&&VR.I18N.lang):'V');
+const chest=LF.chestAt?T('g.lf.chest')+' ':'';
+const txt=chest+T(n.kind==='out'?'g.lf.next.out':'g.lf.next.vil',{name,d:Math.round(n.d/10)*10,dir,key});
+const fk=g.funke;if(fk&&fk.on&&fk.on()&&fk.show)fk.show(txt);else if(g.ui&&g.ui.hint)g.ui.hint(txt,5200);
+LF.chestAt=null;
+return LF.next;
+};
+
+
+const L0=Lb();
+if(L0&&L0.beat&& !L0.beat.__lf){
+const ob=L0.beat;
+L0.beat=function(g,s,k){
+if(LF.on&&k==='banner'){try{LF.celebrate(g,s);}catch(e){LF.err=String(e&&e.message||e);}}
+const r=ob.apply(this,arguments);
+if(LF.on&&k==='end')LF.nextAt=(g.time||0)+1.5;
+return r;
+};
+L0.beat.__lf=true;
+}
+if(L0&&L0.look&& !L0.look.__lf){
+const ol=L0.look;
+L0.look=function(g){const r=ol.apply(this,arguments);try{LF.look(g);}catch(e){LF.err=String(e&&e.message||e);}return r;};
+L0.look.__lf=true;
+}
+if(VR.Funke&&VR.Funke.addSource)VR.Funke.addSource(()=>(LF.on&&LF.next?{pos:LF.next.pos,name:LF.next.name,kind:'libnext'}:null));
+const Q=VR.Quests;
+if(Q&&Array.isArray(Q.journalSections))Q.journalSections.push(()=>{
+const P=LF.pages(),ids=Object.keys(P);if(!ids.length|| !L0)return'';
+let h=`<h3>📖 ${esc(T('g.lf.pages'))}</h3><div class="jdone">`;
+for(const id of ids){const q=P[id],s=L0.siteOf(id)||{id};h+=`<div>✦ ${esc(T('g.lf.pageLine',{day:q.day,name:L0.nameOf(s)}))} — ${esc(T('g.lf.how.'+(q.how||'peace')))}</div>`;}
+return h+'</div>';
+});
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 VR.GenieLazy=function(){
 if(VR.GenieLazy.done)return!!VR.GenieBrain;VR.GenieLazy.done=true;
