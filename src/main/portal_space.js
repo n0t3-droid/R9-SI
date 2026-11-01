@@ -186,9 +186,18 @@
   PS.render = function (g, shot, k, v, it) {
     const SS = SSc(), r = g && g.renderer;
     if (!SS || !r || !it || !it.gl || !SS.frameSetup || !PS.ready(g)) { PS.stats.miss++; return false; }
-    const t0 = performance.now(), tier = SS.tier(g);
+    const t0 = performance.now();
     SS.ephemeris(it.t + k * 40, EPH);   // (40 s of the orbit across a shot: the bands flow, the moons creep)
     const view = PS.pose(shot, k, v, it.id, EPH); if (!view) return false;
+    return PS.renderView(g, view, EPH, t0);
+  };
+  // o-seamless: any view {pos, fwd, up, fov, ref, body} (system frame) at an ephemeris through the renderer (journey.js:
+  // the Himmelsleiter's way up the tether, a Lichtbrücke's way between the worlds)
+  PS.eph = (t) => { const SS = SSc(); if (!SS) return null; SS.ephemeris(t, EPH); return EPH; };
+  PS.renderView = function (g, view, eph, t0) {
+    const SS = SSc(), r = g && g.renderer; if (!view || !SS || !r || !SS.frameSetup) { PS.stats.miss++; return false; }
+    if (t0 === undefined) { if (!PS.ready(g)) { PS.stats.miss++; return false; } t0 = performance.now(); }
+    const tier = SS.tier(g), EPH = eph;
     const was = SS.cur;
     try {
       const fr = SS.frameSetup({ anc: SS.anchor(view, EPH), tier }, EPH, { H: r.H, tier, bloom: !!(r.q && r.q.bloom && r.hdr), patch: null });

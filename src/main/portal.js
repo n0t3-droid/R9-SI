@@ -178,29 +178,36 @@
 
   // ---------------------------------------------------------------- the journey
   // dest: {dim, at?, yaw?, fav?, id?} · o: {dry: the film only (pictures, tests), seed, film: a given film}
+  // may this trip start? (else a hint and false) — o-seamless: shared with the Himmelsleiter (journey.js)
+  Portal.check = function (g, dest) {
+    const local = dest.dim === g.dim, why = C.why(ctxOf(g), g.meta, g.dim, dest);
+    if (why) { if (g.ui && g.ui.hint) g.ui.hint(T(why === 'guest' ? 'g.pt.guest' : 'g.pt.lockedTip'), 2200); return false; }
+    if (!local && VR.Travel) { const w = VR.Travel.canGo(g, dest.dim); if (w) { if (g.ui && g.ui.hint) g.ui.hint(T(w, { dim: dimName(dest.dim) }), 2200); return false; } }
+    return true;
+  };
+  Portal.J = () => M.J;   // (o-seamless: the journey running under the Leuchtpfad's frame)
   Portal.go = function (g, dest, o) {
     o = o || {};
     if (!doc || !g || !dest || !dest.dim || M.J) return false;
     const rec = C.rec(g.meta), local = dest.dim === g.dim;
-    if (!o.dry) {
-      const why = C.why(ctxOf(g), g.meta, g.dim, dest);
-      if (why) { if (g.ui && g.ui.hint) g.ui.hint(T(why === 'guest' ? 'g.pt.guest' : 'g.pt.lockedTip'), 2200); return false; }
-      if (!local && VR.Travel) { const w = VR.Travel.canGo(g, dest.dim); if (w) { if (g.ui && g.ui.hint) g.ui.hint(T(w, { dim: dimName(dest.dim) }), 2200); return false; } }
-    }
+    if (!o.dry && !Portal.check(g, dest)) return false;
+    // o-seamless: a journey you walk or ride instead of the film (journey.js sets Portal.route; it comes back here with
+    // o.walk, its own player o.player and clock o.adv)
+    if (!o.dry && !o.walk && typeof Portal.route === 'function') { const rr = Portal.route(g, dest, o); if (rr) return rr; }
     style();
     const film = o.film || C.film(rec, (o.seed !== undefined ? o.seed : seedOf(g)) >>> 0, g.dim, dest.dim, { low: low(g) });
     rec.last = dest.id || null;
     const homeBody = palOf(D.home(g.meta));
     const fromBody = C.kindOf(g.dim) === 'deep' || C.kindOf(g.dim) === 'station' ? D.home(g.meta) : g.dim;
     const plan = spacePlan(g, film, g.dim, dest.dim);
-    const P = F.make(film, palOf(dest.dim), palOf(g.dim), { air: C.airOf(dest.dim), curveFrom: C.kindOf(g.dim) === 'deep' ? homeBody : palOf(g.dim), to: dest.dim, from: g.dim, fromBody, kind: C.kindOf(dest.dim), gl: spaceDraw(g, plan) });
+    const P = o.player || F.make(film, palOf(dest.dim), palOf(g.dim), { air: C.airOf(dest.dim), curveFrom: C.kindOf(g.dim) === 'deep' ? homeBody : palOf(g.dim), to: dest.dim, from: g.dim, fromBody, kind: C.kindOf(dest.dim), gl: spaceDraw(g, plan) });
     let cv = doc.getElementById('ptFilm');
     if (!cv) { cv = el('canvas'); cv.id = 'ptFilm'; host().appendChild(cv); cv.addEventListener('pointerdown', () => skip()); const sk = el('div'); sk.id = 'ptSkip'; host().appendChild(sk); }
     const sc = low(g) ? 0.4 : 0.75;
     cv.width = Math.max(320, Math.round(innerWidth * sc)); cv.height = Math.max(180, Math.round(innerHeight * sc));
     cv.style.display = 'block'; cv.style.opacity = '1'; cv.style.transition = 'none';
     const firstGate = !rec.gated.includes(dest.dim);
-    M.J = { g, dest, film, P, cv, x: cv.getContext('2d'), t: 0, t0: now(), last: now(), went: false, arrived: false, local, dry: !!o.dry, paused: false, phase: 'film', rt: 0, firstGate, failed: false, plan, want: false, skipped: false, hour: false };
+    M.J = { g, dest, film, P, cv, x: cv.getContext('2d'), t: 0, t0: now(), last: now(), went: false, arrived: false, local, dry: !!o.dry, paused: false, phase: 'film', rt: 0, firstGate, failed: false, plan, want: false, skipped: false, hour: false, walk: !!o.walk, adv: o.adv || null };
     M.padSt.held = true; M.keyHeld = true;   // (a button or key held from before is not a skip)
     Portal.prewarm(g);
     if (doc.pointerLockElement && doc.exitPointerLock && o.dry) doc.exitPointerLock();
@@ -300,7 +307,7 @@
     const tn = now(), wall = Math.max(0, (tn - J.last) / 1000), dt = Math.min(0.25, wall); J.last = tn;
     const g = J.g;
     if (J.phase === 'film') {
-      if (!J.paused && !J.covered) J.t += wall;   // (a menu over the trip: the film waits under it)
+      if (!J.paused && !J.covered) J.t += J.adv ? J.adv(J, wall) : wall;   // (o-seamless: a walked journey keeps its own clock)   // (a menu over the trip: the film waits under it)
       // e-portal2: a machine that cannot draw the space shots smoothly (three frames over 0.25 s while one is shown —
       // software GL, a weak chip under load) gets the painted film for the rest of the trip: never slower than before
       if (!J.dry && J.P.gl && J.t < J.P.len) { J.slowN = wall > 0.25 ? (J.slowN || 0) + 1 : Math.max(0, (J.slowN || 0) - 1); if (J.slowN >= 3) J.noGL = true; }
@@ -385,7 +392,7 @@
   // the reveal's camera: from above and aside it swings down into your eyes
   Portal.cam = function (g, cam) {
     const J = M.J, FL = M.fly;
-    if (J && J.g === g && J.phase === 'reveal' && !(VR.A11y && VR.A11y.less && VR.A11y.less(g.settings))) {
+    if (J && J.g === g && J.phase === 'reveal' && !J.walk && !(VR.A11y && VR.A11y.less && VR.A11y.less(g.settings))) {
       const u = ease(clamp(J.rt / Portal.REVEAL, 0, 1)), deep = C.kindOf(g.dim) === 'deep' || C.kindOf(g.dim) === 'station';
       return Object.assign({}, cam, { y: cam.y + (1 - u) * (deep ? 2.5 : 16), yaw: cam.yaw + (1 - u) * 0.85, pitch: cam.pitch + (1 - u) * (-0.42 - cam.pitch * 0.5) });
     }
