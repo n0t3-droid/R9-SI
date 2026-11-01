@@ -84,7 +84,8 @@ async function judge(id, png, note) {
   if (!png) { check(false, `${id}: no picture (${note || ''})`); return; }
   const now = SHOTS + 'golden_' + id + '.png', ref = GOLD + id + '.png';
   fs.writeFileSync(now, png);
-  if (UPDATE) { await sharp(png).png({ compressionLevel: 9, palette: false }).toFile(ref); run.shots[id] = { ref: 'written', note }; console.log(`  ⟳ ${id}: reference written (${note || ''})`); save(); return; }
+  if (UPDATE) { await sharp(png).resize(CW, CH, { fit: 'fill' }).removeAlpha().png({ compressionLevel: 9 }).toFile(ref);   // (the references at the comparison's size: ~0.1 MB a shot in git)
+    run.shots[id] = { ref: 'written', note }; console.log(`  ⟳ ${id}: reference written (${note || ''})`); save(); return; }
   if (!fs.existsSync(ref)) { check(false, `${id}: no reference test/golden/${id}.png — run UPDATE=1 once`); return; }
   const a = await small(fs.readFileSync(ref)), b = await small(png);
   const s = S.compare(a, b, CW, CH, { ch: 3 }), bad = S.verdict(s, THR[id]);
