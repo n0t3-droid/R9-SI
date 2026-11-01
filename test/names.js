@@ -341,7 +341,7 @@ console.log('7 · the Flausel\'s names, the Heartland\'s sites in the Wanderbuch
   const sh = P.first.concat(P.kids, P.elders).filter(w => others.has(w));
   check(!sh.length, 'no Flausel shares a given name with another people' + (sh.length ? ': ' + sh.join(', ') : ''));
   const fy = src('src/main/fairy.js');
-  check(/VR\.Names\.flausel\(/.test(fy) && /whoName\(f\)/.test(fy) && !/T\(nameKey\(f\.who\)\)/.test(fy), 'the tree village\'s folk have names of their own (fairy.js: VR.Names.flausel, not „Ein Flausel")');
+  check(/VR\.Names\.flausel\(/.test(fy) && /whoName\(f\)/.test(fy) && !/whoName = \(f\) => f\.nm \|\| whoName\(f\)/.test(fy), 'the tree village\'s folk have names of their own (fairy.js: VR.Names.flausel, not „Ein Flausel")');
   check(N.flausel(77, 0) === N.flausel(77, 0) && N.flausel(77, 0) !== N.flausel(77, 1) || N.flausel(78, 1) !== N.flausel(77, 0), 'a Flausel keeps its name (seeded by the place): ' + N.flausel(77, 0) + ', ' + N.flausel(77, 1));
   // the sites: every Wanderbuch site has a name of its own in both tables; the trailer's landmarks read as the quests read
   const W = src('src/main/wander.js'), L = VR.Land || {};
