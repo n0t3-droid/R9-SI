@@ -162,7 +162,7 @@ if (want('ride')) {
 }
 
 if (want('cost')) {
-  console.log('0 · Very Low keeps the film; the costs');
+  console.log('0 · Very Low keeps the film; the costs'); where = 'cost: the frames';
   const r = await ev(() => {
     const g = VR.game, out = {};
     for (const preset of ['potato', 'high']) for (const on of [false, true]) {
@@ -174,16 +174,22 @@ if (want('cost')) {
     }
     g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
     out.potatoBridge = VR.Journey.mode(g, 'bridge'); out.potatoLift = VR.Journey.mode(g, 'lift');
-    // (o-seamless2: Very Low walks the painted bridge — its frame against the film's, both at Very Low's 0.4 canvas)
-    const C = VR.PortalCore, F = C.film(C.rec({}), 7, 'stn.ring', 'aqua', { low: true });
-    out.vlFilm = +VR.Portal.bench(F, 40, true).toFixed(2); out.vlBridge = +VR.Journey.bench(g, 40, true, 'aqua').toFixed(2);
-    g.applyPreset('high'); g.settings.dynRes = false; g.applySettings('*');
-    out.hiFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', {}), 40, false).toFixed(2); out.hiBridgePaint = +VR.Journey.bench(g, 40, false, 'aqua').toFixed(2);
+
     g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
     out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
     g.settings.journeys = true; g.applySettings('*');
     return out;
   });
+  where = 'cost: the painted bridge vs the film';
+  // (o-seamless2: Very Low walks the painted bridge — its frame against the film's, both at Very Low's 0.4 canvas)
+  Object.assign(r, await ev(() => {
+    const g = VR.game, out = {}, C = VR.PortalCore;
+    g.applyPreset('potato'); g.applySettings('*');
+    out.vlFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', { low: true }), 12, true).toFixed(2); out.vlBridge = +VR.Journey.bench(g, 12, true, 'aqua').toFixed(2);
+    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.applySettings('*');
+    out.hiFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', {}), 12, false).toFixed(2); out.hiBridgePaint = +VR.Journey.bench(g, 12, false, 'aqua').toFixed(2);
+    return out;
+  }));
   run.cost = r;
   console.log('  ' + JSON.stringify(r));
   check(r.potatoBridge === 'walk' && r.potatoLift === 'film' && r.offRoute === null, 'Very Low walks the painted Lichtbrücke (its lift stays the film); the switch off: the films as before');

@@ -402,28 +402,29 @@
     X.fillStyle = look.cL; X.globalAlpha = 0.07;
     X.beginPath(); X.moveTo(px(zMax, -hw * 3), py(zMax, -0.4)); X.lineTo(px(zMax, hw * 3), py(zMax, -0.4)); X.lineTo(px(0.7, hw * 4), py(0.7, -1.2)); X.lineTo(px(0.7, -hw * 4), py(0.7, -1.2)); X.fill();
     // aurora ribbons (High): two soft curtains swaying along the path
-    if (FX.ribbons) for (let sd = -1; sd <= 1; sd += 2) {
-      let pX = 0, pB = 0, pT = 0;
-      for (let z = 3, i = 0; z <= zMax + 4; z += 4, i++) {
-        const zz = Math.min(z, zMax), x = sd * (hw + 2.4 + 0.9 * Math.sin(zz * 0.09 + s * 0.05 + sd)), yb = 0.4 + 0.5 * Math.sin(zz * 0.05 + tc * 0.4 + sd), yt = yb + 2.6 + 1.3 * Math.sin(zz * 0.07 - tc * 0.3);
-        const cx = px(zz, x), cb = py(zz, yb), ct = py(zz, yt);
+    if (FX.ribbons) for (let sd = -1; sd <= 1; sd += 2) {   // (thin curtains high off the path's sides: bright lower hem, fading up)
+      let pX = 0, pB = 0, pM = 0, pT = 0;
+      for (let z = 9, i = 0; z <= zMax + 4; z += 4, i++) {
+        const zz = Math.min(z, zMax), x = sd * (hw + 5 + 1.2 * Math.sin(zz * 0.09 + s * 0.05 + sd)), yb = 1.8 + 0.6 * Math.sin(zz * 0.05 + tc * 0.4 + sd), yt = yb + 3 + 1.4 * Math.sin(zz * 0.07 - tc * 0.3);
+        const cx = px(zz, x), cb = py(zz, yb), cm = py(zz, (yb * 2 + yt) / 3), ct = py(zz, yt);
         if (i > 0) {
-          const a = clamp(0.2 - zz / 500, 0.04, 0.2) * (0.6 + 0.4 * Math.sin(zz * 0.21 - tc * 1.3));
-          X.globalAlpha = a; X.fillStyle = (i & 1) ? look.cA : look.cA2;
-          X.beginPath(); X.moveTo(pX, pB); X.lineTo(cx, cb); X.lineTo(cx, ct); X.lineTo(pX, pT); X.fill();
-          X.globalAlpha = a * 1.6; X.strokeStyle = look.cA; X.lineWidth = 1; X.beginPath(); X.moveTo(pX, pT); X.lineTo(cx, ct); X.stroke();
+          const a = clamp(0.11 - zz / 900, 0.03, 0.11) * (0.55 + 0.45 * Math.sin(zz * 0.21 - tc * 1.3));
+          X.fillStyle = look.cA;
+          X.globalAlpha = a; X.beginPath(); X.moveTo(pX, pB); X.lineTo(cx, cb); X.lineTo(cx, cm); X.lineTo(pX, pM); X.fill();
+          X.globalAlpha = a * 0.4; X.beginPath(); X.moveTo(pX, pM); X.lineTo(cx, cm); X.lineTo(cx, ct); X.lineTo(pX, pT); X.fill();
+          X.globalAlpha = a * 3; X.strokeStyle = look.cA; X.lineWidth = 1.5; X.beginPath(); X.moveTo(pX, pB); X.lineTo(cx, cb); X.stroke();
         }
-        pX = cx; pB = cb; pT = ct;
+        pX = cx; pB = cb; pM = cm; pT = ct;
       }
     }
     // the tiles, far to near (1.6 m long, 0.25 m apart, sliding toward you as you walk)
     for (let z = zMax - ((zMax + ph) % tl); z > 0.55; z -= tl) {
       const z0 = Math.max(0.55, z - 1.6), zm = (z + z0) / 2, pu = Math.exp(-(zm - zp) * (zm - zp) / 6), a = clamp(1.2 - z / 70, 0.15, 0.95);
       const xa = px(z, -hw), xb = px(z, hw), ya = py(z, 0), xc = px(z0, hw), xd = px(z0, -hw), yb = py(z0, 0);
-      X.fillStyle = look.cL; X.globalAlpha = a * (0.3 + 0.35 * pu);
+      X.fillStyle = look.cL; X.globalAlpha = a * (0.55 + 0.35 * pu);
       X.beginPath(); X.moveTo(xa, ya); X.lineTo(xb, ya); X.lineTo(xc, yb); X.lineTo(xd, yb); X.fill();
       const ia = px(z - 0.4, -hw * 0.6), ib = px(z - 0.4, hw * 0.6), iy = py(z - 0.4, 0), ic = px(z0 + 0.4, hw * 0.6), id = px(z0 + 0.4, -hw * 0.6), iy2 = py(z0 + 0.4, 0);
-      if (z - z0 > 1) { X.globalAlpha = a * (0.22 + 0.3 * pu); X.fillStyle = look.cW; X.beginPath(); X.moveTo(ia, iy); X.lineTo(ib, iy); X.lineTo(ic, iy2); X.lineTo(id, iy2); X.fill(); }
+      if (z - z0 > 1) { X.globalAlpha = a * (0.35 + 0.35 * pu); X.fillStyle = look.cL; X.beginPath(); X.moveTo(ia, iy); X.lineTo(ib, iy); X.lineTo(ic, iy2); X.lineTo(id, iy2); X.fill(); }
       X.strokeStyle = look.cL; X.globalAlpha = a * 0.28; X.lineWidth = Math.max(2, 0.12 / z * f);
       X.beginPath(); X.moveTo(xa, ya); X.lineTo(xb, ya); X.lineTo(xc, yb); X.lineTo(xd, yb); X.closePath(); X.stroke();
       X.strokeStyle = look.cW; X.globalAlpha = a * (0.7 + 0.3 * pu); X.lineWidth = 1;
@@ -565,6 +566,9 @@
         else if (y > 1 && y < 23 && d > 8.6 && d < 10) { const post = Math.abs(Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) * (Math.PI / 4) - Math.atan2(dz, dx)) < 0.09; if (post || y === 12) gr.set(x, y, z, 0xd8b46a, 0); else if ((x + y + z) % 7 === 0) gr.set(x, y, z, 0xbfe8ff, 1); }
       }
     }) }, layout: { cab: [0, 0, 0] } });
+    // o-seamless2: the cart you ride — the caravan's own, its canopy pulled back over the rear half (a sunshade behind
+    // you), so the bench in front has the open sky and the road ahead
+    VM.jy_cart_seat = () => { const m = VM.life_cart(), gr = m.parts.body.grid; for (let y = 7; y < gr.sy; y++) for (let z = 0; z <= 12; z++) for (let x = 0; x < gr.sx; x++) gr.c[gr.i(x, y, z)] = 0; return m; };
     // the tether (1 voxel = 1/4 m): a slim pale gold line 160 m up, a marker light every 8 m
     VM.jy_tether = () => ({ unit: 4, radius: 80, parts: { line: part(1, 640, 1, [0, 0, 0], (gr) => { for (let y = 0; y < 640; y++) gr.set(0, y, 0, y % 32 < 2 ? 0xffc870 : 0xfff0c8, 1); }) }, layout: { line: [0, 0, 0] } });
   }
@@ -704,7 +708,7 @@
         cam = cam || r.cam;
         let p = null; const prog = () => p || (p = ent.beginVox(r, E));
         const J = M.J;
-        if (J && J.kind === 'ride' && J.g === g) { LK.drawModel(g, r, prog(), 'life_cart', [J.at.x, J.y + 0.1 + (J.bob || 0), J.at.z], J.at.yaw, cam, CART_O); LK.drawFolk(g, r, prog(), J.F, cam, g.time || 0); }
+        if (J && J.kind === 'ride' && J.g === g) { LK.drawModel(g, r, prog(), VM && VM.jy_cart_seat ? 'jy_cart_seat' : 'life_cart', [J.at.x, J.y + 0.1 + (J.bob || 0), J.at.z], J.at.yaw, cam, CART_O); LK.drawFolk(g, r, prog(), J.F, cam, g.time || 0); }
         for (const c of M.carts) {
           if (J && J.kind === 'ride' && J.st.t < 4 && Math.hypot(c.x - J.at.x, c.z - J.at.z) < 3) continue;
           LK.drawModel(g, r, prog(), 'life_cart', [c.x, c.y + 0.1, c.z], c.yaw, cam, CART_O);
