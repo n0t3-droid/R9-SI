@@ -360,6 +360,7 @@
   const baseUpdate = P.update;
   P.update = function (dt) {
     baseUpdate.call(this, dt);
+    this._miDt = dt;   // (f-polish5: the festival's one-frame lanterns live a frame)
     try { MI.init(this); MI.tick(this, dt); } catch (e) { if (!MI.warned) { MI.warned = true; console.warn('movein', e); } }
   };
   const baseThink = P.think;
@@ -823,7 +824,7 @@
   MI.drawFest = function (V, r, E, cam) {
     const g = V.g, rec = g.meta.movein, tod = g.env.timeOfDay, LK = VR.LifeKit;
     if (!rec || !rec.sets.length || !V.festivalOn) return;
-    const T0 = tierOf(g), dt = Math.min(0.1, (g._miFestDt = g.dt || 0.033));
+    const T0 = tierOf(g), dt = Math.min(0.1, V._miDt || 0.033);
     for (const set of rec.sets) {
       const vil = V.known.get(set.id); if (!vil || !vil.active || !V.festivalOn(vil, tod)) continue;
       const pz = vil.plan.plaza; if ((pz.x - cam.x) ** 2 + (pz.z - cam.z) ** 2 > 140 * 140) continue;

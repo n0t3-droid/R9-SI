@@ -245,8 +245,10 @@ if (want('movein')) {
         const dx = lead[4][0] - door[0], dz = lead[4][2] - door[2], dl = Math.hypot(dx, dz) || 1;
         const sav = await ev(() => { const p = VR.game.player; return [p.pos.slice(), p.yaw, p.pitch]; });
         await stand([door[0] + 0.5 - dz / dl * 9 - dx / dl * 3, door[1] + 4, door[2] + 0.5 + dx / dl * 9 - dz / dl * 3], [lead[4][0], lead[4][1] + 0.5, lead[4][2]]);
+        await ev(() => { const J = VR.game.villages._mi && VR.game.villages._mi.job; if (J) { window.__fr = J.frame; J.frame = null; } });   // (the wide shot from the same place as before)
         await step(2, 33);
         await grab('arrive', 6);
+        await ev(() => { const J = VR.game.villages._mi && VR.game.villages._mi.job; if (J && window.__fr) J.frame = window.__fr; window.__fr = null; });
         await ev((s) => { const p = VR.game.player; p.teleport(s[0][0], s[0][1], s[0][2]); p.yaw = s[1]; p.pitch = s[2]; p.viewYaw = s[1]; p.flying = false; }, sav);
         await ev(() => { VR.game.zenFreezeTime = false; });
       }
