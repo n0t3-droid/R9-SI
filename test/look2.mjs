@@ -100,9 +100,10 @@ const pickTime = (o) => ev(async (o) => { const g = VR.game; let best = null, bs
 // natural ground: a grass (or leaves, dirt, stone, snow) top
 const meadowAt = (S0, o) => ev(([S0, o]) => { const g = VR.game, w = g.world, R = VR.R; const nm = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z); return { y, n: s ? R.types[R.T.type[s]].name : '' }; };
   let best = null, bd = 1e9;
-  for (let gx = -128; gx <= 128; gx += 8) for (let gz = -128; gz <= 128; gz += 8) { const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz), d = Math.hypot(gx, gz); if (d < 16 || d > bd || !w.isLoaded(x, z)) continue;
-    const c = nm(x, z); if (!/grass/.test(c.n)) continue; let ok = true;
-    for (let dx = -3; dx <= 3 && ok; dx++) for (let dz = -3; dz <= 3 && ok; dz++) { const q = nm(x + dx, z + dz); if (!/grass/.test(q.n) || Math.abs(q.y - c.y) > 2) ok = false; }
+  // (run 2: a 7 × 7 lawn was a city yard between walls — 25 × 25 m of open grass now, sampled every 3 m)
+  for (let gx = -240; gx <= 240; gx += 12) for (let gz = -240; gz <= 240; gz += 12) { const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz), d = Math.hypot(gx, gz); if (d < 40 || d > bd || !w.isLoaded(x, z)) continue;
+    const c = nm(x, z); if (!/grass/.test(c.n) || /vx_/.test(c.n)) continue; let ok = true;
+    for (let dx = -12; dx <= 12 && ok; dx += 3) for (let dz = -12; dz <= 12 && ok; dz += 3) { if (!w.isLoaded(x + dx, z + dz)) { ok = false; break; } const q = nm(x + dx, z + dz); if (!/grass|flower|fern/.test(q.n) || Math.abs(q.y - c.y) > 3) ok = false; }
     if (ok) { bd = d; best = [x + 0.5, z + 0.5]; } }
   return best; }, [S0, o || {}]);
 const natural = (x, z) => ev(([x, z]) => { const g = VR.game, w = g.world, R = VR.R, y = w.topAt(Math.floor(x), Math.floor(z)), s = w.getBlock(Math.floor(x), y, Math.floor(z)); const n = s ? R.types[R.T.type[s]].name : ''; return /grass|leaves|dirt|stone|snow|sand|moss|podzol|log/.test(n) && !/brick|slab|stairs|polished|smooth|tile|vx_/.test(n); }, [x, z]);
@@ -145,11 +146,14 @@ try {
     // the highest ground 40 … 140 m toward the sun (a little left and right too), the eye 40 m before it and lower
     let R = null;
     // (run 1: the highest 'ridge' was the city's tower — natural tops only, from a meadow away from the city)
+    // (run 2: the 'meadow' was a roof garden — the open meadow's eye, then the natural top toward the sun that stands
+    // highest over the eye's horizon: the steepest angle up, so it cuts the low sun's sky)
     const G = (await meadowAt(S0)) || [S0[0], S0[2]];
-    for (const da of [0, 0.3, -0.3, 0.6, -0.6, 0.9, -0.9]) for (let d = 30; d <= 130; d += 10) { const x = G[0] + Math.cos(a + da) * d, z = G[1] + Math.sin(a + da) * d, h = await top(x, z); if ((!R || h > R.h) && await natural(x, z)) R = { x, z, h, d, da }; }
-    if (!R) R = { x: G[0] + Math.cos(a) * 60, z: G[1] + Math.sin(a) * 60, h: (await top(G[0], G[1])) + 10, d: 60, da: 0 };
-    const ex = R.x - Math.cos(a + R.da) * Math.min(45, R.d), ez = R.z - Math.sin(a + R.da) * Math.min(45, R.d), eh = await top(ex, ez);
-    const P = [ex, eh + 1 + 1.7, ez], T = [R.x, Math.max(R.h + 3, eh + 6), R.z];
+    await camAt([G[0], (await top(G[0], G[1])) + 3, G[1]], [G[0] + Math.cos(a) * 30, (await top(G[0], G[1])) + 3, G[1] + Math.sin(a) * 30], GOLD); await settle(40);
+    const eh = await top(G[0], G[1]);
+    for (const da of [0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75]) for (let d = 30; d <= 180; d += 10) { const x = G[0] + Math.cos(a + da) * d, z = G[1] + Math.sin(a + da) * d, h = await top(x, z), el = (h - eh) / d; if ((!R || el > R.el) && await natural(x, z)) R = { x, z, h, d, da, el }; }
+    if (!R) R = { x: G[0] + Math.cos(a) * 60, z: G[1] + Math.sin(a) * 60, h: eh + 10, d: 60, da: 0 };
+    const P = [G[0], eh + 1 + 1.7, G[1]], T = [R.x, Math.max(R.h + 2, eh + 5), R.z];
     console.log('     ridge ' + JSON.stringify({ R, P }));
     await camAt(P, T, GOLD); await settle(40);
     N.cams.ridge = { P, T };
@@ -162,8 +166,11 @@ try {
         const r = { before: [], after: [] };
         // (run 1: a shared machine — single samples from 3.7 to 32 ms: ten alternations (A B B A …), 8 frames after 8
         // warm-up frames each (the rebuilt programs compiled), min and median)
-        for (let i = 0; i < 10; i++) { const c = (i % 4 === 0 || i % 4 === 3) ? 'before' : 'after'; await config(c); await run(2); r[c].push(await ms(8)); }
-        r.passes = {}; for (const c of CONFIGS) { await config(c); r.passes[c] = await passes(); }
+        // (run 2: ten switches with a full program rebuild each (the meadow is a terrain define) did not finish in an hour
+        // under a load of 10 — A B B A: three switches, three samples of 6 frames at each visit, the passes on the way)
+        r.passes = {};
+        for (const c of ['before', 'after', 'after', 'before']) { if (r.cur !== c) { await config(c); await run(2); r.cur = c; } if (!r.passes[c]) r.passes[c] = await passes(); for (let k = 0; k < 3; k++) r[c].push(await ms(6)); }
+        delete r.cur;
         r.prog = await ev(() => { const P = VR.game.renderer.P; return { comp: P.composite && P.composite.key || null, n: Object.keys(P).length }; });
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2).toFixed(1); };
         const mn = (a) => +Math.min(...a).toFixed(1);
