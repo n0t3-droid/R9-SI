@@ -118,7 +118,7 @@ function partMeshes(def, smooth) {
 function drawPerson(cv, def, meshes, x, z, yaw, pose, scale, hide) {
   const base = m4.create(); m4.translate(base, base, x, 0, z); m4.rotY(base, base, yaw); const s = (scale || 1) / def.unit; m4.scale(base, base, s, s, s);
   const mats = FS.rigMats(def, base, pose, {});
-  for (const name of def.order) { if (hide && hide[name]) continue; const M = meshes[name]; if (M) cv.mesh(M, mats[name]); }
+  for (const name of def.order) { if (hide && hide[name]) continue; if ((name === 'joy' || name === 'wow') && !(hide && hide.expr === name)) continue; const M = meshes[name]; if (M) cv.mesh(M, mats[name]); }
 }
 const people = cast.map(([role, age, seed, style]) => { const L = Folk.look(seed, role, age, null, style); return { L, def: Folk.buildFine(L), kid: age === 'child' }; });
 const idle = FA.sample(FA.clips.idle, 0.7, {});
@@ -165,6 +165,16 @@ for (const smooth of [false, true]) {
   six.forEach((L, i) => { const def = Folk.buildFine(L); drawPerson(cv, def, partMeshes(def, true), (i - 2.5) * 0.36, 0, 0, idle, L.age === 'child' ? 0.82 : 1, { lids: true, mouth: true }); });
   fs.writeFileSync(path.join(OUT, 'folk_sheet_faces.png'), cv.png());
   check(cv.drawn > 50000, `six faces at two blocks, smooth (${cv.drawn} pixels)`);
+}
+{
+  // u-folk2: the expressions — the same three faces resting, in joy and in surprise (folkmodel.js joy / wow parts)
+  const three = [Folk.look(31, 'scholar', 'adult'), Folk.look(1212, 'child', 'child'), Folk.look(15, 'baker', 'adult')];
+  const cv = new Canvas(1280, 720, BG);
+  cv.cam([0, 1.5, -2.2], [0, 1.4, 0], 40);
+  let i = 0;
+  for (const L of three) for (const ex of [null, 'joy', 'wow']) { const def = Folk.buildFine(L); drawPerson(cv, def, partMeshes(def, true), (i - 4) * 0.27, 0, 0, idle, L.age === 'child' ? 0.82 : 1, { lids: true, mouth: true, expr: ex }); i++; }
+  fs.writeFileSync(path.join(OUT, 'folk_sheet_expr.png'), cv.png());
+  check(cv.drawn > 50000, `three faces resting, in joy, in surprise (${cv.drawn} pixels)`);
 }
 {
   // every hat and hair style on the fine face (folkmodel.js fineFace), two rows of heads at 1.1 blocks: the trades' hats

@@ -3757,6 +3757,16 @@
     "g.town.rewardAdv": "Für den Aufstieg: +{xp} EP, +{t} Heliataler",
     "g.town.again": "Der Blick ist so schön wie beim ersten Mal.",
     // ---- u-worlds5 end
+    // ---- u-folk2 (folkjoy.js: the inhabitants' warm moments)
+    "g.joy.forYouFlower": "Für dich – eine Blume!",
+    "g.joy.forYouSnack": "Magst du was Leckeres?",
+    "g.joy.dance": "Tanzt du mit uns? ♪",
+    "g.joy.hide": "Spielst du Verstecken? Such mich!",
+    "g.joy.found": "Gefunden! Hihi!",
+    "g.joy.here": "Hier bin ich!",
+    "g.joy.enjoy": "Lass es dir gut gehen!",
+    "g.joy.danceThanks": "Das war schön – danke!",
+    // ---- u-folk2 end
     // ---- a-fairy (src/main/fairy.js): die Märchenorte und die Abenteuer der Flausel
     "g.set.fairy": "Märchenorte",
     "g.set.fairy.tip": "Leuchtpilzwald, Wunschquelle, Schlummerbaum, Mondsteinkreis und Schwebegarten in den Welten, mit ihren Flauseln und kleinen Abenteuern. Kostet nur in der Nähe eines Ortes etwas.",

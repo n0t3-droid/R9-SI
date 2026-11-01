@@ -684,7 +684,10 @@
     for (let Y = 0; Y < g.sy; Y++) for (let Z = 0; Z < g.sz; Z++) for (let X = 0; X < g.sx; X++) if (w[g.i(X, Y, Z)]) { const x = X - g.ox, y = Y - g.oy, z = Z - g.oz; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
     const fx0 = 2 * x0 - 3, fy0 = 2 * y0 - 3, fz0 = 2 * z0 - 3, fx1 = 2 * x1 + 4, fy1 = 2 * y1 + 4, fz1 = 2 * z1 + 4;
     const OX = -fx0, OY = -fy0, OZ = -fz0, SX = fx1 - fx0 + 1, SY = fy1 - fy0 + 1, SZ = fz1 - fz0 + 1;
-    const grid = () => { const q = new VR.VoxGrid(SX, SY, SZ, OX, OY, OZ); q.res = 2; return q; };
+    // (u-folk2: the head a little larger than life — 8 % a grown-up's, 3 % a child's —, the warm read of a cartoon film's
+    // people; the fine grids' res scales them about the head's pivot at the chin, the hat and the hair with them)
+    const HS = C.kid ? 1.03 : 1.08, RES = 2 / HS;
+    const grid = () => { const q = new VR.VoxGrid(SX, SY, SZ, OX, OY, OZ); q.res = RES; return q; };
     const F = grid();
     for (let Y = fy0; Y <= fy1; Y++) for (let Z = fz0; Z <= fz1; Z++) for (let X = fx0; X <= fx1; X++) {
       const x = Math.floor(X / 2), y = Math.floor(Y / 2), z = Math.floor(Z / 2), dx = X & 1 ? 1 : -1, dy = Y & 1 ? 1 : -1, dz = Z & 1 ? 1 : -1;
@@ -791,29 +794,39 @@
       const lids = grid(), mouth = grid();
       for (const [X, Y, Z] of eyeAt2) fset(lids, X, Y, Z - 1, mul(skin, 0.9));
       for (const [X, Y, Z] of mouthAt) { fset(mouth, X, Y, Z - 1, 0x3A1418); fset(mouth, X, Y - 1, Z - 1, 0x3A1418); }
-      const hu = (X) => (X + 0.5) / 2;
-      F.face = { kind: sp, eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / 2, mouthX: (bL + 1) / 2, mouthY: (mouthY + 1) / 2 + 0.25, noseY: (Ye - 2) / 2 + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2) };
-      return { head: F, lids, mouth };
+      // (u-folk2: a native's expressions — `joy` the mouth widened and its corners up, `wow` the mouth a round O)
+      const joy = grid(), wow = grid();
+      for (const [X, Y, Z] of mouthAt) { fset(joy, X, Y, Z - 1, 0x4A1820); fset(wow, X, Y, Z - 1, 0x3A1418); fset(wow, X, Y - 1, Z - 1, 0x3A1418); fset(wow, X, Y - 2, Z - 1, 0x3A1418); }
+      if (mouthAt.length) { let xa = 1e9, xb = -1e9, Ym = 0, Zm = 0; for (const [X, Y, Z] of mouthAt) { if (X < xa) { xa = X; Ym = Y; Zm = Z; } if (X > xb) xb = X; } fset(joy, xa - 1, Ym + 1, Zm - 1, 0x4A1820); fset(joy, xb + 1, Ym + 1, Zm - 1, 0x4A1820); }
+      const hu = (X) => (X + 0.5) / RES;
+      F.face = { kind: sp, eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / RES, mouthX: (bL + 1) / RES, mouthY: (mouthY + 1) / RES + 0.25, noseY: (Ye - 2) / RES + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2), scale: HS };
+      return { head: F, lids, mouth, joy, wow };
     }
     // the eyes: the white, the iris, the white, in the face's plane (sunk a voxel into a socket they went dark whenever
     // the light came from behind: the socket's occlusion and its shadow — in the game the eyes read as slits); the iris dark
     // enough to read on every skin, the outer white a shade greyer (the eye's round). The lids close them from before
     const iris = mix(C.eye, 0x0A0806, 0.35), white = 0xF2EEE6, whiteO = 0xDED8CE;
     const eyeAt = [];
-    for (const X0 of [eL - 1, eL, eL + 1]) for (const X of [X0, mir(X0)]) {
-      const Z = frontZ(X, Ye); if (Z === null || !skinAt(X, Ye, Z)) continue;
-      const c = X0 === eL ? iris : X0 === eL - 1 ? whiteO : white;
-      fset(F, X, Ye, Z, c, TG.eye); eyeAt.push([X, Z - 1]);
+    // (u-folk2, the owner: „die Bewohner sehen nicht wirklich echt aus" — the eye was ONE fine row, a slit at any
+    // distance: now two rows high and four wide — the outer white, a two-wide iris, the inner white — with a catch-light
+    // in the iris's upper outer corner, the warm spark a cartoon-film eye lives by; the pupil a shade darker below it)
+    const pupil = mix(C.eye, 0x050404, 0.62), glint = 0xFFFCF4;
+    for (const Y of [Ye - 1, Ye]) for (const X0 of [eL - 2, eL - 1, eL, eL + 1]) for (const X of [X0, mir(X0)]) {
+      const Z = frontZ(X, Y); if (Z === null || !skinAt(X, Y, Z)) continue;
+      const c = X0 === eL - 2 ? whiteO : X0 === eL + 1 ? white : X0 === eL - 1 ? (Y === Ye ? glint : iris) : (Y === Ye ? iris : pupil);
+      fset(F, X, Y, Z, c, TG.eye); eyeAt.push([X, Z - 1, Y]);
     }
     // the upper lid's line over the eye (darker with lashes, a flick at the outer corner), a shade under it
     // (the features that must stay crisp carry a tag of their own — the lid's line the eye's, the brows the hair's, the
     // lips another: the smooth surface keeps a crease where two tags meet instead of blending their colours)
-    const lid = mix(skin, LASH, C.kid ? 0.42 : C.lashes ? 0.7 : 0.55);
-    for (const X of [eL - 1, eL, eL + 1]) { both(X, Ye + 1, lid, TG.eye); both(X, Ye - 1, mul(skin, 0.94)); }
-    if (C.lashes && !C.kid) both(eL - 2, Ye + 1, mix(skin, LASH, 0.5), TG.eye);
-    // the brows: four voxels from over the eye's inner corner outward, the hair's colour over the skin (an elder's greyer)
+    const lid = mix(skin, LASH, C.kid ? 0.5 : C.lashes ? 0.72 : 0.5);
+    for (const X of [eL - 2, eL - 1, eL, eL + 1]) both(X, Ye + 1, lid, TG.eye);
+    if (C.lashes && !C.kid) both(eL - 3, Ye + 1, mix(skin, LASH, 0.5), TG.eye);
+    // the brows: from over the eye's inner corner outward, the hair's colour over the skin (an elder's greyer); u-folk2:
+    // the brow a row above the lid (it lifts in surprise: the `wow` part)
     const browC = C.elder ? mix(skin, mix(C.hair, 0xE6E6E6, 0.45), 0.5) : C.bald ? mix(skin, 0x3A2A20, 0.45) : mix(skin, mul(C.hair, 0.72), 0.62);
-    for (let X = eL - 2; X <= eL + 1; X++) both(X, Ye + 2, browC, TG.hair);
+    // (u-folk2: the brow two rows over the lid's line — an open, friendly face; a row nearer read as a heavy, tired lid)
+    for (let X = eL - 2; X <= eL + 1; X++) both(X, Ye + 3, browC, TG.hair);
     // the nose: the bridge between the eyes stays in the face's plane (the eyes are a voxel in), below it the nose stands
     // a voxel out down to its tip; a child's is a small button. The nostrils' wings a shade beside the tip
     // (a grown-up's tip, the nose's lowest row, two voxels out: the smoothing takes some of it back)
@@ -837,32 +850,46 @@
       both(bL, by, lipL, TG.other, true);
     } else if (C.kid) { both(bL, ty, lipU, TG.other); both(bL, by, lipL, TG.other); }
     else { both(bL, ty, lipU, TG.other); both(bL - 1, ty, lipC, TG.other); both(bL, by, lipL, TG.other); }
+    // u-folk2: the resting mouth smiles — its corners a row up, a shade darker; a soft blush on every cheek (warmer on a child)
+    if (!C.beard) both(bL - 2, ty + 1, mix(mul(skin, 0.78), 0xA84050, 0.25 * kL), TG.other);
+    for (const X of [eL - 2, eL - 1, eL]) both(X, Ye - 3, mix(skin, PINK, C.kid ? 0.3 : 0.16));
     // cheeks, freckles, an elder's lines
-    if (C.kid) for (const X of [eL - 1, eL]) both(X, Ye - 3, mix(skin, PINK, 0.24));
+    if (C.kid) for (const X of [eL - 1, eL]) both(X, Ye - 3, mix(skin, PINK, 0.3));
     if (C.freckles) for (const [X, Y] of [[eL - 1, Ye - 2], [eL, Ye - 3], [eL + 1, Ye - 2]]) both(X, Y, mul(skin, 0.86));
     if (C.elder) { both(eL - 2, Ye, mul(skin, 0.9)); both(eL - 2, Ye - 1, mul(skin, 0.92)); both(bL - 2, ty, mul(skin, 0.92)); both(bL - 2, ty + 1, mul(skin, 0.94)); }
     // glasses: the frame's top over each eye and across the nose's root (the bridge), its outer sides, a fine lower rim (half
     // the frame's tone: a full dark ring read as a mask), the arms back over the ears
     if (C.glasses) {
       const fr = C.frame, low = mix(skin, fr, 0.4);
-      for (let X = eL - 2; X <= eL + 2; X++) { both(X, Ye + 1, fr, TG.metal); if (X <= eL + 1) both(X, Ye - 1, low, TG.metal); }
-      both(eL - 2, Ye, fr, TG.metal);
+      // (u-folk2: round the eye's two rows — the frame's top over the lid's line, its lower rim under the eye)
+      for (let X = eL - 3; X <= eL + 2; X++) { both(X, Ye + 2, fr, TG.metal); if (X <= eL + 1) both(X, Ye - 2, low, TG.metal); }
+      both(eL - 3, Ye, fr, TG.metal); both(eL - 3, Ye - 1, fr, TG.metal); both(eL - 3, Ye + 1, fr, TG.metal);
       for (let Z = fz0; Z <= 1; Z++) for (const side of [-1, 1]) {
         // the head's side at the frame's row: the outermost voxel this deep, the arm a voxel beyond it
         let X = null;
-        if (side < 0) { for (let x = fx0; x <= fx1; x++) if (fget(x, Ye + 1, Z)) { X = x - 1; break; } }
-        else { for (let x = fx1; x >= fx0; x--) if (fget(x, Ye + 1, Z)) { X = x + 1; break; } }
-        if (X !== null && (side < 0 ? X < eL - 1 : X > mir(eL - 1))) fset(F, X, Ye + 1, Z, fr, TG.metal);
+        if (side < 0) { for (let x = fx0; x <= fx1; x++) if (fget(x, Ye + 2, Z)) { X = x - 1; break; } }
+        else { for (let x = fx1; x >= fx0; x--) if (fget(x, Ye + 2, Z)) { X = x + 1; break; } }
+        if (X !== null && (side < 0 ? X < eL - 1 : X > mir(eL - 1))) fset(F, X, Ye + 2, Z, fr, TG.metal);
       }
     }
     // the lids (drawn while blinking): skin in each eye's socket; the talking mouth: dark before the lips
     const lids = grid(), mouth = grid();
-    for (const [X, Z] of eyeAt) fset(lids, X, Ye, Z, mul(skin, 0.9));
+    for (const [X, Z, Y] of eyeAt) fset(lids, X, Y, Z, mul(skin, 0.9));
     for (const X of [bL, bL + 1]) for (const Y of [ty, by]) { const Z = frontZ(X, Y); if (Z !== null) fset(mouth, X, Y, Z - 1, 0x5A1E26); }
+    // u-folk2: the expressions (folkjoy.js shows them like the lids): `joy` an open smile — the corners up, the upper
+    // teeth, the dark mouth, a rosy lower lip; `wow` a round open mouth and the brows a row higher
+    const joy = grid(), wow = grid();
+    const on = (q, X, Y, c, t) => { const Z = frontZ(X, Y); if (Z !== null) fset(q, X, Y, Z - 1, c, t || TG.other); };
+    for (let X = bL - 1; X <= bL + 2; X++) { on(joy, X, ty, X === bL - 1 || X === bL + 2 ? 0x4A1820 : 0xF6F0E6); on(joy, X, by, 0x4A1820); }
+    for (const X of [bL, bL + 1]) on(joy, X, by - 1, mix(skin, 0xC86A78, 0.55));
+    for (const X of [bL - 2, bL + 3]) on(joy, X, ty + 1, 0x4A1820);
+    for (const X of [bL, bL + 1]) for (const Y of [ty, by, by - 1]) on(wow, X, Y, 0x3A1418);
+    for (const X of [bL - 1, bL + 2]) on(wow, X, by, 0x4A1820);
+    for (let X = eL - 2; X <= eL + 1; X++) { on(wow, X, Ye + 4, browC, TG.hair); on(wow, mir(X), Ye + 4, browC, TG.hair); on(wow, X, Ye + 3, skin, TG.skin); on(wow, mir(X), Ye + 3, skin, TG.skin); }
     // where the features are (the head's units)
-    const hu = (X) => (X + 0.5) / 2;
-    F.face = { eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / 2, mouthX: (bL + 1) / 2, mouthY: (by + 1) / 2 + 0.25, noseY: (Ye - 2) / 2 + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2) };
-    return { head: F, lids, mouth };
+    const hu = (X) => (X + 0.5) / RES, hv = (Y) => Y / RES;
+    F.face = { eyesX: [hu(eL - 0.5), hu(mir(eL) + 0.5)], eyeY: hv(Ye), mouthX: hv(bL + 1), mouthY: hv(by + 1) + 0.25, noseY: hv(Ye - 2) + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2), scale: HS };
+    return { head: F, lids, mouth, joy, wow };
   }
   // ============================== u-worlds2 · the natives' body plans
   // Five plans of our own on the person's rig (no new bones: the tail hangs on the hips, the plates on the upper arms,
@@ -1586,6 +1613,8 @@
       skel: S,
     };
     if (fine) def.fine = fine;
+    // (u-folk2: the expressions hang on the head like the lids — the smooth path only; folkjoy.js shows them)
+    if (fine && fine.joy) { def.parts.joy = def.parts.mouth; def.parts.wow = def.parts.mouth; def.rig.joy = ['head', [0, 0, 0]]; def.rig.wow = ['head', [0, 0, 0]]; def.layout.joy = def.layout.head; def.layout.wow = def.layout.head; def.order.splice(def.order.indexOf('mouth') + 1, 0, 'joy', 'wow'); }
     if (SPB) { def.species = L.species; def.h *= SPB.scale; }
     // (t-folk2: the smooth path's hands at the wrists and what they hold at the grips — their own bones: the wrist bends,
     // a bag hangs straight down; the voxel people keep them in the forearm)

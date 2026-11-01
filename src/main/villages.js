@@ -105,6 +105,20 @@
     vil.people = [];
     for (const f of fams) for (const m of f.members) vil.people.push(m);
     if (Folk.unlike) Folk.unlike(vil.people, 3);   // t-folk: no two neighbours dressed alike (villagers.js)
+    // ---- u-folk2: a modern or tech town's couples' children (FolkJoy.visitKids; Low and up), appended after everyone
+    // else — nobody's name, job or clothes change; they sleep in their parents' flat
+    if (VR.FolkJoy && VR.FolkJoy.visitKids) {
+      const tier = VR.LifeKit && VR.LifeKit.tierOf && VR.game && VR.game.settings ? VR.LifeKit.tierOf(VR.game.settings) : 2;
+      for (const fi of VR.FolkJoy.visitKids(fams, P.style, P.seed, tier)) {
+        const f = fams[fi], k = f.members.length, seed = H(H(P.seed, f.home, 101), k, 7), par = f.members[0];
+        const m = { id: P.id + ':' + f.home + ':' + k, fam: fi, home: f.home, idx: k, age: 'child', role: 'child', seed, newHome: false, visit: true,
+          years: 5 + H(seed, 4, 9) % 8, name: nameFor(seed, true), bed: (homes[f.home] && homes[f.home].beds[0]) || null,
+          trait: Folk.TRAITS[H(seed, 1, 9) % Folk.TRAITS.length], likes: Folk.LIKES[H(seed, 2, 9) % Folk.LIKES.length], look: null };
+        m.parentLook = par.look; m.look = Folk.look(seed, 'child', 'child', m.parentLook, P.style);
+        f.members.push(m); vil.people.push(m);
+      }
+    }
+    // ---- u-folk2 end
     vil.homes = homes;
   }
 
@@ -370,7 +384,8 @@
       makeRoster(vil);
       if (vil.active) {
         const tod = g.env.timeOfDay;
-        for (let k = oldCount; k < vil.people.length; k++) { const person = vil.people[k]; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(TL('g.folk.newHome')[k === oldCount ? 0 : 1] || '', 5); }
+        const had = new Set(vil.agents.map(a => a.p.id)); let nk = 0;   // (u-folk2: the new ones by id — a town's visiting children stay last)
+        for (const person of vil.people) { if (had.has(person.id)) continue; const k = oldCount + nk++; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(TL('g.folk.newHome')[k === oldCount ? 0 : 1] || '', 5); }
         // re-link existing agents to (possibly re-ordered) roster entries
         for (const a of vil.agents) { const np = vil.people.find(pp => pp.id === a.p.id); if (np) a.p = np; }
       }
@@ -1417,7 +1432,7 @@
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
         const sleeping = a.pose === 'sleep';
         if (a.shadeT === undefined || t - a.shadeT > 0.25) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }   // terrain-shadow ray only 4× a second per villager
-        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: (a.kid ? 0.82 : 1) * (a.p.look && a.p.look.species && Folk.SPECIES_BODY && Folk.SPECIES_BODY[a.p.look.species] ? Folk.SPECIES_BODY[a.p.look.species].scale : 1), shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn, item_r: a.pose === 'sit' || sleeping, item_l: a.pose === 'sit' || sleeping } };   // (t-folk2: a guest puts the bag down)
+        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: (a.kid ? 0.82 : 1) * (a.p.look && a.p.look.species && Folk.SPECIES_BODY && Folk.SPECIES_BODY[a.p.look.species] ? Folk.SPECIES_BODY[a.p.look.species].scale : 1), shade: a.shade, expr: far ? null : a.expr || null, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn || !!a.expr, item_r: a.pose === 'sit' || sleeping, item_l: a.pose === 'sit' || sleeping } };   // (t-folk2: a guest puts the bag down)
         if (a.pose === 'sit' && VR.FolkAnim.sitHides && VR.FolkAnim.sitHides(a.gait)) for (const k of VR.FolkAnim.SIT_HIDE) opts.hide[k] = true;   // (a robe's lap hides the legs)
         let pos = a.pos;
         if (sleeping) { opts.pitch = Math.PI / 2; pos = [a.pos[0] - VR.HF_DX[a.p.bed ? a.p.bed[3] : 0] * 0.85, a.pos[1] + 0.12, a.pos[2] - VR.HF_DZ[a.p.bed ? a.p.bed[3] : 0] * 0.85]; }
@@ -1458,6 +1473,7 @@
       if (a.stretchT > 0) { a.stretchT -= dt; state = 'stretch'; }
       if (a.waveT > 0) { a.waveT -= dt; state = 'wave'; }                                                               // wave when the player comes close
       if (a.dance) state = 'dance';
+      if (a.joyClip) state = a.joyClip;   // u-folk2: the moments' clips (folkjoy.js: clap, gasp, give, cheer)
       // t-folk: a person walks on its own legs (folkanim.js FA.walkPerson: the phase by the distance walked, the step by the
       // pace and the clothes) and shifts its weight standing; the gait is the look's, kept on the agent
       const G = a.gait !== undefined ? a.gait : (a.gait = Folk.gaitFor && a.p.look && a.p.look.role !== 'hero' ? Folk.gaitFor(a.p.look) : null);
@@ -1502,6 +1518,7 @@
         if (d2 > 26 * 26 || a.drawn === false) continue;   // (no bubble floats where the street's budget drew nobody)
         const looked = this.lookTarget === a;
         if (!a.bubble && !(looked && d2 < 12 * 12)) continue;
+        if (a.bubble && a.bubble.icon && d2 > 14 * 14) continue;   // (u-folk2: an icon bubble only near — the calm screen)
         // greet the player the first time they come close
         list.push([d2, a, looked]);
       }
@@ -1529,7 +1546,9 @@
         const cx = (vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw, cy = (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw;
         if (cx < -1.2 || cx > 1.2 || cy < -1.2 || cy > 1.2) { el.style.display = 'none'; continue; }
         const sx = (cx * 0.5 + 0.5) * W, sy = (1 - (cy * 0.5 + 0.5)) * Hh;
-        const html = (it[2] || a.bubble ? `<b>${esc(a.p.name)}</b>` : '') + (a.bubble ? `<span>${esc(a.bubble.text)}</span>` : `<span class="role">${esc(Folk.ROLES[a.role] ? Folk.ROLES[a.role].title : '')}</span>`);
+        const ico = !!(a.bubble && a.bubble.icon);   // (u-folk2: ♪ ♥ ! ☆ — a small round bubble, no name)
+        const html = ico ? `<i>${esc(a.bubble.text)}</i>` : (it[2] || a.bubble ? `<b>${esc(a.p.name)}</b>` : '') + (a.bubble ? `<span>${esc(a.bubble.text)}</span>` : `<span class="role">${esc(Folk.ROLES[a.role] ? Folk.ROLES[a.role].title : '')}</span>`);
+        if (el._ico !== ico) { el._ico = ico; el.classList.toggle('ico', ico); }
         if (el._html !== html) { el.innerHTML = html; el._html = html; }
         el.style.display = 'block';
         const sc = Math.max(0.65, Math.min(1.1, 9 / Math.sqrt(it[0] + 1)));
