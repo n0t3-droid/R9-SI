@@ -175,14 +175,6 @@ try {
       check(fs0.fest === true, 'the village celebrates the Dreilichterfest tonight');
       await at('c16.b1', [3, 10.5, 17], ['c16_1_fest', 'c16_1_round', 'c16_1_funke'], DUSK);
       await at('c16.b2', [4.5, 12, 20], ['c16_2_sky', 'c16_2_home', 'c16_2_funke'], DUSK);
-      // the costs: ms a drawn frame outside a scene and in one, Very Low and High
-      for (const pr of ['potato', 'high']) {
-        await preset(pr); await draw(DUSK); N['out_' + pr] = await frameMs(20);
-        await ev(() => VR.StoryPlay.debug.play('c16.b1')); await sceneTo(4); N['in_' + pr] = await frameMs(20); await skipScene();
-      }
-      await preset('balanced');
-      N.brainMs = await ev(() => { const S0 = VR.StoryPlay.stats; return +(S0.brainMs / Math.max(1, S0.brains)).toFixed(3); });
-      console.log('     costs ' + JSON.stringify({ out_potato: N.out_potato, in_potato: N.in_potato, out_high: N.out_high, in_high: N.in_high, brainMs: N.brainMs }));
     }
   }
   // ---------------------------------------------------------------- the journey: the Ringstation, Zinnober
@@ -199,6 +191,18 @@ try {
       if (fz) { console.log('     stand ' + JSON.stringify(await toward(fz.x, fz.y, fz.z, 13, 0))); await settle(10, 'the far Flausel'); await at('c14.b3', [3, 9], ['c14_3_flausel', 'c14_3_funke'], null); }
       check(!!fz, 'Zinnober\'s fairy place (' + JSON.stringify(fz) + ')');
     }
+  }
+  // ---------------------------------------------------------------- the costs: ms a drawn frame outside a scene and in one
+  if (want('cost')) {
+    console.log('cost · Very Low and High, outside a scene and in one (' + secs() + ')');
+    for (const pr of ['potato', 'high']) {
+      await preset(pr); console.log('     preset ' + pr + ' (' + secs() + ')'); await draw(null); N['out_' + pr] = await frameMs(12); console.log('     out ' + N['out_' + pr] + ' ms (' + secs() + ')');
+      await ev(() => VR.StoryPlay.debug.play('c16.b1')); await sceneTo(4); N['in_' + pr] = await frameMs(12); console.log('     in ' + N['in_' + pr] + ' ms (' + secs() + ')'); await skipScene();
+    }
+    N.brainMs = await ev(() => { const S0 = VR.StoryPlay.stats; return +(S0.brainMs / Math.max(1, S0.brains)).toFixed(3); });
+    N.arc2 = await ev(() => VR.StoryArc2.stats);
+    console.log('     costs ' + JSON.stringify({ out_potato: N.out_potato, in_potato: N.in_potato, out_high: N.out_high, in_high: N.in_high, brainMs: N.brainMs, arc2: N.arc2 }));
+    save();
   }
 } catch (e) { fails++; console.log('  ✗ stopped: ' + (e.stack || e.message).slice(0, 900)); }
 const errs = logs.filter(l => l.startsWith('[pageerror]'));
