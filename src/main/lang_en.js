@@ -4123,6 +4123,7 @@
     "g.jy.lift.cabin": "🛗 Sky Ladder to the Ring Station — step into the cabin",
     "g.jy.lift.alt": "{m} m",
     "g.jy.lift.space": "Above the air — the Ring Station waits up there",
+    "g.jy.lift.greet": "The Ring Station greets you — its lights run to meet you",
     "g.jy.bridge.name": "Light bridge to {place}",
     "g.jy.bridge.walk": "W walk · S slower · Space skip",
     "g.jy.ride.offer": "🛒 Caravan to {place} · {d} m — [V] climb on",

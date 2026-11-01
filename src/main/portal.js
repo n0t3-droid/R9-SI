@@ -220,7 +220,7 @@
     return film;
   };
   // while the film covers the whole screen the 3D world is not drawn (the camera is still set: streaming follows it)
-  Portal.covers = () => { const J = M.J; return !!(J && J.phase === 'film' && !J.covered && (J.P.gl || (!J.dry && J.t > J.film.shots[0].dur * 0.85))); };   // (e-portal2: a 3-D shot covers it in a dry film too)
+  Portal.covers = () => { const J = M.J; return !!(J && J.phase === 'film' && !J.covered && (J.P.gl || J.P.cover || (!J.dry && J.t > J.film.shots[0].dur * 0.85))); };   // (o-seamless2: a journey's painted frame covers it too)   // (e-portal2: a 3-D shot covers it in a dry film too)
   function hush(g) {
     const r = g && g.renderer; if (!r || r.__ptHush) return;
     const orig = r.render; r.__ptHush = true; r.__ptOrig = orig;   // (e-portal2: the film's space shots draw through the unhushed one)

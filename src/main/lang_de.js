@@ -4123,6 +4123,7 @@
     "g.jy.lift.cabin": "🛗 Himmelsleiter zur Ringstation — stell dich in die Kabine",
     "g.jy.lift.alt": "{m} m",
     "g.jy.lift.space": "Über der Luft — die Ringstation wartet oben",
+    "g.jy.lift.greet": "Die Ringstation grüßt dich — ihre Lichter laufen dir entgegen",
     "g.jy.bridge.name": "Lichtbrücke nach {place}",
     "g.jy.bridge.walk": "W gehen · S langsamer · Leertaste überspringen",
     "g.jy.ride.offer": "🛒 Karawane nach {place} · {d} m — [V] aufsitzen",

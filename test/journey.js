@@ -127,6 +127,39 @@ console.log('f · the rules');
   check(K.mode({ potato: true }) === 'film' && K.mode({ off: true }) === 'film' && K.mode({}) === 'walk', 'Very Low or off: the film as before');
 }
 
+console.log('h · o-seamless2: the bridge on Very Low, the heading across the switch, the look up, the greeting, the chimes, the seat');
+{
+  check(typeof K.mode === 'function' && K.mode({ potato: true }, 'bridge') === 'walk' && K.mode({ potato: true }, 'lift') === 'film' && K.mode({ off: true }, 'bridge') === 'film' && K.mode({}, 'bridge') === 'walk', 'Very Low walks the Lichtbrücke (painted, cheap); the lift stays the film there; off: films');
+  check(typeof K.fx === 'function' && K.fx({ potato: true }).sparks === 0 && K.fx({ potato: true }).ribbons === 0 && !K.fx({ potato: true }).travellers && K.fx({ preset: 'low' }).sparks > 0 && K.fx({ preset: 'low' }).sparks < K.fx({ preset: 'high' }).sparks && K.fx({ preset: 'high' }).ribbons === 2 && K.fx({ preset: 'high' }).travellers, 'the bridge\'s extras per tier: Very Low none, Low a few sparkles, High sparkles, ribbons, travellers');
+  // the heading: the player's yaw relative to the sun's azimuth (voxel world: forward = (-sin yaw, -cos yaw), y up)
+  let bad = 0;
+  if (typeof K.relAz !== 'function') bad = 99;
+  else for (const sa of [0, 0.7, 2.1, -2.8]) for (const yaw of [0, 0.6, 1.9, -1.2, 3.0]) {
+    const sx = Math.cos(sa), sz = Math.sin(sa), a = K.relAz([sx, 0.3, sz], yaw);
+    const rx = sx * Math.cos(a) + sz * Math.sin(a), rz = -sx * Math.sin(a) + sz * Math.cos(a);   // (sun's heading turned by a about +y)
+    if (Math.hypot(rx + Math.sin(yaw), rz + Math.cos(yaw)) > 1e-6) bad++;
+  }
+  check(bad === 0, 'the heading across the switch: turning the sun\'s azimuth by relAz about the up axis gives the look (' + bad + ' off)');
+  const L = K.liftLook;
+  check(typeof L === 'function' && Math.abs(L(0, -0.3) + 0.3) < 1e-9 && Math.abs(L(0.01, -0.3) - L(0, -0.3)) < 0.03, 'the look up: continuous at the switch (your pitch kept)');
+  let mono = typeof L === 'function'; if (mono) for (let k = 0; k < 1; k += 0.02) if (L(k + 0.02, -0.3) < L(k, -0.3) - 1e-9) mono = false;
+  const fov2 = 35 * Math.PI / 180;
+  check(mono && L(0.4, -0.3) >= Math.PI / 2 - fov2 + 0.05 && L(1, 0.2) >= Math.PI / 2 - fov2 + 0.2 && L(1, 0.2) < Math.PI / 2, 'it eases up: the station (straight up) in view from 40 % of the space phase on (' + (mono ? L(0.4, -0.3).toFixed(2) + ' rad at 40 %' : 'not monotone') + ')');
+  check(typeof K.greet === 'function' && K.greet(0.5) === 0 && K.greet(0.8) === 0 && K.greet(0.92) > 0 && K.greet(0.92) < 1 && K.greet(1) === 1, 'the ring\'s lights greet you at the top (from 82 %)');
+  check(typeof K.chimes === 'function' && K.chimes(0, 1.8, 1.85) === 0 && K.chimes(1.8, 1.9, 1.85) === 1 && K.chimes(0, 10, 1.85) === 5 && K.chimes(5, 5, 1.85) === 0, 'a chime for every tile crossed');
+  const S = K.seat;
+  if (typeof S !== 'function') check(false, 'the seat');
+  else {
+    const at = { x: 10, z: 20, yaw: 0.8 }, s = S(at, 64, 3.0, true), fx = -Math.sin(at.yaw), fz = -Math.cos(at.yaw);
+    const dx = s.d[0] - s.p[0], dz = s.d[2] - s.p[2], dd = Math.hypot(dx, dz), cosA = (dx * fx + dz * fz) / (dd || 1);
+    const fwdOff = (s.p[0] - at.x) * fx + (s.p[2] - at.z) * fz;
+    check(dd > 0.6 && Math.abs(cosA) < 0.35 && fwdOff > 0.5, 'the seat: on the bench ahead of the middle beside the driver, not behind him (' + dd.toFixed(2) + ' m apart, cos ' + cosA.toFixed(2) + ', ' + fwdOff.toFixed(2) + ' m forward)');
+    let mx = 0; for (let t = 0; t < 30; t += 0.07) mx = Math.max(mx, Math.abs(S(at, 64, t, true).roll));
+    check(mx > 0.005 && mx <= 0.04 && S(at, 64, 3.0, false).roll === 0, 'a gentle sway (≤ ' + mx.toFixed(3) + ' rad), none with Weniger Bewegung');
+    check(s.eye > 1.7 && s.eye < 2.25, 'the eye ' + (s && s.eye) + ' m over the cart\'s floor: under the canopy (2.36 m), over the crates');
+  }
+}
+
 console.log('g · keys');
 {
   const de = V.I18N && V.I18N.dict.de, en = V.I18N && V.I18N.dict.en;

@@ -11,6 +11,7 @@ import { execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '').replace(/\/\.tmp_tests$/, '');
 const DIST = process.env.DIST || 'file://' + ROOT + '/dist/index.html';
 const SHOTS = ROOT + '/test/shots/';
+const PFX = process.env.PFX || '';   // (PFX=before_ : the strips of an older build, side by side)
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, want = (s) => !ONLY || ONLY.includes(s);
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -31,7 +32,7 @@ setInterval(() => console.log('    … ' + secs() + ' at ' + where), 60000).unre
 const shot = async (name) => { await ev(() => VR.Journey.pause(true)); await wait(150); try { await page.screenshot({ path: SHOTS + name, type: 'jpeg', quality: 82, timeout: 240000 }); console.log('  📷 ' + name); } catch (e) { console.log('  (no picture ' + name + ': ' + e.message.slice(0, 80) + ')'); } await ev(() => VR.Journey.pause(false)); return SHOTS + name; };
 const stats = () => ev(() => Object.assign(VR.Journey.stats(), { dim: VR.game.dim, state: VR.game.state, pj: !!VR.Portal.J() }));
 const sheet = [];
-const writeSheet = () => { if (!sheet.length) return; const spec = ROOT + '/.tmp_tests/seamless_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'seamless_sheet.jpg', spec]).toString().trim()); } catch (e) { console.log('  (no sheet: ' + e.message.slice(0, 100) + ')'); } };
+const writeSheet = () => { if (!sheet.length) return; const spec = ROOT + '/.tmp_tests/seamless_sheet.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + PFX + (process.env.SHEET || 'seamless2_sheet.jpg'), spec]).toString().trim()); } catch (e) { console.log('  (no sheet: ' + e.message.slice(0, 100) + ')'); } };
 const strip = (label, imgs) => { for (let i = 0; i < imgs.length; i += 6) sheet.push({ label: label + (imgs.length > 6 ? ' ' + (i / 6 + 1) : ''), imgs: imgs.slice(i, i + 6) }); };
 // a journey's picture strip: every 5 s of its own clock, until it ends (or maxS of the wall clock)
 async function follow(tag, maxS, each) {
@@ -41,7 +42,7 @@ async function follow(tag, maxS, each) {
     where = tag + ' follow'; const s = await stats(); lines = Math.max(lines, s.lines || 0);
     if (!s.kind && !s.pj) { last = s; break; }
     if (each) await each(s);
-    if (s.kind && s.t >= next) { if (each) await each(s, true); imgs.push(await shot(`jy_${tag}_${String(Math.round(next)).padStart(3, '0')}.jpg`)); console.log(`    ${tag} t ${s.t} s · ${s.ph} · alt ${s.alt} · s ${s.s} · k ${s.k} · gl ${s.shots} · ${s.dim}${s.portal ? ' · pt ' + JSON.stringify(s.portal) : ''}`); next += 5; }
+    if (s.kind && s.t >= next) { if (each) await each(s, true); imgs.push(await shot(`${PFX}jy_${tag}_${String(Math.round(next)).padStart(3, '0')}.jpg`)); console.log(`    ${tag} t ${s.t} s · ${s.ph} · alt ${s.alt} · s ${s.s} · k ${s.k} · gl ${s.shots} · ${s.dim}${s.portal ? ' · pt ' + JSON.stringify(s.portal) : ''}`); next += 5; }
     last = s;
   }
   return { imgs, last, lines, wall: (Date.now() - t0) / 1000 };
@@ -73,7 +74,7 @@ if (want('lift')) {
   if (!base) { await ev(() => { const p = VR.game.player; p.flying = false; p.safeTeleport(0.5, 90, 0.5); }); await wait(8000); }
   if (true) {
     if (base) await ev((b) => { const p = VR.game.player; p.pos = [b.x + 7, b.y + 2, b.z + 9]; p.yaw = Math.atan2(7, 9); p.pitch = 0.18; p.flying = true; }, base);
-    if (base) { await wait(5000); lift.push(await shot('jy_lift_base.jpg')); where = 'lift: stand in the cabin';
+    if (base) { await wait(5000); lift.push(await shot(PFX + 'jy_lift_base.jpg')); where = 'lift: stand in the cabin';
       await ev((b) => { const p = VR.game.player; p.flying = false; p.pos = [b.x, b.y + 0.2, b.z]; p.vel = [0, 0, 0]; p.yaw = 0.6; p.pitch = -0.12; }, base); }
     let started = false; for (let i = 0; i < 30 && !started && base; i++) { await wait(500); started = (await stats()).kind === 'lift'; }
     check(started, 'standing in the cabin starts the Himmelsleiter');
@@ -89,7 +90,7 @@ if (want('lift')) {
     check(F.imgs.length >= 9, F.imgs.length + ' pictures, one every 5 s of the 52-s ride');
     const A = await alive('lift'); run.lift.alive = A;
     console.log('  the station: ' + JSON.stringify(A));
-    await wait(3000); lift.push(await shot('jy_lift_arrive.jpg'));
+    await wait(3000); lift.push(await shot(PFX + 'jy_lift_arrive.jpg'));
     strip('Himmelsleiter (alle 5 s)', lift.filter(Boolean));
     void t0;
   }
@@ -111,7 +112,7 @@ if (want('bridge')) {
   check(F.imgs.length >= 4, F.imgs.length + ' pictures along the path');
   const A = await alive('bridge'); run.bridge.alive = A;
   check(A && A.at !== null && A.at >= 0 && A.at <= 20, 'Aquamarin is alive: a moment ' + (A && A.at) + ' s after the arrival (' + (A && A.kind) + ')');
-  const arr = await shot('jy_bridge_arrive.jpg');
+  const arr = await shot(PFX + 'jy_bridge_arrive.jpg');
   strip('Lichtbrücke → Aquamarin (alle 5 s)', F.imgs.concat([arr]).filter(Boolean));
   void walkT;
   saveRun(); writeSheet();
@@ -133,7 +134,7 @@ if (want('ride')) {
     const c = carts[0];
     await ev((c) => { const p = VR.game.player; p.flying = false; p.pos = [c.x + 2.6, c.y + 0.2, c.z + 1.2]; p.vel = [0, 0, 0]; p.yaw = Math.atan2(2.6, 1.2); p.pitch = -0.1; }, c);
     await wait(4000);
-    ride.push(await shot('jy_ride_cart.jpg'));
+    ride.push(await shot(PFX + 'jy_ride_cart.jpg'));
     await ev((c) => { const p = VR.game.player; p.pos = [c.x + 1.2, c.y + 0.2, c.z + 0.6]; }, c);
     let off = null; for (let i = 0; i < 20 && !off; i++) { await wait(500); off = (await stats()).offer; }
     check(!!off, 'by the cart: the offer ([V] aufsitzen)');
@@ -154,14 +155,14 @@ if (want('ride')) {
     ride.push(...F.imgs);
     const A = await alive('ride'); run.ride.alive = A;
     check(A && A.at !== null && A.at >= 0 && A.at <= 20, 'the place is alive: a moment ' + (A && A.at) + ' s after the arrival (' + (A && A.kind) + ')');
-    ride.push(await shot('jy_ride_arrive.jpg'));
+    ride.push(await shot(PFX + 'jy_ride_arrive.jpg'));
     strip('Karawane (alle 5 s)', ride.filter(Boolean));
   }
   saveRun(); writeSheet();
 }
 
 if (want('cost')) {
-  console.log('0 · Very Low keeps the film; the costs');
+  console.log('0 · Very Low keeps the film; the costs'); where = 'cost: the frames';
   const r = await ev(() => {
     const g = VR.game, out = {};
     for (const preset of ['potato', 'high']) for (const on of [false, true]) {
@@ -172,15 +173,28 @@ if (want('cost')) {
       out[preset + (on ? '_on' : '_off')] = { frame: +times[Math.floor(times.length / 2)].toFixed(1), idle: on ? +VR.Journey.cost(g, 300).toFixed(4) : 0 };
     }
     g.applyPreset('potato'); g.settings.journeys = true; g.applySettings('*');
-    out.potatoRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
+    out.potatoBridge = VR.Journey.mode(g, 'bridge'); out.potatoLift = VR.Journey.mode(g, 'lift');
+
     g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.settings.journeys = false; g.applySettings('*');
     out.offRoute = VR.Portal.route(g, { dim: 'aqua', id: 'w:aqua' });
     g.settings.journeys = true; g.applySettings('*');
     return out;
   });
+  where = 'cost: the painted bridge vs the film';
+  // (o-seamless2: Very Low walks the painted bridge — its frame against the film's, both at Very Low's 0.4 canvas)
+  Object.assign(r, await ev(() => {
+    const g = VR.game, out = {}, C = VR.PortalCore;
+    g.applyPreset('potato'); g.applySettings('*');
+    out.vlFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', { low: true }), 12, true).toFixed(2); out.vlBridge = +VR.Journey.bench(g, 12, true, 'aqua').toFixed(2);
+    g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 5; g.applySettings('*');
+    out.hiFilm = +VR.Portal.bench(C.film(C.rec({}), 7, 'stn.ring', 'aqua', {}), 12, false).toFixed(2); out.hiBridgePaint = +VR.Journey.bench(g, 12, false, 'aqua').toFixed(2);
+    return out;
+  }));
   run.cost = r;
   console.log('  ' + JSON.stringify(r));
-  check(r.potatoRoute === null && r.offRoute === null, 'Very Low and the switch off: the Leuchtpfad\'s film as before (no journey)');
+  check(r.potatoBridge === 'walk' && r.potatoLift === 'film' && r.offRoute === null, 'Very Low walks the painted Lichtbrücke (its lift stays the film); the switch off: the films as before');
+  check(r.vlBridge <= r.vlFilm * 1.15 + 0.3, 'Very Low: the painted bridge ' + r.vlBridge + ' ms a frame, the film ' + r.vlFilm + ' ms (never slower)');
+  console.log('  High painted: bridge ' + r.hiBridgePaint + ' ms, film ' + r.hiFilm + ' ms');
   check(r.potato_on.idle < 0.05 && r.high_on.idle < 0.05, 'the idle look: Very Low ' + r.potato_on.idle + ' ms, High ' + r.high_on.idle + ' ms');
   saveRun();
 }
