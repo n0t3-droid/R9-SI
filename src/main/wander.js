@@ -143,7 +143,7 @@
   // cached for 1.5 s; the director's own bookkeeping (pacing, the map's chest) every EVERY[tier] frames on Very Low;
   // a stage on open ground (W.openAt: no trunk, no low leaves, little tall grass within OPEN.r m) with the line to the
   // figure's feet and head free of leaves and plants too (W.clearLine with an occluder test)
-  W.BUDGET = [3, 5, 8, 8, 8]; W.EVERY = [3, 1, 1, 1, 1];
+  W.BUDGET = [3, 4, 6, 6, 6]; W.EVERY = [3, 1, 1, 1, 1];
   W.OPEN = { r: 1.5, plants: 2 };
   // the open-ground rule (pure): occ(x, y, z) → 0 free, 1 a plant / low leaves, 2 solid (a trunk, a wall); the figure's
   // own column and eight around it at r, three cells from the ground up: no solid (one step around is fine), plants in
@@ -396,16 +396,17 @@
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let best = null;
       // (f-polish7: while staged within 9–15 m, on open ground, in sight — the stage's own rules)
       const st = !!this.stg, occ = this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz));
-      const DS = st ? HI_D : [d, d + 10, d + 20], AS = st ? HI_A : HI_A0, hc = st && this.hiC && this.hiC.n === (this.pacer && this.pacer.n) ? this.hiC : null;
+      const DS = st ? HI_D : [d, d + 10, d + 20], AS = st ? HI_A : HI_A0, hc = st && this.hiC && this.hiC.n === (this.pacer && this.pacer.n) && this.hiC.k === this.stg ? this.hiC : null;
+      if (hc && hc.done) return hc.best;   // (searched already for this moment: the answer kept, the budget left to spot())
       let i0 = 0; if (hc) { i0 = hc.i; best = hc.best; }
       for (let i = i0; i < DS.length * AS.length; i++) {
-        if (st) { if (this.sb <= 0) { this.hiC = { n: this.pacer && this.pacer.n, i, best }; this.more = true; return null; } this.sb--; }   // (budgeted as spot)
+        if (st) { if (this.sb <= 0) { this.hiC = { n: this.pacer && this.pacer.n, k: this.stg, i, best }; this.more = true; return null; } this.sb--; }   // (budgeted as spot)
         const dd = DS[Math.floor(i / AS.length)], a = a0 + AS[i % AS.length], x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd, y = this.ground(x, z, p[1] + 6);
         if (y === null || (best && y <= best[1])) continue;
         if (st && (!W.openAt(occ, x, y, z) || !this.clear([x, y + 1.1, z], true) || !this.clear([x, y + 0.3, z]))) continue;
         best = [x, y, z];
       }
-      this.hiC = null;
+      this.hiC = st ? { n: this.pacer && this.pacer.n, k: this.stg, done: true, best } : null;
       return best;
     }
     folk(seed, role, age) {
@@ -521,10 +522,10 @@
         // (f-polish7: a search the frame's budget stopped goes on next frame with the same kind)
         for (let i = this.ofs ? this.ofs.i : 0; i < order.length && i < 5; i++) {
           this.more = false;
-          if (this.start(order[i], 1000 + P.n)) { this.ofs = null; return; }
+          if (this.start(order[i], 1000 + P.n)) { this.ofs = null; this.hiC = null; return; }
           if (this.more) { this.ofs = { n: P.n, i }; this.tryT = 0; return; }
         }
-        this.ofs = null;
+        this.ofs = null; this.hiC = null;
         this.st.quiet++;   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
         return;
       }

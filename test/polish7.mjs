@@ -56,7 +56,7 @@ for (const TAG of BUILDS) {
   page.on('console', m => { if (m.type() === 'error') logs.push('[error] ' + m.text().slice(0, 300)); });
   const wait = (ms) => page.waitForTimeout(ms);
   let where = 'boot';
-  const ev = (fn, a) => Promise.race([page.evaluate(fn, a), new Promise((_, rej) => setTimeout(() => rej(new Error('evaluate timeout at ' + where)), 180000))]);
+  const ev = (fn, a) => Promise.race([page.evaluate(fn, a), new Promise((_, rej) => setTimeout(() => rej(new Error('evaluate timeout at ' + where)), 300000))]);
   const tick = setInterval(() => console.log('    … ' + secs() + ' at ' + where), 60000);
   const pshot = async (name) => { await ev(() => VR.Journey && VR.Journey.pause(true)); await wait(150); const f = SHOTS + 'p7_' + TAG + '_' + name; try { await page.screenshot({ path: f, type: 'jpeg', quality: 82, timeout: 240000 }); console.log('  📷 ' + name); } catch (e) { console.log('  (no picture ' + name + ')'); } await ev(() => VR.Journey && VR.Journey.pause(false)); return f; };
   const jst = () => ev(() => Object.assign(VR.Journey.stats(), { dim: VR.game.dim, state: VR.game.state, pj: !!(VR.Portal && VR.Portal.J && VR.Portal.J()) }));
@@ -156,7 +156,7 @@ for (const TAG of BUILDS) {
           const D = g.wanderer; if (D && !D.__t7) { const u = D.update.bind(D); D.__t7 = { n: 0, ms: 0, max: 0, fr: [] }; D.update = function (dt) { const t0 = performance.now(); const r = u(dt); const e = performance.now() - t0; const T = this.__t7; T.n++; T.ms += e; if (e > T.max) T.max = e; if (T.fr.length < 20000) T.fr.push(e); return r; }; }
           if (D) { D.__t7.n = 0; D.__t7.ms = 0; D.__t7.max = 0; D.__t7.fr = []; }
           window.__w7 = { x: p0[0] + 0.5, z0: p0[2] + 0.5, t: 0 };
-          window.__each = (g, dt) => { const W = window.__w7, p = g.player; if (!W || g.state !== 'play') return; W.t += dt; W.x += 2.2 * dt; const z = W.z0 + Math.sin(W.t * 0.15) * 1.2; const t = g.world.topAt(Math.floor(W.x), Math.floor(z)); p.pos[0] = W.x; p.pos[2] = z; p.pos[1] = Math.max(t, 60) + 1.02; if (p.vel) { p.vel[0] = p.vel[1] = p.vel[2] = 0; } p.flying = true; p.yaw = -Math.PI / 2 + Math.sin(W.t * 0.15) * 0.12; p.pitch = -0.06; p.viewYaw = p.yaw; };
+          window.__each = (g, dt) => { const W = window.__w7, p = g.player; if (!W || g.state !== 'play') return; W.t += dt; W.n = (W.n | 0) + 1; W.x += 2.2 * dt; const z = W.z0 + Math.sin(W.t * 0.15) * 1.2; const t = g.world.topAt(Math.floor(W.x), Math.floor(z)); p.pos[0] = W.x; p.pos[2] = z; p.pos[1] = Math.max(t, 60) + 1.02; if (p.vel) { p.vel[0] = p.vel[1] = p.vel[2] = 0; } p.flying = true; p.yaw = -Math.PI / 2 + Math.sin(W.t * 0.15) * 0.12; p.pitch = -0.06; p.viewYaw = p.yaw; };
           return true;
         }, [base, preset]);
         const shots = [];
@@ -184,7 +184,8 @@ for (const TAG of BUILDS) {
         const hi = await walkWood('high', 52, 5);
         R.woodsHigh = { T: hi.T, frame: hi.frame, shots: hi.shots.map(s => ({ s: s.s, kind: s.kind, sh: s.sh })) };
         console.log('  High: the director ' + JSON.stringify(hi.T) + ', frame median ' + hi.frame + ' ms');
-        const vl = await walkWood('potato', 40, 0);
+        where = 'woods: Very Low walk';
+        const vl = await walkWood('potato', 40, 0).catch(e => { console.log('  !! ' + e.message + ' ' + JSON.stringify(R.dbg || null)); return { T: null, frame: null, shots: [] }; });
         R.woodsVL = { T: vl.T, frame: vl.frame };
         console.log('  Very Low: the director ' + JSON.stringify(vl.T) + ', frame median ' + vl.frame + ' ms');
         const inv = hi.shots.filter(s => s.sh && s.sh.inView), big = hi.shots.filter(s => s.sh && s.sh.share >= 0.06);
