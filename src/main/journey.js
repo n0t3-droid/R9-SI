@@ -166,7 +166,7 @@
           const P = S.place('ring', J.tw + ks * 30); Nn = norm(perm(P.r)); St = add(Hc, perm(P.r));
           const sun = norm(sub(eph.bodies.helia.p, Hc)), hs = perp(sun, Nn), hd = norm(cross(Nn, hs));
           const dip = Math.acos(R / (R + alt)), fov = 70 * D2R, up0 = -dip + 0.24 * fov, look = ease(clamp((ks - 0.62) / 0.38, 0, 1));
-          const pt = up0 + (52 * D2R - up0) * look, fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
+          const pt = up0 + (80 * D2R - up0) * look, fwd = norm(add(mul(hd, Math.cos(pt)), mul(Nn, Math.sin(pt))));
           view = { pos: add(Hc, mul(Nn, R + alt)), fwd, up: perp(Nn, fwd), fov, ref: 'herz', body: 'herz' };
         }
         let drawn = false;
@@ -303,7 +303,8 @@
 
   // ================================================================ die Karawanen
   const CART_O = { scale: 1.35 };
-  function placesOf(g) { const D = g.wanderer; return D && D.places ? D.places.filter(P => P.kind === 'village' || P.kind === 'city' || P.kind === 'temple' || P.kind === 'landmark' || P.kind === 'farm' || P.kind === 'landing') : []; }
+  function placesOf(g) { const D = g.wanderer; if (D && D._key !== (g.meta && g.meta.id) + ':' + g.dim) return [];   // (the last world's director: its places are not here)
+    return D && D.places ? D.places.filter(P => P.kind === 'village' || P.kind === 'city' || P.kind === 'temple' || P.kind === 'landmark' || P.kind === 'farm' || P.kind === 'landing') : []; }
   function groundAt(g, x, z, y0) {
     const D = g.wanderer; if (D && D.ground) { const y = D.ground(x, z, y0); if (y !== null) return y; }
     const w = g.world; if (w && w.topAt) { const t = w.topAt(Math.floor(x), Math.floor(z)); if (t > 0) return t + 1; }
@@ -312,6 +313,7 @@
   // a cart stands at each place near (within 90 m), on the ground at the place's edge toward its middle
   function refreshCarts(g) {
     const p = g.player; if (!p) return;
+    if (M.cartDim !== g.dim) { M.cartDim = g.dim; M.carts = []; M.offer = null; }   // (a new world: none of the last one's carts)
     const out = [];
     for (const P of placesOf(g)) {
       const d = Math.hypot(P.x - p.pos[0], P.z - p.pos[2]); if (d > 90 + (P.rad || 30)) continue;
