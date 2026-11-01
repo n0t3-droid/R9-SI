@@ -52,6 +52,11 @@ console.log('a · the camera director');
   const room = boxes([[-3, 64, -3, 4, 80, -3], [-3, 64, 4, 4, 80, 4], [-3, 64, -3, -3, 80, 4], [4, 64, -3, 4, 80, 4], [-3, 68, -3, 4, 68, 4]]);
   const f4 = F3.frame(room, { head: [0.5, 65.6, 0.5], yaw: 0.4 }, {});
   check(!!f4 && lens(room, f4.P, 0.4) && line(room, f4.P, [0.5, 65.6, 0.5]), `a small room: still in the open (${f4 ? f4.P.map(v => v.toFixed(1)).join(', ') : '-'})`);
+  // a tight yard open to the sky (walls 5 high a block off on every side — Ocker's native had no frame in
+  // runs 3 and 4): the frame from above, the lens in the open, the line to the face clear
+  const yard = boxes([[-1, 64, -1, 2, 68, -1], [-1, 64, 2, 2, 68, 2], [-1, 64, -1, -1, 68, 2], [2, 64, -1, 2, 68, 2]]);
+  const fy = F3.frame(yard, { head: [0.5, 65.76, 0.5], yaw: 0 }, {});
+  check(!!fy && lens(yard, fy.P, 0.3) && line(yard, fy.P, [0.5, 65.76, 0.5]), `a tight yard: a frame from above (${fy ? fy.P.map(v => v.toFixed(1)).join(', ') : 'none'})`);
   // a thousand random walled places: never inside a wall
   let bad = 0, none = 0, rs = 7; const rnd = () => (rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0) / 4294967296;
   for (let k = 0; k < 400; k++) {
@@ -137,6 +142,15 @@ console.log('d · the far face');
   const lo = Folk.buildLow(L), hg = lo.parts.head.grid;
   let dark = 0; for (let Y = 0; Y < hg.sy; Y++) for (let X = 0; X < hg.sx; X++) for (let Z = 0; Z < hg.sz; Z++) { const v = hg.get(X, Y, Z); if (!v) continue; const c = v & 0xffffff, lum = ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11; if (lum < 60) dark++; break; }
   check(dark >= 2, `the voxel LOD's face: ${dark} dark eye voxels on the front`);
+}
+
+console.log('d2 · a portrait\'s subject stands calm (no arms up from a held clip: the steps draw nothing, the timers do not run out)');
+{
+  const a = { joyClip: 'cheer', waveT: 2, stretchT: 1.5, festRole: null, dance: false, expr: 'wow', exprT: 1 };
+  F3.calm(a);
+  check(!a.joyClip && !(a.waveT > 0) && !(a.stretchT > 0) && !a.expr, 'F3.calm clears the clips (cheer, wave, stretch, an expression)');
+  const b = { joyClip: null, dance: true, ringDance: { chord: 1.4 } }; F3.calm(b);
+  check(b.dance && b.ringDance, '… a dancer keeps dancing');
 }
 
 console.log('e · the texts');

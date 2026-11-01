@@ -94,6 +94,12 @@
     let w = best(solid, S.head, rays, op);
     if (!w && op.side) { op.side = 0; w = best(solid, S.head, rays, op); }
     if (!w && op.avoid) { op.avoid = null; w = best(solid, S.head, rays, op); }
+    // (a tight yard or a court between high walls — Ocker's native had no frame in runs 3 and 4: from above, steeper and
+    // steeper, a slimmer lens, nearer)
+    if (!w) {
+      const up = []; for (const off of F3.OFFS) for (const h of [3, 6, 10]) up.push([f + off, h, Math.abs(off) * 1.1 + h * 0.4 + sunPen(f + off, o.sun) * 2]);
+      w = best(solid, S.head, up, Object.assign(op, { lens: Math.min(op.lens, 0.3), mins: [2, 1.2, 0.8] }));
+    }
     return w;
   };
   // a group round C (feet) of radius r: farther and raised; o: {pref (an angle to prefer), sun}
@@ -181,6 +187,13 @@
     return o;
   };
 
+  // a portrait's subject stands calm: a held clip's arms come down (the cheer, the wave, the stretch, a gasp) — a dancer
+  // keeps dancing (the self-review: the subjects had their arms up; the photo mode's steps do not run the timers out)
+  F3.calm = function (a) {
+    if (!a || a.dance) return a;
+    a.joyClip = null; a.waveT = 0; a.stretchT = 0; a.expr = null; a.exprT = 0;
+    return a;
+  };
   // ================================================================ the game
   const Vs = VR.Villages;
   if (!Vs) return;
@@ -344,6 +357,7 @@
   // a portrait of a: o {d, dMin, dMax} (the default 3.8 m), the sun's side
   F3.portraitOf = function (pc, a, o) {
     const g = pc.g, s = pc.s; if (!s || !g.world || !a) return null;
+    if (!(o && o.keep)) F3.calm(a);
     const avoid = []; if (a.vil) for (const q of a.vil.agents) if (q !== a && (q.pos[0] - a.pos[0]) ** 2 + (q.pos[2] - a.pos[2]) ** 2 < 100) avoid.push([q.pos[0], q.pos[2]]);
     const f = F3.frame(solidW(g.world), F3.subject(a), Object.assign({ sun: F3.sunAngle(g), avoid }, o || {}));
     if (!f) return null;
