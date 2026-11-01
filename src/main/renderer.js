@@ -534,7 +534,7 @@
       this.shadowValid = false;
       if (VR.Light2 && VR.Light2.key && VR.Light2.key(this.q) !== this.l2Key) this.buildPrograms();   // (t-light2: the light's switches are program defines)
       else if (VR.Sky3 && VR.Sky3.key(this.q) !== this.s3Key) this.buildPrograms();
-      else if (VR.Look && VR.Look.key(this.q) !== this.lvKey) this.buildPrograms();   // (v-look: the same for the film look's)   // (t-sky3: the same for the sky's)
+      else if (VR.Look && VR.Look.key(this.q) !== this.lvKey) { if (this.lvRebuild) this.lvRebuild(); else this.buildPrograms(); }   // (v-look: the film look's switches are the composite's defines: that one program again)   // (t-sky3: the same for the sky's)
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
     }

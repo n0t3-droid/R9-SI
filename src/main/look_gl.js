@@ -24,6 +24,13 @@
     T.ok = !!T.fb;
     return T.ok ? T : null;
   };
+  // a switch changed: only the composite again (its defines are the switches; every other program stays)
+  R.lvRebuild = function () {
+    L.use(this.q); this.lvKey = L.key(this.q);
+    if (!this.P || !this.P.composite) { this.buildPrograms(); return; }
+    const G = GL, was = G.deferred; G.deferred = true;
+    try { this.P.composite = GL.program(S.FS_VS, S.COMPOSITE_FS, 'composite'); } finally { G.deferred = was; }
+  };
   // the frame's state: on (the switches, the main world, a scene depth), the soft copy made
   R.lvPre = function (F, E) {
     const q = this.q;

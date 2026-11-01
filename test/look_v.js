@@ -144,6 +144,12 @@ console.log('e · the renderer');
   check(r3_.lvOn === true && t3 === 1, 'High: the soft copy asked for');
   r3_.lvPre({ underwater: true }, { dimId: 0, sunDir: [0, 1, 0], sunColor: [1, 1, 1], fogColor: [0.5, 0.5, 0.5] });
   check(t3 === 1, 'under water: no soft copy');
+  // a switch changed: only the composite rebuilt (the other programs kept)
+  let full = 0; const rr = Object.create(R); rr.q = L.defaults('high'); rr.P = { composite: { p: 1 }, terrain: { p: 2 } }; rr.buildPrograms = () => { full++; };
+  const t0 = rr.P.terrain, gp = V.GL.program; let asked = ''; V.GL.program = (vs, fs, name) => { asked += name; return { p: 3 }; };
+  try { rr.lvRebuild(); } finally { V.GL.program = gp; }
+  check(full === 0 && rr.P.terrain === t0 && asked === 'composite' && rr.P.composite.p === 3 && rr.lvKey === '1111', 'a switch changed: the composite alone again (key ' + rr.lvKey + ')');
+  check(/this\.lvRebuild\(\)/.test(fs.readFileSync(SRC + '/renderer.js', 'utf8')), 'renderer.setQuality asks for it');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
