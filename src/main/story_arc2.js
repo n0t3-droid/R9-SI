@@ -108,7 +108,7 @@
       else {
         if (!st.base) st.base = A2.signNow(g);
         const way = this.rec.choices && this.rec.choices.style || S.styleWay(st.base, A2.signNow(g, st.base));
-        if (way) { if (S.sign(this.rec, way)) A2.signAt = A2.signOf(g, way, st.base); ev.sign = way; }
+        if (way) { if (!this.rec.choices.style) { this.rec.choices.style = way; A2.signAt = A2.signOf(g, way, st.base); } ev.sign = way; }   // (the act itself is marked by actDone — Funke then names your way)
       }
     }
     return tick0.call(this, dt, ev);
