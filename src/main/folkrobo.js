@@ -16,6 +16,7 @@
   'use strict';
   const Rb = VR.Robo = VR.Robo || {};
   Rb.off = Rb.off || false;
+  Rb.sw = Rb.sw || { avoid: true, makeWay: true, plant: true, spring: true, gaze: true };   // (the parts, for the cost test)
   Rb.tier = function (g) {
     if (Rb.off) return 0;
     const s = g && g.settings;
@@ -200,15 +201,23 @@
 
   // ------------------------------------------------------------------ springs
   // s = { x, v } toward target with the natural frequency w (rad/s) and damping ratio z < 1, exactly over dt
+  // (the step's coefficients depend on w, z and dt only: a small direct-mapped memo — a frame calls the same few springs
+  // with the same dt for every person)
+  const MW = new Float64Array(16 * 8);
   Rb.spring = function (s, target, w, z, dt) {
     const e = s.x - target, v = s.v;
     if (!(dt > 0)) return s;
-    const a = z * w, wd = w * Math.sqrt(Math.max(1e-6, 1 - z * z));
-    const ex = Math.exp(-a * dt), c = Math.cos(wd * dt), sn = Math.sin(wd * dt);
+    const slot = (((w * 7.3 + z * 31.7) | 0) & 15) * 8;
+    let a, wd, ex, c, sn;
+    if (MW[slot] === w && MW[slot + 1] === z && MW[slot + 2] === dt) { a = MW[slot + 3]; wd = MW[slot + 4]; ex = MW[slot + 5]; c = MW[slot + 6]; sn = MW[slot + 7]; }
+    else {
+      a = z * w; wd = w * Math.sqrt(Math.max(1e-6, 1 - z * z)); ex = Math.exp(-a * dt); c = Math.cos(wd * dt); sn = Math.sin(wd * dt);
+      MW[slot] = w; MW[slot + 1] = z; MW[slot + 2] = dt; MW[slot + 3] = a; MW[slot + 4] = wd; MW[slot + 5] = ex; MW[slot + 6] = c; MW[slot + 7] = sn;
+    }
     const B = (v + a * e) / wd;
     s.x = target + ex * (e * c + B * sn);
     // (the solution's dx/dt: ex·[−a (e c + B sn) + wd (B c − e sn)])
-    s.v = ex * (-a * (e * c + B * sn) + (-e * wd * sn + B * wd * c));
+    s.v = ex * (-a * (e * c + B * sn) + wd * (B * c - e * sn));
     return s;
   };
   // a pendulum (angle s.x, + forward) hanging in a frame accelerating forward by acc (b/s²): its rest angle leans back by
@@ -245,5 +254,139 @@
     if (R.dbl > 0) { R.dbl -= dt; if (R.dbl <= 0 && R.bl <= 0) R.bl = 0.12; }
     if (R.bl > 0) { R.bl -= dt; R.blink = true; } else R.blink = false;
     return R;
+  };
+
+  // ================================================================== the hooks (villages.js calls them; mgr = VR.Villages)
+  // the neighbours of a villager from the personal-space grid (folklife.js P.separate keeps it, 2-block cells stamped
+  // with its frame), the player among them (the villagers yield to the player fully). Fills NB, returns the count.
+  const NB = []; for (let i = 0; i < MAXL; i++) NB.push({ x: 0, z: 0, vx: 0, vz: 0, r: 0, resp: 0.5, a: null });
+  const SELF = { x: 0, z: 0, vx: 0, vz: 0, r: 0.4, pvx: 0, pvz: 0, vmax: 1, jam: 0 }, OUT = [0, 0];
+  Rb.R_ADULT = 0.4; Rb.R_KID = 0.3; Rb.R_PLAYER = 0.42; Rb.TAU = 2; Rb.NEAR2 = 3.2 * 3.2;
+  const radiusOf = (a) => a.kid ? Rb.R_KID : Rb.R_ADULT;
+  function gather(mgr, a, moversOnly) {
+    const grid = mgr._sepGrid, fr = mgr._sepFr;
+    let n = 0;
+    if (grid) {
+      const ax = Math.floor(a.pos[0]) >> 1, az = Math.floor(a.pos[2]) >> 1;
+      for (let gx = ax - 1; gx <= ax + 1; gx++) for (let gz = az - 1; gz <= az + 1; gz++) {
+        const cell = grid.get((gx + 32768) * 65536 + (gz + 32768)); if (!cell || cell.f !== fr) continue;
+        for (let q = 0; q < cell.length && n < MAXL - 1; q++) {
+          const b = cell[q]; if (b === a || b.inBoat) continue;
+          const dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2];
+          if (dx * dx + dz * dz > Rb.NEAR2 || Math.abs(b.pos[1] - a.pos[1]) > 1.5) continue;
+          const still = b.pose === 'sit' || b.pose === 'sleep' || b.pose === 'sitground';
+          const bv2 = b.vel[0] * b.vel[0] + b.vel[2] * b.vel[2];
+          if (moversOnly && (still || bv2 < 0.09)) continue;
+          const o = NB[n++]; o.x = b.pos[0]; o.z = b.pos[2]; o.a = b;
+          if (still) { o.vx = 0; o.vz = 0; o.resp = 1; o.r = 0.32; }
+          else { o.vx = b.vel[0]; o.vz = b.vel[2]; o.resp = moversOnly ? 1 : 0.5; o.r = radiusOf(b); }
+          // (family and friends walk closer together)
+          if (!still && a.p && b.p && a.p.home === b.p.home) o.r *= 0.75;
+        }
+      }
+    }
+    const pl = mgr.g && mgr.g.player;
+    if (pl && !pl.dead && !pl.flying && n < MAXL) {
+      const dx = pl.pos[0] - a.pos[0], dz = pl.pos[2] - a.pos[2];
+      if (dx * dx + dz * dz < Rb.NEAR2 * 1.6 && Math.abs(pl.pos[1] - a.pos[1]) < 1.8) {
+        const pv = pl.vel || ZV, o = NB[n++]; o.x = pl.pos[0]; o.z = pl.pos[2]; o.vx = pv[0]; o.vz = pv[2]; o.r = Rb.R_PLAYER; o.resp = 1; o.a = null;
+      }
+    }
+    return n;
+  }
+  const ZV = [0, 0, 0];
+  // a walker's wanted velocity (pvx, pvz) through ORCA → out (the velocity to steer to). Family members walking the same
+  // way come abreast: the one behind steps out a little, the one ahead slows (side by side, not in a file)
+  Rb.avoid = function (mgr, a, pvx, pvz, dt, out) {
+    out[0] = pvx; out[1] = pvz;
+    if (!Rb.sw.avoid) return out;
+    const n = gather(mgr, a, false);
+    const sp = Math.hypot(pvx, pvz);
+    if (sp > 0.4) {
+      const ux = pvx / sp, uz = pvz / sp;
+      for (let i = 0; i < n; i++) {
+        const b = NB[i].a; if (!b || !a.p || !b.p || b.p.home !== a.p.home) continue;
+        const bs = Math.hypot(b.vel[0], b.vel[2]); if (bs < 0.4 || (b.vel[0] * ux + b.vel[2] * uz) < 0.85 * bs) continue;
+        const along = (b.pos[0] - a.pos[0]) * ux + (b.pos[2] - a.pos[2]) * uz;
+        if (Math.abs(along) > 2.5) continue;
+        const k = 1 + Math.max(-0.3, Math.min(0.3, along * 0.3)); pvx *= k; pvz *= k;
+        break;
+      }
+    }
+    if (!n) { out[0] = pvx; out[1] = pvz; return out; }
+    SELF.x = a.pos[0]; SELF.z = a.pos[2]; SELF.vx = a.vel[0]; SELF.vz = a.vel[2]; SELF.r = radiusOf(a);
+    SELF.pvx = pvx; SELF.pvz = pvz; SELF.vmax = Math.max(0.6, sp * 1.25); SELF.jam = a.rbJam || 0;
+    Rb.orca(SELF, NB, n, Rb.TAU, Math.max(1 / 60, dt), out);
+    a.rbJam = SELF.jam;
+    return out;
+  };
+  // a person standing (with nowhere to go) makes way: a step aside for a walker or the player coming at it; null when
+  // nobody is coming
+  Rb.makeWay = function (mgr, a, dt, out) {
+    if (!Rb.sw.makeWay) return null;
+    // (a look round every third step; between, the last answer holds)
+    const k = a.rbMw = ((a.rbMw | 0) + 1) % 3, m = a.rbMwV;
+    if (k !== 0) { if (!m) return null; out[0] = m[0]; out[1] = m[1]; return out; }
+    const n = gather(mgr, a, true);
+    if (!n) { if (m) a.rbMwV = null; return null; }
+    SELF.x = a.pos[0]; SELF.z = a.pos[2]; SELF.vx = a.vel[0]; SELF.vz = a.vel[2]; SELF.r = radiusOf(a);
+    SELF.pvx = 0; SELF.pvz = 0; SELF.vmax = 0.75; SELF.jam = 0;
+    Rb.orca(SELF, NB, n, 1.5, Math.max(1 / 60, dt), out);
+    if (out[0] * out[0] + out[1] * out[1] > 0.02) { const v = a.rbMwV || (a.rbMwV = [0, 0]); v[0] = out[0]; v[1] = out[1]; return out; }
+    a.rbMwV = null; return null;
+  };
+
+  // after the pose (tier 2, a person posed every frame): the feet planted, the drawn root following stairs softly, the
+  // torso leaning into acceleration and turns, a skirt's hem and a hanging bag or lantern swinging, settling
+  const FKt = [0, 0];
+  const HANG = { bag: 1, basket: 1, can: 1, lantern: 1 };
+  Rb.body = function (mgr, a, P, G, dt) {
+    const S = a.rb || (a.rb = { y: a.pos[1], vy: { x: a.pos[1], v: 0 }, cL: {}, cR: {}, ax: 0, az: 0, pvx: a.vel[0], pvz: a.vel[2], lean: { x: 0, v: 0 }, roll: { x: 0, v: 0 }, hem: { x: 0, v: 0 }, hemZ: { x: 0, v: 0 }, itm: { x: 0, v: 0 }, itmZ: { x: 0, v: 0 }, hx: 0, hx1: 0, hand: 0, hand1: 0 });
+    if (!(dt > 0)) return S;
+    const d = Math.min(dt, 0.1);
+    // the drawn root: a critically damped follow of the body's height (a stair's 0.5 no longer pops the whole person)
+    if (Math.abs(a.pos[1] - S.vy.x) > 1.2) { S.vy.x = a.pos[1]; S.vy.v = 0; }
+    Rb.spring(S.vy, a.pos[1], 16, 0.95, d); S.y = S.vy.x;
+    // acceleration (world, low-passed) → the body's forward / right components
+    const ax = (a.vel[0] - S.pvx) / d, az = (a.vel[2] - S.pvz) / d; S.pvx = a.vel[0]; S.pvz = a.vel[2];
+    const kk = Math.min(1, d * 10); S.ax += (Math.max(-12, Math.min(12, ax)) - S.ax) * kk; S.az += (Math.max(-12, Math.min(12, az)) - S.az) * kk;
+    const sy = Math.sin(a.yaw), cy = Math.cos(a.yaw);
+    const aF = -S.ax * sy - S.az * cy, aR = S.ax * cy - S.az * sy;
+    // the feet on the ground under them
+    const bpu = G.bpu, get = mgr._rbGet || (mgr._rbGet = (x, y, z) => mgr.g.world.getBlock(x, y, z));
+    if (Rb.sw.plant && P.leg_l && P.shin_l && mgr.g && mgr.g.world) {
+      let gL = 0, gR = 0;
+      for (let s = 0; s < 2; s++) {
+        const L = s ? P.leg_r : P.leg_l, Sh = s ? P.shin_r : P.shin_l;
+        Rb.legFK(G.thigh, G.shin, L[0], -Sh[0], FKt);
+        const fw = FKt[0] * bpu, lat = (s ? 1 : -1) * G.legX * bpu;
+        const fx = a.pos[0] - sy * fw + cy * lat, fz = a.pos[2] - cy * fw - sy * lat;
+        const h = Rb.footGround(get, fx, a.pos[1] + 0.3, fz, s ? S.cR : S.cL);
+        let gg = h - S.y; if (!(gg > -0.6 && gg < 0.6)) gg = 0;
+        if (s) gR = gg / bpu; else gL = gg / bpu;
+      }
+      Rb.plant(G, P, gL, gR);
+    }
+    if (!Rb.sw.spring) return S;
+    // the torso leans into the acceleration (forward when setting off, back when stopping) and into a turn
+    Rb.spring(S.lean, Math.max(-0.14, Math.min(0.14, -aF * 0.03)), 7, 0.5, d);
+    Rb.spring(S.roll, Math.max(-0.1, Math.min(0.1, -aR * 0.025)), 7, 0.5, d);
+    if (P.body) { P.body[0] += S.lean.x; P.body[2] += S.roll.x; }
+    // the pelvis's own sway in the walk (its side-to-side acceleration) shakes the hem and the hand's load too
+    const hx = (P.hips ? P.hips[3] : 0) * bpu, hAcc = (hx - 2 * S.hx + S.hx1) / (d * d); S.hx1 = S.hx; S.hx = hx;
+    const hAccC = Math.max(-6, Math.min(6, hAcc));
+    if (G.skirt && P.hips && P.body) {
+      Rb.pendulum(S.hem, aF, 5.2, 0.2, d); Rb.pendulum(S.hemZ, aR + hAccC, 5.2, 0.2, d);
+      const hp = Math.max(-0.12, Math.min(0.12, S.hem.x * 0.6)), hr = Math.max(-0.08, Math.min(0.08, S.hemZ.x * 0.6));
+      P.hips[0] += hp; P.hips[2] += hr; P.body[0] -= hp; P.body[2] -= hr;   // (the torso turned back: only the skirt swings)
+    }
+    if (G.carry && HANG[G.carry] && P.item_r) {
+      // the hand's own forward acceleration from the arm's swing (the arm some 0.55 b)
+      const hand = Math.sin(P.arm_r ? P.arm_r[0] : 0) * 0.55, hA = Math.max(-8, Math.min(8, (hand - 2 * S.hand + S.hand1) / (d * d))); S.hand1 = S.hand; S.hand = hand;
+      const w = G.carry === 'lantern' ? 4.6 : 5.6;
+      Rb.pendulum(S.itm, aF + hA, w, 0.12, d); Rb.pendulum(S.itmZ, aR + hAccC, w, 0.12, d);
+      P.item_r[0] += Math.max(-0.5, Math.min(0.5, S.itm.x)); P.item_r[2] += Math.max(-0.35, Math.min(0.35, S.itmZ.x));
+    }
+    return S;
   };
 })(VR);

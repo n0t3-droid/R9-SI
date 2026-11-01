@@ -238,6 +238,7 @@
       // half as often again while the main thread is the bottleneck — the far crowd keeps living, cheaper
       const fr = (this.frameN = (this.frameN || 0) + 1), slow = g.cpuBound ? 2 : 1;
       const px = p.pos[0], pz = p.pos[2];
+      this._rbT = VR.Robo ? VR.Robo.tier(g) : 0;   // (x-robo: 0 Very Low · 1 avoidance · 2 the body too — folkrobo.js)
       let budget = g.cpuBound ? 40 : 72; // agent updates per frame at most; the rest catch up with the time they skipped
       for (let i = 0; i < this.agents.length; i++) {
         const a = this.agents[i];
@@ -637,13 +638,22 @@
       if (tx !== null) {
         const dx = tx - a.pos[0], dz = tz - a.pos[2], d = Math.hypot(dx, dz) || 1;
         const sp = a.act && a.act.run ? a.speed * 1.5 : a.speed;
-        a.vel[0] += (dx / d * sp - a.vel[0]) * Math.min(1, dt * 8);
-        a.vel[2] += (dz / d * sp - a.vel[2]) * Math.min(1, dt * 8);
+        // x-robo: the wanted velocity through ORCA (folkrobo.js Robo.avoid) — people pass each other and the player
+        // politely instead of meeting nose to nose; within 40 b of the player, not on a stair's climb
+        let wvx = dx / d * sp, wvz = dz / d * sp;
+        if (this._rbT && a.onGround && !a.inBoat && Math.abs(ty - a.pos[1]) < 0.6 && (a.pos[0] - g.player.pos[0]) ** 2 + (a.pos[2] - g.player.pos[2]) ** 2 < 1600) { const o = VR.Robo.avoid(this, a, wvx, wvz, dt, this._rbO || (this._rbO = [0, 0])); wvx = o[0]; wvz = o[1]; }
+        a.vel[0] += (wvx - a.vel[0]) * Math.min(1, dt * 8);
+        a.vel[2] += (wvz - a.vel[2]) * Math.min(1, dt * 8);
         const ty2 = Math.atan2(-dx, -dz);
         let dy = ty2 - a.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
         a.yaw += dy * Math.min(1, dt * 8);
         if (ty > a.pos[1] + 0.55 && a.onGround && d < 1.3) a.vel[1] = 8.4;
-      } else { a.vel[0] *= Math.exp(-dt * 10); a.vel[2] *= Math.exp(-dt * 10); }
+      } else {
+        // x-robo: a person standing makes way for a walker or the player coming at it (a step aside)
+        const mw = this._rbT && a.pose === 'stand' && a.onGround && !a.inBoat && !(a.act && a.act.type === 'talk' && a.act.hug) && (a.pos[0] - g.player.pos[0]) ** 2 + (a.pos[2] - g.player.pos[2]) ** 2 < 576 ? VR.Robo.makeWay(this, a, dt, this._rbO || (this._rbO = [0, 0])) : null;
+        if (mw) { const k = Math.min(1, dt * 6); a.vel[0] += (mw[0] - a.vel[0]) * k; a.vel[2] += (mw[1] - a.vel[2]) * k; }
+        else { a.vel[0] *= Math.exp(-dt * 10); a.vel[2] *= Math.exp(-dt * 10); }
+      }
       // face whatever we are looking at when standing
       if (tx === null && a.lookAt) { const dx = a.lookAt[0] - a.pos[0], dz = a.lookAt[2] - a.pos[2]; const ty2 = Math.atan2(-dx, -dz); let dy = ty2 - a.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; a.yaw += dy * Math.min(1, dt * 5); }
       // standing still on solid ground with nowhere to go: nothing moves this step, so no collision query — a town's most
@@ -1445,6 +1455,7 @@
         else if (a.pose === 'sitground') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? -0.05 - (G.hip - 4) * G.bpu : -(a.kid ? 0.26 : 0.6)), a.pos[2]]; }
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
+        if (a.rb && !sleeping && a.pose !== 'sit' && a.pose !== 'sitground') pos = [pos[0], pos[1] + (a.rb.y - a.pos[1]), pos[2]];   // (x-robo: the root soft on stairs)
         // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
         // (in the 'map' mode a round contact shadow under the soles stays — the ground's occlusion, not the sun's: the people
         // stand on the floor indoors too, where the hall's roof keeps the sun off; the sun's shadow is the map's. Run 2's
@@ -1480,6 +1491,10 @@
       const G = a.gait !== undefined ? a.gait : (a.gait = Folk.gaitFor && a.p.look && a.p.look.role !== 'hero' ? Folk.gaitFor(a.p.look) : null);
       if (G) FA.stride(G, Math.hypot(a.vel[0], a.vel[2]), dt, run);
       const P = FA.pose(a, state, dt, ph, wa, run, a.poseOut || (a.poseOut = {}), undefined, G);
+      // x-robo (folkrobo.js, Balanced and up, a person posed every frame within 24 b): feet planted on the ground under
+      // them, the drawn root soft on stairs, the torso leaning into starts, stops and turns, hems and lanterns swinging
+      const rbNear = this._rbT === 2 && G && !a.inBoat && (a.d2v === undefined || a.d2v < 576) && !(FA.clips[a.anim && a.anim.cur] || {}).still && a.pose !== 'sleep';
+      if (rbNear) VR.Robo.body(this, a, P, G, dt); else if (a.rb) a.rb = null;
       // head: look at the target (or the player close by), otherwise glance around now and then
       let hy = 0, hp = 0;
       const pl = this.g.player.pos;
@@ -1495,14 +1510,16 @@
         if (a.glanceT <= 0) { a.glanceT = 2 + Math.random() * 4; a.glance = wa > 0.5 ? 0 : (Math.random() - 0.5) * 1.1; a.glanceP = (Math.random() - 0.4) * 0.3; }
         hy = a.glance || 0; hp = a.glanceP || 0;
       }
-      const k = Math.min(1, dt * 7);
-      a.headYaw += (hy - a.headYaw) * k; a.headPitch += (hp - a.headPitch) * k;
+      // x-robo: the head jumps between fixations and pursues slowly, blinks come with big gaze shifts (Robo.gaze)
+      if (rbNear && VR.Robo.sw.gaze) { const R = a.rbG || (a.rbG = {}); VR.Robo.gaze(R, hy, hp, dt, Math.random); a.headYaw = R.hy; a.headPitch = R.hp; }
+      else { const k = Math.min(1, dt * 7); a.headYaw += (hy - a.headYaw) * k; a.headPitch += (hp - a.headPitch) * k; }
       // (t-folk: the head turns up to 40° toward what the person looks at, the shoulders take the rest — up to 23°)
       const hyH = G ? Math.max(-0.7, Math.min(0.7, a.headYaw)) : a.headYaw, hyB = G ? Math.max(-0.4, Math.min(0.4, a.headYaw - hyH)) : 0;
       P.head[0] += a.headPitch + (a.bubble ? Math.sin(t * 7) * 0.04 : 0); P.head[1] += hyH; if (hyB) P.body[1] += hyB;
       // blinking and a talking mouth (the lids and mouth parts hang on the head: no pose of their own)
       a.blinkT = (a.blinkT === undefined ? Math.random() * 4 : a.blinkT) - dt;
-      if (a.blinkT < 0) { a.blinkOn = true; if (a.blinkT < -0.14) { a.blinkOn = false; a.blinkT = 2.2 + Math.random() * 4; } }
+      if (rbNear && a.rbG && VR.Robo.sw.gaze) { a.blinkOn = !!a.rbG.blink; a.blinkT = 9; }   // (x-robo: the gaze's own blinks)
+      else if (a.blinkT < 0) { a.blinkOn = true; if (a.blinkT < -0.14) { a.blinkOn = false; a.blinkT = 2.2 + Math.random() * 4; } }
       if (a.talkAnim > 0) { a.talkAnim -= dt; a.mouthOn = Math.sin(t * 21 + a.p.seed) > 0.1; } else a.mouthOn = false;
       a.speaking = a.talkAnim > 0;   // (t-folk2: the speaker gestures, the listener's hands rest — folkanim.js FA.gesture)
       P.lids = null; P.mouth = null;
