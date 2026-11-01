@@ -71,11 +71,13 @@
   // per mood: haze — the veil's reach (m to half), its strength toward the sun and away, its warm and cool colour (×
   // the sun's and the sky's light); pal — the greens' calm (0…1), the warm lean in the light, the teal lean in the shade;
   // soft — where the far softening starts and is full (m), its strength; wrap — its strength
+  // (browser run 2: toward the sun at the golden hour the veil hid the hill at 120 m and the softening started too near —
+  // the veils' reach longer and their strength down, the softening from ~85 m; the greens' calm was too shy at noon)
   const MOOD = {
-    day: { half: 260, sunK: 0.32, skyK: 0.18, warm: [1.0, 0.92, 0.78], cool: [0.78, 0.86, 1.0], calm: 0.32, lean: 0.03, teal: 0.035, s0: 70, s1: 220, sK: 0.55, wK: 0.5 },
-    gold: { half: 170, sunK: 0.45, skyK: 0.2, warm: [1.0, 0.8, 0.58], cool: [0.72, 0.76, 1.0], calm: 0.38, lean: 0.06, teal: 0.05, s0: 60, s1: 200, sK: 0.6, wK: 0.75 },
-    dusk: { half: 150, sunK: 0.42, skyK: 0.26, warm: [1.0, 0.66, 0.5], cool: [0.55, 0.68, 1.0], calm: 0.3, lean: 0.035, teal: 0.07, s0: 55, s1: 180, sK: 0.6, wK: 0.65 },
-    night: { half: 200, sunK: 0.0, skyK: 0.22, warm: [0.8, 0.85, 1.0], cool: [0.62, 0.74, 1.0], calm: 0.22, lean: 0.0, teal: 0.04, s0: 50, s1: 170, sK: 0.5, wK: 0.55 },
+    day: { half: 320, sunK: 0.24, skyK: 0.18, warm: [1.0, 0.92, 0.78], cool: [0.78, 0.86, 1.0], calm: 0.45, lean: 0.045, teal: 0.04, s0: 90, s1: 300, sK: 0.42, wK: 0.5 },
+    gold: { half: 230, sunK: 0.32, skyK: 0.2, warm: [1.0, 0.8, 0.58], cool: [0.72, 0.76, 1.0], calm: 0.45, lean: 0.06, teal: 0.055, s0: 85, s1: 280, sK: 0.45, wK: 0.75 },
+    dusk: { half: 200, sunK: 0.3, skyK: 0.26, warm: [1.0, 0.66, 0.5], cool: [0.55, 0.68, 1.0], calm: 0.42, lean: 0.035, teal: 0.09, s0: 80, s1: 260, sK: 0.45, wK: 0.65 },
+    night: { half: 240, sunK: 0.0, skyK: 0.22, warm: [0.8, 0.85, 1.0], cool: [0.62, 0.74, 1.0], calm: 0.3, lean: 0.0, teal: 0.05, s0: 70, s1: 240, sK: 0.4, wK: 0.55 },
   };
   L.MOOD = MOOD;
   const MK = ['day', 'gold', 'dusk', 'night'];

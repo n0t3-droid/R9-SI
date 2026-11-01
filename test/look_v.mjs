@@ -130,6 +130,10 @@ try {
         await preset(pr); await camAt(P, T, GOLD); await settle(25);
         const r = { off: [], on: [] };
         for (const c of CONFIGS.length > 1 ? ['off', 'on', 'on', 'off', 'off', 'on'] : ['off', 'off', 'off']) { await config(c); r[c].push(await ms(6)); }
+        // the full-screen passes of one frame by config (name w × h, the bytes read): the look's share in numbers
+        r.passes = {};
+        for (const c of CONFIGS) { await config(c); r.passes[c] = await ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; }); }
+        console.log('     passes ' + pr + ' ' + JSON.stringify(r.passes));
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };
         N.cost[pr] = { off: med(r.off), on: r.on.length ? med(r.on) : null, all: r };
         console.log('     cost ' + pr + ' ' + JSON.stringify({ off: N.cost[pr].off, on: N.cost[pr].on }) + ' (' + secs() + ')'); save();
@@ -172,11 +176,12 @@ try {
     console.log('     forest ' + JSON.stringify(F));
     if (F) {
       await camAt([F.c[0], 140, F.c[1]], [F.c[0] + 10, 130, F.c[1]], NOON); await settle(40);
-      // the eye under the crowns: the ground below the canopy (the first open air above the ground), looking along the wood
-      const G = await ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let i = 0; i < 40; i++) { const xx = Math.floor(x + (i % 7) - 3), zz = Math.floor(z + ((i / 7) | 0) - 3); for (let y = w.topAt(xx, zz); y > 40; y--) { const s = w.getBlock(xx, y, zz); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) { const a = w.getBlock(xx, y + 1, zz), b = w.getBlock(xx, y + 2, zz), c2 = w.getBlock(xx, y + 3, zz); if ((!a || !(R.T.flags[a] & F.SOLID)) && (!b || !(R.T.flags[b] & F.SOLID)) && (!c2 || !(R.T.flags[c2] & F.SOLID))) return [xx + 0.5, y + 1, zz + 0.5]; break; } } } return null; }, F.c);
-      const P = G ? [G[0], G[1] + 1.7, G[2]] : [F.c[0], (await top(F.c[0], F.c[1])) + 3, F.c[1]];
-      const sun = await ev(() => VR.game.env.E.sunDir.slice()), a = Math.atan2(sun[2], sun[0]) + 1.4;
-      const T = [P[0] + Math.cos(a) * 30, P[1] + 1.5, P[2] + Math.sin(a) * 30];
+      // (run 2: the eye 'under the crowns' stood in a meadow beside the wood) — the wood from its edge: 26 m off its middle,
+      // the sun behind the camera's shoulder, 4 m up, looking at the crowns
+      const sun = await ev(() => VR.game.env.E.sunDir.slice()), a = Math.atan2(sun[2], sun[0]) + 0.6;
+      const P = [F.c[0] + Math.cos(a) * 26, 0, F.c[1] + Math.sin(a) * 26]; P[1] = (await top(P[0], P[2])) + 1 + 4;
+      const T = [F.c[0], (await top(F.c[0], F.c[1])) - 1, F.c[1]];
+      const G = null;
       await camAt(P, T, NOON); await settle(30);
       N.cams.forest = { P, T, under: !!G };
       await shots('forest', NOON);
@@ -213,13 +218,17 @@ try {
   if (want('fairy')) {
     const NIGHT = 18000;
     let s = null; await photoOff();
-    for (let i = 0; i < 30; i++) {
-      s = (await ev(() => VR.Fairy && VR.Fairy.debug ? VR.Fairy.debug.sites() : [])).find(x => x.kind === 'circle');
-      if (!s) break;
-      if (s.y !== null && await ev(() => VR.Fairy.debug.near()) === s.id) break;
-      await ev((s) => { const p = VR.game.player; p.flying = true; p.teleport(s.x + 0.5, 150, s.z + 0.5); }, s); await settle(8); await run(20);
+    // (runs 1–2: the Mondsteinkreis never settled its spot here — the first of the places that does)
+    for (const kind of ['circle', 'shroom', 'spring', 'tree', 'garden']) {
+      for (let i = 0; i < 12; i++) {
+        s = (await ev(() => VR.Fairy && VR.Fairy.debug ? VR.Fairy.debug.sites() : [])).find(x => x.kind === kind);
+        if (!s) break;
+        if (s.y !== null && await ev(() => VR.Fairy.debug.near()) === s.id) break;
+        await ev((s) => { const p = VR.game.player; p.flying = true; p.teleport(s.x + 0.5, 150, s.z + 0.5); }, s); await settle(8); await run(20);
+      }
+      if (s && s.y !== null) { N.fairyKind = kind; break; }
     }
-    console.log('     fairy ' + JSON.stringify(s && { x: s.x, y: s.y, z: s.z }));
+    console.log('     fairy ' + JSON.stringify(s && { kind: s.kind, x: s.x, y: s.y, z: s.z }));
     if (s && s.y !== null) {
       const a = (s.yaw || 0) + 0.2, P = [s.x + Math.cos(a) * 15, 0, s.z + Math.sin(a) * 15];
       P[1] = (await top(P[0], P[2])) + 1 + 3;
@@ -227,7 +236,7 @@ try {
       await camAt(P, T, NIGHT); await settle(20); await run(60);
       N.cams.fairy = { P, T };
       await shots('fairy', NIGHT);
-    } else check(false, 'the Mondsteinkreis');
+    } else check(false, 'a fairy place settled');
   }
 
   // ---------------------------------------------------------------- the nebula (ch. 9, a-story6)
@@ -251,7 +260,7 @@ try {
   }
   save();
   // ---------------------------------------------------------------- the sheet
-  const pairs = [['spawn', 'Spawn-Blick · goldene Stunde'], ['village', 'Dorf in der Dämmerung'], ['forest', 'Wald am Mittag'], ['coast', 'Küste am Nachmittag'], ['fairy', 'Mondsteinkreis bei Nacht'], ['nebula', 'Der Nebel (Kap. 9)']];
+  const pairs = [['spawn', 'Spawn-Blick · goldene Stunde'], ['village', 'Dorf in der Dämmerung'], ['forest', 'Wald am Mittag'], ['coast', 'Küste am Nachmittag'], ['fairy', 'Märchenort bei Nacht'], ['nebula', 'Der Nebel (Kap. 9)']];
   const rows = [];
   for (const [v, lab] of pairs) { const imgs = CONFIGS.map(c => N.pics[v + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: lab + (imgs.length > 1 ? ' — vorher | nachher (Filmblick)' : ''), imgs }); }
   if (rows.length) {
