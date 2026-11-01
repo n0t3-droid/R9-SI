@@ -60,7 +60,7 @@ console.log('a · the switches');
   check(/VR\.Look\.defaults\(p\)/.test(g) && /LV_SW\.includes\(key\)/.test(g) && /for \(const k of LV_SW\) qb\[k\]/.test(g), 'game.js: the presets, a hand change → custom, the renderer gets them');
   check(b.indexOf("'look'") > b.indexOf("'sky3'") && b.indexOf("'look'") < b.indexOf("'shaders'") && b.indexOf("'look_gl'") > b.indexOf("'renderer'"), 'build.js: look before shaders, look_gl after the renderer');
   check(/VR\.Look\.ROWS/.test(sr), 'settings_reg.js shows the rows');
-  check(L.key({ lvHaze: true, lvSoft: true }) === '1010' && L.key(null) === '0000', 'the key (the renderer rebuilds its programs when it changes)');
+  check(L.key({ lvHaze: true, lvSoft: true }) === '101000' && L.key(null) === '000000', 'the key (the renderer rebuilds its programs when it changes)');
 }
 
 console.log('b · the composite');
@@ -72,9 +72,9 @@ console.log('b · the composite');
   for (const set of base) if (pre(comp0, set) === pre(comp1, set)) same++;
   check(same === base.length, 'switches off: the composite is the same text as before (' + base.length + ' sets)', same + '/' + base.length);
   L.use(L.off());
-  check(L.definesFor('composite').length === 0 && L.definesFor('terrain', L.defaults('high')).length === 0, 'off: no defines; on: none outside the composite');
+  check(L.definesFor('composite').length === 0 && L.definesFor('terrain', L.defaults('high')).join() === 'LV_MEADOW' && L.definesFor('terrainCut', L.defaults('high')).length === 0, 'off: no defines; on: none outside the composite (v-look2: the opaque terrain\'s LV_MEADOW)');
   const dh = L.definesFor('composite', L.defaults('high')), db = L.definesFor('composite', L.defaults('balanced'));
-  check(dh.join() === 'LV_HAZE,LV_PAL,LV_SOFT,LV_WRAP,LOOKV' && db.join() === 'LV_HAZE,LV_PAL,LOOKV', 'the defines', dh.join() + ' | ' + db.join());
+  check(dh.join() === 'LV_HAZE,LV_PAL,LV_SOFT,LV_WRAP,LV_TONE,LOOKV' && db.join() === 'LV_HAZE,LV_PAL,LV_TONE,LOOKV', 'the defines', dh.join() + ' | ' + db.join());
   let ok = 0; const sets = [db, dh, ['LV_PAL', 'LOOKV'], ['LV_SOFT', 'LOOKV'], ['LV_WRAP', 'LOOKV'], ['LV_HAZE', 'LOOKV']];
   for (const s of sets) { try { const t = pre(comp1, s.concat(['GRADE2'])); if (/lvHdr\(c, uv\)/.test(t) && /lvPal\(c\)/.test(t) && t.includes('vec3 lvHdr(') && t.includes('vec3 lvPal(')) ok++; } catch (e) { console.log('    ' + e.message); } }
   check(ok === sets.length, 'every switch set preprocesses with both calls and both functions', ok + '/' + sets.length);
@@ -148,7 +148,7 @@ console.log('e · the renderer');
   let full = 0; const rr = Object.create(R); rr.q = L.defaults('high'); rr.P = { composite: { p: 1 }, terrain: { p: 2 } }; rr.buildPrograms = () => { full++; };
   const t0 = rr.P.terrain, gp = V.GL.program; let asked = ''; V.GL.program = (vs, fs, name) => { asked += name; return { p: 3 }; };
   try { rr.lvRebuild(); } finally { V.GL.program = gp; }
-  check(full === 0 && rr.P.terrain === t0 && asked === 'composite' && rr.P.composite.p === 3 && rr.lvKey === '1111', 'a switch changed: the composite alone again (key ' + rr.lvKey + ')');
+  check(full === 0 && rr.P.terrain === t0 && asked === 'composite' && rr.P.composite.p === 3 && rr.lvKey === '111111', 'a switch changed: the composite alone again (key ' + rr.lvKey + ')');
   check(/this\.lvRebuild\(\)/.test(fs.readFileSync(SRC + '/renderer.js', 'utf8')), 'renderer.setQuality asks for it');
 }
 

@@ -885,6 +885,9 @@ void main() {
 
   S.TERRAIN_FS = `
 uniform float u_mipScale;
+#ifdef LV_MEADOW
+uniform vec4 u_lvMeadow;     // v-look2 · Wiesenruhe (look.js): x the texel noise's calm, y the patches' scale (1/m), z their strength, w on
+#endif
 uniform float u_wet;
 uniform float u_matTier;     // F2: the material detail tier (0 Very Low … 3 High)
 uniform float u_puddle;      // F2: the puddles' fill (env.js: they gather in the rain, dry over minutes)
@@ -1157,6 +1160,26 @@ void main() {
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
   }
+#ifdef LV_MEADOW
+  // v-look2 · Wiesenruhe (look.js): a green-tinted face (grass, moss, leaves on an opaque block) calmed like a painted
+  // field — part of each texel's lime/dark noise replaced by the texture's own mean (its 1 × 1 mip: one coarse tap), and
+  // large soft patches over tens of metres, deeper and cooler or lighter and warmer (the low frequencies post can't give)
+  // (never in the Klassisch look: its crisp 16-texel ground and the block grid stay — classic_v2)
+  if (u_lvMeadow.w > 0.0 && u_blockVar < 0.5 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5)) {
+#ifdef TEXHI
+    vec3 mean = hiOn ? textureLod(u_albedoHi, vec3(fu, float(hiK - 1)), 6.0).rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb;
+#else
+    vec3 mean = textureLod(u_albedo, vec3(fu, layer), 4.0).rgb;
+#endif
+    mean = mix(mean, mean * tint, alb.a);
+    alb.rgb = mix(alb.rgb, mean, u_lvMeadow.x * alb.a);
+    // (run 1: two vnoise3 — 16 hashes a grass pixel — cost High ~7 ms on SwiftShader; the noise texture's smooth tileable
+    // value noise instead, two taps at scales 173 m and 411 m to the tile — the pattern repeats nowhere one sees)
+    vec2 gq = v_localPos.xz + vec2(u_camInt.xz);
+    float mn = texture(u_noise, gq * u_lvMeadow.y).r * 0.6 + texture(u_noise, gq * u_lvMeadow.y * 0.42 + vec2(0.37, 0.61)).g * 0.4;
+    alb.rgb *= mix(vec3(1.0), mix(vec3(0.88, 0.95, 1.0), vec3(1.1, 1.05, 0.86), smoothstep(0.25, 0.75, mn)), u_lvMeadow.z * alb.a);
+  }
+#endif
 #ifdef BODYGROUND
   // u-orbit2 (R52-09: the ground a uniform stepped grey): on an airless body from Low up (bodysky.js's define hook) the
   // ground's albedo in patches over metres to a hundred metres — the regolith's darker and brighter dust, the ice's frost
@@ -3140,6 +3163,9 @@ void main() {
 #endif
 #ifdef LOOKV
   c = lvPal(c);   // v-look: the film's greens (look.js)
+#endif
+#ifdef LV_TONE
+  c = lvTone(c);   // v-look2: the night's moonlight, the worlds' palettes (look.js)
 #endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
