@@ -4150,5 +4150,17 @@
     "g.photo.noFace": "📷 Nobody near for a portrait",
     "g.photo.more3": " · H: portrait",
     // ---- u-folk3 end
+    // ---- o-wander2 start
+    "g.fairy.tw.lanterns": "Oh! The smallest lantern has lost its light seed – the wind carried it off. Will you come? I'll show you the way!",
+    "g.fairy.tw.lost": "Home! But … my little bell light blew away on the way. Will you help me look for it? I'll come too!",
+    "g.fairy.tw.bridge": "The bridge sings! Only one light seed is missing, the last note – the wind blew it away. Shall we fetch it together?",
+    "g.fairy.tw.riddle": "How clever you are! One last riddle: what glows, flies and has no wings? … A light seed! And one is dancing out there. Come!",
+    "g.fairy.tw.hat": "My hat! Thank you! But the feather … the wind took the light seed from my hat's feather. Shall we catch it?",
+    "g.fairy.tw.near": "There! Can you see it glow? Very carefully …",
+    "g.fairy.tw.hop": "Hee hee, it hops on! After it!",
+    "g.fairy.tw.got": "You've got it! Now quickly home with it.",
+    "g.fairy.tw.still": "The light seed is still out there – I'll stay with you.",
+    "g.fairy.tw.note": "✨ One more thing: a light seed blown away by the wind – together with your Flausel",
+    // ---- o-wander2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

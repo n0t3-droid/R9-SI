@@ -99,6 +99,83 @@
     return out;
   };
 
+  // ---- o-wander2 · the pacing (R56-04): one clock over everything seen — every weight-≥ 2 event of any source moves
+  // `last`; nothing of ours within PACE.space of it (clumps deferred); a moment due at a jittered 15–23 s after it, its
+  // stage scouted PACE.look s before along the heading; from PACE.beat a small ambient beat fills anywhere (flying too),
+  // from PACE.hard even when the Regie says busy — so no gap grows past ≈ 31 s plus the time a beat needs to be seen
+  W.PACE = { space: 10, lo: 15, hi: 23, look: 4, beat: 27, hard: 31 };
+  W.Pacer = class {
+    constructor(seed) { this.seed = seed | 0; this.last = -1e9; this.n = 0; this.tgt = this.jit(0); }
+    jit(n) { const P = W.PACE; return P.lo + (P.hi - P.lo) * h(this.seed, n, 0x9ace); }
+    seen(t, w) { if (!(w >= 2)) return; if (t > this.last) { this.last = t; this.n++; this.tgt = this.jit(this.n); } }
+    since(t) { return t - this.last; }
+    scout(t) { const s = t - this.last; return s >= this.tgt - W.PACE.look && s < this.tgt; }
+    // null · 'moment' · 'beat' — o: {foot (on foot: a moment may start), stage (its stage is clear), busy (the Regie),
+    // coming (something another source started is about to be seen: a craft closing in, a start not seen yet)}
+    want(t, o) {
+      const s = t - this.last, P = W.PACE; if (s < P.space) return null;
+      const foot = !o || o.foot !== false, busy = !!(o && (o.busy || o.coming)), stage = !o || o.stage !== false;
+      if (s >= this.tgt && foot && stage && !busy) return 'moment';
+      if (s >= P.beat && (!busy || s >= P.hard)) return 'beat';
+      return null;
+    }
+  };
+  // a walk of `dur` s: ext — the other sources' weighted events: numbers (they do not ask: fixed) or {t, ask: true}
+  // (they ask the Regie, which keeps them PACE.space − 2 s clear of ours); opt.foot(t), opt.stage(t) → {starts, all}
+  W.paceSim = function (seed, dur, ext, opt) {
+    opt = opt || {};
+    const P = new W.Pacer(seed), starts = [], all = [];
+    const E = (ext || []).map(e => (typeof e === 'number' ? { t: e, ask: false } : { t: e.t, ask: !!e.ask })).sort((a, b) => a.t - b.t);
+    let i = 0, lastOurs = -1e9; P.seen(0, 2); all.push(0);
+    for (let t = 0; t <= dur; t += 0.25) {
+      while (i < E.length && E[i].t <= t) { const e = E[i++]; if (e.ask && t - lastOurs < W.PACE.space - 2) { e.t = lastOurs + W.PACE.space - 2; E.splice(i, 0, e); E.sort((a, b) => a.t - b.t); i = E.indexOf(e); if (e.t > t) continue; } all.push(+e.t.toFixed(2)); P.seen(e.t, 2); }
+      const k = P.want(t, { foot: opt.foot ? opt.foot(t) : true, stage: opt.stage ? opt.stage(t) : true });
+      if (k) { starts.push({ t, kind: k }); all.push(t); P.seen(t, 2); lastOurs = t; }
+    }
+    all.sort((a, b) => a - b);
+    return { starts, all };
+  };
+
+  // ---- o-wander2 · the staging (R56-03): 8–15 m ahead (the proof walk: at 12–16 m grass and trunks hid too much) inside the view cone, the main figure's height ≥ 6 % of the
+  // frame's (W.share; staged for 7 %: a margin for the figure's own way); a small figure stages nearer (animals are drawn × STAGE.animal); a clear voxel line from the eye
+  W.STAGE = { near: 8, far: 15, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.35 };
+  W.share = (hgt, d, fov) => hgt / (2 * Math.max(0.1, d) * Math.tan((fov || W.STAGE.fov) / 2));
+  W.stageRange = function (hgt, fov) {
+    const S = W.STAGE, dmax = hgt / (S.share * 2 * Math.tan((fov || S.fov) / 2));
+    return [S.near, Math.max(S.near, Math.min(S.far, dmax))];
+  };
+  // the candidates [d, side] — the nearer half of the range first, the centre of the cone first
+  W.stageCands = function (R) {
+    const S = W.STAGE, a = R[0], b = R[1], mid = a + (b - a) * 0.35, out = [];
+    for (const d of [mid, mid + (b - mid) * 0.6, a + (mid - a) * 0.4, b, a]) for (const s of [0.18, -0.18, 0, 0.34, -0.34, S.cone, -S.cone]) out.push([Math.max(a, Math.min(b, d)), s]);
+    return out;
+  };
+  // a voxel raycast eye → target: false when a solid cell lies between (the first 0.5 m and the last 0.9 m skipped —
+  // the eye's own cell, the ground the figure stands on and its own body)
+  W.clearLine = function (solidAt, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz); if (L < 1.5) return true;
+    const n = Math.ceil(L / 0.35);
+    for (let i = 1; i < n; i++) { const u = i / n, s = u * L; if (s < 0.5 || s > L - 0.9) continue; if (solidAt(a[0] + dx * u, a[1] + dy * u, a[2] + dz * u)) return false; }
+    return true;
+  };
+  // each moment's main figure (its height in m, what has to read in the frame)
+  const FIG = { traveller: 1.8, caravan: 2.2, pet: 0.75, picnic: 1.3, musician: 1.8, kites: 1.8, crossing: 0.75, rainbow: 9, glade: 1.1, cairn: 1.5, shrine: 2.2, ruins: 3.6, scrap: 1.1, sign: 2.4, stargazer: 1.8, lanterns: 1.8, well: 2.4 };
+  for (const n of W.NAMES) W.KINDS[n].fig = FIG[n] || 1.6;
+  // the ambient beats (fill a gap; tier 0, one or two draws, ≤ 14 s): fly — also in flight / on the Sky Isles
+  W.BEATS = {
+    bird: { tier: 0, dur: 11, fly: false, fig: 0.45, hours: DAYD, ico: '🐦' },
+    flutter: { tier: 0, dur: 10, fly: false, fig: 0.5, hours: MID, dry: 1, ico: '🦋' },
+    breeze: { tier: 0, dur: 9, fly: false, fig: 0.9, hours: DAYD, ico: '🌼' },
+    song: { tier: 0, dur: 13, fly: false, fig: 1.8, hours: ALL, ico: '🎵' },
+    flock: { tier: 0, dur: 12, fly: true, fig: 1.6, hours: DAYD, ico: '🕊' },
+    glow: { tier: 0, dur: 11, fly: true, fig: 1.2, hours: ['dusk', 'night'], ico: '✨' },
+  };
+  W.beatFor = function (seed, n, ctx, flying) {
+    const L = Object.keys(W.BEATS).filter(b => { const B = W.BEATS[b]; if (flying && !B.fly) return false; if (!flying && B.fly && b !== 'glow') return false; if (B.hours.indexOf(ctx.hour) < 0) return false; if (B.dry && ctx.wet) return false; return true; });
+    if (!L.length) return flying ? 'glow' : 'song';
+    return L[Math.floor(h(seed, n, 0xbea7) * L.length) % L.length];
+  };
+
   // ---------------------------------------------------------------- das Wanderbuch (meta.wander)
   W.PAGES = ['places', 'people', 'creatures', 'stickers', 'recipes'];
   W.SOFT = { places: 20, people: 12, creatures: 8, stickers: W.NAMES.length, recipes: 6 };
@@ -244,6 +321,20 @@
     // free and level enough: [x, y, z] or null
     spot(d, side, flat) {
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let fb = null;
+      // o-wander2: while a moment is staged — 8–18 m ahead where its main figure reads, inside the cone, a clear voxel
+      // line from the eye; no hidden fallback (no clear spot: it waits)
+      if (this.stg) {
+        const K = W.KINDS[this.stg], R = W.stageRange(K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1), this.fov());
+        for (const [dd, aa] of W.stageCands(R)) {
+          const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
+          const y = this.ground(x, z, p[1]); if (y === null) continue;
+          if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) continue; }
+          const q = [x, y + Math.min(1.4, K.fig * 0.6), z];
+          if (!this.clear(q) || !this.inSight(q)) continue;
+          return [x, y, z];
+        }
+        return null;
+      }
       for (const dd of [d, d + 6, d - 5, d + 12]) for (const aa of [side, -side, side * 0.4, 0, side * 1.4]) {
         if (dd < 8) continue;
         const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
@@ -257,7 +348,9 @@
     }
     inSight(q) { const L = VR.EventLog; if (!L || !L.inView) return true; try { return !!L.inView(q, 1.2, this.g).inView; } catch (e) { return true; } }
     // the highest ground of a few spots ahead (the cairn's hilltop)
+    fov() { const S = this.g.settings; return S && Number.isFinite(S.fov) ? S.fov * Math.PI / 180 : W.STAGE.fov; }
     high(d) {
+      if (this.stg) d = 12;   // (o-wander2: the hilltop within the stage's reach — 12 … 32 m was 26 … 46)
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let best = null;
       for (const dd of [d, d + 10, d + 20]) for (const aa of [-0.5, -0.25, 0, 0.25, 0.5]) {
         const a = a0 + aa, x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd, y = this.ground(x, z, p[1] + 6);
@@ -342,6 +435,126 @@
       if (p.flying) { const gy = this.ground(p.pos[0], p.pos[2], p.pos[1] - 4); if (gy === null || p.pos[1] - gy > 18) return false; }
       return true;
     }
+    // ---- o-wander2 · the pacing (W.Pacer) and the beats
+    get now() { const t = this.g.time; return Number.isFinite(t) ? t : this.time; }
+    // in the air or over the Sky Isles: the beats that fly (a flock beside you, a glow drifting up)
+    airborne() {
+      const g = this.g, p = g.player;
+      if (!p || g.photo || g.studioOpen || (g.ui && g.ui.screen && g.ui.screen !== 'hud')) return false;
+      return !!(g.flight || p.flying);
+    }
+    readLog() {
+      const L = VR.EventLog; if (!L || !L.events) return;
+      if (this.logN === undefined) this.logN = L.count | 0;
+      if ((L.count | 0) === this.logN) return;
+      const E = L.events(this.logN); this.logN = L.count | 0;
+      for (const e of E) if (e.w >= 2 && e.inView && e.src !== 'wander') { this.pacer.seen(e.t, e.w); this.st.outside = (this.st.outside | 0) + 1; }
+    }
+    pace(dt, walking) {
+      const g = this.g, now = this.now;
+      const P = this.pacer || (this.pacer = new W.Pacer(this.seed));
+      if (P.last < -1e8) P.seen(now - 8, 2);   // (the first moment ≈ 10–15 s after you set out)
+      if ((this.logT = (this.logT || 0) - dt) <= 0) { this.logT = 0.25; this.readLog(); }
+      if (this.auto === false || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) return;
+      const air = !walking && this.airborne();
+      if (!walking && !air) return;
+      // the scout: PACE.look s before the moment is due, its kind is chosen and its stage tried along the heading
+      if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
+      if (now < (this.tryT || 0)) return;
+      const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g));
+      const want = P.want(now, { foot: walking, busy, coming: this.coming(now) });
+      if (!want) return;
+      this.tryT = now + 1;
+      if (want === 'moment') {
+        const order = this.plan && this.plan.n === P.n ? this.plan.order : W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent);
+        for (let i = 0; i < order.length && i < 5; i++) if (this.start(order[i], 1000 + P.n)) return;
+        this.st.quiet++;   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
+        return;
+      }
+      this.beat(air);
+    }
+    // o-wander2: is something of another source about to be seen? — a start the Regie noted that no event has shown yet
+    // (≤ 15 s), or a craft of the sky traffic closing in (its nearest pass within ≈ 9 s): ours waits, no pair
+    coming(now) {
+      const g = this.g, RG = VR.Regie, RS = RG && RG.of ? RG.of(g) : null, P = this.pacer;
+      if (RS && RS.sched && RS.sched.lastStart > P.last + 0.5 && now - RS.sched.lastStart < 15) return true;
+      const Tr = g.traffic, e = this.pos; if (!Tr || !Tr.ships) return false;
+      const M = this.shipD || (this.shipD = new Map());
+      let soon = false;
+      for (const s of Tr.ships) {
+        if (!s || s.wing || s._elDone || !s.pos) continue;
+        const d = Math.hypot(s.pos[0] - e[0], s.pos[1] - e[1], s.pos[2] - e[2]), d0 = M.get(s);
+        M.set(s, d);
+        if (d0 !== undefined && d < d0 && d < 260 && (d - 60) / Math.max(6, s.speed || 20) < 9) soon = true;
+      }
+      if (M.size > 64) M.clear();
+      return soon;
+    }
+    // a beat: small and close (6–16 m ahead in the cone), one or two draws, silent on screen (no toast)
+    beat(air) {
+      if (this.b) this.b = null;
+      const g = this.g, P = this.pacer, ctx = this.ctx || (this.ctx = this.context());
+      const kind = W.beatFor(this.seed, P.n, ctx, air), B = W.BEATS[kind];
+      const c = g.cam, eye = c && Number.isFinite(c.x) ? [c.x, c.y, c.z] : this.eye, f = this.fwd, a0 = Math.atan2(f[1], f[0]);
+      const b = { kind, age: 0, dur: B.dur, seed: (h(this.seed, P.n, 0xbea7) * 0x7fffffff) | 0, pos: null, vel: [0, 0, 0], F: null, y0: 0 };
+      const side = (h(b.seed, 1, 3) - 0.5) * 0.5;
+      if (B.fly) {
+        const d = kind === 'flock' ? 15 : 11, a = a0 + side * 1.4;
+        b.pos = [eye[0] + Math.cos(a) * d, eye[1] + (kind === 'glow' ? -2 : 0.5), eye[2] + Math.sin(a) * d];
+        b.vel = [f[0] * (kind === 'flock' ? 6 : 0.4), kind === 'glow' ? 0.8 : 0, f[1] * (kind === 'flock' ? 6 : 0.4)];
+      } else {
+        const R = kind === 'song' ? [12, 16] : kind === 'breeze' ? [7, 10] : [6, 9];
+        for (const [d, s] of W.stageCands(R)) {
+          const a = a0 + s + side * 0.2, x = this.pos[0] + Math.cos(a) * d, z = this.pos[2] + Math.sin(a) * d, y = this.ground(x, z, this.pos[1]);
+          if (y === null) continue;
+          const q = [x, y + (kind === 'flutter' ? 1.2 : 0.4), z];
+          if (!this.clear(q) || !this.inSight(q)) continue;
+          b.pos = [x, y, z]; break;
+        }
+        if (!b.pos) return false;
+        if (kind === 'song') { b.F = this.fig(b.seed, b.pos, 'farmer'); this.face(b.F, this.pos); b.F.state = 'cheer'; b.F.talking = true; }
+        if (kind === 'bird') { b.y0 = b.pos[1]; b.pos[1] += 6; }
+      }
+      b.yaw = LK.yawOf(this.pos[0] - b.pos[0], this.pos[2] - b.pos[2]);
+      this.b = b; P.seen(this.now, 2); this.st.beats = (this.st.beats | 0) + 1;
+      let seen = null;
+      if (VR.EventLog && VR.EventLog.emit) { try { const R = VR.EventLog.emit('ambient', 'wb:' + kind, 2, [b.pos[0], b.pos[1] + (kind === 'song' ? 1 : 0.3), b.pos[2]], 'wander', 1.2); seen = R ? !!R.inView : null; } catch (e) { /* optional */ } }
+      if (VR.Regie && VR.Regie.note) VR.Regie.note(g, 2, 'ambient', 'wb:' + kind);
+      this.timeline.push({ t: Math.round(this.time * 10) / 10, kind: 'b:' + kind, d: Math.round(Math.hypot(b.pos[0] - eye[0], b.pos[2] - eye[2])), x: Math.round(this.pos[0]), z: Math.round(this.pos[2]), seen, share: +W.share(B.fig, Math.hypot(b.pos[0] - eye[0], b.pos[1] - eye[1], b.pos[2] - eye[2])).toFixed(3) });
+      if (this.timeline.length > 400) this.timeline.shift();
+      if (kind === 'song') this.songN = 0;
+      return true;
+    }
+    beatUpdate(dt) {
+      const b = this.b; if (!b) return;
+      b.age += dt; const u = b.age / b.dur, A = this.audio;
+      if (u >= 1) { this.b = null; return; }
+      if (b.kind === 'bird') {
+        // it glides down, lands, hops and pecks, sings twice, flies off
+        if (b.age < 1.6) b.pos[1] = b.y0 + 6 * Math.pow(1 - b.age / 1.6, 2);
+        else if (u > 0.82) { b.pos[1] += dt * 5; b.pos[0] += Math.sin(b.yaw) * -dt * 4; b.pos[2] += Math.cos(b.yaw) * -dt * 4; }
+        else { b.pos[1] = b.y0 + Math.abs(Math.sin(b.age * 3.1)) * 0.12; if (Math.floor(b.age * 1.3) !== Math.floor((b.age - dt) * 1.3) && Math.floor(b.age) % 3 === 0 && A && A.ctx && A.tone) { A.tone(2400, 0.02, 0.07, 'sine', true); A.tone(2900, 0.018, 0.09, 'sine', true, (A.ctx.currentTime || 0) + 0.1); } }
+      } else if (b.kind === 'flock' || b.kind === 'glow') {
+        b.pos[0] += b.vel[0] * dt; b.pos[1] += b.vel[1] * dt; b.pos[2] += b.vel[2] * dt;
+        if (b.kind === 'flock') { const e = this.g.cam; if (e && Number.isFinite(e.x)) b.pos[1] += ((e.y + 0.5) - b.pos[1]) * Math.min(1, dt); }
+      } else if (b.kind === 'song') {
+        if (b.F) { b.F.talking = Math.sin(b.age * 2.2) > -0.2; this.face(b.F, this.pos); }
+        const S = [392, 440, 523.3, 440, 392, 349.2, 392, 0], i = Math.floor(b.age * 1.6);
+        if (A && A.ctx && A.tone && i !== this.songN && i < 16) { this.songN = i; const f0 = S[i % S.length]; if (f0) A.tone(f0, 0.03 * Math.max(0, 1 - this.dist(b.pos) / 40), 0.5, 'triangle', true); }
+      }
+    }
+    drawBeat(r, cam, prog) {
+      const b = this.b, g = this.g; if (!b) return;
+      const t = this.time, flap = Math.sin(t * 22) * 0.8;
+      if (b.kind === 'bird') { BEAT_O.scale = 1.6; BEAT_O.pose = birdPose(b.age < 1.6 || b.age / b.dur > 0.82 ? flap : 0); LK.drawModel(g, r, prog(), 'wander_bird', b.pos, b.yaw + Math.sin(t * 1.7) * 0.4, cam, BEAT_O); BEAT_O.pose = null; }
+      else if (b.kind === 'flock') { BEAT_O.scale = 2.2; BEAT_O.pose = birdPose(flap); const yaw = Math.atan2(-b.vel[0], -b.vel[2]); for (let i = 0; i < 3; i++) { const q = FLOCK_P[i]; q[0] = b.pos[0] + (i - 1) * 1.6; q[1] = b.pos[1] + (i === 1 ? 0.8 : 0) + Math.sin(t * 2 + i) * 0.2; q[2] = b.pos[2] + (i === 1 ? -1 : 0.6); LK.drawModel(g, r, prog(), 'wander_bird', q, yaw, cam, BEAT_O); } BEAT_O.pose = null; }
+      else if (b.kind === 'flutter') { BEAT_O.scale = 1.5; for (let i = 0; i < 2; i++) { const q = FLOCK_P[i], a = t * 1.3 + i * 2.6; q[0] = b.pos[0] + Math.cos(a) * 0.9; q[1] = b.pos[1] + 1.1 + Math.sin(t * 3.1 + i) * 0.3; q[2] = b.pos[2] + Math.sin(a) * 0.9; BEAT_O.pose = flyPose(Math.sin(t * 18 + i) * 0.9); LK.drawModel(g, r, prog(), 'wander_fly' + i, q, -a, cam, BEAT_O); } BEAT_O.pose = null; }
+      else if (b.kind === 'breeze') { BEAT_O.scale = 1; BEAT_O.pose = swayPose(Math.sin(t * 2.4) * 0.22 + Math.sin(t * 5.3) * 0.06); LK.drawModel(g, r, prog(), 'wander_flowers', b.pos, b.yaw, cam, BEAT_O); BEAT_O.pose = null; if (this.tier >= 1 && this.P && Math.random() < 0.15) this.P.spawn(b.pos[0], b.pos[1] + 0.8, b.pos[2], 1.2, 0.3, 0.4, { life: 2, size: 0.08, grav: 0.02, col: [1, 0.8, 0.9], emis: 0, drag: 0.6, collide: false }); }
+      else if (b.kind === 'song') { if (b.F) LK.drawFolk(g, r, prog(), b.F, cam, t); }
+      else if (b.kind === 'glow') { BEAT_O.scale = 2.4; LK.drawModel(g, r, prog(), 'wander_hlamp', b.pos, t * 0.3, cam, BEAT_O); }
+    }
+    // o-wander2: the voxel line from the eye to a point is clear (W.clearLine over the world's blocks)
+    clear(q) { const e = this.eye; return W.clearLine((x, y, z) => this.solid(this.get(x, y, z)), e, q); }
     update(dt) {
       const g = this.g, S = g.settings || {}, t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       this.time += dt;
@@ -354,16 +567,9 @@
       if ((this.ctxT -= dt) <= 0) { this.ctxT = 1; this.ctx = this.context(); }
       const walking = this.onFoot();
       if (walking) this.clock += dt;
-      const k = W.slotAt(this.seed, this.clock);
-      if (this.lastK === null) this.lastK = k - 1;   // (the first moment comes with the next slot … or now: see below)
-      if (k > this.lastK && walking && this.auto !== false) { this.lastK = k; const t1 = Math.max(this.time, (this.lastStart || -1e9) + 12); this.retry = { k, until: t1 + 8, nextT: t1 }; }   // (never two moments within 12 s)
-      // the fill: a slot that found no stage (a wall, water, a cliff ahead) leaves no long gap — 30 s after the last start
-      // the next moment is tried at once (a slot of its own: 500000 + n, the same for every guest at the same walk)
-      if (!this.retry && walking && this.auto !== false && this.time - (this.lastStart || 0) > W.FILL) this.retry = { k: 500000 + (this.fillN = (this.fillN || 0) + 1), until: this.time + 6, nextT: 0 };
-      if (this.retry && this.time >= this.retry.nextT) {
-        if (this.time > this.retry.until) { this.retry = null; this.st.quiet++; }
-        else { this.retry.nextT = this.time + 1; if (this.slot(this.retry.k)) this.retry = null; }
-      }
+      // ---- o-wander2: the pacer — one clock over every weighted event seen (the event log), ours deferred off clumps,
+      // a moment due 15–23 s after the last (its stage scouted ahead), a beat filling from 27 s on foot or in flight
+      this.pace(dt, walking);
       // the moments
       const cap = this.tier === 0 ? 1 : this.tier === 1 ? 2 : 3;
       while (this.ms.length > cap) this.end(this.ms[0]);
@@ -376,6 +582,7 @@
         if (alive) this.hello(m, dt);   // (f-polish5)
         if (!alive) this.end(m);
       }
+      this.beatUpdate(dt);
       this.mapUpdate(dt);
       this.beaconUpdate(dt, walking);
       if (t0) this.st.cost = this.st.cost * 0.95 + (performance.now() - t0) * 0.05;
@@ -391,20 +598,24 @@
       const A = ACT[kind]; if (!A) return null;
       if (!force && this.ms.some(m => m.kind === kind)) return null;
       const m = { kind, k, seed: (h(this.seed, k, NH[kind]) * 0x7fffffff) | 0, age: 0, dur: W.KINDS[kind].dur, pos: null, found: false };
-      let ok = false; try { ok = A.start(this, m) !== false; } catch (err) { ok = false; if (!this.warnedS) { this.warnedS = true; console.warn('wander start', kind, err); } }
+      let ok = false; this.stg = force ? null : kind; try { ok = A.start(this, m) !== false; } catch (err) { ok = false; if (!this.warnedS) { this.warnedS = true; console.warn('wander start', kind, err); } }
+      this.stg = null;
       if (!ok) return null;
+      if (this.pacer) this.pacer.seen(this.now, 2);   // (o-wander2)
+      if (VR.Regie && VR.Regie.note) VR.Regie.note(this.g, 2, 'ambient', 'wd:' + kind);
       // f-polish5: a spot's front turned toward the walker (its own small turn kept)
       if (STAGE_SPOT[kind] && m.pos && Number.isFinite(m.yaw)) m.yaw = W.stageYaw(m.yaw, LK.yawOf(this.pos[0] - m.pos[0], this.pos[2] - m.pos[2]));
       this.ms.push(m); this.recent.push(kind); if (this.recent.length > 24) this.recent.shift();
       this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1; this.lastStart = this.time;
       const p = this.pos; let seen = null;
       if (VR.EventLog && VR.EventLog.emit) { try { const R = VR.EventLog.emit('ambient', 'wd:' + kind, 2, m.pos ? [m.pos[0], m.pos[1] + 1, m.pos[2]] : null, 'wander', 3); seen = R ? !!R.inView : null; } catch (e) { /* the log is optional */ } }
-      this.timeline.push({ t: Math.round(this.time * 10) / 10, kind, d: m.pos ? Math.round(this.dist(m.pos)) : 0, x: Math.round(p[0]), z: Math.round(p[2]), seen });
+      const dd = m.pos ? Math.hypot(m.pos[0] - p[0], m.pos[1] + 1 - p[1] - 1.62, m.pos[2] - p[2]) : 0, K = W.KINDS[kind];
+      this.timeline.push({ t: Math.round(this.time * 10) / 10, kind, d: m.pos ? Math.round(this.dist(m.pos)) : 0, x: Math.round(p[0]), z: Math.round(p[2]), seen, share: m.pos ? +W.share(K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1), dd, this.fov()).toFixed(3) : 0 });
       if (this.timeline.length > 400) this.timeline.shift();
       return m;
     }
     end(m) { const A = ACT[m.kind]; if (A && A.end) { try { A.end(this, m); } catch (e) { /* ends anyway */ } } const i = this.ms.indexOf(m); if (i >= 0) this.ms.splice(i, 1); }
-    endAll() { while (this.ms.length) this.end(this.ms[0]); }
+    endAll() { while (this.ms.length) this.end(this.ms[0]); this.b = null; }
     // ---- the treasure map's chest: at its X (a real place), drawn when near, found when reached
     mapUpdate() {
       const B = W.book(this.g.meta), M = B && B.map; if (!M) { this.mapChest = null; return; }
@@ -437,11 +648,13 @@
     }
     draw(r, E, layer, cam) {
       if (!this.on || layer !== 'opaque') return;
-      if (!this.ms.length && !this.bcOn && !this.mapChest) return;
+      if (!this.ms.length && !this.bcOn && !this.mapChest && !this.b) return;
       const g = this.g, ent = g.entities; if (!ent) return;
       let p = null; const prog = () => p || (p = ent.beginVox(r, E));
       cam = cam || r.cam;
       for (const m of this.ms) { const A = ACT[m.kind]; if (A.draw) { try { A.draw(this, m, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('wander draw', m.kind, e); } } } }
+      if (this.b) { try { this.drawBeat(r, cam, prog); } catch (e) { /* drawn next frame */ } }
+      if (this.tier === 0) this.drawLamp(r, cam, prog);   // (o-wander2: Very Low's dusk cue — one warm lamp)
       if (this.bcOn) LK.drawModel(g, r, prog(), 'wander_balloon', this.bcPos, this.time * 0.2, cam, BAL_O);
       if (this.mapChest) LK.drawModel(g, r, prog(), 'wander_chest', this.mapChest, 0.4, cam, {});
       if (this.tier >= 1 && g.settings.wonderGlow !== false && VR.StoryGlow && VR.StoryGlow.draw) this.drawCues(r, cam);
@@ -449,6 +662,8 @@
     // ---- f-polish5: a moment greets you as you come near — its people turn and wave once (25 m … 6 m)
     hello(m, dt) {
       const L = m.F ? (Array.isArray(m.F) ? m.F : [m.F]) : null; if (!L || !L.length || !m.pos) return;
+      // o-wander2: while you are within 20 m its standing people keep turning toward you (softly)
+      if (this.dist(m.pos) < 20) for (const F of L) if (F && !F.walkAmt && F.state !== 'sit') { const want = LK.yawOf(this.pos[0] - F.pos[0], this.pos[2] - F.pos[2]); let d = (want - F.yaw) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; F.yaw += d * Math.min(1, dt * 3); }
       if (!m.hi) { const d = this.dist(m.pos); if (d < 25 && d > 6) m.hi = 2.6; else return; }
       if (m.hi < 0) return;
       m.hi -= dt;
@@ -477,7 +692,15 @@
       for (let i = n; i < CUES.length; i++) CUES[i].a = 0;
       if (n) this.st.cues = VR.StoryGlow.draw(r, cam, CUES);
     }
-    stats() { return { on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0 }; }
+    // o-wander2: Very Low's dusk/night cue — a warm hand lamp on a stake beside the nearest unfound moment (one draw)
+    drawLamp(r, cam, prog) {
+      const E = (this.g.env && this.g.env.E) || {}; if ((E.night || 0) < 0.3) return;
+      let m = null, md = 1e9; for (const q of this.ms) { if (!q.pos || q.found || W.KINDS[q.kind].fam === 'sky') continue; const d = this.dist(q.pos); if (d < md && d > 3) { md = d; m = q; } }
+      if (!m || md > 40) return;
+      LAMP_P[0] = m.pos[0] + 1.2; LAMP_P[1] = m.pos[1] + 1.5; LAMP_P[2] = m.pos[2] + 0.4;
+      LK.drawModel(this.g, r, prog(), 'wander_hlamp', LAMP_P, 0, cam, LAMP_O);
+    }
+    stats() { return { beats: this.st.beats | 0, outside: this.st.outside | 0, beat: this.b ? this.b.kind : null, since: this.pacer ? +this.pacer.since(this.now).toFixed(1) : null, on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0 }; }
     destroy() { this.endAll(); }
   };
 
@@ -486,6 +709,12 @@
   const CUE_COL = { folk: [1, 0.78, 0.45], animal: [1, 0.9, 0.72], spot: [0.72, 0.95, 1] };
   const STAGE_SPOT = { glade: 1, cairn: 1, scrap: 1, well: 1 };
   const BAL_O = { scale: 2.6 };
+  // o-wander2: the beats' draw options and poses (reused)
+  const BEAT_O = { scale: 1, pose: null }, FLOCK_P = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], LAMP_P = [0, 0, 0], LAMP_O = { scale: 1.6 };
+  const BP = { body: [0, 0, 0], wl: [0, 0, 0], wr: [0, 0, 0] }, FP = { body: [0, 0, 0], wl: [0, 0, 0], wr: [0, 0, 0] }, SP = { stems: [0, 0, 0] };
+  const birdPose = (a) => { BP.wl[2] = a; BP.wr[2] = -a; return BP; };
+  const flyPose = (a) => { FP.wl[2] = a; FP.wr[2] = -a; return FP; };
+  const swayPose = (a) => { SP.stems[2] = a; return SP; };
   // ================================================================ the moments' actors
   const rnd = (m, i) => h(m.seed, i, 0x77);
   const pt = (m) => m.pos;
@@ -589,7 +818,7 @@
         if (m.age - m.oT > 9) return false;
       }
     },
-    draw(D, m, r, E, cam, prog) { LK.drawQuad(D.g, r, prog(), m.q, cam, D.time); if (m.owner) LK.drawFolk(D.g, r, prog(), m.owner, cam, D.time); },
+    draw(D, m, r, E, cam, prog) { LK.drawModel(D.g, r, prog(), m.q.kind, m.q.pos, m.q.yaw, cam, { pose: LK.quadPose(m.q, D.time), scale: W.STAGE.animal }); if (m.owner) LK.drawFolk(D.g, r, prog(), m.owner, cam, D.time); },
   };
   // a picnic on a blanket: they wave you over, you are invited — a slice of pie and a recipe for the Wanderbuch
   ACT.picnic = {
@@ -694,7 +923,7 @@
       m.pos = m.Q[0].pos;
       if (!m.found && D.dist(m.pos) < 30) { m.found = true; const first = W.note(D.g.meta, 'creatures', m.cr); W.note(D.g.meta, 'stickers', 'crossing'); if (first) D.note(W.KINDS.crossing.ico + ' ' + T('g.wd.k.crossing'), T('g.wd.cr.' + m.cr)); D.st.found++; }
     },
-    draw(D, m, r, E, cam, prog) { for (const q of m.Q) { const y = q.pos[1]; q.pos[1] = y + (q.dy || 0); LK.drawModel(D.g, r, prog(), q.kind, q.pos, q.yaw, cam, { pose: LK.quadPose(q, D.time) }); q.pos[1] = y; } },
+    draw(D, m, r, E, cam, prog) { for (const q of m.Q) { const y = q.pos[1]; q.pos[1] = y + (q.dy || 0); LK.drawModel(D.g, r, prog(), q.kind, q.pos, q.yaw, cam, { pose: LK.quadPose(q, D.time), scale: W.STAGE.animal }); q.pos[1] = y; } },
   };
   // the weather's rainbow (weather.js draws it): noticed, a sticker
   ACT.rainbow = {
@@ -833,6 +1062,32 @@
       }
       gr.box(5, 0, 5, 6, 1, 6, 0xFFF2A0, { emis: 1 });
     });
+    // o-wander2 · the beats' models: a songbird (1/16 m: a round brown body, an orange breast, wings that flap), two
+    // butterflies, a tuft of tall flowers that sways in the wind
+    const pt = (sx, sy, sz, pv, fn) => part(sx, sy, sz, pv, fn);
+    M.wander_bird = () => ({ unit: 16, radius: 0.5, parts: {
+      body: pt(5, 6, 9, [2.5, 0, 4.5], (gr) => {
+        gr.ell(2.5, 2.4, 4.8, 2.2, 2, 3.2, (x, y, z) => (z < 4 && y < 3 ? 0xF08A3A : 0x8A5A3A));
+        gr.ell(2.5, 4.3, 2.2, 1.6, 1.6, 1.6, 0x7A4E30); gr.set(2, 4, 0, 0xE8C040); gr.set(1, 5, 1, 0x101010); gr.set(3, 5, 1, 0x101010);
+        gr.box(2, 2, 8, 2, 3, 8, 0x5A3A22); gr.set(1, 0, 4, 0x6A4A2A); gr.set(3, 0, 4, 0x6A4A2A);
+      }),
+      wl: pt(4, 1, 5, [4, 0, 2.5], (gr) => gr.box(0, 0, 0, 3, 0, 4, (x) => (x === 0 ? 0x5A3A22 : 0x7A4E30))),
+      wr: pt(4, 1, 5, [0, 0, 2.5], (gr) => gr.box(0, 0, 0, 3, 0, 4, (x) => (x === 3 ? 0x5A3A22 : 0x7A4E30))),
+    }, layout: { body: [0, 0, 0], wl: [-2, 3.2, 0.3], wr: [2, 3.2, 0.3] } });
+    [[0xF0A030, 0x3A2A1E], [0x7AB0F0, 0xF4F0E6]].forEach((c, i) => {
+      M['wander_fly' + i] = () => ({ unit: 16, radius: 0.3, parts: {
+        body: pt(1, 1, 4, [0.5, 0, 2], (gr) => gr.box(0, 0, 0, 0, 0, 3, 0x2A2018)),
+        wl: pt(4, 1, 4, [4, 0, 2], (gr) => gr.box(0, 0, 0, 3, 0, 3, (x, y, z) => ((x + z) % 3 === 0 ? c[1] : c[0]))),
+        wr: pt(4, 1, 4, [0, 0, 2], (gr) => gr.box(0, 0, 0, 3, 0, 3, (x, y, z) => ((x + z) % 3 === 0 ? c[1] : c[0]))),
+      }, layout: { body: [0, 0, 0], wl: [-0.5, 0.5, 0], wr: [0.5, 0.5, 0] } });
+    });
+    M.wander_flowers = () => ({ unit: 8, radius: 1.4, parts: {
+      base: pt(16, 1, 16, [8, 0, 8], (gr) => { for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) if (Math.hypot(x - 7.5, z - 7.5) < 7.6 && h(x, z, 41) < 0.75) gr.set(x, 0, z, h(x, z, 42) < 0.5 ? 0x5A9A3A : 0x4A8A32); }),
+      stems: pt(16, 9, 16, [8, 0, 8], (gr) => {
+        const FL = [0xF08AB0, 0xFFF0A0, 0xC070E0, 0xF4F4F0, 0xF0A030, 0x7AA0F0];
+        for (let k = 0; k < 26; k++) { const a = h(k, 1, 77) * TAU, rr = h(k, 2, 77) * 6.8, x = Math.round(7.5 + Math.cos(a) * rr), z = Math.round(7.5 + Math.sin(a) * rr), ht = 3 + Math.floor(h(k, 3, 77) * 5); for (let y = 0; y < ht; y++) gr.set(x, y, z, 0x4A8A32); gr.set(x, ht, z, FL[k % FL.length]); if (k % 2) gr.set(Math.min(15, x + 1), ht, z, FL[k % FL.length]); }
+      }),
+    }, layout: { base: [0, 0, 0], stems: [0, 1, 0] } });
     // a kite (1 voxel = 1/8 m): a diamond 1.4 m tall in four colours, a bow tail
     const KC = [[0xE8483A, 0xF6D24A], [0x3A7AD8, 0xF4F0E6], [0x5ABF6A, 0xF08A2A], [0xC070E0, 0x40C0C0]];
     KC.forEach((c, i) => {

@@ -213,8 +213,19 @@
   MI.frameSkip = function (t) { const F = MI.FRAME; return t < F.rise ? F.dur - F.fall * Math.max(0, t) / F.rise : t < F.rise + F.hold ? F.rise + F.hold : t; };
   // the framing camera: beside the way a little ahead of the family (6 m toward the door, 6 m to the side, 2.6 m up),
   // looking at the group (the lead, the cart behind) — they walk toward the frame's side, the land behind them
-  MI.framePose = function (lead, door, out, side) {
+  // o-wander2 (R56-12): with the cart the shot comes close — 4 m beside the cart, a little ahead toward the door, 1.9 m
+  // up, looking between the cart and the lead: the cart ≥ 8 % of the frame, the lead beside it (MI.FRAME_NEAR)
+  MI.FRAME_NEAR = { d: 4.0, ahead: 1.2, up: 1.9 };
+  MI.framePose = function (lead, door, out, side, cart) {
     out = out || {};
+    if (cart) {
+      let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+      const N = MI.FRAME_NEAR, sd = side || 1, mx = (lead[0] + cart[0]) / 2, mz = (lead[2] + cart[2]) / 2, my = Math.max(lead[1], cart[1]);
+      out.x = cart[0] - dx * N.ahead - dz * N.d * sd; out.z = cart[2] - dz * N.ahead + dx * N.d * sd; out.y = my + N.up;
+      const ex = mx - out.x, ez = mz - out.z, ty = my + 0.9;
+      out.yaw = Math.atan2(-ex, -ez); out.pitch = Math.atan2(ty - out.y, Math.hypot(ex, ez));
+      return out;
+    }
     let dx = lead[0] - door[0], dz = lead[2] - door[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
     const sd = side || 1, ah = Math.min(6, L * 0.5);
     out.x = lead[0] - dx * ah - dz * 6 * sd; out.z = lead[2] - dz * ah + dx * 6 * sd; out.y = lead[1] + 2.6;
@@ -633,8 +644,17 @@
     // the side of the way with the lower ground (the camera never in a hill)
     const dx = (L.pos[0] - o[0]) / dl, dz = (L.pos[2] - o[2]) / dl, mx = o[0] + dx * dl * 0.5, mz = o[2] + dz * dl * 0.5, w = g.world;
     const hA = w.topAt ? w.topAt(Math.floor(mx - dz * 9), Math.floor(mz + dx * 9)) : 0, hB = w.topAt ? w.topAt(Math.floor(mx + dz * 9), Math.floor(mz - dx * 9)) : 0;
-    J.frame = { t: 0, side: hA <= hB ? 1 : -1, pose: {}, hh: !!g.hideHud };
+    let side = hA <= hB ? 1 : -1;
+    // o-wander2: the close shot — the side whose line from the camera to the cart is clear of blocks (else the lower)
+    if (J.cart && VR.MoveIn.lineClear) { const ok = (sd) => { const P = MI.framePose(L.pos, o, {}, sd, J.cart); return MI.lineClear(w, [P.x, P.y, P.z], [J.cart[0], J.cart[1] + 1, J.cart[2]]); }; if (!ok(side) && ok(-side)) side = -side; }
+    J.frame = { t: 0, side, pose: {}, hh: !!g.hideHud };
     g.hideHud = true;   // (the held item is not in the shot)
+  };
+  // o-wander2: no solid block on the line a → b (0.4-m steps, the last metre skipped: the cart itself)
+  MI.lineClear = function (w, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz), n = Math.ceil(L / 0.4), R = VR.R, F = VR.F;
+    for (let i = 1; i < n; i++) { const u = i / n; if (u * L > L - 1) break; const st = w.getBlock(Math.floor(a[0] + dx * u), Math.floor(a[1] + dy * u), Math.floor(a[2] + dz * u)); if (st && R && R.T && (R.T.flags[st] & F.SOLID)) return false; }
+    return true;
   };
   MI.frameEnd = function (g, J) { if (!J || !J.frame) return; g.hideHud = J.frame.hh; J.frame = null; J.frameDone = true; };
   const wrapA = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
@@ -643,7 +663,7 @@
     const V = g.villages, J = V && V._mi && V._mi.job, F = J && J.frame; if (!F) return null;
     const L = J.agents[0]; if (!L) return null;
     const k = MI.frameK(F.t); if (k <= 0.001) return null;
-    const P = MI.framePose(L.pos, J.h.outside, F.pose, F.side);
+    const P = MI.framePose(L.pos, J.h.outside, F.pose, F.side, J.cart || null);
     const gy = g.world.topAt ? g.world.topAt(Math.floor(P.x), Math.floor(P.z)) + 2.2 : P.y; if (P.y < gy) P.y = gy;
     return Object.assign({}, base, { x: base.x + (P.x - base.x) * k, y: base.y + (P.y - base.y) * k, z: base.z + (P.z - base.z) * k, yaw: base.yaw + wrapA(P.yaw - base.yaw) * k, pitch: base.pitch + (P.pitch - base.pitch) * k, roll: (base.roll || 0) * (1 - k), fixed: true });
   };

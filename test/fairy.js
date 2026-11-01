@@ -118,5 +118,25 @@ check(F.ADV.tree === 'lanterns' && F.ADV.shroom === 'lost' && F.ADV.garden === '
   const D = VR.I18N.dict, de = names.map(k => D.de[k]), en = names.map(k => D.en[k]);
   check(de.every((s, i) => s && s !== names[i]) && en.every((s, i) => s && s !== names[i] && s !== de[i]), 'the places\' names: ' + de.join(', ') + ' / ' + en.join(', '));
 }
+{ // o-wander2: the twist, the seed's walk, the companion light beside you, the tree's berth from towns
+  const rec = F.load({}).rec, id = 'overworld:tree', q = F.Q.start(rec, id, 'lanterns', 1);
+  check(F.Q.twist(q) === 'idle', 'the twist waits for the main task');
+  F.Q.lantern(q, 0); F.Q.lantern(q, 1); F.Q.lantern(q, 2);
+  check(F.Q.twist(q) === 'twist' && q.tw === 1 && F.Q.twist(q) === 'still', 'back at the giver: one more thing (the twist)');
+  check(F.Q.fetch(q) === 'hop' && F.Q.fetch(q) === 'hop' && F.Q.fetch(q) === 'got' && q.tw === 2 && F.Q.twist(q) === 'ready', 'the glow seed flits ahead twice, the third time caught');
+  const r2 = F.load({ fairy: { v: 1, q: { [id]: q } } }).rec;
+  check(r2.q[id].tw === 2 && r2.q[id].h === 3, 'the twist survives the save');
+  check(F.Q.finish(rec, id, 'lanterns') && q.s === 3, 'home again: done');
+  const site = { id, x: 100, z: -50 }; let lo = 1e9, hi = 0, away = true;
+  for (let sd = 1; sd < 60; sd++) { const p = F.twistSpot(sd, site), d = Math.hypot(p[0] - 100, p[1] + 50); lo = Math.min(lo, d); hi = Math.max(hi, d); const n = F.hopSpot(sd, id, 0, p, [p[0] - 3, 0, p[1]]); if (!(n[0] > p[0] + 5)) away = false; }
+  check(lo >= 120 && hi <= 150, `the seed 120–150 m from the place (${lo.toFixed(0)}–${hi.toFixed(0)}): out, two hops and back ≥ 290 m — with the main task ≥ 2 minutes on foot`);
+  check(away, 'each hop away from you');
+  const eye = [0, 70, 0]; let minD = 1e9, minA = 1e9;
+  for (let k = 0; k < 16; k++) { const yaw = k / 16 * Math.PI * 2, b = F.budPos(eye, yaw), dx = b[0], dy = b[1] - 70, dz = b[2], d = Math.hypot(dx, dy, dz), f = [-Math.sin(yaw), 0, -Math.cos(yaw)], cos = (dx * f[0] + dz * f[2]) / d; minD = Math.min(minD, d); minA = Math.min(minA, Math.acos(cos) * 180 / Math.PI); }
+  check(minD >= 1.5 && minA >= 30, `the companion light ${minD.toFixed(2)} m from the eye, ${minA.toFixed(0)}° off the view's centre (≥ 1.5 m, ≥ 30°)`);
+  const town = [{ x: 0, z: 0, r: 60 }];
+  check(F.clearOf(150, 0, town, F.EXTRA.tree) === true && F.clearOf(120, 0, town, F.EXTRA.tree) === false && F.clearOf(120, 0, town) === true, 'the Slumber Tree keeps 80 m beyond a town\'s footprint (others 40 m)');
+  check(Math.abs(F.clearance(150, 0, town) - 90) < 1e-9, 'the clearance: metres beyond the nearest footprint');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exitCode = fails ? 1 : 0;
