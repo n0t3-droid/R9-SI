@@ -370,6 +370,10 @@
     const g = this.g; if (!LK || !g.entities || !c || !S.on(g)) return;
     let prog = null; const PG = () => prog || (prog = g.entities.beginVox(r, E));
     const tod = g.env.timeOfDay, tier = LK.tierOf ? LK.tierOf(g.settings) : 2;
+    // P6_VL · f-polish6 (R56-01, the rule: the winter light night on Very Low 3.8 → 7.2 ms with ⚙ Jahreszeiten, the draws
+    // equal — the decor's vox models are not counted there): Very Low keeps the season's tint alone, as w-seasons' plan
+    // said — no festival models (the base festival's own lanterns and fire still burn). test/polish6.js
+    if (tier <= 0) { SF.cost.models = 0; return; }
     let n = 0;
     for (const vil of this.known.values()) {
       if (!vil.active) continue;
@@ -379,7 +383,6 @@
       const D = this.ssDeco(vil, s.id), N = D.length;
       for (let i = 0; i < N; i++) {
         const d = D[i];
-        if (d.small && tier <= 0 && i % 2) continue;
         const u = Math.max(0, Math.min(1, (k * N - i) * 1.5)); if (u <= 0) continue;
         if (d.small) { const ddx = d.pos[0] - c.x, ddz = d.pos[2] - c.z; if (ddx * ddx + ddz * ddz > 90 * 90) continue; }
         MP.scale = (d.scale || 1) * (u < 1 ? 0.3 + 0.7 * u : 1); MP.pitch = 0;

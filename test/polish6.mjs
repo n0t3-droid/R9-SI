@@ -127,11 +127,12 @@ await settle(30); await step(40, 33);
 
 // ---------------------------------------------------------------- 2 · R56-01: Very Low, the winter light night
 if (want('cost')) {
+  // (seasons.mjs's village: a meadow, cherry, taiga, savanna or jungle one — its festival decor stands on the plaza)
   let vil = null;
-  for (let k = 0; k < 7 && !vil; k++) {
-    vil = await ev(() => { const t = VR.Seasons.Fest.debug.today(); return t && t.plaza ? t : null; });
+  for (let k = 0; k < 9 && !vil; k++) {
+    vil = await ev((k) => { const t = VR.Seasons.Fest.debug.today(); return t && t.plaza && (k >= 7 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(t.style || '')) ? t : null; }, k);
     if (vil) break;
-    const kn = await ev(() => { const g = VR.game, V = g.villages, p = g.player.pos; const L = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return L[0] || null; });
+    const kn = await ev((k) => { const g = VR.game, V = g.villages, p = g.player.pos; const L = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine && (k >= 7 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(v.plan.style || ''))).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return L[0] || null; }, k);
     if (kn) await ev((v) => { const p = VR.game.player; p.flying = true; p.teleport(v.x + 6.5, v.y + 6, v.z + 6.5); }, kn);
     else await ev((k) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0] + 160 * Math.cos(k * 2.4), 120, p.pos[2] + 160 * Math.sin(k * 2.4)); }, k);
     await settle(12); await step(40, 33);
@@ -144,23 +145,23 @@ if (want('cost')) {
     await settle(8); await lookAt([pz.x + 0.5, pz.y + 1, pz.z + 0.5]); await step(20, 33);
     OUT.fest = await ev(() => VR.Seasons.Fest.debug.today());
     const cost = {};
-    const MODES = ['off', 'on', 'nodeco', 'nodef'];
+    // off · on · deco (on, the festival's models drawn as before f-polish6: ssDraw with the tier read as Low)
+    const MODES = ['off', 'on', 'deco'];
     for (const pr of ['potato', 'high']) {
       await preset(pr); await settle(12);
-      for (let round = 0; round < (pr === 'potato' ? 3 : 1); round++) for (const mode of (pr === 'potato' ? (round % 2 ? MODES.slice().reverse() : MODES) : ['off', 'on'])) {
+      for (let round = 0; round < (pr === 'potato' ? 4 : 1); round++) for (const mode of (pr === 'potato' ? (round % 2 ? MODES.slice().reverse() : MODES) : ['off', 'on'])) {
         const r = await ev((mode) => {
           const g = VR.game, S = VR.Seasons, V = g.villages, R = g.renderer;
           g.settings.seasons = mode !== 'off';
-          V.ssDraw = mode === 'nodeco' ? function () {} : Object.getPrototypeOf(V).ssDraw;
+          const P0 = Object.getPrototypeOf(V).ssDraw, LK = VR.LifeKit;
+          V.ssDraw = mode === 'deco' ? function () { const t = LK.tierOf; LK.tierOf = () => 1; try { return P0.apply(this, arguments); } finally { LK.tierOf = t; } } : P0;
           window.__norender = false;
           for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
-          if (mode === 'nodef' && S.want) { S.want = false; R.buildPrograms(); }
           for (let i = 0; i < 20; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
           R.gl.finish();
           const ms = []; let draws = 0;
           for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); R.gl.finish(); ms.push(performance.now() - t); draws = R.stats.draws; }
           const models = VR.Seasons.Fest.debug.cost().models;
-          if (mode === 'nodef') { S.want = true; R.buildPrograms(); }
           V.ssDraw = Object.getPrototypeOf(V).ssDraw;
           window.__norender = true; ms.sort((a, b) => a - b);
           return { ms: +ms[8].toFixed(1), draws, models: mode === 'off' ? 0 : models };
