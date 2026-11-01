@@ -259,5 +259,40 @@ console.log('gather');
   g.env.thunder = 1; x = S.gather(g, {}); check(x.storm === true, 'a thunderstorm read');
 }
 
+// ---- 8. a-story8: the waltz fuller, the peoples' B-sections and figures, Arc 2's story cues (src/main/score_story.js)
+console.log('a-story8');
+{
+  require('../src/main/score_story.js');
+  const th = S.THEMES.waltz, comp = th.layers.find(l => l.id === 'comp'), oo = th.layers.find(l => l.id === 'oo');
+  check(comp && comp.gain >= 0.026 && oo && oo.inst === 'choir' && oo.lv === 0 && th.B.lines.oo, 'the Mondstein waltz fuller: the harp\'s oom-pah-pah up, an \'oo\' choir line at the first level (A and B)');
+  const PE = ['p_aqua', 'p_ocker', 'p_zinn', 'p_basalt', 'p_opal'], FIG = { p_aqua: 'tide', p_ocker: 'turn', p_zinn: 'call', p_basalt: 'drone', p_opal: 'trill' };
+  check(PE.every(id => S.THEMES[id].B && S.THEMES[id].B.chords && S.THEMES[id].B.lines.mel && S.FORMS[id] && S.FORMS[id].some(f => f.indexOf('B') >= 0)), 'each people\'s theme has a B-section in its forms');
+  check(PE.every(id => S.THEMES[id].layers.some(l => l.id === FIG[id])), 'each people\'s theme has its signature figure (' + PE.map(id => FIG[id]).join(' ') + ')');
+  const ST = ['st_warm', 'st_wide', 'st_rise', 'st_tense'], plan = K.musicPlan(12), bad = [];
+  let outKey = 0;
+  for (const id of PE.concat(ST, ['waltz'])) {
+    const t = S.THEMES[id], MB = t.meter || 4, lines = [['chords', t.chords]].concat(t.layers.filter(l => l.kind === 'line').map(l => [l.id, l.notes]));
+    if (t.B) { lines.push(['B.chords', t.B.chords]); for (const k in t.B.lines) lines.push(['B.' + k, t.B.lines[k]]); }
+    for (const [name, txt] of lines) { const p = S.parseLine(txt); if (p.barBeats.length !== t.len || p.barBeats.some(b => Math.abs(b - MB) > 1e-6)) bad.push(id + '.' + name + ' ' + p.barBeats.join(',')); }
+    const set = S.scaleOf(id, plan);
+    for (const seed of [0, 1, 2, 3, 5]) for (const lv of [0, 2]) for (const e of S.events(id, { plan, lv, seed, variant: 'day', season: 1 })) if (e.midi && !set.has(e.midi % 12)) outKey++;
+  }
+  check(!bad.length, 'whole bars everywhere' + (bad.length ? ': ' + bad.join(' | ') : ''));
+  check(outKey === 0, 'every note of the new sections, figures and cues in its key (' + outKey + ' out)');
+  check(ST.every(id => S.THEMES[id].sting && S.GAP[id] > 0), 'four story cues (Wiegelind\'s motif in the scene\'s mood), stingers with a gap');
+    check(ST.every(id => { const t = S.THEMES[id], q = S.parseLine(t.layers.find(l => l.id === 'mel').notes); return q.notes.filter(n => n.b < (t.meter || 4)).length === 3 && new Set(q.notes.slice(0, 3).map(n => n.degs[0])).size === 1; }), 'her motif opens every cue: three notes on one pitch — the three blinks');
+  // audio.storyCue: the mood's cue on the beat; an unknown mood the 'warm' one; Very Low the same (the cue is short)
+  const c = makeCtx(), a = new VR.Audio(); a.init(c); a.listen([0, 66, 0], 0, W15, false); run(a, c, 6, MUS);
+  check(typeof a.storyCue === 'function' && a.storyCue('c15.b1', 'tense') === true && a.score.queue[0] === 'st_tense', 'audio.storyCue(id, mood) queues the mood\'s cue');
+  run(a, c, 8, MUS); check(a.score.log.some(l => l.id === 'st_tense'), 'and it plays');
+  a.score.lastSting = {}; check(a.storyCue('c13.b1', 'odd') === true && a.score.queue[0] === 'st_warm', 'an unknown mood: the warm one');
+  // the director in an Arc-2 scene plays the arc's theme
+  const sc = (id, ch) => ({ story: { scene: { b: { id, ch } } }, player: { pos: [0, 70, 0] }, env: { timeOfDay: 16000 }, dim: 'overworld', meta: {} });
+  const D = new S.Director(5), base = Object.assign({}, AW, { story: true, night: 1 });
+  const w = (id, ch, x) => D.want(Object.assign({}, base, S.storyCtx(sc(id, ch)), x || {}));
+  check(w('c13.b1', 13).id === 'lullaby' && w('c15.b3', 15).id === 'waltz' && w('c16.b2', 16).id === 'waltz' && w('c14.b2', 14, { people: 'zinn' }).id === 'p_zinn' && w('c14.b3', 14).id === 'fairy' && /^d_/.test(w('c16.b1', 16).id), 'an Arc-2 scene: the lullaby, the waltz at her place, the people\'s theme, the festival\'s dance (' + ['c13.b1', 'c15.b3', 'c16.b1'].map(i => w(i, +i.slice(1, 3)).id).join(' ') + ')');
+  check(D.want(Object.assign({}, base, S.storyCtx(sc('c5.b1', 5)))).id === 'home' && D.want(Object.assign({}, base)).id === 'home', 'the older chapters keep the home theme\'s story variant');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

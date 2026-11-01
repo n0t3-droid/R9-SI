@@ -106,10 +106,11 @@
       layers: [
         L('mel', 'line', 'musicbox', 12, 0.05, 0, 3, { notes: '4:2 2 | 3:2 5 | 6:2 4 | 2:3 | 4:1.5 5:.5 7 | 7:2 5 | 6 4 1 | 0:3' }),
         L('bass', 'bass', 'bass', -24, 0.055, 0, 2, { pat: [0], plen: 1 }),
-        L('comp', 'comp', 'harp', -12, 0.016, 0, 2, { beats: [1, 2], nlen: 0.7 }),
+        L('comp', 'comp', 'harp', -12, 0.026, 0, 2, { beats: [1, 2], nlen: 0.7 }),   // (a-story8: 0.016 → 0.026 — the oom-pah-pah heard)
+        L('oo', 'line', 'choir', 0, 0.026, 0, 2, { notes: '2:3 | 3:3 | 1:3 | 2:3 | 4:3 | 5:3 | 4:2 6 | 4:3' }),   // a-story8: the choir's slow 'oo' counter-line on the chords' tones
         L('choir', 'chord', 'choir', -12, 0.022, 1, 1),
       ],
-      B: { chords: '2:3 | 6:3 | 3:3 | 0:3 | 2:3 | 6:3 | 3:3 | 4:3', lines: { mel: '6:2 4 | 8:2 6 | 5:2 3 | 4:3 | 9:2 6 | 8:2 6 | 7 5 3 | 4:3' } },
+      B: { chords: '2:3 | 6:3 | 3:3 | 0:3 | 2:3 | 6:3 | 3:3 | 4:3', lines: { mel: '6:2 4 | 8:2 6 | 5:2 3 | 4:3 | 9:2 6 | 8:2 6 | 7 5 3 | 4:3', oo: '4:3 | 3:3 | 5:3 | 4:3 | 6:3 | 6:3 | 5:3 | 4:3' } },
     },
     // Gezeitenlied — the Wellari: bells like water on stone, drops falling into their pitch, mixolydian (♭VII)
     p_aqua: {
@@ -122,7 +123,9 @@
         L('bass', 'bass', 'bass', -24, 0.055, 1, 2, { pat: [0, 2.5], plen: 1.5 }),
         L('tom', 'drum', 'tom', 0, 0.07, 2, 2, { hits: 'x..x..x.' }),
         L('shaker', 'drum', 'shaker', 0, 0.028, 2, 1, { hits: '.x.x.x.x' }),
+        L('tide', 'arp', 'harp', -12, 0.018, 1, 1, { pat: [0, 2, 4, 7, 9, 11, 9, 7], step: 0.5, nlen: 1.6 }),   // a-story8: the Wellari's signature — the tide rising and falling
       ],
+      B: { chords: '3:4 | 0:4 | 6:4 | 4:4 | 3:4 | 0:4 | 6:2 4:2 | 4:4', lines: { mel: '5 7 8:2 | 7 4 2:2 | 6 8 10:2 | 8:3 r | 5 7 5 3 | 4:2 2:2 | 1 3 4 6 | 4:3 r' } },
     },
     // Sandsternweise — the Dunelin: warm frame drums under a reed, strings holding the chords, phrygian (♭II)
     p_ocker: {
@@ -135,7 +138,9 @@
         L('tom', 'drum', 'tom', 0, 0.07, 0, 2, { hits: 'x..x.x..' }),
         L('shaker', 'drum', 'shaker', 0, 0.025, 1, 1, { hits: '..x...x.' }),
         L('tom2', 'drum', 'tom', 0, 0.045, 2, 1, { hits: '.x...x.x' }),
+        L('turn', 'line', 'flute', 12, 0.02, 1, 1, { notes: 'r:3 2:.25 1:.25 0:.25 1:.25 | r:4 | r:3 4:.25 3:.25 2:.25 1:.25 | r:4 | r:3 2:.25 1:.25 0:.25 1:.25 | r:4 | r:3 1:.25 0:.25 -1:.25 0:.25 | r:4' }),   // a-story8: the Dunelin's signature — a quick reed turn at the end of a bar, like wind round a dune
       ],
+      B: { chords: '6:4 | 0:4 | 1:4 | 0:4 | 6:4 | 0:4 | 1:2 6:2 | 0:4', lines: { mel: '6:2 4 3 | 4:1.5 3:.5 1:2 | 1 2 3 4 | 2:3 r | 6 7 6 4 | 3:2 2:2 | 1 3 2 1 | 0:4' } },
     },
     // Funkelweise — the Glimari: a warm brass call like embers glowing up, sparks on a celesta
     p_zinn: {
@@ -148,7 +153,9 @@
         L('bass', 'bass', 'bass', -24, 0.06, 0, 2, { pat: [0, 2], plen: 2 }),
         L('tom', 'drum', 'tom', 0, 0.06, 2, 2, { hits: 'x...x.x.' }),
         L('shaker', 'drum', 'shaker', 0, 0.025, 2, 1, { hits: '.x.x.x.x' }),
+        L('call', 'line', 'brass', -12, 0.026, 1, 2, { notes: '0:.5 3:.5 4:1 r:2 | r:4 | r:4 | r:4 | 0:.5 3:.5 4:1 r:2 | r:4 | r:4 | r:2 4:.5 7:1.5' }),   // a-story8: the Glimari's signature — an ember call, a fourth leaping up to the fifth
       ],
+      B: { chords: '5:4 | 1:4 | 4:4 | 0:4 | 5:4 | 1:4 | 3:2 4:2 | 4:4', lines: { mel: '9:1.5 7:.5 5:2 | 8 6 3:2 | 4:1.5 6:.5 8:2 | 7:3 r | 5:1.5 7:.5 9:2 | 8 6 5:2 | 3 5 7 8 | 6:3 r' } },
     },
     // Steinglut-Gesang — the Regoli: deep hums like a choir in a crater, slow stone chimes, aeolian
     p_basalt: {
@@ -160,7 +167,9 @@
         L('bass', 'bass', 'hum', -24, 0.055, 0, 2, { pat: [0], plen: 4 }),
         L('tom', 'drum', 'tom', 0, 0.055, 1, 2, { hits: 'x.......' }),
         L('tom2', 'drum', 'tom', 0, 0.05, 2, 1, { hits: '....x.x.' }),
+        L('drone', 'line', 'hum', -12, 0.028, 0, 1, { notes: '4:4 | 4:4 | 4:4 | 4:4 | 4:4 | 4:4 | 4:4 | 4:4' }),   // a-story8: the Regoli's signature — a deep drone held on the fifth through every chord
       ],
+      B: { chords: '3:4 | 4:4 | 0:4 | 5:4 | 3:4 | 4:4 | 5:2 6:2 | 4:4', lines: { mel: '3:2 4:2 | 4:3 r | 5:2 4 2 | 0:3 r | 3:2 5:2 | 4:2 2:2 | 2:2 3:2 | 1:4' } },
     },
     // Eisblütenlied — the Isveli: glass pads like frost, glass bells climbing in lydian, a celesta's flakes
     p_opal: {
@@ -173,7 +182,9 @@
         L('bass', 'bass', 'bass', -24, 0.045, 1, 2, { pat: [0], plen: 4 }),
         L('shaker', 'drum', 'shaker', 0, 0.028, 2, 1, { hits: 'x.x.x.x.' }),
         L('tom', 'drum', 'tom', 0, 0.05, 2, 2, { hits: '...x...x' }),
+        L('trill', 'line', 'celesta', 12, 0.018, 1, 1, { notes: 'r:2 11:.25 12:.25 11:.25 12:.25 14 | r:4 | r:4 | r:4 | r:2 11:.25 12:.25 11:.25 12:.25 14 | r:4 | r:4 | r:2 9:.25 10:.25 9:.25 10:.25 11' }),   // a-story8: the Isveli's signature — a frost trill under a glassy top note
       ],
+      B: { chords: '5:4 | 1:4 | 2:4 | 6:4 | 5:4 | 1:4 | 3:2 1:2 | 0:4', lines: { mel: '9:2 8 7 | 8:2 5:2 | 6 7 9 11 | 10:3 r | 9:2 11 12 | 11:2 8:2 | 7 8 6:2 | 7:4' } },
     },
     // Lichtbrücke — a choir pad that soars (lydian I II vi II), bells above it, a high voice climbing to the ninth
     bridge: {
@@ -285,6 +296,7 @@
   };
   Object.assign(S.THEMES, T);
   for (const id of ['meadow', 'harbour', 'fairy', 'waltz']) S.FORMS[id] = ['A', 'AB', 'BA', 'AB'];
+  for (const id of ['p_aqua', 'p_ocker', 'p_zinn', 'p_basalt', 'p_opal']) S.FORMS[id] = ['AB', 'A', 'BA', 'AB'];   // a-story8: the peoples' themes with their B-sections
   for (const id of ['d_bluete', 'd_drachen', 'd_tafel', 'd_lichter']) S.FORMS[id] = ['AB', 'ABA', 'BA', 'ABAB'];
   Object.assign(S.GAP, { glimpse: 45, friend: 90, welcome: 60, freed: 20 });
 

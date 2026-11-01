@@ -67,6 +67,7 @@ MAIN.push('folk3');   // u-folk3: VR.Folk3 (src/main/folk3.js) — the camera di
 MAIN.push('liberate_fest');   // a-adventure: das Fest am Leuchtfeuer (src/main/liberate_fest.js: the goal line, the reward chest, the Wanderbuch page, the cheer, the next goal — wraps VR.Liberate's beat and look)
 MAIN.push('story_arc2');   // a-story7: Arc 2 in the game (src/main/story_arc2.js — after story, journey, fairy, movein, seasons_fest: it wraps them)
 MAIN.push('score2_hooks');   // e-score2: the discoveries' stingers (src/main/score2_hooks.js: wander moments, fairy places, a family moving in) — last, it wraps
+MAIN.splice(MAIN.indexOf('audio') + 1, 0, 'score_story');   // a-story8: Arc 2's music (src/main/score_story.js: the story cues, audio.storyCue, the arc's theme in a scene) — after score2 and audio.js
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
