@@ -492,18 +492,53 @@ function pageHelpers(win, VRx) {
     }
     release(I);
   };
+  // a-adventure: the outpost's moments in pictures with the HUD re-drawn over them (page.screenshot times out here): the
+  // goal line, the timing ring, the beam, the banner, Funke's next goal, the village's cheer — each once, the frame drawn
+  S.hud = []; S.hudTaken = {};
+  S.hudWant = function () {
+    const L = VR.Liberate, LF = VR.LibFest, M = L && L.moment, vis = (id) => { const e = typeof document !== 'undefined' && document.getElementById(id); return !!(e && e.style.display !== 'none' && e.offsetParent !== null && (e.textContent || '').trim()); };
+    const W = {
+      goal: vis('libgoal') && S.mode.kind === 'outpost' && S.t > 2,
+      calm: !!(L && L.calmSt) && (VR.game.time - (L.calmSt.t0 || 0)) > 0.6,
+      beam: !!M && M.t > 0.9 && M.t < 2.3,
+      banner: !!M && M.t > 3.0 && M.t < 6,
+      after: !M && !!(S.ad && S.ad.freed) && S.t - (S.ad.freeT || 0) > 1.5 && S.t - (S.ad.freeT || 0) < 4,
+      next: !!(LF && LF.next) && vis('funkebub'),
+      cheer: !!(LF && LF.cheered) && vis('funkebub'),
+    };
+    for (const k in W) if (W[k] && !S.hudTaken[k]) return k;
+    return null;
+  };
+  S.captureHud = function (k) {
+    const g = VR.game, src = g.canvas || document.getElementById('gl'); if (!src || !src.width) return;
+    const c = document.createElement('canvas'); c.width = 960; c.height = 540; const x = c.getContext('2d');
+    try { x.drawImage(src, 0, 0, 960, 540); } catch (e) { return; }
+    const W = src.clientWidth || src.width, H = src.clientHeight || src.height, sx = 960 / W, sy = 540 / H;
+    for (const id of ['libgoal', 'libcalm', 'libban', 'funkebub', 'libring']) {
+      const e = document.getElementById(id); if (!e || e.style.display === 'none' || e.offsetParent === null) continue;
+      const r = e.getBoundingClientRect(), t = (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim(); if (!t || r.width < 2) continue;
+      const big = id === 'libban', fs = big ? 30 : 15, bx = Math.max(4, r.left * sx), by = Math.max(4, r.top * sy);
+      x.font = `600 ${fs}px sans-serif`; const tw = Math.min(940, x.measureText(t).width + 24);
+      x.fillStyle = big ? 'rgba(20,40,70,0.55)' : 'rgba(14,22,40,0.7)'; x.fillRect(big ? (960 - tw) / 2 : Math.min(bx, 956 - tw), by, tw, fs + 14);
+      x.fillStyle = big ? '#7ff6ff' : id === 'libgoal' ? '#e8f6ff' : '#fff8e0'; x.fillText(t, (big ? (960 - tw) / 2 : Math.min(bx, 956 - tw)) + 12, by + fs + 3);
+      if (id === 'libcalm') { x.strokeStyle = '#7ff6ff'; x.lineWidth = 4; x.beginPath(); x.arc(480, 270, 60, 0, Math.PI * 2); x.stroke(); }
+    }
+    S.hudTaken[k] = true; S.hud.push({ k, t: +(+g.time).toFixed(1), url: c.toDataURL('image/jpeg', 0.82) });
+  };
   // n frames of 1/30 s, the last one drawn and captured when asked
   S.frames = function (n, render) {
     const g = VR.game; if (!g || g.state !== 'play') return { t: g ? g.time : 0, state: g ? g.state : 'none', done: S.done };
     let rms = 0;
     for (let i = 0; i < n; i++) {
       const last = !!render && i === n - 1;
-      win.__norender = !last;
+      const hk = typeof document !== 'undefined' && (i % 5 === 4) ? S.hudWant() : null;   // (a-adventure)
+      win.__norender = !last && !hk;
       S.control(1 / 30);
       if (S.acceptStory && VR.Story && VR.Story.offer && VR.Story.offer(g)) VR.Story.watch(g);   // a-story: the adventurer takes a beat Funke offers ([V])
       const t0 = performance.now();
       g.last = t0 - 1000 / 30; g.loop(t0);
       if (last) { try { g.renderer.gl.finish(); } catch (e) { /* no GL in a stand-in */ } rms = performance.now() - t0; S.capture(); }
+      if (hk) S.captureHud(hk);
     }
     win.__norender = true;
     const p = g.player;
@@ -528,7 +563,7 @@ function pageHelpers(win, VRx) {
     return { miss, dirty };
   };
   S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
-  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, trace: S.ad.trace || [] } : null }; };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { plans: S.ad.plans | 0, noway: S.ad.noway | 0, ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, trace: S.ad.trace || [] } : null }; };
   return S;
 }
 
@@ -803,7 +838,7 @@ async function session(type, setup, script) {
       if (r.last.state) P.why = 'the game left play: ' + r.last.state;
     } catch (e) { P.failed = String(e && e.message || e).slice(0, 300); P.t1 = +tNow.toFixed(2); tNow = (await ev(() => VR.game.time).catch(() => t0 + tNow)) - t0; }
     rec.parts.push(P);
-    if (P.status && P.status.ad && P.status.ad.trace) { console.log(`  trace ${part.name}: ` + P.status.ad.trace.map(q => q.join(' ')).join(' | ')); delete P.status.ad.trace; }
+    if (P.status && P.status.ad && P.status.ad.trace) { if (part.name === 'outpost') console.log(`  trace ${part.name}: ` + P.status.ad.trace.map(q => q.join(' ')).join(' | ') + ` · plans ${P.status.ad.plans} noway ${P.status.ad.noway}`); delete P.status.ad.trace; }
     console.log(`  · ${part.name} ${P.t0}–${P.t1} s${P.failed ? ' FAILED ' + P.failed : ''} ${JSON.stringify(P.status && { stat: P.status.stat, route: P.status.route, B: P.status.B && { phase: P.status.B.phase, ding: P.status.B.ding, tries: P.status.B.tries, whys: P.status.B.whys.slice(-4), site: !!P.status.B.site } })} (${secs()})`);
   }
   if (tNow < DUR - 0.25 && !overBudget) {
@@ -842,6 +877,14 @@ async function session(type, setup, script) {
     const q15 = await ev((ts) => window.__S.picsAt(ts), ts), dir = `${SHOTS}session_${type}/`; fs.mkdirSync(dir, { recursive: true });
     rec.every15 = [];
     q15.forEach((q, k) => { if (!q || !q.url) return; const f = `${dir}f_${String(k * 15).padStart(3, '0')}.jpg`; fs.writeFileSync(f, Buffer.from(q.url.split(',')[1], 'base64')); rec.every15.push({ t: k * 15, pic: +(q.t - t0).toFixed(1), occ: q.occ, file: f.replace(ROOT, '') }); });
+  }
+  if (type === 'adventurer') {   // a-adventure: the outpost's moments with the HUD (test/shots/adventure_<moment>.jpg)
+    const H = await ev(() => { const h = window.__S.hud || []; window.__S.hud = []; return h; });
+    rec.hudShots = H.map(q => { const f = `${SHOTS}adventure_${q.k}.jpg`; fs.writeFileSync(f, Buffer.from(q.url.split(',')[1], 'base64')); return { k: q.k, t: +(q.t - t0).toFixed(1), file: f.replace(ROOT, '') }; });
+    console.log(`  the outpost's moments: ${rec.hudShots.map(q => q.k + '@' + q.t).join(', ') || 'none'}`);
+    const LF = await ev(() => { const F = VR.LibFest, L = VR.Liberate; return F ? { cost: F.cost, err: F.err || '', next: F.next ? F.next.name : null, cheered: F.cheered | 0, pages: Object.keys(F.pages()).length, Lcost: L && L.cost } : null; });
+    console.log(`  das Fest: ${JSON.stringify(LF)}`);
+    rec.fest = LF;
   }
   await ev(() => { window.__S.pics = []; });
   let sheet = null;
