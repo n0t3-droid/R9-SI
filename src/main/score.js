@@ -190,12 +190,13 @@
     return { root, mode };
   }
   const beatLen = (id, variant) => 60 / (THEMES[id].bpm * ((VARIANTS[variant] && VARIANTS[variant].bpm) || 1));
+  const meterOf = (id) => (THEMES[id] && THEMES[id].meter) || 4;   // e-score2: the beats of a bar (the waltzes: 3)
   // a cue's length in seconds (the wander layer: 8 bars of the day's plan at its own beat)
   // (e-music2: the form's sections and the outro bar; the wander layer's eight bars and its held last bar)
   function cueLen(id, variant, seed) {
     if (id === 'wander') return 9 * 4 * WANDER_BEAT[variant === 'night' ? 'night' : variant === 'cave' ? 'cave' : 'day'];
     const th = THEMES[id]; if (!th) return 0;
-    return (formOf(id, seed).length * th.len + (OUTRO[id] ? 1 : 0)) * 4 * beatLen(id, variant);
+    return (formOf(id, seed).length * th.len + (OUTRO[id] ? 1 : 0)) * meterOf(id) * beatLen(id, variant);
   }
   const WANDER_BEAT = { day: 0.56, night: 0.7, cave: 0.8 };
 
@@ -237,13 +238,18 @@
   // seed (e-music2): the form and the variation (none: the plain theme); colour: the place's instrumentation
   function events(id, o) {
     o = o || {};
-    if (id === 'wander') return wanderEvents(o.plan || (VR.Klang && VR.Klang.musicPlan(0)), o.variant, o.seed, o.colour);
+    if (id === 'wander') return wanderEvents(o.plan || (VR.Klang && VR.Klang.musicPlan(0)), o.variant, o.seed, o.colour, o.season);
     const th = THEMES[id]; if (!th) return [];
+    // e-score2 · an own theme (a place's, a people's, a dance, a stinger) keeps its instruments and its mode: no place
+    // colour, no variant's instrument swap; the season (o.season 0 … 3, VR.Score.SEASONS) colours the arrangement
+    if (th.own && o.colour) o = Object.assign({}, o, { colour: '' });
+    const MB = th.meter || 4, SE = o.season >= 0 && !th.sting && VR.Score.SEASONS ? VR.Score.SEASONS[o.season] : null;
     const V = VARIANTS[o.variant] || {}, B = beatLen(id, o.variant), key = keyOf(id, o.plan, o.colour), seed = o.seed >>> 0;
-    const col = colourDef(o.colour) || {}, CI = col.inst || {};
-    let lv = o.lv !== undefined ? o.lv : V.lv !== undefined ? V.lv : 0; if (o.calm) lv = Math.min(lv, 1);
+    const col = colourDef(o.colour) || {}, CI = SE && SE.inst && !th.own ? Object.assign({}, SE.inst, col.inst) : col.inst || {};
+    let lv = o.lv !== undefined ? o.lv : V.lv !== undefined ? V.lv : 0; if (SE && SE.lv) lv = Math.min(2, lv + SE.lv); if (o.calm) lv = Math.min(lv, 1);
+    const TONE = (col.tone || 1) * (SE && SE.tone ? SE.tone : 1);
     const G = (V.gain || 1) * (o.calm ? 0.8 : 1), out = [];
-    const form = th.sting ? 'A' : formOf(id, seed), secBeats = th.len * 4, OU = th.sting ? null : OUTRO[id];
+    const form = th.sting ? 'A' : formOf(id, seed), secBeats = th.len * MB, OU = th.sting ? null : OUTRO[id];
     const layers = th.layers.slice();
     if (col.drops && !th.sting) layers.push({ id: 'drops', kind: 'arp', inst: 'drop', oct: 12, gain: col.drops, lv: 0, pri: 1, drops: true });
     const midiOf = (d, L) => degMidi(key.root, key.mode, d) + (L.oct || 0) + (L.id === 'mel' && col.melOct ? col.melOct : 0);
@@ -251,10 +257,10 @@
       if (L.lv > lv) return;
       if (o.calm && L.kind === 'drum') return;
       if (o.lowEnd && L.pri < 2 && L.kind !== 'line') return;   // Very Low: no ornament layers
-      const vi = (V.inst && V.inst[L.id]) || L.inst, inst = CI[vi] || vi, act = id === 'adventure';
+      const vi = (!th.own && V.inst && V.inst[L.id]) || L.inst, inst = CI[vi] || vi, act = id === 'adventure';
       const lg = L.gain * G * (L.kind === 'bass' && col.bassG ? col.bassG : 1) * (L.kind === 'drum' && col.drumG ? col.drumG : 1);
       const push = (b, len, midi, g2) => out.push({ t: (off + b) * B, dur: len * B, midi, inst, gain: g2 === undefined ? lg : g2, pri: L.pri, act, layer: L.id, sec: outro ? 'O' : sec });
-      const total = outro ? 4 : secBeats, alt = th.alt && th.alt[L.id];
+      const total = outro ? MB : secBeats, alt = th.alt && th.alt[L.id];
       const chordAt = (b) => { for (const c of chords) if (b >= c.b - 1e-6 && b < c.b + c.len - 1e-6) return c; return chords[chords.length - 1]; };
       if (L.kind === 'line') {
         const txt = outro ? OU.lines[L.id] : sec === 'B' ? th.B.lines[L.id] : L.notes; if (!txt) return;
@@ -264,14 +270,16 @@
       else if (L.kind === 'bass') {
         if (outro) { for (const c of chords) push(c.b, c.len, midiOf(c.degs[0], L)); return; }
         const pp = alt && r && r() < 0.5 ? alt[Math.floor(r() * alt.length)] : { pat: L.pat, plen: L.plen };
-        for (let b = 0; b < total; b += 4) for (const p of pp.pat) { const c = chordAt(b + p); push(b + p, pp.plen, midiOf(c.degs[0], L)); }
+        for (let b = 0; b < total; b += MB) for (const p of pp.pat) { const c = chordAt(b + p); push(b + p, pp.plen, midiOf(c.degs[0], L)); }
       } else if (L.kind === 'arp' || L.kind === 'osti') {
-        const osti = L.kind === 'osti', pat = alt && r && r() < 0.5 ? alt[Math.floor(r() * alt.length)] : osti ? L.pat : L.drops ? [0, 2, 4, 7, 4, 2] : [0, 2, 4, 2];
-        const step = L.drops ? 0.75 : 0.5, lim = outro ? 2 : total;
-        for (let b = 0, k = 0; b < lim - 1e-6; b += step, k++) { const c = chordAt(b); push(b, osti ? 0.45 : L.drops ? 1.2 : 0.9, midiOf(c.degs[0] + pat[k % pat.length], L)); }
+        const osti = L.kind === 'osti', pat = alt && r && r() < 0.5 ? alt[Math.floor(r() * alt.length)] : osti || L.pat ? L.pat : L.drops ? [0, 2, 4, 7, 4, 2] : [0, 2, 4, 2];
+        const step = L.step || (L.drops ? 0.75 : 0.5), lim = outro ? 2 : total, nl = L.nlen || (osti ? 0.45 : L.drops ? 1.2 : 0.9);   // (e-score2: an arp's own pattern, step and length)
+        for (let b = 0, k = 0; b < lim - 1e-6; b += step, k++) { const c = chordAt(b); push(b, nl, midiOf(c.degs[0] + pat[k % pat.length], L)); }
+      } else if (L.kind === 'comp') {   // e-score2 · the chord struck on some beats of each bar (the waltz's oom-pah-pah)
+        for (let b = 0; b < total; b += MB) for (const p of L.beats) { const c = chordAt(b + p); for (const d of [0, 2, 4]) push(b + p, L.nlen || 0.6, midiOf(c.degs[0] + d, L), lg * (d ? 0.8 : 1)); }
       } else if (L.kind === 'drum') {
         if (outro) { if (L.inst === 'kick') push(0, 0.4, 0); return; }
-        for (let b = 0; b < total; b += 0.5) { const k = Math.round(b * 2) % 8; if (L.hits[k] === 'x') push(b, 0.4, 0); }
+        for (let b = 0; b < total; b += 0.5) { const k = Math.round(b * 2) % (2 * MB); if (L.hits[k] === 'x') push(b, 0.4, 0); }
       }
     };
     for (let si = 0; si < form.length; si++) {
@@ -283,12 +291,12 @@
     if (OU) { const och = parseLine(OU.chords).notes; for (const L of layers) emit(L, body, 'O', och, null, true); }
     // the phrase breathes (arc: a gain per bar; the outro a little softer), and the ending rings: the notes of the last
     // chord that reach the end get a long release (tail)
-    const end = (body + (OU ? 4 : 0)) * B, lastCh = OU ? parseLine(OU.chords).notes.pop() : parseLine(th.chords).notes.pop();
+    const end = (body + (OU ? MB : 0)) * B, lastCh = OU ? parseLine(OU.chords).notes.pop() : parseLine(th.chords).notes.pop();
     const lastAt = (OU ? body + lastCh.b : lastCh.b) * B, tail = OU ? OU.tail : STING_TAIL;
     for (const e of out) {
-      if (th.arc) e.gain *= e.sec === 'O' ? th.arc[th.arc.length - 1] * 0.9 : th.arc[Math.min(th.arc.length - 1, Math.floor((e.t / B - 0) / 4 + 1e-6) % th.len)];
+      if (th.arc) e.gain *= e.sec === 'O' ? th.arc[th.arc.length - 1] * 0.9 : th.arc[Math.min(th.arc.length - 1, Math.floor((e.t / B - 0) / MB + 1e-6) % th.len)];
       if (e.midi && e.t >= lastAt - 1e-6 && (e.t + e.dur >= end - B * 1.01 || e.layer === 'pad' || e.layer === 'bass' || e.layer === 'str')) { e.dur = Math.max(e.dur, end - e.t); e.tail = tail; }
-      if (col.tone && (e.inst === 'pad' || e.inst === 'strings' || e.inst === 'glasspad')) e.tone = col.tone;
+      if (TONE !== 1 && (e.inst === 'pad' || e.inst === 'strings' || e.inst === 'glasspad' || e.inst === 'choir' || e.inst === 'harp')) e.tone = TONE;
       delete e.sec;
     }
     out.sort((a, b) => a.t - b.t || b.pri - a.pri);
@@ -296,9 +304,10 @@
   }
   // the wander layer: the old calm generative music (eight bars of the day's pentatonic plan: pad, bass, a motif in
   // plucks, varied by the seed), so the days between the themes never repeat
-  function wanderEvents(plan, variant, seed, colour) {
+  function wanderEvents(plan, variant, seed, colour, season) {
     const K = VR.Klang, r = K.rng((seed >>> 0) || (K.seedOf(plan.day) ^ 0x51ed)), out = [];
-    const CI = (colourDef(colour) || {}).inst || {};
+    const SE = season >= 0 && VR.Score.SEASONS ? VR.Score.SEASONS[season] : null;   // (e-score2: the season's instruments too)
+    const CI = Object.assign({}, SE && SE.inst, (colourDef(colour) || {}).inst);
     const beat = WANDER_BEAT[variant === 'night' ? 'night' : variant === 'cave' ? 'cave' : 'day'], bar = beat * 4;
     const density = variant === 'cave' ? 0.25 : variant === 'night' ? 0.4 : 0.6, padG = variant === 'cave' ? 0.03 : 0.045;
     for (let k = 0; k < 8; k++) {
@@ -337,6 +346,9 @@
     constructor(o) {
       o = o || {};
       this.seed = (o.seed >>> 0) || 1; this.r = VR.Klang.rng(this.seed); this.calm = !!o.calm;
+      // e-score2: less (⚙ „Musik seltener": rests × 2.2), the beat grid of the last cue (the stingers land on it), the
+      // stinger's start (qAt), a place change held since pkT, the cross-fade pending (xf), the season of now
+      this.less = !!o.less; this.grid = null; this.qAt = 0; this.pkT = 0; this.xf = false; this.lastPk = undefined; this.season = -1;
       this.cue = null;           // {id, variant, lv, t0, t1, fading, sting}
       this.restUntil = 0; this.queue = []; this.lastSting = {}; this.rot = 0; this.after = null; this.loops = 0;
       this.nCue = 0; this.colour = '';   // e-music2: every cue's seed (the director's and the cue's number), the place's colour
@@ -362,9 +374,10 @@
       const len = cue.t1 - cue.t0;
       if (cue.id === 'adventure' && (c.danger || c.boss > 0)) return ++this.loops % 3 === 0 ? 4 : 0.5;   // the fight: looped, a breath now and then
       this.loops = 0;
+      if (c.festival && cue.pk === 'fest') return 0.4;   // e-score2: the dance goes round, a breath between the rounds
       const k = c.space ? REST.space : c.cave ? REST.cave : c.story ? REST.story : c.building ? REST.build : c.night > 0.5 ? REST.night : cue.id === 'wander' ? REST.wander : REST.day;
       const jit = 0.8 + 0.4 * this.r();
-      return Math.max(cue.sting ? 6 : 12, len * k * jit) * (this.calm ? 1.7 : 1);
+      return Math.max(cue.sting ? 6 : 12, len * k * jit) * (this.calm ? 1.7 : 1) * (this.less ? 2.2 : 1);
     }
     // a moment: 'wonder' (a vista, a discovery, a first visit), 'funke' (the companion arrives), 'freeing' (an outpost
     // freed: the swell is heard, then the home theme bright), 'hold' (a swell plays: the director waits until `until`)
@@ -372,7 +385,10 @@
       if (name === 'hold' || name === 'freeing') {
         this.restUntil = Math.max(this.restUntil, until || now + 4);
         if (this.cue && !this.cue.fading) this.fade(now, STING_FADE);
-        if (name === 'freeing') this.after = { id: 'home', variant: 'bright', lv: 1 };
+        if (name === 'freeing') {
+          this.after = { id: 'home', variant: 'bright', lv: 1 };
+          if (THEMES.freed) { this.queue.length = 0; this.queue.push('freed'); this.qAt = until || now + 4; this.lastSting.freed = now; }   // e-score2: the freed stinger after the swell
+        }
         return true;
       }
       if (!THEMES[name] || !THEMES[name].sting) return false;
@@ -381,8 +397,21 @@
       if (this.cue && this.cue.id === 'adventure' && !this.cue.fading) return false;   // no sting in a fight
       this.lastSting[name] = now;
       this.queue.length = 0; this.queue.push(name);
-      if (this.cue && !this.cue.fading && !this.cue.sting) this.fade(now, STING_FADE);
+      // e-score2 · the stinger lands on the beat: the running cue's grid (the next bar if it comes within 1.6 s, else the
+      // next beat, at least 0.3 s ahead); the cue fades out to end exactly there. A stinger playing: after it.
+      let qt = this.quant(now); if (this.cue && this.cue.sting && !this.cue.fading) qt = Math.max(qt, this.cue.t1);
+      if (this.cue && this.cue.fading) qt = Math.max(qt, Math.min(this.cue.t1, now + 0.3));
+      this.qAt = qt;
+      if (this.cue && !this.cue.fading && !this.cue.sting) this.fade(now, Math.max(0.3, qt - now));
       return true;
+    }
+    quant(now) {
+      const G = this.cue && !this.cue.fading ? this.cue : this.grid, lead = now + 0.3;
+      if (!G || !(G.B > 0)) return now + 0.05;
+      const bar = G.B * G.MB, kb = Math.max(0, Math.ceil((lead - G.t0) / bar - 1e-9)), qb = G.t0 + kb * bar;
+      if (qb - now <= 1.6 && qb >= lead - 1e-9) return qb;
+      const k = Math.max(0, Math.ceil((lead - G.t0) / G.B - 1e-9)), q = G.t0 + k * G.B;
+      return q >= lead - 1e-9 ? q : lead;
     }
     fade(now, len) {
       const cu = this.cue; cu.fading = true; cu.t1 = Math.min(cu.t1, now + len);
@@ -392,41 +421,59 @@
     // one look (four times a second is plenty): returns null or an action {type: 'start', id, variant, lv, at, dur} |
     // {type: 'fade', at, len}; and sets duckT (the music's level under dialogue / a hostile mob)
     step(now, c) {
-      this.colour = c.colour || '';
+      this.colour = c.colour || ''; this.season = c.season >= 0 ? c.season | 0 : -1;
       const a = this.decide(now, c);
       this.duckT = c.dialogue ? 0.35 : c.hostile && !(this.cue && this.cue.id === 'adventure') ? 0.25 : 1;
       return a;
     }
     decide(now, c) {
       this.out = null;
+      // e-score2 · a stinger due: it starts on its beat (decided up to half a second early: the audio clock schedules ahead)
+      if (this.queue.length && this.qAt && now >= this.qAt - 0.5) {
+        const at = Math.max(this.qAt, now + 0.05); this.qAt = 0;
+        if (this.cue && this.cue.t1 > at) this.fade(now, at - now);
+        if (this.cue && !this.cue.fading) this.rot++;
+        this.cue = null;
+        return this.start(now, { id: this.queue.shift(), variant: 'day', lv: 0, sting: true }, at);
+      }
       const cu = this.cue;
       if (cu) {
         if (now >= cu.t1) {   // the cue has ended: a rest (quiet) unless a sting or the fight goes on
           this.cue = null;
           if (!cu.fading) this.rot++;
-          const rest = cu.fading ? (this.queue.length ? 0 : 1.5) : this.restFor(cu, c);
+          const rest = cu.fading ? (this.queue.length ? 0 : this.xf ? 0.3 : 1.5) : cu.sting && this.after ? 0.5 : this.restFor(cu, c);
           this.restUntil = Math.max(this.restUntil, now + rest);
         } else {
           const w = this.want(c);
+          // e-score2 · a new place (its key) held 3 s: the cue fades over 3.5 s and the place's theme fades in after it
+          if (!cu.fading && !cu.sting && !w.urgent && w.pk !== undefined && cu.pk !== undefined && w.pk !== cu.pk && cu.id !== 'adventure' && cu.id !== 'space') {
+            if (!this.pkT) this.pkT = now; else if (now - this.pkT >= 3 - 1e-6) { this.pkT = 0; this.xf = w.id !== 'none'; this.fade(now, 3.5); return this.out; }
+          } else this.pkT = 0;
           if (!cu.fading && !cu.sting && w.urgent && w.id === cu.id && ((w.lv | 0) > cu.lv || (/^boss/.test(cu.variant) && w.variant !== cu.variant))) { this.fade(now, 1.0); return this.out; }   // the fight grows (a boss phase): out, and in again higher
           if (!cu.fading && !cu.sting && w.id !== cu.id && (w.urgent || cu.id === 'adventure' || (cu.id === 'space' && !c.space))) { this.fade(now, cu.id === 'adventure' ? 3 : FADE); if (w.urgent) this.restUntil = 0; }
           return this.out;
         }
       }
-      if (this.queue.length) return this.start(now, { id: this.queue.shift(), variant: 'day', lv: 0, sting: true });
+      if (this.queue.length && !this.qAt) return this.start(now, { id: this.queue.shift(), variant: 'day', lv: 0, sting: true });
       const w = this.want(c);
-      if (w.id === 'festival') return null;
+      if (w.id === 'festival' || w.id === 'none') return null;   // (e-score2: none — a thunderstorm, the music rests)
+      // e-score2: a new place reached during a long rest: its theme within four seconds
+      if (w.pk !== undefined && this.lastPk !== undefined && w.pk !== this.lastPk) this.restUntil = Math.min(this.restUntil, now + 4);
       const last = this.log.length ? this.log[this.log.length - 1].id : '';
       if (now < this.restUntil && !(w.urgent && last !== w.id)) return null;   // an urgent change (a fight, the boss) cuts a rest short
       if (this.after) { const a = this.after; this.after = null; return this.start(now, a); }
       return this.start(now, w);
     }
-    start(now, w) {
+    start(now, w, at) {
       const seed = ((Math.imul(this.seed, 0x9e3779b1) ^ Math.imul(++this.nCue, 0x85ebca6b)) >>> 0) || 1, colour = this.colour;
-      const t0 = now + 0.05, dur = cueLen(w.id, w.variant, seed), lv = this.calm ? Math.min(1, w.lv | 0) : w.lv | 0;
-      this.cue = { id: w.id, variant: w.variant, lv, t0, t1: t0 + dur, fading: false, sting: !!w.sting };
-      this.log.push({ id: w.id, variant: w.variant, lv, seed, colour, t0, t1: t0 + dur }); if (this.log.length > 64) this.log.shift();
-      return (this.out = { type: 'start', id: w.id, variant: w.variant, lv, at: t0, dur, sting: !!w.sting, seed, colour });
+      const t0 = at !== undefined ? at : now + 0.05, dur = cueLen(w.id, w.variant, seed), lv = this.calm ? Math.min(1, w.lv | 0) : w.lv | 0;
+      // (e-score2: the cue's place key, its beat and meter — the stingers' grid; a cross-fade's fade-in; the season)
+      const B = w.id === 'wander' ? WANDER_BEAT[w.variant === 'night' ? 'night' : w.variant === 'cave' ? 'cave' : 'day'] : THEMES[w.id] ? beatLen(w.id, w.variant) : 0.5;
+      const pk = w.sting ? (this.lastPk) : w.pk, fadeIn = this.xf && !w.sting ? 2.5 : 0; this.xf = false; if (!w.sting) this.lastPk = w.pk;
+      this.cue = { id: w.id, variant: w.variant, lv, t0, t1: t0 + dur, fading: false, sting: !!w.sting, pk, B, MB: meterOf(w.id) };
+      this.grid = this.cue;
+      this.log.push({ id: w.id, variant: w.variant, lv, seed, colour, t0, t1: t0 + dur, pk }); if (this.log.length > 64) this.log.shift();
+      return (this.out = { type: 'start', id: w.id, variant: w.variant, lv, at: t0, dur, sting: !!w.sting, seed, colour, fadeIn, season: this.season });
     }
   }
   // the context of now, read from the game (four times a second; never throws): the boss's phase, a machine on you,

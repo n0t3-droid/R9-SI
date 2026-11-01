@@ -41,6 +41,7 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'exo_blocks'); SHARED.push('exoworld
 MAIN.push('../shared/story', 'regie', 'story_art', 'story_glow', 'story_neb', 'story');   // (a-story2: story_art — the speakers' faces, the Eiswächter's model; before the player)
 MAIN.push('regie_acts');   // a-regie: the Regie's own acts — the adventurer's first encounter (after foes, liberate, funke and the Regie)   // a-story: the book (src/shared/story.js — pure, main thread only), die Regie, the story's player (after funke, quests, liberate, ctx and the space scene, whose parts it uses)
 MAIN.splice(MAIN.indexOf('audio'), 0, 'score', 'scoresynth');   // e-music: VR.Score (src/main/score.js, the themes and the director) and VR.ScoreSynth (scoresynth.js) before audio.js
+MAIN.splice(MAIN.indexOf('audio'), 0, 'score2');   // e-score2: the place-aware score (src/main/score2.js: the places' themes, the seasons, the new voices) after scoresynth, before audio.js
 MAIN.push('ux');   // e-ux: VR.UX (src/main/ux.js) — the UI scale, the key-hint strip, the first minute's hints, the settings' search; last: it wraps ui.js and game.js
 MAIN.push('firstlook');
 MAIN.push('konvoi');
