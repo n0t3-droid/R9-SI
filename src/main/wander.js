@@ -136,9 +136,9 @@
     return { starts, all };
   };
 
-  // ---- o-wander2 · the staging (R56-03): 8–18 m ahead inside the view cone, the main figure's height ≥ 6 % of the
+  // ---- o-wander2 · the staging (R56-03): 8–15 m ahead (the proof walk: at 12–16 m grass and trunks hid too much) inside the view cone, the main figure's height ≥ 6 % of the
   // frame's (W.share; staged for 7 %: a margin for the figure's own way); a small figure stages nearer (animals are drawn × STAGE.animal); a clear voxel line from the eye
-  W.STAGE = { near: 8, far: 18, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.35 };
+  W.STAGE = { near: 8, far: 15, cone: 0.42, share: 0.07, fov: 70 * Math.PI / 180, animal: 1.35 };
   W.share = (hgt, d, fov) => hgt / (2 * Math.max(0.1, d) * Math.tan((fov || W.STAGE.fov) / 2));
   W.stageRange = function (hgt, fov) {
     const S = W.STAGE, dmax = hgt / (S.share * 2 * Math.tan((fov || S.fov) / 2));
@@ -146,7 +146,7 @@
   };
   // the candidates [d, side] — the nearer half of the range first, the centre of the cone first
   W.stageCands = function (R) {
-    const S = W.STAGE, a = R[0], b = R[1], mid = a + (b - a) * 0.45, out = [];
+    const S = W.STAGE, a = R[0], b = R[1], mid = a + (b - a) * 0.35, out = [];
     for (const d of [mid, mid + (b - mid) * 0.6, a + (mid - a) * 0.4, b, a]) for (const s of [0.18, -0.18, 0, 0.34, -0.34, S.cone, -S.cone]) out.push([Math.max(a, Math.min(b, d)), s]);
     return out;
   };

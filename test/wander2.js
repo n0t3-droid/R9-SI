@@ -61,7 +61,7 @@ if (W.share && W.stageRange) {
   const fov = 70 * Math.PI / 180;
   check(Math.abs(W.share(1.8, 10, fov) - 1.8 / (20 * Math.tan(fov / 2))) < 1e-9, 'the share: height ÷ the frame height at that distance');
   const R = W.stageRange(1.8, fov);
-  check(R[0] === W.STAGE.near && R[1] <= W.STAGE.far && R[0] >= 8 && W.share(1.8, R[1], fov) >= 0.06, `a grown-up stages ${R[0]}–${R[1].toFixed(1)} m (share at the far end ${(W.share(1.8, R[1], fov) * 100).toFixed(1)} %, staged for ${W.STAGE.share * 100} %)`);
+  check(R[0] === W.STAGE.near && R[1] <= W.STAGE.far && R[0] >= 8 && W.share(1.8, R[1], fov) >= 0.06, `a grown-up stages ${R[0]}–${R[1].toFixed(1)} m (share at the far end ${(W.share(1.8, R[1], fov) * 100).toFixed(1)} %, staged for ${Math.round(W.STAGE.share * 100)} %)`);
   let bad = []; for (const n of W.NAMES) { const K = W.KINDS[n], r = W.stageRange(K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1), fov); if (!(K.fig > 0) || W.share(K.fig * (K.fam === 'animal' ? W.STAGE.animal : 1), r[1], fov) < 0.06 - 1e-9 || r[1] > 18 || r[0] < 8) bad.push(n); }
   check(!bad.length, `every moment has a main figure and stages at a distance where it reads ≥ 6 % (${bad.join(',') || 'all'})`);
   const C = W.stageCands(R);
