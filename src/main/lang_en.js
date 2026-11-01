@@ -4145,5 +4145,10 @@
     "g.jy.line.8": "In the evening the lanterns light the whole way.",
     "g.jy.line.9": "We're almost there. Stay a while, the people are friendly.",
     // ---- o-seamless end
+    // ---- u-folk3 (folk3.js: the photo mode's portrait)
+    "g.photo.portrait": "📷 Portrait: {n} — H: the next one · G: golden hour",
+    "g.photo.noFace": "📷 Nobody near for a portrait",
+    "g.photo.more3": " · H: portrait",
+    // ---- u-folk3 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

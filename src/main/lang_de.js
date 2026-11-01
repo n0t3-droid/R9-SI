@@ -4145,5 +4145,10 @@
     "g.jy.line.8": "Am Abend leuchten die Laternen den ganzen Weg entlang.",
     "g.jy.line.9": "Gleich sind wir da. Bleib doch eine Weile, die Leute sind freundlich.",
     // ---- o-seamless end
+    // ---- u-folk3 (folk3.js: the photo mode's portrait)
+    "g.photo.portrait": "📷 Porträt: {n} — H: der Nächste · G: goldene Stunde",
+    "g.photo.noFace": "📷 Niemand in der Nähe für ein Porträt",
+    "g.photo.more3": " · H: Porträt",
+    // ---- u-folk3 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
