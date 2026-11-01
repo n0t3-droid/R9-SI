@@ -233,7 +233,7 @@
       P.fxaa = GL.program(S.FS_VS, S.FXAA_FS, 'fxaa');
       P.tsr = GL.program(S.FS_VS, S.TSR_FS, 'tsr');
       P.copy = GL.program(S.FS_VS, S.COPY_FS, 'copy');
-      P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh', this.q.lite ? ['LITE'] : []);   // (f-polish6: LITE keeps Very Low's mesh program as it was — no hand desaturation there)
+      P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh');
       P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox');
       P.voxInst = GL.program(S.VOX_VS, S.VOX_FS, 'voxInst', ['INST']);   // (the Baustelle's scaffold: one mesh, many instances)
       P.part = GL.program(S.PART_VS, S.PART_FS, 'part');

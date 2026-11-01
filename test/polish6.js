@@ -58,8 +58,7 @@ check(V.First2.HAND_SAT === 0.7, 'VR.First2.HAND_SAT 0.7 (70 % of its chroma: ab
   check(ok && worst >= 0.15, 'Very Low: handTint moves a block\'s mean colour toward its luma (saturation ≥ 15 % lower, the luma kept) — least ' + (worst * 100).toFixed(0) + ' %'); }
 check(/F2\.handTint\(mesh\.meanCol/.test(src('entities.js')) && /m\.meanCol = /.test(src('entities.js')), 'drawHand tints Very Low\'s hand lights by the block\'s mean colour');
 const sh = src('shaders.js'), mesh = sh.slice(sh.indexOf('S.MESH_FS'), sh.indexOf('// ------------------------------------------------------------ particles'));
-check(/#ifndef LITE\nuniform float u_desat;/.test(mesh) && /#ifndef LITE\n  if \(u_desat > 0\.0\)/.test(mesh), 'the mesh program\'s desaturation sits behind LITE (Very Low unchanged)');
-check(/P\.mesh = GL\.program\(S\.MESH_VS, S\.MESH_FS, 'mesh', this\.q\.lite \? \['LITE'\] : \[\]\)/.test(src('renderer.js')), 'the mesh program gets LITE on Very Low');
+check(/#ifdef LIGHT2\nuniform float u_desat;/.test(mesh) && /#ifdef LIGHT2\n  if \(u_desat > 0\.0\)/.test(mesh), 'the mesh program\'s desaturation sits behind LIGHT2 (Very Low\'s program unchanged: test/vl_programs.js)');
 const en = src('entities.js');
 check(/u_desat, hDs\)/.test(en) && /u_desat, 0\)/.test(en), 'drawHand sets the held block\'s desaturation and resets it');
 
