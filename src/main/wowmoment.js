@@ -53,7 +53,7 @@
   // the place's name for the caption (lang keys g.wow.<landmark>)
   const NAMES = {
     temple: ['Der Tor-Tempel', 'The Gate Temple'], citadel: ['Die Turmzitadelle', 'The Spire Citadel'], isles: ['Die Himmelsinseln', 'The Sky Isles'],
-    lighthouse: ['Der Leuchtturm am fernen Ufer', 'The Lighthouse on the Far Shore'], falls: ['Der Wasserfall', 'The Waterfall'], nova: ['Nova Haven', 'Nova Haven'],
+    lighthouse: ['Der Leuchtturm am fernen Ufer', 'The Lighthouse on the Far Shore'], falls: ['Der Wasserfall', 'The Waterfall'], nova: ['Palmenhafen', 'Nova Haven'],
     station: ['Die Bergstation', 'The Mountain Station'], lookout: ['Der Aussichtsturm auf dem Grat', 'The Lookout on the Ridge'], hills: ['Die Kuppelhügel', 'The Pod Hills'],
   };
   W.NAMES = NAMES;

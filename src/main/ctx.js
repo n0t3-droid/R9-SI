@@ -69,7 +69,7 @@
     'g.ctx.to.isles': ['zu den Himmelsinseln', 'to the Sky Isles'],
     'g.ctx.to.lighthouse': ['zum Leuchtturm', 'to the lighthouse'],
     'g.ctx.to.falls': ['zum Wasserfall', 'to the waterfall'],
-    'g.ctx.to.nova': ['nach Nova Haven', 'to Nova Haven'],
+    'g.ctx.to.nova': ['nach Palmenhafen', 'to Nova Haven'],
     'g.ctx.to.station': ['zur Bergstation', 'to the Mountain Station'],
     'g.ctx.to.lookout': ['zum Aussichtsturm', 'to the lookout'],
     'g.ctx.to.hills': ['zu den Kuppelhügeln', 'to the Pod Hills'],
