@@ -153,7 +153,7 @@
   // the define: the terrain's programs get SEASON while ⚙ Jahreszeiten is on (light2's, sky3's, bodysky's hooks first)
   if (VR.GL && !VR.GL.__seasons) {
     const prev = VR.GL.defineHook || null;
-    const NAMES = { terrain: 1, terrainCut: 1, trans: 1, terrainCutZ: 1, lod: 1, lodFar: 1 };
+    const NAMES = { terrain: 1, terrainCut: 1, trans: 1, terrainCutZ: 1, lod: 1, lodFar: 1, prop: 1 };
     VR.GL.defineHook = (name, defines) => {
       const d = prev ? prev(name, defines) : (defines || []);
       return S.want && NAMES[name] ? d.concat(['SEASON']) : d;

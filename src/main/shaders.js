@@ -1513,6 +1513,9 @@ uniform float u_gust;
 uniform vec3 u_camPos;   // t-motion: the camera's world position (the palm's place in the gust bands)
 ${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
+#ifdef SEASON
+uniform vec4 u_season;   // w-seasons (seasons.js)
+#endif
 out vec2 v_uv;
 out vec3 v_col;
 out vec3 v_n;
@@ -1545,6 +1548,16 @@ void main() {
 #endif
   vec3 rel = q * on + a_inst0.xyz;
   v_uv = a_uv; v_col = a_col; v_n = nq; v_rel = rel; v_sky = a_inst2.x; v_block = a_inst2.yzw;
+#ifdef SEASON
+  // w-seasons (seasons.js): the smooth plants' green in the season's colour (per plant: its phase) — fresh, gold, warm
+  // red and gold, frosted
+  { float ps = u_season.x + u_season.y + u_season.z + u_season.w;
+    if (ps > 0.001 && a_col.g > a_col.r * 1.05 && a_col.g > a_col.b * 1.05) {
+      vec3 pc = a_col; float pl = dot(pc, vec3(0.3, 0.59, 0.11)), ph2 = fract(a_inst1.z * 7.13 + 0.37);
+      vec3 pAu = mix(pc, ph2 < 0.5 ? pl * vec3(2.2, 1.0, 0.3) : pl * vec3(1.9, 1.4, 0.35), 0.75);
+      v_col = pc * (1.0 - ps) + pc * vec3(0.88, 1.12, 0.78) * u_season.x + mix(pc * vec3(1.1, 1.0, 0.7), pl * vec3(1.5, 1.15, 0.3), 0.3) * u_season.y + pAu * u_season.z + mix(pc, vec3(0.8, 0.85, 0.92), 0.55) * u_season.w;
+    } }
+#endif
 #ifdef SHADOWS
   v_shadow = u_shadowMat * vec4(rel + nq * 0.04, 1.0);
 #endif

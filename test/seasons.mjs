@@ -170,8 +170,8 @@ const cost = {};
 for (const preset of ['potato', 'high']) {
   await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 7; g.applySettings('*'); }, preset);
   await settle(12);
-  for (const on of [false, true, false, true, false, true]) {
-    const r = await ev(([on]) => { const g = VR.game; g.settings.seasons = on; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws }; }, [on]);
+  for (const on of [false, false, false, true, true, true]) {
+    const r = await ev(([on]) => { const g = VR.game; g.settings.seasons = on; window.__norender = false; for (let i = 0; i < 24; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; let draws = 0; for (let i = 0; i < 16; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); draws = g.renderer.stats.draws; } window.__norender = true; ms.sort((a, b) => a - b); return { ms: +ms[8].toFixed(1), draws }; }, [on]);
     (cost[preset + (on ? '_on' : '_off')] || (cost[preset + (on ? '_on' : '_off')] = [])).push(r);
   }
   console.log('  cost ' + preset + ' ' + JSON.stringify(cost));
