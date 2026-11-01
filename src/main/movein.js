@@ -818,7 +818,7 @@
   };
 
   // ---- f-polish5: the festival night of your settlement, readable — lanterns strung between the doorsteps and a fire
-  // ring on the plaza (presentation only; no block). Very Low: the lanterns as warm one-frame dots (one batch), the ring's
+  // ring on the plaza (presentation only; no block). Very Low: the lanterns as warm one-frame dots (one batch), the fire as
   // embers; Low and up: the paper lanterns, the fire's flames, soft halos (⚙ wonderGlow; ≤ 10 halos).
   const FPO = { col: [1, 0.7, 0.35], size: 0.2, force: true, grav: 0, drag: 0, collide: false, fade: false, life: 0.05, emis: 1 };
   const FFL = { col: [1, 0.6, 0.2], size: 0.22, grav: -1.4, drag: 0.6, collide: false, life: 0.7, emis: 1, wind: 0.2 };
@@ -845,7 +845,8 @@
       }
       // the fire ring
       const f = FL.fire;
-      if (LK) LK.drawModel(g, r, P0(), 'movein_firering', [f[0] + 0.5, f[1], f[2] + 0.5], 0, cam, LAMPO);
+      if (LK && T0 >= 1) LK.drawModel(g, r, P0(), 'movein_firering', [f[0] + 0.5, f[1], f[2] + 0.5], 0, cam, LAMPO);
+      else if (P) { FPO.col = LCOL[0]; FPO.size = 0.5; FPO.life = dt * 1.5 + 1e-4; P.spawn(f[0] + 0.5, f[1] + 0.25, f[2] + 0.5, 0, 0, 0, FPO); }   // (Very Low: the embers as one warm dot — no model, no vox pass)
       if (P && Math.random() < dt * (T0 >= 1 ? 26 : 8)) { FFL.col = Math.random() < 0.5 ? [1, 0.55, 0.15] : [1, 0.8, 0.3]; P.spawn(f[0] + 0.5 + (Math.random() - 0.5) * 0.6, f[1] + 0.3, f[2] + 0.5 + (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.3, 1.2 + Math.random() * 0.8, (Math.random() - 0.5) * 0.3, FFL); }
       // the halos: the fire and the lanterns nearest you
       if (T0 >= 1 && g.settings.wonderGlow !== false && VR.StoryGlow && VR.StoryGlow.draw) {
