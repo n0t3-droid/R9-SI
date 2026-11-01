@@ -18,6 +18,7 @@ import path from 'path';
 import fs from 'fs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = path.join(ROOT, 'test', 'shots');
+const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null, want = (k) => !ONLY || ONLY.has(k);   // ONLY=stairs,crowd,stop,fest
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
 const page = await ctx.newPage();
@@ -81,7 +82,10 @@ const cam = (x, y, z, yaw, pitch) => ev(([x, y, z, yaw, pitch]) => { const p = V
 
 // ---------------------------------------------------------------- stairs
 const S0 = [PX + PR + 3, PY, PZ - 1];   // the stair's foot (x rising by half a block a step), 3 wide in z
-await ev(([x0, y, z0]) => {
+// (the eye goes there first: a column out of reach is not loaded, and a block set into it is lost)
+await cam(S0[0] + 1.7, S0[1] + 2, S0[2] + 3.2, 0, -0.2);
+for (let i = 0; i < 40; i++) { await step(10); await wait(150); if (await ev(([x, z]) => VR.game.world.isLoaded(x - 6, z) && VR.game.world.isLoaded(x + 12, z), S0)) break; }
+const placed = await ev(([x0, y, z0]) => {
   const g = VR.game, w = g.world, B = VR.R.byName, slab = B.oak_slab.defaultState, pl = B.oak_planks.defaultState;
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -4; dx <= 9; dx++) { w.setBlock(x0 + dx, y - 1, z0 + dz, B.stone.defaultState, 4); for (let yy = y; yy <= y + 4; yy++) w.setBlock(x0 + dx, yy, z0 + dz, 0, 4); }   // a clear lane on a stone floor
@@ -90,7 +94,9 @@ await ev(([x0, y, z0]) => {
     w.setBlock(x0 + 2, y, z0 + dz, pl, 4); w.setBlock(x0 + 2, y + 1, z0 + dz, slab, 4);
     for (let dx = 3; dx <= 9; dx++) { w.setBlock(x0 + dx, y, z0 + dz, pl, 4); w.setBlock(x0 + dx, y + 1, z0 + dz, pl, 4); }
   }
+  return w.getBlock(x0, y, z0) === slab && w.getBlock(x0 + 2, y + 1, z0) === slab;
 }, S0);
+check(placed, 'stairs: the stair is built');
 await step(20);
 const stairRun = async (tag) => {
   await setRobo(tag === 'before');
@@ -113,8 +119,7 @@ const stairRun = async (tag) => {
   await ev(() => { window.__stairA.__robo = null; });
   return true;
 };
-check(await stairRun('before'), 'stairs: before');
-check(await stairRun('after'), 'stairs: after');
+if (want('stairs')) { check(await stairRun('before'), 'stairs: before'); check(await stairRun('after'), 'stairs: after'); }
 
 // ---------------------------------------------------------------- crowd
 const crowdRun = async (tag) => {
@@ -139,7 +144,7 @@ const crowdRun = async (tag) => {
   console.log(`  crowd ${tag}: the closest two came ${closest.toFixed(2)} b`);
   return closest;
 };
-const cB = await crowdRun('before'), cA = await crowdRun('after');
+if (want('crowd')) { const cB = await crowdRun('before'), cA = await crowdRun('after');
 check(cA >= 0.45, `crowd: with Robo nobody comes closer than 0.45 b (${cA.toFixed(2)}; before ${cB.toFixed(2)})`);
 
 // ---------------------------------------------------------------- stop
@@ -164,8 +169,9 @@ const stopRun = async (tag) => {
   await ev(() => { window.__stopA.__robo = null; });
   return stoppedAt > 0;
 };
-check(await stopRun('before'), 'stop: before');
-check(await stopRun('after'), 'stop: after');
+}
+if (want('stop')) { check(await stopRun('before'), 'stop: before'); check(await stopRun('after'), 'stop: after'); }
+if (want('fest')) {
 
 // ---------------------------------------------------------------- the festival at dusk, and the costs
 await ev(() => VR.game.env.setTime(11250));
@@ -192,6 +198,7 @@ for (const pre of ['potato', 'balanced']) {
 }
 console.log('costs (ms a frame, the villages\' update + poses): ' + JSON.stringify(Object.fromEntries(Object.entries(C).map(([k, v]) => [k, +v.toFixed(3)]))));
 check(C.potato_on <= C.potato_off + 0.1, `Very Low: the people's frame with Robo ${C.potato_on.toFixed(3)} ms ≤ without ${C.potato_off.toFixed(3)} + 0.1`);
+}
 const errs = logs.filter(l => /pageerror|TypeError|ReferenceError/.test(l));
 check(!errs.length, `no page error (${errs.length})`);
 for (const l of logs.slice(0, 12)) console.log(l);
