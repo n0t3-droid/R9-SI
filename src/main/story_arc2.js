@@ -225,6 +225,15 @@
     if (g.ui && g.ui.hint) g.ui.hint(text, 5000);
   };
 
+  // ---------------------------------------------------------------- Funke stays at your side while an arc scene plays
+  // (his anchor follows the frame's camera — in a scene that is the scene's own: he would fly into the lens; here he
+  // hovers at the player's front right, where the close shots look for him)
+  { const Fk = VR.Funke; if (Fk && Fk.Actor && !Fk._arc2) { Fk._arc2 = true; const place0 = Fk.Actor.prototype.place; Fk.Actor.prototype.place = function (T) {
+    const s = pl(this.g), sc = s && s.scene;
+    if (sc && sc.b.ch >= 13 && sc.eye0 && sc.fwd && !this.ph) { const A = this.anchor, f = sc.fwd, e = sc.eye0; A[0] = e[0] + f[0] * 1.3 - f[2] * 0.7; A[1] = e[1] + 0.1 + Math.sin(T * 2.1) * 0.05; A[2] = e[2] + f[2] * 1.3 + f[0] * 0.7; return; }
+    return place0.apply(this, arguments);
+  }; } }
+
   // ---------------------------------------------------------------- the pictures' inputs (story_fx2.js)
   // where Wiegelind's sky spot is in the view (0…1, from the frame's camera), the shot's kind, your way, the choice
   A2.project = function (cam, Q, aspect) {
