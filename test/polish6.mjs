@@ -160,9 +160,9 @@ if (parts.includes('cost')) {
   // (seasons.mjs's village: a meadow, cherry, taiga, savanna or jungle one — its festival decor stands on the plaza)
   let vil = null;
   for (let k = 0; k < 9 && !vil; k++) {
-    vil = await ev((k) => { const t = VR.Seasons.Fest.debug.today(); return t && t.plaza && (k >= 7 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(t.style || '')) ? t : null; }, k);
+    vil = await ev((k) => { const t = VR.Seasons.Fest.debug.today(); return t && t.plaza && (k >= 3 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(t.style || '')) ? t : null; }, k);
     if (vil) break;
-    const kn = await ev((k) => { const g = VR.game, V = g.villages, p = g.player.pos; const L = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine && (k >= 7 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(v.plan.style || ''))).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return L[0] || null; }, k);
+    const kn = await ev((k) => { const g = VR.game, V = g.villages, p = g.player.pos; const L = [...V.known.values()].filter(v => v.plan && v.plan.plaza && !v.plan.mine && (k >= 3 || /^(meadow|cherry|taiga|savanna|jungle)$/.test(v.plan.style || ''))).map(v => ({ x: v.plan.plaza.x, y: v.plan.plaza.y, z: v.plan.plaza.z, d: Math.hypot(v.plan.plaza.x - p[0], v.plan.plaza.z - p[2]) })).sort((a, b) => a.d - b.d); return L[0] || null; }, k);
     if (kn) await ev((v) => { const p = VR.game.player; p.flying = true; p.teleport(v.x + 6.5, v.y + 6, v.z + 6.5); }, kn);
     else await ev((k) => { const p = VR.game.player; p.flying = true; p.teleport(p.pos[0] + 160 * Math.cos(k * 2.4), 120, p.pos[2] + 160 * Math.sin(k * 2.4)); }, k);
     await settle(12); await step(40, 33);
