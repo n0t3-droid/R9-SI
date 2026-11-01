@@ -61,7 +61,7 @@
     const skin = L.skin, hc = L.hair, shoes = L.shoes;
     let shirt = L.shirt, pants = L.pants;
     // (the Weißstadt's robes and coats replace a trade's work clothes, but aprons, sashes, the healer's cross and armour stay over them)
-    const acc = kid ? null : L.garb ? (/^(apron|apron2|sash|cross|armor)$/.test(role.acc || '') ? role.acc : null) : role.acc;
+    const acc = kid ? (L.kidAcc === 'overalls' ? 'overalls' : null) : L.garb ? (/^(apron|apron2|sash|cross|armor)$/.test(role.acc || '') ? role.acc : null) : V.accOf(L, role);   // (a-adventure: L.acc / L.kidAcc — Folk.vary's choice)
     if (acc === 'overalls') pants = 0x3A5A9A;
     // proportions (model units = 1/32 block)
     // the trailer heroes are chunkier: shorter legs, broader shoulders, the same torso (two blocks tall in all)
@@ -192,7 +192,7 @@
       head.set(0, eyeY + 2, -7, fr); head.set(-1, eyeY + 2, -7, fr); head.set(1, eyeY + 2, -7, fr);
     }
     // ---- hats
-    const hat = kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);
+    const hat = kid ? L.kidHat : L.hat !== undefined ? L.hat : (elder ? (L.elderHat || role.hat) : role.hat);   // (a-adventure: L.hat — Folk.vary's choice)
     const H1 = HT + (bald ? 1 : 2);
     const disc = (y, r, c, hole) => { for (let z = -r; z <= r; z++) for (let x = -r; x <= r; x++) { const d = x * x + (z - 0.5) * (z - 0.5); if (d > r * r + 0.5) continue; if (hole && d < hole * hole) continue; head.set(x, y, z, typeof c === 'function' ? c(x, y, z) : c); } };
     if (hat === 'straw') {
@@ -385,6 +385,14 @@
       else { for (let y = y0; y <= top - 1; y++) front(0, y, mul(shirt, 0.84)); for (const y of [3, 6, 9, 12]) front(1, y, trim); for (let x = -3; x <= 3; x++) body.set(x, top, bz0 - 1, mul(shirt, 1.16)); }
     }
 
+    // ---- a-adventure (R56-07): a knitted scarf round the neck in the cold months (L.scarf: its colour), one end down the front
+    if (L.scarf) {
+      const sc = L.scarf, sk = (x, y) => (((x + y) & 1) ? sc : mul(sc, 0.86)), nz0 = -3, nz1 = 2;
+      for (let y = top + 1; y <= top + 2; y++) for (let z = nz0; z <= nz1; z++) for (let x = -3; x <= 3; x++) if (Math.abs(x) === 3 || z === nz0 || z === nz1) body.set(x, y, z, sk(x, y));
+      for (let y = top - (kid ? 3 : 5); y <= top; y++) { front(-2, y, sk(-2, y)); front(-1, y, sk(-1, y)); }
+      front(-2, top - (kid ? 4 : 6), mul(sc, 1.15)); front(-1, top - (kid ? 4 : 6), mul(sc, 1.15));
+    }
+    // ---- a-adventure end
     // ============================== arms (pivot at the shoulder)
     const sleeveLen = armLen - handH;
     const rolled = L.role === 'smith' || L.role === 'builder' || L.role === 'farmer';
@@ -560,10 +568,12 @@
     child: { xl: -3, xr: 2, top: 7, z0: -3, z1: 2, eyes: [-2, 1], rows: [[-2, 1, -3, 0], [-3, 2, -3, 1], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2]] },
   };
   // the outfit families (step 3): every villager wears one; the trades and the Weißstadt's robes and coats choose it
+  // a-adventure (R56-07): what a person wears over the shirt — Folk.vary's choice (L.acc, null: nothing) or the trade's
+  V.accOf = (L, role) => (L.acc !== undefined ? L.acc : role.acc);
   V.FAMILIES = ['shirt', 'overalls', 'apron', 'smith', 'tunic', 'vest', 'coat', 'frock', 'robe', 'whitecoat', 'suit', 'armor', 'jumpsuit', 'shawl', 'dress', 'tee', 'gown', 'cape'];
   V.familyOf = function (L) {
-    const kid = L.age === 'child', role = V.ROLES[L.role] || V.ROLES.farmer, acc = role.acc || '';
-    if (kid) return L.dress ? 'dress' : 'tee';
+    const kid = L.age === 'child', role = V.ROLES[L.role] || V.ROLES.farmer, acc = V.accOf(L, role) || '';
+    if (kid) return L.kidAcc === 'overalls' && !L.dress ? 'overalls' : L.dress ? 'dress' : 'tee';
     if (L.garb === 'robe') return 'robe';
     if (L.garb === 'coat') return 'coat';
     if (L.garb === 'tunic' || L.garb === 'gown' || L.garb === 'cape') return L.garb;   // (t-folk: the Weißstadt's other garbs)
@@ -1150,7 +1160,7 @@
       }
     }
     // ---- hats (at the head's scale; H1 is the first row over the hair)
-    const hat = L.feat ? null : kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);   // (u-worlds: a native's feature, never under a hat)
+    const hat = L.feat ? null : kid ? L.kidHat : L.hat !== undefined ? L.hat : (elder ? (L.elderHat || role.hat) : role.hat);   // (u-worlds: a native's feature, never under a hat)
     const H1 = A.top + (bald ? 1 : 2);
     const disc = (y, r, c, hole, t) => { for (let z = Math.floor(zc - r - 1); z <= Math.ceil(zc + r + 1); z++) for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) { const d = (x - cx) * (x - cx) + (z - zc) * (z - zc); if (d > r * r + 0.3) continue; if (hole && d < hole * hole) continue; head.set(x, y, z, c, 0, t || TG.cloth); } };
     if (hat === 'straw') {
@@ -1410,6 +1420,13 @@
         collar(mul(shirt, 1.12));
       }
     }
+    // ---- a-adventure (R56-07): the scarf (L.scarf) — a knitted ring round the neck's base, one end hanging down the front
+    if (L.scarf) {
+      const sc = L.scarf, sk = (x, y) => (((x + y) & 1) ? sc : mul(sc, 0.86)), r = rowOf(top);
+      if (r) for (let y = neck0; y <= neck0 + 1; y++) for (let z = r[1] - 1; z <= r[2] + 1; z++) for (let x = -3; x <= 3; x++) if (Math.abs(x) === 3 || z === r[1] - 1 || z === r[2] + 1) body.set(x, y, z, sk(x, y), 0, TG.cloth);
+      for (let y = top - (kid ? 3 : 5); y <= top; y++) { front(-2, y, sk(-2, y), TG.cloth, true); front(-1, y, sk(-1, y), TG.cloth, true); }
+    }
+    // ---- a-adventure end
     // a trade's mark over a Weißstadt coat (the baker's apron is drawn by its family; the mayor's sash, the healer's cross)
     if (over === 'sash') for (let y = beltY; y <= top - 1; y++) { const x = Math.round(-hw + (y / top) * (2 * hw)); front(x, y, 0xE0B040, TG.cloth, true); }
     if (over === 'cross') { front(-2, top - 5, 0xE04040, TG.other, true); front(-2, top - 4, 0xE04040, TG.other, true); front(-3, top - 5, 0xE04040, TG.other, true); front(-1, top - 5, 0xE04040, TG.other, true); front(-2, top - 6, 0xE04040, TG.other, true); }

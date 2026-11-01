@@ -131,15 +131,16 @@
     return out;
   };
   // (the helmet and the white panels join the key only when a suit has them: the villagers' keys stay as they were)
-  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '') + (L.cape ? ':c' + L.cape : '') + (L.feat ? ':f' + L.feat + (L.featC | 0) + (L.glow ? 'g' : '') : '');
+  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '') + (L.cape ? ':c' + L.cape : '') + (L.feat ? ':f' + L.feat + (L.featC | 0) + (L.glow ? 'g' : '') : '') + V.varyKey(L);
 
   // ---------------------------------------------------------------- t-folk: no two neighbours dressed alike
   // the clothes of a look (the outfit family, the colours): two people with the same key wear the same clothes
-  V.outfitKey = (L) => [V.familyOf ? V.familyOf(L) : L.role, L.shirt, L.pants, L.dress ? L.dressCol : 0, L.garb || '', L.cape | 0].join(':');
+  V.outfitKey = (L) => [V.familyOf ? V.familyOf(L) : L.role, L.shirt, L.pants, L.dress ? L.dressCol : 0, L.garb || '', L.cape | 0].join(':') + V.varyKey(L);
   // the next colour of the person's own palette (the trade's shirts, the Weißstadt garb's, the children's): n steps on; a
   // trade with one colour (the baker's white, the healer's) changes its trousers instead
   V.recolor = function (L, n) {
     const R0 = ROLES[L.role] || ROLES.farmer;
+    if (L.pal !== undefined && !L.garb && !(L.dress && !L.garb)) { const FP = V.PALS[L.pal] && V.PALS[L.pal][L.age === 'child' ? 'kid' : 'ad'], i = FP ? FP.indexOf(L.shirt) : -1; if (i >= 0) { L.shirt = FP[(i + n) % FP.length]; return L; } }   // (a-adventure: within the family's palette)
     if (L.dress && !L.garb) { const D = V.DRESS; L.dressCol = D[(D.indexOf(L.dressCol) + n + D.length) % D.length]; return L; }
     const pal = L.garb ? (L.garb === 'cape' ? WEISS.tunic : WEISS[L.garb]) : L.town === 'hall' && L.age === 'child' ? WEISS.kid : R0.shirts;
     if (L.garb === 'cape' && (n & 1)) { const C = WEISS.cape; L.cape = C[(C.indexOf(L.cape) + 1) % C.length]; return L; }
@@ -164,6 +165,83 @@
     }
     return changed;
   };
+
+
+  // ---------------------------------------------------------------- a-adventure (R56-07): dressed by family, trade, age and season
+  // „the same straw-hat green shirt and the same blue child in every picture" (docs/reviews/v0.55.md). Every household
+  // gets a palette family (seven of them, the neighbours' differ); the grown-ups of the free trades (farmers, gardeners,
+  // crafters, scholars, teachers, office folk, elders) take their shirts from it, the hats, aprons and overalls vary by
+  // trade, the children wear its brighter colours as tees, dresses or overalls with caps, bows or woollen hats; autumn and
+  // winter bring scarves and beanies, summer sun hats. The uniforms (baker, healer, pilot, ranger, mayor, shop staff,
+  // builders) stay. The Weißstadt and the natives of other worlds keep their own clothes. Deterministic by the seed.
+  V.PALS = [
+    { id: 'erde', ad: [0xB0603A, 0xC8964A, 0x7A5236, 0xD8B888], kid: [0xE07A3A, 0xF0B050, 0xC86A4A, 0xF4D8A0], sc: [0xB04A3A, 0xC8964A] },
+    { id: 'meer', ad: [0x2F6A8A, 0x4A90B8, 0x24456A, 0x8AC0D0], kid: [0x3AA0E0, 0x5AC8D8, 0x2F70C8, 0xA8E0F0], sc: [0xE8E4D8, 0x24456A] },
+    { id: 'beere', ad: [0x8A2F4A, 0xC0506A, 0x6A3A6A, 0xE8A0B0], kid: [0xE85A7A, 0xF08AB0, 0xB050A0, 0xF8C0D0], sc: [0xE8A0B0, 0x6A3A6A] },
+    { id: 'wiese', ad: [0x6A8A4A, 0xA8A860, 0x4A5A3A, 0xC8D090], kid: [0x7AC05A, 0xC8D050, 0x5AA070, 0xE0EAA0], sc: [0xC8A030, 0x4A5A3A] },
+    { id: 'sonne', ad: [0xD89A30, 0xE8C060, 0xC86A30, 0xF0E0B0], kid: [0xF6C840, 0xF8A040, 0xF0D878, 0xFFE8B0], sc: [0xC0443A, 0x2F6A8A] },
+    { id: 'heide', ad: [0x7A6AA0, 0x9A8AC0, 0x5A5A80, 0xC8B8D8], kid: [0xA080E0, 0xC0A0F0, 0x8070C8, 0xE0D0F8], sc: [0xE8D070, 0x5A5A80] },
+    { id: 'wolle', ad: [0xA8A49A, 0x6A6A70, 0x3A3A44, 0xE0DCD0], kid: [0xD0CCC0, 0x8A9AB0, 0xF0A0A0, 0xA0C0A0], sc: [0xC0443A, 0x2F8C8A] },
+  ];
+  const FREE = { farmer: 1, gardener: 1, crafter: 1, scholar: 1, teacher: 1, office: 1, elder: 1, smith: 1 };
+  // the trade's hats and what it wears over the shirt — [value, weight], the season's own first
+  const HATS = {
+    farmer: [['straw', 3], ['sun', 2], ['flat', 2], ['cap', 1], [null, 3]],
+    gardener: [['sun', 3], ['straw', 2], [null, 2], ['cap', 1]],
+    crafter: [[null, 4], ['cap', 2], ['flat', 2]], smith: [[null, 4], ['cap', 1]],
+    scholar: [[null, 5], ['flat', 1]], teacher: [[null, 5], ['flat', 1]], office: [[null, 5], ['cap', 1]], elder: [[null, 3], ['flat', 2], ['sun', 1]],
+  };
+  const ACCS = {
+    farmer: [['overalls', 4], [null, 3], ['belt', 2], ['apron', 1], ['leather', 1]],
+    gardener: [['apron2', 4], [null, 2], ['overalls', 1]], crafter: [['belt', 3], ['leather', 2], [null, 2], ['apron', 1]],
+  };
+  const wpick = (list, h) => { let tot = 0; for (const q of list) tot += q[1]; let r = h % tot; for (const q of list) { if (r < q[1]) return q[0]; r -= q[1]; } return list[0][0]; };
+  V.varyKey = (L) => (L.pal === undefined && L.hat === undefined && L.acc === undefined && !L.scarf && !L.kidAcc ? '' : ':p' + (L.pal === undefined ? '' : L.pal) + ':' + (L.hat === undefined ? '~' : L.hat) + ':' + (L.acc === undefined ? '~' : L.acc) + ':' + (L.scarf | 0) + ':' + (L.kidAcc || ''));
+  // one person: o = { pal: the household's palette family, season: 0 spring · 1 summer · 2 autumn · 3 winter, seed }
+  V.vary1 = function (L, o) {
+    if (!L || L.garb || L.town === 'hall' || L.feat || L.species || L.role === 'hero' || L.suit2) return L;
+    const P = V.PALS[((o.pal | 0) % V.PALS.length + V.PALS.length) % V.PALS.length], h = (k) => hash(o.seed | 0, k, 4243), ss = o.season | 0;
+    const cold = ss === 3 ? 0.75 : ss === 2 ? 0.35 : ss === 0 ? 0.12 : 0;
+    const u = (k) => (h(k) % 1000) / 1000;
+    L.pal = (o.pal | 0) % V.PALS.length;
+    if (L.age === 'child') {
+      L.shirt = P.kid[h(1) % P.kid.length];
+      L.dress = u(2) < 0.3; if (L.dress) L.dressCol = P.kid[(h(3) + 1) % P.kid.length];
+      L.kidAcc = !L.dress && u(4) < 0.22 ? 'overalls' : null;
+      L.kidHat = u(5) < cold ? 'beanie' : wpick(ss === 1 ? [[null, 3], ['kidcap', 3], ['bow', 2]] : [[null, 4], ['kidcap', 2], ['bow', 2], ['beanie', 1]], h(6));
+      L.pants = [0x3A4A6A, 0x6A4A3A, 0x4A6A5A, 0x5A4A6A, 0x8A6A4A][h(7) % 5];
+      L.longSleeves = ss >= 2 || ss === 0 && u(8) < 0.5;
+    } else {
+      const role = L.age === 'elder' ? 'elder' : L.role;
+      if (FREE[role]) {
+        if (u(1) < 0.75) L.shirt = P.ad[h(2) % P.ad.length];
+        if (L.dress) L.dressCol = P.ad[(h(3) + 2) % P.ad.length];
+        if (HATS[role]) L.hat = u(4) < cold * 0.7 ? (u(9) < 0.6 ? 'beanie' : 'flat') : wpick(ss === 1 ? HATS[role].concat([['sun', 2], ['straw', 1]]) : HATS[role], h(5));
+        if (ACCS[role]) L.acc = wpick(ACCS[role], h(6));
+      } else if (u(4) < cold * 0.6 && !/^(chef|hard|goggles|visor|top)$/.test(String((ROLES[role] || {}).hat))) L.hat = 'beanie';
+    }
+    L.scarf = u(10) < cold * (L.age === 'child' ? 0.6 : 0.55) ? P.sc[h(11) & 1] : 0;
+    if (!L.scarf) delete L.scarf;
+    return L;
+  };
+  // a village's people (makeRoster): the households' palette families (the next household's differs from the last), the season
+  V.vary = function (fams, style, seed, season) {
+    if (style === 'hall' || (style && String(style).slice(0, 3) === 'sp:')) return 0;
+    let last = -1, n = 0;
+    for (const f of fams) {
+      let pal = hash(seed | 0, f.home | 0, 4244) % V.PALS.length; if (pal === last) pal = (pal + 1 + (hash(seed | 0, f.home | 0, 4245) % (V.PALS.length - 1))) % V.PALS.length;
+      last = pal;
+      for (const m of f.members) if (m.look) { V.vary1(m.look, { pal, season, seed: m.seed }); n++; }
+    }
+    return n;
+  };
+  V.seasonNow = function () {
+    if (V.SEASON !== undefined) return V.SEASON;
+    const g = VR.game, S = VR.Seasons;
+    try { if (g && g.env && S && S.at) { const a = S.at(g.env.day || 0, g.env.timeOfDay, S.lock ? S.lock(g) : -1); if (a && a.idx >= 0) return a.idx; } } catch (e) { /* the summer */ }
+    return 1;
+  };
+  // ---- a-adventure end
 
   // ---------------------------------------------------------------- heroes (players): armour suits from the trailer
   V.SKIN = SKIN; V.HAIR = HAIR; V.HAIR_STYLES = STYLES_H.slice(0, 9);
