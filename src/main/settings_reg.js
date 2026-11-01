@@ -69,6 +69,7 @@
     { key: 'volAmbient', g: 'snd', sec: 'vol', t: 'slider', lab: 'g.set.volAmbient', tip: 'g.set.volAmbient.tip', def: 0.6, min: 0, max: 1, step: 0.05, fmt: 'pct' },
     { key: 'volVoice', g: 'snd', sec: 'vol', t: 'slider', lab: 'g.set.volVoice', tip: 'g.set.volVoice.tip', def: 0.8, min: 0, max: 1, step: 0.05, fmt: 'pct' },   // e-music: Stimmen (Funke, the villagers)
     { key: 'calmMusic', g: 'snd', sec: 'vol', t: 'switch', lab: 'g.set.calmMusic', tip: 'g.set.calmMusic.tip', def: false },   // e-music: Ruhige Musik (longer quiet, no drums, no Funke sting)
+    { key: 'musicLess', g: 'snd', sec: 'vol', t: 'switch', lab: 'g.set.musicLess', tip: 'g.set.musicLess.tip', def: false },   // e-score2: Musik seltener (the rests between the pieces × 2.2)
     { key: 'wx', g: 'snd', sec: 'air', t: 'choice', lab: 'g.set.wx', tip: 'g.set.wx.tip', def: 'normal', opts: [['normal', 'g.set.wx.normal', 'g.set.wx.normal.tip'], ['calm', 'g.set.wx.calm', 'g.set.wx.calm.tip'], ['off', 'g.set.wx.off', 'g.set.wx.off.tip']] },
     { key: 'natSound', g: 'snd', sec: 'air', t: 'choice', lab: 'g.set.natSound', tip: 'g.set.natSound.tip', def: 'synth', opts: [['synth', 'g.set.natSound.synth', 'g.set.natSound.synth.tip'], ['off', 'g.set.natSound.off', 'g.set.natSound.off.tip']] },
     // ---- Spiel · Steuerung

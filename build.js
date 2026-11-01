@@ -64,6 +64,7 @@ MAIN.push('fairy_models', 'fairy');   // a-fairy: the enchanted places' models (
 MAIN.push('movein');
 MAIN.push('seasons', 'seasons_fest');   // w-seasons: VR.Seasons (src/main/seasons.js: the calendar, the tints, the snow, the air's leaves; wraps env, game, mp, wander) and the festivals (seasons_fest.js: wraps VR.Villages after festival.js and movein.js)   // u-movein: VR.MoveIn (src/main/movein.js) — build a home, a family moves in; your settlement grows (after homes, festival, lifekit, quiet: it wraps VR.Villages)
 MAIN.push('folk3');   // u-folk3: VR.Folk3 (src/main/folk3.js) — the camera director (📷 H), the circle dance, the far face, the moods (after natives, photomode, showcase: it wraps their openTalk and the photo mode)
+MAIN.push('score2_hooks');   // e-score2: the discoveries' stingers (src/main/score2_hooks.js: wander moments, fairy places, a family moving in) — last, it wraps
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
