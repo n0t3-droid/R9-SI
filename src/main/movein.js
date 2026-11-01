@@ -644,8 +644,17 @@
     // the side of the way with the lower ground (the camera never in a hill)
     const dx = (L.pos[0] - o[0]) / dl, dz = (L.pos[2] - o[2]) / dl, mx = o[0] + dx * dl * 0.5, mz = o[2] + dz * dl * 0.5, w = g.world;
     const hA = w.topAt ? w.topAt(Math.floor(mx - dz * 9), Math.floor(mz + dx * 9)) : 0, hB = w.topAt ? w.topAt(Math.floor(mx + dz * 9), Math.floor(mz - dx * 9)) : 0;
-    J.frame = { t: 0, side: hA <= hB ? 1 : -1, pose: {}, hh: !!g.hideHud };
+    let side = hA <= hB ? 1 : -1;
+    // o-wander2: the close shot — the side whose line from the camera to the cart is clear of blocks (else the lower)
+    if (J.cart && VR.MoveIn.lineClear) { const ok = (sd) => { const P = MI.framePose(L.pos, o, {}, sd, J.cart); return MI.lineClear(w, [P.x, P.y, P.z], [J.cart[0], J.cart[1] + 1, J.cart[2]]); }; if (!ok(side) && ok(-side)) side = -side; }
+    J.frame = { t: 0, side, pose: {}, hh: !!g.hideHud };
     g.hideHud = true;   // (the held item is not in the shot)
+  };
+  // o-wander2: no solid block on the line a → b (0.4-m steps, the last metre skipped: the cart itself)
+  MI.lineClear = function (w, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz), n = Math.ceil(L / 0.4), R = VR.R, F = VR.F;
+    for (let i = 1; i < n; i++) { const u = i / n; if (u * L > L - 1) break; const st = w.getBlock(Math.floor(a[0] + dx * u), Math.floor(a[1] + dy * u), Math.floor(a[2] + dz * u)); if (st && R && R.T && (R.T.flags[st] & F.SOLID)) return false; }
+    return true;
   };
   MI.frameEnd = function (g, J) { if (!J || !J.frame) return; g.hideHud = J.frame.hh; J.frame = null; J.frameDone = true; };
   const wrapA = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };

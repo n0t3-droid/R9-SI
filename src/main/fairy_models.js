@@ -298,7 +298,7 @@
           }
           if (c === null && Math.abs(y + 0.5 - 8.6) < 1.1 && Math.abs(Math.abs(x + 0.5 - cx) - 6.0) < 1.2) c = 0xff9aa8;   // cheeks
           if (c === null && ((y === 7 && Math.abs(x + 0.5 - cx) < 1.6) || (y === 8 && Math.abs(Math.abs(x + 0.5 - cx) - 2.0) < 0.6))) c = 0x8a3a4a;   // a small smile
-          if (c === null && y > 2 && y < 7 && Math.abs(x + 0.5 - cx) < 4.5) c = C.belly;
+          if (c === null && y > 1 && y < 6 && Math.abs(x + 0.5 - cx) < 3.6) c = mix(C.body, C.belly, 0.55);   // (a soft belly, not a row of teeth)
           if (c !== null) gr.set(x, y, z, c, glow && c !== 0x1e1628 ? 1 : 0);
         }
       }),
@@ -321,9 +321,9 @@
   });
   FOLK.forEach((C, v) => { M['fy_sprite_' + v] = flausel(C, v === 4, false); });
   M.fy_sprite_hat = flausel(FOLK[1], false, true);
-  // o-wander2: Very Low's night glow at a fairy place (1/4 m): a ring of glowing moss and tiny warm lights, 9 m across
-  M.fy_glow = () => ({ unit: 4, radius: 5, parts: { body: part(37, 1, 37, [18.5, 0, 18.5], (gr) => {
-    for (let z = 0; z < 37; z++) for (let x = 0; x < 37; x++) { const d = Math.hypot(x - 18, z - 18); if (d > 18 || d < 6) continue; const k = hs(x, 0, z, 11); if (k < 0.16) gr.set(x, 0, z, k < 0.05 ? 0xffd890 : k < 0.1 ? 0xb8f0d0 : 0xffb0d0, 1); }
+  // o-wander2: Very Low's night glow at a fairy place (1/2 m): a ring of glowing moss and warm lights, 15 m across
+  M.fy_glow = () => ({ unit: 2, radius: 8, parts: { body: part(31, 1, 31, [15.5, 0, 15.5], (gr) => {
+    for (let z = 0; z < 31; z++) for (let x = 0; x < 31; x++) { const d = Math.hypot(x - 15, z - 15); if (d > 15 || d < 6) continue; const k = hs(x, 0, z, 11); if (k < 0.3) gr.set(x, 0, z, k < 0.1 ? 0xffd890 : k < 0.2 ? 0xb8f0d0 : 0xffb0d0, 1); }
   }) }, layout: { body: [0, 0, 0] } });
   // o-wander2: the glow seed (1/16 m): a pale puff on a short stalk, a warm glowing heart
   M.fy_seed = () => ({ unit: 16, radius: 0.5, parts: { body: part(9, 12, 9, [4.5, 0, 4.5], (gr) => {

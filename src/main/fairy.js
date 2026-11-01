@@ -210,11 +210,11 @@
   F.SET = ['b:lumishroom', 'b:spirit_lantern', 'b:pink_petals', 'b:wildflowers', 'b:moss_carpet', 'b:rose_crystal_cluster', 'b:glow_berry_vine', 'b:vm_light_table_mushroom_white', 'b:spore_blossom', 'b:azure_crystal_cluster'];
   F.GIFT = { lanterns: ['b:spirit_lantern', 6], lost: ['b:lumishroom', 8], bridge: ['b:pink_petals', 16], riddle: ['b:rose_crystal_cluster', 6], hat: ['b:wildflowers', 16] };
   // o-wander2 · the twist (every adventure's second stage): back at the giver after the main task, one more thing — a
-  // glow seed the wind carried off 110–140 m away; the giver walks with you; the seed flits ahead twice before it is
+  // glow seed the wind carried off 120–150 m away; the giver walks with you; the seed flits ahead twice before it is
   // caught (tw: 1 away · 2 caught; h the catches); home again (within 8 m of the place) the adventure ends
   Q.twist = function (q) { if (!q || q.s !== 2) return 'idle'; if (!q.tw) { q.tw = 1; q.h = 0; return 'twist'; } return q.tw === 2 ? 'ready' : 'still'; };
   Q.fetch = function (q) { if (!q || q.tw !== 1) return 'idle'; q.h = (q.h | 0) + 1; if (q.h >= 3) { q.tw = 2; return 'got'; } return 'hop'; };
-  F.TW = { near: 110, far: 140, hop: [12, 16], home: 8 };
+  F.TW = { near: 120, far: 150, hop: [12, 16], home: 8 };
   // the seed's first spot (pure: seed, the place) and each hop (away from the player, along the same bearing)
   F.twistSpot = function (seed, site) { const a = h(seed, strH(site.id + '#tw')) * TAU, r = F.TW.near + (F.TW.far - F.TW.near) * h(seed, strH(site.id + '#twr')); return [site.x + Math.cos(a) * r, site.z + Math.sin(a) * r]; };
   F.hopSpot = function (seed, id, n, from, player) { let dx = from[0] - player[0], dz = from[1] - player[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; const a = (h(seed, strH(id + '#hop'), n) - 0.5) * 1.2, c = Math.cos(a), sn = Math.sin(a), d = F.TW.hop[0] + (F.TW.hop[1] - F.TW.hop[0]) * h(seed, strH(id + '#hd'), n); return [from[0] + (dx * c - dz * sn) * d, from[1] + (dx * sn + dz * c) * d]; };
@@ -507,8 +507,8 @@
     const rec = recOf(g), q = rec.q[W0.s.id]; if (!q || q.s !== 2) { S.tw = null; return; }
     W0.t += dt;
     const f = W0.f, pl = g.player, yaw = pl.yaw;
-    // the giver beside you: 1.4 m to your left, a little ahead — it hops along, looks round, chirps near the seed
-    const tx = p[0] - Math.cos(yaw) * 1.4 - Math.sin(yaw) * 0.6, tz = p[2] + Math.sin(yaw) * 1.4 - Math.cos(yaw) * 0.6;
+    // the giver beside you: 1.2 m to your left, 1.6 m ahead — it hops along, looks round, chirps near the seed
+    const tx = p[0] - Math.cos(yaw) * 1.2 - Math.sin(yaw) * 1.6, tz = p[2] + Math.sin(yaw) * 1.2 - Math.cos(yaw) * 1.6;   // (≈ 37° to the left: in the view's edge)
     const far = Math.hypot(tx - f.pos[0], tz - f.pos[2]);
     if (far > 18) { f.pos[0] = tx; f.pos[2] = tz; const y = ground(g, tx, tz); if (y !== null) f.pos[1] = y; }
     if (stepTo(g, f, [tx, 0, tz], dt, Math.min(9, 2 + far * 1.6))) f.yaw = yaw + Math.PI + Math.sin(W0.t * 0.7) * 0.5;
@@ -889,7 +889,7 @@
       if (s.kind === 'tree' && s.lanterns) { const q = recOf(g).q[s.id]; if (q && q.s === 1) for (const L of s.lanterns) if (!(q.m & (1 << L.i))) { MP.scale = 1; LK.drawModel(g, r, P(), 'fy_lantern', L.pos, S.t * 0.3, c, MP); n++; } }
     }
     if (S.escort && (!s || s.folk.indexOf(S.escort.f) < 0)) n += drawSprite(g, r, P, S.escort.f, c);
-    if (S.tw) { if (!s || s.folk.indexOf(S.tw.f) < 0) n += drawSprite(g, r, P, S.tw.f, c); const q = recOf(g).q[S.tw.s.id]; if (q && q.tw === 1 && S.tw.pos[1] !== null) { MP.scale = 1.1 + Math.sin(S.t * 3) * 0.06; MP.pose = null; const sp = S.tw.pos, y = sp[1]; sp[1] = y + Math.sin(S.t * 1.7) * 0.15; if (LK.drawModel(g, r, P(), 'fy_seed', sp, S.t * 0.6, c, MP)) n++; sp[1] = y; } }
+    if (S.tw) { if (!s || s.folk.indexOf(S.tw.f) < 0) n += drawSprite(g, r, P, S.tw.f, c); const q = recOf(g).q[S.tw.s.id]; if (q && q.tw === 1 && S.tw.pos[1] !== null) { MP.scale = 2.2 + Math.sin(S.t * 3) * 0.1; MP.pose = null; const sp = S.tw.pos, y = sp[1]; sp[1] = y + Math.sin(S.t * 1.7) * 0.15; if (LK.drawModel(g, r, P(), 'fy_seed', sp, S.t * 0.6, c, MP)) n++; sp[1] = y; } }
     // o-wander2: Very Low's night glow — a warm ring of light on the ground at the place (one emissive draw)
     if (s && s.parts && vlOf(g) && S.E && (S.E.night || 0) > 0.3 && s.y !== null) { MP.scale = 1; MP.pose = null; const gp = S.gp || (S.gp = [0, 0, 0]); gp[0] = s.x; gp[1] = s.y + 0.05; gp[2] = s.z; if (LK.drawModel(g, r, P(), 'fy_glow', gp, 0, c, MP)) n++; }
     if (S.bud && recOf(g).buddy && g.settings.fairyBuddy !== false && g.player) { const B = S.bud; MP.scale = 0.42; MP.pose = wings(B, 'bud'); LK.drawModel(g, r, P(), 'fy_sprite_0', [B.pos[0], B.pos[1] - 0.2, B.pos[2]], g.player.yaw, c, MP); MP.pose = null; n++; }

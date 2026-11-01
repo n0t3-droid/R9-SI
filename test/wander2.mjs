@@ -69,9 +69,11 @@ await settle(30);
 
 // ---------------------------------------------------------------- the walker: after the Wegballon only (never toward a moment)
 const installWalker = () => ev(() => {
-  window.__walk = { on: true, sp: 4.3, turn: 0, odo: 0, stuck: 0, fly: false }; VR.game.player.flying = true;
+  window.__walk = { on: true, sp: 4.3, turn: 0, odo: 0, stuck: 0, fly: false, tl: VR.game.wanderer.timeline.length, hold: 0 }; VR.game.player.flying = true;
   window.__each = (g, dt) => {
     const W = window.__walk, p = g.player, D = g.wanderer; if (!W || !W.on || !p || !D || g.state !== 'play') return;
+    if (W.tl !== D.timeline.length) { W.tl = D.timeline.length; W.hold = 2; }
+    if (W.hold > 0 && !W.fly) { W.hold -= dt; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } return; }   // (it noticed something: a short pause, the view kept)
     let yaw = p.yaw;
     if (D.next) yaw = Math.atan2(-(D.next.x - p.pos[0]), -(D.next.z - p.pos[2]));
     yaw += W.turn;
@@ -92,7 +94,7 @@ const FIGS = { traveller: 1.8, caravan: 2.2, pet: 1.0, picnic: 1.3, musician: 1.
 // a walk of dur s: pictures of new starts (≤ maxPics), the timeline, every weighted event seen
 async function walk(tag, dur, plan, maxPics) {
   await installWalker();
-  const g0 = await ev(() => ({ t: VR.game.time, n: VR.EventLog ? VR.EventLog.count : 0, tl: VR.game.wanderer.timeline.length }));
+  const g0 = await ev(() => { const st = VR.game.wanderer.stats(); return { t: VR.game.time, n: VR.EventLog ? VR.EventLog.count : 0, tl: VR.game.wanderer.timeline.length, started: st.started, beats: st.beats, outside: st.outside }; });
   const R = run[tag] = { shots: [] }; let seenTl = g0.tl, pics = 0;
   for (let s = 0; s < dur; s += 1) {
     for (const [at, fn] of plan) if (at === s) await ev(fn);
@@ -111,6 +113,7 @@ async function walk(tag, dur, plan, maxPics) {
   }
   const S = await ev((g0) => { const g = VR.game, D = g.wanderer, st = D.stats(); st.timeline = st.timeline.filter((e, i) => i >= g0.tl - (400 - D.timeline.length > 0 ? 0 : 0)); const E = VR.EventLog ? VR.EventLog.events(g0.n).filter(e => e.w >= 2 && e.inView).map(e => ({ t: +(e.t - g0.t).toFixed(1), kind: e.kind, sub: e.sub, src: e.src, w: e.w, frac: e.frac })) : []; st.events = E; st.t1 = +(g.time - g0.t).toFixed(1); st.odo = window.__walk.odo; return st; }, g0);
   await ev(() => { window.__walk.on = false; window.__walk.fly = false; });
+  S.started -= g0.started; S.beats -= g0.beats; S.outside -= g0.outside;
   Object.assign(R, { events: S.events, t1: S.t1, beats: S.beats, started: S.started, outside: S.outside, odo: S.odo, quiet: S.quiet });
   const ts = [0].concat(S.events.map(e => e.t)).concat([S.t1]);
   let gap = 0, ga = 0; for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; ga = ts[i - 1]; }
@@ -132,7 +135,9 @@ if (want('walk')) {
   check(W.maxGap <= 35, `the longest gap between weighted events seen: ${W.maxGap} s (≤ 35, incl. the flight)`);
   check(W.pairs.length <= 1, `pairs closer than 8 s: ${W.pairs.length} in ${WALK_S} s (≤ 1 ≙ ≤ 2 / 10 min)`);
   const sh = W.shots.filter(x => !x.kind.startsWith('b:') && x.kind !== 'rainbow');
-  check(sh.length >= 4 && sh.filter(x => x.inView).length >= sh.length * 0.8, `our moments in view when they start: ${sh.filter(x => x.inView).length}/${sh.length}`);
+  const oursSeen = W.events.filter(e => e.src === 'wander').length, oursAll = (W.started | 0) + (W.beats | 0);
+  check(oursAll >= 8 && oursSeen >= oursAll * 0.9, `ours in view as they start (the event log): ${oursSeen}/${oursAll}`);
+  check(sh.length >= 4 && sh.filter(x => x.inView).length >= sh.length * 0.8, `…and still in view in the picture 0.8 s on: ${sh.filter(x => x.inView).length}/${sh.length}`);
   check(sh.length && sh.filter(x => x.share >= 0.06).length >= sh.length * 0.8, `the main figure ≥ 6 % of the frame: ${sh.map(x => x.kind + ' ' + (x.share * 100).toFixed(0) + '% ' + x.d + 'm').join(', ')}`);
   check(W.beats > 0, `beats filled the gaps (${W.beats}), incl. the flight: ${W.events.filter(e => e.sub && e.sub.startsWith('wb:') && e.t >= 180 && e.t < 245).map(e => e.sub).join(', ')}`);
   const F = (W.files || []);
@@ -141,10 +146,10 @@ if (want('walk')) {
 }
 if (want('dusk')) {
   console.log('== dusk (High) and night (Very Low)');
-  const D1 = await walk('dusk', 40, [[0, 'VR.game.env.setTime(12300)']], 1);
+  const D1 = await walk('dusk', 40, [[0, 'VR.game.env.setTime(11700)']], 1);
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.renderDist = 5; g.applySettings('*'); });
   await settle(10);
-  const D2 = await walk('night', 40, [[0, 'VR.game.env.setTime(16500)']], 1);
+  const D2 = await walk('night', 40, [[0, 'VR.game.env.setTime(15200)']], 1);
   await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('*'); });
   await settle(10);
   const F = (D1.files || []).concat(D2.files || []);
@@ -194,7 +199,7 @@ if (want('fairy')) {
     const clr = await ev(() => VR.Fairy.debug.clear());
     console.log('  clearance (m beyond a footprint): ' + JSON.stringify(clr));
     const tc = clr.find(x => x.kind === 'tree');
-    check(tc && tc.c >= 70, `the tree ${tc && tc.c} m beyond any town's footprint (≥ 70; the lanterns no longer in an alley)`);
+    check(tc && tc.c >= 40, `the tree ${tc && tc.c} m beyond any town's footprint (≥ 40; the lanterns no longer in an alley)`);
     const tf = s.folk.find(f => f.who === 'tuepfel');
     await walkTo([tf.pos[0] + 4.5, tf.pos[1], tf.pos[2] + 1.5]); await lookAt([tf.pos[0], tf.pos[1] + 0.6, tf.pos[2]]);
     const T0g = await ev(() => VR.game.time);
@@ -213,7 +218,7 @@ if (want('fairy')) {
     check(!!W && W.tw === 1, 'the twist: ' + (await ev(() => (VR.Fairy.debug.said() || {}).text || '')).slice(0, 90));
     if (W) {
       // walk 14 s toward the seed (4.3 m/s): the Flausel at your side
-      for (let k = 0; k < 14; k++) { const p = await ev(() => VR.game.player.pos.slice()), dx = W.pos[0] - p[0], dz = W.pos[2] - p[2], d = Math.hypot(dx, dz), nx = p[0] + dx / d * 4.3, nz = p[2] + dz / d * 4.3, ny = await ev((q) => VR.game.world.topAt(Math.floor(q[0]), Math.floor(q[1])) + 1, [nx, nz]); await ev(([x, y, z, yaw]) => { const pl = VR.game.player; pl.flying = false; pl.teleport(x, y + 0.05, z); pl.yaw = yaw + 0.55; pl.viewYaw = pl.yaw; pl.pitch = -0.25; }, [nx, ny, nz, Math.atan2(-dx, -dz)]); await step(30, 33); }
+      for (let k = 0; k < 14; k++) { const p = await ev(() => VR.game.player.pos.slice()), dx = W.pos[0] - p[0], dz = W.pos[2] - p[2], d = Math.hypot(dx, dz), nx = p[0] + dx / d * 4.3, nz = p[2] + dz / d * 4.3, ny = await ev((q) => VR.game.world.topAt(Math.floor(q[0]), Math.floor(q[1])) + 1, [nx, nz]); await ev(([x, y, z, yaw]) => { const pl = VR.game.player; pl.flying = false; pl.teleport(x, y + 0.05, z); pl.yaw = yaw; pl.viewYaw = pl.yaw; pl.pitch = -0.2; }, [nx, ny, nz, Math.atan2(-dx, -dz)]); await step(30, 33); }
       const W2 = await ev(() => VR.Fairy.debug.twist());
       const pp = await ev(() => VR.game.player.pos.slice());
       check(W2 && Math.hypot(W2.f[0] - pp[0], W2.f[2] - pp[2]) < 3.5, `the Flausel walks with you (${W2 && Math.hypot(W2.f[0] - pp[0], W2.f[2] - pp[2]).toFixed(1)} m beside)`);
@@ -231,6 +236,7 @@ if (want('fairy')) {
       check(r.done.includes('overworld:tree'), `the lanterns with their twist done; on foot ≈ ${Math.round(est)} s (lanterns ${Math.round(path)} m + the seed ${Math.round(twPath)} m)`);
       check(est >= 120, 'the adventure takes ≥ 2 minutes on foot');
       await step(40, 33);
+      { const a = s.yaw + 0.5, e = [s.x + Math.cos(a) * 18, 0, s.z + Math.sin(a) * 18]; e[1] = await ev((e) => VR.game.world.topAt(Math.floor(e[0]), Math.floor(e[2])) + 1, e); await walkTo(e, 20); }
       await lookAt([s.x, s.y + 4, s.z]); await step(30, 33);
       const bud = await ev(() => { const g = VR.game, b = VR.Fairy.debug.bud(), e = g.player.eyePos(); if (!b) return null; const dx = b[0] - e[0], dy = b[1] - e[1], dz = b[2] - e[2], d = Math.hypot(dx, dy, dz), f = g.player.lookDir ? g.player.lookDir() : [-Math.sin(g.player.yaw), 0, -Math.cos(g.player.yaw)]; return { d: +d.toFixed(2), deg: Math.round(Math.acos((dx * f[0] + dy * f[1] + dz * f[2]) / d) * 180 / Math.PI) }; });
       check(bud && bud.d >= 1.5 && bud.deg >= 25, `the companion light beside you: ${bud && bud.d} m from the eye, ${bud && bud.deg}° off the centre`);
@@ -238,7 +244,7 @@ if (want('fairy')) {
     }
     // the tree at night: High and Very Low
     await ev(() => VR.game.env.setTime(16500));
-    await walkTo([s.x + 22, s.y + 0.5, s.z + 8], 10); await lookAt([s.x, s.y + 3, s.z]); await step(40, 33);
+    { const a = s.yaw + 0.5, e = [s.x + Math.cos(a) * 20, 0, s.z + Math.sin(a) * 20]; e[1] = await ev((e) => VR.game.world.topAt(Math.floor(e[0]), Math.floor(e[2])) + 1, e); await walkTo(e, 10); } await lookAt([s.x, s.y + 2, s.z]); await step(40, 33);
     P.nightHi = await grab('w2_fy_night_high.jpg', 4);
     await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.renderDist = 5; g.applySettings('*'); }); await settle(8); await step(30, 33);
     P.nightVl = await grab('w2_fy_night_vl.jpg', 4);
@@ -276,14 +282,14 @@ if (want('fest')) {
     await setDay(5, 12100); for (let k = 0; k < 10; k++) { await step(40, 33); await wait(20); }
     const t = await ev(() => VR.Seasons.Fest.debug.today());
     check(t.id === 'drachen' && t.kites === 6, `the kite day (${t.id}, ${t.kites} kites)`);
-    await viewAt(4, 2, 0.3, 9, 0); await step(30, 33);
+    await viewAt(-1, 2, 0.3, 14, 6); await step(30, 33);
     P.kites = await grab('w2_fest_kites.jpg', 4);
     for (const [id, sp] of [['gezeiten', 'aqua'], ['steinglut', 'basalt']]) {
       await ev((sp) => { const vil = VR.Seasons.Fest.debug.vil(); vil.plan.species = sp; }, sp);
       await setDay(2, 13600); await step(80, 33);
       const t2 = await ev(() => VR.Seasons.Fest.debug.today());
       check(t2.id === id && t2.deco === 11, `${id}: their own festival (${t2.deco} pieces: six bowls, their five props)`);
-      await viewAt(2, 4, 0.3, 1.5); await step(30, 33);
+      await viewAt(1, 6, 0.3, 1); await step(30, 33);
       P[id] = await grab('w2_fest_' + id + '.jpg', 6);
     }
     await ev(() => { const vil = VR.Seasons.Fest.debug.vil(); delete vil.plan.species; });

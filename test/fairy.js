@@ -129,7 +129,7 @@ check(F.ADV.tree === 'lanterns' && F.ADV.shroom === 'lost' && F.ADV.garden === '
   check(F.Q.finish(rec, id, 'lanterns') && q.s === 3, 'home again: done');
   const site = { id, x: 100, z: -50 }; let lo = 1e9, hi = 0, away = true;
   for (let sd = 1; sd < 60; sd++) { const p = F.twistSpot(sd, site), d = Math.hypot(p[0] - 100, p[1] + 50); lo = Math.min(lo, d); hi = Math.max(hi, d); const n = F.hopSpot(sd, id, 0, p, [p[0] - 3, 0, p[1]]); if (!(n[0] > p[0] + 5)) away = false; }
-  check(lo >= 110 && hi <= 140, `the seed 110–140 m from the place (${lo.toFixed(0)}–${hi.toFixed(0)}): out, two hops and back ≥ 270 m — with the main task ≥ 2 minutes on foot`);
+  check(lo >= 120 && hi <= 150, `the seed 120–150 m from the place (${lo.toFixed(0)}–${hi.toFixed(0)}): out, two hops and back ≥ 290 m — with the main task ≥ 2 minutes on foot`);
   check(away, 'each hop away from you');
   const eye = [0, 70, 0]; let minD = 1e9, minA = 1e9;
   for (let k = 0; k < 16; k++) { const yaw = k / 16 * Math.PI * 2, b = F.budPos(eye, yaw), dx = b[0], dy = b[1] - 70, dz = b[2], d = Math.hypot(dx, dy, dz), f = [-Math.sin(yaw), 0, -Math.cos(yaw)], cos = (dx * f[0] + dz * f[2]) / d; minD = Math.min(minD, d); minA = Math.min(minA, Math.acos(cos) * 180 / Math.PI); }
