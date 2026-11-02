@@ -1,5 +1,5 @@
 {
- "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs",
+ "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs · a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds)",
  "frames": 1200,
  "build": "cur",
  "totalMs": 2.395,
@@ -97,7 +97,9 @@
   "jsonValue": 0,
   "portal_core": 0,
   "starmap": 0,
-  "quiet": 0
+  "quiet": 0,
+  "tales_core": 0,
+  "tales": 0.002
  },
  "base": {
   "tag": "v0556",
@@ -377,6 +379,8 @@
   "story_arc2",
   "story_arc2b",
   "score2_hooks",
-  "diegetic"
+  "diegetic",
+  "tales_core",
+  "tales"
  ]
 }
