@@ -98,10 +98,10 @@ const sunNow = () => ev(() => VR.game.env.E.sunDir.slice());
 const EVE = 13900;
 // (run 3: a near column re-shown after a long trip grows from the ground and fades in: pictures caught it half there,
 // before as after — the near columns (5 chunks round the eye) all shown, grown and faded in first, frames drawn meanwhile)
-const shown = async (max = 30) => {
+const shown = async (max = 8) => {
   let bad = -1;
   for (let i = 0; i < max; i++) {
-    bad = await ev(() => { const g = VR.game, w = g.world, s = g.photoCam && g.photoCam.on ? g.photoCam.s : { x: g.player.pos[0], z: g.player.pos[2] }, cx = Math.floor(s.x) >> 4, cz = Math.floor(s.z) >> 4; let b = 0; for (const c of w.cols.values()) { if (Math.abs(c.cx - cx) > 5 || Math.abs(c.cz - cz) > 5) continue; if (!c.ready || c.shownAt < 0 || (c.fade !== undefined && c.fade < 1) || (c.grow !== undefined && c.grow < 1)) b++; } return b; });
+    bad = await ev(() => { const g = VR.game, w = g.world, s = g.photoCam && g.photoCam.on ? g.photoCam.s : { x: g.player.pos[0], z: g.player.pos[2] }, cx = Math.floor(s.x) >> 4, cz = Math.floor(s.z) >> 4; let b = 0; for (const c of w.cols.values()) { if (Math.abs(c.cx - cx) > 5 || Math.abs(c.cz - cz) > 5) continue; if (!c.ready || c.shownAt < 0 || (c.fade !== undefined && c.fade < 1) || (c.grow !== undefined && c.grow < 1)) { b++; if (b <= 2) window.__bad = (b === 1 ? '' : window.__bad + ' | ') + [c.cx - cx, c.cz - cz, c.ready ? 'r' : '-', c.shownAt, c.fade, c.grow, c.sec ? c.sec.filter(q => !q.meshed).length : 'x'].join(','); } } return b; });
     if (!bad) return 0;
     await ev(() => { const g = VR.game; window.__norender = false; for (let k = 0; k < 3; k++) { g.last = performance.now() - 33; window.__step(performance.now()); } window.__norender = true; });
     await run(10);
@@ -225,7 +225,7 @@ try {
       let P = v.P, T = v.T;
       if (v.dyn) { const d = await v.dyn(); if (!d) { console.log('     ' + v.name + ': nobody'); continue; } P = d.P; T = d.T; }
       await camAt(P, T, v.tod); await settle(25); await run(10);
-      const nb = await shown(); if (nb) console.log('     ' + v.name + ': ' + nb + ' near columns not shown');
+      const nb = await shown(); if (nb) console.log('     ' + v.name + ': ' + nb + ' near columns not shown: ' + await ev(() => window.__bad));
       if (v.dyn) { const d = await v.dyn(); if (d) { P = d.P; T = d.T; await camAt(P, T, v.tod); } }   // (the bearer walked on while the place settled: the frame again, at once)
       N.cams[v.name + '_' + c] = { P, T };
       const f = await grab(v.name + '_' + c, v.tod, 6);
