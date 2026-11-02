@@ -467,15 +467,24 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     const base = !!(opt(g, 'goalTrail') && g.cam && !g.hideHud && !(g.ui && g.ui.screen) && !g.flight);
     const sg = S.sign, el = S.signEl;
     let show = !!(base && sg && el);
+    if (show && sg.occ) show = false;
     if (show) show = project(g, sg, el);
     if (show !== S.signShown) { S.signShown = show; if (el) el.style.display = show ? 'block' : 'none'; }
     for (let i = 0; i < S.forkEls.length; i++) {
       const f = S.forks[i], fe = S.forkEls[i]; let on = !!(base && f);
+      if (on && f.occ) on = false;
       if (on) on = project(g, f, fe);
       if (on !== fe._on) { fe._on = on; fe.style.display = on ? 'block' : 'none'; }
     }
   }
   S.forks = []; S.forkEls = []; S.forksShown = 0;
+  // a sign behind a wall stays hidden (one ray from the eye to its board, at 4 Hz)
+  function hidden(g, sg) {
+    const c = g.cam, PH = VR.PHYS, w = g.world; if (!c || !PH || !PH.raycast || !w) return false;
+    const dx = sg.x - c.x, dy = sg.y - 0.4 - c.y, dz = sg.z - c.z, L = Math.hypot(dx, dy, dz); if (L < 2) return false;
+    const hit = PH.raycast((x, y, z) => w.getBlock(x, y, z), c.x, c.y, c.z, dx / L, dy / L, dz / L, L - 0.8);
+    return !!(hit && hit.state && VR.R && VR.F && (VR.R.T.flags[hit.state] & VR.F.SOLID) && !(VR.R.T.flags[hit.state] & VR.F.PLANT));   // (a flower or the grass hides nothing)
+  }
   const fmtD = (d) => (d >= 1000 ? (d / 1000).toFixed(1).replace('.', VR.I18N && VR.I18N.lang === 'en' ? '.' : ',') + ' km' : Math.round(d) + ' m');
   const signHtml = '<div class="pl"><b></b><i></i><span>➜</span></div><div class="post"></div>';
   function signText(el, txt, d, key) { if (el._k !== key) { el._k = key; el.querySelector('b').textContent = txt; el.querySelector('i').textContent = '· ' + d; } }
@@ -512,6 +521,8 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       }
     }
 
+    if (S.sign) S.sign.occ = hidden(g, S.sign);
+    for (const f of S.forks) f.occ = hidden(g, f);
     // the rose
     const roseOn = !!opt(g, 'mapRose') && g.settings.minimap !== false && !g.hideHud && !g.photo;
     if (roseOn !== S.roseOn) { S.roseOn = roseOn; document.body.classList.toggle('dg-rose', roseOn); if (S.roseEl) S.roseEl.style.display = roseOn ? '' : 'none'; if (g.map) g.map.shown = undefined; }
