@@ -527,19 +527,18 @@
       if (P.last < -1e8) P.seen(now - 8, 2);   // (the first moment ≈ 10–15 s after you set out)
       if ((this.logT = (this.logT || 0) - dt) <= 0) { this.logT = 0.25; this.readLog(); }
       // o-wander3: the instrument — why no moment started, in seconds of play per reason (stats().why; session.mjs)
-      const Y = this.st.why || (this.st.why = {}), why = (k) => { Y[k] = +((Y[k] || 0) + dt).toFixed(2); };
-      if (this.auto === false || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) return why('hold');
+      if (this.auto === false || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) return this.why('hold', dt);
       const air = !walking && this.airborne();
-      if (!walking && !air) return why('still');
+      if (!walking && !air) return this.why('still', dt);
       // the scout: PACE.look s before the moment is due, its kind is chosen and its stage tried along the heading
       if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
-      if (now < (this.tryT || 0)) return why(P.since(now) < P.tgt ? 'early' : 'retry');
+      if (now < (this.tryT || 0)) return this.why(P.since(now) < P.tgt ? 'early' : 'retry', dt);
       if (this.ofs && this.ofs.n !== P.n) { this.ofs = null; this.cur = null; }
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g, false, W.PACE.big));
       { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt - W.PACE.look && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1.5); }   // (o-wander3: the slot is ours while it is due)
       const c0 = this.coming(now), coming = c0 && (!walking || P.since(now) < P.tgt + W.PACE.defer) ? c0 : false;   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
       const want = P.want(now, { foot: walking, busy, coming });
-      if (want !== 'moment') { const s0 = P.since(now); why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming ? 'coming:' + coming : 'wait'); }
+      if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {
@@ -551,11 +550,13 @@
           if (this.more) { this.ofs = { n: P.n, i }; this.tryT = 0; return; }
         }
         this.ofs = null; this.hiC = null;
-        this.st.quiet++; why('nostage');   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
+        this.st.quiet++; this.why('nostage', dt);   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
         return;
       }
       this.beat(air);
     }
+    // o-wander3: the instrument's count (seconds per reason; rounded in stats(): nothing allocated a frame)
+    why(k, dt) { const Y = this.st.why || (this.st.why = {}); Y[k] = (Y[k] || 0) + dt; }
     // o-wander2: is something of another source about to be seen? — a start the Regie noted that no event has shown yet
     // (≤ 15 s), or a craft of the sky traffic closing in (its nearest pass within ≈ 9 s): ours waits, no pair
     coming(now) {
@@ -793,7 +794,7 @@
       LAMP_P[0] = m.pos[0] + 1.2; LAMP_P[1] = m.pos[1] + 1.5; LAMP_P[2] = m.pos[2] + 0.4;
       LK.drawModel(this.g, r, prog(), 'wander_hlamp', LAMP_P, 0, cam, LAMP_O);
     }
-    stats() { return { beats: this.st.beats | 0, outside: this.st.outside | 0, beat: this.b ? this.b.kind : null, since: this.pacer ? +this.pacer.since(this.now).toFixed(1) : null, on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0, why: Object.assign({}, this.st.why), stage: Object.assign({}, this.st.stage) }; }
+    stats() { return { beats: this.st.beats | 0, outside: this.st.outside | 0, beat: this.b ? this.b.kind : null, since: this.pacer ? +this.pacer.since(this.now).toFixed(1) : null, on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0, why: Object.fromEntries(Object.entries(this.st.why || {}).map(([k, v]) => [k, +v.toFixed(2)])), stage: Object.assign({}, this.st.stage) }; }
     destroy() { this.endAll(); }
   };
 
