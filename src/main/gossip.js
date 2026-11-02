@@ -209,7 +209,7 @@
     const F = vil.fest;
     if (F && F.roles && V.festivalOn && V.festivalOn(vil, tod)) {
       const d = H[0];
-      if (!G.wasTold(rec, site.id, 'verse@' + day, d.id)) for (const [a, r] of F.roles) if (r === 'music' && d2(a) < 30 * 30 && !a.bubble) { G.once(rec, site.id, 'verse@' + day, d.id); say(G, a, '♪ ' + T(G.lineKey('verse', d.k, h32(hs(d.id), day)), vars(g, d, a)) + ' ♪', 7, 'verse'); return true; }
+      if (!G.wasTold(rec, site.id, 'verse@' + day, d.id)) for (const [a, r] of F.roles) if (r === 'music' && d2(a) < 20 * 20 && !a.bubble) { G.once(rec, site.id, 'verse@' + day, d.id); say(G, a, '♪ ' + T(G.lineKey('verse', d.k, h32(hs(d.id), day)), vars(g, d, a)) + ' ♪', 7, 'verse'); return true; }
     }
     // the greeting: someone near you who heard of a deed and hasn't greeted you by it
     let best = null, bd = 7 * 7;
