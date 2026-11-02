@@ -129,6 +129,7 @@ async function scenes() {
   page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 600)));
   const wait = (ms) => page.waitForTimeout(ms), ev = (fn, a) => page.evaluate(fn, a);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } for (let i = 0; i < m; i++) { window.__norender = true; g.last = performance.now() - d; g.loop(performance.now()); } window.__norender = true; }, [Math.min(10, n - k), dtms]); await wait(3); } };
+  const settle = async (max = 50) => { for (let i = 0; i < max; i++) { await step(20, 16); const s = await ev(() => { const g = VR.game, w = g.world; if (!w || g.state !== 'play') return null; const P = w.pool; return { busy: P && P.busy ? P.busy() : 0, q: w.queue ? w.queue.length : 0 }; }).catch(() => null); if (s && !s.busy && !s.q && i > 2) break; await wait(30); } };
   const loaded = async (C, r) => { for (let i = 0; i < 120; i++) { await step(10, 33); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (!w.isLoaded(C[0] + dx, C[2] + dz)) return false; return true; }, [C, r]); if (ok) return true; await wait(25); } return false; };
   const grab = async (name, frames = 4) => {
     const url = await ev((frames) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, frames);
@@ -139,11 +140,16 @@ async function scenes() {
   const shotPage = async (name) => { try { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } }); await page.screenshot({ path: SHOTS + name, timeout: 180000 }); console.log('  📷 ' + name); return SHOTS + name; } catch (e) { console.log('  !! no page shot ' + name); return null; } };
   await page.goto('file://' + ROOT + 'dist/index.html');
   for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
+  // (as test/folk3.mjs does it: Balanced, render distance 6, the smooth people, then the land settled)
+  await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.smoothFolk = true; g.applySettings('*'); });
   await ev(`VR.game.createWorld({name:'Enden',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
-  for (let i = 0; i < 400; i++) { await wait(500); if (await ev(() => VR.game.state === 'play' && !VR.game.arrival).catch(() => false)) break; await ev(() => { const g = VR.game; if (g.arrival && g.arrival.skip) try { g.arrival.skip(); } catch (e) { /* */ } }).catch(() => {}); }
+  for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state).catch(() => '') === 'play') break; }
+  await ev(() => { if (VR.Portal) VR.Portal.GATE_S = 1e9; const g = VR.game; if (g.arrival && g.arrival.skip) { try { g.arrival.skip(); } catch (e) { /* */ } } });
   await ev(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.setTime(5200); if (g.ui && g.ui.show) g.ui.show(null); });
+  await settle(30);
   let list = null;
-  for (let i = 0; i < 40 && !(list && list.length); i++) { await step(20, 33); list = await ev(() => { const g = VR.game, p = g.player.pos; return g.villages.sites.filter(s => !/^eco:/.test(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y, z: s.z, name: s.name, d: Math.round(Math.hypot(s.x - p[0], s.z - p[2])) })).sort((a, b) => a.d - b.d).slice(0, 4); }); }
+  for (let i = 0; i < 60 && !(list && list.length); i++) { await step(20, 33); list = await ev(() => { const g = VR.game, p = g.player.pos; return g.villages.sites.filter(s => !/^eco:/.test(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y, z: s.z, name: s.name, d: Math.round(Math.hypot(s.x - p[0], s.z - p[2])) })).sort((a, b) => a.d - b.d).slice(0, 4); }); }
+  if (!(list && list.length)) console.log('  !! no village sites: ' + JSON.stringify(await ev(() => { const g = VR.game; return { dim: g.dim, st: g.state, V: !!g.villages, n: g.villages ? g.villages.sites.length : -1, pos: g.player.pos.map(Math.round), arrival: !!g.arrival }; })));
   let HV = null, HP = null;
   for (const cand of list || []) {
     HV = cand; HP = null;
@@ -240,11 +246,12 @@ if (want('calm')) {
   if (B) console.log(`  message-seconds: before ${B.msgSecs} (${B.samples} samples) · after ${A.msgSecs} (${A.samples}); distinct ${B.distinct} → ${A.distinct}; duplicates ${B.dups} → ${A.dups}`);
 }
 if (want('bubbles') || want('endings')) await scenes();
+if (ONLY) { try { const old = JSON.parse(fs.readFileSync(SHOTS + 'quiet2_probe.json', 'utf8')); for (const k in old) if (!(k in OUT)) OUT[k] = old[k]; } catch (e) { /* the first run */ } }
 fs.writeFileSync(SHOTS + 'quiet2_probe.json', JSON.stringify(OUT, null, 1));
 try {
   const S = (OUT.scenes && OUT.scenes.shots) || {};
   const rows = [];
-  if (fs.existsSync(SHOTS + 'quiet2_before_t3.png')) rows.push({ label: 'vorher | nachher — Abenteuer nach 2½ min: der ✨/⚔-Zeiger, die Meldungen', imgs: [SHOTS + 'quiet2_before_t3.png', SHOTS + 'quiet2_after_t3.png'] });
+  if (fs.existsSync(SHOTS + 'quiet2_before_t3.png')) rows.push({ label: 'vorher | nachher — Abenteuer nach 2½ min: die Wegzeiger oben, die Meldungen links', imgs: [SHOTS + 'quiet2_before_t3.png', SHOTS + 'quiet2_after_t3.png'] });
   if (fs.existsSync(SHOTS + 'quiet2_before_t2.png')) rows.push({ label: 'vorher | nachher — nach 100 s', imgs: [SHOTS + 'quiet2_before_t2.png', SHOTS + 'quiet2_after_t2.png'] });
   if (S.bubbles) rows.push({ label: 'sechs reden zugleich: zwei Sprechblasen, der Rest 💬', imgs: [S.bubbles] });
   if (S.lost_come || S.lost) rows.push({ label: 'Das verirrte Kind: es läuft der Freundin in die Arme', imgs: [S.lost_come, S.lost].filter(Boolean) });
