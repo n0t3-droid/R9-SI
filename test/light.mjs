@@ -96,7 +96,7 @@ const sunNow = () => ev(() => VR.game.env.E.sunDir.slice());
 const EVE = 13900;
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 const meanL = async (f) => { try { const s = await sharp(f).stats(); return +(0.2126 * s.channels[0].mean + 0.7152 * s.channels[1].mean + 0.0722 * s.channels[2].mean).toFixed(2); } catch (e) { return null; } };
-const stat = () => ev(() => { const g = VR.game, r = g.renderer, f = r.lfField, E = g.env.E, V = g.villages; let car = 0; if (V) for (const a of V.agents) if (a.drawn && a.street && VR.LField.carrier(a)) car++; return { lights: f ? f.stats.lights : 0, dyn: f ? f.stats.dyn : 0, night: +(E.night || 0).toFixed(2), carriers: car, live: !!r.lfLive, jsms: VR.LField.cost.last ? +VR.LField.cost.last.toFixed(2) : null, tod: g.env.timeOfDay | 0 }; });
+const stat = () => ev(() => { const g = VR.game, r = g.renderer, f = r.lfField, E = g.env.E, V = g.villages; let car = 0; if (V) for (const a of V.agents) if (a.drawn && a.street && VR.LField.carrier(a)) car++; return { lights: f ? f.stats.lights : 0, dyn: f ? f.stats.dyn : 0, night: +(E.night || 0).toFixed(2), carriers: car, live: !!r.lfLive, jsms: VR.LField.cost.last ? +VR.LField.cost.last.toFixed(2) : null, jsAvg: +(VR.LField.cost.ms || 0).toFixed(2), tod: g.env.timeOfDay | 0, err: VR.LField.err || null, kinds: (() => { if (!f) return null; const c = {}; for (let i = 0; i < f.em.length; i++) if (f.em[i]) { const s = g.world.getBlock(f.tx[i], f.emY[i], f.tz[i]), n = s ? VR.R.types[VR.R.T.type[s]].name : '?'; c[n] = (c[n] || 0) + 1; } return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0] + ' ' + e[1]).join(', '); })() }; });
 const fest = (on, off) => ev(([on, off]) => { const g = VR.game, M = g.villages, day = g.env.day || 0; for (const v of M.known.values()) { if (v.id === on) v.festOff = (3 - (day % 3)) % 3; else if (off === 'all' || v.id === off) v.festOff = (4 - (day % 3)) % 3; } }, [on, off]);
 const carrierNear = (C) => ev((C) => { const g = VR.game, V = g.villages; let best = null, bd = 1e9; for (const a of V.agents) { if (!a.street || a.kid || !VR.LField.carrier(a)) continue; const d = Math.hypot(a.pos[0] - C[0], a.pos[2] - C[1]); if (d < bd) { bd = d; best = { p: a.pos.slice(), yaw: a.yaw, d }; } } return best; }, C);
 
@@ -134,7 +134,7 @@ try {
     const C = vS.h ? [vS.h[0] + 0.5, vS.h[1] + 0.5] : [vS.c[0] + 8, vS.c[1]];
     const y = (await top(C[0], C[1])) + 1;
     const f = await director([C[0], y, C[1]], 4, 1.4, 1.5);
-    views.push({ name: 'street', P: f.P, T: f.T, tod: EVE, prep: async () => { await fest(vF ? vF.id : null, vS.id === (vF && vF.id) ? null : vS.id); await run(60); } });
+    views.push({ name: 'street', P: f.P, T: f.T, tod: EVE, prep: async () => { await fest(vF && vF.id !== vS.id ? vF.id : null, vS.id); await run(60); } });   // (the street's village not celebrating)
     if (want('carry')) views.push({ name: 'carry', tod: EVE, dyn: async () => {
       const a = await carrierNear(C); if (!a) return null;
       const yw = a.yaw || 0, P = [a.p[0] - Math.sin(yw) * 4.5 + Math.cos(yw) * 2, a.p[1] + 2.2, a.p[2] - Math.cos(yw) * 4.5 - Math.sin(yw) * 2];
@@ -155,8 +155,11 @@ try {
     }
     if (s && s.y !== null) {
       await camAt([s.x + 0.5, s.y + 30, s.z + 0.5], [s.x + 6, s.y, s.z], NIGHT); await settle(30); await run(30);
+      // (run 1: the director's frame stood inside a mushroom's cap — a ring of places 12 m out, 6 m up: the first whose
+      // eye is in the air and sees the site's middle)
       let f = null;
-      for (const k of [1.6, 1.3, 1.0]) { f = await director([s.x + 0.5, s.y, s.z + 0.5], 3.5, k, 1.5); const clear = await ev(([P, T]) => { const F3 = VR.Folk3, so = F3.solidW(VR.game.world); return F3.lineFirst(so, T, P) === Infinity; }, [f.P, f.T]); if (clear) break; }
+      for (let j = 0; j < 12 && !f; j++) { const a = j / 12 * Math.PI * 2, P = [s.x + 0.5 + Math.cos(a) * 12, s.y + 6, s.z + 0.5 + Math.sin(a) * 12], T = [s.x + 0.5, s.y + 1, s.z + 0.5]; const ok = await ev(([P, T]) => { const g = VR.game, w = g.world, F3 = VR.Folk3, so = F3.solidW(w); for (let dy = -1; dy <= 1; dy++) if (w.getBlock(Math.floor(P[0]), Math.floor(P[1]) + dy, Math.floor(P[2]))) return false; return F3.lineFirst(so, T, P) === Infinity && F3.lineFirst(so, P, T) === Infinity; }, [P, T]); if (ok) f = { P, T }; }
+      if (!f) f = { P: [s.x + 0.5, s.y + 14, s.z + 12.5], T: [s.x + 0.5, s.y + 1, s.z + 0.5] };
       views.push({ name: 'fairy', P: f.P, T: f.T, tod: NIGHT, prep: async () => { await run(60); } });
     } else check(false, 'a fairy place');
   }
@@ -194,7 +197,7 @@ try {
     }, G);
     console.log('     home ' + JSON.stringify(B));
     await settle(40);
-    const P = [B.x0 - 4, B.y0 + 3.4, B.z0 - 15], T = [B.x0 + 4, B.y0 + 0.6, B.z0 - 2];
+    const P = [B.x0 - 2, Math.max(B.y0 + 5, (await top(B.x0 - 2, B.z0 - 14)) + 3.5), B.z0 - 14], T = [B.x0 + 4, B.y0 + 0.5, B.z0 - 1];
     views.push({ name: 'home', P, T, tod: NIGHT, prep: async () => { await run(10); } });
   }
   // ---------------------------------------------------------------- the pictures: all befores, then all afters
