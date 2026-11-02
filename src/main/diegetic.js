@@ -153,7 +153,7 @@ html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-sa
 #wanderbuch .dgleaf.fw{animation:dgturn .55s ease-in-out forwards}#wanderbuch .dgleaf.bw{left:14px;transform-origin:100% 50%;border-radius:8px 2px 2px 8px;animation:dgturnb .55s ease-in-out forwards}
 @keyframes dgturn{0%{transform:rotateY(0)}100%{transform:rotateY(-178deg);opacity:.2}}@keyframes dgturnb{0%{transform:rotateY(0)}100%{transform:rotateY(178deg);opacity:.2}}
 html.a11y-less #wanderbuch .dgbook,html.a11y-less #wanderbuch .dgleaf{animation:none!important}html.a11y-less #wanderbuch .dgleaf{display:none}
-#wanderbuch .dgmap{display:block;width:100%;aspect-ratio:1;border-radius:6px 10px 7px 12px/10px 6px 12px 7px;border:2px solid rgba(59,42,26,.6)}
+#wanderbuch .dgmap{display:block;width:min(100%,44vh);margin:0 auto;aspect-ratio:1;border-radius:6px 10px 7px 12px/10px 6px 12px 7px;border:2px solid rgba(59,42,26,.6)}
 #wanderbuch .dgboard{position:relative;height:min(300px,30vh);margin-top:6px;border:2px dashed rgba(106,61,28,.35);border-radius:12px;cursor:crosshair;overflow:hidden}
 #wanderbuch .dgboard .stk{position:absolute;font-size:34px;line-height:1;transform:translate(-50%,-50%) rotate(var(--r,0deg));filter:drop-shadow(1px 2px 0 #fff) drop-shadow(-1px -1px 0 #fff) drop-shadow(0 2px 3px rgba(0,0,0,.3));cursor:pointer;user-select:none}
 #wanderbuch .dgtray{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#wanderbuch .dgtray button{font-size:22px;width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(59,42,26,.45);background:rgba(255,255,255,.4);cursor:pointer}
@@ -245,13 +245,18 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       }
       const ring = S.roseEl.firstChild, yaw = p.yaw || 0, deg = (r) => ((r * 180 / Math.PI) % 360).toFixed(0);
       const gT = S.roseEl.querySelector('.goal'), wT = S.roseEl.querySelector('.wp');
-      let k = deg(yaw);
-      ring.style.transform = 'rotate(' + k + 'deg)';
-      for (const sp of ring.children) { const i = ['n', 'e', 's', 'w'].indexOf(sp.className); sp.style.transform = `rotate(${i * 90}deg) translateY(calc(-32px*var(--ux-scale,1) + 9px)) rotate(${-i * 90 - (+k)}deg)`; }
-      if (S.goal) { const a = Math.atan2(S.goal.x - p.pos[0], -(S.goal.z - p.pos[2])); gT.style.display = 'block'; gT.style.transform = 'rotate(' + deg(a + yaw) + 'deg)'; k += 'g' + deg(a); } else gT.style.display = 'none';
+      const ga = S.goal ? Math.atan2(S.goal.x - p.pos[0], -(S.goal.z - p.pos[2])) : null;
       const gad = g.gadgets; let best = null, bd = 1e18;
       if (gad && gad.waypoints) for (const wp of gad.waypoints) { const d = (wp.x - p.pos[0]) ** 2 + (wp.z - p.pos[2]) ** 2; if (d < bd) { bd = d; best = wp; } }
-      if (best) { const a = Math.atan2(best.x - p.pos[0], -(best.z - p.pos[2])); wT.style.display = 'block'; wT.style.transform = 'rotate(' + deg(a + yaw) + 'deg)'; } else wT.style.display = 'none';
+      const wa = best ? Math.atan2(best.x - p.pos[0], -(best.z - p.pos[2])) : null, k = deg(yaw);
+      const key = k + '|' + (ga === null ? '-' : deg(ga + yaw)) + '|' + (wa === null ? '-' : deg(wa + yaw));
+      if (key !== S.roseK) {   // (written only when it turned a degree)
+        S.roseK = key;
+        ring.style.transform = 'rotate(' + k + 'deg)';
+        for (const sp of ring.children) { const i = ['n', 'e', 's', 'w'].indexOf(sp.className); sp.style.transform = `rotate(${i * 90}deg) translateY(calc(-32px*var(--ux-scale,1) + 9px)) rotate(${-i * 90 - (+k)}deg)`; }
+        if (ga !== null) { gT.style.display = 'block'; gT.style.transform = 'rotate(' + deg(ga + yaw) + 'deg)'; } else gT.style.display = 'none';
+        if (wa !== null) { wT.style.display = 'block'; wT.style.transform = 'rotate(' + deg(wa + yaw) + 'deg)'; } else wT.style.display = 'none';
+      }
       if (S.goal) S.roseEl.title = T('g.ux.rose.goal', { name: S.goal.label || '', d: fmtD(S.goalD) });
     }
     // the vitals
@@ -320,8 +325,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       if (S.hp >= 0 && h !== S.hp && !p.dead) pulse(h < S.hp ? 'hurt' : 'heal');
       S.hp = h;
     } else S.hp = -1;
-    S.acc += dt;
-    if (S.acc >= 0.25) { S.acc = 0; try { slow(g); } catch (e) { if (!D.warned) { D.warned = true; console.warn('diegetic', e); } } }
+    if (t0 - S.acc >= 250) { S.acc = t0;   // (4 Hz of real time: the game's dt is clamped, a slow frame must not stall it) try { slow(g); } catch (e) { if (!D.warned) { D.warned = true; console.warn('diegetic', e); } } }
     trailFrame(g, dt);
     signFrame(g);
     const ms = now() - t0, C = D.cost; C.frames++; C.ms += ms; if (ms > C.worst) C.worst = ms;
