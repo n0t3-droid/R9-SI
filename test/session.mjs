@@ -467,7 +467,8 @@ function pageHelpers(win, VRx) {
       if (d > 3.6) { go(spot[0], spot[1], 0.8); aim(p, c, dt, 0); p.pitch += (Math.atan2(c[1] - p.pos[1] - 1.62, Math.max(1, d)) - p.pitch) * Math.min(1, dt * 4); return; }
       I.keys.delete('KeyW'); aim(p, c, dt, 5);
       A.clickT -= dt;
-      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; I.mouse.releasedBtn[0] = true; I.dragStart = null; A.clickT = 0.42;   /* a-story5 (R55-16): a press and its release — headless has no pointer lock, drag-look counts a click on release */ A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1; }
+      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; I.mouse.releasedBtn[0] = true; I.dragStart = null; A.clickT = 0.42;   /* a-story5 (R55-16): a press and its release — headless has no pointer lock, drag-look counts a click on release */ A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1;
+        /* f-polish10: why a click misses — the game's own ray at the click */ { const hr = En.rayEntity(p.eyePos(), p.lookDir(), 4.2), bd = p.target ? p.target.dist : 99, e = hr && hr.ent; const why = !hr ? 'none' : e !== m ? 'other:' + ((e.def && e.def.companion) ? 'companion' : (e.kind || (e.foe && e.foe.k) || '?')) : hr.dist > bd ? 'block' : g.ui.blocking ? 'ui' : 'ok'; const M2 = A.miss || (A.miss = {}); M2[why] = (M2[why] | 0) + 1; if (!hr || e !== m) { const dv = p.lookDir(), ex = p.eyePos(), tx = c[0] - ex[0], ty = c[1] - ex[1], tz = c[2] - ex[2], tl = Math.hypot(tx, ty, tz) || 1; const ang = Math.acos(Math.max(-1, Math.min(1, (dv[0] * tx + dv[1] * ty + dv[2] * tz) / tl))); (A.missAng || (A.missAng = [])).push(+(ang * 57.3).toFixed(0) + '/' + tl.toFixed(1)); if (A.missAng.length > 20) A.missAng.shift(); } } }
       if (A.hp0 !== undefined && m.foe.hp < A.hp0) { A.hits++; A.hp0 = undefined; }
       if (A.hitAsk > 40 && A.hits === 0) { fall('melee never lands'); Fo.hurtMob ? En.hurtMob(m, 4, p.pos) : 0; A.hitAsk = 0; }
       return;
@@ -577,7 +578,7 @@ function pageHelpers(win, VRx) {
     return { miss, dirty };
   };
   S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
-  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { plans: S.ad.plans | 0, noway: S.ad.noway | 0, ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, trace: S.ad.trace || [] } : null }; };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null, ad: S.ad ? { plans: S.ad.plans | 0, noway: S.ad.noway | 0, ph: S.ad.ph, fought: S.ad.fought, calmed: S.ad.calmed, hits: S.ad.hits, turns: S.ad.turns, freed: S.ad.freed, sites: S.ad.sites, why: S.ad.why || '', fallbacks: S.ad.fallbacks.slice(-12), fx: S.ad.fx, miss: S.ad.miss || null, missAng: S.ad.missAng || null, trace: S.ad.trace || [] } : null }; };
   return S;
 }
 
@@ -1017,7 +1018,7 @@ try {
       check(beats / (R.played / 600) >= 1, `adventurer: ${beats} story beat(s) in ${R.played.toFixed(0)} s (≥ 1 per 10 min)`);
       check(st.gaps.longest.d <= 60, `adventurer: the longest gap ${st.gaps.longest.d.toFixed(0)} s (≤ 60)`);
       const op = (R.parts.find(q => q.name === 'outpost') || {}).status, ad = op && op.ad;
-      check(!!ad && ad.fought >= 1 && ad.calmed >= 1 && ad.freed, `adventurer: at the outpost — ${ad ? ad.fought : 0} fought (${ad ? ad.hits : 0} hits), ${ad ? ad.calmed : 0} calmed, ${ad && ad.freed ? 'freed' : 'not freed'} (${ad ? JSON.stringify(ad.fallbacks) : '-'})`);
+      check(!!ad && ad.fought >= 1 && ad.calmed >= 1 && ad.freed, `adventurer: at the outpost — ${ad ? ad.fought : 0} fought (${ad ? ad.hits : 0} hits), ${ad ? ad.calmed : 0} calmed, ${ad && ad.freed ? 'freed' : 'not freed'} (${ad ? JSON.stringify(ad.fallbacks) : '-'}; clicks ${ad ? JSON.stringify(ad.miss) : '-'} ${ad ? JSON.stringify(ad.missAng) : ''})`);
       const fx = ad && ad.fx;
       if (fx && fx.n) check(fx.cover / fx.n <= 0.1, `adventurer: Funke or its bubble over the machine in ${fx.cover} of ${fx.n} fight samples (≤ 10 %; the worst overlap ${fx.worst})`);
     }

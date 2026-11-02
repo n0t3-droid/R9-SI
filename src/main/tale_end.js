@@ -119,12 +119,15 @@
       let shot = null;
       try { if (F3 && F3.frameGroup) { const E = g.env, sun = E && E.sunDir ? Math.atan2(E.sunDir[2], E.sunDir[0]) : null; const ax = Math.atan2(to[1] - m.friend[1], to[0] - m.friend[0]), toYou = Math.atan2(p[2] - mid[2], p[0] - mid[0]), s1 = ax + Math.PI / 2, s2 = ax - Math.PI / 2;
           const pref = pt ? (Math.cos(s1 - toYou) >= Math.cos(s2 - toYou) ? s1 : s2) : toYou;   // (the pair from the side, on your side; the friend alone: from you)
+          const kneel = plan.touch === 'hug' && pt && !!pt.kid !== !!gv.kid, HS = kneel ? (gv.kid ? TE.hugShot(to, m.friend) : TE.hugShot(m.friend, to)) : null;   // (f-polish10: the kneeling hug from the child's face)
+          const fo = (x) => HS ? Object.assign({ sun }, HS, x || {}) : Object.assign({ pref, sun }, x || {});
           const avoid = []; for (const a of V.agents) if (a !== gv && a !== pt && Math.abs(a.pos[0] - mid[0]) < 12 && Math.abs(a.pos[2] - mid[2]) < 12) avoid.push([a.pos[0], a.pos[2]]);   // (nobody else before the lens)
           if (pt) {
             const so = solidOf(g, mid);   // (f-polish9: the palms' fronds too)
-            shot = F3.frameGroup(so, mid, 0.9, { pref, sun, avoid });
-            if (!shot && avoid.length) shot = F3.frameGroup(so, mid, 0.9, { pref, sun });
-            if (!shot) { shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun, avoid }); if (shot) TE.stats.frondFallback = (TE.stats.frondFallback | 0) + 1; }
+            shot = F3.frameGroup(so, mid, 0.9, fo({ avoid }));
+            if (!shot && avoid.length) shot = F3.frameGroup(so, mid, 0.9, fo());
+            if (!shot) { shot = F3.frameGroup(solidOf(g), mid, 0.9, fo({ avoid })); if (shot) TE.stats.frondFallback = (TE.stats.frondFallback | 0) + 1; }
+            if (shot && HS) TE.stats.hugFront = (TE.stats.hugFront | 0) + 1;
           } } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, pt ? 1.1 : 0.7, (innerWidth || 16) / (innerHeight || 9)) : null }; }
       if (shot) C.aside = TE.asideOf(V.agents, [gv, pt], shot.P, mid);   // (f-polish9: nobody's head in the picture's corner)
@@ -170,6 +173,13 @@
   };
   // f-polish9: the two embraces of the pair (FA.embrace's o, blocks): the gap between them; an adult kneels to a child,
   // its arms round the child's back, the child's round its shoulders; two adults (or two children) chest to chest
+  // f-polish10: the kneeling hug's lens — where the child looks (it faces the adult), 35° to the child's left where its head
+  // passes the adult's (FA.embrace: each head tips to its own left), low at the kneeling pair's eyes, aimed at their heads;
+  // it outweighs the sun's side (run 1 of f-polish9 filmed the adult's back)
+  TE.hugShot = function (ad, kid) {
+    const fw = Math.atan2(ad[1] - kid[1], ad[0] - kid[0]);
+    return { pref: fw - 0.6, prefW: 4, ty: 0.75, hs: [0.45, 0.75, 0.2] };
+  };
   TE.hugOf = function (a, b) {
     const gap = Math.max(0.15, Math.min(0.6, Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2])));
     const one = (me, other) => {

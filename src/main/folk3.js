@@ -106,10 +106,11 @@
   // else between the group and the lens — f-quiet2)}
   F3.frameGroup = function (solid, C, r, o) {
     o = o || {};
-    const d = clamp(2.2 * r + 1.5, 3.5, 9), T = [C[0], C[1] + 0.9, C[2]];
+    const d = clamp(2.2 * r + 1.5, 3.5, 9), T = [C[0], C[1] + (o.ty !== undefined ? o.ty : 0.9), C[2]];   // (f-polish10: o.ty — the aim's height, o.hs — the lens heights, o.prefW — how much the preferred side weighs)
     const op = { d, dMax: d + 1.5, mins: [Math.max(3, d - 2.5), 2.2, 1.4], lens: o.lens || F3.LENS, avoid: o.avoid || null };   // (f-quiet2: avoid — others not in front of the lens, as F3.frame)
     const rays = [];
-    for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; for (const h of [0.8 + 0.4 * r, 1.6 + 0.5 * r, 0.5]) rays.push([a, h, (o.pref !== undefined ? (1 - Math.cos(a - o.pref)) * 1.6 : 0) + sunPen(a, o.sun) * 1.5 + Math.abs(h - 0.8 - 0.4 * r) * 0.3]); }
+    const hs = o.hs || [0.8 + 0.4 * r, 1.6 + 0.5 * r, 0.5], pw = o.prefW || 1.6;
+    for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; for (const h of hs) rays.push([a, h, (o.pref !== undefined ? (1 - Math.cos(a - o.pref)) * pw : 0) + sunPen(a, o.sun) * 1.5 + Math.abs(h - hs[0]) * 0.3]); }
     return best(solid, T, rays, op);
   };
 
