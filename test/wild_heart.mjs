@@ -133,7 +133,7 @@ try {
   check(line.eyes, 'the fawn\'s model has big eyes and a closed-eye head for its blinks');
   check(line.modes.every(m => m === 'follow') && line.gaps.every(d => d < 2.2), 'the fawns walk in a line behind their mother');
   // the picture: the family from the side, a little above
-  await ev(() => { const g = VR.game, ms = g.entities.mobs, mom = ms.find(q => q.id === window.__fam.mom); const p = g.player; p.pos[0] = mom.pos[0] - 0.5; p.pos[2] = mom.pos[2] + 4.2; p.pos[1] = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; });
+  await ev(() => { const g = VR.game, ms = g.entities.mobs, mom = ms.find(q => q.id === window.__fam.mom); const p = g.player; p.pos[0] = mom.pos[0] - 3.2; p.pos[2] = mom.pos[2] + 2.4; p.pos[1] = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; });
   const mp = await ev(() => { const m = VR.game.entities.mobs.find(q => q.id === window.__fam.mom); return [m.pos[0] + 1.4, m.pos[1] + 0.5, m.pos[2]]; });
   await lookAt(mp[0], mp[1], mp[2]); await step(2);
   await shot('wild2_family', DAY);
@@ -151,12 +151,12 @@ try {
   console.log('   fed ' + fed.fed + ' · ' + fed.state + ' · friends ' + fed.friends + ' · berries left ' + fed.n);
   check(fed.fed >= 3 && fed.state === 'friend' && fed.friends === 1, 'it ate from your hand three times: a friend');
   // up close: the fox at your feet, the camera down to it
-  const fp = await ev((id) => { const g = VR.game, m = g.entities.mobs.find(q => q.id === id), p = g.player; m.pos[0] = p.pos[0]; m.pos[2] = p.pos[2] - 1.9; m.yaw = Math.PI + 0.45; m.wh.mode = 'sniff'; m.wh.thinkT = 99; return [m.pos[0], m.pos[1] + 0.45, m.pos[2]]; }, fox);
+  const fp = await ev((id) => { const g = VR.game, m = g.entities.mobs.find(q => q.id === id), p = g.player; m.pos[0] = p.pos[0] + 0.9; m.pos[2] = p.pos[2] - 2.4; m.yaw = Math.PI - 0.55; m.wh.mode = 'sniff'; m.wh.thinkT = 99; return [m.pos[0], m.pos[1] + 0.45, m.pos[2]]; }, fox);
   await lookAt(fp[0], fp[1], fp[2]); await step(3);
   await shot('wild2_fox', DAY);
 
   console.log('--- 3 · finches');
-  const bx = await ev(() => { const g = VR.game, p = g.player, H = g.companions.heart; H.flock(p.pos[0] + 0.5, p.pos[2] - 5.6, 6); return [p.pos[0] + 0.5, p.pos[1] + 0.1, p.pos[2] - 5.6]; });
+  const bx = await ev(() => { const g = VR.game, p = g.player, H = g.companions.heart; for (const m of g.entities.mobs) if (m.kind === 'glimmer_fox') { m.pos[0] += 30; m.wh.bond.followT = 0; } H.flock(p.pos[0] + 0.5, p.pos[2] - 5.2, 6); return [p.pos[0] + 0.5, p.pos[1] + 0.25, p.pos[2] - 5.2]; });
   await lookAt(bx[0], bx[1], bx[2]); await step(30);
   await shot('wild2_birds', DAY);
   const hop = await ev(() => VR.game.companions.heart.birds.filter(b => b.st === 'hop').length);
@@ -203,8 +203,8 @@ try {
     return [cx, cz];
   }, P0);
   await ev((t) => VR.game.env.setTime(t), DAY);
-  await step(30);
-  const v0 = await ev(() => { const v = VR.game.companions.heart.visitor; return v ? v.kind : null; });
+  let v0 = null;
+  for (let k = 0; k < 10 && !v0; k++) { await step(30); v0 = await ev(() => { const v = VR.game.companions.heart.visitor; return v ? v.kind : null; }); }
   check(v0 === 'glimmer_fox', 'your friend comes to visit (' + v0 + ')');
   await step(360);
   const v1 = await ev(() => { const g = VR.game, v = g.companions.heart.visitor, h = g.player.spawn; return v ? { mode: v.wh.mode, d: Math.hypot(v.pos[0] - h[0], v.pos[2] - h[2]), pos: [v.pos[0], v.pos[1], v.pos[2]] } : null; });

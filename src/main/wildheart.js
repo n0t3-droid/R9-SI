@@ -28,7 +28,7 @@
     glimmer_deer: [[1, 3, 3, 0, -1], [4, 3, 3, 0, -1]],
     moss_boar: [[1, 4, 0, 1, 0], [6, 4, 0, -1, 0]],
     bloom_sheep: [[1, 3, 0, -1, 0], [4, 3, 0, 1, 0]],
-    glimmer_fox: [[2, 4, 4, 0, -1], [6, 4, 4, 0, -1]],
+    glimmer_fox: [[2, 4, 4, 0, 1, 1], [6, 4, 4, 0, 1, 1]],   // (6th: the catchlight's cell — up front when the eye grows backward)
     moss_cat: [[2, 4, 1, -1, 0], [5, 4, 1, 1, 0]],
     crystal_pup: [[2, 5, 1, -1, 0], [5, 5, 1, 1, 0]],
   };
@@ -82,7 +82,8 @@
           let z = z0; while (i > 0 && !filled(head, x, y, z) && z < z0 + 2) z++;   // (a round face: the eye's cell one deeper)
           if (!filled(head, x, y, z) && i > 0) return;
           const g3 = filled(head, cells[3][0], cells[3][1], cells[3][2]) || filled(head, cells[3][0], cells[3][1], cells[3][2] + 1);
-          head.set(x, y, z, i === 3 || (i === 1 && !g3) ? 0xffffff : ec, 0);   // the catchlight: up front, or on top
+          const cl = e.length > 5 ? e[5] : g3 ? 3 : 1;
+          head.set(x, y, z, i === cl ? 0xffffff : ec, 0);   // the catchlight: up front, or on top
           shut.set(x, y, z, i === 0 || i === 2 ? B.mix(lid, 0x000000, 0.25) : lid, 0);
         });
       }
@@ -424,10 +425,11 @@
       // lying down (dusk): legs folded, the body lowered; a happy wiggle rolls the body
       if (rest) {
         const L = h.legs; P.leg_fl = put(L[0], 1.4, 0, 0, 0, 0, 0, 1); P.leg_fr = put(L[1], 1.4, 0, 0, 0, 0, 0, 1); P.leg_bl = put(L[2], -1.4, 0, 0, 0, 0, 0, 1); P.leg_br = put(L[3], -1.4, 0, 0, 0, 0, 0, 1);
-        P.body = put(h.pb, 0, 0, 0, 0, -3, 0, 1);
-        P.head[4] -= 3;
-        P.ear_l[4] -= 3; P.ear_r[4] -= 3;
-        if (P.tail) P.tail[4] -= 3;
+        const dn = m.kind === 'glimmer_deer' ? -5.5 : m.kind === 'bloom_sheep' ? -4.5 : -3;   // (long legs: lower)
+        P.body = put(h.pb, 0, 0, 0, 0, dn, 0, 1);
+        P.head[4] += dn;
+        P.ear_l[4] += dn; P.ear_r[4] += dn;
+        if (P.tail) P.tail[4] += dn;
       } else if (h.wig > 0 || P.body) {
         const b = P.body || [0, 0, 0];
         P.body = put(h.pb, b[0] || 0, b[1] || 0, (b[2] || 0) + wig * 0.25, b[3] || 0, b[4] || 0, b[5] || 0, 1);
@@ -476,7 +478,7 @@
     draw(ent, r, p, cam, t) {
       if (!this.on || !this.birds.length) return;
       const model = VR.getVoxModel(r.gl, 'wh_finch'); if (!model) return;
-      const pos = this.bpos || (this.bpos = [0, 0, 0]), opts = this.bopts || (this.bopts = { scale: 1, shade: 0 });
+      const pos = this.bpos || (this.bpos = [0, 0, 0]), opts = this.bopts || (this.bopts = { scale: 1.35, shade: 0 });
       for (const b of this.birds) {
         const dx = b.x - cam.x, dz = b.z - cam.z; if (dx * dx + dz * dz > 80 * 80) continue;
         const P = b.P, fly = b.st === 'fly' || b.air;
