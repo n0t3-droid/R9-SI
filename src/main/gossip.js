@@ -271,24 +271,21 @@
       const y = MI.groundAt(w, sx, door[1] + 14, sz, 30); if (y !== null && y !== undefined) start = [sx + 0.5, y, sz + 0.5];
     }
     if (!start) return false;
-    let a = live, guest = false, pOrig = null;
-    if (a) {   // their village is awake: the real one comes (with a basket while they visit); unseen, from the way's start
-      pOrig = a.p; a.p = Object.assign({}, a.p, { look: a.p.look ? Object.assign({}, a.p.look, { tool: 'basket' }) : a.p.look }); a.fg = null;
-      if (a.drawn === false || Math.hypot(a.pos[0] - door[0], a.pos[2] - door[2]) > 60) { a.pos = start.slice(); a.vel = [0, 0, 0]; }
-    } else {
-      const look = person.look ? Object.assign({}, person.look, { tool: 'basket' }) : person.look;
-      a = new proto.constructor(vil, Object.assign({}, person, { look }), start); a.guest = true; guest = true;
-      V.agents.push(a);
-    }
+    // always a guest of their own (with a basket); the real one, if awake here, steps aside until the visit ends
+    let stash = null;
+    if (live) { const i = V.agents.indexOf(live); if (i >= 0) V.agents.splice(i, 1); const j = live.vil && live.vil.agents ? live.vil.agents.indexOf(live) : -1; if (j >= 0) live.vil.agents.splice(j, 1); stash = { a: live, pos: live.pos.slice() }; }
+    const look = person.look ? Object.assign({}, person.look, { tool: 'basket' }) : person.look;
+    const a = new proto.constructor(vil, Object.assign({}, person, { look, town: undefined }), start), guest = true; a.guest = true;
+    V.agents.push(a);
     a.act = { type: 'gsvisit' }; a.path = null; a.goal = null; a.bubble = null; a.pose = 'stand';
-    V._gsVisit = { a, guest, pOrig, pid, f, door: door.slice(0, 3), start, gift, ph: 'walk', t: 0, given: false };
+    V._gsVisit = { lastRun: Date.now(), a, guest, stash, pid, f, door: door.slice(0, 3), start, gift, ph: 'walk', t: 0, given: false };
     G.log.push({ t: Date.now(), who: person.id, what: 'visitStart', text: 'start' });
     return true;
   };
   G.runVisit = function (V, a, dt) {
     const J = V._gsVisit, g = V.g, MI = VR.MoveIn;
     if (!J || J.a !== a) { a.act = null; return; }
-    J.t += dt;
+    J.t += dt; J.lastRun = Date.now();
     const p = g.player.pos, o = J.door, dP = Math.hypot(p[0] - a.pos[0], p[2] - a.pos[2]);
     let arrived = false;
     if (J.ph === 'walk') { arrived = V.goTo(a, o[0], o[1], o[2], 1.4); if (!arrived && J.t >= G.VISIT.walk - dt) { a.pos = [o[0] + 0.5, o[1], o[2] + 0.5]; a.path = null; } }
@@ -311,7 +308,8 @@
   G.endVisit = function (V) {
     const J = V._gsVisit; if (!J) return; V._gsVisit = null;
     const a = J.a;
-    if (J.guest) { const i = V.agents.indexOf(a); if (i >= 0) V.agents.splice(i, 1); } else { if (a.act && a.act.type === 'gsvisit') a.act = null; if (J.pOrig) { a.p = J.pOrig; a.fg = null; } }
+    const i = V.agents.indexOf(a); if (i >= 0) V.agents.splice(i, 1);
+    if (J.stash) { const r = J.stash.a; if (r.vil && r.vil.active && V.agents.indexOf(r) < 0) { V.agents.push(r); if (r.vil.agents.indexOf(r) < 0) r.vil.agents.push(r); } }
   };
   G.tick = function (V, dt) {
     const g = V.g; if (!G.on(g) || !g.player || !g.env) { G.why = 'off'; return; }
@@ -333,6 +331,7 @@
       }
       G.dinner(V, rec, tod, day);
       G.visit(V, rec, tod, day);
+      const J = V._gsVisit; if (J && Date.now() - (J.lastRun || Date.now()) > 1500) { try { G.runVisit(V, J.a, 0.5); } catch (e) { G.endVisit(V); } }   // (the guest's own update was skipped: the visit goes on)
     }
     if (t0) { const ms = performance.now() - t0; G.cost.ticks++; G.cost.ms += ms; if (ms > G.cost.worst) G.cost.worst = ms; }
   };
