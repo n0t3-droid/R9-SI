@@ -16,6 +16,7 @@ const world = { getBlock: (x, y, z) => (y < 64 ? (y === 63 ? grass : stone) : wa
 V.Folk.warm();
 const g = { world, player: { pos: [0.5, 64, 0.5] }, settings: { particles: 2, goalTrail: true }, cpuBound: false };
 const goal = { x: 0.5, z: -60 };
+D._pathFor(g, g.player, goal); D._pump();
 const way = D._pathFor(g, g.player, goal);
 check(Array.isArray(way) && way.length > 10, 'a way was found (' + (way ? way.length : 0) + ' cells)');
 if (way) {
@@ -33,17 +34,21 @@ if (way) {
 const n0 = D.cost.pathN;
 g.player.pos = [1.5, 64, -0.5]; D._pathFor(g, g.player, goal);
 check(D.cost.pathN === n0, 'moved 1.4 m: no new search (the way is trimmed to where you stand)');
-for (let k = 0; k < 8; k++) { D.state.pathT = -1e9; D.state.pFrom = null; D._pathFor(g, g.player, goal); }
+for (let k = 0; k < 8; k++) { D.state.pathT = -1e9; D.state.pFrom = null; D._pathFor(g, g.player, goal); D._pump(); }
 const ms = D.cost.pathMs / D.cost.pathN, worst = D.cost.pathWorst;
 console.log('    searches ' + D.cost.pathN + ', worst ' + worst.toFixed(2) + ' ms');
 check(ms < 8, 'one search ' + ms.toFixed(2) + ' ms (≤ 0.67 Hz: ' + (ms / 90).toFixed(3) + ' ms a frame)');
 // an open field: the way goes straight
 const open = { getBlock: (x, y, z) => (y < 64 ? stone : 0), topAt: () => 63, isLoaded: () => true };
 const g2 = { world: open, player: { pos: [0.5, 64, 0.5] }, settings: { particles: 2 } };
-D.state.pathT = -1e9;
+D.state.pathT = -1e9; D._pathFor(g2, g2.player, goal); D._pump();
 const w2 = D._pathFor(g2, g2.player, goal);
 check(w2 && D.forks(w2, 40).length === 0 && D.trailPath(w2).every(q => Math.abs(q.x - 0.5) < 0.9), 'open land: a straight way, no fork signs');
-{ let t = 0; for (let k = 0; k < 20; k++) { D.state.pathT = -1e9; D.state.pFrom = null; const a = process.hrtime.bigint(); D._pathFor(g2, g2.player, goal); t += Number(process.hrtime.bigint() - a) / 1e6; }
+{ let t = 0; for (let k = 0; k < 20; k++) { D.state.pathT = -1e9; D.state.pFrom = null; const a = process.hrtime.bigint(); D._pathFor(g2, g2.player, goal); D._pump(); t += Number(process.hrtime.bigint() - a) / 1e6; }
   check(t / 20 < 0.6, 'open land: the straight check only, ' + (t / 20).toFixed(3) + ' ms a search'); }
+{ // the search in slices: ≤ D.PATH_STEP cells a frame
+  g.player.pos = [0.5, 64, 0.5]; let worst = 0, frames = 0;
+  for (let r = 0; r < 4; r++) { D.state.pathT = -1e9; D.state.pFrom = null; D.state.q = null; D._pathFor(g, g.player, goal); while (D.state.q) { const a = process.hrtime.bigint(); D.state.q.step(D.PATH_STEP); const ms = Number(process.hrtime.bigint() - a) / 1e6; if (r > 0 && ms > worst) worst = ms; frames++; if (D.state.q.done) D.state.q = null; } }
+  check(worst < 1.5 && frames >= 4, 'the search spread over frames: ' + (frames / 4).toFixed(1) + ' frames a search, the worst slice ' + worst.toFixed(2) + ' ms'); }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

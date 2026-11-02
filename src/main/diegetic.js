@@ -74,7 +74,8 @@
   // corners, water slow, doors open. pass(s) → 0 blocked · 1 free · 2 door · 3 water; stand(s) → 1 can stand on it.
   // → { path: [[x, z, y], …] cell centres from `from`, complete, expanded } or null
   const GP = { R: 0 };
-  D.gridPath = function (getBlock, pass, stand, from, to, R, max) {
+  // D.gridBegin(…) → a search { done, result, step(n) } that goes on over frames (≤ n cells a step); D.gridPath: at once
+  D.gridBegin = function (getBlock, pass, stand, from, to, R, max) {
     R = R | 0; const N = 2 * R + 1, NN = N * N;
     if (GP.R !== R) { GP.R = R; GP.cost = new Float32Array(NN); GP.came = new Int32Array(NN); GP.hy = new Int16Array(NN); GP.st = new Uint8Array(NN); GP.hk = new Int32Array(NN * 4); GP.hv = new Float32Array(NN * 4); GP.sy = new Int16Array(NN); GP.syr = new Int16Array(NN); }
     const cost = GP.cost, came = GP.came, hy = GP.hy, st = GP.st, hk = GP.hk, hv = GP.hv;
@@ -96,10 +97,23 @@
         const ny = standAt(cx, cz, ly); if (ny === -32768 || (ny > ly && !pass(getBlock(lx, ly + 2, lz)))) { ok = false; break; }
         lx = cx; lz = cz; ly = ny; line.push([cx + 0.5, cz + 0.5, ny]);
       }
-      if (ok && line.length > 1) return { path: line, complete: true, expanded: 0, straight: true }; }
+      if (ok && line.length > 1) return { done: true, result: { path: line, complete: true, expanded: 0, straight: true }, step() { return true; } }; }
     const k0 = R * N + R; cost[k0] = 0; hy[k0] = from[1]; came[k0] = -1; st[k0] = 1; push(k0, hh(from[0], from[2]));
     let best = k0, bestH = hh(from[0], from[2]), n = 0, goal = -1;
-    while (hn > 0 && n < max && hn < hk.length - 8) {
+    const Q = { done: false, result: null, gp: GP.gen = (GP.gen || 0) + 1 };
+    const finish = () => {
+      Q.done = true;
+      const end = goal >= 0 ? goal : best; if (end === k0) return true;
+      const path = []; for (let k = end, g = 0; k >= 0 && g < NN; k = came[k], g++) path.push([((k / N) | 0) + x0 + 0.5, (k % N) + z0 + 0.5, hy[k]]);
+      path.reverse();
+      Q.result = { path, complete: goal >= 0, expanded: n };
+      return true;
+    };
+    Q.step = function (budget) {
+      if (Q.done) return true;
+      if (GP.gen !== Q.gp) { Q.done = true; return true; }   // (a newer search took the arrays)
+      const lim = Math.min(max, n + budget);
+    while (hn > 0 && n < lim && hn < hk.length - 8) {
       const k = pop(); if (st[k] === 2) continue; st[k] = 2; n++;
       const cx = ((k / N) | 0) + x0, cz = (k % N) + z0, cy = hy[k];
       const ddx = cx - tx, ddz = cz - tz; if (ddx * ddx + ddz * ddz <= near2) { goal = k; break; }
@@ -116,11 +130,12 @@
         cost[nk] = nc; came[nk] = k; hy[nk] = ny; st[nk] = 1; push(nk, nc + hh(nx, nz));
       }
     }
-    const end = goal >= 0 ? goal : best; if (end === k0) return null;
-    const path = []; for (let k = end, g = 0; k >= 0 && g < NN; k = came[k], g++) path.push([((k / N) | 0) + x0 + 0.5, (k % N) + z0 + 0.5, hy[k]]);
-    path.reverse();
-    return { path, complete: goal >= 0, expanded: n };
+      if (goal >= 0 || !(hn > 0) || n >= max || hn >= hk.length - 8) return finish();
+      return false;
+    };
+    return Q;
   };
+  D.gridPath = function (getBlock, pass, stand, from, to, R, max) { const q = D.gridBegin(getBlock, pass, stand, from, to, R, max); while (!q.done) q.step(1e9); return q.result; };
   // the Wegweiser at a fork: where the way turns more than 35° (over 3 m before and after: the grid's staircase is no
   // turn), the sharpest point of each bend, ≥ 8 m apart, at most two, 4 m on
   D.FORK_DEG = 35;
@@ -382,20 +397,30 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   // moved 3 m or the goal moved 2 m, at most every 1.5 s, ≤ 700 cells (400 when the main thread is the bottleneck)
   D.decals = true; D.paths = true;   // (false: the f-ux trail — round dots on the straight line; test/ux2_shots.mjs's „before“)
   D.PATH_REACH = 32; D.PATH_MAX = 900;
+  // the search goes on a little each frame (≤ D.PATH_STEP cells: ≈ 0.2–0.4 ms), the old way stays until the new one is found
+  D.PATH_STEP = 120;
+  function pump(n) {
+    const q = S.q; if (!q) return;
+    const t1 = now(), done = q.step(n), ms = now() - t1;
+    D.cost.pathMs = (D.cost.pathMs || 0) + ms; if (ms > (D.cost.pathWorst || 0)) D.cost.pathWorst = ms;
+    if (done) { S.q = null; const r = q.result; S.poly = r && r.path && r.path.length > 1 ? r.path : null; S.polyV = (S.polyV || 0) + 1; }
+  }
+  D._pump = () => { while (S.q) pump(1e9); };
   function pathFor(g, p, goal) {
     const F = VR.Folk, w = g.world;
     if (!F || !F.passable || !F.standable || !w || !w.getBlock || (F.warmed && !F.warmed())) return null;
     const px = p.pos[0], pz = p.pos[2], t = now();
     const moved = S.pFrom ? Math.hypot(px - S.pFrom[0], pz - S.pFrom[1]) : 1e9, gm = S.pGoal ? Math.hypot(goal.x - S.pGoal[0], goal.z - S.pGoal[1]) : 1e9;
     if ((moved > 3 || gm > 2 || S.pW !== w) && t - (S.pathT || -1e9) > 1500) {
-      S.pathT = t; S.pFrom = [px, pz]; S.pGoal = [goal.x, goal.z]; S.pW = w; S.poly = null;
+      S.pathT = t; S.pFrom = [px, pz]; S.pGoal = [goal.x, goal.z]; S.pW = w; if (S.pW0 !== w) { S.poly = null; S.pW0 = w; }
       const dx = goal.x - px, dz = goal.z - pz, L = Math.hypot(dx, dz) || 1, r0 = Math.min(L, D.PATH_REACH);
       const gx = Math.floor(px + dx / L * r0), gz = Math.floor(pz + dz / L * r0);
       const top = w.topAt ? w.topAt(gx, gz) : -1, fy = Math.floor(p.pos[1] + 0.1), gy = top > 0 && Math.abs(top + 1 - fy) < 16 ? top + 1 : fy;
       try {
-        const t1 = now(), gb = (x, y, z) => w.getBlock(x, y, z), r = D.gridPath(gb, F.passable, F.standable, [Math.floor(px), fy, Math.floor(pz)], [gx, gy, gz], D.PATH_REACH + 2, g.cpuBound ? D.PATH_MAX >> 1 : D.PATH_MAX);
-        const ms = now() - t1; D.cost.pathN = (D.cost.pathN || 0) + 1; D.cost.pathMs = (D.cost.pathMs || 0) + ms; if (ms > (D.cost.pathWorst || 0)) D.cost.pathWorst = ms;
-        if (r && r.path && r.path.length > 1) S.poly = r.path;
+        const t1 = now(), gb = (x, y, z) => w.getBlock(x, y, z);
+        S.q = D.gridBegin(gb, F.passable, F.standable, [Math.floor(px), fy, Math.floor(pz)], [gx, gy, gz], D.PATH_REACH + 2, g.cpuBound ? D.PATH_MAX >> 1 : D.PATH_MAX);
+        D.cost.pathN = (D.cost.pathN || 0) + 1; D.cost.pathMs = (D.cost.pathMs || 0) + (now() - t1);
+        pump(D.PATH_STEP);
       } catch (e) { S.poly = null; }
     }
     const poly = S.poly; if (!poly) return null;
@@ -616,6 +641,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     } else S.hp = -1;
     // (4 Hz of real time: the game's dt is clamped, a slow frame must not stall it)
     if (t0 - S.acc >= 250) { S.acc = t0; try { slow(g); } catch (e) { if (!D.warned) { D.warned = true; console.warn('diegetic', e); } } }
+    if (S.q) { try { pump(g.cpuBound ? D.PATH_STEP >> 1 : D.PATH_STEP); } catch (e) { S.q = null; } }
     trailFrame(g, dt);
     signFrame(g);
     const ms = now() - t0, C = D.cost; C.frames++; C.ms += ms; if (ms > C.worst) C.worst = ms;
