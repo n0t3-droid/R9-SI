@@ -54596,6 +54596,8 @@ VR.I18N.add('en',{
 'g.set.lvTone':'Moonlight & world colours',
 'g.set.lvTone.tip':'Silver-blue moonlight at night, warm lamps glowing softly, the sky never fully black — and every world its own colour mood (Aquamarine, Ochre, Cinnabar, Opal, Basalt, the station).',
 'g.set.lvMeadow':'Calm meadow',
+'g.set.lfPools':'Light pools',
+'g.set.lfPools.tip':'Warm islands of light at night: lanterns, fires, windows and fairy lights cast soft coloured pools onto streets, walls and people — walls cast shadows, carried lanterns move with their bearers.',
 'g.set.lvMeadow.tip':'The grass near you calmer, as if painted: less pixel noise, large soft patches of colour across the meadow.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
@@ -59252,6 +59254,8 @@ VR.I18N.add('de',{
 'g.set.lvTone':'Mondlicht & Weltenfarben',
 'g.set.lvTone.tip':'Nachts silberblaues Mondlicht, warme Lampen leuchten sanft, der Himmel nie ganz schwarz — und jede Welt ihre eigene Farbstimmung (Aquamarin, Ocker, Zinnober, Opal, Basalt, die Station).',
 'g.set.lvMeadow':'Wiesenruhe',
+'g.set.lfPools':'Lichtpfützen',
+'g.set.lfPools.tip':'Nachts warme Lichtinseln: Laternen, Feuer, Fenster und Feenlichter werfen weiche, farbige Lichtpfützen auf Straßen, Wände und Leute — Mauern werfen Schatten, getragene Laternen wandern mit.',
 'g.set.lvMeadow.tip':'Das Gras nah vor dir ruhiger, wie gemalt: weniger Pixelrauschen, große weiche Farbflecken über die Wiese.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
@@ -68013,6 +68017,294 @@ ptile:{vs:PTILE_VS,fs:'#define PTILE\n#define AIRZ u_air.z\n'+HERZ_SRC},
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const LF=VR.LField=VR.LField||{};
+const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
+
+
+LF.SW=['lfPools'];
+const OFF={lfPools:false};
+const TIERS={potato:OFF,low:OFF,balanced:OFF,high:{lfPools:true},ultra:{lfPools:true},ultraLite:{lfPools:true}};
+LF.defaults=(preset)=>Object.assign({},TIERS[preset]||OFF);
+LF.off=()=>Object.assign({},OFF);
+LF.ROWS_SET=[{key:'lfPools',g:'img',sec:'light',t:'switch',lab:'g.set.lfPools',tip:'g.set.lfPools.tip',cost:'mid',def:false}];
+LF.key=(q)=>(q&&q.lfPools?'1':'0');
+LF.q=OFF;
+LF.use=function(q){LF.q=q||OFF;return LF.q;};
+
+
+LF.PROGS={terrain:1,terrainCut:1,terrainCutZ:1,prop:1,furn:1,vox:1,voxInst:1,folk:1,folkSun:1};
+LF.definesFor=(name,q)=>((q||LF.q).lfPools&&LF.PROGS[name]?['LFIELD']:[]);
+LF.hook=function(name,defines){
+const extra=LF.definesFor(name);
+if(!extra.length)return defines||[];
+return(defines||[]).concat(extra.filter(d=> !(defines||[]).includes(d)));
+};
+if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>LF.hook(name,prev?prev(name,defines):(defines||[]));}
+
+
+LF.N=128;LF.HALF=64;LF.BAND=32;LF.BELOW=12;
+LF.ROWS=2;
+LF.STAMPS=24;
+LF.LMAX=0.9;
+LF.HSPAN=48;
+LF.DMAX=32;
+
+
+
+
+LF.K={gain:1.25,k:0.07,R:14,Rd:11,str:1.0,kv:0.05,fade0:50,fade1:60,cube:0.25,minLv:8};
+const N=LF.N,NN=N*N,M=N-1,OPQ=2;
+
+
+
+const discs={};
+LF.disc=function(R){
+if(discs[R])return discs[R];
+const L=[];
+for(let z= -R;z<=R;z++)for(let x= -R;x<=R;x++){const d=Math.hypot(x,z);if(d<=R)L.push([x,z,d]);}
+L.sort((a,b)=>a[2]-b[2]||a[1]-b[1]||a[0]-b[0]);
+const at=new Map();L.forEach((o,i)=>at.set(o[0]+','+o[1],i));
+const n=L.length,ox=new Int8Array(n),oz=new Int8Array(n),par=new Int32Array(n),dist=new Float32Array(n);
+for(let i=0;i<n;i++){
+const[x,z,d]=L[i];ox[i]=x;oz[i]=z;dist[i]=d;
+if(i===0){par[i]= -1;continue;}
+const s=(d-1)/d;let px=Math.round(x*s),pz=Math.round(z*s);
+let j=at.get(px+','+pz);
+if(j===undefined||j>=i){px=x-Math.sign(x);pz=z-Math.sign(z);j=at.get(px+','+pz);}
+par[i]=j===undefined?0:j;
+}
+return(discs[R]={n,ox,oz,par,dist,vis:new Float32Array(n)});
+};
+
+LF.fall=(d,R,k)=>{const t=1-(d/R)*(d/R);return t<=0?0:(t*t)/(1+k*d*d);};
+
+
+LF.Field=function(){
+this.mask=new Uint32Array(NN);
+this.base=new Int32Array(NN);
+this.tx=new Int32Array(NN).fill(0x7fffffff);this.tz=new Int32Array(NN).fill(0x7fffffff);
+this.em=new Uint16Array(NN);this.emY=new Int32Array(NN);
+this.front=new Float32Array(NN*4);this.back=new Float32Array(NN*4);
+this.work=new Float32Array(NN*4);
+this.out=new Uint8Array(NN*4);
+
+
+this.L=new Float32Array((NN>>2)*6);this.nList=0;this.li=0;
+this.dirty=true;this.fresh=true;this.lastDyn=0;
+this.touchT=new Int32Array(NN);this.prevT=new Int32Array(NN);this.nTouch=0;this.nPrev=0;this.mark=new Uint32Array(NN);this.gen=1;this.hs=255/LF.HSPAN;
+this.row=0;this.cx=0;this.cz=0;this.cy=0;this.Y0=0;
+this.started=false;this.swapped=0;this.dyn=new Float32Array(LF.DMAX*7);this.nDyn=0;
+this.stats={scan:0,stamps:0,swaps:0,lights:0,dyn:0};
+this.lut=new Uint8Array(1024);for(let i=0;i<1024;i++)this.lut[i]=Math.round(255*Math.sqrt(i/1023));
+};
+const FP=LF.Field.prototype;
+
+FP.center=function(x,y,z){
+const cx=Math.floor(x),cz=Math.floor(z),cy=Math.floor(y);
+const jump= !this.started||Math.abs(cx-this.cx)>16||Math.abs(cz-this.cz)>16||Math.abs(cy-this.cy)>16;
+this.cx=cx;this.cz=cz;this.cy=cy;
+if(jump){this.started=true;this.front.fill(0);this.back.fill(0);this.tx.fill(0x7fffffff);this.nList=0;this.li=0;this.swapped++;this.dirty=this.fresh=true;}
+return jump;
+};
+
+const inWin=(i,lo)=>lo+((i-lo)&M);
+
+FP.scan=function(col,T,rows){
+const flags=T.flags,emit=T.emit,x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,yb=this.cy-LF.BELOW;
+let n=0;
+for(let r=0;r<rows;r++){
+const rr=this.row;this.row=(this.row+1)&M;
+const z=inWin(rr,z0);
+let c=null,ccx=0x7fffffff;
+for(let ii=0;ii<N;ii++){
+const x=inWin(ii,x0),i=rr*N+ii,kx=x>>4;
+if(kx!==ccx){ccx=kx;c=col(kx,z>>4);}
+const moved=this.tx[i]!==x||this.tz[i]!==z||this.base[i]!==yb;
+this.tx[i]=x;this.tz[i]=z;this.base[i]=yb;
+let m=0,e=0,ey=0,eb=0;
+if(c&&c.blocks){
+const B=c.blocks,H=c.H||(B.length>>8),lc=((z&15)<<4)|(x&15);
+for(let b=0;b<LF.BAND;b++){
+const y=yb+b;if(y<0||y>=H)continue;
+const s=B[(y<<8)|lc];if(!s)continue;
+if(flags[s]&OPQ)m|=(1<<b);
+const em=emit[s];
+if(em){const lv=Math.max((em>>8)&15,(em>>4)&15,em&15)*((flags[s]&OPQ)?1:2);if(lv>eb){eb=lv;e=(em&0xfff)|((flags[s]&OPQ)?0x8000:0);ey=y;}}
+}
+}
+if(moved?(m||e||this.mask[i]||this.em[i]):(this.mask[i]!==(m>>>0)||this.em[i]!==e||this.emY[i]!==ey))this.dirty=true;
+this.mask[i]=m>>>0;this.em[i]=e;this.emY[i]=ey;n++;
+}
+}
+this.stats.scan=n;
+return n;
+};
+
+FP.open=function(i,wx,wz,y){
+if(this.tx[i]!==wx||this.tz[i]!==wz)return 1;
+const b=y-this.base[i];
+if(b<0||b>=LF.BAND)return 1;
+return(this.mask[i]>>>b)&1?0:1;
+};
+
+FP.stamp=function(A,lx,ly,lz,r,g,b,R,rec){
+const D=LF.disc(R),vis=D.vis,ox=D.ox,oz=D.oz,par=D.par,dist=D.dist,k=LF.K.k;
+const x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,ix=Math.floor(lx),iz=Math.floor(lz),iy=Math.floor(ly);
+const lum=r+g+b;if(lum<=0)return;
+for(let j=0;j<D.n;j++){
+const wx=ix+ox[j],wz=iz+oz[j];
+if(wx<x0||wx>=x0+N||wz<z0||wz>=z0+N){vis[j]=0;continue;}
+const i=(wz&M)*N+(wx&M);
+const vp=j===0?1:vis[par[j]];
+if(vp<=0){vis[j]=0;continue;}
+const f=LF.fall(dist[j],R,k)*vp;
+const q=i*4;
+A[q]+=r*f;A[q+1]+=g*f;A[q+2]+=b*f;A[q+3]+=ly*lum*f;
+if(rec&&this.mark[i]!==this.gen){this.mark[i]=this.gen;this.touchT[this.nTouch++]=i;}
+vis[j]=j===0?1:vp*this.open(i,wx,wz,iy);
+}
+};
+
+
+
+LF.radius=(r,g,b)=>{const lv=Math.min(30,Math.max(r,g,b)*15/LF.K.gain);return Math.max(5,Math.min(16,Math.round(5+9*Math.sqrt(lv/15))));};
+FP.rebuild=function(budget){
+const K=LF.K,x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,gk=K.gain/15,L=this.L;
+if(this.li>=this.nList){
+if(!this.dirty)return false;
+this.dirty=false;
+
+let n=0;
+for(let bz=z0& ~1;bz<z0+N;bz+=2)for(let bx=x0& ~1;bx<x0+N;bx+=2){
+let sr=0,sg=0,sb=0,sx=0,sy=0,sz=0,sw=0;
+for(let k=0;k<4;k++){
+const wx=bx+(k&1),wz=bz+(k>>1);
+if(wx<x0||wx>=x0+N||wz<z0||wz>=z0+N)continue;
+const i=(wz&M)*N+(wx&M),e=this.em[i];
+if(!e||this.tx[i]!==wx||this.tz[i]!==wz)continue;
+
+
+const lv=Math.max((e>>8)&15,(e>>4)&15,e&15);if(lv<K.minLv)continue;
+const ck=((e&0x8000)?K.cube:1)*(lv/15)*(lv/15),r=((e>>8)&15)*gk*ck,g=((e>>4)&15)*gk*ck,b=(e&15)*gk*ck,w=r+g+b;
+sr+=r;sg+=g;sb+=b;sx+=(wx+0.5)*w;sy+=(this.emY[i]+0.5)*w;sz+=(wz+0.5)*w;sw+=w;
+}
+if(sw<=0)continue;
+const o=n++ *6;L[o]=sx/sw;L[o+1]=sy/sw;L[o+2]=sz/sw;L[o+3]=sr;L[o+4]=sg;L[o+5]=sb;
+}
+this.nList=n;this.li=0;this.back.fill(0);this.stats.lights=n;
+if(!n){const t=this.front;this.front=this.back;this.back=t;this.stats.swaps++;this.swapped++;return true;}
+}
+const end=Math.min(this.nList,this.li+budget);
+for(;this.li<end;this.li++){
+const o=this.li*6;
+this.stamp(this.back,L[o],L[o+1],L[o+2],L[o+3],L[o+4],L[o+5],LF.radius(L[o+3],L[o+4],L[o+5]));
+}
+this.stats.stamps=end;
+if(this.li>=this.nList){const t=this.front;this.front=this.back;this.back=t;this.stats.swaps++;this.swapped++;return true;}
+return false;
+};
+
+FP.clearDyn=function(){this.nDyn=0;};
+FP.add=function(x,y,z,r,g,b,R){
+if(this.nDyn>=LF.DMAX|| !(r+g+b>0.002))return false;
+const dx=x-this.cx,dz=z-this.cz;if(dx*dx+dz*dz>62*62)return false;
+const o=this.nDyn++ *7,D=this.dyn;D[o]=x;D[o+1]=y;D[o+2]=z;D[o+3]=r;D[o+4]=g;D[o+5]=b;D[o+6]=Math.max(2,Math.min(24,Math.round(R||LF.K.Rd)));
+return true;
+};
+
+
+
+FP.packCell=function(i){
+const A=this.work,out=this.out,lut=this.lut,q=i*4,r=A[q],g=A[q+1],b=A[q+2],l=r+g+b;
+if(l<1e-4){out[q]=out[q+1]=out[q+2]=out[q+3]=0;return;}
+
+const S=LF.LMAX,s=1023/S,kr=r/(1+r/S),kg=g/(1+g/S),kb=b/(1+b/S);
+out[q]=lut[Math.min(1023,(kr*s)|0)];out[q+1]=lut[Math.min(1023,(kg*s)|0)];out[q+2]=lut[Math.min(1023,(kb*s)|0)];
+out[q+3]=clamp(((A[q+3]/l-this.Y0)*this.hs)|0,0,255);
+};
+FP.compose=function(force){
+const Y0=this.cy-16,full=force||this.fresh||this.swapped!==this.composedAt||Y0!==this.Y0;
+
+if(!full&&this.nDyn===0&&this.nPrev===0)return null;
+this.fresh=false;this.lastDyn=this.nDyn;this.composedAt=this.swapped;this.Y0=Y0;this.hs=255/LF.HSPAN;
+const A=this.work,D=this.dyn,F=this.front,P=this.prevT;
+if(full)A.set(F);
+else for(let k=0;k<this.nPrev;k++){const q=P[k]*4;A[q]=F[q];A[q+1]=F[q+1];A[q+2]=F[q+2];A[q+3]=F[q+3];}
+this.gen=(this.gen+1)>>>0||1;this.nTouch=0;
+for(let j=0;j<this.nDyn;j++){const o=j*7;this.stamp(A,D[o],D[o+1],D[o+2],D[o+3],D[o+4],D[o+5],D[o+6],true);}
+this.stats.dyn=this.nDyn;
+let n=0;
+if(full){for(let i=0;i<NN;i++)this.packCell(i);n=NN;}
+else{for(let k=0;k<this.nPrev;k++)this.packCell(P[k]);for(let k=0;k<this.nTouch;k++)this.packCell(this.touchT[k]);n=this.nPrev+this.nTouch;}
+this.stats.packed=n;
+const t=this.prevT;this.prevT=this.touchT;this.touchT=t;this.nPrev=this.nTouch;this.nTouch=0;
+return this.out;
+};
+
+LF.decode=function(out,i,Y0){
+const q=i*4,d=(v)=>(v/255)*(v/255)*LF.LMAX;
+return{r:d(out[q]),g:d(out[q+1]),b:d(out[q+2]),h:Y0+out[q+3]/255*LF.HSPAN};
+};
+
+
+
+
+LF.glslCommon=()=>`
+#ifdef LFIELD
+
+uniform sampler2D u_lf;
+uniform vec4 u_lfO;
+uniform vec4 u_lfK;
+
+vec3 lfLight(vec3 rel, vec3 n, float sky) {
+if (u_lfO.w <= 0.0) return vec3(0.0);
+float dh = length(rel.xz);
+float fade = 1.0 - smoothstep(u_lfK.w, u_lfK.w + 10.0, dh);
+if (fade <= 0.0) return vec3(0.0);
+vec4 t = texture(u_lf, (rel.xz + n.xz * 0.45 + u_lfO.xy) * (1.0 / 128.0));
+vec3 c = t.rgb * t.rgb * u_lfK.x;
+float dy = t.a * u_lfK.y - (rel.y + u_lfO.z);
+float ady = max(abs(dy) - 1.5, 0.0);
+float fy = clamp((dy + 0.5) * 0.5, -1.0, 1.0);
+float lam = clamp(0.55 + 0.45 * n.y * fy + 0.25 * (1.0 - abs(n.y)), 0.0, 1.0);
+float out_ = mix(0.3, 1.0, smoothstep(0.35, 0.85, sky));
+return c * (lam * fade * out_ * u_lfO.w / (1.0 + u_lfK.z * ady * ady));
+}
+#endif
+`;
+
+LF.shade=function(dy,ny,sky){
+const ady=Math.max(Math.abs(dy)-1.5,0),fy=clamp((dy+0.5)*0.5,-1,1);
+const t=clamp((sky===undefined?1:sky)-0.35,0,0.5)/0.5,out=0.3+0.7*t*t*(3-2*t);
+return clamp(0.55+0.45*ny*fy+0.25*(1-Math.abs(ny)),0,1)*out/(1+LF.K.kv*ady*ady);
+};
+})(VR);
+
+
+
+
+
 (function(VR){
 'use strict';
 const S=VR.SHADERS={};
@@ -68702,6 +68994,7 @@ if (dir.y + u_dip < 0.0) col = mix(col, u_skyHorizon * 0.6, clamp(-(dir.y + u_di
 return col;
 }
 ${(VR.Light2&&VR.Light2.glslCommon)?VR.Light2.glslCommon():''}
+${(VR.LField&&VR.LField.glslCommon)?VR.LField.glslCommon():''}
 vec3 applyFog(vec3 col, vec3 rel, float dist) {
 #ifdef AIR2
 return l2Fog(col, rel, dist);
@@ -69341,6 +69634,9 @@ vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
 blockL = l2Pool(bl);
 #endif
+#ifdef LFIELD
+blockL += lfLight(v_rel, N, v_sky);
+#endif
 float ao = 1.0 - v_ao * 0.2;
 float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
 if (noshade) faceShade = 0.92;
@@ -69644,6 +69940,9 @@ vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
 blockL = l2Pool(v_block);
 #endif
+#ifdef LFIELD
+blockL += lfLight(v_rel, N, v_sky);
+#endif
 float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
 vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
 vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -69837,6 +70136,9 @@ float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
 vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
 blockL = l2Pool(v_block);
+#endif
+#ifdef LFIELD
+blockL += lfLight(v_rel, N, v_sky);
 #endif
 float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
 vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -70967,6 +71269,9 @@ vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + pow(
 
 hemi = l2Hemi(n) * 1.04; wrapL = l2Wrap(dot(n, L), u_l2K.w);
 light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + l2Pool(u_blockLight) + 0.03;
+#endif
+#ifdef LFIELD
+light += lfLight(v_rel, n, u_sky);
 #endif
 vec3 col = alb * light;
 vec3 V = normalize(-v_rel);
@@ -74751,6 +75056,7 @@ try{this.buildProgramsNow();}finally{G.deferred=was;}
 buildProgramsNow(){
 if(VR.Light2){VR.Light2.use(this.q);this.l2Key=VR.Light2.key?VR.Light2.key(this.q):'';if(VR.GL&& !VR.GL.defineHook)VR.GL.defineHook=VR.Light2.hook;}
 if(VR.Sky3){VR.Sky3.use(this.q);this.s3Key=VR.Sky3.key(this.q);}
+if(VR.LField){VR.LField.use(this.q);this.lfKey=VR.LField.key(this.q);}
 if(VR.Look){VR.Look.use(this.q);this.lvKey=VR.Look.key(this.q);}
 const md=this.multi?['MULTIDRAW']:[];
 const sh=(this.q.shadows?['SHADOWS']:[]).concat(this.q.hshadow?['HSHADOW']:[]).concat(this.q.lite?['LITE']:[]).concat(this.q.motion?['MOTION']:[]).concat(this.q.cloudShadow?['CLOUDSH']:[]);
@@ -75080,6 +75386,7 @@ if(!!this.q.texLite!==prevT&&this.texAlbedo)this.setAniso(this.q.texLite?2:4);
 this.shadowValid=false;
 if(VR.Light2&&VR.Light2.key&&VR.Light2.key(this.q)!==this.l2Key)this.buildPrograms();
 else if(VR.Sky3&&VR.Sky3.key(this.q)!==this.s3Key)this.buildPrograms();
+else if(VR.LField&&VR.LField.key(this.q)!==this.lfKey)this.buildPrograms();
 else if(VR.Look&&VR.Look.key(this.q)!==this.lvKey){if(this.lvRebuild)this.lvRebuild();else this.buildPrograms();}
 if(full||this.q.shadows!==prevSize)this.ensureShadowMap();
 this.resize(full||this.q.scale!==prevScale);
@@ -105011,6 +105318,7 @@ if(VR.Light2&&VR.Light2.ROWS)for(const it of VR.Light2.ROWS)S.add(Object.assign(
 
 if(VR.Sky3&&VR.Sky3.ROWS)for(const it of VR.Sky3.ROWS)S.add(Object.assign({},it));
 if(VR.Look&&VR.Look.ROWS)for(const it of VR.Look.ROWS)S.add(Object.assign({},it));
+if(VR.LField&&VR.LField.ROWS_SET)for(const it of VR.LField.ROWS_SET)S.add(Object.assign({},it));
 
 
 for(const k of['hdrLite','postLite','zPre','texLite','dprLite'])S.add({key:k,g:'img',sec:'quality',t:'switch',lab:'g.set.'+k,tip:'g.set.'+k+'.tip',cost:'low',def:false});
@@ -105633,6 +105941,9 @@ float sun = 1.0 - v_light.y;
 vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + pow(v_bl, vec3(1.7)) * 1.35 * u_blockLightTint + 0.03;
 #ifdef LIGHT2
 light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + l2Pool(v_bl) + 0.03;
+#endif
+#ifdef LFIELD
+light += lfLight(v_rel, n, v_light.x);
 #endif
 
 
@@ -114492,6 +114803,9 @@ if(VR.Sky3)for(const p in PRESETS)Object.assign(PRESETS[p],VR.Sky3.defaults(p));
 const LV_SW=VR.Look?VR.Look.SW:[];
 if(VR.Look)for(const p in PRESETS)Object.assign(PRESETS[p],VR.Look.defaults(p));
 
+const LF_SW=VR.LField?VR.LField.SW:[];
+if(VR.LField)for(const p in PRESETS)Object.assign(PRESETS[p],VR.LField.defaults(p));
+
 
 
 
@@ -114560,6 +114874,7 @@ for(const k of L2_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRES
 for(const k of S3_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Sky3.off()[k]:PRESETS.balanced[k]);
 
 for(const k of LV_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Look.off()[k]:PRESETS.balanced[k]);
+for(const k of LF_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:false;
 
 if(s.smoothFolk===undefined&&s.preset)out.smoothFolk=PRESETS[s.preset]?PRESETS[s.preset].smoothFolk:((s.vxLod|0)>=44&& !s.lite?1:0);
 
@@ -114644,6 +114959,7 @@ if(key!=='*'&&F9_SW.includes(key))S.preset='custom';
 if(key!=='*'&&L2_SW.includes(key))S.preset='custom';
 if(key!=='*'&&S3_SW.includes(key))S.preset='custom';
 if(key!=='*'&&LV_SW.includes(key))S.preset='custom';
+if(key!=='*'&&LF_SW.includes(key))S.preset='custom';
 if(key!=='*'&&F10_SW.includes(key))S.preset='custom';
 if(key!=='*'&&MO_SW.includes(key))S.preset='custom';
 for(const k of MO_SW)if(S[k]===undefined)S[k]=PRESETS[S.preset]?PRESETS[S.preset][k]:(k==='cloudShadow'? +((S.clouds|0)>=2):1);
@@ -114661,6 +114977,7 @@ if(S.smoothFurn===undefined)S.smoothFurn=PRESETS[S.preset]?PRESETS[S.preset].smo
 const hDist=Math.min(160,Math.max(56,S.renderDist*16*0.75));
 if(r&&VR.Light2){const qb=r.qBase||(r.qBase={}),d=VR.Light2.off();for(const k of L2_SW)qb[k]=S[k]===undefined?d[k]:(typeof d[k]==='number'?Math.max(0,Math.min(VR.Light2.MAX[k]||3,S[k]|0)): !!S[k]);}
 if(r&&VR.Sky3){const qb=r.qBase||(r.qBase={}),d=VR.Sky3.off();for(const k of S3_SW)qb[k]=S[k]===undefined?d[k]:(typeof d[k]==='number'?Math.max(0,Math.min(VR.Sky3.MAX[k]||2,S[k]|0)): !!S[k]);}
+if(r&&VR.LField){const qb=r.qBase||(r.qBase={});for(const k of LF_SW)qb[k]= !!S[k];}
 if(r&&VR.Look){const qb=r.qBase||(r.qBase={});for(const k of LV_SW)qb[k]= !!S[k];}
 if(r&&VR.IPU){const qb=r.qBase||(r.qBase={});for(const k of F10_SW)qb[k]= !!S[k];qb.dprCap= !!S.dprLite&&S.preset==='ultraLite';}
 if(r){const qb=r.qBase||(r.qBase={});qb.pbr=S.pbr===undefined?(S.lite?0:1):Math.max(0,Math.min(2,S.pbr|0));qb.texHi= !!S.texHi&& !S.lite;}
@@ -153656,6 +153973,223 @@ if(e.code==='ArrowRight'||e.code==='PageDown'){e.preventDefault();D.turn(g,1);}e
 }
 D.hookBook=hookBook;hookBook();
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const LF=VR.LField;
+if(!LF|| !VR.Renderer)return;
+const R=VR.Renderer.prototype,UNIT=16,TAU=Math.PI*2;
+const H=(s)=>{let h=2166136261;s=String(s);for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;};
+LF.cost={ms:0,n:0};
+
+
+const glows=[],glowsNext=[];
+const flashes=[];
+
+LF.carrier=(a)=> !!(a&&a.p&& !a.kid&&(H(a.p.seed!==undefined?a.p.seed:a.p.id)%3)===0);
+LF.handPos=function(a,t,out){
+const yw=a.yaw||0,sw=Math.sin((a.t||t)*5.2)*0.04*(a.walkAmt||0);
+
+out[0]=a.pos[0]+Math.cos(yw)*0.36-Math.sin(yw)*0.08;out[1]=a.pos[1]+0.62+sw;out[2]=a.pos[2]-Math.sin(yw)*0.36-Math.cos(yw)*0.08;
+return out;
+};
+
+
+LF.FAIRY={fy_shroom_0:[0.3,0.95,0.85],fy_shroom_1:[0.65,0.45,1.0],fy_shroom_2:[1.0,0.5,0.75],fy_lamp:[1.0,0.8,0.45],fy_tree:[1.0,0.75,0.4],fy_pool:[0.45,0.85,1.0],fy_crystal_0:[0.5,0.8,1.0],fy_crystal_1:[0.8,0.55,1.0],fy_crystal_2:[1.0,0.6,0.8],fy_garden:[0.9,0.8,1.0]};
+const night=(E)=>Math.max(0,Math.min(1,(E&&E.night)||0));
+const hp=[0,0,0];
+LF.gather=function(g,f,E,t){
+f.clearDyn();
+const K=LF.K,nt=night(E);
+
+const pl=g.player,held=pl&&pl.inv&&pl.inv.held;
+if(held&&VR.R&&VR.R.byName[held.id]&& !(g.photoCam&&g.photoCam.on)){
+const ty=VR.R.byName[held.id],s=ty.defaultState,e=s?VR.R.T.emit[s]:0;
+if(e){const gg=K.gain/15*0.8,ep=pl.eyePos?pl.eyePos():[pl.pos[0],pl.pos[1]+1.5,pl.pos[2]];f.add(ep[0],ep[1]-0.5,ep[2],((e>>8)&15)*gg,((e>>4)&15)*gg,(e&15)*gg,10);}
+}
+const V=g.villages;
+if(V&&nt>0.25){
+
+const cam=f,L=[];
+for(const a of V.agents||[]){
+if(!a.drawn|| !a.street|| !LF.carrier(a))continue;
+const dx=a.pos[0]-cam.cx,dz=a.pos[2]-cam.cz,d2=dx*dx+dz*dz;
+if(d2<56*56)L.push([d2,a]);
+}
+L.sort((p,q)=>p[0]-q[0]);
+const k=0.85*nt;
+for(let i=0;i<L.length&&i<12;i++){const a=L[i][1],fl=0.92+0.08*Math.sin(t*9+i*1.7);LF.handPos(a,t,hp);f.add(hp[0],hp[1]+0.25,hp[2],1.0*k*fl,0.62*k*fl,0.28*k*fl,10);}
+
+const tod=g.env&&g.env.timeOfDay;
+if(V.festivalOn&&V.known)for(const vil of V.known.values()){
+const pz=vil.plan&&vil.plan.plaza;if(!pz|| !vil.fest)continue;
+const dx=pz.x-f.cx,dz=pz.z-f.cz;if(dx*dx+dz*dz>70*70)continue;
+if(!V.festivalOn(vil,tod))continue;
+const cx=pz.x+0.5,cz=pz.z+0.5,y=pz.y,PR=(pz.r||4)+1.5,fl=0.85+0.15*Math.sin(t*11)*Math.sin(t*7.3+1);
+f.add(cx,y+1.2,cz,1.6*fl,0.75*fl,0.25*fl,14);
+for(let j=0;j<6;j++){const a=j/6*TAU+0.3;f.add(cx+Math.cos(a)*PR,y+2.6,cz+Math.sin(a)*PR,0.75,0.5,0.3,10);}
+}
+}
+
+
+const FS=VR.Fairy&&VR.Fairy.state;
+if(FS&&FS.sites&&nt>0.3){
+let n=0;
+for(const st of FS.sites){
+if(!st.parts||n>=8)continue;
+const dx=st.x-f.cx,dz=st.z-f.cz;if(dx*dx+dz*dz>80*80)continue;
+for(const m of st.parts){
+if(n>=8)break;
+const c=LF.FAIRY[m.m];if(!c|| !m.pos)continue;
+const ex=m.pos[0]-f.cx,ez=m.pos[2]-f.cz;if(ex*ex+ez*ez>56*56)continue;
+const h=(m.o&&m.o.h)||1.5,k=0.9*nt*(0.9+0.1*Math.sin(t*1.3+n));
+if(f.add(m.pos[0],m.pos[1]+h*0.6,m.pos[2],c[0]*k,c[1]*k,c[2]*k,Math.round(8+Math.min(4,h))))n++;
+}
+}
+}
+
+for(let i=flashes.length-1;i>=0;i--){
+const q=flashes[i],age=t-q.t;
+if(age>1.4||age<0){flashes.splice(i,1);continue;}
+const k=1.6*Math.exp(-age*3);
+f.add(q.x,q.gy+8,q.z,q.c[0]*k,q.c[1]*k,q.c[2]*k,22);
+}
+
+for(const q of glows)f.add(q[0],q[1],q[2],q[3],q[4],q[5],q[6]);
+glows.length=0;
+for(const q of glowsNext)glows.push(q);
+glowsNext.length=0;
+};
+
+
+R.lfOn=function(F){return!!(this.q&&this.q.lfPools&&F&&F.world&&F.cam&&this.lfUnitOk());};
+R.lfUnitOk=function(){
+if(this.lfUnits===undefined){try{this.lfUnits=this.gl.getParameter(this.gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS)|0;}catch(e){this.lfUnits=0;}}
+return this.lfUnits>UNIT;
+};
+R.lfTex=function(){
+if(this.lfT)return this.lfT;
+const gl=this.gl,t=gl.createTexture();
+gl.activeTexture(gl.TEXTURE0+UNIT);gl.bindTexture(gl.TEXTURE_2D,t);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,LF.N,LF.N,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+gl.activeTexture(gl.TEXTURE0);
+return(this.lfT=t);
+};
+R.lfFrame=function(F,E){
+this.lfLive=false;
+if(!this.lfOn(F)|| !isFinite(F.cam.x)|| !isFinite(F.cam.z)|| !isFinite(F.cam.y))return;
+const t0=performance.now(),gl=this.gl,c=F.cam,w=F.world,g=VR.game;
+const f=this.lfField||(this.lfField=new LF.Field());
+
+if(this.lfFrameNo===this.frameNo&&this.lfDone){this.lfLive=true;return;}
+this.lfFrameNo=this.frameNo;
+
+
+if(f.center(c.x,c.y,c.z))this.lfWarm(f);
+if(this.lfWorld!==w){this.lfWorld=w;this.lfCol=(kx,kz)=>w.col(kx,kz);f.started=false;if(f.center(c.x,c.y,c.z))this.lfWarm(f);}
+f.scan(this.lfCol,VR.R.T,LF.ROWS);
+f.rebuild(LF.STAMPS);
+if(g)LF.gather(g,f,E,g.time||t0/1000);
+const fresh= !this.lfT;
+this.lfTex();
+if(f.compose(fresh)){
+gl.activeTexture(gl.TEXTURE0+UNIT);gl.bindTexture(gl.TEXTURE_2D,this.lfT);
+gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);
+gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,LF.N,LF.N,gl.RGBA,gl.UNSIGNED_BYTE,f.out);
+gl.activeTexture(gl.TEXTURE0);
+LF.uploads=(LF.uploads|0)+1;
+}
+const ox=c.x-128*Math.floor(c.x/128),oz=c.z-128*Math.floor(c.z/128);
+this.lfU=this.lfU||[0,0,0,0];
+this.lfU[0]=ox;this.lfU[1]=oz;this.lfU[2]=c.y-f.Y0;this.lfU[3]=LF.K.str;
+this.lfLive=this.lfDone=true;
+const ms=performance.now()-t0;LF.cost.ms=LF.cost.ms*0.95+ms*0.05;LF.cost.n++;LF.cost.last=ms;
+};
+
+R.lfWarm=function(f){
+f=f||this.lfField;if(!f|| !this.lfCol)return 0;
+f.scan(this.lfCol,VR.R.T,LF.N);
+f.li=f.nList=0;f.dirty=true;
+for(let i=0;i<200;i++)if(f.rebuild(4096))break;
+return f.stats.lights;
+};
+const l2Frame0=R.l2Frame;
+R.l2Frame=function(F,E){if(l2Frame0)l2Frame0.call(this,F,E);this.lfFrame(F,E);};
+
+R.lfUniforms=function(p){
+const u=p.u,gl=this.gl;
+if(!u.u_lfO)return;
+const on= !!(this.lfLive&&this.lfT),U=this.lfU;
+gl.uniform4f(u.u_lfO,on?U[0]:0,on?U[1]:0,on?U[2]:0,on?U[3]:0);
+if(u.u_lfK)gl.uniform4f(u.u_lfK,LF.LMAX,LF.HSPAN,LF.K.kv,LF.K.fade0);
+if(u.u_lf){gl.activeTexture(gl.TEXTURE0+UNIT);gl.bindTexture(gl.TEXTURE_2D,this.lfT||this.lfTex());gl.uniform1i(u.u_lf,UNIT);gl.activeTexture(gl.TEXTURE0);}
+};
+const common0=R.common;
+R.common=function(p,E){common0.call(this,p,E);if(p&&p.u&&p.u.u_lfO)this.lfUniforms(p);};
+
+
+const Vs=VR.Villages&&VR.Villages.prototype;
+if(Vs&&Vs.draw){
+const draw0=Vs.draw,MP={scale:0.55},pos=[0,0,0];
+Vs.draw=function(r,E,cam){
+const out=draw0.apply(this,arguments);
+if(!r|| !r.q|| !r.q.lfPools||night(E)<=0.25|| !VR.LifeKit|| !this.agents|| !this.agents.length)return out;
+const g=this.g,ent=g&&g.entities;if(!ent)return out;
+let prog=null,n=0;
+for(const a of this.agents){
+if(!a.drawn|| !a.street|| !LF.carrier(a))continue;
+const dx=a.pos[0]-cam.x,dz=a.pos[2]-cam.z;if(dx*dx+dz*dz>48*48)continue;
+if(!prog)prog=ent.beginVox(r,E);
+LF.handPos(a,g.time||0,pos);pos[1]-=0.05;
+try{if(VR.LifeKit.drawModel(g,r,prog,'fy_lantern',pos,a.yaw||0,cam,MP))n++;}catch(e){LF.err=String(e);return out;}
+if(n>=12)break;
+}
+return out;
+};
+}
+if(Vs&&Vs.burst){
+const burst0=Vs.burst;
+Vs.burst=function(F,r,dist){
+const out=burst0.apply(this,arguments);
+try{
+const g=this.g,rr=g&&g.renderer;
+if(rr&&rr.q&&rr.q.lfPools&&r&&r.p&&(!VR.A11y|| !VR.A11y.flash||VR.A11y.flash('fireworks'))&&flashes.length<4){
+const c=r.col||[1,0.8,0.5],gy=g.player?Math.min(r.p[1],g.player.pos[1]+4):r.p[1]-20;
+flashes.push({x:r.p[0],y:r.p[1],gy,z:r.p[2],c:[c[0],c[1],c[2]],t:g.time||0});
+}
+}catch(e){}
+return out;
+};
+}
+const SG=VR.StoryGlow;
+if(SG&&SG.draw){
+const sgDraw0=SG.draw;
+SG.draw=function(r,cam,list){
+if(r&&r.q&&r.q.lfPools&&list)for(let i=0;i<list.length&&glowsNext.length<10;i++){
+const q=list[i];if(!q||(q.kind|0)!==0|| !q.p|| !q.col|| !(q.a>0.05))continue;
+const dx=q.p[0]-cam.x,dz=q.p[2]-cam.z;if(dx*dx+dz*dz>50*50)continue;
+const s=q.s?(q.s[0]||1):1,k=Math.min(1.2,q.a*1.1);
+glowsNext.push([q.p[0],q.p[1],q.p[2],q.col[0]*k,q.col[1]*k,q.col[2]*k,Math.max(5,Math.min(10,4+s*3))]);
+}
+return sgDraw0.apply(this,arguments);
+};
+}
+})(VR);
 
 VR.GenieLazy=function(){
 if(VR.GenieLazy.done)return!!VR.GenieBrain;VR.GenieLazy.done=true;
