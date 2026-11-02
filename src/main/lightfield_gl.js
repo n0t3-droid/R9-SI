@@ -101,8 +101,10 @@
     // the same frame drawn twice (a mirror, the far cache): the field once
     if (this.lfFrameNo === this.frameNo && this.lfDone) { this.lfLive = true; return; }
     this.lfFrameNo = this.frameNo;
-    f.center(c.x, c.y, c.z);
-    if (this.lfWorld !== w) { this.lfWorld = w; this.lfCol = (kx, kz) => w.col(kx, kz); f.started = false; f.center(c.x, c.y, c.z); }   // (another world: the field anew)
+    // (a jump — a teleport, a respawn, another world: the whole window scanned and stamped at once, ~10 ms, so the
+    // place is not dark for half a second)
+    if (f.center(c.x, c.y, c.z)) this.lfWarm(f);
+    if (this.lfWorld !== w) { this.lfWorld = w; this.lfCol = (kx, kz) => w.col(kx, kz); f.started = false; if (f.center(c.x, c.y, c.z)) this.lfWarm(f); }   // (another world: the field anew)
     f.scan(this.lfCol, VR.R.T, LF.ROWS);
     f.rebuild(LF.STAMPS);
     if (g) LF.gather(g, f, E, g.time || t0 / 1000);
@@ -117,6 +119,14 @@
     this.lfU[0] = ox; this.lfU[1] = oz; this.lfU[2] = c.y - f.Y0; this.lfU[3] = LF.K.str;
     this.lfLive = this.lfDone = true;
     const ms = performance.now() - t0; LF.cost.ms = LF.cost.ms * 0.95 + ms * 0.05; LF.cost.n++; LF.cost.last = ms;
+  };
+  // the whole window now: every row scanned, every light stamped (a jump; the tests)
+  R.lfWarm = function (f) {
+    f = f || this.lfField; if (!f || !this.lfCol) return 0;
+    f.scan(this.lfCol, VR.R.T, LF.N);
+    f.li = f.nList = 0;
+    for (let i = 0; i < 200; i++) if (f.rebuild(4096)) break;
+    return f.stats.lights;
   };
   const l2Frame0 = R.l2Frame;
   R.l2Frame = function (F, E) { if (l2Frame0) l2Frame0.call(this, F, E); this.lfFrame(F, E); };
