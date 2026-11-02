@@ -106,9 +106,9 @@
   W.PACE = { space: 10, lo: 15, hi: 23, look: 4, beat: 27, hard: 31 };
   // o-wander3 (R58-03): a start another source noted and nobody has seen holds ours PACE.noted s (was 15: on a busy
   // Herzwelt the notes came every ≈ 11 s — ours never started); while ours is due on foot it claims the Regie's slot
-  // (VR.Regie.claim) for at most PACE.claim s past its target, so the others wait for it instead of the other way round
+  // (VR.Regie.claim) for at most PACE.claim s from its target, so the others wait for it instead of the other way round
   // (big, small: a sliver seen far off neither ends our gap nor makes the Regie busy for us)
-  W.PACE.noted = 5; W.PACE.claim = 10; W.PACE.defer = 6; W.PACE.big = true; W.PACE.small = true;
+  W.PACE.noted = 5; W.PACE.claim = 3; W.PACE.defer = 6; W.PACE.big = true; W.PACE.small = true;
   W.Pacer = class {
     constructor(seed) { this.seed = seed | 0; this.last = -1e9; this.n = 0; this.tgt = this.jit(0); }
     jit(n) { const P = W.PACE; return P.lo + (P.hi - P.lo) * h(this.seed, n, 0x9ace); }
@@ -535,7 +535,7 @@
       if (now < (this.tryT || 0)) return this.why(P.since(now) < P.tgt ? 'early' : 'retry', dt);
       if (this.ofs && this.ofs.n !== P.n) { this.ofs = null; this.cur = null; }
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g, false, W.PACE.big));
-      { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt - W.PACE.look && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1.5); }   // (o-wander3: the slot is ours while it is due)
+      { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1); }   // (o-wander3: the slot is ours while it is due — PACE.claim s at most: session run 3 with a 14-s window held the life director's movers off 518 times in 5 min)
       const c0 = this.coming(now), coming = c0 && (!walking || P.since(now) < P.tgt + W.PACE.defer) ? c0 : false;   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
       const want = P.want(now, { foot: walking, busy, coming });
       if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
