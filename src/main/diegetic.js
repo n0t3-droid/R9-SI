@@ -131,7 +131,7 @@ body.dg-satchel #inventory.on #invpanel{position:relative}
 @keyframes dgsatch{0%{transform:translateY(18%) scale(.72,.5);opacity:0}55%{opacity:1}100%{transform:none;opacity:1}}
 @keyframes dgflap{0%{transform:perspective(500px) rotateX(0)}100%{transform:perspective(500px) rotateX(-150deg) scaleY(.6)}}@keyframes dgbuckle{0%{transform:translateY(30px)}100%{transform:translateY(-14px)}}
 html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-satchel #inventory.on #invpanel::before,html.a11y-less body.dg-satchel #inventory.on #invpanel::after{animation:none}
-#wanderbuch.dgb{perspective:1600px}
+#wanderbuch.dgb{perspective:1600px;align-items:center;justify-content:center}
 #wanderbuch.dgb .wdcard{max-width:min(980px,96vw);width:min(980px,96vw);max-height:none;overflow:visible;background:transparent;border:0;box-shadow:none;padding:0;color:#3b2a1a}
 #wanderbuch .dgbook{position:relative;display:grid;grid-template-columns:1fr 1fr;min-height:min(560px,76vh);background:#5a3a22;padding:14px;border-radius:14px 14px 18px 18px;box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 2px #3c2614;transform-style:preserve-3d;animation:dgbopen .5s ease-out}
 @keyframes dgbopen{0%{transform:rotateX(18deg) translateY(30px) scale(.92);opacity:0}100%{transform:none;opacity:1}}
@@ -143,9 +143,9 @@ html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-sa
 #wanderbuch .dgpage .wdsec{margin-bottom:14px}#wanderbuch .dgpage .wdbar{height:7px;border-radius:4px;background:rgba(106,61,28,.15);border:1px solid rgba(106,61,28,.35)}#wanderbuch .dgpage .wdbar i{background:repeating-linear-gradient(45deg,#c27a3a 0 4px,#d9935a 4px 8px)}
 #wanderbuch .dgpage .chip{display:inline-block;padding:0 8px;margin:2px 3px;background:transparent;color:#3b2a1a;border:1.5px solid rgba(59,42,26,.55);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;line-height:22px}
 #wanderbuch .dgpage .wdst{background:transparent;border:1.5px dashed rgba(59,42,26,.4);border-radius:50%;color:#3b2a1a}#wanderbuch .dgpage .wdst.on{background:rgba(255,255,255,.5);border-style:solid}
-#wanderbuch .dgpage .note{opacity:.75;font-size:13px}
+#wanderbuch .dgpage .note{opacity:.85;font-size:13px;color:#6a4a2a}
 #wanderbuch .dgnum{position:absolute;bottom:8px;left:0;right:0;text-align:center;font:italic 12px Georgia,serif;opacity:.6}
-#wanderbuch .dghead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px;color:#ffe7c2}
+#wanderbuch .dghead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 8px;padding:6px 10px 6px 14px;border-radius:12px;background:rgba(30,20,12,.72);color:#ffe7c2}#wanderbuch .dghead .note{flex:1;min-width:0;font:italic 13px/1.35 Georgia,serif;color:#f1dcbc;opacity:.9}
 #wanderbuch .dghead h2{margin:0;font:italic 700 24px Georgia,serif;text-shadow:0 2px 4px #000}
 #wanderbuch .dgnav{display:flex;gap:6px}
 #wanderbuch .dgnav button{font:600 15px Georgia,serif;min-width:44px;min-height:40px}
@@ -154,7 +154,7 @@ html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-sa
 @keyframes dgturn{0%{transform:rotateY(0)}100%{transform:rotateY(-178deg);opacity:.2}}@keyframes dgturnb{0%{transform:rotateY(0)}100%{transform:rotateY(178deg);opacity:.2}}
 html.a11y-less #wanderbuch .dgbook,html.a11y-less #wanderbuch .dgleaf{animation:none!important}html.a11y-less #wanderbuch .dgleaf{display:none}
 #wanderbuch .dgmap{display:block;width:100%;aspect-ratio:1;border-radius:6px 10px 7px 12px/10px 6px 12px 7px;border:2px solid rgba(59,42,26,.6)}
-#wanderbuch .dgboard{position:relative;height:300px;margin-top:6px;border:2px dashed rgba(106,61,28,.35);border-radius:12px;cursor:crosshair;overflow:hidden}
+#wanderbuch .dgboard{position:relative;height:min(300px,30vh);margin-top:6px;border:2px dashed rgba(106,61,28,.35);border-radius:12px;cursor:crosshair;overflow:hidden}
 #wanderbuch .dgboard .stk{position:absolute;font-size:34px;line-height:1;transform:translate(-50%,-50%) rotate(var(--r,0deg));filter:drop-shadow(1px 2px 0 #fff) drop-shadow(-1px -1px 0 #fff) drop-shadow(0 2px 3px rgba(0,0,0,.3));cursor:pointer;user-select:none}
 #wanderbuch .dgtray{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#wanderbuch .dgtray button{font-size:22px;width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(59,42,26,.45);background:rgba(255,255,255,.4);cursor:pointer}
 #wanderbuch .dgtray button.on{outline:3px solid #c27a3a;background:#fff}

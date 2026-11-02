@@ -51,16 +51,15 @@ async function run(tag, url) {
   }
   const hold = (on) => ev((on) => { const r = VR.game.renderer; if (on && !r.__hold) { r.__hold = r.render; r.render = function () {}; } else if (!on && r.__hold) { r.render = r.__hold; r.__hold = null; } }, on);
   // vitals: low health, a hit
-  await ev(() => { const p = VR.game.player; p.health = 5; });
-  await wait(1600);
-  await ev(() => { const p = VR.game.player; p.health = 4; });
-  await wait(2500); await hold(true); await wait(400); await shot('vitals'); await hold(false);
+  // (peaceful heals fast: the health held low while the edge comes)
+  for (let i = 0; i < 8; i++) { await ev((h) => { const p = VR.game.player; p.health = h; }, i < 7 ? 5 : 4); await wait(350); }
+  await hold(true); await ev(() => { VR.game.player.health = 4; }); await wait(1200); await shot('vitals'); await hold(false);
   if (tag === 'after') { const o = await ev(() => +getComputedStyle(document.getElementById('dgvig') || document.body).opacity); check(o > 0.2, 'after: the edge shows at 4 of 20 (' + o + ')'); }
   await ev(() => { const p = VR.game.player; p.health = 20; });
   await wait(1200);
   // the book
   await ev((tag) => { const g = VR.game, W = VR.Wander, B = W.book(g.meta); for (const n of W.NAMES.slice(0, 6)) B.stickers[n] = 1; B.places['l:x1'] = 'Mühlbach'; B.places['l:x2'] = 'Birkenhain'; B.people.a = 'Ilse'; B.people.b = 'Tomek'; B.creatures.fox = 1; B.creatures.rabbit = 1; B.recipes.applecake = 1; if (tag === 'after') B.board = [[W.NAMES[0], 30, 40, -8], [W.NAMES[2], 62, 58, 12]]; W.open(g); }, tag);
-  await hold(true); await wait(1200); await shot('book');
+  await hold(true); await wait(2500); await shot('book');
   if (tag === 'after') {
     const n = await ev(() => document.querySelectorAll('#wanderbuch .dgpage').length);
     check(n === 2, 'after: the book has two pages open (' + n + ')');
