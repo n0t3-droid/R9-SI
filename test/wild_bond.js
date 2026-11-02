@@ -55,7 +55,7 @@ console.log('(a) coats');
   check(Object.keys(B.KINDS).every(k => B.coatSpec(k, 0, false) && B.PATTERNS[B.KINDS[k].coat]), 'every kind has a coat');
   const t0 = process.hrtime.bigint(); for (let i = 0; i < 12; i++) B.coat(100 + i, ['spots', 'stripes', 'dapples'][i % 3]);
   const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 12;
-  check(ms < 25, `a coat takes ${ms.toFixed(1)} ms (< 25, once per variant)`);
+  check(ms < 6, `a coat takes ${ms.toFixed(1)} ms (< 6, once per variant)`);
   check(B.sample(a, -3, 5, 40) === B.sample(a, -3, 5, 40) && B.mix(0x000000, 0xffffff, 0.5) === 0x808080, 'sampling wraps; colours mix');
 }
 

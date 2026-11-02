@@ -57,13 +57,17 @@
   // → Uint8Array n×n, 0 (ground colour) … 255 (pattern colour), softened once (a 3×3 binomial blur)
   B.coat = function (seed, pat, n) {
     n = n || B.N;
-    const q = B.PATTERNS[pat] || B.PATTERNS.spots, off = hood(B.PATTERNS[pat] ? pat : 'spots'), r = B.rng(seed), N = n * n, W = n * 8;
+    const q = B.PATTERNS[pat] || B.PATTERNS.spots, off = hood(B.PATTERNS[pat] ? pat : 'spots'), r = B.rng(seed), N = n * n;
     let c = new Uint8Array(N), c2 = new Uint8Array(N);
     for (let i = 0; i < N; i++) c[i] = r() < q.p0 ? 1 : 0;
+    // (wrap tables instead of a modulo per neighbour: ~3× faster)
+    const L = off.length / 3, ox = new Int32Array(L), oy = new Int32Array(L), ow = new Float32Array(L), wr = new Int32Array(n * 3);
+    for (let k = 0; k < L; k++) { ox[k] = off[k * 3]; oy[k] = off[k * 3 + 1]; ow[k] = off[k * 3 + 2]; }
+    for (let i = 0; i < n * 3; i++) wr[i] = i % n;
     for (let it = 0; it < 6; it++) {
       for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
         let s = 0;
-        for (let k = 0; k < off.length; k += 3) if (c[((y + off[k + 1] + W) % n) * n + (x + off[k] + W) % n]) s += off[k + 2];
+        for (let k = 0; k < L; k++) if (c[wr[y + oy[k] + n] * n + wr[x + ox[k] + n]]) s += ow[k];
         c2[y * n + x] = s > 0 ? 1 : s < 0 ? 0 : c[y * n + x];
       }
       const t = c; c = c2; c2 = t;

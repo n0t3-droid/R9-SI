@@ -76,9 +76,11 @@
         const ec = EYE_COL[kind] || (orig && cdist(orig, 0x101010) < 200 ? 0x1a1420 : 0x1a1420);
         const above = head.get(e[0], e[1] + 2, e[2]) & 0xffffff || base, lid = B.mix(above, 0x000000, 0.18);
         const cells = [[e[0], e[1], e[2]], [e[0], e[1] + 1, e[2]], [e[0] + e[3], e[1], e[2] + e[4]], [e[0] + e[3], e[1] + 1, e[2] + e[4]]];
-        cells.forEach(([x, y, z], i) => {
+        cells.forEach(([x, y, z0], i) => {
+          let z = z0; while (i > 0 && !filled(head, x, y, z) && z < z0 + 2) z++;   // (a round face: the eye's cell one deeper)
           if (!filled(head, x, y, z) && i > 0) return;
-          head.set(x, y, z, i === 3 || (i === 1 && !e[3] && !e[4]) ? 0xffffff : ec, 0);
+          const g3 = filled(head, cells[3][0], cells[3][1], cells[3][2]) || filled(head, cells[3][0], cells[3][1], cells[3][2] + 1);
+          head.set(x, y, z, i === 3 || (i === 1 && !g3) ? 0xffffff : ec, 0);   // the catchlight: up front, or on top
           shut.set(x, y, z, i === 0 || i === 2 ? B.mix(lid, 0x000000, 0.25) : lid, 0);
         });
       }
@@ -350,11 +352,14 @@
     }
     visit(f, home) {
       const g = this.g, w = g.world, ent = g.entities; if (!ent || !w) return null;
-      for (let k = 0; k < 8; k++) {
+      for (let k = 0; k < 16; k++) {
         const a = Math.random() * Math.PI * 2, x = Math.floor(home[0] + Math.cos(a) * 14), z = Math.floor(home[2] + Math.sin(a) * 14);
         if (!w.isLoaded(x, z)) continue;
         const top = w.topAt(x, z);
         if (!(VR.R.T.flags[w.getBlock(x, top, z)] & VR.F.SOLID) || Math.abs(top - home[1]) > 8) continue;
+        let clear = true;   // (a straight walk to the door: no wall in the way)
+        for (let s = 1; s < 8 && clear; s++) { const sx = Math.floor(x + (home[0] + 1.5 - x) * s / 8), sz = Math.floor(z + (home[2] + 1.5 - z) * s / 8), b = w.getBlock(sx, Math.floor(home[1]), sz); if (b && (VR.R.T.flags[b] & VR.F.SOLID)) clear = false; }
+        if (!clear) continue;
         const m = ent.summon(f.kind, x + 0.5, top + 1, z + 0.5); if (!m) return null;
         const h = this.attach(m);
         h.bond = f; h.visit = { stay: B.VISIT_STAY, home, hearts: 0 };
