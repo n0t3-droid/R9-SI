@@ -216,21 +216,24 @@ try {
     const P = [B.x0 - 1, Math.max(B.y0 + 4.5, (await top(B.x0 - 1, B.z0 - 11)) + 3), B.z0 - 11], T = [B.x0 + 4, B.y0 + 0.5, B.z0];
     views.push({ name: 'home', P, T, tod: NIGHT, prep: async () => { await run(10); } });
   }
-  // ---------------------------------------------------------------- the pictures: all befores, then all afters
-  for (const c of ['before', 'after']) {
-    console.log(c + ': ' + await config(c));
-    for (const v of views) {
-      await photoOff();
-      if (v.prep) await v.prep();
-      let P = v.P, T = v.T;
-      if (v.dyn) { const d = await v.dyn(); if (!d) { console.log('     ' + v.name + ': nobody'); continue; } P = d.P; T = d.T; }
-      await camAt(P, T, v.tod); await settle(25); await run(10);
-      const nb = await shown(); if (nb) console.log('     ' + v.name + ': ' + nb + ' near columns not shown: ' + await ev(() => window.__bad));
-      if (v.dyn) { const d = await v.dyn(); if (d) { P = d.P; T = d.T; await camAt(P, T, v.tod); } }   // (the bearer walked on while the place settled: the frame again, at once)
+  // ---------------------------------------------------------------- the pictures: each view before | after, back to back
+  // (run 4: all befores then all afters — the world's streaming stalled on the second round of trips (the same in both
+  // configurations: lfdiag, 309 sections unmeshed with lfPools off and on), so an 'after' showed the far tiles where the
+  // 'before' had the town: now each pair shares one streamed state)
+  for (const v of views) {
+    await photoOff();
+    if (v.prep) await v.prep();
+    let P = v.P, T = v.T;
+    if (v.dyn) { const d = await v.dyn(); if (!d) { console.log('     ' + v.name + ': nobody'); continue; } P = d.P; T = d.T; }
+    await camAt(P, T, v.tod); await settle(25); await run(10);
+    const nb = await shown(); if (nb) console.log('     ' + v.name + ': ' + nb + ' near columns not shown: ' + await ev(() => window.__bad));
+    if (v.dyn) { const d = await v.dyn(); if (d) { P = d.P; T = d.T; await camAt(P, T, v.tod); } }   // (the bearer walked on while the place settled: the frame again, at once)
+    for (const c of ['before', 'after']) {
+      await config(c);
       N.cams[v.name + '_' + c] = { P, T };
       const f = await grab(v.name + '_' + c, v.tod, 6);
       const st = await stat(); st.L = f ? await meanL(f) : null; N.stats[v.name + '_' + c] = st;
-      console.log('     ' + v.name + ' ' + c + ' ' + JSON.stringify(st));
+      console.log('     ' + v.name + ' ' + c + ' ' + JSON.stringify(st).slice(0, 260));
     }
   }
   for (const v of views) {
