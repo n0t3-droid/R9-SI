@@ -466,9 +466,16 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     x.fillStyle = '#efe0bf'; x.fillRect(0, 0, w, h);
     if (M && M.renderBig && M.big) {
       const c0 = M.center, s0 = M.scale;
-      try { M.center = [g.player.pos[0], g.player.pos[2]]; M.scale = 2; M.renderBig(); } finally { M.center = c0; M.scale = s0; }
+      const rd = (g.world && g.world.renderDist) || (g.settings && g.settings.renderDist) || 8; B.mapScale = clamp(rd * 16 * 2.2 / 640, 0.25, 2);
+      try { M.center = [g.player.pos[0], g.player.pos[2]]; M.scale = B.mapScale; M.renderBig(); } finally { M.center = c0; M.scale = s0; }
       try { x.filter = 'sepia(0.9) saturate(0.55) contrast(0.92) brightness(1.08)'; } catch (e) { /* no filter: the plain colours */ }
       x.globalAlpha = 0.92; x.drawImage(M.big, 0, 0, w, h); x.globalAlpha = 1; try { x.filter = 'none'; } catch (e) { /* — */ }
+      // the land not seen yet stays paper (the map's dark checker → parchment, a few pencil dots)
+      try {
+        const im = x.getImageData(0, 0, w, h), d = im.data;
+        for (let i = 0, n = 0; i < d.length; i += 4, n++) if (d[i] + d[i + 1] + d[i + 2] < 150) { const dot = ((n * 2654435761) >>> 0) % 97 === 0; d[i] = dot ? 150 : 239; d[i + 1] = dot ? 120 : 224; d[i + 2] = dot ? 90 : 191; }
+        x.putImageData(im, 0, 0);
+      } catch (e) { /* a tainted canvas never happens here; the map stays as drawn */ }
     } else { x.fillStyle = '#6a3d1c'; x.font = 'italic 16px Georgia,serif'; x.textAlign = 'center'; x.fillText(T('g.ux.book.nomap'), w / 2, h / 2); return true; }
     // ink: a wobbly frame, the hatched edge, the rose, you
     x.strokeStyle = 'rgba(59,42,26,.75)'; x.lineWidth = 2.2; x.beginPath();
@@ -480,7 +487,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     x.strokeStyle = '#9b2a1a'; x.lineWidth = 3; x.beginPath(); x.moveTo(w / 2 - 7, h / 2 - 7); x.lineTo(w / 2 + 7, h / 2 + 7); x.moveTo(w / 2 + 7, h / 2 - 7); x.lineTo(w / 2 - 7, h / 2 + 7); x.stroke();
     x.fillStyle = '#9b2a1a'; x.font = 'italic 13px Georgia,serif'; x.fillText(T('g.ux.book.you'), w / 2, h / 2 + 22);
     if (S.goal) {
-      const k = w / (640 * 2), gx = w / 2 + (S.goal.x - g.player.pos[0]) * k, gy = h / 2 + (S.goal.z - g.player.pos[2]) * k;
+      const k = w / (640 * (B.mapScale || 2)), gx = w / 2 + (S.goal.x - g.player.pos[0]) * k, gy = h / 2 + (S.goal.z - g.player.pos[2]) * k;
       x.setLineDash([4, 5]); x.strokeStyle = 'rgba(155,42,26,.7)'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(w / 2, h / 2); x.lineTo(clamp(gx, 12, w - 12), clamp(gy, 12, h - 12)); x.stroke(); x.setLineDash([]);
       x.fillStyle = '#b8742a'; x.font = '18px Georgia,serif'; x.fillText('✦', clamp(gx, 12, w - 12), clamp(gy, 12, h - 12) + 6);
     }

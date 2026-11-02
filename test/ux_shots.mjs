@@ -53,10 +53,14 @@ async function run(tag, url) {
   // vitals: low health, a hit
   // (peaceful heals fast: the health held low while the edge comes)
   for (let i = 0; i < 8; i++) { await ev((h) => { const p = VR.game.player; p.health = h; }, i < 7 ? 5 : 4); await wait(350); }
-  await hold(true); await ev(() => { VR.game.player.health = 4; }); await wait(1200); await shot('vitals'); await hold(false);
+  await ev(() => { const st = document.createElement('style'); st.id = 'uxnotr'; st.textContent = '#dgvig{transition:none!important}'; document.head.appendChild(st); });
+  await hold(true); for (let i = 0; i < 6; i++) { await ev(() => { VR.game.player.health = 4; }); await wait(500); }
+  console.log('  vitals: ' + JSON.stringify(await ev(() => ({ hp: VR.game.player.health, vig: (document.getElementById('dgvig') || {}).style ? document.getElementById('dgvig').style.opacity : null, danger: document.getElementById('stats').className, body: document.body.className.slice(0, 80) }))));
+  await shot('vitals'); await hold(false);
   if (tag === 'after') { const o = await ev(() => +getComputedStyle(document.getElementById('dgvig') || document.body).opacity); check(o > 0.2, 'after: the edge shows at 4 of 20 (' + o + ')'); }
   await ev(() => { const p = VR.game.player; p.health = 20; });
   await wait(1200);
+  if (process.env.VITALS_ONLY !== '1') {
   // the book
   await ev((tag) => { const g = VR.game, W = VR.Wander, B = W.book(g.meta); for (const n of W.NAMES.slice(0, 6)) B.stickers[n] = 1; B.places['l:x1'] = 'Mühlbach'; B.places['l:x2'] = 'Birkenhain'; B.people.a = 'Ilse'; B.people.b = 'Tomek'; B.creatures.fox = 1; B.creatures.rabbit = 1; B.recipes.applecake = 1; if (tag === 'after') B.board = [[W.NAMES[0], 30, 40, -8], [W.NAMES[2], 62, 58, 12]]; W.open(g); }, tag);
   await hold(true); await wait(2500); await shot('book');
@@ -89,6 +93,7 @@ async function run(tag, url) {
     out.costs[tag + '_' + pr] = c; console.log('  cost ' + pr + ' ' + JSON.stringify(c));
   }
   if (tag === 'after') check(out.costs.after_potato.spawns === 0, 'after: Very Low spawns no trail particles');
+  }
   check(!logs.length, tag + ': no page errors' + (logs.length ? ' — ' + logs.slice(0, 3).join(' | ') : ''));
   await page.close();
 }
