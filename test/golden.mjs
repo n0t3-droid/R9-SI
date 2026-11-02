@@ -67,7 +67,7 @@ const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying =
 // before the far columns arrived had the lower half of the spawn black — run 2)
 const loaded = async (C, r) => { for (let i = 0; i < 150; i++) { await step(10, 16); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (dx * dx + dz * dz <= r * r && !w.isLoaded(Math.floor(C[0] + dx), Math.floor(C[2] + dz))) return false; return true; }, [C, r]); if (ok) return true; await wait(30); } return false; };
 const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); await settle(80); await step(20); await settle(20); };
-const freeze = () => ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.camMode = 0; g.settings.fov = 75; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
+const freeze = () => ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.camMode = 0; g.settings.fov = 75; if (VR.Seasons && VR.Seasons.at && g.meta && g.meta.mode === 'creative' && (!g.settings.seasonPick || g.settings.seasonPick === 'auto')) g.settings.seasonPick = VR.Seasons.NAMES[VR.Seasons.at(g.env.day || 0, g.env.timeOfDay, -1).idx];   /* (f-polish8: the season held — the calendar's season of the frozen day, the same picture) */ const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 const preset = (p, rd) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.particles = false; g.applySettings('*'); }, [p, rd]);
 async function trip(to) {
   await ev((to) => VR.Travel.go(VR.game, { dim: to, via: 'cmd' }), to);
@@ -77,15 +77,21 @@ async function trip(to) {
 // the world's picture from the canvas (animals and people not drawn: their walk differs run to run)
 const grabGL = () => ev(() => {
   const g = VR.game, E = g.entities, V = g.villages, keep = [E && E.draw, E && E.drawTranslucent, V && V.draw];
+  const P = g.particles, spawn0 = P && P.spawn;
   try {
     if (E) { E.draw = () => {}; if (E.drawTranslucent) E.drawTranslucent = () => {}; } if (V) V.draw = () => {};
     // the shader clock and the clouds' drift set: both run on with every stepped frame, and how many frames a settle
     // takes differs run to run (run 5: the Very Low pixel clouds over the spawn had moved, worst tile 0.34)
     g.env.anim = 600; g.env.cloudDrift = [540, 0];
-    window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
+    // (f-polish8: the fairy shot flickered in the tree's crown — its blossoms are sub-pixel voxels and the tree breathes
+    // with the fairies' clock (frames played so far); fireflies, spring petals and sparks are particles whose number and
+    // place follow how many frames a settle took: the fairies' clock set, no particle spawned or drawn in a picture)
+    if (VR.Fairy && VR.Fairy.state) VR.Fairy.state.t = 0;
+    if (P) { P.n = 0; P.count = 0; P.spawn = () => -1; }
+    window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); if (VR.Fairy && VR.Fairy.state) VR.Fairy.state.t = 0; if (P) { P.n = 0; P.count = 0; } }
     return g.renderer.gl.canvas.toDataURL('image/png');
   } catch (e) { return null; }
-  finally { window.__norender = true; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; }
+  finally { window.__norender = true; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; if (P) P.spawn = spawn0; }
 });
 const small = (buf) => sharp(buf).resize(CW, CH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
 // one shot: write it, compare it (or make it the reference)

@@ -55,7 +55,16 @@ const settle = async (max = 60) => {
 // before: v-look as merged (its four on by the preset, the two new off); after: the preset's defaults
 // (run 2: the pictures right after the switch lacked the near chunks — the rebuilt programs still compiling: frames
 // drawn until every deferred program is ready)
-const config = (c) => ev((c) => { const g = VR.game, r = g.renderer; r.setQuality({ lfPools: c === 'after' && VR.LField.defaults(g.settings.preset).lfPools }); window.__norender = false; let i = 0; for (; i < 40 && (i < 3 || VR.GL.pending.size); i++) { g.last = performance.now() - 33; window.__step(performance.now()); } window.__norender = true; return 'lfPools=' + (r.q.lfPools ? 1 : 0) + ' (' + i + ' frames, ' + VR.GL.pending.size + ' pending)'; }, c);
+// f-polish8: three configurations — 'before' no pools, 'old' the pools as v-light merged them (every light plain, no
+// point gain, no cap, no low/window shapes, the old ceiling and fairy/bearer strengths: emulated by the field's own
+// constants), 'after' f-polish8's
+const OLDK = { point: 1, low: -1, window: 1, LMAX: 0.9, MAXL: 1e9 };
+const config = (c) => ev(([c, OLDK]) => { const g = VR.game, r = g.renderer, LF = VR.LField, T = VR.R.T;
+  if (!LF.__k) LF.__k = { K: Object.assign({}, LF.K), LMAX: LF.LMAX, MAXL: LF.MAXL };
+  Object.assign(LF.K, LF.__k.K); LF.LMAX = LF.__k.LMAX; LF.MAXL = LF.__k.MAXL; delete T.lfKind;
+  if (c === 'old') { LF.K.point = OLDK.point; LF.K.fairy = 1; LF.K.low = OLDK.low; LF.LMAX = OLDK.LMAX; LF.MAXL = OLDK.MAXL; const kt = LF.kindTable(T); for (let i = 0; i < kt.length; i++) if (T.emit[i]) kt[i] = 1; }
+  if (r.lfField) { r.lfField.started = false; r.lfField.tx.fill(0x7fffffff); }
+  r.setQuality({ lfPools: c !== 'before' && LF.defaults(g.settings.preset).lfPools }); window.__norender = false; let i = 0; for (; i < 40 && (i < 3 || VR.GL.pending.size); i++) { g.last = performance.now() - 33; window.__step(performance.now()); } window.__norender = true; return 'lfPools=' + (r.q.lfPools ? 1 : 0) + ' ' + c + ' (' + i + ' frames, ' + VR.GL.pending.size + ' pending)'; }, [c, OLDK]);
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.applySettings('*'); }, p);
 const grab = async (name, tod, K = 4) => {
   const url = await ev(([tod, K]) => { const g = VR.game; if (tod !== null) { g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } } window.__norender = false; for (let i = 0; i < K; i++) { if (tod !== null) { g.env.setTime(tod); if (g.photoCam && g.photoCam.on) g.photoCam.held = tod; } g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
@@ -112,7 +121,7 @@ import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 const meanL = async (f) => { try { const s = await sharp(f).stats(); return +(0.2126 * s.channels[0].mean + 0.7152 * s.channels[1].mean + 0.0722 * s.channels[2].mean).toFixed(2); } catch (e) { return null; } };
 const stat = () => ev(() => { const g = VR.game, r = g.renderer, f = r.lfField, E = g.env.E, V = g.villages; let car = 0; if (V) for (const a of V.agents) if (a.drawn && a.street && VR.LField.carrier(a)) car++; return { lights: f ? f.stats.lights : 0, dyn: f ? f.stats.dyn : 0, night: +(E.night || 0).toFixed(2), carriers: car, live: !!r.lfLive, jsms: VR.LField.cost.last ? +VR.LField.cost.last.toFixed(2) : null, jsAvg: +(VR.LField.cost.ms || 0).toFixed(2), tod: g.env.timeOfDay | 0, err: VR.LField.err || null, kinds: (() => { if (!f) return null; const c = {}; for (let i = 0; i < f.em.length; i++) if (f.em[i]) { const s = g.world.getBlock(f.tx[i], f.emY[i], f.tz[i]), n = s ? VR.R.types[VR.R.T.type[s]].name : '?'; c[n] = (c[n] || 0) + 1; } return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0] + ' ' + e[1]).join(', '); })() }; });
 const fest = (on, off) => ev(([on, off]) => { const g = VR.game, M = g.villages, day = g.env.day || 0; for (const v of M.known.values()) { if (v.id === on) v.festOff = (3 - (day % 3)) % 3; else if (off === 'all' || v.id === off) v.festOff = (4 - (day % 3)) % 3; } }, [on, off]);
-const carrierNear = (C) => ev((C) => { const g = VR.game, V = g.villages; let best = null, bd = 1e9; for (const a of V.agents) { if (!a.street || a.kid || !VR.LField.carrier(a)) continue; if ((g.world.getLight(Math.floor(a.pos[0]), Math.floor(a.pos[1]) + 1, Math.floor(a.pos[2])) >>> 12) < 13) continue; /* (run 3: one in a bedroom — out under the sky only) */ const d = Math.hypot(a.pos[0] - C[0], a.pos[2] - C[1]); if (d < bd) { bd = d; best = { p: a.pos.slice(), yaw: a.yaw, d }; } } return best; }, C);
+const carrierNear = (C) => ev((C) => { const g = VR.game, V = g.villages; let best = null, bd = 1e9; for (const a of V.agents) { if (!a.street || a.kid || !VR.LField.carrier(a)) continue; const Lt = g.world.getLight(Math.floor(a.pos[0]), Math.floor(a.pos[1]) + 1, Math.floor(a.pos[2])); if ((Lt >>> 12) < 13) continue; /* (run 3: one in a bedroom — out under the sky only) */ const bl = Math.max(Lt & 15, (Lt >> 4) & 15, (Lt >> 8) & 15); /* (f-polish8: a dark lane — the darkest stretch first, then the nearest) */ const d = Math.hypot(a.pos[0] - C[0], a.pos[2] - C[1]) + bl * 25; if (d < bd) { bd = d; best = { p: a.pos.slice(), yaw: a.yaw, d, bl }; } } return best; }, C);
 
 try {
   await page.goto(DIST);
@@ -149,7 +158,7 @@ try {
     const y = (await top(C[0], C[1])) + 1;
     const f = await director([C[0], y, C[1]], 4, 1.4, 1.5);
     views.push({ name: 'street', P: f.P, T: f.T, tod: EVE, prep: async () => { await fest(vF && vF.id !== vS.id ? vF.id : null, vS.id); await run(60); } });   // (the street's village not celebrating)
-    if (want('carry')) views.push({ name: 'carry', tod: EVE, dyn: async () => {
+    if (want('carry')) views.push({ name: 'carry', tod: NIGHT, dyn: async () => {
       const a = await carrierNear(C); if (!a) return null;
       // (run 2: the eye stood in a wall — a ring of places 4 m out, 2 m up: the first in the air that sees the bearer)
       const T = [a.p[0], a.p[1] + 0.8, a.p[2]];
@@ -228,18 +237,21 @@ try {
     await camAt(P, T, v.tod); await settle(25); await run(10);
     const nb = await shown(); if (nb) console.log('     ' + v.name + ': ' + nb + ' near columns not shown: ' + await ev(() => window.__bad));
     if (v.dyn) { const d = await v.dyn(); if (d) { P = d.P; T = d.T; await camAt(P, T, v.tod); } }   // (the bearer walked on while the place settled: the frame again, at once)
-    for (const c of ['before', 'after']) {
+    if (v.name === 'carry') await ev(() => { const V = VR.game.villages; if (V && !V.__upd) { V.__upd = V.update; V.update = function () {}; } });   // (the bearer held in place for the three pictures)
+    for (const c of ['before', 'old', 'after']) {
       await config(c);
       N.cams[v.name + '_' + c] = { P, T };
       const f = await grab(v.name + '_' + c, v.tod, 6);
       const st = await stat(); st.L = f ? await meanL(f) : null; N.stats[v.name + '_' + c] = st;
       console.log('     ' + v.name + ' ' + c + ' ' + JSON.stringify(st).slice(0, 260));
     }
+    await ev(() => { const V = VR.game.villages; if (V && V.__upd) { V.update = V.__upd; delete V.__upd; } });
   }
   for (const v of views) {
     const a = N.stats[v.name + '_after'], b = N.stats[v.name + '_before']; if (!a || !b) continue;
     if (v.name !== 'carry') check(a.live && a.lights > 0, v.name + ': the field live, ' + a.lights + ' lights, ' + a.dyn + ' moving');
     if (v.name === 'home' || v.name === 'street' || v.name === 'haven') check(a.L > b.L, v.name + ': brighter with the pools (L ' + b.L + ' → ' + a.L + ')');
+    const o = N.stats[v.name + '_old']; if (o && v.name !== 'festival') console.log('     ' + v.name + ': L ' + b.L + ' · v-light ' + o.L + ' · f-polish8 ' + a.L + ' (lights ' + o.lights + ' → ' + a.lights + ')');
   }
   // ---------------------------------------------------------------- the costs (the street view, A B B A)
   if (want('cost') && N.cams.street_after) {
@@ -248,14 +260,14 @@ try {
     const passes = () => ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; });
     for (const pr of ['potato', 'high']) {
       await photoOff(); await preset(pr); await camAt(P, T, EVE); await settle(25);
-      const r = { before: [], after: [], passes: {} };
-      for (const c of ['before', 'after', 'after', 'before']) { if (r.cur !== c) { await config(c); await run(2); r.cur = c; } if (!r.passes[c]) r.passes[c] = await passes(); for (let k = 0; k < 3; k++) r[c].push(await ms(6)); }
+      const r = { before: [], old: [], after: [], passes: {} };
+      for (const c of (pr === 'high' ? ['before', 'old', 'after', 'after', 'old', 'before'] : ['before', 'after', 'after', 'before'])) { if (r.cur !== c) { await config(c); await run(2); r.cur = c; } if (!r.passes[c]) r.passes[c] = await passes(); for (let k = 0; k < 3; k++) r[c].push(await ms(6)); }
       delete r.cur;
       r.jsms = await ev(() => VR.LField.cost.ms ? +VR.LField.cost.ms.toFixed(3) : 0);
       r.prog = await ev(() => Object.keys(VR.game.renderer.P).length);
       const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2).toFixed(1); };
-      N.cost[pr] = { before: med(r.before), after: med(r.after), minBefore: +Math.min(...r.before).toFixed(1), minAfter: +Math.min(...r.after).toFixed(1), jsms: r.jsms, all: r };
-      console.log('     cost ' + pr + ' ' + JSON.stringify({ before: N.cost[pr].before, after: N.cost[pr].after, min: [N.cost[pr].minBefore, N.cost[pr].minAfter], jsms: r.jsms, passes: [r.passes.before.n, r.passes.after.n] }));
+      N.cost[pr] = { before: med(r.before), old: r.old.length ? med(r.old) : null, after: med(r.after), minBefore: +Math.min(...r.before).toFixed(1), minAfter: +Math.min(...r.after).toFixed(1), jsms: r.jsms, all: r };
+      console.log('     cost ' + pr + ' ' + JSON.stringify({ before: N.cost[pr].before, old: N.cost[pr].old, after: N.cost[pr].after, min: [N.cost[pr].minBefore, N.cost[pr].minAfter], jsms: r.jsms, passes: [r.passes.before.n, r.passes.after.n] }));
       save();
     }
     const P0 = N.cost.potato.all.passes; check(JSON.stringify(P0.before) === JSON.stringify(P0.after), 'Very Low: the same passes and bytes (' + P0.after.n + ' passes)');
@@ -263,9 +275,9 @@ try {
   }
   save();
   // ---------------------------------------------------------------- the sheet
-  const labs = { street: 'Dorfstraße am Abend', carry: 'Laternenträger', festival: 'Festplatz beim Feuerwerk', fairy: 'Märchenort bei Nacht', haven: 'Palmenhafen bei Nacht', home: 'Eigene Siedlung mit Laternenzaun' };
+  const labs = { street: 'Dorfstraße am Abend', carry: 'Laternenträger in dunkler Gasse', festival: 'Festplatz beim Feuerwerk', fairy: 'Märchenort bei Nacht', haven: 'Palmenhafen bei Nacht', home: 'Eigene Siedlung mit Laternenzaun' };
   const rows = [];
-  for (const v of ['street', 'carry', 'festival', 'fairy', 'haven', 'home']) { const imgs = ['before', 'after'].map(c => N.pics[v + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: labs[v] + ' — vorher | Lichtpfützen', imgs }); }
+  for (const v of ['street', 'carry', 'festival', 'fairy', 'haven', 'home']) { const imgs = ['before', 'old', 'after'].map(c => N.pics[v + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: labs[v] + ' — ohne | v-light | f-polish8', imgs }); }
   if (rows.length) {
     const spec = ROOT + '/.tmp_tests/light_sheet_' + TAG + '.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
     try { console.log('     ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'light_sheet' + (TAG === 'after' ? '' : '_' + TAG) + '.jpg', spec]).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message.slice(0, 200)); }
