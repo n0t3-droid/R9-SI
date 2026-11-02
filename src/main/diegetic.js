@@ -111,8 +111,8 @@
 #dgrose .tick.wp i{color:#9fe3ff;font-size:9px;text-shadow:0 0 4px rgba(120,200,255,.8),0 0 1px #000}
 #dgrose .me{position:absolute;left:50%;top:50%;width:0;height:0;margin:-6px 0 0 -4px;border:4px solid transparent;border-bottom:9px solid rgba(255,244,220,.85);border-top:0}
 body.dg-rose #hud #minimap,body.dg-rose #hud #compass{display:none!important}
-#dgvig{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .9s ease;background:radial-gradient(ellipse at 50% 50%,transparent 52%,var(--dgv,rgba(90,0,8,.9)) 100%)}
-#dgpulse{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,var(--dgp,rgba(140,10,20,.8)) 100%)}
+#dgvig{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .9s ease;background:radial-gradient(ellipse farthest-side at 50% 50%,transparent 58%,var(--dgv,rgba(90,0,8,.9)) 112%)}
+#dgpulse{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;background:radial-gradient(ellipse farthest-side at 50% 50%,transparent 45%,var(--dgp,rgba(140,10,20,.8)) 110%)}
 #dgpulse.go{animation:dgpulse .65s ease-out}
 @keyframes dgpulse{0%{opacity:0}18%{opacity:var(--dgpa,.32)}100%{opacity:0}}
 body.dg-vit #hud #stats:not(.dg-danger){opacity:0!important;pointer-events:none}

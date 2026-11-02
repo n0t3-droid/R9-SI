@@ -9,6 +9,7 @@
 // regress: skip  (a picture run)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
+import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 const ROOT = new URL('../', import.meta.url).pathname;
 const SHOTS = ROOT + 'test/shots/';
 const AFTER = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
@@ -56,7 +57,13 @@ async function run(tag, url) {
   await ev(() => { const st = document.createElement('style'); st.id = 'uxnotr'; st.textContent = '#dgvig{transition:none!important}'; document.head.appendChild(st); });
   await hold(true); for (let i = 0; i < 6; i++) { await ev(() => { VR.game.player.health = 4; }); await wait(500); }
   console.log('  vitals: ' + JSON.stringify(await ev(() => ({ hp: VR.game.player.health, vig: (document.getElementById('dgvig') || {}).style ? document.getElementById('dgvig').style.opacity : null, danger: document.getElementById('stats').className, body: document.body.className.slice(0, 80) }))));
-  await shot('vitals'); await hold(false);
+  await shot('vitals');
+  if (tag === 'after') {   // the edge is seen: the left strip with it and without it (mean brightness)
+    const edge = async () => { const b = await page.screenshot(); const st = await sharp(b).extract({ left: 0, top: 120, width: 60, height: 300 }).stats(); return st.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3; };
+    const withE = await edge(); await ev(() => { document.getElementById('dgvig').style.visibility = 'hidden'; }); const without = await edge(); await ev(() => { document.getElementById('dgvig').style.visibility = ''; });
+    check(withE < without * 0.85, `after: the edge darkens the screen's side (${withE.toFixed(1)} vs ${without.toFixed(1)} without)`);
+  }
+  await hold(false);
   if (tag === 'after') { const o = await ev(() => +getComputedStyle(document.getElementById('dgvig') || document.body).opacity); check(o > 0.2, 'after: the edge shows at 4 of 20 (' + o + ')'); }
   await ev(() => { const p = VR.game.player; p.health = 20; });
   await wait(1200);
