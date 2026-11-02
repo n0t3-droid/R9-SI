@@ -69,6 +69,19 @@ if (free.real) for (let i = 0; i < 40; i++) { await step(10, 50); if (await ev((
 const st1 = await ev(() => { const r = VR.Gossip.test.rec(); return { deeds: r.deeds.map(d => [d.k, d.pl, Math.round(d.x), Math.round(d.z)]), day: VR.game.env.day || 0 }; });
 run.free = free; run.st1 = st1;
 check(st1.deeds.some(d => d[0] === 'freed'), `the outpost freed (${free.real ? 'its own moment' : 'the test API'}): the stream holds ${JSON.stringify(st1.deeds)}`);
+const shotLine = async (what, key) => {   // the moment a kind of line is said: look at the speaker, a picture
+  // (an eye 4.5 m from the speaker and 1.6 m over its head, on the side where the line of sight is free air)
+  const ok = await ev((w) => { const L = VR.Gossip.log.filter(l => l.what === w).pop(); if (!L || (Date.now() - L.t) > 6000) return false; let b = null; for (const q of VR.game.villages.agents) if (q.p.id === L.who) b = q; if (!b || !b.bubble) return false;
+    const g = VR.game, p = g.player, W = g.world, R = VR.R, solid = (x, y, z) => { const st = W.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(st && (R.T.flags[st] & VR.F.SOLID)); };
+    let best = null;
+    for (let k = 0; k < 16 && !best; k++) { const an = k / 16 * Math.PI * 2 + 0.3, ex = b.pos[0] + Math.cos(an) * 4.5, ez = b.pos[2] + Math.sin(an) * 4.5, ey = b.pos[1] + 3.2; let clear = true; for (let s2 = 0; s2 <= 1.0001 && clear; s2 += 0.1) if (solid(ex + (b.pos[0] - ex) * s2, ey + (b.pos[1] + 1.4 - ey) * s2, ez + (b.pos[2] - ez) * s2) || solid(ex, ey - 1, ez)) clear = false; if (clear) best = [ex, ey, ez]; }
+    if (!best) best = [b.pos[0] + 3, b.pos[1] + 4, b.pos[2] + 3];
+    p.flying = true; p.teleport(best[0], best[1] - 1.6, best[2]); p.vel = [0, 0, 0];
+    const dx = b.pos[0] - best[0], dy = b.pos[1] + 1.3 - best[1], dz = b.pos[2] - best[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw;
+    b.bubble.t = Math.max(b.bubble.t, 3); return true; }, what);
+  if (ok) { await step(4, 33); await ev(() => { for (const q of VR.game.villages.agents) if (q.bubble) q.bubble.t = Math.max(q.bubble.t, 2); }); await shotDom(key, 'gossip_' + key + '.png'); return true; } return false;
+};
+const shotDone = {};
 // ---------------------------------------------------------------- 2 · a far village, three days later
 // (the Heartland keeps 720 m round its middle free of villages: look from farther out when none is in the list)
 const pickFar = () => ev((F) => {
@@ -104,7 +117,7 @@ if (tgt) {
 const follow = () => ev(() => { const g = VR.game, a = window.__gsWho; if (!a || a.bubble || Math.hypot(a.pos[0] - g.player.pos[0], a.pos[2] - g.player.pos[2]) > 4) { const b = g.villages.agents.find(x => !x.kid && x.pose !== 'sleep' && !x.bubble && x.vil === (a && a.vil)); if (b) window.__gsWho = b; } const q = window.__gsWho; if (!q) return; g.player.teleport(q.pos[0] + 1.6, q.pos[1] + 0.2, q.pos[2] + 1.6); });
 for (let i = 0; i < 16 && !greet; i++) { await follow(); await step(10, 33); greet = await ev(() => VR.Gossip.test.log().find(l => l.what === 'greet' || l.what === 'ref') || null); }
 run.gsState = await ev(() => VR.Gossip.test.state()); console.log('  gossip state ' + JSON.stringify(run.gsState));
-  if (greet) { await ev(() => { const a = window.__gsWho, p = VR.game.player, gl = VR.Gossip.log; const L = gl.find(l => l.what === 'greet' || l.what === 'ref'); let b = null; for (const q of VR.game.villages.agents) if (q.p.id === L.who) b = q; if (b) { const e = [p.pos[0], p.pos[1] + 1.6, p.pos[2]]; p.yaw = Math.atan2(-(b.pos[0] - e[0]), -(b.pos[2] - e[2])); p.viewYaw = p.yaw; if (b.bubble) b.bubble.t = 4; } void a; }); await shotDom('greet', 'gossip_greet.png'); }
+  if (greet) await shotLine(greet.what, 'greet');
   run.greet = greet;
   check(!!greet && /Leuchtfeuer|Mila/.test(greet.text), `a stranger (${who}) greets you by it: „${greet && greet.text}“`);
   // longer there: no repeat by the same person
@@ -136,13 +149,11 @@ await stand([PZ[0] + 4, PZ[1] + 3.2, PZ[2] - 1], [PZ[0] - 3, PZ[1] + 0.8, PZ[2] 
 await step(6, 33);
 await shotDom('day', 'gossip_city_day.png');
 await grab('day3d', 'gossip_city_day_3d.png', 6);
+// the day's moments in the city: the children's play, the neighbours' talk (once per village and deed — whenever they come)
+await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; VR.Gossip.test.cool(); });
+for (let i = 0; i < 40 && !(shotDone.kid && shotDone.tell); i++) { await step(10, 33); for (const w of ['kid', 'tell']) if (!shotDone[w] && await shotLine(w, w)) { shotDone[w] = true; await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; }); } }
 await ev(() => { VR.game.env.setTime(14200); });
 await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; });
-const shotLine = async (what, key) => {   // the moment a kind of line is said: look at the speaker, a picture
-  const ok = await ev((w) => { const L = VR.Gossip.log.filter(l => l.what === w).pop(); if (!L || (Date.now() - L.t) > 6000) return false; let b = null; for (const q of VR.game.villages.agents) if (q.p.id === L.who) b = q; if (!b || !b.bubble) return false; const p = VR.game.player, dx = b.pos[0] - p.pos[0], dz = b.pos[2] - p.pos[2], d = Math.hypot(dx, dz); p.flying = true; p.teleport(b.pos[0] - dx / d * 5, b.pos[1] + 0.6, b.pos[2] - dz / d * 5); p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.08; p.viewYaw = p.yaw; b.bubble.t = Math.max(b.bubble.t, 3); return true; }, what);
-  if (ok) { await shotDom(key, 'gossip_' + key + '.png'); return true; } return false;
-};
-const shotDone = {};
 await ev(() => VR.Gossip.test.cool());
 for (let i = 0; i < 48 && !(shotDone.verse && shotDone.kid); i++) { await step(10, 33); for (const w of ['verse', 'kid']) if (!shotDone[w] && await shotLine(w, w)) { shotDone[w] = true; await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; }); } }
 const cn = await census();
@@ -160,22 +171,24 @@ const pull = (on) => ev((on) => { const V = VR.game.villages; let vil = null; fo
 for (const preset of process.env.SKIP_COST ? [] : ['potato', 'high']) {
   await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('*'); }, preset);
   await settle(10);
-  for (const on of [false, true, false, true]) {
+  for (const on of [false, true, true, false, false, true]) {   // (ABBA: the machine's load drifts)
     await pull(on);
-    const r = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let i = 0; i < 8; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return +ms[4].toFixed(1); });
+    const r = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let i = 0; i < 9; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return +ms[4].toFixed(1); });   // (warm-up 8 frames after the change: the people's models are built)
     (cost[preset + (on ? '_on' : '_off')] || (cost[preset + (on ? '_on' : '_off')] = [])).push(r);
   }
 }
 const mn = (a) => Math.min(...a);
 run.cost = cost; run.gscost = await ev(() => VR.Gossip.cost);
 save(); console.log('  cost ' + JSON.stringify(cost) + ' gossip ' + JSON.stringify(run.gscost));
-if (!process.env.SKIP_COST) check(mn(cost.potato_on) <= mn(cost.potato_off) * 1.15 + 2, `Very Low: townsfolk there ${mn(cost.potato_on)} ms, removed ${mn(cost.potato_off)} ms (High ${mn(cost.high_on)} / ${mn(cost.high_off)} ms)`);
+const md = (a) => { const q = a.slice().sort((x, y) => x - y); return q[q.length >> 1]; };
+run.costMed = { potato_on: md(cost.potato_on || [0]), potato_off: md(cost.potato_off || [0]), high_on: md(cost.high_on || [0]), high_off: md(cost.high_off || [0]) };
+if (!process.env.SKIP_COST) check(run.costMed.potato_on <= run.costMed.potato_off * 1.15 + 2, `Very Low (medians of three ABBA rounds): townsfolk there ${run.costMed.potato_on} ms, removed ${run.costMed.potato_off} ms (High ${run.costMed.high_on} / ${run.costMed.high_off} ms; mins ${mn(cost.potato_on)} / ${mn(cost.potato_off)} · ${mn(cost.high_on)} / ${mn(cost.high_off)})`);
 const rt = await ev(() => { const g = VR.game, G = VR.Gossip, a = JSON.stringify(g.meta.gossip), b = JSON.stringify(G.save(G.load(JSON.parse(a)))); return { same: a === b, bytes: a.length }; });
 check(rt.same, `the save record round-trips (${rt.bytes} bytes)`);
 check(!logs.some(l => /pageerror|gossip|citylife/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 4).join(' · ') : ''));
 save();
 const row = (label, ks) => ({ label, imgs: ks.map(k => pics[k]).filter(Boolean) });
-const rows = [row('Drei Tage später, ein fernes Dorf: eine Fremde grüßt dich nach deiner Tat', ['greet']), row('Palmenhafen am Tag: Händler, Spaziergänger, Kinder am Platz', ['day', 'day3d']), row('Palmenhafen in der Nacht: Nachtschwärmer, das Fest · der Musikant singt von deiner Tat · Kinder spielen sie nach', ['night', 'verse', 'kid'])].filter(r => r.imgs.length);
+const rows = [row('Drei Tage später, ein fernes Dorf: eine Fremde grüßt dich nach deiner Tat', ['greet']), row('Palmenhafen am Tag: Händler, Spaziergänger, Kinder am Platz', ['day', 'day3d']), row('Palmenhafen in der Nacht: Nachtschwärmer, das Fest · der Musikant singt von deiner Tat', ['night', 'verse']), row('Kinder spielen deine Tat nach · Nachbarn erzählen sie weiter', ['kid', 'tell'])].filter(r => r.imgs.length);
 if (rows.length) { fs.writeFileSync(ROOT + '/.tmp_tests/gossip_sheet.json', JSON.stringify({ w: 620, rows })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'gossip_sheet.jpg', ROOT + '/.tmp_tests/gossip_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 await browser.close();
