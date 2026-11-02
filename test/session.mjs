@@ -396,11 +396,16 @@ function pageHelpers(win, VRx) {
       const d = Math.hypot(x - p.pos[0], z - p.pos[2]); if (d <= near) { I.keys.delete('KeyW'); return true; }
       // a-adventure: along A*'s way (replanned when the target moved 2 m, every 4 s, or when stuck); straight when none
       const W = A.way; if (!W || Math.hypot(W.tx - x, W.tz - z) > 2 || S.t - W.t > 4 || W.stuck) { const pts = S.astar(x, z, Math.max(0.8, near - 0.3)); A.way = { tx: x, tz: z, t: S.t, pts: pts || [], i: 0, ok: !!pts }; A.plans = (A.plans | 0) + 1; if (!pts) A.noway = (A.noway | 0) + 1; }
-      let sx = x, sz = z; const Wy = A.way; while (Wy.ok && Wy.i < Wy.pts.length - 1 && Math.hypot(Wy.pts[Wy.i][0] - p.pos[0], Wy.pts[Wy.i][1] - p.pos[2]) < 0.9) Wy.i++;
+      let sx = x, sz = z; const Wy = A.way;
+      // (f-polish10: run 2 stood 125 s against one wall 0.3 m ahead, A* giving the same way each time — after 4 jumps in
+      // one spot a 2-s step aside, alternately left and right, then the way again)
+      if (A.det && S.t < A.det.t) { const off = turnTo(p, A.det.x, A.det.z, dt, 5); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW'); return false; } while (Wy.ok && Wy.i < Wy.pts.length - 1 && Math.hypot(Wy.pts[Wy.i][0] - p.pos[0], Wy.pts[Wy.i][1] - p.pos[2]) < 0.9) Wy.i++;
       if (Wy.ok && Wy.pts.length) { const q = Wy.pts[Math.min(Wy.i + 1, Wy.pts.length - 1)]; sx = q[0]; sz = q[1]; }
       const off = turnTo(p, sx, sz, dt, 5); if (off > 1.0) I.keys.delete('KeyW'); else I.keys.add('KeyW');
       const lm = A.last; if (Math.hypot(p.pos[0] - lm[0], p.pos[2] - lm[1]) > 0.6) { lm[0] = p.pos[0]; lm[1] = p.pos[2]; lm[2] = S.t; }
-      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; if (A.way) A.way.stuck = true; }
+      if (A.jumpT > 0) { A.jumpT -= dt; if (A.jumpT <= 0) I.keys.delete('Space'); } else if (S.t - lm[2] > 1.2) { I.keys.add('Space'); A.jumpT = 0.25; lm[2] = S.t; S.stat.jumps++; if (A.way) A.way.stuck = true;
+        const sp = A.spot && Math.hypot(A.spot[0] - p.pos[0], A.spot[1] - p.pos[2]) < 1.5 ? A.spot : (A.spot = [p.pos[0], p.pos[2], 0]); sp[2]++;
+        if (sp[2] >= 4) { sp[2] = 0; A.detN = (A.detN | 0) + 1; const a = Math.atan2(z - p.pos[2], x - p.pos[0]) + (A.detN % 2 ? 1.9 : -1.9); A.det = { x: p.pos[0] + Math.cos(a) * 5, z: p.pos[2] + Math.sin(a) * 5, t: S.t + 2 }; S.stat.detours = (S.stat.detours | 0) + 1; } }
       return false;
     };
     if (!site) { const o = g.meta && g.meta.advStart && g.meta.advStart.out; if (o) go(o[0], o[2], 12); if (A.t > 40) { A.why = 'no site'; S.done = true; } return; }
