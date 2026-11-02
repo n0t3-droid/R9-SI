@@ -246,3 +246,11 @@ These browser tests got new checks in this change and have not been run since (o
 
 Browser tests that already printed a summary before this change and were not run here: `bridge.mjs`, `catalog.mjs`, `create_standalone.mjs`, `deadends.mjs`, `favs.mjs`, `house_genie.mjs`, `imagine.mjs`, `modern_pack.mjs`, `player2.mjs`, `projects.mjs`, `site_plan.mjs`, `spawn.mjs`, `studio_live.mjs`, `workbench.mjs`, `world_style.mjs`.
 
+
+## The release gate (w-golden, 2026-11-02)
+- `release_gate.sh` — smoke → golden → monkey in sequence; `GATE ALL OK` / `GATE FAILED n` (docs/process/RELEASE.md).
+- `golden.mjs` — nine deterministic shots (seed 4242; Very Low + Balanced) against `test/golden/*.png` by windowed SSIM
+  (luma, chroma, worst of 8 × 8 tiles); a failure writes `test/shots/golden_<id>_diff.png`; `UPDATE=1` refreshes.
+- `golden_ssim.js` (the comparison) · `golden_ssim_unit.js` (node: its behaviour on made-up pictures).
+- `monkey.mjs` — 3 min of seeded random input, save → reload → 30 s; page errors, soft-locks, NaN, a lost save.
+- `starmap_creative.js` (node) — the star map in a creative world (systemsNear with a 1e6-ly range; the range sphere).
