@@ -164,6 +164,7 @@ async function scenes() {
   // stand on the plaza
   await ev(([x, y, z]) => { const p = VR.game.player, w = VR.game.world; p.flying = false; p.noclip = false; const h = w.topAt ? w.topAt(Math.floor(x + 3), Math.floor(z + 3)) : y; p.teleport(x + 3, (h > 0 ? h + 1 : y + 1), z + 3); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, HP.plaza);
   await step(120, 33);
+  await ev((P) => { window.__plaza = P; }, HP.plaza);
   const B = OUT.scenes = { shots: {} };
   // B1 · the crowd: six near you speak at once
   if (want('bubbles')) {
@@ -186,17 +187,21 @@ async function scenes() {
     for (const tt of T) {
       const st = await ev(([tt, used]) => {
         const g = VR.game, V = g.villages, TE = VR.TaleEnd, p = g.player.pos; if (!TE) return { err: 'no TaleEnd' };
-        const ok = (a) => a.p && !a.kid && a.pose !== 'sleep' && a.pose !== 'sit' && used.indexOf(String(a.p.id)) < 0 && Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < 30;
+        const ok = (a) => a.p && !a.kid && a.pose !== 'sleep' && a.pose !== 'sit' && used.indexOf(String(a.p.id)) < 0 && Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < 40;
         const famOf = (a) => V.agents.filter(b => b !== a && b.p && b.p.fam === a.p.fam && b.pose !== 'sleep');
         let gv = null, kid = null;
         if (tt === 'lost') { for (const a of V.agents) { if (!ok(a)) continue; const k = V.agents.find(b => b.kid && b.p.fam !== a.p.fam && b.pose !== 'sleep'); if (k) { gv = a; kid = k; break; } } }
         else gv = V.agents.filter(ok).sort((x, y) => famOf(y).length - famOf(x).length)[0];
         if (!gv) return { err: 'no friend' };
-        // the friend 6 m from you, the partner a few metres beyond (a fresh start each time, on the plaza)
-        const ang = { lost: 0.4, ingr: 1.6, home: 2.8, letter: 4.0, beacon: 5.2 }[tt];
-        const put = (a, d, side) => { const x = p[0] - Math.sin(g.player.yaw + ang) * d + side, z = p[2] - Math.cos(g.player.yaw + ang) * d; const h = g.world.topAt ? g.world.topAt(Math.floor(x), Math.floor(z)) : p[1] - 1; a.pos = [x, h > 0 ? h + 1 : p[1], z]; a.path = null; a.vel = [0, 0, 0]; a.act = null; a.bubble = null; };
-        put(gv, 6, 0);
-        const pt0 = tt === 'lost' ? kid : (famOf(gv)[0] || null); if (pt0) put(pt0, 9, 1.2);
+        // (f-quiet2 run 2: placed round you, some stood against the hall's walls) — on the plaza: the pair across its
+        // middle, you 7 m off to the side; each template turns the pair a little
+        const ang = { lost: 0.3, ingr: 1.5, home: 2.7, letter: 3.9, beacon: 5.1 }[tt], ux = Math.cos(ang), uz = Math.sin(ang), Pz = window.__plaza;
+        const gy = (x, z) => { const h = g.world.topAt ? g.world.topAt(Math.floor(x), Math.floor(z)) : Pz[1]; return h > 0 ? h + 1 : Pz[1] + 1; };
+        const put = (a, x, z) => { a.pos = [x, gy(x, z), z]; a.path = null; a.goal = null; a.vel = [0, 0, 0]; a.act = null; a.bubble = null; };
+        const cx = Pz[0] + 2 * Math.cos(ang * 2), cz = Pz[2] + 2 * Math.sin(ang * 2);
+        put(gv, cx - ux * 1.6, cz - uz * 1.6);
+        const pt0 = tt === 'lost' ? kid : (famOf(gv)[0] || null); if (pt0) put(pt0, cx + ux * 1.6, cz + uz * 1.6);
+        const pl = g.player, px = cx - uz * 7, pz = cz + ux * 7; pl.teleport(px, gy(px, pz), pz); pl.vel[0] = pl.vel[1] = pl.vel[2] = 0; pl.yaw = Math.atan2(-(cx - px), -(cz - pz)); pl.pitch = -0.15;
         if (tt === 'lost' && kid) kid.pose = 'stand';
         TE.hold = true;
         const ok2 = TE.start(V, { t: tt, giver: gv, kid, text: '„' + (gv.p.name || 'Freund') + ': Danke — ohne dich hätten wir es nie geschafft!"' });
@@ -211,7 +216,7 @@ async function scenes() {
       const touch = await ev(() => { const C = VR.TaleEnd.cur; if (!C) return null; const a = C.gv, b = C.pt; return { pose: [a.pose, b ? b.pose : null], d: b ? +Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]).toFixed(2) : null, cap: VR.TaleEnd.caption(), hud: document.getElementById('hud').style.visibility }; });
       B.shots[tt] = await shotPage('quiet2_end_' + tt + '.png');
       B[tt] = Object.assign({}, st, { touch });
-      check(!!touch && touch.d !== null && touch.d <= 1.6 && (touch.pose[0] === 'hug' || touch.pose[0] === 'stand'), `${tt}: ${st.gv} and ${st.pt} touch (${touch && touch.pose.join('/')}, ${touch && touch.d} m apart), framed by the director: ${st.shot}`);
+      check(!!touch && touch.d !== null && touch.d <= 1.0 && (touch.pose[0] === 'hug' || touch.pose[0] === 'stand'), `${tt}: ${st.gv} and ${st.pt} touch (${touch && touch.pose.join('/')}, ${touch && touch.d} m apart), framed by the director: ${st.shot}`);
       if (tt === 'lost' || tt === 'home') { await ev(() => VR.TaleEnd.seek(5.7)); await step(24, 33); const cap = await ev(() => VR.TaleEnd.caption()); B.shots[tt + '_gift'] = await shotPage('quiet2_end_' + tt + '_gift.png'); B[tt].gift = cap; check(/🎁|💛/.test(cap), tt + ': the gift moment with its caption „' + cap + '"'); }
       await ev(() => { VR.TaleEnd.hold = false; VR.TaleEnd.seek(VR.TaleEnd.DUR + 0.1); }); await step(6, 33);
       const after = await ev(() => ({ cur: !!VR.TaleEnd.cur, hud: document.getElementById('hud').style.visibility, hide: !!VR.game.hideHud }));
@@ -253,7 +258,8 @@ try {
   const rows = [];
   if (fs.existsSync(SHOTS + 'quiet2_before_t3.png')) rows.push({ label: 'vorher | nachher — Abenteuer nach 2½ min: die Wegzeiger oben, die Meldungen links', imgs: [SHOTS + 'quiet2_before_t3.png', SHOTS + 'quiet2_after_t3.png'] });
   if (fs.existsSync(SHOTS + 'quiet2_before_t2.png')) rows.push({ label: 'vorher | nachher — nach 100 s', imgs: [SHOTS + 'quiet2_before_t2.png', SHOTS + 'quiet2_after_t2.png'] });
-  if (S.bubbles) rows.push({ label: 'sechs reden zugleich: zwei Sprechblasen, der Rest 💬', imgs: [S.bubbles] });
+  const bub = S.bubbles || (fs.existsSync(SHOTS + 'quiet2_bubbles.png') ? SHOTS + 'quiet2_bubbles.png' : null);
+  if (bub) rows.push({ label: 'sechs reden zugleich: zwei Sprechblasen, der Rest als kleines Symbol', imgs: [bub] });
   if (S.lost_come || S.lost) rows.push({ label: 'Das verirrte Kind: es läuft der Freundin in die Arme', imgs: [S.lost_come, S.lost].filter(Boolean) });
   if (S.lost_gift) rows.push({ label: 'Das verirrte Kind: das Geschenk', imgs: [S.lost_gift] });
   if (S.ingr || S.letter) rows.push({ label: 'Die Festzutat · der Brief: eine Umarmung mit der Familie', imgs: [S.ingr, S.letter].filter(Boolean) });

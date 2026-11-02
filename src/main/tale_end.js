@@ -47,9 +47,9 @@
     return fam || nb || (P.with === 'kid' ? null : null);
   };
   // where they meet ([x, z]): the friend walks up to GAP m before the partner; mid: between them
-  TE.GAP = 1.0;
-  TE.meet = function (f, p) {
-    const dx = p[0] - f[0], dz = p[1] - f[1], L = Math.hypot(dx, dz) || 1, g = Math.min(TE.GAP, L);
+  TE.GAP = 1.0; TE.GAPS = { hug: 0.5, hands: 0.85 };   // (a hug close, hands at arm's length)
+  TE.meet = function (f, p, gap) {
+    const dx = p[0] - f[0], dz = p[1] - f[1], L = Math.hypot(dx, dz) || 1, g = Math.min(gap || TE.GAP, L);
     const friend = [p[0] - dx / L * g, p[1] - dz / L * g];
     return { friend, mid: [(friend[0] + p[0]) / 2, (friend[1] + p[1]) / 2] };
   };
@@ -80,12 +80,12 @@
     const why = busy(g); if (why) { TE.stats.refused++; TE.log.push(['refused', why]); return false; }
     const plan = TE.PLAN[o.t] || TE.PLAN.letter, pt = TE.partner(o.t, gv, V.agents, o.kid || null), p = g.player.pos;
     // the meeting: the friend walks to the partner (or to you); far away — the friend starts nearer (≤ 3.5 m to walk)
-    const to = pt ? [pt.pos[0], pt.pos[2]] : [p[0], p[2]], m = TE.meet([gv.pos[0], gv.pos[2]], to);
+    const to = pt ? [pt.pos[0], pt.pos[2]] : [p[0], p[2]], m = TE.meet([gv.pos[0], gv.pos[2]], to, TE.GAPS[plan.touch]);
     if (!pt) { const dx = to[0] - gv.pos[0], dz = to[1] - gv.pos[2], L = Math.hypot(dx, dz) || 1; m.friend = [to[0] - dx / L * 1.8, to[1] - dz / L * 1.8]; m.mid = [(m.friend[0] + to[0]) / 2, (m.friend[1] + to[1]) / 2]; }
     const far = Math.hypot(gv.pos[0] - m.friend[0], gv.pos[2] - m.friend[1]);
     if (far > 3.5) { const u = 3.5 / far, x = m.friend[0] + (gv.pos[0] - m.friend[0]) * u, z = m.friend[1] + (gv.pos[2] - m.friend[1]) * u; gv.pos = [x, groundY(g, x, z, gv.pos[1]), z]; gv.path = null; gv.vel = [0, 0, 0]; }
     const fy = groundY(g, m.friend[0], m.friend[1], pt ? pt.pos[1] : gv.pos[1]);
-    const C = { V, g, t: 0, tt: o.t || 'letter', plan, gv, pt, kid: o.kid || null, m, fy, text: String(o.text || ''), acts: [gv.act, pt ? pt.act : null], hud: !!g.hideHud, first: true, sparkT: 0, said: {} };
+    const C = { V, g, t: 0, tt: o.t || 'letter', plan, gv, pt, kid: o.kid || null, m, fy, text: String(o.text || ''), acts: [gv.act, pt ? pt.act : null], hud: !!g.hideHud, first: true, sparkT: 0, said: {}, pinP: pt ? [pt.pos[0], pt.pos[2]] : null };
     gv.act = { type: 'teEnd' }; gv.path = null; gv.bubble = null; gv.teHold = true;
     if (pt) { if (!pt.tlKid) pt.act = { type: 'teEnd' }; pt.path = null; pt.bubble = null; pt.teHold = true; }
     // the camera: u-folk3's director round the pair, on your side; ⚙ Weniger Bewegung: none
@@ -93,12 +93,14 @@
     if (!C.less) {
       const F3 = VR.Folk3, cy = fy, mid = [m.mid[0], cy, m.mid[1]];
       let shot = null;
-      try { if (F3 && F3.frameGroup) { const E = g.env, sun = E && E.sunDir ? Math.atan2(E.sunDir[2], E.sunDir[0]) : null; shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref: Math.atan2(p[2] - mid[2], p[0] - mid[0]), sun }); } } catch (e) { shot = null; }
+      try { if (F3 && F3.frameGroup) { const E = g.env, sun = E && E.sunDir ? Math.atan2(E.sunDir[2], E.sunDir[0]) : null; const ax = Math.atan2(to[1] - m.friend[1], to[0] - m.friend[0]), toYou = Math.atan2(p[2] - mid[2], p[0] - mid[0]), s1 = ax + Math.PI / 2, s2 = ax - Math.PI / 2;
+          const pref = pt ? (Math.cos(s1 - toYou) >= Math.cos(s2 - toYou) ? s1 : s2) : toYou;   // (the pair from the side, on your side; the friend alone: from you)
+          shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun }); } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, 1.1, (innerWidth || 16) / (innerHeight || 9)) : null }; }
       else { const e = [p[0], p[1] + 1.6, p[2]], dx = mid[0] - e[0], dy = mid[1] + 1 - e[1], dz = mid[2] - e[2]; C.shot = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: null }; }
     }
     g.hideHud = true; const hud = document.getElementById('hud'); if (hud) hud.style.visibility = 'hidden';
-    TE.cur = C; TE.stats.started++; TE.log.push(['start', C.tt, pt ? (pt.tlKid ? 'kid' : pt.p.fam === gv.p.fam ? 'fam' : 'neighbour') : 'you', C.shot ? (C.less ? 'less' : 'cam') : 'nocam']);
+    TE.cur = C; TE.stats.started++; TE.log.push(['start', C.tt, pt ? (pt === C.kid ? 'kid' : pt.p.fam === gv.p.fam ? 'fam' : 'neighbour') : 'you', C.shot ? (C.less ? 'less' : 'cam') : 'nocam']);
     caption(C.text);
     if (VR.EventLog && VR.EventLog.emit) { try { VR.EventLog.emit('social', 'tale_end', 3, [m.mid[0], fy + 1, m.mid[1]], 'tales', 3); } catch (e) { /* the log's */ } }
     return true;
@@ -139,6 +141,9 @@
     P.runAct.__te = true;
   }
   if (P.think && !P.think.__te) { const ot = P.think; P.think = function (a) { if (a && a.teHold && TE.cur) return; return ot.apply(this, arguments); }; P.think.__te = true; }
+  // ---- standing together: the villages' „make way" (x-robo) would part them — their places pinned, their faces turned
+  const pin = (a, x, z) => { a.pos[0] = x; a.pos[2] = z; a.vel[0] = 0; a.vel[2] = 0; a.path = null; };
+  const face = (a, q, dt) => { const ty = Math.atan2(-(q[0] - a.pos[0]), -(q[2] - a.pos[2])); let dy = ty - (a.yaw || 0); while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; a.yaw = (a.yaw || 0) + dy * Math.min(1, dt * 9 + 0.05); a.lookAt = q; };
   // ---- the frame step (after the villages' update)
   TE.step = function (V, dt) {
     const C = TE.cur; if (!C || C.V !== V) return;
@@ -152,10 +157,11 @@
     if (ph === 'end' || gone || g.state !== 'play') { TE.end(); return; }
     const eye = C.shot && !C.less ? [C.shot.x, C.shot.y, C.shot.z] : [p[0], p[1] + 1.6, p[2]];
     if (ph === 'come') {
-      if (pt) { pt.lookAt = [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]]; }
+      if (pt) { if (!C.pinP) C.pinP = [pt.pos[0], pt.pos[2]]; pin(pt, C.pinP[0], C.pinP[1]); face(pt, [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]], dt); }
       gv.lookAt = pt ? [pt.pos[0], pt.pos[1] + 1, pt.pos[2]] : [p[0], p[1] + 1.4, p[2]];
       return;
     }
+    pin(gv, C.m.friend[0], C.m.friend[1]); if (pt && C.pinP) pin(pt, C.pinP[0], C.pinP[1]);
     // (a slow machine, a seek: the friend is there when the touch begins)
     if (!C.said.at) {
       C.said.at = true;
@@ -164,17 +170,17 @@
     }
     if (ph === 'touch') {
       const hug = C.plan.touch === 'hug';
-      if (pt) { pt.lookAt = [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]]; gv.lookAt = [pt.pos[0], pt.pos[1] + 1, pt.pos[2]]; }
-      else gv.lookAt = [eye[0], eye[1], eye[2]];
+      if (pt) { face(pt, [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]], dt); face(gv, [pt.pos[0], pt.pos[1] + 1, pt.pos[2]], dt); }
+      else face(gv, eye, dt);
       gv.pose = hug && pt ? 'hug' : 'stand'; gv.teFx = hug && pt ? null : HANDS;
       if (pt) { pt.pose = hug ? 'hug' : 'stand'; pt.teFx = hug ? null : HANDS; }
       if (!C.said.touch) { C.said.touch = true; if (C.V.hearts) { C.V.hearts(gv); if (pt) C.V.hearts(pt); } if (g.audio && g.audio.play) { try { g.audio.play('pop'); } catch (e) { /* a sound */ } } }
       return;
     }
     if (ph === 'gift' || ph === 'back') {
-      gv.pose = 'stand'; gv.lookAt = [eye[0], eye[1], eye[2]];
+      gv.pose = 'stand'; face(gv, eye, dt);
       gv.teFx = ph === 'gift' ? GIFT : null;
-      if (pt) { pt.pose = 'stand'; pt.teFx = null; pt.lookAt = [eye[0], eye[1], eye[2]]; }
+      if (pt) { pt.pose = 'stand'; pt.teFx = null; face(pt, eye, dt); }
       if (!C.said.gift) {
         C.said.gift = true;
         const L = VR.Tales && VR.Tales.state && VR.Tales.state.lastEnd, item = L && L.item;
