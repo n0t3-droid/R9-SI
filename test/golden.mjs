@@ -83,9 +83,9 @@ async function trip(to) {
 // the world's picture from the canvas (animals and people not drawn: their walk differs run to run)
 const grabGL = (still = true) => ev((still) => {
   const g = VR.game, E = g.entities, V = g.villages, keep = [E && E.draw, E && E.drawTranslucent, V && V.draw];
-  // f-quiet3 (still, every shot): the moving craft not drawn either, as animals and people — the ships at the gate hall bob with the frames a
+  // f-quiet3 (still, every shot): the moving craft not drawn either, as animals and people (the hall's shuttles: hangarflight.js; the contrails: run 9's fairy sky had a plane's trail without its plane) — the ships at the gate hall bob with the frames a
   // settle took, the sky traffic flies (run 7: the hall's ship a hand's breadth off, worst tile 0.343)
-  const mov = still ? [[g, 'starships'], [g, 'traffic'], [g, 'padLife'], [g, 'lifeDirector'], [g, 'wild']].map(([o, k]) => o[k] && o[k].draw ? [o[k], o[k].draw] : null).filter(Boolean) : [];
+  const mov = still ? [[g, 'starships'], [g, 'traffic'], [g, 'padLife'], [g, 'lifeDirector'], [g, 'wild'], [g.hall || {}, 'flight'], [g, 'trails']].map(([o, k]) => o[k] && o[k].draw ? [o[k], o[k].draw] : null).filter(Boolean) : [];
   const ship = still && g.gadgets ? g.gadgets.drawShip : null;
   for (const m of mov) m[0].draw = () => {}; if (ship) g.gadgets.drawShip = () => {};
   const P = g.particles, spawn0 = P && P.spawn;

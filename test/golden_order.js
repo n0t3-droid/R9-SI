@@ -9,7 +9,8 @@
 // usage: node test/golden_order.js  (GOLDEN=<path> checks another copy of golden.mjs)
 'use strict';
 const fs = require('fs'), path = require('path');
-const G = require(path.join(__dirname, 'golden_wait.js'));
+const ROOT = path.join(__dirname, '..'), TEST = path.join(ROOT, 'test');   // (from test/ or from .tmp_tests/)
+const G = require(path.join(TEST, 'golden_wait.js'));
 let fails = 0;
 const ok = (c, m) => { if (c) console.log('  ✓ ' + m); else { fails++; console.log('  ✗ ' + m); } };
 const clean = { state: 'play', busy: 0, pend: 0, dirty: 0, up: 0, lod: 0 };
@@ -19,7 +20,7 @@ ok(!G.settledOk(Object.assign({}, clean, { dirty: 2, lod: 6 }), 40), 'the ONLY=v
 for (const k of ['busy', 'pend', 'dirty', 'up', 'lod']) ok(!G.settledOk(Object.assign({}, clean, { [k]: 1 }), 9), k + ' > 0 is not settled');
 ok(!G.settledOk({ state: 'title' }, 9) && !G.settledOk(null, 9), 'not in play / no state: not settled');
 ok(G.READY_MS >= 20000 && G.READY_MS <= 120000, 'ready keeps settling 20–120 s (' + G.READY_MS + ' ms)');
-const src = fs.readFileSync(process.env.GOLDEN || path.join(__dirname, 'golden.mjs'), 'utf8');
+const src = fs.readFileSync(process.env.GOLDEN || path.join(TEST, 'golden.mjs'), 'utf8');
 const hud = (src.match(/await timed\('hud'[\s\S]*?\n\}\);/) || [''])[0];
 const iDraw = hud.indexOf('await grabGL(true)'), iShot = hud.indexOf('page.screenshot(');
 ok(hud && iShot > 0, 'golden.mjs has the hud shot');

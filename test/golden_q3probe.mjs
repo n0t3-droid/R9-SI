@@ -22,7 +22,7 @@ const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (the t
 const require = createRequire(import.meta.url);
 const S = require(ROOT + 'test/golden_ssim.js');
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
-const GOLD = ROOT + 'test/golden/', SHOTS = ROOT + 'test/shots/q3' + (process.env.TAG || '') + '_';
+const GOLD = process.env.GOLD_DIR || ROOT + 'test/golden/', SHOTS = ROOT + 'test/shots/q3' + (process.env.TAG || '') + '_';
 const UPDATE = process.env.UPDATE === '1', UPD_IDS = process.env.UPDATE_IDS ? process.env.UPDATE_IDS.split(',') : null, ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const want = (id) => !ONLY || ONLY.includes(id);
 const W = 640, H = 360, CW = 320, CH = 180;   // (the page, the comparison)
@@ -149,7 +149,7 @@ const atCitadel = async () => { await lookFrom(citEye, [cit.x, cit.y + Math.min(
 for (const tag of ['vl', 'bal']) {
   const sfx = tag === 'vl' ? '_vl' : '';
   if (tag === 'bal') { await preset('balanced', 5); await freeze(); }
-  await timed('vista' + sfx, async () => { await atSpawn(); await dumpP('pre-vista' + sfx); const gpng = b64(await grabGL()); await dumpP('post-vista' + sfx); await judge('vista' + sfx, gpng, 'spawn ' + spawn.pos.map(Math.round)); });
+  await timed('vista' + sfx, async () => { await atSpawn(); await dumpP('pre-vista' + sfx); const gpng = b64(await grabGL()); await dumpP('post-vista' + sfx); console.log('STATE' + sfx + ' ' + JSON.stringify(await ev(() => { const g = VR.game, r = g.renderer, flat = (o) => { const out = {}; if (!o) return out; for (const k of Object.keys(o)) { const v = o[k]; if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') out[k] = typeof v === 'number' ? +v.toFixed(3) : v; } return out; }; return { settings: flat(g.settings), q: flat(r.q), r: flat(r), w: flat(g.world), env: flat(g.env) }; }))); await judge('vista' + sfx, gpng, 'spawn ' + spawn.pos.map(Math.round)); });
   await timed('citadel' + sfx, async () => { if (!cit) throw new Error('no citadel within 1500 m'); await atCitadel(); await judge('citadel' + sfx, b64(await grabGL()), 'eye ' + citEye.map(Math.round)); });
 }
 // ---------------------------------------------------------------- Balanced: the places
