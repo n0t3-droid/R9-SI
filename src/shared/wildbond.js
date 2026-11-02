@@ -85,8 +85,40 @@
     const K = B.KINDS[kind]; if (!K) return null;
     const pat = baby ? K.babyCoat : K.coat;
     const seed = (((kind.length * 7919) ^ (v * 104729)) + (baby ? 31337 : 0)) | 0;
-    return { pat, tex: B.coat(seed + kind.charCodeAt(0) * 13, pat), dark: K.dark, light: K.light, k: baby ? K.babyStrength : K.strength };
+    const P = (baby ? B.PAINT_BABY : B.PAINT)[kind];   // (f-wild3: the colours that read at 8 m)
+    return { pat, tex: B.coat(seed + kind.charCodeAt(0) * 13, pat), dark: K.dark, light: K.light, k: baby ? K.babyStrength : K.strength, ink: P[0], kInk: P[1], gnd: P[2], kGnd: P[3], sat: baby ? 1.14 : 1.06 };
   };
+  // ---------------------------------------------------------------- f-wild3: coats that read at play distance
+  // (docs/superpowers/plans/2026-11-03-f-wild3.md) per kind: [ink, its strength, ground tint, its strength] — the
+  // pattern and the ground pushed apart (a luminance step ≥ 0.1, babies' ≥ 0.14: fawns chestnut with near-white spots,
+  // piglets dark with cream stripes, tabby kittens near-black on a light moss ground)
+  B.PAINT = {
+    glimmer_deer: [0xfff4dc, 0.62, 0x9a6a3e, 0.3], bloom_sheep: [0xb898d0, 0.62, 0xffffff, 0.3], moss_boar: [0xc8a878, 0.55, 0x4a3220, 0.3],
+    glimmer_fox: [0xffd8b0, 0.6, 0xb04a14, 0.35], moss_cat: [0x141c0c, 0.75, 0x7a9850, 0.42], crystal_pup: [0x6aa4e0, 0.7, 0xffffff, 0.3],
+  };
+  B.PAINT_BABY = {
+    glimmer_deer: [0xfffaf0, 0.95, 0x8a4e24, 0.55], bloom_sheep: [0xa880c8, 0.72, 0xffffff, 0.35], moss_boar: [0xf0d8a8, 0.85, 0x3a2616, 0.5],
+    glimmer_fox: [0xfff0dc, 0.75, 0xa8400e, 0.42], moss_cat: [0x101808, 0.8, 0x8aa860, 0.5], crystal_pup: [0x5090dc, 0.8, 0xffffff, 0.35],
+  };
+  // the coat mapped over a body (not folded voxel axes): u along it (z, one cell a voxel), v once around it (the angle
+  // about its long axis: one turn = one period of the torus, so there is no seam). C = {cx, cy, z0}: the axis, the start
+  B.bodyUV = (x, y, z, C, out) => { out = out || [0, 0]; out[0] = z - C.z0; out[1] = (Math.atan2(y - C.cy, x - C.cx) / (Math.PI * 2) + 0.5) * B.N; return out; };
+  B.sampleUV = (tex, u, v, n) => { n = n || B.N; const a = ((Math.round(u) % n) + n) % n, b = ((Math.round(v) % n) + n) % n; return tex[b * n + a]; };
+  // a voxel's colour c under coat value t (0 … 1): the ground tinted, the pattern inked with a crisp edge (a smoothstep
+  // 0.3 … 0.7: soft cells blur away at 8 m), then a touch more saturation
+  B.paint = (c, t, S) => {
+    const e = Math.max(0, Math.min(1, (t - 0.3) / 0.4)), s = e * e * (3 - 2 * e);
+    return B.sat(B.mix(B.mix(c, S.gnd, S.kGnd * (1 - s)), S.ink, S.kInk * s), S.sat || 1);
+  };
+  B.sat = (c, k) => {
+    if (k === 1) return c;
+    const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255, l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const f = (q) => Math.max(0, Math.min(255, Math.round(l + (q - l) * k)));
+    return (f(r) << 16) | (f(g) << 8) | f(b);
+  };
+  // eyes: a soft blink (half lid → shut → half lid, B.BLINK s), shut at rest, a content half-lid while petted or eating
+  B.BLINK = 0.18;
+  B.lid = (bl, rest, happy) => (rest ? 'shut' : bl > 0 ? (bl > B.BLINK - 0.045 || bl <= 0.045 ? 'half' : 'shut') : happy ? 'half' : 'open');
   // sample a coat at voxel (x, y, z): wrapped on the torus, the three axes folded so a body's sides and back both show it
   B.sample = (tex, x, y, z, n) => { n = n || B.N; const u = ((Math.round(z * 1.3 + x * 0.6) % n) + n) % n, v = ((Math.round(y * 1.5 + x * 0.9) % n) + n) % n; return tex[v * n + u]; };
   // a colour mixed toward the pattern's colour (dark spots on a light ground, or light flecks on a dark one)
@@ -194,6 +226,47 @@
       out.push(b);
     }
     return out;
+  };
+
+  // ---------------------------------------------------------------- f-wild3: finches fly a short arc and land again
+  // a take-off from b (x, y, z) with you at (px, pz): it picks a perch 4–9 blocks away from you (a leaf or a fence top:
+  // w.perch(x, z), w.top(x, z)), else grass 5–8 blocks off, and flies there on a raised quadratic curve (1.1–2.4 s,
+  // eased): wings beat while it climbs, it glides in and flares at the end. rnd: a 0 … 1 generator
+  B.finchTakeoff = function (b, px, pz, w, rnd) {
+    let ax = b.x - px, az = b.z - pz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+    let best = null, bs = -1e9;
+    const bx = Math.floor(b.x), bz = Math.floor(b.z);
+    for (let oz = -9; oz <= 9; oz++) for (let ox = -9; ox <= 9; ox++) {   // (the ring 4–9 blocks: ~250 cells, once a take-off)
+      const r = Math.hypot(ox, oz); if (r < 4 || r > 9) continue;
+      const dot = (ox * ax + oz * az) / r; if (dot < -0.1) continue;
+      const x = bx + ox, z = bz + oz;
+      if (!w.perch(x, z)) continue;
+      const sc = dot * 2 - Math.abs(r - 6.5) * 0.2 + rnd() * 0.5; if (sc > bs) { bs = sc; best = [x + 0.5, w.top(x, z) + 1, z + 0.5]; }
+    }
+    b.target = best ? 'perch' : 'hop';
+    if (!best) {
+      const a = Math.atan2(az, ax) + (rnd() - 0.5) * 1.6, r = 5 + rnd() * 3, x = b.x + Math.cos(a) * r, z = b.z + Math.sin(a) * r;
+      best = [x, w.top(Math.floor(x), Math.floor(z)) + 1, z];
+    }
+    const x1 = best[0], y1 = best[1], z1 = best[2], d = Math.hypot(x1 - b.x, z1 - b.z), side = (rnd() < 0.5 ? -1 : 1) * d * 0.35;
+    // the control point: halfway, lifted, swung sideways (a curve, not a line)
+    const mx = (b.x + x1) / 2 + (-(z1 - b.z) / (d || 1)) * side, mz = (b.z + z1) / 2 + ((x1 - b.x) / (d || 1)) * side;
+    const lift = Math.min(b.y + 7.5, Math.max(b.y, y1) + 2.6 + rnd() * 1.2);
+    b.fp = { x0: b.x, y0: b.y, z0: b.z, cx: mx, cy: lift, cz: mz, x1, y1, z1, T: Math.max(1.1, Math.min(2.4, d / 4)), t: 0 };
+    b.st = 'fly'; b.air = false; b.beat = true; b.flights = (b.flights || 0) + 1;
+    return b;
+  };
+  B.finchFly = function (b, dt) {
+    const f = b.fp; if (!f) { b.st = 'hop'; return b; }
+    f.t = Math.min(f.T, f.t + dt);
+    const u = f.t / f.T, s = u * u * (3 - 2 * u), q = 1 - s;
+    const x = q * q * f.x0 + 2 * q * s * f.cx + s * s * f.x1, y = q * q * f.y0 + 2 * q * s * f.cy + s * s * f.y1, z = q * q * f.z0 + 2 * q * s * f.cz + s * s * f.z1;
+    const vx = (x - b.x) / (dt || 1), vy = (y - b.y) / (dt || 1), vz = (z - b.z) / (dt || 1);
+    b.x = x; b.y = y; b.z = z; b.vx = vx; b.vy = vy; b.vz = vz;
+    if (vx * vx + vz * vz > 1e-4) b.yaw = Math.atan2(-vx, -vz);
+    b.beat = vy > -0.6 || u > 0.88;   // (beats climbing, glides down, flares to land)
+    if (u >= 1) { b.st = b.target || 'hop'; b.y = b.gy = f.y1; b.fp = null; b.vx = b.vy = b.vz = 0; b.air = false; b.beat = false; b.calm = 1.2 + ((b.flights * 0.37) % 1) * 0.8; b.t = 0.6; }
+    return b;
   };
 
   // how often an animal thinks about you (s): near often, far rarely; beyond 48 blocks not at all (Infinity)

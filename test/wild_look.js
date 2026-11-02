@@ -70,7 +70,7 @@ console.log('(a) coats at play distance');
   check(rows.every(([, r]) => r.adult.smin >= 0.12 && r.baby.smin >= 0.12 && r.adult.smax <= 0.7 && r.baby.smax <= 0.7), 'the pattern covers both flanks and the back (12–70 % each)');
   check(rows.every(([, r]) => r.adult.blob >= 3 && r.baby.blob >= 3), 'in blobs and bands of several voxels (mean ≥ 3)');
   // u along the flank, v around the body: one turn around it is one period of the torus (no seam under the belly)
-  const C = { cx: 4, cy: 4, z0: 0 }, a = B.bodyUV ? B.bodyUV(4 + 3, 4 - 0.001, 5, C) : null, b = B.bodyUV ? B.bodyUV(4 + 3, 4 + 0.001, 5, C) : null;
+  const C = { cx: 4, cy: 4, z0: 0 }, a = B.bodyUV ? B.bodyUV(4 - 3, 4 - 0.001, 5, C) : null, b = B.bodyUV ? B.bodyUV(4 - 3, 4 + 0.001, 5, C) : null;
   check(!!a && Math.abs(((a[1] - b[1]) + B.N * 1.5) % B.N - B.N * 0.5) < 0.2 && Math.abs(a[0] - b[0]) < 1e-9, 'the coat is mapped around the body (u along it, v around it, seamless)');
 }
 
