@@ -187,7 +187,7 @@
     setJ6(out, 'hand_' + s, load === 'tray' ? 0 : 0.08 * amt, load === 'tray' ? -sx * 1.45 : 0, 0, 0, 0, 0);
   }
   // ---- a little 3 × 3 algebra (row-major, scratch arrays: no allocation once warm)
-  const M3a = new Float64Array(9), M3b = new Float64Array(9), M3c = new Float64Array(9), M3d = new Float64Array(9), V3a = [0, 0, 0], V3b = [0, 0, 0], V3c = [0, 0, 0], V3d = [0, 0, 0];
+  const M3a = new Float64Array(9), M3b = new Float64Array(9), M3c = new Float64Array(9), M3d = new Float64Array(9), V3a = [0, 0, 0], V3b = [0, 0, 0], V3c = [0, 0, 0], V3d = [0, 0, 0], V3e = [0, 0, 0], V3f = [0, 0, 0];
   // R = Ry(ry)·Rx(rx)·Rz(rz): the rotation folksmooth.js rigMats (and entities.js drawModel) applies for a pose
   const rotYXZ = FA.rotYXZ = function (rx, ry, rz, R) {
     const ca = Math.cos(ry), sa = Math.sin(ry), cb = Math.cos(rx), sb = Math.sin(rx), cc = Math.cos(rz), sc = Math.sin(rz);
@@ -286,6 +286,44 @@
     const W = V3c; W[0] = sx * (G.hw + (kid ? 1.6 : 2.6) + (G.wide ? 2.6 : 0)); W[1] = kid ? 2.5 : 3.5; W[2] = 0.4;
     FA.armIK(G, s, [W[0], W[1], W[2]], [sx, 0.15, 0.55], out);
     return FA.handAim(out, s, [sx * 0.3, -0.75, -0.6], sx * -1.2, out);
+  };
+  // ---- f-polish9 · the embrace (the tale's ending hug): both arms round the partner — the wrists behind its back, the
+  // elbows out and down —, the head turned beside the partner's. o (blocks): {gap (between the two middles), h (the wrists'
+  // height over the ground), depth (the partner's half depth), wide (the wrists' x, model units), kneel (an adult down on
+  // both knees to a child: the thighs upright, the shins back on the ground, the hips lowered), lean (the torso forward)}.
+  // → the root's drop (model units)
+  const EMB_PL = [-1, -0.55, 0.25], EMB_PR = [1, -0.55, 0.25], EMB_DL = [0.85, -0.1, -0.5], EMB_DR = [-0.85, -0.1, -0.5];
+  FA.embrace = function (G, o, out) {
+    if (!G || !G.arm) return 0;
+    o = o || {};
+    const U = 1 / G.bpu, Lt = G.thigh, kneel = !!o.kneel && !G.kid;
+    const hipH = kneel ? Lt + 1 : G.hip, drop = G.hip - hipH, lean = o.lean !== undefined ? o.lean : kneel ? 0.12 : 0.16;
+    for (const j of JOINTS) { const q = out[j] || (out[j] = Z6()); for (let i = 0; i < 6; i++) q[i] = 0; }
+    setJ6(out, 'hips', 0, 0, 0, 0, -drop, 0);
+    if (kneel) {
+      setJ6(out, 'leg_l', 0.1, 0, -0.06, 0, -drop, 0); setJ6(out, 'leg_r', 0.1, 0, 0.06, 0, -drop, 0);
+      setJ6(out, 'shin_l', -(Math.PI / 2 + 0.1), 0, 0, 0, 0, 0); setJ6(out, 'shin_r', -(Math.PI / 2 + 0.1), 0, 0, 0, 0, 0);
+    } else {
+      // (standing close: the hips back a little under the lean, the knees soft)
+      setJ6(out, 'leg_l', 0.06, 0, -0.03, 0, 0, 0); setJ6(out, 'leg_r', 0.06, 0, 0.03, 0, 0, 0);
+      setJ6(out, 'shin_l', -0.08, 0, 0, 0, 0, 0); setJ6(out, 'shin_r', -0.08, 0, 0, 0, 0, 0);
+    }
+    setJ6(out, 'body', -lean, 0, 0, 0, 0, 0);
+    // (the head beside the partner's: turned and tipped toward its own left — the two heads pass each other)
+    setJ6(out, 'head', kneel ? 0.05 : 0.18, 0.42, -0.1, 0, 0, 0);
+    const gap = (o.gap || 0.3) * U, back = gap + (o.depth || 0.1) * U, y = (o.h || 1) * U - hipH, wide = o.wide !== undefined ? o.wide : G.hw * 0.5;
+    const X = V3e, W = V3f;
+    let miss = 0;
+    for (const s of ['l', 'r']) {
+      const sx = s === 'l' ? -1 : 1;
+      // (one wrist a little higher than the other: they cross behind the back instead of meeting in one point)
+      X[0] = sx * wide; X[1] = y + (s === 'l' ? 1.2 : -1.2); X[2] = -back;
+      toBody(out, X, W);
+      miss += FA.armIK(G, s, W, s === 'l' ? EMB_PL : EMB_PR, out);
+      FA.handAim(out, s, s === 'l' ? EMB_DL : EMB_DR, 0, out);
+    }
+    FA.embrace.miss = miss;
+    return drop;
   };
   // ---- talking: the speaker's forearms up at the waist with small swings and now and then an open-palm beat; the
   // listener's hands clasped before the belly. t seconds, seed the person's
@@ -494,7 +532,8 @@
       for (const j of JOINTS) { const q = dst[j] || (dst[j] = Z6()), b = sp.pose[j]; for (let i = 0; i < 6; i++) q[i] = b ? b[i] : 0; }
       dst.body[4] += 0.22 * Math.sin(t * 1.7);   // (breathing)
       dst.head[1] += 0.12 * Math.sin(t * 0.31 + a.seedW);
-    } else if (name === 'talk') FA.gesture(G, t, a.seedW | 0, !!a.speaking, dst);
+    } else if (name === 'hug' && a.hugO && G.arm) FA.embrace(G, a.hugO, dst);   // (f-polish9: the tale's ending — both arms round the partner)
+    else if (name === 'talk') FA.gesture(G, t, a.seedW | 0, !!a.speaking, dst);
     else if (name === 'idle') {
       if (G.carry === 'tray') armSwing(dst, 'r', 0, 0, false, 1, 'tray', 0);
       else if (G.carry && IT[G.carry]) restCarry(dst, 'r');

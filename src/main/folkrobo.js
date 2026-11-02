@@ -354,7 +354,7 @@
     const aF = -S.ax * sy - S.az * cy, aR = S.ax * cy - S.az * sy;
     // the feet on the ground under them
     const bpu = G.bpu, get = mgr._rbGet || (mgr._rbGet = (x, y, z) => mgr.g.world.getBlock(x, y, z));
-    if (Rb.sw.plant && P.leg_l && P.shin_l && mgr.g && mgr.g.world) {
+    if (Rb.sw.plant && P.leg_l && P.shin_l && mgr.g && mgr.g.world && !(a.hugO && a.hugO.kneel)) {   // (f-polish9: a kneeling embrace keeps its knees down)
       let gL = 0, gR = 0;
       for (let s = 0; s < 2; s++) {
         const L = s ? P.leg_r : P.leg_l, Sh = s ? P.shin_r : P.shin_l;

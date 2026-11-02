@@ -47,7 +47,7 @@
     return fam || nb || (P.with === 'kid' ? null : null);
   };
   // where they meet ([x, z]): the friend walks up to GAP m before the partner; mid: between them
-  TE.GAP = 1.0; TE.GAPS = { hug: 0.5, hands: 0.85 };   // (a hug close, hands at arm's length)
+  TE.GAP = 1.0; TE.GAPS = { hug: 0.3, hugKid: 0.22, hands: 0.85 };   // (a hug close — f-polish9: chest to chest, an embrace —, hands at arm's length)
   TE.meet = function (f, p, gap) {
     const dx = p[0] - f[0], dz = p[1] - f[1], L = Math.hypot(dx, dz) || 1, g = Math.min(gap || TE.GAP, L);
     const friend = [p[0] - dx / L * g, p[1] - dz / L * g];
@@ -62,10 +62,32 @@
   TE.cur = null; TE.hold = false; TE.log = [];
   TE.stats = { started: 0, skipped: 0, framed: 0, refused: 0 };
   const groundY = (g, x, z, y0) => { const w = g.world; if (!w || !w.topAt) return y0; const h = w.topAt(Math.floor(x), Math.floor(z)); return h > 0 && Math.abs(h + 1 - y0) < 6 ? h + 1 : y0; };
-  function solidOf(g) {
+  // (any block: a palm's leaves are no wall, but no lens belongs in them — run 3; f-polish9: a palm's fronds are props
+  // drawn round its crown, not blocks — the crowns within FROND_R of the pair count as taken, 3 m round and 2.5 m under)
+  TE.FROND = { r: 3.2, below: 2.5, above: 1.5, scan: 10, up: 9 };
+  let PROPT = null;
+  TE.crowns = function (w, C) {
+    const R = VR.R; if (!R || !R.T || !w || !w.getBlock) return [];
+    if (!PROPT) { PROPT = new Uint8Array(R.types.length + 1); R.types.forEach((t, i) => { if (t && t.o && (t.o.prop || t.o.propStem)) PROPT[i] = 1; }); }
+    const F = TE.FROND, out = [], x0 = Math.floor(C[0]), y0 = Math.floor(C[1]), z0 = Math.floor(C[2]);
+    for (let dx = -F.scan; dx <= F.scan; dx++) for (let dz = -F.scan; dz <= F.scan; dz++) {
+      let top = -1;
+      for (let y = y0 + F.up; y >= y0 - 2; y--) { const s = w.getBlock(x0 + dx, y, z0 + dz); if (s && PROPT[R.T.type[s]]) { top = y; break; } }
+      if (top >= 0) out.push([x0 + dx + 0.5, top + 0.5, z0 + dz + 0.5]);
+    }
+    return out;
+  };
+  function solidOf(g, C) {
     const w = g.world, R = VR.R, F = VR.F; if (!w || !R || !F) return () => false;
-    return (x, y, z) => !!w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));   // (any block: a palm's leaves are no wall, but no lens belongs in them — run 3)
+    const K = C ? TE.crowns(w, C) : [], FR = TE.FROND, r2 = FR.r * FR.r;
+    TE.stats.crowns = K.length;
+    return (x, y, z) => {
+      if (w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z))) return true;
+      for (const k of K) if (y > k[1] - FR.below && y < k[1] + FR.above && (x - k[0]) ** 2 + (z - k[2]) ** 2 < r2) return true;
+      return false;
+    };
   }
+  TE.solidOf = solidOf;
   function busy(g) {
     if (!g || g.state !== 'play' || !g.player) return 'state';
     if (g.ui && g.ui.screen && g.ui.screen !== 'hud') return 'screen';
@@ -80,7 +102,7 @@
     const why = busy(g); if (why) { TE.stats.refused++; TE.log.push(['refused', why]); return false; }
     const plan = TE.PLAN[o.t] || TE.PLAN.letter, pt = TE.partner(o.t, gv, V.agents, o.kid || null), p = g.player.pos;
     // the meeting: the friend walks to the partner (or to you); far away — the friend starts nearer (≤ 3.5 m to walk)
-    const to = pt ? [pt.pos[0], pt.pos[2]] : [p[0], p[2]], m = TE.meet([gv.pos[0], gv.pos[2]], to, TE.GAPS[plan.touch]);
+    const to = pt ? [pt.pos[0], pt.pos[2]] : [p[0], p[2]], m = TE.meet([gv.pos[0], gv.pos[2]], to, plan.touch === 'hug' && pt && !!pt.kid !== !!gv.kid ? TE.GAPS.hugKid : TE.GAPS[plan.touch]);
     if (!pt) { const dx = to[0] - gv.pos[0], dz = to[1] - gv.pos[2], L = Math.hypot(dx, dz) || 1; m.friend = [to[0] - dx / L * 1.8, to[1] - dz / L * 1.8]; m.mid = [(m.friend[0] + to[0]) / 2, (m.friend[1] + to[1]) / 2]; }
     const far = Math.hypot(gv.pos[0] - m.friend[0], gv.pos[2] - m.friend[1]);
     if (far > 3.5) { const u = 3.5 / far, x = m.friend[0] + (gv.pos[0] - m.friend[0]) * u, z = m.friend[1] + (gv.pos[2] - m.friend[1]) * u; gv.pos = [x, groundY(g, x, z, gv.pos[1]), z]; gv.path = null; gv.vel = [0, 0, 0]; }
@@ -99,10 +121,13 @@
           const pref = pt ? (Math.cos(s1 - toYou) >= Math.cos(s2 - toYou) ? s1 : s2) : toYou;   // (the pair from the side, on your side; the friend alone: from you)
           const avoid = []; for (const a of V.agents) if (a !== gv && a !== pt && Math.abs(a.pos[0] - mid[0]) < 12 && Math.abs(a.pos[2] - mid[2]) < 12) avoid.push([a.pos[0], a.pos[2]]);   // (nobody else before the lens)
           if (pt) {
-            shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun, avoid });
-            if (!shot && avoid.length) shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun });
+            const so = solidOf(g, mid);   // (f-polish9: the palms' fronds too)
+            shot = F3.frameGroup(so, mid, 0.9, { pref, sun, avoid });
+            if (!shot && avoid.length) shot = F3.frameGroup(so, mid, 0.9, { pref, sun });
+            if (!shot) { shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun, avoid }); if (shot) TE.stats.frondFallback = (TE.stats.frondFallback | 0) + 1; }
           } } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, pt ? 1.1 : 0.7, (innerWidth || 16) / (innerHeight || 9)) : null }; }
+      if (shot) C.aside = TE.asideOf(V.agents, [gv, pt], shot.P, mid);   // (f-polish9: nobody's head in the picture's corner)
       else { const e = [p[0], p[1] + 1.6, p[2]], dx = mid[0] - e[0], dy = mid[1] + 1 - e[1], dz = mid[2] - e[2]; C.shot = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: null }; }   // (no frame: your view turned toward them)
     }
     g.hideHud = true; const hud = document.getElementById('hud'); if (hud) hud.style.visibility = 'hidden';
@@ -125,8 +150,35 @@
   // ---- the poses: hands held (both arms forward and low, the hands meeting) and the gift (both hands out)
   const set = (Pz, j, rx, ry, rz) => { const q = Pz[j]; if (q) { q[0] = rx; q[1] = ry; q[2] = rz; } };
   const HANDS = (Pz) => { set(Pz, 'arm_l', 0.8, 0, 0.12); set(Pz, 'arm_r', 0.8, 0, -0.12); set(Pz, 'fore_l', 0.3, 0, 0); set(Pz, 'fore_r', 0.3, 0, 0); };
-  const HUGKID = (Pz) => { set(Pz, 'arm_l', 0.95, 0, 0.42); set(Pz, 'arm_r', 0.95, 0, -0.42); set(Pz, 'fore_l', 0.75, 0, 0.35); set(Pz, 'fore_r', 0.75, 0, -0.35); if (Pz.body) Pz.body[0] = 0.22; if (Pz.head) Pz.head[0] = 0.25; };
   const GIFT = (Pz) => { set(Pz, 'arm_l', 1.25, 0, 0.22); set(Pz, 'arm_r', 1.25, 0, -0.22); set(Pz, 'fore_l', 0.55, 0, 0); set(Pz, 'fore_r', 0.55, 0, 0); if (Pz.head) Pz.head[0] = 0.12; };
+  // f-polish9: the bystanders near the lens (within ASIDE.lens m of it, or within ASIDE.line m of the line from it to the
+  // pair, not beside the pair) step aside, across the line to ASIDE.to m off it — they walk there while the scene holds
+  TE.ASIDE = { lens: 2.6, line: 0.8, to: 2.6 };
+  TE.asideOf = function (agents, keep, P, M) {
+    const A = TE.ASIDE, out = [], dx = M[0] - P[0], dz = M[2] - P[2], L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
+    for (const a of agents || []) {
+      if (!a || !a.pos || keep.indexOf(a) >= 0 || a.teHold || a.sitO || a.pose === 'sleep') continue;
+      const ex = a.pos[0] - P[0], ez = a.pos[2] - P[2], along = ex * ux + ez * uz, side = ex * -uz + ez * ux;
+      if (along < -1 || along > L - 1.2) continue;
+      if (Math.hypot(ex, ez) > A.lens && Math.abs(side) > A.line) continue;
+      const sg = side >= 0 ? 1 : -1, off = Math.max(A.to, Math.abs(side) + 0.6) * sg;
+      a.teAside = [P[0] + ux * Math.max(0, along) - uz * off, P[2] + uz * Math.max(0, along) + ux * off];
+      a.path = null; out.push(a);
+    }
+    TE.stats.aside = (TE.stats.aside | 0) + out.length;
+    return out;
+  };
+  // f-polish9: the two embraces of the pair (FA.embrace's o, blocks): the gap between them; an adult kneels to a child,
+  // its arms round the child's back, the child's round its shoulders; two adults (or two children) chest to chest
+  TE.hugOf = function (a, b) {
+    const gap = Math.max(0.15, Math.min(0.6, Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2])));
+    const one = (me, other) => {
+      if (!me.kid && other.kid) return { gap, kneel: true, h: 0.72, depth: 0.08, wide: 2 };
+      if (me.kid && !other.kid) return { gap, h: 0.92, depth: 0.1, wide: 4.6 };
+      return me.kid ? { gap, h: 0.66, depth: 0.08, wide: 2 } : { gap, h: 1.15, depth: 0.1, wide: 2.4 };
+    };
+    return [one(a, b), one(b, a)];
+  };
   if (P.pose && !P.pose.__te) {
     const op = P.pose;
     P.pose = function (a, t) { const Pz = op.apply(this, arguments); if (a && a.teFx && Pz) { try { a.teFx(Pz, t); } catch (e) { a.teFx = null; } } return Pz; };
@@ -137,6 +189,7 @@
     const orun = P.runAct;
     P.runAct = function (a, dt, tod) {
       const C = TE.cur;
+      if (a && a.teAside && C && !a.teHold) { if (this.goTo(a, a.teAside[0], a.pos[1], a.teAside[1], 0.4)) { a.vel[0] = 0; a.vel[2] = 0; a.path = null; a.pose = 'stand'; } return; }   // (f-polish9: a step aside for the picture)
       if (!a || !a.teHold || !C) return orun.apply(this, arguments);
       const ph = TE.phase(C.t).ph;
       if (a === C.gv && ph === 'come') {
@@ -147,7 +200,7 @@
     };
     P.runAct.__te = true;
   }
-  if (P.think && !P.think.__te) { const ot = P.think; P.think = function (a) { if (a && a.teHold && TE.cur) return; return ot.apply(this, arguments); }; P.think.__te = true; }
+  if (P.think && !P.think.__te) { const ot = P.think; P.think = function (a) { if (a && (a.teHold || a.teAside) && TE.cur) return; return ot.apply(this, arguments); }; P.think.__te = true; }
   // ---- standing together: the villages' „make way" (x-robo) would part them — their places pinned, their faces turned
   const pin = (a, x, z) => { a.pos[0] = x; a.pos[2] = z; a.vel[0] = 0; a.vel[2] = 0; a.path = null; };
   const face = (a, q, dt) => { const ty = Math.atan2(-(q[0] - a.pos[0]), -(q[2] - a.pos[2])); let dy = ty - (a.yaw || 0); while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; a.yaw = (a.yaw || 0) + dy * Math.min(1, dt * 9 + 0.05); a.lookAt = q; };
@@ -179,14 +232,19 @@
       const hug = C.plan.touch === 'hug';
       if (pt) { face(pt, [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]], dt); face(gv, [pt.pos[0], pt.pos[1] + 1, pt.pos[2]], dt); }
       else face(gv, eye, dt);
-      const small = !!(pt && pt.kid && !gv.kid);
-      gv.pose = hug && pt && !small ? 'hug' : 'stand'; gv.teFx = hug && pt ? (small ? HUGKID : null) : HANDS;
-      if (pt) { pt.pose = hug ? 'hug' : 'stand'; pt.teFx = hug ? null : HANDS; }
+      if (hug && pt) {
+        // f-polish9: an embrace (folkanim.js FA.embrace) — both arms round the other, an adult down on both knees to a child
+        if (!gv.hugO) { const o = TE.hugOf(gv, pt); gv.hugO = o[0]; pt.hugO = o[1]; }
+        gv.pose = 'hug'; pt.pose = 'hug'; gv.teFx = null; pt.teFx = null;
+      } else {
+        gv.pose = 'stand'; gv.teFx = hug ? null : HANDS;
+        if (pt) { pt.pose = 'stand'; pt.teFx = hug ? null : HANDS; }
+      }
       if (!C.said.touch) { C.said.touch = true; if (C.V.hearts) { C.V.hearts(gv); if (pt) C.V.hearts(pt); } if (g.audio && g.audio.play) { try { g.audio.play('pop'); } catch (e) { /* a sound */ } } }
       return;
     }
     if (ph === 'gift' || ph === 'back') {
-      gv.pose = 'stand'; face(gv, eye, dt);
+      gv.pose = 'stand'; face(gv, eye, dt); gv.hugO = null; if (pt) pt.hugO = null;
       gv.teFx = ph === 'gift' ? GIFT : null;
       if (pt) { pt.pose = 'stand'; pt.teFx = null; face(pt, eye, dt); }
       if (!C.said.gift) {
@@ -208,7 +266,8 @@
     const C = TE.cur; if (!C) return;
     TE.cur = null;
     const g = C.g, gv = C.gv, pt = C.pt;
-    for (const a of [gv, pt]) if (a) { a.teHold = false; a.teFx = null; if (a.pose === 'hug') a.pose = 'stand'; }
+    for (const a of [gv, pt]) if (a) { a.teHold = false; a.teFx = null; a.hugO = null; if (a.pose === 'hug') a.pose = 'stand'; }
+    if (C.aside) for (const a of C.aside) a.teAside = null;
     gv.act = null; gv.lookAt = null;
     if (pt && !pt.tlKid) { pt.act = C.acts[1] && C.acts[1].type !== 'talk' ? C.acts[1] : null; pt.lookAt = null; }
     g.hideHud = C.hud; const hud = document.getElementById('hud'); if (hud) hud.style.visibility = g.hideHud ? 'hidden' : 'visible';
