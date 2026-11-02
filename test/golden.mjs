@@ -76,6 +76,9 @@ const grabGL = () => ev(() => {
   const g = VR.game, E = g.entities, V = g.villages, keep = [E && E.draw, E && E.drawTranslucent, V && V.draw];
   try {
     if (E) { E.draw = () => {}; if (E.drawTranslucent) E.drawTranslucent = () => {}; } if (V) V.draw = () => {};
+    // the shader clock and the clouds' drift set: both run on with every stepped frame, and how many frames a settle
+    // takes differs run to run (run 5: the Very Low pixel clouds over the spawn had moved, worst tile 0.34)
+    g.env.anim = 600; g.env.cloudDrift = [540, 0];
     window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
     return g.renderer.gl.canvas.toDataURL('image/png');
   } catch (e) { return null; }
