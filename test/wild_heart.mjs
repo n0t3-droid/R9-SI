@@ -30,6 +30,7 @@ const step = async (n, dtms = 33) => {
   for (let k = 0; k < n; k += 20) {
     await ev(([m, d]) => {
       const g = VR.game;
+      if (!window.__noraf) { window.__noraf = true; window.requestAnimationFrame = () => 0; }   // (the game moves only when the test steps it)
       if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; }
       window.__norender = true;
       for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); }
@@ -37,6 +38,18 @@ const step = async (n, dtms = 33) => {
   }
 };
 const shots = [];
+// a time of day by the sky the player sees (the local time shifts with the place): 'day' the highest sun, 'dusk' half night
+const pickTime = (want) => ev((want) => {
+  const g = VR.game; let best = 6000, bs = 1e9;
+  window.__norender = true;
+  for (let t = 0; t < 24000; t += 500) {
+    g.env.setTime(t); g.last = performance.now() - 16; g.loop(performance.now());
+    const n = g.env.E.night, sy = g.env.E.sunDir[1];
+    const sc = want === 'day' ? n * 10 - sy : Math.abs(n - 0.5) * 5 + (sy > 0 ? 1 : 0);
+    if (sc < bs) { bs = sc; best = t; }
+  }
+  g.env.setTime(best); return best;
+}, want);
 const shot = async (name, tod) => {
   const hide = (on) => ev((on) => {
     for (const el of document.querySelectorAll('#hud > *')) el.style.visibility = on ? 'hidden' : '';
@@ -75,7 +88,7 @@ try {
   const P0 = await ev(() => {
     const g = VR.game, p = g.player, w = g.world, R = VR.R, S = (n) => (R.byName[n] ? R.S(n) : 0);
     g.settings.preset = 'balanced'; g.settings.wildHeart = true;
-    g.env.setTime(5200); g.env.rain = 0; g.env.rainTarget = 0;
+    g.env.rain = 0; g.env.rainTarget = 0;
     g.entities.trySpawn = () => {};
     p.flying = false;
     const x0 = Math.floor(p.pos[0]), z0 = Math.floor(p.pos[2]), y0 = w.topAt(x0, z0);
@@ -90,6 +103,9 @@ try {
     return [x0, y0, z0];
   });
   const [x0, y0, z0] = P0;
+  const DAY = await pickTime('day'), DUSK = await pickTime('dusk');
+  console.log('   day ' + DAY + ' · dusk ' + DUSK);
+  await ev((t) => VR.game.env.setTime(t), DAY);
   await step(40);
 
   console.log('--- 1 · a family in a meadow');
@@ -120,7 +136,7 @@ try {
   await ev(() => { const g = VR.game, ms = g.entities.mobs, mom = ms.find(q => q.id === window.__fam.mom); const p = g.player; p.pos[0] = mom.pos[0] - 0.5; p.pos[2] = mom.pos[2] + 4.2; p.pos[1] = g.world.topAt(Math.floor(p.pos[0]), Math.floor(p.pos[2])) + 1; });
   const mp = await ev(() => { const m = VR.game.entities.mobs.find(q => q.id === window.__fam.mom); return [m.pos[0] + 1.4, m.pos[1] + 0.5, m.pos[2]]; });
   await lookAt(mp[0], mp[1], mp[2]); await step(2);
-  await shot('wild2_family', 5600);
+  await shot('wild2_family', DAY);
 
   console.log('--- 2 · a curious Glimmerfuchs');
   await ev(() => { const g = VR.game, ms = g.entities.mobs; for (const m of ms) if (m.kind === 'glimmer_deer') { m.pos[0] += 14; } });
@@ -137,19 +153,19 @@ try {
   // up close: the fox at your feet, the camera down to it
   const fp = await ev((id) => { const g = VR.game, m = g.entities.mobs.find(q => q.id === id), p = g.player; m.pos[0] = p.pos[0]; m.pos[2] = p.pos[2] - 1.9; m.yaw = Math.PI + 0.45; m.wh.mode = 'sniff'; m.wh.thinkT = 99; return [m.pos[0], m.pos[1] + 0.45, m.pos[2]]; }, fox);
   await lookAt(fp[0], fp[1], fp[2]); await step(3);
-  await shot('wild2_fox', 5600);
+  await shot('wild2_fox', DAY);
 
   console.log('--- 3 · finches');
   const bx = await ev(() => { const g = VR.game, p = g.player, H = g.companions.heart; H.flock(p.pos[0] + 0.5, p.pos[2] - 5.6, 6); return [p.pos[0] + 0.5, p.pos[1] + 0.1, p.pos[2] - 5.6]; });
   await lookAt(bx[0], bx[1], bx[2]); await step(30);
-  await shot('wild2_birds', 5600);
+  await shot('wild2_birds', DAY);
   const hop = await ev(() => VR.game.companions.heart.birds.filter(b => b.st === 'hop').length);
   await ev(() => { const g = VR.game, p = g.player, b = g.companions.heart.birds[0]; if (b) { p.pos[0] = b.x + 1.2; p.pos[2] = b.z + 0.5; } });
   await step(6);
   const fly = await ev(() => VR.game.companions.heart.birds.filter(b => b.st === 'fly').length);
   check(hop >= 4 && fly >= 1, `finches hop on the grass (${hop}) and take off as you come near (${fly})`);
   await step(10);
-  await shot('wild2_takeoff', 5600);
+  await shot('wild2_takeoff', DAY);
 
   console.log('--- 4 · V pets the fawn; dusk');
   const pet = await ev(() => {
@@ -162,19 +178,18 @@ try {
     return { act: res && res.act, ok: !!ok, wig: k.wh.wig };
   });
   check(pet.act === 'pet' && pet.ok && pet.wig > 0, `V: „Streicheln" — the fawn wiggles (${pet.act}, ${pet.wig.toFixed(2)})`);
-  await ev(() => { VR.game.env.setTime(13000); });
+  await ev((t) => { VR.game.env.setTime(t); }, DUSK);
   await step(320);
   const dusk = await ev(() => { const ms = VR.game.entities.mobs; return [window.__fam.mom, ...window.__fam.kids].map(id => ms.find(q => q.id === id).wh.mode); });
   console.log('   at dusk: ' + dusk.join(' '));
   check(dusk.filter(m => m === 'rest').length >= 3, 'at dusk the family lies down');
   const dp = await ev(() => { const g = VR.game, m = g.entities.mobs.find(q => q.id === window.__fam.mom), p = g.player; p.pos[0] = m.pos[0] + 3.5; p.pos[2] = m.pos[2] + 3.5; return [m.pos[0], m.pos[1] + 0.3, m.pos[2]]; });
   await lookAt(dp[0], dp[1], dp[2]); await step(2);
-  await shot('wild2_dusk', 13000);
+  await shot('wild2_dusk', DUSK);
 
   console.log('--- 5 · a friend at your door');
   const door = await ev(([x0, y0, z0]) => {
     const g = VR.game, w = g.world, R = VR.R, S = (n) => (R.byName[n] ? R.S(n) : 0), p = g.player, H = g.companions.heart;
-    g.env.setTime(5000);
     // a little cottage front: planks, an opening, a lantern
     const cx = x0 + 4, cz = z0 + 6;
     for (let dx = -3; dx <= 3; dx++) for (let y = 1; y <= 4; y++) { if (dx === 0 && y <= 2) continue; w.setBlock(cx + dx, y0 + y, cz, y === 4 ? S('spruce_planks') : S('oak_planks'), 4); }
@@ -187,6 +202,7 @@ try {
     H.visitT = 0;
     return [cx, cz];
   }, P0);
+  await ev((t) => VR.game.env.setTime(t), DAY);
   await step(30);
   const v0 = await ev(() => { const v = VR.game.companions.heart.visitor; return v ? v.kind : null; });
   check(v0 === 'glimmer_fox', 'your friend comes to visit (' + v0 + ')');
@@ -195,7 +211,7 @@ try {
   console.log('   the visitor: ' + (v1 ? v1.mode + ' ' + v1.d.toFixed(2) : 'none'));
   check(v1 && v1.mode === 'wait' && v1.d < 3, 'it waits at your door');
   if (v1) { await ev(([x, z]) => { const p = VR.game.player; p.pos[0] = x - 1; p.pos[2] = z - 4.6; }, [v1.pos[0], v1.pos[2]]); await lookAt(v1.pos[0] + 0.6, v1.pos[1] + 0.9, v1.pos[2] + 1.6); await step(2); }
-  await shot('wild2_door', 5600);
+  await shot('wild2_door', DAY);
   const saved = await ev(() => { const m = {}; VR.game.companions.beforeSave(m); return m.wildBonds || null; });
   check(Array.isArray(saved) && saved.length === 1 && saved[0].kind === 'glimmer_fox' && saved[0].fed >= 3, 'the save holds your friend (meta.wildBonds)');
   const back = await ev((s) => VR.WildBond.deserialize(JSON.parse(JSON.stringify(s))).length, saved);
