@@ -201,5 +201,58 @@ console.log('8 · the glue loads beside the villages and u-gossip (no browser)')
   for (const m of ['tl_print', 'tl_spark', 'tl_lens', 'tl_jar', 'tl_cozy', 'tl_bloom', 'tl_stake', 'tl_beacon', 'tl_beacon_lit']) { const f = V.VOXMODELS[m]; if (!f) { check(false, 'model ' + m); continue; } const d = f(); if (!(d && d.parts && Object.keys(d.parts).length)) check(false, 'model ' + m + ' builds'); }
   check(true, 'nine voxel marks of our own build');
 }
+console.log('9 · f-polish8: the 2-Hz look stays light; the beacon changes as lights come; the woken beacon is drawn at night');
+{
+  const V = VR, TL = V.Tales, R = V.R, stone = R.S('stone'), lavaS = R.S('lava');
+  // a stub world: hills of stone (a dome round the hill's spot), a lava pond on its very top; reads counted
+  let reads = 0;
+  const HX = 960, HZ = -150, top = (x, z) => Math.round(70 + Math.max(0, 30 - Math.hypot(x - HX, z - HZ) * 0.8));
+  const lavaAt = (x, z) => Math.hypot(x - HX, z - HZ) < 4;
+  const W = { isLoaded: () => true, topAt: (x, z) => top(x, z) + (lavaAt(x, z) ? 1 : 0), getBlock: (x, y, z) => { reads++; const t = top(x, z); return y <= t ? stone : (lavaAt(x, z) && y === t + 1 ? lavaS : 0); } };
+  const g = { state: 'play', meta: { tales: null, seed: 'p8' }, env: { day: 1, timeOfDay: 3000 }, settings: {}, player: { pos: [HX + 60, 90, HZ + 60] }, world: W, time: 0 };
+  const Vi = Object.create(V.Villages.prototype); Vi.g = g; Vi.agents = []; Vi.known = new Map(); Vi.sites = [];
+  const rec = TL.rec(g); let q = null;
+  for (let s = 1; s < 200 && !q; s++) { const x = TC.make(world(s), { hist: [{ t: 'lost', v: '' }] }); if (x && x.t === 'beacon') q = x; }
+  const hill = q.steps.find(s => s.at === 'hill'); const dx0 = HX - hill.p[0], dz0 = HZ - hill.p[1];
+  const mv = (s) => { if (s.p) s.p = [s.p[0] + dx0 - 9, s.p[1] + dz0 + 7]; if (s.pts) s.pts = s.pts.map(v => [v[0] + dx0 - 9, v[1] + dz0 + 7]); if (s.of) s.of.forEach(mv); };
+  q.steps.forEach(mv);   // (the tale's hill 11 m off the true top: the refinement has to find it)
+  TC.accept(rec, q, TC.DAY + 3000, 'builder'); q.i = 0;
+  reads = 0; const r0 = reads; const y1 = TL.ground(g, HX + 20, HZ + 20); const one = reads - r0;
+  check(y1 === top(HX + 20, HZ + 20) + 1 && one <= 8, 'the ground from the height map: ' + one + ' reads (was up to 250)');
+  let worst = 0, worstReads = 0, ticks = 0; const msL = [];
+  for (let i = 0; i < 40; i++) { reads = 0; const t0 = process.hrtime.bigint(); TL.tick(Vi, 0.55); const ms = Number(process.hrtime.bigint() - t0) / 1e6; ticks++; msL.push(ms.toFixed(2)); if (ms > worst && ticks > 1) worst = ms; if (reads > worstReads) worstReads = reads; if (q.refined) break; }
+  const hp = q.steps.find(s => s.at === 'hill').p;
+  check(q.refined && Math.hypot(hp[0] - HX, hp[1] - HZ) > 3.5 && Math.hypot(hp[0] - HX, hp[1] - HZ) < 9, 'the hilltop found on dry ground beside the lava pond (' + Math.round(Math.hypot(hp[0] - HX, hp[1] - HZ)) + ' m off its middle, ' + ticks + ' ticks)');
+  check(worst <= 1.0 && worstReads <= 400, 'a warm tick ≤ 1 ms (ticks ' + msL.join(' / ') + ' ms — the first one cold, JIT; ≤ ' + worstReads + ' reads a tick, the old search: 69 probes × up to 250 reads in one)');
+  // the stages: dark → the lens set → brighter per light → awake; the models
+  const st = [TL.stage(q)];
+  const lens = q.steps.find(s => s.id === 'lens'), lights = q.steps.find(s => s.id === 'lights');
+  q.i = q.steps.indexOf(lens) + 1; lens.done = true; st.push(TL.stage(q));
+  const pl = lights.of.find(o => o.k === 'place'); pl.c = 1; st.push(TL.stage(q)); pl.c = 2; st.push(TL.stage(q));
+  pl.c = 3; lights.done = true; q.i = q.steps.indexOf(lights) + 1; st.push(TL.stage(q));
+  check(st.join(' ') === '0 1 2 3 4', 'the beacon\'s stages as the tale goes: ' + st.join(' '));
+  const mods = [0, 1, 2, 3, 4].map(k => V.VOXMODELS['tl_beacon_s' + k]).filter(Boolean).map(f => f());
+  const emisOf = (d) => { let n = 0; for (const p of Object.values(d.parts)) { const c = p.grid.c; for (let i = 0; i < c.length; i++) if (c[i] && (c[i] >>> 24) & 1) n++; } return n; };
+  const em = mods.map(emisOf);
+  check(mods.length === 5 && em[0] === 0 && em[1] > 0 && em[2] > em[1] && em[3] > em[2] && em[4] > em[3], 'five beacon models, each glowing more (' + em.join(' ') + ' glowing voxels)');
+  const bm = [1, 2, 3, 4, 5].map(k => TL.beam(k, 1, 0));
+  check(bm[0].length === 0 || bm[0][0].s[1] < bm[3][0].s[1], 'the beam grows with the lights', bm.map(b => b.length ? b[0].s[1].toFixed(1) : '-').join(' '));
+  check(TL.beam(5, 0, 0).every(b => b.a < 0.02) || TL.beam(5, 0, 0).length === 0, 'no beam by day');
+  // the ending: the lit record gets its height there (the beacon's mark knows it), drawn at night with its beam
+  rec.cur = null; rec.lit.length = 0; g.player.pos = [HX + 300, 90, HZ];
+  TL.test.markY && TL.test.markY(hp[0], hp[1], top(hp[0], hp[1]) + 1);
+  const lit = { k: 'beacon', x: hp[0], z: hp[1], dim: 'overworld', d: 1, v: 'hum' }; rec.lit.push(lit);
+  TL.litY(g, lit);
+  check(Number.isFinite(lit.y) && Math.abs(lit.y - (top(hp[0], hp[1]) + 1)) < 0.01, 'the woken beacon\'s height known at the ending, 300 m from it (' + lit.y + ')');
+  const drawn = []; V.LifeKit = { drawModel: (gg, r, p, m) => { drawn.push(m); return true; } };
+  const glows = []; V.StoryGlow = { ok: () => true, draw: (r, cam, L) => { for (const x of L) if (x.a > 0.01) glows.push(x); return L.length; } };
+  g.entities = { beginVox: () => ({}) }; g.env.timeOfDay = 16500; g.env.night = 1;
+  Vi.draw({ q: {}, gl: {} }, { night: 1 }, { x: hp[0] + 14, y: lit.y + 5, z: hp[1] });
+  check(drawn.includes('tl_beacon_lit') && glows.length >= 1 && !TL.drawErr, 'at night the woken beacon drawn lit, its beam shining (' + drawn.join(',') + '; ' + glows.length + ' glows' + (TL.drawErr ? '; ' + TL.drawErr : '') + ')');
+  g.settings.preset = 'potato'; glows.length = 0; drawn.length = 0;
+  Vi.draw({ q: {}, gl: {} }, { night: 1 }, { x: hp[0] + 14, y: lit.y + 5, z: hp[1] });
+  check(drawn.includes('tl_beacon_lit') && glows.length === 0, 'Very Low: the lit model, no beam (no glow program there)');
+  delete V.LifeKit; delete V.StoryGlow;
+}
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);

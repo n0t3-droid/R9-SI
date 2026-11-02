@@ -51,7 +51,9 @@
   function ground(g, x, z) {
     const w = g.world; if (!w || !w.getBlock || (w.isLoaded && !w.isLoaded(Math.floor(x), Math.floor(z)))) return null;
     const R = VR.R, F = VR.F;
-    for (let y = Math.min(250, (VR.MAXY || 256) - 1); y > 1; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && R && R.T.flags[s] & F.SOLID) return y + 1; }
+    // (f-polish8: from the column's height map down — a handful of reads, not 250: the 2-Hz look's 31-ms spike)
+    const hm = w.topAt ? w.topAt(Math.floor(x), Math.floor(z)) : 0, y0 = hm > 0 ? Math.min(250, hm + 3) : Math.min(250, (VR.MAXY || 256) - 1);
+    for (let y = y0; y > 1; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && R && R.T.flags[s] & F.SOLID) return y + 1; }
     return null;
   }
   TL.ground = ground;
@@ -90,17 +92,59 @@
     }
     tale.safe = true; return true;   // (no dry side: the place itself is the hide's only choice — it stays)
   };
+  // the hilltop: the highest dry ground within 26 m (f-polish8: a resumable job, ≤ TL.PROBES probes a tick — it cost one
+  // 31-ms tick; a top of lava or water is no place for a beacon)
+  TL.PROBES = 12;
+  const RF = []; for (let dz = -26; dz <= 26; dz += 6.5) for (let dx = -26; dx <= 26; dx += 6.5) if (dx * dx + dz * dz <= 27 * 27) RF.push([dx, dz]);
+  const wet = (g, x, y, z) => { const R = VR.R, s = g.world.getBlock(Math.floor(x), y, Math.floor(z)), t0 = s && R.types[R.T.type[s]]; return !!(t0 && /lava|magma|water|fire/.test(t0.name)); };
   TL.refine = function (g, tale) {
     const s = tale.steps.find(q => q.at === 'hill' && q.p); if (!s || tale.refined) return false;
     const p = g.player.pos; if (Math.hypot(s.p[0] - p[0], s.p[1] - p[2]) > 110) return false;
-    let best = null;
-    for (let dz = -26; dz <= 26; dz += 6.5) for (let dx = -26; dx <= 26; dx += 6.5) { if (dx * dx + dz * dz > 27 * 27) continue; const y = ground(g, s.p[0] + dx, s.p[1] + dz); if (y === null) return false; if (!best || y > best[2]) best = [dx, dz, y]; }
+    const J = S.rf && S.rf.tale === tale ? S.rf : (S.rf = { tale, i: 0, best: null });
+    for (let k = 0; k < TL.PROBES && J.i < RF.length; k++, J.i++) {
+      const dx = RF[J.i][0], dz = RF[J.i][1], x = s.p[0] + dx, z = s.p[1] + dz, y = ground(g, x, z);
+      if (y === null) return false;   // (not loaded yet: the same probe next tick)
+      if (wet(g, x, y, z) || wet(g, x, y - 1, z)) continue;
+      if (!J.best || y > J.best[2]) J.best = [dx, dz, y];
+    }
+    if (J.i < RF.length) return false;
+    const best = J.best; S.rf = null;
     tale.refined = true; if (!best) return true;
     const ox = Math.round(best[0]), oz = Math.round(best[1]);
     const mv = (q) => { if (q.p && (q.at === 'hill' || q.at === 'motes' || q.at === 'lens')) q.p = [q.p[0] + ox, q.p[1] + oz]; if (q.pts && (q.at === 'motes' || q.at === 'lens')) q.pts = q.pts.map(v => [v[0] + ox, v[1] + oz]); if (q.of) q.of.forEach(mv); };
     tale.steps.forEach(mv); S.mkKey = null;
     log('refine', ox + ',' + oz + ' y' + best[2]);
     return true;
+  };
+  // the sleepy beacon's stage as its tale goes (f-polish8): 0 dark · 1 the lens set in its bowl · 2, 3 brighter with each
+  // light · 4 awake (a small flame); the woken one (kept) is drawn lit
+  TL.stage = function (tale) {
+    if (!tale || tale.t !== 'beacon') return -1;
+    const lens = tale.steps.find(q => q.id === 'lens'), lights = tale.steps.find(q => q.id === 'lights');
+    if (!lens || !lens.done) return 0;
+    if (!lights || lights.done) return 4;
+    let f = 0; for (const q of lights.of || [lights]) { if (q.k === 'place' && q.n) f = Math.max(f, (q.c | 0) / q.n); if (q.k === 'marks' && q.pts && q.pts.length) f = Math.max(f, (q.m | 0) / q.pts.length); }
+    return Math.min(3, 1 + Math.floor(f * 3));
+  };
+  // its light at night: a halo round the lens and a soft beam that grows with the stage (5: the woken beacon) — StoryGlow
+  // sprites (kind 0), positions over the beacon's foot; nt the night 0 … 1; out an array to fill (the draw reuses one)
+  const BEAMH = [0, 0, 2.5, 5, 9, 16];
+  TL.beam = function (stage, nt, t, out) {
+    out = out || []; out.length = 0;
+    if (!(stage >= 1) || !(nt > 0.05)) return out;
+    const k = Math.min(5, stage), br = 0.92 + 0.08 * Math.sin((t || 0) * 1.7), hs = 0.9 + 0.35 * k;
+    out.push({ p: [0, 4.5, 0], s: [hs, hs], col: [1.0, 0.86, 0.58], a: (0.12 + 0.1 * k) * nt * br, kind: 0 });
+    const H = BEAMH[k];
+    if (H > 0) out.push({ p: [0, 4.6 + H, 0], s: [0.45 + 0.05 * k, H], col: [1.0, 0.9, 0.62], a: (0.1 + 0.06 * k) * nt * br, kind: 0 });
+    return out;
+  };
+  // the woken beacon's height: at the ending from its mark's (the tale drew it there), else the ground once loaded
+  TL.litY = function (g, L) {
+    if (!L || fin(L.y)) return L ? L.y : null;
+    const k = Math.round(L.x) + ',' + Math.round(L.z); let y = fin(S.yc[k]) ? S.yc[k] : null;
+    if (y === null) y = ground(g, L.x, L.z);
+    if (y !== null) L.y = y;
+    return y;
   };
   function ctxFor(V, a) {
     const g = V.g, vil = a.vil, gpid = dimOf(g) + '/' + a.p.id, fams = vil.fams || {}, fam = fams[a.p.fam];
@@ -272,6 +316,7 @@
   function finish(V, tale) {
     const g = V.g, rec = TL.rec(g), t = now(g), V0 = vars(g, tale);
     const res = TC.finish(rec, t); if (!res) return;
+    if (res.lit) TL.litY(g, res.lit);   // (f-polish8: its height now — the ending is said in the village, 200–320 m off)
     const end = T(res.key, V0), head = T(res.head, V0), gv = liveOf(V, res.giver.pid);
     S.endGiver = res.giver.pid;
     S.pend = { pid: res.giver.pid, text: end, t: Date.now() };   // (said by the friend in person: now, or as soon as their village is awake around you)
@@ -356,7 +401,7 @@
     if (S.kid && S.kid.ph === 'home' && !rec.cur && S.kid.t > 30) endKid(V);
     if (S.kid && !rec.cur && S.kid.ph !== 'home') endKid(V);
     // the woken beacons and the Flausel houses: their ground once near
-    for (const L of rec.lit) if (L.dim === dimOf(g) && !fin(L.y) && Math.hypot(L.x - g.player.pos[0], L.z - g.player.pos[2]) < 200) { const y = ground(g, L.x, L.z); if (y !== null) L.y = y; }
+    for (const L of rec.lit) if (L.dim === dimOf(g) && !fin(L.y) && Math.hypot(L.x - g.player.pos[0], L.z - g.player.pos[2]) < 200) TL.litY(g, L);
     if (t0) { const ms = performance.now() - t0; S.cost.ticks++; S.cost.ms += ms; if (ms > S.cost.worst) S.cost.worst = ms; }
   };
 
@@ -385,11 +430,17 @@
     let prog = null; const Pg = () => prog || (prog = ent.beginVox(r, E)); const tt = g.time || 0;
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now(), fdt = Math.min(0.1, Math.max(0, (nowMs - (S.lastDraw || nowMs)) / 1000)); S.lastDraw = nowMs;
     let n = 0;
+    // (f-polish8: the beacons' halo and beam at night — StoryGlow sprites, drawn after the models; not on Very Low)
+    const nt = night ? Math.max(0.35, Math.min(1, (E && E.night) || (g.env && g.env.night) || 1)) : 0;
+    const SGl = VR.StoryGlow, glowOk = !!(nt > 0 && SGl && SGl.draw && (!SGl.ok || SGl.ok()) && !(g.settings && (g.settings.preset === 'potato' || g.settings.storyLights === false)));
+    const GL = S.gl || (S.gl = []), BT = S.bt || (S.bt = []); let ng = 0;
+    const beamAt = (x, y, z, stage) => { if (!glowOk) return; TL.beam(stage, nt, tt, BT); for (const q of BT) { if (ng >= 8) break; const o = GL[ng] || (GL[ng] = { p: [0, 0, 0], s: [0, 0], col: [0, 0, 0], a: 0, kind: 0 }); o.p[0] = x + q.p[0]; o.p[1] = y + q.p[1]; o.p[2] = z + q.p[2]; o.s[0] = q.s[0]; o.s[1] = q.s[1]; o.col[0] = q.col[0]; o.col[1] = q.col[1]; o.col[2] = q.col[2]; o.a = q.a; ng++; } };
     // the woken beacons (at night, and while the tale's own light is fresh) and the Flausel houses' little folk
     for (const L of rec.lit) {
-      if (L.dim !== dimOf(g) || !fin(L.y)) continue;
+      if (L.dim !== dimOf(g)) continue;
       const dx = L.x - cam.x, dz = L.z - cam.z; if (dx * dx + dz * dz > 220 * 220) continue;
-      if (L.k === 'beacon') { MP.scale = 1; MP.light = night ? FULL : null; MP.noShade = false; const bp = S.bp || (S.bp = [0, 0, 0]); bp[0] = L.x; bp[1] = L.y - 0.05; bp[2] = L.z; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon', bp, 0, cam, MP)) n++; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
+      if (!fin(L.y) && TL.litY(g, L) === null) continue;   // (f-polish8: its height found here too — a night picture missed it)
+      if (L.k === 'beacon') { MP.scale = 1; MP.light = night ? FULL : null; MP.noShade = false; const bp = S.bp || (S.bp = [0, 0, 0]); bp[0] = L.x; bp[1] = L.y - 0.05; bp[2] = L.z; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon_s4', bp, 0, cam, MP)) n++; beamAt(L.x, L.y, L.z, 5); S.litDrawn = (S.litDrawn | 0) + 1; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
       else if (L.k === 'flausel' && dx * dx + dz * dz < 60 * 60) { MP.scale = 1.05; MP.light = null; MP.noShade = false; for (let i = 0; i < 2; i++) if (LK.drawModel(g, r, Pg(), 'fy_sprite_' + ((TC.h(L.x, L.z, i) % 4)), [L.x + 1.2 + i * 0.9, L.y + Math.abs(Math.sin(tt * 2 + i)) * 0.12, L.z - 1.4], tt * 0.2 + i * 2, cam, MP)) n++; }
     }
     if (tale) {
@@ -399,6 +450,8 @@
         const dx = M0.x - cam.x, dz = M0.z - cam.z; if (dx * dx + dz * dz > (M0.big ? 160 * 160 : 64 * 64)) continue;
         const y = yAt(g, M0.x, M0.z); if (y === null) continue;
         MP.scale = M0.m === 'fy_shroom_1' ? 0.32 : 1; MP.light = M0.glow || M0.m === 'tl_print' ? FULL : null; MP.noShade = !!M0.glow;
+        // (f-polish8: the sleepy beacon shows its stage — the lens set, brighter with each light, awake — and at night its beam)
+        if (M0.m === 'tl_beacon') { const sg = Math.max(0, TL.stage(tale)), dp = S.dp || (S.dp = [0, 0, 0]); dp[0] = M0.x; dp[1] = y; dp[2] = M0.z; if (sg >= 2 && night) MP.light = FULL; if (LK.drawModel(g, r, Pg(), 'tl_beacon_s' + sg, dp, 0, cam, MP)) n++; beamAt(M0.x, y, M0.z, sg); continue; }
         const hov = M0.glow ? 0.5 + Math.sin(tt * 2.2 + M0.x) * 0.15 : M0.m === 'tl_print' ? 0.02 : 0;
         const dp = S.dp || (S.dp = [0, 0, 0]); dp[0] = M0.x; dp[1] = y + hov; dp[2] = M0.z;
         if (LK.drawModel(g, r, Pg(), M0.m, dp, M0.glow ? tt * 0.8 : (M0.yaw || 0), cam, MP)) n++;
@@ -424,6 +477,7 @@
       }
     }
     S.cost.draws = n;
+    if (ng) { GL.length = Math.max(GL.length, ng); const L2 = S.gl2 || (S.gl2 = []); L2.length = 0; for (let i = 0; i < ng; i++) L2.push(GL[i]); try { SGl.draw(r, cam, L2); S.glows = ng; } catch (e) { TL.drawErr = 'glow ' + String((e && e.message) || e); } }
   }
 
   // ---------------------------------------------------------------- hooks (Villages' prototype, the talk, Funke, the books)
@@ -503,16 +557,25 @@
     // the plot's stake: a peeled stick with a red ribbon
     M.tl_stake = () => ({ unit: 16, radius: 0.6, parts: { b: part(5, 20, 3, [2, 0, 1], (gr) => { gr.box(2, 0, 1, 2, 17, 1, 0xc8a070); gr.box(2, 18, 1, 2, 19, 1, 0xa88050); for (let y = 13; y < 16; y++) for (let x = 0; x < 5; x++) if (x !== 2) gr.set(x, y - (x === 0 || x === 4 ? 1 : 0), 1, 0xd8343a); }) }, layout: { b: [0, 0, 0] } });
     // the beacon: a round stone tower 3.5 blocks tall, a brass bowl on top; lit, the bowl holds a warm flame
-    const beacon = (lit) => () => ({ unit: 6, radius: 4, parts: { b: part(15, 30, 15, [7, 0, 7], (gr) => {
+    // (f-polish8: its stages — 0 the dark bowl · 1 the lens set in it, a pale gleam · 2, 3 the lens brighter, a small
+    // lamp on the rim for each light · 4 awake: three lamps, a small flame over the bright lens · lit: the full flame)
+    const beacon = (lit, stage) => () => ({ unit: 6, radius: 4, parts: { b: part(15, 30, 15, [7, 0, 7], (gr) => {
       for (let y = 0; y < 24; y++) for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) {
         const d = Math.hypot(x - 7, z - 7), R0 = y < 3 ? 6.6 : 5.2 - y * 0.06; if (d > R0 || d < R0 - 1.6) continue;
         const c = ((Math.floor(y / 3) + Math.floor(Math.atan2(z - 7, x - 7) * 2.6)) & 1) ? 0xa8a49a : 0x928e84; gr.set(x, y, z, (x * 3 + y * 5 + z) % 11 === 0 ? 0x6a8a4a : c, 0);
       }
       for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) { const d = Math.hypot(x - 7, z - 7); if (d < 6.2) gr.set(x, 24, z, 0xb88a3a); if (d > 5 && d < 6.4) { gr.set(x, 25, z, 0xc89a4a); gr.set(x, 26, z, 0xa87a2a); } }
       if (lit) for (let y = 25; y < 30; y++) for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) { const d = Math.hypot(x - 7, z - 7); if (d < 4.6 - (y - 25) * 0.9) gr.set(x, y, z, y > 27 ? 0xfff2b0 : 0xffb84a, 1); }
-      else for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) if (Math.hypot(x - 7, z - 7) < 4.4) gr.set(x, 25, z, 0x3a3430);
+      else {
+        const st = stage | 0, glowR = [0, 1.2, 2.3, 3.5, 4.5][st], lensC = [0x3a3430, 0x9fd0f0, 0xbfe8ff, 0xe0f6ff, 0xf4fbff][st];
+        for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) { const d = Math.hypot(x - 7, z - 7); if (d < 4.4) gr.set(x, 25, z, st === 0 ? 0x3a3430 : d < 3.6 ? lensC : 0xc89a3a, st > 0 && d < glowR ? 1 : 0); }
+        // the rim's lamps: one for each light brought (stage 2: one, 3: two, 4: three)
+        for (let k = 0; k < Math.max(0, st - 1); k++) { const a = k * 2.094 + 0.5, x = Math.round(7 + Math.cos(a) * 5.6), z = Math.round(7 + Math.sin(a) * 5.6); gr.set(x, 27, z, 0xffc860, 1); gr.set(x, 28, z, 0xfff0b0, 1); }
+        if (st >= 4) for (let y = 26; y < 28; y++) for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) { const d = Math.hypot(x - 7, z - 7); if (d < 1.9 - (y - 26) * 0.9) gr.set(x, y, z, y > 26 ? 0xfff2b0 : 0xffb84a, 1); }
+      }
     }) }, layout: { b: [0, 0, 0] } });
-    M.tl_beacon = beacon(false); M.tl_beacon_lit = beacon(true);
+    for (let k = 0; k <= 4; k++) M['tl_beacon_s' + k] = beacon(false, k);
+    M.tl_beacon = beacon(false, 0); M.tl_beacon_lit = beacon(true);
   }
 
   // ---------------------------------------------------------------- the test API (test/tales.mjs)
@@ -540,5 +603,7 @@
     cost: () => Object.assign({}, S.cost, { avg: S.cost.ticks ? S.cost.ms / S.cost.ticks : 0 }),
     marks: () => { const c = TL.rec(VR.game).cur; return c ? TL.marks(VR.game, c) : []; },
     cool: () => { const r = TL.rec(VR.game); r.cool = 0; },
+    markY: (x, z, y) => { S.yc[Math.round(x) + ',' + Math.round(z)] = y; },
+    diag: () => ({ lit: TL.rec(VR.game).lit, litDrawn: S.litDrawn | 0, glows: S.glows | 0, draws: S.cost.draws, err: TL.drawErr || null, stage: TL.stage(TL.rec(VR.game).cur) }),
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
