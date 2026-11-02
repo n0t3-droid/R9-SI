@@ -253,6 +253,7 @@
       + 'html body #funkebub{max-width:min(260px,36vw);padding:4px 10px 5px;border-radius:11px;font:600 13px/1.3 var(--font,sans-serif);box-shadow:0 2px 8px rgba(0,0,0,.28),0 0 0 1px rgba(70,232,255,.6)}'
       + 'html body #funkebub b{display:inline;font-size:11px;margin-right:6px}html body #funkebub:after{display:none}'
       + '#qrecent{margin-top:8px;font:500 12px/1.4 var(--font,sans-serif);color:#b9c6da;text-align:left;max-height:8.5em;overflow:hidden}#qrecent b{display:block;color:#dfe8f8;font-size:12px;margin-bottom:2px}'
+      + 'body.q-held #hints{display:none !important}'
       + '#wcompass,#f2point{transition:opacity .8s ease}#wcompass.q-away,#f2point.q-away{opacity:0 !important}'
       + '@media (prefers-reduced-motion: reduce){#notes .qn,#wcompass,#f2point{transition:none}}';
     document.head.appendChild(s);
@@ -303,6 +304,7 @@
       const held = heldNow(g);
       N.hold(held, t);
       const hud = document.getElementById('hud'); if (hud && hud.classList.contains('q-held') !== held) hud.classList.toggle('q-held', held);
+      if (document.body && document.body.classList.contains('q-held') !== held) document.body.classList.toggle('q-held', held);   // (f-quiet2: the 🧭 hint card too — run 3 showed it over a staged ending)
       if (g && g.state === 'play' && g.player && !held) {
         const p = g.player, v = p.vel || [0, 0, 0];
         looking = look.step(t, Math.hypot(v[0] || 0, v[2] || 0), p.yaw || 0);
@@ -459,6 +461,7 @@
     const os = Hn.show;
     Hn.show = function (id, o) {
       if (!Q.hintOk(level(), Q.age())) return false;
+      { const g = game(); if (g && g.state === 'play' && heldNow(g)) return false; }   // (f-quiet2: never over a scene)
       const ok = os.apply(this, arguments);
       if (ok) hintAt = nowS();
       return ok;
