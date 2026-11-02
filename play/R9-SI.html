@@ -77526,28 +77526,36 @@ farOn(){return!!(this.far&&this.far.on());}
 
 static focusD(F,L,tx,tz){if(!F)return Infinity;const S=tileSize(L),x0=tx*S,z0=tz*S;return Math.hypot(Math.max(x0-F[0],0,F[0]-(x0+S)),Math.max(z0-F[1],0,F[1]-(z0+S)));}
 static prio(d,L,fd){const S=tileSize(L);return d/S-L*0.6-(fd<S?Horizon.FOCUS_K:0);}
+
+static keepSel(h,cam,w){return!!h.selList&&h.selWant===0&&h.selVer===(h.ver|0)&&h.selW===w&&h.selR===h.radius&&h.selFar===h.farOn()&&h.frame-h.selF<Horizon.KEEP_FRAMES&&Math.abs(cam.x-h.selX)<Horizon.KEEP_D&&Math.abs(cam.z-h.selZ)<Horizon.KEEP_D;}
 static radiusFor(level){return RADII[Math.max(0,Math.min(4,level|0))];}
 setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level];if(r!==this.radius){this.radius=r;}}
-key(L,tx,tz){return L+':'+tx+':'+tz;}
-free(t){const gl=this.g.renderer.gl;if(t.vao){gl.deleteVertexArray(t.vao);gl.deleteBuffer(t.vbo);gl.deleteBuffer(t.ibo);t.vao=null;this.bytes-=t.bytes||0;t.bytes=0;}}
-reset(){for(const t of this.tiles.values())this.free(t);this.tiles.clear();this.drawList.length=0;this.inflight=0;this.bytes=0;this.focus=null;if(this.far)this.far.reset();}
+
+key(L,tx,tz){return(L*1048576+tx+524288)*1048576+tz+524288;}
+free(t){this.ver=(this.ver|0)+1;const gl=this.g.renderer.gl;if(t.vao){gl.deleteVertexArray(t.vao);gl.deleteBuffer(t.vbo);gl.deleteBuffer(t.ibo);t.vao=null;this.bytes-=t.bytes||0;t.bytes=0;}}
+reset(){this.ver=(this.ver|0)+1;for(const t of this.tiles.values())this.free(t);this.tiles.clear();this.drawList.length=0;this.inflight=0;this.bytes=0;this.focus=null;if(this.far)this.far.reset();}
 
 
 
-keepReady(){for(const[k,t]of this.tiles)if(!(t.state===1&&(t.vao||t.empty)))this.tiles.delete(k);this.drawList.length=0;this.inflight=0;if(this.far)this.far.reset();}
+keepReady(){this.ver=(this.ver|0)+1;for(const[k,t]of this.tiles)if(!(t.state===1&&(t.vao||t.empty)))this.tiles.delete(k);this.drawList.length=0;this.inflight=0;if(this.far)this.far.reset();}
 
 progress(){const s=this.stats;return s.want+s.done>0?s.done/(s.want+s.done):1;}
 enabled(){const g=this.g,w=g.world;return this.radius>0&&w&&(g.dim||'overworld')==='overworld'&&w.dim==='overworld';}
 
 update(cam){
 const g=this.g,w=g.world,r=g.renderer;
-this.drawList.length=0;
-if(!this.enabled()|| !r)return;
+
+
+const wasSel=this.listSel;this.listSel=false;
+if(!this.enabled()|| !r){this.drawList.length=0;return;}
 
 if(!this.maskTex){const gl=r.gl;this.maskTex=VR.GL.tex2D(64,64,gl.R8,gl.RED,gl.UNSIGNED_BYTE,{data:this.mask,filter:gl.LINEAR});}
 if(!this.sentAvg&&g.tex&&g.tex.avgColor){g.pool.broadcast({type:'lodinit',avg:g.tex.avgColor});this.sentAvg=true;}
+if(w!==this.wkW){
+this.wkW=w;
 const wk=w.seed+':'+(w.genOpts&&w.genOpts.worldType||'')+':'+(w.genOpts&&w.genOpts.vgen||1);
 if(wk!==this.worldKey){this.reset();this.worldKey=wk;}
+}
 
 {const av=(g.arrival&&g.arrival.v)||(g.arrivalPending&&g.arrivalPending.vista);if(av&&Array.isArray(av.aim)&& !this.focus){this.focus=[av.aim[0],av.aim[2]];this.focusAt=performance.now();}if(this.focus&&performance.now()-this.focusAt>Horizon.FOCUS_MS)this.focus=null;}
 
@@ -77560,15 +77568,19 @@ const far1=this.farOn();
 if(this.far)this.far.update(cam);
 if(far1)this.updateMaskFar(cam);else this.updateMask(cam);
 
+
+if(r.q&&r.q.lite&&Horizon.keepSel(this,cam,w)){if(!wasSel){const K=this.selList;this.drawList.length=0;for(let i=0;i<K.length;i++)this.drawList.push(K[i]);}this.listSel=true;this.selKept=(this.selKept|0)+1;return;}
+
 const R=this.radius,Lr=TOP[this.level]||2,Sr=tileSize(Lr),Lmin=far1?Math.min(2,Lr):0;
 const cx=cam.x,cz=cam.z;
 const want=[];
-const list=this.drawList;
+const list=this.drawList;list.length=0;
 let done=0;
-const dist=(L,tx,tz)=>{const S=tileSize(L),x0=tx*S,z0=tz*S;const dx=Math.max(x0-cx,0,cx-(x0+S)),dz=Math.max(z0-cz,0,cz-(z0+S));return Math.hypot(dx,dz);};
+const dist=(L,tx,tz)=>{const S=tileSize(L),x0=tx*S,z0=tz*S;const dx=Math.max(x0-cx,0,cx-(x0+S)),dz=Math.max(z0-cz,0,cz-(z0+S));return Math.sqrt(dx*dx+dz*dz);};
 const ready=(t)=>t&&t.state===1;
 
-const get=(L,tx,tz)=>{const k=this.key(L,tx,tz),t=this.tiles.get(k);if(t&&t.state===2&&this.frame-t.failedAt>300){this.tiles.delete(k);return undefined;}return t;};
+const get=(L,tx,tz)=>{const k=this.key(L,tx,tz),t=this.tiles.get(k);if(t&&t.state===2&&this.frame-t.failedAt>300){this.tiles.delete(k);this.ver=(this.ver|0)+1;return undefined;}return t;};
+const KT=this.ktS||(this.ktS=[[],[],[],[],[],[],[]]);
 const visit=(L,tx,tz)=>{
 const d=dist(L,tx,tz);
 if(d>R)return;
@@ -77576,17 +77588,17 @@ const S=tileSize(L);
 const t=get(L,tx,tz);
 if(t)t.used=this.frame;
 if(L>Lmin&&d<this.split*S){
-const kids=[[tx*2,tz*2],[tx*2+1,tz*2],[tx*2,tz*2+1],[tx*2+1,tz*2+1]];
-const kt=kids.map(([a,b])=>(dist(L-1,a,b)>R?'out':get(L-1,a,b)));
-const allReady=kt.every(k=>k==='out'||ready(k));
+
+const kt=KT[L];let allReady=true;
+for(let i=0;i<4;i++){const k=dist(L-1,tx*2+(i&1),tz*2+(i>>1))>R?'out':get(L-1,tx*2+(i&1),tz*2+(i>>1));kt[i]=k;if(!(k==='out'||ready(k)))allReady=false;}
 if(allReady|| !ready(t)){
 
-for(let i=0;i<4;i++)if(kt[i]!=='out')visit(L-1,kids[i][0],kids[i][1]);
+for(let i=0;i<4;i++)if(kt[i]!=='out')visit(L-1,tx*2+(i&1),tz*2+(i>>1));
 if(!allReady&& !t)want.push([d,L,tx,tz]);
 return;
 }
 
-for(let i=0;i<4;i++){const k=kt[i];if(k==='out')continue;if(!k)want.push([dist(L-1,kids[i][0],kids[i][1]),L-1,kids[i][0],kids[i][1]]);else k.used=this.frame;}
+for(let i=0;i<4;i++){const k=kt[i];if(k==='out')continue;const a=tx*2+(i&1),b=tz*2+(i>>1);if(!k)want.push([dist(L-1,a,b),L-1,a,b]);else k.used=this.frame;}
 if(!t.empty)list.push(t);
 done++;
 return;
@@ -77622,18 +77634,22 @@ for(const t of old){if(n<=capN-10&&b+fb<=capB*0.92)break;b-=t.bytes||0;n--;this.
 if(far1&&this.bytes+this.far.set.bytes>capB*0.92)this.far.evict(capB*0.92-this.bytes);
 }
 this.stats.tiles=this.tiles.size;this.stats.mb=this.bytes/1048576;
+
+const K=this.selList||(this.selList=[]);K.length=0;for(let i=0;i<list.length;i++)K.push(list[i]);
+this.selWant=want.length;this.selVer=this.ver|0;this.selX=cam.x;this.selZ=cam.z;this.selF=this.frame;this.selW=w;this.selR=this.radius;this.selFar=far1;this.listSel=true;
 }
 request(L,tx,tz,d,k){
 if(!Number.isFinite(k))k=Horizon.prio(d,L,Infinity);
 const g=this.g,key=this.key(L,tx,tz),S=tileSize(L);
 const t={L,tx,tz,S,x0:tx*S,z0:tz*S,state:0,used:this.frame,empty:false};
-this.tiles.set(key,t);
+this.tiles.set(key,t);this.ver=(this.ver|0)+1;
 this.inflight++;
 
 const cancel=()=>this.tiles.get(key)!==t||this.frame-t.used>45;
 g.pool.submit({type:'lod',dim:'overworld',level:L,tx,tz,lane:1,cancel},null,(m)=>{
 this.inflight=Math.max(0,this.inflight-1);
 if(this.tiles.get(key)!==t)return;
+this.ver=(this.ver|0)+1;
 if(m.type==='cancelled'){this.tiles.delete(key);return;}
 if(m.type!=='lod'){t.state=2;t.failedAt=this.frame;return;}
 if(m.empty){t.state=1;t.empty=true;return;}
@@ -77648,7 +77664,7 @@ t.queued=true;
 const P=Horizon.parted(g.renderer.gl,m),mine=()=>this.tiles.get(key)===t&& !t.vao;
 w.uploadQ.push({key:null,col:undefined,lane:1,prio:k,x:t.x0+S/2,z:t.z0+S/2,bytes:P.bytes,
 alive:()=>mine()&&this.frame-t.used<=120,
-abort:()=>{P.abort();if(mine())this.tiles.delete(key);},
+abort:()=>{P.abort();if(mine()){this.tiles.delete(key);this.ver=(this.ver|0)+1;}},
 step:P.step,
 commit:()=>{if(mine())this.put(t,m,S,P.take());else P.abort();},
 run:()=>{if(mine())this.put(t,m,S);}});
@@ -77689,7 +77705,7 @@ abort(){if(made){gl.deleteBuffer(made.vbo);gl.deleteBuffer(made.ibo);made=null;}
 }
 
 dropQueued(){
-for(const[k,t]of this.tiles)if(t.queued&& !t.vao)this.tiles.delete(k);
+this.ver=(this.ver|0)+1;for(const[k,t]of this.tiles)if(t.queued&& !t.vao)this.tiles.delete(k);
 if(this.far)this.far.dropQueued();
 }
 
@@ -77706,7 +77722,7 @@ gl.bindVertexArray(null);
 t.count=m.count;t.type=m.big?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT;t.minY=m.minY;t.maxY=m.maxY;
 t.bx0=m.bx0!==undefined?m.bx0:0;t.bz0=m.bz0!==undefined?m.bz0:0;t.bx1=m.bx1!==undefined?m.bx1:S;t.bz1=m.bz1!==undefined?m.bz1:S;
 t.bytes=m.verts.byteLength+m.idx.byteLength;this.bytes+=t.bytes;
-t.state=1;
+t.state=1;this.ver=(this.ver|0)+1;
 }
 
 
@@ -77807,6 +77823,7 @@ farPlane(){return this.enabled()?this.radius+400:0;}
 destroy(){this.reset();}
 }
 Horizon.FOCUS_K=10;Horizon.FOCUS_MS=300000;
+Horizon.KEEP_FRAMES=15;Horizon.KEEP_D=1;
 VR.Horizon=Horizon;
 })(VR);
 
@@ -112209,11 +112226,13 @@ wl.appendChild(d);
 }
 }
 loading(msg,frac,detail){
-if(this.screen!=='loading'){this.show('loading');this.tipTimer=0;}
-$('#loadmsg').textContent=msg;
+if(this.screen!=='loading'){this.show('loading');this.tipTimer=0;this.loadSeen=null;}
 
-{const d=$('#loaddetail');if(d)d.textContent=detail||'';const L=$('#loading');if(L)L.classList.toggle('sky',this.game.state==='loading');}
-$('#loadbar').style.width=Math.round(Math.max(0,Math.min(1,frac))*100)+'%';
+const LC=this.loadSeen||(this.loadSeen={msg:null,detail:null,sky:null,pct: -1});
+if(LC.msg!==msg){LC.msg=msg;$('#loadmsg').textContent=msg;}
+
+{const dt0=detail||'',sky=this.game.state==='loading';if(LC.detail!==dt0){LC.detail=dt0;const d=$('#loaddetail');if(d)d.textContent=dt0;}if(LC.sky!==sky){LC.sky=sky;const L=$('#loading');if(L)L.classList.toggle('sky',sky);}}
+{const pct=Math.round(Math.max(0,Math.min(1,frac))*100);if(LC.pct!==pct){LC.pct=pct;$('#loadbar').style.width=pct+'%';}}
 if(!this.tipAt||performance.now()-this.tipAt>4500){this.tipAt=performance.now();const tips=TL('g.load.tips');$('#loadtip').textContent=tips.length?tips[Math.floor(Math.random()*tips.length)]:'';}
 }
 
@@ -112234,9 +112253,10 @@ const name=h?VR.itemName(h.id):'';
 if(name!==this.lastName){this.lastName=name;nm.textContent=name;nm.style.opacity=name?1:0;clearTimeout(this.nameT);this.nameT=setTimeout(()=>nm.style.opacity=0,2200);}
 }
 const surv=p.mode==='survival';
-$('#stats').style.display=surv?'flex':'none';
-$('#xpbar').style.display=surv?'block':'none';
-$('#xplvl').style.display=surv&&p.level>0?'block':'none';
+
+{const stEl=$('#stats'),lv=surv&&p.level>0;
+if(stEl!==this.hudStatsEl||surv!==this.hudSurv||lv!==this.hudLv||force){this.hudStatsEl=stEl;this.hudSurv=surv;this.hudLv=lv;
+stEl.style.display=surv?'flex':'none';$('#xpbar').style.display=surv?'block':'none';$('#xplvl').style.display=lv?'block':'none';}}
 if(surv){
 const key=Math.ceil(p.health)+':'+p.food+':'+Math.ceil(p.air/30)+':'+p.level+':'+Math.floor(p.xp*100);
 if(key!==this.statKey||force){
@@ -144347,7 +144367,14 @@ const S=W.STAGE,dmax=hgt/(S.share*2*Math.tan((fov||S.fov)/2));
 return[S.near,Math.max(S.near,Math.min(S.far,dmax))];
 };
 
+
+const CANDS=[];
 W.stageCands=function(R){
+const c0=W.STAGE.cone;for(let i=0;i<CANDS.length;i++){const C=CANDS[i];if(C.a===R[0]&&C.b===R[1]&&C.c===c0)return C.out;}
+const out=stageCands0(R);CANDS.push({a:R[0],b:R[1],c:c0,out});if(CANDS.length>24)CANDS.shift();
+return out;
+};
+const stageCands0=function(R){
 const S=W.STAGE,a=R[0],b=R[1],mid=a+(b-a)*0.35,out=[];
 for(const d of[mid,mid+(b-mid)*0.6,a+(mid-a)*0.4,b,a])for(const s of[0.18,-0.18,0,0.34,-0.34,S.cone,-S.cone])out.push([Math.max(a,Math.min(b,d)),s]);
 return out;
@@ -147262,8 +147289,8 @@ F.frame=function(g,dt,eye,E){
 if(!on(g)|| !g.player|| !g.world){if(S.sites.length&&(!g||g.state!=='play')){S.sites=[];S.key='';hideBubble();}return;}
 const t0=performance.now();
 S.dt=dt;S.t+=dt;S.E=E;
-const key=(g.dim||'overworld')+'|'+(g.meta&&g.meta.seed);
-if(key!==S.key)setup(g);
+
+if(!S.key||S.kDim!==g.dim||S.kSeed!==(g.meta&&g.meta.seed)){S.kDim=g.dim;S.kSeed=g.meta&&g.meta.seed;const key=(g.dim||'overworld')+'|'+(g.meta&&g.meta.seed);if(key!==S.key)setup(g);}
 const p=g.player.pos;
 if((S.chk-=dt)<=0){
 S.chk=0.5;let best=null,bd=1e9;
