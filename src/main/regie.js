@@ -107,6 +107,7 @@
   R.allow = function (g, w, kind, act) {
     const S = R.of(g); if (!S) return true;
     if (R.vistaNear(g)) return false;   // a-regie: a wow moment is coming (an unseen vista near) — nothing on top of it
+    if (kind !== 'story' && R.claimed(g)) { S.st.claimNo = (S.st.claimNo | 0) + 1; return false; }   // o-wander3: the walker's moment is due — the slot is its
     return S.sched.allow(now(g), w || 2, kind || 'ambient', act);   // (a query: what starts is seen through the event log)
   };
   // a-regie: a self-scheduling source (the pads' visitors, the traffic's passes) tells what it started after allow said yes
@@ -129,6 +130,12 @@
     if (S) { if (near !== S.vid) { S.vid = near; S.v0 = t; } if (near && t - S.v0 > R.RULES.vistaHold) near = null; S.vt = t; S.vn = !!near; }
     return !!near;
   };
+  // o-wander3 (R58-03): the Wanderregisseur claims the next slot while its moment is due (≤ CLAIM s at a time, refreshed
+  // while it stages): the self-scheduling sources and the Regie's own fill wait — on a busy Herzwelt their starts, noted
+  // every ≈ 11 s and often not seen, held the walker's moments off for good (node: test/wander3.js, 0 of 16)
+  R.CLAIM = 4;
+  R.claim = function (g, s) { const S = R.of(g); if (S) { S.claim = now(g) + Math.max(0, Math.min(R.CLAIM, s === undefined ? R.CLAIM : s)); S.st.claims = (S.st.claims | 0) + 1; } };
+  R.claimed = function (g) { const S = R.of(g); return !!(S && S.claim > now(g)); };
   R.inScene = (g, on) => { const S = R.of(g); if (S) S.sched.scene = !!on; };
   function bind(g) {
     const seed = ((g.meta && g.meta.seed) >>> 0) || 0x5eed, A = VR.Adventure;
@@ -195,13 +202,19 @@
     S.sched.bauruhe = !!(F && ((F.budget && F.budget.quiet(t)) || (F.buildFocus && F.buildFocus())));
     if ((S.t -= dt) > 0) return;
     S.t = 0.25;
-    if (R.vistaNear(g)) return;   // a-regie: a wow moment is coming
+    // o-wander3: why nothing started this tick (counted per tick of 0.25 s; the session's JSON)
+    const why = (k) => { const q = S.st.why || (S.st.why = {}); q[k] = (q[k] | 0) + 1; };
+    if (R.vistaNear(g)) return why('vista');   // a-regie: a wow moment is coming
+    if (S.claim > t) return why('claim');   // o-wander3: the walker's moment has the slot
     const ctx = { t, place: g.lifeDirector && g.lifeDirector.ctx ? g.lifeDirector.ctx.place : '' }, offers = [];
     for (const fn of SOURCES) { try { const o = fn(g, ctx); if (o) for (const q of o) if (q) offers.push(q); } catch (e) { /* a source's */ } }
     S.st.offers += offers.length;
+    const q = S.sched, due = q.due(t) && t - q.lastStart >= q.o.space;
+    if (due) S.st.dueOffers = (S.st.dueOffers | 0) + offers.length;   // (o-wander3: the offers made while a gap was due — the real chances)
     const of = S.sched.choose(t, offers, ctx.place);
-    if (!of) return;
+    if (!of) return why(!offers.length ? 'none' : !q.due(t) ? 'notdue' : t - q.lastStart < q.o.space ? 'space' : 'budget');
     let ok = false; try { ok = of.start() !== false; } catch (e) { ok = false; }
+    if (!ok) why('fail');
     if (ok) { S.sched.started(t, of); S.sched.lastStart = Math.max(S.sched.lastStart, t); S.st.started++; S.st[of.source] = (S.st[of.source] | 0) + 1; if (of.kind === 'story') { S.sched.lastBeat = t; S.sched.lastStart = t; } }
   };
   R.stats = function (g) { const S = R.of(g); if (!S) return null; const q = S.sched; return { st: Object.assign({}, S.st), last2: q.last2, target: +q.target.toFixed(1), slot: q.slot, kinds: q.kinds.slice(), scene: q.scene, bauruhe: q.bauruhe, builder: !!q.o.builder, log: q.log.slice(-12) }; };

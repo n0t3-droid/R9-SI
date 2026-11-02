@@ -104,6 +104,10 @@
   // stage scouted PACE.look s before along the heading; from PACE.beat a small ambient beat fills anywhere (flying too),
   // from PACE.hard even when the Regie says busy — so no gap grows past ≈ 31 s plus the time a beat needs to be seen
   W.PACE = { space: 10, lo: 15, hi: 23, look: 4, beat: 27, hard: 31 };
+  // o-wander3 (R58-03): a start another source noted and nobody has seen holds ours PACE.noted s (was 15: on a busy
+  // Herzwelt the notes came every ≈ 11 s — ours never started); while ours is due on foot it claims the Regie's slot
+  // (VR.Regie.claim) for at most PACE.claim s past its target, so the others wait for it instead of the other way round
+  W.PACE.noted = 5; W.PACE.claim = 10; W.PACE.defer = 6;
   W.Pacer = class {
     constructor(seed) { this.seed = seed | 0; this.last = -1e9; this.n = 0; this.tgt = this.jit(0); }
     jit(n) { const P = W.PACE; return P.lo + (P.hi - P.lo) * h(this.seed, n, 0x9ace); }
@@ -373,11 +377,15 @@
           if (this.sb <= 0) { cur[this.stg] = i; this.more = true; return null; }
           this.sb--;
           const dd = cands[i][0], a = a0 + cands[i][1], x = p[0] + Math.cos(a) * dd, z = p[2] + Math.sin(a) * dd;
-          const y = this.ground(x, z, p[1]); if (y === null) continue;
-          if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) continue; }
-          if (!W.openAt(this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz)), x, y, z)) continue;
+          const SG = this.st.stage || (this.st.stage = { ground: 0, flat: 0, open: 0, head: 0, feet: 0, sight: 0, ok: 0 });
+          const y = this.ground(x, z, p[1]); if (y === null) { SG.ground++; continue; }
+          if (flat) { let ok = true; for (const [ox, oz] of [[flat, 0], [-flat, 0], [0, flat], [0, -flat]]) { const y2 = this.ground(x + ox, z + oz, y); if (y2 === null || Math.abs(y2 - y) > 1) { ok = false; break; } } if (!ok) { SG.flat++; continue; } }
+          if (!W.openAt(this.occF || (this.occF = (ox, oy, oz) => this.occ(ox, oy, oz)), x, y, z)) { SG.open++; continue; }
           const q = [x, y + Math.min(1.4, fh * 0.75), z];
-          if (!this.clear(q, true) || !this.clear([x, y + Math.min(0.35, fh * 0.3), z]) || !this.inSight(q)) continue;   // (the head past leaves and plants, the feet past trunks and walls)
+          if (!this.clear(q, true)) { SG.head++; continue; }
+          if (!this.clear([x, y + Math.min(0.35, fh * 0.3), z])) { SG.feet++; continue; }
+          if (!this.inSight(q)) { SG.sight++; continue; }   // (the head past leaves and plants, the feet past trunks and walls)
+          SG.ok++;
           cur[this.stg] = 0;
           return [x, y, z];
         }
@@ -513,15 +521,20 @@
       const P = this.pacer || (this.pacer = new W.Pacer(this.seed));
       if (P.last < -1e8) P.seen(now - 8, 2);   // (the first moment ≈ 10–15 s after you set out)
       if ((this.logT = (this.logT || 0) - dt) <= 0) { this.logT = 0.25; this.readLog(); }
-      if (this.auto === false || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) return;
+      // o-wander3: the instrument — why no moment started, in seconds of play per reason (stats().why; session.mjs)
+      const Y = this.st.why || (this.st.why = {}), why = (k) => { Y[k] = +((Y[k] || 0) + dt).toFixed(2); };
+      if (this.auto === false || (VR.StoryPlay && VR.StoryPlay.holds && VR.StoryPlay.holds(g))) return why('hold');
       const air = !walking && this.airborne();
-      if (!walking && !air) return;
+      if (!walking && !air) return why('still');
       // the scout: PACE.look s before the moment is due, its kind is chosen and its stage tried along the heading
       if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
-      if (now < (this.tryT || 0)) return;
+      if (now < (this.tryT || 0)) return why(P.since(now) < P.tgt ? 'early' : 'retry');
       if (this.ofs && this.ofs.n !== P.n) { this.ofs = null; this.cur = null; }
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g));
-      const want = P.want(now, { foot: walking, busy, coming: this.coming(now) });
+      { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt - W.PACE.look && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1.5); }   // (o-wander3: the slot is ours while it is due)
+      const coming = this.coming(now) && (!walking || P.since(now) < P.tgt + W.PACE.defer);   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
+      const want = P.want(now, { foot: walking, busy, coming });
+      if (want !== 'moment') { const s0 = P.since(now); why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming ? 'coming:' + coming : 'wait'); }
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {
@@ -533,7 +546,7 @@
           if (this.more) { this.ofs = { n: P.n, i }; this.tryT = 0; return; }
         }
         this.ofs = null; this.hiC = null;
-        this.st.quiet++;   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
+        this.st.quiet++; why('nostage');   // (no clear stage ahead: it waits — the beat fills from PACE.beat)
         return;
       }
       this.beat(air);
@@ -542,7 +555,7 @@
     // (≤ 15 s), or a craft of the sky traffic closing in (its nearest pass within ≈ 9 s): ours waits, no pair
     coming(now) {
       const g = this.g, RG = VR.Regie, RS = RG && RG.of ? RG.of(g) : null, P = this.pacer;
-      if (RS && RS.sched && RS.sched.lastStart > P.last + 0.5 && now - RS.sched.lastStart < 15) return true;
+      if (RS && RS.sched && RS.sched.lastStart > P.last + 0.5 && now - RS.sched.lastStart < W.PACE.noted) return 'noted';
       const Tr = g.traffic, e = this.pos; if (!Tr || !Tr.ships) return false;
       const M = this.shipD || (this.shipD = new Map());
       let soon = false;
@@ -553,7 +566,7 @@
         if (d0 !== undefined && d < d0 && d < 260 && (d - 60) / Math.max(6, s.speed || 20) < 9) soon = true;
       }
       if (M.size > 64) M.clear();
-      return soon;
+      return soon ? 'ship' : false;
     }
     // a beat: small and close (6–16 m ahead in the cone), one or two draws, silent on screen (no toast)
     beat(air) {
@@ -775,7 +788,7 @@
       LAMP_P[0] = m.pos[0] + 1.2; LAMP_P[1] = m.pos[1] + 1.5; LAMP_P[2] = m.pos[2] + 0.4;
       LK.drawModel(this.g, r, prog(), 'wander_hlamp', LAMP_P, 0, cam, LAMP_O);
     }
-    stats() { return { beats: this.st.beats | 0, outside: this.st.outside | 0, beat: this.b ? this.b.kind : null, since: this.pacer ? +this.pacer.since(this.now).toFixed(1) : null, on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0 }; }
+    stats() { return { beats: this.st.beats | 0, outside: this.st.outside | 0, beat: this.b ? this.b.kind : null, since: this.pacer ? +this.pacer.since(this.now).toFixed(1) : null, on: this.on, tier: this.tier, started: this.st.started, quiet: this.st.quiet, found: this.st.found, kinds: Object.assign({}, this.st.kinds), active: this.ms.map(m => m.kind), timeline: this.timeline.slice(), next: this.next ? this.next.name : null, beacon: this.bcOn ? this.bcPos.slice() : null, cost: this.st.cost, places: this.places.length, ctx: this.ctx, chests: this.st.chests || 0, why: Object.assign({}, this.st.why), stage: Object.assign({}, this.st.stage) }; }
     destroy() { this.endAll(); }
   };
 
