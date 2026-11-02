@@ -4469,6 +4469,7 @@
     "g.ux.book.you": "you",
     "g.ux.book.page": "Page {n}",
     "g.ux.book.nomap": "Nothing to draw here yet.",
+    "g.ux.book.notYet": "Nothing sketched yet — go out and find something!",
     "g.ux.radial": "Quick wheel",
     "g.ux.r.none": "Pick …",
     "g.ux.r.build": "Build",

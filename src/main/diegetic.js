@@ -171,8 +171,8 @@
     person: (q) => { q.C(.5, .2, .1, 0, 6.3); q.P([.5, .3], [.5, .62]); q.P([.28, .46], [.5, .38], [.72, .46]); q.P([.36, .92], [.5, .62], [.64, .92]); q.P([.36, .12], [.64, .12]); },
     fox: (q) => { q.P([.12, .5], [.2, .3], [.26, .44], [.34, .3], [.38, .5]); q.P([.12, .5], [.24, .62], [.38, .5]); q.P([.36, .52], [.7, .5], [.8, .62]); q.P([.32, .58], [.68, .64]); q.P([.42, .62], [.4, .86]); q.P([.64, .64], [.66, .86]); q.P([.8, .62], [.94, .42], [.88, .74], [.72, .66]); q.P([.21, .48], [.22, .49]); },
     rabbit: (q) => { q.C(.55, .64, .2, 0, 6.3); q.C(.32, .48, .11, 0, 6.3); q.P([.3, .38], [.24, .1], [.34, .36]); q.P([.36, .38], [.4, .1], [.42, .38]); q.C(.78, .62, .05, 0, 6.3); q.P([.4, .84], [.7, .84]); },
-    dog: (q) => { q.C(.24, .38, .11, 0, 6.3); q.P([.16, .3], [.12, .5]); q.P([.32, .44], [.76, .46], [.86, .3]); q.P([.32, .6], [.76, .6]); q.P([.36, .6], [.36, .84]); q.P([.7, .6], [.72, .84]); q.P([.76, .46], [.76, .6]); },
-    pup: (q) => { q.C(.38, .44, .16, 0, 6.3); q.P([.26, .32], [.22, .14], [.34, .3]); q.P([.42, .28], [.5, .12], [.5, .32]); q.C(.66, .66, .16, 3.4, 6.3); q.P([.52, .68], [.84, .7]); q.P([.12, .2], [.16, .16]); q.P([.84, .2], [.88, .14]); q.P([.86, .46], [.9, .42]); },
+    dog: (q) => { q.C(.24, .36, .13, 0, 6.3); q.P([.12, .4], [.06, .44]); q.P([.16, .3], [.12, .5]); q.P([.32, .44], [.76, .46], [.86, .3]); q.P([.32, .6], [.76, .6]); q.P([.36, .6], [.36, .84]); q.P([.7, .6], [.72, .84]); q.P([.76, .46], [.76, .6]); },
+    pup: (q) => { q.C(.34, .4, .15, 0, 6.3); q.P([.24, .28], [.2, .1], [.32, .26]); q.P([.38, .25], [.46, .08], [.48, .3]); q.P([.44, .52], [.8, .56], [.82, .84], [.46, .84], [.44, .52]); q.P([.56, .54], [.6, .4], [.66, .55], [.72, .42], [.76, .56]); q.P([.82, .7], [.94, .58]); q.P([.29, .38], [.3, .39]); q.P([.84, .2], [.88, .14]); q.P([.12, .62], [.16, .58]); },
     pot: (q) => { q.P([.16, .44], [.84, .44]); q.C(.5, .44, .34, 0, 3.15); q.P([.12, .5], [.04, .46]); q.P([.88, .5], [.96, .46]); q.P([.38, .32], [.34, .2], [.4, .1]); q.P([.56, .32], [.6, .2], [.54, .08]); q.P([.3, .92], [.7, .92]); },
     cart: (q) => { q.P([.12, .4], [.8, .4], [.74, .66], [.18, .66], [.12, .4]); q.C(.3, .76, .1, 0, 6.3); q.C(.64, .76, .1, 0, 6.3); q.P([.8, .4], [.94, .3]); q.P([.24, .4], [.3, .24], [.5, .22], [.62, .4]); },
     basket: (q) => { q.P([.14, .5], [.86, .5], [.76, .88], [.24, .88], [.14, .5]); q.C(.5, .5, .3, 3.2, 6.25); q.P([.2, .64], [.8, .64]); q.P([.24, .76], [.76, .76]); q.P([.4, .5], [.4, .88]); q.P([.6, .5], [.6, .88]); },
@@ -192,10 +192,10 @@
   D.doodle = function (kind, seed) {
     const f = DRAW[kind] || DRAW.star, sd = (seed >>> 0) || 1, out = [];
     let n = 0;
-    const wob = (x, y) => { n++; return [clamp(x + (dh(sd, n * 2) - 0.5) * 0.03, 0.01, 0.99), clamp(y + (dh(sd, n * 2 + 1) - 0.5) * 0.03, 0.01, 0.99)]; };
+    const wob = (x, y, am) => { n++; const A = am === undefined ? 0.03 : am; return [clamp(x + (dh(sd, n * 2) - 0.5) * A, 0.01, 0.99), clamp(y + (dh(sd, n * 2 + 1) - 0.5) * A, 0.01, 0.99)]; };
     const q = {
       P: (...pts) => { const s = []; for (let i = 0; i < pts.length; i++) { if (i) { const a = pts[i - 1], b = pts[i]; s.push(wob((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)); } s.push(wob(pts[i][0], pts[i][1])); } out.push(s); },
-      C: (cx, cy, r, a0, a1) => { const s = [], m = Math.max(6, Math.round(Math.abs(a1 - a0) * 5)); for (let i = 0; i <= m; i++) { const a = a0 + (a1 - a0) * i / m; s.push(wob(cx + Math.cos(a) * r, cy + Math.sin(a) * r)); } out.push(s); },
+      C: (cx, cy, r, a0, a1) => { const s = [], m = Math.max(6, Math.round(Math.abs(a1 - a0) * 5)); for (let i = 0; i <= m; i++) { const a = a0 + (a1 - a0) * i / m; s.push(wob(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0.03 * Math.min(1, r * 4))); } out.push(s); },
     };
     f(q);
     return out;
@@ -252,7 +252,7 @@
   };
 
   // ---------------------------------------------------------------- the words and the switches
-  D.KEYS = ['g.ux.sign', 'g.ux.rose.n', 'g.ux.rose.goal', 'g.ux.book.prev', 'g.ux.book.next', 'g.ux.book.map', 'g.ux.book.mapNote', 'g.ux.book.board', 'g.ux.book.boardNote', 'g.ux.book.tray', 'g.ux.book.you', 'g.ux.book.page', 'g.ux.radial', 'g.ux.r.none', 'g.ux.wave', 'g.ux.here', 'g.ux.book.nomap'];
+  D.KEYS = ['g.ux.sign', 'g.ux.book.notYet', 'g.ux.rose.n', 'g.ux.rose.goal', 'g.ux.book.prev', 'g.ux.book.next', 'g.ux.book.map', 'g.ux.book.mapNote', 'g.ux.book.board', 'g.ux.book.boardNote', 'g.ux.book.tray', 'g.ux.book.you', 'g.ux.book.page', 'g.ux.radial', 'g.ux.r.none', 'g.ux.wave', 'g.ux.here', 'g.ux.book.nomap'];
   D.ROWS = [
     { key: 'goalTrail', g: 'play', sec: 'ux', t: 'switch', lab: 'g.set.goalTrail', tip: 'g.set.goalTrail.tip', cost: 'low', def: true },
     { key: 'mapRose', g: 'play', sec: 'ux', t: 'switch', lab: 'g.set.mapRose', tip: 'g.set.mapRose.tip', cost: 'low', def: true },
@@ -327,10 +327,11 @@ html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-sa
 #wanderbuch .dghead h2{margin:0;font:italic 700 24px Georgia,serif;text-shadow:0 2px 4px #000}
 #wanderbuch .dgnav{display:flex;gap:6px}
 #wanderbuch .dgnav button{font:600 15px Georgia,serif;min-width:44px;min-height:40px}
-#wanderbuch .dgleaf{position:absolute;top:14px;bottom:14px;left:50%;width:calc(50% - 14px);transform-origin:0 50%;background:#efdfbd;border-radius:2px 8px 8px 2px;box-shadow:0 0 18px rgba(0,0,0,.35);backface-visibility:hidden;pointer-events:none;z-index:4}
+#wanderbuch .dgleaf{position:absolute;top:14px;bottom:14px;left:50%;width:calc(50% - 14px);transform-origin:0 50%;background:#efdfbd;background-image:linear-gradient(90deg,rgba(60,40,20,.28),rgba(60,40,20,0) 22%,rgba(255,250,235,.35) 70%,rgba(60,40,20,.12)),repeating-linear-gradient(180deg,transparent 0 27px,rgba(110,140,170,.2) 27px 28px);border-radius:2px 8px 8px 2px;box-shadow:0 0 18px rgba(0,0,0,.35);backface-visibility:hidden;pointer-events:none;z-index:4}
 #wanderbuch .dgleaf.fw{animation:dgturn .55s ease-in-out forwards}#wanderbuch .dgleaf.bw{left:14px;transform-origin:100% 50%;border-radius:8px 2px 2px 8px;animation:dgturnb .55s ease-in-out forwards}
 @keyframes dgturn{0%{transform:rotateY(0)}100%{transform:rotateY(-178deg);opacity:.2}}@keyframes dgturnb{0%{transform:rotateY(0)}100%{transform:rotateY(178deg);opacity:.2}}
 html.a11y-less #wanderbuch .dgbook,html.a11y-less #wanderbuch .dgleaf{animation:none!important}html.a11y-less #wanderbuch .dgleaf{display:none}
+#wanderbuch .dgdoods{display:flex;flex-wrap:wrap;gap:4px 8px;margin:4px 0 6px}#wanderbuch .dgdood{margin:0;width:62px;text-align:center;transform:rotate(var(--r,0deg))}#wanderbuch .dgdood canvas{width:56px;height:56px;display:block;margin:0 auto}#wanderbuch .dgdood figcaption{font:italic 11px/13px Georgia,serif;color:#5a3a1c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#wanderbuch .dgdood.faint{opacity:.45;width:auto}#wanderbuch .dgdood.faint figcaption{white-space:normal}
 #wanderbuch .dgmap{display:block;width:min(100%,44vh);margin:0 auto;aspect-ratio:1;border-radius:6px 10px 7px 12px/10px 6px 12px 7px;border:2px solid rgba(59,42,26,.6)}
 #wanderbuch .dgboard{position:relative;height:min(300px,30vh);margin-top:6px;border:2px dashed rgba(106,61,28,.35);border-radius:12px;cursor:crosshair;overflow:hidden}
 #wanderbuch .dgboard .stk{position:absolute;font-size:34px;line-height:1;transform:translate(-50%,-50%) rotate(var(--r,0deg));filter:drop-shadow(1px 2px 0 #fff) drop-shadow(-1px -1px 0 #fff) drop-shadow(0 2px 3px rgba(0,0,0,.3));cursor:pointer;user-select:none}
@@ -733,10 +734,38 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   // ---------------------------------------------------------------- the Wanderbuch as a book
   let W = VR.Wander;
   const B = D.book = { page: 0, sel: null };
+  // f-ux2: two sections a page, each with a strip of ink doodles of what you found (the newest first, ≤ 5)
+  function doodles(g, page) {
+    const Bk = (W && W.book && W.book(g.meta)) || {}, src = Bk[page] || {};
+    let ids = page === 'stickers' ? W.NAMES.filter(n => src[n]) : Object.keys(src);
+    ids = ids.slice(-5).reverse();
+    const cap = (id) => page === 'places' ? W.placeName(id, typeof src[id] === 'string' ? src[id] : id) : page === 'creatures' ? T('g.wd.cr.' + id) : page === 'recipes' ? T('g.wd.r.' + id) : page === 'stickers' ? T('g.wd.k.' + id) : typeof src[id] === 'string' ? src[id] : id;
+    const one = (k, sd, c, i, faint) => `<figure class="dgdood${faint ? ' faint' : ''}" style="--r:${((sd % 9) - 4) * 1.2}deg"><canvas width="112" height="112" data-k="${esc(k)}" data-s="${sd}" data-i="${i}"></canvas><figcaption>${esc(String(c).slice(0, 22))}</figcaption></figure>`;
+    if (!ids.length) { const k = D.doodleKind(page, page === 'creatures' ? 'fox' : page === 'stickers' ? 'sign' : page); return `<div class="dgdoods">${one(k, 3, T('g.ux.book.notYet'), 0, true)}</div>`; }
+    return `<div class="dgdoods">${ids.map((id, i) => { const sd = D.hsd(page + ':' + id); return one(D.doodleKind(page, id), sd, cap(id), i, false); }).join('')}</div>`;
+  }
   function bookPages(g, html) {
     const tmp = document.createElement('div'); tmp.innerHTML = html;
-    const secs = Array.prototype.slice.call(tmp.querySelectorAll('.wdsec')).map(s => s.outerHTML);
-    return [{ map: true }].concat(secs.map(h => ({ html: h })), [{ board: true }]);
+    const secs = Array.prototype.slice.call(tmp.querySelectorAll('.wdsec')).map((sec, i) => {
+      const page = W && W.PAGES ? W.PAGES[i] : null;
+      if (page) { const h = sec.querySelector('h3'); if (h) h.insertAdjacentHTML('afterend', doodles(g, page)); }
+      return sec.outerHTML;
+    });
+    return D.pairPages(secs);
+  }
+  // the pen: wobbly strokes in sepia ink, a second fainter pass a hair off (a sketch, not a vector), a light wash under
+  const WASH = { house: '#d9a066', tower: '#a8a29a', tree: '#8fb46a', person: '#d99a7a', fox: '#e08a3a', rabbit: '#c8b8a0', dog: '#c89a6a', pup: '#9ad0e0', pot: '#c8925a', cart: '#b88a5a', basket: '#d0a860', note: '#a0a0d0', kite: '#e07060', rainbow: '#e0b0d0', mushroom: '#e07a6a', cairn: '#a0a098', gate: '#d0705a', scroll: '#e0d0a0', signpost: '#b8905a', star: '#f0d060', lantern: '#f0a050', well: '#8ab0d0' };
+  function inkDoodle(cv) {
+    const x = cv.getContext && cv.getContext('2d'); if (!x) return;
+    const w = cv.width, h = cv.height, k = cv.dataset.k, sd = +cv.dataset.s || 1, st = D.doodle(k, sd), pad = 10;
+    x.clearRect(0, 0, w, h);
+    x.globalAlpha = 0.35; x.fillStyle = WASH[k] || '#d0b080'; x.beginPath(); x.ellipse(w / 2 + (sd % 7) - 3, h / 2 + 6, w * 0.34, h * 0.26, ((sd % 5) - 2) * 0.2, 0, 6.2832); x.fill(); x.globalAlpha = 1;
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (let pass = 0; pass < 2; pass++) {
+      x.strokeStyle = pass ? 'rgba(59,42,26,.35)' : 'rgba(52,36,20,.9)'; x.lineWidth = pass ? 1.2 : 2.1;
+      const ox = pass ? 1.1 : 0, oy = pass ? -0.8 : 0;
+      for (const sk of st) { x.beginPath(); for (let i = 0; i < sk.length; i++) { const X = pad + sk[i][0] * (w - 2 * pad) + ox, Y = pad + sk[i][1] * (h - 2 * pad) + oy; i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke(); }
+    }
   }
   function drawMap(g, cv) {
     const M = g.map, x = cv.getContext('2d'); if (!x) return false;
@@ -783,6 +812,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     return pg.html + num;
   }
   function bindPage(g, el, pg) {
+    el.querySelectorAll('canvas[data-k]').forEach(inkDoodle);
     if (pg.map) { const cv = el.querySelector('canvas'); if (cv) drawMap(g, cv); }
     if (pg.board) {
       el.querySelectorAll('.dgtray button').forEach(b => { b.onclick = () => { B.sel = B.sel === b.dataset.n ? null : b.dataset.n; el.querySelectorAll('.dgtray button').forEach(q => q.classList.toggle('on', q.dataset.n === B.sel)); }; });

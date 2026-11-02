@@ -4469,6 +4469,7 @@
     "g.ux.book.you": "du",
     "g.ux.book.page": "Seite {n}",
     "g.ux.book.nomap": "Hier gibt es noch nichts zu zeichnen.",
+    "g.ux.book.notYet": "Noch nichts gezeichnet — geh hinaus und finde etwas!",
     "g.ux.radial": "Schnellrad",
     "g.ux.r.none": "Wählen …",
     "g.ux.r.build": "Bauen",
