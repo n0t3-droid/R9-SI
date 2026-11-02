@@ -213,7 +213,7 @@ try {
     }, G);
     console.log('     home ' + JSON.stringify(B));
     await settle(40);
-    const P = [B.x0 - 2, Math.max(B.y0 + 5, (await top(B.x0 - 2, B.z0 - 14)) + 3.5), B.z0 - 14], T = [B.x0 + 4, B.y0 + 0.5, B.z0 - 1];
+    const P = [B.x0 - 1, Math.max(B.y0 + 4.5, (await top(B.x0 - 1, B.z0 - 11)) + 3), B.z0 - 11], T = [B.x0 + 4, B.y0 + 0.5, B.z0];
     views.push({ name: 'home', P, T, tod: NIGHT, prep: async () => { await run(10); } });
   }
   // ---------------------------------------------------------------- the pictures: all befores, then all afters

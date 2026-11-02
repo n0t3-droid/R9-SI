@@ -57,7 +57,7 @@
   // strength, vertical falloff (1/m², past 1.5 m) and the fade at the window's edge (m)
   // cube: a full glowing cube's share (a neon band, a lit floor line, a glowing block — its own glow and the voxel light
   // already light its place; the field is for the lamps, the lanterns, the fires, the windows' light)
-  LF.K = { gain: 1.25, k: 0.07, R: 14, Rd: 11, str: 1.0, kv: 0.05, fade0: 50, fade1: 60, cube: 0.25 };
+  LF.K = { gain: 1.25, k: 0.07, R: 14, Rd: 11, str: 1.0, kv: 0.05, fade0: 50, fade1: 60, cube: 0.25, minLv: 8 };
   const N = LF.N, NN = N * N, M = N - 1, OPQ = 2;   // (VR.F.OPAQUE is 1 << 1: registry.js)
 
   // ---------------------------------------------------------------- the disc's order (a ray cast in one pass)
@@ -187,7 +187,10 @@
           if (wx < x0 || wx >= x0 + N || wz < z0 || wz >= z0 + N) continue;
           const i = (wz & M) * N + (wx & M), e = this.em[i];
           if (!e || this.tx[i] !== wx || this.tz[i] !== wz) continue;
-          const ck = (e & 0x8000) ? K.cube : 1, r = ((e >> 8) & 15) * gk * ck, g = ((e >> 4) & 15) * gk * ck, b = (e & 15) * gk * ck, w = r + g + b;
+          // (run 3: a hangar's thousand faint panel lights flooded the meadow — a light under level 8 is decoration, its
+          // place lit by the voxel light alone; the rest weighted by (level / 15)²: the lamps, the lanterns, the fires count)
+          const lv = Math.max((e >> 8) & 15, (e >> 4) & 15, e & 15); if (lv < K.minLv) continue;
+          const ck = ((e & 0x8000) ? K.cube : 1) * (lv / 15) * (lv / 15), r = ((e >> 8) & 15) * gk * ck, g = ((e >> 4) & 15) * gk * ck, b = (e & 15) * gk * ck, w = r + g + b;
           sr += r; sg += g; sb += b; sx += (wx + 0.5) * w; sy += (this.emY[i] + 0.5) * w; sz += (wz + 0.5) * w; sw += w;
         }
         if (sw <= 0) continue;

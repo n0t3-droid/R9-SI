@@ -97,6 +97,8 @@ check(sw && f.compose() !== null && lum(at(20, 20)) > 0.8, 'a lantern placed: re
 const n0 = f.stats.lights; for (let x = 40; x < 52; x++) set(x, 66, -20, lantern); f.scan(col, R.T, 128); for (let i = 0; i < 40; i++) if (f.rebuild(48)) break;
 check(f.stats.lights - n0 === 6, 'a row of 12 light blocks: 6 lights (merged 2 × 2)', f.stats.lights - n0);
 const glsl0 = () => LF.glslCommon();
+const n1 = f.stats.lights; for (let x = 40; x < 52; x++) set(x, 66, 25, R.S('magma_block')); f.scan(col, R.T, 128); for (let i = 0; i < 40; i++) if (f.rebuild(48)) break;
+check(f.stats.lights === n1, 'faint glowing blocks (magma, level 3) are no lights of the field (the voxel light lights them)', f.stats.lights - n1);
 console.log('e · the shaders');
 const names = ['TERRAIN_FS', 'PROP_FS', 'FURN_FS', 'VOX_FS', 'COMMON', 'TRANS_FS', 'LOD_FS', 'MESH_FS'];
 const strip = (s) => s.replace(/#ifdef LFIELD[\s\S]*?#endif\n/g, '').replace(/\n\s*\n/g, '\n'), sq = (s) => s.replace(/\n\s*\n/g, '\n');
