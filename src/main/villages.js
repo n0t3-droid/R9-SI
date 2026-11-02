@@ -1544,6 +1544,7 @@
       for (const a of this.agents) {
         const d2 = (a.pos[0] - pl[0]) ** 2 + (a.pos[2] - pl[2]) ** 2;
         if (d2 < 5 * 5 && !a.greeted && a.pose !== 'sleep' && a.act && a.act.type !== 'talk' && a.act.type !== 'hide') {
+          if (VR.Gossip && VR.Gossip.hello && VR.Gossip.hello(this, a)) continue;   // f-ux2: the deed greeting is their first word (u-gossip)
           a.greeted = true; a.waveT = 1.2;
           const st = a.vil.st;
           const known = (st.met || []).includes(a.p.id);
