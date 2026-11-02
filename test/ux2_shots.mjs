@@ -206,7 +206,8 @@ if (vis && !vis.err) for (let i = 0; i < 260; i++) {
 }
 const vend = await ev(() => ({ gifts: (VR.MoveIn.rec(VR.game).gifts || []).length, lines: VR.Gossip.log.filter(l => l.what === 'visit').map(l => l.text) }));
 run.visit.ph = visPh; run.visit.end = vend;
-check(visPh.slice(0, 3).join(',') === 'walk,wait,chat' && vend.gifts >= 1, `a friend's visit in person: ${visPh.join(' → ')}; ${vend.gifts} gift at the door; „${vend.lines.join('“ · „')}“`);
+check(visPh[0] === 'walk' && visPh.indexOf('chat') > 0 && visPh.indexOf('leave') > visPh.indexOf('chat') && vend.gifts >= 1,   // (you stand at the door: 'wait' lasts one frame, between two looks)
+   `a friend's visit in person: ${visPh.join(' → ')}; ${vend.gifts} gift at the door; „${vend.lines.join('“ · „')}“`);
 // the bard's verse at the night's festival
 await ev(() => { VR.game.env.setTime(14200); });
 await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; VR.Gossip.test.cool(); });
