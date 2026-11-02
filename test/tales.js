@@ -25,7 +25,7 @@ function world(seed, o) {
     seed, n: o.n || 0, t: o.t === undefined ? 2 * D + 3000 : o.t, dim: 'overworld', role: o.role || 'explorer',
     giver: { pid: 'overworld/p' + (seed % 7), name: 'Lene', sur: 'Brandt', vid: 'v1', vn: 'Birkenau', x: gx, z: gz, kids: o.nokid ? [] : [{ pid: 'overworld/k1', name: 'Mira' }, { pid: 'overworld/k2', name: 'Jo' }] },
     villages: [{ id: 'v1', name: 'Birkenau', x: gx, z: gz }, { id: 'v2', name: 'Sonnfurt', x: gx + 420, z: gz + 200 + Math.round(r('v2') * 100) }, { id: 'v3', name: 'Kleewiese', x: gx - 300, z: gz + 520 }, { id: 'v9', name: 'Fernau', x: gx + 3000, z: 0 }],
-    fairy: o.nofairy ? [] : [{ id: 'f1', kind: 'shroom', name: 'Leuchtpilzwald', x: 260 + Math.round(r('f') * 60), z: 120 }],
+    fairy: o.nofairy ? [] : [{ id: 'f1', kind: 'shroom', name: 'Leuchtpilzwald', x: 260 + Math.round(r('f') * 60), z: 120 }, { id: 'f2', kind: 'garden', name: 'Schwebegarten', x: 300, z: 60 }],
     hills: [{ x: gx + 160, z: gz - 150, y: 120 }],
     gate: o.nogate ? null : { x: 380, z: -200, name: 'Tempel' },
     home: o.home === undefined ? { x: gx + 40, z: gz + 60 } : o.home,
@@ -42,6 +42,7 @@ console.log('1 · the generator is a pure function of its inputs');
   const all = new Set(); for (let s = 1; s <= 60; s++) { const q = TC.make(world(s), TC.fresh()); if (q) all.add(q.t); }
   check(all.size === TC.list().length, `every template is drawn (${[...all].sort().join(', ')})`);
   check(TC.make(world(5, { nokid: true, nofairy: true }), TC.fresh()).t !== 'lost', 'no child, no fairy place → never the lost child');
+  { let g2 = 0; for (let s = 1; s < 80; s++) { const o = TC.options(world(s)).find(x => x.t === 'lost'); if (o && o.P.place.id === 'f:f2') g2++; } check(g2 === 0, 'the child is never lost at the floating garden (only ground places)'); }
   const q = TC.make(world(7, { nogate: true }), TC.fresh()), L = TC.options(world(7, { nogate: true })).find(o => o.t === 'letter');
   check(L && L.way.id === 'hills', 'no Lichtbrücke in reach → the letter goes over the hills to a far village');
   check(TC.options(world(7)).find(o => o.t === 'letter').way.id === 'bridge', 'the gate in reach → the letter crosses the Lichtbrücke');
@@ -163,9 +164,10 @@ console.log('6 · the deadline, the ending, the rewards');
   check(rec.cur === null && rec.pages.length === 1 && rec.pages[0].t === 'ingr' && rec.cool > q.due, 'the Wanderbuch page, the tale done, a short rest before the next offer');
   let b = null; for (let s = 1; s < 300 && !b; s++) { const x = TC.make(world(s), { hist: [{ t: 'lost', v: '' }] }); if (x && x.t === 'beacon') b = x; }
   const r2 = TC.fresh(); TC.accept(r2, b, 0, 'builder'); play(b, 'builder'); const res = TC.finish(r2, 1000);
-  check(res && res.lit && r2.lit.length === 1 && res.fr >= 3 && res.items.length && res.verse, 'the beacon stays lit, friendship, an item, a song verse');
+  check(res && res.lit && res.lit.k === 'beacon' && r2.lit.length === 1 && res.fr >= 3 && res.items.length && res.verse, 'the beacon stays lit, friendship, an item, a song verse');
   check(TC.canOffer(r2, r2.cool - 1) === false && TC.canOffer(r2, r2.cool) === true, 'one offer at a time, never right after the last');
   const r3 = TC.fresh(); TC.decline(r3, 5000); check(!TC.canOffer(r3, 5000 + D * 0.5) && TC.canOffer(r3, 5000 + D), '„Ein andermal" → nobody asks again for most of a day');
+  { const w2 = world(12); w2.tod = 3000; check(!TC.options(w2).some(o => o.t === 'lost'), 'the lost child only towards dusk (offered in the afternoon, not the morning)'); w2.tod = 9000; check(TC.options(w2).some(o => o.t === 'lost') && !TC.options(w2).some(o => o.t === 'ingr'), 'the festival errand only by day, the lost child in the afternoon'); }
   check(TC.catsOf('oak_planks').indexOf('wood') >= 0 && TC.catsOf('torch', { emit: 1 })[0] === 'light' && TC.catsOf('poppy').indexOf('flower') >= 0 && TC.catsOf('oak_door', { door: 1 }).indexOf('door') >= 0, 'the kinds of blocks: wood, light, flower, door');
 }
 
@@ -179,6 +181,25 @@ console.log('7 · the words');
   check(!diff.length, 'the same placeholders in both' + (diff.length ? ': ' + diff.slice(0, 6).join(', ') : ''));
   const longDe = K.filter(k => k in de && /\.s\./.test(k) && String(de[k]).length > 120);
   check(!longDe.length, 'the HUD lines are short (≤ 120 characters)' + (longDe.length ? ': ' + longDe.join(', ') : ''));
+}
+console.log('8 · the glue loads beside the villages and u-gossip (no browser)');
+{
+  const V = require('./load_shared.js');
+  require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js'); require('../src/main/villages.js'); require('../src/main/folklife.js');
+  global.document = global.document || { getElementById: () => null, querySelector: () => null, createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }) };
+  require('../src/main/gossip.js'); require('../src/main/tales.js');
+  const TL = V.Tales, G = V.Gossip;
+  check(!!TL && typeof TL.tick === 'function' && !!V.Villages.prototype.update, 'VR.Tales wraps the villages (update, think, act, draw, talk)');
+  check(G.KINDS.tale && G.KINDS.tale.imp === 6 && G.KEYS.indexOf('g.gs.greet.tale.2') >= 0, 'u-gossip knows the tale as news (importance 6, its lines)');
+  const R = V.R, st = (n) => R.byName[n] && R.byName[n].defaultState, lan = st('lantern') || st('torch'), door = st('oak_door');
+  check(TL.catsAt({}, lan).indexOf('light') >= 0 && TL.catsAt({}, door).indexOf('door') >= 0 && TL.catsAt({}, st('oak_planks')).indexOf('wood') >= 0, 'the registry\'s blocks → light, door, wood');
+  const g = { meta: { tales: null }, env: { day: 1, timeOfDay: 3000 }, settings: {}, player: { pos: [0, 70, 0] } };
+  const rec = TL.rec(g); let q = null; for (let s = 1; s < 100 && !q; s++) { const x = TC.make(world(s), { hist: [{ t: 'lost', v: '' }] }); if (x && x.t === 'beacon') q = x; }
+  TC.accept(rec, q, 0, 'explorer');
+  const mk = TL.marks(g, q); check(mk.some(m => m.m === 'tl_beacon'), 'the sleepy beacon is drawn while its tale runs');
+  const h = TL.html(g); check(/Geschichten|Stories/.test(h) && h.indexOf('tlsec') >= 0, 'the Wanderbuch section „Geschichten“');
+  for (const m of ['tl_print', 'tl_spark', 'tl_lens', 'tl_jar', 'tl_cozy', 'tl_bloom', 'tl_stake', 'tl_beacon', 'tl_beacon_lit']) { const f = V.VOXMODELS[m]; if (!f) { check(false, 'model ' + m); continue; } const d = f(); if (!(d && d.parts && Object.keys(d.parts).length)) check(false, 'model ' + m + ' builds'); }
+  check(true, 'nine voxel marks of our own build');
 }
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);

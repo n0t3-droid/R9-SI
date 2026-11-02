@@ -154,7 +154,7 @@ const askT = await ev(() => { const el = document.getElementById('tk_text'); ret
 check(/Leuchtfeuer/.test(askT) && !!(await ev(() => document.querySelector('[data-tl="tlyes"]'))), `„✿ Was ist los?“ tells it: „${askT.slice(0, 90)}…“, Ja / Ein andermal`);
 await shotDom('offer', 'tales_offer.png');
 await ev(() => { const b = document.querySelector('[data-tl="tlyes"]'); if (b) b.click(); });
-await step(60, 33);
+await step(30, 33); await wait(1700); await step(30, 33);
 let cur = await ev(() => VR.Tales.test.cur());
 check(cur && cur.t === 'beacon' && cur.st === 'on' && cur.role === 'builder', `accepted: ${JSON.stringify(cur && { step: cur.step, role: cur.role, line: cur.line })}`);
 const hud1 = await ev(() => { const el = document.getElementById('tlline'); return el && el.style.display !== 'none' ? el.textContent : ''; });
@@ -208,7 +208,7 @@ await shotOf(() => { const g = VR.game; return g.villages.agents.find(a => a.bub
 await step(90, 33);   // (the toast)
 // at night the woken beacon shines over the land
 await ev(() => { VR.game.env.setTime(16500); });
-await stand([vpos[0] + (hill[0] - vpos[0]) * 0.55, hy + 14, vpos[1] + (hill[1] - vpos[1]) * 0.55], [hill[0], hy + 3, hill[1]]);
+{ const dx = vpos[0] - hill[0], dz = vpos[1] - hill[1], L = Math.hypot(dx, dz) || 1; await stand([hill[0] + dx / L * 26, hy + 7, hill[1] + dz / L * 26], [hill[0], hy + 3, hill[1]]); }
 await settle(6); await step(10, 33);
 await grab('bnight', 'tales_beacon_night.png', 6);
 const lit = await ev(() => VR.Tales.test.rec().lit);
@@ -234,7 +234,10 @@ if (lostOk) {
   await stand([T1.place[0], (py || 80) + 2.2, T1.place[1]], [T1.prints[0][0], (py || 80) + 0.2, T1.prints[0][1]]);
   await settle(4); await step(6, 33);
   await shotDom('ltrail', 'tales_lost_trail.png');
-  for (let k = 0; k < T1.prints.length; k++) { await goTo(T1.prints[k][0], T1.prints[k][1], null, { frames: 8 }); }
+  await goTo(T1.place[0], T1.place[1], null, { frames: 24 });
+  const T2 = await ev(() => { const t = VR.Tales.test.tale(); const s = t.steps.find(q => q.id === 'trail').of[0]; return { prints: s.pts, hide: t.steps.find(q => q.id === 'find').p, safe: VR.Tales.test.log().filter(l => l.what === 'safe').map(l => l.text) }; });
+  run.safe = T2.safe; T1.prints = T2.prints; T1.hide = T2.hide;
+  for (let k = 0; k < T1.prints.length; k++) { await goTo(T1.prints[k][0], T1.prints[k][1], null, { frames: 24 }); }
   cur = await ev(() => VR.Tales.test.cur());
   check(cur.step === 'find', 'three footprints followed; the child is near: ' + cur.line);
   // the save mid-quest: the record through JSON and back, the game reads it anew
@@ -247,7 +250,7 @@ if (lostOk) {
   check(!!kid0, 'the child waits at the hide: ' + JSON.stringify(kid0));
   await goTo(T1.hide[0], T1.hide[1], null, { frames: 30, dx: 1.5, dz: 1.5 });
   cur = await ev(() => VR.Tales.test.cur());
-  check(cur && cur.step !== 'find', `found! the twist: ${cur && cur.v}; next ${cur && cur.step}`);
+  check(cur && cur.step !== 'find' && cur.step !== 'trail', `found! the twist: ${cur && cur.v}; next ${cur && cur.step}`);
   await shotOf(() => VR.Tales.state.kid && VR.Tales.state.kid.a, 'lfound', 'tales_lost_found.png', 3.6);
   await step(110, 33);   // (the twist's line comes after the first)
   await shotOf(() => VR.Tales.state.kid && VR.Tales.state.kid.a, 'ltwist', 'tales_lost_twist.png', 3.6);
@@ -280,10 +283,11 @@ run.news = news;
 check(news.length >= (lostOk ? 2 : 1), 'the news travels (u-gossip): ' + JSON.stringify(news));
 const book = await ev(() => { const g = VR.game; const h = VR.Wander && VR.Wander.html ? VR.Wander.html(g.meta) : ''; return { has: /tlsec/.test(h), pages: VR.Tales.test.rec().pages.map(p => p.t + ':' + p.v), opened: !!(VR.Wander && VR.Wander.open && (VR.Wander.open(g), true)) }; });
 await step(4, 33);
-await ev(() => { const s = document.querySelector('#wanderbuch .tlsec'); if (s && s.scrollIntoView) s.scrollIntoView(); });
+for (let i = 0; i < 8; i++) { const on = await ev(() => !!document.querySelector('#wanderbuch .tlsec')); if (on) break; await ev(() => { const b = [...document.querySelectorAll('#wanderbuch button')].find(x => /▶|›|→/.test(x.textContent)); if (b) b.click(); }); await wait(700); }
+book.shown = await ev(() => !!document.querySelector('#wanderbuch .tlsec'));
 await shotDom('book', 'tales_book.png');
 await ev(() => { const g = VR.game; if (VR.Wander.close) VR.Wander.close(g); });
-check(book.has && book.pages.length >= (lostOk ? 2 : 1), 'the Wanderbuch: „Geschichten“ with ' + JSON.stringify(book.pages));
+check(book.has && book.shown && book.pages.length >= (lostOk ? 2 : 1), 'the Wanderbuch: „Geschichten“ (on its page: ' + book.shown + ') with ' + JSON.stringify(book.pages));
 run.tlcost = await ev(() => VR.Tales.test.cost());
 check(run.tlcost.avg < 3, `the 2-Hz look: ${run.tlcost.avg.toFixed(3)} ms average, worst ${run.tlcost.worst.toFixed(2)} ms (${run.tlcost.ticks} ticks)`);
 // the frame near the woken beacon at night with a tale running (marks drawn): Very Low and High, tales on / off

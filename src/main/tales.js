@@ -64,6 +64,32 @@
     for (let k = 0; k < 3; k++) { const a = (TC.h(seed, 'hill', k) / 4294967296) * Math.PI * 2, r = 200 + 120 * (TC.h(seed, 'hr', k) / 4294967296); out.push({ x: Math.round(cx + Math.cos(a) * r), z: Math.round(cz + Math.sin(a) * r) }); }
     return out;
   }
+  // the child's hide and the trail stay on dry, safe ground: near the place, if lava or water lies there, the hide
+  // turns round the place (45° at a time) until it and its footprints are on the land
+  const unsafe = (g, x, z) => {
+    const y = ground(g, x, z); if (y === null) return null;
+    const R = VR.R, W = g.world;
+    for (const yy of [y - 1, y, y + 1]) { const s = W.getBlock(Math.floor(x), yy, Math.floor(z)), t0 = s && R.types[R.T.type[s]]; if (t0 && /lava|magma|water|fire|ice/.test(t0.name)) return true; }
+    return false;
+  };
+  TL.safe = function (g, tale) {
+    const pl = tale.steps.find(q => q.at === 'place' && q.p), hd = tale.steps.find(q => q.at === 'hide' && q.p); if (!pl || !hd || tale.safe) return false;
+    const p = g.player.pos; if (Math.hypot(pl.p[0] - p[0], pl.p[1] - p[2]) > 90) return false;
+    const tr = tale.steps.find(q => q.id === 'trail'), prints = tr && tr.of && tr.of[0].pts ? tr.of[0].pts : [];
+    const cx = pl.p[0], cz = pl.p[1], rot = (v, a) => { const dx = v[0] - cx, dz = v[1] - cz, c = Math.cos(a), sn = Math.sin(a); return [Math.round(cx + dx * c - dz * sn), Math.round(cz + dx * sn + dz * c)]; };
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4, pts = [rot(hd.p, a)].concat(prints.map(v => rot(v, a)));
+      let bad = false; for (const v of pts) { const u = unsafe(g, v[0], v[1]); if (u === null) return false; if (u) { bad = true; break; } }
+      if (bad) continue;
+      tale.safe = true; if (!k) return true;
+      const mv = (q) => { if (q.p && q.at === 'hide') q.p = rot(q.p, a); if (q.pts && (q.at === 'prints' || q.at === 'shrooms' || q.at === 'flies')) q.pts = q.pts.map(v => rot(v, a)); if (q.of) q.of.forEach(mv); };
+      tale.steps.forEach(mv); S.mkKey = null; S.yc = {};
+      if (S.kid) { endKid(g.villages); }
+      log('safe', String(k * 45));
+      return true;
+    }
+    tale.safe = true; return true;   // (no dry side: the place itself is the hide's only choice — it stays)
+  };
   TL.refine = function (g, tale) {
     const s = tale.steps.find(q => q.at === 'hill' && q.p); if (!s || tale.refined) return false;
     const p = g.player.pos; if (Math.hypot(s.p[0] - p[0], s.p[1] - p[2]) > 110) return false;
@@ -123,7 +149,7 @@
   }
   TL.line = lineOf;
   function hud(g, text) {
-    const show = text && !(g.ui && g.ui.screen) && !g.photoMode;
+    const show = text && !(g.ui && g.ui.screen) && !g.photo;
     if (!S.el) {
       const host0 = document.getElementById('hud') || document.body; if (!host0) return;
       const el = S.el = document.createElement('div'); el.id = 'tlline';
@@ -189,7 +215,7 @@
     const hide = tale.steps.find(s => s.at === 'hide' && s.p), at = hide ? hide.p : TC.target(tale); if (!at) return null;
     const y = yAt(g, at[0], at[1]); if (y === null) return null;
     const a = new S.Ctor(vil, Object.assign({}, person, { town: undefined }), [at[0] + 0.5, y, at[1] + 0.5]);
-    a.tlKid = true; a.act = { type: 'tlkid', ph: 'hide' }; a.path = null; a.goal = null; a.pose = 'sitground';
+    a.tlKid = true; a.greeted = true; a.talkCool = 30; a.act = { type: 'tlkid', ph: 'hide' }; a.path = null; a.goal = null; a.pose = 'sitground';
     V.agents.push(a); stashTwin(V, a);
     S.kid = { a, ph: 'hide', t: 0 };
     log('kid', person.name);
@@ -248,7 +274,7 @@
     const res = TC.finish(rec, t); if (!res) return;
     const end = T(res.key, V0), head = T(res.head, V0), gv = liveOf(V, res.giver.pid);
     S.endGiver = res.giver.pid;
-    if (gv && Math.hypot(gv.pos[0] - g.player.pos[0], gv.pos[2] - g.player.pos[2]) < 40) { say(gv, end, 8); gv.lookAt = [g.player.pos[0], g.player.pos[1] + 1.4, g.player.pos[2]]; if (V.hearts) V.hearts(gv); }
+    if (gv && Math.hypot(gv.pos[0] - g.player.pos[0], gv.pos[2] - g.player.pos[2]) < 90) { say(gv, end, 8); gv.lookAt = [g.player.pos[0], g.player.pos[1] + 1.4, g.player.pos[2]]; if (V.hearts) V.hearts(gv); }
     else note(g, end, 'tl:end');
     if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
     if (S.fl) S.fl.ph = 'home';
@@ -290,6 +316,7 @@
     const g = V.g, tale = rec.cur, p = g.player.pos, dim = dimOf(g);
     if (tale.st !== 'on') return;
     if (!tale.refined && TC.TPL[tale.t].keep && TC.TPL[tale.t].keep.k === 'beacon') TL.refine(g, tale);
+    if (!tale.safe && tale.kid) TL.safe(g, tale);
     const outs = [];
     if (S.dim !== dim) { S.dim = dim; outs.push(...TC.feed(tale, { k: 'dim', dim })); }
     if (tale.st === 'on') outs.push(...TC.feed(tale, { k: 'pos', x: p[0], z: p[2], dim }));
@@ -351,7 +378,7 @@
     for (const L of rec.lit) {
       if (L.dim !== dimOf(g) || !fin(L.y)) continue;
       const dx = L.x - cam.x, dz = L.z - cam.z; if (dx * dx + dz * dz > 220 * 220) continue;
-      if (L.k === 'beacon') { MP.scale = 1; MP.light = FULL; MP.noShade = true; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon', [L.x, L.y - 0.05, L.z], 0, cam, MP)) n++; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
+      if (L.k === 'beacon') { MP.scale = 1; MP.light = night ? FULL : null; MP.noShade = false; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon', [L.x, L.y - 0.05, L.z], 0, cam, MP)) n++; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
       else if (L.k === 'flausel' && dx * dx + dz * dz < 60 * 60) { MP.scale = 1.05; MP.light = null; MP.noShade = false; for (let i = 0; i < 2; i++) if (LK.drawModel(g, r, Pg(), 'fy_sprite_' + ((TC.h(L.x, L.z, i) % 4)), [L.x + 1.2 + i * 0.9, L.y + Math.abs(Math.sin(tt * 2 + i)) * 0.12, L.z - 1.4], tt * 0.2 + i * 2, cam, MP)) n++; }
     }
     if (tale) {
@@ -360,7 +387,7 @@
       for (const M0 of S.mk) {
         const dx = M0.x - cam.x, dz = M0.z - cam.z; if (dx * dx + dz * dz > (M0.big ? 160 * 160 : 64 * 64)) continue;
         const y = yAt(g, M0.x, M0.z); if (y === null) continue;
-        MP.scale = M0.m === 'fy_shroom_1' ? 0.32 : 1; MP.light = M0.glow || M0.big ? FULL : null; MP.noShade = !!M0.glow;
+        MP.scale = M0.m === 'fy_shroom_1' ? 0.32 : 1; MP.light = M0.glow || M0.m === 'tl_print' ? FULL : null; MP.noShade = !!M0.glow;
         const hov = M0.glow ? 0.5 + Math.sin(tt * 2.2 + M0.x) * 0.15 : M0.m === 'tl_print' ? 0.02 : 0;
         if (LK.drawModel(g, r, Pg(), M0.m, [M0.x, y + hov, M0.z], M0.glow ? tt * 0.8 : (M0.yaw || 0), cam, MP)) n++;
         if (M0.glow && g.particles && g.particles.glow && Math.random() < 0.25 && !(g.settings && g.settings.preset === 'potato')) g.particles.glow(M0.x + (Math.random() - 0.5) * 0.5, y + hov + 0.2, M0.z + (Math.random() - 0.5) * 0.5, [1, 0.9, 0.55], 1.4, 0.06, 0.6);
@@ -447,8 +474,8 @@
   if (M && Grid) {
     const part = (sx, sy, sz, pv, fn) => { const gr = new Grid(sx, sy, sz, pv[0], pv[1], pv[2]); fn(gr); return { grid: gr, pivot: [0, 0, 0] }; };
     // two small bare footprints in the grass (1/16 block): pale earth, the toes as dots
-    M.tl_print = () => ({ unit: 16, radius: 0.5, parts: { b: part(9, 1, 12, [4, 0, 6], (gr) => {
-      const foot = (ox, oz) => { for (let z = 0; z < 6; z++) for (let x = 0; x < 3; x++) if (!(z === 0 && x !== 1) && !(z === 5 && x === 1)) gr.set(ox + x, 0, oz + z, 0x8a6a48); for (let x = 0; x < 3; x++) gr.set(ox + x, 0, oz - 1 - (x & 1), 0x7a5a3a); };
+    M.tl_print = () => ({ unit: 12, radius: 0.6, parts: { b: part(9, 1, 12, [4, 0, 6], (gr) => {   // (a little fairy dust in each: they glimmer at dusk)
+      const foot = (ox, oz) => { for (let z = 0; z < 6; z++) for (let x = 0; x < 3; x++) if (!(z === 0 && x !== 1) && !(z === 5 && x === 1)) gr.set(ox + x, 0, oz + z, (x + z) % 3 ? 0xf6e2a8 : 0xfff6d8, 1); for (let x = 0; x < 3; x++) gr.set(ox + x, 0, oz - 1 - (x & 1), 0xffeebb, 1); };
       foot(0, 5); foot(5, 1);
     }) }, layout: { b: [0, 0, 0] } });
     // a stray spark: a small warm glowing orb with a pale core (it hovers and turns)
@@ -464,7 +491,7 @@
     // the plot's stake: a peeled stick with a red ribbon
     M.tl_stake = () => ({ unit: 16, radius: 0.6, parts: { b: part(5, 20, 3, [2, 0, 1], (gr) => { gr.box(2, 0, 1, 2, 17, 1, 0xc8a070); gr.box(2, 18, 1, 2, 19, 1, 0xa88050); for (let y = 13; y < 16; y++) for (let x = 0; x < 5; x++) if (x !== 2) gr.set(x, y - (x === 0 || x === 4 ? 1 : 0), 1, 0xd8343a); }) }, layout: { b: [0, 0, 0] } });
     // the beacon: a round stone tower 3.5 blocks tall, a brass bowl on top; lit, the bowl holds a warm flame
-    const beacon = (lit) => () => ({ unit: 8, radius: 3, parts: { b: part(15, 30, 15, [7, 0, 7], (gr) => {
+    const beacon = (lit) => () => ({ unit: 6, radius: 4, parts: { b: part(15, 30, 15, [7, 0, 7], (gr) => {
       for (let y = 0; y < 24; y++) for (let z = 0; z < 15; z++) for (let x = 0; x < 15; x++) {
         const d = Math.hypot(x - 7, z - 7), R0 = y < 3 ? 6.6 : 5.2 - y * 0.06; if (d > R0 || d < R0 - 1.6) continue;
         const c = ((Math.floor(y / 3) + Math.floor(Math.atan2(z - 7, x - 7) * 2.6)) & 1) ? 0xa8a49a : 0x928e84; gr.set(x, y, z, (x * 3 + y * 5 + z) % 11 === 0 ? 0x6a8a4a : c, 0);

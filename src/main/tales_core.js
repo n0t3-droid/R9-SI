@@ -57,7 +57,7 @@
       w: 1, news: { fairy: 3, helped: 1, tale: 0.5 }, hours: [6500, 12600], fr: 5, items: ['lantern', 'torch'], verse: true,
       need: { kid: true },
       ways: [{
-        id: 'wood', pick: { place: ['fairy', 0, 650] },
+        id: 'wood', pick: { place: ['fairy', 0, 650, ['shroom', 'tree', 'circle', 'spring']] },   // (not the floating garden: a child stays on the ground)
         pts: { hide: ['off', 'place', 18, 30], prints: ['trail', 'place', 'hide', 3], shrooms: ['ring', 'hide', 5, 9, 2], flies: ['ring', 'hide', 6, 10, 1] },
         steps: [
           { id: 'place', k: 'go', at: 'place', r: 18 },
@@ -161,7 +161,7 @@
   //       news: [{k, pl, score}], role}
   function source(ctx, kind) {
     const G = ctx.giver;
-    if (kind === 'fairy') return (ctx.fairy || []).map(f => ({ x: f.x, z: f.z, name: f.name || '', id: 'f:' + f.id }));
+    if (kind === 'fairy') return (ctx.fairy || []).map(f => ({ x: f.x, z: f.z, name: f.name || '', id: 'f:' + f.id, kind: f.kind }));
     if (kind === 'village') return (ctx.villages || []).filter(v => String(v.id) !== String(G.vid)).map(v => ({ x: v.x, z: v.z, name: v.name || '', id: 'v:' + v.id }));
     if (kind === 'hill') return (ctx.hills || []).map((p, i) => ({ x: p.x, z: p.z, y: p.y, id: 'h:' + i }));
     if (kind === 'gate') return ctx.gate ? [{ x: ctx.gate.x, z: ctx.gate.z, name: ctx.gate.name || '', id: 'gate' }] : [];
@@ -171,13 +171,13 @@
   TC.resolve = function (ctx, tn, way, hs) {
     const G = ctx.giver, home = { x: G.x, z: G.z }, P = { home: Object.assign({ id: 'home', name: G.vn || '' }, home) };
     for (const nm of Object.keys(way.pick || {})) {
-      const [src, mn, mx] = way.pick[nm];
+      const [src, mn, mx, kinds] = way.pick[nm];
       if (src === 'plot') {
         const b = ctx.home && dist(ctx.home, home) <= mx ? ctx.home : home, near = b === ctx.home, a = u(hs, 'plot') * Math.PI * 2, r = near ? 6 + 4 * u(hs, 'plr') : 28 + 10 * u(hs, 'plr');
         P[nm] = { x: Math.round(b.x + Math.cos(a) * r), z: Math.round(b.z + Math.sin(a) * r), id: near ? 'plot:home' : 'plot:vil', mine: near };
         continue;
       }
-      const L = source(ctx, src).filter(p => { const d = dist(p, home); return d >= mn && d <= mx; }).sort((a, b) => (a.id < b.id ? -1 : 1));
+      const L = source(ctx, src).filter(p => { const d = dist(p, home); return d >= mn && d <= mx && (!kinds || kinds.indexOf(p.kind) >= 0); }).sort((a, b) => (a.id < b.id ? -1 : 1));
       if (!L.length) return null;
       P[nm] = L[TC.h(hs, nm) % L.length];
     }
