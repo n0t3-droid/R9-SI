@@ -208,11 +208,59 @@ for (const b of BUILDS) {   // (critic_vl: each build's title once on Very Low f
   await ctx.close();
 }
 console.log(`warmed (${secs()})`);
+// ---------------------------------------------------------------- the loads alone: each build in a fresh page with no other
+// page open (a page that has loaded keeps its worker on the far land), LOADS rounds in turns; the CPU of the browser's
+// threads round the load by kind (the page's main thread, its workers, the GPU process …), the shaders compiled
+const threadCpu = () => {
+  const kids = new Map(), out = {};
+  for (const l of execSync('ps -e -o pid=,ppid=').toString().trim().split('\n')) { const [p, pp] = l.trim().split(/\s+/).map(Number); if (!kids.has(pp)) kids.set(pp, []); kids.get(pp).push(p); }
+  const st = [process.pid];
+  while (st.length) for (const c of kids.get(st.pop()) || []) {
+    st.push(c);
+    let type = 'browser'; try { const m = /--type=([\w-]+)/.exec(fs.readFileSync(`/proc/${c}/cmdline`, 'utf8')); if (m) type = m[1]; } catch (e) { continue; }
+    let tids = []; try { tids = fs.readdirSync(`/proc/${c}/task`); } catch (e) { continue; }
+    for (const t of tids) { try { const s = fs.readFileSync(`/proc/${c}/task/${t}/stat`, 'utf8'), comm = s.slice(s.indexOf('(') + 1, s.lastIndexOf(')')).replace(/[\d]+/g, '#'), f = s.slice(s.lastIndexOf(')') + 2).split(' '); const k = type + ':' + comm; out[k] = (out[k] || 0) + (+f[11] + +f[12]) * 10; } catch (e) { /* gone */ } }
+  }
+  return out;
+};
+const LOADS = +(process.env.LOADS || 3);
+rec.loads = {}; for (const b of BUILDS) rec.loads[b.tag] = [];
+for (let rd = 0; rd < LOADS; rd++) for (let i = 0; i < BUILDS.length; i++) {
+  const b = BUILDS[(i + rd) % BUILDS.length];
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, locale: 'de-DE' }), page = await ctx.newPage();
+  await page.addInitScript(() => { const P = WebGL2RenderingContext.prototype, c0 = P.compileShader, l0 = P.linkProgram; window.__sh = { n: 0, len: 0, links: 0 }; P.compileShader = function (s) { window.__sh.n++; try { window.__sh.len += (this.getShaderSource(s) || '').length; } catch (e) { /* none */ } return c0.call(this, s); }; P.linkProgram = function (p) { window.__sh.links++; return l0.call(this, p); }; const pm = Worker.prototype.postMessage; window.__jobs = {}; Worker.prototype.postMessage = function (m) { const k = m && m.type || '?'; window.__jobs[k] = (window.__jobs[k] || 0) + 1; return pm.apply(this, arguments); }; });
+  const L = { };
+  try {
+    const tb = Date.now();
+    await page.goto('file://' + b.path);
+    for (let i = 0; i < 320; i++) { await page.waitForTimeout(250); if (await page.evaluate(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
+    L.titleS = r1((Date.now() - tb) / 1000);
+    await page.evaluate(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+    await page.waitForTimeout(1500);
+    const sh0 = await page.evaluate(() => Object.assign({}, window.__sh)), c0 = threadCpu(), t0 = Date.now();
+    await page.evaluate((seed) => VR.game.createWorld({ name: 'Kritik VL', mode: 'creative', difficulty: 'peaceful', type: 'default', seed, cheats: true, kit: true }), SEED);
+    for (let i = 0; i < 960; i++) { await page.waitForTimeout(250); if (await page.evaluate(() => VR.game.state).catch(() => '') === 'play') break; }
+    L.loadS = r1((Date.now() - t0) / 1000); L.ok = await page.evaluate(() => VR.game.state) === 'play';
+    const c1 = threadCpu(), sh1 = await page.evaluate(() => window.__sh);
+    const d = {}; for (const k in c1) { const v = c1[k] - (c0[k] || 0); if (v >= 50) d[k] = v; }
+    L.cpu = d; L.cpuS = r1(Object.values(d).reduce((a, x) => a + x, 0) / 1000);
+    L.shaders = { compiled: sh1.n - sh0.n, chars: sh1.len - sh0.len, links: sh1.links - sh0.links };
+    L.jobs = await page.evaluate(() => window.__jobs);
+    L.heapMB = await page.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null));
+  } catch (e) { L.err = String(e.message || e).slice(0, 200); }
+  await ctx.close();
+  rec.loads[b.tag].push(L);
+  const top = Object.entries(L.cpu || {}).sort((a, x) => x[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${r1(v / 1000)}`).join(', ');
+  console.log(`  load ${rd + 1} ${b.tag}: ${L.ok ? '' : 'NOT play '}${L.loadS} s (title ${L.titleS} s) · CPU ${L.cpuS} s: ${top} · shaders ${JSON.stringify(L.shaders)} · jobs ${JSON.stringify(L.jobs)} · heap ${L.heapMB} MB (${secs()})`);
+  save();
+}
+for (const b of BUILDS) { const a = rec.loads[b.tag]; rec.pages[b.tag] = rec.pages[b.tag] || {}; rec.pages[b.tag].loadMed = r1(med(a.map(x => x.loadS))); rec.pages[b.tag].loadCpuMed = r1(med(a.map(x => x.cpuS))); console.log(`  ${b.tag}: load median ${rec.pages[b.tag].loadMed} s (${a.map(x => x.loadS).join(' · ')}) · CPU median ${rec.pages[b.tag].loadCpuMed} s`); }
+if (process.env.LOADS_ONLY) { await browser.close(); console.log('\nALL OK (loads only)'); process.exit(0); }
 const PAGES = [];
 for (const b of BUILDS) {
   const P = await openWorld('file://' + b.path, b.tag); P.map = lineMap(b.path); PAGES.push(P);
   const lp = byModule(P.loadProf, P.map, 1); delete P.loadProf;
-  rec.pages[b.tag] = { loadS: r1(P.loadS), info: P.info, loadProf: lp };
+  Object.assign(rec.pages[b.tag], { loadS: r1(P.loadS), info: P.info, loadProf: lp });
   console.log(`${b.tag}: ${P.ok ? 'play' : 'NOT play'} after ${r1(P.loadS)} s · main thread ${Math.round(lp.totalMs)} ms busy: ` + lp.mods.slice(0, 10).map(([m, v]) => `${m} ${Math.round(v)}`).join(', ') + ` (${secs()})`);
   check(P.ok, `${b.tag}: the world is there`);
   save();
@@ -261,7 +309,7 @@ for (const P of PAGES) {
   const w = W[P.tag], R = rec.pages[P.tag], B = W[BASE];
   R.table = { drawMs: r1(med(w.r)), drawCpu: r1(med(w.rc)), logicMs: r3(med(w.l)), logicCpu: r3(med(w.lc)), orbitMs: r1(med(w.o)), orbitCpu: r1(med(w.oc)), rounds: w };
   if (B) R.vsBase = { draw: ratioMed(w.r, B.r), drawCpu: ratioMed(w.rc, B.rc), logic: ratioMed(w.l, B.l), logicCpu: ratioMed(w.lc, B.lc), orbit: w.o.length === B.o.length ? ratioMed(w.o, B.o) : null, orbitCpu: w.oc.length === B.oc.length ? ratioMed(w.oc, B.oc) : null };
-  console.log(`  ${P.tag}: load ${R.loadS} s · heap ${R.plaza && R.plaza.heapMB} MB · plaza draw ${R.table.drawMs} ms (CPU ${R.table.drawCpu}) · logic ${R.table.logicMs} ms (CPU ${R.table.logicCpu}) · orbit ${R.table.orbitMs} ms (CPU ${R.table.orbitCpu}) · vs ${BASE} ${JSON.stringify(R.vsBase)}`);
+  console.log(`  ${P.tag}: load ${R.loadMed} s (in the shared page ${R.loadS} s) · heap ${R.plaza && R.plaza.heapMB} MB · plaza draw ${R.table.drawMs} ms (CPU ${R.table.drawCpu}) · logic ${R.table.logicMs} ms (CPU ${R.table.logicCpu}) · orbit ${R.table.orbitMs} ms (CPU ${R.table.orbitCpu}) · vs ${BASE} ${JSON.stringify(R.vsBase)}`);
 }
 save();
 const C = rec.pages[CUR];
@@ -269,7 +317,7 @@ if (C && C.vsBase && rec.pages[BASE]) {
   check(C.vsBase.drawCpu <= 1.03 && C.vsBase.draw <= 1.03, `plaza draw not slower than ${BASE} (×${C.vsBase.draw}, CPU ×${C.vsBase.drawCpu} ≤ 1.03)`);
   check(C.vsBase.logic <= 1.03, `the game's frame (no draw) not slower than ${BASE} (×${C.vsBase.logic}, CPU ×${C.vsBase.logicCpu} ≤ 1.03)`);
   if (C.vsBase.orbit !== null) check(C.vsBase.orbit <= 1.03, `orbit not slower than ${BASE} (×${C.vsBase.orbit}, CPU ×${C.vsBase.orbitCpu})`);
-  check(C.loadS <= Math.max(13, rec.pages[BASE].loadS * 1.03), `load ${C.loadS} s ≤ 13 s or ${BASE}'s ${rec.pages[BASE].loadS} s`);
+  check(C.loadMed <= Math.max(13, rec.pages[BASE].loadMed * 1.03), `load (alone, median of ${LOADS}) ${C.loadMed} s ≤ 13 s or ${BASE}'s ${rec.pages[BASE].loadMed} s (+3 %)`);
   check(C.plaza.heapMB <= rec.pages[BASE].plaza.heapMB * 1.05 + 2, `heap ${C.plaza.heapMB} MB ≤ ${BASE}'s ${rec.pages[BASE].plaza.heapMB} MB (+5 %)`);
   check(C.plaza.draws === rec.pages[BASE].plaza.draws, `the same draws (${C.plaza.draws} / ${rec.pages[BASE].plaza.draws})`);
 }
