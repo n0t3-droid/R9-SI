@@ -1331,7 +1331,7 @@ void main() {
   blockL = l2Pool(bl);   // t-light2: the lamps' light in pools (light2.js)
 #endif
 #ifdef LFIELD
-  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
+  blockL += lfLight(v_rel, N, v_sky);   // v-light: the light field's pools (lightfield.js)
 #endif
   float ao = 1.0 - v_ao * 0.2;
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
@@ -1637,7 +1637,7 @@ void main() {
   blockL = l2Pool(v_block);   // t-light2: the lamps' pools
 #endif
 #ifdef LFIELD
-  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
+  blockL += lfLight(v_rel, N, v_sky);   // v-light: the light field's pools (lightfield.js)
 #endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -1834,7 +1834,7 @@ void main() {
   blockL = l2Pool(v_block);   // t-light2: the lamps' pools
 #endif
 #ifdef LFIELD
-  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
+  blockL += lfLight(v_rel, N, v_sky);   // v-light: the light field's pools (lightfield.js)
 #endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -2967,7 +2967,7 @@ void main() {
   light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + l2Pool(u_blockLight) + 0.03;
 #endif
 #ifdef LFIELD
-  light += lfLight(v_rel, n);   // v-light: the light field's pools (lightfield.js)
+  light += lfLight(v_rel, n, u_sky);   // v-light: the light field's pools (lightfield.js)
 #endif
   vec3 col = alb * light;
   vec3 V = normalize(-v_rel);

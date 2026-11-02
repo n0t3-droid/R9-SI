@@ -50,7 +50,7 @@
   LF.N = 128; LF.HALF = 64; LF.BAND = 32; LF.BELOW = 12;
   LF.ROWS = 2;       // columns scanned a frame: 2 rows of 128 (the window in 64 frames, ~1 s)
   LF.STAMPS = 24;    // static lights restamped a frame (only while the scan sees a change)
-  LF.LMAX = 1.6;     // the packed range (√-encoded) and the soft ceiling L / (1 + L / LMAX)
+  LF.LMAX = 0.9;     // the packed range (√-encoded) and the soft ceiling L / (1 + L / LMAX): under a full lamp's own light (1.35)
   LF.HSPAN = 48;     // the height channel's span over Y0 (m)
   LF.DMAX = 32;      // moving lights a frame
   // the light: gain per emit level 15, falloff k (1/m²), radius R (m) of a block light and of a moving one; the shader's
@@ -257,7 +257,8 @@
 uniform sampler2D u_lf;
 uniform vec4 u_lfO;
 uniform vec4 u_lfK;   // x LMAX, y the height span, z the vertical falloff, w the fade's start (its end + 10)
-vec3 lfLight(vec3 rel, vec3 n) {
+// sky: the place's sky light (0 indoors … 1 outdoors) — indoors the voxel light already lights the room: a third there
+vec3 lfLight(vec3 rel, vec3 n, float sky) {
   if (u_lfO.w <= 0.0) return vec3(0.0);
   float dh = length(rel.xz);
   float fade = 1.0 - smoothstep(u_lfK.w, u_lfK.w + 10.0, dh);
@@ -268,13 +269,15 @@ vec3 lfLight(vec3 rel, vec3 n) {
   float ady = max(abs(dy) - 1.5, 0.0);
   float fy = clamp((dy + 0.5) * 0.5, -1.0, 1.0);   // 1: the light above, −1: below
   float lam = clamp(0.55 + 0.45 * n.y * fy + 0.25 * (1.0 - abs(n.y)), 0.0, 1.0);
-  return c * (lam * fade * u_lfO.w / (1.0 + u_lfK.z * ady * ady));
+  float out_ = mix(0.3, 1.0, smoothstep(0.35, 0.85, sky));
+  return c * (lam * fade * out_ * u_lfO.w / (1.0 + u_lfK.z * ady * ady));
 }
 #endif
 `;
   // the JS mirror of lfLight's shape (node test): the vertical falloff and the hemispheric cosine
-  LF.shade = function (dy, ny) {
+  LF.shade = function (dy, ny, sky) {
     const ady = Math.max(Math.abs(dy) - 1.5, 0), fy = clamp((dy + 0.5) * 0.5, -1, 1);
-    return clamp(0.55 + 0.45 * ny * fy + 0.25 * (1 - Math.abs(ny)), 0, 1) / (1 + LF.K.kv * ady * ady);
+    const t = clamp((sky === undefined ? 1 : sky) - 0.35, 0, 0.5) / 0.5, out = 0.3 + 0.7 * t * t * (3 - 2 * t);
+    return clamp(0.55 + 0.45 * ny * fy + 0.25 * (1 - Math.abs(ny)), 0, 1) * out / (1 + LF.K.kv * ady * ady);
   };
 })(VR);

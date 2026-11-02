@@ -293,7 +293,7 @@ void main() {
   light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + l2Pool(v_bl) + 0.03;   // t-light2: the lamps' pools
 #endif
 #ifdef LFIELD
-  light += lfLight(v_rel, n);   // v-light: the light field's pools (lightfield.js)
+  light += lfLight(v_rel, n, v_light.x);   // v-light: the light field's pools (lightfield.js)
 #endif
   // t-folk2: an eye takes the light's brightness, not its colour, and a little of its own — the whites stay white (a
   // shade cool) by a lantern and at dusk, the iris dark (the owner: amber eyes under warm light)

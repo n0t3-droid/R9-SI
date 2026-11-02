@@ -96,12 +96,13 @@ check(sw && f.compose() !== null && lum(at(20, 20)) > 0.8, 'a lantern placed: re
 // a neon wall: 12 lights in a row, merged 2 × 2 into 6
 const n0 = f.stats.lights; for (let x = 40; x < 52; x++) set(x, 66, -20, lantern); f.scan(col, R.T, 128); for (let i = 0; i < 40; i++) if (f.rebuild(48)) break;
 check(f.stats.lights - n0 === 6, 'a row of 12 light blocks: 6 lights (merged 2 × 2)', f.stats.lights - n0);
+const glsl0 = () => LF.glslCommon();
 console.log('e · the shaders');
 const names = ['TERRAIN_FS', 'PROP_FS', 'FURN_FS', 'VOX_FS', 'COMMON', 'TRANS_FS', 'LOD_FS', 'MESH_FS'];
 const strip = (s) => s.replace(/#ifdef LFIELD[\s\S]*?#endif\n/g, '').replace(/\n\s*\n/g, '\n'), sq = (s) => s.replace(/\n\s*\n/g, '\n');
 let same = true; for (const k of names) if (strip(S1[k]) !== strip(S0[k])) { same = false; console.log('     differs: ' + k); }
 check(same, 'with LFIELD dropped every text the same as without lightfield.js (its GLSL only under the define)');
-check(/vec3 lfLight\(vec3 rel, vec3 n\)/.test(S1.COMMON) && ['TERRAIN_FS', 'PROP_FS', 'FURN_FS', 'VOX_FS'].every(k => /#ifdef LFIELD\n\s+(blockL|light) \+= lfLight/.test(S1[k])), 'lfLight in COMMON; terrain, props, furniture, voxel models add it');
+check(/vec3 lfLight\(vec3 rel, vec3 n, float sky\)/.test(S1.COMMON) && ['TERRAIN_FS', 'PROP_FS', 'FURN_FS', 'VOX_FS'].every(k => /#ifdef LFIELD\n\s+(blockL|light) \+= lfLight/.test(S1[k])), 'lfLight in COMMON; terrain, props, furniture, voxel models add it');
 check(/#ifdef LFIELD\n\s+light \+= lfLight/.test(fs.readFileSync(SRC + '/folkgpu.js', 'utf8')), 'the smooth people add it');
 LF.use({ lfPools: false }); check(LF.definesFor('terrain').length === 0, 'switch off: no define');
 LF.use({ lfPools: true });
@@ -109,6 +110,7 @@ check(LF.definesFor('terrain')[0] === 'LFIELD' && LF.definesFor('folk')[0] === '
 check(V.GL.defineHook('terrain', ['FADE']).includes('LFIELD'), 'the define hook chains it');
 LF.use({ lfPools: false });
 check(LF.shade(3, 1) > 0.85 && LF.shade(3, -1) < 0.2 && LF.shade(-6, 1) < 0.15 && Math.abs(LF.shade(0, 0) - 0.8) < 0.01, 'the cosine: the floor under a lamp lit, its ceiling, a roof above it little; a wall 0.8', [r3(LF.shade(3, 1)), r3(LF.shade(3, -1)), r3(LF.shade(-6, 1)), r3(LF.shade(0, 0))].join(' '));
+check(Math.abs(LF.shade(3, 1, 0.1) / LF.shade(3, 1, 1) - 0.3) < 0.01 && glsl0().includes('mix(0.3, 1.0, smoothstep(0.35, 0.85, sky))'), 'indoors (no sky light) a third: the voxel light lights the rooms', r3(LF.shade(3, 1, 0.1)));
 check(LF.shade(14, 1) < 0.3, 'the vertical falloff: 14 m under the lights little', r3(LF.shade(14, 1)));
 const glsl = LF.glslCommon();
 check(glsl.includes('max(abs(dy) - 1.5, 0.0)') && glsl.includes('0.55 + 0.45 * n.y * fy + 0.25 * (1.0 - abs(n.y))'), 'the GLSL carries the mirror\'s shape');
