@@ -206,7 +206,7 @@ async function scenes() {
         TE.hold = true;
         const ok2 = TE.start(V, { t: tt, giver: gv, kid, text: '„' + (gv.p.name || 'Freund') + ': Danke — ohne dich hätten wir es nie geschafft!"' });
         const C = TE.cur;
-        return { ok: ok2, gv: gv.p.name, id: String(gv.p.id), pt: C && C.pt ? (C.pt.kid ? 'kid ' : '') + C.pt.p.name : null, shot: !!(C && C.shot), framed: TE.stats.framed, log: TE.log.slice(-2) };
+        return { ok: ok2, gv: gv.p.name, id: String(gv.p.id), pt: C && C.pt ? (C.pt.kid ? 'kid ' : '') + C.pt.p.name : null, shot: !!(C && C.shot), framed: TE.stats.framed, log: TE.log.slice(-2), lens: TE.lastShot || null, hugFront: TE.stats.hugFront | 0 };   // (f-polish10: where the lens stood)
       }, [tt, [...done]]);
       console.log('  · ' + tt + ': ' + JSON.stringify(st));
       if (!st || !st.ok) { check(false, tt + ': the ending staged (' + JSON.stringify(st) + ')'); await ev(() => { if (VR.TaleEnd) { VR.TaleEnd.end(); VR.TaleEnd.hold = false; } }); continue; }

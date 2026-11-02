@@ -1,6 +1,6 @@
 // f-polish10 · f-polish9's open items (docs/superpowers/plans/2026-11-02-f-polish10.md):
-//   a · the kneeling hug from the child's facing side: the lens where the child looks (a little to its left, where its
-//       head passes the adult's), low (the kneeling pair's eye height), aimed at their heads
+//   a · the kneeling hug from the child's facing side: the lens on the child's left (77° off its line of sight, where its
+//       head passes the adult's and turns), low (the kneeling pair's eye height), aimed at their heads
 //   b · a look deed („schau dir den Ausblick in Ruhe an") is not done by a trip's camera: the adventurer's session had
 //       act:c1.b1 done 1.4 s after its own [V] takeoff (the trip's camera swung past the vista) — a pair
 // Run: bash test/wt_run.sh polish10.js 300
@@ -28,7 +28,7 @@ console.log('a · the kneeling hug from the front');
       const mid = [(kid[0] + ad[0]) / 2, 64, (kid[1] + ad[1]) / 2];
       const shot = F3.frameGroup(open, mid, 0.9, H);
       const a = shot ? Math.atan2(shot.P[2] - mid[2], shot.P[0] - mid[0]) : NaN, off = wrap(a - fw) * 180 / Math.PI;
-      check(!!shot && Math.abs(off) <= 55 && Math.abs(off) >= 15, `the lens on the child's facing side, beside the adult's head (${f2(off)}° off the child's line of sight)`);
+      check(!!shot && off <= -60 && off >= -95, `the lens on the child's left, its face toward the lens, the adult in profile (${f2(off)}° off the child's line of sight)`);
       check(!!shot && shot.P[1] - 64 <= 1.6 && shot.P[1] - 64 >= 0.7 && shot.T[1] - 64 <= 0.95, `low: the lens ${shot ? f2(shot.P[1] - 64) : '—'} m over the ground, aimed at ${shot ? f2(shot.T[1] - 64) : '—'} m (the kneeling heads 1.18 / 0.97)`);
     }
     // the old frame unchanged: no options → the same lens as before (T 0.9 over the middle)

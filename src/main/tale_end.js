@@ -128,6 +128,7 @@
             if (!shot && avoid.length) shot = F3.frameGroup(so, mid, 0.9, fo());
             if (!shot) { shot = F3.frameGroup(solidOf(g), mid, 0.9, fo({ avoid })); if (shot) TE.stats.frondFallback = (TE.stats.frondFallback | 0) + 1; }
             if (shot && HS) TE.stats.hugFront = (TE.stats.hugFront | 0) + 1;
+            if (shot) TE.lastShot = { P: shot.P.map(v => +v.toFixed(2)), T: shot.T.map(v => +v.toFixed(2)), hug: !!HS, off: HS ? +(Math.atan2(Math.sin(shot.a - HS.pref - TE.HUG_SIDE), Math.cos(shot.a - HS.pref - TE.HUG_SIDE)) * 57.3).toFixed(0) : null };   // (the probe's record: where the lens stood)
           } } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, pt ? 1.1 : 0.7, (innerWidth || 16) / (innerHeight || 9)) : null }; }
       if (shot) C.aside = TE.asideOf(V.agents, [gv, pt], shot.P, mid);   // (f-polish9: nobody's head in the picture's corner)
@@ -173,12 +174,14 @@
   };
   // f-polish9: the two embraces of the pair (FA.embrace's o, blocks): the gap between them; an adult kneels to a child,
   // its arms round the child's back, the child's round its shoulders; two adults (or two children) chest to chest
-  // f-polish10: the kneeling hug's lens — where the child looks (it faces the adult), 35° to the child's left where its head
-  // passes the adult's (FA.embrace: each head tips to its own left), low at the kneeling pair's eyes, aimed at their heads;
-  // it outweighs the sun's side (run 1 of f-polish9 filmed the adult's back)
+  // f-polish10: the kneeling hug's lens — on the child's left (77° off its line of sight to the adult), where its head
+  // passes the adult's and turns (FA.embrace: each head tips to its own left): the child's face toward the lens, the
+  // adult in profile, not its back; low at the kneeling pair's eyes, aimed at their heads; it outweighs the sun's side
+  // (f-polish9 filmed the adult's back; a first cut at 35° still had the robe over the child's face)
+  TE.HUG_SIDE = 1.35;
   TE.hugShot = function (ad, kid) {
     const fw = Math.atan2(ad[1] - kid[1], ad[0] - kid[0]);
-    return { pref: fw - 0.6, prefW: 4, ty: 0.75, hs: [0.45, 0.75, 0.2] };
+    return { pref: fw - TE.HUG_SIDE, prefW: 4, ty: 0.75, hs: [0.45, 0.75, 0.2] };
   };
   TE.hugOf = function (a, b) {
     const gap = Math.max(0.15, Math.min(0.6, Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2])));
