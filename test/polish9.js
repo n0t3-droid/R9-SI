@@ -133,6 +133,10 @@ console.log('c · one event clock');
     RG.frame(g, 0.3);
     check(RG.atWork(g) && RG.busy(g) && (S.st.work | 0) >= 1 && (S.st.offers | 0) === o0, `at work on an outpost: the walker waits, the Regie's fill offers nothing but the story's beats (${(S.st.offers | 0) - o0} offers)`);
     delete V.Liberate;
+    g.gadgets = { blue: { sites: [{ phase: 'build', mode: 'show', box: [4, 64, 4, 10, 68, 10], T: 30, t: 10 }] } };
+    const far = RG.siteDue(g); g.gadgets.blue.sites[0].t = 23;
+    check(!far && RG.siteDue(g) && RG.busy(g) && !RG.busy(g, true), 'a Baustelle near you about to stand (≤ SITE_DUE s): the walker waits for its moment, not 20 s before it');
+    g.gadgets = null;
   } else check(false, 'the Regie binds to the stand-in game');
 }
 

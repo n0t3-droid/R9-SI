@@ -131,13 +131,24 @@
     const t = now(g), q = S.sched; if (t - Math.max(q.last2, big ? (q.lastNote === undefined ? -Infinity : q.lastNote) : q.lastStart) < q.o.space || q.scene) return true;
     if (g.wow && g.wow.active) return true;
     if (!big && q.pending(t)) return true;   // f-polish9: a start noted, about to be seen (the walker keeps its own PACE.noted)
-    return hard ? false : R.vistaNear(g) || R.foeComing(g) || R.atWork(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
+    return hard ? false : R.vistaNear(g) || R.foeComing(g) || R.atWork(g) || R.siteDue(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
   };
   // f-polish9 · the one event clock: an encounter about to begin — a foe on patrol within its notice range and FOE_M m
   // more of you (foes.js VR.Foes.coming): the walker's moments and beats wait for it rather than pair with it
   R.FOE_M = 8;
   // f-polish9: the player at work on an outpost (liberate.js Liberate.engaged) — its fight, calm, puzzle and freed moment
   // are the scene: the walker's moments and the Regie's fill (all but the story's beats) wait
+  // f-polish9: a Baustelle about to stand — rising within SITE_R m of you, SITE_DUE s or less left (its standing is the
+  // moment: the builder's session had the walker's caravan 6 s before it)
+  R.SITE_R = 48; R.SITE_DUE = 9;
+  R.siteDue = function (g) {
+    const B = g && g.gadgets && g.gadgets.blue, L = B && B.sites, p = g && g.player && g.player.pos; if (!L || !L.length || !p) return false;
+    for (const s of L) {
+      if (!s || !s.box || s.mode === 'instant' || (s.phase !== 'build' && s.phase !== 'earth') || !(s.T > 0) || s.T - (s.t || 0) > R.SITE_DUE) continue;
+      const b = s.box, cx = (b[0] + b[3]) / 2, cz = (b[2] + b[5]) / 2; if (Math.hypot(cx - p[0], cz - p[2]) < R.SITE_R) return true;
+    }
+    return false;
+  };
   R.atWork = function (g) { const L = VR.Liberate; try { return !!(L && L.engaged && L.engaged(g)); } catch (e) { return false; } };
   R.foeComing = function (g) { const F = VR.Foes; try { return !!(F && F.coming && F.coming(g, R.FOE_M)); } catch (e) { return false; } };
   // f-polish9: may an encounter begin now (foes.js asks before a foe notices you)? Not on top of a weighted event seen or
