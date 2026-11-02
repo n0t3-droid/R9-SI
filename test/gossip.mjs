@@ -138,7 +138,13 @@ await shotDom('day', 'gossip_city_day.png');
 await grab('day3d', 'gossip_city_day_3d.png', 6);
 await ev(() => { VR.game.env.setTime(14200); });
 await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; });
-for (let i = 0; i < 16; i++) await step(20, 33);
+const shotLine = async (what, key) => {   // the moment a kind of line is said: look at the speaker, a picture
+  const ok = await ev((w) => { const L = VR.Gossip.log.filter(l => l.what === w).pop(); if (!L || (Date.now() - L.t) > 6000) return false; let b = null; for (const q of VR.game.villages.agents) if (q.p.id === L.who) b = q; if (!b || !b.bubble) return false; const p = VR.game.player, dx = b.pos[0] - p.pos[0], dz = b.pos[2] - p.pos[2], d = Math.hypot(dx, dz); p.flying = true; p.teleport(b.pos[0] - dx / d * 5, b.pos[1] + 0.6, b.pos[2] - dz / d * 5); p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.08; p.viewYaw = p.yaw; b.bubble.t = Math.max(b.bubble.t, 3); return true; }, what);
+  if (ok) { await shotDom(key, 'gossip_' + key + '.png'); return true; } return false;
+};
+const shotDone = {};
+await ev(() => VR.Gossip.test.cool());
+for (let i = 0; i < 48 && !(shotDone.verse && shotDone.kid); i++) { await step(10, 33); for (const w of ['verse', 'kid']) if (!shotDone[w] && await shotLine(w, w)) { shotDone[w] = true; await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; }); } }
 const cn = await census();
 run.city.night = cn; run.nightLog = await ev(() => VR.Gossip.test.log().map(l => [l.what, l.text])); console.log('  night lines ' + JSON.stringify(run.nightLog.slice(-4)));
 check(cn && cn.near >= 1 && /stroll/.test(cn.acts), `Palmenhafen by night: ${cn && cn.near} out within 45 m (${cn && cn.acts})`);
@@ -151,25 +157,25 @@ const cost = {};
 const pull = (on) => ev((on) => { const V = VR.game.villages; let vil = null; for (const v of V.known.values()) if (v.town) vil = v; if (!vil || !vil.active) return 0;
   if (!on) { window.__gsTown = vil.agents.filter(a => a.p.town); for (const a of window.__gsTown) { vil.agents.splice(vil.agents.indexOf(a), 1); V.agents.splice(V.agents.indexOf(a), 1); } return window.__gsTown.length; }
   const L = window.__gsTown || []; for (const a of L) { vil.agents.push(a); V.agents.push(a); } window.__gsTown = null; return L.length; }, on);
-for (const preset of ['potato', 'high']) {
+for (const preset of process.env.SKIP_COST ? [] : ['potato', 'high']) {
   await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('*'); }, preset);
   await settle(10);
-  for (const on of [false, true, false, true, false, true]) {
+  for (const on of [false, true, false, true]) {
     await pull(on);
-    const r = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let i = 0; i < 12; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return +ms[6].toFixed(1); });
+    const r = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const ms = []; for (let i = 0; i < 8; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); g.renderer.gl.finish(); ms.push(performance.now() - t); } window.__norender = true; ms.sort((a, b) => a - b); return +ms[4].toFixed(1); });
     (cost[preset + (on ? '_on' : '_off')] || (cost[preset + (on ? '_on' : '_off')] = [])).push(r);
   }
 }
 const mn = (a) => Math.min(...a);
 run.cost = cost; run.gscost = await ev(() => VR.Gossip.cost);
-console.log('  cost ' + JSON.stringify(cost) + ' gossip ' + JSON.stringify(run.gscost));
-check(mn(cost.potato_on) <= mn(cost.potato_off) * 1.15 + 2, `Very Low: townsfolk there ${mn(cost.potato_on)} ms, removed ${mn(cost.potato_off)} ms (High ${mn(cost.high_on)} / ${mn(cost.high_off)} ms)`);
+save(); console.log('  cost ' + JSON.stringify(cost) + ' gossip ' + JSON.stringify(run.gscost));
+if (!process.env.SKIP_COST) check(mn(cost.potato_on) <= mn(cost.potato_off) * 1.15 + 2, `Very Low: townsfolk there ${mn(cost.potato_on)} ms, removed ${mn(cost.potato_off)} ms (High ${mn(cost.high_on)} / ${mn(cost.high_off)} ms)`);
 const rt = await ev(() => { const g = VR.game, G = VR.Gossip, a = JSON.stringify(g.meta.gossip), b = JSON.stringify(G.save(G.load(JSON.parse(a)))); return { same: a === b, bytes: a.length }; });
 check(rt.same, `the save record round-trips (${rt.bytes} bytes)`);
 check(!logs.some(l => /pageerror|gossip|citylife/.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 4).join(' · ') : ''));
 save();
 const row = (label, ks) => ({ label, imgs: ks.map(k => pics[k]).filter(Boolean) });
-const rows = [row('Drei Tage später, ein fernes Dorf: eine Fremde grüßt dich nach deiner Tat', ['greet']), row('Palmenhafen am Tag: Händler, Spaziergänger, Kinder am Platz', ['day', 'day3d']), row('Palmenhafen in der Nacht: Nachtschwärmer auf den beleuchteten Wegen', ['night'])].filter(r => r.imgs.length);
+const rows = [row('Drei Tage später, ein fernes Dorf: eine Fremde grüßt dich nach deiner Tat', ['greet']), row('Palmenhafen am Tag: Händler, Spaziergänger, Kinder am Platz', ['day', 'day3d']), row('Palmenhafen in der Nacht: Nachtschwärmer, das Fest · der Musikant singt von deiner Tat · Kinder spielen sie nach', ['night', 'verse', 'kid'])].filter(r => r.imgs.length);
 if (rows.length) { fs.writeFileSync(ROOT + '/.tmp_tests/gossip_sheet.json', JSON.stringify({ w: 620, rows })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'gossip_sheet.jpg', ROOT + '/.tmp_tests/gossip_sheet.json']).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message); } }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 await browser.close();

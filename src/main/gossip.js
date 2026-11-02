@@ -152,7 +152,8 @@
   const siteOf = (g, vil) => ({ id: dimOf(g) + '/' + vil.id, x: vil.plan.x, z: vil.plan.z, dim: dimOf(g) });
   const pidOf = (g, a) => dimOf(g) + '/' + a.p.id;
   const vars = (g, d, a) => { const nm = pname(g); return { name: nm || T('g.gs.you'), o: d.pl || T('g.gs.somewhere'), v: (a && a.vil && a.vil.name) || '' }; };
-  const say = (G0, a, text, dur, what) => { a.say(text, dur || 4.5); G.cost.said++; G.log.push({ t: Date.now(), who: a.p.id, what, text }); if (G.log.length > 30) G.log.shift(); };
+  // (the villagers' own first hello and their small talk wait while the line stands: villages.js a.greeted, a.talkCool)
+  const say = (G0, a, text, dur, what) => { a.say(text, dur || 4.5); a.greeted = true; a.talkCool = Math.max(a.talkCool || 0, (dur || 4.5) + 2); G.cost.said++; G.log.push({ t: Date.now(), who: a.p.id, what, text }); if (G.log.length > 30) G.log.shift(); };
   const nearestPlace = (g, x, z) => {
     const V = g.villages; let best = null, bd = 1e18;
     if (V && V.known) for (const vil of V.known.values()) { const d = (vil.plan.x - x) ** 2 + (vil.plan.z - z) ** 2; if (d < bd) { bd = d; best = vil; } }
