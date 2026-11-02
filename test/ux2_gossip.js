@@ -47,6 +47,15 @@ check(seen.join(',') === 'walk,tap,rise', 'the phases: ' + seen.join(' → ') + 
 check(seen.near < 1.9, 'the hero walked up to the machine (' + (seen.near || 0).toFixed(2) + ' m) before the tap');
 check(said.join(',') === 'kid,kid2', 'the hero\'s line, then the machine\'s answer');
 check(!Vm._gsPlay && !k1.act && !k2.act && k2.pose === 'stand', 'then their day goes on (no act, standing)');
+// a play whose act another module took ends (the village never stays silent)
+G.stagePlay(Vm, k1, k2, d); k1.act = { type: 'joy' };
+G.tick(Vm, 0.6);
+check(!Vm._gsPlay && !(k2.act && k2.act.type === 'gsplay') && k2.pose === 'stand', 'a play whose act was taken ends at the next look');
+// a play nobody updates goes on from the 2-Hz look
+G.stagePlay(Vm, k1, k2, d); Vm._gsPlay.lastRun = Date.now() - 5000; const ph0 = Vm._gsPlay.t;
+G.tick(Vm, 0.6); console.log('    why ' + G.why + ' t ' + (Vm._gsPlay && Vm._gsPlay.t) + ' lr ' + (Vm._gsPlay && Date.now() - Vm._gsPlay.lastRun) + ' acts ' + (k1.act && k1.act.type) + (k2.act && k2.act.type));
+check(Vm._gsPlay && Vm._gsPlay.t > ph0, 'a play nobody updates goes on from the look');
+Vm._gsPlay = null; k1.act = null; k2.act = null; k2.pose = 'stand';
 console.log('3 · a friend\'s visit in person');
 const notes = []; V.Quiet = { note: (t) => notes.push(t) };
 const gifts = []; V.MoveIn = { groundAt: () => 64, rec: () => ({ gifts }) };

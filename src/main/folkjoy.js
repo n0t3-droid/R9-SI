@@ -107,7 +107,7 @@
   const Vs = VR.Villages;
   if (!Vs) return;
   const P = Vs.prototype, Folk = VR.Folk, R = VR.R;
-  const BUSY = new Set(['talk', 'joy', 'outing', 'hide', 'fight', 'sleep', 'school', 'home', 'terrace']);
+  const BUSY = new Set(['talk', 'joy', 'outing', 'hide', 'fight', 'sleep', 'school', 'home', 'terrace', 'gsplay', 'gsvisit']);   // (f-ux2: the children's play and a friend's visit are u-gossip's)
   const free = (a) => !!a.act && a.pose !== 'sleep' && a.pose !== 'sit' && a.pose !== 'sitground' && !a.inBoat && !BUSY.has(a.act.type) && !(a.clipQ && a.clipQ.length);
   const d2xz = (a, p) => (a.pos[0] - p[0]) ** 2 + (a.pos[2] - p[2]) ** 2;
   const icon = (a, ch, t) => { a.bubble = { text: ch, t: t || 2.4, icon: true }; };

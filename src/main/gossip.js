@@ -223,7 +223,7 @@
   // the children's play: k1 the hero, k2 the machine (for the freed beacon: kneeling, blue sparks); one play at a time
   G.stagePlay = function (V, k1, k2, d) {
     const freed = d.k === 'freed';
-    V._gsPlay = { k1, k2, d, ph: 'walk', t: 0, freed };
+    V._gsPlay = { k1, k2, d, ph: 'walk', t: 0, freed, lastRun: Date.now() };
     for (const k of [k1, k2]) { k.act = { type: 'gsplay', role: k === k1 ? 'hero' : 'machine' }; k.path = null; k.goal = null; k.vel[0] = 0; k.vel[2] = 0; }
     k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]];
     if (freed) { k2.pose = 'sitground'; say(G, k2, T('g.gs.play.machine'), 2.6, 'play'); }
@@ -237,7 +237,7 @@
     const { k1, k2, d } = P0;
     if (a === k2) { k2.vel[0] = 0; k2.vel[2] = 0; if (P0.freed && P0.ph !== 'rise') k2.pose = 'sitground'; k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]]; if (P0.freed && P0.ph !== 'rise' && (P0.blink = (P0.blink || 0) + dt) > 0.6) { P0.blink = 0; sparks(g, k2, [0.45, 0.75, 1], 2); } return; }
     // the hero drives the play
-    P0.t += dt;
+    P0.t += dt; P0.lastRun = Date.now();
     let arrived = false;
     if (P0.ph === 'walk') { const ux = k1.pos[0] - k2.pos[0], uz = k1.pos[2] - k2.pos[2], L = Math.hypot(ux, uz) || 1; arrived = L < 1.6; if (!arrived && V.goTo(k1, k2.pos[0] + ux / L * 1.1, k2.pos[1], k2.pos[2] + uz / L * 1.1, 0.8)) { const st = Math.min(L - 1.3, dt * (k1.speed || 2)); k1.pos[0] -= ux / L * st; k1.pos[2] -= uz / L * st; } }
     else { k1.vel[0] = 0; k1.vel[2] = 0; k1.path = null; }
@@ -331,6 +331,8 @@
       }
       G.dinner(V, rec, tod, day);
       G.visit(V, rec, tod, day);
+      const P0 = V._gsPlay;   // (the play's own update was skipped or its act taken: it goes on here, or ends)
+      if (P0) { if (!(P0.k1.act && P0.k1.act.type === 'gsplay') || !(P0.k2.act && P0.k2.act.type === 'gsplay')) { for (const k of [P0.k1, P0.k2]) { if (k.act && k.act.type === 'gsplay') k.act = null; if (k.pose === 'sitground') k.pose = 'stand'; } V._gsPlay = null; } else if (Date.now() - P0.lastRun > 1500) { try { G.runPlay(V, P0.k2, 0.5); G.runPlay(V, P0.k1, 0.5); } catch (e) { V._gsPlay = null; } } }
       const J = V._gsVisit; if (J && Date.now() - (J.lastRun || Date.now()) > 1500) { try { G.runVisit(V, J.a, 0.5); } catch (e) { G.endVisit(V); } }   // (the guest's own update was skipped: the visit goes on)
     }
     if (t0) { const ms = performance.now() - t0; G.cost.ticks++; G.cost.ms += ms; if (ms > G.cost.worst) G.cost.worst = ms; }
