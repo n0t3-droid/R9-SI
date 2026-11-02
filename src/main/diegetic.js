@@ -76,9 +76,10 @@
   const GP = { R: 0 };
   D.gridPath = function (getBlock, pass, stand, from, to, R, max) {
     R = R | 0; const N = 2 * R + 1, NN = N * N;
-    if (GP.R !== R) { GP.R = R; GP.cost = new Float32Array(NN); GP.came = new Int32Array(NN); GP.hy = new Int16Array(NN); GP.st = new Uint8Array(NN); GP.hk = new Int32Array(NN * 4); GP.hv = new Float32Array(NN * 4); }
+    if (GP.R !== R) { GP.R = R; GP.cost = new Float32Array(NN); GP.came = new Int32Array(NN); GP.hy = new Int16Array(NN); GP.st = new Uint8Array(NN); GP.hk = new Int32Array(NN * 4); GP.hv = new Float32Array(NN * 4); GP.sy = new Int16Array(NN); GP.syr = new Int16Array(NN); }
     const cost = GP.cost, came = GP.came, hy = GP.hy, st = GP.st, hk = GP.hk, hv = GP.hv;
-    cost.fill(Infinity); st.fill(0);
+    cost.fill(Infinity); st.fill(0); GP.syr.fill(-32768);
+    const sy = GP.sy, syr = GP.syr;
     const x0 = from[0] - R, z0 = from[2] - R, tx = to[0], tz = to[2], near2 = 4;
     const free = (x, y, z) => { const a = pass(getBlock(x, y, z)); return a && pass(getBlock(x, y + 1, z)) ? a : 0; };
     const standAt = (x, z, yr) => { for (let k = 0; k < 5; k++) { const y = yr + (k === 0 ? 0 : k === 1 ? 1 : 1 - k); if (free(x, y, z) && stand(getBlock(x, y - 1, z))) return y; } return -32768; };
@@ -108,7 +109,7 @@
         const nx = cx + dx, nz = cz + dz, ix = nx - x0, iz = nz - z0; if (ix < 0 || iz < 0 || ix >= N || iz >= N) continue;
         const nk = ix * N + iz; if (st[nk] === 2) continue;
         if (di >= 4 && (!free(cx + dx, cy, cz) || !free(cx, cy, cz + dz))) continue;
-        const ny = standAt(nx, nz, cy); if (ny === -32768) continue;
+        let ny; if (syr[nk] === cy) ny = sy[nk]; else { ny = standAt(nx, nz, cy); sy[nk] = ny; syr[nk] = cy; } if (ny === -32768) continue;   // (one cell's ground once per height it is reached from)
         if (ny > cy && !pass(getBlock(cx, cy + 2, cz))) continue;   // (a step up needs the head room)
         const a = pass(getBlock(nx, ny, nz)), nc = cost[k] + (di >= 4 ? 1.414 : 1) + (a === 3 ? 4 : 0) + (ny !== cy ? 0.5 : 0);
         if (nc >= cost[nk]) continue;
@@ -380,7 +381,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   // f-ux2: the walkable way to the goal — VR.Folk.findPath to a point ≤ 40 m toward it, searched again only when you
   // moved 3 m or the goal moved 2 m, at most every 1.5 s, ≤ 700 cells (400 when the main thread is the bottleneck)
   D.decals = true; D.paths = true;   // (false: the f-ux trail — round dots on the straight line; test/ux2_shots.mjs's „before“)
-  D.PATH_REACH = 32; D.PATH_MAX = 1400;
+  D.PATH_REACH = 32; D.PATH_MAX = 900;
   function pathFor(g, p, goal) {
     const F = VR.Folk, w = g.world;
     if (!F || !F.passable || !F.standable || !w || !w.getBlock || (F.warmed && !F.warmed())) return null;
