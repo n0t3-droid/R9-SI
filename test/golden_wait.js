@@ -7,4 +7,6 @@ const G = {};
 G.settledOk = (s, i) => !!s && s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && !s.lod && i > 2;
 // a ready() keeps settling this long (real ms) after its rounds ran out — a loaded machine meshes slower than the rounds
 G.READY_MS = 60000;
+// the frames drawn between the settles of a ready() (golden.mjs warm): the detail residency runs only in drawn frames
+G.WARM = [6, 3];
 module.exports = G;

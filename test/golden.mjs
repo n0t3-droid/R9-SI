@@ -71,8 +71,14 @@ const loaded = async (C, r) => { for (let i = 0; i < 150; i++) { await step(10, 
 // f-quiet3: ready until the world has settled — a settle that ran out of rounds returned an unsettled world (a section
 // still meshing, far tiles in flight: under load the vista's foreground had a black hole, worst tile 0.337); now it
 // keeps settling up to G.READY_MS of real time and the shot's note says when it never settled
+// … and the detail drawn: the renderer keeps a section's fine voxel detail (vxResidency) on the GPU only from its drawn
+// frames — the stepped frames draw nothing, so how much detail the hall had in the picture followed what earlier shots
+// had drawn there (the vista's luma 0.78–0.92 run to run). warm(): a few frames drawn (they queue the detail and the
+// re-meshes of dropped detail), then settled again
+const warm = (n) => ev((n) => { const g = VR.game; window.__norender = false; try { for (let i = 0; i < n; i++) { g.last = performance.now() - 16; g.loop(performance.now()); } } finally { window.__norender = true; } }, n);
 let unsettled = false;
-const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); const t0 = Date.now(); let s = await settle(80); while (!(s && s.ok) && Date.now() - t0 < G.READY_MS) s = await settle(40); await step(20); s = await settle(20); for (let k = 0; k < 6 && !(s && s.ok); k++) s = await settle(40); unsettled = !(s && s.ok); return !unsettled; };
+const settleOk = async (t0) => { let s = await settle(40); while (!(s && s.ok) && Date.now() - t0 < G.READY_MS) s = await settle(40); return s; };
+const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); const t0 = Date.now(); let s = await settle(80); while (!(s && s.ok) && Date.now() - t0 < G.READY_MS) s = await settle(40); for (let k = 0; k < G.WARM.length; k++) { await warm(G.WARM[k]); s = await settleOk(t0); } await step(20); s = await settle(20); for (let k = 0; k < 6 && !(s && s.ok); k++) s = await settle(40); unsettled = !(s && s.ok); return !unsettled; };
 const freeze = () => ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.camMode = 0; g.settings.fov = 75; if (VR.Seasons && VR.Seasons.at && g.meta && g.meta.mode === 'creative' && (!g.settings.seasonPick || g.settings.seasonPick === 'auto')) g.settings.seasonPick = VR.Seasons.NAMES[VR.Seasons.at(g.env.day || 0, g.env.timeOfDay, -1).idx];   /* (f-polish8: the season held — the calendar's season of the frozen day, the same picture) */ const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 const preset = (p, rd) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.particles = false; g.applySettings('*'); }, [p, rd]);
 async function trip(to) {
