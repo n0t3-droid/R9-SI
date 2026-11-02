@@ -3,6 +3,8 @@
 //       head passes the adult's and turns), low (the kneeling pair's eye height), aimed at their heads
 //   b · a look deed („schau dir den Ausblick in Ruhe an") is not done by a trip's camera: the adventurer's session had
 //       act:c1.b1 done 1.4 s after its own [V] takeoff (the trip's camera swung past the vista) — a pair
+//   c · the life director's own acts (a balloon …) wait while you are at work on an outpost or a foe is coming, as the
+//       Regie's fill and the walker already do (run 3: a balloon 7 s before „calmed")
 // Run: bash test/wt_run.sh polish10.js 300
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -54,6 +56,22 @@ console.log('b · a look deed and the trip\'s camera');
   check(!done && st.hold === 0, `the hold starts again after the trip (${st.hold})`);
   const src = require('fs').readFileSync(__dirname + '/../src/main/story.js', 'utf8');
   check(/away: !!\(VR\.Intent/.test(src), 'the story\'s deed context marks a trip by intent as away');
+}
+
+console.log('c · the life director\'s acts and the outpost at work');
+{
+  for (const f of ['lifekit', 'lifedirector', 'eventlog', 'regie']) require(__dirname + '/../src/main/' + f + '.js');
+  const RG = V.Regie, g = { state: 'play', time: 50, world: {}, meta: { seed: 1 }, player: { pos: [0, 64, 0] }, entities: { mobs: [] } };
+  RG.frame(g, 0.3); const S = RG.of(g);
+  if (S) {
+    S.sched.lastStart = -100; S.sched.last2 = -100; S.sched.lastNote = -100; g.time = 300;
+    const free = RG.allow(g, 2, 'ambient');
+    V.Liberate = { engaged: () => true };
+    const work = RG.allow(g, 2, 'ambient'), story = RG.allow(g, 4, 'story');
+    delete V.Liberate; V.Foes = { coming: () => true };
+    const foe = RG.allow(g, 2, 'ambient'); delete V.Foes;
+    check(free && !work && !foe && story, `a balloon may start (${free}), not while an outpost is at work (${work}) or a foe is coming (${foe}); the story's beat still may (${story})`);
+  } else check(false, 'the Regie binds to the stand-in game');
 }
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');

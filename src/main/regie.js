@@ -117,6 +117,7 @@
     const S = R.of(g); if (!S) return true;
     if (R.vistaNear(g)) return false;   // a-regie: a wow moment is coming (an unseen vista near) — nothing on top of it
     if (kind !== 'story' && R.claimed(g)) { S.st.claimNo = (S.st.claimNo | 0) + 1; return false; }   // o-wander3: the walker's moment is due — the slot is its
+    if (kind !== 'story' && (R.atWork(g) || R.foeComing(g))) { S.st.workNo = (S.st.workNo | 0) + 1; return false; }   // f-polish10: an outpost at work, a foe coming — the life director's own acts wait too (run 3: a balloon 7 s before „calmed")
     return S.sched.allow(now(g), w || 2, kind || 'ambient', act);   // (a query: what starts is seen through the event log)
   };
   // a-regie: a self-scheduling source (the pads' visitors, the traffic's passes) tells what it started after allow said yes
