@@ -249,7 +249,7 @@ try {
   }
   for (const v of views) {
     const a = N.stats[v.name + '_after'], b = N.stats[v.name + '_before']; if (!a || !b) continue;
-    if (v.name !== 'carry') check(a.live && a.lights > 0, v.name + ': the field live, ' + a.lights + ' lights, ' + a.dyn + ' moving');
+    if (v.name !== 'carry') check(a.live && a.lights + a.dyn > 0, v.name + ': the field live, ' + a.lights + ' lights, ' + a.dyn + ' moving');   // (f-polish8: the fairy place's lights are its models — moving lights; its magma is no light of the field now)
     if (v.name === 'home' || v.name === 'street' || v.name === 'haven') check(a.L > b.L, v.name + ': brighter with the pools (L ' + b.L + ' → ' + a.L + ')');
     const o = N.stats[v.name + '_old']; if (o && v.name !== 'festival') console.log('     ' + v.name + ': L ' + b.L + ' · v-light ' + o.L + ' · f-polish8 ' + a.L + ' (lights ' + o.lights + ' → ' + a.lights + ')');
   }
