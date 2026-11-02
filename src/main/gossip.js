@@ -194,8 +194,9 @@
   // ================================================================ f-ux2: the calm greeting, the play, the visit
   // the deed greeting is that person's first word (it replaces their plain „Hallo"); while it stands (6 s) the
   // neighbours within 12 m only wave — no bubble beside it
-  G.CALM = 6000;
+  G.CALM = 6000; G.calm = true;   // (false: the u-gossip screen — the neighbours' own hellos beside it; test/ux2_shots.mjs's „before“)
   const calmAround = (V, a) => {
+    if (!G.calm) return;
     const p = V.g.player.pos; G.calmT = Date.now() + G.CALM;
     for (const o of V.agents) { if (o === a || o.greeted) continue; if ((o.pos[0] - p[0]) ** 2 + (o.pos[2] - p[2]) ** 2 < 12 * 12) { o.greeted = true; o.waveT = Math.max(o.waveT || 0, 0.9); } }
   };
