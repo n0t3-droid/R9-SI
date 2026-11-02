@@ -55,7 +55,7 @@
   LF.DMAX = 32;      // moving lights a frame
   // the light: gain per emit level 15, falloff k (1/m²), radius R (m) of a block light and of a moving one; the shader's
   // strength, vertical falloff (1/m², past 1.5 m) and the fade at the window's edge (m)
-  LF.K = { gain: 1.25, k: 0.11, R: 14, Rd: 11, str: 0.55, kv: 0.05, fade0: 50, fade1: 60 };
+  LF.K = { gain: 1.25, k: 0.07, R: 14, Rd: 11, str: 1.0, kv: 0.05, fade0: 50, fade1: 60 };
   const N = LF.N, NN = N * N, M = N - 1, OPQ = 2;   // (VR.F.OPAQUE is 1 << 1: registry.js)
 
   // ---------------------------------------------------------------- the disc's order (a ray cast in one pass)
@@ -90,7 +90,10 @@
     this.front = new Float32Array(NN * 4); this.back = new Float32Array(NN * 4);   // rgb, Σ h·lum
     this.work = new Float32Array(NN * 4);
     this.out = new Uint8Array(NN * 4);
-    this.list = new Int32Array(NN); this.nList = 0; this.li = 0;   // the lights of the rebuild under way
+    // the lights of the rebuild under way: the scanned cells merged 2 × 2 (a neon wall's thousand blocks a quarter as
+    // many lights — their light summed, their place the light-weighted mean), x y z r g b each
+    this.L = new Float32Array((NN >> 2) * 6); this.nList = 0; this.li = 0;
+    this.dirty = true; this.fresh = true; this.lastDyn = 0;
     this.row = 0; this.cx = 0; this.cz = 0; this.cy = 0; this.Y0 = 0;
     this.started = false; this.swapped = 0; this.dyn = new Float32Array(LF.DMAX * 7); this.nDyn = 0;
     this.stats = { scan: 0, stamps: 0, swaps: 0, lights: 0, dyn: 0 };
@@ -102,7 +105,7 @@
     const cx = Math.floor(x), cz = Math.floor(z), cy = Math.floor(y);
     const jump = !this.started || Math.abs(cx - this.cx) > 16 || Math.abs(cz - this.cz) > 16 || Math.abs(cy - this.cy) > 16;
     this.cx = cx; this.cz = cz; this.cy = cy;
-    if (jump) { this.started = true; this.front.fill(0); this.back.fill(0); this.tx.fill(0x7fffffff); this.nList = 0; this.li = 0; this.swapped++; }
+    if (jump) { this.started = true; this.front.fill(0); this.back.fill(0); this.tx.fill(0x7fffffff); this.nList = 0; this.li = 0; this.swapped++; this.dirty = this.fresh = true; }
     return jump;
   };
   // the world coordinate in the window for a toroidal index (x0 = the window's low edge)
@@ -118,6 +121,7 @@
       for (let ii = 0; ii < N; ii++) {
         const x = inWin(ii, x0), i = rr * N + ii, kx = x >> 4;
         if (kx !== ccx) { ccx = kx; c = col(kx, z >> 4); }
+        const moved = this.tx[i] !== x || this.tz[i] !== z || this.base[i] !== yb;
         this.tx[i] = x; this.tz[i] = z; this.base[i] = yb;
         let m = 0, e = 0, ey = 0, eb = 0;
         if (c && c.blocks) {
@@ -130,6 +134,7 @@
             if (em) { const lv = Math.max((em >> 8) & 15, (em >> 4) & 15, em & 15); if (lv > eb) { eb = lv; e = em; ey = y; } }
           }
         }
+        if (moved ? (m || e || this.mask[i] || this.em[i]) : (this.mask[i] !== (m >>> 0) || this.em[i] !== e || this.emY[i] !== ey)) this.dirty = true;   // (a change: the lights again)
         this.mask[i] = m >>> 0; this.em[i] = e; this.emY[i] = ey; n++;
       }
     }
@@ -160,26 +165,37 @@
       vis[j] = j === 0 ? 1 : vp * this.open(i, wx, wz, iy);
     }
   };
-  // the static lights: a rebuild a slice at a time — the list gathered from the scanned cells, stamped STAMPS a frame
-  // into the back buffer, swapped in whole (returns true on a swap)
+  // the static lights: a rebuild a slice at a time — the list gathered from the scanned cells (merged 2 × 2), stamped
+  // STAMPS a frame into the back buffer, swapped in whole (returns true on a swap). Nothing changed since the last pass
+  // (the scan saw the same blocks): nothing to do
+  LF.radius = (r, g, b) => { const lv = Math.min(30, Math.max(r, g, b) * 15 / LF.K.gain); return Math.max(5, Math.min(16, Math.round(5 + 9 * Math.sqrt(lv / 15)))); };
   FP.rebuild = function (budget) {
-    const K = LF.K, x0 = this.cx - LF.HALF, z0 = this.cz - LF.HALF;
+    const K = LF.K, x0 = this.cx - LF.HALF, z0 = this.cz - LF.HALF, gk = K.gain / 15, L = this.L;
     if (this.li >= this.nList) {
-      // a new pass: the lights the window holds now
+      if (!this.dirty) return false;
+      this.dirty = false;
+      // a new pass: the lights the window holds now, 2 × 2 cells (toroidal pairs: even world coordinates first)
       let n = 0;
-      for (let i = 0; i < NN; i++) {
-        if (!this.em[i]) continue;
-        const wx = this.tx[i], wz = this.tz[i];
-        if (wx < x0 || wx >= x0 + N || wz < z0 || wz >= z0 + N) continue;
-        this.list[n++] = i;
+      for (let bz = z0 & ~1; bz < z0 + N; bz += 2) for (let bx = x0 & ~1; bx < x0 + N; bx += 2) {
+        let sr = 0, sg = 0, sb = 0, sx = 0, sy = 0, sz = 0, sw = 0;
+        for (let k = 0; k < 4; k++) {
+          const wx = bx + (k & 1), wz = bz + (k >> 1);
+          if (wx < x0 || wx >= x0 + N || wz < z0 || wz >= z0 + N) continue;
+          const i = (wz & M) * N + (wx & M), e = this.em[i];
+          if (!e || this.tx[i] !== wx || this.tz[i] !== wz) continue;
+          const r = ((e >> 8) & 15) * gk, g = ((e >> 4) & 15) * gk, b = (e & 15) * gk, w = r + g + b;
+          sr += r; sg += g; sb += b; sx += (wx + 0.5) * w; sy += (this.emY[i] + 0.5) * w; sz += (wz + 0.5) * w; sw += w;
+        }
+        if (sw <= 0) continue;
+        const o = n++ * 6; L[o] = sx / sw; L[o + 1] = sy / sw; L[o + 2] = sz / sw; L[o + 3] = sr; L[o + 4] = sg; L[o + 5] = sb;
       }
       this.nList = n; this.li = 0; this.back.fill(0); this.stats.lights = n;
       if (!n) { const t = this.front; this.front = this.back; this.back = t; this.stats.swaps++; this.swapped++; return true; }
     }
-    const end = Math.min(this.nList, this.li + budget), g = K.gain / 15;
+    const end = Math.min(this.nList, this.li + budget);
     for (; this.li < end; this.li++) {
-      const i = this.list[this.li], e = this.em[i];
-      this.stamp(this.back, this.tx[i] + 0.5, this.emY[i] + 0.5, this.tz[i] + 0.5, ((e >> 8) & 15) * g, ((e >> 4) & 15) * g, (e & 15) * g, K.R);
+      const o = this.li * 6;
+      this.stamp(this.back, L[o], L[o + 1], L[o + 2], L[o + 3], L[o + 4], L[o + 5], LF.radius(L[o + 3], L[o + 4], L[o + 5]));
     }
     this.stats.stamps = end;
     if (this.li >= this.nList) { const t = this.front; this.front = this.back; this.back = t; this.stats.swaps++; this.swapped++; return true; }
@@ -194,7 +210,10 @@
     return true;
   };
   // the picture: static + moving, packed (the field's base height Y0 = the eye's − 16)
-  FP.compose = function () {
+  FP.compose = function (force) {
+    // (nothing new — no swap since the last picture, no moving light now or then: the picture of before stands)
+    if (!force && !this.fresh && this.nDyn === 0 && this.lastDyn === 0 && this.swapped === this.composedAt) return null;
+    this.fresh = false; this.lastDyn = this.nDyn; this.composedAt = this.swapped;
     const A = this.work, D = this.dyn; A.set(this.front);
     for (let j = 0; j < this.nDyn; j++) { const o = j * 7; this.stamp(A, D[o], D[o + 1], D[o + 2], D[o + 3], D[o + 4], D[o + 5], D[o + 6]); }
     this.stats.dyn = this.nDyn;

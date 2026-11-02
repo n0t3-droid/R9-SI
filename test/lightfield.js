@@ -86,6 +86,16 @@ console.log('     a frame: ' + r3(ms) + ' ms (scan ' + LF.ROWS + ' rows, ' + LF.
 check(f.stats.lights === 61, 'the scan found every light', f.stats.lights);
 check(ms < 2.0, 'a frame\'s JS under 2 ms (node)', r3(ms));
 
+// nothing changed: no restamp, no new picture; a block changed: the lights again
+for (let i = 0; i < 40; i++) { f.scan(col, R.T, 4); f.rebuild(48); }
+f.clearDyn(); f.compose(); f.compose();
+f.scan(col, R.T, 128); const rb = f.rebuild(48), cp = f.compose();
+check(rb === false && cp === null, 'still: no restamp, no upload (the picture of before stands)');
+set(20, 66, 20, lantern); f.scan(col, R.T, 128); let sw = false; for (let i = 0; i < 40 && !sw; i++) sw = f.rebuild(48);
+check(sw && f.compose() !== null && lum(at(20, 20)) > 0.8, 'a lantern placed: restamped, a new picture, its light there');
+// a neon wall: 12 lights in a row, merged 2 × 2 into 6
+const n0 = f.stats.lights; for (let x = 40; x < 52; x++) set(x, 66, -20, lantern); f.scan(col, R.T, 128); for (let i = 0; i < 40; i++) if (f.rebuild(48)) break;
+check(f.stats.lights - n0 === 6, 'a row of 12 light blocks: 6 lights (merged 2 × 2)', f.stats.lights - n0);
 console.log('e · the shaders');
 const names = ['TERRAIN_FS', 'PROP_FS', 'FURN_FS', 'VOX_FS', 'COMMON', 'TRANS_FS', 'LOD_FS', 'MESH_FS'];
 const strip = (s) => s.replace(/#ifdef LFIELD[\s\S]*?#endif\n/g, '').replace(/\n\s*\n/g, '\n'), sq = (s) => s.replace(/\n\s*\n/g, '\n');

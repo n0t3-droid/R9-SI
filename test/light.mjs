@@ -120,7 +120,7 @@ try {
   N.spawn = S0;
   const views = [];
   // ---------------------------------------------------------------- the villages: the nearest one's festival, the next one's street
-  const vils = await ev((S0) => { const M = VR.game.villages, out = []; for (const v of M.known.values()) { const P = v.plan && v.plan.plaza; if (!P) continue; const h = v.plan.homes && v.plan.homes[0], hc = h && typeof h.x === 'number' ? [h.x, h.z] : (h && h.door ? [h.door.x, h.door.z] : null); out.push({ id: v.id, c: [P.x, P.z], y: P.y, d: Math.hypot(P.x - S0[0], P.z - S0[2]), h: hc }); } return out.sort((a, b) => a.d - b.d).slice(0, 4); }, S0);
+  const vils = await ev((S0) => { const M = VR.game.villages, out = []; for (const v of M.known.values()) { const P = v.plan && v.plan.plaza; if (!P) continue; const hs = (v.plan.homes || []).map(h => (h && Array.isArray(h.outside) ? h.outside : h && Array.isArray(h.door) ? h.door : null)).filter(d => d && isFinite(d[0]) && isFinite(d[2])).sort((a, b) => Math.hypot(a[0] - P.x, a[2] - P.z) - Math.hypot(b[0] - P.x, b[2] - P.z)); const hc = hs.length ? [hs[Math.min(2, hs.length - 1)][0], hs[Math.min(2, hs.length - 1)][2]] : null; out.push({ id: v.id, c: [P.x, P.z], y: P.y, d: Math.hypot(P.x - S0[0], P.z - S0[2]), h: hc }); } return out.sort((a, b) => a.d - b.d).slice(0, 4); }, S0);
   console.log('     villages ' + JSON.stringify(vils));
   const vF = vils[0], vS = vils[1] || vils[0];
   if (vF && want('festival')) {
@@ -131,7 +131,7 @@ try {
   }
   if (vS && want('street')) {
     await camAt([vS.c[0], 140, vS.c[1]], [vS.c[0] + 10, 130, vS.c[1]], EVE); await settle(40);
-    const C = vS.h ? [(vS.c[0] + vS.h[0]) / 2, (vS.c[1] + vS.h[1]) / 2] : [vS.c[0] + 8, vS.c[1]];
+    const C = vS.h ? [vS.h[0] + 0.5, vS.h[1] + 0.5] : [vS.c[0] + 8, vS.c[1]];
     const y = (await top(C[0], C[1])) + 1;
     const f = await director([C[0], y, C[1]], 4, 1.4, 1.5);
     views.push({ name: 'street', P: f.P, T: f.T, tod: EVE, prep: async () => { await fest(vF ? vF.id : null, vS.id === (vF && vF.id) ? null : vS.id); await run(60); } });

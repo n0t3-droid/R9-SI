@@ -95,7 +95,7 @@
   };
   R.lfFrame = function (F, E) {
     this.lfLive = false;
-    if (!this.lfOn(F)) return;
+    if (!this.lfOn(F) || !isFinite(F.cam.x) || !isFinite(F.cam.z) || !isFinite(F.cam.y)) return;
     const t0 = performance.now(), gl = this.gl, c = F.cam, w = F.world, g = VR.game;
     const f = this.lfField || (this.lfField = new LF.Field());
     // the same frame drawn twice (a mirror, the far cache): the field once
@@ -108,12 +108,15 @@
     f.scan(this.lfCol, VR.R.T, LF.ROWS);
     f.rebuild(LF.STAMPS);
     if (g) LF.gather(g, f, E, g.time || t0 / 1000);
-    f.compose();
+    const fresh = !this.lfT;
     this.lfTex();
-    gl.activeTexture(gl.TEXTURE0 + UNIT); gl.bindTexture(gl.TEXTURE_2D, this.lfT);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, LF.N, LF.N, gl.RGBA, gl.UNSIGNED_BYTE, f.out);
-    gl.activeTexture(gl.TEXTURE0);
+    if (f.compose(fresh)) {   // (null: the picture of before stands — no upload)
+      gl.activeTexture(gl.TEXTURE0 + UNIT); gl.bindTexture(gl.TEXTURE_2D, this.lfT);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, LF.N, LF.N, gl.RGBA, gl.UNSIGNED_BYTE, f.out);
+      gl.activeTexture(gl.TEXTURE0);
+      LF.uploads = (LF.uploads | 0) + 1;
+    }
     const ox = c.x - 128 * Math.floor(c.x / 128), oz = c.z - 128 * Math.floor(c.z / 128);
     this.lfU = this.lfU || [0, 0, 0, 0];
     this.lfU[0] = ox; this.lfU[1] = oz; this.lfU[2] = c.y - f.Y0; this.lfU[3] = LF.K.str;
@@ -124,7 +127,7 @@
   R.lfWarm = function (f) {
     f = f || this.lfField; if (!f || !this.lfCol) return 0;
     f.scan(this.lfCol, VR.R.T, LF.N);
-    f.li = f.nList = 0;
+    f.li = f.nList = 0; f.dirty = true;
     for (let i = 0; i < 200; i++) if (f.rebuild(4096)) break;
     return f.stats.lights;
   };
@@ -145,7 +148,7 @@
   // ---------------------------------------------------------------- the villagers' lanterns, the bursts
   const Vs = VR.Villages && VR.Villages.prototype;
   if (Vs && Vs.draw) {
-    const draw0 = Vs.draw, MP = { scale: 0.55, light: [1, 1, 1] }, pos = [0, 0, 0];
+    const draw0 = Vs.draw, MP = { scale: 0.55 }, pos = [0, 0, 0];
     Vs.draw = function (r, E, cam) {
       const out = draw0.apply(this, arguments);
       if (!r || !r.q || !r.q.lfPools || night(E) <= 0.25 || !VR.LifeKit || !this.agents || !this.agents.length) return out;
@@ -156,7 +159,7 @@
         const dx = a.pos[0] - cam.x, dz = a.pos[2] - cam.z; if (dx * dx + dz * dz > 48 * 48) continue;
         if (!prog) prog = ent.beginVox(r, E);
         LF.handPos(a, g.time || 0, pos); pos[1] -= 0.05;
-        if (VR.LifeKit.drawModel(g, r, prog, 'fy_lantern', pos, a.yaw || 0, cam, MP)) n++;
+        try { if (VR.LifeKit.drawModel(g, r, prog, 'fy_lantern', pos, a.yaw || 0, cam, MP)) n++; } catch (e) { LF.err = String(e); return out; }   // (a lantern never breaks the frame)
         if (n >= 12) break;
       }
       return out;
