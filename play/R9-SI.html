@@ -68066,14 +68066,37 @@ if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>LF.
 LF.N=128;LF.HALF=64;LF.BAND=32;LF.BELOW=12;
 LF.ROWS=2;
 LF.STAMPS=24;
-LF.LMAX=0.9;
+LF.LMAX=1.15;
 LF.HSPAN=48;
 LF.DMAX=32;
 
 
 
 
-LF.K={gain:1.25,k:0.07,R:14,Rd:11,str:1.0,kv:0.05,fade0:50,fade1:60,cube:0.25,minLv:8};
+LF.K={gain:1.25,k:0.07,R:14,Rd:11,str:1.0,kv:0.05,fade0:50,fade1:60,cube:0.25,minLv:8,
+
+
+point:1.6,low:2,lowR:0.55,lowK:6,fairy:1.8,window:1.0};
+LF.MAXL=192;
+LF.LW=8;
+
+
+
+
+
+
+LF.KIND={none:0,plain:1,point:2,window:3};
+const RX_NONE= /neon|strip|_line|led_|_led|cove|light_bar|slit|trim|panel|hangar|screen|holo|_pad|tread|console|mediawall|ledbed|_ore|forcefield|conduit|portal|gate|veil|aether|obsidian|heart|glowspar|exo_crystal|crystal_block|sunstone|mire_light|reactor|thruster|runic|lightning_rod|turret|helm|_desk|railing|dome_glass|selfcheckout|shop_sign|promo|_tv|pc_rgb|booth|charger|fridge|freezer|vending|aquarium|hottub|pergola|fountain|lava|magma|ice_crystal|hex_light|stn_clamp|ferry_dock|launch_beacon|beacon_red/;
+const RX_WIN= /window/;
+const RX_POINT= /lantern|lamp|torch|fire|bulb|pendant|chandelier|sconce|bollard|jack_o|_spot|candles|beacon|stove|pizzaoven|fire_pit|firetable|stall_tall|globe|uplight|cauldron|glow_berry|lumishroom|crystal_cluster|vx_crystal|swingarm|updown|arc_lamp/;
+LF.kindName=(n)=>(!n?LF.KIND.plain:RX_WIN.test(n)?LF.KIND.window:RX_NONE.test(n)?LF.KIND.none:RX_POINT.test(n)?LF.KIND.point:LF.KIND.plain);
+LF.kindTable=function(T){
+if(T.lfKind&&T.lfKind.length===T.emit.length)return T.lfKind;
+const n=T.emit.length,out=new Uint8Array(n),types=VR.R&&VR.R.types;
+for(let s=0;s<n;s++){if(!T.emit[s])continue;const t0=types&&types[T.type[s]];out[s]=LF.kindName(t0&&t0.name);}
+return(T.lfKind=out);
+};
+LF.kindOf=(T,s)=>LF.kindTable(T)[s];
 const N=LF.N,NN=N*N,M=N-1,OPQ=2;
 
 
@@ -68110,7 +68133,7 @@ this.work=new Float32Array(NN*4);
 this.out=new Uint8Array(NN*4);
 
 
-this.L=new Float32Array((NN>>2)*6);this.nList=0;this.li=0;
+this.L=new Float32Array((NN>>2)*LF.LW);this.nList=0;this.li=0;
 this.dirty=true;this.fresh=true;this.lastDyn=0;
 this.touchT=new Int32Array(NN);this.prevT=new Int32Array(NN);this.nTouch=0;this.nPrev=0;this.mark=new Uint32Array(NN);this.gen=1;this.hs=255/LF.HSPAN;
 this.row=0;this.cx=0;this.cz=0;this.cy=0;this.Y0=0;
@@ -68131,7 +68154,7 @@ return jump;
 const inWin=(i,lo)=>lo+((i-lo)&M);
 
 FP.scan=function(col,T,rows){
-const flags=T.flags,emit=T.emit,x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,yb=this.cy-LF.BELOW;
+const flags=T.flags,emit=T.emit,kinds=LF.kindTable(T),x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,yb=this.cy-LF.BELOW;
 let n=0;
 for(let r=0;r<rows;r++){
 const rr=this.row;this.row=(this.row+1)&M;
@@ -68150,7 +68173,7 @@ const y=yb+b;if(y<0||y>=H)continue;
 const s=B[(y<<8)|lc];if(!s)continue;
 if(flags[s]&OPQ)m|=(1<<b);
 const em=emit[s];
-if(em){const lv=Math.max((em>>8)&15,(em>>4)&15,em&15)*((flags[s]&OPQ)?1:2);if(lv>eb){eb=lv;e=(em&0xfff)|((flags[s]&OPQ)?0x8000:0);ey=y;}}
+if(em){const kd=kinds[s];if(kd){const lv=Math.max((em>>8)&15,(em>>4)&15,em&15)*((flags[s]&OPQ)?1:2)*(kd===2?2:1);if(lv>eb){eb=lv;e=(em&0xfff)|(kd<<12)|((flags[s]&OPQ)?0x8000:0);ey=y;}}}
 }
 }
 if(moved?(m||e||this.mask[i]||this.em[i]):(this.mask[i]!==(m>>>0)||this.em[i]!==e||this.emY[i]!==ey))this.dirty=true;
@@ -68168,8 +68191,10 @@ if(b<0||b>=LF.BAND)return 1;
 return(this.mask[i]>>>b)&1?0:1;
 };
 
-FP.stamp=function(A,lx,ly,lz,r,g,b,R,rec){
-const D=LF.disc(R),vis=D.vis,ox=D.ox,oz=D.oz,par=D.par,dist=D.dist,k=LF.K.k;
+
+const DIRX=[0,1,-1,0,0],DIRZ=[0,0,0,1,-1];
+FP.stamp=function(A,lx,ly,lz,r,g,b,R,rec,km,dir){
+const D=LF.disc(R),vis=D.vis,ox=D.ox,oz=D.oz,par=D.par,dist=D.dist,k=LF.K.k*(km||1),ddx=DIRX[dir|0],ddz=DIRZ[dir|0];
 const x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,ix=Math.floor(lx),iz=Math.floor(lz),iy=Math.floor(ly);
 const lum=r+g+b;if(lum<=0)return;
 for(let j=0;j<D.n;j++){
@@ -68177,7 +68202,7 @@ const wx=ix+ox[j],wz=iz+oz[j];
 if(wx<x0||wx>=x0+N||wz<z0||wz>=z0+N){vis[j]=0;continue;}
 const i=(wz&M)*N+(wx&M);
 const vp=j===0?1:vis[par[j]];
-if(vp<=0){vis[j]=0;continue;}
+if(vp<=0||ox[j]*ddx+oz[j]*ddz<0){vis[j]=0;continue;}
 const f=LF.fall(dist[j],R,k)*vp;
 const q=i*4;
 A[q]+=r*f;A[q+1]+=g*f;A[q+2]+=b*f;A[q+3]+=ly*lum*f;
@@ -68189,15 +68214,35 @@ vis[j]=j===0?1:vp*this.open(i,wx,wz,iy);
 
 
 LF.radius=(r,g,b)=>{const lv=Math.min(30,Math.max(r,g,b)*15/LF.K.gain);return Math.max(5,Math.min(16,Math.round(5+9*Math.sqrt(lv/15))));};
+
+FP.overGround=function(i,y){
+const b=y-this.base[i];if(b<=0||b>LF.BAND)return 99;
+const m=this.mask[i]&(b>=32?0xffffffff:((1<<b)>>>0)-1);
+return m?b-(31-Math.clz32(m)):99;
+};
+
+FP.skyOpen=function(i,wx,wz,y){
+if(this.tx[i]!==wx||this.tz[i]!==wz)return false;
+const b=y-this.base[i];if(b<0||b>=LF.BAND)return false;
+return(this.mask[i]>>>b)===0;
+};
+
+FP.outward=function(wx,wz,y){
+for(let d=1;d<=4;d++){
+const nx=wx+DIRX[d],nz=wz+DIRZ[d],j=(nz&M)*N+(nx&M);
+if(this.skyOpen(j,nx,nz,y)){const bx=wx-DIRX[d],bz=wz-DIRZ[d],k=(bz&M)*N+(bx&M);if(!this.skyOpen(k,bx,bz,y))return d;}
+}
+return 0;
+};
 FP.rebuild=function(budget){
-const K=LF.K,x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,gk=K.gain/15,L=this.L;
+const K=LF.K,x0=this.cx-LF.HALF,z0=this.cz-LF.HALF,gk=K.gain/15,L=this.L,LW=LF.LW;
 if(this.li>=this.nList){
 if(!this.dirty)return false;
 this.dirty=false;
 
 let n=0;
 for(let bz=z0& ~1;bz<z0+N;bz+=2)for(let bx=x0& ~1;bx<x0+N;bx+=2){
-let sr=0,sg=0,sb=0,sx=0,sy=0,sz=0,sw=0;
+let sr=0,sg=0,sb=0,sx=0,sy=0,sz=0,sw=0,lw=0,wd=0;
 for(let k=0;k<4;k++){
 const wx=bx+(k&1),wz=bz+(k>>1);
 if(wx<x0||wx>=x0+N||wz<z0||wz>=z0+N)continue;
@@ -68206,19 +68251,34 @@ if(!e||this.tx[i]!==wx||this.tz[i]!==wz)continue;
 
 
 const lv=Math.max((e>>8)&15,(e>>4)&15,e&15);if(lv<K.minLv)continue;
-const ck=((e&0x8000)?K.cube:1)*(lv/15)*(lv/15),r=((e>>8)&15)*gk*ck,g=((e>>4)&15)*gk*ck,b=(e&15)*gk*ck,w=r+g+b;
-sr+=r;sg+=g;sb+=b;sx+=(wx+0.5)*w;sy+=(this.emY[i]+0.5)*w;sz+=(wz+0.5)*w;sw+=w;
+const kd=(e>>12)&3,ey=this.emY[i];
+
+const kk=kd===2?K.point:kd===3?K.window:((e&0x8000)?K.cube:1);
+const ck=kk*(lv/15)*(lv/15),r=((e>>8)&15)*gk*ck,g=((e>>4)&15)*gk*ck,b=(e&15)*gk*ck,w=r+g+b;
+let px=wx+0.5,pz=wz+0.5;
+if(kd===3){const d=this.outward(wx,wz,ey);if(d){px+=DIRX[d]*1.0;pz+=DIRZ[d]*1.0;if(!wd)wd=d;}}
+else if(this.overGround(i,ey)<=K.low)lw+=w;
+sr+=r;sg+=g;sb+=b;sx+=px*w;sy+=(ey+0.5)*w;sz+=pz*w;sw+=w;
 }
 if(sw<=0)continue;
-const o=n++ *6;L[o]=sx/sw;L[o+1]=sy/sw;L[o+2]=sz/sw;L[o+3]=sr;L[o+4]=sg;L[o+5]=sb;
+const o=n++ *LW;L[o]=sx/sw;L[o+1]=sy/sw;L[o+2]=sz/sw;L[o+3]=sr;L[o+4]=sg;L[o+5]=sb;L[o+6]=lw>sw*0.5?1:0;L[o+7]=wd;
+}
+
+if(n>LF.MAXL){
+const W=this.wts||(this.wts=new Float32Array(NN>>2));
+for(let j=0;j<n;j++)W[j]=L[j*LW+3]+L[j*LW+4]+L[j*LW+5];
+const Ws=W.subarray(0,n).slice().sort(),thr=Ws[n-LF.MAXL];
+let m=0;
+for(let j=0;j<n&&m<LF.MAXL;j++){if(W[j]<thr)continue;if(m!==j)for(let c=0;c<LW;c++)L[m*LW+c]=L[j*LW+c];m++;}
+this.stats.cut=n-m;n=m;
 }
 this.nList=n;this.li=0;this.back.fill(0);this.stats.lights=n;
 if(!n){const t=this.front;this.front=this.back;this.back=t;this.stats.swaps++;this.swapped++;return true;}
 }
 const end=Math.min(this.nList,this.li+budget);
 for(;this.li<end;this.li++){
-const o=this.li*6;
-this.stamp(this.back,L[o],L[o+1],L[o+2],L[o+3],L[o+4],L[o+5],LF.radius(L[o+3],L[o+4],L[o+5]));
+const o=this.li*LW,low=L[o+6]>0,R0=LF.radius(L[o+3],L[o+4],L[o+5]);
+this.stamp(this.back,L[o],L[o+1],L[o+2],L[o+3],L[o+4],L[o+5],low?Math.max(4,Math.round(R0*K.lowR)):R0,false,low?K.lowK:1,L[o+7]);
 }
 this.stats.stamps=end;
 if(this.li>=this.nList){const t=this.front;this.front=this.back;this.back=t;this.stats.swaps++;this.swapped++;return true;}
@@ -68260,6 +68320,26 @@ else{for(let k=0;k<this.nPrev;k++)this.packCell(P[k]);for(let k=0;k<this.nTouch;
 this.stats.packed=n;
 const t=this.prevT;this.prevT=this.touchT;this.touchT=t;this.nPrev=this.nTouch;this.nTouch=0;
 return this.out;
+};
+
+
+
+LF.FAIRY={fy_shroom_0:[0.3,0.95,0.85],fy_shroom_1:[0.65,0.45,1.0],fy_shroom_2:[1.0,0.5,0.75],fy_lamp:[1.0,0.8,0.45],fy_tree:[1.0,0.75,0.4],fy_pool:[0.45,0.85,1.0],fy_crystal_0:[0.5,0.8,1.0],fy_crystal_1:[0.8,0.55,1.0],fy_crystal_2:[1.0,0.6,0.8],fy_garden:[0.9,0.8,1.0]};
+LF.fairyLights=function(FS,f,nt,t){
+if(!FS|| !FS.sites|| !(nt>0.3))return 0;
+let n=0;
+for(const st of FS.sites){
+if(!st.parts||n>=8)continue;
+const dx=st.x-f.cx,dz=st.z-f.cz;if(dx*dx+dz*dz>80*80)continue;
+for(const m of st.parts){
+if(n>=8)break;
+const c=LF.FAIRY[m.m];if(!c|| !m.pos)continue;
+const ex=m.pos[0]-f.cx,ez=m.pos[2]-f.cz;if(ex*ex+ez*ez>56*56)continue;
+const h=(m.o&&m.o.h)||1.5,k=0.9*nt*LF.K.fairy*(0.9+0.1*Math.sin(t*1.3+n));
+if(f.add(m.pos[0],m.pos[1]+h*0.6,m.pos[2],c[0]*k,c[1]*k,c[2]*k,12))n++;
+}
+}
+return n;
 };
 
 LF.decode=function(out,i,Y0){
@@ -151978,7 +152058,9 @@ if(VR.Settings&&VR.Settings.add&& !(VR.Settings.byKey&&VR.Settings.byKey('tales'
 function ground(g,x,z){
 const w=g.world;if(!w|| !w.getBlock||(w.isLoaded&& !w.isLoaded(Math.floor(x),Math.floor(z))))return null;
 const R=VR.R,F=VR.F;
-for(let y=Math.min(250,(VR.MAXY||256)-1);y>1;y--){const s=w.getBlock(Math.floor(x),y,Math.floor(z));if(s&&R&&R.T.flags[s]&F.SOLID)return y+1;}
+
+const hm=w.topAt?w.topAt(Math.floor(x),Math.floor(z)):0,y0=hm>0?Math.min(250,hm+3):Math.min(250,(VR.MAXY||256)-1);
+for(let y=y0;y>1;y--){const s=w.getBlock(Math.floor(x),y,Math.floor(z));if(s&&R&&R.T.flags[s]&F.SOLID)return y+1;}
 return null;
 }
 TL.ground=ground;
@@ -152017,17 +152099,61 @@ return true;
 }
 tale.safe=true;return true;
 };
+
+
+TL.PROBES=36;
+const RF=[];for(let dz= -26;dz<=26;dz+=6.5)for(let dx= -26;dx<=26;dx+=6.5)if(dx*dx+dz*dz<=27*27)RF.push([dx,dz]);
+
+const wet=(g,x,y,z)=>{const R=VR.R,s=g.world.getBlock(Math.floor(x),y,Math.floor(z)),t0=s&&R.types[R.T.type[s]];return!!(t0&& /lava|magma|water|fire|leaves|log|wood\b/.test(t0.name));};
 TL.refine=function(g,tale){
 const s=tale.steps.find(q=>q.at==='hill'&&q.p);if(!s||tale.refined)return false;
 const p=g.player.pos;if(Math.hypot(s.p[0]-p[0],s.p[1]-p[2])>110)return false;
-let best=null;
-for(let dz= -26;dz<=26;dz+=6.5)for(let dx= -26;dx<=26;dx+=6.5){if(dx*dx+dz*dz>27*27)continue;const y=ground(g,s.p[0]+dx,s.p[1]+dz);if(y===null)return false;if(!best||y>best[2])best=[dx,dz,y];}
+const J=S.rf&&S.rf.tale===tale?S.rf:(S.rf={tale,i:0,best:null});
+for(let k=0;k<TL.PROBES&&J.i<RF.length;k++,J.i++){
+const dx=RF[J.i][0],dz=RF[J.i][1],x=s.p[0]+dx,z=s.p[1]+dz,y=ground(g,x,z);
+if(y===null)return false;
+if(wet(g,x,y,z)||wet(g,x,y-1,z))continue;
+if(!J.best||y>J.best[2])J.best=[dx,dz,y];
+}
+if(J.i<RF.length)return false;
+const best=J.best;S.rf=null;
 tale.refined=true;if(!best)return true;
 const ox=Math.round(best[0]),oz=Math.round(best[1]);
 const mv=(q)=>{if(q.p&&(q.at==='hill'||q.at==='motes'||q.at==='lens'))q.p=[q.p[0]+ox,q.p[1]+oz];if(q.pts&&(q.at==='motes'||q.at==='lens'))q.pts=q.pts.map(v=>[v[0]+ox,v[1]+oz]);if(q.of)q.of.forEach(mv);};
 tale.steps.forEach(mv);S.mkKey=null;
 log('refine',ox+','+oz+' y'+best[2]);
 return true;
+};
+
+
+TL.stage=function(tale){
+if(!tale||tale.t!=='beacon')return-1;
+const lens=tale.steps.find(q=>q.id==='lens'),lights=tale.steps.find(q=>q.id==='lights');
+if(!lens|| !lens.done)return 0;
+if(!lights||lights.done)return 4;
+let f=0;for(const q of lights.of||[lights]){if(q.k==='place'&&q.n)f=Math.max(f,(q.c|0)/q.n);if(q.k==='marks'&&q.pts&&q.pts.length)f=Math.max(f,(q.m|0)/q.pts.length);}
+return Math.min(3,1+Math.floor(f*3));
+};
+
+
+const BEAMH=[0,0,2.5,5,9,16];
+TL.beam=function(stage,nt,t,out){
+out=out||[];out.length=0;
+if(!(stage>=1)|| !(nt>0.05))return out;
+const k=Math.min(5,stage),br=0.92+0.08*Math.sin((t||0)*1.7),hs=0.9+0.35*k;
+out.push({p:[0,4.5,0],s:[hs,hs],col:[1.0,0.86,0.58],a:(0.12+0.1*k)*nt*br,kind:0});
+
+const H=BEAMH[k],ns=Math.max(1,k-1),L=H/ns;
+if(H>0)for(let j=0;j<ns;j++)out.push({p:[0,4.6+L*(j+0.5),0],s:[0.42+0.05*k,L*0.8],col:[1.0,0.9,0.62],a:(0.14+0.06*k)*nt*br*(1-j/(ns+1)),kind:0});
+return out;
+};
+
+TL.litY=function(g,L){
+if(!L||fin(L.y))return L?L.y:null;
+const k=Math.round(L.x)+','+Math.round(L.z);let y=fin(S.yc[k])?S.yc[k]:null;
+if(y===null)y=ground(g,L.x,L.z);
+if(y!==null)L.y=y;
+return y;
 };
 function ctxFor(V,a){
 const g=V.g,vil=a.vil,gpid=dimOf(g)+'/'+a.p.id,fams=vil.fams||{},fam=fams[a.p.fam];
@@ -152162,6 +152288,8 @@ return;
 }
 if(K.ph==='home'){
 const gv=liveOf(V,S.endGiver||'');
+
+if(gv&&K.t<14&&Math.hypot(gv.pos[0]-a.pos[0],gv.pos[2]-a.pos[2])>12){const p0=g.player.pos,dx=p0[0]-gv.pos[0],dz=p0[2]-gv.pos[2],L=Math.hypot(dx,dz)||1,x=gv.pos[0]+dx/L*0.9,z=gv.pos[2]+dz/L*0.9,y=g.world?yAt(g,x,z):null;a.pos=[x,y!==null?y:gv.pos[1],z];a.path=null;a.vel[0]=0;a.vel[2]=0;}
 if(gv&&Math.hypot(gv.pos[0]-a.pos[0],gv.pos[2]-a.pos[2])>1.6&&K.t<14){if(V.goTo)V.goTo(a,gv.pos[0],gv.pos[1],gv.pos[2],1.2);}
 else{a.vel[0]=0;a.vel[2]=0;a.path=null;if(gv){a.lookAt=[gv.pos[0],gv.pos[1]+1.3,gv.pos[2]];gv.lookAt=[a.pos[0],a.pos[1]+0.9,a.pos[2]];}}
 if(K.t>22)endKid(V);
@@ -152199,6 +152327,7 @@ if(o.k==='done')finish(V,tale);
 function finish(V,tale){
 const g=V.g,rec=TL.rec(g),t=now(g),V0=vars(g,tale);
 const res=TC.finish(rec,t);if(!res)return;
+if(res.lit)TL.litY(g,res.lit);
 const end=T(res.key,V0),head=T(res.head,V0),gv=liveOf(V,res.giver.pid);
 S.endGiver=res.giver.pid;
 S.pend={pid:res.giver.pid,text:end,t:Date.now()};
@@ -152206,16 +152335,18 @@ sayEnd(V);
 if(S.kid){S.kid.ph='home';S.kid.t=0;}
 if(S.fl)S.fl.ph='home';
 
-if(G&&G.rec){try{const gr=G.rec(g);G.befriend(gr,res.giver.pid,res.fr,null);G.deed(g,'tale',{x:res.giver.x,z:res.giver.z,pl:head.slice(0,60),key:res.page.id});}catch(e){}}
+
+
+if(G&&G.rec)TL.defer(()=>{try{const gr=G.rec(g);G.befriend(gr,res.giver.pid,res.fr,null);G.deed(g,'tale',{x:res.giver.x,z:res.giver.z,pl:head.slice(0,60),key:res.page.id});}catch(e){}});
 let item=null;
 const inv=g.player&&g.player.inv,ok=(id)=> !!((VR.itemDef&&VR.itemDef(id))||(VR.R&&VR.R.byName&&VR.R.byName[id]));
 for(const id of res.items)if(ok(id)){item=id;break;}
 if(item&&inv&&inv.add){try{inv.add(item,1);}catch(e){item=null;}}
-if(VR.Wander&&VR.Wander.note){try{VR.Wander.note(g.meta,'people',res.giver.pid,res.giver.name);}catch(e){}}
-if(VR.Adventure&&VR.Adventure.award&&VR.Adventure.on&&VR.Adventure.on()){try{VR.Adventure.award('quest',{size:'M'});}catch(e){}}
+if(VR.Wander&&VR.Wander.note)TL.defer(()=>{try{VR.Wander.note(g.meta,'people',res.giver.pid,res.giver.name);}catch(e){}});
+if(VR.Adventure&&VR.Adventure.award&&VR.Adventure.on&&VR.Adventure.on())TL.defer(()=>{try{VR.Adventure.award('quest',{size:'M'});}catch(e){}});
 const body=T('g.tl.done',{title:head,giver:res.giver.name})+(item?' · '+T('g.tl.item',{item:VR.itemName?VR.itemName(item):item}):'')+(res.late?' '+T('g.tl.late'):'');
 setTimeout(()=>{try{if(g.ui&&g.ui.toast)g.ui.toast(T('g.tl.doneT'),body,null);}catch(e){}},2600);
-if(g.audio&&g.audio.play){try{g.audio.play('levelup');}catch(e){}}
+if(g.audio&&g.audio.play)TL.defer(()=>{try{g.audio.play('levelup');}catch(e){}});
 S.lastEnd={key:res.key,text:end,head,item,late:res.late,page:res.page.id,t:Date.now()};
 log('done',res.key);
 hud(g,'');
@@ -152256,7 +152387,10 @@ if(!tale.refined&&TC.TPL[tale.t].keep&&TC.TPL[tale.t].keep.k==='beacon')TL.refin
 if(!tale.safe&&tale.kid)TL.safe(g,tale);
 const outs=[];
 if(S.dim!==dim){S.dim=dim;outs.push(...TC.feed(tale,{k:'dim',dim}));}
-if(tale.st==='on')outs.push(...TC.feed(tale,{k:'pos',x:p[0],z:p[2],dim}));
+
+
+const holdPos= !tale.refined&&TC.TPL[tale.t].keep&&TC.TPL[tale.t].keep.k==='beacon';
+if(tale.st==='on'&& !holdPos)outs.push(...TC.feed(tale,{k:'pos',x:p[0],z:p[2],dim}));
 
 const cur=TC.cur(tale);
 if(cur&&(cur.k==='talk'||cur.k==='meet')){
@@ -152270,6 +152404,9 @@ if(tale.kid&& !S.kid&&cur&&tale.steps.some(s=>s.with==='kid'&& !s.done)){const h
 if(outs.length)handle(V,tale,outs);
 if(rec.cur===tale)hud(g,lineOf(g,tale));
 }
+
+S.later=[];
+TL.defer=(fn)=>{S.later.push(fn);};
 TL.tick=function(V,dt){
 const g=V.g;if(!TL.on(g)|| !g.player||g.state!=='play'){if(S.line)hud(g||{},'');return;}
 if(!S.Ctor&&V.agents.length&&V.agents[0].constructor)S.Ctor=V.agents[0].constructor;
@@ -152280,11 +152417,12 @@ const rec=TL.rec(g),t=now(g);
 if(rec.cur&&rec.cur.st==='on')run(V,rec,t);
 else{if(S.line)hud(g,'');if(rec.cur&&rec.cur.st!=='on')rec.cur=null;tryOffer(V,rec,t);}
 if(S.pend)sayEnd(V);
+if(S.later.length){const f=S.later.shift();try{f();}catch(e){}}
 if(S.kid&&S.kid.ph==='home'&& !rec.cur&&S.kid.t>30)endKid(V);
 if(S.kid&& !rec.cur&&S.kid.ph!=='home')endKid(V);
 
-for(const L of rec.lit)if(L.dim===dimOf(g)&& !fin(L.y)&&Math.hypot(L.x-g.player.pos[0],L.z-g.player.pos[2])<200){const y=ground(g,L.x,L.z);if(y!==null)L.y=y;}
-if(t0){const ms=performance.now()-t0;S.cost.ticks++;S.cost.ms+=ms;if(ms>S.cost.worst)S.cost.worst=ms;}
+for(const L of rec.lit)if(L.dim===dimOf(g)&& !fin(L.y)&&Math.hypot(L.x-g.player.pos[0],L.z-g.player.pos[2])<200)TL.litY(g,L);
+if(t0){const ms=performance.now()-t0;S.cost.ticks++;S.cost.ms+=ms;if(ms>1)S.cost.over1=(S.cost.over1|0)+1;if(ms>S.cost.worst){S.cost.worst=ms;S.cost.worstAt=rec.cur?'run '+rec.cur.t+':'+(TC.cur(rec.cur)?TC.cur(rec.cur).id:'-'):(S.pend?'end':'offer');}}
 };
 
 
@@ -152313,10 +152451,16 @@ let prog=null;const Pg=()=>prog||(prog=ent.beginVox(r,E));const tt=g.time||0;
 const nowMs=typeof performance!=='undefined'?performance.now():Date.now(),fdt=Math.min(0.1,Math.max(0,(nowMs-(S.lastDraw||nowMs))/1000));S.lastDraw=nowMs;
 let n=0;
 
+const nt=night?Math.max(0.35,Math.min(1,(E&&E.night)||(g.env&&g.env.night)||1)):0;
+const SGl=VR.StoryGlow,glowOk= !!(nt>0&&SGl&&SGl.draw&&(!SGl.ok||SGl.ok())&& !(g.settings&&(g.settings.preset==='potato'||g.settings.storyLights===false)));
+const GL=S.gl||(S.gl=[]),BT=S.bt||(S.bt=[]);let ng=0;
+const beamAt=(x,y,z,stage)=>{if(!glowOk)return;TL.beam(stage,nt,tt,BT);for(const q of BT){if(ng>=8)break;const o=GL[ng]||(GL[ng]={p:[0,0,0],s:[0,0],col:[0,0,0],a:0,kind:0});o.p[0]=x+q.p[0];o.p[1]=y+q.p[1];o.p[2]=z+q.p[2];o.s[0]=q.s[0];o.s[1]=q.s[1];o.col[0]=q.col[0];o.col[1]=q.col[1];o.col[2]=q.col[2];o.a=q.a;ng++;}};
+
 for(const L of rec.lit){
-if(L.dim!==dimOf(g)|| !fin(L.y))continue;
+if(L.dim!==dimOf(g))continue;
 const dx=L.x-cam.x,dz=L.z-cam.z;if(dx*dx+dz*dz>220*220)continue;
-if(L.k==='beacon'){MP.scale=1;MP.light=night?FULL:null;MP.noShade=false;const bp=S.bp||(S.bp=[0,0,0]);bp[0]=L.x;bp[1]=L.y-0.05;bp[2]=L.z;if(LK.drawModel(g,r,Pg(),night?'tl_beacon_lit':'tl_beacon',bp,0,cam,MP))n++;if(night&&g.particles&&g.particles.glow&&Math.random()<0.3)g.particles.glow(L.x+(Math.random()-0.5),L.y+3.2+Math.random(),L.z+(Math.random()-0.5),[1,0.85,0.5],1.6,0.12,0.3);}
+if(!fin(L.y)&&TL.litY(g,L)===null)continue;
+if(L.k==='beacon'){MP.scale=1;MP.light=night?FULL:null;MP.noShade=false;const bp=S.bp||(S.bp=[0,0,0]);bp[0]=L.x;bp[1]=L.y-0.05;bp[2]=L.z;if(LK.drawModel(g,r,Pg(),night?'tl_beacon_lit':'tl_beacon_s4',bp,0,cam,MP))n++;beamAt(L.x,L.y,L.z,5);S.litDrawn=(S.litDrawn|0)+1;if(night&&g.particles&&g.particles.glow&&Math.random()<0.3)g.particles.glow(L.x+(Math.random()-0.5),L.y+3.2+Math.random(),L.z+(Math.random()-0.5),[1,0.85,0.5],1.6,0.12,0.3);}
 else if(L.k==='flausel'&&dx*dx+dz*dz<60*60){MP.scale=1.05;MP.light=null;MP.noShade=false;for(let i=0;i<2;i++)if(LK.drawModel(g,r,Pg(),'fy_sprite_'+((TC.h(L.x,L.z,i)%4)),[L.x+1.2+i*0.9,L.y+Math.abs(Math.sin(tt*2+i))*0.12,L.z-1.4],tt*0.2+i*2,cam,MP))n++;}
 }
 if(tale){
@@ -152326,6 +152470,8 @@ for(const M0 of S.mk){
 const dx=M0.x-cam.x,dz=M0.z-cam.z;if(dx*dx+dz*dz>(M0.big?160*160:64*64))continue;
 const y=yAt(g,M0.x,M0.z);if(y===null)continue;
 MP.scale=M0.m==='fy_shroom_1'?0.32:1;MP.light=M0.glow||M0.m==='tl_print'?FULL:null;MP.noShade= !!M0.glow;
+
+if(M0.m==='tl_beacon'){const sg=Math.max(0,TL.stage(tale)),dp=S.dp||(S.dp=[0,0,0]);dp[0]=M0.x;dp[1]=y;dp[2]=M0.z;if(sg>=2&&night)MP.light=FULL;if(LK.drawModel(g,r,Pg(),'tl_beacon_s'+sg,dp,0,cam,MP))n++;beamAt(M0.x,y,M0.z,sg);continue;}
 const hov=M0.glow?0.5+Math.sin(tt*2.2+M0.x)*0.15:M0.m==='tl_print'?0.02:0;
 const dp=S.dp||(S.dp=[0,0,0]);dp[0]=M0.x;dp[1]=y+hov;dp[2]=M0.z;
 if(LK.drawModel(g,r,Pg(),M0.m,dp,M0.glow?tt*0.8:(M0.yaw||0),cam,MP))n++;
@@ -152351,6 +152497,7 @@ if(LK.drawModel(g,r,Pg(),'fy_sprite_'+[1,0,2][i],[q[0],y+Math.abs(Math.sin(tt*7+
 }
 }
 S.cost.draws=n;
+if(ng){GL.length=Math.max(GL.length,ng);const L2=S.gl2||(S.gl2=[]);L2.length=0;for(let i=0;i<ng;i++)L2.push(GL[i]);try{SGl.draw(r,cam,L2);S.glows=ng;}catch(e){TL.drawErr='glow '+String((e&&e.message)||e);}}
 }
 
 
@@ -152430,16 +152577,25 @@ M.tl_bloom=()=>({unit:16,radius:0.4,parts:{b:part(5,8,5,[2,0,2],(gr)=>{for(let y
 
 M.tl_stake=()=>({unit:16,radius:0.6,parts:{b:part(5,20,3,[2,0,1],(gr)=>{gr.box(2,0,1,2,17,1,0xc8a070);gr.box(2,18,1,2,19,1,0xa88050);for(let y=13;y<16;y++)for(let x=0;x<5;x++)if(x!==2)gr.set(x,y-(x===0||x===4?1:0),1,0xd8343a);})},layout:{b:[0,0,0]}});
 
-const beacon=(lit)=>()=>({unit:6,radius:4,parts:{b:part(15,30,15,[7,0,7],(gr)=>{
+
+
+const beacon=(lit,stage)=>()=>({unit:6,radius:4,parts:{b:part(15,30,15,[7,0,7],(gr)=>{
 for(let y=0;y<24;y++)for(let z=0;z<15;z++)for(let x=0;x<15;x++){
 const d=Math.hypot(x-7,z-7),R0=y<3?6.6:5.2-y*0.06;if(d>R0||d<R0-1.6)continue;
 const c=((Math.floor(y/3)+Math.floor(Math.atan2(z-7,x-7)*2.6))&1)?0xa8a49a:0x928e84;gr.set(x,y,z,(x*3+y*5+z)%11===0?0x6a8a4a:c,0);
 }
 for(let z=0;z<15;z++)for(let x=0;x<15;x++){const d=Math.hypot(x-7,z-7);if(d<6.2)gr.set(x,24,z,0xb88a3a);if(d>5&&d<6.4){gr.set(x,25,z,0xc89a4a);gr.set(x,26,z,0xa87a2a);}}
 if(lit)for(let y=25;y<30;y++)for(let z=0;z<15;z++)for(let x=0;x<15;x++){const d=Math.hypot(x-7,z-7);if(d<4.6-(y-25)*0.9)gr.set(x,y,z,y>27?0xfff2b0:0xffb84a,1);}
-else for(let z=0;z<15;z++)for(let x=0;x<15;x++)if(Math.hypot(x-7,z-7)<4.4)gr.set(x,25,z,0x3a3430);
+else{
+const st=stage|0,glowR=[0,1.2,2.3,3.5,4.5][st],lensC=[0x3a3430,0x9fd0f0,0xbfe8ff,0xe0f6ff,0xf4fbff][st];
+for(let z=0;z<15;z++)for(let x=0;x<15;x++){const d=Math.hypot(x-7,z-7);if(d<4.4)gr.set(x,25,z,st===0?0x3a3430:d<3.6?lensC:0xc89a3a,st>0&&d<glowR?1:0);}
+
+for(let k=0;k<Math.max(0,st-1);k++){const a=k*2.094+0.5,x=Math.round(7+Math.cos(a)*5.6),z=Math.round(7+Math.sin(a)*5.6);gr.set(x,27,z,0xffc860,1);gr.set(x,28,z,0xfff0b0,1);}
+if(st>=4)for(let y=26;y<28;y++)for(let z=0;z<15;z++)for(let x=0;x<15;x++){const d=Math.hypot(x-7,z-7);if(d<1.9-(y-26)*0.9)gr.set(x,y,z,y>26?0xfff2b0:0xffb84a,1);}
+}
 })},layout:{b:[0,0,0]}});
-M.tl_beacon=beacon(false);M.tl_beacon_lit=beacon(true);
+for(let k=0;k<=4;k++)M['tl_beacon_s'+k]=beacon(false,k);
+M.tl_beacon=beacon(false,0);M.tl_beacon_lit=beacon(true);
 }
 
 
@@ -152467,6 +152623,8 @@ log:()=>S.log.slice(),
 cost:()=>Object.assign({},S.cost,{avg:S.cost.ticks?S.cost.ms/S.cost.ticks:0}),
 marks:()=>{const c=TL.rec(VR.game).cur;return c?TL.marks(VR.game,c):[];},
 cool:()=>{const r=TL.rec(VR.game);r.cool=0;},
+markY:(x,z,y)=>{S.yc[Math.round(x)+','+Math.round(z)]=y;},
+diag:()=>({lit:TL.rec(VR.game).lit,litDrawn:S.litDrawn|0,glows:S.glows|0,draws:S.cost.draws,err:TL.drawErr||null,stage:TL.stage(TL.rec(VR.game).cur)}),
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -154007,8 +154165,6 @@ out[0]=a.pos[0]+Math.cos(yw)*0.36-Math.sin(yw)*0.08;out[1]=a.pos[1]+0.62+sw;out[
 return out;
 };
 
-
-LF.FAIRY={fy_shroom_0:[0.3,0.95,0.85],fy_shroom_1:[0.65,0.45,1.0],fy_shroom_2:[1.0,0.5,0.75],fy_lamp:[1.0,0.8,0.45],fy_tree:[1.0,0.75,0.4],fy_pool:[0.45,0.85,1.0],fy_crystal_0:[0.5,0.8,1.0],fy_crystal_1:[0.8,0.55,1.0],fy_crystal_2:[1.0,0.6,0.8],fy_garden:[0.9,0.8,1.0]};
 const night=(E)=>Math.max(0,Math.min(1,(E&&E.night)||0));
 const hp=[0,0,0];
 LF.gather=function(g,f,E,t){
@@ -154030,7 +154186,7 @@ const dx=a.pos[0]-cam.cx,dz=a.pos[2]-cam.cz,d2=dx*dx+dz*dz;
 if(d2<56*56)L.push([d2,a]);
 }
 L.sort((p,q)=>p[0]-q[0]);
-const k=0.85*nt;
+const k=1.15*nt;
 for(let i=0;i<L.length&&i<12;i++){const a=L[i][1],fl=0.92+0.08*Math.sin(t*9+i*1.7);LF.handPos(a,t,hp);f.add(hp[0],hp[1]+0.25,hp[2],1.0*k*fl,0.62*k*fl,0.28*k*fl,10);}
 
 const tod=g.env&&g.env.timeOfDay;
@@ -154044,22 +154200,7 @@ for(let j=0;j<6;j++){const a=j/6*TAU+0.3;f.add(cx+Math.cos(a)*PR,y+2.6,cz+Math.s
 }
 }
 
-
-const FS=VR.Fairy&&VR.Fairy.state;
-if(FS&&FS.sites&&nt>0.3){
-let n=0;
-for(const st of FS.sites){
-if(!st.parts||n>=8)continue;
-const dx=st.x-f.cx,dz=st.z-f.cz;if(dx*dx+dz*dz>80*80)continue;
-for(const m of st.parts){
-if(n>=8)break;
-const c=LF.FAIRY[m.m];if(!c|| !m.pos)continue;
-const ex=m.pos[0]-f.cx,ez=m.pos[2]-f.cz;if(ex*ex+ez*ez>56*56)continue;
-const h=(m.o&&m.o.h)||1.5,k=0.9*nt*(0.9+0.1*Math.sin(t*1.3+n));
-if(f.add(m.pos[0],m.pos[1]+h*0.6,m.pos[2],c[0]*k,c[1]*k,c[2]*k,Math.round(8+Math.min(4,h))))n++;
-}
-}
-}
+LF.fairyLights(VR.Fairy&&VR.Fairy.state,f,nt,t);
 
 for(let i=flashes.length-1;i>=0;i--){
 const q=flashes[i],age=t-q.t;
