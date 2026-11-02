@@ -30,7 +30,7 @@ const modName = (f) => f.replace(/^\.\.\/shared\//, '');
 if (process.argv[2] === '--write') {
   const rec = JSON.parse(fs.readFileSync(process.argv[3], 'utf8')), tag = process.argv[4] || 'cur', P = rec.pages[tag], B = rec.pages.v0556;
   const by = (pg) => (pg && pg.logicProf && pg.logicProf.prof) || null;
-  const out = { note: 'f-perf8: Very Low, seed 53, the plaza (critic_vl\'s eye), the game\'s frame without the draw, ms a frame — perf8.mjs', frames: rec.fr, build: tag, totalMs: by(P).totalMs, modules: Object.fromEntries(by(P).incl), base: B && by(B) ? { tag: 'v0556', totalMs: by(B).totalMs, modules: Object.fromEntries(by(B).incl) } : null, logicMs: P.table && P.table.logicMs, all: MAIN.map(modName) };
+  const out = { note: 'f-perf8: Very Low, seed 53, the plaza (critic_vl\'s eye), the game\'s frame without the draw, ms a frame — perf8.mjs', frames: rec.fr, build: tag, totalMs: by(P).totalMs, modules: Object.fromEntries(by(P).incl), base: B && by(B) ? { tag: 'v0556', totalMs: by(B).totalMs, modules: Object.fromEntries(by(B).incl), logicMs: B.table && B.table.logicMs } : null, logicMs: P.table && P.table.logicMs, logicVsBase: P.vsBase && P.vsBase.logic, pop: P.logicProf.pop, all: MAIN.map(modName) };
   fs.mkdirSync(path.dirname(TABLE), { recursive: true }); fs.writeFileSync(TABLE, JSON.stringify(out, null, 1));
   console.log('written ' + TABLE); process.exit(0);
 }
@@ -47,6 +47,9 @@ const REASONS = {
   '(garbage collector)': 'V8: the frame\'s short-lived objects (all modules together)',
   villages: 'the villagers within reach: their walk, poses and bubbles (the crowd\'s budget sets how many on Very Low)',
   env: 'the sky, the sun, the weather and the season tint for the frame',
+  padlife: 'the spawn pad\'s small craft (t-life, v0.4x): their flight paths every frame — not new; a next step (the self-review)',
+  story: 'the story\'s checks (0.5 s, 1 s, 4 Hz already): a brain() second in the profile — not every frame',
+  ui: 'the HUD: f-perf8 took three queries and writes a frame out (updateHUD); the hot bar and the badge remain',
 };
 {
   console.log('1 · the Very Low table (docs/perf/f-perf8_vl.json)');
@@ -60,7 +63,7 @@ const REASONS = {
     check(over.length === 0, 'every module over 0.05 ms a frame has a reason' + (over.length ? ': ' + over.map(([m, v]) => m + ' ' + v).join(', ') : ''));
     const nw = MAIN.map(modName).filter(m => !T.all.includes(m));
     check(nw.length === 0, 'the table measured every main module of this build' + (nw.length ? ' — new since: ' + nw.join(', ') + ' (run perf8.mjs and --write)' : ''));
-    if (T.base) check(T.totalMs <= T.base.totalMs * 1.03, `the frame on Very Low (no draw) ≤ v0.55.6's +3 %: ${T.totalMs} vs ${T.base.totalMs} ms`);
+    if (T.base) check(T.logicVsBase <= 1.03, `the frame on Very Low (no draw; the median of the rounds' ratios, in turns) ≤ v0.55.6's +3 %: ×${T.logicVsBase} (${T.logicMs} vs ${T.base.logicMs} ms)`);
   }
 }
 

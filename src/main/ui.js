@@ -313,9 +313,10 @@
         if (name !== this.lastName) { this.lastName = name; nm.textContent = name; nm.style.opacity = name ? 1 : 0; clearTimeout(this.nameT); this.nameT = setTimeout(() => nm.style.opacity = 0, 2200); }
       }
       const surv = p.mode === 'survival';
-      $('#stats').style.display = surv ? 'flex' : 'none';
-      $('#xpbar').style.display = surv ? 'block' : 'none';
-      $('#xplvl').style.display = surv && p.level > 0 ? 'block' : 'none';
+      // (f-perf8: the three displays written when they change — or the HUD was built anew — not three queries and writes a frame)
+      { const stEl = $('#stats'), lv = surv && p.level > 0;
+        if (stEl !== this.hudStatsEl || surv !== this.hudSurv || lv !== this.hudLv || force) { this.hudStatsEl = stEl; this.hudSurv = surv; this.hudLv = lv;
+          stEl.style.display = surv ? 'flex' : 'none'; $('#xpbar').style.display = surv ? 'block' : 'none'; $('#xplvl').style.display = lv ? 'block' : 'none'; } }
       if (surv) {
         const key = Math.ceil(p.health) + ':' + p.food + ':' + Math.ceil(p.air / 30) + ':' + p.level + ':' + Math.floor(p.xp * 100);
         if (key !== this.statKey || force) {
