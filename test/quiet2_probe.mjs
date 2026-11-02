@@ -138,7 +138,7 @@ async function scenes() {
   };
   // the DOM over the canvas is not in the canvas: the bubbles and the caption as a page screenshot
   const shotPage = async (name) => { try { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } }); await page.screenshot({ path: SHOTS + name, timeout: 180000 }); console.log('  📷 ' + name); return SHOTS + name; } catch (e) { console.log('  !! no page shot ' + name); return null; } };
-  await page.goto('file://' + ROOT + 'dist/index.html');
+  await page.goto(process.env.SCENES_DIST ? 'file://' + process.env.SCENES_DIST : 'file://' + ROOT + 'dist/index.html');   // (f-polish9: SCENES_DIST — the scenes on another build; SHOT_TAG prefixes their pictures)
   for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
   // (as test/folk3.mjs does it: Balanced, render distance 6, the smooth people, then the land settled)
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.smoothFolk = true; g.applySettings('*'); });
@@ -211,10 +211,10 @@ async function scenes() {
       console.log('  · ' + tt + ': ' + JSON.stringify(st));
       if (!st || !st.ok) { check(false, tt + ': the ending staged (' + JSON.stringify(st) + ')'); await ev(() => { if (VR.TaleEnd) { VR.TaleEnd.end(); VR.TaleEnd.hold = false; } }); continue; }
       done.add(st.id);
-      if (tt === 'lost') { await ev(() => VR.TaleEnd.seek(1.4)); await step(20, 33); B.shots.lost_come = await grab('quiet2_end_lost_come.png'); }
+      if (tt === 'lost') { await ev(() => VR.TaleEnd.seek(1.4)); await step(20, 33); B.shots.lost_come = await grab('quiet2_end_' + (process.env.SHOT_TAG || '') + 'lost_come.png'); }
       await ev(() => VR.TaleEnd.seek(3.6)); await step(30, 33);
       const touch = await ev(() => { const C = VR.TaleEnd.cur; if (!C) return null; const a = C.gv, b = C.pt; return { pose: [a.pose, b ? b.pose : null], d: b ? +Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]).toFixed(2) : null, cap: VR.TaleEnd.caption(), hud: document.getElementById('hud').style.visibility }; });
-      B.shots[tt] = await shotPage('quiet2_end_' + tt + '.png');
+      B.shots[tt] = await shotPage('quiet2_end_' + (process.env.SHOT_TAG || '') + tt + '.png');
       B[tt] = Object.assign({}, st, { touch });
       check(!!touch && (st.pt === null ? !st.shot : touch.d !== null && touch.d <= 1.0) && (touch.pose[0] === 'hug' || touch.pose[0] === 'stand'), `${tt}: ${st.gv} and ${st.pt || 'you (nobody of theirs near: your own view)'} touch (${touch && touch.pose.join('/')}, ${touch && touch.d} m apart), framed by the director: ${st.shot}`);
       if (tt === 'lost' || tt === 'home') { await ev(() => VR.TaleEnd.seek(5.7)); await step(24, 33); const cap = await ev(() => VR.TaleEnd.caption()); B.shots[tt + '_gift'] = await shotPage('quiet2_end_' + tt + '_gift.png'); B[tt].gift = cap; check(/🎁|💛/.test(cap), tt + ': the gift moment with its caption „' + cap + '"'); }

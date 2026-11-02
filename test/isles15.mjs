@@ -20,7 +20,8 @@ const views = (process.env.VIEWS || 'below,afar,side,top').split(',');
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let bad = 0; const ok = (c, m) => { if (!c) bad++; console.log((c ? '  ✓ ' : '  ✗ ') + m); };
 const res = {};
-for (const vg of [14, 15]) {
+const VG = (process.env.VG || '14,15').split(',').map(Number), A0 = 'v' + VG[0], A1 = 'v' + VG[1];   // (f-polish9: VG=15,16)
+for (const vg of VG) {
   const tag = 'v' + vg;
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'de-DE' });
   const page = await ctx.newPage();
@@ -67,9 +68,9 @@ for (const vg of [14, 15]) {
   console.log('cost', tag, JSON.stringify(res[tag]));
   await ctx.close();
 }
-ok(res.v14 && res.v14.vgen === 14 && res.v15 && res.v15.vgen === 15, `the worlds are vgen 14 and 15 (${res.v14 && res.v14.vgen}, ${res.v15 && res.v15.vgen})`);
-for (const v of views) ok(fs.existsSync(SHOTS + `isles15_${v}_v14.png`) && fs.existsSync(SHOTS + `isles15_${v}_v15.png`), `the ${v} view before and after`);
-ok(!res.v14.logs.length && !res.v15.logs.length, `no page error (${(res.v14.logs.concat(res.v15.logs)).join(' | ').slice(0, 300) || 'none'})`);
-fs.writeFileSync(SHOTS + 'isles15_cost.json', JSON.stringify(res, null, 1));
+ok(res[A0] && res[A0].vgen === VG[0] && res[A1] && res[A1].vgen === VG[1], `the worlds are vgen ${VG[0]} and ${VG[1]} (${res[A0] && res[A0].vgen}, ${res[A1] && res[A1].vgen})`);
+for (const v of views) ok(fs.existsSync(SHOTS + `isles15_${v}_${A0}.png`) && fs.existsSync(SHOTS + `isles15_${v}_${A1}.png`), `the ${v} view before and after`);
+ok(!res[A0].logs.length && !res[A1].logs.length, `no page error (${(res[A0].logs.concat(res[A1].logs)).join(' | ').slice(0, 300) || 'none'})`);
+fs.writeFileSync(SHOTS + (process.env.VG ? 'isles' + VG[1] + '_cost.json' : 'isles15_cost.json'), JSON.stringify(res, null, 1));
 await browser.close();
 console.log(bad ? `FAILED ${bad}` : 'ALL OK');
