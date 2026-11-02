@@ -94,7 +94,7 @@
   };
   // the hilltop: the highest dry ground within 26 m (f-polish8: a resumable job, ≤ TL.PROBES probes a tick — it cost one
   // 31-ms tick; a top of lava or water is no place for a beacon)
-  TL.PROBES = 12;
+  TL.PROBES = 36;   // (two ticks for the whole search: a probe is ~4 reads now)
   const RF = []; for (let dz = -26; dz <= 26; dz += 6.5) for (let dx = -26; dx <= 26; dx += 6.5) if (dx * dx + dz * dz <= 27 * 27) RF.push([dx, dz]);
   // (run 1 of f-polish8: the beacon stood on an oak's crown — leaves and logs are no ground for it either)
   const wet = (g, x, y, z) => { const R = VR.R, s = g.world.getBlock(Math.floor(x), y, Math.floor(z)), t0 = s && R.types[R.T.type[s]]; return !!(t0 && /lava|magma|water|fire|leaves|log|wood\b/.test(t0.name)); };
@@ -378,7 +378,10 @@
     if (!tale.safe && tale.kid) TL.safe(g, tale);
     const outs = [];
     if (S.dim !== dim) { S.dim = dim; outs.push(...TC.feed(tale, { k: 'dim', dim })); }
-    if (tale.st === 'on') outs.push(...TC.feed(tale, { k: 'pos', x: p[0], z: p[2], dim }));
+    // (f-polish8 run 2: the hill reached before its top was found — the search then moved the lens away from where you
+    // stood: a beacon's tale waits for its hilltop before your steps count)
+    const holdPos = !tale.refined && TC.TPL[tale.t].keep && TC.TPL[tale.t].keep.k === 'beacon';
+    if (tale.st === 'on' && !holdPos) outs.push(...TC.feed(tale, { k: 'pos', x: p[0], z: p[2], dim }));
     // meeting someone: an awake grown-up within 4 m (the trader, the letter's addressee) — or a village's middle in the other world
     const cur = TC.cur(tale);
     if (cur && (cur.k === 'talk' || cur.k === 'meet')) {
