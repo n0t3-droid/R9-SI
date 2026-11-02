@@ -20,6 +20,7 @@ import { createRequire } from 'module';
 const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (the test runs from test/ or from .tmp_tests/)
 const require = createRequire(import.meta.url);
 const S = require(ROOT + 'test/golden_ssim.js');
+const G = require(ROOT + 'test/golden_wait.js');   // (f-quiet3: when the world counts as settled)
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const GOLD = ROOT + 'test/golden/', SHOTS = ROOT + 'test/shots/';
 const UPDATE = process.env.UPDATE === '1', UPD_IDS = process.env.UPDATE_IDS ? process.env.UPDATE_IDS.split(',') : null, ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
@@ -57,7 +58,7 @@ const settle = async (max = 50) => {
   for (let i = 0; i < max; i++) {
     await step(20, 16);
     s = await ev(() => { const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state }; const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, lod: g.horizon ? g.horizon.inflight || 0 : 0 }; });
-    if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && !s.lod && i > 2) break;
+    if (G.settledOk(s, i)) { s.ok = true; break; }   // (f-quiet3: the condition in test/golden_wait.js, pinned by its node test)
     await wait(30);
   }
   return s;
@@ -66,7 +67,11 @@ const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying =
 // every column within r of C loaded (settle alone counts the dirty sections of the columns there are: a picture taken
 // before the far columns arrived had the lower half of the spawn black — run 2)
 const loaded = async (C, r) => { for (let i = 0; i < 150; i++) { await step(10, 16); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (dx * dx + dz * dz <= r * r && !w.isLoaded(Math.floor(C[0] + dx), Math.floor(C[2] + dz))) return false; return true; }, [C, r]); if (ok) return true; await wait(30); } return false; };
-const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); await settle(80); await step(20); await settle(20); };
+// f-quiet3: ready until the world has settled — a settle that ran out of rounds returned an unsettled world (a section
+// still meshing, far tiles in flight: under load the vista's foreground had a black hole, worst tile 0.337); now it
+// keeps settling up to G.READY_MS of real time and the shot's note says when it never settled
+let unsettled = false;
+const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); const t0 = Date.now(); let s = await settle(80); while (!(s && s.ok) && Date.now() - t0 < G.READY_MS) s = await settle(40); await step(20); s = await settle(20); for (let k = 0; k < 6 && !(s && s.ok); k++) s = await settle(40); unsettled = !(s && s.ok); return !unsettled; };
 const freeze = () => ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.camMode = 0; g.settings.fov = 75; if (VR.Seasons && VR.Seasons.at && g.meta && g.meta.mode === 'creative' && (!g.settings.seasonPick || g.settings.seasonPick === 'auto')) g.settings.seasonPick = VR.Seasons.NAMES[VR.Seasons.at(g.env.day || 0, g.env.timeOfDay, -1).idx];   /* (f-polish8: the season held — the calendar's season of the frozen day, the same picture) */ const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 const preset = (p, rd) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.particles = false; g.applySettings('*'); }, [p, rd]);
 async function trip(to) {
@@ -97,6 +102,7 @@ const small = (buf) => sharp(buf).resize(CW, CH, { fit: 'fill' }).removeAlpha().
 // one shot: write it, compare it (or make it the reference)
 async function judge(id, png, note) {
   const t = Date.now();
+  if (unsettled) note = (note || '') + ' · UNSETTLED';   // (f-quiet3: the world never settled before this picture)
   if (!png) { check(false, `${id}: no picture (${note || ''})`); return; }
   const now = SHOTS + 'golden_' + id + '.png', ref = GOLD + id + '.png';
   try { fs.unlinkSync(SHOTS + 'golden_' + id + '_diff.png'); } catch (e) { /* none from an earlier run */ }
@@ -119,7 +125,7 @@ async function judge(id, png, note) {
   }
 }
 const b64 = (u) => (u && u.length > 2000 ? Buffer.from(u.split(',')[1], 'base64') : null);
-const timed = async (id, fn) => { if (!want(id)) return; const t = Date.now(); try { await fn(); } catch (e) { check(false, `${id}: ${String(e && e.message || e).slice(0, 200)}`); } console.log(`    (${id} ${((Date.now() - t) / 1000).toFixed(0)} s, at ${secs()})`); };
+const timed = async (id, fn) => { if (!want(id)) return; const t = Date.now(); unsettled = false; try { await fn(); } catch (e) { check(false, `${id}: ${String(e && e.message || e).slice(0, 200)}`); } console.log(`    (${id} ${((Date.now() - t) / 1000).toFixed(0)} s, at ${secs()})`); };
 
 // ---------------------------------------------------------------- the world
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
@@ -148,6 +154,10 @@ await timed('hud', async () => {   // f-ux: the HUD at spawn, as a player sees i
   await atSpawn();
   await ev(() => { const g = VR.game; g.hideHud = false; const h = document.getElementById('hud'); if (h) h.style.display = ''; const n = document.getElementById('notes'); if (n) n.style.visibility = 'hidden'; const f = document.getElementById('funkebub'); if (f) f.style.visibility = 'hidden'; });
   await step(20); await wait(500); await step(4);
+  // f-quiet3: the world drawn here, at the spawn, before the page's picture — the stepped frames draw nothing, so the
+  // canvas used to hold the shot before (a full run: the citadel's towers; ONLY=hud,…: whatever came last — the order
+  // dependence)
+  await grabGL();
   const png = await page.screenshot({ type: 'png' });
   await ev(() => { const g = VR.game; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
   await judge('hud', png, 'the HUD at spawn');
