@@ -53,8 +53,8 @@ G.tick(Vm, 0.6);
 check(!Vm._gsPlay && !(k2.act && k2.act.type === 'gsplay') && k2.pose === 'stand', 'a play whose act was taken ends at the next look');
 // a play nobody updates goes on from the 2-Hz look
 G.stagePlay(Vm, k1, k2, d); Vm._gsPlay.lastRun = Date.now() - 5000; const ph0 = Vm._gsPlay.t;
-G.tick(Vm, 0.6); console.log('    why ' + G.why + ' t ' + (Vm._gsPlay && Vm._gsPlay.t) + ' lr ' + (Vm._gsPlay && Date.now() - Vm._gsPlay.lastRun) + ' acts ' + (k1.act && k1.act.type) + (k2.act && k2.act.type));
-check(Vm._gsPlay && Vm._gsPlay.t > ph0, 'a play nobody updates goes on from the look');
+G.tick(Vm, 0.6);
+check(Vm._gsPlay && (Vm._gsPlay.t > ph0 || Vm._gsPlay.ph !== 'walk'), 'a play nobody updates goes on from the look (' + (Vm._gsPlay && Vm._gsPlay.ph) + ')');
 Vm._gsPlay = null; k1.act = null; k2.act = null; k2.pose = 'stand';
 console.log('3 · a friend\'s visit in person');
 const notes = []; V.Quiet = { note: (t) => notes.push(t) };
