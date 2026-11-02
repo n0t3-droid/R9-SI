@@ -58,6 +58,11 @@
   // source of the generators asks this one gate. A generator made with the option noCrystal (the title panorama: a
   // vgen-5 world that is only looked at) asks it too. Older worlds keep their crystals (and their chunks) exactly.
   GEN.NOCRY_VGEN = 9;
+  // o-wander3 (vgen 15; docs/superpowers/plans/2026-11-02-o-wander3.md §2): the Sky Isles as floating gardens — warm
+  // strata and moss under the designed isles, vine curtains down the rims, glowing berries and mushrooms under them, more
+  // flowers on top, one more little fall an isle (gen_realm.js; test/isles15.js pins vgen 14's isle chunks)
+  GEN.ISLE_VGEN = 15;
+  GEN.isleGarden = (g) => !!g && (g.vgen | 0) >= GEN.ISLE_VGEN;
   GEN.noCry = (g) => !!g && ((g.vgen | 0) >= GEN.NOCRY_VGEN || g.noCrystal === true);
   // a natural rock pinnacle where a crystal spire stood: a round needle tapering gently to a blunt top, its outline
   // wobbling a little and stepping out in a ledge now and then (a hash of the cell and o.seed: no draw from the caller's

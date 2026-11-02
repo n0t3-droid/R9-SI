@@ -838,6 +838,9 @@ async function session(type, setup, script) {
   console.log(`  settled ${JSON.stringify(st)} (${secs()})`);
   const start = await ev(() => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, day: g.env.day | 0, cost: Object.assign({}, L.cost), count: L.count, n: L.nSamples }; });
   const t0 = start.t; rec.tod0 = Math.round(start.tod); rec.day = start.day;
+  // o-wander3: the Wanderregisseur's instrument from here (its refusals per reason, its staging) — WANDER_LEGACY=1: the
+  // pacing as before o-wander3 (an unseen note held ours 15 s, a craft closing in without limit, no claim), the „before"
+  rec.wander0 = await ev((legacy) => { const g = VR.game, W = VR.Wander, D = g.wanderer; if (legacy && W && W.PACE) { W.PACE.noted = 15; W.PACE.defer = 1e9; W.PACE.claim = -1e9; W.PACE.big = false; W.PACE.small = false; } const RS = VR.Regie && VR.Regie.of ? VR.Regie.of(g) : null; if (RS) RS.st = { offers: 0, started: 0, story: 0, ld: 0, seen: 0 }; if (!D) return null; D.st.why = {}; D.st.stage = null; return { started: D.st.started, beats: D.st.beats | 0, time: D.time, legacy: !!legacy }; }, !!process.env.WANDER_LEGACY);
   let tNow = 0;
   for (const part of script) {
     if (tNow >= DUR - 0.25 || overBudget) break;
@@ -865,6 +868,9 @@ async function session(type, setup, script) {
   const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), error: L.error, stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice(), regie: VR.Regie && VR.Regie.stats ? VR.Regie.stats(g) : null, acts: VR.RegieActs ? JSON.parse(JSON.stringify(VR.RegieActs.stats)) : null, foes: VR.Foes && VR.Foes.stats ? Object.assign({}, VR.Foes.stats) : null }; }, [t0]);
   rec.tod1 = Math.round(end.tod);
   rec.regie = { stats: end.regie, acts: end.acts, foes: end.foes };   // a-regie: what the Regie started and why its own acts waited
+  // o-wander3: the Wanderregisseur over this session — moments and beats started, why it waited (s), the staging, the timeline
+  rec.wander = await ev((w0) => { const D = VR.game.wanderer; if (!D || !w0) return null; const s = D.stats(); return { legacy: w0.legacy, started: s.started - w0.started, beats: s.beats - w0.beats, why: s.why, stage: s.stage, tier: s.tier, timeline: s.timeline.filter(e => e.t >= w0.time - 1e-6).map(e => Object.assign({}, e, { t: +(e.t - w0.time).toFixed(1) })) }; }, rec.wander0);
+  if (rec.wander) console.log(`  wander: ${rec.wander.legacy ? 'LEGACY ' : ''}moments ${rec.wander.started} · beats ${rec.wander.beats} · why ${JSON.stringify(rec.wander.why)} · stage ${JSON.stringify(rec.wander.stage)} · timeline ${rec.wander.timeline.map(e => e.t + ' ' + e.kind).join(', ')}`);
   rec.played = +(end.t - t0).toFixed(2);
   rec.events = end.events.filter(e => e.t - t0 <= DUR + 1e-6).map(e => Object.assign({}, e, { t: +(e.t - t0).toFixed(3) }));
   rec.samples = end.samples.filter(s => s.t - t0 <= DUR + 1e-6).map(s => Object.assign({}, s, { t: +(s.t - t0).toFixed(3) }));
@@ -971,6 +977,21 @@ try {
     { name: 'to_nova', de: 'Reise nach Nova Haven', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt', mode: { kind: 'intent', target: 'nova' }, max: DUR },
   ]);
   // a-story · the adventurer (erlebnis §7; plan docs/superpowers/plans/2026-10-29-a-story.md): an Abenteuer world (Begegnungen normal), the story on —
+  // o-wander3: ISLE_SHOTS=1 — after the builder, in its world (a new world: vgen 15 on this build), the Sky Isles from
+  // below, from afar and from the side as test/isles15.mjs frames them → test/shots/isles15_<view>_v<vgen>_s.png (the
+  // session's canvas size)
+  if (process.env.ISLE_SHOTS && recs.builder) {
+    const VIEWS = [['below', [296, 84, 196], [330, 140, 140]], ['afar', [175, 150, 150], [330, 146, 140]], ['side', [262, 150, 222], [330, 146, 140]]];
+    for (const [name, c, t] of VIEWS) {
+      const vg = await ev(([c, t]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(c[0], c[1], c[2]); p.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); p.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); if (p.viewYaw !== undefined) p.viewYaw = p.yaw; if (p.vel) { p.vel[0] = p.vel[1] = p.vel[2] = 0; } g.env.setTime(7000); g.env.rain = 0; g.env.rainTarget = 0; return g.meta.vgen | 0; }, [c, t]);
+      await settle(150, 8, 8);
+      await ev(() => window.__S.frames(30, false));
+      await ev(([c, t]) => { const p = VR.game.player; p.teleport(c[0], c[1], c[2]); p.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); p.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); if (p.viewYaw !== undefined) p.viewYaw = p.yaw; }, [c, t]);
+      const url = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 2; i++) { const t0 = performance.now(); g.last = t0 - 1000 / 30; g.loop(t0); } window.__norender = true; try { g.renderer.gl.finish(); } catch (e) { /* none */ } const src = g.canvas || document.getElementById('gl'), cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0); return cv.toDataURL('image/png'); });
+      fs.writeFileSync(`${SHOTS}isles15_${name}_v${vg}_s.png`, Buffer.from(url.split(',')[1], 'base64'));
+      console.log(`  isle view ${name} (vgen ${vg}) (${secs()})`);
+    }
+  }
   // Funke offers chapter 1 in the Hangar Hall after 20 s of calm and the adventurer takes it ([V]); the ways to Nova Haven and through the city (c1.b2 out
   // there, 5 min after the first). Only when asked (ONLY=adventurer; DUR=600 for ten minutes: two beats)
   if (ONLY && ONLY.includes('adventurer')) {
