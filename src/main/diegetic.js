@@ -378,6 +378,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   }
   // f-ux2: the walkable way to the goal — VR.Folk.findPath to a point ≤ 40 m toward it, searched again only when you
   // moved 3 m or the goal moved 2 m, at most every 1.5 s, ≤ 700 cells (400 when the main thread is the bottleneck)
+  D.decals = true; D.paths = true;   // (false: the f-ux trail — round dots on the straight line; test/ux2_shots.mjs's „before“)
   D.PATH_REACH = 32; D.PATH_MAX = 1400;
   function pathFor(g, p, goal) {
     const F = VR.Folk, w = g.world;
@@ -484,10 +485,10 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     if (S.goal) {
       const dx = S.goal.x - p.pos[0], dz = S.goal.z - p.pos[2]; S.goalD = Math.hypot(dx, dz);
       if (opt(g, 'goalTrail')) {
-        const on = trailOn(g), way = on && S.goalD > 2.5 ? pathFor(g, p, S.goal) : null;
+        const on = trailOn(g), way = on && D.paths && S.goalD > 2.5 ? pathFor(g, p, S.goal) : null;
         const tr = way ? D.trailPath(way) : D.trail(p.pos[0], p.pos[2], S.goal.x, S.goal.z); for (const q of tr) S.pts.push(q);
         S.onPath = !!way;
-        if (on && S.pts.length) buildSoles(g, Math.atan2(dx, -dz));
+        if (on && S.pts.length && D.decals) buildSoles(g, Math.atan2(dx, -dz));
         const txt = S.goal.label || T('g.ux.sign');
         if (way && S.goalD > 20) { for (const f of D.forks(way, D.PATH_REACH)) { const ox = Math.cos(f.h) * 1.1 * f.dir, oz = Math.sin(f.h) * 1.1 * f.dir; S.forks.push({ x: f.x - ox, z: f.z - oz, y: (fin(f.y) ? f.y : groundY(g, f.x, f.z, p.pos[1])) + 1.9, s: f.s, dir: f.dir }); } }
         if (D.sign(S.goalD)) {
@@ -744,8 +745,10 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     if (!ids.length) { const k = D.doodleKind(page, page === 'creatures' ? 'fox' : page === 'stickers' ? 'sign' : page); return `<div class="dgdoods">${one(k, 3, T('g.ux.book.notYet'), 0, true)}</div>`; }
     return `<div class="dgdoods">${ids.map((id, i) => { const sd = D.hsd(page + ':' + id); return one(D.doodleKind(page, id), sd, cap(id), i, false); }).join('')}</div>`;
   }
+  D.bookV = 2;   // (1: the f-ux book — one section a page, no doodles; test/ux2_shots.mjs's „before“)
   function bookPages(g, html) {
     const tmp = document.createElement('div'); tmp.innerHTML = html;
+    if (D.bookV === 1) return [{ map: true }].concat(Array.prototype.slice.call(tmp.querySelectorAll('.wdsec')).map(s0 => ({ html: s0.outerHTML })), [{ board: true }]);
     const secs = Array.prototype.slice.call(tmp.querySelectorAll('.wdsec')).map((sec, i) => {
       const page = W && W.PAGES ? W.PAGES[i] : null;
       if (page) { const h = sec.querySelector('h3'); if (h) h.insertAdjacentHTML('afterend', doodles(g, page)); }
