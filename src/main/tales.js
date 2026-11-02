@@ -57,15 +57,25 @@
   TL.ground = ground;
   const yAt = (g, x, z) => { const k = Math.round(x) + ',' + Math.round(z); if (fin(S.yc[k])) return S.yc[k]; const y = ground(g, x, z); if (y !== null) S.yc[k] = y; return y; };
   const ELDER = ['Ottilie', 'Hedwig', 'Frieda', 'Mathilde', 'Rosalie', 'Henriette', 'Amalie', 'Luise'];
-  function hills(g, cx, cz) {
+  // the hills: three spots 200–320 m out (the land there is rarely loaded yet); the beacon finds the top of its hill
+  // when you come near (TL.refine: the highest ground within 26 m, every point of the tale around it moves along)
+  function hills(g, cx, cz, seed) {
     const out = [];
-    for (let r = 170; r <= 360; r += 60) for (let k = 0; k < 10; k++) {
-      const a = k / 10 * Math.PI * 2 + r * 0.01, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, y = ground(g, x, z);
-      if (y !== null && y > ((VR.C && VR.C.SEA) || 63) + 4) out.push({ x: Math.round(x), z: Math.round(z), y });
-    }
-    out.sort((a, b) => b.y - a.y);
-    return out.slice(0, 3);
+    for (let k = 0; k < 3; k++) { const a = (TC.h(seed, 'hill', k) / 4294967296) * Math.PI * 2, r = 200 + 120 * (TC.h(seed, 'hr', k) / 4294967296); out.push({ x: Math.round(cx + Math.cos(a) * r), z: Math.round(cz + Math.sin(a) * r) }); }
+    return out;
   }
+  TL.refine = function (g, tale) {
+    const s = tale.steps.find(q => q.at === 'hill' && q.p); if (!s || tale.refined) return false;
+    const p = g.player.pos; if (Math.hypot(s.p[0] - p[0], s.p[1] - p[2]) > 110) return false;
+    let best = null;
+    for (let dz = -26; dz <= 26; dz += 6.5) for (let dx = -26; dx <= 26; dx += 6.5) { if (dx * dx + dz * dz > 27 * 27) continue; const y = ground(g, s.p[0] + dx, s.p[1] + dz); if (y === null) return false; if (!best || y > best[2]) best = [dx, dz, y]; }
+    tale.refined = true; if (!best) return true;
+    const ox = Math.round(best[0]), oz = Math.round(best[1]);
+    const mv = (q) => { if (q.p && (q.at === 'hill' || q.at === 'motes' || q.at === 'lens')) q.p = [q.p[0] + ox, q.p[1] + oz]; if (q.pts && (q.at === 'motes' || q.at === 'lens')) q.pts = q.pts.map(v => [v[0] + ox, v[1] + oz]); if (q.of) q.of.forEach(mv); };
+    tale.steps.forEach(mv); S.mkKey = null;
+    log('refine', ox + ',' + oz + ' y' + best[2]);
+    return true;
+  };
   function ctxFor(V, a) {
     const g = V.g, vil = a.vil, gpid = dimOf(g) + '/' + a.p.id, fams = vil.fams || {}, fam = fams[a.p.fam];
     let kids = (vil.people || []).filter(q => q.age === 'child' && q.fam === a.p.fam);
@@ -82,7 +92,7 @@
       seed, n: rec.n | 0, t, tod: g.env.timeOfDay, dim: dimOf(g), role: roleOf(g),
       giver: { pid: gpid, name: a.p.name, sur: fam ? fam.surname || '' : '', vid: vil.id, vn: vil.name || '', x: vil.plan.x, z: vil.plan.z, kids: kids.map(q => ({ pid: dimOf(g) + '/' + q.id, name: q.name })) },
       villages, fairy: FS.filter(s => fin(s.x) && fin(s.z)).map(s => ({ id: s.id, kind: s.kind, name: T('g.fairy.place.' + s.kind), x: s.x, z: s.z })),
-      hills: hills(g, vil.plan.x, vil.plan.z), gate: heart ? { x: H.TEMPLE.x, z: H.TEMPLE.z - 5 } : null,
+      hills: hills(g, vil.plan.x, vil.plan.z, seed + '|' + gpid + '|' + (rec.n | 0)), gate: heart ? { x: H.TEMPLE.x, z: H.TEMPLE.z - 5 } : null,
       home: Array.isArray(bed) && fin(bed[0]) ? { x: bed[0], z: bed[2] } : null, news, toName: ELDER[TC.h(seed, rec.n, gpid, 'to') % ELDER.length],
     };
   }
@@ -279,6 +289,7 @@
   function run(V, rec, t) {
     const g = V.g, tale = rec.cur, p = g.player.pos, dim = dimOf(g);
     if (tale.st !== 'on') return;
+    if (!tale.refined && TC.TPL[tale.t].keep && TC.TPL[tale.t].keep.k === 'beacon') TL.refine(g, tale);
     const outs = [];
     if (S.dim !== dim) { S.dim = dim; outs.push(...TC.feed(tale, { k: 'dim', dim })); }
     if (tale.st === 'on') outs.push(...TC.feed(tale, { k: 'pos', x: p[0], z: p[2], dim }));
