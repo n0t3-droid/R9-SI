@@ -341,6 +341,15 @@
     return ZL;
   };
   L.siteOf = (id) => W0.sites.get(id) || null;
+  // f-polish9 · the one event clock: is the player at work on an outpost — within ENGAGED m of a known one not yet freed,
+  // or in its ring, its calm, its puzzle, its freed moment? (regie.js Regie.atWork: the walker and the Regie's fill wait)
+  L.ENGAGED = 40;
+  L.engaged = function (g) {
+    if (L.moment || L.puz || L.calmSt) return true;
+    const p = g && g.player && g.player.pos; if (!p || !W0 || !W0.sites) return false;
+    for (const s of W0.sites.values()) if (s.known && s.st !== 'frei' && Math.abs(s.x - p[0]) < L.ENGAGED && Math.abs(s.z - p[2]) < L.ENGAGED && Math.hypot(s.x - p[0], s.z - p[2]) < L.ENGAGED) return true;
+    return false;
+  };
   L.save = function (g, s) { const r0 = rec(); if (r0 && s) L.store(r0, s); if (g && g.saveMeta && !(g.meta && g.meta.guest)) { try { const q = g.saveMeta(); if (q && q.catch) q.catch(() => {}); } catch (e) { /* the autosave keeps it */ } } };
   // a stray of a site powered down or calmed
   L.resolved = function (g, id, how) {

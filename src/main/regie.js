@@ -131,11 +131,14 @@
     const t = now(g), q = S.sched; if (t - Math.max(q.last2, big ? (q.lastNote === undefined ? -Infinity : q.lastNote) : q.lastStart) < q.o.space || q.scene) return true;
     if (g.wow && g.wow.active) return true;
     if (!big && q.pending(t)) return true;   // f-polish9: a start noted, about to be seen (the walker keeps its own PACE.noted)
-    return hard ? false : R.vistaNear(g) || R.foeComing(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
+    return hard ? false : R.vistaNear(g) || R.foeComing(g) || R.atWork(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
   };
   // f-polish9 · the one event clock: an encounter about to begin — a foe on patrol within its notice range and FOE_M m
   // more of you (foes.js VR.Foes.coming): the walker's moments and beats wait for it rather than pair with it
   R.FOE_M = 8;
+  // f-polish9: the player at work on an outpost (liberate.js Liberate.engaged) — its fight, calm, puzzle and freed moment
+  // are the scene: the walker's moments and the Regie's fill (all but the story's beats) wait
+  R.atWork = function (g) { const L = VR.Liberate; try { return !!(L && L.engaged && L.engaged(g)); } catch (e) { return false; } };
   R.foeComing = function (g) { const F = VR.Foes; try { return !!(F && F.coming && F.coming(g, R.FOE_M)); } catch (e) { return false; } };
   // f-polish9: may an encounter begin now (foes.js asks before a foe notices you)? Not on top of a weighted event seen or
   // started within the spacing, a start about to be seen, a scene or a wow moment — the foe waits (≤ foes.js HOLD s)
@@ -231,7 +234,9 @@
     if (R.vistaNear(g)) return why('vista');   // a-regie: a wow moment is coming
     if (S.claim > t) return why('claim');   // o-wander3: the walker's moment has the slot
     const ctx = { t, place: g.lifeDirector && g.lifeDirector.ctx ? g.lifeDirector.ctx.place : '' }, offers = [];
-    for (const fn of SOURCES) { try { const o = fn(g, ctx); if (o) for (const q of o) if (q) offers.push(q); } catch (e) { /* a source's */ } }
+    const work = R.foeComing(g) || R.atWork(g);   // (f-polish9: an encounter coming or running, an outpost at work — only the story's beats)
+    for (const fn of SOURCES) { try { const o = fn(g, ctx); if (o) for (const q of o) if (q && (!work || q.kind === 'story')) offers.push(q); } catch (e) { /* a source's */ } }
+    if (work) S.st.work = (S.st.work | 0) + 1;
     S.st.offers += offers.length;
     const q = S.sched, due = q.due(t) && t - q.lastStart >= q.o.space;
     if (due) S.st.dueOffers = (S.st.dueOffers | 0) + offers.length;   // (o-wander3: the offers made while a gap was due — the real chances)

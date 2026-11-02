@@ -489,6 +489,7 @@
   // (regie.js Regie.foeComing: the walker's moments wait for it); the longest a foe waits to notice you while the Regie holds
   F.HOLD = 6;
   F.coming = function (g, more) {
+    if (F.enc0) return true;   // (an encounter running)
     const En = g && g.entities, p = g && g.player && g.player.pos; if (!En || !En.mobs || !p || !F.count || F.enc() === 'off') return false;
     for (const m of En.mobs) {
       const f = m.foe; if (!f || f.gone || f.remote || f.helper || f.st !== 'patrol') continue;

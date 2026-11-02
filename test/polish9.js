@@ -128,6 +128,11 @@ console.log('c · one event clock');
     V.Foes = { coming: (gg, more) => more === RG.FOE_M };
     check(RG.foeComing(g) && RG.busy(g) && !RG.busy(g, true), 'a foe about to notice you: busy for the walker (not hard)');
     delete V.Foes;
+    V.Liberate = { engaged: () => true };
+    const o0 = S.st.offers | 0; g.time = 200; S.t = 0; RG.addSource(function testOffer() { return [{ source: 't', act: 'x', weight: 2, kind: 'ambient', start: () => true }]; });
+    RG.frame(g, 0.3);
+    check(RG.atWork(g) && RG.busy(g) && (S.st.work | 0) >= 1 && (S.st.offers | 0) === o0, `at work on an outpost: the walker waits, the Regie's fill offers nothing but the story's beats (${(S.st.offers | 0) - o0} offers)`);
+    delete V.Liberate;
   } else check(false, 'the Regie binds to the stand-in game');
 }
 

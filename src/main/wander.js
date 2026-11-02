@@ -539,7 +539,7 @@
       const c0 = this.coming(now), coming = c0 && (!walking || P.since(now) < P.tgt + W.PACE.defer) ? c0 : false;   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
       // f-polish9 (the one event clock): a wow moment coming (an unseen vista near), an encounter coming (a foe about to
       // notice you), a scene or a wow on screen — those fill the gap themselves: no beat on top of them, even past hard
-      const hold = !!(RG && ((RG.vistaNear && RG.vistaNear(g)) || (RG.foeComing && RG.foeComing(g)) || (g.wow && g.wow.active) || (RG.of && RG.of(g) && RG.of(g).sched.scene)));
+      const hold = !!(RG && ((RG.vistaNear && RG.vistaNear(g)) || (RG.foeComing && RG.foeComing(g)) || (RG.atWork && RG.atWork(g)) || (g.wow && g.wow.active) || (RG.of && RG.of(g) && RG.of(g).sched.scene)));
       const want = P.want(now, { foot: walking, busy, coming, hold });
       if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : hold ? 'held' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
       if (!want) return;
