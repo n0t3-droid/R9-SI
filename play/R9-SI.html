@@ -132600,7 +132600,7 @@ if(act.pitch!==undefined&& !(a.pitch>=act.pitch))return'pitch';
 if(act.below!==undefined&& !(a.pitch<=act.below))return'pitch';
 if(act.level!==undefined&& !(Math.abs(a.pitch)<=act.level))return'pitch';
 if(act.kind==='feat')return S.WAYS.indexOf(a.feat)>=0?'ok':'armed';
-if(act.kind==='look')return'ok';
+if(act.kind==='look')return a.away?'away':'ok';
 if(act.kind==='photo')return a.photo?'ok':'armed';
 return a.press?'ok':'armed';
 };
@@ -132809,6 +132809,7 @@ R.allow=function(g,w,kind,act){
 const S=R.of(g);if(!S)return true;
 if(R.vistaNear(g))return false;
 if(kind!=='story'&&R.claimed(g)){S.st.claimNo=(S.st.claimNo|0)+1;return false;}
+if(kind!=='story'&&(R.atWork(g)||R.foeComing(g))){S.st.workNo=(S.st.workNo|0)+1;return false;}
 return S.sched.allow(now(g),w||2,kind||'ambient',act);
 };
 
@@ -134205,7 +134206,7 @@ P.actCtx=function(g,act){
 const p=g.player,cam=g.cam||{x:p.pos[0],y:p.pos[1]+1.6,z:p.pos[2],yaw:p.yaw||0,pitch:p.pitch||0};
 const cp=Math.cos(cam.pitch||0),d=[-Math.sin(cam.yaw||0)*cp,Math.sin(cam.pitch||0),-Math.cos(cam.yaw||0)*cp],e=[cam.x,cam.y,cam.z];
 const BS=VR.BodySky,L=BS&&BS.cur&&BS.cur.light,sea=(VR.C&&VR.C.SEA)||64;
-const a={pitch:(cam.pitch||0)/DEG,high:p.pos[1]-sea,orbit:P.orbit(g),dim:g.dim||'overworld',eclipse:L?L.eclipse||0:0,ground: !!p.onGround};
+const a={pitch:(cam.pitch||0)/DEG,high:p.pos[1]-sea,orbit:P.orbit(g),dim:g.dim||'overworld',eclipse:L?L.eclipse||0:0,ground: !!p.onGround,away: !!(VR.Intent&&VR.Intent.current&&VR.Intent.current())};
 const toward=(Q)=>{if(!Q)return;const v=[Q[0]-e[0],Q[1]-e[1],Q[2]-e[2]],L0=Math.hypot(v[0],v[1],v[2])||1;a.dist=L0;a.ang=Math.acos(clamp((v[0]*d[0]+v[1]*d[1]+v[2]*d[2])/L0,-1,1))/DEG;};
 const k=act.target;
 if(k==='vista'){
@@ -150829,10 +150830,11 @@ return w;
 
 F3.frameGroup=function(solid,C,r,o){
 o=o||{};
-const d=clamp(2.2*r+1.5,3.5,9),T=[C[0],C[1]+0.9,C[2]];
+const d=clamp(2.2*r+1.5,3.5,9),T=[C[0],C[1]+(o.ty!==undefined?o.ty:0.9),C[2]];
 const op={d,dMax:d+1.5,mins:[Math.max(3,d-2.5),2.2,1.4],lens:o.lens||F3.LENS,avoid:o.avoid||null};
 const rays=[];
-for(let i=0;i<16;i++){const a=i/16*TAU;for(const h of[0.8+0.4*r,1.6+0.5*r,0.5])rays.push([a,h,(o.pref!==undefined?(1-Math.cos(a-o.pref))*1.6:0)+sunPen(a,o.sun)*1.5+Math.abs(h-0.8-0.4*r)*0.3]);}
+const hs=o.hs||[0.8+0.4*r,1.6+0.5*r,0.5],pw=o.prefW||1.6;
+for(let i=0;i<16;i++){const a=i/16*TAU;for(const h of hs)rays.push([a,h,(o.pref!==undefined?(1-Math.cos(a-o.pref))*pw:0)+sunPen(a,o.sun)*1.5+Math.abs(h-hs[0])*0.3]);}
 return best(solid,T,rays,op);
 };
 
@@ -153128,12 +153130,16 @@ const F3=VR.Folk3,cy=fy,mid=[m.mid[0],cy,m.mid[1]];
 let shot=null;
 try{if(F3&&F3.frameGroup){const E=g.env,sun=E&&E.sunDir?Math.atan2(E.sunDir[2],E.sunDir[0]):null;const ax=Math.atan2(to[1]-m.friend[1],to[0]-m.friend[0]),toYou=Math.atan2(p[2]-mid[2],p[0]-mid[0]),s1=ax+Math.PI/2,s2=ax-Math.PI/2;
 const pref=pt?(Math.cos(s1-toYou)>=Math.cos(s2-toYou)?s1:s2):toYou;
+const kneel=plan.touch==='hug'&&pt&& !!pt.kid!== !!gv.kid,HS=kneel?(gv.kid?TE.hugShot(to,m.friend):TE.hugShot(m.friend,to)):null;
+const fo=(x)=>HS?Object.assign({sun},HS,x||{}):Object.assign({pref,sun},x||{});
 const avoid=[];for(const a of V.agents)if(a!==gv&&a!==pt&&Math.abs(a.pos[0]-mid[0])<12&&Math.abs(a.pos[2]-mid[2])<12)avoid.push([a.pos[0],a.pos[2]]);
 if(pt){
 const so=solidOf(g,mid);
-shot=F3.frameGroup(so,mid,0.9,{pref,sun,avoid});
-if(!shot&&avoid.length)shot=F3.frameGroup(so,mid,0.9,{pref,sun});
-if(!shot){shot=F3.frameGroup(solidOf(g),mid,0.9,{pref,sun,avoid});if(shot)TE.stats.frondFallback=(TE.stats.frondFallback|0)+1;}
+shot=F3.frameGroup(so,mid,0.9,fo({avoid}));
+if(!shot&&avoid.length)shot=F3.frameGroup(so,mid,0.9,fo());
+if(!shot){shot=F3.frameGroup(solidOf(g),mid,0.9,fo({avoid}));if(shot)TE.stats.frondFallback=(TE.stats.frondFallback|0)+1;}
+if(shot&&HS)TE.stats.hugFront=(TE.stats.hugFront|0)+1;
+if(shot)TE.lastShot={P:shot.P.map(v=> +v.toFixed(2)),T:shot.T.map(v=> +v.toFixed(2)),hug: !!HS,aside:TE.stats.aside|0,off:HS? +(Math.atan2(Math.sin(shot.a-HS.pref-TE.HUG_SIDE),Math.cos(shot.a-HS.pref-TE.HUG_SIDE))*57.3).toFixed(0):null};
 }}}catch(e){shot=null;}
 if(shot){TE.stats.framed++;C.shot={x:shot.P[0],y:shot.P[1],z:shot.P[2],yaw:shot.yaw,pitch:shot.pitch,fov:F3.groupFov?F3.groupFov(shot.d,pt?1.1:0.7,(innerWidth||16)/(innerHeight||9)):null};}
 if(shot)C.aside=TE.asideOf(V.agents,[gv,pt],shot.P,mid);
@@ -153162,14 +153168,16 @@ const HANDS=(Pz)=>{set(Pz,'arm_l',0.8,0,0.12);set(Pz,'arm_r',0.8,0,-0.12);set(Pz
 const GIFT=(Pz)=>{set(Pz,'arm_l',1.25,0,0.22);set(Pz,'arm_r',1.25,0,-0.22);set(Pz,'fore_l',0.55,0,0);set(Pz,'fore_r',0.55,0,0);if(Pz.head)Pz.head[0]=0.12;};
 
 
-TE.ASIDE={lens:2.6,line:0.8,to:2.6};
+TE.ASIDE={lens:2.6,line:0.8,to:2.6,back:4};
 TE.asideOf=function(agents,keep,P,M){
 const A=TE.ASIDE,out=[],dx=M[0]-P[0],dz=M[2]-P[2],L=Math.hypot(dx,dz)||1,ux=dx/L,uz=dz/L;
 for(const a of agents||[]){
 if(!a|| !a.pos||keep.indexOf(a)>=0||a.teHold||a.sitO||a.pose==='sleep')continue;
 const ex=a.pos[0]-P[0],ez=a.pos[2]-P[2],along=ex*ux+ez*uz,side=ex* -uz+ez*ux;
-if(along< -1||along>L-1.2)continue;
-if(Math.hypot(ex,ez)>A.lens&&Math.abs(side)>A.line)continue;
+
+const back=along>L+0.5&&along<L+A.back&&Math.abs(side)<A.line+0.2;
+if(!back&&(along< -1||along>L-1.2))continue;
+if(!back&&Math.hypot(ex,ez)>A.lens&&Math.abs(side)>A.line)continue;
 const sg=side>=0?1: -1,off=Math.max(A.to,Math.abs(side)+0.6)*sg;
 a.teAside=[P[0]+ux*Math.max(0,along)-uz*off,P[2]+uz*Math.max(0,along)+ux*off];
 a.path=null;out.push(a);
@@ -153179,6 +153187,15 @@ return out;
 };
 
 
+
+
+
+
+TE.HUG_SIDE=1.35;
+TE.hugShot=function(ad,kid){
+const fw=Math.atan2(ad[1]-kid[1],ad[0]-kid[0]);
+return{pref:fw-TE.HUG_SIDE,prefW:4,ty:0.75,hs:[0.45,0.75,0.2]};
+};
 TE.hugOf=function(a,b){
 const gap=Math.max(0.15,Math.min(0.6,Math.hypot(a.pos[0]-b.pos[0],a.pos[2]-b.pos[2])));
 const one=(me,other)=>{
