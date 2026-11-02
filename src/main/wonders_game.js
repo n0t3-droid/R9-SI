@@ -302,6 +302,7 @@
         if (best) {
           const a = Math.atan2(best.x - p.pos[0], -(best.z - p.pos[2])), rel = ((Math.round((a + p.yaw) * 180 / Math.PI) % 360) + 540) % 360 - 180;
           const m = bd < 100 ? Math.round(bd) : Math.round(bd / 10) * 10;
+          if (el.dataset.goal !== best.key) el.dataset.goal = best.key;   // (f-quiet2: a new goal shows the pointer again — quiet.js)
           text = '✨ ' + m.toLocaleString(VR.I18N && VR.I18N.locale ? VR.I18N.locale() : 'de-DE') + ' m ' + ARROWS[((Math.round(rel / 45) % 8) + 8) % 8];
         }
       }

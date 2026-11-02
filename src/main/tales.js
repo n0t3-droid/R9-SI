@@ -323,7 +323,7 @@
     if (res.lit) TL.litY(g, res.lit);   // (f-polish8: its height now — the ending is said in the village, 200–320 m off)
     const end = T(res.key, V0), head = T(res.head, V0), gv = liveOf(V, res.giver.pid);
     S.endGiver = res.giver.pid;
-    S.pend = { pid: res.giver.pid, text: end, t: Date.now() };   // (said by the friend in person: now, or as soon as their village is awake around you)
+    S.pend = { pid: res.giver.pid, text: end, t: Date.now(), tt: tale.t };   // (f-quiet2: tt — the template, for the staged ending)   // (said by the friend in person: now, or as soon as their village is awake around you)
     sayEnd(V);
     if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
     if (S.fl) S.fl.ph = 'home';
@@ -350,6 +350,8 @@
     if (gv && Math.hypot(gv.pos[0] - p[0], gv.pos[2] - p[2]) < 90 && !(gv.bubble && gv.bubble.text === J.text)) {
       S.pend = null; say(gv, J.text, 9); gv.lookAt = [p[0], p[1] + 1.4, p[2]]; gv.waveT = 1.6; if (V.hearts) V.hearts(gv);
       if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
+      // f-quiet2: the ending shown, not told — a short scene (tale_end.js); the line is its caption, not a bubble
+      if (VR.TaleEnd && VR.TaleEnd.start) { try { if (VR.TaleEnd.start(V, { t: J.tt, giver: gv, kid: S.kid ? S.kid.a : null, text: J.text })) gv.bubble = null; } catch (e) { /* the bubble stays */ } }
       return;
     }
     if (Date.now() - J.t > 15000) { S.pend = null; note(g, J.text, 'tl:end'); }

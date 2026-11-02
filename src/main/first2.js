@@ -255,10 +255,12 @@
     if (st && st.out && p && !g.hideHud && !g.photo && !(g.ui && g.ui.screen) && F.advWorld(g) && !F.cine(g)) {
       const site = VR.StoryPlay && VR.StoryPlay.nearSite ? VR.StoryPlay.nearSite(g, false) : null;
       const to = site && site.s ? [site.s.x, 0, site.s.z] : st.out, b = F.bearing(p.pos, p.yaw, to);
+      P.goal = (site && site.s ? 's' : 'o') + Math.round(to[0]) + ',' + Math.round(to[2]);   // (f-quiet2)
       if (b.d > 24 && b.d < 2000 && !st.reached) text = F.pointText(p.pos, p.yaw, to);
       else if (b.d <= 24) st.reached = true;
     }
     if (!P.el && text) { P.el = document.createElement('div'); P.el.id = 'f2point'; (document.getElementById('hud') || document.body).appendChild(P.el); }
+    if (P.el && text && P.el.dataset.goal !== P.goal) P.el.dataset.goal = P.goal;   // (f-quiet2: the goal, for the fade — quiet.js)
     if (P.el && text !== P.text) { P.text = text; P.el.textContent = text; P.el.style.display = text ? 'block' : 'none'; }
   };
 

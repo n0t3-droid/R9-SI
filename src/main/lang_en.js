@@ -4652,5 +4652,9 @@
     "g.ux.wave": "You wave.",
     "g.ux.here": "Here! (a waypoint)",
     // ---- f-ux end
+    // ---- f-quiet2: the tale's ending shown (tale_end.js)
+    "g.te.gift": "🎁 {who} gives you: {item}",
+    "g.te.thanks": "💛 {who} squeezes your hands, thankful",
+    // ---- f-quiet2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

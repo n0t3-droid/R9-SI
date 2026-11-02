@@ -4652,5 +4652,9 @@
     "g.ux.wave": "Du winkst.",
     "g.ux.here": "Hier! (ein Wegpunkt)",
     // ---- f-ux end
+    // ---- f-quiet2: the tale's ending shown (tale_end.js)
+    "g.te.gift": "🎁 {who} schenkt dir: {item}",
+    "g.te.thanks": "💛 {who} drückt dir dankbar die Hände",
+    // ---- f-quiet2 end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

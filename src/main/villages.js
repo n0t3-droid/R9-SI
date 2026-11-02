@@ -1552,6 +1552,7 @@
         } else if (d2 > 14 * 14) a.greeted = false;
       }
       list.sort((x, y) => x[0] - y[0]);
+      if (VR.Quiet && VR.Quiet.bubbleCap) { try { VR.Quiet.bubbleCap(list, this.talking || null); } catch (e) { /* as sorted */ } }   // f-quiet2: two text bubbles at most, the rest a small 💬
       const vp = r.viewProj, W = r.canvas ? r.canvas.clientWidth : window.innerWidth, Hh = r.canvas ? r.canvas.clientHeight : window.innerHeight;
       const c = g.cam || cam;
       for (let i = 0; i < this.bubs.length; i++) {
@@ -1565,8 +1566,8 @@
         const cx = (vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw, cy = (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw;
         if (cx < -1.2 || cx > 1.2 || cy < -1.2 || cy > 1.2) { el.style.display = 'none'; continue; }
         const sx = (cx * 0.5 + 0.5) * W, sy = (1 - (cy * 0.5 + 0.5)) * Hh;
-        const ico = !!(a.bubble && a.bubble.icon);   // (u-folk2: ♪ ♥ ! ☆ — a small round bubble, no name)
-        const html = ico ? `<i>${esc(a.bubble.text)}</i>` : (it[2] || a.bubble ? `<b>${esc(a.p.name)}</b>` : '') + (a.bubble ? `<span>${esc(a.bubble.text)}</span>` : `<span class="role">${esc(Folk.ROLES[a.role] ? Folk.ROLES[a.role].title : '')}</span>`);
+        const dem = !!it[3], ico = dem || !!(a.bubble && a.bubble.icon);   // (u-folk2: ♪ ♥ ! ☆ — a small round bubble, no name; f-quiet2: dem — a third speaker's 💬)
+        const html = ico ? `<i>${dem ? '💬' : esc(a.bubble.text)}</i>` : (it[2] || a.bubble ? `<b>${esc(a.p.name)}</b>` : '') + (a.bubble ? `<span>${esc(a.bubble.text)}</span>` : `<span class="role">${esc(Folk.ROLES[a.role] ? Folk.ROLES[a.role].title : '')}</span>`);
         if (el._ico !== ico) { el._ico = ico; el.classList.toggle('ico', ico); }
         if (el._html !== html) { el.innerHTML = html; el._html = html; }
         el.style.display = 'block';

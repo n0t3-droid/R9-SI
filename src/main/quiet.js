@@ -37,7 +37,7 @@
 
   // ---------------------------------------------------------------- the notice manager (pure)
   class Notes {
-    constructor(o) { o = o || {}; this.level = lvl(o.level); this.vis = []; this.wait = []; this.last = new Map(); this.lastNew = -Infinity; this.held = false; this.history = []; this.stats = { shown: 0, merged: 0, dropped: 0, queued: 0, expired: 0 }; }
+    constructor(o) { o = o || {}; this.level = lvl(o.level); this.vis = []; this.wait = []; this.last = new Map(); this.gists = new Map(); this.keyT = new Map(); this.legacy = false; this.lastNew = -Infinity; this.held = false; this.history = []; this.stats = { shown: 0, merged: 0, dropped: 0, queued: 0, expired: 0 }; }
     setLevel(l) { this.level = lvl(l); }
     gap() { return this.level === 'normal' ? Q.GAP_NORMAL : Q.GAP_FEW; }
     rec(n, t, r) { this.history.push({ text: n.text, prio: n.prio, t, r }); if (this.history.length > Q.HIST) this.history.splice(0, this.history.length - Q.HIST); }
@@ -59,12 +59,32 @@
       if (prio < MIN_PRIO[this.level]) { h.r = 'level'; this.stats.dropped++; return 'dropped'; }
       const lt = this.last.get(text);
       if (!key && lt !== undefined && t - lt < Q.REPEAT) { h.r = 'repeat'; this.stats.dropped++; return 'dropped'; }
+      // f-quiet2: at Wenig / Aus the gist across every source (DUP s, sliding) and the per-key cooldowns
+      const why = this.level !== 'normal' && !this.legacy ? this.dupWhy(text, prio, key, t) : '';
+      if (why) { h.r = why; this.stats.dropped++; this.stats[why] = (this.stats[why] | 0) + 1; return 'dropped'; }
       this.last.set(text, t);
       if (this.last.size > 200) this.last.clear();
       if (this.held) { if (prio < 2) { h.r = 'held'; this.stats.dropped++; return 'dropped'; } return this.enqueue(e0, t, h); }
       if (prio >= 3) { this.show(e0, t, true); h.r = 'shown'; return 'shown'; }
       if (this.vis.length >= Q.MAX_VIS || t - this.lastNew < this.gap() || this.wait.length) return this.enqueue(e0, t, h);
       this.show(e0, t, false); h.r = 'shown'; return 'shown';
+    }
+    // f-quiet2: why a notice is a duplicate — 'dup' (its gist seen within DUP s, and shown within DUP_MAX s; must-see:
+    // within MUST_DUP s) or 'cool' (its key shown within the key's cooldown) — else ''. Every look slides the gist's clock
+    dupWhy(text, prio, key, t) {
+      const gs = Q.gist(text), G = this.gists.get(gs);
+      if (this.gists.size > 300) this.gists.clear();
+      if (G) {
+        const win = prio >= 3 ? Q.MUST_DUP : Q.DUP, seen = G[0]; G[0] = t;
+        if (t - seen < win && t - G[1] < Q.DUP_MAX) return 'dup';
+      } else this.gists.set(gs, [t, -Infinity]);
+      const c = prio >= 3 ? 0 : Q.coolOf(key), kt = key ? this.keyT.get(key) : undefined;
+      if (c > 0 && kt !== undefined && t - kt < c) return 'cool';
+      return '';
+    }
+    shownAt(e0, t) {
+      const gs = Q.gist(e0.text), G = this.gists.get(gs); if (G) { G[0] = t; G[1] = t; } else this.gists.set(gs, [t, t]);
+      if (e0.key) this.keyT.set(e0.key, t);
     }
     enqueue(e0, t, h) {
       if (this.wait.length >= Q.QMAX) { h.r = 'full'; this.stats.dropped++; return 'dropped'; }
@@ -78,6 +98,7 @@
         this.vis.splice(k, 1);
       }
       this.vis.push({ text: e0.text, prio: e0.prio, key: e0.key, count: 1, t0: t, until: t + Q.LIFE });
+      this.shownAt(e0, t);   // (f-quiet2: the gist's and the key's clocks)
       if (e0.prio < 3) this.lastNew = t;
       this.stats.shown++; return true;
     }
@@ -97,6 +118,53 @@
     visible(t) { this.tick(t); return this.vis.filter(v => t < v.until + Q.FADE); }
   }
   Q.Notes = Notes;
+
+  // ---------------------------------------------------------------- f-quiet2: duplicates (pure)
+  // (plan docs/superpowers/plans/2026-11-02-f-quiet2.md; the v0.57 review: 6 duplicates in 10 minutes, the target ≤ 2)
+  Q.DUP = 180;        // s: the same gist again (from any source) within this drops at Wenig / Aus — sliding
+  Q.DUP_MAX = 600;    // s: … but a gist shown this long ago may show again
+  Q.MUST_DUP = 4;     // s: a must-see answer (prio 3) repeats after this
+  // per-key cooldowns (s): a second line of the key within it drops even with another text (the key's first one shows)
+  Q.COOLS = { 'gs:visit': 120, 'gs:up': 120, 'gs:hello': 60, 'story-fest': 600, 'tl:tw': 30, 'fairy': 45, 'season': 300, 'wander': 40 };
+  Q.coolOf = (key) => { if (!key) return 0; const k = String(key); if (Q.COOLS[k] !== undefined) return Q.COOLS[k]; const i = k.indexOf(':'); return i > 0 && Q.COOLS[k.slice(0, i)] !== undefined ? Q.COOLS[k.slice(0, i)] : 0; };
+  // the gist: lower case, words only (no numbers standing alone, no emoji, no punctuation) — „3 Äpfel!" = „12 Äpfel"
+  Q.gist = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/).filter(w => w && !/^\p{N}+$/u.test(w)).join(' ');
+  // a codex find whose toast the level drops (codex toasts are low: prio 1) was not on the screen: weight 1 in the
+  // event log (a wonder keeps its banner's weight)
+  Q.foundW = (id, w, level) => { const s = String(id || ''); if (s[0] === 'w' && s[1] === ':') return w; return (MIN_PRIO[lvl(level)] || 2) > 1 ? Math.min(w, 1) : w; };
+
+  // ---------------------------------------------------------------- f-quiet2: the way pointers fade (pure)
+  // shown PT_SHOW s (Normal PT_SHOW_N) for a new goal and once after PT_IDLE s without a key; then gone
+  Q.PT_SHOW = 6; Q.PT_SHOW_N = 20; Q.PT_IDLE = 45;
+  class Pointer {
+    constructor() { this.goal = ''; this.until = -Infinity; this.idled = false; }
+    step(t, goal, idle, level) {
+      goal = goal ? String(goal) : '';
+      const show = lvl(level) === 'normal' ? Q.PT_SHOW_N : Q.PT_SHOW;
+      if (goal && goal !== this.goal) this.until = t + show;
+      this.goal = goal;
+      if ((idle || 0) >= Q.PT_IDLE) { if (!this.idled) { this.idled = true; this.until = Math.max(this.until, t + show); } } else this.idled = false;
+      return !!goal && t < this.until;
+    }
+  }
+  Q.Pointer = Pointer;
+
+  // ---------------------------------------------------------------- f-quiet2: speech bubbles (pure)
+  // list: [[d², agent, looked], …] (villages.js updateBubbles). The one looked at first, then the one talking with you,
+  // then the nearest; at most BUB_MAX text bubbles (a name tag counts) — the rest get it[3] = true: a small 💬 icon.
+  // Icon bubbles (♪ ♥ …) stay as they are and are not counted.
+  Q.BUB_MAX = 2;
+  Q.bubbleCap = function (list, talking) {
+    const rank = (it) => (it[2] ? 0 : it[1] === talking ? 1 : 2);
+    list.sort((x, y) => rank(x) - rank(y) || x[0] - y[0]);
+    let n = 0;
+    for (const it of list) {
+      const b = it[1].bubble, icon = !!(b && b.icon);
+      if (icon) { it[3] = false; continue; }
+      if (n < Q.BUB_MAX) { n++; it[3] = false; } else it[3] = !!b;
+    }
+    return list;
+  };
 
   // ---------------------------------------------------------------- the old channels' priorities (pure)
   // [key, prio, de fallback, en fallback] — a title made from this key's template (the {vars} anything)
@@ -182,7 +250,8 @@
       + 'html body #funkebub{max-width:min(260px,36vw);padding:4px 10px 5px;border-radius:11px;font:600 13px/1.3 var(--font,sans-serif);box-shadow:0 2px 8px rgba(0,0,0,.28),0 0 0 1px rgba(70,232,255,.6)}'
       + 'html body #funkebub b{display:inline;font-size:11px;margin-right:6px}html body #funkebub:after{display:none}'
       + '#qrecent{margin-top:8px;font:500 12px/1.4 var(--font,sans-serif);color:#b9c6da;text-align:left;max-height:8.5em;overflow:hidden}#qrecent b{display:block;color:#dfe8f8;font-size:12px;margin-bottom:2px}'
-      + '@media (prefers-reduced-motion: reduce){#notes .qn{transition:none}}';
+      + '#wcompass,#f2point{transition:opacity .8s ease}#wcompass.q-away,#f2point.q-away{opacity:0 !important}'
+      + '@media (prefers-reduced-motion: reduce){#notes .qn,#wcompass,#f2point{transition:none}}';
     document.head.appendChild(s);
   })();
   let box = null;
@@ -238,12 +307,48 @@
         if (id) { const A = readAges().a; if (ageId !== id) { ageId = id; } A[id] = (A[id] || 0) + dt; if (t - ageSaved > 10) { ageSaved = t; try { const ks = Object.keys(A); if (ks.length > 64) delete A[ks[0]]; localStorage.setItem(AGE_KEY, JSON.stringify(ages)); } catch (e) { /* a convenience */ } } }
       } else looking = false;
       N.tick(t); render(t);
+      pointers(g, t, held);   // (f-quiet2)
+      if (!foundWrapped) wrapFound();
       // a 🧭 hint at Wenig steps back after HINT_HIDE s
       const H = VR.Hints;
       if (H && hintAt && H.current() && level() !== 'normal' && t - hintAt > Q.HINT_HIDE) { hintAt = 0; H.dismiss(); }
       if (H && !H.current()) hintAt = 0;
     } catch (e) { /* the channel is a nicety */ }
     const ms = performance.now() - t0, C = Q.cost; C.ticks++; C.ms += ms; if (ms > C.worst) C.worst = ms;
+  }
+  // ---- f-quiet2: the way pointers (#wcompass ✨, #f2point ⚔) show for a new goal (their data-goal) and after a long
+  // idle (no key, not moving), then fade
+  const PTS = { wcompass: new Pointer(), f2point: new Pointer() };
+  let lastActive = 0;
+  Q.pointerStats = { shownS: 0, hiddenS: 0 };
+  function pointers(g, t, held) {
+    if (!g || !g.player) return;
+    const v = g.player.vel || [0, 0, 0];
+    if (Math.hypot(v[0] || 0, v[2] || 0) >= 0.6 || t - lastInput < 0.5 || !lastActive) lastActive = t;
+    const idle = t - lastActive, lv = level();
+    for (const id in PTS) {
+      const el = document.getElementById(id); if (!el) continue;
+      const shown = el.style.display !== 'none' && !!el.textContent;
+      const on = PTS[id].step(t, shown ? (el.dataset.goal || el.textContent.replace(/[\d.,\s]+m\b.*$/, '')) : '', held ? 0 : idle, lv);
+      if (el.classList.contains('q-away') === on) el.classList.toggle('q-away', !on);
+      if (shown) Q.pointerStats[on ? 'shownS' : 'hiddenS'] += 0.25;
+    }
+  }
+  Q.pointers = PTS;
+  // ---- f-quiet2: a codex find whose toast this level drops was not on the screen — weight 1 in the event log
+  let foundWrapped = false;
+  function wrapFound() {
+    const EL = VR.EventLog; if (!EL || !EL.found) return; foundWrapped = true;
+    if (EL.found.__q) return;
+    const of = EL.found;
+    EL.found = function (id) {
+      const s = String(id || '');
+      if (Q.foundW(s, 2, level()) >= 2) return of.apply(this, arguments);
+      const oe = EL.emit;
+      EL.emit = function () { const a = Array.prototype.slice.call(arguments); a[2] = Q.foundW(s, a[2] | 0, level()); return oe.apply(this, a); };
+      try { return of.apply(this, arguments); } finally { EL.emit = oe; }
+    };
+    EL.found.__q = true;
   }
   setInterval(tick, 250);
 
