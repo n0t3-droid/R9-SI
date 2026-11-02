@@ -181,12 +181,28 @@ check(cur.step === 'lights', 'the lens found (its line: ' + JSON.stringify(await
 // three lanterns by the beacon, placed through the game's own hook
 const placed = await ev((hill) => {
   const g = VR.game, R = VR.R, st = (R.byName.lantern || R.byName.torch).defaultState, out = [];
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 1; k++) {
     const a = k * 2.1 + 0.5, x = Math.floor(hill[0] + Math.cos(a) * 5), z = Math.floor(hill[1] + Math.sin(a) * 5), y = VR.Tales.ground(g, x + 0.5, z + 0.5);
     if (y === null) continue; g.world.setBlock(x, y, z, st); if (g.onBlockPlaced) g.onBlockPlaced(x, y, z, st, g.player); out.push([x, y, z]);
   }
   return { out, hooked: !!(g.onBlockPlaced && g.onBlockPlaced.__tl) };
 }, hill);
+// (f-polish8: the beacon stirs with the first light — its lens brighter, a lamp on its rim: a picture at dusk)
+run.stage1 = await ev(() => VR.Tales.test.diag().stage);
+await ev(() => VR.game.env.setTime(12600));
+await stand([hill[0] + 7, hy + 3, hill[1] + 6], [hill[0], hy + 3, hill[1]]);
+await step(8, 33);
+await grab('bstage', 'tales_beacon_stage.png', 4);
+await ev(() => VR.game.env.setTime(9600));
+{ const more = await ev((hill) => {
+  const g = VR.game, R = VR.R, st = (R.byName.lantern || R.byName.torch).defaultState, out = [];
+  for (let k = 1; k < 3; k++) {
+    const a = k * 2.1 + 0.5, x = Math.floor(hill[0] + Math.cos(a) * 5), z = Math.floor(hill[1] + Math.sin(a) * 5), y = VR.Tales.ground(g, x + 0.5, z + 0.5);
+    if (y === null) continue; g.world.setBlock(x, y, z, st); if (g.onBlockPlaced) g.onBlockPlaced(x, y, z, st, g.player); out.push([x, y, z]);
+  }
+  return out;
+}, hill); placed.out.push(...more); }
+check(run.stage1 === 2, 'one light brought: the beacon stirs (stage ' + run.stage1 + ' of 4)');
 await step(30, 33);
 cur = await ev(() => VR.Tales.test.cur());
 run.beaconPlaced = placed;
@@ -208,9 +224,17 @@ await shotOf(() => { const g = VR.game; return g.villages.agents.find(a => a.bub
 await step(90, 33);   // (the toast)
 // at night the woken beacon shines over the land
 await ev(() => { VR.game.env.setTime(16500); });
-{ const dx = vpos[0] - hill[0], dz = vpos[1] - hill[1], L = Math.hypot(dx, dz) || 1; await stand([hill[0] + dx / L * 26, hy + 7, hill[1] + dz / L * 26], [hill[0], hy + 3, hill[1]]); }
+// (f-polish8: run 1 of a-quest missed it from 26 m — now 15 m, and the numbers of the draw logged)
+const litPre = await ev(() => VR.Tales.test.diag());
+console.log('     lit before the night picture: ' + JSON.stringify(litPre).slice(0, 300));
+const LB = litPre.lit[0] || { x: hill[0], z: hill[1], y: hy };
+const lby = Number.isFinite(LB.y) ? LB.y : hy;
+{ const dx = vpos[0] - LB.x, dz = vpos[1] - LB.z, L = Math.hypot(dx, dz) || 1; await stand([LB.x + dx / L * 15, lby + 4, LB.z + dz / L * 15], [LB.x, lby + 4.5, LB.z]); }
 await settle(6); await step(10, 33);
 await grab('bnight', 'tales_beacon_night.png', 6);
+run.litDiag = await ev(() => { const d = VR.Tales.test.diag(), g = VR.game, L = d.lit[0], R = VR.R; let names = ''; if (L && Number.isFinite(L.y)) for (let y = L.y - 2; y <= L.y + 1; y++) { const s = g.world.getBlock(Math.floor(L.x), y, Math.floor(L.z)); names += y + ':' + (s ? R.types[R.T.type[s]].name : 'air') + ' '; } return Object.assign(d, { column: names, tod: g.env.timeOfDay | 0 }); });
+console.log('     the night picture: ' + JSON.stringify(run.litDiag).slice(0, 400));
+check(run.litDiag.litDrawn > 0 && !run.litDiag.err, 'the woken beacon drawn at night (' + run.litDiag.litDrawn + ' draws, ' + run.litDiag.glows + ' glows)');
 const lit = await ev(() => VR.Tales.test.rec().lit);
 check(lit.length === 1 && lit[0].k === 'beacon', 'the beacon stays awake: ' + JSON.stringify(lit));
 
@@ -272,8 +296,13 @@ if (lostOk) {
   const end2 = await ev(() => VR.Tales.test.last());
   run.end2 = end2;
   check(end2 && /lost\.end/.test(end2.key), `home: „${end2 && end2.text}“`);
-  await step(30, 33);
-  await shotOf(() => { const g = VR.game; return g.villages.agents.find(a => a.bubble && a.bubble.text && a.bubble.text.length > 30 && !a.kid) || (VR.Tales.state.kid && VR.Tales.state.kid.a) || null; }, 'lend', 'tales_lost_end.png');
+  // (f-polish8: the ending pictured — the friend says it in person with the child beside her: wait for her bubble)
+  let hug = null;
+  for (let i = 0; i < 14; i++) { await step(10, 33); hug = await ev((gid) => { const g = VR.game, a = g.villages.agents.find(x => x.p && String(x.p.id) === String(gid) && !x.tlKid), k = VR.Tales.state.kid && VR.Tales.state.kid.a; if (!a) return null; return { bubble: !!(a.bubble && a.bubble.text && a.bubble.text.length > 20), text: a.bubble ? a.bubble.text : '', d: k ? +Math.hypot(k.pos[0] - a.pos[0], k.pos[2] - a.pos[2]).toFixed(1) : null }; }, giver.id); if (hug && hug.bubble && hug.d !== null && hug.d < 3) break; }
+  run.hug = hug;
+  await ev((id) => { window.__gid = id; }, giver.id);
+  await shotOf(() => { const g = VR.game; return g.villages.agents.find(a => a.p && String(a.p.id) === String(window.__gid) && !a.tlKid && a.bubble) || g.villages.agents.find(a => a.bubble && a.bubble.text && a.bubble.text.length > 30 && !a.kid) || (VR.Tales.state.kid && VR.Tales.state.kid.a) || null; }, 'lend', 'tales_lost_end.png', 3.8);
+  check(!!(hug && hug.bubble && hug.d !== null && hug.d < 3), 'the ending in person: the friend speaks it, the child beside her (' + JSON.stringify(hug).slice(0, 200) + ')');
   lostOk = !!(end2 && /lost\.end/.test(end2.key));
 }
 
@@ -316,7 +345,8 @@ const row = (label, ks) => ({ label, imgs: ks.map(k => pics[k]).filter(Boolean) 
 const rows = [
   row('Ein Freund fragt — eine kleine Blase, dann im Gespräch: „✿ Was ist los?“', ['hook', 'offer']),
   row('Das schläfrige Leuchtfeuer: der Hügel, die Linse am Hang', ['bhill', 'blens']),
-  row('Drei Laternen (Bauen) — dann das Ende beim Freund', ['blit', 'bend']),
+  row('Die erste Laterne: das Leuchtfeuer regt sich (Linse heller, eine Lampe am Rand) · alle drei: es erwacht', ['bstage', 'blit']),
+  row('Das Ende beim Freund', ['bend']),
   row('Nachts leuchtet das geweckte Feuer über dem Land · das Wanderbuch', ['bnight', 'book']),
   row('Wo ist …? In der Dämmerung am Feenort: die Fußspuren · gefunden', ['ltrail', 'lfound']),
   row('Die Wendung · das Kind läuft dir nach', ['ltwist', 'lfollow']),
