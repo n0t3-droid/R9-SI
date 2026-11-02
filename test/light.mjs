@@ -53,7 +53,9 @@ const settle = async (max = 60) => {
   return s;
 };
 // before: v-look as merged (its four on by the preset, the two new off); after: the preset's defaults
-const config = (c) => ev((c) => { const g = VR.game, r = g.renderer; r.setQuality({ lfPools: c === 'after' && VR.LField.defaults(g.settings.preset).lfPools }); return 'lfPools=' + (r.q.lfPools ? 1 : 0); }, c);
+// (run 2: the pictures right after the switch lacked the near chunks — the rebuilt programs still compiling: frames
+// drawn until every deferred program is ready)
+const config = (c) => ev((c) => { const g = VR.game, r = g.renderer; r.setQuality({ lfPools: c === 'after' && VR.LField.defaults(g.settings.preset).lfPools }); window.__norender = false; let i = 0; for (; i < 40 && (i < 3 || VR.GL.pending.size); i++) { g.last = performance.now() - 33; window.__step(performance.now()); } window.__norender = true; return 'lfPools=' + (r.q.lfPools ? 1 : 0) + ' (' + i + ' frames, ' + VR.GL.pending.size + ' pending)'; }, c);
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.applySettings('*'); }, p);
 const grab = async (name, tod, K = 4) => {
   const url = await ev(([tod, K]) => { const g = VR.game; if (tod !== null) { g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } } window.__norender = false; for (let i = 0; i < K; i++) { if (tod !== null) { g.env.setTime(tod); if (g.photoCam && g.photoCam.on) g.photoCam.held = tod; } g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
@@ -137,8 +139,10 @@ try {
     views.push({ name: 'street', P: f.P, T: f.T, tod: EVE, prep: async () => { await fest(vF && vF.id !== vS.id ? vF.id : null, vS.id); await run(60); } });   // (the street's village not celebrating)
     if (want('carry')) views.push({ name: 'carry', tod: EVE, dyn: async () => {
       const a = await carrierNear(C); if (!a) return null;
-      const yw = a.yaw || 0, P = [a.p[0] - Math.sin(yw) * 4.5 + Math.cos(yw) * 2, a.p[1] + 2.2, a.p[2] - Math.cos(yw) * 4.5 - Math.sin(yw) * 2];
-      return { P, T: [a.p[0], a.p[1] + 0.9, a.p[2]] };
+      // (run 2: the eye stood in a wall — a ring of places 4 m out, 2 m up: the first in the air that sees the bearer)
+      const T = [a.p[0], a.p[1] + 0.8, a.p[2]];
+      for (let j = 0; j < 12; j++) { const an = (a.yaw || 0) + Math.PI + j / 12 * Math.PI * 2, P = [a.p[0] + Math.sin(an) * 4.2, a.p[1] + 2.0, a.p[2] + Math.cos(an) * 4.2]; const ok = await ev(([P, T]) => { const w = VR.game.world, F3 = VR.Folk3, so = F3.solidW(w); for (let dy = -1; dy <= 1; dy++) if (w.getBlock(Math.floor(P[0]), Math.floor(P[1]) + dy, Math.floor(P[2]))) return false; return F3.lineFirst(so, T, P) === Infinity && F3.lineFirst(so, P, T) === Infinity; }, [P, T]); if (ok) return { P, T }; }
+      return { P: [a.p[0], a.p[1] + 6, a.p[2] + 4], T };
     }, prep: async () => { await run(30); } });
   }
   // ---------------------------------------------------------------- a fairy place
@@ -209,6 +213,7 @@ try {
       let P = v.P, T = v.T;
       if (v.dyn) { const d = await v.dyn(); if (!d) { console.log('     ' + v.name + ': nobody'); continue; } P = d.P; T = d.T; }
       await camAt(P, T, v.tod); await settle(25); await run(10);
+      if (v.dyn) { const d = await v.dyn(); if (d) { P = d.P; T = d.T; await camAt(P, T, v.tod); } }   // (the bearer walked on while the place settled: the frame again, at once)
       N.cams[v.name + '_' + c] = { P, T };
       const f = await grab(v.name + '_' + c, v.tod, 6);
       const st = await stat(); st.L = f ? await meanL(f) : null; N.stats[v.name + '_' + c] = st;

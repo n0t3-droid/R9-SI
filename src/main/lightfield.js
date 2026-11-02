@@ -13,7 +13,7 @@
 //                own cell is lit, its far side not). Falloff 1 / (1 + k d²), tapered to 0 at R
 //   · static     the scanned lights restamped into a back buffer a few dozen a frame, swapped when complete
 //   · moving     the frame's moving lights (≤ LF.DMAX) stamped over a copy of the static grid every frame
-//   · packed     RGBA8: rgb √(light / LMAX), a the lights' mean height (over Y0, 48 m) — one 64 KB upload a frame
+//   · packed     RGBA8: rgb √(L′ / LMAX) with L′ = L / (1 + L / LMAX) (a soft ceiling), a the lights' mean height (over Y0, 48 m) — one 64 KB upload a frame
 // The shaders (terrain, props, furniture, the voxel models, the people) sample it at their place (one bilinear tap)
 // and add it to the lamps' light: soft coloured light, a vertical falloff from the lights' height, a hemispheric cosine.
 // Very Low and Low: off (their programs unchanged, nothing runs). Balanced: off by default (switchable). High and up: on.
@@ -48,14 +48,16 @@
 
   // ---------------------------------------------------------------- the constants
   LF.N = 128; LF.HALF = 64; LF.BAND = 32; LF.BELOW = 12;
-  LF.ROWS = 4;       // columns scanned a frame: 4 rows of 128 (the window in 32 frames)
-  LF.STAMPS = 48;    // static lights restamped a frame
-  LF.LMAX = 3.0;     // the packed range (√-encoded)
+  LF.ROWS = 2;       // columns scanned a frame: 2 rows of 128 (the window in 64 frames, ~1 s)
+  LF.STAMPS = 24;    // static lights restamped a frame (only while the scan sees a change)
+  LF.LMAX = 1.6;     // the packed range (√-encoded) and the soft ceiling L / (1 + L / LMAX)
   LF.HSPAN = 48;     // the height channel's span over Y0 (m)
   LF.DMAX = 32;      // moving lights a frame
   // the light: gain per emit level 15, falloff k (1/m²), radius R (m) of a block light and of a moving one; the shader's
   // strength, vertical falloff (1/m², past 1.5 m) and the fade at the window's edge (m)
-  LF.K = { gain: 1.25, k: 0.07, R: 14, Rd: 11, str: 1.0, kv: 0.05, fade0: 50, fade1: 60 };
+  // cube: a full glowing cube's share (a neon band, a lit floor line, a glowing block — its own glow and the voxel light
+  // already light its place; the field is for the lamps, the lanterns, the fires, the windows' light)
+  LF.K = { gain: 1.25, k: 0.07, R: 14, Rd: 11, str: 1.0, kv: 0.05, fade0: 50, fade1: 60, cube: 0.25 };
   const N = LF.N, NN = N * N, M = N - 1, OPQ = 2;   // (VR.F.OPAQUE is 1 << 1: registry.js)
 
   // ---------------------------------------------------------------- the disc's order (a ray cast in one pass)
@@ -94,6 +96,7 @@
     // many lights — their light summed, their place the light-weighted mean), x y z r g b each
     this.L = new Float32Array((NN >> 2) * 6); this.nList = 0; this.li = 0;
     this.dirty = true; this.fresh = true; this.lastDyn = 0;
+    this.touchT = new Int32Array(NN); this.prevT = new Int32Array(NN); this.nTouch = 0; this.nPrev = 0; this.mark = new Uint32Array(NN); this.gen = 1; this.hs = 255 / LF.HSPAN;
     this.row = 0; this.cx = 0; this.cz = 0; this.cy = 0; this.Y0 = 0;
     this.started = false; this.swapped = 0; this.dyn = new Float32Array(LF.DMAX * 7); this.nDyn = 0;
     this.stats = { scan: 0, stamps: 0, swaps: 0, lights: 0, dyn: 0 };
@@ -131,7 +134,7 @@
             const s = B[(y << 8) | lc]; if (!s) continue;
             if (flags[s] & OPQ) m |= (1 << b);
             const em = emit[s];
-            if (em) { const lv = Math.max((em >> 8) & 15, (em >> 4) & 15, em & 15); if (lv > eb) { eb = lv; e = em; ey = y; } }
+            if (em) { const lv = Math.max((em >> 8) & 15, (em >> 4) & 15, em & 15) * ((flags[s] & OPQ) ? 1 : 2); if (lv > eb) { eb = lv; e = (em & 0xfff) | ((flags[s] & OPQ) ? 0x8000 : 0); ey = y; } }   // (a lamp, a torch, a lantern before a glowing cube in the same column)
           }
         }
         if (moved ? (m || e || this.mask[i] || this.em[i]) : (this.mask[i] !== (m >>> 0) || this.em[i] !== e || this.emY[i] !== ey)) this.dirty = true;   // (a change: the lights again)
@@ -149,7 +152,7 @@
     return (this.mask[i] >>> b) & 1 ? 0 : 1;
   };
   // stamp one light (world x, y, z; rgb at the source) into the buffer A, radius R
-  FP.stamp = function (A, lx, ly, lz, r, g, b, R) {
+  FP.stamp = function (A, lx, ly, lz, r, g, b, R, rec) {
     const D = LF.disc(R), vis = D.vis, ox = D.ox, oz = D.oz, par = D.par, dist = D.dist, k = LF.K.k;
     const x0 = this.cx - LF.HALF, z0 = this.cz - LF.HALF, ix = Math.floor(lx), iz = Math.floor(lz), iy = Math.floor(ly);
     const lum = r + g + b; if (lum <= 0) return;
@@ -162,6 +165,7 @@
       const f = LF.fall(dist[j], R, k) * vp;
       const q = i * 4;
       A[q] += r * f; A[q + 1] += g * f; A[q + 2] += b * f; A[q + 3] += ly * lum * f;
+      if (rec && this.mark[i] !== this.gen) { this.mark[i] = this.gen; this.touchT[this.nTouch++] = i; }
       vis[j] = j === 0 ? 1 : vp * this.open(i, wx, wz, iy);
     }
   };
@@ -183,7 +187,7 @@
           if (wx < x0 || wx >= x0 + N || wz < z0 || wz >= z0 + N) continue;
           const i = (wz & M) * N + (wx & M), e = this.em[i];
           if (!e || this.tx[i] !== wx || this.tz[i] !== wz) continue;
-          const r = ((e >> 8) & 15) * gk, g = ((e >> 4) & 15) * gk, b = (e & 15) * gk, w = r + g + b;
+          const ck = (e & 0x8000) ? K.cube : 1, r = ((e >> 8) & 15) * gk * ck, g = ((e >> 4) & 15) * gk * ck, b = (e & 15) * gk * ck, w = r + g + b;
           sr += r; sg += g; sb += b; sx += (wx + 0.5) * w; sy += (this.emY[i] + 0.5) * w; sz += (wz + 0.5) * w; sw += w;
         }
         if (sw <= 0) continue;
@@ -210,21 +214,33 @@
     return true;
   };
   // the picture: static + moving, packed (the field's base height Y0 = the eye's − 16)
+  // (only the moving lights changed: the cells they lit the frame before and light now — restored from the static
+  // grid, restamped, repacked — not the whole grid: their touch lists)
+  FP.packCell = function (i) {
+    const A = this.work, out = this.out, lut = this.lut, q = i * 4, r = A[q], g = A[q + 1], b = A[q + 2], l = r + g + b;
+    if (l < 1e-4) { out[q] = out[q + 1] = out[q + 2] = out[q + 3] = 0; return; }
+    // a soft ceiling (L / (1 + L / LMAX)): a street of lamps sums to a glow, never to white
+    const S = LF.LMAX, s = 1023 / S, kr = r / (1 + r / S), kg = g / (1 + g / S), kb = b / (1 + b / S);
+    out[q] = lut[Math.min(1023, (kr * s) | 0)]; out[q + 1] = lut[Math.min(1023, (kg * s) | 0)]; out[q + 2] = lut[Math.min(1023, (kb * s) | 0)];
+    out[q + 3] = clamp(((A[q + 3] / l - this.Y0) * this.hs) | 0, 0, 255);
+  };
   FP.compose = function (force) {
+    const Y0 = this.cy - 16, full = force || this.fresh || this.swapped !== this.composedAt || Y0 !== this.Y0;
     // (nothing new — no swap since the last picture, no moving light now or then: the picture of before stands)
-    if (!force && !this.fresh && this.nDyn === 0 && this.lastDyn === 0 && this.swapped === this.composedAt) return null;
-    this.fresh = false; this.lastDyn = this.nDyn; this.composedAt = this.swapped;
-    const A = this.work, D = this.dyn; A.set(this.front);
-    for (let j = 0; j < this.nDyn; j++) { const o = j * 7; this.stamp(A, D[o], D[o + 1], D[o + 2], D[o + 3], D[o + 4], D[o + 5], D[o + 6]); }
+    if (!full && this.nDyn === 0 && this.nPrev === 0) return null;
+    this.fresh = false; this.lastDyn = this.nDyn; this.composedAt = this.swapped; this.Y0 = Y0; this.hs = 255 / LF.HSPAN;
+    const A = this.work, D = this.dyn, F = this.front, P = this.prevT;
+    if (full) A.set(F);
+    else for (let k = 0; k < this.nPrev; k++) { const q = P[k] * 4; A[q] = F[q]; A[q + 1] = F[q + 1]; A[q + 2] = F[q + 2]; A[q + 3] = F[q + 3]; }
+    this.gen = (this.gen + 1) >>> 0 || 1; this.nTouch = 0;
+    for (let j = 0; j < this.nDyn; j++) { const o = j * 7; this.stamp(A, D[o], D[o + 1], D[o + 2], D[o + 3], D[o + 4], D[o + 5], D[o + 6], true); }
     this.stats.dyn = this.nDyn;
-    const out = this.out, lut = this.lut, s = 1023 / LF.LMAX, Y0 = this.Y0 = this.cy - 16, hs = 255 / LF.HSPAN;
-    for (let i = 0, q = 0; i < NN; i++, q += 4) {
-      const r = A[q], g = A[q + 1], b = A[q + 2], l = r + g + b;
-      if (l < 1e-4) { out[q] = out[q + 1] = out[q + 2] = 0; out[q + 3] = 0; continue; }
-      out[q] = lut[Math.min(1023, (r * s) | 0)]; out[q + 1] = lut[Math.min(1023, (g * s) | 0)]; out[q + 2] = lut[Math.min(1023, (b * s) | 0)];
-      out[q + 3] = clamp(((A[q + 3] / l - Y0) * hs) | 0, 0, 255);
-    }
-    return out;
+    let n = 0;
+    if (full) { for (let i = 0; i < NN; i++) this.packCell(i); n = NN; }
+    else { for (let k = 0; k < this.nPrev; k++) this.packCell(P[k]); for (let k = 0; k < this.nTouch; k++) this.packCell(this.touchT[k]); n = this.nPrev + this.nTouch; }
+    this.stats.packed = n;
+    const t = this.prevT; this.prevT = this.touchT; this.touchT = t; this.nPrev = this.nTouch; this.nTouch = 0;
+    return this.out;
   };
   // decode a packed cell (the node test; the GLSL does the same)
   LF.decode = function (out, i, Y0) {

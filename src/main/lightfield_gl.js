@@ -29,6 +29,9 @@
     out[0] = a.pos[0] + Math.cos(yw) * 0.36 - Math.sin(yw) * 0.08; out[1] = a.pos[1] + 0.62 + sw; out[2] = a.pos[2] - Math.sin(yw) * 0.36 - Math.cos(yw) * 0.08;
     return out;
   };
+  // the fairy models' light colours (fairy_models.js: the mushrooms teal · violet · rose, the lamp and the tree's windows
+  // warm, the crystals and the pool cool)
+  LF.FAIRY = { fy_shroom_0: [0.3, 0.95, 0.85], fy_shroom_1: [0.65, 0.45, 1.0], fy_shroom_2: [1.0, 0.5, 0.75], fy_lamp: [1.0, 0.8, 0.45], fy_tree: [1.0, 0.75, 0.4], fy_pool: [0.45, 0.85, 1.0], fy_crystal_0: [0.5, 0.8, 1.0], fy_crystal_1: [0.8, 0.55, 1.0], fy_crystal_2: [1.0, 0.6, 0.8], fy_garden: [0.9, 0.8, 1.0] };
   const night = (E) => Math.max(0, Math.min(1, (E && E.night) || 0));
   const hp = [0, 0, 0];
   LF.gather = function (g, f, E, t) {
@@ -61,6 +64,23 @@
         const cx = pz.x + 0.5, cz = pz.z + 0.5, y = pz.y, PR = (pz.r || 4) + 1.5, fl = 0.85 + 0.15 * Math.sin(t * 11) * Math.sin(t * 7.3 + 1);
         f.add(cx, y + 1.2, cz, 1.6 * fl, 0.75 * fl, 0.25 * fl, 14);
         for (let j = 0; j < 6; j++) { const a = j / 6 * TAU + 0.3; f.add(cx + Math.cos(a) * PR, y + 2.6, cz + Math.sin(a) * PR, 0.75, 0.5, 0.3, 10); }
+      }
+    }
+    // the fairy places at night: their glowing models (the giant mushrooms, the lamps, the crystals, the pool) — models,
+    // not blocks, so the scan does not see them: the nearest eight cast their colour on the moss
+    const FS = VR.Fairy && VR.Fairy.state;
+    if (FS && FS.sites && nt > 0.3) {
+      let n = 0;
+      for (const st of FS.sites) {
+        if (!st.parts || n >= 8) continue;
+        const dx = st.x - f.cx, dz = st.z - f.cz; if (dx * dx + dz * dz > 80 * 80) continue;
+        for (const m of st.parts) {
+          if (n >= 8) break;
+          const c = LF.FAIRY[m.m]; if (!c || !m.pos) continue;
+          const ex = m.pos[0] - f.cx, ez = m.pos[2] - f.cz; if (ex * ex + ez * ez > 56 * 56) continue;
+          const h = (m.o && m.o.h) || 1.5, k = 0.9 * nt * (0.9 + 0.1 * Math.sin(t * 1.3 + n));
+          if (f.add(m.pos[0], m.pos[1] + h * 0.6, m.pos[2], c[0] * k, c[1] * k, c[2] * k, Math.round(8 + Math.min(4, h)))) n++;
+        }
       }
     }
     // the bursts: a moment of coloured light from above
