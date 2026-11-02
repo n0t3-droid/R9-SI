@@ -146218,7 +146218,7 @@ const b=p.querySelector('[data-wd="close"]');if(b)b.onclick=()=>W.close(g);
 g.ui.show('wanderbuch');
 return true;
 };
-W.close=function(g){if(g&&g.ui&&g.ui.screen==='wanderbuch')g.ui.show('hud');};
+W.close=function(g){if(g&&g.ui&&g.ui.screen==='wanderbuch')(g.ui.resume?g.ui.resume():g.ui.show(null));};
 
 
 const LD=VR.LifeDirector;
