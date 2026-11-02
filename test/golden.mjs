@@ -9,6 +9,8 @@
 //   pass   every shot ≥ its thresholds (THR below); a failure writes test/shots/golden_<id>_diff.png (reference · now ·
 //          the SSIM map, dark = different) and the scores; all scores → .tmp_tests/golden_run.json
 //   UPDATE=1 writes the references test/golden/<id>.png (commit them); ONLY=vista,cafe · DIST=file:///…/index.html
+//   UPDATE_IDS=hud,starmap (with UPDATE=1): writes only those references, compares the rest (f-ux: an intended change)
+//   hud (f-ux): the page with the HUD at spawn (Balanced; the compass rose, the hotbar, no minimap) — a page screenshot
 //   usage: nohup bash test/wt_run.sh golden.mjs 1200 > .tmp_tests/golden.log 2>&1 &   (≤ 6 min on the 2-CPU machine)
 // regress: skip  (the release gate runs it: test/release_gate.sh; UPDATE=1 is a choice a person makes)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -20,13 +22,14 @@ const require = createRequire(import.meta.url);
 const S = require(ROOT + 'test/golden_ssim.js');
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const GOLD = ROOT + 'test/golden/', SHOTS = ROOT + 'test/shots/';
-const UPDATE = process.env.UPDATE === '1', ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+const UPDATE = process.env.UPDATE === '1', UPD_IDS = process.env.UPDATE_IDS ? process.env.UPDATE_IDS.split(',') : null, ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const want = (id) => !ONLY || ONLY.includes(id);
 const W = 640, H = 360, CW = 320, CH = 180;   // (the page, the comparison)
 // the thresholds a shot: luma, chroma, the worst tile (the DOM map is exact; the station and the town settle less alike)
 const THR = {
   vista_vl: { y: 0.80, c: 0.85, tile: 0.45 }, citadel_vl: { y: 0.80, c: 0.85, tile: 0.45 },
   vista: { y: 0.80, c: 0.85, tile: 0.45 }, citadel: { y: 0.80, c: 0.85, tile: 0.45 }, plaza: { y: 0.75, c: 0.85, tile: 0.40 },
+  hud: { y: 0.75, c: 0.80, tile: 0.35 },
   fairy: { y: 0.75, c: 0.85, tile: 0.40 }, starmap: { y: 0.95, c: 0.95, tile: 0.80 }, cafe: { y: 0.75, c: 0.85, tile: 0.40 },
   aqua: { y: 0.70, c: 0.80, tile: 0.35 },
 };
@@ -92,7 +95,7 @@ async function judge(id, png, note) {
   const now = SHOTS + 'golden_' + id + '.png', ref = GOLD + id + '.png';
   try { fs.unlinkSync(SHOTS + 'golden_' + id + '_diff.png'); } catch (e) { /* none from an earlier run */ }
   fs.writeFileSync(now, png);
-  if (UPDATE) { await sharp(png).resize(CW, CH, { fit: 'fill' }).removeAlpha().png({ compressionLevel: 9 }).toFile(ref);   // (the references at the comparison's size: ~0.1 MB a shot in git)
+  if (UPDATE && (!UPD_IDS || UPD_IDS.includes(id))) { await sharp(png).resize(CW, CH, { fit: 'fill' }).removeAlpha().png({ compressionLevel: 9 }).toFile(ref);   // (the references at the comparison's size: ~0.1 MB a shot in git)
     run.shots[id] = { ref: 'written', note }; console.log(`  ⟳ ${id}: reference written (${note || ''})`); save(); return; }
   if (!fs.existsSync(ref)) { check(false, `${id}: no reference test/golden/${id}.png — run UPDATE=1 once`); return; }
   const a = await small(fs.readFileSync(ref)), b = await small(png);
@@ -135,6 +138,14 @@ for (const tag of ['vl', 'bal']) {
   await timed('citadel' + sfx, async () => { if (!cit) throw new Error('no citadel within 1500 m'); await atCitadel(); await judge('citadel' + sfx, b64(await grabGL()), 'eye ' + citEye.map(Math.round)); });
 }
 // ---------------------------------------------------------------- Balanced: the places
+await timed('hud', async () => {   // f-ux: the HUD at spawn, as a player sees it (the page, not the GL canvas alone)
+  await atSpawn();
+  await ev(() => { const g = VR.game; g.hideHud = false; const h = document.getElementById('hud'); if (h) h.style.display = ''; const n = document.getElementById('notes'); if (n) n.style.visibility = 'hidden'; const f = document.getElementById('funkebub'); if (f) f.style.visibility = 'hidden'; });
+  await step(20); await wait(500); await step(4);
+  const png = await page.screenshot({ type: 'png' });
+  await ev(() => { const g = VR.game; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
+  await judge('hud', png, 'the HUD at spawn');
+});
 await timed('plaza', async () => {
   const site = await ev((P) => { let b = null; for (const s of VR.game.villages.sites) { const d = Math.hypot(s.x - P[0], s.z - P[2]); if (!b || d < b.d) b = { id: s.id, x: s.x, y: s.y, z: s.z, d }; } return b; }, spawn.pos);
   if (!site) throw new Error('no village');

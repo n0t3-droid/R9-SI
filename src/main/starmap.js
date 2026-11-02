@@ -223,7 +223,7 @@
       boxes.push([bx, by, w + 6]); M.labels++;
       X.fillStyle = '#000a'; X.fillRect(bx, by, w + 6, 16); X.fillStyle = col; X.fillText(txt, P.x[i] + 12, P.y[i]);
     };
-    const near = G().systemsNear(N, N.list[M.here].p, range);
+    const near0 = G().systemsNear(N, N.list[M.here].p, range), near = VR.Diegetic && VR.Diegetic.capNear ? VR.Diegetic.capNear(near0, VR.Diegetic.STAR_LABELS) : near0;   // f-ux: the labels in reach, the nearest 24 (creative: all 1518 were)
     for (const q of near) if (q.idx !== M.here && shown(q.idx)) label(q.idx, '#cfe6ffcc', q.s.name + ' · ' + fmt(q.d) + ' ' + T('g.stars.ly'), true);
     // ---- e-portal2 (R55-05): the neighbourhood's names beyond the jump's reach too (the nearest 28, dimmer)
     if (M.fitHere === M.here && M.fitLabels) for (const i of M.fitLabels) if (shown(i) && !near.some(q => q.idx === i)) label(i, '#9fb8d8b0', N.list[i].name + ' · ' + fmt(distLy(i, M.here)) + ' ' + T('g.stars.ly'), true);
@@ -238,7 +238,7 @@
       label(i, '#fff', N.list[i].name + ' · ' + fmt(d) + ' ' + T('g.stars.ly'));
     }
     if (NX && P.z[NX.idx] >= 1) label(NX.idx, '#ffd36a', T('g.stars2.next', { name: NX.name, ly: fmt(NX.d), why: T('g.stars2.why.' + NX.why) }));   // u-stars2
-    root.querySelector('#smWhere').textContent = T('g.stars.mapWhere', { name: N.list[M.here].name, n: near.length - 1, ly: range, all: N.list.length }) + (RT.length > 1 ? ' · ' + T('g.stars2.route', { n: RT.length - 1 }) : '');   // (u-stars2: the route)
+    root.querySelector('#smWhere').textContent = T('g.stars.mapWhere', { name: N.list[M.here].name, n: near0.length - 1, ly: range, all: N.list.length }) + (RT.length > 1 ? ' · ' + T('g.stars2.route', { n: RT.length - 1 }) : '');   // (u-stars2: the route)
   }
 
   // ---------------------------------------------------------------- the card
