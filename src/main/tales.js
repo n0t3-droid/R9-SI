@@ -215,7 +215,7 @@
     const hide = tale.steps.find(s => s.at === 'hide' && s.p), at = hide ? hide.p : TC.target(tale); if (!at) return null;
     const y = yAt(g, at[0], at[1]); if (y === null) return null;
     const a = new S.Ctor(vil, Object.assign({}, person, { town: undefined }), [at[0] + 0.5, y, at[1] + 0.5]);
-    a.tlKid = true; a.greeted = true; a.talkCool = 30; a.act = { type: 'tlkid', ph: 'hide' }; a.path = null; a.goal = null; a.pose = 'sitground';
+    a.tlKid = true; a.greeted = true; a.talkCool = 9999; a.act = { type: 'tlkid', ph: 'hide' }; a.path = null; a.goal = null; a.pose = 'sitground';
     V.agents.push(a); stashTwin(V, a);
     S.kid = { a, ph: 'hide', t: 0 };
     log('kid', person.name);
@@ -274,8 +274,8 @@
     const res = TC.finish(rec, t); if (!res) return;
     const end = T(res.key, V0), head = T(res.head, V0), gv = liveOf(V, res.giver.pid);
     S.endGiver = res.giver.pid;
-    if (gv && Math.hypot(gv.pos[0] - g.player.pos[0], gv.pos[2] - g.player.pos[2]) < 90) { say(gv, end, 8); gv.lookAt = [g.player.pos[0], g.player.pos[1] + 1.4, g.player.pos[2]]; if (V.hearts) V.hearts(gv); }
-    else note(g, end, 'tl:end');
+    S.pend = { pid: res.giver.pid, text: end, t: Date.now() };   // (said by the friend in person: now, or as soon as their village is awake around you)
+    sayEnd(V);
     if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
     if (S.fl) S.fl.ph = 'home';
     // friendship, the news, the page, a small gift
@@ -292,6 +292,16 @@
     S.lastEnd = { key: res.key, text: end, head, item, late: res.late, page: res.page.id, t: Date.now() };
     log('done', res.key);
     hud(g, '');
+  }
+  function sayEnd(V) {
+    const J = S.pend, g = V.g; if (!J) return;
+    const gv = liveOf(V, J.pid), p = g.player.pos;
+    if (gv && Math.hypot(gv.pos[0] - p[0], gv.pos[2] - p[2]) < 90 && !(gv.bubble && gv.bubble.text === J.text)) {
+      S.pend = null; say(gv, J.text, 9); gv.lookAt = [p[0], p[1] + 1.4, p[2]]; gv.waveT = 1.6; if (V.hearts) V.hearts(gv);
+      if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
+      return;
+    }
+    if (Date.now() - J.t > 15000) { S.pend = null; note(g, J.text, 'tl:end'); }
   }
   // the player's own placing (player.js afterPlace → g.onBlockPlaced, chained like adventure.js does)
   function install(g) {
@@ -342,6 +352,7 @@
     const rec = TL.rec(g), t = now(g);
     if (rec.cur && rec.cur.st === 'on') run(V, rec, t);
     else { if (S.line) hud(g, ''); if (rec.cur && rec.cur.st !== 'on') rec.cur = null; tryOffer(V, rec, t); }
+    if (S.pend) sayEnd(V);
     if (S.kid && S.kid.ph === 'home' && !rec.cur && S.kid.t > 30) endKid(V);
     if (S.kid && !rec.cur && S.kid.ph !== 'home') endKid(V);
     // the woken beacons and the Flausel houses: their ground once near
@@ -378,18 +389,19 @@
     for (const L of rec.lit) {
       if (L.dim !== dimOf(g) || !fin(L.y)) continue;
       const dx = L.x - cam.x, dz = L.z - cam.z; if (dx * dx + dz * dz > 220 * 220) continue;
-      if (L.k === 'beacon') { MP.scale = 1; MP.light = night ? FULL : null; MP.noShade = false; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon', [L.x, L.y - 0.05, L.z], 0, cam, MP)) n++; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
+      if (L.k === 'beacon') { MP.scale = 1; MP.light = night ? FULL : null; MP.noShade = false; const bp = S.bp || (S.bp = [0, 0, 0]); bp[0] = L.x; bp[1] = L.y - 0.05; bp[2] = L.z; if (LK.drawModel(g, r, Pg(), night ? 'tl_beacon_lit' : 'tl_beacon', bp, 0, cam, MP)) n++; if (night && g.particles && g.particles.glow && Math.random() < 0.3) g.particles.glow(L.x + (Math.random() - 0.5), L.y + 3.2 + Math.random(), L.z + (Math.random() - 0.5), [1, 0.85, 0.5], 1.6, 0.12, 0.3); }
       else if (L.k === 'flausel' && dx * dx + dz * dz < 60 * 60) { MP.scale = 1.05; MP.light = null; MP.noShade = false; for (let i = 0; i < 2; i++) if (LK.drawModel(g, r, Pg(), 'fy_sprite_' + ((TC.h(L.x, L.z, i) % 4)), [L.x + 1.2 + i * 0.9, L.y + Math.abs(Math.sin(tt * 2 + i)) * 0.12, L.z - 1.4], tt * 0.2 + i * 2, cam, MP)) n++; }
     }
     if (tale) {
-      const key = tale.i + ':' + JSON.stringify(TC.cur(tale) ? [TC.cur(tale).m, TC.cur(tale).c] : 0);
+      const cq = TC.cur(tale), key = tale.i * 4096 + (cq ? ((cq.m | 0) * 64 + (cq.c | 0)) : 0) + (cq && cq.of ? cq.of.reduce((x, b) => x + (b.m | 0) * 8 + (b.c | 0), 0) * 262144 : 0);   // (a number: no string per frame)
       if (S.mkKey !== key || S.mkTale !== tale) { S.mkKey = key; S.mkTale = tale; S.mk = TL.marks(g, tale); }
       for (const M0 of S.mk) {
         const dx = M0.x - cam.x, dz = M0.z - cam.z; if (dx * dx + dz * dz > (M0.big ? 160 * 160 : 64 * 64)) continue;
         const y = yAt(g, M0.x, M0.z); if (y === null) continue;
         MP.scale = M0.m === 'fy_shroom_1' ? 0.32 : 1; MP.light = M0.glow || M0.m === 'tl_print' ? FULL : null; MP.noShade = !!M0.glow;
         const hov = M0.glow ? 0.5 + Math.sin(tt * 2.2 + M0.x) * 0.15 : M0.m === 'tl_print' ? 0.02 : 0;
-        if (LK.drawModel(g, r, Pg(), M0.m, [M0.x, y + hov, M0.z], M0.glow ? tt * 0.8 : (M0.yaw || 0), cam, MP)) n++;
+        const dp = S.dp || (S.dp = [0, 0, 0]); dp[0] = M0.x; dp[1] = y + hov; dp[2] = M0.z;
+        if (LK.drawModel(g, r, Pg(), M0.m, dp, M0.glow ? tt * 0.8 : (M0.yaw || 0), cam, MP)) n++;
         if (M0.glow && g.particles && g.particles.glow && Math.random() < 0.25 && !(g.settings && g.settings.preset === 'potato')) g.particles.glow(M0.x + (Math.random() - 0.5) * 0.5, y + hov + 0.2, M0.z + (Math.random() - 0.5) * 0.5, [1, 0.9, 0.55], 1.4, 0.06, 0.6);
       }
       // the little lost Flausel in the child's arms (the twist) until it is home
