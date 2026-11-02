@@ -552,10 +552,19 @@ function pageHelpers(win, VRx) {
   S.capture = function () {
     const g = VR.game, src = g.canvas || (typeof document !== 'undefined' ? document.getElementById('gl') : null); if (!src || !src.width) return false;
     const c = S.cv || (S.cv = document.createElement('canvas')); c.width = 480; c.height = 270;
-    try { c.getContext('2d').drawImage(src, 0, 0, 480, 270); S.pics.push({ t: g.time, url: c.toDataURL('image/jpeg', 0.74), occ: +S.occ().toFixed(2) }); return true; } catch (e) { S.log.push(['capture', String(e && e.message)]); return false; }
+    try { c.getContext('2d').drawImage(src, 0, 0, 480, 270); S.pics.push({ t: g.time, url: c.toDataURL('image/jpeg', 0.74), occ: +S.occ().toFixed(2), trail: S.trailPx() }); return true; } catch (e) { S.log.push(['capture', String(e && e.message)]); return false; }
+  };
+  // (f-quiet2: the diegetic lantern trail's points on the picture, 480 × 270 — the trail check accepts lines along it)
+  S.trailPx = function () {
+    try {
+      const g = VR.game, D = VR.Diegetic, pts = D && D.state && D.state.pts, r = g.renderer, vp = r && r.viewProj, c = g.cam; if (!pts || !pts.length || !vp || !c) return null;
+      const out = [], y0 = g.player.pos[1];
+      for (const q of pts) { const x = q.x - c.x, y = (Number.isFinite(q.y) ? q.y : y0) + 0.2 - c.y, z = q.z - c.z, w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15]; if (w <= 0.1) continue; out.push([+(((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w * 0.5 + 0.5) * 480).toFixed(1), +((1 - ((vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w * 0.5 + 0.5)) * 270).toFixed(1)]); }
+      return out.length >= 2 ? out : null;
+    } catch (e) { return null; }
   };
   // (a-regie: a picture over 30 % occluded gives way to a clear one within 3 s; else it is marked)
-  S.picsAt = function (ts) { return ts.map(t => { let best = null, bd = Infinity; for (const q of S.pics) { const d = Math.abs(q.t - t) + (q.occ > 0.3 ? 3 : 0); if (d < bd) { bd = d; best = q; } } return best ? { t: best.t, url: best.url, occ: best.occ || 0 } : null; }); };
+  S.picsAt = function (ts) { return ts.map(t => { let best = null, bd = Infinity; for (const q of S.pics) { const d = Math.abs(q.t - t) + (q.occ > 0.3 ? 3 : 0); if (d < bd) { bd = d; best = q; } } return best ? { t: best.t, url: best.url, occ: best.occ || 0, trail: best.trail || null } : null; }); };
   // the world ahead: columns missing within r chunks, sections still to mesh within rm
   S.ready = function (r, rm) {
     const g = VR.game, w = g.world, p = g.player; if (!w || !p) return { miss: 99, dirty: 0 };
@@ -771,13 +780,14 @@ async function openWorld(adv) {
   for (let i = 0; i < 300 && !inPlay; i++) { await wait(1000); inPlay = await ev(() => !!(VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)).catch(() => false); }
   // (a-session, f-hud's self-review 3: the minimap 4 s after the world starts — its luma sd as test/critic_ux.mjs reads it)
   let mapSd = null;
-  if (adv && inPlay) { await wait(4000); mapSd = await ev(() => { const mm = document.getElementById('minimap'); if (!mm || !mm.width) return -1; try { const d = mm.getContext('2d').getImageData(0, 0, mm.width, mm.height).data; let m = 0, m2 = 0, n = 0; for (let i = 0; i < d.length; i += 8) { if (d[i + 3] < 10) continue; const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; m += L; m2 += L * L; n++; } if (!n) return 0; m /= n; return +Math.sqrt(Math.max(0, m2 / n - m * m)).toFixed(1); } catch (e) { return -2; } }).catch(() => -3); }
+  // (f-quiet2: the minimap is gone since f-ux — the compass rose #dgrose stands in its place: shown with its ring and N)
+  if (adv && inPlay) { await wait(4000); mapSd = await ev(() => { const r = document.getElementById('dgrose'); if (r) { const b = r.getBoundingClientRect(), cs = getComputedStyle(r); return { rose: true, ok: b.width >= 30 && b.height >= 30 && cs.display !== 'none' && cs.visibility !== 'hidden' && !!r.querySelector('.ring'), w: Math.round(b.width) }; } const mm = document.getElementById('minimap'); return { rose: false, ok: !!(mm && mm.width && mm.offsetParent !== null), w: mm ? mm.width : 0 }; }).catch(() => ({ rose: false, ok: false, w: -1 })); }
   const meta = await ev(() => { const g = VR.game, A = VR.Adventure; return { state: g.state, vgen: (g.meta && g.meta.vgen) | 0, type: g.meta && g.meta.type, mode: g.meta && g.meta.mode, adv: !!(A && A.on && A.on()), enc: A && A.enc ? A.enc() : null, advStart: g.meta && g.meta.advStart || null, tod: Math.round(g.env.timeOfDay), preset: g.settings.preset, eventlog: !!VR.EventLog, pos: g.player.pos.map(v => +v.toFixed(1)), W: g.renderer.W, H: g.renderer.H }; });
   meta.mapSd4 = mapSd;
   console.log(`world (${secs()}): ${JSON.stringify(meta)}`);
   if (adv) check(inPlay && meta.adv && meta.enc === 'normal' && meta.advStart && meta.advStart.d >= 150 && meta.advStart.d <= 320, `a fresh Abenteuer world (mit Begegnungen, ${meta.mode}), its start ${meta.advStart && meta.advStart.d} m before the first outpost, ${meta.tod} on the clock`);
   else check(inPlay && meta.vgen >= 11 && meta.type === 'default' && meta.eventlog, `a new default world (the Heartland, vgen ${meta.vgen}) with VR.EventLog, Balanced (${meta.preset}, ${meta.W}×${meta.H})`);
-  if (adv && mapSd !== null) check(mapSd > 10, `Abenteuer: the minimap drawn 4 s after the start (luma sd ${mapSd} > 10)`);
+  if (adv && mapSd !== null) check(mapSd.ok, `Abenteuer: the ${mapSd.rose ? 'compass rose' : 'minimap'} shown 4 s after the start (${mapSd.w} px)`);
   if (!inPlay || !meta.eventlog) { console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l); await browser.close(); console.log('FAILED ' + Math.max(1, fails)); process.exit(1); }
   // the clock is ours: no animation frames, the renderer only draws when asked; the weather held; uploads boosted; the world's known landmarks
   await ev((lms) => {
@@ -870,11 +880,11 @@ async function session(type, setup, script) {
   const frames = [];
   for (let k = 0; k < rec.frames.length; k++) {
     const f = rec.frames[k], q = pics[k], file = `${SHOTS}session_${type}_${String(f.i).padStart(2, '0')}.jpg`;
-    if (q && q.url) { fs.writeFileSync(file, Buffer.from(q.url.split(',')[1], 'base64')); f.file = file.replace(ROOT, ''); f.pic = +(q.t - t0).toFixed(2); f.occ = q.occ; }
+    if (q && q.url) { fs.writeFileSync(file, Buffer.from(q.url.split(',')[1], 'base64')); f.file = file.replace(ROOT, ''); f.pic = +(q.t - t0).toFixed(2); f.occ = q.occ; f.trail = q.trail || null; }
     frames.push(Object.assign({}, f, { file: q && q.url ? file : null }));
   }
   const gq = pics[pics.length - 1];
-  if (gq && gq.url) { fs.writeFileSync(`${SHOTS}session_${type}_gap.jpg`, Buffer.from(gq.url.split(',')[1], 'base64')); rec.gapFrame = { t: +(gq.t - t0).toFixed(2), file: `test/shots/session_${type}_gap.jpg` }; }
+  if (gq && gq.url) { fs.writeFileSync(`${SHOTS}session_${type}_gap.jpg`, Buffer.from(gq.url.split(',')[1], 'base64')); rec.gapFrame = { t: +(gq.t - t0).toFixed(2), file: `test/shots/session_${type}_gap.jpg` }; rec.gapTrail = gq.trail || null; }
   if (process.env.ALL) { const all = await ev(() => window.__S.pics.map(q => [q.t, q.url])); fs.mkdirSync(`${SHOTS}session_${type}`, { recursive: true }); all.forEach(([t, u]) => fs.writeFileSync(`${SHOTS}session_${type}/t${String(Math.round((t - t0) * 10)).padStart(5, '0')}.jpg`, Buffer.from(u.split(',')[1], 'base64'))); }
   // a-session: the adventurer's picture every 15 s of play (test/shots/session_adventurer/f_000.jpg …), named by the time
   if (type === 'adventurer' || process.env.EVERY15) {
@@ -913,10 +923,18 @@ async function session(type, setup, script) {
   check(M3.variety.n >= 6, `${type}: ${M3.variety.n} kinds seen (≥ 6): ${M3.variety.kinds.join(', ')}`);
   try {
     const TL = require(ROOT + 'test/trail_lines.js'), files = frames.filter(f => f.file).map(f => f.file).concat(fs.existsSync(`${SHOTS}session_${type}_gap.jpg`) ? [`${SHOTS}session_${type}_gap.jpg`] : []);
-    const per = []; for (const f of files) { const r = await TL.measure(f); per.push({ file: f.replace(ROOT, ''), longest: r.longest, segs: r.sky.slice(0, 3) }); }
+    // (f-quiet2: a segment lying along the diegetic lantern trail's projected points — both ends and its middle within
+    // 18 px of the trail's polyline — is the trail itself, not a contrail: accepted and counted apart)
+    const dSeg = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1, k = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)); return Math.hypot(p[0] - a[0] - dx * k, p[1] - a[1] - dy * k); };
+    const near = (p, T) => { let m = Infinity; for (let i = 1; i < T.length; i++) m = Math.min(m, dSeg(p, T[i - 1], T[i])); return m; };
+    const onTrail = (q, T, sc) => { if (!T || T.length < 2) return false; const a = [q.from[0] * sc[0], q.from[1] * sc[1]], b = [q.to[0] * sc[0], q.to[1] * sc[1]], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return near(a, T) <= 18 && near(b, T) <= 18 && near(m, T) <= 18; };
+    const trailOf = (f) => { const fr = frames.find(x => x.file === f); return fr ? fr.trail : (rec.gapTrail || null); };
+    const per = []; let accepted = 0;
+    for (const f of files) { const r = await TL.measure(f), T = trailOf(f), sc = [480 / ((r.size && r.size[0]) || 480), 270 / ((r.size && r.size[1]) || 270)], keep = r.sky.filter(q => !onTrail(q, T, sc)); accepted += r.sky.length - keep.length; per.push({ file: f.replace(ROOT, ''), longest: keep.length ? keep[0].len : 0, trailSegs: r.sky.length - keep.length, segs: keep.slice(0, 3) }); }
+    rec.trailAccepted = accepted;
     rec.trails = { longest: per.reduce((m, q) => Math.max(m, q.longest), 0), per };
     fs.writeFileSync(`${SHOTS}session_${type}.json`, JSON.stringify(rec, null, 1));
-    check(rec.trails.longest <= 150, `${type}: no straight constant-width trail segment over 150 px in its ${per.length} pictures (the longest ${rec.trails.longest} px)`);
+    check(rec.trails.longest <= 150, `${type}: no straight constant-width trail segment over 150 px in its ${per.length} pictures (the longest ${rec.trails.longest} px; ${accepted} along the lantern trail accepted)`);
   } catch (e) { console.log('  !! the line detector: ' + String(e && e.message || e).slice(0, 200)); }
   return rec;
 }
@@ -962,7 +980,7 @@ try {
     // story's offer taken when Funke makes it; a look round, then on to the nearest village
     META = await openWorld(true);
     await ev(() => { window.__S.acceptStory = true; });
-    recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the minimap 4 s after the start: luma sd ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
+    recs.adventurer = await session('adventurer', { notes: ['a-session: a fresh Abenteuer world (mit Begegnungen, band Normal) at its own start ' + JSON.stringify(META.advStart) + ', ' + META.tod + ' on the clock; the compass rose 4 s after the start: ' + META.mapSd4, 'a-story: the story offered by Funke and taken at once', 'a-session: Funke\'s way to the outpost, one stray fought (clicks), the others calmed ([V] and the ring), the Lichtleiter, the moment; then the nearest village'] }, [
       { name: 'arrive', de: 'Ankunft: umsehen', mode: { kind: 'look', sec: 8, speed: 0.12 }, max: 8 },
       { name: 'to_outpost', de: 'Funkes Weg: [V] zum Außenposten', mode: { kind: 'intent', prefix: 'out:', direct: true }, max: 120 },
       // (a-adventure, run 2: the straight walk of the last metres ran into the forest's cliffs; the outpost's own walker plans its way on foot)
