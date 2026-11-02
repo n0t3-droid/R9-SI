@@ -153,13 +153,20 @@ for (const tag of ['vl', 'bal']) {
 await timed('hud', async () => {   // f-ux: the HUD at spawn, as a player sees it (the page, not the GL canvas alone)
   await atSpawn();
   await ev(() => { const g = VR.game; g.hideHud = false; const h = document.getElementById('hud'); if (h) h.style.display = ''; const n = document.getElementById('notes'); if (n) n.style.visibility = 'hidden'; const f = document.getElementById('funkebub'); if (f) f.style.visibility = 'hidden'; });
+  // f-quiet3: the calm HUD pinned — the ✨/⚔ pointers faded and no 🧭 hint card (f-quiet2: the pointers show for a few
+  // real seconds for a new goal or after a long idle, a hint for 12 s: when the picture fell in one of those depended
+  // on the machine's speed — run 5 had the pill, run 4 the hint card)
+  const calm = () => ev(() => { const Q = VR.Quiet; if (Q && Q.pointers) for (const k in Q.pointers) { Q.pointers[k].until = -Infinity; Q.pointers[k].idled = true; } });
+  await ev(() => { const Hn = VR.Hints; if (Hn && Hn.current && Hn.current() && Hn.dismiss) Hn.dismiss(); if (Hn && Hn.show && !Hn.__gold) { const os = Hn.show; Hn.show = function () { return VR.game && VR.game.__goldHud ? false : os.apply(this, arguments); }; Hn.__gold = true; } VR.game.__goldHud = true; });
   await step(20); await wait(500); await step(4);
+  await calm(); await wait(1300); await step(4);   // (the HUD just shown is a new goal for the pointers: faded after it, 0.8 s)
   // f-quiet3: the world drawn here, at the spawn, before the page's picture — the stepped frames draw nothing, so the
   // canvas used to hold the shot before (a full run: the citadel's towers; ONLY=hud,…: whatever came last — the order
   // dependence)
   await grabGL();
+  if (process.env.HUD_DEBUG) console.log('HUDDBG ' + JSON.stringify(await ev(() => { const el = document.getElementById('wcompass'), Q = VR.Quiet; return { cls: el && el.className, disp: el && el.style.display, goal: el && el.dataset.goal, txt: el && el.textContent, op: el && getComputedStyle(el).opacity, P: Q && Q.pointers ? JSON.stringify(Q.pointers.wcompass) : null, lvl: Q && Q.level ? Q.level() : null, hint: VR.Hints && VR.Hints.current ? String(VR.Hints.current()) : null }; })));
   const png = await page.screenshot({ type: 'png' });
-  await ev(() => { const g = VR.game; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
+  await ev(() => { const g = VR.game; g.hideHud = true; g.__goldHud = false; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
   await judge('hud', png, 'the HUD at spawn');
 });
 await timed('plaza', async () => {

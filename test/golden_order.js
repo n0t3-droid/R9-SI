@@ -24,6 +24,8 @@ const hud = (src.match(/await timed\('hud'[\s\S]*?\n\}\);/) || [''])[0];
 const iDraw = hud.indexOf('await grabGL()'), iShot = hud.indexOf('page.screenshot(');
 ok(hud && iShot > 0, 'golden.mjs has the hud shot');
 ok(iDraw > 0 && iDraw < iShot, 'hud draws the world at the spawn before the page\'s picture (not the canvas of the shot before)');
+const iCalm = hud.indexOf('await calm()');
+ok(iCalm > 0 && iCalm < iDraw && /Hints/.test(hud), 'hud pins the calm HUD (the pointers faded after the HUD is shown, no 🧭 hint card) before it draws');
 const ready = (src.match(/const ready = [^\n]*/) || [''])[0];
 ok(/G\.settledOk/.test(src) && /READY_MS/.test(ready) && /while \(!\(s && s\.ok\)/.test(ready), 'ready() settles until settled (not a fixed number of rounds)');
 ok(/UNSETTLED/.test(src), 'a picture of an unsettled world says so in its note');
