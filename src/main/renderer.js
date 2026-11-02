@@ -205,6 +205,7 @@
     buildProgramsNow() {
       if (VR.Light2) { VR.Light2.use(this.q); this.l2Key = VR.Light2.key ? VR.Light2.key(this.q) : ''; if (VR.GL && !VR.GL.defineHook) VR.GL.defineHook = VR.Light2.hook; }   // (t-light2: its switches are defines, light2.js)
       if (VR.Sky3) { VR.Sky3.use(this.q); this.s3Key = VR.Sky3.key(this.q); }
+      if (VR.LField) { VR.LField.use(this.q); this.lfKey = VR.LField.key(this.q); }   // (v-light: Lichtpfützen is a define, lightfield.js)
       if (VR.Look) { VR.Look.use(this.q); this.lvKey = VR.Look.key(this.q); }   // (v-look: the film look's switches are composite defines, look.js)   // (t-sky3: the sky's switches are defines too, sky3.js — its hook follows the light's)
       const md = this.multi ? ['MULTIDRAW'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs) · MOTION (t-motion): the wind in everything (wind.js; off on Very Low) · CLOUDSH (t-motion): the clouds' shadows (Balanced+)
@@ -534,6 +535,7 @@
       this.shadowValid = false;
       if (VR.Light2 && VR.Light2.key && VR.Light2.key(this.q) !== this.l2Key) this.buildPrograms();   // (t-light2: the light's switches are program defines)
       else if (VR.Sky3 && VR.Sky3.key(this.q) !== this.s3Key) this.buildPrograms();
+      else if (VR.LField && VR.LField.key(this.q) !== this.lfKey) this.buildPrograms();   // (v-light: Lichtpfützen's define)
       else if (VR.Look && VR.Look.key(this.q) !== this.lvKey) { if (this.lvRebuild) this.lvRebuild(); else this.buildPrograms(); }   // (v-look: the film look's switches are the composite's defines: that one program again)   // (t-sky3: the same for the sky's)
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);

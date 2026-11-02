@@ -690,6 +690,7 @@ vec3 hazeColor(vec3 dir) {
   return col;
 }
 ${(VR.Light2 && VR.Light2.glslCommon) ? VR.Light2.glslCommon() : ''}
+${(VR.LField && VR.LField.glslCommon) ? VR.LField.glslCommon() : ''}
 vec3 applyFog(vec3 col, vec3 rel, float dist) {
 #ifdef AIR2
   return l2Fog(col, rel, dist);   // t-light2: the air — the same haze, with the valleys' height fog and aerial perspective
@@ -1329,6 +1330,9 @@ void main() {
 #ifdef LIGHT2
   blockL = l2Pool(bl);   // t-light2: the lamps' light in pools (light2.js)
 #endif
+#ifdef LFIELD
+  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
+#endif
   float ao = 1.0 - v_ao * 0.2;
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
   if (noshade) faceShade = 0.92;
@@ -1632,6 +1636,9 @@ void main() {
 #ifdef LIGHT2
   blockL = l2Pool(v_block);   // t-light2: the lamps' pools
 #endif
+#ifdef LFIELD
+  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
+#endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -1825,6 +1832,9 @@ void main() {
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
   blockL = l2Pool(v_block);   // t-light2: the lamps' pools
+#endif
+#ifdef LFIELD
+  blockL += lfLight(v_rel, N);   // v-light: the light field's pools (lightfield.js)
 #endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -2955,6 +2965,9 @@ void main() {
   // t-light2: the hemisphere, the skin's softer wrap, the lamps' pools
   hemi = l2Hemi(n) * 1.04; wrapL = l2Wrap(dot(n, L), u_l2K.w);
   light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + l2Pool(u_blockLight) + 0.03;
+#endif
+#ifdef LFIELD
+  light += lfLight(v_rel, n);   // v-light: the light field's pools (lightfield.js)
 #endif
   vec3 col = alb * light;
   vec3 V = normalize(-v_rel);

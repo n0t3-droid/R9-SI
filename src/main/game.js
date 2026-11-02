@@ -34,6 +34,9 @@
   // Low none of them (their programs and passes as before)
   const LV_SW = VR.Look ? VR.Look.SW : [];
   if (VR.Look) for (const p in PRESETS) Object.assign(PRESETS[p], VR.Look.defaults(p));
+  // v-light · Lichtpfützen (lightfield.js): the light field round the eye — High and up; Very Low, Low and Balanced off
+  const LF_SW = VR.LField ? VR.LField.SW : [];
+  if (VR.LField) for (const p in PRESETS) Object.assign(PRESETS[p], VR.LField.defaults(p));
   // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
   // voxel people (with the same real proportions)
   // F10 · Bandbreite (ipu.js): five switches for the GPUs that share the system's memory — off on every preset but Ultra ·
@@ -103,6 +106,7 @@
       for (const k of S3_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.Sky3.off()[k] : PRESETS.balanced[k]);
       // v-look: the same for the film look's switches (a custom one: Balanced's, none when lite)
       for (const k of LV_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.Look.off()[k] : PRESETS.balanced[k]);
+      for (const k of LF_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : false;   // (v-light: a custom one: off)
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
       // t-material: settings saved before the gloss tiers follow their preset (a custom one: the gloss without the mirror, none when lite)
@@ -187,6 +191,7 @@
       if (key !== '*' && L2_SW.includes(key)) S.preset = 'custom';   // (t-light2: a light switch changed by hand)
       if (key !== '*' && S3_SW.includes(key)) S.preset = 'custom';   // (t-sky3: the same for the sky's)
       if (key !== '*' && LV_SW.includes(key)) S.preset = 'custom';   // (v-look: a film-look switch changed by hand)
+      if (key !== '*' && LF_SW.includes(key)) S.preset = 'custom';   // (v-light: Lichtpfützen changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
       for (const k of MO_SW) if (S[k] === undefined) S[k] = PRESETS[S.preset] ? PRESETS[S.preset][k] : (k === 'cloudShadow' ? +((S.clouds | 0) >= 2) : 1);   // (settings saved before t-motion follow their preset)
@@ -204,6 +209,7 @@
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
       if (r && VR.Light2) { const qb = r.qBase || (r.qBase = {}), d = VR.Light2.off(); for (const k of L2_SW) qb[k] = S[k] === undefined ? d[k] : (typeof d[k] === 'number' ? Math.max(0, Math.min(VR.Light2.MAX[k] || 3, S[k] | 0)) : !!S[k]); }   // t-light2: the light's switches (renderer: their defines and passes)
       if (r && VR.Sky3) { const qb = r.qBase || (r.qBase = {}), d = VR.Sky3.off(); for (const k of S3_SW) qb[k] = S[k] === undefined ? d[k] : (typeof d[k] === 'number' ? Math.max(0, Math.min(VR.Sky3.MAX[k] || 2, S[k] | 0)) : !!S[k]); }   // t-sky3: the sky's switches (renderer: their defines, sky3.js S3.definesFor)
+      if (r && VR.LField) { const qb = r.qBase || (r.qBase = {}); for (const k of LF_SW) qb[k] = !!S[k]; }   // v-light: Lichtpfützen (renderer: the LFIELD define, lightfield_gl.js the field)
       if (r && VR.Look) { const qb = r.qBase || (r.qBase = {}); for (const k of LV_SW) qb[k] = !!S[k]; }   // v-look: the film look's switches (renderer: the composite's defines, look_gl.js its soft copy)
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
       if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); qb.texHi = !!S.texHi && !S.lite; }   // t-material: the gloss tier (renderer: the PBR / SSR defines), the hero textures (TEXHI)
