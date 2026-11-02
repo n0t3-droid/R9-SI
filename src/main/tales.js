@@ -328,16 +328,18 @@
     if (S.kid) { S.kid.ph = 'home'; S.kid.t = 0; }
     if (S.fl) S.fl.ph = 'home';
     // friendship, the news, the page, a small gift
-    if (G && G.rec) { try { const gr = G.rec(g); G.befriend(gr, res.giver.pid, res.fr, null); G.deed(g, 'tale', { x: res.giver.x, z: res.giver.z, pl: head.slice(0, 60), key: res.page.id }); } catch (e) { /* the news waits */ } }
+    // (f-polish8: run 3's worst tick, 9.7 ms, was the ending — the news, the book, the award and the sound now one a
+    // tick after it: TL.defer)
+    if (G && G.rec) TL.defer(() => { try { const gr = G.rec(g); G.befriend(gr, res.giver.pid, res.fr, null); G.deed(g, 'tale', { x: res.giver.x, z: res.giver.z, pl: head.slice(0, 60), key: res.page.id }); } catch (e) { /* the news waits */ } });
     let item = null;
     const inv = g.player && g.player.inv, ok = (id) => !!((VR.itemDef && VR.itemDef(id)) || (VR.R && VR.R.byName && VR.R.byName[id]));
     for (const id of res.items) if (ok(id)) { item = id; break; }
     if (item && inv && inv.add) { try { inv.add(item, 1); } catch (e) { item = null; } }
-    if (VR.Wander && VR.Wander.note) { try { VR.Wander.note(g.meta, 'people', res.giver.pid, res.giver.name); } catch (e) { /* the book's */ } }
-    if (VR.Adventure && VR.Adventure.award && VR.Adventure.on && VR.Adventure.on()) { try { VR.Adventure.award('quest', { size: 'M' }); } catch (e) { /* theirs */ } }
+    if (VR.Wander && VR.Wander.note) TL.defer(() => { try { VR.Wander.note(g.meta, 'people', res.giver.pid, res.giver.name); } catch (e) { /* the book's */ } });
+    if (VR.Adventure && VR.Adventure.award && VR.Adventure.on && VR.Adventure.on()) TL.defer(() => { try { VR.Adventure.award('quest', { size: 'M' }); } catch (e) { /* theirs */ } });
     const body = T('g.tl.done', { title: head, giver: res.giver.name }) + (item ? ' · ' + T('g.tl.item', { item: VR.itemName ? VR.itemName(item) : item }) : '') + (res.late ? ' ' + T('g.tl.late') : '');
     setTimeout(() => { try { if (g.ui && g.ui.toast) g.ui.toast(T('g.tl.doneT'), body, null); } catch (e) { /* a toast */ } }, 2600);
-    if (g.audio && g.audio.play) { try { g.audio.play('levelup'); } catch (e) { /* a sound */ } }
+    if (g.audio && g.audio.play) TL.defer(() => { try { g.audio.play('levelup'); } catch (e) { /* a sound */ } });
     S.lastEnd = { key: res.key, text: end, head, item, late: res.late, page: res.page.id, t: Date.now() };
     log('done', res.key);
     hud(g, '');
@@ -395,6 +397,9 @@
     if (outs.length) handle(V, tale, outs);
     if (rec.cur === tale) hud(g, lineOf(g, tale));
   }
+  // work after a tale's ending, one piece a tick (the 2-Hz look stays light)
+  S.later = [];
+  TL.defer = (fn) => { S.later.push(fn); };
   TL.tick = function (V, dt) {
     const g = V.g; if (!TL.on(g) || !g.player || g.state !== 'play') { if (S.line) hud(g || {}, ''); return; }
     if (!S.Ctor && V.agents.length && V.agents[0].constructor) S.Ctor = V.agents[0].constructor;
@@ -405,6 +410,7 @@
     if (rec.cur && rec.cur.st === 'on') run(V, rec, t);
     else { if (S.line) hud(g, ''); if (rec.cur && rec.cur.st !== 'on') rec.cur = null; tryOffer(V, rec, t); }
     if (S.pend) sayEnd(V);
+    if (S.later.length) { const f = S.later.shift(); try { f(); } catch (e) { /* the piece's own */ } }
     if (S.kid && S.kid.ph === 'home' && !rec.cur && S.kid.t > 30) endKid(V);
     if (S.kid && !rec.cur && S.kid.ph !== 'home') endKid(V);
     // the woken beacons and the Flausel houses: their ground once near

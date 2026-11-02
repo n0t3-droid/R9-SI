@@ -275,6 +275,10 @@ console.log('9 · f-polish8: the 2-Hz look stays light; the beacon changes as li
   const dk = Math.hypot(kidA.pos[0] - gv.pos[0], kidA.pos[2] - gv.pos[2]);
   check(dk < 1.6 && Array.isArray(gv.lookAt), 'the child far behind runs into the friend\'s arms (' + dk.toFixed(2) + ' m, they look at each other)');
   TL.state.kid = null; Vi.agents = [];
+  // the ending's work (the news, the book, the award, the sound) one piece a tick
+  const ran = []; for (let i = 0; i < 3; i++) TL.defer(() => ran.push(i));
+  rec.cur = null; g.world = W; TL.tick(Vi, 0.55); const r1 = ran.length; TL.tick(Vi, 0.55); TL.tick(Vi, 0.55);
+  check(r1 === 1 && ran.length === 3, 'after an ending its work runs one piece a tick (' + r1 + ', then ' + ran.length + ')');
 }
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
