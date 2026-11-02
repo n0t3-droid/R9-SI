@@ -1,5 +1,5 @@
 {
- "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs · a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds)",
+ "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs · a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds) · v-light: lightfield, lightfield_gl set to 0 by the coordinator — inert on Very Low (lfPools off in the potato tier: no define, lfOn() false, the frame returns at once); re-measure with perf8.mjs on a quiet machine",
  "frames": 1200,
  "build": "cur",
  "totalMs": 2.395,
@@ -99,7 +99,9 @@
   "starmap": 0,
   "quiet": 0,
   "tales_core": 0,
-  "tales": 0.002
+  "tales": 0.002,
+  "lightfield": 0,
+  "lightfield_gl": 0
  },
  "base": {
   "tag": "v0556",
@@ -381,6 +383,8 @@
   "score2_hooks",
   "diegetic",
   "tales_core",
-  "tales"
+  "tales",
+  "lightfield",
+  "lightfield_gl"
  ]
 }
