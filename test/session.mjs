@@ -447,7 +447,7 @@ function pageHelpers(win, VRx) {
       return;
     }
     // the strays not there yet: closer to the beacon (they stand up as their outpost is near)
-    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 150 || (A.t > 60 && Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]) < 60)) { A.why = 'no strays'; S.done = true; } return; }   // (a-adventure: the way there first)
+    if (!active.length) { A.ph = 'near'; go(b[0], b[2], 14); if (A.t > 150 || (A.t > 60 && Math.hypot(b[0] - p.pos[0], b[2] - p.pos[2]) < 20)) { A.why = 'no strays'; S.done = true; } return; }   // (f-polish9: within 20 m, not 60 — the guardians stand up at ≤ 76 m once their columns are loaded, beyond the 64 m the clock waits for: run 3's came at 110 s, 5 s after the walker gave up 58 m off)   // (a-adventure: the way there first)
     // the target: the first one fought (a walker before a sentry, never the crane on its tower), the others calmed
     if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
