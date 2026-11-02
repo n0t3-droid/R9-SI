@@ -64,7 +64,7 @@
   const groundY = (g, x, z, y0) => { const w = g.world; if (!w || !w.topAt) return y0; const h = w.topAt(Math.floor(x), Math.floor(z)); return h > 0 && Math.abs(h + 1 - y0) < 6 ? h + 1 : y0; };
   function solidOf(g) {
     const w = g.world, R = VR.R, F = VR.F; if (!w || !R || !F) return () => false;
-    return (x, y, z) => { const s = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(s && (R.T.flags[s] & F.SOLID)); };
+    return (x, y, z) => !!w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));   // (any block: a palm's leaves are no wall, but no lens belongs in them — run 3)
   }
   function busy(g) {
     if (!g || g.state !== 'play' || !g.player) return 'state';
@@ -95,7 +95,9 @@
       let shot = null;
       try { if (F3 && F3.frameGroup) { const E = g.env, sun = E && E.sunDir ? Math.atan2(E.sunDir[2], E.sunDir[0]) : null; const ax = Math.atan2(to[1] - m.friend[1], to[0] - m.friend[0]), toYou = Math.atan2(p[2] - mid[2], p[0] - mid[0]), s1 = ax + Math.PI / 2, s2 = ax - Math.PI / 2;
           const pref = pt ? (Math.cos(s1 - toYou) >= Math.cos(s2 - toYou) ? s1 : s2) : toYou;   // (the pair from the side, on your side; the friend alone: from you)
-          shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun }); } } catch (e) { shot = null; }
+          const avoid = []; for (const a of V.agents) if (a !== gv && a !== pt && Math.abs(a.pos[0] - mid[0]) < 12 && Math.abs(a.pos[2] - mid[2]) < 12) avoid.push([a.pos[0], a.pos[2]]);   // (nobody else before the lens)
+          shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun, avoid });
+          if (!shot && avoid.length) shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun }); } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, 1.1, (innerWidth || 16) / (innerHeight || 9)) : null }; }
       else { const e = [p[0], p[1] + 1.6, p[2]], dx = mid[0] - e[0], dy = mid[1] + 1 - e[1], dz = mid[2] - e[2]; C.shot = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: null }; }
     }
@@ -119,6 +121,7 @@
   // ---- the poses: hands held (both arms forward and low, the hands meeting) and the gift (both hands out)
   const set = (Pz, j, rx, ry, rz) => { const q = Pz[j]; if (q) { q[0] = rx; q[1] = ry; q[2] = rz; } };
   const HANDS = (Pz) => { set(Pz, 'arm_l', 0.8, 0, 0.12); set(Pz, 'arm_r', 0.8, 0, -0.12); set(Pz, 'fore_l', 0.3, 0, 0); set(Pz, 'fore_r', 0.3, 0, 0); };
+  const HUGKID = (Pz) => { set(Pz, 'arm_l', 0.95, 0, 0.42); set(Pz, 'arm_r', 0.95, 0, -0.42); set(Pz, 'fore_l', 0.75, 0, 0.35); set(Pz, 'fore_r', 0.75, 0, -0.35); if (Pz.body) Pz.body[0] = 0.22; if (Pz.head) Pz.head[0] = 0.25; };
   const GIFT = (Pz) => { set(Pz, 'arm_l', 1.25, 0, 0.22); set(Pz, 'arm_r', 1.25, 0, -0.22); set(Pz, 'fore_l', 0.55, 0, 0); set(Pz, 'fore_r', 0.55, 0, 0); if (Pz.head) Pz.head[0] = 0.12; };
   if (P.pose && !P.pose.__te) {
     const op = P.pose;
@@ -172,7 +175,8 @@
       const hug = C.plan.touch === 'hug';
       if (pt) { face(pt, [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]], dt); face(gv, [pt.pos[0], pt.pos[1] + 1, pt.pos[2]], dt); }
       else face(gv, eye, dt);
-      gv.pose = hug && pt ? 'hug' : 'stand'; gv.teFx = hug && pt ? null : HANDS;
+      const small = !!(pt && pt.kid && !gv.kid);
+      gv.pose = hug && pt && !small ? 'hug' : 'stand'; gv.teFx = hug && pt ? (small ? HUGKID : null) : HANDS;
       if (pt) { pt.pose = hug ? 'hug' : 'stand'; pt.teFx = hug ? null : HANDS; }
       if (!C.said.touch) { C.said.touch = true; if (C.V.hearts) { C.V.hearts(gv); if (pt) C.V.hearts(pt); } if (g.audio && g.audio.play) { try { g.audio.play('pop'); } catch (e) { /* a sound */ } } }
       return;

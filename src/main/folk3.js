@@ -102,11 +102,12 @@
     }
     return w;
   };
-  // a group round C (feet) of radius r: farther and raised; o: {pref (an angle to prefer), sun}
+  // a group round C (feet) of radius r: farther and raised; o: {pref (an angle to prefer), sun, avoid ([[x, z], …]: nobody
+  // else between the group and the lens — f-quiet2)}
   F3.frameGroup = function (solid, C, r, o) {
     o = o || {};
     const d = clamp(2.2 * r + 1.5, 3.5, 9), T = [C[0], C[1] + 0.9, C[2]];
-    const op = { d, dMax: d + 1.5, mins: [Math.max(3, d - 2.5), 2.2, 1.4], lens: o.lens || F3.LENS };
+    const op = { d, dMax: d + 1.5, mins: [Math.max(3, d - 2.5), 2.2, 1.4], lens: o.lens || F3.LENS, avoid: o.avoid || null };   // (f-quiet2: avoid — others not in front of the lens, as F3.frame)
     const rays = [];
     for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; for (const h of [0.8 + 0.4 * r, 1.6 + 0.5 * r, 0.5]) rays.push([a, h, (o.pref !== undefined ? (1 - Math.cos(a - o.pref)) * 1.6 : 0) + sunPen(a, o.sun) * 1.5 + Math.abs(h - 0.8 - 0.4 * r) * 0.3]); }
     return best(solid, T, rays, op);
