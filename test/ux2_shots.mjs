@@ -96,8 +96,8 @@ check(ta.onPath && ta.inWall === 0 && ta.pts >= 8, `after: ${ta.pts} steps along
 check(ta.soles >= 8, `after: the steps are soles (${ta.soles} decals)`);
 check(ta.forks >= 1, `after: a Wegweiser at the bend (${ta.forks}, ${ta.forkShown} in view; end sign ${ta.sign})`);
 // a look from above (the 3D picture, no HUD)
-await ev((W1) => { const g = VR.game; g.camMode = 0; window.__ux2cam = { x: W1.fx + 0.5 + 9, y: W1.y + 14, z: W1.fz + 6 }; }, W1);
-await ev((W1) => { const g = VR.game, p = g.player; const o = g.renderer.setupCamera; if (!g.renderer.__ux2) { g.renderer.__ux2 = o; g.renderer.setupCamera = function (c) { const k = window.__ux2cam; if (k) { c.x = k.x; c.y = k.y; c.z = k.z; c.yaw = k.yaw; c.pitch = k.pitch; } return o.call(this, c); }; } const k = window.__ux2cam, dx = W1.fx + 0.5 - k.x, dy = W1.y - k.y, dz = W1.fz - 9 - k.z; k.yaw = Math.atan2(-dx, -dz); k.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, W1);
+await ev((W1) => { const g = VR.game; g.camMode = 0; window.__ux2cam = { x: W1.fx + 0.5 - 1, y: W1.y + 8.5, z: W1.fz + 3.5 }; }, W1);
+await ev((W1) => { const g = VR.game, p = g.player; const o = g.renderer.setupCamera; if (!g.renderer.__ux2) { g.renderer.__ux2 = o; g.renderer.setupCamera = function (c) { const k = window.__ux2cam; if (k) { c.x = k.x; c.y = k.y; c.z = k.z; c.yaw = k.yaw; c.pitch = k.pitch; } return o.call(this, c); }; } const k = window.__ux2cam, dx = W1.fx + 0.5 - 6 - k.x, dy = W1.y - k.y, dz = W1.fz - 6 - k.z; k.yaw = Math.atan2(-dx, -dz); k.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, W1);
 await grab('trail_top', 'ux2_trail_top.png', 3);
 await ev(() => { window.__ux2cam = null; VR.game.camMode = 0; VR.Diegetic.setGoal(null); });
 // ---------------------------------------------------------------- 2 · the Wanderbuch
@@ -198,7 +198,7 @@ run.visit = { start: vis }; console.log('  visit ' + JSON.stringify(vis));
 const visPh = []; let vShot = 0;
 if (vis && !vis.err) for (let i = 0; i < 260; i++) {
   await step(10, 33); const s = await ev(() => VR.Gossip.test.visit()); const ph = s ? s.ph : 'done'; if (visPh[visPh.length - 1] !== ph) visPh.push(ph);
-  if (s && ph === 'walk' && !vShot && Math.hypot(s.pos[0] - s.door[0], s.pos[2] - s.door[2]) < 11) { vShot = 1; await shotDom('visit1', 'ux2_visit_walk.png'); }
+  if (s && ph === 'walk' && !vShot && Math.hypot(s.pos[0] - s.door[0], s.pos[2] - s.door[2]) < 6.5) { vShot = 1; await shotDom('visit1', 'ux2_visit_walk.png'); }
   if (s && ph === 'wait' && vShot < 2) { await ev(() => { const p = VR.game.player, J = VR.game.villages._gsVisit; p.teleport(J.door[0] + 0.5 + 2.6, J.door[1] + 0.3, J.door[2] + 0.5 + 2.6); const e = [p.pos[0], p.pos[1] + 1.6, p.pos[2]], a = J.a; p.yaw = Math.atan2(-(a.pos[0] - e[0]), -(a.pos[2] - e[2])); p.pitch = -0.12; p.viewYaw = p.yaw; }); }
   if (s && ph === 'chat' && vShot < 2) { vShot = 2; await step(6, 33); await shotDom('visit2', 'ux2_visit_chat.png'); }
   if (s && ph === 'chat' && vShot < 3 && await ev(() => VR.Gossip.log.filter(l => l.what === 'visit').length >= 2)) { vShot = 3; await shotDom('visit3', 'ux2_visit_chat2.png'); }
@@ -218,7 +218,7 @@ await ev(() => { const g = VR.game; g.env.setTime(3000); });
 await stand([S0[0], S0[1] + 1, S0[2]], [S0[0], S0[1], S0[2] - 30]);
 await ev((W1) => { const g = VR.game, p = g.player; p.flying = false; p.teleport(W1.fx + 0.5, W1.y, W1.fz + 0.5); p.yaw = 0.25; p.pitch = -0.3; p.viewYaw = p.yaw; VR.Diegetic.setGoal({ x: W1.fx + 0.5, z: W1.fz - 50, label: 'Aussichtspunkt' }); }, W1);
 const cost = {};
-for (const preset of ['potato', 'high']) {
+for (const preset of process.env.SKIP_COST ? [] : ['potato', 'high']) {
   await ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('*'); }, preset);
   await settle(10);
   for (const on of [true, false, false, true, true, false]) {
@@ -228,11 +228,13 @@ for (const preset of ['potato', 'high']) {
 }
 await ev(() => { VR.game.settings.goalTrail = true; });
 run.cost = cost; save(); console.log('  cost ' + JSON.stringify(cost));
+if (!process.env.SKIP_COST) {
 const md = (a, k) => { const q = a.map(x => x[k]).sort((x, y) => x - y); return q[q.length >> 1]; };
 run.costMed = { potato_on: md(cost.potato_on, 'ms'), potato_off: md(cost.potato_off, 'ms'), high_on: md(cost.high_on, 'ms'), high_off: md(cost.high_off, 'ms'), dg_potato: md(cost.potato_on, 'dg'), dg_high: md(cost.high_on, 'dg') };
 console.log('  cost medians ' + JSON.stringify(run.costMed));
 check(cost.potato_on.every(r => !r.onPath && r.soles === 0), 'Very Low: no path search, no soles (particles 0) — as before');
 check(run.costMed.dg_potato < 0.15 && run.costMed.dg_high < 0.5, `VR.Diegetic per frame: Very Low ${run.costMed.dg_potato} ms, High ${run.costMed.dg_high} ms`);
+}
 check(!logs.some(l => /pageerror|gossip|diegetic/i.test(l)), 'no page error' + (logs.length ? ': ' + logs.slice(0, 4).join(' · ') : ''));
 save();
 const row = (label, ks) => ({ label, imgs: ks.map(k => pics[k]).filter(Boolean) });
