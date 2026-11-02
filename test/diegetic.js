@@ -73,5 +73,46 @@ const keys = D.KEYS || [];
 check(keys.length > 10 && keys.every(k => VR.I18N.dict.de[k] && VR.I18N.dict.en[k]), 'every text it shows in de and en (' + keys.length + ' keys)');
 check(D.RADIAL.every(r => VR.I18N.dict.de[r.lab] && VR.I18N.dict.en[r.lab]), 'the ring\'s labels in both languages');
 
+// ---- f-ux2: the trail along a walkable path, the soles, the forks, the doodles, the book's pairs
+if (typeof D.trailPath === 'function') {
+  // a path that goes 10 m north (−z), then turns east (+x) around a wall
+  const poly = []; for (let i = 0; i <= 10; i++) poly.push([0, -i]); for (let i = 1; i <= 20; i++) poly.push([i, -10]);
+  const tp = D.trailPath(poly);
+  check(tp.length >= 10 && tp.length <= 14, 'trailPath: 10–14 steps along a bent path (' + tp.length + ')');
+  check(tp.every(q => Math.abs(q.x) < 0.5 || Math.abs(q.z + 10) < 0.5), 'every step on the path (±0.5 m), none cuts the corner');
+  check(tp.some(q => q.x > 3), 'the steps follow the turn east');
+  check(tp.every((q, i) => i === 0 || q.side === -tp[i - 1].side), 'left, right, left along the path');
+  const n0 = tp.find(q => q.s < 6), e0 = tp.find(q => q.s > 13);
+  check(n0 && Math.abs(Math.sin(n0.h)) < 0.2 && e0 && Math.abs(Math.sin(e0.h) - 1) < 0.2, 'each step faces along its stretch (north, then east)');
+  check(D.trailPath([[0, 0]]).length === 0 && D.trailPath(null).length === 0, 'no path: no steps');
+  const fk = D.forks(poly, 40);
+  check(fk.length === 1 && Math.abs(fk[0].x) < 2 && Math.abs(fk[0].z + 10) < 2, 'one Wegweiser at the turn (' + JSON.stringify(fk.map(f => [f.x.toFixed(1), f.z.toFixed(1)])) + ')');
+  const straight = []; for (let i = 0; i <= 30; i++) straight.push([i * 0.7, -i]);
+  check(D.forks(straight, 40).length === 0, 'no Wegweiser on a straight way');
+  const jag = []; for (let i = 0; i <= 30; i++) jag.push([(i >> 1), -i]);   // (the grid's staircase: not a fork)
+  check(D.forks(jag, 40).length === 0, 'the grid\'s staircase is no fork');
+  const zig = [[0, 0]]; for (let i = 1; i <= 8; i++) zig.push([0, -i]); for (let i = 1; i <= 10; i++) zig.push([i, -8]); for (let i = 1; i <= 12; i++) zig.push([10, -8 - i]); for (let i = 1; i <= 12; i++) zig.push([10 + i, -20]);
+  check(D.forks(zig, 40).length <= 2, 'at most two signs on the way');
+  const buf = new Float32Array(400), n = D.sole(buf, 0, 0, 0, 0, 0, 1, 1);
+  let ax = 0, az = 0; for (let i = 0; i < n; i += 3) { ax = Math.max(ax, Math.abs(buf[i])); az = Math.max(az, Math.abs(buf[i + 2])); }
+  check(n > 0 && n % 9 === 0 && n <= D.SOLE_FLOATS, 'a sole: whole triangles (' + n / 9 + ')');
+  check(az > ax * 1.8, 'the sole is stretched along its heading (' + az.toFixed(2) + ' × ' + ax.toFixed(2) + ' m)');
+  const nL = D.sole(buf, 0, 0, 0, 0, 0, -1, 1); let cx = 0; for (let i = 0; i < nL; i += 3) cx += buf[i]; const nR = D.sole(buf, 0, 0, 0, 0, 0, 1, 1); let cr = 0; for (let i = 0; i < nR; i += 3) cr += buf[i];
+  check(Math.sign(cx) !== Math.sign(cr), 'left and right soles are mirrored');
+}
+else check(false, 'D.trailPath missing');
+if (typeof D.doodle === 'function') {
+  let okAll = true, bad = '';
+  for (const k of D.DOODLES) { const d = D.doodle(k, 7); const fl = d.flat(2); if (d.length < 3 || fl.some(v => !(v >= 0 && v <= 1))) { okAll = false; bad = k; } }
+  check(okAll && D.DOODLES.length >= 10, 'every doodle (' + D.DOODLES.length + ') draws ≥ 3 pen strokes inside its box' + (bad ? ' — not ' + bad : ''));
+  check(JSON.stringify(D.doodle('fox', 3)) === JSON.stringify(D.doodle('fox', 3)) && JSON.stringify(D.doodle('fox', 3)) !== JSON.stringify(D.doodle('fox', 4)), 'a doodle is the same for its seed, a little different for another (the hand)');
+  check(D.doodleKind('creatures', 'fox') === 'fox' && D.doodleKind('creatures', 'pup') === 'pup' && D.doodleKind('people', 'Ida') === 'person' && D.doodleKind('recipes', 'herbsoup') === 'pot', 'the doodle for an entry: fox, pup, a person, a pot');
+  check(D.DOODLES.indexOf(D.doodleKind('places', 'v:12')) >= 0 && D.DOODLES.indexOf(D.doodleKind('stickers', 'well')) >= 0, 'places and stickers find a doodle');
+} else check(false, 'D.doodle missing');
+if (typeof D.pairPages === 'function') {
+  const pg = D.pairPages(['a', 'b', 'c', 'd', 'e']);
+  check(pg.length === 5 && pg[0].map && pg[4].board && pg[1].html === 'ab' && pg[3].html === 'e', 'two sections a page: map · ab · cd · e · board');
+} else check(false, 'D.pairPages missing');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

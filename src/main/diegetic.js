@@ -44,6 +44,183 @@
   // the Wegweiser: beyond 20 m, at the trail's end
   D.sign = (d) => (fin(d) && d > 20 ? { at: D.TRAIL_TO } : null);
 
+  // ================================================================ f-ux2 (pure): the trail along a walkable path
+  // poly: [[x, z], …] from the player (a VR.Folk.findPath result, cell centres). Steps every D.STEP m of the path's own
+  // length, left/right, each facing along its stretch (h: 0 = north −z, π/2 = east +x).
+  function arcOf(poly) { const L = [0]; for (let i = 1; i < poly.length; i++) L.push(L[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1])); return L; }
+  function at(poly, L, s, o) {
+    const n = poly.length; if (s <= 0) { o[0] = poly[0][0]; o[1] = poly[0][1]; return o; }
+    let i = 1; while (i < n - 1 && L[i] < s) i++;
+    const a = poly[i - 1], b = poly[i], seg = L[i] - L[i - 1] || 1, u = clamp((s - L[i - 1]) / seg, 0, 1);
+    o[0] = a[0] + (b[0] - a[0]) * u; o[1] = a[1] + (b[1] - a[1]) * u; o[2] = (u < 0.5 ? a : b)[2]; return o;
+  }
+  const _a = [0, 0], _b = [0, 0];
+  D.trailPath = function (poly) {
+    const out = [];
+    if (!Array.isArray(poly) || poly.length < 2) return out;
+    const L = arcOf(poly), tot = L[L.length - 1]; if (tot < 2.5) return out;
+    const end = Math.min(D.TRAIL_TO, tot - 1.2);
+    let i = 0;
+    for (let s = D.TRAIL_FROM; s <= end + 1e-6; s += D.STEP, i++) {
+      at(poly, L, s - 0.9, _a); at(poly, L, Math.min(tot, s + 0.9), _b);
+      const h = Math.atan2(_b[0] - _a[0], -(_b[1] - _a[1])), rx = Math.cos(h), rz = Math.sin(h);
+      const c = at(poly, L, s, [0, 0, undefined]), side = i & 1 ? -1 : 1;
+      out.push({ x: c[0] + rx * side * D.SIDE, z: c[1] + rz * side * D.SIDE, y: fin(c[2]) ? c[2] : undefined, side, h, lantern: i % D.LANTERN === 2, k: 1 - 0.55 * (s - D.TRAIL_FROM) / (D.TRAIL_TO - D.TRAIL_FROM), s });
+    }
+    return out;
+  };
+  // a cheap grid A* (f-ux2): a (2R+1)² window around `from`, typed arrays kept between searches (no allocation but the
+  // result), each cell's standing height found lazily (≤ 5 block reads), steps up 1 / down 3, diagonals only past free
+  // corners, water slow, doors open. pass(s) → 0 blocked · 1 free · 2 door · 3 water; stand(s) → 1 can stand on it.
+  // → { path: [[x, z, y], …] cell centres from `from`, complete, expanded } or null
+  const GP = { R: 0 };
+  D.gridPath = function (getBlock, pass, stand, from, to, R, max) {
+    R = R | 0; const N = 2 * R + 1, NN = N * N;
+    if (GP.R !== R) { GP.R = R; GP.cost = new Float32Array(NN); GP.came = new Int32Array(NN); GP.hy = new Int16Array(NN); GP.st = new Uint8Array(NN); GP.hk = new Int32Array(NN * 4); GP.hv = new Float32Array(NN * 4); }
+    const cost = GP.cost, came = GP.came, hy = GP.hy, st = GP.st, hk = GP.hk, hv = GP.hv;
+    cost.fill(Infinity); st.fill(0);
+    const x0 = from[0] - R, z0 = from[2] - R, tx = to[0], tz = to[2], near2 = 4;
+    const free = (x, y, z) => { const a = pass(getBlock(x, y, z)); return a && pass(getBlock(x, y + 1, z)) ? a : 0; };
+    const standAt = (x, z, yr) => { for (let k = 0; k < 5; k++) { const y = yr + (k === 0 ? 0 : k === 1 ? 1 : 1 - k); if (free(x, y, z) && stand(getBlock(x, y - 1, z))) return y; } return -32768; };
+    const hh = (x, z) => { const dx = Math.abs(x - tx), dz = Math.abs(z - tz); return (dx > dz ? dx + 0.414 * dz : dz + 0.414 * dx) * 1.1; };
+    let hn = 0;
+    const push = (k, v) => { let i = hn++; hk[i] = k; hv[i] = v; while (i > 0) { const q = (i - 1) >> 1; if (hv[q] <= hv[i]) break; const tk = hk[q], tv = hv[q]; hk[q] = hk[i]; hv[q] = hv[i]; hk[i] = tk; hv[i] = tv; i = q; } };
+    const pop = () => { const top = hk[0]; hn--; if (hn > 0) { hk[0] = hk[hn]; hv[0] = hv[hn]; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < hn && hv[l] < hv[m]) m = l; if (r < hn && hv[r] < hv[m]) m = r; if (m === i) break; const tk = hk[m], tv = hv[m]; hk[m] = hk[i]; hv[m] = hv[i]; hk[i] = tk; hv[i] = tv; i = m; } } return top; };
+    // the straight way first (open land: no search at all)
+    { const L = Math.hypot(tx - from[0], tz - from[2]), ux = (tx - from[0]) / (L || 1), uz = (tz - from[2]) / (L || 1), line = [[from[0] + 0.5, from[2] + 0.5, from[1]]];
+      let lx = from[0], lz = from[2], ly = from[1], ok = L > 0;
+      for (let t = 0.5; ok && t <= L; t += 0.5) {
+        const cx = Math.floor(from[0] + 0.5 + ux * t), cz = Math.floor(from[2] + 0.5 + uz * t); if (cx === lx && cz === lz) continue;
+        if (cx !== lx && cz !== lz && (!free(cx, ly, lz) || !free(lx, ly, cz))) { ok = false; break; }
+        const ny = standAt(cx, cz, ly); if (ny === -32768 || (ny > ly && !pass(getBlock(lx, ly + 2, lz)))) { ok = false; break; }
+        lx = cx; lz = cz; ly = ny; line.push([cx + 0.5, cz + 0.5, ny]);
+      }
+      if (ok && line.length > 1) return { path: line, complete: true, expanded: 0, straight: true }; }
+    const k0 = R * N + R; cost[k0] = 0; hy[k0] = from[1]; came[k0] = -1; st[k0] = 1; push(k0, hh(from[0], from[2]));
+    let best = k0, bestH = hh(from[0], from[2]), n = 0, goal = -1;
+    while (hn > 0 && n < max && hn < hk.length - 8) {
+      const k = pop(); if (st[k] === 2) continue; st[k] = 2; n++;
+      const cx = ((k / N) | 0) + x0, cz = (k % N) + z0, cy = hy[k];
+      const ddx = cx - tx, ddz = cz - tz; if (ddx * ddx + ddz * ddz <= near2) { goal = k; break; }
+      const hc = hh(cx, cz); if (hc < bestH) { bestH = hc; best = k; }
+      for (let di = 0; di < 8; di++) {
+        const dx = di < 4 ? (di === 0 ? 1 : di === 1 ? -1 : 0) : (di & 1 ? -1 : 1), dz = di < 4 ? (di === 2 ? 1 : di === 3 ? -1 : 0) : (di < 6 ? 1 : -1);
+        const nx = cx + dx, nz = cz + dz, ix = nx - x0, iz = nz - z0; if (ix < 0 || iz < 0 || ix >= N || iz >= N) continue;
+        const nk = ix * N + iz; if (st[nk] === 2) continue;
+        if (di >= 4 && (!free(cx + dx, cy, cz) || !free(cx, cy, cz + dz))) continue;
+        const ny = standAt(nx, nz, cy); if (ny === -32768) continue;
+        if (ny > cy && !pass(getBlock(cx, cy + 2, cz))) continue;   // (a step up needs the head room)
+        const a = pass(getBlock(nx, ny, nz)), nc = cost[k] + (di >= 4 ? 1.414 : 1) + (a === 3 ? 4 : 0) + (ny !== cy ? 0.5 : 0);
+        if (nc >= cost[nk]) continue;
+        cost[nk] = nc; came[nk] = k; hy[nk] = ny; st[nk] = 1; push(nk, nc + hh(nx, nz));
+      }
+    }
+    const end = goal >= 0 ? goal : best; if (end === k0) return null;
+    const path = []; for (let k = end, g = 0; k >= 0 && g < NN; k = came[k], g++) path.push([((k / N) | 0) + x0 + 0.5, (k % N) + z0 + 0.5, hy[k]]);
+    path.reverse();
+    return { path, complete: goal >= 0, expanded: n };
+  };
+  // the Wegweiser at a fork: where the way turns more than 35° (over 3 m before and after: the grid's staircase is no
+  // turn), the sharpest point of each bend, ≥ 8 m apart, at most two, 4 m on
+  D.FORK_DEG = 35;
+  D.forks = function (poly, maxS) {
+    const out = []; if (!Array.isArray(poly) || poly.length < 3) return out;
+    const L = arcOf(poly), tot = L[L.length - 1], lim = Math.min(maxS || 40, tot - 3), c = [0, 0, 0], p0 = [0, 0, 0], p1 = [0, 0, 0];
+    let best = null;
+    const flush = () => { if (best && (!out.length || best.s - out[out.length - 1].s >= 8) && out.length < 2) out.push(best); best = null; };
+    for (let s = 4; s <= lim + 1e-6; s += 0.5) {
+      at(poly, L, s, c); at(poly, L, s - 3, p0); at(poly, L, s + 3, p1);
+      const ax = c[0] - p0[0], az = c[1] - p0[1], bx = p1[0] - c[0], bz = p1[1] - c[1];
+      const cs = (ax * bx + az * bz) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1), deg = Math.acos(clamp(cs, -1, 1)) * 180 / Math.PI;
+      if (deg > D.FORK_DEG) { if (!best || deg > best.turn) best = { x: c[0], z: c[1], y: c[2], s, turn: deg, h: Math.atan2(bx, -bz), dir: ax * bz - az * bx > 0 ? 1 : -1 }; }
+      else flush();
+    }
+    flush();
+    return out;
+  };
+  // one sole on the ground (a ball and a heel, stretched along h, the right one mirrored): triangles (x, y, z) into buf
+  // from o; returns the floats written. k: size.
+  D.SOLE_N = 8; D.SOLE_FLOATS = D.SOLE_N * 2 * 9;
+  D.sole = function (buf, o, x, y, z, h, side, k) {
+    const s = k || 1, toe = 0.12 * side, hh = h + toe, fx = Math.sin(hh), fz = -Math.cos(hh), rx = Math.cos(hh), rz = Math.sin(hh), N = D.SOLE_N;
+    const o0 = o;
+    // [across, along, half-width, half-length]: the ball forward (its inner edge straighter), the heel behind
+    const E = [[side * 0.012, 0.065, 0.056, 0.095], [side * 0.004, -0.105, 0.042, 0.05]];
+    for (const e of E) {
+      const cu = e[0] * s, cv = e[1] * s, cxw = x + rx * cu + fx * cv, czw = z + rz * cu + fz * cv;
+      for (let i = 0; i < N; i++) {
+        const a0 = i / N * 6.2832, a1 = (i + 1) / N * 6.2832;
+        buf[o++] = cxw; buf[o++] = y; buf[o++] = czw;
+        let u = Math.cos(a0) * e[2] * s, v = Math.sin(a0) * e[3] * s;
+        buf[o++] = cxw + rx * u + fx * v; buf[o++] = y; buf[o++] = czw + rz * u + fz * v;
+        u = Math.cos(a1) * e[2] * s; v = Math.sin(a1) * e[3] * s;
+        buf[o++] = cxw + rx * u + fx * v; buf[o++] = y; buf[o++] = czw + rz * u + fz * v;
+      }
+    }
+    return o - o0;
+  };
+
+  // ================================================================ f-ux2 (pure): ink doodles for the Wanderbuch
+  // D.doodle(kind, seed) → pen strokes [[[x, y], …], …] in a 0..1 box (y down), a hand's small wobble by the seed.
+  // Our own little drawings (houses, a tower, a tree, people, the fox, …), procedural.
+  const dh = (a, b) => { let x = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35); x ^= x >>> 13; x = Math.imul(x, 0x27d4eb2f); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
+  const DRAW = {
+    house: (q) => { q.P([.15, .9], [.85, .9], [.85, .48], [.5, .16], [.15, .48], [.15, .9]); q.P([.08, .52], [.5, .12], [.92, .52]); q.P([.42, .9], [.42, .66], [.58, .66], [.58, .9]); q.P([.24, .58], [.36, .58], [.36, .7], [.24, .7], [.24, .58]); q.P([.66, .28], [.66, .14], [.74, .14], [.74, .36]); },
+    tower: (q) => { q.P([.3, .92], [.34, .3], [.66, .3], [.7, .92]); q.P([.28, .3], [.28, .18], [.36, .18], [.36, .24], [.46, .24], [.46, .18], [.54, .18], [.54, .24], [.64, .24], [.64, .18], [.72, .18], [.72, .3]); q.P([.46, .92], [.46, .76], [.54, .76], [.54, .92]); q.P([.47, .44], [.47, .54], [.53, .54], [.53, .44]); q.P([.08, .92], [.92, .92]); },
+    tree: (q) => { q.P([.47, .92], [.48, .6], [.4, .5]); q.P([.53, .92], [.52, .6], [.62, .48]); q.C(.5, .36, .24, 0, 6.3); q.C(.34, .48, .14, 1.6, 4.9); q.C(.66, .46, .14, -1.7, 1.6); q.P([.3, .92], [.7, .92]); },
+    person: (q) => { q.C(.5, .2, .1, 0, 6.3); q.P([.5, .3], [.5, .62]); q.P([.28, .46], [.5, .38], [.72, .46]); q.P([.36, .92], [.5, .62], [.64, .92]); q.P([.36, .12], [.64, .12]); },
+    fox: (q) => { q.P([.12, .5], [.2, .3], [.26, .44], [.34, .3], [.38, .5]); q.P([.12, .5], [.24, .62], [.38, .5]); q.P([.36, .52], [.7, .5], [.8, .62]); q.P([.32, .58], [.68, .64]); q.P([.42, .62], [.4, .86]); q.P([.64, .64], [.66, .86]); q.P([.8, .62], [.94, .42], [.88, .74], [.72, .66]); q.P([.21, .48], [.22, .49]); },
+    rabbit: (q) => { q.C(.55, .64, .2, 0, 6.3); q.C(.32, .48, .11, 0, 6.3); q.P([.3, .38], [.24, .1], [.34, .36]); q.P([.36, .38], [.4, .1], [.42, .38]); q.C(.78, .62, .05, 0, 6.3); q.P([.4, .84], [.7, .84]); },
+    dog: (q) => { q.C(.24, .38, .11, 0, 6.3); q.P([.16, .3], [.12, .5]); q.P([.32, .44], [.76, .46], [.86, .3]); q.P([.32, .6], [.76, .6]); q.P([.36, .6], [.36, .84]); q.P([.7, .6], [.72, .84]); q.P([.76, .46], [.76, .6]); },
+    pup: (q) => { q.C(.38, .44, .16, 0, 6.3); q.P([.26, .32], [.22, .14], [.34, .3]); q.P([.42, .28], [.5, .12], [.5, .32]); q.C(.66, .66, .16, 3.4, 6.3); q.P([.52, .68], [.84, .7]); q.P([.12, .2], [.16, .16]); q.P([.84, .2], [.88, .14]); q.P([.86, .46], [.9, .42]); },
+    pot: (q) => { q.P([.16, .44], [.84, .44]); q.C(.5, .44, .34, 0, 3.15); q.P([.12, .5], [.04, .46]); q.P([.88, .5], [.96, .46]); q.P([.38, .32], [.34, .2], [.4, .1]); q.P([.56, .32], [.6, .2], [.54, .08]); q.P([.3, .92], [.7, .92]); },
+    cart: (q) => { q.P([.12, .4], [.8, .4], [.74, .66], [.18, .66], [.12, .4]); q.C(.3, .76, .1, 0, 6.3); q.C(.64, .76, .1, 0, 6.3); q.P([.8, .4], [.94, .3]); q.P([.24, .4], [.3, .24], [.5, .22], [.62, .4]); },
+    basket: (q) => { q.P([.14, .5], [.86, .5], [.76, .88], [.24, .88], [.14, .5]); q.C(.5, .5, .3, 3.2, 6.25); q.P([.2, .64], [.8, .64]); q.P([.24, .76], [.76, .76]); q.P([.4, .5], [.4, .88]); q.P([.6, .5], [.6, .88]); },
+    note: (q) => { q.C(.3, .76, .1, 0, 6.3); q.C(.7, .68, .1, 0, 6.3); q.P([.4, .76], [.4, .2], [.8, .12], [.8, .68]); q.P([.4, .32], [.8, .24]); },
+    kite: (q) => { q.P([.5, .08], [.8, .36], [.5, .66], [.22, .36], [.5, .08]); q.P([.5, .08], [.5, .66]); q.P([.22, .36], [.8, .36]); q.P([.5, .66], [.42, .78], [.56, .86], [.46, .96]); },
+    rainbow: (q) => { q.C(.5, .82, .4, 3.15, 6.28); q.C(.5, .82, .3, 3.15, 6.28); q.C(.5, .82, .2, 3.15, 6.28); q.P([.04, .84], [.96, .84]); },
+    mushroom: (q) => { q.C(.5, .5, .32, 3.15, 6.28); q.P([.18, .5], [.82, .5]); q.P([.42, .5], [.4, .86], [.6, .86], [.58, .5]); q.C(.38, .36, .04, 0, 6.3); q.C(.6, .3, .05, 0, 6.3); q.P([.2, .9], [.8, .9]); },
+    cairn: (q) => { q.C(.5, .78, .24, 0, 6.3); q.C(.5, .5, .17, 0, 6.3); q.C(.5, .28, .11, 0, 6.3); q.P([.1, .96], [.9, .96]); },
+    gate: (q) => { q.P([.28, .92], [.28, .26]); q.P([.72, .92], [.72, .26]); q.P([.12, .2], [.5, .14], [.88, .2]); q.P([.2, .34], [.8, .34]); q.P([.1, .92], [.9, .92]); },
+    scroll: (q) => { q.P([.2, .2], [.8, .2], [.8, .8], [.2, .8], [.2, .2]); q.C(.2, .2, .06, 0, 6.3); q.C(.8, .8, .06, 0, 6.3); q.P([.3, .38], [.7, .38]); q.P([.3, .5], [.6, .5]); q.P([.36, .64], [.5, .58], [.62, .66]); },
+    signpost: (q) => { q.P([.48, .94], [.48, .14]); q.P([.52, .94], [.52, .14]); q.P([.2, .2], [.76, .2], [.88, .28], [.76, .36], [.2, .36], [.2, .2]); q.P([.8, .48], [.24, .48], [.12, .56], [.24, .64], [.8, .64], [.8, .48]); },
+    star: (q) => { q.P([.5, .1], [.6, .4], [.9, .42], [.66, .6], [.76, .9], [.5, .72], [.24, .9], [.34, .6], [.1, .42], [.4, .4], [.5, .1]); q.P([.84, .14], [.86, .12]); q.P([.14, .16], [.16, .14]); },
+    lantern: (q) => { q.P([.5, .04], [.5, .16]); q.C(.5, .5, .3, 0, 6.3); q.P([.36, .2], [.64, .2]); q.P([.36, .8], [.64, .8]); q.P([.5, .2], [.5, .8]); q.P([.5, .84], [.5, .96]); },
+    well: (q) => { q.P([.16, .56], [.84, .56], [.8, .9], [.2, .9], [.16, .56]); q.P([.22, .56], [.22, .26]); q.P([.78, .56], [.78, .26]); q.P([.1, .3], [.5, .08], [.9, .3]); q.P([.22, .36], [.78, .36]); q.P([.5, .36], [.5, .46]); q.P([.2, .72], [.8, .72]); },
+  };
+  D.DOODLES = Object.keys(DRAW);
+  D.doodle = function (kind, seed) {
+    const f = DRAW[kind] || DRAW.star, sd = (seed >>> 0) || 1, out = [];
+    let n = 0;
+    const wob = (x, y) => { n++; return [clamp(x + (dh(sd, n * 2) - 0.5) * 0.03, 0.01, 0.99), clamp(y + (dh(sd, n * 2 + 1) - 0.5) * 0.03, 0.01, 0.99)]; };
+    const q = {
+      P: (...pts) => { const s = []; for (let i = 0; i < pts.length; i++) { if (i) { const a = pts[i - 1], b = pts[i]; s.push(wob((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)); } s.push(wob(pts[i][0], pts[i][1])); } out.push(s); },
+      C: (cx, cy, r, a0, a1) => { const s = [], m = Math.max(6, Math.round(Math.abs(a1 - a0) * 5)); for (let i = 0; i <= m; i++) { const a = a0 + (a1 - a0) * i / m; s.push(wob(cx + Math.cos(a) * r, cy + Math.sin(a) * r)); } out.push(s); },
+    };
+    f(q);
+    return out;
+  };
+  const STK = { traveller: 'person', caravan: 'cart', pet: 'dog', picnic: 'basket', musician: 'note', kites: 'kite', crossing: 'fox', rainbow: 'rainbow', glade: 'mushroom', cairn: 'cairn', shrine: 'gate', ruins: 'tower', scrap: 'scroll', sign: 'signpost', stargazer: 'star', lanterns: 'lantern', well: 'well' };
+  const PLACES = ['house', 'tower', 'tree', 'gate', 'well'];
+  const hsd = (s) => { let x = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619); return x >>> 0; };
+  D.hsd = hsd;
+  D.doodleKind = function (page, id) {
+    const s = String(id === undefined || id === null ? '' : id);
+    if (page === 'creatures') return DRAW[s] ? s : /hase|rabbit/.test(s) ? 'rabbit' : 'fox';
+    if (page === 'people') return 'person';
+    if (page === 'recipes') return 'pot';
+    if (page === 'stickers') return STK[s] || 'star';
+    if (page === 'places') return /^v:|dorf|village|hafen/i.test(s) ? 'house' : PLACES[hsd(s) % PLACES.length];
+    return 'star';
+  };
+  // the book's pages: the map, then two sections a page, the sticker board last
+  D.pairPages = function (secs) {
+    const out = [{ map: true }];
+    for (let i = 0; i < secs.length; i += 2) out.push({ html: secs[i] + (secs[i + 1] || ''), n: secs[i + 1] ? 2 : 1 });
+    out.push({ board: true });
+    return out;
+  };
+
   // ---------------------------------------------------------------- the vitals (pure): the edge's strength and kind
   D.vitals = function (hp, food, air) {
     const h = fin(hp) ? clamp(hp, 0, 1) : 1, f = fin(food) ? clamp(food, 0, 1) : 1, a = fin(air) ? clamp(air, 0, 1) : 1;
@@ -99,10 +276,11 @@
 
   // ================================================================ the game side
   const CSS = `
-#dgsign{position:absolute;left:0;top:0;display:none;pointer-events:none;transform:translate(-50%,-30px);z-index:3;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))}
-#dgsign .pl{display:flex;align-items:center;gap:6px;padding:4px 14px 4px 10px;background:linear-gradient(180deg,#9a6b3f,#7a5130);color:#fff4dc;font:600 calc(13px*var(--ux-scale,1)) Georgia,serif;border-radius:4px 10px 10px 4px/4px 6px 6px 4px;clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%);border:1px solid #4a2f18;text-shadow:0 1px 0 #3a2410;white-space:nowrap}
-#dgsign .pl b{font-weight:700}#dgsign .pl i{font-style:normal;opacity:.85;font-size:.9em}
-#dgsign .post{width:5px;height:var(--post,26px);margin:0 auto;background:linear-gradient(90deg,#5a3a20,#7a5130,#5a3a20);border-radius:1px}
+.dgsign{position:absolute;left:0;top:0;display:none;pointer-events:none;transform:translate(-50%,-30px);z-index:3;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))}
+.dgsign .pl{display:flex;align-items:center;gap:6px;padding:4px 14px 4px 10px;background:linear-gradient(180deg,#9a6b3f,#7a5130);color:#fff4dc;font:600 calc(13px*var(--ux-scale,1)) Georgia,serif;border-radius:4px 10px 10px 4px/4px 6px 6px 4px;clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%);border:1px solid #4a2f18;text-shadow:0 1px 0 #3a2410;white-space:nowrap}
+.dgsign .pl b{font-weight:700}.dgsign .pl i{font-style:normal;opacity:.85;font-size:.9em}
+.dgsign .post{width:5px;height:var(--post,26px);margin:0 auto;background:linear-gradient(90deg,#5a3a20,#7a5130,#5a3a20);border-radius:1px}
+.dgsign.l .pl{clip-path:polygon(12% 0,100% 0,100% 100%,12% 100%,0 50%);padding:4px 10px 4px 14px;border-radius:10px 4px 4px 10px/6px 4px 4px 6px}.dgsign.l .pl span{display:inline-block;transform:scaleX(-1);order:-1}.dgsign.fork .pl{font-size:calc(12px*var(--ux-scale,1))}
 #dgrose{position:absolute;right:16px;top:14px;width:calc(64px*var(--ux-scale,1));height:calc(64px*var(--ux-scale,1));pointer-events:none;opacity:.78;transition:opacity .4s}
 #dgrose .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,236,200,.55);background:radial-gradient(circle,rgba(10,14,28,.32),rgba(10,14,28,.12) 70%,transparent 72%)}
 #dgrose .ring span{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;text-align:center;font:700 10px/14px var(--display,sans-serif);color:rgba(255,240,215,.75)}
@@ -122,7 +300,7 @@ body.dg-vit #hud #stats:not(.dg-danger){opacity:0!important;pointer-events:none}
 #dgradial .it{position:absolute;width:64px;height:64px;margin:-32px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;color:#fff3dc;background:rgba(30,36,58,.55);border:1.5px solid rgba(255,230,190,.25);transition:transform .1s,background .1s}
 #dgradial .it.sel{transform:scale(1.18);background:rgba(255,190,90,.38);border-color:#ffd38a;box-shadow:0 0 18px rgba(255,190,90,.45)}
 #dgradial .lab{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:30%;text-align:center;font:600 calc(14px*var(--ux-scale,1)) var(--display,sans-serif);color:#ffe7b8;text-shadow:0 1px 3px #000}
-html.a11y-hc #dgradial .it{background:#000;border-color:#fff}html.a11y-hc #dgradial .it.sel{outline:3px solid #ffe600}html.a11y-hc #dgsign .pl{background:#000;color:#fff;border-color:#fff}
+html.a11y-hc #dgradial .it{background:#000;border-color:#fff}html.a11y-hc #dgradial .it.sel{outline:3px solid #ffe600}html.a11y-hc .dgsign .pl{background:#000;color:#fff;border-color:#fff}
 body.dg-satchel #inventory.on #invpanel{animation:dgsatch .34s cubic-bezier(.2,.9,.3,1.15);transform-origin:50% 100%}
 body.dg-satchel #inventory.on #invpanel::before{content:'';position:absolute;left:10%;right:10%;top:-16px;height:46px;border-radius:6px 6px 30px 30px;background:linear-gradient(180deg,#8a5a34,#6b4325);border:2px dashed rgba(255,220,170,.35);box-shadow:0 4px 8px rgba(0,0,0,.4);transform-origin:50% 0;animation:dgflap .42s ease-in forwards;pointer-events:none;z-index:5}
 body.dg-satchel #inventory.on #invpanel::after{content:'';position:absolute;left:50%;top:-2px;width:22px;height:16px;margin-left:-11px;border-radius:4px;background:linear-gradient(180deg,#e8c27a,#a87b34);box-shadow:0 1px 2px rgba(0,0,0,.5);animation:dgbuckle .42s ease-in forwards;pointer-events:none;z-index:6}
@@ -182,59 +360,154 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   const PO = { life: 1.1, size: 0.09, grav: 0, col: [1, 0.82, 0.45], emis: 1, drag: 0, collide: false, force: true, uv: [0, 0, 1, 1], alpha: 0.9 };
   const PL = { life: 1.1, size: 0.2, grav: 0, col: [1, 0.72, 0.32], emis: 1, drag: 0, collide: false, force: true, uv: [0, 0, 1, 1], alpha: 0.8 };
   const groundY = (g, x, z, y0) => { const w = g.world; if (!w || !w.topAt) return y0; const h = w.topAt(Math.floor(x), Math.floor(z)); return h > 0 && Math.abs(h + 1 - y0) < 12 ? h + 1 : y0; };
+  // (the trail shows: the setting, particles on — Very Low has none —, on foot, no auto-walk)
+  const trailOn = (g) => !!(opt(g, 'goalTrail') && ((g.settings && g.settings.particles) | 0) > 0 && !g.flight && !(VR.Intent && VR.Intent.current && VR.Intent.current()));
   function trailFrame(g, dt) {
     const P = g.particles, p = g.player;
-    if (!P || !S.goal || !opt(g, 'goalTrail') || ((g.settings && g.settings.particles) | 0) <= 0 || g.flight || (VR.Intent && VR.Intent.current && VR.Intent.current())) return;
+    if (!P || !S.goal || !trailOn(g)) return;
     if ((S.trailT -= dt) > 0) return;
     S.trailT = 0.5;
-    const pts = S.pts, y0 = p.pos[1], t = g.time || 0;
+    const pts = S.pts, y0 = p.pos[1], t = g.time || 0, decal = !!S.soleN;
     for (let i = 0; i < pts.length; i++) {
       const q = pts[i], y = q.y === undefined ? (q.y = groundY(g, q.x, q.z, y0)) : q.y;
       const tw = 0.75 + 0.25 * Math.sin(t * 2 + i * 0.9);
-      PO.alpha = 0.85 * q.k * tw; PO.size = 0.085 + 0.02 * q.k;
-      P.spawn(q.x, y + 0.04, q.z, 0, 0.02, 0, PO); D.cost.spawns++;
+      if (!decal) { PO.alpha = 0.85 * q.k * tw; PO.size = 0.085 + 0.02 * q.k; P.spawn(q.x, y + 0.04, q.z, 0, 0.02, 0, PO); D.cost.spawns++; }   // (the steps are soles now; the dots only without the decal batch)
       if (q.lantern) { PL.alpha = 0.7 * q.k * tw; P.spawn(q.x - q.side * 0.5, y + 0.85 + 0.06 * Math.sin(t * 1.7 + i), q.z, 0, 0.03, 0, PL); D.cost.spawns++; }
     }
   }
-  // the signpost: projected at the trail's end (intent.js's projection)
-  function signFrame(g) {
-    const sg = S.sign, el = S.signEl;
-    let show = !!(sg && el && opt(g, 'goalTrail') && g.cam && !g.hideHud && !(g.ui && g.ui.screen) && !g.flight);
-    if (show) {
-      const c = g.cam, cy = Math.cos(c.yaw), sy = Math.sin(c.yaw), cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
-      const fx = -sy * cp, fy = sp, fz = -cy * cp, rx = cy, rz = -sy, ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;
-      const dx = sg.x - c.x, dy = sg.y - c.y, dz = sg.z - c.z, zc = dx * fx + dy * fy + dz * fz;
-      const W = window.innerWidth || 960, H = window.innerHeight || 540, ty = Math.tan((c.fov || 1.2) / 2), txx = ty * W / H;
-      if (zc > 1.5) {
-        const nx = (dx * rx + dz * rz) / zc / txx, ny = (dx * ux + dy * uy + dz * uz) / zc / ty;
-        if (Math.abs(nx) < 1.1 && Math.abs(ny) < 1.1) {
-          const gy = dy - 1.9, ny2 = (dx * ux + gy * uy + dz * uz) / zc / ty, post = Math.max(6, Math.min(140, (ny - ny2) * 0.5 * H + 4));
-          el.style.left = ((nx * 0.5 + 0.5) * W).toFixed(1) + 'px'; el.style.top = ((0.5 - ny * 0.5) * H).toFixed(1) + 'px'; el.style.setProperty('--post', post.toFixed(0) + 'px');
-        }
-        else show = false;
-      } else show = false;
+  // f-ux2: the walkable way to the goal — VR.Folk.findPath to a point ≤ 40 m toward it, searched again only when you
+  // moved 3 m or the goal moved 2 m, at most every 1.5 s, ≤ 700 cells (400 when the main thread is the bottleneck)
+  D.PATH_REACH = 32; D.PATH_MAX = 1400;
+  function pathFor(g, p, goal) {
+    const F = VR.Folk, w = g.world;
+    if (!F || !F.passable || !F.standable || !w || !w.getBlock || (F.warmed && !F.warmed())) return null;
+    const px = p.pos[0], pz = p.pos[2], t = now();
+    const moved = S.pFrom ? Math.hypot(px - S.pFrom[0], pz - S.pFrom[1]) : 1e9, gm = S.pGoal ? Math.hypot(goal.x - S.pGoal[0], goal.z - S.pGoal[1]) : 1e9;
+    if ((moved > 3 || gm > 2 || S.pW !== w) && t - (S.pathT || -1e9) > 1500) {
+      S.pathT = t; S.pFrom = [px, pz]; S.pGoal = [goal.x, goal.z]; S.pW = w; S.poly = null;
+      const dx = goal.x - px, dz = goal.z - pz, L = Math.hypot(dx, dz) || 1, r0 = Math.min(L, D.PATH_REACH);
+      const gx = Math.floor(px + dx / L * r0), gz = Math.floor(pz + dz / L * r0);
+      const top = w.topAt ? w.topAt(gx, gz) : -1, fy = Math.floor(p.pos[1] + 0.1), gy = top > 0 && Math.abs(top + 1 - fy) < 16 ? top + 1 : fy;
+      try {
+        const t1 = now(), gb = (x, y, z) => w.getBlock(x, y, z), r = D.gridPath(gb, F.passable, F.standable, [Math.floor(px), fy, Math.floor(pz)], [gx, gy, gz], D.PATH_REACH + 2, g.cpuBound ? D.PATH_MAX >> 1 : D.PATH_MAX);
+        const ms = now() - t1; D.cost.pathN = (D.cost.pathN || 0) + 1; D.cost.pathMs = (D.cost.pathMs || 0) + ms; if (ms > (D.cost.pathWorst || 0)) D.cost.pathWorst = ms;
+        if (r && r.path && r.path.length > 1) S.poly = r.path;
+      } catch (e) { S.poly = null; }
     }
-    if (show !== S.signShown) { S.signShown = show; if (el) el.style.display = show ? 'block' : 'none'; }
+    const poly = S.poly; if (!poly) return null;
+    // from where you stand: the nearest of its first cells on
+    let j = 0, bd = 1e18; for (let i = 0; i < Math.min(poly.length, 14); i++) { const d = (poly[i][0] - px) ** 2 + (poly[i][1] - pz) ** 2; if (d < bd) { bd = d; j = i; } }
+    if (bd > 36) return null;
+    const out = [[px, pz, Math.floor(p.pos[1] + 0.1)]]; for (let i = j + 1; i < poly.length; i++) out.push(poly[i]);
+    return out;
   }
+  D._pathFor = pathFor;   // (test/ux2_trail.js)
+  // the soles: one small batch (≤ 14 × 16 triangles), rebuilt with the trail (4 Hz), drawn after the crack (popFx)
+  const SOLES = 14; S.soleBuf = null; S.soleN = 0; S.soleVer = 0; S.soleK = new Float32Array(SOLES); S.soleAt = new Int32Array(SOLES); S.soleCnt = new Int32Array(SOLES);
+  function buildSoles(g, h0) {
+    if (!S.soleBuf) S.soleBuf = new Float32Array(SOLES * D.SOLE_FLOATS);
+    const pts = S.pts, y0 = g.player.pos[1]; let o = 0, n = 0;
+    for (let i = 0; i < pts.length && n < SOLES; i++, n++) {
+      const q = pts[i], y = q.y === undefined ? (q.y = groundY(g, q.x, q.z, y0)) : q.y;
+      S.soleAt[n] = o / 3; const w = D.sole(S.soleBuf, o, q.x, y + 0.025, q.z, fin(q.h) ? q.h : h0, q.side, 1.3); S.soleCnt[n] = w / 3; S.soleK[n] = q.k; o += w;
+    }
+    S.soleN = n; S.soleVer++;
+  }
+  D.drawSoles = function (ren) {
+    const g = VR.game; if (!S.soleN || !g || !S.goal || !trailOn(g) || g.state !== 'play') return 0;
+    const gl = ren.gl, p = ren.P && ren.P.line, cam = ren.cam; if (!gl || !p || !cam) return 0;
+    if (!S.soleVBO) {
+      S.soleVBO = gl.createBuffer(); S.soleVAO = gl.createVertexArray();
+      gl.bindVertexArray(S.soleVAO); gl.bindBuffer(gl.ARRAY_BUFFER, S.soleVBO); gl.bufferData(gl.ARRAY_BUFFER, S.soleBuf.byteLength, gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 12, 0); S.soleUp = -1; S.soleGL = gl;
+    }
+    gl.bindVertexArray(S.soleVAO);
+    if (S.soleUp !== S.soleVer) { gl.bindBuffer(gl.ARRAY_BUFFER, S.soleVBO); gl.bufferSubData(gl.ARRAY_BUFFER, 0, S.soleBuf); S.soleUp = S.soleVer; }
+    gl.useProgram(p.p);
+    gl.uniformMatrix4fv(p.u.u_viewProj, false, ren.viewProj);
+    gl.uniform3f(p.u.u_offset, -cam.x, -cam.y, -cam.z);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -2);
+    const t = g.time || 0, E = g.env, night = E && fin(E.night) ? clamp(E.night, 0, 1) : 0.3, gain = 1.25 + 0.6 * night;
+    for (let i = 0; i < S.soleN; i++) {
+      const tw = 0.8 + 0.2 * Math.sin(t * 2 - i * 0.7), a = clamp(0.7 * S.soleK[i] * tw, 0, 1);
+      gl.uniform4f(p.u.u_color, 1.0 * gain, 0.74 * gain, 0.36 * gain, a);
+      gl.drawArrays(gl.TRIANGLES, S.soleAt[i], S.soleCnt[i]);
+    }
+    gl.disable(gl.POLYGON_OFFSET_FILL); gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+    gl.bindVertexArray(null);
+    D.cost.soleDraws = (D.cost.soleDraws || 0) + 1;
+    return S.soleN;
+  };
+  const RenC = VR.Renderer;
+  if (RenC && RenC.prototype && !(RenC.prototype.popFx && RenC.prototype.popFx.__dgs)) {
+    const pf = RenC.prototype.popFx;
+    RenC.prototype.popFx = function (F) { const r = pf ? pf.apply(this, arguments) : undefined; try { if (S.soleN) D.drawSoles(this); } catch (e) { /* the frame goes on */ } return r; };
+    RenC.prototype.popFx.__dgs = true;
+  }
+  // the signposts: projected (intent.js's projection) — the one at the trail's end and one at each fork on the way
+  function project(g, sg, el) {
+    const c = g.cam, cy = Math.cos(c.yaw), sy = Math.sin(c.yaw), cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+    const fx = -sy * cp, fy = sp, fz = -cy * cp, rx = cy, rz = -sy, ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;
+    const dx = sg.x - c.x, dy = sg.y - c.y, dz = sg.z - c.z, zc = dx * fx + dy * fy + dz * fz;
+    const W = window.innerWidth || 960, H = window.innerHeight || 540, ty = Math.tan((c.fov || 1.2) / 2), txx = ty * W / H;
+    if (zc <= 1.5) return false;
+    const nx = (dx * rx + dz * rz) / zc / txx, ny = (dx * ux + dy * uy + dz * uz) / zc / ty;
+    if (Math.abs(nx) >= 1.1 || Math.abs(ny) >= 1.1) return false;
+    const gy = dy - 1.9, ny2 = (dx * ux + gy * uy + dz * uz) / zc / ty, post = Math.max(6, Math.min(140, (ny - ny2) * 0.5 * H + 4));
+    el.style.left = ((nx * 0.5 + 0.5) * W).toFixed(1) + 'px'; el.style.top = ((0.5 - ny * 0.5) * H).toFixed(1) + 'px'; el.style.setProperty('--post', post.toFixed(0) + 'px');
+    el.style.opacity = zc > 34 ? String(clamp(1 - (zc - 34) / 10, 0.25, 1)) : '';
+    return true;
+  }
+  function signFrame(g) {
+    const base = !!(opt(g, 'goalTrail') && g.cam && !g.hideHud && !(g.ui && g.ui.screen) && !g.flight);
+    const sg = S.sign, el = S.signEl;
+    let show = !!(base && sg && el);
+    if (show) show = project(g, sg, el);
+    if (show !== S.signShown) { S.signShown = show; if (el) el.style.display = show ? 'block' : 'none'; }
+    for (let i = 0; i < S.forkEls.length; i++) {
+      const f = S.forks[i], fe = S.forkEls[i]; let on = !!(base && f);
+      if (on) on = project(g, f, fe);
+      if (on !== fe._on) { fe._on = on; fe.style.display = on ? 'block' : 'none'; }
+    }
+  }
+  S.forks = []; S.forkEls = []; S.forksShown = 0;
   const fmtD = (d) => (d >= 1000 ? (d / 1000).toFixed(1).replace('.', VR.I18N && VR.I18N.lang === 'en' ? '.' : ',') + ' km' : Math.round(d) + ' m');
+  const signHtml = '<div class="pl"><b></b><i></i><span>➜</span></div><div class="post"></div>';
+  function signText(el, txt, d, key) { if (el._k !== key) { el._k = key; el.querySelector('b').textContent = txt; el.querySelector('i').textContent = '· ' + d; } }
   function slow(g) {
     const p = g.player;
     // the goal, the trail, the sign
     S.goal = goalOf(g);
-    S.pts.length = 0; S.sign = null;
+    S.pts.length = 0; S.sign = null; S.forks.length = 0; S.soleN = 0; S.onPath = false;
     if (S.goal) {
       const dx = S.goal.x - p.pos[0], dz = S.goal.z - p.pos[2]; S.goalD = Math.hypot(dx, dz);
       if (opt(g, 'goalTrail')) {
-        const tr = D.trail(p.pos[0], p.pos[2], S.goal.x, S.goal.z); for (const q of tr) S.pts.push(q);
+        const on = trailOn(g), way = on && S.goalD > 2.5 ? pathFor(g, p, S.goal) : null;
+        const tr = way ? D.trailPath(way) : D.trail(p.pos[0], p.pos[2], S.goal.x, S.goal.z); for (const q of tr) S.pts.push(q);
+        S.onPath = !!way;
+        if (on && S.pts.length) buildSoles(g, Math.atan2(dx, -dz));
+        const txt = S.goal.label || T('g.ux.sign');
+        if (way && S.goalD > 20) { for (const f of D.forks(way, D.PATH_REACH)) { const ox = Math.cos(f.h) * 1.1 * f.dir, oz = Math.sin(f.h) * 1.1 * f.dir; S.forks.push({ x: f.x - ox, z: f.z - oz, y: (fin(f.y) ? f.y : groundY(g, f.x, f.z, p.pos[1])) + 1.9, s: f.s, dir: f.dir }); } }
         if (D.sign(S.goalD)) {
-          const L = S.goalD || 1, x = p.pos[0] + dx / L * D.TRAIL_TO + dz / L * 0.9, z = p.pos[2] + dz / L * D.TRAIL_TO - dx / L * 0.9;
-          S.sign = { x, z, y: groundY(g, x, z, p.pos[1]) + 1.9 };
-          if (!S.signEl) S.signEl = mk('div', 'dgsign', '', '<div class="pl"><b></b><i></i><span>➜</span></div><div class="post"></div>');
-          const txt = S.goal.label || T('g.ux.sign'), dt = fmtD(S.goalD);
-          if (S.signTxt !== txt + dt) { S.signTxt = txt + dt; S.signEl.querySelector('b').textContent = txt; S.signEl.querySelector('i').textContent = '· ' + dt; }
+          let x, z, y;
+          const last = way && S.pts.length ? S.pts[S.pts.length - 1] : null;
+          if (last) { x = last.x + Math.cos(last.h) * 0.9; z = last.z + Math.sin(last.h) * 0.9; y = (last.y === undefined ? groundY(g, x, z, p.pos[1]) : last.y) + 1.9; }
+          else { const L = S.goalD || 1; x = p.pos[0] + dx / L * D.TRAIL_TO + dz / L * 0.9; z = p.pos[2] + dz / L * D.TRAIL_TO - dx / L * 0.9; y = groundY(g, x, z, p.pos[1]) + 1.9; }
+          const near = S.forks.some(f => Math.hypot(f.x - x, f.z - z) < 5);
+          if (!near) {
+            S.sign = { x, z, y };
+            if (!S.signEl) S.signEl = mk('div', 'dgsign', 'dgsign', signHtml);
+            signText(S.signEl, txt, fmtD(S.goalD), txt + fmtD(S.goalD));
+          }
+        }
+        for (let i = 0; i < S.forks.length; i++) {
+          const f = S.forks[i]; if (!S.forkEls[i]) { const e = mk('div', '', 'dgsign fork', signHtml); e._on = false; S.forkEls.push(e); }
+          const e = S.forkEls[i], d = fmtD(Math.max(0, S.goalD - f.s)); e.classList.toggle('l', f.dir < 0); signText(e, txt, d, txt + d);
         }
       }
     }
+
     // the rose
     const roseOn = !!opt(g, 'mapRose') && g.settings.minimap !== false && !g.hideHud && !g.photo;
     if (roseOn !== S.roseOn) { S.roseOn = roseOn; document.body.classList.toggle('dg-rose', roseOn); if (S.roseEl) S.roseEl.style.display = roseOn ? '' : 'none'; if (g.map) g.map.shown = undefined; }
