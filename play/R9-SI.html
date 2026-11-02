@@ -49333,14 +49333,19 @@ for(let k=0;k<want&&k<ds.length;k++){const[d,bi,s]=ds[k];s.neb=bi;nebs[bi].r=Mat
 
 const grid=new Map(),key=(a,b,c)=>a+','+b+','+c;
 for(const s of list){const k=key(Math.floor(s.p[0]/20),Math.floor(s.p[1]/20),Math.floor(s.p[2]/20));if(!grid.has(k))grid.set(k,[]);grid.get(k).push(s);}
-const N={seed,list,nebs,grid,sys:new Map()};
+
+const gb=[Infinity,-Infinity,Infinity,-Infinity,Infinity,-Infinity];
+for(const k of grid.keys()){const v=k.split(',').map(Number);for(let i=0;i<3;i++){if(v[i]<gb[2*i])gb[2*i]=v[i];if(v[i]>gb[2*i+1])gb[2*i+1]=v[i];}}
+const N={seed,list,nebs,grid,gb,sys:new Map()};
 CACHE.set(seed,N);if(CACHE.size>4)CACHE.delete(CACHE.keys().next().value);
 Galaxy.cur=N;
 return N;
 }
 function systemsNear(N,p,ly){
 const out=[],c=Math.ceil(ly/20),cx=Math.floor(p[0]/20),cy=Math.floor(p[1]/20),cz=Math.floor(p[2]/20);
-for(let a=cx-c;a<=cx+c;a++)for(let b=cy-c;b<=cy+c;b++)for(let e=cz-c;e<=cz+c;e++){
+const B=N.gb||[-Infinity,Infinity,-Infinity,Infinity,-Infinity,Infinity];
+const a0=Math.max(cx-c,B[0]),a1=Math.min(cx+c,B[1]),b0=Math.max(cy-c,B[2]),b1=Math.min(cy+c,B[3]),e0=Math.max(cz-c,B[4]),e1=Math.min(cz+c,B[5]);
+for(let a=a0;a<=a1;a++)for(let b=b0;b<=b1;b++)for(let e=e0;e<=e1;e++){
 const L=N.grid.get(a+','+b+','+e);if(!L)continue;
 for(const s of L){const d=Math.hypot(s.p[0]-p[0],s.p[1]-p[1],s.p[2]-p[2]);if(d<=ly)out.push({idx:s.idx,d,s});}
 }
@@ -53805,7 +53810,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="a0795250d82b49ce";
+VR.TEX_SRC_HASH="76aa2d97a3d86047";
 
 
 
@@ -126604,6 +126609,11 @@ const far=d.length?d[d.length-1][1]:30;
 return{labels:d.map(q=>q[0]),dist:Math.max(12,Math.min(520,far*0.95/0.38+far)),far};
 };
 
+
+
+
+VR.StarMapSphere=(rp,W,H)=>(!(rp>0)?'none':rp>4*Math.max(W,H)?'all':'ring');
+
 if(typeof window==='undefined'|| !VR.Game)return;
 const SM=VR.StarMap={};
 const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
@@ -126751,12 +126761,15 @@ for(let k=0;k<=72;k++){const a=k/72*Math.PI*2,q=P.to([P.c[0]+rr*Math.cos(a),0,P.
 X.stroke();
 }
 
-const cq=P.to(P.c),rp=range*P.f/cq[2];
+const cq=P.to(P.c),rp=range*P.f/cq[2],sph=VR.StarMapSphere(rp,W,H);
+if(sph==='all'){X.fillStyle='#7fd4ff0d';X.fillRect(0,0,W,H);}
+else if(sph==='ring'){
 X.strokeStyle='#7fd4ff88';X.lineWidth=1.5;X.beginPath();X.arc(cq[0],cq[1],rp,0,Math.PI*2);X.stroke();
 X.fillStyle='#7fd4ff0d';X.fill();
 X.strokeStyle='#7fd4ff44';X.beginPath();
 for(let k=0;k<=64;k++){const a=k/64*Math.PI*2,q=P.to([P.c[0]+range*Math.cos(a),P.c[1],P.c[2]+range*Math.sin(a)]);k?X.lineTo(q[0],q[1]):X.moveTo(q[0],q[1]);}
 X.stroke();
+}
 
 const order=M.order||(M.order=new Int32Array(N.list.length).map((_,i)=>i));
 order.sort((a,b)=>P.z[b]-P.z[a]);
