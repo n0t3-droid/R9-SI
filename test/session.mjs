@@ -830,7 +830,7 @@ async function session(type, setup, script) {
   const t0 = start.t; rec.tod0 = Math.round(start.tod); rec.day = start.day;
   // o-wander3: the Wanderregisseur's instrument from here (its refusals per reason, its staging) — WANDER_LEGACY=1: the
   // pacing as before o-wander3 (an unseen note held ours 15 s, a craft closing in without limit, no claim), the „before"
-  rec.wander0 = await ev((legacy) => { const g = VR.game, W = VR.Wander, D = g.wanderer; if (legacy && W && W.PACE) { W.PACE.noted = 15; W.PACE.defer = 1e9; W.PACE.claim = -1e9; } const RS = VR.Regie && VR.Regie.of ? VR.Regie.of(g) : null; if (RS) RS.st = { offers: 0, started: 0, story: 0, ld: 0, seen: 0 }; if (!D) return null; D.st.why = {}; D.st.stage = null; return { started: D.st.started, beats: D.st.beats | 0, time: D.time, legacy: !!legacy }; }, !!process.env.WANDER_LEGACY);
+  rec.wander0 = await ev((legacy) => { const g = VR.game, W = VR.Wander, D = g.wanderer; if (legacy && W && W.PACE) { W.PACE.noted = 15; W.PACE.defer = 1e9; W.PACE.claim = -1e9; W.PACE.big = false; W.PACE.small = false; } const RS = VR.Regie && VR.Regie.of ? VR.Regie.of(g) : null; if (RS) RS.st = { offers: 0, started: 0, story: 0, ld: 0, seen: 0 }; if (!D) return null; D.st.why = {}; D.st.stage = null; return { started: D.st.started, beats: D.st.beats | 0, time: D.time, legacy: !!legacy }; }, !!process.env.WANDER_LEGACY);
   let tNow = 0;
   for (const part of script) {
     if (tNow >= DUR - 0.25 || overBudget) break;

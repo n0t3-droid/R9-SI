@@ -107,7 +107,8 @@
   // o-wander3 (R58-03): a start another source noted and nobody has seen holds ours PACE.noted s (was 15: on a busy
   // Herzwelt the notes came every ≈ 11 s — ours never started); while ours is due on foot it claims the Regie's slot
   // (VR.Regie.claim) for at most PACE.claim s past its target, so the others wait for it instead of the other way round
-  W.PACE.noted = 5; W.PACE.claim = 10; W.PACE.defer = 6;
+  // (big, small: a sliver seen far off neither ends our gap nor makes the Regie busy for us)
+  W.PACE.noted = 5; W.PACE.claim = 10; W.PACE.defer = 6; W.PACE.big = true; W.PACE.small = true;
   W.Pacer = class {
     constructor(seed) { this.seed = seed | 0; this.last = -1e9; this.n = 0; this.tgt = this.jit(0); }
     jit(n) { const P = W.PACE; return P.lo + (P.hi - P.lo) * h(this.seed, n, 0x9ace); }
@@ -514,7 +515,11 @@
       if (this.logN === undefined) this.logN = L.count | 0;
       if ((L.count | 0) === this.logN) return;
       const E = L.events(this.logN); this.logN = L.count | 0;
-      for (const e of E) if (e.w >= 2 && e.inView && e.src !== 'wander') { this.pacer.seen(e.t, e.w); this.st.outside = (this.st.outside | 0) + 1; }
+      // (o-wander3: as the Regie and the session's measure see it — a sliver of the frame, a craft over the horizon, a bird
+      // 150 m off, does not end a gap: before, such events every few seconds held every moment off — session builder:
+      // „space" 134 s, „early" 91 s of 300, five moments)
+      const RG = VR.Regie, SF = RG && RG.RULES ? RG.RULES.seenFrac : 0.005;
+      for (const e of E) if (e.w >= 2 && e.inView && e.src !== 'wander') { if (W.PACE.small && e.frac > 0 && e.frac < SF) { this.st.small = (this.st.small | 0) + 1; continue; } this.pacer.seen(e.t, e.w); this.st.outside = (this.st.outside | 0) + 1; }
     }
     pace(dt, walking) {
       const g = this.g, now = this.now;
@@ -530,9 +535,9 @@
       if (walking && P.scout(now) && (!this.plan || this.plan.n !== P.n)) this.plan = { n: P.n, order: W.order(this.seed, 1000 + P.n, this.ctx || (this.ctx = this.context()), this.recent) };
       if (now < (this.tryT || 0)) return why(P.since(now) < P.tgt ? 'early' : 'retry');
       if (this.ofs && this.ofs.n !== P.n) { this.ofs = null; this.cur = null; }
-      const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g));
+      const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g, false, W.PACE.big));
       { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt - W.PACE.look && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1.5); }   // (o-wander3: the slot is ours while it is due)
-      const coming = this.coming(now) && (!walking || P.since(now) < P.tgt + W.PACE.defer);   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
+      const c0 = this.coming(now), coming = c0 && (!walking || P.since(now) < P.tgt + W.PACE.defer) ? c0 : false;   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
       const want = P.want(now, { foot: walking, busy, coming });
       if (want !== 'moment') { const s0 = P.since(now); why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming ? 'coming:' + coming : 'wait'); }
       if (!want) return;

@@ -16,7 +16,7 @@ function world(kind) {
   const top = (x, z) => kind === 'isle' ? 140 : 64;
   const tree = (x, z) => { const k = kind === 'mixed' ? Math.floor(x / 60) % 3 : -1; if (!(kind === 'forest' || k === 1)) return false; return ((x % 6) + 6) % 6 === 0 && ((z % 7) + 7) % 7 === 0; };
   return {
-    col: true,
+    col() { return null; },   // (the event log's line of sight: no shadow map here — the frustum decides)
     getBlock(x, y, z) {
       const t = top(x, z);
       if (kind === 'isle' && Math.hypot(x, z) > 22) return 0;
@@ -49,6 +49,8 @@ function walk(o) {
     g.cam = { x: p[0], y: p[1] + 1.62, z: p[2], yaw: o.terrain === 'isle' ? Math.atan2(-(-Math.sin(ang)), -(Math.cos(ang))) : 0, pitch: -0.05 };
     if (o.terrain === 'isle') g.player.yaw = g.cam.yaw;
     while (ei < ext.length && ext[ei].t <= t) { const e = ext[ei++]; if (V.Regie.allow(g, 2, 'ambient', e.act || 'x' + ei) || e.force) { V.Regie.note(g, 2, 'ambient', e.act || 'x' + ei); if (e.seen) L.emit('ambient', 'ext', 2, null, 'ext'); } }
+    // (far: small things seen far off — a craft over the horizon, a bird 150 m away: in view, a sliver of the frame)
+    if (o.far && Math.floor(t / o.far) !== Math.floor((t - dt) / o.far)) { const c = g.cam, f = [-Math.sin(c.yaw), -Math.cos(c.yaw)]; L.emit('sky', 'far', 2, [c.x + f[0] * 160, c.y + 12, c.z + f[1] * 160], 'far', 1); }
     if (o.ships) { if (ships.length === 0 || t % 20 < dt) ships.push({ pos: [p[0] + 300, p[1] + 40, p[2] - 50], speed: 25, wing: false }); for (const s of ships) { const dx = p[0] - s.pos[0], dz = p[2] - s.pos[2], d = Math.hypot(dx, dz) || 1; s.pos[0] += dx / d * s.speed * dt; s.pos[2] += dz / d * s.speed * dt; } while (ships.length > 3) ships.shift(); }
     V.Regie.frame(g, dt);
     D.update(dt);

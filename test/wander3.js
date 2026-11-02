@@ -1,6 +1,6 @@
 // o-wander3 (R58-03) — the Wanderregisseur is no longer starved (docs/superpowers/plans/2026-11-02-o-wander3.md):
 // the real W.Actor, the Regie and the event log walk 5 minutes over synthetic ground (test/wander3_sim.js) on a busy
-// Herzwelt (other sources note a start every 11 s, a third of them seen; a craft closes in every 20 s) — before the fix
+// Herzwelt (other sources note a start every 11 s, a third of them seen; a craft closes in every 20 s, something small is seen far off every 7 s) — before the fix
 // 0 moments in 300 s (only the hard beats): now on flat land, in a forest, on a sky isle and mixed, Balanced and Very Low,
 // a staged moment at least every 40 s, ≥ 8 in 5 min, never two of ours within 8 s; the instrument (why / stage) is there;
 // a claim holds the other sources off, a story beat not.
@@ -11,7 +11,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const ext = []; for (let t = 5; t < 300; t += 11) ext.push({ t, seen: (t | 0) % 3 === 0 });
 for (const tier of [2, 0]) for (const terrain of ['flat', 'forest', 'isle', 'mixed']) {
-  const r = S.walk({ terrain, tier, ext, ships: true });
+  const r = S.walk({ terrain, tier, ext, ships: true, far: 7 });
   const tag = `${tier ? 'Balanced' : 'Very Low'} · ${terrain}`;
   check(r.moments >= 8, `${tag}: ${r.moments} staged moments (+ ${r.beats} beats) in 5 min (≥ 8)`);
   check(r.mgap <= 40, `${tag}: the longest wait for a staged moment ${r.mgap} s (≤ 40)`);

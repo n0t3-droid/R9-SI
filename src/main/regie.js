@@ -67,7 +67,7 @@
     gapCap() { return this.o.builder ? this.o.gapBuilder : this.o.adv ? R.ADV.gap : this.o.gap; }
     cooling(t, act) { const a = this.acts[act]; return a !== undefined && t - a < this.o.cool; }
     // a-regie: a self-scheduling source started an act (it asked allow first): the spacing and the cooldown move
-    note(t, w, kind, act) { if (t > this.lastStart) this.lastStart = t; if (act) this.acts[act] = t; this.log.push([t, w, kind, act || '']); if (this.log.length > 64) this.log.shift(); }
+    note(t, w, kind, act) { if (t > this.lastStart) this.lastStart = t; if (!(this.lastNote > t)) this.lastNote = t; if (act) this.acts[act] = t; this.log.push([t, w, kind, act || '']); if (this.log.length > 64) this.log.shift(); }
     // the offer to start now, or null: a story beat at the first allowed moment; else, when the gap is due, the best
     // allowed offer (weight ≥ 2 within the budget, not the kind of the last two unless nothing else, ties by the hash)
     choose(t, offers, place) {
@@ -93,7 +93,7 @@
       return best;
     }
     // the record of a start (the source tells the event log; seen() follows when it is seen)
-    started(t, of) { this.log.push([t, of.weight, of.kind, of.source]); if (this.log.length > 64) this.log.shift(); if (of.act) this.acts[of.act] = t; }
+    started(t, of) { if (!(this.lastNote > t)) this.lastNote = t; this.log.push([t, of.weight, of.kind, of.source]); if (this.log.length > 64) this.log.shift(); if (of.act) this.acts[of.act] = t; }
   }
   R.Sched = Sched;
 
@@ -115,9 +115,11 @@
   // a-regie: is the screen busy — a weighted event seen or started within the spacing, a wow moment, an unseen vista
   // within 40 m (its moment is coming)? A toast (codex.js) waits meanwhile (≤ HOLD s)
   R.HOLD = 15;
-  R.busy = function (g, hard) {
+  // (o-wander3: big — only what ends a gap or was started counts for the spacing, not a sliver seen far off: the
+  // Wanderregisseur asks so; a small craft over the horizon every few seconds held its moments off for good)
+  R.busy = function (g, hard, big) {
     const S = R.of(g); if (!S) return false;
-    const t = now(g), q = S.sched; if (t - Math.max(q.last2, q.lastStart) < q.o.space || q.scene) return true;
+    const t = now(g), q = S.sched; if (t - Math.max(q.last2, big ? (q.lastNote === undefined ? -Infinity : q.lastNote) : q.lastStart) < q.o.space || q.scene) return true;
     if (g.wow && g.wow.active) return true;
     return hard ? false : R.vistaNear(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
   };
