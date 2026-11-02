@@ -1214,8 +1214,11 @@
       // over it): drawn ~7 times a second, not every frame, and never more than a quarter of the time when one drawing
       // costs more (a weak GPU, a software renderer: seconds a sky) — the GPU and the CPU are left to the streaming
       const tnow = performance.now();
-      if (!LS || !this.loadDrawAt || tnow - this.loadDrawAt >= (this.loadDrawGap || 140) || tnow < this.loadDrawAt) {
-        this.loadDrawAt = tnow; this.loadDrawCost = tnow;
+      // (f-perf8: on Very Low the held sky is drawn at most every 0.6 s — and at once when the canvas changed size; the
+      // picture is the same, the GPU's time goes to the uploads that end the loading screen — VR.First.loadGap)
+      const r0 = this.renderer, lite = !!(r0 && r0.q && r0.q.lite), wh = r0 ? (r0.W | 0) * 65536 + (r0.H | 0) : 0, gap0 = VR.First && VR.First.loadGap ? VR.First.loadGap(lite) : 140;
+      if (!LS || !this.loadDrawAt || tnow - this.loadDrawAt >= Math.max(gap0, this.loadDrawGap || 0) || tnow < this.loadDrawAt || wh !== this.loadDrawWH) {
+        this.loadDrawAt = tnow; this.loadDrawCost = tnow; this.loadDrawWH = wh; this.loadDraws = (this.loadDraws | 0) + 1;
         this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
       } else if (this.loadDrawCost) {
         // (the first frame after a drawing comes when the GPU has finished it: its cost)

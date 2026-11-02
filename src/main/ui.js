@@ -286,11 +286,13 @@
       }
     }
     loading(msg, frac, detail) {
-      if (this.screen !== 'loading') { this.show('loading'); this.tipTimer = 0; }
-      $('#loadmsg').textContent = msg;
+      if (this.screen !== 'loading') { this.show('loading'); this.tipTimer = 0; this.loadSeen = null; }
+      // (f-perf8: only what changed is written — the same text set again each frame was a style and paint pass a frame)
+      const LC = this.loadSeen || (this.loadSeen = { msg: null, detail: null, sky: null, pct: -1 });
+      if (LC.msg !== msg) { LC.msg = msg; $('#loadmsg').textContent = msg; }
       // t-first: the counts of the needed sections under the bar; the world's sky shows through while it renders behind
-      { const d = $('#loaddetail'); if (d) d.textContent = detail || ''; const L = $('#loading'); if (L) L.classList.toggle('sky', this.game.state === 'loading'); }
-      $('#loadbar').style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%';
+      { const dt0 = detail || '', sky = this.game.state === 'loading'; if (LC.detail !== dt0) { LC.detail = dt0; const d = $('#loaddetail'); if (d) d.textContent = dt0; } if (LC.sky !== sky) { LC.sky = sky; const L = $('#loading'); if (L) L.classList.toggle('sky', sky); } }
+      { const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100); if (LC.pct !== pct) { LC.pct = pct; $('#loadbar').style.width = pct + '%'; } }
       if (!this.tipAt || performance.now() - this.tipAt > 4500) { this.tipAt = performance.now(); const tips = TL('g.load.tips'); $('#loadtip').textContent = tips.length ? tips[Math.floor(Math.random() * tips.length)] : ''; }
     }
     // ---------------------------------------------------------------- HUD

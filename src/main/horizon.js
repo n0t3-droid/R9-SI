@@ -35,15 +35,18 @@
     // Without a focus the order is the old one: coarse and near first, relative to the tile's size. Pure: test/first4.js
     static focusD(F, L, tx, tz) { if (!F) return Infinity; const S = tileSize(L), x0 = tx * S, z0 = tz * S; return Math.hypot(Math.max(x0 - F[0], 0, F[0] - (x0 + S)), Math.max(z0 - F[1], 0, F[1] - (z0 + S))); }
     static prio(d, L, fd) { const S = tileSize(L); return d / S - L * 0.6 - (fd < S ? Horizon.FOCUS_K : 0); }
+    // f-perf8: may this frame keep the last selection? (Very Low; pure on the horizon's fields — test/vl_budget.js)
+    static keepSel(h, cam, w) { return !!h.selList && h.selWant === 0 && h.selVer === (h.ver | 0) && h.selW === w && h.selR === h.radius && h.selFar === h.farOn() && h.frame - h.selF < Horizon.KEEP_FRAMES && Math.abs(cam.x - h.selX) < Horizon.KEEP_D && Math.abs(cam.z - h.selZ) < Horizon.KEEP_D; }
     static radiusFor(level) { return RADII[Math.max(0, Math.min(4, level | 0))]; }
     setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level]; if (r !== this.radius) { this.radius = r; } }
-    key(L, tx, tz) { return L + ':' + tx + ':' + tz; }
-    free(t) { const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
-    reset() { for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; this.focus = null; if (this.far) this.far.reset(); }
+    // (f-perf8: a number, not a string — the selection looks up ~4 keys a tile a frame; |tx|, |tz| < 2^19 tiles: ±67 M blocks)
+    key(L, tx, tz) { return (L * 1048576 + tx + 524288) * 1048576 + tz + 524288; }
+    free(t) { this.ver = (this.ver | 0) + 1; const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
+    reset() { this.ver = (this.ver | 0) + 1; for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; this.focus = null; if (this.far) this.far.reset(); }
     // u-dims · a trip between the worlds of one save (travel.js): the tiles on the GPU stay for the way back (the same
     // world key finds them, the coarse ring is whole on the first frame home); what was still asked for is forgotten
     // with its jobs (the pool is cleared with the world), ring 1 starts again. Not drawn elsewhere (enabled: overworld)
-    keepReady() { for (const [k, t] of this.tiles) if (!(t.state === 1 && (t.vao || t.empty))) this.tiles.delete(k); this.drawList.length = 0; this.inflight = 0; if (this.far) this.far.reset(); }
+    keepReady() { this.ver = (this.ver | 0) + 1; for (const [k, t] of this.tiles) if (!(t.state === 1 && (t.vao || t.empty))) this.tiles.delete(k); this.drawList.length = 0; this.inflight = 0; if (this.far) this.far.reset(); }
     // how much of the horizon around the camera is built (1 = every wanted tile is on the GPU)
     progress() { const s = this.stats; return s.want + s.done > 0 ? s.done / (s.want + s.done) : 1; }
     enabled() { const g = this.g, w = g.world; return this.radius > 0 && w && (g.dim || 'overworld') === 'overworld' && w.dim === 'overworld'; }
@@ -55,8 +58,11 @@
       // the mask is filtered linearly: the cut between far tiles and chunks is a soft band over a chunk (F8), not a step
       if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.LINEAR }); }
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
-      const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
-      if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
+      if (w !== this.wkW) {   // (f-perf8: the world's key made when the world object changes, not every frame)
+        this.wkW = w;
+        const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
+        if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
+      }
       // (f-first4) the landmark of a vista start's arrival: its tiles first for the world's first minutes
       { const av = (g.arrival && g.arrival.v) || (g.arrivalPending && g.arrivalPending.vista); if (av && Array.isArray(av.aim) && !this.focus) { this.focus = [av.aim[0], av.aim[2]]; this.focusAt = performance.now(); } if (this.focus && performance.now() - this.focusAt > Horizon.FOCUS_MS) this.focus = null; }
       // (F-Far) another world object (a dimension and back) took the old upload queue with it: the tiles and forms that
@@ -68,16 +74,20 @@
       const far1 = this.farOn();
       if (this.far) this.far.update(cam);
       if (far1) this.updateMaskFar(cam); else this.updateMask(cam);
+      // f-perf8 · Very Low: the selection below is kept while the camera stays within a block of it, no tile changed, it
+      // wanted no tile (no request waits) and it is younger than 15 frames (its tiles are ≥ 128 blocks wide: the same tiles; the masks above stay per frame)
+      if (r.q && r.q.lite && Horizon.keepSel(this, cam, w)) { const K = this.selList; for (let i = 0; i < K.length; i++) this.drawList.push(K[i]); this.selKept = (this.selKept | 0) + 1; return; }
       // ---- quadtree selection (with ring 1 on, no tile finer than level 2: ring 1 is the land within 1 km)
       const R = this.radius, Lr = TOP[this.level] || 2, Sr = tileSize(Lr), Lmin = far1 ? Math.min(2, Lr) : 0;
       const cx = cam.x, cz = cam.z;
       const want = [];
       const list = this.drawList;
       let done = 0;
-      const dist = (L, tx, tz) => { const S = tileSize(L), x0 = tx * S, z0 = tz * S; const dx = Math.max(x0 - cx, 0, cx - (x0 + S)), dz = Math.max(z0 - cz, 0, cz - (z0 + S)); return Math.hypot(dx, dz); };
+      const dist = (L, tx, tz) => { const S = tileSize(L), x0 = tx * S, z0 = tz * S; const dx = Math.max(x0 - cx, 0, cx - (x0 + S)), dz = Math.max(z0 - cz, 0, cz - (z0 + S)); return Math.sqrt(dx * dx + dz * dz); };   // (f-perf8: not Math.hypot — it allocated a call)
       const ready = (t) => t && t.state === 1;
       // a failed tile is forgotten after a while and asked for again
-      const get = (L, tx, tz) => { const k = this.key(L, tx, tz), t = this.tiles.get(k); if (t && t.state === 2 && this.frame - t.failedAt > 300) { this.tiles.delete(k); return undefined; } return t; };
+      const get = (L, tx, tz) => { const k = this.key(L, tx, tz), t = this.tiles.get(k); if (t && t.state === 2 && this.frame - t.failedAt > 300) { this.tiles.delete(k); this.ver = (this.ver | 0) + 1; return undefined; } return t; };
+      const KT = this.ktS || (this.ktS = [[], [], [], [], [], [], []]);
       const visit = (L, tx, tz) => {
         const d = dist(L, tx, tz);
         if (d > R) return;
@@ -85,17 +95,17 @@
         const t = get(L, tx, tz);
         if (t) t.used = this.frame;
         if (L > Lmin && d < this.split * S) {
-          const kids = [[tx * 2, tz * 2], [tx * 2 + 1, tz * 2], [tx * 2, tz * 2 + 1], [tx * 2 + 1, tz * 2 + 1]];
-          const kt = kids.map(([a, b]) => (dist(L - 1, a, b) > R ? 'out' : get(L - 1, a, b)));
-          const allReady = kt.every(k => k === 'out' || ready(k));
+          // the four children (x, z) = (2tx + (i & 1), 2tz + (i >> 1)) — f-perf8: in a scratch row of this level, no arrays a visit
+          const kt = KT[L]; let allReady = true;
+          for (let i = 0; i < 4; i++) { const k = dist(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1)) > R ? 'out' : get(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1)); kt[i] = k; if (!(k === 'out' || ready(k))) allReady = false; }
           if (allReady || !ready(t)) {
             // descend: children draw themselves (or request themselves)
-            for (let i = 0; i < 4; i++) if (kt[i] !== 'out') visit(L - 1, kids[i][0], kids[i][1]);
+            for (let i = 0; i < 4; i++) if (kt[i] !== 'out') visit(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1));
             if (!allReady && !t) want.push([d, L, tx, tz]);
             return;
           }
           // parent stands in until every child is ready
-          for (let i = 0; i < 4; i++) { const k = kt[i]; if (k === 'out') continue; if (!k) want.push([dist(L - 1, kids[i][0], kids[i][1]), L - 1, kids[i][0], kids[i][1]]); else k.used = this.frame; }
+          for (let i = 0; i < 4; i++) { const k = kt[i]; if (k === 'out') continue; const a = tx * 2 + (i & 1), b = tz * 2 + (i >> 1); if (!k) want.push([dist(L - 1, a, b), L - 1, a, b]); else k.used = this.frame; }
           if (!t.empty) list.push(t);
           done++;
           return;
@@ -131,18 +141,22 @@
         if (far1 && this.bytes + this.far.set.bytes > capB * 0.92) this.far.evict(capB * 0.92 - this.bytes);
       }
       this.stats.tiles = this.tiles.size; this.stats.mb = this.bytes / 1048576;
+      // (f-perf8: the selection's moment, for Horizon.keepSel — after the eviction, so its frees count as before it)
+      const K = this.selList || (this.selList = []); K.length = 0; for (let i = 0; i < list.length; i++) K.push(list[i]);
+      this.selWant = want.length; this.selVer = this.ver | 0; this.selX = cam.x; this.selZ = cam.z; this.selF = this.frame; this.selW = w; this.selR = this.radius; this.selFar = far1;
     }
     request(L, tx, tz, d, k) {
       if (!Number.isFinite(k)) k = Horizon.prio(d, L, Infinity);
       const g = this.g, key = this.key(L, tx, tz), S = tileSize(L);
       const t = { L, tx, tz, S, x0: tx * S, z0: tz * S, state: 0, used: this.frame, empty: false };
-      this.tiles.set(key, t);
+      this.tiles.set(key, t); this.ver = (this.ver | 0) + 1;
       this.inflight++;
       // stale when nobody has wanted it for a while (the camera moved on) or the world changed
       const cancel = () => this.tiles.get(key) !== t || this.frame - t.used > 45;
       g.pool.submit({ type: 'lod', dim: 'overworld', level: L, tx, tz, lane: 1, cancel }, null, (m) => {
         this.inflight = Math.max(0, this.inflight - 1);
         if (this.tiles.get(key) !== t) return;
+        this.ver = (this.ver | 0) + 1;
         if (m.type === 'cancelled') { this.tiles.delete(key); return; }
         if (m.type !== 'lod') { t.state = 2; t.failedAt = this.frame; return; }
         if (m.empty) { t.state = 1; t.empty = true; return; }
@@ -157,7 +171,7 @@
           const P = Horizon.parted(g.renderer.gl, m), mine = () => this.tiles.get(key) === t && !t.vao;
           w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: k, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: P.bytes,
             alive: () => mine() && this.frame - t.used <= 120,
-            abort: () => { P.abort(); if (mine()) this.tiles.delete(key); },
+            abort: () => { P.abort(); if (mine()) { this.tiles.delete(key); this.ver = (this.ver | 0) + 1; } },
             step: P.step,
             commit: () => { if (mine()) this.put(t, m, S, P.take()); else P.abort(); },
             run: () => { if (mine()) this.put(t, m, S); } });
@@ -198,7 +212,7 @@
     }
     // (F-Far) the tiles whose mesh waited in a world's upload queue that is gone: asked for again; ring 1 likewise
     dropQueued() {
-      for (const [k, t] of this.tiles) if (t.queued && !t.vao) this.tiles.delete(k);
+      this.ver = (this.ver | 0) + 1; for (const [k, t] of this.tiles) if (t.queued && !t.vao) this.tiles.delete(k);
       if (this.far) this.far.dropQueued();
     }
     // a tile's mesh onto the GPU (at once, or from the upload queue: F10 hands the buffers it filled in parts, `made`)
@@ -215,7 +229,7 @@
       t.count = m.count; t.type = m.big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT; t.minY = m.minY; t.maxY = m.maxY;
       t.bx0 = m.bx0 !== undefined ? m.bx0 : 0; t.bz0 = m.bz0 !== undefined ? m.bz0 : 0; t.bx1 = m.bx1 !== undefined ? m.bx1 : S; t.bz1 = m.bz1 !== undefined ? m.bz1 : S;
       t.bytes = m.verts.byteLength + m.idx.byteLength; this.bytes += t.bytes;
-      t.state = 1;
+      t.state = 1; this.ver = (this.ver | 0) + 1;
     }
     // chunk sections that are really drawn → the far tiles are cut there. Each texel holds its chunk column's fade
     // (0..255; 255 = whole, 0 = not drawn): the cut follows the same dither thresholds as the chunk's fade-in (shaders.js
@@ -316,5 +330,6 @@
     destroy() { this.reset(); }
   }
   Horizon.FOCUS_K = 10; Horizon.FOCUS_MS = 300000;   // (f-first4: the landmark's tiles ahead of everything, for 5 minutes)
+  Horizon.KEEP_FRAMES = 15; Horizon.KEEP_D = 1;   // (f-perf8: Very Low keeps a selection ≤ 15 frames while the camera stays within a block)
   VR.Horizon = Horizon;
 })(VR);
