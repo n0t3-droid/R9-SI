@@ -456,7 +456,7 @@ function pageHelpers(win, VRx) {
     // the target: the first one fought (a walker before a sentry, never the crane on its tower), the others calmed
     if (!A.tg || OFF[A.tg.foe.st] || A.tg.foe.gone) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
-      const P = p.pos, near = (m) => Math.hypot(m.pos[0] - P[0], m.pos[2] - P[2]), pref = (m) => near(m) + (m.foe.k === 'crane' ? 60 : 0) + (A.fought < 1 && m.foe.k === 'driller' ? -12 : 0);
+      const P = p.pos, near = (m) => Math.hypot(m.pos[0] - P[0], m.pos[2] - P[2]), pref = (m) => near(m) + (m.foe.k === 'crane' ? 60 : 0) + (A.fought < 1 && m.foe.k === 'driller' ? -12 : 0) + (Math.abs(m.pos[1] - P[1]) > 3 ? 40 : 0);   // (f-polish10: not one up on a ledge — run 4 picked a sentry 15 m over the bot, out of reach)
       A.tg = active.slice().sort((x, y) => pref(x) - pref(y))[0]; A.tgT = A.t; A.vTry = 0; A.tout = 0;
       A.ph = A.fought < 1 && A.tg.foe.k !== 'crane' ? 'fight' : 'calmgo'; A.fightT = 0;   // (f-polish10: the fight's clock per target — run 1 of f-polish10 gave up the second driller at 1.4 m on the first one's 8 s)
     }
@@ -465,7 +465,7 @@ function pageHelpers(win, VRx) {
     if (A.ph === 'fight') {
       if (d < 16) A.fightT += dt;   // (f-polish10: engaged — not while it is still on patrol 58 m off)
       if (A.fightT > 35) { A.ph = 'calmgo'; fall('fight timeout'); return; }
-      if (A.fightT > 8 && d > 4.0 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
+      if (A.fightT > 8 && d > 6 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
       // to its side (its core is the weak point from the side and behind), then strikes at a player's rhythm
       const sx = Math.cos(m.yaw), sz = -Math.sin(m.yaw), side = ((p.pos[0] - m.pos[0]) * sx + (p.pos[2] - m.pos[2]) * sz) >= 0 ? 1 : -1;
       const spot = [m.pos[0] + sx * side * 2.4, m.pos[2] + sz * side * 2.4];
