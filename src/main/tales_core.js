@@ -93,7 +93,7 @@
       },
     },
     home: {
-      w: 1, news: { home: 3, fairy: 1.5, tale: 0.5 }, hours: [0, 11000], fr: 4, items: ['flower_pot', 'lantern'], verse: true,
+      w: 1, news: { home: 3, fairy: 1.5, tale: 0.5 }, hours: [0, 11000], fr: 4, items: ['flower_pot', 'lantern'], verse: true, keep: { k: 'flausel', at: 'plot' },
       names: { fam: ['moosbart', 'tauglanz', 'kieselklee', 'wurzelwisch'], style: ['moss', 'stone', 'round'] },
       styles: { moss: ['wood', 'leaf', 'light'], stone: ['stone', 'flower', 'door'], round: ['wood', 'door', 'light'] },
       ways: [{
@@ -137,7 +137,7 @@
       twists: { reply: [], gift: [], invite: [] },
     },
     beacon: {
-      w: 1, news: { freed: 3, fest: 1, tale: 0.5 }, hours: [0, 11500], fr: 4, items: ['lantern', 'glowstone'], verse: true, lights: true,
+      w: 1, news: { freed: 3, fest: 1, tale: 0.5 }, hours: [0, 11500], fr: 4, items: ['lantern', 'glowstone'], verse: true, keep: { k: 'beacon', at: 'hill' },
       names: { hill: ['lark', 'glimmer', 'slumber', 'cloudrest'] },
       ways: [{
         id: 'hill', pick: { hill: ['hill', 150, 380] },
@@ -203,6 +203,7 @@
     for (const tn of TC.list()) {
       const T0 = TC.TPL[tn];
       if (T0.need && T0.need.kid && !(ctx.giver.kids && ctx.giver.kids.length)) continue;
+      if (T0.hours && fin(ctx.tod) && !(ctx.tod >= T0.hours[0] && ctx.tod < T0.hours[1])) continue;   // (the lost child at dusk, the festival's errands by day)
       for (const way of T0.ways) { const P = TC.resolve(ctx, tn, way, TC.h(ctx.seed, ctx.n, ctx.giver.pid, tn)); if (P) { out.push({ t: tn, way, P }); break; } }
     }
     return out;
@@ -365,7 +366,7 @@
     rec.pages.push(page); if (rec.pages.length > TC.PAGES) rec.pages.shift();
     rec.hist.push({ t: c.t, v: c.v, d: day }); if (rec.hist.length > TC.HIST) rec.hist.shift();
     let lit = null;
-    if (T0.lights) { const s = c.steps.find(q => q.at === 'hill' && q.p); if (s) { lit = { x: s.p[0], z: s.p[1], dim: c.dim0, d: day }; rec.lit.push(lit); if (rec.lit.length > 12) rec.lit.shift(); } }
+    if (T0.keep) { const s = c.steps.find(q => q.at === T0.keep.at && q.p); if (s) { lit = { k: T0.keep.k, x: s.p[0], z: s.p[1], dim: c.dim0, d: day, v: c.v }; rec.lit.push(lit); if (rec.lit.length > 12) rec.lit.shift(); } }
     rec.cur = null; rec.cool = (t || 0) + TC.DAY * 0.25;
     return { page, fr: T0.fr || 3, items: (T0.items || []).slice(), late, lit, key: 'g.tl.' + c.t + '.end.' + c.v + (late ? '.late' : ''), head: 'g.tl.' + c.t + '.head', verse: T0.verse ? 'g.tl.' + c.t + '.verse' : null, giver: c.giver, kid: c.kid };
   };
