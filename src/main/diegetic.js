@@ -99,10 +99,10 @@
 
   // ================================================================ the game side
   const CSS = `
-#dgsign{position:absolute;left:0;top:0;display:none;pointer-events:none;transform:translate(-50%,-100%);z-index:3;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))}
+#dgsign{position:absolute;left:0;top:0;display:none;pointer-events:none;transform:translate(-50%,-30px);z-index:3;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))}
 #dgsign .pl{display:flex;align-items:center;gap:6px;padding:4px 14px 4px 10px;background:linear-gradient(180deg,#9a6b3f,#7a5130);color:#fff4dc;font:600 calc(13px*var(--ux-scale,1)) Georgia,serif;border-radius:4px 10px 10px 4px/4px 6px 6px 4px;clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%);border:1px solid #4a2f18;text-shadow:0 1px 0 #3a2410;white-space:nowrap}
 #dgsign .pl b{font-weight:700}#dgsign .pl i{font-style:normal;opacity:.85;font-size:.9em}
-#dgsign .post{width:5px;height:26px;margin:0 auto;background:linear-gradient(90deg,#5a3a20,#7a5130,#5a3a20);border-radius:1px}
+#dgsign .post{width:5px;height:var(--post,26px);margin:0 auto;background:linear-gradient(90deg,#5a3a20,#7a5130,#5a3a20);border-radius:1px}
 #dgrose{position:absolute;right:16px;top:14px;width:calc(64px*var(--ux-scale,1));height:calc(64px*var(--ux-scale,1));pointer-events:none;opacity:.78;transition:opacity .4s}
 #dgrose .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,236,200,.55);background:radial-gradient(circle,rgba(10,14,28,.32),rgba(10,14,28,.12) 70%,transparent 72%)}
 #dgrose .ring span{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;text-align:center;font:700 10px/14px var(--display,sans-serif);color:rgba(255,240,215,.75)}
@@ -123,12 +123,14 @@ body.dg-vit #hud #stats:not(.dg-danger){opacity:0!important;pointer-events:none}
 #dgradial .it.sel{transform:scale(1.18);background:rgba(255,190,90,.38);border-color:#ffd38a;box-shadow:0 0 18px rgba(255,190,90,.45)}
 #dgradial .lab{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:30%;text-align:center;font:600 calc(14px*var(--ux-scale,1)) var(--display,sans-serif);color:#ffe7b8;text-shadow:0 1px 3px #000}
 html.a11y-hc #dgradial .it{background:#000;border-color:#fff}html.a11y-hc #dgradial .it.sel{outline:3px solid #ffe600}html.a11y-hc #dgsign .pl{background:#000;color:#fff;border-color:#fff}
-body.dg-satchel #invent.on .erf,body.dg-satchel #inventory.on #invpanel{animation:dgsatch .34s cubic-bezier(.2,.9,.3,1.15);transform-origin:50% 100%}
-body.dg-satchel #invent.on .erf::before,body.dg-satchel #inventory.on #invpanel::before{content:'';position:absolute;left:8%;right:8%;top:-6px;height:44px;border-radius:0 0 28px 28px;background:linear-gradient(180deg,#8a5a34,#6b4325);box-shadow:0 4px 8px rgba(0,0,0,.4);transform-origin:50% 0;animation:dgflap .42s ease-in forwards;pointer-events:none;z-index:5}
+body.dg-satchel #inventory.on #invpanel{animation:dgsatch .34s cubic-bezier(.2,.9,.3,1.15);transform-origin:50% 100%}
+body.dg-satchel #inventory.on #invpanel::before{content:'';position:absolute;left:10%;right:10%;top:-16px;height:46px;border-radius:6px 6px 30px 30px;background:linear-gradient(180deg,#8a5a34,#6b4325);border:2px dashed rgba(255,220,170,.35);box-shadow:0 4px 8px rgba(0,0,0,.4);transform-origin:50% 0;animation:dgflap .42s ease-in forwards;pointer-events:none;z-index:5}
+body.dg-satchel #inventory.on #invpanel::after{content:'';position:absolute;left:50%;top:-2px;width:22px;height:16px;margin-left:-11px;border-radius:4px;background:linear-gradient(180deg,#e8c27a,#a87b34);box-shadow:0 1px 2px rgba(0,0,0,.5);animation:dgbuckle .42s ease-in forwards;pointer-events:none;z-index:6}
+body.dg-satchel #inventory.on #invpanel{border:2px solid #6b4325;box-shadow:0 0 0 4px rgba(107,67,37,.35),inset 0 0 0 3px rgba(0,0,0,.15);outline:1.5px dashed rgba(255,220,170,.25);outline-offset:-8px}
 body.dg-satchel #inventory.on #invpanel{position:relative}
 @keyframes dgsatch{0%{transform:translateY(18%) scale(.72,.5);opacity:0}55%{opacity:1}100%{transform:none;opacity:1}}
-@keyframes dgflap{0%{transform:rotateX(0)}100%{transform:perspective(500px) rotateX(-160deg);opacity:0}}
-html.a11y-less body.dg-satchel #invent.on .erf,html.a11y-less body.dg-satchel #inventory.on #invpanel{animation:none}html.a11y-less body.dg-satchel #invent.on .erf::before,html.a11y-less body.dg-satchel #inventory.on #invpanel::before{display:none}
+@keyframes dgflap{0%{transform:perspective(500px) rotateX(0)}100%{transform:perspective(500px) rotateX(-150deg) scaleY(.6)}}@keyframes dgbuckle{0%{transform:translateY(30px)}100%{transform:translateY(-14px)}}
+html.a11y-less body.dg-satchel #inventory.on #invpanel,html.a11y-less body.dg-satchel #inventory.on #invpanel::before,html.a11y-less body.dg-satchel #inventory.on #invpanel::after{animation:none}
 #wanderbuch.dgb{perspective:1600px}
 #wanderbuch.dgb .wdcard{max-width:min(980px,96vw);width:min(980px,96vw);max-height:none;overflow:visible;background:transparent;border:0;box-shadow:none;padding:0;color:#3b2a1a}
 #wanderbuch .dgbook{position:relative;display:grid;grid-template-columns:1fr 1fr;min-height:min(560px,76vh);background:#5a3a22;padding:14px;border-radius:14px 14px 18px 18px;box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 2px #3c2614;transform-style:preserve-3d;animation:dgbopen .5s ease-out}
@@ -205,7 +207,10 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       const W = window.innerWidth || 960, H = window.innerHeight || 540, ty = Math.tan((c.fov || 1.2) / 2), txx = ty * W / H;
       if (zc > 1.5) {
         const nx = (dx * rx + dz * rz) / zc / txx, ny = (dx * ux + dy * uy + dz * uz) / zc / ty;
-        if (Math.abs(nx) < 1.1 && Math.abs(ny) < 1.1) { el.style.left = ((nx * 0.5 + 0.5) * W).toFixed(1) + 'px'; el.style.top = ((0.5 - ny * 0.5) * H).toFixed(1) + 'px'; }
+        if (Math.abs(nx) < 1.1 && Math.abs(ny) < 1.1) {
+          const gy = dy - 1.9, ny2 = (dx * ux + gy * uy + dz * uz) / zc / ty, post = Math.max(6, Math.min(140, (ny - ny2) * 0.5 * H + 4));
+          el.style.left = ((nx * 0.5 + 0.5) * W).toFixed(1) + 'px'; el.style.top = ((0.5 - ny * 0.5) * H).toFixed(1) + 'px'; el.style.setProperty('--post', post.toFixed(0) + 'px');
+        }
         else show = false;
       } else show = false;
     }
@@ -307,7 +312,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   D.tick = function (g, dt) {
     if (!g || g.state !== 'play' || !g.player) return;
     const t0 = now(), p = g.player;
-    style();
+    style(); if (!S.hooked) { S.hooked = true; if (D.hookBook) D.hookBook(); }
     if (g.world !== S.world) { S.world = g.world; S.hp = -1; S.pts.length = 0; }
     // hurt / heal by the health's change (survival)
     if (p.mode === 'survival' && opt(g, 'vitals') !== 'bars') {
@@ -448,7 +453,7 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   window.addEventListener('blur', () => { if (R.open) radialShow(false); });
 
   // ---------------------------------------------------------------- the Wanderbuch as a book
-  const W = VR.Wander;
+  let W = VR.Wander;
   const B = D.book = { page: 0, sel: null };
   function bookPages(g, html) {
     const tmp = document.createElement('div'); tmp.innerHTML = html;
@@ -530,6 +535,8 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     } else paint();
   }
   D.turn = function (g, d) { if (!B.pages) return; const n = B.pages.length, np = clamp(B.page + d * 2, 0, Math.max(0, n - 2 + (n % 2))); if (np === B.page) return; B.page = np; renderBook(g, d); };
+  function hookBook() {
+  W = VR.Wander;
   if (W && W.open && !W.open.__dg) {
     const wo = W.open;
     W.open = function (g) {
@@ -557,4 +564,6 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       if (e.code === 'ArrowRight' || e.code === 'PageDown') { e.preventDefault(); D.turn(g, 1); } else if (e.code === 'ArrowLeft' || e.code === 'PageUp') { e.preventDefault(); D.turn(g, -1); }
     }, true);
   }
+  }
+  D.hookBook = hookBook; hookBook();
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
