@@ -2732,7 +2732,7 @@ setJ6(out,'fore_'+s,fx,fy,fz,0,0,0);
 setJ6(out,'hand_'+s,load==='tray'?0:0.08*amt,load==='tray'? -sx*1.45:0,0,0,0,0);
 }
 
-const M3a=new Float64Array(9),M3b=new Float64Array(9),M3c=new Float64Array(9),M3d=new Float64Array(9),V3a=[0,0,0],V3b=[0,0,0],V3c=[0,0,0],V3d=[0,0,0];
+const M3a=new Float64Array(9),M3b=new Float64Array(9),M3c=new Float64Array(9),M3d=new Float64Array(9),V3a=[0,0,0],V3b=[0,0,0],V3c=[0,0,0],V3d=[0,0,0],V3e=[0,0,0],V3f=[0,0,0];
 
 const rotYXZ=FA.rotYXZ=function(rx,ry,rz,R){
 const ca=Math.cos(ry),sa=Math.sin(ry),cb=Math.cos(rx),sb=Math.sin(rx),cc=Math.cos(rz),sc=Math.sin(rz);
@@ -2831,6 +2831,44 @@ const sx=s==='l'? -1:1,kid=G.kid;
 const W=V3c;W[0]=sx*(G.hw+(kid?1.6:2.6)+(G.wide?2.6:0));W[1]=kid?2.5:3.5;W[2]=0.4;
 FA.armIK(G,s,[W[0],W[1],W[2]],[sx,0.15,0.55],out);
 return FA.handAim(out,s,[sx*0.3,-0.75,-0.6],sx* -1.2,out);
+};
+
+
+
+
+
+const EMB_PL=[-1,-0.55,0.25],EMB_PR=[1,-0.55,0.25],EMB_DL=[0.85,-0.1,-0.5],EMB_DR=[-0.85,-0.1,-0.5];
+FA.embrace=function(G,o,out){
+if(!G|| !G.arm)return 0;
+o=o||{};
+const U=1/G.bpu,Lt=G.thigh,kneel= !!o.kneel&& !G.kid;
+const hipH=kneel?Lt+1:G.hip,drop=G.hip-hipH,lean=o.lean!==undefined?o.lean:kneel?0.12:0.16;
+for(const j of JOINTS){const q=out[j]||(out[j]=Z6());for(let i=0;i<6;i++)q[i]=0;}
+setJ6(out,'hips',0,0,0,0,-drop,0);
+if(kneel){
+setJ6(out,'leg_l',0.1,0,-0.06,0,-drop,0);setJ6(out,'leg_r',0.1,0,0.06,0,-drop,0);
+setJ6(out,'shin_l',-(Math.PI/2+0.1),0,0,0,0,0);setJ6(out,'shin_r',-(Math.PI/2+0.1),0,0,0,0,0);
+}else{
+
+setJ6(out,'leg_l',0.06,0,-0.03,0,0,0);setJ6(out,'leg_r',0.06,0,0.03,0,0,0);
+setJ6(out,'shin_l',-0.08,0,0,0,0,0);setJ6(out,'shin_r',-0.08,0,0,0,0,0);
+}
+setJ6(out,'body',-lean,0,0,0,0,0);
+
+setJ6(out,'head',kneel?0.05:0.18,0.42,-0.1,0,0,0);
+const gap=(o.gap||0.3)*U,back=gap+(o.depth||0.1)*U,y=(o.h||1)*U-hipH,wide=o.wide!==undefined?o.wide:G.hw*0.5;
+const X=V3e,W=V3f;
+let miss=0;
+for(const s of['l','r']){
+const sx=s==='l'? -1:1;
+
+X[0]=sx*wide;X[1]=y+(s==='l'?1.2: -1.2);X[2]= -back;
+toBody(out,X,W);
+miss+=FA.armIK(G,s,W,s==='l'?EMB_PL:EMB_PR,out);
+FA.handAim(out,s,s==='l'?EMB_DL:EMB_DR,0,out);
+}
+FA.embrace.miss=miss;
+return drop;
 };
 
 
@@ -3039,7 +3077,8 @@ const sp=FA.sitOf(a,G);
 for(const j of JOINTS){const q=dst[j]||(dst[j]=Z6()),b=sp.pose[j];for(let i=0;i<6;i++)q[i]=b?b[i]:0;}
 dst.body[4]+=0.22*Math.sin(t*1.7);
 dst.head[1]+=0.12*Math.sin(t*0.31+a.seedW);
-}else if(name==='talk')FA.gesture(G,t,a.seedW|0,!!a.speaking,dst);
+}else if(name==='hug'&&a.hugO&&G.arm)FA.embrace(G,a.hugO,dst);
+else if(name==='talk')FA.gesture(G,t,a.seedW|0,!!a.speaking,dst);
 else if(name==='idle'){
 if(G.carry==='tray')armSwing(dst,'r',0,0,false,1,'tray',0);
 else if(G.carry&&IT[G.carry])restCarry(dst,'r');
@@ -13913,6 +13952,10 @@ GEN.NOCRY_VGEN=9;
 
 GEN.ISLE_VGEN=15;
 GEN.isleGarden=(g)=> !!g&&(g.vgen|0)>=GEN.ISLE_VGEN;
+
+
+GEN.ISLE_CALM_VGEN=16;
+GEN.isleCalm=(g)=> !!g&&(g.vgen|0)>=GEN.ISLE_CALM_VGEN;
 GEN.noCry=(g)=> !!g&&((g.vgen|0)>=GEN.NOCRY_VGEN||g.noCrystal===true);
 
 
@@ -15472,15 +15515,39 @@ petals:['pink_petals','wildflowers'].filter(n=>R.byName[n]).map(n=>R.byName[n].s
 function gardenCell(g,ISL,S,I,x,y,z){
 const depth=I.top-y,tip=y-I.bottom,sd=I.isle?I.isle.seed:0;
 if(depth<=3)return I.k<0.16&&depth>=2?ISL.moss:S.dirt;
+if(GEN.isleCalm(g))return calmCell(g,ISL,I,x,y,z,tip,sd);
 if(tip<=1){const r=GH(x,y,z,1);return r<0.03?gst().shroom||ISL.moss:r<0.38?ISL.moss:ISL.strata[(y+(sd&7))%ISL.strata.length];}
 if(g.nVein.n3(x*0.6,y*0.8,z*0.6)>0.4)return ISL.moss;
 return ISL.strata[(y+(sd&7))%ISL.strata.length];
+}
+
+
+
+
+function calmCell(g,ISL,I,x,y,z,tip,sd){
+const L=ISL.strata.length;
+if(tip<=2){
+const m=g.nVein.n2(x*0.09+sd*0.37,z*0.09-sd*0.21);
+if(tip===0&&m>0.2&&GH(x>>2,0,z>>2,11)<0.07&&GH(x,y,z,1)<0.4)return gst().shroom||ISL.moss;
+if(m> -0.12)return ISL.moss;
+const w=g.nVein.n2(x*0.05-sd*0.13,z*0.05+sd*0.29);
+return ISL.strata[((w>0.15?1:w< -0.15?2:0)+(sd&3))%L];
+}
+if(g.nVein.n3(x*0.15,y*0.2,z*0.15)>0.45)return ISL.moss;
+return ISL.strata[Math.floor((y+(sd&7))/(3+(sd&1)))%L];
 }
 
 function gardenUnder(g,blocks,col,I,x,z){
 if(I.k<0.12)return;
 const K=gst(),r=GH(x,I.bottom,z,2),yb=I.bottom-1;
 const hang=(len,f)=>{for(let k=0;k<len;k++){const y=yb-k;if(y<2)break;const i=(y<<8)|col;if(blocks[i])break;blocks[i]=f(k,len);}};
+if(GEN.isleCalm(g)){
+if(r<0.05)hang(2+Math.floor(GH(x,0,z,3)*3),()=>K.vine(GH(x,1,z,4)<0.5?1|2:4|8));
+else if(r<0.08)hang(2+Math.floor(GH(x,0,z,3)*2),(k,n)=>K.berry(k%2===1||k===n-1,k===n-1));
+else if(r<0.095&&K.spore)hang(1,()=>K.spore);
+else if(r<0.11)hang(1+Math.floor(GH(x,0,z,3)*2),()=>K.roots);
+return;
+}
 if(r<0.11)hang(2+Math.floor(GH(x,0,z,3)*7),()=>K.vine(GH(x,1,z,4)<0.5?1|2:4|8));
 else if(r<0.16)hang(2+Math.floor(GH(x,0,z,3)*4),(k,n)=>K.berry(k%2===1||k===n-1,k===n-1));
 else if(r<0.18&&K.spore)hang(1,()=>K.spore);
@@ -15508,8 +15575,9 @@ for(const[dx,dz,f]of NB){
 const lx=(col&15)+dx,lz=(col>>4)+dz;
 const J=lx>=0&&lx<16&&lz>=0&&lz<16?isl[(lz<<4)|lx]:g.islandAt(x+dx,z+dz);
 if(!J|| !J.isle|| !J.isle.designed||J.isle.lava)continue;
-if(GH(x,J.top,z,7)>0.42)break;
-const len=3+Math.floor(GH(x,0,z,8)*Math.min(12,Math.max(3,J.top-J.bottom)));
+const calm=GEN.isleCalm(g);
+if(calm?GH(x>>2,J.top,z>>2,9)>0.45||GH(x,J.top,z,7)>0.55:GH(x,J.top,z,7)>0.42)break;
+const len=calm?2+Math.floor(GH(x,0,z,8)*Math.min(6,Math.max(2,J.top-J.bottom))):3+Math.floor(GH(x,0,z,8)*Math.min(12,Math.max(3,J.top-J.bottom)));
 for(let k=0;k<len;k++){const y=J.top-k;if(y<2)break;const i=(y<<8)|col;if(blocks[i])break;blocks[i]=K.vine(f);}
 break;
 }
