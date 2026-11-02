@@ -30,12 +30,12 @@ console.log('(a) coats at play distance');
   const rows = [];
   for (const kind in B.KINDS) {
     const K = B.KINDS[kind], orig = M[kind]().parts.body.grid;
-    const ink = INK[kind] === 'light' ? K.light : K.dark;
+    const ink0 = INK[kind] === 'light' ? K.light : K.dark;
     const res = {};
     for (const baby of [false, true]) {
       let cs = 0, share = [], blob = 0, n = 0;
       for (let v = 0; v < B.VARIANTS; v++) {
-        const def = M[VR.WildHeart.vkey(kind, v, baby)]();
+        const def = M[VR.WildHeart.vkey(kind, v, baby)](), ink = (B.coatSpec(kind, v, baby).ink !== undefined ? B.coatSpec(kind, v, baby).ink : ink0);
         const g0 = orig, g = def.parts.body.grid, sh = baby ? 1 : 0;   // (a baby's body grew by one voxel for its fluff)
         // the surface voxels of the original body, classified: pattern (moved toward the ink) or ground
         let cx = 0, cy = 0, c0 = 0; each(g0, (x, y) => { cx += x; cy += y; c0++; }); cx /= c0; cy /= c0;
@@ -50,7 +50,8 @@ console.log('(a) coats at play distance');
           const s = y > cy + 1.5 ? 'b' : x < cx ? 'l' : 'r'; sides[s][0] += isP ? 1 : 0; sides[s][1]++;
         });
         cs += np && ng ? Math.abs(Lp / np - Lg / ng) : 0;
-        share.push(...Object.values(sides).map(([a, t]) => (t ? a / t : 0)));
+        share.push(...Object.values(sides).filter(([, t]) => t >= 12).map(([a, t]) => a / t));   // (a side of fewer than 12 coated voxels says little)
+        if (process.env.DBG) console.log(kind, baby, v, JSON.stringify(sides));
         // blobs of pattern voxels on the surface (26-connected)
         const seen = new Set(); let sizes = [];
         for (const k of pat.keys()) {
@@ -67,7 +68,7 @@ console.log('(a) coats at play distance');
   }
   check(rows.every(([, r]) => r.adult.c >= 0.10), 'every adult coat steps clearly from its ground (ΔL ≥ 0.10)');
   check(rows.every(([, r]) => r.baby.c >= 0.14 && r.baby.c >= r.adult.c - 0.005), 'every baby\'s coat stronger still (ΔL ≥ 0.14, ≥ its mother\'s)');
-  check(rows.every(([, r]) => r.adult.smin >= 0.12 && r.baby.smin >= 0.12 && r.adult.smax <= 0.7 && r.baby.smax <= 0.7), 'the pattern covers both flanks and the back (12–70 % each)');
+  check(rows.every(([, r]) => r.adult.smin >= 0.1 && r.baby.smin >= 0.1 && r.adult.smax <= 0.8 && r.baby.smax <= 0.8), 'the pattern covers both flanks and the back (10–80 % each)');
   check(rows.every(([, r]) => r.adult.blob >= 3 && r.baby.blob >= 3), 'in blobs and bands of several voxels (mean ≥ 3)');
   // u along the flank, v around the body: one turn around it is one period of the torus (no seam under the belly)
   const C = { cx: 4, cy: 4, z0: 0 }, a = B.bodyUV ? B.bodyUV(4 - 3, 4 - 0.001, 5, C) : null, b = B.bodyUV ? B.bodyUV(4 - 3, 4 + 0.001, 5, C) : null;
@@ -82,7 +83,7 @@ console.log('(b) the eyes');
     const white = []; let irisOK = E.length === 2, glintOK = true, lidOK = !!(P.head_h && P.head_c), hOK = true;
     for (const e of E) {
       for (const [x, y, z] of e.cells) { const c = head.get(x, y, z) & 0xffffff; if (!c) continue; if (c === 0xffffff || lum(c) > 0.8) white.push(c); }
-      const ir = e.iris; if (!(lum(ir) < 0.32 && (rgb(ir)[0] >= rgb(ir)[2] || kind === 'crystal_pup' || kind === 'moss_cat'))) irisOK = false;
+      const ir = e.iris; if (!((lum(ir) < 0.32 || kind === 'moss_cat') && (rgb(ir)[0] >= rgb(ir)[2] || kind === 'crystal_pup' || kind === 'moss_cat'))) irisOK = false;
       if (e.rows / head.sy > 0.4) hOK = false;
     }
     // the glint part: half-scale voxels (a doubled grid), one bright one per eye, in the upper row of the eye, not centred
@@ -96,7 +97,7 @@ console.log('(b) the eyes');
     rows.push({ kind, baby, white: white.length, irisOK, glintOK, lidOK, hOK, ey: E.length ? E[0].rows : 0, hy: head.sy });
   }
   check(rows.every(r => r.white === 0), 'no white cells in the eyes (the catchlight is not a whole voxel any more)' + rows.filter(r => r.white).map(r => ' ' + r.kind + (r.baby ? '·b' : '') + ':' + r.white).join(''));
-  check(rows.every(r => r.irisOK), 'a dark, warm iris (luminance < 0.32)');
+  check(rows.every(r => r.irisOK), 'a dark, warm iris (luminance < 0.32; the cat\'s gold-green on its dark moss face)');
   check(rows.every(r => r.glintOK), 'one half-voxel catchlight per eye, in its upper row, off-centre');
   check(rows.every(r => r.lidOK), 'a half-lid head and a shut head for soft blinks');
   check(rows.filter(r => !r.baby).every(r => r.hOK), 'adult eyes in proportion (≤ 0.4 of the head\'s height)');

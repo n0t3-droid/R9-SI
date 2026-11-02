@@ -20,10 +20,10 @@
   // pet (it can become a 🐾 companion: src/shared/pets.js)
   B.KINDS = {
     glimmer_deer: { temper: 'shy', coat: 'spots', babyCoat: 'spots', food: ['apple', 'wheat', 'carrot'], family: true, base: [0xd8c8a0], dark: 0x8a6a42, light: 0xfff4dc, strength: 0.35, babyStrength: 0.85 },
-    bloom_sheep: { temper: 'calm', coat: 'dapples', babyCoat: 'dapples', food: ['wheat', 'apple'], family: true, base: null, dark: 0xe6d6ea, light: 0xfffcff, strength: 0.5, babyStrength: 0.6 },
+    bloom_sheep: { temper: 'calm', coat: 'spots', babyCoat: 'spots', food: ['wheat', 'apple'], family: true, base: null, dark: 0xe6d6ea, light: 0xfffcff, strength: 0.5, babyStrength: 0.6 },
     moss_boar: { temper: 'calm', coat: 'stripes', babyCoat: 'stripes', food: ['carrot', 'potato', 'apple', 'beetroot'], family: true, base: null, dark: 0x3a3020, light: 0xb89a6a, strength: 0.3, babyStrength: 0.8 },
     glimmer_fox: { temper: 'curious', coat: 'dapples', babyCoat: 'dapples', food: ['glow_berries', 'sweet_berries'], pet: true, base: [0xe8782e], dark: 0xc2561e, light: 0xffb070, strength: 0.45, babyStrength: 0.5 },
-    moss_cat: { temper: 'shy', coat: 'stripes', babyCoat: 'stripes', food: ['raw_cod'], pet: true, base: [0x3d4d30], dark: 0x26321e, light: 0x6a8048, strength: 0.6, babyStrength: 0.6 },
+    moss_cat: { temper: 'shy', coat: 'stripes', babyCoat: 'stripes', ring: true, su: 2, food: ['raw_cod'], pet: true, base: [0x3d4d30], dark: 0x26321e, light: 0x6a8048, strength: 0.6, babyStrength: 0.6 },
     crystal_pup: { temper: 'curious', coat: 'spots', babyCoat: 'spots', food: ['bone'], pet: true, base: [0xeaf6ff], dark: 0xa8d0f0, light: 0xffffff, strength: 0.5, babyStrength: 0.6 },
   };
   B.isKind = (k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(B.KINDS, k);
@@ -42,7 +42,7 @@
   B.PATTERNS = {
     spots: { r1: 2.2, r2: 4.6, w: 0.30, p0: 0.2, ax: 1, ay: 1 },
     stripes: { r1: 2.0, r2: 4.2, w: 0.30, p0: 0.5, ax: 0.55, ay: 1 },
-    dapples: { r1: 1.5, r2: 3.2, w: 0.55, p0: 0.3, ax: 1, ay: 1 },
+    dapples: { r1: 1.5, r2: 3.2, w: 0.55, p0: 0.36, ax: 1, ay: 1 },
   };
   const NB = {};
   const hood = (pat) => {
@@ -101,8 +101,8 @@
     glimmer_fox: [0xfff0dc, 0.75, 0xa8400e, 0.42], moss_cat: [0x101808, 0.8, 0x8aa860, 0.5], crystal_pup: [0x5090dc, 0.8, 0xffffff, 0.35],
   };
   // the coat mapped over a body (not folded voxel axes): u along it (z, one cell a voxel), v once around it (the angle
-  // about its long axis: one turn = one period of the torus, so there is no seam). C = {cx, cy, z0}: the axis, the start
-  B.bodyUV = (x, y, z, C, out) => { out = out || [0, 0]; out[0] = z - C.z0; out[1] = (Math.atan2(y - C.cy, x - C.cx) / (Math.PI * 2) + 0.5) * B.N; return out; };
+  // about its long axis: one turn = one period of the torus, so there is no seam). C = {cx, cy, z0, su}: the axis, the start, cells a voxel along
+  B.bodyUV = (x, y, z, C, out) => { out = out || [0, 0]; out[0] = (z - C.z0) * (C.su || 1); out[1] = (Math.atan2(y - C.cy, x - C.cx) / (Math.PI * 2) + 0.5) * B.N; return out; };
   B.sampleUV = (tex, u, v, n) => { n = n || B.N; const a = ((Math.round(u) % n) + n) % n, b = ((Math.round(v) % n) + n) % n; return tex[b * n + a]; };
   // a voxel's colour c under coat value t (0 … 1): the ground tinted, the pattern inked with a crisp edge (a smoothstep
   // 0.3 … 0.7: soft cells blur away at 8 m), then a touch more saturation
@@ -240,8 +240,8 @@
       const r = Math.hypot(ox, oz); if (r < 4 || r > 9) continue;
       const dot = (ox * ax + oz * az) / r; if (dot < -0.1) continue;
       const x = bx + ox, z = bz + oz;
-      if (!w.perch(x, z)) continue;
-      const sc = dot * 2 - Math.abs(r - 6.5) * 0.2 + rnd() * 0.5; if (sc > bs) { bs = sc; best = [x + 0.5, w.top(x, z) + 1, z + 0.5]; }
+      if (!w.perch(x, z) || w.top(x, z) + 1 - b.y > 5) continue;
+      const sc = dot * 2 - Math.abs(r - 6.5) * 0.2 + rnd() * 0.5; if (sc > bs) { bs = sc; best = [x + 0.5 + (rnd() - 0.5) * 0.5, w.top(x, z) + 1, z + 0.5 + (rnd() - 0.5) * 0.5]; }   // (not all on one spot)
     }
     b.target = best ? 'perch' : 'hop';
     if (!best) {

@@ -32,7 +32,12 @@
     moss_cat: [[2, 4, 1, -1, 0], [5, 4, 1, 1, 0]],
     crystal_pup: [[2, 5, 1, -1, 0], [5, 5, 1, 1, 0]],
   };
-  const EYE_COL = { moss_cat: 0xd8f04a, crystal_pup: 0x2a4ab8 };
+  // f-wild3: soft eyes — per kind [pupil row (the upper, in the lid's shadow), iris (the lower, warm)]
+  const IRIS = {
+    glimmer_deer: [0x1e120c, 0x4a2c18], moss_boar: [0x180e08, 0x3e2614], bloom_sheep: [0x140c08, 0x6a4818],
+    glimmer_fox: [0x1a0e08, 0x6a3a12], moss_cat: [0x1a2210, 0x8aa830], crystal_pup: [0x141830, 0x2a3c80],
+  };
+  const GLINT = 0xfff6e8;   // (a warm catchlight: the sky in a wet eye, half a voxel, off-centre in the upper row)
   // the pattern's colour: light spots on a fawn, light stripes on a piglet, dark tabby stripes, …
   const INK = { glimmer_deer: 'light', bloom_sheep: 'dark', moss_boar: 'light', glimmer_fox: 'light', moss_cat: 'dark', crystal_pup: 'dark' };
   const COATED = ['body', 'head', 'tail'];
@@ -48,47 +53,70 @@
   const clone = (g) => { const c = new Grid(g.sx, g.sy, g.sz, g.ox, g.oy, g.oz); c.c.set(g.c); return c; };
   const grow = (g) => { const c = new Grid(g.sx + 2, g.sy + 2, g.sz + 2, g.ox + 1, g.oy + 1, g.oz + 1); each(g, (x, y, z, v) => { c.c[c.i(x + 1, y + 1, z + 1)] = v; }); return c; };
   const filled = (g, x, y, z) => g.in(x, y, z) && g.get(x, y, z) !== 0;
-  // kind's model, variant v, baby or not: coated, big-eyed, a closed-eye head (head_c), a baby's fluff
+  const DIRS = [[-1, 0, 0], [1, 0, 0], [0, 0, -1], [0, 0, 1]];
+  // kind's model, variant v, baby or not: coated, soft-eyed (head: open with the glint's cell cut out, glint: that
+  // cell in half voxels with its catchlight, head_o: open from afar, head_h: half lid, head_c: shut), a baby's fluff
   function build(kind, v, baby) {
     const def = M[kind](), spec = B.coatSpec(kind, v, baby), K = B.KINDS[kind];
     if (!def || !spec) return def;
     const body = def.parts.body && def.parts.body.grid, base = body ? dominant(body) : 0;
-    const ink = INK[kind] === 'light' ? K.light : K.dark, other = INK[kind] === 'light' ? K.dark : K.light;
     const eyes = EYES[kind] || [], head = def.parts.head && def.parts.head.grid;
     const eyeCells = new Set();
-    if (head) for (const e of eyes) for (const [dx, dy, dz] of [[0, 0, 0], [0, 1, 0], [e[3], 0, e[4]], [e[3], 1, e[4]]]) eyeCells.add((e[0] + dx) + ',' + (e[1] + dy) + ',' + (e[2] + dz));
+    if (head) for (const e of eyes) for (const [dx, dy, dz] of [[0, 0, 0], [0, 1, 0], [e[3], 0, e[4]], [e[3], 1, e[4]]]) for (let k = 0; k < 3; k++) eyeCells.add((e[0] + dx) + ',' + (e[1] + dy) + ',' + (e[2] + dz + k));
+    // the coat, mapped over each part (u along it, v around its long axis: WildBond.bodyUV), painted crisp
+    const uv = [0, 0];
     for (const name of COATED) {
       const pr = def.parts[name]; if (!pr) continue;
       const g = pr.grid;
+      let cx = 0, cy = 0, n = 0; each(g, (x, y) => { cx += x + 0.5; cy += y + 0.5; n++; });
+      const C = { cx: cx / (n || 1), cy: cy / (n || 1), z0: name === 'head' ? -7 : name === 'tail' ? -11 : 0, su: K.su || 1 };
       each(g, (x, y, z, val) => {
         if ((val >> 24) & 1) return;
         if (name === 'head' && eyeCells.has(x + ',' + y + ',' + z)) return;
         const c = val & 0xffffff; if (cdist(c, base) > 90) return;
-        const t = B.sample(spec.tex, x, y + (name === 'head' ? 7 : 0), z + (name === 'tail' ? 11 : 0)) / 255;
-        // two tones: the pattern toward its ink, the ground a little toward the other colour (contrast both ways)
-        if (t > 0.5) g.set(x, y, z, B.mix(c, ink, spec.k * (t - 0.5) * 2), 0);
-        else g.set(x, y, z, B.mix(c, other, spec.k * 0.45 * (0.5 - t) * 2), 0);
+        B.bodyUV(x + 0.5, y + 0.5, z + 0.5, C, uv);
+        const t = K.ring ? B.sampleUV(spec.tex, uv[1], uv[0]) : B.sampleUV(spec.tex, uv[0], uv[1]);   // (a tabby's stripes run around it)
+        g.set(x, y, z, B.paint(c, t / 255, spec), 0);
       });
     }
-    // big eyes (two by two, a catchlight up front) and the closed-eye head
     if (head) {
-      const shut = clone(head);
+      const col = IRIS[kind] || IRIS.glimmer_deer, glint = new Grid(head.sx * 2, head.sy * 2, head.sz * 2, head.ox * 2, head.oy * 2, head.oz * 2);
+      const far = clone(head), half = clone(head), shut = clone(head);
+      def.eyes = [];
+      const hc = [0, 0]; let hn = 0; each(head, (x, y, z) => { hc[0] += x + 0.5; hc[1] += z + 0.5; hn++; }); hc[0] /= hn || 1; hc[1] /= hn || 1;
       for (const e of eyes) {
-        const orig = head.get(e[0], e[1], e[2]) & 0xffffff;
-        const ec = EYE_COL[kind] || (orig && cdist(orig, 0x101010) < 200 ? 0x1a1420 : 0x1a1420);
-        const above = head.get(e[0], e[1] + 2, e[2]) & 0xffffff || base, lid = B.mix(above, 0x000000, 0.18);
         const cells = [[e[0], e[1], e[2]], [e[0], e[1] + 1, e[2]], [e[0] + e[3], e[1], e[2] + e[4]], [e[0] + e[3], e[1] + 1, e[2] + e[4]]];
-        cells.forEach(([x, y, z0], i) => {
-          let z = z0; while (i > 0 && !filled(head, x, y, z) && z < z0 + 2) z++;   // (a round face: the eye's cell one deeper)
-          if (!filled(head, x, y, z) && i > 0) return;
-          const g3 = filled(head, cells[3][0], cells[3][1], cells[3][2]) || filled(head, cells[3][0], cells[3][1], cells[3][2] + 1);
-          const cl = e.length > 5 ? e[5] : g3 ? 3 : 1;
-          head.set(x, y, z, i === cl ? 0xffffff : ec, 0);   // the catchlight: up front, or on top
-          shut.set(x, y, z, i === 0 || i === 2 ? B.mix(lid, 0x000000, 0.25) : lid, 0);
-        });
+        // (a round face: a cell that is not there is looked for one deeper)
+        const at = cells.map(([x, y, z0]) => { let z = z0; while (!filled(head, x, y, z) && z < z0 + 2) z++; return filled(head, x, y, z) ? [x, y, z] : null; });
+        if (!at[0]) continue;
+        const above = head.get(e[0], e[1] + 2, e[2]) & 0xffffff || base, lid = B.mix(above, 0x000000, 0.12), lash = B.mix(lid, 0x000000, 0.4);
+        const ok = at.filter(Boolean);
+        for (const [x, y, z] of ok) {
+          const top = y === e[1] + 1;
+          for (const g of [head, far, half]) g.set(x, y, z, top && g === half ? lid : top ? col[0] : col[1], 0);
+          shut.set(x, y, z, top ? lid : lash, 0);
+          // a soft brow: the fur over the eye a little darker (it frames it, the eye looks set in, not stuck on)
+          if (top && filled(head, x, y + 1, z) && cdist(head.get(x, y + 1, z) & 0xffffff, base) < 120) for (const g of [head, far, half, shut]) g.set(x, y + 1, z, B.mix(g.get(x, y + 1, z) & 0xffffff, 0x000000, 0.14), 0);
+        }
+        // the catchlight: in the upper row, the cell toward +x (the same side on every eye: one light), the half voxel
+        // facing out, upper, the half toward the eye's middle — one eighth of the cell; the cell itself moves to glint
+        const tops = ok.filter(c => c[1] === e[1] + 1); if (!tops.length) { def.eyes.push({ cells: ok, iris: col[1], top: e[1] + 1, rows: 2 }); continue; }
+        const gc = tops.reduce((a, c) => (c[0] > a[0] || (c[0] === a[0] && c[2] < a[2]) ? c : a));
+        let out = [0, 0, -1], ob = -1e9;   // (out: the open side most away from the head's middle)
+        for (const D of DIRS) if (!filled(head, gc[0] + D[0], gc[1], gc[2] + D[2])) { const sc = (gc[0] + 0.5 - hc[0]) * D[0] + (gc[2] + 0.5 - hc[1]) * D[2]; if (sc > ob) { ob = sc; out = D; } }
+        const other = tops.find(c => c !== gc) || gc;
+        const hx = out[0] ? (out[0] > 0 ? 1 : 0) : other[0] < gc[0] ? 0 : other[0] > gc[0] ? 1 : 0, hz = out[2] ? (out[2] > 0 ? 1 : 0) : other[2] < gc[2] ? 0 : 1;
+        for (let a = 0; a < 2; a++) for (let b2 = 0; b2 < 2; b2++) for (let c = 0; c < 2; c++) glint.set(gc[0] * 2 + a, gc[1] * 2 + b2, gc[2] * 2 + c, a === hx && b2 === 1 && c === hz ? GLINT : col[0], 0);
+        head.c[head.i(gc[0], gc[1], gc[2])] = 0;
+        def.eyes.push({ cells: ok, iris: col[1], top: e[1] + 1, rows: 2 });
       }
-      def.parts.head_c = { grid: shut, pivot: def.parts.head.pivot };
-      def.layout.head_c = def.layout.head;
+      const pv = def.parts.head.pivot;
+      def.parts.glint = { grid: glint, pivot: pv };
+      def.parts.head_o = { grid: far, pivot: pv };
+      def.parts.head_h = { grid: half, pivot: pv };
+      def.parts.head_c = { grid: shut, pivot: pv };
+      def.layout.glint = def.layout.head_o = def.layout.head_h = def.layout.head_c = def.layout.head;
+      def.glintScale = 0.5;
     }
     // a baby's fluff: a soft lighter shell on its back and flanks
     if (baby && body) {
@@ -124,7 +152,10 @@
     };
   };
 
-  const HIDE_OPEN = { head_c: true }, HIDE_SHUT = { head: true };
+  // which head is drawn (f-wild3): open near (with its glint), open from afar (no glint: one draw call less), half lid, shut
+  const HIDE_OPEN = { head_o: true, head_h: true, head_c: true }, HIDE_FAR = { head: true, glint: true, head_h: true, head_c: true };
+  const HIDE_HALF = { head: true, head_o: true, glint: true, head_c: true }, HIDE_SHUT = { head: true, head_o: true, head_h: true, glint: true };
+  const GLINT_D2 = 12 * 12;   // (the catchlight is drawn within 12 blocks of you; beyond it is below a pixel)
   const ZERO6 = () => [0, 0, 0, 0, 0, 0, 1];
   const put = (v, rx, ry, rz, ox, oy, oz, s) => { v[0] = rx; v[1] = ry; v[2] = rz; v[3] = ox; v[4] = oy; v[5] = oz; v[6] = s; return v; };
 
@@ -134,6 +165,11 @@
       this.on = false; this.chk = 0; this.built = new Set(); this.queue = []; this.buildT = 0;
       this.friends = B.deserialize(meta && meta.wildBonds);
       this.birds = []; this.birdT = 3;
+      // what a finch may land on (f-wild3): a leaf or a fence top, loaded, not far above it (WildBond.finchTakeoff)
+      this.bw = {
+        top: (x, z) => { const w = this.g.world; return w && w.isLoaded(x, z) ? w.topAt(x, z) : -1e9; },
+        perch: (x, z) => { const w = this.g.world; if (!w || !w.isLoaded(x, z)) return false; const b = w.getBlock(x, w.topAt(x, z), z); return !!b && (!!(VR.R.T.flags[b] & VR.F.LEAVES) || VR.R.T.shape[b] === VR.SHAPE.FENCE); },
+      };
       this.still = 0; this.pspeed = 0; this.attachT = 0; this.visitT = 5; this.visitor = null;
       this.out = [0, 0, 0];
       this.cost = { thinks: 0, ms: 0 };
@@ -392,12 +428,16 @@
     pose(m, t, P) {
       const h = m.wh; if (!h || !this.on) return P;
       const dt = h.lt < 0 ? 0 : Math.min(0.25, t - h.lt); h.lt = t;
-      // blinks (every 2–6 s, 0.13 s)
+      // blinks (every 2–6 s: half lid, shut, half lid — WildBond.lid), a content half-lid while petted or eating
       h.blinkT -= dt;
-      if (h.blinkT <= 0) { h.bl = 0.13; h.blinkT = 2 + hash(m.id, Math.floor(t), 0, 1) * 4; }
+      if (h.blinkT <= 0) { h.bl = B.BLINK; h.blinkT = 2 + hash(m.id, Math.floor(t), 0, 1) * 4; }
       h.bl = Math.max(0, h.bl - dt);
       const rest = h.mode === 'rest';
-      m.whide = !m.vkey ? null : h.bl > 0 || rest ? HIDE_SHUT : HIDE_OPEN;   // (the closed-eye head comes with the variant)
+      if (m.vkey) {   // (the heads come with the variant)
+        const lid = B.lid(h.bl, rest, h.wig > 0 || h.eatT > 0.3), pp = this.g.player && this.g.player.pos;
+        const far = !pp || (m.pos[0] - pp[0]) ** 2 + (m.pos[1] - pp[1]) ** 2 + (m.pos[2] - pp[2]) ** 2 > GLINT_D2;
+        m.whide = lid === 'shut' ? HIDE_SHUT : lid === 'half' ? HIDE_HALF : far ? HIDE_FAR : HIDE_OPEN;
+      } else m.whide = null;
       // springs: the tail swings out of a turn, the ears flop when the head moves
       const yr = dt > 0 ? angDiff(m.yaw - h.ly) / dt : 0; h.ly = m.yaw;
       const wig = h.wig > 0 ? Math.sin(t * 16) * 0.5 : 0;
@@ -414,7 +454,7 @@
       B.spring(h.sE, (hx - (h.phx || hx)) * 3 + (m.walkAmt || 0) * Math.sin((m.walk || 0) * 6) * 0.18, 12, 0.25, dt); h.phx = hx;
       const hs = h.baby ? 1.3 : 1;
       P.head = put(h.hp, hx, hy, 0, 0, h.baby ? 0.6 : 0, 0, hs);
-      P.head_c = P.head;
+      P.head_c = P.head_h = P.head_o = P.head;
       if (P.tail || m.def.companion || m.kind === 'moss_cat' || m.kind === 'glimmer_fox' || m.kind === 'crystal_pup') {
         const tl = P.tail || [0, 0, 0];
         P.tail = put(h.pt, tl[0] || 0, (tl[1] || 0) + h.sT.x, tl[2] || 0, tl[3] || 0, tl[4] || 0, tl[5] || 0, 1);
@@ -434,6 +474,7 @@
         const b = P.body || [0, 0, 0];
         P.body = put(h.pb, b[0] || 0, b[1] || 0, (b[2] || 0) + wig * 0.25, b[3] || 0, b[4] || 0, b[5] || 0, 1);
       }
+      const q = P.head; P.glint = put(h.pg || (h.pg = ZERO6()), q[0], q[1], q[2], q[3], q[4], q[5], q[6] * 0.5);   // (half-voxel cells)
       return P;
     }
     // ---------------------------------------------------------------- finches (hop, peck, take off)
@@ -452,18 +493,27 @@
         const b = L[i];
         b.t -= dt; b.flap += dt;
         const dx = b.x - p.pos[0], dz = b.z - p.pos[2], d2 = dx * dx + dz * dz;
-        if (b.st === 'hop') {
-          if (d2 < 20 || (d2 < 64 && this.pspeed > 4)) { const d = Math.sqrt(d2) || 1; b.st = 'fly'; b.vx = dx / d * 4.5 + (Math.random() - 0.5); b.vz = dz / d * 4.5 + (Math.random() - 0.5); b.vy = 4 + Math.random() * 1.5; b.yaw = Math.atan2(-b.vx, -b.vz); continue; }
-          if (b.air) { b.vy -= 22 * dt; b.x += b.vx * dt; b.z += b.vz * dt; b.y += b.vy * dt; if (b.y <= b.gy) { b.y = b.gy; b.air = false; b.vy = 0; } }
+        if (b.st === 'hop' || b.st === 'perch') {
+          b.calm = Math.max(0, (b.calm || 0) - dt);
+          if ((d2 < 20 || (d2 < 64 && this.pspeed > 4)) && !(b.calm > 0)) {
+            // f-wild3: a short arc to a leaf or a fence top near (or the grass further off) — after three scares it leaves
+            if ((b.flights || 0) < 3) { B.finchTakeoff(b, p.pos[0], p.pos[2], this.bw, Math.random); continue; }
+            const d = Math.sqrt(d2) || 1; b.st = 'leave'; b.vx = dx / d * 4.5 + (Math.random() - 0.5); b.vz = dz / d * 4.5 + (Math.random() - 0.5); b.vy = 4 + Math.random() * 1.5; b.yaw = Math.atan2(-b.vx, -b.vz); continue;
+          }
+          if (b.st === 'perch') {
+            // sitting: it looks about and preens now and then
+            if (b.t <= 0) { b.t = 0.6 + Math.random() * 1.6; if (Math.random() < 0.6) b.yaw += (Math.random() - 0.5) * 1.8; else b.peck = 0.25; }
+          } else if (b.air) { b.vy -= 22 * dt; b.x += b.vx * dt; b.z += b.vz * dt; b.y += b.vy * dt; if (b.y <= b.gy) { b.y = b.gy; b.air = false; b.vy = 0; } }
           else if (b.t <= 0) {
             b.t = 0.5 + Math.random() * 1.4;
             if (Math.random() < 0.6) { const a = b.yaw + (Math.random() - 0.5) * 1.6; b.yaw = a; b.vx = -Math.sin(a) * 0.9; b.vz = -Math.cos(a) * 0.9; b.vy = 3.4; b.air = true; const top = w.topAt(Math.floor(b.x + b.vx * 0.3), Math.floor(b.z + b.vz * 0.3)); b.gy = top + 1; }
             else b.peck = 0.35;
           }
           b.peck = Math.max(0, (b.peck || 0) - dt);
-        } else {
+        } else if (b.st === 'fly') B.finchFly(b, dt);
+        else {
           b.vy = Math.max(-0.5, b.vy - dt * 2.2); b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
-          if (d2 > 1600) { L.splice(i, 1); if (!L.length) this.birdT = 20; }
+          if (d2 > 1600) { L.splice(i, 1); if (!L.length) this.birdT = 20; continue; }
         }
         if (d2 > 3600) { L.splice(i, 1); if (!L.length) this.birdT = 12; }
       }
@@ -481,10 +531,10 @@
       const pos = this.bpos || (this.bpos = [0, 0, 0]), opts = this.bopts || (this.bopts = { scale: 1.35, shade: 0 });
       for (const b of this.birds) {
         const dx = b.x - cam.x, dz = b.z - cam.z; if (dx * dx + dz * dz > 80 * 80) continue;
-        const P = b.P, fly = b.st === 'fly' || b.air;
-        const f = fly ? Math.sin(b.flap * 34) * 1.1 : 0.0;
-        P.wing_l[2] = fly ? -0.4 - f : -0.1; P.wing_r[2] = fly ? 0.4 + f : 0.1;
-        P.body[0] = b.peck > 0 ? -0.5 : fly ? 0.15 : 0;
+        const P = b.P, fly = b.st === 'fly' || b.st === 'leave' || b.air, beat = b.st === 'leave' || b.air || (b.st === 'fly' && b.beat);
+        const f = beat ? Math.sin(b.flap * 38) * 1.1 : 0.0;   // (6 Hz beats; spread and still when it glides in)
+        P.wing_l[2] = beat ? -0.4 - f : fly ? -1.25 : -0.1; P.wing_r[2] = beat ? 0.4 + f : fly ? 1.25 : 0.1;
+        P.body[0] = b.peck > 0 ? -0.5 : fly ? Math.max(-0.35, Math.min(0.45, (b.vy || 0) * 0.12)) : 0;
         pos[0] = b.x; pos[1] = b.y + (fly ? 0 : 0.02); pos[2] = b.z;
         ent.drawModel(r, p, model, pos, cam, b.yaw, P, ent.lightAt(b.x, b.y + 0.3, b.z), opts);
       }
