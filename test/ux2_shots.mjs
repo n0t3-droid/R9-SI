@@ -120,7 +120,7 @@ const bk = await ev(() => ({ pages: VR.Diegetic.book.pages.length, doodles: docu
 run.book = bk;
 check(bk.pages === 5 && bk.secs >= 3 && bk.doodles >= 6, `the book: ${bk.pages} pages, ${bk.secs} sections on this spread, ${bk.doodles} doodles`);
 // the leaf mid-turn (frozen: a leaf of our own, its animation paused half way)
-await ev(() => { const st = document.createElement('style'); st.textContent = '#wanderbuch .dgleaf.ux2{animation-play-state:paused!important;animation-delay:-0.3s!important}'; document.head.appendChild(st); const l = document.createElement('div'); l.className = 'dgleaf fw ux2'; document.querySelector('#wanderbuch .dgbook').appendChild(l); });
+await ev(() => { const st = document.createElement('style'); st.textContent = '#wanderbuch .dgleaf.ux2{animation-play-state:paused!important;animation-delay:-0.16s!important}'; document.head.appendChild(st); const l = document.createElement('div'); l.className = 'dgleaf fw ux2'; document.querySelector('#wanderbuch .dgbook').appendChild(l); });
 await wait(300); await shotDom('book_turn', 'ux2_book_turn.png');
 await ev(() => { const l = document.querySelector('.dgleaf.ux2'); if (l) l.remove(); VR.Wander.close(VR.game); }); await wait(300);
 // ---------------------------------------------------------------- 3 · Palmenhafen: the greeting, the play, the visit
