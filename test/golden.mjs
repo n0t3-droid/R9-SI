@@ -2,7 +2,8 @@
 // must never vanish, each compared with its reference in test/golden/ by a windowed SSIM (test/golden_ssim.js: luma,
 // chroma and the worst tile of an 8 × 8 grid, so a landmark gone from a wide view fails even when the mean stays high).
 // One page, 640 × 360, de-DE, Math.random seeded in the page, a new default world (seed 4242, creative, peaceful), the
-// clock and the weather frozen (clear), the HUD hidden, animals and people not drawn (their walk is not deterministic).
+// clock and the weather frozen (clear), the HUD hidden, animals and people not drawn (their walk is not deterministic), nor the craft (f-quiet3:
+//          ships, sky traffic, pad visitors — where they are follows how many frames a settle took).
 //   shots  Very Low: vista_vl (from 14 m over the spawn, away from the gate), citadel_vl (the Turmzitadelle from 90 m);
 //          Balanced: vista, citadel, plaza (the nearest village's plaza), fairy (the fairy tree by day), starmap (the
 //          star map, DOM), cafe (the Ringstation café), aqua (Aquamarin's town)
@@ -80,8 +81,13 @@ async function trip(to) {
   return false;
 }
 // the world's picture from the canvas (animals and people not drawn: their walk differs run to run)
-const grabGL = () => ev(() => {
+const grabGL = (still = true) => ev((still) => {
   const g = VR.game, E = g.entities, V = g.villages, keep = [E && E.draw, E && E.drawTranslucent, V && V.draw];
+  // f-quiet3 (still, every shot): the moving craft not drawn either, as animals and people — the ships at the gate hall bob with the frames a
+  // settle took, the sky traffic flies (run 7: the hall's ship a hand's breadth off, worst tile 0.343)
+  const mov = still ? [[g, 'starships'], [g, 'traffic'], [g, 'padLife'], [g, 'lifeDirector'], [g, 'wild']].map(([o, k]) => o[k] && o[k].draw ? [o[k], o[k].draw] : null).filter(Boolean) : [];
+  const ship = still && g.gadgets ? g.gadgets.drawShip : null;
+  for (const m of mov) m[0].draw = () => {}; if (ship) g.gadgets.drawShip = () => {};
   const P = g.particles, spawn0 = P && P.spawn;
   try {
     if (E) { E.draw = () => {}; if (E.drawTranslucent) E.drawTranslucent = () => {}; } if (V) V.draw = () => {};
@@ -96,8 +102,8 @@ const grabGL = () => ev(() => {
     window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); if (VR.Fairy && VR.Fairy.state) VR.Fairy.state.t = 0; if (P) { P.n = 0; P.count = 0; } }
     return g.renderer.gl.canvas.toDataURL('image/png');
   } catch (e) { return null; }
-  finally { window.__norender = true; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; if (P) P.spawn = spawn0; }
-});
+  finally { window.__norender = true; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; if (P) P.spawn = spawn0; for (const m of mov) m[0].draw = m[1]; if (ship) g.gadgets.drawShip = ship; }
+}, !!still);
 const small = (buf) => sharp(buf).resize(CW, CH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
 // one shot: write it, compare it (or make it the reference)
 async function judge(id, png, note) {
@@ -163,7 +169,7 @@ await timed('hud', async () => {   // f-ux: the HUD at spawn, as a player sees i
   // f-quiet3: the world drawn here, at the spawn, before the page's picture — the stepped frames draw nothing, so the
   // canvas used to hold the shot before (a full run: the citadel's towers; ONLY=hud,…: whatever came last — the order
   // dependence)
-  await grabGL();
+  await grabGL(true);
   if (process.env.HUD_DEBUG) console.log('HUDDBG ' + JSON.stringify(await ev(() => { const el = document.getElementById('wcompass'), Q = VR.Quiet; return { cls: el && el.className, disp: el && el.style.display, goal: el && el.dataset.goal, txt: el && el.textContent, op: el && getComputedStyle(el).opacity, P: Q && Q.pointers ? JSON.stringify(Q.pointers.wcompass) : null, lvl: Q && Q.level ? Q.level() : null, hint: VR.Hints && VR.Hints.current ? String(VR.Hints.current()) : null }; })));
   const png = await page.screenshot({ type: 'png' });
   await ev(() => { const g = VR.game; g.hideHud = true; g.__goldHud = false; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });

@@ -21,9 +21,10 @@ ok(!G.settledOk({ state: 'title' }, 9) && !G.settledOk(null, 9), 'not in play / 
 ok(G.READY_MS >= 20000 && G.READY_MS <= 120000, 'ready keeps settling 20–120 s (' + G.READY_MS + ' ms)');
 const src = fs.readFileSync(process.env.GOLDEN || path.join(__dirname, 'golden.mjs'), 'utf8');
 const hud = (src.match(/await timed\('hud'[\s\S]*?\n\}\);/) || [''])[0];
-const iDraw = hud.indexOf('await grabGL()'), iShot = hud.indexOf('page.screenshot(');
+const iDraw = hud.indexOf('await grabGL(true)'), iShot = hud.indexOf('page.screenshot(');
 ok(hud && iShot > 0, 'golden.mjs has the hud shot');
-ok(iDraw > 0 && iDraw < iShot, 'hud draws the world at the spawn before the page\'s picture (not the canvas of the shot before)');
+ok(iDraw > 0 && iDraw < iShot, 'hud draws the world at the spawn before the page\'s picture (not the canvas of the shot before), the moving craft not drawn');
+ok(/still \? \[\[g, 'starships'\]/.test(src), 'grabGL(still) leaves the ships and the sky traffic out');
 const iCalm = hud.indexOf('await calm()');
 ok(iCalm > 0 && iCalm < iDraw && /Hints/.test(hud), 'hud pins the calm HUD (the pointers faded after the HUD is shown, no 🧭 hint card) before it draws');
 const ready = (src.match(/const ready = [^\n]*/) || [''])[0];
