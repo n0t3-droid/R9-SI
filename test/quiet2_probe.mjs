@@ -62,12 +62,12 @@ for (let t = 50; t < 150; t += 30) BURST.push([t, 'hint', '🧭 Drücke V, um mi
 BURST.sort((a, b) => a[0] - b[0]);
 
 async function calm(tag, url) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
   await ctx.addInitScript(() => { try { if (!localStorage.getItem('r9si.settings')) localStorage.setItem('r9si.settings', JSON.stringify({ preset: 'potato', dynRes: false })); localStorage.setItem('r9si.lang', 'de'); } catch (e) { /* */ } });
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)));
   const wait = (ms) => page.waitForTimeout(ms), ev = (fn, a) => page.evaluate(fn, a);
   const until = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { if (await ev(fn).catch(() => false)) return Date.now() - t; await wait(400); } return -1; };
-  const shot = async (n) => { try { await page.screenshot({ path: SHOTS + 'quiet2_' + tag + '_' + n + '.png', timeout: 120000 }); } catch (e) { console.log('  (no shot ' + n + ')'); } };
+  const shot = async (n) => { try { await page.screenshot({ path: SHOTS + 'quiet2_' + tag + '_' + n + '.png', timeout: 240000 }); } catch (e) { console.log('  (no shot ' + n + ')'); } };
   await page.goto(url);
   await until(() => VR.game && VR.game.state === 'title', 240000); await wait(3000);
   await page.click('#title [data-act="newworld"]', { timeout: 15000 }).catch(() => ev(() => document.querySelector('#title [data-act="newworld"]').click()));
@@ -115,7 +115,6 @@ async function calm(tag, url) {
   }
   await page.keyboard.up('KeyW');
   const A = OUT[tag] = await ev(() => { clearInterval(window.__q2iv); const A = window.__q2; A.msgSecs = +A.msgSecs.toFixed(1); A.err = window.__q2err || null; return A; });
-  A.distinct = shownG.size; A.msgSecs = +A.msgSecs.toFixed(1);
   A.quiet = await ev(() => VR.Quiet ? { cost: VR.Quiet.cost, stats: VR.Quiet.notes.stats, pointer: VR.Quiet.pointerStats || null } : null).catch(() => null);
   A.errors = errs.slice(0, 4);
   console.log('  ' + tag + ': ' + JSON.stringify(A).slice(0, 1500));
