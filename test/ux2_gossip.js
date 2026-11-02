@@ -39,7 +39,7 @@ console.log('2 · the children\'s play');
 const k1 = vil.agents[4], k2 = vil.agents[5];
 const d = G.heard(rec, { id: 'overworld/v1', x: 0, z: 0, dim: 'overworld' }, t0)[0];
 G.stagePlay(Vm, k1, k2, d);
-check(k2.pose === 'crouch' && k2.bubble && Vm._gsPlay.ph === 'walk', 'the machine kneels and rumbles: „' + (k2.bubble ? k2.bubble.text : '') + '"');
+check(k2.pose === 'sitground' && k2.bubble && Vm._gsPlay.ph === 'walk', 'the machine kneels and rumbles: „' + (k2.bubble ? k2.bubble.text : '') + '"');
 k1.pos = [8, 64, 8]; k2.pos = [12, 64, 8];
 const seen = ['walk'], said = [];
 for (let i = 0; i < 300 && Vm._gsPlay; i++) { G.runPlay(Vm, k2, 0.05); G.runPlay(Vm, k1, 0.05); const P0 = Vm._gsPlay; if (P0 && seen[seen.length - 1] !== P0.ph) seen.push(P0.ph); const L = G.log[G.log.length - 1]; if (L && (L.what === 'kid' || L.what === 'kid2') && said.indexOf(L.what) < 0) said.push(L.what); if (P0 && P0.ph === 'tap' && !seen.near) seen.near = Math.hypot(k1.pos[0] - k2.pos[0], k1.pos[2] - k2.pos[2]); }

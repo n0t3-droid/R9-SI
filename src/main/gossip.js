@@ -213,7 +213,7 @@
   // villages.js asks this before a person's plain first hello: true → handled (the deed greeting, or a calm wave)
   G.hello = function (V, a) {
     const g = V && V.g; if (!g || !a || !a.p || !a.vil || !G.on(g) || !g.env) return false;
-    if (Date.now() < (G.calmT || 0)) { a.greeted = true; a.waveT = Math.max(a.waveT || 0, 1); return true; }
+    if (Date.now() < (G.calmT || 0) || V._gsPlay) { a.greeted = true; a.waveT = Math.max(a.waveT || 0, 1); return true; }
     if (a.kid || V.talking || (g.ui && g.ui.blocking) || (a.act && (a.act.type === 'gsplay' || a.act.type === 'gsvisit'))) return false;
     const rec = G.rec(g), site = siteOf(g, a.vil), t = now(g), pid = pidOf(g, a), d = G.greetFor(rec, pid, site, t);
     if (!d) return false;
@@ -226,16 +226,16 @@
     V._gsPlay = { k1, k2, d, ph: 'walk', t: 0, freed };
     for (const k of [k1, k2]) { k.act = { type: 'gsplay', role: k === k1 ? 'hero' : 'machine' }; k.path = null; k.goal = null; k.vel[0] = 0; k.vel[2] = 0; }
     k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]];
-    if (freed) { k2.pose = 'crouch'; say(G, k2, T('g.gs.play.machine'), 2.6, 'play'); }
+    if (freed) { k2.pose = 'sitground'; say(G, k2, T('g.gs.play.machine'), 2.6, 'play'); }
     G.log.push({ t: Date.now(), who: k1.p.id, what: 'play', text: 'stage' });
     return V._gsPlay;
   };
   const sparks = (g, a, col, n) => { if (g.particles && g.particles.glow) for (let k = 0; k < n; k++) g.particles.glow(a.pos[0] + (Math.random() - 0.5) * 0.8, a.pos[1] + 0.6 + Math.random() * 0.6, a.pos[2] + (Math.random() - 0.5) * 0.8, col, 1.4, 0.07, 0.5); };
   G.runPlay = function (V, a, dt) {
     const P0 = V._gsPlay, g = V.g;
-    if (!P0 || (a !== P0.k1 && a !== P0.k2) || V.agents.indexOf(P0.k1) < 0 || V.agents.indexOf(P0.k2) < 0) { a.act = null; if (a.pose === 'crouch') a.pose = 'stand'; if (P0 && (a === P0.k1 || a === P0.k2)) V._gsPlay = null; return; }
+    if (!P0 || (a !== P0.k1 && a !== P0.k2) || V.agents.indexOf(P0.k1) < 0 || V.agents.indexOf(P0.k2) < 0) { a.act = null; if (a.pose === 'sitground') a.pose = 'stand'; if (P0 && (a === P0.k1 || a === P0.k2)) V._gsPlay = null; return; }
     const { k1, k2, d } = P0;
-    if (a === k2) { k2.vel[0] = 0; k2.vel[2] = 0; if (P0.freed && P0.ph !== 'rise') k2.pose = 'crouch'; k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]]; if (P0.freed && P0.ph !== 'rise' && (P0.blink = (P0.blink || 0) + dt) > 0.6) { P0.blink = 0; sparks(g, k2, [0.45, 0.75, 1], 2); } return; }
+    if (a === k2) { k2.vel[0] = 0; k2.vel[2] = 0; if (P0.freed && P0.ph !== 'rise') k2.pose = 'sitground'; k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]]; if (P0.freed && P0.ph !== 'rise' && (P0.blink = (P0.blink || 0) + dt) > 0.6) { P0.blink = 0; sparks(g, k2, [0.45, 0.75, 1], 2); } return; }
     // the hero drives the play
     P0.t += dt;
     let arrived = false;
@@ -250,7 +250,7 @@
     } else if (nx === 'rise') {   // the machine stands up, friendly; both cheer
       k2.pose = 'stand'; k2.waveT = 1.6; k1.waveT = 1.6; k1.bubble = null;
       say(G, k2, T('g.gs.kid2.' + d.k, vars(g, d, k2)), 4, 'kid2'); sparks(g, k2, [0.6, 1, 1], 8); sparks(g, k1, [1, 0.9, 0.5], 4);
-    } else if (nx === 'done') { for (const k of [k1, k2]) { if (k.act && k.act.type === 'gsplay') k.act = null; if (k.pose === 'crouch') k.pose = 'stand'; k.lookAt = null; } V._gsPlay = null; }
+    } else if (nx === 'done') { for (const k of [k1, k2]) { if (k.act && k.act.type === 'gsplay') k.act = null; if (k.pose === 'sitground') k.pose = 'stand'; k.lookAt = null; } V._gsPlay = null; }
   };
   // a friend's visit in person: their own person record (a guest with a basket) walks to your door; ≤ 1 at a time
   G.startVisit = function (V, pid, f, door, gift) {
@@ -338,6 +338,7 @@
   };
   // one village: at most one moment (a greeting, the neighbours' talk, the children, the bard, the elder)
   G.lookVillage = function (V, vil, rec, t, tod, day) {
+    if (V._gsPlay) { G.why = 'play'; return false; }   // (f-ux2: while the children play, the village watches)
     const g = V.g, p = g.player.pos, site = siteOf(g, vil);
     const H = G.heard(rec, site, t); if (!H.length) { G.why = 'unheard'; return false; }
     const awake = (a) => a.pose !== 'sleep' && !a.bubble && a !== V.talking && !(a.act && a.act.type === 'arrive');
@@ -510,7 +511,7 @@
     log: () => G.log.slice(),
     friend: (pid, pts) => G.befriend(G.rec(VR.game), pid, pts, null),
     cool: () => { G.lastSay = -1e9; G.calmT = 0; },
-    play: () => { const P0 = VR.game.villages && VR.game.villages._gsPlay; return P0 ? { ph: P0.ph, k1: P0.k1.pos.slice(), k2: P0.k2.pos.slice(), crouch: P0.k2.pose === 'crouch' } : null; },
+    play: () => { const P0 = VR.game.villages && VR.game.villages._gsPlay; return P0 ? { ph: P0.ph, k1: P0.k1.pos.slice(), k2: P0.k2.pos.slice(), crouch: P0.k2.pose === 'sitground' } : null; },
     visit: () => { const J = VR.game.villages && VR.game.villages._gsVisit; return J ? { ph: J.ph, pos: J.a.pos.slice(), guest: J.guest, given: J.given, door: J.door } : null; },
     state: () => { const g = VR.game; return { on: G.on(g), why: G.why || '', screen: g.ui && g.ui.screen, blocking: !!(g.ui && g.ui.blocking), ticks: G.cost.ticks, said: G.cost.said }; },
   };
