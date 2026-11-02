@@ -140,6 +140,7 @@
   };
   // one sole on the ground (a ball and a heel, stretched along h, the right one mirrored): triangles (x, y, z) into buf
   // from o; returns the floats written. k: size.
+  D.SOLE_SIZE = 1.9;   // (a step's print ≈ 37 × 21 cm: read from the third-person view)
   D.SOLE_N = 8; D.SOLE_FLOATS = D.SOLE_N * 2 * 9;
   D.sole = function (buf, o, x, y, z, h, side, k) {
     const s = k || 1, toe = 0.12 * side, hh = h + toe, fx = Math.sin(hh), fz = -Math.cos(hh), rx = Math.cos(hh), rz = Math.sin(hh), N = D.SOLE_N;
@@ -406,12 +407,13 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   D._pathFor = pathFor;   // (test/ux2_trail.js)
   // the soles: one small batch (≤ 14 × 16 triangles), rebuilt with the trail (4 Hz), drawn after the crack (popFx)
   const SOLES = 14; S.soleBuf = null; S.soleN = 0; S.soleVer = 0; S.soleK = new Float32Array(SOLES); S.soleAt = new Int32Array(SOLES); S.soleCnt = new Int32Array(SOLES);
+  D._buildSoles = (g, h0) => buildSoles(g, h0);
   function buildSoles(g, h0) {
     if (!S.soleBuf) S.soleBuf = new Float32Array(SOLES * D.SOLE_FLOATS);
     const pts = S.pts, y0 = g.player.pos[1], fr = y0 - Math.floor(y0 + 0.1), lift = (fr > 0 && fr < 0.95 ? fr : 0) + 0.03; let o = 0, n = 0;   // (the floor's own height: a plate or a slab under your feet)
     for (let i = 0; i < pts.length && n < SOLES; i++, n++) {
       const q = pts[i], y = q.y === undefined ? (q.y = groundY(g, q.x, q.z, y0)) : q.y;
-      S.soleAt[n] = o / 3; const w = D.sole(S.soleBuf, o, q.x, (q.y === Math.floor(q.y) ? y + lift : y + 0.03), q.z, fin(q.h) ? q.h : h0, q.side, 1.3); S.soleCnt[n] = w / 3; S.soleK[n] = q.k; o += w;
+      S.soleAt[n] = o / 3; const w = D.sole(S.soleBuf, o, q.x, (q.y === Math.floor(q.y) ? y + lift : y + 0.03), q.z, fin(q.h) ? q.h : h0, q.side, D.SOLE_SIZE); S.soleCnt[n] = w / 3; S.soleK[n] = q.k; o += w;
     }
     S.soleN = n; S.soleVer++;
   }
@@ -430,10 +432,10 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
     gl.uniform3f(p.u.u_offset, -cam.x, -cam.y, -cam.z);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -2);
-    const t = g.time || 0, E = g.env, night = E && fin(E.night) ? clamp(E.night, 0, 1) : 0.3, gain = 1.25 + 0.6 * night;
+    const t = g.time || 0, E = g.env, night = E && fin(E.night) ? clamp(E.night, 0, 1) : 0.3, gain = 1.9 + 0.8 * night;
     for (let i = 0; i < S.soleN; i++) {
-      const tw = 0.8 + 0.2 * Math.sin(t * 2 - i * 0.7), a = clamp(0.7 * S.soleK[i] * tw, 0, 1);
-      gl.uniform4f(p.u.u_color, 1.0 * gain, 0.74 * gain, 0.36 * gain, a);
+      const tw = 0.85 + 0.15 * Math.sin(t * 2 - i * 0.7), a = clamp(0.95 * S.soleK[i] * tw, 0, 1);
+      gl.uniform4f(p.u.u_color, 1.0 * gain, 0.72 * gain, 0.3 * gain, a);
       gl.drawArrays(gl.TRIANGLES, S.soleAt[i], S.soleCnt[i]);
     }
     gl.disable(gl.POLYGON_OFFSET_FILL); gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
