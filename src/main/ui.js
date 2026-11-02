@@ -286,11 +286,13 @@
       }
     }
     loading(msg, frac, detail) {
-      if (this.screen !== 'loading') { this.show('loading'); this.tipTimer = 0; }
-      $('#loadmsg').textContent = msg;
+      if (this.screen !== 'loading') { this.show('loading'); this.tipTimer = 0; this.loadSeen = null; }
+      // (f-perf8: only what changed is written — the same text set again each frame was a style and paint pass a frame)
+      const LC = this.loadSeen || (this.loadSeen = { msg: null, detail: null, sky: null, pct: -1 });
+      if (LC.msg !== msg) { LC.msg = msg; $('#loadmsg').textContent = msg; }
       // t-first: the counts of the needed sections under the bar; the world's sky shows through while it renders behind
-      { const d = $('#loaddetail'); if (d) d.textContent = detail || ''; const L = $('#loading'); if (L) L.classList.toggle('sky', this.game.state === 'loading'); }
-      $('#loadbar').style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%';
+      { const dt0 = detail || '', sky = this.game.state === 'loading'; if (LC.detail !== dt0) { LC.detail = dt0; const d = $('#loaddetail'); if (d) d.textContent = dt0; } if (LC.sky !== sky) { LC.sky = sky; const L = $('#loading'); if (L) L.classList.toggle('sky', sky); } }
+      { const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100); if (LC.pct !== pct) { LC.pct = pct; $('#loadbar').style.width = pct + '%'; } }
       if (!this.tipAt || performance.now() - this.tipAt > 4500) { this.tipAt = performance.now(); const tips = TL('g.load.tips'); $('#loadtip').textContent = tips.length ? tips[Math.floor(Math.random() * tips.length)] : ''; }
     }
     // ---------------------------------------------------------------- HUD
@@ -311,9 +313,10 @@
         if (name !== this.lastName) { this.lastName = name; nm.textContent = name; nm.style.opacity = name ? 1 : 0; clearTimeout(this.nameT); this.nameT = setTimeout(() => nm.style.opacity = 0, 2200); }
       }
       const surv = p.mode === 'survival';
-      $('#stats').style.display = surv ? 'flex' : 'none';
-      $('#xpbar').style.display = surv ? 'block' : 'none';
-      $('#xplvl').style.display = surv && p.level > 0 ? 'block' : 'none';
+      // (f-perf8: the three displays written when they change — or the HUD was built anew — not three queries and writes a frame)
+      { const stEl = $('#stats'), lv = surv && p.level > 0;
+        if (stEl !== this.hudStatsEl || surv !== this.hudSurv || lv !== this.hudLv || force) { this.hudStatsEl = stEl; this.hudSurv = surv; this.hudLv = lv;
+          stEl.style.display = surv ? 'flex' : 'none'; $('#xpbar').style.display = surv ? 'block' : 'none'; $('#xplvl').style.display = lv ? 'block' : 'none'; } }
       if (surv) {
         const key = Math.ceil(p.health) + ':' + p.food + ':' + Math.ceil(p.air / 30) + ':' + p.level + ':' + Math.floor(p.xp * 100);
         if (key !== this.statKey || force) {

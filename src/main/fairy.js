@@ -387,8 +387,8 @@
     if (!on(g) || !g.player || !g.world) { if (S.sites.length && (!g || g.state !== 'play')) { S.sites = []; S.key = ''; hideBubble(); } return; }
     const t0 = performance.now();
     S.dt = dt; S.t += dt; S.E = E;
-    const key = (g.dim || 'overworld') + '|' + (g.meta && g.meta.seed);
-    if (key !== S.key) setup(g);
+    // (f-perf8: the world's key made only when the dimension or the seed changed — not a string every frame)
+    if (!S.key || S.kDim !== g.dim || S.kSeed !== (g.meta && g.meta.seed)) { S.kDim = g.dim; S.kSeed = g.meta && g.meta.seed; const key = (g.dim || 'overworld') + '|' + (g.meta && g.meta.seed); if (key !== S.key) setup(g); }
     const p = g.player.pos;
     if ((S.chk -= dt) <= 0) {   // twice a second: the nearest place, settled when its land is there
       S.chk = 0.5; let best = null, bd = 1e9;
