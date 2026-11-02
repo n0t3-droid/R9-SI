@@ -57,6 +57,7 @@ async function watch(tag) {
 async function act(s) {
   const r = rnd(), count = (k) => { run.actions[k] = (run.actions[k] || 0) + 1; };
   const menu = s && s.screen && s.screen !== 'hud';   // ('hud' is the game itself, no menu)
+  if (menu && rnd() < 0.5) { count('close ' + s.screen); await page.keyboard.press('Escape'); await wait(150); return; }   // (a child closes menus too: the bot plays, not only pauses)
   if (r < 0.34) { const k = pick(MOVES); count('walk'); await page.keyboard.down(k); if (rnd() < 0.3) await page.keyboard.down('ControlLeft'); await wait(200 + rnd() * 1300); await page.keyboard.up(k); await page.keyboard.up('ControlLeft'); }
   else if (r < 0.46) { count('look'); const dx = (rnd() - 0.5) * 300, dy = (rnd() - 0.5) * 120; await page.mouse.move(320, 180); await page.mouse.move(320 + dx, 180 + dy, { steps: 6 }); }
   else if (r < 0.55) { count('jump'); await page.keyboard.press('Space'); if (rnd() < 0.3) { await wait(120); await page.keyboard.press('Space'); count('fly'); } }
