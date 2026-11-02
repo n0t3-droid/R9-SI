@@ -2354,6 +2354,15 @@
     'wiz.firstWorld': '▶ Losspielen — es entsteht in deiner neuen Welt',
     // ---- 🐾 Begleiter: die drei Arten, das Zähmen, der Chip, das Pfeifen
     'g.mob.glimmer_fox': 'Glimmerfuchs', 'g.mob.moss_cat': 'Mooskätzchen', 'g.mob.crystal_pup': 'Kristallwelpe',
+    // u-wild2: Tiere zum Liebhaben (wildheart.js)
+    'g.set.wildHeart': 'Tiere zum Liebhaben',
+    'g.set.wildHeart.tip': 'Jedes Tier mit eigenem Fellmuster, großen blinzelnden Augen und wippenden Ohren; Mütter mit Jungen in einer Reihe, neugierige und scheue Tiere, hüpfende Finken; füttern, Vertrauen, Freundschaft (ab Ausgewogen).',
+    'g.wh.shy': '{name} ist noch scheu — halte {food} in der Hand und warte.',
+    'g.wh.ate': '{name} frisst dir aus der Hand.',
+    'g.wh.trust': '{name} vertraut dir und folgt dir ein Stück.',
+    'g.wh.friend': '💛 {name} ist jetzt dein Freund',
+    'g.wh.friendSub': 'Es besucht dich manchmal zu Hause.',
+    'g.wh.visit': '💛 {name} besucht dich!',
     'g.pet.tamed': '🐾 {name} ist jetzt dein Begleiter!',
     'g.pet.tamedSub': '{kind} · Rechtsklick: sitzen oder folgen',
     'g.pet.wantsTreat': '{name} mag {treat}. Halte {treat} in der Hand und klicke rechts.',

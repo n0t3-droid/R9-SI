@@ -1,5 +1,5 @@
 {
- "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs · a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds) · v-light: lightfield, lightfield_gl set to 0 by the coordinator — inert on Very Low (lfPools off in the potato tier: no define, lfOn() false, the frame returns at once); re-measure with perf8.mjs on a quiet machine",
+ "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame \u2014 perf8.mjs \u00b7 a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds) \u00b7 v-light: lightfield, lightfield_gl set to 0 by the coordinator \u2014 inert on Very Low (lfPools off in the potato tier: no define, lfOn() false, the frame returns at once); re-measure with perf8.mjs on a quiet machine",
  "frames": 1200,
  "build": "cur",
  "totalMs": 2.395,
@@ -102,7 +102,9 @@
   "tales": 0.002,
   "lightfield": 0,
   "lightfield_gl": 0,
-  "tale_end": 0
+  "tale_end": 0,
+  "wildbond": 0,
+  "wildheart": 0
  },
  "base": {
   "tag": "v0556",
@@ -387,9 +389,13 @@
   "tales",
   "lightfield",
   "lightfield_gl",
-  "tale_end"
+  "tale_end",
+  "wildbond",
+  "wildheart"
  ],
  "unmeasured": {
-  "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs — without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release"
+  "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs \u2014 without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release",
+  "wildbond": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 rules only (VR.WildBond), called by wildheart.js; nothing runs on Very Low; re-measure with perf8.mjs at the next release",
+  "wildheart": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 on Very Low (tier 0) update() returns at its first line between once-a-second tier checks, nothing is attached to an animal (entities' hooks test m.wh), nothing drawn; re-measure with perf8.mjs at the next release"
  }
 }

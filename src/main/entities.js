@@ -108,7 +108,9 @@
           const kind = opts[Math.floor(Math.random() * opts.length)];
           const [g0, g1] = MOBS[kind].group || [1, 2];
           const n = g0 + Math.floor(Math.random() * (g1 - g0 + 1));
-          for (let i = 0; i < n; i++) { const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6); const ty = w.topAt(ox, oz); if (R.T.flags[w.getBlock(ox, ty, oz)] & F.SOLID) this.summon(kind, ox + 0.5, ty + 1, oz + 0.5); }
+          const grp = this.grp || (this.grp = []); grp.length = 0;
+          for (let i = 0; i < n; i++) { const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6); const ty = w.topAt(ox, oz); if (R.T.flags[w.getBlock(ox, ty, oz)] & F.SOLID) grp.push(this.summon(kind, ox + 0.5, ty + 1, oz + 0.5)); }
+          if (g.companions && g.companions.heart) g.companions.heart.group(grp);   // (u-wild2: now and then a mother and her babies)
           counts.passive += n;
         }
       }
@@ -280,6 +282,9 @@
         if (dist < 1.4 + m.w && Math.abs(p.pos[1] - m.pos[1]) < 2 && A.cool <= 0) { A.cool = 1.1; p.damage(def.dmg * (g.difficulty === 'hard' ? 1.5 : g.difficulty === 'easy' ? 0.6 : 1), 'mob', m.pos); m.swing = 1; }
       } else if (A.flee > 0) {
         tx = m.pos[0] + (m.pos[0] - p.pos[0]); tz = m.pos[2] + (m.pos[2] - p.pos[2]); speed *= 1.6;
+      } else if (m.wh && g.companions && g.companions.heart && g.companions.heart.steer(this, m, dt, d2, A)) {
+        // (u-wild2, wildheart.js) families, curious and shy ones, rest at dusk, shelter in rain, a friend's visit
+        if (A.wt) { tx = A.wt[0]; tz = A.wt[1]; speed *= A.wt[2]; }
       } else {
         // (t-wild, wildlife.js) a deer in its line at dawn walks its slot of the line; a sheep of a drifting herd keeps
         // round the herd's point — and grazes where it stands
@@ -487,7 +492,7 @@
         else { const L = lay[name] || [0, 0, 0]; t.set(base); mat4.translate(t, t, L[0], L[1], L[2]); }
         const q = pose && pose[name];
         // q = [rotX, rotY, rotZ, (offset x, y, z in model units)]
-        if (q) { if (q.length > 3) mat4.translate(t, t, q[3] || 0, q[4] || 0, q[5] || 0); if (q[1]) mat4.rotY(t, t, q[1]); if (q[0]) mat4.rotX(t, t, q[0]); if (q[2]) mat4.rotZ(t, t, q[2]); }
+        if (q) { if (q.length > 3) mat4.translate(t, t, q[3] || 0, q[4] || 0, q[5] || 0); if (q[1]) mat4.rotY(t, t, q[1]); if (q[0]) mat4.rotX(t, t, q[0]); if (q[2]) mat4.rotZ(t, t, q[2]); if (q.length > 6 && q[6] && q[6] !== 1) mat4.scale(t, t, q[6], q[6], q[6]); }   // (u-wild2: q[6] a part's scale — a baby's big head)
         if (mats) { let m = mats[name]; if (!m) m = mats[name] = new Float32Array(16); m.set(t); }
         if (hide && hide[name]) continue;
         gl.uniformMatrix4fv(p.u.u_model, false, t);
@@ -496,7 +501,8 @@
       }
     }
     pose(m, t) {
-      if (m.def && m.def.companion && VR.Companions) return VR.Companions.poseOf(m, t);
+      const H = m.wh && this.game.companions ? this.game.companions.heart : null;   // (u-wild2: blinks, springs, a baby's head, the head's moods)
+      if (m.def && m.def.companion && VR.Companions) return H ? H.pose(m, t, VR.Companions.poseOf(m, t)) : VR.Companions.poseOf(m, t);
       const gait = m.def ? VR.getVoxModel(this.game.renderer.gl, m.def.model).def.gait : 'biped';
       const s = Math.sin(m.walk * 3) * 0.7 * (m.walkAmt || 0);
       const P = {};
@@ -507,7 +513,7 @@
       else if (gait === 'float') { P.ring = [0.3, t * 2, 0.2]; P.body = [0, t, 0]; }
       else if (gait === 'hover') { P.rotor_l = [0, t * 30, 0]; P.rotor_r = [0, -t * 30, 0]; }
       if (m.dead) { for (const k in P) void k; }
-      return P;
+      return H ? H.pose(m, t, P) : P;
     }
     draw(r, E, cam) {
       const gl = r.gl, t = this.game.time;
@@ -517,13 +523,14 @@
         if (dx * dx + dz * dz > 110 * 110) continue;
         if (!mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
         if (m.def.foe && VR.Foes) { VR.Foes.draw(this, r, p, m, cam, t); continue; }   // a-foes: a foe's parts, its optic and core tinted (foes.js)
-        const model = VR.getVoxModel(gl, m.def.model);
+        const model = VR.getVoxModel(gl, m.vkey || m.def.model);   // (u-wild2: an animal's own coat, when its variant is built)
         if (!model) continue;
         const light = this.lightAt(m.pos[0], m.pos[1] + m.h * 0.6, m.pos[2]);
         if (m.def.fly === 'float') { light.sky = 1; }
         const deathRoll = m.dead ? Math.min(1.5, m.deathT * 4) : 0;
-        this.drawModel(r, p, model, m.pos, cam, m.yaw, this.pose(m, t), light, { flash: m.hurt > 0.25 ? 1 : 0, roll: deathRoll, pitch: m.def.fly === 'glide' ? Math.sin(m.age * 0.4) * 0.1 : 0 });
+        this.drawModel(r, p, model, m.pos, cam, m.yaw, this.pose(m, t), light, { flash: m.hurt > 0.25 ? 1 : 0, roll: deathRoll, pitch: m.def.fly === 'glide' ? Math.sin(m.age * 0.4) * 0.1 : 0, scale: m.wscale || 1, hide: m.whide || null });
       }
+      if (this.game.companions && this.game.companions.heart) this.game.companions.heart.draw(this, r, p, cam, t);   // (u-wild2: the finches)
       if (VR.Foes && VR.Foes.drawExtra) VR.Foes.drawExtra(this, r, p, cam);   // a-foes: shed plates and shards, the slow bolts, a pile of Taler
       // other players' shadows / third person self
       const g = this.game, pl = g.player;

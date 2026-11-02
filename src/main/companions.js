@@ -26,6 +26,7 @@
       this.chipT = 0; this.chipText = null;
       this.rename = null; this.renameEl = null; this.renameIn = null;
       this.mountUI();
+      this.heart = VR.WildHeart ? new VR.WildHeart(g, meta) : null;   // (u-wild2: the animals you fall in love with, wildheart.js)
       const list = meta ? P.deserialize(meta.companions) : [];
       for (const rec of list) this.adopt(rec);
     }
@@ -66,6 +67,7 @@
     }
     // left-click: a pat (never a blow)
     pat(m) {
+      if (!m.pet && this.heart && this.heart.pat(m)) return;   // (u-wild2: hearts for one that knows you; a hint for a shy one)
       if (m.pet) { m.pet.wig = 1.2; this.hearts(m, 3); } else if (m.ai) m.ai.flee = 2.5;   // a wild one is shy: it runs off a little
       if (m.vel) m.vel[1] = Math.max(m.vel[1], 3.2);
       this.g.audio.play('pet');
@@ -158,6 +160,7 @@
       this.prevOnGround = !!p.onGround;
       if (jumped) for (const m of g.entities.mobs) if (m.pet && m.pet.state === 'follow' && m.onGround) { const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2]; if (dx * dx + dz * dz < 49) m.vel[1] = 7.4; }
       this.chipTick(dt);
+      if (this.heart) this.heart.update(dt);
     }
     // the rules think (VR.Pets.decide); this walks, following the path and the player
     steer(m, dt, d2) {
@@ -311,6 +314,7 @@
     }
     // ---------------------------------------------------------------- the save (meta.companions)
     beforeSave(meta) {
+      if (this.heart) this.heart.beforeSave(meta);   // (u-wild2: meta.wildBonds, your friends)
       const list = this.pets();
       if (!list.length) { delete meta.companions; return; }
       meta.companions = P.serialize(list.map(m => ({ kind: m.kind, name: m.pet.name, state: m.pet.state, pos: m.pos, yaw: m.yaw, seed: m.pet.seed })));

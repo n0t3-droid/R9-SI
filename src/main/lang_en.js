@@ -2354,6 +2354,15 @@
     'wiz.firstWorld': '▶ Play — it appears in your new world',
     // ---- 🐾 companions: the three kinds, taming, the chip, whistling
     'g.mob.glimmer_fox': 'Glimmer Fox', 'g.mob.moss_cat': 'Moss Kitten', 'g.mob.crystal_pup': 'Crystal Pup',
+    // u-wild2: lovable animals (wildheart.js)
+    'g.set.wildHeart': 'Lovable animals',
+    'g.set.wildHeart.tip': 'Every animal with its own coat pattern, big blinking eyes and bouncing ears; mothers with their young in a line, curious and shy animals, hopping finches; feeding, trust, friendship (Balanced and up).',
+    'g.wh.shy': '{name} is still shy — hold {food} and wait.',
+    'g.wh.ate': '{name} eats from your hand.',
+    'g.wh.trust': '{name} trusts you and follows you a while.',
+    'g.wh.friend': '💛 {name} is your friend now',
+    'g.wh.friendSub': 'It will visit you at home now and then.',
+    'g.wh.visit': '💛 {name} has come to visit!',
     'g.pet.tamed': '🐾 {name} is now your companion!',
     'g.pet.tamedSub': '{kind} · right-click: sit or follow',
     'g.pet.wantsTreat': '{name} likes {treat}. Hold {treat} and right-click.',
