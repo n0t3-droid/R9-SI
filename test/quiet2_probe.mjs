@@ -48,6 +48,7 @@ const SAMPLE = () => {
   const pt = {}; for (const id of ['wcompass', 'f2point']) { const e = document.getElementById(id); pt[id] = !!(e && e.textContent && e.getBoundingClientRect().width > 2 && visible(e)); }
   return { items: out, pt, play: !!(window.VR && VR.game && VR.game.state === 'play' && !VR.game.ui.screen && !VR.game.arrival) };
 };
+const GIST_SRC = "(s) => String(s || '').toLowerCase().replace(/[^\\p{L}\\p{N}\\s]+/gu, ' ').split(/\\s+/).filter(w => w && !/^\\p{N}+$/u.test(w)).join(' ')";
 const gist = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/).filter(w => w && !/^\p{N}+$/u.test(w)).join(' ').replace(/ ×$/, '');
 // the burst (s of play → a message through a channel both builds have)
 const BURST = [];
@@ -62,7 +63,7 @@ BURST.sort((a, b) => a[0] - b[0]);
 
 async function calm(tag, url) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
-  await ctx.addInitScript(() => { try { if (!localStorage.getItem('r9si.settings')) localStorage.setItem('r9si.settings', JSON.stringify({ preset: 'balanced', dynRes: false })); localStorage.setItem('r9si.lang', 'de'); } catch (e) { /* */ } });
+  await ctx.addInitScript(() => { try { if (!localStorage.getItem('r9si.settings')) localStorage.setItem('r9si.settings', JSON.stringify({ preset: 'potato', dynRes: false })); localStorage.setItem('r9si.lang', 'de'); } catch (e) { /* */ } });
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)));
   const wait = (ms) => page.waitForTimeout(ms), ev = (fn, a) => page.evaluate(fn, a);
   const until = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { if (await ev(fn).catch(() => false)) return Date.now() - t; await wait(400); } return -1; };
@@ -77,23 +78,17 @@ async function calm(tag, url) {
   await ev(() => document.querySelector('#create .btn.primary').click());
   check(await until(() => VR.game && VR.game.state === 'play', 300000) >= 0, tag + ': the Abenteuer world');
   for (let i = 0; i < 40; i++) { const a = await ev(() => { const g = VR.game; if (g.arrival && g.arrival.skip) { try { g.arrival.skip(); } catch (e) { /* */ } } return !!g.arrival; }).catch(() => true); if (!a) break; await wait(1500); }
-  const A = OUT[tag] = { samples: 0, msgSecs: 0, centre: 0, distinct: 0, dups: 0, dupList: [], pt: { n: 0, on: 0, late: 0, lateOn: 0 }, by: {} };
-  const shownG = new Map(); let prev = new Set(), bi = 0, last = Date.now(), shotN = 0;
-  const shotsAt = [20000, 100000, PLAY - 6000];
-  const t0 = Date.now();
-  while (Date.now() - t0 < PLAY) {
-    const el = Date.now() - t0;
-    const ph = el < 8000 ? 'stand' : (Math.floor((el - 8000) / 4000) % 2 ? 'look' : 'walk');
-    if (ph === 'walk') await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
-    if (ph === 'look') await ev(() => { VR.game.player.yaw += 0.18; }).catch(() => {});
-    while (bi < BURST.length && BURST[bi][0] * 1000 <= el) {
-      const b = BURST[bi++];
-      await ev((b) => { const g = VR.game; try { if (b[1] === 'toast') g.ui.toast(b[2], b[3]); else if (b[1] === 'hint') g.ui.hint(b[2], 4000); else if (VR.Quiet && VR.Quiet.note) VR.Quiet.note(b[2], 2, b[3]); else g.ui.hint(b[2], 4000); } catch (e) { /* */ } }, b).catch(() => {});
-    }
-    if (shotN < shotsAt.length && el >= shotsAt[shotN]) { shotN++; await shot('t' + shotN); }
-    const s = await ev(SAMPLE).catch(() => null);
-    const now = Date.now(), dt = Math.min(3, (now - last) / 1000); last = now;
-    if (s && s.play) {
+  // (the sampler and the burst run in the page, once a second by its own clock: an evaluate from outside waits behind
+  // SwiftShader's slow frames — run 1 got 19 samples in 150 s)
+  await ev(([SRC, GSRC, BURST]) => {
+    const S = eval('(' + SRC + ')'), gist = eval('(' + GSRC + ')');
+    const A = window.__q2 = { samples: 0, msgSecs: 0, centre: 0, distinct: 0, dups: 0, dupList: [], pt: { n: 0, on: 0, late: 0, lateOn: 0 }, by: {} };
+    const shownG = new Map(); let prev = new Set(), bi = 0; const t0 = performance.now(); let last = t0;
+    window.__q2iv = setInterval(() => { try {
+      const el = performance.now() - t0, g = VR.game;
+      while (bi < BURST.length && BURST[bi][0] * 1000 <= el) { const b = BURST[bi++]; try { if (b[1] === 'toast') g.ui.toast(b[2], b[3]); else if (b[1] === 'hint') g.ui.hint(b[2], 4000); else if (VR.Quiet && VR.Quiet.note) VR.Quiet.note(b[2], 2, b[3]); else g.ui.hint(b[2], 4000); } catch (e) { /* */ } }
+      const s = S(), now = performance.now(), dt = Math.min(3, (now - last) / 1000); last = now;
+      if (!s.play) return;
       A.samples++; let cx = false; const cur = new Set();
       for (const it of s.items) {
         if (it.w) continue;
@@ -105,10 +100,21 @@ async function calm(tag, url) {
       prev = cur; if (cx) A.centre++;
       const on = s.pt.wcompass || s.pt.f2point; A.pt.n++; if (on) A.pt.on++;
       if (el > 60000) { A.pt.late++; if (on) A.pt.lateOn++; }
-    }
-    await wait(Math.max(0, 1000 - (Date.now() - now)));
+      A.distinct = shownG.size; A.el = Math.round(el / 1000);
+    } catch (e) { window.__q2err = String(e); } }, 1000);
+  }, [SAMPLE.toString(), GIST_SRC, BURST]);
+  let shotN = 0; const shotsAt = [20000, 100000, PLAY - 6000];
+  const t0 = Date.now();
+  while (Date.now() - t0 < PLAY) {
+    const el = Date.now() - t0;
+    const ph = el < 8000 ? 'stand' : (Math.floor((el - 8000) / 4000) % 2 ? 'look' : 'walk');
+    if (ph === 'walk') await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
+    if (ph === 'look') await ev(() => { VR.game.player.yaw += 0.18; }).catch(() => {});
+    if (shotN < shotsAt.length && el >= shotsAt[shotN]) { shotN++; await shot('t' + shotN); }
+    await wait(1000);
   }
   await page.keyboard.up('KeyW');
+  const A = OUT[tag] = await ev(() => { clearInterval(window.__q2iv); const A = window.__q2; A.msgSecs = +A.msgSecs.toFixed(1); A.err = window.__q2err || null; return A; });
   A.distinct = shownG.size; A.msgSecs = +A.msgSecs.toFixed(1);
   A.quiet = await ev(() => VR.Quiet ? { cost: VR.Quiet.cost, stats: VR.Quiet.notes.stats, pointer: VR.Quiet.pointerStats || null } : null).catch(() => null);
   A.errors = errs.slice(0, 4);

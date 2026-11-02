@@ -154,9 +154,12 @@
   // then the nearest; at most BUB_MAX text bubbles (a name tag counts) — the rest get it[3] = true: a small 💬 icon.
   // Icon bubbles (♪ ♥ …) stay as they are and are not counted.
   Q.BUB_MAX = 2;
+  let bTalk = null;   // (no allocation a frame: the comparator is made once)
+  const bRank = (it) => (it[2] ? 0 : it[1] === bTalk ? 1 : 2);
+  const bCmp = (x, y) => bRank(x) - bRank(y) || x[0] - y[0];
   Q.bubbleCap = function (list, talking) {
-    const rank = (it) => (it[2] ? 0 : it[1] === talking ? 1 : 2);
-    list.sort((x, y) => rank(x) - rank(y) || x[0] - y[0]);
+    if (list.length < 2) { if (list.length) list[0][3] = false; return list; }
+    bTalk = talking || null; list.sort(bCmp); bTalk = null;
     let n = 0;
     for (const it of list) {
       const b = it[1].bubble, icon = !!(b && b.icon);
