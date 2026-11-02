@@ -60,6 +60,10 @@ const settle = async (max = 50) => {
   return s;
 };
 const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(P[0], P[1] - (p.eye || 1.62), P[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; const e = p.eyePos(), dx = T[0] - e[0], dy = T[1] - e[1], dz = T[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [P, T]);
+// every column within r of C loaded (settle alone counts the dirty sections of the columns there are: a picture taken
+// before the far columns arrived had the lower half of the spawn black — run 2)
+const loaded = async (C, r) => { for (let i = 0; i < 150; i++) { await step(10, 16); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (dx * dx + dz * dz <= r * r && !w.isLoaded(Math.floor(C[0] + dx), Math.floor(C[2] + dz))) return false; return true; }, [C, r]); if (ok) return true; await wait(30); } return false; };
+const ready = async (C, r = 48) => { await settle(30); await loaded(C, r); await settle(80); await step(20); await settle(20); };
 const freeze = () => ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.camMode = 0; g.settings.fov = 75; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 const preset = (p, rd) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.particles = false; g.applySettings('*'); }, [p, rd]);
 async function trip(to) {
@@ -115,10 +119,10 @@ await freeze(); await ev(() => VR.game.env.setTime(5200));
 const spawn = await ev(() => { const p = VR.game.player; return { pos: p.pos.slice(), yaw: p.yaw, pitch: p.pitch }; });
 const cit = await ev(() => { const g = VR.game, gen = new VR.OverworldGen(g.meta.seed >>> 0, { vgen: g.meta.vgen || 3 }), p = g.player.pos, s = gen.nearestCitadel(p[0], p[2], 1500); return s ? { x: s.x, y: s.y, z: s.z, R: s.R, h: s.towers[0].h } : null; });
 run.spawn = spawn; run.citadel = cit; console.log('  spawn ' + spawn.pos.map(Math.round) + ' · citadel ' + JSON.stringify(cit));
-const atSpawn = async () => { await ev((s) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(s.pos[0], s.pos[1] + 14, s.pos[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; p.yaw = p.viewYaw = s.yaw + Math.PI; p.pitch = -0.12; }, spawn); await settle(60); await step(10); };
+const atSpawn = async () => { await ev((s) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(s.pos[0], s.pos[1] + 14, s.pos[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; p.yaw = p.viewYaw = s.yaw + Math.PI; p.pitch = -0.12; }, spawn); await ready(spawn.pos); };
 // the citadel from 90 m on the spawn's side, 30 m over its foot, looking at the middle of its towers
 const citEye = cit ? (() => { const dx = spawn.pos[0] - cit.x, dz = spawn.pos[2] - cit.z, L = Math.hypot(dx, dz) || 1, d = Math.max(90, (cit.R || 30) + 60); return [cit.x + dx / L * d, cit.y + 30, cit.z + dz / L * d]; })() : null;
-const atCitadel = async () => { await lookFrom(citEye, [cit.x, cit.y + Math.min(40, (cit.h || 40) * 0.5), cit.z]); await settle(80); await step(10); };
+const atCitadel = async () => { await lookFrom(citEye, [cit.x, cit.y + Math.min(40, (cit.h || 40) * 0.5), cit.z]); await ready(citEye); };
 
 for (const tag of ['vl', 'bal']) {
   const sfx = tag === 'vl' ? '_vl' : '';
@@ -133,7 +137,7 @@ await timed('plaza', async () => {
   await lookFrom([site.x + 14, site.y + 12, site.z + 14], [site.x, site.y, site.z]); await settle(40);
   let P = null; for (let i = 0; i < 40 && !P; i++) { await step(20); P = await ev((id) => { const v = VR.game.villages.known.get(id); if (!v || !v.active) return null; const q = v.plan.plaza; return [q.x + 0.5, q.y, q.z + 0.5]; }, site.id); }
   if (!P) throw new Error('the village ' + site.id + ' did not come alive');
-  await lookFrom([P[0] + 15, P[1] + 16, P[2] + 15], [P[0], P[1] + 1, P[2]]); await settle(60); await step(10);
+  await lookFrom([P[0] + 15, P[1] + 16, P[2] + 15], [P[0], P[1] + 1, P[2]]); await ready(P);
   await judge('plaza', b64(await grabGL()), site.id + ' plaza ' + P.map(Math.round));
 });
 await timed('fairy', async () => {
@@ -145,9 +149,11 @@ await timed('fairy', async () => {
     await ev((s) => { const p = VR.game.player; p.flying = true; p.teleport(s.x + 0.5, 150, s.z + 0.5); }, s); await settle(6); await step(20);
   }
   if (!s || s.y === null) throw new Error('the fairy tree did not settle');
-  const a = s.yaw + 0.5, e = [s.x + Math.cos(a) * 30, 0, s.z + Math.sin(a) * 30];
-  e[1] = (await ev((e) => VR.game.world.topAt(Math.floor(e[0]), Math.floor(e[2])), e)) + 5 + 1.62;
-  await lookFrom(e, [s.x, s.y + 12, s.z]); await settle(40); await step(30);
+  const a = s.yaw + 0.5, e = [s.x + Math.cos(a) * 30, s.y + 6, s.z + Math.sin(a) * 30];
+  await loaded(e, 32);   // (run 2: topAt of a column not yet there put the eye somewhere over the clouds)
+  const top = await ev((e) => VR.game.world.topAt(Math.floor(e[0]), Math.floor(e[2])), e);
+  if (Number.isFinite(top) && top > 0 && Math.abs(top - s.y) < 40) e[1] = top + 5 + 1.62;
+  await lookFrom(e, [s.x, s.y + 12, s.z]); await ready([s.x, s.y, s.z], 40);
   await judge('fairy', b64(await grabGL()), 'tree ' + [s.x, s.y, s.z].join(','));
 });
 await timed('starmap', async () => {
@@ -160,7 +166,7 @@ await timed('cafe', async () => {
   if (!await trip('stn.ring')) throw new Error('no trip to the Ringstation');
   await freeze(); await ev(() => { VR.Stations.DECK_BUILD = 99; });
   await ev(() => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(-5.5, 65.4, 3.0); p.yaw = p.viewYaw = Math.atan2(9.5, -5.5); p.pitch = -0.16; });
-  await settle(80); await step(10);
+  await settle(80); await step(20); await settle(20);
   await judge('cafe', b64(await grabGL()), 'the deck, toward the counter');
 });
 await timed('aqua', async () => {
@@ -170,7 +176,7 @@ await timed('aqua', async () => {
   await settle(30);
   let T = null; for (let i = 0; i < 30 && !T; i++) { await step(20); T = await ev(() => { const s = VR.game.villages.sites.find(q => q.id === 'eco:aqua:0'); return s ? [s.x, s.y, s.z] : null; }); }
   if (!T) throw new Error("Aquamarin's town not found");
-  await lookFrom([T[0] + 22, T[1] + 14, T[2] + 22], [T[0], T[1] + 2, T[2]]); await settle(80); await step(10);
+  await lookFrom([T[0] + 22, T[1] + 14, T[2] + 22], [T[0], T[1] + 2, T[2]]); await ready(T, 40);
   await judge('aqua', b64(await grabGL()), 'eco:aqua:0 ' + T.map(Math.round));
 });
 

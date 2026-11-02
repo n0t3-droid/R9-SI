@@ -3,7 +3,8 @@
 // held 0.2–1.5 s), sprint, jump, fly (creative: double Space), look (mouse moves), break / place (left / right click,
 // only while no menu is open — a click in a menu might quit or delete), the keys E (inventory), V (the action key),
 // M (the map), J (the journal), O (the star map), Esc (pause / close), F5 (the camera), number keys; MONKEY_S seconds
-// (default 180) on a new default world (seed 4242, creative, peaceful, 960 × 540, de-DE); then a marker block set,
+// (default 180) on a new default world (seed 4242, creative, peaceful, Very Low, view 3, 640 × 360, de-DE — run 1 at
+// 960 × 540, view 5 drew 46 frames in two minutes on SwiftShader: the bot pressed keys into a slide show); then a marker block set,
 // the world saved, the page reloaded, the world opened again from the list, the marker and the position checked, and
 // 30 s more of the same.
 //   fail on: a page error; a soft-lock (the game drew no frame for 10 s, or the page did not answer); a NaN position
@@ -28,7 +29,7 @@ const save = () => { try { fs.writeFileSync(ROOT + '.tmp_tests/monkey_run.json',
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const page = await browser.newPage({ viewport: { width: 960, height: 540 }, locale: 'de-DE' });
+const page = await browser.newPage({ viewport: { width: 640, height: 360 }, locale: 'de-DE' });
 page.on('pageerror', e => { run.pageErrors = (run.pageErrors || 0) + 1; run.errors.push('pageerror: ' + (e.stack || e.message).slice(0, 1200)); console.log('  [pageerror] ' + (e.message || '').slice(0, 300)); });
 page.on('dialog', d => d.dismiss().catch(() => {}));   // (a confirm() the bot opened: no)
 await page.goto(DIST);
@@ -55,11 +56,11 @@ async function watch(tag) {
 }
 async function act(s) {
   const r = rnd(), count = (k) => { run.actions[k] = (run.actions[k] || 0) + 1; };
-  const menu = s && s.screen;
+  const menu = s && s.screen && s.screen !== 'hud';   // ('hud' is the game itself, no menu)
   if (r < 0.34) { const k = pick(MOVES); count('walk'); await page.keyboard.down(k); if (rnd() < 0.3) await page.keyboard.down('ControlLeft'); await wait(200 + rnd() * 1300); await page.keyboard.up(k); await page.keyboard.up('ControlLeft'); }
-  else if (r < 0.46) { count('look'); const dx = (rnd() - 0.5) * 500, dy = (rnd() - 0.5) * 200; await page.mouse.move(480, 270); await page.mouse.move(480 + dx, 270 + dy, { steps: 6 }); }
+  else if (r < 0.46) { count('look'); const dx = (rnd() - 0.5) * 300, dy = (rnd() - 0.5) * 120; await page.mouse.move(320, 180); await page.mouse.move(320 + dx, 180 + dy, { steps: 6 }); }
   else if (r < 0.55) { count('jump'); await page.keyboard.press('Space'); if (rnd() < 0.3) { await wait(120); await page.keyboard.press('Space'); count('fly'); } }
-  else if (r < 0.67) { if (menu) { count('menu-skip-click'); await page.keyboard.press('Escape'); } else { const b = rnd() < 0.5 ? 'left' : 'right'; count(b === 'left' ? 'break' : 'place'); await page.mouse.click(480, 270, { button: b }); } }
+  else if (r < 0.67) { if (menu) { count('menu-skip-click'); await page.keyboard.press('Escape'); } else { const b = rnd() < 0.5 ? 'left' : 'right'; count(b === 'left' ? 'break' : 'place'); await page.mouse.click(320, 180, { button: b }); } }
   else if (r < 0.95) { const k = pick(Object.keys(KEYS)); count('key ' + k); await page.keyboard.press(KEYS[k]); await wait(150 + rnd() * 900); }
   else { count('idle'); await wait(500 + rnd() * 1500); }
 }
@@ -77,11 +78,12 @@ async function monkey(sec, tag) {
 
 // ---------------------------------------------------------------- 1 · a new world, the monkey
 check(await untilState('title'), 'the title at ' + secs());
-await ev(() => { const g = VR.game; g.settings.renderDist = 5; g.settings.dynRes = false; g.applySettings('renderDist'); });
+await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.renderDist = 3; g.settings.dynRes = false; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Monkey',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
 check(await untilState('play', 240), 'a new world at ' + secs());
 await hook();
 await wait(3000);
+await page.mouse.click(320, 180).catch(() => {});   // (the page's focus and the mouse, as a player's first click)
 run.n1 = await monkey(DUR, 'run');
 await page.screenshot({ path: SHOTS + 'monkey_1.png' }).catch(() => {});
 // ---------------------------------------------------------------- 2 · save → reload → open → check
@@ -96,7 +98,7 @@ run.before = before; console.log('  before ' + JSON.stringify(before));
 await ev(async () => { await VR.game.saveMeta(); await VR.game.world.saveAll(); }, null, 60000);
 await page.reload();
 check(await untilState('title'), 'the page comes back at the title (' + secs() + ')');
-await ev(() => { const g = VR.game; g.settings.renderDist = 5; g.settings.dynRes = false; g.applySettings('renderDist'); });
+await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.renderDist = 3; g.settings.dynRes = false; g.applySettings('*'); });
 const opened = await ev(async (id) => { const ws = await VR.game.store.listWorlds(); const m = ws.find(w => w.id === id); if (!m) return false; await VR.game.loadWorld(m); return true; }, before.id, 60000);
 check(opened, 'the saved world is in the list and opens');
 check(await untilState('play', 240), 'the world is played again (' + secs() + ')');
