@@ -172,6 +172,9 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   function goalOf(g) {
     if (D.forced) return D.forced;
     try { const Q = VR.Quests, t = Q && Q.target ? Q.target() : null; if (t && fin(t.x) && fin(t.z)) return t; } catch (e) { /* no quests here */ }
+    // no quest: the waypoint placed last (a goal the player set), within 3 km
+    const gad = g.gadgets, wl = gad && gad.waypoints, wp = wl && wl.length ? wl[wl.length - 1] : null, p = g.player;
+    if (wp && fin(wp.x) && fin(wp.z) && Math.hypot(wp.x - p.pos[0], wp.z - p.pos[2]) < 3000) return { x: wp.x + 0.5, y: wp.y, z: wp.z + 0.5, label: String(wp.name || '') };
     return null;
   }
   const PO = { life: 1.1, size: 0.09, grav: 0, col: [1, 0.82, 0.45], emis: 1, drag: 0, collide: false, force: true, uv: [0, 0, 1, 1], alpha: 0.9 };
