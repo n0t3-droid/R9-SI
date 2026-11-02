@@ -96,7 +96,8 @@
   // 31-ms tick; a top of lava or water is no place for a beacon)
   TL.PROBES = 12;
   const RF = []; for (let dz = -26; dz <= 26; dz += 6.5) for (let dx = -26; dx <= 26; dx += 6.5) if (dx * dx + dz * dz <= 27 * 27) RF.push([dx, dz]);
-  const wet = (g, x, y, z) => { const R = VR.R, s = g.world.getBlock(Math.floor(x), y, Math.floor(z)), t0 = s && R.types[R.T.type[s]]; return !!(t0 && /lava|magma|water|fire/.test(t0.name)); };
+  // (run 1 of f-polish8: the beacon stood on an oak's crown — leaves and logs are no ground for it either)
+  const wet = (g, x, y, z) => { const R = VR.R, s = g.world.getBlock(Math.floor(x), y, Math.floor(z)), t0 = s && R.types[R.T.type[s]]; return !!(t0 && /lava|magma|water|fire|leaves|log|wood\b/.test(t0.name)); };
   TL.refine = function (g, tale) {
     const s = tale.steps.find(q => q.at === 'hill' && q.p); if (!s || tale.refined) return false;
     const p = g.player.pos; if (Math.hypot(s.p[0] - p[0], s.p[1] - p[2]) > 110) return false;
@@ -134,8 +135,9 @@
     if (!(stage >= 1) || !(nt > 0.05)) return out;
     const k = Math.min(5, stage), br = 0.92 + 0.08 * Math.sin((t || 0) * 1.7), hs = 0.9 + 0.35 * k;
     out.push({ p: [0, 4.5, 0], s: [hs, hs], col: [1.0, 0.86, 0.58], a: (0.12 + 0.1 * k) * nt * br, kind: 0 });
-    const H = BEAMH[k];
-    if (H > 0) out.push({ p: [0, 4.6 + H, 0], s: [0.45 + 0.05 * k, H], col: [1.0, 0.9, 0.62], a: (0.1 + 0.06 * k) * nt * br, kind: 0 });
+    // (a sprite is brightest at its middle: the beam in segments stacked from the lens up, fading as it climbs)
+    const H = BEAMH[k], ns = Math.max(1, k - 1), L = H / ns;
+    if (H > 0) for (let j = 0; j < ns; j++) out.push({ p: [0, 4.6 + L * (j + 0.5), 0], s: [0.42 + 0.05 * k, L * 0.8], col: [1.0, 0.9, 0.62], a: (0.14 + 0.06 * k) * nt * br * (1 - j / (ns + 1)), kind: 0 });
     return out;
   };
   // the woken beacon's height: at the ending from its mark's (the tale drew it there), else the ground once loaded
@@ -279,6 +281,8 @@
     }
     if (K.ph === 'home') {   // to the friend's arms, then home on their own
       const gv = liveOf(V, S.endGiver || '');
+      // (f-polish8: a child left far behind — the hops home outran her — runs ahead into the friend's arms: placed beside her)
+      if (gv && K.t < 14 && Math.hypot(gv.pos[0] - a.pos[0], gv.pos[2] - a.pos[2]) > 12) { const p0 = g.player.pos, dx = p0[0] - gv.pos[0], dz = p0[2] - gv.pos[2], L = Math.hypot(dx, dz) || 1, x = gv.pos[0] + dx / L * 0.9, z = gv.pos[2] + dz / L * 0.9, y = g.world ? yAt(g, x, z) : null; a.pos = [x, y !== null ? y : gv.pos[1], z]; a.path = null; a.vel[0] = 0; a.vel[2] = 0; }
       if (gv && Math.hypot(gv.pos[0] - a.pos[0], gv.pos[2] - a.pos[2]) > 1.6 && K.t < 14) { if (V.goTo) V.goTo(a, gv.pos[0], gv.pos[1], gv.pos[2], 1.2); }
       else { a.vel[0] = 0; a.vel[2] = 0; a.path = null; if (gv) { a.lookAt = [gv.pos[0], gv.pos[1] + 1.3, gv.pos[2]]; gv.lookAt = [a.pos[0], a.pos[1] + 0.9, a.pos[2]]; } }
       if (K.t > 22) endKid(V);
@@ -402,7 +406,7 @@
     if (S.kid && !rec.cur && S.kid.ph !== 'home') endKid(V);
     // the woken beacons and the Flausel houses: their ground once near
     for (const L of rec.lit) if (L.dim === dimOf(g) && !fin(L.y) && Math.hypot(L.x - g.player.pos[0], L.z - g.player.pos[2]) < 200) TL.litY(g, L);
-    if (t0) { const ms = performance.now() - t0; S.cost.ticks++; S.cost.ms += ms; if (ms > S.cost.worst) S.cost.worst = ms; }
+    if (t0) { const ms = performance.now() - t0; S.cost.ticks++; S.cost.ms += ms; if (ms > 1) S.cost.over1 = (S.cost.over1 | 0) + 1; if (ms > S.cost.worst) { S.cost.worst = ms; S.cost.worstAt = rec.cur ? 'run ' + rec.cur.t + ':' + (TC.cur(rec.cur) ? TC.cur(rec.cur).id : '-') : (S.pend ? 'end' : 'offer'); } }   // (f-polish8: where the worst tick was, how many over 1 ms)
   };
 
   // ---------------------------------------------------------------- the marks in the world (our own voxel models)

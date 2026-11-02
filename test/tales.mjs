@@ -318,7 +318,7 @@ await shotDom('book', 'tales_book.png');
 await ev(() => { const g = VR.game; if (VR.Wander.close) VR.Wander.close(g); });
 check(book.has && book.shown && book.pages.length >= (lostOk ? 2 : 1), 'the Wanderbuch: „Geschichten“ (on its page: ' + book.shown + ') with ' + JSON.stringify(book.pages));
 run.tlcost = await ev(() => VR.Tales.test.cost());
-check(run.tlcost.avg < 3, `the 2-Hz look: ${run.tlcost.avg.toFixed(3)} ms average, worst ${run.tlcost.worst.toFixed(2)} ms (${run.tlcost.ticks} ticks)`);
+check(run.tlcost.avg < 1 && run.tlcost.worst < 4, `the 2-Hz look: ${run.tlcost.avg.toFixed(3)} ms average, worst ${run.tlcost.worst.toFixed(2)} ms (${run.tlcost.worstAt}), ${run.tlcost.over1 | 0} of ${run.tlcost.ticks} ticks over 1 ms (budget: ≤ 1 ms a tick, no frame > 4 ms from it)`);
 // the frame near the woken beacon at night with a tale running (marks drawn): Very Low and High, tales on / off
 await ev(() => { VR.game.env.setTime(16500); VR.Tales.test.cool(); });
 await beside();

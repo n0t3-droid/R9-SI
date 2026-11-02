@@ -253,6 +253,28 @@ console.log('9 · f-polish8: the 2-Hz look stays light; the beacon changes as li
   Vi.draw({ q: {}, gl: {} }, { night: 1 }, { x: hp[0] + 14, y: lit.y + 5, z: hp[1] });
   check(drawn.includes('tl_beacon_lit') && glows.length === 0, 'Very Low: the lit model, no beam (no glow program there)');
   delete V.LifeKit; delete V.StoryGlow;
+  // the beam reaches down to the bowl (a sprite's light is brightest at its middle: segments, the lowest at the lens)
+  const b5 = TL.beam(5, 1, 0).slice(1), low = b5.reduce((m, q) => Math.min(m, q.p[1] - q.s[1]), 99), high = b5.reduce((m, q) => Math.max(m, q.p[1] + q.s[1]), 0);
+  check(b5.length >= 3 && low <= 5.2 && high >= 18, 'the woken beacon\'s beam: ' + b5.length + ' segments from ' + low.toFixed(1) + ' m to ' + high.toFixed(1) + ' m');
+  // no beacon on a tree's crown: a hilltop whose highest ground is leaves
+  const leaves = R.S('oak_leaves');
+  const W2 = { isLoaded: () => true, topAt: (x, z) => top(x, z) + (Math.hypot(x - HX, z - HZ) < 9 ? 4 : 0), getBlock: (x, y, z) => { const t = top(x, z); if (y <= t) return stone; return Math.hypot(x - HX, z - HZ) < 9 && y <= t + 4 ? leaves : 0; } };
+  g.world = W2; g.player.pos = [HX + 40, 90, HZ];
+  let q2 = null; for (let s2 = 1; s2 < 200 && !q2; s2++) { const x = TC.make(world(s2), { hist: [{ t: 'lost', v: '' }] }); if (x && x.t === 'beacon') q2 = x; }
+  const h2 = q2.steps.find(s2 => s2.at === 'hill'); const ex = HX - h2.p[0], ez = HZ - h2.p[1];
+  const mv2 = (s2) => { if (s2.p) s2.p = [s2.p[0] + ex, s2.p[1] + ez]; if (s2.pts) s2.pts = s2.pts.map(v => [v[0] + ex, v[1] + ez]); if (s2.of) s2.of.forEach(mv2); };
+  q2.steps.forEach(mv2); rec.cur = null; TC.accept(rec, q2, TC.DAY + 3000, 'builder'); q2.i = 0;
+  for (let i = 0; i < 20 && !q2.refined; i++) TL.tick(Vi, 0.55);
+  const hp2 = q2.steps.find(s2 => s2.at === 'hill').p, onLeaf = Math.hypot(hp2[0] - HX, hp2[1] - HZ) < 9;
+  check(q2.refined && !onLeaf, 'the beacon stands on the ground, not on a tree\'s crown (' + Math.round(Math.hypot(hp2[0] - HX, hp2[1] - HZ)) + ' m from the trees)');
+  // the ending in the friend's arms: a child far behind runs to her (placed beside her, facing her)
+  const kidA = { p: { id: 'k9' }, pos: [HX + 120, 80, HZ], vel: [0, 0, 0], tlKid: true }, gv = { p: { id: 'p3' }, pos: [HX, 80, HZ + 5], vel: [0, 0, 0] };
+  Vi.agents = [gv, kidA]; Vi.goTo = () => {};
+  TL.state.kid = { a: kidA, ph: 'home', t: 0 }; TL.state.endGiver = 'overworld/p3';
+  TL.kidAct(Vi, kidA, 0.1);
+  const dk = Math.hypot(kidA.pos[0] - gv.pos[0], kidA.pos[2] - gv.pos[2]);
+  check(dk < 1.6 && Array.isArray(gv.lookAt), 'the child far behind runs into the friend\'s arms (' + dk.toFixed(2) + ' m, they look at each other)');
+  TL.state.kid = null; Vi.agents = [];
 }
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
