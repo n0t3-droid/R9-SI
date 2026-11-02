@@ -63,6 +63,10 @@
   // flowers on top, one more little fall an isle (gen_realm.js; test/isles15.js pins vgen 14's isle chunks)
   GEN.ISLE_VGEN = 15;
   GEN.isleGarden = (g) => !!g && (g.vgen | 0) >= GEN.ISLE_VGEN;
+  // f-polish9 (vgen 16): the isles calmer — big moss shapes, rare mushroom clusters, shorter sparser curtains (gen_realm.js;
+  // test/isles16.js pins vgen 15's isle chunks)
+  GEN.ISLE_CALM_VGEN = 16;
+  GEN.isleCalm = (g) => !!g && (g.vgen | 0) >= GEN.ISLE_CALM_VGEN;
   GEN.noCry = (g) => !!g && ((g.vgen | 0) >= GEN.NOCRY_VGEN || g.noCrystal === true);
   // a natural rock pinnacle where a crystal spire stood: a round needle tapering gently to a blunt top, its outline
   // wobbling a little and stepping out in a ledge now and then (a hash of the cell and o.seed: no draw from the caller's

@@ -172,15 +172,39 @@
   function gardenCell(g, ISL, S, I, x, y, z) {
     const depth = I.top - y, tip = y - I.bottom, sd = I.isle ? I.isle.seed : 0;
     if (depth <= 3) return I.k < 0.16 && depth >= 2 ? ISL.moss : S.dirt;
+    if (GEN.isleCalm(g)) return calmCell(g, ISL, I, x, y, z, tip, sd);
     if (tip <= 1) { const r = GH(x, y, z, 1); return r < 0.03 ? gst().shroom || ISL.moss : r < 0.38 ? ISL.moss : ISL.strata[(y + (sd & 7)) % ISL.strata.length]; }
     if (g.nVein.n3(x * 0.6, y * 0.8, z * 0.6) > 0.4) return ISL.moss;
     return ISL.strata[(y + (sd & 7)) % ISL.strata.length];
+  }
+  // f-polish9 (vgen 16): calm from below — vgen 15's tips changed block at nearly every column (the jagged bottom ends
+  // each column on another stratum, 38 % random moss, 3 % mushrooms: an orange-green speckle). Now the tip layer is one
+  // 2-D shape: big moss patches and wide warm fields (a low-frequency noise over x, z, not y), glowing mushrooms only in
+  // a few small clusters; above it the strata in bands of 3–4 rows with large moss veins.
+  function calmCell(g, ISL, I, x, y, z, tip, sd) {
+    const L = ISL.strata.length;
+    if (tip <= 2) {
+      const m = g.nVein.n2(x * 0.09 + sd * 0.37, z * 0.09 - sd * 0.21);
+      if (tip === 0 && m > 0.2 && GH(x >> 2, 0, z >> 2, 11) < 0.07 && GH(x, y, z, 1) < 0.4) return gst().shroom || ISL.moss;
+      if (m > 0.02) return ISL.moss;
+      const w = g.nVein.n2(x * 0.05 - sd * 0.13, z * 0.05 + sd * 0.29);
+      return ISL.strata[((w > 0.15 ? 1 : w < -0.15 ? 2 : 0) + (sd & 3)) % L];
+    }
+    if (g.nVein.n3(x * 0.15, y * 0.2, z * 0.15) > 0.45) return ISL.moss;
+    return ISL.strata[Math.floor((y + (sd & 7)) / (3 + (sd & 1))) % L];
   }
   // under the column: green vine strands, glowing berry vines, a spore blossom, a few roots
   function gardenUnder(g, blocks, col, I, x, z) {
     if (I.k < 0.12) return;   // (the rim's own curtains hang outside it)
     const K = gst(), r = GH(x, I.bottom, z, 2), yb = I.bottom - 1;
     const hang = (len, f) => { for (let k = 0; k < len; k++) { const y = yb - k; if (y < 2) break; const i = (y << 8) | col; if (blocks[i]) break; blocks[i] = f(k, len); } };
+    if (GEN.isleCalm(g)) {   // (f-polish9, vgen 16: fewer and shorter strands under the isle)
+      if (r < 0.05) hang(2 + Math.floor(GH(x, 0, z, 3) * 3), () => K.vine(GH(x, 1, z, 4) < 0.5 ? 1 | 2 : 4 | 8));
+      else if (r < 0.08) hang(2 + Math.floor(GH(x, 0, z, 3) * 2), (k, n) => K.berry(k % 2 === 1 || k === n - 1, k === n - 1));
+      else if (r < 0.095 && K.spore) hang(1, () => K.spore);
+      else if (r < 0.11) hang(1 + Math.floor(GH(x, 0, z, 3) * 2), () => K.roots);
+      return;
+    }
     if (r < 0.11) hang(2 + Math.floor(GH(x, 0, z, 3) * 7), () => K.vine(GH(x, 1, z, 4) < 0.5 ? 1 | 2 : 4 | 8));
     else if (r < 0.16) hang(2 + Math.floor(GH(x, 0, z, 3) * 4), (k, n) => K.berry(k % 2 === 1 || k === n - 1, k === n - 1));
     else if (r < 0.18 && K.spore) hang(1, () => K.spore);
@@ -208,8 +232,9 @@
         const lx = (col & 15) + dx, lz = (col >> 4) + dz;
         const J = lx >= 0 && lx < 16 && lz >= 0 && lz < 16 ? isl[(lz << 4) | lx] : g.islandAt(x + dx, z + dz);
         if (!J || !J.isle || !J.isle.designed || J.isle.lava) continue;
-        if (GH(x, J.top, z, 7) > 0.42) break;
-        const len = 3 + Math.floor(GH(x, 0, z, 8) * Math.min(12, Math.max(3, J.top - J.bottom)));
+        const calm = GEN.isleCalm(g);   // (f-polish9, vgen 16: curtains in groups on about a quarter of the rim, 2–7 long)
+        if (calm ? GH(x >> 2, J.top, z >> 2, 9) > 0.45 || GH(x, J.top, z, 7) > 0.55 : GH(x, J.top, z, 7) > 0.42) break;
+        const len = calm ? 2 + Math.floor(GH(x, 0, z, 8) * Math.min(6, Math.max(2, J.top - J.bottom))) : 3 + Math.floor(GH(x, 0, z, 8) * Math.min(12, Math.max(3, J.top - J.bottom)));
         for (let k = 0; k < len; k++) { const y = J.top - k; if (y < 2) break; const i = (y << 8) | col; if (blocks[i]) break; blocks[i] = K.vine(f); }
         break;
       }
