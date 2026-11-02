@@ -368,7 +368,7 @@
     if (act.below !== undefined && !(a.pitch <= act.below)) return 'pitch';
     if (act.level !== undefined && !(Math.abs(a.pitch) <= act.level)) return 'pitch';
     if (act.kind === 'feat') return S.WAYS.indexOf(a.feat) >= 0 ? 'ok' : 'armed';   // a-story4: one of the four ways seen
-    if (act.kind === 'look') return 'ok';
+    if (act.kind === 'look') return a.away ? 'away' : 'ok';   // (f-polish10: a trip's camera is not your eyes — the adventurer's act:c1.b1 was done by its takeoff's swing)
     if (act.kind === 'photo') return a.photo ? 'ok' : 'armed';
     return a.press ? 'ok' : 'armed';
   };

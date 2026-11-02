@@ -1,6 +1,8 @@
 // f-polish10 · f-polish9's open items (docs/superpowers/plans/2026-11-02-f-polish10.md):
 //   a · the kneeling hug from the child's facing side: the lens where the child looks (a little to its left, where its
 //       head passes the adult's), low (the kneeling pair's eye height), aimed at their heads
+//   b · a look deed („schau dir den Ausblick in Ruhe an") is not done by a trip's camera: the adventurer's session had
+//       act:c1.b1 done 1.4 s after its own [V] takeoff (the trip's camera swung past the vista) — a pair
 // Run: bash test/wt_run.sh polish10.js 300
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -33,6 +35,17 @@ console.log('a · the kneeling hug from the front');
     const g0 = F3.frameGroup(open, [0.5, 64, 0.5], 0.9, { pref: 0 });
     check(!!g0 && Math.abs(g0.T[1] - 64.9) < 1e-9 && Math.abs(Math.atan2(g0.P[2] - 0.5, g0.P[0] - 0.5)) < 0.01, `the other frames unchanged (T ${g0 ? f2(g0.T[1]) : '—'}, the lens at ${g0 ? g0.P.map(f2).join(', ') : '—'})`);
   }
+}
+
+console.log('b · a look deed and the trip\'s camera');
+{
+  require('../src/shared/story.js');
+  const S = V.Story, act = { kind: 'look', target: 'vista', max: 450, cone: 14, hold: 1.5 };
+  check(!!S && S.actCheck(act, { ang: 5, dist: 60 }) === 'ok' && S.actCheck(act, { ang: 5, dist: 60, away: true }) === 'away', `a vista in view: done by your eyes (${S && S.actCheck(act, { ang: 5, dist: 60 })}), not while a trip's camera shows it (${S && S.actCheck(act, { ang: 5, dist: 60, away: true })})`);
+  const st = { id: 'x' }; let done = false; for (let i = 0; i < 8; i++) done = S.actStep(st, act, { ang: 5, dist: 60, away: i >= 3 }, 0.25) || done;
+  check(!done && st.hold === 0, `the hold starts again after the trip (${st.hold})`);
+  const src = require('fs').readFileSync(__dirname + '/../src/main/story.js', 'utf8');
+  check(/away: !!\(VR\.Intent/.test(src), 'the story\'s deed context marks a trip by intent as away');
 }
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');

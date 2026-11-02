@@ -453,21 +453,23 @@ function pageHelpers(win, VRx) {
       if (A.tg && A.tg.foe.st === 'down' && A.ph === 'fight') { A.fought++; S.log.push(['down', A.tg.foe.k, +T.toFixed(1), A.hits]); }
       const P = p.pos, near = (m) => Math.hypot(m.pos[0] - P[0], m.pos[2] - P[2]), pref = (m) => near(m) + (m.foe.k === 'crane' ? 60 : 0) + (A.fought < 1 && m.foe.k === 'driller' ? -12 : 0);
       A.tg = active.slice().sort((x, y) => pref(x) - pref(y))[0]; A.tgT = A.t; A.vTry = 0; A.tout = 0;
-      A.ph = A.fought < 1 && A.tg.foe.k !== 'crane' ? 'fight' : 'calmgo';
+      A.ph = A.fought < 1 && A.tg.foe.k !== 'crane' ? 'fight' : 'calmgo'; A.fightT = 0;   // (f-polish10: the fight's clock per target — run 1 of f-polish10 gave up the second driller at 1.4 m on the first one's 8 s)
     }
     const m = A.tg, K = Fo.KINDS[m.foe.k], c = [m.pos[0], m.pos[1] + K.h * 0.55, m.pos[2]], d = Math.hypot(m.pos[0] - p.pos[0], m.pos[2] - p.pos[2]);
     if (S.t - A.fxT > 0.5 && d < 16) { A.fxT = S.t; funkeOver(g, m, A); }
     if (A.ph === 'fight') {
-      A.fightT += dt;
+      if (d < 16) A.fightT += dt;   // (f-polish10: engaged — not while it is still on patrol 58 m off)
       if (A.fightT > 35) { A.ph = 'calmgo'; fall('fight timeout'); return; }
-      if (A.fightT > 8 && d > 3.6 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
+      if (A.fightT > 8 && d > 4.0 && A.way && !A.way.ok) { A.ph = 'calmgo'; A.tgT = A.t; fall('fight unreachable'); return; }   // (a-adventure: no way to its side — the peaceful way)
       // to its side (its core is the weak point from the side and behind), then strikes at a player's rhythm
       const sx = Math.cos(m.yaw), sz = -Math.sin(m.yaw), side = ((p.pos[0] - m.pos[0]) * sx + (p.pos[2] - m.pos[2]) * sz) >= 0 ? 1 : -1;
       const spot = [m.pos[0] + sx * side * 2.4, m.pos[2] + sz * side * 2.4];
-      if (d > 3.6) { go(spot[0], spot[1], 0.8); aim(p, c, dt, 0); p.pitch += (Math.atan2(c[1] - p.pos[1] - 1.62, Math.max(1, d)) - p.pitch) * Math.min(1, dt * 4); return; }
-      I.keys.delete('KeyW'); aim(p, c, dt, 5);
+      if (d > 4.0) { go(spot[0], spot[1], 0.8); aim(p, c, dt, 0); p.pitch += (Math.atan2(c[1] - p.pos[1] - 1.62, Math.max(1, d)) - p.pitch) * Math.min(1, dt * 4); return; }
+      I.keys.delete('KeyW'); aim(p, c, dt, 9);
       A.clickT -= dt;
-      if (A.clickT <= 0) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; I.mouse.releasedBtn[0] = true; I.dragStart = null; A.clickT = 0.42;   /* a-story5 (R55-16): a press and its release — headless has no pointer lock, drag-look counts a click on release */ A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1;
+      // (f-polish10: a player's mouse — aimed first, then the click: run 1's one click went 50° off at 1.7 m)
+      const ex = p.eyePos(), dv = p.lookDir(), tx = c[0] - ex[0], ty = c[1] - ex[1], tz = c[2] - ex[2], onIt = (dv[0] * tx + dv[1] * ty + dv[2] * tz) / (Math.hypot(tx, ty, tz) || 1) > Math.cos(0.26);
+      if (A.clickT <= 0 && onIt) { const hp0 = m.foe.hp; I.captured = true; I.mouse.clicked[0] = true; I.mouse.releasedBtn[0] = true; I.dragStart = null; A.clickT = 0.42;   /* a-story5 (R55-16): a press and its release — headless has no pointer lock, drag-look counts a click on release */ A.hp0 = hp0; A.hitAsk = (A.hitAsk | 0) + 1;
         /* f-polish10: why a click misses — the game's own ray at the click */ { const hr = En.rayEntity(p.eyePos(), p.lookDir(), 4.2), bd = p.target ? p.target.dist : 99, e = hr && hr.ent; const why = !hr ? 'none' : e !== m ? 'other:' + ((e.def && e.def.companion) ? 'companion' : (e.kind || (e.foe && e.foe.k) || '?')) : hr.dist > bd ? 'block' : g.ui.blocking ? 'ui' : 'ok'; const M2 = A.miss || (A.miss = {}); M2[why] = (M2[why] | 0) + 1; if (!hr || e !== m) { const dv = p.lookDir(), ex = p.eyePos(), tx = c[0] - ex[0], ty = c[1] - ex[1], tz = c[2] - ex[2], tl = Math.hypot(tx, ty, tz) || 1; const ang = Math.acos(Math.max(-1, Math.min(1, (dv[0] * tx + dv[1] * ty + dv[2] * tz) / tl))); (A.missAng || (A.missAng = [])).push(+(ang * 57.3).toFixed(0) + '/' + tl.toFixed(1)); if (A.missAng.length > 20) A.missAng.shift(); } } }
       if (A.hp0 !== undefined && m.foe.hp < A.hp0) { A.hits++; A.hp0 = undefined; }
       if (A.hitAsk > 40 && A.hits === 0) { fall('melee never lands'); Fo.hurtMob ? En.hurtMob(m, 4, p.pos) : 0; A.hitAsk = 0; }

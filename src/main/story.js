@@ -104,7 +104,7 @@
     const p = g.player, cam = g.cam || { x: p.pos[0], y: p.pos[1] + 1.6, z: p.pos[2], yaw: p.yaw || 0, pitch: p.pitch || 0 };
     const cp = Math.cos(cam.pitch || 0), d = [-Math.sin(cam.yaw || 0) * cp, Math.sin(cam.pitch || 0), -Math.cos(cam.yaw || 0) * cp], e = [cam.x, cam.y, cam.z];
     const BS = VR.BodySky, L = BS && BS.cur && BS.cur.light, sea = (VR.C && VR.C.SEA) || 64;
-    const a = { pitch: (cam.pitch || 0) / DEG, high: p.pos[1] - sea, orbit: P.orbit(g), dim: g.dim || 'overworld', eclipse: L ? L.eclipse || 0 : 0, ground: !!p.onGround };
+    const a = { pitch: (cam.pitch || 0) / DEG, high: p.pos[1] - sea, orbit: P.orbit(g), dim: g.dim || 'overworld', eclipse: L ? L.eclipse || 0 : 0, ground: !!p.onGround, away: !!(VR.Intent && VR.Intent.current && VR.Intent.current()) };   // (f-polish10: a trip by intent under way — its camera, not you)
     const toward = (Q) => { if (!Q) return; const v = [Q[0] - e[0], Q[1] - e[1], Q[2] - e[2]], L0 = Math.hypot(v[0], v[1], v[2]) || 1; a.dist = L0; a.ang = Math.acos(clamp((v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / L0, -1, 1)) / DEG; };
     const k = act.target;
     if (k === 'vista') {
