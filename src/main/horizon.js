@@ -53,8 +53,10 @@
     // ---------------------------------------------------------------- per frame
     update(cam) {
       const g = this.g, w = g.world, r = g.renderer;
-      this.drawList.length = 0;
-      if (!this.enabled() || !r) return;
+      // (f-perf8: the list is emptied where it is rebuilt — a kept selection on Very Low leaves it as it is: an emptied
+      // array gives its storage back, and filling it again each frame was the horizon's garbage)
+      const wasSel = this.listSel; this.listSel = false;
+      if (!this.enabled() || !r) { this.drawList.length = 0; return; }
       // the mask is filtered linearly: the cut between far tiles and chunks is a soft band over a chunk (F8), not a step
       if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.LINEAR }); }
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
@@ -76,12 +78,12 @@
       if (far1) this.updateMaskFar(cam); else this.updateMask(cam);
       // f-perf8 · Very Low: the selection below is kept while the camera stays within a block of it, no tile changed, it
       // wanted no tile (no request waits) and it is younger than 15 frames (its tiles are ≥ 128 blocks wide: the same tiles; the masks above stay per frame)
-      if (r.q && r.q.lite && Horizon.keepSel(this, cam, w)) { const K = this.selList; for (let i = 0; i < K.length; i++) this.drawList.push(K[i]); this.selKept = (this.selKept | 0) + 1; return; }
+      if (r.q && r.q.lite && Horizon.keepSel(this, cam, w)) { if (!wasSel) { const K = this.selList; this.drawList.length = 0; for (let i = 0; i < K.length; i++) this.drawList.push(K[i]); } this.listSel = true; this.selKept = (this.selKept | 0) + 1; return; }
       // ---- quadtree selection (with ring 1 on, no tile finer than level 2: ring 1 is the land within 1 km)
       const R = this.radius, Lr = TOP[this.level] || 2, Sr = tileSize(Lr), Lmin = far1 ? Math.min(2, Lr) : 0;
       const cx = cam.x, cz = cam.z;
       const want = [];
-      const list = this.drawList;
+      const list = this.drawList; list.length = 0;
       let done = 0;
       const dist = (L, tx, tz) => { const S = tileSize(L), x0 = tx * S, z0 = tz * S; const dx = Math.max(x0 - cx, 0, cx - (x0 + S)), dz = Math.max(z0 - cz, 0, cz - (z0 + S)); return Math.sqrt(dx * dx + dz * dz); };   // (f-perf8: not Math.hypot — it allocated a call)
       const ready = (t) => t && t.state === 1;
@@ -143,7 +145,7 @@
       this.stats.tiles = this.tiles.size; this.stats.mb = this.bytes / 1048576;
       // (f-perf8: the selection's moment, for Horizon.keepSel — after the eviction, so its frees count as before it)
       const K = this.selList || (this.selList = []); K.length = 0; for (let i = 0; i < list.length; i++) K.push(list[i]);
-      this.selWant = want.length; this.selVer = this.ver | 0; this.selX = cam.x; this.selZ = cam.z; this.selF = this.frame; this.selW = w; this.selR = this.radius; this.selFar = far1;
+      this.selWant = want.length; this.selVer = this.ver | 0; this.selX = cam.x; this.selZ = cam.z; this.selF = this.frame; this.selW = w; this.selR = this.radius; this.selFar = far1; this.listSel = true;
     }
     request(L, tx, tz, d, k) {
       if (!Number.isFinite(k)) k = Horizon.prio(d, L, Infinity);

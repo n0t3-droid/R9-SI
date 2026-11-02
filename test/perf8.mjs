@@ -163,14 +163,17 @@ const enterRaum = async (A, cmd, key, setup) => {
 // ---------------------------------------------------------------- the profile by source module
 // the debug page has the source text and the same lines as the player page: its markers /* main/x.js */ name the lines
 const lineMap = (pagePath) => {
-  const at = [], name = [], L = fs.readFileSync(pagePath.replace(/index\.html$/, 'index.debug.html'), 'utf8').split('\n');
-  for (let i = 0; i < L.length; i++) { const m = /\/\* (main|shared|studio)\/([\w]+)\.js \*\//.exec(L[i]); if (m) { at.push(i); name.push(m[2]); } }
-  return { at, name };
+  const at = [], name = [], shared = new Set(), L = fs.readFileSync(pagePath.replace(/index\.html$/, 'index.debug.html'), 'utf8').split('\n');
+  for (let i = 0; i < L.length; i++) { const m = /\/\* (main|shared|studio)\/([\w]+)\.js \*\//.exec(L[i]); if (m) { at.push(i); name.push(m[2]); if (m[1] === 'shared') shared.add(m[2]); } }
+  return { at, name, shared };
 };
 const modAt = (M, line) => { let lo = 0, hi = M.at.length - 1, r = -1; while (lo <= hi) { const k = (lo + hi) >> 1; if (M.at[k] <= line) { r = k; lo = k + 1; } else hi = k - 1; } return r < 0 ? '(page)' : M.name[r]; };
 const byModule = (prof, M, per) => {
-  const node = new Map(); for (const n of prof.nodes) node.set(n.id, n);
-  const mods = {}, fns = {}; let total = 0;
+  const node = new Map(), parent = new Map(); for (const n of prof.nodes) { node.set(n.id, n); for (const c of n.children || []) parent.set(c, n.id); }
+  const mods = {}, fns = {}, incl = {}; let total = 0;
+  // (the inclusive view: a shared helper's or a native call's time to the nearest game module up the stack that called it)
+  const own = (n) => { const cf = n.callFrame; return cf.url && /index\.html$/.test(cf.url) ? modAt(M, cf.lineNumber) : null; };
+  const owner = (n) => { let x = n, first = null; while (x) { const m = own(x); if (m && !M.shared.has(m)) return m; if (m && !first) first = m; const pid = parent.get(x.id); x = pid !== undefined ? node.get(pid) : null; } return first || n.callFrame.functionName || '(native)'; };
   for (let i = 0; i < prof.samples.length; i++) {
     const n = node.get(prof.samples[i]), dt = (prof.timeDeltas[i + 1] !== undefined ? prof.timeDeltas[i + 1] : 0) / 1000, cf = n.callFrame;
     let mod;
@@ -178,11 +181,11 @@ const byModule = (prof, M, per) => {
     else if (!cf.url) mod = cf.functionName || '(native)';
     else mod = 'other';
     if (mod === '(idle)') continue;
-    total += dt; mods[mod] = (mods[mod] || 0) + dt;
+    total += dt; mods[mod] = (mods[mod] || 0) + dt; { const o = owner(n); incl[o] = (incl[o] || 0) + dt; }
     const fk = mod + ' ' + (cf.functionName || '(anon)') + ':' + (cf.lineNumber + 1); fns[fk] = (fns[fk] || 0) + dt;
   }
   const top = (o, k) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, k).map(([m, v]) => [m, Math.round(v / per * 1000) / 1000]);
-  return { totalMs: Math.round(total / per * 1000) / 1000, mods: top(mods, 40), fns: top(fns, 30) };
+  return { totalMs: Math.round(total / per * 1000) / 1000, mods: top(mods, 40), fns: top(fns, 30), incl: top(incl, 400) };
 };
 // the game's own frame without the draw: n frames of g.loop, dt 16.7 ms, the renderer's draw skipped (critic_vl's __norender)
 const logic = async (P, n, prof) => {
@@ -241,6 +244,7 @@ for (let rd = 0; rd < LOADS; rd++) for (let i = 0; i < BUILDS.length; i++) {
     await page.evaluate((seed) => VR.game.createWorld({ name: 'Kritik VL', mode: 'creative', difficulty: 'peaceful', type: 'default', seed, cheats: true, kit: true }), SEED);
     for (let i = 0; i < 960; i++) { await page.waitForTimeout(250); if (await page.evaluate(() => VR.game.state).catch(() => '') === 'play') break; }
     L.loadS = r1((Date.now() - t0) / 1000); L.ok = await page.evaluate(() => VR.game.state) === 'play';
+    L.at = await page.evaluate(() => { const g = VR.game, hz = g.horizon; return { frames: g.frame | 0, draws: g.loadDraws | 0, coarse: hz && hz.stats ? hz.stats.coarse : null, kept: hz ? hz.selKept | 0 : 0, gap: g.loadDrawGap | 0 }; }).catch(() => null);
     const c1 = threadCpu(), sh1 = await page.evaluate(() => window.__sh);
     const d = {}; for (const k in c1) { const v = c1[k] - (c0[k] || 0); if (v >= 50) d[k] = v; }
     L.cpu = d; L.cpuS = r1(Object.values(d).reduce((a, x) => a + x, 0) / 1000);
@@ -251,7 +255,7 @@ for (let rd = 0; rd < LOADS; rd++) for (let i = 0; i < BUILDS.length; i++) {
   await ctx.close();
   rec.loads[b.tag].push(L);
   const top = Object.entries(L.cpu || {}).sort((a, x) => x[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${r1(v / 1000)}`).join(', ');
-  console.log(`  load ${rd + 1} ${b.tag}: ${L.ok ? '' : 'NOT play '}${L.loadS} s (title ${L.titleS} s) · CPU ${L.cpuS} s: ${top} · shaders ${JSON.stringify(L.shaders)} · jobs ${JSON.stringify(L.jobs)} · heap ${L.heapMB} MB (${secs()})`);
+  console.log(`  load ${rd + 1} ${b.tag}: ${L.ok ? '' : 'NOT play '}${L.loadS} s (title ${L.titleS} s) · CPU ${L.cpuS} s: ${top} · shaders ${JSON.stringify(L.shaders)} · jobs ${JSON.stringify(L.jobs)} · at play ${JSON.stringify(L.at)} · heap ${L.heapMB} MB (${secs()})`);
   save();
 }
 for (const b of BUILDS) { const a = rec.loads[b.tag]; rec.pages[b.tag] = rec.pages[b.tag] || {}; rec.pages[b.tag].loadMed = r1(med(a.map(x => x.loadS))); rec.pages[b.tag].loadCpuMed = r1(med(a.map(x => x.cpuS))); console.log(`  ${b.tag}: load median ${rec.pages[b.tag].loadMed} s (${a.map(x => x.loadS).join(' · ')}) · CPU median ${rec.pages[b.tag].loadCpuMed} s`); }
@@ -291,7 +295,8 @@ for (let rd = 0; rd < ROUNDS; rd++) {
 for (const P of PAGES) {
   const c = await logic(P, FR, true);
   rec.pages[P.tag].logicProf = c;
-  console.log(`  ${P.tag} logic ×${FR}: ${c.wallMs} ms a frame (median ${c.medMs}, max ${c.maxMs}) · profiled ${c.prof.totalMs} ms: ` + c.prof.mods.slice(0, 14).map(([m, v]) => `${m} ${v}`).join(', '));
+  c.pop = await P.ev(() => { const g = VR.game, p = g.player.pos, n2 = (a) => (a || []).filter(e => e && e.pos && Math.hypot(e.pos[0] - p[0], e.pos[2] - p[2]) < 48).length; return { mobs: n2(g.entities && g.entities.mobs), folk: n2(g.villages && g.villages.agents), kept: g.horizon ? g.horizon.selKept | 0 : 0 }; }).catch(() => null);
+  console.log(`  ${P.tag} logic ×${FR}: ${c.wallMs} ms a frame (median ${c.medMs}, max ${c.maxMs}) · profiled ${c.prof.totalMs} ms (near: ${JSON.stringify(c.pop)}) · own: ` + c.prof.mods.slice(0, 14).map(([m, v]) => `${m} ${v}`).join(', ') + ' · with the helpers they call: ' + c.prof.incl.slice(0, 14).map(([m, v]) => `${m} ${v}`).join(', '));
   save();
 }
 // the orbit (/raum herz) on each page, its kept frame in turns

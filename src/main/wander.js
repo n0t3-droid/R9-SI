@@ -164,7 +164,14 @@
     return [S.near, Math.max(S.near, Math.min(S.far, dmax))];
   };
   // the candidates [d, side] — the nearer half of the range first, the centre of the cone first
+  // (f-perf8: the lists kept — the staging asks every frame it searches, with a handful of ranges; read only)
+  const CANDS = [];
   W.stageCands = function (R) {
+    const c0 = W.STAGE.cone; for (let i = 0; i < CANDS.length; i++) { const C = CANDS[i]; if (C.a === R[0] && C.b === R[1] && C.c === c0) return C.out; }
+    const out = stageCands0(R); CANDS.push({ a: R[0], b: R[1], c: c0, out }); if (CANDS.length > 24) CANDS.shift();
+    return out;
+  };
+  const stageCands0 = function (R) {
     const S = W.STAGE, a = R[0], b = R[1], mid = a + (b - a) * 0.35, out = [];
     for (const d of [mid, mid + (b - mid) * 0.6, a + (mid - a) * 0.4, b, a]) for (const s of [0.18, -0.18, 0, 0.34, -0.34, S.cone, -S.cone]) out.push([Math.max(a, Math.min(b, d)), s]);
     return out;
