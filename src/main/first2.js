@@ -260,7 +260,7 @@
       else if (b.d <= 24) st.reached = true;
     }
     if (!P.el && text) { P.el = document.createElement('div'); P.el.id = 'f2point'; (document.getElementById('hud') || document.body).appendChild(P.el); }
-    if (P.el && text && P.el.dataset.goal !== P.goal) P.el.dataset.goal = P.goal;   // (f-quiet2: the goal, for the fade — quiet.js)
+    if (P.el && text && P.el.dataset && P.el.dataset.goal !== P.goal) P.el.dataset.goal = P.goal;   // (f-quiet2: the goal, for the fade — quiet.js)
     if (P.el && text !== P.text) { P.text = text; P.el.textContent = text; P.el.style.display = text ? 'block' : 'none'; }
   };
 

@@ -101,7 +101,8 @@
   "tales_core": 0,
   "tales": 0.002,
   "lightfield": 0,
-  "lightfield_gl": 0
+  "lightfield_gl": 0,
+  "tale_end": 0
  },
  "base": {
   "tag": "v0556",
@@ -385,6 +386,10 @@
   "tales_core",
   "tales",
   "lightfield",
-  "lightfield_gl"
- ]
+  "lightfield_gl",
+  "tale_end"
+ ],
+ "unmeasured": {
+  "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs — without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release"
+ }
 }
