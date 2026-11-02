@@ -20244,6 +20244,11 @@ GEN.ColumnWriter=ColumnWriter;
 
 
 GEN.NOCRY_VGEN=9;
+
+
+
+GEN.ISLE_VGEN=15;
+GEN.isleGarden=(g)=> !!g&&(g.vgen|0)>=GEN.ISLE_VGEN;
 GEN.noCry=(g)=> !!g&&((g.vgen|0)>=GEN.NOCRY_VGEN||g.noCrystal===true);
 
 
@@ -21788,6 +21793,66 @@ return best||origSpawn.call(this);
 
 
 
+const GH=(x,y,z,k)=>M.hashf2(x*31+y*7919,z*17-y*131,0x15e15+k);
+let GS=null;
+const gst=()=>GS||(GS={
+vine:(f)=>R.byName.vines.state({faces:f}),berry:(b,t)=>R.byName.glow_berry_vine.state({berries:b?1:0,tip:t?1:0}),
+spore:R.byName.spore_blossom?R.byName.spore_blossom.defaultState:0,roots:R.byName.hanging_roots.defaultState,
+shroom:R.byName.lumishroom?R.byName.lumishroom.defaultState:0,azalea:R.byName.flowering_azalea?R.byName.flowering_azalea.defaultState:0,
+leaves:R.byName.flowering_azalea_leaves?R.byName.flowering_azalea_leaves.defaultState:0,
+flowers:['poppy','dandelion','cornflower','allium','oxeye_daisy','azure_bluet'].filter(n=>R.byName[n]).map(n=>R.byName[n].defaultState),
+petals:['pink_petals','wildflowers'].filter(n=>R.byName[n]).map(n=>R.byName[n].state({count:4})),
+});
+
+
+function gardenCell(g,ISL,S,I,x,y,z){
+const depth=I.top-y,tip=y-I.bottom,sd=I.isle?I.isle.seed:0;
+if(depth<=3)return I.k<0.16&&depth>=2?ISL.moss:S.dirt;
+if(tip<=1){const r=GH(x,y,z,1);return r<0.03?gst().shroom||ISL.moss:r<0.38?ISL.moss:ISL.strata[(y+(sd&7))%ISL.strata.length];}
+if(g.nVein.n3(x*0.6,y*0.8,z*0.6)>0.4)return ISL.moss;
+return ISL.strata[(y+(sd&7))%ISL.strata.length];
+}
+
+function gardenUnder(g,blocks,col,I,x,z){
+if(I.k<0.12)return;
+const K=gst(),r=GH(x,I.bottom,z,2),yb=I.bottom-1;
+const hang=(len,f)=>{for(let k=0;k<len;k++){const y=yb-k;if(y<2)break;const i=(y<<8)|col;if(blocks[i])break;blocks[i]=f(k,len);}};
+if(r<0.11)hang(2+Math.floor(GH(x,0,z,3)*7),()=>K.vine(GH(x,1,z,4)<0.5?1|2:4|8));
+else if(r<0.16)hang(2+Math.floor(GH(x,0,z,3)*4),(k,n)=>K.berry(k%2===1||k===n-1,k===n-1));
+else if(r<0.18&&K.spore)hang(1,()=>K.spore);
+else if(r<0.20)hang(1+Math.floor(GH(x,0,z,3)*3),()=>K.roots);
+}
+
+function gardenTop(g,blocks,col,I,x,z,S){
+const i=((I.top+1)<<8)|col;if(blocks[i]!==0)return;
+const K=gst(),r=GH(x,I.top,z,5);
+if(I.k<0.16&&r<0.12&&K.azalea)blocks[i]=K.azalea;
+else if(r<0.26)blocks[i]=S.shortgrass;
+else if(r<0.40){const L=r<0.33&&K.petals.length?K.petals:K.flowers;if(L.length)blocks[i]=L[Math.floor(GH(x,1,z,6)*L.length)%L.length];}
+}
+
+
+const NB=[[1,0,2],[-1,0,8],[0,1,4],[0,-1,1]];
+function gardenCurtains(g,blocks,isl,x0,z0){
+let any=false;for(let c=0;c<256&& !any;c++)if(isl[c]&&isl[c].isle&&isl[c].isle.designed)any=true;
+if(!any&& !(g.designedIslands&&g.designedIslands(x0+8,z0+8)))return;
+const K=gst();
+for(let col=0;col<256;col++){
+const I0=isl[col];if(I0&&I0.isle&&I0.isle.designed)continue;
+const x=x0+(col&15),z=z0+(col>>4);
+for(const[dx,dz,f]of NB){
+const lx=(col&15)+dx,lz=(col>>4)+dz;
+const J=lx>=0&&lx<16&&lz>=0&&lz<16?isl[(lz<<4)|lx]:g.islandAt(x+dx,z+dz);
+if(!J|| !J.isle|| !J.isle.designed||J.isle.lava)continue;
+if(GH(x,J.top,z,7)>0.42)break;
+const len=3+Math.floor(GH(x,0,z,8)*Math.min(12,Math.max(3,J.top-J.bottom)));
+for(let k=0;k<len;k++){const y=J.top-k;if(y<2)break;const i=(y<<8)|col;if(blocks[i])break;blocks[i]=K.vine(f);}
+break;
+}
+}
+}
+
+
 const ICELL=72;
 OG.islandCell=function(i,j){
 
@@ -21972,9 +22037,12 @@ isl[col]=I;
 if(!I)continue;
 const cl=g.climateAt(x,z);
 const ember=(cl.ember>0.45&& !(I.isle&&I.isle.designed))|| !!(I.isle&&I.isle.lava&&I.k>0.9),prism=cl.prism>0.45&& !(I.isle&&I.isle.designed),cold=cl.t< -0.35;
+
+const G15=GEN.isleGarden(g)&& !!(I.isle&&I.isle.designed)&& !ember&& !cold;
 for(let y=Math.max(1,I.bottom);y<=Math.min(250,I.top);y++){
 const i=(y<<8)|col;
 let s;
+if(G15&&y<I.top){blocks[i]=gardenCell(g,ISL,S,I,x,y,z);continue;}
 if(y===I.top)s=ember?S.redsand:cold?S.snowblock:S.grass;
 else if(y>=I.top-3)s=ember?S.ochre:S.dirt;
 else{
@@ -21997,17 +22065,20 @@ if(!prism&& !ember&&y-I.bottom<=2&&rng.chance(0.05)){const c=CRY[rng.int(5)];if(
 }
 blocks[i]=s;
 }
+if(G15){gardenUnder(g,blocks,col,I,x,z);gardenTop(g,blocks,col,I,x,z,S);continue;}
 
 if(I.k>0.3&&rng.chance(0.08)){const len=1+rng.int(4);for(let k=1;k<=len;k++){const i=((I.bottom-k)<<8)|col;if(blocks[i])break;blocks[i]=k===len?st('hanging_roots'):st('hanging_roots');}}
 
 const ai=((I.top+1)<<8)|col;
 if(blocks[ai]===0&& !ember&& !cold&&rng.chance(0.3))blocks[ai]=rng.chance(0.85)?S.shortgrass:st(rng.pick(['poppy','dandelion','cornflower','allium']));
 }
+if(GEN.isleGarden(g))gardenCurtains(g,blocks,isl,x0,z0);
 
 {
 for(const I of g.islandsNear(x0,z0)){
 if(!I|| !I.falls)continue;
-for(let f=0;f<I.falls;f++){
+const nF=I.falls+(I.designed&&GEN.isleGarden(g)&& !I.lava?1:0);
+for(let f=0;f<nF;f++){
 const a=((I.seed*0.618+f*0.37)%1)*Math.PI*2;
 
 let fx=0,fz=0,ft=null;
@@ -53810,7 +53881,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="76aa2d97a3d86047";
+VR.TEX_SRC_HASH="38ec4b0847a658b8";
 
 
 
@@ -58587,6 +58658,10 @@ VR.I18N.add('en',{
 "g.ux.wave":"You wave.",
 "g.ux.here":"Here! (a waypoint)",
 
+
+"g.te.gift":"🎁 {who} gives you: {item}",
+"g.te.thanks":"💛 {who} squeezes your hands, thankful",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -63244,6 +63319,10 @@ VR.I18N.add('de',{
 "g.ux.r.here":"Hier!",
 "g.ux.wave":"Du winkst.",
 "g.ux.here":"Hier! (ein Wegpunkt)",
+
+
+"g.te.gift":"🎁 {who} schenkt dir: {item}",
+"g.te.thanks":"💛 {who} drückt dir dankbar die Hände",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -93050,6 +93129,7 @@ for(const s of this.sites){const e=this.st[s.key];if(e&&(e.found||e.status==='bl
 if(best){
 const a=Math.atan2(best.x-p.pos[0],-(best.z-p.pos[2])),rel=((Math.round((a+p.yaw)*180/Math.PI)%360)+540)%360-180;
 const m=bd<100?Math.round(bd):Math.round(bd/10)*10;
+if(el.dataset&&el.dataset.goal!==best.key)el.dataset.goal=best.key;
 text='✨ '+m.toLocaleString(VR.I18N&&VR.I18N.locale?VR.I18N.locale():'de-DE')+' m '+ARROWS[((Math.round(rel/45)%8)+8)%8];
 }
 }
@@ -100150,6 +100230,7 @@ a.say(known?Folk.say('helloBack',H(a.p.seed,this.time|0,3),{p:g.playerName||'fri
 }else if(d2>14*14)a.greeted=false;
 }
 list.sort((x,y)=>x[0]-y[0]);
+if(VR.Quiet&&VR.Quiet.bubbleCap){try{VR.Quiet.bubbleCap(list,this.talking||null);}catch(e){}}
 const vp=r.viewProj,W=r.canvas?r.canvas.clientWidth:window.innerWidth,Hh=r.canvas?r.canvas.clientHeight:window.innerHeight;
 const c=g.cam||cam;
 for(let i=0;i<this.bubs.length;i++){
@@ -100163,8 +100244,8 @@ if(cw<=0.1){el.style.display='none';continue;}
 const cx=(vp[0]*x+vp[4]*y+vp[8]*z+vp[12])/cw,cy=(vp[1]*x+vp[5]*y+vp[9]*z+vp[13])/cw;
 if(cx< -1.2||cx>1.2||cy< -1.2||cy>1.2){el.style.display='none';continue;}
 const sx=(cx*0.5+0.5)*W,sy=(1-(cy*0.5+0.5))*Hh;
-const ico= !!(a.bubble&&a.bubble.icon);
-const html=ico?`<i>${esc(a.bubble.text)}</i>`:(it[2]||a.bubble?`<b>${esc(a.p.name)}</b>`:'')+(a.bubble?`<span>${esc(a.bubble.text)}</span>`:`<span class="role">${esc(Folk.ROLES[a.role]?Folk.ROLES[a.role].title:'')}</span>`);
+const dem= !!it[3],ico=dem|| !!(a.bubble&&a.bubble.icon);
+const html=ico?`<i>${dem?'💬':esc(a.bubble.text)}</i>`:(it[2]||a.bubble?`<b>${esc(a.p.name)}</b>`:'')+(a.bubble?`<span>${esc(a.bubble.text)}</span>`:`<span class="role">${esc(Folk.ROLES[a.role]?Folk.ROLES[a.role].title:'')}</span>`);
 if(el._ico!==ico){el._ico=ico;el.classList.toggle('ico',ico);}
 if(el._html!==html){el.innerHTML=html;el._html=html;}
 el.style.display='block';
@@ -115385,7 +115466,7 @@ this.renderer&&(this.renderer.visDirty=true);
 async createWorld(o){
 const seedStr=o.seed;
 let seed=seedStr?(/^-?\d+$/.test(seedStr)?(parseInt(seedStr,10)>>>0):VR.seedFromString(seedStr)):(Math.floor(Math.random()*4294967295)>>>0);
-const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:14};
+const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:15};
 if(o.first&&VR.First)VR.First.mark(this,meta);
 await this.store.saveWorld(meta);
 this.startWorld(meta,true);
@@ -116232,6 +116313,7 @@ if(VR.Intent){const ic=VR.Intent.cam(this,cam);if(ic)cam=ic;}
 if(this.director&&this.director.active){const dc=this.director.cam(cam);if(dc)cam=dc;}
 if(this.wow&&this.wow.active){const wc=this.wow.cam(cam);if(wc)cam=wc;}
 if(VR.MoveIn&&VR.MoveIn.cam){const mc=VR.MoveIn.cam(this,cam);if(mc)cam=mc;}
+if(VR.TaleEnd&&VR.TaleEnd.cur){const te=VR.TaleEnd.cam(this,cam);if(te)cam=te;}
 if(VR.Liberate&&VR.Liberate.mcam){const lc=VR.Liberate.cam(this,cam);if(lc)cam=lc;}
 if(VR.Ferries&&VR.Ferries.camOn){const fc=VR.Ferries.cam(this,cam);if(fc)cam=fc;}
 if(VR.StoryPlay&&VR.StoryPlay.holds(this)){const sc=VR.StoryPlay.cam(this,cam);if(sc)cam=sc;}
@@ -132580,7 +132662,7 @@ due(t){return t-this.last2>=this.target;}
 gapCap(){return this.o.builder?this.o.gapBuilder:this.o.adv?R.ADV.gap:this.o.gap;}
 cooling(t,act){const a=this.acts[act];return a!==undefined&&t-a<this.o.cool;}
 
-note(t,w,kind,act){if(t>this.lastStart)this.lastStart=t;if(act)this.acts[act]=t;this.log.push([t,w,kind,act||'']);if(this.log.length>64)this.log.shift();}
+note(t,w,kind,act){if(t>this.lastStart)this.lastStart=t;if(!(this.lastNote>t))this.lastNote=t;if(act)this.acts[act]=t;this.log.push([t,w,kind,act||'']);if(this.log.length>64)this.log.shift();}
 
 
 choose(t,offers,place){
@@ -132606,7 +132688,7 @@ if(s>bs){bs=s;best=of;}
 return best;
 }
 
-started(t,of){this.log.push([t,of.weight,of.kind,of.source]);if(this.log.length>64)this.log.shift();if(of.act)this.acts[of.act]=t;}
+started(t,of){if(!(this.lastNote>t))this.lastNote=t;this.log.push([t,of.weight,of.kind,of.source]);if(this.log.length>64)this.log.shift();if(of.act)this.acts[of.act]=t;}
 }
 R.Sched=Sched;
 
@@ -132620,6 +132702,7 @@ R.of=(g)=>{g=g||game();return g&&g.regie&&g.regie.world===g.world?g.regie:null;}
 R.allow=function(g,w,kind,act){
 const S=R.of(g);if(!S)return true;
 if(R.vistaNear(g))return false;
+if(kind!=='story'&&R.claimed(g)){S.st.claimNo=(S.st.claimNo|0)+1;return false;}
 return S.sched.allow(now(g),w||2,kind||'ambient',act);
 };
 
@@ -132627,9 +132710,11 @@ R.note=function(g,w,kind,act){const S=R.of(g);if(S){S.sched.note(now(g),w||2,kin
 
 
 R.HOLD=15;
-R.busy=function(g,hard){
+
+
+R.busy=function(g,hard,big){
 const S=R.of(g);if(!S)return false;
-const t=now(g),q=S.sched;if(t-Math.max(q.last2,q.lastStart)<q.o.space||q.scene)return true;
+const t=now(g),q=S.sched;if(t-Math.max(q.last2,big?(q.lastNote===undefined? -Infinity:q.lastNote):q.lastStart)<q.o.space||q.scene)return true;
 if(g.wow&&g.wow.active)return true;
 return hard?false:R.vistaNear(g);
 };
@@ -132642,6 +132727,12 @@ if(P&&g.wow&&g.wow.list&& !(g.settings&&g.settings.wowMoments===false))for(const
 if(S){if(near!==S.vid){S.vid=near;S.v0=t;}if(near&&t-S.v0>R.RULES.vistaHold)near=null;S.vt=t;S.vn= !!near;}
 return!!near;
 };
+
+
+
+R.CLAIM=4;
+R.claim=function(g,s){const S=R.of(g);if(S){S.claim=now(g)+Math.max(0,Math.min(R.CLAIM,s===undefined?R.CLAIM:s));S.st.claims=(S.st.claims|0)+1;}};
+R.claimed=function(g){const S=R.of(g);return!!(S&&S.claim>now(g));};
 R.inScene=(g,on)=>{const S=R.of(g);if(S)S.sched.scene= !!on;};
 function bind(g){
 const seed=((g.meta&&g.meta.seed)>>>0)||0x5eed,A=VR.Adventure;
@@ -132708,13 +132799,19 @@ const F=g.funke;
 S.sched.bauruhe= !!(F&&((F.budget&&F.budget.quiet(t))||(F.buildFocus&&F.buildFocus())));
 if((S.t-=dt)>0)return;
 S.t=0.25;
-if(R.vistaNear(g))return;
+
+const why=(k)=>{const q=S.st.why||(S.st.why={});q[k]=(q[k]|0)+1;};
+if(R.vistaNear(g))return why('vista');
+if(S.claim>t)return why('claim');
 const ctx={t,place:g.lifeDirector&&g.lifeDirector.ctx?g.lifeDirector.ctx.place:''},offers=[];
 for(const fn of SOURCES){try{const o=fn(g,ctx);if(o)for(const q of o)if(q)offers.push(q);}catch(e){}}
 S.st.offers+=offers.length;
+const q=S.sched,due=q.due(t)&&t-q.lastStart>=q.o.space;
+if(due)S.st.dueOffers=(S.st.dueOffers|0)+offers.length;
 const of=S.sched.choose(t,offers,ctx.place);
-if(!of)return;
+if(!of)return why(!offers.length?'none': !q.due(t)?'notdue':t-q.lastStart<q.o.space?'space':'budget');
 let ok=false;try{ok=of.start()!==false;}catch(e){ok=false;}
+if(!ok)why('fail');
 if(ok){S.sched.started(t,of);S.sched.lastStart=Math.max(S.sched.lastStart,t);S.st.started++;S.st[of.source]=(S.st[of.source]|0)+1;if(of.kind==='story'){S.sched.lastBeat=t;S.sched.lastStart=t;}}
 };
 R.stats=function(g){const S=R.of(g);if(!S)return null;const q=S.sched;return{st:Object.assign({},S.st),last2:q.last2,target: +q.target.toFixed(1),slot:q.slot,kinds:q.kinds.slice(),scene:q.scene,bauruhe:q.bauruhe,builder: !!q.o.builder,log:q.log.slice(-12)};};
@@ -141576,10 +141673,12 @@ const st=g.meta&&g.meta.advStart,p=g.player;
 if(st&&st.out&&p&& !g.hideHud&& !g.photo&& !(g.ui&&g.ui.screen)&&F.advWorld(g)&& !F.cine(g)){
 const site=VR.StoryPlay&&VR.StoryPlay.nearSite?VR.StoryPlay.nearSite(g,false):null;
 const to=site&&site.s?[site.s.x,0,site.s.z]:st.out,b=F.bearing(p.pos,p.yaw,to);
+P.goal=(site&&site.s?'s':'o')+Math.round(to[0])+','+Math.round(to[2]);
 if(b.d>24&&b.d<2000&& !st.reached)text=F.pointText(p.pos,p.yaw,to);
 else if(b.d<=24)st.reached=true;
 }
 if(!P.el&&text){P.el=document.createElement('div');P.el.id='f2point';(document.getElementById('hud')||document.body).appendChild(P.el);}
+if(P.el&&text&&P.el.dataset&&P.el.dataset.goal!==P.goal)P.el.dataset.goal=P.goal;
 if(P.el&&text!==P.text){P.text=text;P.el.textContent=text;P.el.style.display=text?'block':'none';}
 };
 
@@ -144568,7 +144667,7 @@ const lvl=(l)=>(MIN_PRIO[l]?l:Q.DEF);
 
 
 class Notes{
-constructor(o){o=o||{};this.level=lvl(o.level);this.vis=[];this.wait=[];this.last=new Map();this.lastNew= -Infinity;this.held=false;this.history=[];this.stats={shown:0,merged:0,dropped:0,queued:0,expired:0};}
+constructor(o){o=o||{};this.level=lvl(o.level);this.vis=[];this.wait=[];this.last=new Map();this.gists=new Map();this.keyT=new Map();this.legacy=false;this.lastNew= -Infinity;this.held=false;this.history=[];this.stats={shown:0,merged:0,dropped:0,queued:0,expired:0};}
 setLevel(l){this.level=lvl(l);}
 gap(){return this.level==='normal'?Q.GAP_NORMAL:Q.GAP_FEW;}
 rec(n,t,r){this.history.push({text:n.text,prio:n.prio,t,r});if(this.history.length>Q.HIST)this.history.splice(0,this.history.length-Q.HIST);}
@@ -144590,12 +144689,32 @@ const h=this.history[this.history.length-1];
 if(prio<MIN_PRIO[this.level]){h.r='level';this.stats.dropped++;return'dropped';}
 const lt=this.last.get(text);
 if(!key&&lt!==undefined&&t-lt<Q.REPEAT){h.r='repeat';this.stats.dropped++;return'dropped';}
+
+const why=this.level!=='normal'&& !this.legacy?this.dupWhy(text,prio,key,t):'';
+if(why){h.r=why;this.stats.dropped++;this.stats[why]=(this.stats[why]|0)+1;return'dropped';}
 this.last.set(text,t);
 if(this.last.size>200)this.last.clear();
 if(this.held){if(prio<2){h.r='held';this.stats.dropped++;return'dropped';}return this.enqueue(e0,t,h);}
 if(prio>=3){this.show(e0,t,true);h.r='shown';return'shown';}
 if(this.vis.length>=Q.MAX_VIS||t-this.lastNew<this.gap()||this.wait.length)return this.enqueue(e0,t,h);
 this.show(e0,t,false);h.r='shown';return'shown';
+}
+
+
+dupWhy(text,prio,key,t){
+const gs=Q.gist(text),G=this.gists.get(gs);
+if(this.gists.size>300)this.gists.clear();
+if(G){
+const win=prio>=3?Q.MUST_DUP:Q.DUP,seen=G[0];G[0]=t;
+if(t-seen<win&&t-G[1]<Q.DUP_MAX)return'dup';
+}else this.gists.set(gs,[t,-Infinity]);
+const c=prio>=3?0:Q.coolOf(key),kt=key?this.keyT.get(key):undefined;
+if(c>0&&kt!==undefined&&t-kt<c)return'cool';
+return'';
+}
+shownAt(e0,t){
+const gs=Q.gist(e0.text),G=this.gists.get(gs);if(G){G[0]=t;G[1]=t;}else this.gists.set(gs,[t,t]);
+if(e0.key)this.keyT.set(e0.key,t);
 }
 enqueue(e0,t,h){
 if(this.wait.length>=Q.QMAX){h.r='full';this.stats.dropped++;return'dropped';}
@@ -144609,6 +144728,7 @@ let k=0;for(let i=1;i<this.vis.length;i++)if(this.vis[i].prio<this.vis[k].prio)k
 this.vis.splice(k,1);
 }
 this.vis.push({text:e0.text,prio:e0.prio,key:e0.key,count:1,t0:t,until:t+Q.LIFE});
+this.shownAt(e0,t);
 if(e0.prio<3)this.lastNew=t;
 this.stats.shown++;return true;
 }
@@ -144628,6 +144748,56 @@ return this.vis;
 visible(t){this.tick(t);return this.vis.filter(v=>t<v.until+Q.FADE);}
 }
 Q.Notes=Notes;
+
+
+
+Q.DUP=180;
+Q.DUP_MAX=600;
+Q.MUST_DUP=4;
+
+Q.COOLS={'gs:visit':120,'gs:up':120,'gs:hello':60,'story-fest':600,'tl:tw':30,'fairy':45,'season':300,'wander':40};
+Q.coolOf=(key)=>{if(!key)return 0;const k=String(key);if(Q.COOLS[k]!==undefined)return Q.COOLS[k];const i=k.indexOf(':');return i>0&&Q.COOLS[k.slice(0,i)]!==undefined?Q.COOLS[k.slice(0,i)]:0;};
+
+Q.gist=(s)=>String(s||'').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu,' ').split(/\s+/).filter(w=>w&& !/^\p{N}+$/u.test(w)).join(' ');
+
+
+Q.foundW=(id,w,level)=>{const s=String(id||'');if(s[0]==='w'&&s[1]===':')return w;return(MIN_PRIO[lvl(level)]||2)>1?Math.min(w,1):w;};
+
+
+
+Q.PT_SHOW=6;Q.PT_SHOW_N=20;Q.PT_IDLE=45;
+class Pointer{
+constructor(){this.goal='';this.until= -Infinity;this.idled=false;}
+step(t,goal,idle,level){
+goal=goal?String(goal):'';
+const show=lvl(level)==='normal'?Q.PT_SHOW_N:Q.PT_SHOW;
+if(goal&&goal!==this.goal)this.until=t+show;
+this.goal=goal;
+if((idle||0)>=Q.PT_IDLE){if(!this.idled){this.idled=true;this.until=Math.max(this.until,t+show);}}else this.idled=false;
+return!!goal&&t<this.until;
+}
+}
+Q.Pointer=Pointer;
+
+
+
+
+
+Q.BUB_MAX=2;
+let bTalk=null;
+const bRank=(it)=>(it[2]?0:it[1]===bTalk?1:2);
+const bCmp=(x,y)=>bRank(x)-bRank(y)||x[0]-y[0];
+Q.bubbleCap=function(list,talking){
+if(list.length<2){if(list.length)list[0][3]=false;return list;}
+bTalk=talking||null;list.sort(bCmp);bTalk=null;
+let n=0;
+for(const it of list){
+const b=it[1].bubble,icon= !!(b&&b.icon);
+if(icon){it[3]=false;continue;}
+if(n<Q.BUB_MAX){n++;it[3]=false;}else it[3]= !!b;
+}
+return list;
+};
 
 
 
@@ -144713,7 +144883,9 @@ s.textContent='#notes{position:absolute;left:14px;bottom:82px;max-width:min(420p
 +'html body #funkebub{max-width:min(260px,36vw);padding:4px 10px 5px;border-radius:11px;font:600 13px/1.3 var(--font,sans-serif);box-shadow:0 2px 8px rgba(0,0,0,.28),0 0 0 1px rgba(70,232,255,.6)}'
 +'html body #funkebub b{display:inline;font-size:11px;margin-right:6px}html body #funkebub:after{display:none}'
 +'#qrecent{margin-top:8px;font:500 12px/1.4 var(--font,sans-serif);color:#b9c6da;text-align:left;max-height:8.5em;overflow:hidden}#qrecent b{display:block;color:#dfe8f8;font-size:12px;margin-bottom:2px}'
-+'@media (prefers-reduced-motion: reduce){#notes .qn{transition:none}}';
++'body.q-held #hints{display:none !important}'
++'#wcompass,#f2point{transition:opacity .8s ease}#wcompass.q-away,#f2point.q-away{opacity:0 !important}'
++'@media (prefers-reduced-motion: reduce){#notes .qn,#wcompass,#f2point{transition:none}}';
 document.head.appendChild(s);
 })();
 let box=null;
@@ -144762,6 +144934,7 @@ N.setLevel(level());
 const held=heldNow(g);
 N.hold(held,t);
 const hud=document.getElementById('hud');if(hud&&hud.classList.contains('q-held')!==held)hud.classList.toggle('q-held',held);
+if(document.body&&document.body.classList.contains('q-held')!==held)document.body.classList.toggle('q-held',held);
 if(g&&g.state==='play'&&g.player&& !held){
 const p=g.player,v=p.vel||[0,0,0];
 looking=look.step(t,Math.hypot(v[0]||0,v[2]||0),p.yaw||0);
@@ -144769,12 +144942,48 @@ const id=worldId(g);
 if(id){const A=readAges().a;if(ageId!==id){ageId=id;}A[id]=(A[id]||0)+dt;if(t-ageSaved>10){ageSaved=t;try{const ks=Object.keys(A);if(ks.length>64)delete A[ks[0]];localStorage.setItem(AGE_KEY,JSON.stringify(ages));}catch(e){}}}
 }else looking=false;
 N.tick(t);render(t);
+pointers(g,t,held);
+if(!foundWrapped)wrapFound();
 
 const H=VR.Hints;
 if(H&&hintAt&&H.current()&&level()!=='normal'&&t-hintAt>Q.HINT_HIDE){hintAt=0;H.dismiss();}
 if(H&& !H.current())hintAt=0;
 }catch(e){}
 const ms=performance.now()-t0,C=Q.cost;C.ticks++;C.ms+=ms;if(ms>C.worst)C.worst=ms;
+}
+
+
+const PTS={wcompass:new Pointer(),f2point:new Pointer()};
+let lastActive=0;
+Q.pointerStats={shownS:0,hiddenS:0};
+function pointers(g,t,held){
+if(!g|| !g.player)return;
+const v=g.player.vel||[0,0,0];
+if(Math.hypot(v[0]||0,v[2]||0)>=0.6||t-lastInput<0.5|| !lastActive)lastActive=t;
+const idle=t-lastActive,lv=level();
+for(const id in PTS){
+const el=document.getElementById(id);if(!el)continue;
+const shown=el.style.display!=='none'&& !!el.textContent;
+const on=PTS[id].step(t,shown?(el.dataset.goal||el.textContent.replace(/[\d.,\s]+m\b.*$/,'')):'',held?0:idle,lv);
+if(el.classList.contains('q-away')===on)el.classList.toggle('q-away',!on);
+if(shown)Q.pointerStats[on?'shownS':'hiddenS']+=0.25;
+}
+}
+Q.pointers=PTS;
+
+let foundWrapped=false;
+function wrapFound(){
+const EL=VR.EventLog;if(!EL|| !EL.found)return;foundWrapped=true;
+if(EL.found.__q)return;
+const of=EL.found;
+EL.found=function(id){
+const s=String(id||'');
+if(Q.foundW(s,2,level())>=2)return of.apply(this,arguments);
+const oe=EL.emit;
+EL.emit=function(){const a=Array.prototype.slice.call(arguments);a[2]=Q.foundW(s,a[2]|0,level());return oe.apply(this,a);};
+try{return of.apply(this,arguments);}finally{EL.emit=oe;}
+};
+EL.found.__q=true;
 }
 setInterval(tick,250);
 
@@ -144882,6 +145091,7 @@ if(Hn&&Hn.show&& !Hn.show.__q){
 const os=Hn.show;
 Hn.show=function(id,o){
 if(!Q.hintOk(level(),Q.age()))return false;
+{const g=game();if(g&&g.state==='play'&&heldNow(g))return false;}
 const ok=os.apply(this,arguments);
 if(ok)hintAt=nowS();
 return ok;
@@ -145024,6 +145234,11 @@ return out;
 
 
 W.PACE={space:10,lo:15,hi:23,look:4,beat:27,hard:31};
+
+
+
+
+W.PACE.noted=5;W.PACE.claim=3;W.PACE.defer=6;W.PACE.big=true;W.PACE.small=true;
 W.Pacer=class{
 constructor(seed){this.seed=seed|0;this.last= -1e9;this.n=0;this.tgt=this.jit(0);}
 jit(n){const P=W.PACE;return P.lo+(P.hi-P.lo)*h(this.seed,n,0x9ace);}
@@ -145293,11 +145508,15 @@ for(let i=cur[this.stg]||0;i<cands.length;i++){
 if(this.sb<=0){cur[this.stg]=i;this.more=true;return null;}
 this.sb--;
 const dd=cands[i][0],a=a0+cands[i][1],x=p[0]+Math.cos(a)*dd,z=p[2]+Math.sin(a)*dd;
-const y=this.ground(x,z,p[1]);if(y===null)continue;
-if(flat){let ok=true;for(const[ox,oz]of[[flat,0],[-flat,0],[0,flat],[0,-flat]]){const y2=this.ground(x+ox,z+oz,y);if(y2===null||Math.abs(y2-y)>1){ok=false;break;}}if(!ok)continue;}
-if(!W.openAt(this.occF||(this.occF=(ox,oy,oz)=>this.occ(ox,oy,oz)),x,y,z))continue;
+const SG=this.st.stage||(this.st.stage={ground:0,flat:0,open:0,head:0,feet:0,sight:0,ok:0});
+const y=this.ground(x,z,p[1]);if(y===null){SG.ground++;continue;}
+if(flat){let ok=true;for(const[ox,oz]of[[flat,0],[-flat,0],[0,flat],[0,-flat]]){const y2=this.ground(x+ox,z+oz,y);if(y2===null||Math.abs(y2-y)>1){ok=false;break;}}if(!ok){SG.flat++;continue;}}
+if(!W.openAt(this.occF||(this.occF=(ox,oy,oz)=>this.occ(ox,oy,oz)),x,y,z)){SG.open++;continue;}
 const q=[x,y+Math.min(1.4,fh*0.75),z];
-if(!this.clear(q,true)|| !this.clear([x,y+Math.min(0.35,fh*0.3),z])|| !this.inSight(q))continue;
+if(!this.clear(q,true)){SG.head++;continue;}
+if(!this.clear([x,y+Math.min(0.35,fh*0.3),z])){SG.feet++;continue;}
+if(!this.inSight(q)){SG.sight++;continue;}
+SG.ok++;
 cur[this.stg]=0;
 return[x,y,z];
 }
@@ -145426,22 +145645,30 @@ const L=VR.EventLog;if(!L|| !L.events)return;
 if(this.logN===undefined)this.logN=L.count|0;
 if((L.count|0)===this.logN)return;
 const E=L.events(this.logN);this.logN=L.count|0;
-for(const e of E)if(e.w>=2&&e.inView&&e.src!=='wander'){this.pacer.seen(e.t,e.w);this.st.outside=(this.st.outside|0)+1;}
+
+
+
+const RG=VR.Regie,SF=RG&&RG.RULES?RG.RULES.seenFrac:0.005;
+for(const e of E)if(e.w>=2&&e.inView&&e.src!=='wander'){if(W.PACE.small&&e.frac>0&&e.frac<SF){this.st.small=(this.st.small|0)+1;continue;}this.pacer.seen(e.t,e.w);this.st.outside=(this.st.outside|0)+1;}
 }
 pace(dt,walking){
 const g=this.g,now=this.now;
 const P=this.pacer||(this.pacer=new W.Pacer(this.seed));
 if(P.last< -1e8)P.seen(now-8,2);
 if((this.logT=(this.logT||0)-dt)<=0){this.logT=0.25;this.readLog();}
-if(this.auto===false||(VR.StoryPlay&&VR.StoryPlay.holds&&VR.StoryPlay.holds(g)))return;
+
+if(this.auto===false||(VR.StoryPlay&&VR.StoryPlay.holds&&VR.StoryPlay.holds(g)))return this.why('hold',dt);
 const air= !walking&&this.airborne();
-if(!walking&& !air)return;
+if(!walking&& !air)return this.why('still',dt);
 
 if(walking&&P.scout(now)&&(!this.plan||this.plan.n!==P.n))this.plan={n:P.n,order:W.order(this.seed,1000+P.n,this.ctx||(this.ctx=this.context()),this.recent)};
-if(now<(this.tryT||0))return;
+if(now<(this.tryT||0))return this.why(P.since(now)<P.tgt?'early':'retry',dt);
 if(this.ofs&&this.ofs.n!==P.n){this.ofs=null;this.cur=null;}
-const RG=VR.Regie,busy= !!(RG&&RG.busy&&RG.busy(g));
-const want=P.want(now,{foot:walking,busy,coming:this.coming(now)});
+const RG=VR.Regie,busy= !!(RG&&RG.busy&&RG.busy(g,false,W.PACE.big));
+{const s0=P.since(now);if(walking&&RG&&RG.claim&&s0>=P.tgt&&s0<P.tgt+W.PACE.claim)RG.claim(g,1);}
+const c0=this.coming(now),coming=c0&&(!walking||P.since(now)<P.tgt+W.PACE.defer)?c0:false;
+const want=P.want(now,{foot:walking,busy,coming});
+if(want!=='moment'){const s0=P.since(now);this.why(s0<W.PACE.space?'space':s0<P.tgt?'early': !walking?'air':busy?'busy':coming==='ship'?'coming:ship':coming?'coming:noted':'wait',dt);}
 if(!want)return;
 this.tryT=now+1;
 if(want==='moment'){
@@ -145453,16 +145680,18 @@ if(this.start(order[i],1000+P.n)){this.ofs=null;this.hiC=null;return;}
 if(this.more){this.ofs={n:P.n,i};this.tryT=0;return;}
 }
 this.ofs=null;this.hiC=null;
-this.st.quiet++;
+this.st.quiet++;this.why('nostage',dt);
 return;
 }
 this.beat(air);
 }
 
+why(k,dt){const Y=this.st.why||(this.st.why={});Y[k]=(Y[k]||0)+dt;}
+
 
 coming(now){
 const g=this.g,RG=VR.Regie,RS=RG&&RG.of?RG.of(g):null,P=this.pacer;
-if(RS&&RS.sched&&RS.sched.lastStart>P.last+0.5&&now-RS.sched.lastStart<15)return true;
+if(RS&&RS.sched&&RS.sched.lastStart>P.last+0.5&&now-RS.sched.lastStart<W.PACE.noted)return'noted';
 const Tr=g.traffic,e=this.pos;if(!Tr|| !Tr.ships)return false;
 const M=this.shipD||(this.shipD=new Map());
 let soon=false;
@@ -145473,7 +145702,7 @@ M.set(s,d);
 if(d0!==undefined&&d<d0&&d<260&&(d-60)/Math.max(6,s.speed||20)<9)soon=true;
 }
 if(M.size>64)M.clear();
-return soon;
+return soon?'ship':false;
 }
 
 beat(air){
@@ -145695,7 +145924,7 @@ if(!m||md>40)return;
 LAMP_P[0]=m.pos[0]+1.2;LAMP_P[1]=m.pos[1]+1.5;LAMP_P[2]=m.pos[2]+0.4;
 LK.drawModel(this.g,r,prog(),'wander_hlamp',LAMP_P,0,cam,LAMP_O);
 }
-stats(){return{beats:this.st.beats|0,outside:this.st.outside|0,beat:this.b?this.b.kind:null,since:this.pacer? +this.pacer.since(this.now).toFixed(1):null,on:this.on,tier:this.tier,started:this.st.started,quiet:this.st.quiet,found:this.st.found,kinds:Object.assign({},this.st.kinds),active:this.ms.map(m=>m.kind),timeline:this.timeline.slice(),next:this.next?this.next.name:null,beacon:this.bcOn?this.bcPos.slice():null,cost:this.st.cost,places:this.places.length,ctx:this.ctx,chests:this.st.chests||0};}
+stats(){return{beats:this.st.beats|0,outside:this.st.outside|0,beat:this.b?this.b.kind:null,since:this.pacer? +this.pacer.since(this.now).toFixed(1):null,on:this.on,tier:this.tier,started:this.st.started,quiet:this.st.quiet,found:this.st.found,kinds:Object.assign({},this.st.kinds),active:this.ms.map(m=>m.kind),timeline:this.timeline.slice(),next:this.next?this.next.name:null,beacon:this.bcOn?this.bcPos.slice():null,cost:this.st.cost,places:this.places.length,ctx:this.ctx,chests:this.st.chests||0,why:Object.fromEntries(Object.entries(this.st.why||{}).map(([k,v])=>[k,+v.toFixed(2)])),stage:Object.assign({},this.st.stage)};}
 destroy(){this.endAll();}
 };
 
@@ -150451,10 +150680,11 @@ w=best(solid,S.head,up,Object.assign(op,{lens:Math.min(op.lens,0.3),mins:[2,1.2,
 return w;
 };
 
+
 F3.frameGroup=function(solid,C,r,o){
 o=o||{};
 const d=clamp(2.2*r+1.5,3.5,9),T=[C[0],C[1]+0.9,C[2]];
-const op={d,dMax:d+1.5,mins:[Math.max(3,d-2.5),2.2,1.4],lens:o.lens||F3.LENS};
+const op={d,dMax:d+1.5,mins:[Math.max(3,d-2.5),2.2,1.4],lens:o.lens||F3.LENS,avoid:o.avoid||null};
 const rays=[];
 for(let i=0;i<16;i++){const a=i/16*TAU;for(const h of[0.8+0.4*r,1.6+0.5*r,0.5])rays.push([a,h,(o.pref!==undefined?(1-Math.cos(a-o.pref))*1.6:0)+sunPen(a,o.sun)*1.5+Math.abs(h-0.8-0.4*r)*0.3]);}
 return best(solid,T,rays,op);
@@ -152330,7 +152560,7 @@ const res=TC.finish(rec,t);if(!res)return;
 if(res.lit)TL.litY(g,res.lit);
 const end=T(res.key,V0),head=T(res.head,V0),gv=liveOf(V,res.giver.pid);
 S.endGiver=res.giver.pid;
-S.pend={pid:res.giver.pid,text:end,t:Date.now()};
+S.pend={pid:res.giver.pid,text:end,t:Date.now(),tt:tale.t};
 sayEnd(V);
 if(S.kid){S.kid.ph='home';S.kid.t=0;}
 if(S.fl)S.fl.ph='home';
@@ -152357,6 +152587,8 @@ const gv=liveOf(V,J.pid),p=g.player.pos;
 if(gv&&Math.hypot(gv.pos[0]-p[0],gv.pos[2]-p[2])<90&& !(gv.bubble&&gv.bubble.text===J.text)){
 S.pend=null;say(gv,J.text,9);gv.lookAt=[p[0],p[1]+1.4,p[2]];gv.waveT=1.6;if(V.hearts)V.hearts(gv);
 if(S.kid){S.kid.ph='home';S.kid.t=0;}
+
+if(VR.TaleEnd&&VR.TaleEnd.start){try{if(VR.TaleEnd.start(V,{t:J.tt,giver:gv,kid:S.kid?S.kid.a:null,text:J.text}))gv.bubble=null;}catch(e){}}
 return;
 }
 if(Date.now()-J.t>15000){S.pend=null;note(g,J.text,'tl:end');}
@@ -152626,6 +152858,240 @@ cool:()=>{const r=TL.rec(VR.game);r.cool=0;},
 markY:(x,z,y)=>{S.yc[Math.round(x)+','+Math.round(z)]=y;},
 diag:()=>({lit:TL.rec(VR.game).lit,litDrawn:S.litDrawn|0,glows:S.glows|0,draws:S.cost.draws,err:TL.drawErr||null,stage:TL.stage(TL.rec(VR.game).cur)}),
 };
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const TE=VR.TaleEnd=VR.TaleEnd||{};
+
+TE.PLAN={
+lost:{with:'kid',touch:'hug'},
+ingr:{with:'fam',touch:'hug'},
+home:{with:'fam',touch:'hands'},
+letter:{with:'fam',touch:'hug'},
+beacon:{with:'fam',touch:'hands'},
+};
+TE.T={touch:2.6,gift:5.0,back:6.7};
+TE.DUR=7.5;TE.IN=1.0;
+TE.KEYS=['g.te.gift','g.te.thanks'];
+const ss=(x)=>(x<=0?0:x>=1?1:x*x*(3-2*x));
+
+TE.phase=(t)=>({ph:t<TE.T.touch?'come':t<TE.T.gift?'touch':t<TE.T.back?'gift':t<TE.DUR?'back':'end',k:t>=TE.DUR?0:Math.min(ss(t/TE.IN),ss((TE.DUR-t)/(TE.DUR-TE.T.back)))});
+TE.skip=(t)=>(t>=TE.T.back?t:TE.T.back);
+
+TE.partner=function(t,gv,agents,kid){
+const P=TE.PLAN[t]||TE.PLAN.letter;
+if(P.with==='kid'&&kid)return kid;
+if(!gv|| !gv.p)return null;
+const d=(a)=>Math.hypot(a.pos[0]-gv.pos[0],a.pos[2]-gv.pos[2]);
+const ok=(a)=>a&&a!==gv&&a.p&&a.vil===gv.vil&&a.pose!=='sleep'&& !a.guest&& !(a.inBoat)&&Math.abs(a.pos[1]-gv.pos[1])<4;
+let fam=null,fd=40,nb=null,nd=25;
+for(const a of agents||[]){
+if(!ok(a))continue;
+const q=d(a);
+if(a.p.fam===gv.p.fam&&q<fd){fd=q;fam=a;}
+else if(a.p.fam!==gv.p.fam&&q<nd){nd=q;nb=a;}
+}
+return fam||nb||(P.with==='kid'?null:null);
+};
+
+TE.GAP=1.0;TE.GAPS={hug:0.5,hands:0.85};
+TE.meet=function(f,p,gap){
+const dx=p[0]-f[0],dz=p[1]-f[1],L=Math.hypot(dx,dz)||1,g=Math.min(gap||TE.GAP,L);
+const friend=[p[0]-dx/L*g,p[1]-dz/L*g];
+return{friend,mid:[(friend[0]+p[0])/2,(friend[1]+p[1])/2]};
+};
+
+
+if(typeof document==='undefined'|| !document.createElement|| !VR.Villages)return;
+const Vs=VR.Villages,P=Vs.prototype;
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
+const wrapA=(a)=>{a=(a+Math.PI)%(Math.PI*2);if(a<0)a+=Math.PI*2;return a-Math.PI;};
+TE.cur=null;TE.hold=false;TE.log=[];
+TE.stats={started:0,skipped:0,framed:0,refused:0};
+const groundY=(g,x,z,y0)=>{const w=g.world;if(!w|| !w.topAt)return y0;const h=w.topAt(Math.floor(x),Math.floor(z));return h>0&&Math.abs(h+1-y0)<6?h+1:y0;};
+function solidOf(g){
+const w=g.world,R=VR.R,F=VR.F;if(!w|| !R|| !F)return()=>false;
+return(x,y,z)=> !!w.getBlock(Math.floor(x),Math.floor(y),Math.floor(z));
+}
+function busy(g){
+if(!g||g.state!=='play'|| !g.player)return'state';
+if(g.ui&&g.ui.screen&&g.ui.screen!=='hud')return'screen';
+if(VR.First&&VR.First.cine&&VR.First.cine(g))return'cine';
+if(g.player.flying||g.player.vehicle||g.flight||g.player.inShip)return'moving';
+return'';
+}
+
+TE.start=function(V,o){
+const g=V&&V.g;o=o||{};
+const gv=o.giver;if(!gv|| !gv.pos||TE.cur){TE.stats.refused++;return false;}
+const why=busy(g);if(why){TE.stats.refused++;TE.log.push(['refused',why]);return false;}
+const plan=TE.PLAN[o.t]||TE.PLAN.letter,pt=TE.partner(o.t,gv,V.agents,o.kid||null),p=g.player.pos;
+
+const to=pt?[pt.pos[0],pt.pos[2]]:[p[0],p[2]],m=TE.meet([gv.pos[0],gv.pos[2]],to,TE.GAPS[plan.touch]);
+if(!pt){const dx=to[0]-gv.pos[0],dz=to[1]-gv.pos[2],L=Math.hypot(dx,dz)||1;m.friend=[to[0]-dx/L*1.8,to[1]-dz/L*1.8];m.mid=[(m.friend[0]+to[0])/2,(m.friend[1]+to[1])/2];}
+const far=Math.hypot(gv.pos[0]-m.friend[0],gv.pos[2]-m.friend[1]);
+if(far>3.5){const u=3.5/far,x=m.friend[0]+(gv.pos[0]-m.friend[0])*u,z=m.friend[1]+(gv.pos[2]-m.friend[1])*u;gv.pos=[x,groundY(g,x,z,gv.pos[1]),z];gv.path=null;gv.vel=[0,0,0];}
+const fy=groundY(g,m.friend[0],m.friend[1],pt?pt.pos[1]:gv.pos[1]);
+const C={V,g,t:0,tt:o.t||'letter',plan,gv,pt,kid:o.kid||null,m,fy,text:String(o.text||''),acts:[gv.act,pt?pt.act:null],hud: !!g.hideHud,first:true,sparkT:0,said:{},pinP:pt?[pt.pos[0],pt.pos[2]]:null};
+gv.act={type:'teEnd'};gv.path=null;gv.bubble=null;gv.teHold=true;
+if(pt){if(!pt.tlKid)pt.act={type:'teEnd'};pt.path=null;pt.bubble=null;pt.teHold=true;}
+
+C.less= !!(VR.A11y&&VR.A11y.less&&VR.A11y.less(g.settings))||(g.settings&&g.settings.travelCam===false);
+
+
+if(!C.less&&pt){
+const F3=VR.Folk3,cy=fy,mid=[m.mid[0],cy,m.mid[1]];
+let shot=null;
+try{if(F3&&F3.frameGroup){const E=g.env,sun=E&&E.sunDir?Math.atan2(E.sunDir[2],E.sunDir[0]):null;const ax=Math.atan2(to[1]-m.friend[1],to[0]-m.friend[0]),toYou=Math.atan2(p[2]-mid[2],p[0]-mid[0]),s1=ax+Math.PI/2,s2=ax-Math.PI/2;
+const pref=pt?(Math.cos(s1-toYou)>=Math.cos(s2-toYou)?s1:s2):toYou;
+const avoid=[];for(const a of V.agents)if(a!==gv&&a!==pt&&Math.abs(a.pos[0]-mid[0])<12&&Math.abs(a.pos[2]-mid[2])<12)avoid.push([a.pos[0],a.pos[2]]);
+if(pt){
+shot=F3.frameGroup(solidOf(g),mid,0.9,{pref,sun,avoid});
+if(!shot&&avoid.length)shot=F3.frameGroup(solidOf(g),mid,0.9,{pref,sun});
+}}}catch(e){shot=null;}
+if(shot){TE.stats.framed++;C.shot={x:shot.P[0],y:shot.P[1],z:shot.P[2],yaw:shot.yaw,pitch:shot.pitch,fov:F3.groupFov?F3.groupFov(shot.d,pt?1.1:0.7,(innerWidth||16)/(innerHeight||9)):null};}
+else{const e=[p[0],p[1]+1.6,p[2]],dx=mid[0]-e[0],dy=mid[1]+1-e[1],dz=mid[2]-e[2];C.shot={x:e[0],y:e[1],z:e[2],yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz)),fov:null};}
+}
+g.hideHud=true;const hud=document.getElementById('hud');if(hud)hud.style.visibility='hidden';
+TE.cur=C;TE.stats.started++;TE.log.push(['start',C.tt,pt?(pt===C.kid?'kid':pt.p.fam===gv.p.fam?'fam':'neighbour'):'you',C.shot?(C.less?'less':'cam'):'nocam']);
+caption(C.text);
+if(VR.EventLog&&VR.EventLog.emit){try{VR.EventLog.emit('social','tale_end',3,[m.mid[0],fy+1,m.mid[1]],'tales',3);}catch(e){}}
+return true;
+};
+
+let capEl=null;
+function caption(text){
+if(!capEl|| !capEl.isConnected){
+capEl=document.createElement('div');capEl.id='tecap';
+capEl.style.cssText='position:absolute;left:50%;bottom:9%;transform:translateX(-50%);max-width:min(640px,80vw);padding:5px 14px;border-radius:12px;background:rgba(10,8,20,.42);color:#fff4e0;font:600 15px/1.35 var(--font,sans-serif);text-shadow:0 1px 3px rgba(0,0,0,.8);text-align:center;pointer-events:none;z-index:7;transition:opacity .4s ease';
+(document.getElementById('app')||document.body).appendChild(capEl);
+}
+capEl.textContent=text||'';capEl.style.opacity=text?'1':'0';
+}
+TE.caption=()=>(capEl&&capEl.style.opacity!=='0'?capEl.textContent:'');
+
+const set=(Pz,j,rx,ry,rz)=>{const q=Pz[j];if(q){q[0]=rx;q[1]=ry;q[2]=rz;}};
+const HANDS=(Pz)=>{set(Pz,'arm_l',0.8,0,0.12);set(Pz,'arm_r',0.8,0,-0.12);set(Pz,'fore_l',0.3,0,0);set(Pz,'fore_r',0.3,0,0);};
+const HUGKID=(Pz)=>{set(Pz,'arm_l',0.95,0,0.42);set(Pz,'arm_r',0.95,0,-0.42);set(Pz,'fore_l',0.75,0,0.35);set(Pz,'fore_r',0.75,0,-0.35);if(Pz.body)Pz.body[0]=0.22;if(Pz.head)Pz.head[0]=0.25;};
+const GIFT=(Pz)=>{set(Pz,'arm_l',1.25,0,0.22);set(Pz,'arm_r',1.25,0,-0.22);set(Pz,'fore_l',0.55,0,0);set(Pz,'fore_r',0.55,0,0);if(Pz.head)Pz.head[0]=0.12;};
+if(P.pose&& !P.pose.__te){
+const op=P.pose;
+P.pose=function(a,t){const Pz=op.apply(this,arguments);if(a&&a.teFx&&Pz){try{a.teFx(Pz,t);}catch(e){a.teFx=null;}}return Pz;};
+P.pose.__te=true;
+}
+
+if(P.runAct&& !P.runAct.__te){
+const orun=P.runAct;
+P.runAct=function(a,dt,tod){
+const C=TE.cur;
+if(!a|| !a.teHold|| !C)return orun.apply(this,arguments);
+const ph=TE.phase(C.t).ph;
+if(a===C.gv&&ph==='come'){
+if(this.goTo(a,C.m.friend[0],C.fy,C.m.friend[1],0.5)){a.vel[0]=0;a.vel[2]=0;a.path=null;}
+return;
+}
+a.vel[0]=0;a.vel[2]=0;a.path=null;
+};
+P.runAct.__te=true;
+}
+if(P.think&& !P.think.__te){const ot=P.think;P.think=function(a){if(a&&a.teHold&&TE.cur)return;return ot.apply(this,arguments);};P.think.__te=true;}
+
+const pin=(a,x,z)=>{a.pos[0]=x;a.pos[2]=z;a.vel[0]=0;a.vel[2]=0;a.path=null;};
+const face=(a,q,dt)=>{const ty=Math.atan2(-(q[0]-a.pos[0]),-(q[2]-a.pos[2]));let dy=ty-(a.yaw||0);while(dy>Math.PI)dy-=Math.PI*2;while(dy< -Math.PI)dy+=Math.PI*2;a.yaw=(a.yaw||0)+dy*Math.min(1,dt*9+0.05);a.lookAt=q;};
+
+TE.step=function(V,dt){
+const C=TE.cur;if(!C||C.V!==V)return;
+const g=C.g,I=g.input;
+const any= !!I&&((I.pressed&&I.pressed.size>0)||(I.mouse&&I.mouse.clicked&&I.mouse.clicked.some(Boolean))||(I.padPressed&&I.padPressed.size>0)||(I.tPressed&&I.tPressed.size>0));
+if(any&& !C.first&& !C.skipped){C.skipped=true;TE.stats.skipped++;C.t=TE.skip(C.t);}
+C.first=false;
+if(!TE.hold)C.t+=Math.min(dt,0.1);
+const gone=V.agents.indexOf(C.gv)<0||(C.pt&&V.agents.indexOf(C.pt)<0);
+const ph=TE.phase(C.t).ph,gv=C.gv,pt=C.pt,p=g.player.pos;
+if(ph==='end'||gone||g.state!=='play'){TE.end();return;}
+const eye=C.shot&& !C.less?[C.shot.x,C.shot.y,C.shot.z]:[p[0],p[1]+1.6,p[2]];
+if(ph==='come'){
+if(pt){if(!C.pinP)C.pinP=[pt.pos[0],pt.pos[2]];pin(pt,C.pinP[0],C.pinP[1]);face(pt,[gv.pos[0],gv.pos[1]+1.3,gv.pos[2]],dt);}
+gv.lookAt=pt?[pt.pos[0],pt.pos[1]+1,pt.pos[2]]:[p[0],p[1]+1.4,p[2]];
+return;
+}
+pin(gv,C.m.friend[0],C.m.friend[1]);if(pt&&C.pinP)pin(pt,C.pinP[0],C.pinP[1]);
+
+if(!C.said.at){
+C.said.at=true;
+if(Math.hypot(gv.pos[0]-C.m.friend[0],gv.pos[2]-C.m.friend[1])>0.9){gv.pos=[C.m.friend[0],C.fy,C.m.friend[1]];}
+gv.vel=[0,0,0];gv.path=null;
+}
+if(ph==='touch'){
+const hug=C.plan.touch==='hug';
+if(pt){face(pt,[gv.pos[0],gv.pos[1]+1.3,gv.pos[2]],dt);face(gv,[pt.pos[0],pt.pos[1]+1,pt.pos[2]],dt);}
+else face(gv,eye,dt);
+const small= !!(pt&&pt.kid&& !gv.kid);
+gv.pose=hug&&pt&& !small?'hug':'stand';gv.teFx=hug&&pt?(small?HUGKID:null):HANDS;
+if(pt){pt.pose=hug?'hug':'stand';pt.teFx=hug?null:HANDS;}
+if(!C.said.touch){C.said.touch=true;if(C.V.hearts){C.V.hearts(gv);if(pt)C.V.hearts(pt);}if(g.audio&&g.audio.play){try{g.audio.play('pop');}catch(e){}}}
+return;
+}
+if(ph==='gift'||ph==='back'){
+gv.pose='stand';face(gv,eye,dt);
+gv.teFx=ph==='gift'?GIFT:null;
+if(pt){pt.pose='stand';pt.teFx=null;face(pt,eye,dt);}
+if(!C.said.gift){
+C.said.gift=true;
+const L=VR.Tales&&VR.Tales.state&&VR.Tales.state.lastEnd,item=L&&L.item;
+caption(item?T('g.te.gift',{item:VR.itemName?VR.itemName(item):item,who:gv.p?gv.p.name:''}):T('g.te.thanks',{who:gv.p?gv.p.name:''}));
+if(g.audio&&g.audio.play){try{g.audio.play('levelup');}catch(e){}}
+}
+C.sparkT-=dt;
+if(ph==='gift'&&C.sparkT<=0&&g.particles){
+C.sparkT=0.35;
+const y=gv.yaw||0,hx=gv.pos[0]-Math.sin(y)*0.45,hz=gv.pos[2]-Math.cos(y)*0.45,hy=gv.pos[1]+(gv.h||1.8)*0.62;
+try{if(g.particles.spark)g.particles.spark(hx,hy,hz,[1,0.88,0.5],10,1.6,1);if(g.particles.glow)g.particles.glow(hx,hy+0.15,hz,[1,0.8,0.45],1.2,0.12,0.7);}catch(e){}
+}
+if(ph==='back')caption('');
+}
+};
+TE.end=function(){
+const C=TE.cur;if(!C)return;
+TE.cur=null;
+const g=C.g,gv=C.gv,pt=C.pt;
+for(const a of[gv,pt])if(a){a.teHold=false;a.teFx=null;if(a.pose==='hug')a.pose='stand';}
+gv.act=null;gv.lookAt=null;
+if(pt&& !pt.tlKid){pt.act=C.acts[1]&&C.acts[1].type!=='talk'?C.acts[1]:null;pt.lookAt=null;}
+g.hideHud=C.hud;const hud=document.getElementById('hud');if(hud)hud.style.visibility=g.hideHud?'hidden':'visible';
+caption('');
+TE.log.push(['end',C.tt,+C.t.toFixed(2),C.skipped?'skipped':'full']);
+if(TE.log.length>40)TE.log.splice(0,TE.log.length-40);
+};
+
+TE.cam=function(g,base){
+const C=TE.cur;if(!C|| !C.shot||C.less|| !base)return null;
+const k=TE.phase(C.t).k;if(k<=0.001)return null;
+const S=C.shot,fov=S.fov||base.fov;
+return Object.assign({},base,{x:base.x+(S.x-base.x)*k,y:base.y+(S.y-base.y)*k,z:base.z+(S.z-base.z)*k,yaw:base.yaw+wrapA(S.yaw-base.yaw)*k,pitch:base.pitch+(S.pitch-base.pitch)*k,fov:base.fov&&fov?base.fov+(fov-base.fov)*k:base.fov,roll:(base.roll||0)*(1-k),fixed:true});
+};
+TE.seek=(t)=>{if(TE.cur)TE.cur.t=t;};
+if(P.update&& !P.update.__te){
+const ou=P.update;
+P.update=function(dt){const r=ou.apply(this,arguments);if(TE.cur){try{TE.step(this,dt);}catch(e){TE.err=String((e&&e.message)||e);TE.end();}}return r;};
+P.update.__te=true;
+}
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 
