@@ -117,5 +117,48 @@ check(LF.shade(14, 1) < 0.3, 'the vertical falloff: 14 m under the lights little
 const glsl = LF.glslCommon();
 check(glsl.includes('max(abs(dy) - 1.5, 0.0)') && glsl.includes('0.55 + 0.45 * n.y * fy + 0.25 * (1.0 - abs(n.y))'), 'the GLSL carries the mirror\'s shape');
 
+// f-polish8: pools that read — point lights stronger, strips out, low lights round, windows outward, the brightest kept
+console.log('f · f-polish8: what a light is to the field');
+const KD = LF.KIND, kindOf = (n) => (R.byName[n] ? LF.kindOf(R.T, R.S(n)) : -1);
+check(KD && ['lantern', 'torch', 'campfire', 'vx_lamppost', 'vx_lantern', 'lumishroom', 'campfire'].every(n => kindOf(n) === KD.point), 'lamps, lanterns, torches, fires, bulbs: point lights', ['lantern', 'campfire', 'vx_lamppost'].map(kindOf).join(' '));
+check(['neon_cyan', 'vx_led_strip', 'vx_tech_white_strip', 'vx_floor_plaza_line', 'light_panel', 'tech_panel', 'lava', 'temple_light_bar', 'vx_holo_screen'].every(n => kindOf(n) === KD.none), 'neon, LED strips, floor lines, panels, light bars, screens, lava: no light of the field', ['neon_cyan', 'vx_led_strip', 'lava'].map(kindOf).join(' '));
+check(['window_warm', 'vx_window_glow', 'amber_window'].every(n => kindOf(n) === KD.window), 'the glowing windows: outward lights');
+// a fresh stub world for each case
+const cols2 = new Map();
+const colAt2 = (kx, kz) => { const k = kx + ',' + kz; let c = cols2.get(k); if (!c) { c = { blocks: new Uint16Array(Hc << 8), H: Hc }; for (let i = 0; i < 256; i++) for (let y = 0; y < 64; y++) c.blocks[(y << 8) | i] = stone; cols2.set(k, c); } return c; };
+const set2 = (x, y, z, s) => { const c = colAt2(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; };
+const field2 = (build) => { cols2.clear(); build(); const f2 = new LF.Field(); f2.center(0.5, 65.6, 0.5); for (let i = 0; i < 40; i++) f2.scan(colAt2, R.T, 4); for (let i = 0; i < 60; i++) if (f2.rebuild(64)) break; f2.compose(); return f2; };
+const at2 = (f2, x, z) => lum(LF.decode(f2.out, (z & 127) * 128 + (x & 127), f2.Y0));
+const neon = R.S('neon_cyan'), torchS = R.S('torch'), fenceS = R.byName.oak_fence ? R.S('oak_fence') : R.S('cobblestone_wall'), win = R.S('window_warm'), plank = R.byName.oak_planks ? R.S('oak_planks') : stone;
+let f2 = field2(() => { for (let x = -6; x < 6; x++) set2(x, 66, 0, neon); });
+check(f2.stats.lights === 0 && at2(f2, 0, 3) < 0.001, 'a neon band: no pool', f2.stats.lights);
+// a point light against a plain light of the same level and colour (a lantern vs a glowing non-point block stand-in)
+f2 = field2(() => set2(0, 66, 0, lantern));
+const pt3 = at2(f2, 3, 0), pt0 = at2(f2, 0, 0);
+check(pt3 > 0.45 && pt0 > 1.0, 'a lantern\'s pool reads: at 3 m ' + r3(pt3) + ', under it ' + r3(pt0));
+// low lights: two lanterns on fence posts 4 m apart make two pools with a dip between; high ones a band
+const pair = (y, post) => field2(() => { for (const x of [-2, 2]) { if (post) set2(x, 64, 0, fenceS); set2(x, y, 0, lantern); } });
+const lowF = pair(65, true), hiF = pair(68, false);
+const dip = (ff) => at2(ff, 0, 0) / at2(ff, 2, 0);
+check(dip(lowF) < 0.8 && dip(lowF) < dip(hiF) - 0.1, 'low lanterns on posts: round pools, a dip between (' + r3(dip(lowF)) + ' vs high ' + r3(dip(hiF)) + ')');
+check(at2(lowF, 2, 5) < at2(hiF, 2, 5), 'a low light reaches less far', r3(at2(lowF, 2, 5)) + ' < ' + r3(at2(hiF, 2, 5)));
+// a window in a roofed room's wall: the street outside lit, the room little
+f2 = field2(() => { for (let x = -4; x <= 4; x++) for (let z = 0; z <= 6; z++) { set2(x, 69, z, plank); for (let y = 64; y <= 68; y++) if (x === -4 || x === 4 || z === 0 || z === 6) set2(x, y, z, plank); } set2(0, 66, 0, win); });
+const wOut = at2(f2, 0, -3), wIn = at2(f2, 0, 3);
+check(wOut > 0.2 && wOut > wIn * 2, 'a glowing window lights the street outside, not the room (out ' + r3(wOut) + ', in ' + r3(wIn) + ')');
+// the cap: a window of many lights keeps the brightest
+f2 = field2(() => { for (let x = -60; x < 60; x += 2) for (let z = -60; z < 60; z += 2) set2(x, 66, z, (x + z) % 8 === 0 ? lantern : R.S('spirit_lantern')); });
+check(f2.stats.lights <= LF.MAXL && f2.stats.lights > LF.MAXL * 0.9, 'a town of 3600 lights: the ' + LF.MAXL + ' brightest kept', f2.stats.lights);
+let keptBright = 0; for (let i = 0; i < f2.nList; i++) if (f2.L[i * LF.LW + 3] > 0.9) keptBright++;
+check(keptBright >= Math.min(f2.nList, 400) * 0.95, 'the kept ones are the bright lanterns, not the dim spirit lanterns', keptBright + ' of ' + f2.nList);
+// the fairy lights ×1.8, radius 12
+{
+  const fs0 = { sites: [{ x: 0, z: 0, parts: [{ m: 'fy_shroom_0', pos: [3, 65, 3], o: { h: 3 } }] }] };
+  const ff = new LF.Field(); ff.center(0.5, 65.6, 0.5);
+  LF.fairyLights(fs0, ff, 1, 0);
+  const D7 = ff.dyn, c0 = LF.FAIRY.fy_shroom_0;
+  check(ff.nDyn === 1 && Math.abs(D7[3] / c0[0] - LF.K.fairy * 0.9 * 0.9) < 0.02 && D7[6] === 12 && LF.K.fairy >= 1.8, 'a fairy mushroom: ×' + LF.K.fairy + ', radius ' + D7[6], r3(D7[3] / c0[0]));
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
