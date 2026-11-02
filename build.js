@@ -72,6 +72,7 @@ MAIN.push('story_arc2b');   // a-story8: Arc 2's beauty (src/main/story_arc2b.js
 MAIN.push('score2_hooks');   // e-score2: the discoveries' stingers (src/main/score2_hooks.js: wander moments, fairy places, a family moving in) — last, it wraps
 MAIN.splice(MAIN.indexOf('audio') + 1, 0, 'score_story');   // a-story8: Arc 2's music (src/main/score_story.js: the story cues, audio.storyCue, the arc's theme in a scene) — after score2 and audio.js
 MAIN.push('diegetic');   // f-ux: VR.Diegetic (src/main/diegetic.js) — the goal's trail and signpost, the compass rose, the book, the satchel, the vitals' edge, the quick wheel (the last main module: it wraps hudfade, map, funke, input, wander)
+MAIN.splice(MAIN.indexOf('shaders'), 0, 'lightfield'); MAIN.push('lightfield_gl');   // v-light: Lichtpfützen (src/main/lightfield.js before the shaders: its GLSL in COMMON; lightfield_gl.js last: it wraps the renderer, the villages, the festival and the story's glows)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

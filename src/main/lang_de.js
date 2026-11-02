@@ -661,6 +661,8 @@
     'g.set.lvTone': 'Mondlicht & Weltenfarben',
     'g.set.lvTone.tip': 'Nachts silberblaues Mondlicht, warme Lampen leuchten sanft, der Himmel nie ganz schwarz — und jede Welt ihre eigene Farbstimmung (Aquamarin, Ocker, Zinnober, Opal, Basalt, die Station).',
     'g.set.lvMeadow': 'Wiesenruhe',
+    'g.set.lfPools': 'Lichtpfützen',
+    'g.set.lfPools.tip': 'Nachts warme Lichtinseln: Laternen, Feuer, Fenster und Feenlichter werfen weiche, farbige Lichtpfützen auf Straßen, Wände und Leute — Mauern werfen Schatten, getragene Laternen wandern mit.',
     'g.set.lvMeadow.tip': 'Das Gras nah vor dir ruhiger, wie gemalt: weniger Pixelrauschen, große weiche Farbflecken über die Wiese.',
     'g.set.magic.tip': 'Wie stark der Sternenhimmel am Tag durchscheint.',
     'g.set.scale.tip': 'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',

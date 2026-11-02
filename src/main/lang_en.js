@@ -661,6 +661,8 @@
     'g.set.lvTone': 'Moonlight & world colours',
     'g.set.lvTone.tip': 'Silver-blue moonlight at night, warm lamps glowing softly, the sky never fully black — and every world its own colour mood (Aquamarine, Ochre, Cinnabar, Opal, Basalt, the station).',
     'g.set.lvMeadow': 'Calm meadow',
+    'g.set.lfPools': 'Light pools',
+    'g.set.lfPools.tip': 'Warm islands of light at night: lanterns, fires, windows and fairy lights cast soft coloured pools onto streets, walls and people — walls cast shadows, carried lanterns move with their bearers.',
     'g.set.lvMeadow.tip': 'The grass near you calmer, as if painted: less pixel noise, large soft patches of colour across the meadow.',
     'g.set.magic.tip': 'How strongly the starry sky shows through by day.',
     'g.set.scale.tip': 'A lower resolution renders faster; the picture is scaled up.',
