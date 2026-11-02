@@ -39,6 +39,7 @@
   const game = () => VR.game || null;
   const lookAt = (C, Q, fov, base) => { const dx = Q[0] - C[0], dy = Q[1] - C[1], dz = Q[2] - C[2]; return Object.assign({}, base, { x: C[0], y: C[1], z: C[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), roll: 0, fov: fov * DEG, fixed: true }); };
   const keyLabel = () => { const B = VR.Binds, code = B && B.current && B.current.slots ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV'; return B && B.label ? B.label(code, (VR.I18N && VR.I18N.lang) || 'de') : 'V'; };
+  P.ACT_MERGE = 1.5;   // (f-polish9: s an act's record waits for the moment it belongs to)
   P.stats = { offers: 0, scenes: 0, skips: 0, laters: 0, brainMs: 0, brains: 0, drawMs: 0 };
 
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'storyOffer', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.storyOffer', tip: 'g.set.storyOffer.tip', cost: 'low', def: true });
@@ -134,6 +135,7 @@
     update(dt) {
       const g = this.g; if (g.state !== 'play' || !g.player) return;
       this.played += dt;
+      if (this.actEv && (g.time || 0) - this.actEv.t >= P.ACT_MERGE) { const L = VR.EventLog, e = this.actEv; this.actEv = null; if (L) { const big = L.sinceSeen ? L.sinceSeen(4) <= (g.time || 0) - e.t + 0.5 : false; L.emit('story', 'act:' + e.id, big ? 1 : 2, null, 'act'); P.stats.actMerged = (P.stats.actMerged | 0) + (big ? 1 : 0); } }
       // (calm: the cheap checks every frame, the foes' and the cameras' twice a second)
       if ((this.calmCheckT = (this.calmCheckT || 0) - dt) <= 0) { this.calmCheckT = 0.5; this.loud = P.fighting(g) || P.landing(g) || P.otherCam(g); }
       const busy = !!this.scene || this.loud || P.building(g) || !!(g.ui && (g.ui.screen || g.ui.typing));
@@ -167,7 +169,10 @@
       else if (g.ui && g.ui.hint) g.ui.hint(T('story.act.done'), 3000);
       if (g.audio && g.audio.play) { try { g.audio.play('ping', { vol: 0.4 }); } catch (e) { /* a sound */ } }
       const A = VR.Adventure; if (A && A.award) { try { A.award('beat', { id: 'act:' + b.id, xp: 30 }); } catch (e) { /* optional */ } }
-      if (VR.EventLog) VR.EventLog.emit('story', 'act:' + b.id, 2, null, 'act');
+      // (f-polish9 · one moment, one weight: an act done with the moment it belongs to — the outpost freed in the same
+      // second — is told with that moment: its record waits ACT_MERGE s and goes in at weight 1 when something of weight
+      // ≥ 4 was seen meanwhile; the adventurer's session had act:c1.b1 0.3 s before „freed", a pair)
+      this.actEv = { id: b.id, t: g.time || 0 };
       this.save();
       if (VR.Quests && g.ui && g.ui.screen === 'journal') VR.Quests.renderJournal();
     }

@@ -541,7 +541,7 @@
       // notice you), a scene or a wow on screen — those fill the gap themselves: no beat on top of them, even past hard
       const hold = !!(RG && ((RG.vistaNear && RG.vistaNear(g)) || (RG.foeComing && RG.foeComing(g)) || (g.wow && g.wow.active) || (RG.of && RG.of(g) && RG.of(g).sched.scene)));
       const want = P.want(now, { foot: walking, busy, coming, hold });
-      if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : hold ? 'hold' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
+      if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : hold ? 'held' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {

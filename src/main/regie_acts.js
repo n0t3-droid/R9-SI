@@ -104,12 +104,15 @@
   }
   // the first sight of a disturbed outpost (its beacon in the view within RULES.sight m): Funke names it, the event
   // log's discovery — once a site, never on top of another moment (Regie.busy)
-  RA.RULES.sight = 110;
+  RA.RULES.sight = 110; RA.RULES.at = 35;
   function sight(g, S) {
     const s = nearestSite(g), b = s && s.known && s.beacon; if (!b || (S.seen && S.seen[s.id])) return;
     const P = g.player.pos, d = Math.hypot(b[0] - P[0], b[2] - P[2]); if (d > RA.RULES.sight) return;
     const L = VR.EventLog, q = [b[0] + 0.5, b[1] + 2, b[2] + 0.5]; if (!L || !L.inView) return;
     const v = L.inView(q, 12, g); if (!v.inView || (v.frac > 0 && v.frac < 0.005)) return;
+    // (f-polish9: already at it — within RULES.at m, after its guards — it is no discovery: seen, nothing told; the
+    // adventurer's session had its sight 7 s before the last guard calmed, a pair)
+    if (d < RA.RULES.at) { (S.seen || (S.seen = {}))[s.id] = g.time || 0; RA.stats.sightAt = (RA.stats.sightAt | 0) + 1; return; }
     if (VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) return;
     if (VR.Funke && VR.Funke.foeOf && VR.Funke.foeOf(g)) return;   // (a-session: not in the middle of its fight — the outpost is no news then)
     (S.seen || (S.seen = {}))[s.id] = g.time || 0;
