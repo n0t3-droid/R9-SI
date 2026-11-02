@@ -226,7 +226,7 @@
     V._gsPlay = { k1, k2, d, ph: 'walk', t: 0, freed };
     for (const k of [k1, k2]) { k.act = { type: 'gsplay', role: k === k1 ? 'hero' : 'machine' }; k.path = null; k.goal = null; k.vel[0] = 0; k.vel[2] = 0; }
     k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]];
-    if (freed) { k2.pose = 'crouch'; say(G, k2, T('g.gs.play.machine'), 3.2, 'play'); }
+    if (freed) { k2.pose = 'crouch'; say(G, k2, T('g.gs.play.machine'), 2.6, 'play'); }
     G.log.push({ t: Date.now(), who: k1.p.id, what: 'play', text: 'stage' });
     return V._gsPlay;
   };
@@ -235,7 +235,7 @@
     const P0 = V._gsPlay, g = V.g;
     if (!P0 || (a !== P0.k1 && a !== P0.k2) || V.agents.indexOf(P0.k1) < 0 || V.agents.indexOf(P0.k2) < 0) { a.act = null; if (a.pose === 'crouch') a.pose = 'stand'; if (P0 && (a === P0.k1 || a === P0.k2)) V._gsPlay = null; return; }
     const { k1, k2, d } = P0;
-    if (a === k2) { k2.vel[0] = 0; k2.vel[2] = 0; k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]]; if (P0.freed && P0.ph !== 'rise' && (P0.blink = (P0.blink || 0) + dt) > 0.6) { P0.blink = 0; sparks(g, k2, [0.45, 0.75, 1], 2); } return; }
+    if (a === k2) { k2.vel[0] = 0; k2.vel[2] = 0; if (P0.freed && P0.ph !== 'rise') k2.pose = 'crouch'; k2.lookAt = [k1.pos[0], k1.pos[1] + 0.9, k1.pos[2]]; if (P0.freed && P0.ph !== 'rise' && (P0.blink = (P0.blink || 0) + dt) > 0.6) { P0.blink = 0; sparks(g, k2, [0.45, 0.75, 1], 2); } return; }
     // the hero drives the play
     P0.t += dt;
     let arrived = false;
@@ -246,9 +246,9 @@
     P0.ph = nx; P0.t = 0;
     if (nx === 'tap') {   // the hero faces the machine and taps it: the hero's line
       k1.lookAt = [k2.pos[0], k2.pos[1] + 0.8, k2.pos[2]]; k1.waveT = 1.4; k1.yaw = Math.atan2(-(k2.pos[0] - k1.pos[0]), -(k2.pos[2] - k1.pos[2]));
-      say(G, k1, T(G.lineKey('kid', d.k, k1.p.seed), vars(g, d, k1)), 4.2, 'kid'); sparks(g, k2, [1, 0.85, 0.4], 6);
+      k2.bubble = null; say(G, k1, T(G.lineKey('kid', d.k, k1.p.seed), vars(g, d, k1)), 4.2, 'kid'); sparks(g, k2, [1, 0.85, 0.4], 6);
     } else if (nx === 'rise') {   // the machine stands up, friendly; both cheer
-      k2.pose = 'stand'; k2.waveT = 1.6; k1.waveT = 1.6;
+      k2.pose = 'stand'; k2.waveT = 1.6; k1.waveT = 1.6; k1.bubble = null;
       say(G, k2, T('g.gs.kid2.' + d.k, vars(g, d, k2)), 4, 'kid2'); sparks(g, k2, [0.6, 1, 1], 8); sparks(g, k1, [1, 0.9, 0.5], 4);
     } else if (nx === 'done') { for (const k of [k1, k2]) { if (k.act && k.act.type === 'gsplay') k.act = null; if (k.pose === 'crouch') k.pose = 'stand'; k.lookAt = null; } V._gsPlay = null; }
   };
@@ -257,7 +257,8 @@
     const g = V.g, w = g.world, MI = VR.MoveIn;
     if (V._gsVisit || !f || !w || !MI || !MI.groundAt) return false;
     const vil = V.known && V.known.get(f.vid), pidp = String(pid).slice(String(pid).indexOf('/') + 1);
-    const person = vil && vil.people && vil.people.find(q => String(q.id) === pidp);
+    const live = vil && vil.active ? V.agents.find(o => o.vil === vil && o.p && String(o.p.id) === pidp) : null;
+    const person = (vil && vil.people && vil.people.find(q => String(q.id) === pidp)) || (live && live.p);   // (a town's folk live only as agents)
     const proto = V.agents.find(a => a && a.constructor && a.p && a.vil);
     if (!person || !proto) return false;
     // from 26–34 m out, toward their village first (the first heading with ground)
@@ -270,14 +271,17 @@
       const y = MI.groundAt(w, sx, door[1] + 14, sz, 30); if (y !== null && y !== undefined) start = [sx + 0.5, y, sz + 0.5];
     }
     if (!start) return false;
-    let a = vil.active ? V.agents.find(o => o.vil === vil && o.p && String(o.p.id) === pidp) : null, guest = false;
-    if (!a) {
+    let a = live, guest = false, pOrig = null;
+    if (a) {   // their village is awake: the real one comes (with a basket while they visit); unseen, from the way's start
+      pOrig = a.p; a.p = Object.assign({}, a.p, { look: a.p.look ? Object.assign({}, a.p.look, { tool: 'basket' }) : a.p.look }); a.fg = null;
+      if (a.drawn === false || Math.hypot(a.pos[0] - door[0], a.pos[2] - door[2]) > 60) { a.pos = start.slice(); a.vel = [0, 0, 0]; }
+    } else {
       const look = person.look ? Object.assign({}, person.look, { tool: 'basket' }) : person.look;
       a = new proto.constructor(vil, Object.assign({}, person, { look }), start); a.guest = true; guest = true;
       V.agents.push(a);
     }
     a.act = { type: 'gsvisit' }; a.path = null; a.goal = null; a.bubble = null; a.pose = 'stand';
-    V._gsVisit = { a, guest, pid, f, door: door.slice(0, 3), start, gift, ph: 'walk', t: 0, given: false };
+    V._gsVisit = { a, guest, pOrig, pid, f, door: door.slice(0, 3), start, gift, ph: 'walk', t: 0, given: false };
     G.log.push({ t: Date.now(), who: person.id, what: 'visitStart', text: 'start' });
     return true;
   };
@@ -307,7 +311,7 @@
   G.endVisit = function (V) {
     const J = V._gsVisit; if (!J) return; V._gsVisit = null;
     const a = J.a;
-    if (J.guest) { const i = V.agents.indexOf(a); if (i >= 0) V.agents.splice(i, 1); } else if (a.act && a.act.type === 'gsvisit') a.act = null;
+    if (J.guest) { const i = V.agents.indexOf(a); if (i >= 0) V.agents.splice(i, 1); } else { if (a.act && a.act.type === 'gsvisit') a.act = null; if (J.pOrig) { a.p = J.pOrig; a.fg = null; } }
   };
   G.tick = function (V, dt) {
     const g = V.g; if (!G.on(g) || !g.player || !g.env) { G.why = 'off'; return; }

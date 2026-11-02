@@ -408,10 +408,10 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
   const SOLES = 14; S.soleBuf = null; S.soleN = 0; S.soleVer = 0; S.soleK = new Float32Array(SOLES); S.soleAt = new Int32Array(SOLES); S.soleCnt = new Int32Array(SOLES);
   function buildSoles(g, h0) {
     if (!S.soleBuf) S.soleBuf = new Float32Array(SOLES * D.SOLE_FLOATS);
-    const pts = S.pts, y0 = g.player.pos[1]; let o = 0, n = 0;
+    const pts = S.pts, y0 = g.player.pos[1], fr = y0 - Math.floor(y0 + 0.1), lift = (fr > 0 && fr < 0.95 ? fr : 0) + 0.03; let o = 0, n = 0;   // (the floor's own height: a plate or a slab under your feet)
     for (let i = 0; i < pts.length && n < SOLES; i++, n++) {
       const q = pts[i], y = q.y === undefined ? (q.y = groundY(g, q.x, q.z, y0)) : q.y;
-      S.soleAt[n] = o / 3; const w = D.sole(S.soleBuf, o, q.x, y + 0.025, q.z, fin(q.h) ? q.h : h0, q.side, 1.3); S.soleCnt[n] = w / 3; S.soleK[n] = q.k; o += w;
+      S.soleAt[n] = o / 3; const w = D.sole(S.soleBuf, o, q.x, (q.y === Math.floor(q.y) ? y + lift : y + 0.03), q.z, fin(q.h) ? q.h : h0, q.side, 1.3); S.soleCnt[n] = w / 3; S.soleK[n] = q.k; o += w;
     }
     S.soleN = n; S.soleVer++;
   }

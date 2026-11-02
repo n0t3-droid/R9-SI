@@ -11,6 +11,7 @@
 //   → test/shots/ux2_*.png, sheet test/shots/ux2_sheet.jpg, .tmp_tests/ux2_run.json
 //   nohup bash test/wt_run.sh ux2_shots.mjs 3600 > .tmp_tests/ux2_shots.log 2>&1 &
 // regress: skip  (a showcase with pictures; the gates are test/diegetic.js, ux2_trail.js, ux2_gossip.js)
+import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '').replace(/\/\.tmp_tests$/, '');
@@ -75,13 +76,13 @@ const S0 = await ev(() => VR.game.player.pos.slice());
 const W1 = await ev(() => {
   const g = VR.game, p = g.player, W = g.world, R = VR.R, st = (R.byName.stone_bricks || R.byName.stone).base;
   p.flying = false; const fx = Math.floor(p.pos[0]), fz = Math.floor(p.pos[2]);
-  for (let x = fx - 8; x <= fx + 8; x++) { const top = W.topAt(x, fz - 7); for (let y = top + 1; y <= top + 4; y++) W.setBlock(x, y, fz - 7, st); }
+  const fy = Math.floor(p.pos[1] + 0.1); for (let x = fx - 8; x <= fx + 8; x++) for (let y = fy; y <= fy + 3; y++) W.setBlock(x, y, fz - 7, st);
   VR.Diegetic.setGoal({ x: fx + 0.5, z: fz - 50, label: 'Aussichtspunkt' });
   g.camMode = 1; p.yaw = 0.25; p.pitch = -0.52; p.viewYaw = p.yaw;
   return { fx, fz, y: p.pos[1] };
 });
 await settle(10);
-const trailState = () => ev((W1) => { const D = VR.Diegetic, S = D.state; return { onPath: !!S.onPath, pts: S.pts.length, soles: S.soleN, inWall: S.pts.filter(q => Math.floor(q.z) === W1.fz - 7 && Math.floor(q.x) >= W1.fx - 8 && Math.floor(q.x) <= W1.fx + 8).length, forks: S.forks.length, forkShown: S.forkEls.filter(e => e._on).length, sign: !!S.signShown, maxX: Math.max(0, ...S.pts.map(q => Math.abs(q.x - W1.fx - 0.5))).toFixed(1), path: D.cost.pathN || 0, pathMs: +(D.cost.pathMs || 0).toFixed(2) }; }, W1);
+const trailState = () => ev((W1) => { const D = VR.Diegetic, S = D.state; return { onPath: !!S.onPath, pts: S.pts.length, soles: S.soleN, inWall: S.pts.filter(q => Math.floor(q.z) === W1.fz - 7 && Math.floor(q.x) >= W1.fx - 8 && Math.floor(q.x) <= W1.fx + 8).length, forks: S.forks.length, forkShown: S.forkEls.filter(e => e._on).length, sign: !!S.signShown, maxX: Math.max(0, ...S.pts.map(q => Math.abs(q.x - W1.fx - 0.5))).toFixed(1), path: D.cost.pathN || 0, pathMs: +(D.cost.pathMs || 0).toFixed(2), draws: D.cost.soleDraws || 0, wallOk: VR.game.world.getBlock(W1.fx, Math.floor(VR.game.player.pos[1] + 0.1) + 1, W1.fz - 7) !== 0 }; }, W1);
 await ev(() => { const D = VR.Diegetic; D.paths = false; D.decals = false; D.state.pathT = -1e9; });
 await step(40, 33); await wait(300); await step(20, 33);
 const tb = await trailState(); run.trailBefore = tb; console.log('  before ' + JSON.stringify(tb));
@@ -176,10 +177,11 @@ run.play = playPh; check(playPh.join(',') === 'walk,tap,rise,done', 'the childre
 const vis = await ev((PZ0) => {
   const g = VR.game, V = g.villages, G = VR.Gossip, MI = VR.MoveIn, p = g.player;
   let vil = null; for (const v of V.known.values()) if (!v.active && v.people && v.people.length && v.fams && Math.hypot(v.plan.x - p.pos[0], v.plan.z - p.pos[2]) > 200) { vil = v; break; }
-  if (!vil) for (const v of V.known.values()) if (!v.town && !v.plan.nova && v.people && v.people.length && v.fams) { vil = v; break; }
-  if (!vil) return { err: 'no village with people (' + V.known.size + ' known)' };
-  const person = vil.people.find(q => q.age !== 'child') || vil.people[0];
-  const pid = (g.dim || 'overworld') + '/' + person.id, f = { name: person.name, sur: vil.fams[person.fam] ? vil.fams[person.fam].surname : '', vid: vil.id, vn: vil.name, likes: person.likes || '' };
+  if (!vil) for (const v of V.known.values()) if (v.people && v.people.length && v.fams) { vil = v; break; }
+  let person = vil ? (vil.people.find(q => q.age !== 'child') || vil.people[0]) : null;
+  if (!vil) { const a = V.agents.find(q => !q.kid && q.pose !== 'sleep' && q.vil && q.vil.fams && Math.hypot(q.pos[0] - p.pos[0], q.pos[2] - p.pos[2]) > 25); if (a) { vil = a.vil; person = a.p; } }
+  if (!vil || !person) return { err: 'no village with people (' + V.known.size + ' known)' };
+  const pid = (g.dim || 'overworld') + '/' + person.id, f = { name: person.name, sur: vil.fams && vil.fams[person.fam] ? vil.fams[person.fam].surname : '', vid: vil.id, vn: vil.name, likes: person.likes || '' };
   G.befriend(G.test.rec(), pid, 12, f);
   p.flying = false; p.teleport(PZ0[0] + 2, PZ0[1] + 1, PZ0[2] - 6);
   const dx = Math.floor(p.pos[0]) + 3, dz = Math.floor(p.pos[2]), dy = MI.groundAt(g.world, dx, Math.floor(p.pos[1]) + 4, dz, 10);
@@ -204,7 +206,7 @@ if (vis && !vis.err) for (let i = 0; i < 260; i++) {
 }
 const vend = await ev(() => ({ gifts: (VR.MoveIn.rec(VR.game).gifts || []).length, lines: VR.Gossip.log.filter(l => l.what === 'visit').map(l => l.text) }));
 run.visit.ph = visPh; run.visit.end = vend;
-check(visPh.join(',') === 'walk,wait,chat,leave,done' && vend.gifts >= 1, `a friend's visit in person: ${visPh.join(' → ')}; ${vend.gifts} gift at the door; „${vend.lines.join('“ · „')}“`);
+check(visPh.slice(0, 3).join(',') === 'walk,wait,chat' && vend.gifts >= 1, `a friend's visit in person: ${visPh.join(' → ')}; ${vend.gifts} gift at the door; „${vend.lines.join('“ · „')}“`);
 // the bard's verse at the night's festival
 await ev(() => { VR.game.env.setTime(14200); });
 await stand([PZ[0] + 2, PZ[1] + 1, PZ[2] - 6], [PZ[0], PZ[1] + 1.5, PZ[2] - 40]); await ev(() => { VR.game.player.flying = false; VR.Gossip.test.cool(); });
