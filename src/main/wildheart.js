@@ -53,7 +53,7 @@
     const def = M[kind](), spec = B.coatSpec(kind, v, baby), K = B.KINDS[kind];
     if (!def || !spec) return def;
     const body = def.parts.body && def.parts.body.grid, base = body ? dominant(body) : 0;
-    const ink = INK[kind] === 'light' ? K.light : K.dark;
+    const ink = INK[kind] === 'light' ? K.light : K.dark, other = INK[kind] === 'light' ? K.dark : K.light;
     const eyes = EYES[kind] || [], head = def.parts.head && def.parts.head.grid;
     const eyeCells = new Set();
     if (head) for (const e of eyes) for (const [dx, dy, dz] of [[0, 0, 0], [0, 1, 0], [e[3], 0, e[4]], [e[3], 1, e[4]]]) eyeCells.add((e[0] + dx) + ',' + (e[1] + dy) + ',' + (e[2] + dz));
@@ -65,7 +65,9 @@
         if (name === 'head' && eyeCells.has(x + ',' + y + ',' + z)) return;
         const c = val & 0xffffff; if (cdist(c, base) > 90) return;
         const t = B.sample(spec.tex, x, y + (name === 'head' ? 7 : 0), z + (name === 'tail' ? 11 : 0)) / 255;
-        if (t > 0.02) g.set(x, y, z, B.mix(c, ink, t * spec.k), 0);
+        // two tones: the pattern toward its ink, the ground a little toward the other colour (contrast both ways)
+        if (t > 0.5) g.set(x, y, z, B.mix(c, ink, spec.k * (t - 0.5) * 2), 0);
+        else g.set(x, y, z, B.mix(c, other, spec.k * 0.45 * (0.5 - t) * 2), 0);
       });
     }
     // big eyes (two by two, a catchlight up front) and the closed-eye head
@@ -136,10 +138,15 @@
       this.cost = { thinks: 0, ms: 0 };
       if (VR.Ctx && VR.Ctx.hooks && VR.Ctx.hooks.near && !VR.Ctx.hooks.near.wh) {
         // V pets every animal of ours within reach (the 🐾 companions' own row already lists theirs)
-        const hook = (gg, eye) => {
-          const H = gg.companions && gg.companions.heart; if (!H || !H.on || !gg.entities) return null;
-          let best = null, bd = 30;
-          for (const m of gg.entities.mobs) { if (!m.wh || m.dead || m.def.companion) continue; const dx = m.pos[0] - eye[0], dz = m.pos[2] - eye[2], d = dx * dx + dz * dz; if (d < bd) { bd = d; best = m; } }
+        const hook = (gg, eye, dir) => {
+          const H = gg.companions && gg.companions.heart; if (!H || !H.on || !gg.entities || !dir) return null;
+          let best = null, bd = 0.94;   // (the one nearest the aim, within 6 blocks)
+          for (const m of gg.entities.mobs) {
+            if (!m.wh || m.dead || m.def.companion) continue;
+            const dx = m.pos[0] - eye[0], dy = m.pos[1] + m.h * 0.4 * (m.wscale || 1) - eye[1], dz = m.pos[2] - eye[2], d = Math.hypot(dx, dy, dz);
+            if (d > 6 || d < 0.01) continue;
+            const c = (dx * dir[0] + dy * dir[1] + dz * dir[2]) / d; if (c > bd) { bd = c; best = m; }
+          }
           return best ? { kind: 'pet', name: '', pos: [best.pos[0], best.pos[1] + best.h * 0.5 * (best.wscale || 1), best.pos[2]], r: Math.max(0.35, best.w), ref: best } : null;
         };
         VR.Ctx.hooks.near.push(hook); VR.Ctx.hooks.near.wh = true;
@@ -229,7 +236,7 @@
         }
         case 'approach': {
           const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2], d = Math.hypot(dx, dz) || 1;
-          wt[0] = p.pos[0] + dx / d * 1.3; wt[1] = p.pos[2] + dz / d * 1.3; wt[2] = 0.32; go = d > 1.5;
+          wt[0] = p.pos[0] + dx / d * 1.0; wt[1] = p.pos[2] + dz / d * 1.0; wt[2] = 0.32; go = d > 1.5;   // (it stops ~1.6 blocks off: within sniffing reach)
           break;
         }
         case 'trail': {
@@ -267,7 +274,7 @@
       const food = !!(this.held && B.takes(m.kind, this.held));
       const settle = B.settle({ night, rain });
       if (settle && !(food && trust >= 1)) {
-        if (h.baby && h.mom && !h.mom.dead) { const md = Math.hypot(h.mom.pos[0] - m.pos[0], h.mom.pos[2] - m.pos[2]); h.mode = md > 1.4 ? 'follow' : 'rest'; return; }
+        if (h.baby && h.mom && !h.mom.dead) { const md = Math.hypot(h.mom.pos[0] - m.pos[0], h.mom.pos[2] - m.pos[2]); h.mode = md > 2.2 ? 'follow' : 'rest'; return; }
         if (h.mode === 'rest' || h.mode === 'restgo' || h.mode === 'shelter') { if (h.mode === 'shelter' && settle === 'rest') h.mode = 'rest'; return; }
         h.cover = this.coverNear(m.pos[0], m.pos[2], settle === 'shelter' ? 10 : 7);
         h.mode = h.cover ? (settle === 'shelter' ? 'shelter' : 'restgo') : 'rest';

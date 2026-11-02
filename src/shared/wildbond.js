@@ -121,7 +121,7 @@
   // ---------------------------------------------------------------- how a wild animal meets you
   // ctx: {d: blocks to you, speed: your speed (b/s), still: s you stood still, food: you hold its food, trust: 0 … 3,
   //       grazing: it was grazing}. → 'flee' | 'hide' | 'peek' | 'alert' | 'approach' | 'sniff' | 'none'
-  B.NOTICE = 10; B.CURIOUS = 14; B.SNIFF = 1.7; B.SHY = 7;
+  B.NOTICE = 10; B.CURIOUS = 14; B.SNIFF = 1.9; B.SHY = 7;
   B.react = function (kind, c) {
     const K = B.KINDS[kind]; if (!K) return 'none';
     const t = c.trust | 0, fast = c.speed > 4.2, moving = c.speed > 1.2;
