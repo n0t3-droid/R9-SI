@@ -37,6 +37,14 @@ console.log('a · the kneeling hug from the front');
   }
 }
 
+console.log('a2 · nobody standing right behind the pair');
+{
+  const P = [0, 65.6, 6], M = [0, 64, 0], mk = (x, z) => ({ pos: [x, 64, z], vel: [0, 0, 0] });
+  const gv = mk(0, 0.2), pt = mk(0, -0.2), b1 = mk(0.3, -1.5), b2 = mk(2.5, -1.5), b3 = mk(0, -6), side = mk(1.2, 0.3);
+  const out = TE.asideOf([gv, pt, b1, b2, b3, side], [gv, pt], P, M);
+  check(out.length === 1 && out[0] === b1 && Math.abs(b1.teAside[0]) >= TE.ASIDE.to - 0.01, `one standing 1.5 m behind the pair on the line steps aside (${out.length}), not one off the line, far behind or beside the pair`);
+}
+
 console.log('b · a look deed and the trip\'s camera');
 {
   require('../src/shared/story.js');

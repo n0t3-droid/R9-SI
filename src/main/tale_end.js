@@ -128,7 +128,7 @@
             if (!shot && avoid.length) shot = F3.frameGroup(so, mid, 0.9, fo());
             if (!shot) { shot = F3.frameGroup(solidOf(g), mid, 0.9, fo({ avoid })); if (shot) TE.stats.frondFallback = (TE.stats.frondFallback | 0) + 1; }
             if (shot && HS) TE.stats.hugFront = (TE.stats.hugFront | 0) + 1;
-            if (shot) TE.lastShot = { P: shot.P.map(v => +v.toFixed(2)), T: shot.T.map(v => +v.toFixed(2)), hug: !!HS, off: HS ? +(Math.atan2(Math.sin(shot.a - HS.pref - TE.HUG_SIDE), Math.cos(shot.a - HS.pref - TE.HUG_SIDE)) * 57.3).toFixed(0) : null };   // (the probe's record: where the lens stood)
+            if (shot) TE.lastShot = { P: shot.P.map(v => +v.toFixed(2)), T: shot.T.map(v => +v.toFixed(2)), hug: !!HS, aside: TE.stats.aside | 0, off: HS ? +(Math.atan2(Math.sin(shot.a - HS.pref - TE.HUG_SIDE), Math.cos(shot.a - HS.pref - TE.HUG_SIDE)) * 57.3).toFixed(0) : null };   // (the probe's record: where the lens stood)
           } } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, pt ? 1.1 : 0.7, (innerWidth || 16) / (innerHeight || 9)) : null }; }
       if (shot) C.aside = TE.asideOf(V.agents, [gv, pt], shot.P, mid);   // (f-polish9: nobody's head in the picture's corner)
@@ -157,14 +157,16 @@
   const GIFT = (Pz) => { set(Pz, 'arm_l', 1.25, 0, 0.22); set(Pz, 'arm_r', 1.25, 0, -0.22); set(Pz, 'fore_l', 0.55, 0, 0); set(Pz, 'fore_r', 0.55, 0, 0); if (Pz.head) Pz.head[0] = 0.12; };
   // f-polish9: the bystanders near the lens (within ASIDE.lens m of it, or within ASIDE.line m of the line from it to the
   // pair, not beside the pair) step aside, across the line to ASIDE.to m off it — they walk there while the scene holds
-  TE.ASIDE = { lens: 2.6, line: 0.8, to: 2.6 };
+  TE.ASIDE = { lens: 2.6, line: 0.8, to: 2.6, back: 4 };
   TE.asideOf = function (agents, keep, P, M) {
     const A = TE.ASIDE, out = [], dx = M[0] - P[0], dz = M[2] - P[2], L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
     for (const a of agents || []) {
       if (!a || !a.pos || keep.indexOf(a) >= 0 || a.teHold || a.sitO || a.pose === 'sleep') continue;
       const ex = a.pos[0] - P[0], ez = a.pos[2] - P[2], along = ex * ux + ez * uz, side = ex * -uz + ez * ux;
-      if (along < -1 || along > L - 1.2) continue;
-      if (Math.hypot(ex, ez) > A.lens && Math.abs(side) > A.line) continue;
+      // (f-polish10: and right behind the pair, on the line — a standing one there merges into the kneeling pair's outline)
+      const back = along > L + 0.5 && along < L + A.back && Math.abs(side) < A.line + 0.2;
+      if (!back && (along < -1 || along > L - 1.2)) continue;
+      if (!back && Math.hypot(ex, ez) > A.lens && Math.abs(side) > A.line) continue;
       const sg = side >= 0 ? 1 : -1, off = Math.max(A.to, Math.abs(side) + 0.6) * sg;
       a.teAside = [P[0] + ux * Math.max(0, along) - uz * off, P[2] + uz * Math.max(0, along) + ux * off];
       a.path = null; out.push(a);
