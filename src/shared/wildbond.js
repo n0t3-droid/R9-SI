@@ -94,11 +94,11 @@
   // piglets dark with cream stripes, tabby kittens near-black on a light moss ground)
   B.PAINT = {
     glimmer_deer: [0xfff4dc, 0.62, 0x9a6a3e, 0.3], bloom_sheep: [0xb898d0, 0.62, 0xffffff, 0.3], moss_boar: [0xc8a878, 0.55, 0x4a3220, 0.3],
-    glimmer_fox: [0xffd8b0, 0.6, 0xb04a14, 0.35], moss_cat: [0x141c0c, 0.75, 0x7a9850, 0.42], crystal_pup: [0x6aa4e0, 0.7, 0xffffff, 0.3],
+    glimmer_fox: [0xffd8b0, 0.6, 0xb04a14, 0.35], moss_cat: [0x141c0c, 0.75, 0x7a9850, 0.55], crystal_pup: [0x6aa4e0, 0.7, 0xffffff, 0.3],
   };
   B.PAINT_BABY = {
     glimmer_deer: [0xfffaf0, 0.95, 0x8a4e24, 0.55], bloom_sheep: [0xa880c8, 0.72, 0xffffff, 0.35], moss_boar: [0xf0d8a8, 0.85, 0x3a2616, 0.5],
-    glimmer_fox: [0xfff0dc, 0.75, 0xa8400e, 0.42], moss_cat: [0x101808, 0.8, 0x8aa860, 0.5], crystal_pup: [0x5090dc, 0.8, 0xffffff, 0.35],
+    glimmer_fox: [0xfff0dc, 0.75, 0xa8400e, 0.42], moss_cat: [0x101808, 0.8, 0x8aa860, 0.6], crystal_pup: [0x5090dc, 0.8, 0xffffff, 0.35],
   };
   // the coat mapped over a body (not folded voxel axes): u along it (z, one cell a voxel), v once around it (the angle
   // about its long axis: one turn = one period of the torus, so there is no seam). C = {cx, cy, z0, su}: the axis, the start, cells a voxel along

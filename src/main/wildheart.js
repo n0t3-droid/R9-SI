@@ -64,7 +64,7 @@
     const eyeCells = new Set();
     if (head) for (const e of eyes) for (const [dx, dy, dz] of [[0, 0, 0], [0, 1, 0], [e[3], 0, e[4]], [e[3], 1, e[4]]]) for (let k = 0; k < 3; k++) eyeCells.add((e[0] + dx) + ',' + (e[1] + dy) + ',' + (e[2] + dz + k));
     // the coat, mapped over each part (u along it, v around its long axis: WildBond.bodyUV), painted crisp
-    const uv = [0, 0];
+    const uv = [0, 0], face = Object.assign({}, spec, { kInk: spec.kInk * 0.5, kGnd: spec.kGnd * 0.5 });   // (a face stays clean: half the coat)
     for (const name of COATED) {
       const pr = def.parts[name]; if (!pr) continue;
       const g = pr.grid;
@@ -76,7 +76,7 @@
         const c = val & 0xffffff; if (cdist(c, base) > 90) return;
         B.bodyUV(x + 0.5, y + 0.5, z + 0.5, C, uv);
         const t = K.ring ? B.sampleUV(spec.tex, uv[1], uv[0]) : B.sampleUV(spec.tex, uv[0], uv[1]);   // (a tabby's stripes run around it)
-        g.set(x, y, z, B.paint(c, t / 255, spec), 0);
+        g.set(x, y, z, B.paint(c, t / 255, name === 'head' ? face : spec), 0);
       });
     }
     if (head) {
@@ -95,8 +95,8 @@
           const top = y === e[1] + 1;
           for (const g of [head, far, half]) g.set(x, y, z, top && g === half ? lid : top ? col[0] : col[1], 0);
           shut.set(x, y, z, top ? lid : lash, 0);
-          // a soft brow: the fur over the eye a little darker (it frames it, the eye looks set in, not stuck on)
-          if (top && filled(head, x, y + 1, z) && cdist(head.get(x, y + 1, z) & 0xffffff, base) < 120) for (const g of [head, far, half, shut]) g.set(x, y + 1, z, B.mix(g.get(x, y + 1, z) & 0xffffff, 0x000000, 0.14), 0);
+          // a soft brow: the fur over the eye a touch darker (it frames it, the eye looks set in, not stuck on)
+          if (top && filled(head, x, y + 1, z) && cdist(head.get(x, y + 1, z) & 0xffffff, base) < 120) for (const g of [head, far, half, shut]) g.set(x, y + 1, z, B.mix(g.get(x, y + 1, z) & 0xffffff, 0x000000, 0.08), 0);
         }
         // the catchlight: in the upper row, the cell toward +x (the same side on every eye: one light), the half voxel
         // facing out, upper, the half toward the eye's middle — one eighth of the cell; the cell itself moves to glint
@@ -106,7 +106,7 @@
         for (const D of DIRS) if (!filled(head, gc[0] + D[0], gc[1], gc[2] + D[2])) { const sc = (gc[0] + 0.5 - hc[0]) * D[0] + (gc[2] + 0.5 - hc[1]) * D[2]; if (sc > ob) { ob = sc; out = D; } }
         const other = tops.find(c => c !== gc) || gc;
         const hx = out[0] ? (out[0] > 0 ? 1 : 0) : other[0] < gc[0] ? 0 : other[0] > gc[0] ? 1 : 0, hz = out[2] ? (out[2] > 0 ? 1 : 0) : other[2] < gc[2] ? 0 : 1;
-        for (let a = 0; a < 2; a++) for (let b2 = 0; b2 < 2; b2++) for (let c = 0; c < 2; c++) glint.set(gc[0] * 2 + a, gc[1] * 2 + b2, gc[2] * 2 + c, a === hx && b2 === 1 && c === hz ? GLINT : col[0], 0);
+        for (let a = 0; a < 2; a++) for (let b2 = 0; b2 < 2; b2++) for (let c = 0; c < 2; c++) glint.set(gc[0] * 2 + a, gc[1] * 2 + b2, gc[2] * 2 + c, a === hx && b2 === 1 && c === hz ? GLINT : col[0], a === hx && b2 === 1 && c === hz ? 1 : 0);   // (the catchlight unshaded: a reflection)
         head.c[head.i(gc[0], gc[1], gc[2])] = 0;
         def.eyes.push({ cells: ok, iris: col[1], top: e[1] + 1, rows: 2 });
       }
