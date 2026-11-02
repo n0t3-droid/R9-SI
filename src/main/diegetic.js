@@ -325,7 +325,8 @@ html.a11y-hc #wanderbuch .dgpage{background:#fff;color:#000}
       if (S.hp >= 0 && h !== S.hp && !p.dead) pulse(h < S.hp ? 'hurt' : 'heal');
       S.hp = h;
     } else S.hp = -1;
-    if (t0 - S.acc >= 250) { S.acc = t0;   // (4 Hz of real time: the game's dt is clamped, a slow frame must not stall it) try { slow(g); } catch (e) { if (!D.warned) { D.warned = true; console.warn('diegetic', e); } } }
+    // (4 Hz of real time: the game's dt is clamped, a slow frame must not stall it)
+    if (t0 - S.acc >= 250) { S.acc = t0; try { slow(g); } catch (e) { if (!D.warned) { D.warned = true; console.warn('diegetic', e); } } }
     trailFrame(g, dt);
     signFrame(g);
     const ms = now() - t0, C = D.cost; C.frames++; C.ms += ms; if (ms > C.worst) C.worst = ms;
