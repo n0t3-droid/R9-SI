@@ -186,7 +186,6 @@ const sampled = async (f, n) => {
     ['liberate (Liberate.frame)', () => (V.Liberate && V.Liberate.frame ? (dt) => V.Liberate.frame(g, dt, eye, E) : null)],
     ['the horizon on Very Low (standing)', () => { const A = global.__hz, cam = { x: A.h.selX, y: 90, z: A.h.selZ }; return () => A.h.update(cam); }],
     ['the horizon, Balanced and up (standing)', () => { const B = global.__hzB, cam = { x: B.h.selX || 8.5, y: 90, z: B.h.selZ || 74.5 }; return () => B.h.update(cam); }, 'info'],
-    ['the horizon before f-perf8 (standing)', () => { const R = global.__hzRef; if (!R) return null; const cam = { x: 8.5 + 0.072 * 1200, y: 90, z: 74.5 + 0.02 * 1200 }; return () => R.h.update(cam); }, 'info'],
   ];
   for (const [name, mk, info] of entries) {
     let f = null; try { f = mk(); } catch (e) { f = null; }
@@ -194,8 +193,8 @@ const sampled = async (f, n) => {
     let err = null; const run = (i) => { g.time += 1 / 60; g.frame++; try { f(1 / 60); } catch (e) { if (!err) err = String(e.message || e).slice(0, 90); } };
     for (let i = 0; i < 2000; i++) run(i);   // (warm: the first frames build what stays)
     const ms = cpuMs(run, 20000);
-    const H = await sampled(run, N);
-    const top = Object.entries(H.by).sort((a, b) => b[1] - a[1]).slice(0, process.env.FN ? 6 : 2).map(([u, b]) => `${u} ${(b / N).toFixed(1)}`).join(', ');
+    const NN = info ? 20000 : N, H = await sampled(run, NN);   // (the numbers beside: 20 000 frames)
+    const top = Object.entries(H.by).sort((a, b) => b[1] - a[1]).slice(0, process.env.FN ? 6 : 2).map(([u, b]) => `${u} ${(b / NN).toFixed(1)}`).join(', ');
     console.log(`     ${name}: ${(ms * 1000).toFixed(2)} µs a frame · ${H.perFrame.toFixed(1)} bytes a frame${top ? ' (' + top + ')' : ''}${err ? ' · the stand-in stops it: ' + err : ''}`);
     if (info) continue;   // (a number beside: not Very Low's)
     if (err) { console.log(`     (${name}: the stand-in is not enough for it — its number is the part before; perf8.mjs measures it in the game)`); continue; }
