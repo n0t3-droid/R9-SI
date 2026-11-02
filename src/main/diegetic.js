@@ -50,7 +50,7 @@
     const eh = h < 0.5 ? (0.5 - h) / 0.5 : 0, ef = f < 0.3 ? (0.3 - f) / 0.3 : 0, ea = a < 0.5 ? (0.5 - a) / 0.5 : 0;
     let kind = null, e = 0;
     if (eh > 0 && eh >= ef && eh >= ea) { kind = 'hurt'; e = eh; } else if (ea > 0 && ea >= ef) { kind = 'air'; e = ea; } else if (ef > 0) { kind = 'hungry'; e = ef * 0.8; }
-    return { a: e > 0 ? +(0.14 + e * 0.52).toFixed(3) : 0, kind, breath: h < 0.35 };
+    return { a: e > 0 ? +(0.2 + e * 0.6).toFixed(3) : 0, kind, breath: h < 0.35 };
   };
 
   // ---------------------------------------------------------------- the radial (pure)
@@ -111,7 +111,7 @@
 #dgrose .tick.wp i{color:#9fe3ff;font-size:9px;text-shadow:0 0 4px rgba(120,200,255,.8),0 0 1px #000}
 #dgrose .me{position:absolute;left:50%;top:50%;width:0;height:0;margin:-6px 0 0 -4px;border:4px solid transparent;border-bottom:9px solid rgba(255,244,220,.85);border-top:0}
 body.dg-rose #hud #minimap,body.dg-rose #hud #compass{display:none!important}
-#dgvig{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .9s ease;background:radial-gradient(ellipse farthest-side at 50% 50%,transparent 58%,var(--dgv,rgba(90,0,8,.9)) 112%)}
+#dgvig{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .9s ease;background:radial-gradient(ellipse farthest-side at 50% 50%,transparent 50%,var(--dgv,rgba(90,0,8,.9)) 105%)}
 #dgpulse{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;background:radial-gradient(ellipse farthest-side at 50% 50%,transparent 45%,var(--dgp,rgba(140,10,20,.8)) 110%)}
 #dgpulse.go{animation:dgpulse .65s ease-out}
 @keyframes dgpulse{0%{opacity:0}18%{opacity:var(--dgpa,.32)}100%{opacity:0}}

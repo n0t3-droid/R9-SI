@@ -35,7 +35,7 @@ check(sg && sg.at === 16, 'a far goal: the signpost at the trail\'s end (16 m)')
 const v0 = D.vitals(1, 1, 1);
 check(v0.a === 0 && !v0.breath, 'healthy: no vignette, no breath');
 const v1 = D.vitals(0.4, 1, 1), v2 = D.vitals(0.15, 1, 1);
-check(v1.a > 0 && v2.a > v1.a && v2.a <= 0.7, 'lower health: a stronger edge (0.4 → ' + v1.a.toFixed(2) + ', 0.15 → ' + v2.a.toFixed(2) + ')');
+check(v1.a > 0 && v2.a > v1.a && v2.a <= 0.8, 'lower health: a stronger edge (0.4 → ' + v1.a.toFixed(2) + ', 0.15 → ' + v2.a.toFixed(2) + ')');
 check(v2.breath && !v1.breath, 'the breath under 35 %');
 check(v2.kind === 'hurt', 'health low: the hurt edge');
 const vf = D.vitals(1, 0.2, 1);
