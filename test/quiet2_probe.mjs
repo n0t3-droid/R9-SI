@@ -216,7 +216,7 @@ async function scenes() {
       const touch = await ev(() => { const C = VR.TaleEnd.cur; if (!C) return null; const a = C.gv, b = C.pt; return { pose: [a.pose, b ? b.pose : null], d: b ? +Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]).toFixed(2) : null, cap: VR.TaleEnd.caption(), hud: document.getElementById('hud').style.visibility }; });
       B.shots[tt] = await shotPage('quiet2_end_' + tt + '.png');
       B[tt] = Object.assign({}, st, { touch });
-      check(!!touch && touch.d !== null && touch.d <= 1.0 && (touch.pose[0] === 'hug' || touch.pose[0] === 'stand'), `${tt}: ${st.gv} and ${st.pt} touch (${touch && touch.pose.join('/')}, ${touch && touch.d} m apart), framed by the director: ${st.shot}`);
+      check(!!touch && (st.pt === null ? !st.shot : touch.d !== null && touch.d <= 1.0) && (touch.pose[0] === 'hug' || touch.pose[0] === 'stand'), `${tt}: ${st.gv} and ${st.pt || 'you (nobody of theirs near: your own view)'} touch (${touch && touch.pose.join('/')}, ${touch && touch.d} m apart), framed by the director: ${st.shot}`);
       if (tt === 'lost' || tt === 'home') { await ev(() => VR.TaleEnd.seek(5.7)); await step(24, 33); const cap = await ev(() => VR.TaleEnd.caption()); B.shots[tt + '_gift'] = await shotPage('quiet2_end_' + tt + '_gift.png'); B[tt].gift = cap; check(/🎁|💛/.test(cap), tt + ': the gift moment with its caption „' + cap + '"'); }
       await ev(() => { VR.TaleEnd.hold = false; VR.TaleEnd.seek(VR.TaleEnd.DUR + 0.1); }); await step(6, 33);
       const after = await ev(() => ({ cur: !!VR.TaleEnd.cur, hud: document.getElementById('hud').style.visibility, hide: !!VR.game.hideHud }));

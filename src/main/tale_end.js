@@ -90,7 +90,9 @@
     if (pt) { if (!pt.tlKid) pt.act = { type: 'teEnd' }; pt.path = null; pt.bubble = null; pt.teHold = true; }
     // the camera: u-folk3's director round the pair, on your side; ⚙ Weniger Bewegung: none
     C.less = !!(VR.A11y && VR.A11y.less && VR.A11y.less(g.settings)) || (g.settings && g.settings.travelCam === false);
-    if (!C.less) {
+    // (the friend alone comes to you — nobody of theirs near: your own eyes are the camera; runs 3–4: a group frame round
+    // the friend and you rose into a palm's fronds, a face frame missed)
+    if (!C.less && pt) {
       const F3 = VR.Folk3, cy = fy, mid = [m.mid[0], cy, m.mid[1]];
       let shot = null;
       try { if (F3 && F3.frameGroup) { const E = g.env, sun = E && E.sunDir ? Math.atan2(E.sunDir[2], E.sunDir[0]) : null; const ax = Math.atan2(to[1] - m.friend[1], to[0] - m.friend[0]), toYou = Math.atan2(p[2] - mid[2], p[0] - mid[0]), s1 = ax + Math.PI / 2, s2 = ax - Math.PI / 2;
@@ -99,15 +101,9 @@
           if (pt) {
             shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun, avoid });
             if (!shot && avoid.length) shot = F3.frameGroup(solidOf(g), mid, 0.9, { pref, sun });
-          } else if (F3.frame) {
-            // the friend alone comes to you: u-folk3's face frame from your side, lower and nearer (run 3: a group frame
-            // round the friend and you rose into a palm's fronds)
-            const hy = cy + (gv.h || 1.8) * 0.85, yaw = Math.atan2(-(p[0] - m.friend[0]), -(p[2] - m.friend[1]));
-            shot = F3.frame(solidOf(g), { head: [m.friend[0], hy, m.friend[1]], yaw }, { d: 3.4, dMin: 2.6, dMax: 4.2, sun, avoid });
-            if (shot) shot.d = shot.d || 3.4;
           } } } catch (e) { shot = null; }
       if (shot) { TE.stats.framed++; C.shot = { x: shot.P[0], y: shot.P[1], z: shot.P[2], yaw: shot.yaw, pitch: shot.pitch, fov: F3.groupFov ? F3.groupFov(shot.d, pt ? 1.1 : 0.7, (innerWidth || 16) / (innerHeight || 9)) : null }; }
-      else { const e = [p[0], p[1] + 1.6, p[2]], dx = mid[0] - e[0], dy = mid[1] + 1 - e[1], dz = mid[2] - e[2]; C.shot = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: null }; }
+      else { const e = [p[0], p[1] + 1.6, p[2]], dx = mid[0] - e[0], dy = mid[1] + 1 - e[1], dz = mid[2] - e[2]; C.shot = { x: e[0], y: e[1], z: e[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: null }; }   // (no frame: your view turned toward them)
     }
     g.hideHud = true; const hud = document.getElementById('hud'); if (hud) hud.style.visibility = 'hidden';
     TE.cur = C; TE.stats.started++; TE.log.push(['start', C.tt, pt ? (pt === C.kid ? 'kid' : pt.p.fam === gv.p.fam ? 'fam' : 'neighbour') : 'you', C.shot ? (C.less ? 'less' : 'cam') : 'nocam']);
