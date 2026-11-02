@@ -186,7 +186,7 @@
     if (tip <= 2) {
       const m = g.nVein.n2(x * 0.09 + sd * 0.37, z * 0.09 - sd * 0.21);
       if (tip === 0 && m > 0.2 && GH(x >> 2, 0, z >> 2, 11) < 0.07 && GH(x, y, z, 1) < 0.4) return gst().shroom || ISL.moss;
-      if (m > 0.02) return ISL.moss;
+      if (m > -0.12) return ISL.moss;   // (the moss the larger part: from below a green garden with warm fields, not an ember)
       const w = g.nVein.n2(x * 0.05 - sd * 0.13, z * 0.05 + sd * 0.29);
       return ISL.strata[((w > 0.15 ? 1 : w < -0.15 ? 2 : 0) + (sd & 3)) % L];
     }
