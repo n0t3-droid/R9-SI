@@ -1298,7 +1298,7 @@
     g.ui.show('wanderbuch');
     return true;
   };
-  W.close = function (g) { if (g && g.ui && g.ui.screen === 'wanderbuch') g.ui.show('hud'); };
+  W.close = function (g) { if (g && g.ui && g.ui.screen === 'wanderbuch') (g.ui.resume ? g.ui.resume() : g.ui.show(null)); };   // (r-v058: 'hud' left ui.screen set — M, J and the story card stayed blocked after closing the book)
 
   // ================================================================ the hooks (additive)
   const LD = VR.LifeDirector;
