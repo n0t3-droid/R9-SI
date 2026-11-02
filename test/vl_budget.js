@@ -9,7 +9,7 @@
 //       the same tiles drawn when standing; walking ≤ 6 % of the frames differ, each a parent standing in for its children
 //       (or back) or a tile at the 2-km rim ≤ 15 frames later, never a hole; the selection ≥ 5× rarer. Without the keep
 //       (Balanced and up) the same tiles, requests and ring as the horizon before f-perf8 (git BASE) on every frame
-//   3 · the loading screen writes only what changed (ui.loading), the held sky drawn every 0.6 s on Very Low (First.loadGap)
+//   3 · the loading screen writes only what changed (ui.loading)
 //   4 · no allocation a frame: a heap sampler over 100 000 frames of the kept horizon and of the per-frame entries of the
 //       modules that came since v0.55.6, idle on a Very Low stand-in (wander, gossip, seasons, fairy, story, liberate) —
 //       ≤ 1 KB a frame each, ≤ 0.05 ms (before f-perf8: the horizon 8.6 KB, the Wanderregisseur 2.4 KB, fairy 1.2 KB)
@@ -148,9 +148,6 @@ const sig = (list) => list.map(t => t.L + ':' + t.tx + ':' + t.tz).sort().join('
   check(document.getElementById('loadmsg').textContent === 'Netze' && document.getElementById('loaddetail').textContent === '20 / 40' && document.getElementById('loadbar').style.width === '50%', 'what changed is written');
   u.screen = 'play'; u.loading('Netze', 0.5, '20 / 40');
   check(writes > 0 && document.getElementById('loadmsg').textContent === 'Netze', 'a new loading screen writes again');
-  check(V.First.loadGap(true) === 600 && V.First.loadGap(false) === 140, 'the held sky: every 0.6 s on Very Low, 0.14 s elsewhere (as before)');
-  const gsrc = fs.readFileSync(path.join(ROOT, 'src/main/game.js'), 'utf8');
-  check(/VR\.First\.loadGap\(lite\)/.test(gsrc) && /wh !== this\.loadDrawWH/.test(gsrc), 'game.js loadingFrame asks First.loadGap and draws at once when the canvas changed size');
 }
 
 // ---------------------------------------------------------------- 4 · no allocation a frame (a heap sampler, 100 000 frames)

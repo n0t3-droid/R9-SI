@@ -98,10 +98,6 @@
   // when the loading screen ends: the near sections up and the coarse far ring there — the ring gets 6 s after the near
   // sections (an arrival 12 s: its landmark stands in the far tiles), 25 s in all at most
   FI.NEAR_WAIT = 6000; FI.ARRIVAL_WAIT = 12000; FI.MAX_WAIT = 25000;
-  // f-perf8: the shortest time between two drawings of the held sky behind the loading screen (ms) — Very Low 0.6 s (the
-  // sky stands still there; the GPU's time goes to the uploads), else 0.14 s as before (game.js loadingFrame)
-  FI.LOAD_GAP = 140; FI.LOAD_GAP_VL = 600;
-  FI.loadGap = (lite) => (lite ? FI.LOAD_GAP_VL : FI.LOAD_GAP);
   FI.loadDone = (s) => (s.now - s.start > FI.MAX_WAIT) || (!!s.near && (s.far >= 1 || s.now - s.nearAt > (s.arrival ? FI.ARRIVAL_WAIT : FI.NEAR_WAIT)));
   // one loading frame's numbers for the game (game.js loadingFrame): {frac, text, counts, done}
   FI.loadStep = function (g) {
