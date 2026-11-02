@@ -13,6 +13,7 @@ require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
 require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
 for (const f of ['i18n', 'lang_en', 'lang_de']) require(__dirname + '/../src/main/' + f + '.js');
 require('../src/main/villages.js'); require('../src/main/folk3.js'); require('../src/main/tale_end.js');
+for (const f of ['lifekit', 'lifedirector', 'eventlog', 'regie', 'wander']) require(__dirname + '/../src/main/' + f + '.js');
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const f2 = (v) => (+v).toFixed(2);
@@ -93,6 +94,56 @@ console.log('b · the scene\'s lens');
     const H = TE.hugOf(ad, kid);
     check(H[0].kneel && !H[1].kneel && Math.abs(H[0].gap - 0.22) < 1e-9 && TE.GAPS.hugKid <= 0.25 && TE.GAPS.hug <= 0.35, `an adult kneels to a child (gap ${f2(H[0].gap)}), the child does not; the gaps close (${TE.GAPS.hug} · ${TE.GAPS.hugKid})`);
   }
+}
+
+console.log('c · one event clock');
+{
+  const RG = V.Regie, W = V.Wander;
+  const q = new RG.Sched(7, {});
+  q.lastStart = -100; q.last2 = -100;
+  q.note(100, 2, 'ambient', 'wd:pet', true);
+  const before = q.allow(106, 4, 'story'), still = q.allow(109, 4, 'story');
+  q.seen(104.5, 2, 'ambient');
+  const after = q.allow(109, 4, 'story'), late = q.allow(113, 4, 'story');
+  check(!before && !still && !after && late, `a story act waits for the walker's moment noted at 100 s: not at 106 / 109 s while unseen, seen at 104.5 → 8 s after that (113 s: ${late})`);
+  const q2 = new RG.Sched(7, {}); q2.lastStart = -100; q2.last2 = -100;
+  q2.note(100, 2, 'travel', 'pass');
+  check(q2.allow(108.5, 2, 'ambient') && !q2.pending(105), 'a pass noted (the pads, the traffic: not always seen) holds only the spacing, as before');
+  const q3 = new RG.Sched(7, {}); q3.lastStart = -100; q3.last2 = -100; q3.note(100, 2, 'ambient', 'wd:well', true);
+  check(q3.pending(109) && !q3.pending(110.5) && q3.allow(111, 4, 'story'), `an unseen moment holds RULES.pend = ${RG.RULES.pend} s at most`);
+  check(typeof RG.held === 'function' && typeof RG.foeComing === 'function', 'Regie.held (the encounters ask) and Regie.foeComing (an encounter coming)');
+  const P = new W.Pacer(3); P.last = 0;
+  const hard = W.PACE.hard + 0.5;
+  check(P.want(hard, { foot: true, busy: true }) === 'beat' && P.want(hard, { foot: true, busy: true, hold: true }) === null && P.want(hard, { foot: false, hold: true }) === null,
+    'the walker\'s beat past PACE.hard waits while a wow or an encounter is coming (hold), as before when only busy');
+  // the Regie's busy with the stand-in game
+  const g = { state: 'play', time: 50, world: {}, meta: { seed: 1 }, player: { pos: [0, 64, 0] }, entities: { mobs: [] } };
+  RG.frame(g, 0.3); const S = RG.of(g);
+  if (S) {
+    S.sched.lastStart = -100; S.sched.last2 = -100; S.sched.lastNote = -100;
+    g.time = 100; RG.note(g, 2, 'ambient', 'wd:pet', true);
+    g.time = 109;
+    check(RG.held(g) && RG.busy(g) && !RG.busy(g, false, true), 'an unseen walker\'s moment: an encounter is held, the Regie busy; the walker itself asks big (its own PACE.noted)');
+    g.time = 111; check(!RG.held(g), 'after RULES.pend the encounter may begin');
+    V.Foes = { coming: (gg, more) => more === RG.FOE_M };
+    check(RG.foeComing(g) && RG.busy(g) && !RG.busy(g, true), 'a foe about to notice you: busy for the walker (not hard)');
+    delete V.Foes;
+  } else check(false, 'the Regie binds to the stand-in game');
+}
+
+console.log('d · a quick Baustelle told once');
+{
+  const L = V.EventLog;
+  check(L && L.SITE_ONE >= 8 && typeof L.observeSites === 'function', `EventLog.SITE_ONE ${L && L.SITE_ONE} s, observeSites`);
+  const world = { col: () => ({ ready: true, sh: new Uint8Array(512) }) };
+  const g = { state: 'play', dim: 'overworld', time: 10, frame: 0, meta: { seed: 1 }, cam: { x: 0.5, y: 81.6, z: 20, yaw: 0, pitch: 0, fov: 1.3 }, renderer: { W: 1600, H: 900 },
+    world, player: { pos: [0.5, 80, 20], yaw: 0 }, env: { E: { sunDir: [0, 1, 0] } }, settings: {}, gadgets: { blue: { sites: [] } } };
+  L.bind(g); L.reset(world); L.on = true;
+  const quick = { phase: 'build', mode: 'show', box: [0, 80, 0, 6, 84, 6], T: 6, t: 0 }, slow = { phase: 'build', mode: 'show', box: [10, 80, 0, 16, 84, 6], T: 40, t: 0 };
+  g.gadgets.blue.sites.push(quick, slow);
+  L.observeSites(g); quick.phase = 'done'; slow.phase = 'done'; g.time = 16; L.observeSites(g);
+  const ev = L.events().filter(e => e.kind === 'build').map(e => e.sub);
+  check(ev.filter(x => x === 'site').length === 1 && ev.filter(x => x === 'site_done').length === 2, `a 6-s site: its standing only; a 40-s site: its rise and its standing (${ev.join(', ')})`);
 }
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');

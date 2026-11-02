@@ -24,6 +24,7 @@
   // a-regie (plan docs/superpowers/plans/2026-10-29-a-regie.md §2.1): the repeat cooldown per act (s); the adventurer's
   // rhythm (an Abenteuer world: a shorter target, a lower cap) — its first offers (`first`) are taken at the first allowed
   // moment like a story beat
+  R.RULES.pend = 10;   // (f-polish9: s a start noted and not yet seen holds the others — Sched.pending)
   R.RULES.cool = 90; R.RULES.vary = 180; R.RULES.vistaHold = 20; R.ADV = { min: 12, max: 30, gap: 55 };
   // a hash in [0, 1) of three integers (the life director's own, LifeKit.h, when it is there)
   const h = (a, b, c) => { let x = (a | 0) ^ Math.imul(b | 0, 0x9E3779B1) ^ Math.imul((c | 0) + 0x7F4A7C15, 0x85EBCA77); x ^= x >>> 16; x = Math.imul(x, 0x7FEB352D); x ^= x >>> 15; x = Math.imul(x, 0x846CA68B); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
@@ -39,6 +40,7 @@
       this.log = [];   // (what it started or allowed: [t, w, kind, source] — the last 64)
       this.acts = Object.create(null);   // a-regie: act → its last start (the repeat cooldown)
       this.kindT = Object.create(null);  // a-regie: kind → when it was last seen (the variety)
+      this.pend = -Infinity;             // f-polish9: a start noted, not seen yet
     }
     jit(k) { const o = this.o, A = o.adv && !o.builder ? R.ADV : null, lo = A ? A.min : o.min, hi = A ? A.max : o.max; return Math.min(this.gapCap() - 5, lo + (hi - lo) * h(this.seed, k, 0x5e91)); }
     // the budget now: the heaviest weight that may start
@@ -48,6 +50,7 @@
     seen(t, w, kind, small) {
       if (!(w >= 2)) return;
       if (!small && t > this.last2) { this.last2 = t; this.slot++; this.target = this.jit(this.slot); }
+      if (!small && t >= this.pend) this.pend = -Infinity;   // (f-polish9: the start noted is seen — or something else is)
       if (t > this.lastStart) this.lastStart = t;
       if (w >= 4 && t > this.lastMajor) this.lastMajor = t;
       if (kind === 'story' && t > this.lastBeat) this.lastBeat = t;
@@ -58,6 +61,7 @@
     allow(t, w, kind, act) {
       if (this.scene) return false;
       if (act && this.cooling(t, act)) return false;   // a-regie: the same act within its cooldown
+      if (this.pending(t)) return false;   // f-polish9: a start noted and not seen yet — it is about to be (the one clock)
       if (t - this.lastStart < this.o.space) return false;
       if ((w | 0) > this.budget(t)) return false;
       if (kind === 'story' && t - this.lastBeat < this.o.beat) return false;
@@ -67,7 +71,12 @@
     gapCap() { return this.o.builder ? this.o.gapBuilder : this.o.adv ? R.ADV.gap : this.o.gap; }
     cooling(t, act) { const a = this.acts[act]; return a !== undefined && t - a < this.o.cool; }
     // a-regie: a self-scheduling source started an act (it asked allow first): the spacing and the cooldown move
-    note(t, w, kind, act) { if (t > this.lastStart) this.lastStart = t; if (!(this.lastNote > t)) this.lastNote = t; if (act) this.acts[act] = t; this.log.push([t, w, kind, act || '']); if (this.log.length > 64) this.log.shift(); }
+    // f-polish9 (the one event clock): a start noted that no weighted event has shown yet holds the others RULES.pend s
+    // (v0.57's sessions: the walker's moment noted, seen 4 s later, the story act 8 s after the note — a pair)
+    pending(t) { return this.pend > -Infinity && t - this.pend < this.o.pend && t >= this.pend; }
+    // (pend: only a start that will be seen — the walker's staged moments; the pads' and the traffic's passes go unseen
+    // often and do not hold anything)
+    note(t, w, kind, act, pend) { if (pend && (w | 0) >= 2) this.pend = t; if (t > this.lastStart) this.lastStart = t; if (!(this.lastNote > t)) this.lastNote = t; if (act) this.acts[act] = t; this.log.push([t, w, kind, act || '']); if (this.log.length > 64) this.log.shift(); }
     // the offer to start now, or null: a story beat at the first allowed moment; else, when the gap is due, the best
     // allowed offer (weight ≥ 2 within the budget, not the kind of the last two unless nothing else, ties by the hash)
     choose(t, offers, place) {
@@ -111,7 +120,7 @@
     return S.sched.allow(now(g), w || 2, kind || 'ambient', act);   // (a query: what starts is seen through the event log)
   };
   // a-regie: a self-scheduling source (the pads' visitors, the traffic's passes) tells what it started after allow said yes
-  R.note = function (g, w, kind, act) { const S = R.of(g); if (S) { S.sched.note(now(g), w || 2, kind || 'ambient', act); S.st.noted = (S.st.noted | 0) + 1; } };
+  R.note = function (g, w, kind, act, pend) { const S = R.of(g); if (S) { S.sched.note(now(g), w || 2, kind || 'ambient', act, !!pend); S.st.noted = (S.st.noted | 0) + 1; } };
   // a-regie: is the screen busy — a weighted event seen or started within the spacing, a wow moment, an unseen vista
   // within 40 m (its moment is coming)? A toast (codex.js) waits meanwhile (≤ HOLD s)
   R.HOLD = 15;
@@ -121,7 +130,20 @@
     const S = R.of(g); if (!S) return false;
     const t = now(g), q = S.sched; if (t - Math.max(q.last2, big ? (q.lastNote === undefined ? -Infinity : q.lastNote) : q.lastStart) < q.o.space || q.scene) return true;
     if (g.wow && g.wow.active) return true;
-    return hard ? false : R.vistaNear(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
+    if (!big && q.pending(t)) return true;   // f-polish9: a start noted, about to be seen (the walker keeps its own PACE.noted)
+    return hard ? false : R.vistaNear(g) || R.foeComing(g);   // (hard: the spacing, a scene, a wow moment — what a held toast waits for even after HOLD s)
+  };
+  // f-polish9 · the one event clock: an encounter about to begin — a foe on patrol within its notice range and FOE_M m
+  // more of you (foes.js VR.Foes.coming): the walker's moments and beats wait for it rather than pair with it
+  R.FOE_M = 8;
+  R.foeComing = function (g) { const F = VR.Foes; try { return !!(F && F.coming && F.coming(g, R.FOE_M)); } catch (e) { return false; } };
+  // f-polish9: may an encounter begin now (foes.js asks before a foe notices you)? Not on top of a weighted event seen or
+  // started within the spacing, a start about to be seen, a scene or a wow moment — the foe waits (≤ foes.js HOLD s)
+  R.held = function (g) {
+    const S = R.of(g); if (!S) return false;
+    const t = now(g), q = S.sched;
+    if (q.scene || (g.wow && g.wow.active) || q.pending(t)) return true;
+    return t - Math.max(q.last2, q.lastNote === undefined ? -Infinity : q.lastNote) < q.o.space;
   };
   // an unseen vista within 40 m (its wow moment is coming as the player walks on) — checked once a second
   R.vistaNear = function (g) {

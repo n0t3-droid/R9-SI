@@ -203,12 +203,16 @@
     return L.emit('travel', 'landing', 2, put(q.pos[0], q.pos[1] + 3, q.pos[2]), 'pad', r);
   };
   // a Baustelle (baustelle.js; blueprints' sites) rising and standing — observed at 1 Hz, no hook in its file
+  L.SITE_ONE = 9;
+  L.observeSites = (g) => observeSites(g);
   function observeSites(g) {
     const B = g.gadgets && g.gadgets.blue, list = B && B.sites; if (!list || !list.length) return;
     for (const s of list) {
       if (!s || s.mode === 'instant' || !s.box) continue;
       const st = siteSeen.get(s) | 0, ph = s.phase;
-      if (st === 0) { if (ph === 'earth' || ph === 'build') { siteSeen.set(s, 1); site(s, 'site', 2); } else siteSeen.set(s, 3); }
+      // (f-polish9: a site that will stand within SITE_ONE s is one moment — its standing tells it; the rise and the
+      // standing 6 s apart were the builder session's pair)
+      if (st === 0) { if (ph === 'earth' || ph === 'build') { siteSeen.set(s, 1); if (!(s.T > 0 && s.T - (s.t || 0) < L.SITE_ONE)) site(s, 'site', 2); } else siteSeen.set(s, 3); }
       else if (st === 1 && (ph === 'done' || ph === 'gone')) { siteSeen.set(s, 2); site(s, 'site_done', 3); }
       else if (st === 1 && ph === 'cancel') siteSeen.set(s, 2);
     }

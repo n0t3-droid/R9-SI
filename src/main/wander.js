@@ -121,7 +121,7 @@
       const s = t - this.last, P = W.PACE; if (s < P.space) return null;
       const foot = !o || o.foot !== false, busy = !!(o && (o.busy || o.coming)), stage = !o || o.stage !== false;
       if (s >= this.tgt && foot && stage && !busy) return 'moment';
-      if (s >= P.beat && (!busy || s >= P.hard)) return 'beat';
+      if (s >= P.beat && (!busy || s >= P.hard) && !(o && o.hold)) return 'beat';   // (f-polish9: hold — a moment of its own is coming: no beat past hard either)
       return null;
     }
   };
@@ -537,8 +537,11 @@
       const RG = VR.Regie, busy = !!(RG && RG.busy && RG.busy(g, false, W.PACE.big));
       { const s0 = P.since(now); if (walking && RG && RG.claim && s0 >= P.tgt && s0 < P.tgt + W.PACE.claim) RG.claim(g, 1); }   // (o-wander3: the slot is ours while it is due — PACE.claim s at most: session run 3 with a 14-s window held the life director's movers off 518 times in 5 min)
       const c0 = this.coming(now), coming = c0 && (!walking || P.since(now) < P.tgt + W.PACE.defer) ? c0 : false;   // (o-wander3: a craft closing in defers ours PACE.defer s at most)
-      const want = P.want(now, { foot: walking, busy, coming });
-      if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
+      // f-polish9 (the one event clock): a wow moment coming (an unseen vista near), an encounter coming (a foe about to
+      // notice you), a scene or a wow on screen — those fill the gap themselves: no beat on top of them, even past hard
+      const hold = !!(RG && ((RG.vistaNear && RG.vistaNear(g)) || (RG.foeComing && RG.foeComing(g)) || (g.wow && g.wow.active) || (RG.of && RG.of(g) && RG.of(g).sched.scene)));
+      const want = P.want(now, { foot: walking, busy, coming, hold });
+      if (want !== 'moment') { const s0 = P.since(now); this.why(s0 < W.PACE.space ? 'space' : s0 < P.tgt ? 'early' : !walking ? 'air' : hold ? 'hold' : busy ? 'busy' : coming === 'ship' ? 'coming:ship' : coming ? 'coming:noted' : 'wait', dt); }
       if (!want) return;
       this.tryT = now + 1;
       if (want === 'moment') {
@@ -696,7 +699,7 @@
       this.stg = null;
       if (!ok) return null;
       if (this.pacer) this.pacer.seen(this.now, 2);   // (o-wander2)
-      if (VR.Regie && VR.Regie.note) VR.Regie.note(this.g, 2, 'ambient', 'wd:' + kind);
+      if (VR.Regie && VR.Regie.note) VR.Regie.note(this.g, 2, 'ambient', 'wd:' + kind, true);   // (f-polish9: about to be seen — the others wait for it: Regie.pending)
       // f-polish5: a spot's front turned toward the walker (its own small turn kept)
       if (STAGE_SPOT[kind] && m.pos && Number.isFinite(m.yaw)) m.yaw = W.stageYaw(m.yaw, LK.yawOf(this.pos[0] - m.pos[0], this.pos[2] - m.pos[2]));
       this.ms.push(m); this.recent.push(kind); if (this.recent.length > 24) this.recent.shift();

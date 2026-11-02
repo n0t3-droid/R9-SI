@@ -268,7 +268,9 @@
         else steer(m, f.tgt[0], f.tgt[1], K.speed * 0.45, dt);
         hover(m, W, f, K, dt);
         f.flare = Math.max(0, f.flare - dt * 2);
-        if (W.enc !== 'off' && pp && dist <= K.notice) { stop(m, dt); to(m, W, 'notice'); }
+        // (f-polish9 · the one event clock: while the Regie holds — another moment within its spacing, a scene — a foe
+        // waits to notice you, F.HOLD s at most, unless you come within half its range)
+        if (W.enc !== 'off' && pp && dist <= K.notice && (!W.hold || dist <= K.notice * 0.5)) { stop(m, dt); to(m, W, 'notice'); }
         break;
       }
       case 'notice': {
@@ -483,6 +485,18 @@
   const game = () => VR.game || null;
   F.cost = { frames: 0, ms: 0, worst: 0, ai: 0, aiMs: 0, draws: 0, drawMs: 0, spawned: 0, hits: 0, bolts: 0 };
   F.stats = { encounters: 0, faints: 0, downs: 0, calms: 0, helpers: 0 };
+  // f-polish9 · the one event clock: a foe on patrol within its notice range and `more` m of you — an encounter is coming
+  // (regie.js Regie.foeComing: the walker's moments wait for it); the longest a foe waits to notice you while the Regie holds
+  F.HOLD = 6;
+  F.coming = function (g, more) {
+    const En = g && g.entities, p = g && g.player && g.player.pos; if (!En || !En.mobs || !p || !F.count || F.enc() === 'off') return false;
+    for (const m of En.mobs) {
+      const f = m.foe; if (!f || f.gone || f.remote || f.helper || f.st !== 'patrol') continue;
+      const K = F.KINDS[f.k], r = (K ? K.notice : 16) + (more || 0), dx = m.pos[0] - p[0], dz = m.pos[2] - p[2];
+      if (dx * dx + dz * dz <= r * r && Math.abs(m.pos[1] - p[1]) < r) return true;
+    }
+    return false;
+  };
   F.advOn = (g) => !!(VR.Adventure && VR.Adventure.on && VR.Adventure.on() && !(g && g.meta && g.meta.guest));
   F.enc = () => (VR.Adventure && VR.Adventure.enc ? VR.Adventure.enc() : 'off');
   F.on = function (g) {
@@ -506,6 +520,7 @@
     const p = g.player, r0 = rec();
     GWorld = g.world; GW.t = g.time || 0; GW.enc = kids(g) ? 'off' : F.enc(); GW.band = r0 ? r0.band : 'normal'; GW.s = r0 ? r0.tension : 0.4;
     GW.night = g.env && g.env.E ? g.env.E.night : 0;
+    { const RG = VR.Regie, t = g.time || 0, h = !!(RG && RG.held && RG.held(g)); if (!h) F.hold0 = -1; else if (!(F.hold0 >= 0) || t < F.hold0) F.hold0 = t; GW.hold = h && t - F.hold0 < F.HOLD; if (GW.hold) F.stats.held = (F.stats.held || 0) + 1; }   // f-polish9
     GW.player.pos = p.pos; GW.player.dead = !!p.dead || !!F.fainting || !!(g.ui && g.ui.screen === 'death'); GW.player.light = heldLight(p);
     GW.players.length = 1;
     const mp = g.mp; if (mp && mp.role === 'host' && mp.remote) for (const a of mp.remote.values()) if (a && a.has && !a.dead) { const q = a.__fp || (a.__fp = { pos: null, dead: false, light: 0, peer: null }); q.pos = a.pos; q.peer = a.peer; GW.players.push(q); }
