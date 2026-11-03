@@ -20054,10 +20054,10 @@ const B=VR.WildBond={};
 
 B.KINDS={
 glimmer_deer:{temper:'shy',coat:'spots',babyCoat:'spots',food:['apple','wheat','carrot'],family:true,base:[0xd8c8a0],dark:0x8a6a42,light:0xfff4dc,strength:0.35,babyStrength:0.85},
-bloom_sheep:{temper:'calm',coat:'dapples',babyCoat:'dapples',food:['wheat','apple'],family:true,base:null,dark:0xe6d6ea,light:0xfffcff,strength:0.5,babyStrength:0.6},
+bloom_sheep:{temper:'calm',coat:'spots',babyCoat:'spots',food:['wheat','apple'],family:true,base:null,dark:0xe6d6ea,light:0xfffcff,strength:0.5,babyStrength:0.6},
 moss_boar:{temper:'calm',coat:'stripes',babyCoat:'stripes',food:['carrot','potato','apple','beetroot'],family:true,base:null,dark:0x3a3020,light:0xb89a6a,strength:0.3,babyStrength:0.8},
 glimmer_fox:{temper:'curious',coat:'dapples',babyCoat:'dapples',food:['glow_berries','sweet_berries'],pet:true,base:[0xe8782e],dark:0xc2561e,light:0xffb070,strength:0.45,babyStrength:0.5},
-moss_cat:{temper:'shy',coat:'stripes',babyCoat:'stripes',food:['raw_cod'],pet:true,base:[0x3d4d30],dark:0x26321e,light:0x6a8048,strength:0.6,babyStrength:0.6},
+moss_cat:{temper:'shy',coat:'stripes',babyCoat:'stripes',ring:true,su:2,food:['raw_cod'],pet:true,base:[0x3d4d30],dark:0x26321e,light:0x6a8048,strength:0.6,babyStrength:0.6},
 crystal_pup:{temper:'curious',coat:'spots',babyCoat:'spots',food:['bone'],pet:true,base:[0xeaf6ff],dark:0xa8d0f0,light:0xffffff,strength:0.5,babyStrength:0.6},
 };
 B.isKind=(k)=>typeof k==='string'&&Object.prototype.hasOwnProperty.call(B.KINDS,k);
@@ -20076,7 +20076,7 @@ return()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^(s>>>15),1|s);t=(t+Math.imul(t^(
 B.PATTERNS={
 spots:{r1:2.2,r2:4.6,w:0.30,p0:0.2,ax:1,ay:1},
 stripes:{r1:2.0,r2:4.2,w:0.30,p0:0.5,ax:0.55,ay:1},
-dapples:{r1:1.5,r2:3.2,w:0.55,p0:0.3,ax:1,ay:1},
+dapples:{r1:1.5,r2:3.2,w:0.55,p0:0.36,ax:1,ay:1},
 };
 const NB={};
 const hood=(pat)=>{
@@ -20119,8 +20119,40 @@ B.coatSpec=function(kind,v,baby){
 const K=B.KINDS[kind];if(!K)return null;
 const pat=baby?K.babyCoat:K.coat;
 const seed=(((kind.length*7919)^(v*104729))+(baby?31337:0))|0;
-return{pat,tex:B.coat(seed+kind.charCodeAt(0)*13,pat),dark:K.dark,light:K.light,k:baby?K.babyStrength:K.strength};
+const P=(baby?B.PAINT_BABY:B.PAINT)[kind];
+return{pat,tex:B.coat(seed+kind.charCodeAt(0)*13,pat),dark:K.dark,light:K.light,k:baby?K.babyStrength:K.strength,ink:P[0],kInk:P[1],gnd:P[2],kGnd:P[3],sat:baby?1.14:1.06};
 };
+
+
+
+
+B.PAINT={
+glimmer_deer:[0xfff4dc,0.62,0x9a6a3e,0.3],bloom_sheep:[0xb898d0,0.62,0xffffff,0.3],moss_boar:[0xc8a878,0.55,0x4a3220,0.3],
+glimmer_fox:[0xffd8b0,0.6,0xb04a14,0.35],moss_cat:[0x141c0c,0.75,0x7a9850,0.55],crystal_pup:[0x6aa4e0,0.7,0xffffff,0.3],
+};
+B.PAINT_BABY={
+glimmer_deer:[0xfffaf0,0.95,0x8a4e24,0.55],bloom_sheep:[0xa880c8,0.72,0xffffff,0.35],moss_boar:[0xf0d8a8,0.85,0x3a2616,0.5],
+glimmer_fox:[0xfff0dc,0.75,0xa8400e,0.42],moss_cat:[0x101808,0.8,0x8aa860,0.6],crystal_pup:[0x5090dc,0.8,0xffffff,0.35],
+};
+
+
+B.bodyUV=(x,y,z,C,out)=>{out=out||[0,0];out[0]=(z-C.z0)*(C.su||1);out[1]=(Math.atan2(y-C.cy,x-C.cx)/(Math.PI*2)+0.5)*B.N;return out;};
+B.sampleUV=(tex,u,v,n)=>{n=n||B.N;const a=((Math.round(u)%n)+n)%n,b=((Math.round(v)%n)+n)%n;return tex[b*n+a];};
+
+
+B.paint=(c,t,S)=>{
+const e=Math.max(0,Math.min(1,(t-0.3)/0.4)),s=e*e*(3-2*e);
+return B.sat(B.mix(B.mix(c,S.gnd,S.kGnd*(1-s)),S.ink,S.kInk*s),S.sat||1);
+};
+B.sat=(c,k)=>{
+if(k===1)return c;
+const r=(c>>16)&255,g=(c>>8)&255,b=c&255,l=0.2126*r+0.7152*g+0.0722*b;
+const f=(q)=>Math.max(0,Math.min(255,Math.round(l+(q-l)*k)));
+return(f(r)<<16)|(f(g)<<8)|f(b);
+};
+
+B.BLINK=0.18;
+B.lid=(bl,rest,happy)=>(rest?'shut':bl>0?(bl>B.BLINK-0.045||bl<=0.045?'half':'shut'):happy?'half':'open');
 
 B.sample=(tex,x,y,z,n)=>{n=n||B.N;const u=((Math.round(z*1.3+x*0.6)%n)+n)%n,v=((Math.round(y*1.5+x*0.9)%n)+n)%n;return tex[v*n+u];};
 
@@ -20228,6 +20260,47 @@ b.fed=Math.min(99,r.fed|0);b.state='friend';b.nextVisit=0;
 out.push(b);
 }
 return out;
+};
+
+
+
+
+
+B.finchTakeoff=function(b,px,pz,w,rnd){
+let ax=b.x-px,az=b.z-pz;const al=Math.hypot(ax,az)||1;ax/=al;az/=al;
+let best=null,bs= -1e9;
+const bx=Math.floor(b.x),bz=Math.floor(b.z);
+for(let oz= -9;oz<=9;oz++)for(let ox= -9;ox<=9;ox++){
+const r=Math.hypot(ox,oz);if(r<4||r>9)continue;
+const dot=(ox*ax+oz*az)/r;if(dot< -0.1)continue;
+const x=bx+ox,z=bz+oz;
+if(!w.perch(x,z)||w.top(x,z)+1-b.y>5)continue;
+const sc=dot*2-Math.abs(r-6.5)*0.2+rnd()*0.5;if(sc>bs){bs=sc;best=[x+0.5+(rnd()-0.5)*0.5,w.top(x,z)+1,z+0.5+(rnd()-0.5)*0.5];}
+}
+b.target=best?'perch':'hop';
+if(!best){
+const a=Math.atan2(az,ax)+(rnd()-0.5)*1.6,r=5+rnd()*3,x=b.x+Math.cos(a)*r,z=b.z+Math.sin(a)*r;
+best=[x,w.top(Math.floor(x),Math.floor(z))+1,z];
+}
+const x1=best[0],y1=best[1],z1=best[2],d=Math.hypot(x1-b.x,z1-b.z),side=(rnd()<0.5? -1:1)*d*0.35;
+
+const mx=(b.x+x1)/2+(-(z1-b.z)/(d||1))*side,mz=(b.z+z1)/2+((x1-b.x)/(d||1))*side;
+const lift=Math.min(b.y+7.5,Math.max(b.y,y1)+2.6+rnd()*1.2);
+b.fp={x0:b.x,y0:b.y,z0:b.z,cx:mx,cy:lift,cz:mz,x1,y1,z1,T:Math.max(1.1,Math.min(2.4,d/4)),t:0};
+b.st='fly';b.air=false;b.beat=true;b.flights=(b.flights||0)+1;
+return b;
+};
+B.finchFly=function(b,dt){
+const f=b.fp;if(!f){b.st='hop';return b;}
+f.t=Math.min(f.T,f.t+dt);
+const u=f.t/f.T,s=u*u*(3-2*u),q=1-s;
+const x=q*q*f.x0+2*q*s*f.cx+s*s*f.x1,y=q*q*f.y0+2*q*s*f.cy+s*s*f.y1,z=q*q*f.z0+2*q*s*f.cz+s*s*f.z1;
+const vx=(x-b.x)/(dt||1),vy=(y-b.y)/(dt||1),vz=(z-b.z)/(dt||1);
+b.x=x;b.y=y;b.z=z;b.vx=vx;b.vy=vy;b.vz=vz;
+if(vx*vx+vz*vz>1e-4)b.yaw=Math.atan2(-vx,-vz);
+b.beat=vy> -0.6||u>0.88;
+if(u>=1){b.st=b.target||'hop';b.y=b.gy=f.y1;b.fp=null;b.vx=b.vy=b.vz=0;b.air=false;b.beat=false;b.calm=1.2+((b.flights*0.37)%1)*0.8;b.t=0.6;}
+return b;
 };
 
 
@@ -54152,7 +54225,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="8e02785472a8eac5";
+VR.TEX_SRC_HASH="44171da9e06d280a";
 
 
 
@@ -110518,7 +110591,12 @@ glimmer_fox:[[2,4,4,0,1,1],[6,4,4,0,1,1]],
 moss_cat:[[2,4,1,-1,0],[5,4,1,1,0]],
 crystal_pup:[[2,5,1,-1,0],[5,5,1,1,0]],
 };
-const EYE_COL={moss_cat:0xd8f04a,crystal_pup:0x2a4ab8};
+
+const IRIS={
+glimmer_deer:[0x1e120c,0x4a2c18],moss_boar:[0x180e08,0x3e2614],bloom_sheep:[0x140c08,0x6a4818],
+glimmer_fox:[0x1a0e08,0x6a3a12],moss_cat:[0x1a2210,0x8aa830],crystal_pup:[0x141830,0x2a3c80],
+};
+const GLINT=0xfff6e8;
 
 const INK={glimmer_deer:'light',bloom_sheep:'dark',moss_boar:'light',glimmer_fox:'light',moss_cat:'dark',crystal_pup:'dark'};
 const COATED=['body','head','tail'];
@@ -110534,47 +110612,70 @@ return bc;
 const clone=(g)=>{const c=new Grid(g.sx,g.sy,g.sz,g.ox,g.oy,g.oz);c.c.set(g.c);return c;};
 const grow=(g)=>{const c=new Grid(g.sx+2,g.sy+2,g.sz+2,g.ox+1,g.oy+1,g.oz+1);each(g,(x,y,z,v)=>{c.c[c.i(x+1,y+1,z+1)]=v;});return c;};
 const filled=(g,x,y,z)=>g.in(x,y,z)&&g.get(x,y,z)!==0;
+const DIRS=[[-1,0,0],[1,0,0],[0,0,-1],[0,0,1]];
+
 
 function build(kind,v,baby){
 const def=M[kind](),spec=B.coatSpec(kind,v,baby),K=B.KINDS[kind];
 if(!def|| !spec)return def;
 const body=def.parts.body&&def.parts.body.grid,base=body?dominant(body):0;
-const ink=INK[kind]==='light'?K.light:K.dark,other=INK[kind]==='light'?K.dark:K.light;
 const eyes=EYES[kind]||[],head=def.parts.head&&def.parts.head.grid;
 const eyeCells=new Set();
-if(head)for(const e of eyes)for(const[dx,dy,dz]of[[0,0,0],[0,1,0],[e[3],0,e[4]],[e[3],1,e[4]]])eyeCells.add((e[0]+dx)+','+(e[1]+dy)+','+(e[2]+dz));
+if(head)for(const e of eyes)for(const[dx,dy,dz]of[[0,0,0],[0,1,0],[e[3],0,e[4]],[e[3],1,e[4]]])for(let k=0;k<3;k++)eyeCells.add((e[0]+dx)+','+(e[1]+dy)+','+(e[2]+dz+k));
+
+const uv=[0,0],face=Object.assign({},spec,{kInk:spec.kInk*0.5,kGnd:spec.kGnd*0.5});
 for(const name of COATED){
 const pr=def.parts[name];if(!pr)continue;
 const g=pr.grid;
+let cx=0,cy=0,n=0;each(g,(x,y)=>{cx+=x+0.5;cy+=y+0.5;n++;});
+const C={cx:cx/(n||1),cy:cy/(n||1),z0:name==='head'? -7:name==='tail'? -11:0,su:K.su||1};
 each(g,(x,y,z,val)=>{
 if((val>>24)&1)return;
 if(name==='head'&&eyeCells.has(x+','+y+','+z))return;
 const c=val&0xffffff;if(cdist(c,base)>90)return;
-const t=B.sample(spec.tex,x,y+(name==='head'?7:0),z+(name==='tail'?11:0))/255;
-
-if(t>0.5)g.set(x,y,z,B.mix(c,ink,spec.k*(t-0.5)*2),0);
-else g.set(x,y,z,B.mix(c,other,spec.k*0.45*(0.5-t)*2),0);
+B.bodyUV(x+0.5,y+0.5,z+0.5,C,uv);
+const t=K.ring?B.sampleUV(spec.tex,uv[1],uv[0]):B.sampleUV(spec.tex,uv[0],uv[1]);
+g.set(x,y,z,B.paint(c,t/255,name==='head'?face:spec),0);
 });
 }
-
 if(head){
-const shut=clone(head);
+const col=IRIS[kind]||IRIS.glimmer_deer,glint=new Grid(head.sx*2,head.sy*2,head.sz*2,head.ox*2,head.oy*2,head.oz*2);
+const far=clone(head),half=clone(head),shut=clone(head);
+def.eyes=[];
+const hc=[0,0];let hn=0;each(head,(x,y,z)=>{hc[0]+=x+0.5;hc[1]+=z+0.5;hn++;});hc[0]/=hn||1;hc[1]/=hn||1;
 for(const e of eyes){
-const orig=head.get(e[0],e[1],e[2])&0xffffff;
-const ec=EYE_COL[kind]||(orig&&cdist(orig,0x101010)<200?0x1a1420:0x1a1420);
-const above=head.get(e[0],e[1]+2,e[2])&0xffffff||base,lid=B.mix(above,0x000000,0.18);
 const cells=[[e[0],e[1],e[2]],[e[0],e[1]+1,e[2]],[e[0]+e[3],e[1],e[2]+e[4]],[e[0]+e[3],e[1]+1,e[2]+e[4]]];
-cells.forEach(([x,y,z0],i)=>{
-let z=z0;while(i>0&& !filled(head,x,y,z)&&z<z0+2)z++;
-if(!filled(head,x,y,z)&&i>0)return;
-const g3=filled(head,cells[3][0],cells[3][1],cells[3][2])||filled(head,cells[3][0],cells[3][1],cells[3][2]+1);
-const cl=e.length>5?e[5]:g3?3:1;
-head.set(x,y,z,i===cl?0xffffff:ec,0);
-shut.set(x,y,z,i===0||i===2?B.mix(lid,0x000000,0.25):lid,0);
-});
+
+const at=cells.map(([x,y,z0])=>{let z=z0;while(!filled(head,x,y,z)&&z<z0+2)z++;return filled(head,x,y,z)?[x,y,z]:null;});
+if(!at[0])continue;
+const above=head.get(e[0],e[1]+2,e[2])&0xffffff||base,lid=B.mix(above,0x000000,0.12),lash=B.mix(lid,0x000000,0.4);
+const ok=at.filter(Boolean);
+for(const[x,y,z]of ok){
+const top=y===e[1]+1;
+for(const g of[head,far,half])g.set(x,y,z,top&&g===half?lid:top?col[0]:col[1],0);
+shut.set(x,y,z,top?lid:lash,0);
+
+if(top&&filled(head,x,y+1,z)&&cdist(head.get(x,y+1,z)&0xffffff,base)<120)for(const g of[head,far,half,shut])g.set(x,y+1,z,B.mix(g.get(x,y+1,z)&0xffffff,0x000000,0.08),0);
 }
-def.parts.head_c={grid:shut,pivot:def.parts.head.pivot};
-def.layout.head_c=def.layout.head;
+
+
+const tops=ok.filter(c=>c[1]===e[1]+1);if(!tops.length){def.eyes.push({cells:ok,iris:col[1],top:e[1]+1,rows:2});continue;}
+const gc=tops.reduce((a,c)=>(c[0]>a[0]||(c[0]===a[0]&&c[2]<a[2])?c:a));
+let out=[0,0,-1],ob= -1e9;
+for(const D of DIRS)if(!filled(head,gc[0]+D[0],gc[1],gc[2]+D[2])){const sc=(gc[0]+0.5-hc[0])*D[0]+(gc[2]+0.5-hc[1])*D[2];if(sc>ob){ob=sc;out=D;}}
+const other=tops.find(c=>c!==gc)||gc;
+const hx=out[0]?(out[0]>0?1:0):other[0]<gc[0]?0:other[0]>gc[0]?1:0,hz=out[2]?(out[2]>0?1:0):other[2]<gc[2]?0:1;
+for(let a=0;a<2;a++)for(let b2=0;b2<2;b2++)for(let c=0;c<2;c++)glint.set(gc[0]*2+a,gc[1]*2+b2,gc[2]*2+c,a===hx&&b2===1&&c===hz?GLINT:col[0],a===hx&&b2===1&&c===hz?1:0);
+head.c[head.i(gc[0],gc[1],gc[2])]=0;
+def.eyes.push({cells:ok,iris:col[1],top:e[1]+1,rows:2});
+}
+const pv=def.parts.head.pivot;
+def.parts.glint={grid:glint,pivot:pv};
+def.parts.head_o={grid:far,pivot:pv};
+def.parts.head_h={grid:half,pivot:pv};
+def.parts.head_c={grid:shut,pivot:pv};
+def.layout.glint=def.layout.head_o=def.layout.head_h=def.layout.head_c=def.layout.head;
+def.glintScale=0.5;
 }
 
 if(baby&&body){
@@ -110610,7 +110711,10 @@ gait:'wings',
 };
 };
 
-const HIDE_OPEN={head_c:true},HIDE_SHUT={head:true};
+
+const HIDE_OPEN={head_o:true,head_h:true,head_c:true},HIDE_FAR={head:true,glint:true,head_h:true,head_c:true};
+const HIDE_HALF={head:true,head_o:true,glint:true,head_c:true},HIDE_SHUT={head:true,head_o:true,head_h:true,glint:true};
+const GLINT_D2=12*12;
 const ZERO6=()=>[0,0,0,0,0,0,1];
 const put=(v,rx,ry,rz,ox,oy,oz,s)=>{v[0]=rx;v[1]=ry;v[2]=rz;v[3]=ox;v[4]=oy;v[5]=oz;v[6]=s;return v;};
 
@@ -110620,6 +110724,11 @@ this.g=g;
 this.on=false;this.chk=0;this.built=new Set();this.queue=[];this.buildT=0;
 this.friends=B.deserialize(meta&&meta.wildBonds);
 this.birds=[];this.birdT=3;
+
+this.bw={
+top:(x,z)=>{const w=this.g.world;return w&&w.isLoaded(x,z)?w.topAt(x,z): -1e9;},
+perch:(x,z)=>{const w=this.g.world;if(!w|| !w.isLoaded(x,z))return false;const b=w.getBlock(x,w.topAt(x,z),z);return!!b&&(!!(VR.R.T.flags[b]&VR.F.LEAVES)||VR.R.T.shape[b]===VR.SHAPE.FENCE);},
+};
 this.still=0;this.pspeed=0;this.attachT=0;this.visitT=5;this.visitor=null;
 this.out=[0,0,0];
 this.cost={thinks:0,ms:0};
@@ -110880,10 +110989,14 @@ const h=m.wh;if(!h|| !this.on)return P;
 const dt=h.lt<0?0:Math.min(0.25,t-h.lt);h.lt=t;
 
 h.blinkT-=dt;
-if(h.blinkT<=0){h.bl=0.13;h.blinkT=2+hash(m.id,Math.floor(t),0,1)*4;}
+if(h.blinkT<=0){h.bl=B.BLINK;h.blinkT=2+hash(m.id,Math.floor(t),0,1)*4;}
 h.bl=Math.max(0,h.bl-dt);
 const rest=h.mode==='rest';
-m.whide= !m.vkey?null:h.bl>0||rest?HIDE_SHUT:HIDE_OPEN;
+if(m.vkey){
+const lid=B.lid(h.bl,rest,h.wig>0||h.eatT>0.3),pp=this.g.player&&this.g.player.pos;
+const far= !pp||(m.pos[0]-pp[0])**2+(m.pos[1]-pp[1])**2+(m.pos[2]-pp[2])**2>GLINT_D2;
+m.whide=lid==='shut'?HIDE_SHUT:lid==='half'?HIDE_HALF:far?HIDE_FAR:HIDE_OPEN;
+}else m.whide=null;
 
 const yr=dt>0?angDiff(m.yaw-h.ly)/dt:0;h.ly=m.yaw;
 const wig=h.wig>0?Math.sin(t*16)*0.5:0;
@@ -110900,7 +111013,7 @@ else if(rest){hx= -0.5;hy=0.5;}
 B.spring(h.sE,(hx-(h.phx||hx))*3+(m.walkAmt||0)*Math.sin((m.walk||0)*6)*0.18,12,0.25,dt);h.phx=hx;
 const hs=h.baby?1.3:1;
 P.head=put(h.hp,hx,hy,0,0,h.baby?0.6:0,0,hs);
-P.head_c=P.head;
+P.head_c=P.head_h=P.head_o=P.head;
 if(P.tail||m.def.companion||m.kind==='moss_cat'||m.kind==='glimmer_fox'||m.kind==='crystal_pup'){
 const tl=P.tail||[0,0,0];
 P.tail=put(h.pt,tl[0]||0,(tl[1]||0)+h.sT.x,tl[2]||0,tl[3]||0,tl[4]||0,tl[5]||0,1);
@@ -110920,6 +111033,7 @@ if(P.tail)P.tail[4]+=dn;
 const b=P.body||[0,0,0];
 P.body=put(h.pb,b[0]||0,b[1]||0,(b[2]||0)+wig*0.25,b[3]||0,b[4]||0,b[5]||0,1);
 }
+const q=P.head;P.glint=put(h.pg||(h.pg=ZERO6()),q[0],q[1],q[2],q[3],q[4],q[5],q[6]*0.5);
 return P;
 }
 
@@ -110938,18 +111052,27 @@ for(let i=L.length-1;i>=0;i--){
 const b=L[i];
 b.t-=dt;b.flap+=dt;
 const dx=b.x-p.pos[0],dz=b.z-p.pos[2],d2=dx*dx+dz*dz;
-if(b.st==='hop'){
-if(d2<20||(d2<64&&this.pspeed>4)){const d=Math.sqrt(d2)||1;b.st='fly';b.vx=dx/d*4.5+(Math.random()-0.5);b.vz=dz/d*4.5+(Math.random()-0.5);b.vy=4+Math.random()*1.5;b.yaw=Math.atan2(-b.vx,-b.vz);continue;}
-if(b.air){b.vy-=22*dt;b.x+=b.vx*dt;b.z+=b.vz*dt;b.y+=b.vy*dt;if(b.y<=b.gy){b.y=b.gy;b.air=false;b.vy=0;}}
+if(b.st==='hop'||b.st==='perch'){
+b.calm=Math.max(0,(b.calm||0)-dt);
+if((d2<20||(d2<64&&this.pspeed>4))&& !(b.calm>0)){
+
+if((b.flights||0)<3){B.finchTakeoff(b,p.pos[0],p.pos[2],this.bw,Math.random);continue;}
+const d=Math.sqrt(d2)||1;b.st='leave';b.vx=dx/d*4.5+(Math.random()-0.5);b.vz=dz/d*4.5+(Math.random()-0.5);b.vy=4+Math.random()*1.5;b.yaw=Math.atan2(-b.vx,-b.vz);continue;
+}
+if(b.st==='perch'){
+
+if(b.t<=0){b.t=0.6+Math.random()*1.6;if(Math.random()<0.6)b.yaw+=(Math.random()-0.5)*1.8;else b.peck=0.25;}
+}else if(b.air){b.vy-=22*dt;b.x+=b.vx*dt;b.z+=b.vz*dt;b.y+=b.vy*dt;if(b.y<=b.gy){b.y=b.gy;b.air=false;b.vy=0;}}
 else if(b.t<=0){
 b.t=0.5+Math.random()*1.4;
 if(Math.random()<0.6){const a=b.yaw+(Math.random()-0.5)*1.6;b.yaw=a;b.vx= -Math.sin(a)*0.9;b.vz= -Math.cos(a)*0.9;b.vy=3.4;b.air=true;const top=w.topAt(Math.floor(b.x+b.vx*0.3),Math.floor(b.z+b.vz*0.3));b.gy=top+1;}
 else b.peck=0.35;
 }
 b.peck=Math.max(0,(b.peck||0)-dt);
-}else{
+}else if(b.st==='fly')B.finchFly(b,dt);
+else{
 b.vy=Math.max(-0.5,b.vy-dt*2.2);b.x+=b.vx*dt;b.y+=b.vy*dt;b.z+=b.vz*dt;
-if(d2>1600){L.splice(i,1);if(!L.length)this.birdT=20;}
+if(d2>1600){L.splice(i,1);if(!L.length)this.birdT=20;continue;}
 }
 if(d2>3600){L.splice(i,1);if(!L.length)this.birdT=12;}
 }
@@ -110967,10 +111090,10 @@ const model=VR.getVoxModel(r.gl,'wh_finch');if(!model)return;
 const pos=this.bpos||(this.bpos=[0,0,0]),opts=this.bopts||(this.bopts={scale:1.35,shade:0});
 for(const b of this.birds){
 const dx=b.x-cam.x,dz=b.z-cam.z;if(dx*dx+dz*dz>80*80)continue;
-const P=b.P,fly=b.st==='fly'||b.air;
-const f=fly?Math.sin(b.flap*34)*1.1:0.0;
-P.wing_l[2]=fly? -0.4-f: -0.1;P.wing_r[2]=fly?0.4+f:0.1;
-P.body[0]=b.peck>0? -0.5:fly?0.15:0;
+const P=b.P,fly=b.st==='fly'||b.st==='leave'||b.air,beat=b.st==='leave'||b.air||(b.st==='fly'&&b.beat);
+const f=beat?Math.sin(b.flap*38)*1.1:0.0;
+P.wing_l[2]=beat? -0.4-f:fly? -1.25: -0.1;P.wing_r[2]=beat?0.4+f:fly?1.25:0.1;
+P.body[0]=b.peck>0? -0.5:fly?Math.max(-0.35,Math.min(0.45,(b.vy||0)*0.12)):0;
 pos[0]=b.x;pos[1]=b.y+(fly?0:0.02);pos[2]=b.z;
 ent.drawModel(r,p,model,pos,cam,b.yaw,P,ent.lightAt(b.x,b.y+0.3,b.z),opts);
 }
