@@ -1718,7 +1718,7 @@
         case 'dim': if (VR.Travel) VR.Travel.command(this, a); break;   // u-dims: /dim — the worlds of this save; /dim <Welt> travels there
         case 'kill': p.damage(1000, 'void'); break;
         case 'fly': p.flySpeed = Math.max(0.2, Math.min(8, parseFloat(a[0]) || 1)); say(T('g.cmd.fly', { v: p.flySpeed })); break;
-        case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;
+        case 'trailer': case 'cinema': if (a[0] === 'welt' && VR.TrailerWelt) { if (VR.TrailerWelt.ok(this) && this.director && this.director.play('welt')) say(T('g.film.cmd')); else say(T('g.film.no')); break; } if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;   // (t-film: /trailer welt — the second trailer, trailer_welt.js)
         case 'render': this.settings.renderDist = Math.max(3, Math.min(this.settings.rdMax || 24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say(T('g.cmd.render', { n: this.settings.renderDist })); break;
         case 'freeze': this.zenFreezeTime = !this.zenFreezeTime; say(T(this.zenFreezeTime ? 'g.cmd.freezeOn' : 'g.cmd.freezeOff')); break;
         case 'raum': case 'space': if (this.raumCommand) this.raumCommand(a[0]); break;   // u-space0: /raum <herz|amarant|zinn|aqua> — the space view (spacescene.js)

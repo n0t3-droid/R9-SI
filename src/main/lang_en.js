@@ -4665,5 +4665,25 @@
     "g.te.gift": "🎁 {who} gives you: {item}",
     "g.te.thanks": "💛 {who} squeezes your hands, thankful",
     // ---- f-quiet2 end
+    // ---- t-film: the second trailer „Die Welt heute“ (trailer_welt.js)
+    "g.film.cmd": "Director: \"The world today\" is rolling — Esc stops it",
+    "g.film.no": "The world trailer plays in a Heartland world (world type default, on the overworld).",
+    "g.film.btnOld": "🎞 Heartland",
+    "g.film.btnWelt": "🎞 The world today",
+    "g.film.btnTip": "A trailer as a little film — Esc stops it",
+    "g.film.w.c1": "A world of blocks — and it is alive",
+    "g.film.w.c2": "Little families in wide meadows",
+    "g.film.w.c3": "A village that knows you",
+    "g.film.w.c3b": "Something new behind every hill",
+    "g.film.w.c4": "And sometimes: a Flausel",
+    "g.film.w.c4b": "Paths that lead to wonder",
+    "g.film.w.c5": "Islands above the clouds",
+    "g.film.w.c6": "A ferry takes you along",
+    "g.film.w.c7": "Old beacons — bright again",
+    "g.film.w.c7b": "Every day a small adventure",
+    "g.film.w.c8": "When the sun goes down …",
+    "g.film.w.title": "R9-SI",
+    "g.film.w.sub": "A world that lives. Build with it.",
+    // ---- t-film end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
