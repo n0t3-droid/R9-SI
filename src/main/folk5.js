@@ -257,12 +257,16 @@
     }
     return pts;
   };
+  const joyLight = (a) => !!(a.act && a.act.type === 'joy' && !a.act.done && /^(story|follow|hiding|hand)$/.test(a.act.kind) && !a._f4 && !a._f5 && a.pose !== 'sleep' && !a.inBoat && !a.dance);
   F4.extra.lantern = function (V, M, pool) {
     const g = V.g, p = g.player.pos, vil = M.vil;
     // (folk5.mjs run 1: at dusk the children walk home one by one — indoors, not drawn, so not in folk4's pool; the
     // procession calls them out: any free child near, seen or not, the nearest first)
+    // (folk5.mjs run 2: at dusk the children were in folkjoy's little moments — a story by the fire, trailing you, hiding:
+    // the lanterns call them from those too, never from a dance or a gift for you)
     const kids = pool.filter(a => a.kid);
-    for (const a of vil.agents) if (a.kid && kids.length < 6 && kids.indexOf(a) < 0 && freeBody(V, a) && d2xz(a, p) < F4.R * F4.R) kids.push(a);
+    for (const a of vil.agents) if (a.kid && kids.length < 6 && kids.indexOf(a) < 0 && d2xz(a, p) < F4.R * F4.R && (freeBody(V, a) || joyLight(a))) kids.push(a);
+    for (const k of kids) if (k.act && k.act.type === 'joy' && V.joyEnd) { try { V.joyEnd(k); } catch (e) { /* its own */ } }
     kids.length = Math.min(kids.length, 6); if (kids.length < 3) return false;
     const pz = vil.plan && vil.plan.plaza, dp = pz ? Math.hypot(pz.x + 0.5 - p[0], pz.z + 0.5 - p[2]) : 1e9;
     let route = null;

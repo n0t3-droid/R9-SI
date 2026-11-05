@@ -213,7 +213,12 @@ function worldOf(gen) {
     player.pos[0] = C[0] + 4.5; player.pos[2] = C[2] + 4.5;
     F4.clear(mgr); tones = 0;
     if (process.env.DBG) { const pp = player.pos; console.log('DBG kids', vil.agents.filter(o => o.kid).map(o => (o.act && o.act.type) + '/' + o.pose + '/' + Math.hypot(o.pos[0] - pp[0], o.pos[2] - pp[2]).toFixed(0) + '/' + o._f4 + '/' + o.drawn).join(' ')); const pzz = vil.plan.plaza; for (const r of [9, 7, 11, 6]) console.log('DBG route', r, F5.route(world, [pzz.x + 0.5, pzz.y, pzz.z + 0.5], r, pp).length); }
+    // (folk5.mjs run 2: the children were in folkjoy's moments — a story by the fire, trailing the player — at dusk)
+    const kk = vil.agents.filter(o => o.kid);
+    if (kk[0]) { mgr.joyBegin(kk[0], 'story', { role: 'listen', S: { kids: [kk[0]] }, seat: [kk[0].pos[0], kk[0].pos[2]], len: 80 }); kk[0].pose = 'sitground'; }
+    if (kk[1]) mgr.joyBegin(kk[1], 'follow', { len: 40 });
     const ML = F4.begin(mgr, vil, 'lantern');
+    check(!!ML && kk.slice(0, 2).every(k => ML.members.includes(k)), 'lantern: children come from a story by the fire or from trailing you');
     check(!!ML && ML.members.length >= 3, `lantern: ${ML ? ML.members.length : 0} children with lanterns`);
     if (ML) {
       check(ML.route && ML.route.length >= 6, `lantern: a loop through the village (${ML.route ? ML.route.length : 0} points)`);
