@@ -226,7 +226,7 @@ function worldOf(gen) {
           const Lu = V.Dusk && V.Dusk.lure; if (Lu && Math.hypot(Lu[0] - lead.pos[0], Lu[2] - lead.pos[2]) < 4) lureOk++;
         }
       }
-      check(walked > 10, `lantern: the line walks its loop (${walked.toFixed(1)} m in 30 s)`);
+      check(walked > 10 && walked < 45, `lantern: the line walks its loop at a procession's pace (${walked.toFixed(1)} m in 30 s)`);
       check(lineOk >= lineN * 0.7, `lantern: in a line, each close behind the one before (${lineOk} of ${lineN} checks)`);
       check(F5.stats.notes > 8 && tones > 8, `lantern: they sing softly (${F5.stats.notes} notes)`);
       check(lureOk >= lineN * 0.7, `lantern: the Flausellichter follow (${lureOk} of ${lineN})`);

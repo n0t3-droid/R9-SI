@@ -270,7 +270,7 @@
     M.ni = 0; M.noteAt = V.time + 2.5; M.sayAt = V.time + 7; M.waveAt = 0; M.n = 0;
     // the leader first, then by distance to it (a short line forms at once)
     kids.sort((x, y) => d2xz(x, route[0]) - d2xz(y, route[0]));
-    kids.forEach((k, i) => { V.setAct(k, { type: 'f4', role: 'lant', k: i }); k._f4 = M; k.f5lant = 1 + ((k.p.seed + i) % 4); M.members.push(k); smile(k, 4); });
+    kids.forEach((k, i) => { V.setAct(k, { type: 'f4', role: 'lant', k: i }); k._f4 = M; k.f5lant = 1 + ((k.p.seed + i) % 4); k._f5sp = k.speed; k.speed = i ? 1.3 : 0.95; M.members.push(k); smile(k, 4); });   // (a procession's pace: the leader slow, the others catch up)
     say(V, kids[0], 'g.f5.lant.go', null, 3.2);
     if (VR.Dusk) VR.Dusk.lure = M.lureP;
     F5.stats.lanterns++;
@@ -297,7 +297,7 @@
     if (d > 5 || (V.time - (a.steerBlocked === undefined ? -9 : a.steerBlocked) < 0.5)) { a.steer = null; V.goTo(a, tx, ty, tz, 0.8); }
     else if (d > 0.3) { a.path = null; a.steer = a.steer || [0, 0]; a.steer[0] = tx; a.steer[1] = tz; }
     else { a.steer = null; }
-    act.run = d > 6;
+    act.run = false;
     a.pose = 'stand'; a.lookAt = null;
   }
   function lanternTick(V, M, dt) {
@@ -364,11 +364,11 @@
       const MM = M || (V && V._f4M);
       try { bEnd.apply(this, arguments); } finally {
         if (V) { try { releaseLookers(V); } catch (e) { /* done */ } }
-        if (MM && MM.kind === 'lantern') for (const k of MM.members) k.f5lant = 0;
+        if (MM && MM.kind === 'lantern') for (const k of MM.members) { k.f5lant = 0; if (k._f5sp) { k.speed = k._f5sp; k._f5sp = 0; } }
       }
     };
     F4.end.f5 = true;
-    F4.onClear.push((V) => { releaseLookers(V); for (const a of V.agents || []) { if (a.f5lant) a.f5lant = 0; if (a._f5) relL(V, a); if (a.act && a.act.type === 'f5hi') endHi(V, a); } });
+    F4.onClear.push((V) => { releaseLookers(V); for (const a of V.agents || []) { if (a.f5lant) a.f5lant = 0; if (a._f5sp) { a.speed = a._f5sp; a._f5sp = 0; } if (a._f5) relL(V, a); if (a.act && a.act.type === 'f5hi') endHi(V, a); } });
   }
 
   // ---------------------------------------------------------------- the villages' hooks (additive)
