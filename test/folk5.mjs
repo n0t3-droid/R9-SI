@@ -269,9 +269,13 @@ if (HP && want('cost')) {
         for (let blk = 0; blk < 6; blk++) for (const [m, arr] of [['off', a], ['on', b], ['on', b], ['off', a]]) { set(m); for (let i = 0; i < 4; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); gl.finish(); arr.push(performance.now() - t); } }
         window.__norender = true; set('on');
         const med = (q) => { q.sort((x, y) => x - y); return +q[q.length >> 1].toFixed(2); };
-        return { off: med(a), on: med(b), moment: g.villages._f4M ? g.villages._f4M.kind : null };
+        // (run 1: High off 17.5 / on 23.1 ms — the frame's own CPU time measured directly too: Folk4's and Folk5's frame
+        // hooks, 2000 calls each)
+        const V = g.villages, cpu = (f) => { const t = performance.now(); for (let i = 0; i < 2000; i++) f(); return +((performance.now() - t) / 2000 * 1000).toFixed(2); };
+        const f4us = cpu(() => F4.frame(V, 0)), f5us = cpu(() => F5.frame(V, 0));
+        return { off: med(a), on: med(b), moment: V._f4M ? V._f4M.kind : null, f4us, f5us };
       });
-      cost[pr] = r; console.log(`  · cost ${pr}: off ${r.off} ms | on ${r.on} ms (moment ${r.moment}; load ${load()}; ${secs()})`);
+      cost[pr] = r; console.log(`  · cost ${pr}: off ${r.off} ms | on ${r.on} ms (moment ${r.moment}; frame hooks Folk4 ${r.f4us} µs, Folk5 ${r.f5us} µs; load ${load()}; ${secs()})`);
       if (pr === 'potato') check(r.on <= r.off * 1.1 + 0.5, `Very Low not slower with Folk4+Folk5 (${r.off} → ${r.on} ms)`);
       await clean('cost ' + pr);
     }
