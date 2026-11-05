@@ -1337,6 +1337,7 @@
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (VR.BodyLife) VR.BodyLife.update(this, dt, eye, E);   // u-moons1: the moons' life — geysers, dust in vacuum arcs, impacts, the suit's sound, the codex finds (bodylife.js; returns at once elsewhere)
       if (VR.Liberate && VR.Liberate.frame) VR.Liberate.frame(this, dt, eye, E);   // a-foes2: the land's tint round a disturbed outpost and its heal, the moment's camera (liberate.js)
+      if (VR.Dusk && VR.Dusk.frame) VR.Dusk.frame(this, dt, eye, E);   // v-dusk: the Flausellichter (dusk.js; Very Low: returns at its first test)
       if (VR.Fairy && VR.Fairy.frame) VR.Fairy.frame(this, dt, eye, E);   // a-fairy: the enchanted places, their folk and adventures (fairy.js)
       if (VR.StoryPlay) VR.StoryPlay.frame(this, dt);   // a-story: the story's offer and scene, the Regie (story.js, regie.js)
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
@@ -1438,7 +1439,7 @@
       this.smartQuality(dt, S, w);
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
-        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, outline, crack, precip, rainMap,
+        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, motes: VR.Dusk && VR.Dusk.out && VR.Dusk.out.count ? VR.Dusk.out : null, outline, crack, precip, rainMap,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,

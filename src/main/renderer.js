@@ -2338,6 +2338,7 @@
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);
       // particles
       if (F.particles && F.particles.count) this.drawParticles(F.particles, E);
+      if (F.motes && F.motes.count) this.drawMotes(F.motes, E);   // v-dusk: the Flausellichter (dusk.js), additive, one draw
       // selection outline + crack
       if (F.outline) this.drawOutline(F.outline);
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
@@ -2560,6 +2561,36 @@
       gl.bindVertexArray(this.partVAO);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
       gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+    }
+    // v-dusk: the Flausellichter — the particle program, its own instance buffer (made the first time: never on Very Low,
+    // where dusk.js has nothing to draw), additive blending: a soft halo and a bright core a mote, one instanced draw
+    drawMotes(M, E) {
+      const gl = this.gl, p = this.P.part, cam = this.cam; if (!p || !cam) return;
+      const cp = this._moteCam || (this._moteCam = [0, 0, 0]); cp[0] = cam.x; cp[1] = cam.y; cp[2] = cam.z;
+      const q = M.fill(cp); if (!q) return;
+      if (!this.moteVAO) {
+        this.moteInst = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.moteInst); gl.bufferData(gl.ARRAY_BUFFER, M.data.byteLength, gl.DYNAMIC_DRAW);
+        this.moteVAO = gl.createVertexArray(); gl.bindVertexArray(this.moteVAO);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.partVBO); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.moteInst);
+        const st = 14 * 4;
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, st, 0); gl.vertexAttribDivisor(1, 1);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 16); gl.vertexAttribDivisor(2, 1);
+        gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 32); gl.vertexAttribDivisor(3, 1);
+        gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 2, gl.FLOAT, false, st, 48); gl.vertexAttribDivisor(4, 1);
+        gl.bindVertexArray(null);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.moteInst);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, M.data, 0, q * 14);
+      gl.useProgram(p.p); this.common(p, E);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+      gl.uniform3f(p.u.u_right, this.camRight[0], this.camRight[1], this.camRight[2]);
+      gl.uniform3f(p.u.u_up, this.camUp[0], this.camUp[1], this.camUp[2]);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); gl.uniform1i(p.u.u_albedo, 0);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      gl.bindVertexArray(this.moteVAO);
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, q);
+      gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     }
     drawOutline(o) {
       const gl = this.gl, p = this.P.line, cam = this.cam;

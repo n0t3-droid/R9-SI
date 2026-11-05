@@ -2357,6 +2357,9 @@
     // u-wild2: lovable animals (wildheart.js)
     'g.set.wildHeart': 'Lovable animals',
     'g.set.wildHeart.tip': 'Every animal with its own coat pattern, big blinking eyes and bouncing ears; mothers with their young in a line, curious and shy animals, hopping finches; feeding, trust, friendship (Balanced and up).',
+    'g.set.dusk': 'Flausel lights',
+    'g.set.dusk.tip': 'At dusk and at night soft swarms of lights drift over meadows and forest edges: they gather round you when you stand still, part as you walk through and trail toward flowers and water (Low and up).',
+    'g.dusk.ring': 'The Flausel lights dance a ring round you.',
     'g.wh.shy': '{name} is still shy — hold {food} and wait.',
     'g.wh.ate': '{name} eats from your hand.',
     'g.wh.trust': '{name} trusts you and follows you a while.',

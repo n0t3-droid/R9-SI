@@ -105,10 +105,11 @@ const grabGL = (still = true) => ev((still) => {
     // place follow how many frames a settle took: the fairies' clock set, no particle spawned or drawn in a picture)
     if (VR.Fairy && VR.Fairy.state) VR.Fairy.state.t = 0;
     if (P) { P.n = 0; P.count = 0; P.spawn = () => -1; }
+    if (VR.Dusk) { VR.Dusk.hold = true; if (VR.Dusk.out) VR.Dusk.out.count = 0; }   // (v-dusk: the Flausellichter not drawn — they flock with the frames a settle took)
     window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); if (VR.Fairy && VR.Fairy.state) VR.Fairy.state.t = 0; if (P) { P.n = 0; P.count = 0; } }
     return g.renderer.gl.canvas.toDataURL('image/png');
   } catch (e) { return null; }
-  finally { window.__norender = true; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; if (P) P.spawn = spawn0; for (const m of mov) m[0].draw = m[1]; if (ship) g.gadgets.drawShip = ship; }
+  finally { window.__norender = true; if (VR.Dusk) VR.Dusk.hold = false; if (E) { E.draw = keep[0]; if (keep[1]) E.drawTranslucent = keep[1]; } if (V) V.draw = keep[2]; if (P) P.spawn = spawn0; for (const m of mov) m[0].draw = m[1]; if (ship) g.gadgets.drawShip = ship; }
 }, !!still);
 const small = (buf) => sharp(buf).resize(CW, CH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
 // one shot: write it, compare it (or make it the reference)

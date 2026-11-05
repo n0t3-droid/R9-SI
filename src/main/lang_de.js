@@ -2357,6 +2357,9 @@
     // u-wild2: Tiere zum Liebhaben (wildheart.js)
     'g.set.wildHeart': 'Tiere zum Liebhaben',
     'g.set.wildHeart.tip': 'Jedes Tier mit eigenem Fellmuster, großen blinzelnden Augen und wippenden Ohren; Mütter mit Jungen in einer Reihe, neugierige und scheue Tiere, hüpfende Finken; füttern, Vertrauen, Freundschaft (ab Ausgewogen).',
+    'g.set.dusk': 'Flausellichter',
+    'g.set.dusk.tip': 'Abends und nachts schweben sanfte Lichterschwärme über Wiesen und Waldränder: sie sammeln sich um dich, wenn du stillstehst, weichen aus, wenn du hindurchgehst, und ziehen zu Blumen und Wasser (ab Niedrig).',
+    'g.dusk.ring': 'Die Flausellichter tanzen einen Ring um dich.',
     'g.wh.shy': '{name} ist noch scheu — halte {food} in der Hand und warte.',
     'g.wh.ate': '{name} frisst dir aus der Hand.',
     'g.wh.trust': '{name} vertraut dir und folgt dir ein Stück.',
