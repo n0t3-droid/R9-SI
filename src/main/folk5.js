@@ -94,7 +94,8 @@
   F5.sw = { frame: true, draw: true, squint: true };
   const OUT = [0, 0], EMPTY = [];
   const BUSY = new Set(['talk', 'joy', 'outing', 'hide', 'fight', 'sleep', 'school', 'gsplay', 'gsvisit', 'festival', 'f4', 'arrive', 'f5look', 'f5hi', 'play']);
-  const free = (V, a) => a && a.pos && !a._f4 && !a._f5 && !a.guest && !a.inBoat && a.pose !== 'sleep' && a.pose !== 'sit' && a.pose !== 'sitground' && a !== V.talking && !a.dance && !(a.act && BUSY.has(a.act.type) && !(a.act.type === 'joy' && (a.act.done || a.act.kind === 'follow'))) && a.drawn !== false;
+  const freeBody = (V, a) => a && a.pos && !a._f4 && !a._f5 && !a.guest && !a.inBoat && a.pose !== 'sleep' && a.pose !== 'sit' && a.pose !== 'sitground' && a !== V.talking && !a.dance && !(a.act && BUSY.has(a.act.type) && !(a.act.type === 'joy' && (a.act.done || a.act.kind === 'follow')));
+  const free = (V, a) => freeBody(V, a) && a.drawn !== false;
 
   // ---------------------------------------------------------------- the room and the onlookers
   F5.zone = function (V) {
@@ -117,7 +118,7 @@
     }
     const ag = Z.M.vil && Z.M.vil.agents; if (!ag) return;
     for (const a of ag) {
-      if (a._f4 === Z.M || a.pose === 'sleep' || a.inBoat || Math.abs(a.pos[1] - cy) > 2.5) continue;
+      if (a._f4 === Z.M || a.pose === 'sleep' || a.inBoat || Math.abs(a.pos[1] - cy) > 2.5 || (Z.M.D && Z.M.D.members.indexOf(a) >= 0)) continue;   // (folk5.mjs run 1: the dancers carry no mark — they were pushed off their ring)
       if (!F5.keepOff(a.pos[0], a.pos[2], cx, cz, R, OUT)) continue;
       if (V.safeCell && !V.safeCell(Math.floor(OUT[0]), Math.floor(a.pos[1] + 0.05), Math.floor(OUT[1]))) continue;
       a.pos[0] = OUT[0]; a.pos[2] = OUT[1]; F5.stats.pushed++;
@@ -177,7 +178,8 @@
     if (!V || !a || V.time - (a._f5frT === undefined ? -1e9 : a._f5frT) < F5.FR_GAP) return false;
     a._f5frT = V.time; F5.stats.friends++;
     a.f4sq = V.time + 3.2; smile(a, 4);
-    if (!free(V, a) || a.pose !== 'stand' && a.pose !== undefined && a.pose !== 'walk') { if (V.hearts) V.hearts(a); F5.stats.hearts++; return true; }
+    // (folk5.mjs run 1: free() wants the person drawn — one greeting you right after you turned may not be yet)
+    if (!freeBody(V, a) || (a.pose !== 'stand' && a.pose !== undefined && a.pose !== 'walk')) { if (V.hearts) V.hearts(a); F5.stats.hearts++; return true; }
     V.setAct(a, { type: 'f5hi', ph: 'come', p0: [a.pos[0], a.pos[2]], hug: (a.p.seed & 1) === 0 && !a.kid });
     return true;
   };

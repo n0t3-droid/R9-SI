@@ -191,10 +191,14 @@ if (HP && want('friend')) {
       await step(8, 33);   // (into the gesture)
       // freeze the gesture for the pictures
       await ev(() => { const a = window.__cu, V = VR.game.villages; if (a.act && a.act.type === 'f5hi') { a.act.t = 0; a.act.t0 = 100; } a.f4sq = V.time + 60; a.expr = 'joy'; a.exprT = 60; V.hearts(a); });
+      // (run 1: the portrait framed his back — now the player's own eye 2.5 m before the friend, a little to the side:
+      // the friend turns to the player, so to the lens)
+      const cam = await ev(() => { const a = window.__cu, p = VR.game.player.pos; let dx = p[0] - a.pos[0], dz = p[2] - a.pos[2]; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d; const c = Math.cos(0.45), s = Math.sin(0.45), rx = dx * c - dz * s, rz = dx * s + dz * c; return { P: [a.pos[0] + rx * 2.5, a.pos[1] + 1.45, a.pos[2] + rz * 2.5], T: [a.pos[0], a.pos[1] + 1.15, a.pos[2]] }; });
+      await lookFrom(cam.P, cam.T); await step(6, 33);
+      await ev(() => { const a = window.__cu, V = VR.game.villages; if (a.act && a.act.type === 'f5hi') { a.act.t = 0; a.act.t0 = 100; } a.f4sq = V.time + 60; V.hearts(a); });
       rows.friend.push(await snap('f5_friend.png'));
-      await photoOn(4500);
-      const f = await ev(() => { const g = VR.game, a = window.__cu, f = VR.Folk3.portraitOf(g.photoCam, a, { d: 2.6, dMin: 2.0, keep: true }); if (f) window.__shotT = f.T; return !!f; });
-      if (f) { await step(2, 33); await ev(() => { const a = window.__cu; VR.game.villages.hearts(a); a.bubble = { text: '♥', t: 30, icon: true }; }); await step(1, 33); rows.friend.push(await grab('f5_friend_side.png')); }
+      await ev(() => { const a = window.__cu, V = VR.game.villages; if (a.act && a.act.type === 'f5hi') { a.act.t = 0; a.act.t0 = 100; } a.f4sq = V.time + 60; V.hearts(a); a.bubble = { text: '♥', t: 30, icon: true }; });
+      await step(1, 33); rows.friend.push(await grab('f5_friend_side.png'));
       await photoOff();
       await ev(() => { const a = window.__cu; if (a.act && a.act.type === 'f5hi') { a.act = null; a.thinkT = 0; } a.joyClip = null; window.__keep = null; });
     }

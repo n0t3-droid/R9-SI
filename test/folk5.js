@@ -127,6 +127,8 @@ function worldOf(gen) {
       const inside = (o) => Z && dXZ(o, Z.c) < Z.R - 0.15;
       check(!inside(pet), `dance: the pet keeps out of the ring (${dXZ(pet, D.c).toFixed(1)} m)`);
       check(!inside(mobs[0]), `dance: the animal keeps out (${dXZ(mobs[0], D.c).toFixed(1)} m)`);
+      const nr = D.members.filter(a => a.dance && a.ringDance).length;
+      check(nr >= Math.min(3, D.members.length), `dance: the dancers still dance their ring (${nr} of ${D.members.length}; folk5.mjs run 1: the keep-off rim pushed them out)`);
       const walkers = vil.agents.filter(a => !M.members.includes(a) && inside(a));
       check(walkers.length === 0, `dance: no passer-by inside the ring (${walkers.length})`);
       const L = F5.lookers(mgr);
