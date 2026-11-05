@@ -20,7 +20,8 @@ const W = +(process.env.W || 1280), H = +(process.env.H || 720), EVERY = +(proce
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',').map(Number) : null;
 const TAG = process.env.TAG || 'welt';
 const FR = ROOT + '/.tmp_tests/tw_frames_' + TAG + '/';
-fs.rmSync(FR, { recursive: true, force: true }); fs.mkdirSync(FR, { recursive: true }); fs.mkdirSync(SHOTS, { recursive: true });
+const START = process.env.START ? +process.env.START : 0;   // resume: keep the frames of the shots before START, go on from there
+if (!START) fs.rmSync(FR, { recursive: true, force: true }); fs.mkdirSync(FR, { recursive: true }); fs.mkdirSync(SHOTS, { recursive: true });
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const T0 = Date.now(), el = () => ((Date.now() - T0) / 60000).toFixed(1) + ' min';
@@ -66,8 +67,9 @@ await ev(() => {
 const plan = await ev(() => VR.game.director.shots.map((s) => ({ name: s.name, dur: s.dur, cap: s.caption, stage: s.stage || '', at: s.anchor ? s.anchor.map(Math.round) : null })));
 console.log(JSON.stringify(plan));
 // a test capture: jump to the first wanted shot
-if (ONLY) await ev((k) => { VR.game.director.si = k - 1; }, ONLY[0]);
-let fi = 0, simF = 0;
+if (ONLY || START) await ev((k) => { VR.game.director.si = k - 1; }, ONLY ? ONLY[0] : START);
+let fi = START ? fs.readdirSync(FR).filter((f) => /^f_\d+\.jpg$/.test(f)).length : 0, simF = 0;
+const fi0 = fi;
 const frames = [], perShot = {}, ms = [];
 let guard = 0, loadW = 0;
 while (guard++ < 40000) {
@@ -85,7 +87,8 @@ while (guard++ < 40000) {
       const g = VR.game, w = g.world, p = g.player, d = g.director, rd = 6, pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4;
       let miss = 0, hidden = 0;
       for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.cols.get(VR.ckey(pcx + dx, pcz + dz)); if (!c) miss++; else if (!(c.shownAt >= 0)) hidden++; }
-      const ok = !miss && !hidden && !w.pending.size && !(g.horizon && g.horizon.inflight);
+      const st = window.__ld || (window.__ld = { h: -1, n: 0 }); st.n = hidden === st.h ? st.n + 1 : 0; st.h = hidden;
+      const ok = !miss && !w.pending.size && !g.pool.busy && !(g.horizon && g.horizon.inflight) && (hidden <= 8 || st.n >= 20);   // (a few columns of a dense town stay unshown out of view)
       if (!ok) d.loadT = Math.min(d.loadT, 0.1);
       return { ok, miss, hidden, pend: w.pending.size, busy: g.pool.busy };
     });
@@ -114,12 +117,16 @@ while (guard++ < 40000) {
 console.log('captured', fi, 'frames in', el(), '· median', ms.slice().sort((a, b) => a - b)[ms.length >> 1] || 0, 'ms a frame');
 fs.writeFileSync(FR + 'frames.json', JSON.stringify(frames));
 const shotsSeen = Object.keys(perShot).length;
-check(shotsSeen === (ONLY ? ONLY.length : plan.length), 'every shot photographed (' + shotsSeen + ')');
+check(shotsSeen === (ONLY ? ONLY.length : plan.length - START), 'every shot photographed (' + shotsSeen + ')');
 const freed = await ev(() => { const L = VR.Liberate; return L ? [...L.sites().values()].some((s) => s.st === 'frei') : false; });
 if (!ONLY || ONLY.includes(plan.findIndex((p) => p.stage === 'liberate'))) check(freed, 'the outpost was freed in its shot (BEFREIT)');
 await browser.close();
 
 // the contact sheet: one frame per shot at 60 % of it, with its German caption
+if (START && fi0) {   // (the shots before START: their frames are in order, split by the plan's durations)
+  const tot = plan.slice(0, START).reduce((a, p) => a + p.dur, 0); let acc = 0;
+  for (let j = 0; j < START; j++) { const a0 = Math.round(acc / tot * fi0), a1 = Math.round((acc + plan[j].dur) / tot * fi0); acc += plan[j].dur; perShot[j] = []; for (let i = a0; i < a1; i++) perShot[j].push({ file: FR + 'f_' + String(i).padStart(5, '0') + '.jpg', t: (i - a0) / Math.max(1, a1 - a0) * plan[j].dur, dur: plan[j].dur, cap: plan[j].cap, name: plan[j].name }); }
+}
 const pick = Object.keys(perShot).sort((a, b) => a - b).map((k) => { const L = perShot[k], want = L[0].dur * 0.6; let b = L[0]; for (const f of L) if (Math.abs(f.t - want) < Math.abs(b.t - want)) b = f; return { file: b.file, label: (+k + 1) + ' · ' + (b.cap || b.name) }; });
 const sheet = SHOTS + 'trailer_' + TAG + '_sheet.jpg';
 const py = `
