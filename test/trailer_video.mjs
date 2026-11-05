@@ -122,7 +122,8 @@ fs.writeFileSync(FR + 'frames.json', JSON.stringify(frames));
 const shotsSeen = Object.keys(perShot).length;
 check(shotsSeen === (ONLY ? ONLY.length : plan.length - START), 'every shot photographed (' + shotsSeen + ')');
 const freed = await ev(() => { const L = VR.Liberate; return L ? [...L.sites().values()].some((s) => s.st === 'frei') : false; });
-if (!ONLY || ONLY.includes(plan.findIndex((p) => p.stage === 'liberate'))) check(freed, 'the outpost was freed in its shot (BEFREIT)');
+const libI = plan.findIndex((p) => p.stage === 'liberate');
+if (libI >= START && (!ONLY || ONLY.includes(libI))) check(freed, 'the outpost was freed in its shot (BEFREIT)');
 await browser.close();
 
 // the contact sheet: one frame per shot at 60 % of it, with its German caption
@@ -152,7 +153,7 @@ if (!process.env.NOVIDEO && fi > 0) {
   const vf = inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p';
   try {
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
-    const mb = fs.statSync(mp4).size / 1048576, dur = +execFileSync('/usr/local/bin/ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();
+    const mb = fs.statSync(mp4).size / 1048576, dur = +execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();
     check(mb > 0.2 && mb <= 25, 'the video ' + mp4 + ' (' + mb.toFixed(1) + ' MB ≤ 25)');
     check(ONLY || (dur > 38 && dur < 52), 'about 45 s of film (' + dur.toFixed(1) + ' s)');
   } catch (e) { check(false, 'ffmpeg: ' + String(e.message).slice(0, 300)); }
