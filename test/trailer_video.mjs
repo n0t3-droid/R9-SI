@@ -6,7 +6,7 @@
 // yuv420p, faststart, 24 fps — motion-interpolated from the 12 captured), and one frame per shot (at 60 %) goes on the
 // contact sheet test/shots/trailer_welt_sheet.jpg with its German caption. Silent: the music is WebAudio played live
 // (no offline render of the game's own score exists yet).
-// Env: W, H (1280 × 720) · EVERY (2) · ONLY=3,5 (those shots only: a test capture) · TAG (the output's name: welt)
+// Env: W, H (1280 × 720) · EVERY (2) · SCALE (the game's render scale: 0.75 draws 0.56 of the pixels, the captions stay sharp) · ONLY=3,5 (those shots only: a test capture) · TAG (the output's name: welt)
 //      SEED (4242) · NOVIDEO=1 (frames and sheet only)
 //   nohup bash test/wt_run.sh trailer_video.mjs 14400 > .tmp_tests/trailer_video.log 2>&1 &
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -35,7 +35,7 @@ const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
 check(await ev(() => VR.I18N.lang) === 'de', 'the game speaks German');
-await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.settings.wildHeart = true; g.applySettings('*'); }, process.env.PRESET || 'high');
+await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.settings.wildHeart = true; if (process.env.SCALE) g.settings.scale = +process.env.SCALE; g.applySettings('*'); }, process.env.PRESET || 'high');
 await ev(`VR.game.createWorld({name:'Welt heute',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '4242'}',cheats:true,kit:true})`);
 for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a Heartland world');
