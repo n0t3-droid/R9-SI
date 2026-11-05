@@ -103,6 +103,7 @@
   "lightfield": 0,
   "lightfield_gl": 0,
   "tale_end": 0,
+  "folk4": 0.003,
   "wildbond": 0,
   "wildheart": 0
  },
@@ -392,9 +393,11 @@
   "tale_end",
   "wildbond",
   "wildheart",
-  "dusk"
+  "dusk",
+  "folk4"
  ],
  "unmeasured": {
+  "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs \u2014 node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
   "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs \u2014 without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release",
   "wildbond": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 rules only (VR.WildBond), called by wildheart.js; nothing runs on Very Low; re-measure with perf8.mjs at the next release",
   "wildheart": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 on Very Low (tier 0) update() returns at its first line between once-a-second tier checks, nothing is attached to an animal (entities' hooks test m.wh), nothing drawn; re-measure with perf8.mjs at the next release",

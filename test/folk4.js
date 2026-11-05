@@ -181,7 +181,6 @@ function worldOf(gen) {
     mobs.length = 0; void d0;
     // the dusk dance
     g.env.timeOfDay = 11000; run(3);
-    { const c4 = F4.ctxOf(mgr); console.log('    · dusk: ' + JSON.stringify({ kids: c4 && c4.kids, adults: c4 && c4.adults, elders: c4 && c4.elders, joy: !!(mgr.joy && mgr.joy.dance), acts: vil.agents.map(a => (a.act && a.act.type) + (a._f4 ? '*' : '')).join(' ') })); }
     const M4 = F4.begin(mgr, vil, 'dance');
     check(!!M4 && !!M4.fiddler, 'dance: begun with a fiddler');
     if (M4) {
@@ -225,6 +224,11 @@ function worldOf(gen) {
     for (const o of vil.agents) o._f4 = null;
     let got = null; for (let f = 0; f < 120 * 30 && !got; f++) { mgr.update(dt); if (F4.active(mgr)) got = F4.active(mgr).kind; }
     check(!!got, `the clock starts a moment by itself (${got})`);
+    // the cost of the frame hook (a moment running, then idle between the clock's ticks)
+    const cost = () => { const t0 = process.hrtime.bigint(); for (let i = 0; i < 3000; i++) F4.frame(mgr, dt); return Number(process.hrtime.bigint() - t0) / 1e6 / 3000; };
+    const busy = cost(); if (F4.active(mgr)) F4.end(mgr); F4.auto = false; const idle = cost(); F4.auto = true;
+    console.log(`    · the frame hook: ${busy.toFixed(4)} ms with a moment, ${idle.toFixed(4)} ms idle`);
+    check(busy < 0.05 && idle < 0.01, 'the frame hook is cheap (< 0.05 ms with a moment)');
   }
   Math.random = r0;
 }
