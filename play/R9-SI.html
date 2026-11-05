@@ -77945,7 +77945,7 @@ gl.depthMask(true);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);
 drawMotes(M,E){
 const gl=this.gl,p=this.P.part,cam=this.cam;if(!p|| !cam)return;
 const cp=this._moteCam||(this._moteCam=[0,0,0]);cp[0]=cam.x;cp[1]=cam.y;cp[2]=cam.z;
-const q=M.fill(cp);if(!q)return;
+const q=M.fill(cp,E.fog);if(!q)return;
 if(!this.moteVAO){
 this.moteInst=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.moteInst);gl.bufferData(gl.ARRAY_BUFFER,M.data.byteLength,gl.DYNAMIC_DRAW);
 this.moteVAO=gl.createVertexArray();gl.bindVertexArray(this.moteVAO);
@@ -77961,6 +77961,13 @@ gl.bindVertexArray(null);
 gl.bindBuffer(gl.ARRAY_BUFFER,this.moteInst);
 gl.bufferSubData(gl.ARRAY_BUFFER,0,M.data,0,q*14);
 gl.useProgram(p.p);this.common(p,E);
+
+
+const u=p.u;
+if(u.u_fog)gl.uniform4f(u.u_fog,1e7,2e7,0,0);
+if(u.u_l2Fog)gl.uniform4f(u.u_l2Fog,0,0.06,62,64);
+if(u.u_l2Fog2)gl.uniform4f(u.u_l2Fog2,0,0,0,0);
+if(u.u_l2Room)gl.uniform4f(u.u_l2Room,0,0,0,0);
 gl.uniformMatrix4fv(p.u.u_viewProj,false,this.viewProj);
 gl.uniform3f(p.u.u_right,this.camRight[0],this.camRight[1],this.camRight[2]);
 gl.uniform3f(p.u.u_up,this.camUp[0],this.camUp[1],this.camUp[2]);
@@ -149886,17 +149893,25 @@ D.chimeOk=(mem,night)=>{if(mem.night===night)return false;mem.night=night;return
 const rnd=(sw)=>{let t=(sw.rs=(sw.rs+0x6D2B79F5)|0);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};
 D.rnd=rnd;
 
-D.HUES=[[0.26,0.2,0.08],[0.13,0.24,0.16],[0.24,0.14,0.23],[0.14,0.19,0.26]];
 
-D.swarm=function(seed,home,n){
-const sw={n,seed:seed|0,rs:(seed|0)^0x9e3779b9,p:new Float32Array(n*3),v:new Float32Array(n*3),ph:new Float32Array(n),hue:new Uint8Array(n),
-home:[home[0],home[1],home[2]],floor:home[1],tgt:[home[0],home[1]+1.2,home[2]],tgtT:0,attract:[],t:0,fade:0,gone:false,ring:0,near:false,cx:home[0],cy:home[1]+1,cz:home[2]};
-const main=Math.floor(rnd(sw)*4);
+D.HUES=[[0.34,0.15,0.025],[0.33,0.07,0.13],[0.06,0.3,0.15],[0.19,0.07,0.34]];
+
+D.pickHue=function(swarms,seed){
+const k0=(seed>>>0)%4;
+for(let k=0;k<4;k++){const h=(k0+k)%4;if(!swarms.some((s)=>s.main===h))return h;}
+return k0;
+};
+
+D.swarm=function(seed,home,n,hue){
+const sw={n,seed:seed|0,rs:(seed|0)^0x9e3779b9,p:new Float32Array(n*3),v:new Float32Array(n*3),ph:new Float32Array(n),hue:new Uint8Array(n),nb:new Uint8Array(n),
+home:[home[0],home[1],home[2]],floor:home[1],tgt:[home[0],home[1]+1.2,home[2]],tgtT:0,attract:[],t:0,fade:0,gone:false,ring:0,near:false,cx:home[0],cy:home[1]+1,cz:home[2],rotA:0,rotB:0};
+const main0=Math.floor(rnd(sw)*4),main=hue>=0&&hue<4?hue|0:main0;
+sw.main=main;
 for(let i=0;i<n;i++){
 const a=rnd(sw)*TAU,r=Math.sqrt(rnd(sw))*2.2;
 sw.p[i*3]=home[0]+Math.cos(a)*r;sw.p[i*3+1]=home[1]+0.6+rnd(sw)*1.6;sw.p[i*3+2]=home[2]+Math.sin(a)*r;
 sw.v[i*3]=(rnd(sw)-0.5)*0.4;sw.v[i*3+1]=(rnd(sw)-0.5)*0.1;sw.v[i*3+2]=(rnd(sw)-0.5)*0.4;
-sw.ph[i]=rnd(sw)*TAU;sw.hue[i]=rnd(sw)<0.7?main:Math.floor(rnd(sw)*4);
+sw.ph[i]=rnd(sw)*TAU;const r2=rnd(sw);sw.hue[i]=i%8===7?(main+1+Math.floor(r2*3))%4:main;
 }
 return sw;
 };
@@ -149906,6 +149921,9 @@ const K=D.K={rn:1.7,rs:0.6,coh:0.55,ali:0.9,sep:5,home:0.45,ring:1.8,ringR:2.3,p
 D.step=function(sw,dt,ctx){
 if(!(dt>0))return;if(dt>0.1)dt=0.1;
 const n=sw.n,P=sw.p,V=sw.v;sw.t+=dt;
+
+const wA=0.26*Math.cos(sw.t*TAU/46);sw.rotA+=wA*dt;sw.rotB-=0.18*Math.cos(sw.t*TAU/46+1.2)*dt;
+const breathe=0.28*Math.sin(sw.t*0.9);
 
 if((sw.tgtT-=dt)<=0){
 sw.tgtT=6+rnd(sw)*7;
@@ -149921,14 +149939,15 @@ sw.ring+=(ringK-sw.ring)*Math.min(1,dt*1.5);
 const walking=(ctx.speed||0)>0.8,rn2=K.rn*K.rn,t=sw.t,floor=sw.floor;
 for(let i=0;i<n;i++){
 const ix=i*3,x=P[ix],y=P[ix+1],z=P[ix+2];
-let sx=0,sy=0,sz=0,mx=0,my=0,mz=0,ux=0,uy=0,uz=0,m=0;
+let sx=0,sy=0,sz=0,mx=0,my=0,mz=0,ux=0,uy=0,uz=0,m=0,close=0;
 for(let j=0;j<n;j++){
 if(j===i)continue;
 const jx=j*3,dx=x-P[jx],dy=y-P[jx+1],dz=z-P[jx+2],d2=dx*dx+dy*dy+dz*dz;
 if(d2>rn2)continue;
 m++;mx+=P[jx];my+=P[jx+1];mz+=P[jx+2];ux+=V[jx];uy+=V[jx+1];uz+=V[jx+2];
-if(d2<K.rs*K.rs){const d=Math.sqrt(d2)+1e-4,f=(K.rs-d)/(K.rs*d);sx+=dx*f;sy+=dy*f;sz+=dz*f;}
+if(d2<K.rs*K.rs){close++;const d=Math.sqrt(d2)+1e-4,f=(K.rs-d)/(K.rs*d);sx+=dx*f;sy+=dy*f;sz+=dz*f;}
 }
+sw.nb[i]=close>255?255:close;
 let ax=sx*K.sep,ay=sy*K.sep,az=sz*K.sep;
 if(m){ax+=(mx/m-x)*K.coh+(ux/m-V[ix])*K.ali;ay+=(my/m-y)*K.coh+(uy/m-V[ix+1])*K.ali;az+=(mz/m-z)*K.coh+(uz/m-V[ix+2])*K.ali;}
 
@@ -149937,8 +149956,12 @@ const lx=sw.tgt[0]+Math.cos(t*0.31+ph)*1.4,ly=sw.tgt[1]+Math.sin(t*0.53+ph*2)*0.
 let gx=(lx-x)*K.home,gy=(ly-y)*K.home,gz=(lz-z)*K.home;
 const rk=sw.ring;
 if(rk>0.001){
-const a=(i/n)*TAU+t*0.22,R=K.ringR+0.3*Math.sin(t*0.7+ph);
-const rx=px+Math.cos(a)*R,ry=py+0.8+0.5*((i*7)%5)/4+0.2*Math.sin(t*0.9+ph*3),rz=pz+Math.sin(a)*R;
+
+
+const inner=(i&1)===0,jit=ph/TAU-0.5;
+const a=(i/n)*TAU+(inner?sw.rotA:sw.rotB)+jit*0.56;
+const R=(inner?K.ringR-0.25:K.ringR+0.45)+breathe+0.1*Math.sin(t*0.7+ph)+jit*0.16;
+const rx=px+Math.cos(a)*R,ry=py+(inner?0.7:1.6)+0.2*Math.sin(t*0.9+ph*3),rz=pz+Math.sin(a)*R;
 gx=gx*(1-rk)+(rx-x)*K.ring*rk;gy=gy*(1-rk)+(ry-y)*K.ring*rk;gz=gz*(1-rk)+(rz-z)*K.ring*rk;
 ax*=1-0.6*rk;ay*=1-0.6*rk;az*=1-0.6*rk;
 }
@@ -149962,6 +149985,21 @@ if(P[ix+1]<lo){P[ix+1]=lo;if(V[ix+1]<0)V[ix+1]*= -0.3;}else if(P[ix+1]>hi){P[ix+
 }
 };
 
+
+D.space=function(swarms,minD){
+const R=(minD||18)+2;
+for(let i=0;i<swarms.length;i++){
+const a=swarms[i];
+for(let j=0;j<swarms.length;j++){
+if(j===i)continue;
+const b=swarms[j];let dx=a.tgt[0]-b.cx,dz=a.tgt[2]-b.cz,d=Math.sqrt(dx*dx+dz*dz);
+if(d>=R)continue;
+if(d<1e-3){dx=a.cx-b.cx;dz=a.cz-b.cz;d=Math.sqrt(dx*dx+dz*dz);if(d<1e-3){dx=a.home[0]-b.home[0]+1e-3;dz=a.home[2]-b.home[2];d=Math.sqrt(dx*dx+dz*dz);}}
+a.tgt[0]=b.cx+dx/d*R;a.tgt[2]=b.cz+dz/d*R;
+}
+}
+};
+
 const RING={share:0,sectors:0,ok:false};
 D.ring=function(sw,px,py,pz,out){
 let k=0,sec=0;const n=sw.n,P=sw.p;
@@ -149976,7 +150014,10 @@ r.share=share;r.sectors=s;r.ok=share>=0.7&&s===8;return r;
 };
 
 
-D.fill=function(out,swarms,cam,glow,cap){
+
+
+
+D.fill=function(out,swarms,cam,glow,cap,fog){
 const d=out;let o=0,q=0;const max=Math.floor(d.length/14);
 for(const sw of swarms){
 const a0=glow*sw.fade;if(a0<0.01)continue;
@@ -149984,12 +150025,20 @@ const P=sw.p,t=sw.t;
 for(let i=0;i<sw.n&&q+2<=max&&q<cap*2;i++){
 const ph=sw.ph[i],s=Math.sin(t*(1.7+(i%5)*0.23)+ph*9),tw=0.45+0.55*s*s,a=a0*tw,c=D.HUES[sw.hue[i]];
 const x=P[i*3]-cam[0],y=P[i*3+1]-cam[1],z=P[i*3+2]-cam[2];
+let fa=1;
+if(fog){
+const hd=Math.max(Math.sqrt(x*x+z*z),Math.abs(y)*0.35),dist=Math.sqrt(x*x+y*y+z*z);
+let e=fog[1]>fog[0]?Math.max(0,Math.min(1,(hd-fog[0])/(fog[1]-fog[0]))):(hd>=fog[0]?1:0),f=e*e*(3-2*e);
+f=Math.max(f,(1-Math.exp(-dist*(fog[2]||0)))*0.85);if(fog[3]>0.5)f=1-Math.exp(-dist*0.07);
+fa=1-Math.min(1,f);
+}
+const nb=sw.nb?sw.nb[i]:0,cap0=nb>4?1/Math.sqrt(1+0.3*(nb-4)):1;
 for(let h=0;h<2;h++){
 d[o]=x;d[o+1]=y;d[o+2]=z;d[o+3]=h?0.045+0.02*tw:0.2+0.07*tw;
 d[o+4]=0;d[o+5]=0;d[o+6]=1;d[o+7]=1;
 
-const k=h?1.15:0.6,w0=h?0.035:0;d[o+8]=c[0]*k+w0;d[o+9]=c[1]*k+w0;d[o+10]=c[2]*k+w0;d[o+11]= -1;
-d[o+12]=1;d[o+13]=h?a:a*0.2;
+const k=h?1.15:0.6,w0=h?0.01:0;d[o+8]=c[0]*k+w0;d[o+9]=c[1]*k+w0;d[o+10]=c[2]*k+w0;d[o+11]= -1;
+d[o+12]=1;d[o+13]=(h?a:a*0.2*cap0)*fa;
 o+=14;q++;
 }
 }
@@ -150025,7 +150074,7 @@ for(let k=0;k<14;k++){
 const h=Math.imul(night*7919+k*104729+(S.sw.length+1)*15485863,2654435761)>>>0;
 const a=(h%3600)/3600*TAU,r=9+((h>>>12)%1300)/100;
 const x=Math.floor(p[0]+Math.cos(a)*r),z=Math.floor(p[2]+Math.sin(a)*r),gy=ground(g,x,z);if(gy===null)continue;
-if(S.sw.some((s)=>Math.hypot(s.home[0]-x,s.home[2]-z)<13))continue;
+if(S.sw.some((s)=>Math.hypot(s.home[0]-x,s.home[2]-z)<24||Math.hypot(s.cx-x,s.cz-z)<20))continue;
 const top=w.getBlock(x,gy-1,z),below=w.getBlock(x,gy-2,z);
 let floorY=gy,sc=0;
 if(R.T.type[top]===S.grassType)sc=1;else if(R.T.type[below]===S.grassType&& !flag(top,VR.F.SOLID)){sc=1;floorY=gy-1;}
@@ -150079,13 +150128,14 @@ const plan=D.plan(S.tier),night=D.nightOf(E.ticks!==undefined?E.ticks:(g.env&&g.
 if(glow>0.05&&S.sw.length<plan.swarms&&(S.findT-=dt)<=0){
 S.findT=2;
 const h=anchor(g,p,night);
-if(h){const sw=D.swarm((night*31+Math.floor(h[0])*73856093)^(Math.floor(h[2])*19349663),h,plan.per);sw.attract=attractors(g,h);S.sw.push(sw);}
+if(h){const sd2=(night*31+Math.floor(h[0])*73856093)^(Math.floor(h[2])*19349663),sw=D.swarm(sd2,h,plan.per,D.pickHue(S.sw,sd2));sw.attract=attractors(g,h);S.sw.push(sw);}
 }
 let nearest=null,nd=1e9;
 for(const sw of S.sw){const d=Math.hypot(sw.cx-p[0],sw.cz-p[2]);if(d<nd){nd=d;nearest=sw;}sw.gone=sw.gone||d>44||glow<0.03;}
 if((S.floorT-=dt)<=0){S.floorT=0.5;for(const sw of S.sw){const gy=ground(g,sw.cx,sw.cz);if(gy!==null&&Math.abs(gy-sw.floor)<6)sw.floor=gy;}}
 const ctx=S.ctx||(S.ctx={px:0,py:0,pz:0,still:0,speed:0,ringOk:false});
 ctx.px=p[0];ctx.py=p[1];ctx.pz=p[2];ctx.still=S.still;ctx.speed=S.speed;ctx.vx=S.vx;ctx.vz=S.vz;
+if(S.sw.length>1)D.space(S.sw,18);
 for(let i=S.sw.length-1;i>=0;i--){
 const sw=S.sw[i];
 sw.fade=Math.max(0,Math.min(1,sw.fade+dt*(sw.gone? -0.5:0.35)));
@@ -150099,9 +150149,9 @@ if(nearest&&nearest.ring>0.9&&S.still>5&&glow>0.3&&D.ring(nearest,p[0],p[1],p[2]
 out.glow=glow;out.cap=plan.cap;out.count=S.sw.length?1:0;
 };
 
-out.fill=function(cam){
+out.fill=function(cam,fog){
 if(!out.data)out.data=new Float32Array(D.CAPS[4]*2*14);
-return D.fill(out.data,S.sw,cam,out.glow||0,out.cap||0);
+return D.fill(out.data,S.sw,cam,out.glow||0,out.cap||0,fog);
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
