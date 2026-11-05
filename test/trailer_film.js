@@ -50,6 +50,7 @@ check(Math.cos(angA) < 0.6, 'clearAngle(avoid): a ship that would stand in the f
 check(TW.clearAngle(open, [0, 100, 0], 0, 24, 18, 3, 2.5, 6, 12) === 0, 'without it the first angle stays');
 const fr = S.filter(s => s.fogR !== undefined).map(s => s.name + ' ' + s.fogR);
 check(S.find(s => s.name === 'abend').fogR >= 1000 && S.find(s => s.name === 'titel').fogR >= 1000 && S.find(s => s.name === 'inseln').fogR > 70, 'no fog banks in the night shots, none at mid distance by the isles (' + fr.join(', ') + ')');
+check(TW.isMist && TW.isMist({ grow: 0.9, emis: 0.15, col: [0.9, 0.94, 0.98] }) && !TW.isMist({ grow: 0.8, emis: 1, col: [1, 0.6, 0.25] }) && !TW.isMist({ grow: 0.25, col: [0.75, 0.75, 0.78] }) && !TW.isMist({ size: 0.1 }), 'isMist: the falls\' white growing puffs, not sparks, not smoke wisps');
 // (d) the outpost shot
 const lib = S.find(s => s.stage === 'liberate');
 const k0 = lib.keys[0], k1 = lib.keys[lib.keys.length - 1], B = A.beacon;

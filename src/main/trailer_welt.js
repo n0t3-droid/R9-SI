@@ -32,7 +32,7 @@
     const rel = (o, k) => k.map(([t, p, l]) => [t, add(o, p), add(o, l)]);
     const S = [];
     // 1 · the establishing wide: high over the land under the isles, a slow push
-    S.push(shot('auftakt', 5, 62, 3000, 'g.film.w.c1', rel(I, [[0, [-170, 40, 150], [-20, -30, 0]], [5, [-155, 36, 135], [-18, -30, 0]]]), { fadeIn: 1.0 }));
+    S.push(shot('auftakt', 5, 62, 2500, 'g.film.w.c1', rel(I, [[0, [-170, 40, 150], [-20, -30, 0]], [5, [-155, 36, 135], [-18, -30, 0]]]), { fadeIn: 1.0 }));
     // 2 · the meadow: a deer mother and her fawns, a low hero angle looking up toward the isle's underside
     S.push(shot('wiese', 5, 58, 2700, 'g.film.w.c2', rel(M, [[0, [-5, 1.7, 7.5], [1, 2.5, -2]], [5, [-3.4, 1.6, 5.2], [1.6, 2.8, -3]]]), { stage: 'family', anchor: M.slice() }));
     // 3 · the village's life on its plaza (or, in a world without one near, the land)
@@ -97,7 +97,7 @@
         const C = [T[0] + Math.sin(a) * r, T[1] + h, T[2] + Math.cos(a) * r], vt = [T[0] - C[0], T[1] + lh * 0.5 - C[1], T[2] - C[2]], vo = [o.p[0] - C[0], o.p[1] - C[1], o.p[2] - C[2]];
         const dt = Math.hypot(...vt), dq = Math.hypot(...vo); if (dq > dt + o.r || dq < 0.5) continue;
         const cos = (vt[0] * vo[0] + vt[1] * vo[1] + vt[2] * vo[2]) / (dt * dq), off = Math.acos(Math.max(-1, Math.min(1, cos))) - Math.atan(o.r / dq);
-        if (off < 0.45) hits += 40 * (1 - Math.max(0, off) / 0.45);
+        if (off < 0.45) hits += 200 * (1 - Math.max(0, off) / 0.45);
       }
       const sc = hits + i * 0.01; if (sc < bs) { bs = sc; best = a; }
     }
@@ -125,7 +125,8 @@
   // composite's FILMG pass (u_film: the shadows' warm lift, the warmth of the lights, the oval vignette, on).
   TW.FILM = { sat: 1.3, contrast: 0.44, vignette: 0.42, fogDens: 0.00007, expo: 0.8, bloomStr: 0.13 };
   TW.FILM_GL = [1, 1, 0.32, 1];
-  TW.FOG_NEAR = 70;   // m: no fog-bank sprite whose edge is nearer than this to the lens while the film plays
+  TW.FOG_NEAR = 70;
+  TW.HAZE = [1.8, 0.65, 0.5];   // the film's veil: × its half distance, × toward the sun, × the sky's veil (look.js LV_HAZE)   // m: no fog-bank sprite whose edge is nearer than this to the lens while the film plays
   // the knobs of F put into G; returns what was there (swap it back with the result)
   TW.gradeSwap = function (G, F) { const was = {}; for (const k in F) { was[k] = G[k]; G[k] = F[k]; } return was; };
   // the fog-bank sprites ([x, y, z, r, …]) without the ones whose edge is within R of the camera (R 0: the list as it is)
@@ -133,6 +134,9 @@
     if (!(R > 0) || !list) return list;
     return list.filter((s) => Math.hypot(s[0] - cam.x, s[1] - cam.y, s[2] - cam.z) - (s[3] || 0) > R);
   };
+  // a white, growing puff that does not glow — the falls' mist (landlife.js, game.js waterFx): in the night shots its
+  // puffs grow to 5 m and read as smudges, so they stay out of those (TW.mistOff)
+  TW.isMist = (o) => !!(o && o.grow >= 0.5 && (o.emis || 0) < 0.5 && o.col && o.col[0] > 0.8 && o.col[1] > 0.8 && o.col[2] > 0.85);
   // parked ships as solid boxes (their occupancy grid, turned by yaw — starships.js getBlock's inverse) near T
   TW.shipSolid = function (ships, T, R) {
     const L = (ships || []).filter((s) => s && s.pos && s.d && s.d.occ && s.d.meta && Math.hypot(s.pos[0] - T[0], s.pos[2] - T[2]) < (R || 80));
@@ -241,11 +245,19 @@
       const ss = TW.shipSolid(SH, T, 90), solid2 = (x, y, z) => solid(x, y, z) || ss(x, y, z);
       const avoid = SH.map((q) => { const o = q.d && q.d.occ; return { p: [q.pos[0], q.pos[1] + (o ? o.by / 2 : 2), q.pos[2]], r: o ? Math.max(o.bx, o.bz) * 0.5 + 1 : 8 }; });
       const a = TW.clearAngle(solid2, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12, avoid);
+      // (a recording: a world ship parked right by the beacon stands in front of it from every side — it leaves the set
+      // for the film, and is back at the stop)
+      if (run.stage && shot.stage === 'liberate') for (const q of SH) if (!q.hidden && Math.hypot(q.pos[0] - T[0], q.pos[2] - T[2]) < 36) { q.hidden = true; (run.hid = run.hid || []).push(q); }
       shot.keys = TW.orbitKeys(T, a, shot.dur, r0, r1, h0, h1, l0, l1, 0.12);
     }
     TW.resolve(shot, top, 1.8);
     if (run.stage) TW.dress(g, shot);
     TW.fogR = shot.fogR !== undefined ? shot.fogR : TW.FOG_NEAR;
+    // (the night shots: no falls' mist — the puffs there now go, none new while the shot runs)
+    TW.mistOff = TW.fogR >= 1000;
+    const P = g.particles;
+    if (P && P.spawn && !P.spawn.__tw) { const sp0 = P.spawn; P.spawn = function (x, y, z, vx, vy, vz, o) { if (TW.mistOff && TW.run && TW.isMist(o)) return; return sp0.apply(this, arguments); }; P.spawn.__tw = true; }
+    if (TW.mistOff && P && P.life && P.grow) for (let i = 0; i < P.n; i++) if (P.grow[i] >= 0.5 && P.emis[i] < 0.5) P.life[i] = 0;
     if (g.renderer) g.renderer.puffKey = '';   // (f-film2: the fog sprites again, without the ones by the lens)
     if (shot.stage === 'family') {
       const E = g.entities, H = g.companions && g.companions.heart, a = shot.anchor; if (!E || !E.summon) return;
@@ -285,7 +297,11 @@
     const RP = VR.Renderer.prototype, l2p0 = RP.l2Post;
     RP.l2Post = function (p, E, pass, F) {
       if (l2p0) l2p0.call(this, p, E, pass, F);
-      if (pass === 'composite' && p.u.u_film) { const f = TW.FILM_GL; this.gl.uniform4f(p.u.u_film, f[0], f[1], f[2], TW.filmDef ? TW.filmW : 0); }
+      if (pass === 'composite' && p.u.u_film) {
+        const f = TW.FILM_GL; this.gl.uniform4f(p.u.u_film, f[0], f[1], f[2], TW.filmDef ? TW.filmW : 0);
+        // (the film's air clearer: look.js's veil half as far and thinner — the trailer's dense, saturated distance)
+        const l = this.lv; if (TW.filmDef && TW.filmW > 0 && this.lvOn && l && p.u.u_lvHaze) this.gl.uniform4f(p.u.u_lvHaze, l.haze[0] * TW.HAZE[0], l.haze[1] * TW.HAZE[1], l.haze[2] * TW.HAZE[2], l.haze[3]);
+      }
     };
   }
   // the fog banks (the isles' and the valleys') without the sprites by the lens, while the film plays
@@ -353,7 +369,7 @@
     if (was && run && !this.active) {
       const E = this.g.entities;
       if (E && E.mobs) for (const m of run.mobs) { const i = E.mobs.indexOf(m); if (i >= 0) E.mobs.splice(i, 1); }
-      this.g.zenFreezeWeather = run.wx; TW.undress(this.g, run); TW.filmOff(this.g); if (VR.TrailerScore) VR.TrailerScore.stopLive(this.g);
+      this.g.zenFreezeWeather = run.wx; TW.undress(this.g, run); for (const q of run.hid || []) q.hidden = false; TW.mistOff = false; TW.filmOff(this.g); if (VR.TrailerScore) VR.TrailerScore.stopLive(this.g);
       TW.run = null; sub(this, ''); document.body.classList.remove('r9film');
     }
     return r;
