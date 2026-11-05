@@ -294,8 +294,9 @@
       if (Math.hypot(w[0] - a.pos[0], w[2] - a.pos[2]) < 1.1 || (act.t - (act.wiT || 0) > 12)) { M.wi++; act.wiT = act.t; }
       const q = M.route[M.wi % M.route.length]; tx = q[0]; tz = q[2]; ty = q[1];
       // the line keeps together: wait for the last one
-      const last = L[L.length - 1];
-      if (last !== a && Math.hypot(last.pos[0] - a.pos[0], last.pos[2] - a.pos[2]) > 1.6 * L.length + 2) { a.steer = null; a.path = null; a.vel[0] *= 0.5; a.vel[2] *= 0.5; return; }
+      // (any child, not only the last: one straggling from home kept the line 25 m apart — f-folk5 lantern run)
+      let far = 0; for (const k of L) if (k !== a) far = Math.max(far, Math.hypot(k.pos[0] - a.pos[0], k.pos[2] - a.pos[2]));
+      if (far > 1.6 * L.length + 2) { a.steer = null; a.path = null; a.vel[0] *= 0.5; a.vel[2] *= 0.5; return; }
     } else {
       const tr = M.trail, i = act.k * 3, j = tr.length - 1 - i;
       const q = j >= 0 ? tr[j] : tr.length ? tr[0] : null;

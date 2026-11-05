@@ -235,7 +235,7 @@ if (HP && want('lantern')) {
     if (!m) console.log('  · lantern why: ' + JSON.stringify(await ev((vid) => { const g = VR.game, V = g.villages, v = V.known.get(vid), p = g.player.pos; return v.agents.filter(a => a.kid).map(a => [a.act && a.act.type, a.pose, Math.round(Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2])), a.drawn, !!a._f4]); }, HV.id)));
     check(!!m && m.n >= 3, `lantern: ${m ? m.n : 0} children set off with lanterns`);
     if (m) {
-      await step(300, 33);
+      await step(900, 33);   // (30 s: the children gather from their homes first, then walk)
       const st = await ev(() => { const g = VR.game, M = window.__M, L = M.members, Lu = VR.Dusk && VR.Dusk.lure; let gap = 0; for (let i = 1; i < L.length; i++) gap = Math.max(gap, Math.hypot(L[i].pos[0] - L[i - 1].pos[0], L[i].pos[2] - L[i - 1].pos[2])); let cx = 0, cz = 0; for (const k of L) { cx += k.pos[0]; cz += k.pos[2]; } cx /= L.length; cz /= L.length; return { n: L.length, gap: +gap.toFixed(1), c: [cx, L[0].pos[1], cz], spread: Math.max(...L.map(k => Math.hypot(k.pos[0] - cx, k.pos[2] - cz))), lure: Lu ? +Math.hypot(Lu[0] - L[0].pos[0], Lu[2] - L[0].pos[2]).toFixed(1) : null, swarms: VR.Dusk && VR.Dusk.state ? VR.Dusk.state.sw.length : null, notes: VR.Folk5.stats.notes, lit: L.filter(k => k.f5lant).length, wi: M.wi }; });
       run.lantern = st; console.log('  · lantern ' + JSON.stringify(st));
       check(st.gap < 4 && st.wi >= 3, `lantern: a line walking its loop (largest gap ${st.gap} m, waypoint ${st.wi})`);
