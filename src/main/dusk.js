@@ -189,6 +189,7 @@
   const S = D.state = { sw: [], tier: 0, tierT: 0, findT: 0, still: 0, speed: 0, last: null, mem: { night: null }, floorT: 0, flowers: null, cost: { ms: 0, frames: 0 } };
   const out = D.out = { data: null, count: 0, fill: null };
   D.hold = false;   // (golden pictures: nothing drawn)
+  D.lure = null;    // u-folk4: [x, y, z] a dance circle's middle — the swarms gather there instead of round you (VR.Folk4)
   const tierOf = (g) => (VR.AirLife && VR.AirLife.tierOf ? VR.AirLife.tierOf(g.settings) : 2);
   const on = (g) => !!g.settings && g.settings.dusk !== false && g.settings.airLife !== false;
   // the flowers' states (built once)
@@ -263,7 +264,7 @@
     // swarms come with the evening near you, go when you leave them or the day comes
     if (glow > 0.05 && S.sw.length < plan.swarms && (S.findT -= dt) <= 0) {
       S.findT = 2;
-      const h = anchor(g, p, night);
+      const L0 = D.lure, h = L0 && !S.sw.some((s) => Math.hypot(s.cx - L0[0], s.cz - L0[2]) < 10) ? [L0[0], L0[1], L0[2]] : anchor(g, p, night);   // u-folk4: a dance circle draws them (VR.Folk4)
       if (h) { const sd2 = (night * 31 + Math.floor(h[0]) * 73856093) ^ (Math.floor(h[2]) * 19349663), sw = D.swarm(sd2, h, plan.per, D.pickHue(S.sw, sd2)); sw.attract = attractors(g, h); S.sw.push(sw); }
     }
     let nearest = null, nd = 1e9;
@@ -271,6 +272,7 @@
     if ((S.floorT -= dt) <= 0) { S.floorT = 0.5; for (const sw of S.sw) { const gy = ground(g, sw.cx, sw.cz); if (gy !== null && Math.abs(gy - sw.floor) < 6) sw.floor = gy; } }
     const ctx = S.ctx || (S.ctx = { px: 0, py: 0, pz: 0, still: 0, speed: 0, ringOk: false });
     ctx.px = p[0]; ctx.py = p[1]; ctx.pz = p[2]; ctx.still = S.still; ctx.speed = S.speed; ctx.vx = S.vx; ctx.vz = S.vz;
+    const LU = D.lure; if (LU) { ctx.px = LU[0]; ctx.py = LU[1]; ctx.pz = LU[2]; ctx.still = 10; ctx.speed = 0; ctx.vx = 0; ctx.vz = 0; let nl = 1e9; for (const sw of S.sw) { const d = Math.hypot(sw.cx - LU[0], sw.cz - LU[2]); if (d < nl) { nl = d; nearest = sw; } } }   // u-folk4: they ring the dance
     if (S.sw.length > 1) D.space(S.sw, 18);
     for (let i = S.sw.length - 1; i >= 0; i--) {
       const sw = S.sw[i];
