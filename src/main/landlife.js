@@ -26,6 +26,7 @@
       for (const s of spawns) {
         if (!s) continue;
         if (s[0] === 'fauna') { const key = s[1] + ':' + s[2] + ',' + s[4]; if (!this.anchors.has(key)) this.anchors.set(key, { key, kind: s[1], x: s[2], y: s[3], z: s[4], n: s[5] | 0, extra: s.slice(6), fishT: 2 + Math.random() * 4 }); }
+        else if (s[0] === 'petals' || s[0] === 'glowring') { const key = s[0] + ':' + s[1] + ',' + s[3]; if (!this.fx.has(key)) this.fx.set(key, { kind: s[0], x: s[1], y: s[2], z: s[3], k: s[4] || 5, acc: Math.random() }); }   // (v-flora: the wonder spots, gen_flora.js)
         else if (s[0] === 'mist' || s[0] === 'lighthouse') { const key = s[0] + ':' + s[1] + ',' + s[3]; if (!this.fx.has(key)) this.fx.set(key, { kind: s[0], x: s[1], y: s[2], z: s[3], k: s[4] || 1, acc: Math.random() }); }
         else if (s[0] === 'windmill') { const key = 'mill:' + s[1] + ',' + s[2] + ',' + s[3]; if (!this.mills.has(key)) this.mills.set(key, { key, x: s[1], y: s[2], z: s[3], f: (s[4] | 0) & 3, ang: 0, w: 0, state: 0, chk: 0 }); }
       }
@@ -192,6 +193,8 @@
             P.spawn(M.x + 0.5 + (Math.random() - 0.5) * 2.4, M.y + 0.2, M.z + 0.5 + (Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 0.9, 0.5 + Math.random() * 0.7, (Math.random() - 0.5) * 0.9,
               { life: 2.2 + Math.random() * 1.6, size: 0.45 + Math.random() * 0.35, grav: -0.05, drag: 0.5, col: [0.86, 0.91, 0.96], grow: 1.1, emis: 0.15, collide: false });
           }
+        } else if (M.kind === 'petals' || M.kind === 'glowring') {
+          LandLife.floraFx(M, P, dt, d2, low, night, g.env && g.env.E ? g.env.E.season : null);
         } else if (M.kind === 'lighthouse') {
           if (d2 > LIGHT * LIGHT || night < 0.35) continue;
           M.acc += dt;
@@ -201,6 +204,37 @@
     }
   }
   VR.LandLife = LandLife;
+  // v-flora · the wonder spots' life (gen_flora.js; particles: none on Very Low — effects() never runs there):
+  //   petals    the Traumbaum lets its petals go: pink and white flakes from the crown (radius k), drifting down and
+  //             downwind, fluttering; spring the most, summer fewer, autumn a few, winter none (the season's weights)
+  //   glowring  at night the Glimmglocken breathe: soft blue-white glows over the ring (radius k), motes rising slowly
+  LandLife.FLORA = { petalRate: [5, 11], petalReach: 120, ringReach: 90 };
+  LandLife.petalRate = function (season, low) {
+    const s = season || [0, 1, 0, 0], F = LandLife.FLORA;
+    return (low ? F.petalRate[0] : F.petalRate[1]) * (1.5 * s[0] + 1 * s[1] + 0.35 * s[2]);
+  };
+  LandLife.floraFx = function (M, P, dt, d2, low, night, season) {
+    const r = Math.random, F = LandLife.FLORA;
+    if (M.kind === 'petals') {
+      if (d2 > F.petalReach * F.petalReach) return;
+      M.acc += dt * LandLife.petalRate(season, low);
+      while (M.acc >= 1) {
+        M.acc -= 1;
+        const a = r() * 6.283, rr = Math.sqrt(r()) * M.k, pink = r() < 0.72;
+        P.spawn(M.x + 0.5 + Math.cos(a) * rr, M.y + r() * 3, M.z + 0.5 + Math.sin(a) * rr, (r() - 0.5) * 0.5, -0.2, (r() - 0.5) * 0.5,
+          { life: 6 + r() * 4, size: 0.07 + r() * 0.04, grav: 0.35, drag: 1.6, col: pink ? [1, 0.68 + r() * 0.12, 0.82] : [1, 0.97, 0.98], emis: 0.05, collide: true, wind: 0.8, turb: 0.9 });
+      }
+    } else {
+      if (d2 > F.ringReach * F.ringReach || night < 0.3) return;
+      M.acc += dt * (low ? 1.5 : 4) * Math.min(1, night * 1.4);
+      while (M.acc >= 1) {
+        M.acc -= 1;
+        const a = r() * 6.283, rr = M.k * (0.92 + r() * 0.2), x = M.x + 0.5 + Math.cos(a) * rr, z = M.z + 0.5 + Math.sin(a) * rr;
+        P.glow(x, M.y + 0.5, z, [0.62, 0.86, 1], 1.6 + r(), 0.32, 0.05);
+        if (!low && r() < 0.6) P.glow(x, M.y + 0.7, z, [0.8, 0.95, 1], 4 + r() * 3, 0.06 + r() * 0.04, 0.25 + r() * 0.2);
+      }
+    }
+  };
   // ---- the sails' turning (pure: test/polish_mill.js). The speed the wind asks (rad/s): K per unit of the world's wind
   // (weather.js: clear 1, overcast 1.1, fog 0.7, rain 2.6, storm 3), a gust (0…1) adds up to 45 %, capped at MAX; under
   // CALM none. The sails follow it with a lag of TAU seconds (their inertia), so the speed never jumps and the angle — the

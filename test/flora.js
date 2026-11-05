@@ -114,5 +114,19 @@ if (rings.length) {
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const c = g.generate(Math.floor(G.x / 16) + dx, Math.floor(G.z / 16) + dz); for (let i = 0; i < c.blocks.length; i++) if (nm(c.blocks[i]) === 'glowbell') glow++; }
   check(glow >= 10, `the glow ring stands (${glow} glowbells)`);
 }
+// ---- e · the wonder spots' life (landlife.js): the petals follow the season, the ring glows at night only
+try { require(__dirname + '/../src/main/landlife.js'); } catch (e) { }
+const LL = V.LandLife;
+check(!!LL && !!LL.floraFx, 'LandLife.floraFx is there');
+if (LL && LL.floraFx) {
+  const sp = LL.petalRate([1, 0, 0, 0]), su = LL.petalRate([0, 1, 0, 0]), au = LL.petalRate([0, 0, 1, 0]), wi = LL.petalRate([0, 0, 0, 1]);
+  check(sp > su && su > au && au > 0 && wi === 0, `petals: spring ${sp.toFixed(1)} › summer ${su} › autumn ${au.toFixed(1)} › winter ${wi} a second`);
+  check(LL.petalRate([0, 1, 0, 0], true) < su, 'Low lets fewer petals go');
+  const P = { n: 0, spawn() { this.n++; }, glow() { this.n++; } };
+  const M = { kind: 'glowring', x: 0, y: 70, z: 0, k: 5, acc: 0 };
+  for (let i = 0; i < 60; i++) LL.floraFx(M, P, 0.1, 100, false, 0, null);
+  const day = P.n; for (let i = 0; i < 60; i++) LL.floraFx(M, P, 0.1, 100, false, 1, null);
+  check(day === 0 && P.n > 10, `the glow ring: nothing by day, ${P.n} glows in six seconds of night`);
+}
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
