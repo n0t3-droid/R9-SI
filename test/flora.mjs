@@ -39,7 +39,7 @@ for (const vg of VG) {
   const shown = ([f, t]) => { const W = VR.game.world; let n = 0, ok = 0; for (const p of [f, t]) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { n++; const c = W.col((Math.floor(p[0]) >> 4) + dx, (Math.floor(p[2]) >> 4) + dz); if (c && c.shownAt >= 0) ok++; } return ok / n; };
   const look = async (from, to, quick) => {
     await ev(([c, t]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1], c[2]); pl.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); pl.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); }, [from, to]);
-    let f = 0; for (let i = 0; i < (quick ? 3 : 60); i++) { await settle(20); f = await ev(shown, [from, to]); if (f >= 0.97) break; await wait(500); }
+    let f = 0; for (let i = 0; i < (quick ? 40 : 150); i++) { await settle(20); await ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); window.__norender = true; }); f = await ev(shown, [from, to]); /* (one real frame a round: the uploads and fades run in the drawn frame) */ if (f >= 0.97) break; await wait(500); }
     console.log('  columns shown', f.toFixed(2)); await step(40);
   };
   const shot = async (name) => {
@@ -57,7 +57,7 @@ for (const vg of VG) {
     return Math.min(...runs);
   };
   for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
-  await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 12; g.applySettings('*'); });
+  await ev((rd) => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = rd; g.applySettings('*'); }, +(process.env.RD || 8));
   await ev(`VR.game.createWorld({name:'Flora',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '4242'}',cheats:true,kit:true,vgen:${vg}})`);
   for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui', 'hints']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } g.settings.anim = false; g.applySettings('anim'); });

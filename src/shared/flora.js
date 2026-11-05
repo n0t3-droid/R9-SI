@@ -101,7 +101,7 @@
         const d = Math.sqrt(ex * ex + ey * ey + ez * ez) / br;
         if (d > 1.05) continue;
         const h = H3(x, y, z, seed);
-        if (d > 0.72 && h < 0.3) continue;   // a ragged shell
+        if (br >= 1.9 && d > 0.72 && h < 0.3) continue;   // a ragged shell (big balls only: a small one would fall apart into loose cubes — the first pictures)
         put(x, y, z, kind === 2 && d < 0.75 && h > 1 - green ? 3 : kind);
       }
     }

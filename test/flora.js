@@ -12,7 +12,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const nm = (s) => { const t = R.types[R.T.type[s]]; return t ? t.name : ''; };
-const PIN16 = '201fbe20', PIN17 = 'ce539b27';
+const PIN16 = '201fbe20', PIN17 = '399789b4';
 
 // ---- a · the L-systems
 check(!!FL && typeof FL.expand === 'function', 'VR.Flora is there');
@@ -38,6 +38,13 @@ if (FL) {
     const reach = Sp.kind === 'giant' ? 13 : Sp.kind === 'shrub' ? 3 : 7;
     check(same && woodOk && bloomOk && hmin >= Sp.h[0] && hmax <= Sp.h[1] && smax <= reach, `${name}: height ${hmin}–${hmax} (${Sp.h.join('–')}), spread ≤ ${smax} (≤ ${reach}), wood and blossom, cached`);
   }
+  // no loose cube: every cell of a plant touches another (the first pictures showed shrubs falling apart into floating cubes)
+  let loose = 0, cellsN = 0;
+  for (const name of all) for (let seed = 1; seed <= 12; seed++) {
+    const p = FL.grow(name, seed * 7919), set = new Set(p.list.map(c => c[0] + ',' + c[1] + ',' + c[2]));
+    for (const c of p.list) { cellsN++; if (c[1] === 0) continue; let n = 0; for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) if (set.has((c[0] + dx) + ',' + (c[1] + dy) + ',' + (c[2] + dz))) n++; if (!n) loose++; }
+  }
+  check(loose <= cellsN * 0.002, `no loose cubes: ${loose} of ${cellsN} cells touch nothing`);
   const g1 = FL.grow('traumbaum', 11);
   check(g1.list.length > 700, `the Traumbaum is a giant (${g1.list.length} cells)`);
   const u = new Set(); for (let s = 1; s <= 8; s++) u.add(FL.grow('wolkenkirsche', s).list.length);
