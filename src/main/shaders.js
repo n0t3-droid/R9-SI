@@ -3111,10 +3111,17 @@ ${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}
 uniform vec4 u_film;        // x the warm lift, y the warmth, z the vignette, w on (0: the picture as it is)
 vec3 filmGrade(vec3 c, vec2 uv) {
   if (u_film.w <= 0.0) return c;
-  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  vec3 fl = vec3(0.085, 0.055, 0.04) * u_film.x * (1.0 - smoothstep(0.05, 0.55, l));
-  c = 1.0 - (1.0 - c) * (1.0 - fl);
-  c *= mix(vec3(1.0), mix(vec3(1.025, 1.0, 0.96), vec3(1.05, 1.015, 0.93), smoothstep(0.3, 0.85, l)), u_film.y);
+  // the veil off: the black point set under the haze's floor, a soft S-curve (the paint's depth)
+  c = clamp((c - 0.055 * u_film.y) / (1.0 - 0.075 * u_film.y), 0.0, 1.0);
+  c = mix(c, c * c * (3.0 - 2.0 * c), 0.22 * u_film.y);
+  // vibrance: the pale colours gain most (the haze's greys turn back into grass and sky), the bright ones keep theirs
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722)), mx = max(c.r, max(c.g, c.b)), sat = mx - min(c.r, min(c.g, c.b));
+  c = mix(vec3(l), c, 1.0 + 0.45 * u_film.y * (1.0 - smoothstep(0.1, 0.6, sat)));
+  // the shadows lifted toward a warm floor (the deepest only: no grey veil), the lights a touch gold
+  vec3 fl = vec3(0.05, 0.03, 0.018) * u_film.x * (1.0 - smoothstep(0.0, 0.35, l));
+  c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 - fl);
+  c *= mix(vec3(1.0), mix(vec3(1.03, 1.0, 0.955), vec3(1.055, 1.015, 0.925), smoothstep(0.3, 0.85, l)), u_film.y);
+  // a soft oval vignette
   vec2 q = (uv - 0.5) * vec2(1.0, 0.78);
   c *= 1.0 - u_film.z * smoothstep(0.18, 0.72, length(q) * 1.25);
   return clamp(c, 0.0, 1.0);

@@ -79,6 +79,7 @@
     o = o || {};
     const M = TS.marks(shots), SR = o.sr || 44100, len = Math.ceil(M.total * SR);
     const c = new OfflineAudioContext(2, len, SR);
+    c.resume = () => Promise.resolve();   // (audio.js resumes a suspended context: an offline one starts with startRendering)
     const a = new VR.Audio(); a.init(c); a.setVolumes({ master: 1, music: 1 }); if (a.setTier) a.setTier(o.tier === undefined ? 3 : o.tier);
     if (a.roomOut) a.roomOut.gain.value = 0.2;
     a.musCap = () => 64;   // (offline: every voice — no live budget to keep)

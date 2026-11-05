@@ -51,7 +51,7 @@ try {
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', mp4, '-map', '0:v', '-c:v', 'copy', tmp]);
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', tmp, '-i', WAV, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', mp4]);
     fs.rmSync(tmp, { force: true });
-    const st = execFileSync('/usr/local/bin/ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', mp4]).toString().trim().split(/\s+/);
+    const st = execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', mp4]).toString().trim().split(/\s+/);
     check(st.includes('h264') && st.includes('aac'), 'muxed into ' + mp4 + ' (' + st.join(' + ') + ')');
   }
 } catch (e) { fails++; console.log('  ✗ ' + (e.stack || e.message).slice(0, 600)); }

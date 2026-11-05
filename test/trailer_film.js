@@ -44,6 +44,12 @@ check(Math.cos(ang) < 0.5, 'clearAngle turns away from a parked ship in the line
 const rot = TW.shipSolid([Object.assign({}, ship, { yaw: Math.PI / 2, pos: [10, 100, 0] })], [0, 100, 0], 80);
 check(rot(10, 101, 0) && rot(19, 101, 0) && !rot(10, 101, 9), 'shipSolid: the box turns with the ship\'s yaw');
 
+const open = () => false, avoid = [{ p: [0, 102, 12], r: 5 }];   // a ship parked between the +z side and the target
+const angA = TW.clearAngle(open, [0, 100, 0], 0, 24, 18, 3, 2.5, 6, 12, avoid);
+check(Math.cos(angA) < 0.6, 'clearAngle(avoid): a ship that would stand in the frame before the target turns the camera (' + (angA * 180 / Math.PI).toFixed(0) + '°)');
+check(TW.clearAngle(open, [0, 100, 0], 0, 24, 18, 3, 2.5, 6, 12) === 0, 'without it the first angle stays');
+const fr = S.filter(s => s.fogR !== undefined).map(s => s.name + ' ' + s.fogR);
+check(S.find(s => s.name === 'abend').fogR >= 1000 && S.find(s => s.name === 'titel').fogR >= 1000 && S.find(s => s.name === 'inseln').fogR > 70, 'no fog banks in the night shots, none at mid distance by the isles (' + fr.join(', ') + ')');
 // (d) the outpost shot
 const lib = S.find(s => s.stage === 'liberate');
 const k0 = lib.keys[0], k1 = lib.keys[lib.keys.length - 1], B = A.beacon;

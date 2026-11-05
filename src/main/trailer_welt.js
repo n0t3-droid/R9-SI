@@ -32,9 +32,9 @@
     const rel = (o, k) => k.map(([t, p, l]) => [t, add(o, p), add(o, l)]);
     const S = [];
     // 1 · the establishing wide: high over the land under the isles, a slow push
-    S.push(shot('auftakt', 5, 62, 1500, 'g.film.w.c1', rel(I, [[0, [-170, 40, 150], [-20, -30, 0]], [5, [-155, 36, 135], [-18, -30, 0]]]), { fadeIn: 1.0 }));
+    S.push(shot('auftakt', 5, 62, 3000, 'g.film.w.c1', rel(I, [[0, [-170, 40, 150], [-20, -30, 0]], [5, [-155, 36, 135], [-18, -30, 0]]]), { fadeIn: 1.0 }));
     // 2 · the meadow: a deer mother and her fawns, a low hero angle looking up toward the isle's underside
-    S.push(shot('wiese', 5, 58, 2200, 'g.film.w.c2', rel(M, [[0, [-5, 1.7, 7.5], [1, 2.5, -2]], [5, [-3.4, 1.6, 5.2], [1.6, 2.8, -3]]]), { stage: 'family', anchor: M.slice() }));
+    S.push(shot('wiese', 5, 58, 2700, 'g.film.w.c2', rel(M, [[0, [-5, 1.7, 7.5], [1, 2.5, -2]], [5, [-3.4, 1.6, 5.2], [1.6, 2.8, -3]]]), { stage: 'family', anchor: M.slice() }));
     // 3 · the village's life on its plaza (or, in a world without one near, the land)
     if (A.village) S.push(shot('dorf', 5, 60, 5600, 'g.film.w.c3', rel(A.village, [[0, [13, 3.4, 9], [0, 2.6, 0]], [5, [9.5, 3.0, 6.5], [-1, 2.6, -1]]]), { stage: 'village', anchor: A.village.slice() }));
     else { const L = add(M, [-60, 0, 30]); S.push(shot('land', 5, 60, 4200, 'g.film.w.c3b', rel(L, [[0, [14, 8, 12], [0, 3, 0]], [5, [10, 7, 9], [0, 3, 0]]]), { anchor: L })); }
@@ -43,19 +43,19 @@
     else { const L = add(M, [30, 0, 60]); S.push(shot('pfad', 4.5, 55, 10400, 'g.film.w.c4b', rel(L, [[0, [12, 3, 10], [0, 2, 0]], [4.5, [8, 2.4, 7], [0, 2, 0]]]), { anchor: L })); }
     // 5 · the reveal: the camera rises from behind the hill, the isles appear; a freighter crosses in front of them
     S.push(shot('inseln', 5.5, 66, 7600, 'g.film.w.c5', rel(I, [[0, [-170, -36, 60], [0, -10, 0]], [5.5, [-162, -8, 52], [0, -2, 0]]]),
-      { ships: [{ arch: 'freighter', A: add(I, [-60, 10, -110]), C: add(I, [-40, 8, 10]), B: add(I, [-20, 6, 140]), dur: 9, delay: 0 }] }));
+      { fogR: 140, ships: [{ arch: 'freighter', A: add(I, [-60, 10, -110]), C: add(I, [-40, 8, 10]), B: add(I, [-20, 6, 140]), dur: 9, delay: 0 }] }));
     // 6 · the ferry: a shuttle passes close over the lake under the isles, the camera pans with it
     S.push(shot('faehre', 4.5, 64, 8800, 'g.film.w.c6', rel(M, [[0, [0, 2.2, 8], [-14, 6, -14]], [4.5, [3, 2.4, 6], [16, 8, -16]]]),
-      { anchor: M.slice(), fixed: true, ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
+      { anchor: M.slice(), fixed: true, fogR: 140, ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
     // 7 · an outpost freed: the Leuchtfeuer turns cyan, the beam, the ring of light, ✦ BEFREIT ✦ (or a golden ride)
     const B = A.beacon || (A.outpost ? add(A.outpost, [0, 1, 0]) : null);
     // (f-film2: low and wide — the beacon, its beam and the ring against the sky; the BEFREIT banner small up top)
     if (B) S.push(shot('befreit', 6, 58, 9800, 'g.film.w.c7', rel(B, [[0, [22, 3, 15], [0, 6, 0]], [6, [16, 2.5, 11], [0, 6, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
     else { const L = add(M, [-30, 0, -70]); S.push(shot('weite', 6, 60, 9800, 'g.film.w.c7b', rel(L, [[0, [20, 12, 16], [0, 4, 0]], [6, [14, 10, 12], [0, 4, 0]]]), { anchor: L })); }
     // 8 · the sun goes down: the sky turns from gold to night, the stars come out over the isles
-    S.push(shot('abend', 6, 64, 11000, 'g.film.w.c8', rel(I, [[0, [-160, 2, 18], [0, -6, 0]], [6, [-152, 4, 14], [0, -4, 0]]]), { todTo: 15200, fadeOut: 0 }));
+    S.push(shot('abend', 6, 64, 11000, 'g.film.w.c8', rel(I, [[0, [-160, 2, 18], [0, -6, 0]], [6, [-152, 4, 14], [0, -4, 0]]]), { todTo: 15200, fadeOut: 0, fogR: 2000 }));
     // 9 · the title over the night sky: the camera tilts up from the isles into the stars
-    S.push(shot('titel', 5, 66, 15200, 'g.film.w.title', rel(I, [[0, [-152, 4, 14], [0, -4, 0]], [5, [-148, 6, 12], [0, 34, -10]]]), { todTo: 16500, caption: 'R9-SI', big: true, capSmall: false, capAt: 1.0, subKey: 'g.film.w.sub', fadeIn: 0, fadeOut: 1.0, seam: true }));
+    S.push(shot('titel', 5, 66, 15200, 'g.film.w.title', rel(I, [[0, [-152, 4, 14], [0, -4, 0]], [5, [-148, 6, 12], [0, 34, -10]]]), { todTo: 16500, caption: 'R9-SI', big: true, capSmall: false, capAt: 1.0, subKey: 'g.film.w.sub', fadeIn: 0, fadeOut: 1.0, seam: true, fogR: 2000 }));
     return S;
   };
   // every key at least `clear` over the ground (ground(x, z) → the top block's y); the look stays
@@ -81,7 +81,9 @@
     return [[0, [T[0] + s0 * r0, T[1] + h0, T[2] + c0 * r0], [T[0], T[1] + l0, T[2]]], [dur, [T[0] + s1 * r1, T[1] + h1, T[2] + c1 * r1], [T[0], T[1] + l1, T[2]]]];
   };
   // the angle round T whose sight lines (from both ends of the move) are clearest: solid(x, y, z) → true for a block
-  TW.clearAngle = function (solid, T, a0, r0, r1, h0, h1, lh, n) {
+  // (f-film2: avoid — [{p, r}…], things that must not stand in the frame in front of the target, a parked ship: a
+  // heavy penalty when one is nearer than the target and inside the middle of the view)
+  TW.clearAngle = function (solid, T, a0, r0, r1, h0, h1, lh, n, avoid) {
     n = n || 12; let best = a0, bs = 1e9;
     for (let i = 0; i < n; i++) {
       const a = a0 + i * Math.PI * 2 / n; let hits = 0;
@@ -90,6 +92,12 @@
         for (let k = 1; k < 20; k++) { const u = k / 20; if (solid(C[0] + (T[0] - C[0]) * u, C[1] + (T[1] + lh - C[1]) * u, C[2] + (T[2] - C[2]) * u)) hits++; }
         // elbow room: a wall right beside the lens fills a side of the frame
         for (let j = 0; j < 8; j++) { const b = j * Math.PI / 4; for (const rr of [2.5, 5]) if (solid(C[0] + Math.sin(b) * rr, C[1], C[2] + Math.cos(b) * rr)) hits += 1.5; }
+      }
+      for (const o of avoid || []) for (const [r, h] of [[r0, h0], [r1, h1]]) {
+        const C = [T[0] + Math.sin(a) * r, T[1] + h, T[2] + Math.cos(a) * r], vt = [T[0] - C[0], T[1] + lh * 0.5 - C[1], T[2] - C[2]], vo = [o.p[0] - C[0], o.p[1] - C[1], o.p[2] - C[2]];
+        const dt = Math.hypot(...vt), dq = Math.hypot(...vo); if (dq > dt + o.r || dq < 0.5) continue;
+        const cos = (vt[0] * vo[0] + vt[1] * vo[1] + vt[2] * vo[2]) / (dt * dq), off = Math.acos(Math.max(-1, Math.min(1, cos))) - Math.atan(o.r / dq);
+        if (off < 0.45) hits += 40 * (1 - Math.max(0, off) / 0.45);
       }
       const sc = hits + i * 0.01; if (sc < bs) { bs = sc; best = a; }
     }
@@ -229,12 +237,15 @@
       const h0 = k0[1][1] - T[1], h1 = k1[1][1] - T[1], l0 = k0[2][1] - T[1], l1 = k1[2][1] - T[1];
       const a0 = Math.atan2(k0[1][0] - T[0], k0[1][2] - T[2]);
       // (f-film2: a parked world ship is a wall too — it is a model, not blocks)
-      const ss = TW.shipSolid(g.starships && g.starships.ships, T, 90), solid2 = (x, y, z) => solid(x, y, z) || ss(x, y, z);
-      const a = TW.clearAngle(solid2, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12);
+      const SH = (g.starships && g.starships.ships || []).filter((q) => q && q.pos && Math.hypot(q.pos[0] - T[0], q.pos[2] - T[2]) < 70);
+      const ss = TW.shipSolid(SH, T, 90), solid2 = (x, y, z) => solid(x, y, z) || ss(x, y, z);
+      const avoid = SH.map((q) => { const o = q.d && q.d.occ; return { p: [q.pos[0], q.pos[1] + (o ? o.by / 2 : 2), q.pos[2]], r: o ? Math.max(o.bx, o.bz) * 0.5 + 1 : 8 }; });
+      const a = TW.clearAngle(solid2, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12, avoid);
       shot.keys = TW.orbitKeys(T, a, shot.dur, r0, r1, h0, h1, l0, l1, 0.12);
     }
     TW.resolve(shot, top, 1.8);
     if (run.stage) TW.dress(g, shot);
+    TW.fogR = shot.fogR !== undefined ? shot.fogR : TW.FOG_NEAR;
     if (g.renderer) g.renderer.puffKey = '';   // (f-film2: the fog sprites again, without the ones by the lens)
     if (shot.stage === 'family') {
       const E = g.entities, H = g.companions && g.companions.heart, a = shot.anchor; if (!E || !E.summon) return;
@@ -281,9 +292,9 @@
   const CL = VR.Clouds;
   if (CL && CL.field && !CL.field.__tw) {
     const f0 = CL.field;
-    CL.field = function (cam) { const f = f0.apply(this, arguments); if (TW.run && f && f.fog) f.fog = TW.fogNear(f.fog, cam, TW.FOG_NEAR); return f; };
+    CL.field = function (cam) { const f = f0.apply(this, arguments); if (TW.run && f && f.fog) f.fog = TW.fogNear(f.fog, cam, TW.fogR || TW.FOG_NEAR); return f; };
     CL.field.__tw = true;
-    if (CL.valleyFog) { const v0 = CL.valleyFog; CL.valleyFog = function (eye) { const L = v0.apply(this, arguments); const g = VR.game, p = g && g.player; return TW.run && p ? TW.fogNear(L, { x: p.pos[0], y: p.pos[1] + (p.eye || 1.6), z: p.pos[2] }, TW.FOG_NEAR) : L; }; }
+    if (CL.valleyFog) { const v0 = CL.valleyFog; CL.valleyFog = function (eye) { const L = v0.apply(this, arguments); const g = VR.game, p = g && g.player; return TW.run && p ? TW.fogNear(L, { x: p.pos[0], y: p.pos[1] + (p.eye || 1.6), z: p.pos[2] }, TW.fogR || TW.FOG_NEAR) : L; }; }
   }
   // the foreground (a recording only): the game's own flowers and grass tufts in the low shots' lower corners, put back at
   // the stop. (from the shot's last key: the camera moves in toward the subject, the tufts stay ahead of it all along)
@@ -349,7 +360,7 @@
   };
   // the look of the subtitle line
   const st = document.createElement('style');
-  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap;font-size:26px}body.r9film #cine .cap.big{font-size:104px;letter-spacing:.16em;bottom:44%}body.r9film #cine .capsub{font-size:32px;bottom:calc(44% - 58px)}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}body.r9film #libban{top:15%;transform:translate(-50%,-50%) scale(.6)}body.r9film #libban .sub{display:none}';
+  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap;font-size:26px}body.r9film #cine .cap.big{font-size:104px;letter-spacing:.16em;bottom:44%}body.r9film #cine .capsub{font-size:32px;bottom:calc(44% - 58px)}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}body.r9film #libban{top:12%;zoom:.5}body.r9film #libban .sub{display:none}';
   document.head.appendChild(st);
   // 🎞 in the pause menu: which trailer
   const UI = VR.UI;
