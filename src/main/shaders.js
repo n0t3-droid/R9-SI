@@ -3105,6 +3105,21 @@ uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed 
 uniform vec3 u_shaftCol;
 ${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
 ${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}
+#ifdef FILMG
+// f-film2 · the trailer's cartoon-film grade (display space; the define only while the 'welt' trailer plays —
+// trailer_welt.js): the shadows lifted toward a warm floor, the lights a touch gold, a soft oval vignette
+uniform vec4 u_film;        // x the warm lift, y the warmth, z the vignette, w on (0: the picture as it is)
+vec3 filmGrade(vec3 c, vec2 uv) {
+  if (u_film.w <= 0.0) return c;
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  vec3 fl = vec3(0.085, 0.055, 0.04) * u_film.x * (1.0 - smoothstep(0.05, 0.55, l));
+  c = 1.0 - (1.0 - c) * (1.0 - fl);
+  c *= mix(vec3(1.0), mix(vec3(1.025, 1.0, 0.96), vec3(1.05, 1.015, 0.93), smoothstep(0.3, 0.85, l)), u_film.y);
+  vec2 q = (uv - 0.5) * vec2(1.0, 0.78);
+  c *= 1.0 - u_film.z * smoothstep(0.18, 0.72, length(q) * 1.25);
+  return clamp(c, 0.0, 1.0);
+}
+#endif
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -3179,6 +3194,9 @@ void main() {
 #endif
 #ifdef LV_TONE
   c = lvTone(c);   // v-look2: the night's moonlight, the worlds' palettes (look.js)
+#endif
+#ifdef FILMG
+  c = filmGrade(c, v_uv);   // f-film2: the trailer's grade (trailer_welt.js)
 #endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;

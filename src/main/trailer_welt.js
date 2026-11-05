@@ -49,7 +49,8 @@
       { anchor: M.slice(), fixed: true, ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
     // 7 · an outpost freed: the Leuchtfeuer turns cyan, the beam, the ring of light, ✦ BEFREIT ✦ (or a golden ride)
     const B = A.beacon || (A.outpost ? add(A.outpost, [0, 1, 0]) : null);
-    if (B) S.push(shot('befreit', 6, 60, 9800, 'g.film.w.c7', rel(B, [[0, [20, 18, 15], [0, 2, 0]], [6, [14, 12, 10], [0, 3, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
+    // (f-film2: low and wide — the beacon, its beam and the ring against the sky; the BEFREIT banner small up top)
+    if (B) S.push(shot('befreit', 6, 58, 9800, 'g.film.w.c7', rel(B, [[0, [22, 3, 15], [0, 6, 0]], [6, [16, 2.5, 11], [0, 6, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
     else { const L = add(M, [-30, 0, -70]); S.push(shot('weite', 6, 60, 9800, 'g.film.w.c7b', rel(L, [[0, [20, 12, 16], [0, 4, 0]], [6, [14, 10, 12], [0, 4, 0]]]), { anchor: L })); }
     // 8 · the sun goes down: the sky turns from gold to night, the stars come out over the isles
     S.push(shot('abend', 6, 64, 11000, 'g.film.w.c8', rel(I, [[0, [-160, 2, 18], [0, -6, 0]], [6, [-152, 4, 14], [0, -4, 0]]]), { todTo: 15200, fadeOut: 0 }));
@@ -110,6 +111,57 @@
     return null;
   };
 
+  // ---------------------------------------------------------------- f-film2: the cinema grade, the framing (pure)
+  // (docs/superpowers/plans/2026-11-05-f-film2.md) Only while the film plays: VR.Grade's knobs swapped for these (richer,
+  // a warmer cartoon film: more saturation and contrast, a stronger vignette, a thinner haze, a little more glow) and the
+  // composite's FILMG pass (u_film: the shadows' warm lift, the warmth of the lights, the oval vignette, on).
+  TW.FILM = { sat: 1.3, contrast: 0.44, vignette: 0.42, fogDens: 0.00007, expo: 0.8, bloomStr: 0.13 };
+  TW.FILM_GL = [1, 1, 0.32, 1];
+  TW.FOG_NEAR = 70;   // m: no fog-bank sprite whose edge is nearer than this to the lens while the film plays
+  // the knobs of F put into G; returns what was there (swap it back with the result)
+  TW.gradeSwap = function (G, F) { const was = {}; for (const k in F) { was[k] = G[k]; G[k] = F[k]; } return was; };
+  // the fog-bank sprites ([x, y, z, r, …]) without the ones whose edge is within R of the camera (R 0: the list as it is)
+  TW.fogNear = function (list, cam, R) {
+    if (!(R > 0) || !list) return list;
+    return list.filter((s) => Math.hypot(s[0] - cam.x, s[1] - cam.y, s[2] - cam.z) - (s[3] || 0) > R);
+  };
+  // parked ships as solid boxes (their occupancy grid, turned by yaw — starships.js getBlock's inverse) near T
+  TW.shipSolid = function (ships, T, R) {
+    const L = (ships || []).filter((s) => s && s.pos && s.d && s.d.occ && s.d.meta && Math.hypot(s.pos[0] - T[0], s.pos[2] - T[2]) < (R || 80));
+    return function (x, y, z) {
+      for (const s of L) {
+        const o = s.d.occ, org = s.d.meta.origin, cx = x - s.pos[0], cy = y - s.pos[1] + (s.kneel || 0), cz = z - s.pos[2];
+        const c = Math.cos(s.yaw || 0), sn = Math.sin(s.yaw || 0), lx = cx * c - cz * sn, lz = cx * sn + cz * c;
+        const i = Math.floor(lx - org[0]), j = Math.floor(cy - org[1]), k = Math.floor(lz - org[2]);
+        if (i < 0 || j < 0 || k < 0 || i >= o.bx || j >= o.by || k >= o.bz) continue;
+        if (!o.occ || o.occ[(j * o.bz + k) * o.bx + i]) return true;
+      }
+      return false;
+    };
+  };
+  // the foreground of a low shot: spots just past where the frame's bottom edge (inside the letterbox, fov the vertical
+  // fov in degrees) meets the ground, in its lower corners (never the middle third) — on a free ground top (top(x, z) →
+  // the top block's y; can(x, y, z) → a tuft may stand at y). A camera more than 4.5 m over the ground, or one whose
+  // frame meets the ground farther than 14 m away: none (the corners show sky or far land).
+  TW.dressSpots = function (cam, look, top, can, n, fov) {
+    n = n || 12; const out = [];
+    const dx = look[0] - cam[0], dz = look[2] - cam[2], dl = Math.hypot(dx, dz) || 1, fx = dx / dl, fz = dz / dl, rx = -fz, rz = fx;
+    const gy0 = top(Math.floor(cam[0] + fx * 4), Math.floor(cam[2] + fz * 4));
+    const h = cam[1] - (gy0 + 1); if (!Number.isFinite(gy0) || h > 4.5) return out;
+    const tv = Math.tan((fov || 58) * Math.PI / 360), vb = Math.atan(tv * 0.74), pitch = Math.atan2(look[1] - cam[1], dl);   // (0.74: the letterbox)
+    const down = vb - pitch; if (down < 0.05) return out;
+    const a0 = Math.max(1.6, Math.max(0, h) / Math.tan(down) + 0.4); if (a0 > 14) return out;
+    for (let i = 0; i < n * 3 && out.length < n; i++) {
+      const u = ((i * 0.618034) % 1), v = ((i * 0.754878) % 1);
+      const ahead = a0 + u * 4, side = (i % 2 ? 1 : -1) * ahead * tv * 1.78 * (0.42 + v * 0.45);
+      const x = Math.floor(cam[0] + fx * ahead + rx * side), z = Math.floor(cam[2] + fz * ahead + rz * side);
+      const y = top(x, z); if (!Number.isFinite(y) || !can(x, y + 1, z)) continue;
+      if (out.some((p) => p[0] === x && p[2] === z)) continue;
+      out.push([x, y + 1, z]);
+    }
+    return out;
+  };
+
   // ---------------------------------------------------------------- the game side
   const Dir = VR.Director;
   if (!Dir || typeof document === 'undefined') return;
@@ -141,9 +193,10 @@
       TW.busy = false; if (g.state !== 'play' || dir.active) return;
       const shots = TW.plan(A);
       for (const s of shots) if (!s.caption) s.caption = tx(s.capKey, null, '', '');
-      TW.run = { A, mobs: [], stage: !!(o && o.stage), wx: g.zenFreezeWeather, si: -1 };
+      TW.run = { A, mobs: [], stage: !!(o && o.stage), wx: g.zenFreezeWeather, si: -1, o: o || {}, dressed: [] };
       g.zenFreezeWeather = true; document.body.classList.add('r9film');
-      if (!play0.call(dir, shots, o)) { g.zenFreezeWeather = TW.run.wx; TW.run = null; }
+      TW.filmOn(g);
+      if (!play0.call(dir, shots, o)) { g.zenFreezeWeather = TW.run.wx; TW.filmOff(g); TW.run = null; }
     });
     return true;
   };
@@ -175,10 +228,14 @@
       const r0 = Math.hypot(k0[1][0] - T[0], k0[1][2] - T[2]), r1 = Math.hypot(k1[1][0] - T[0], k1[1][2] - T[2]);
       const h0 = k0[1][1] - T[1], h1 = k1[1][1] - T[1], l0 = k0[2][1] - T[1], l1 = k1[2][1] - T[1];
       const a0 = Math.atan2(k0[1][0] - T[0], k0[1][2] - T[2]);
-      const a = TW.clearAngle(solid, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12);
+      // (f-film2: a parked world ship is a wall too — it is a model, not blocks)
+      const ss = TW.shipSolid(g.starships && g.starships.ships, T, 90), solid2 = (x, y, z) => solid(x, y, z) || ss(x, y, z);
+      const a = TW.clearAngle(solid2, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12);
       shot.keys = TW.orbitKeys(T, a, shot.dur, r0, r1, h0, h1, l0, l1, 0.12);
     }
     TW.resolve(shot, top, 1.8);
+    if (run.stage) TW.dress(g, shot);
+    if (g.renderer) g.renderer.puffKey = '';   // (f-film2: the fog sprites again, without the ones by the lens)
     if (shot.stage === 'family') {
       const E = g.entities, H = g.companions && g.companions.heart, a = shot.anchor; if (!E || !E.summon) return;
       const mom = E.summon('glimmer_deer', a[0] + 0.5, a[1] + 1, a[2] + 0.5); if (!mom) return;
@@ -189,6 +246,58 @@
       if (mom.ai) { mom.ai.t = 99; mom.ai.target = [a[0] + 9, a[2] - 1]; }
     }
   };
+  // ---- f-film2: the grade on and off (VR.Grade's knobs and the composite's FILMG define), the foreground, the fog
+  TW.filmDef = false; TW.filmW = 1;
+  const rebuild = (g) => {
+    const R = g && g.renderer, G = VR.GL, S = VR.SHADERS; if (!R || !R.P || !R.P.composite || !G || !S) return;
+    const was = G.deferred; G.deferred = true;
+    try { R.P.composite = G.program(S.FS_VS, S.COMPOSITE_FS, 'composite'); } catch (e) { console.warn('trailer welt', e); } finally { G.deferred = was; }
+  };
+  TW.filmOn = function (g) {
+    if (TW.filmSaved || (TW.run && TW.run.o && TW.run.o.nograde)) return;
+    TW.filmSaved = VR.Grade ? TW.gradeSwap(VR.Grade, TW.FILM) : {}; TW.filmDef = true; TW.filmW = 1; rebuild(g);
+    if (g.renderer) g.renderer.puffKey = '';
+  };
+  TW.filmOff = function (g) {
+    if (!TW.filmSaved) return;
+    if (VR.Grade) TW.gradeSwap(VR.Grade, TW.filmSaved); TW.filmSaved = null; TW.filmDef = false; rebuild(g);
+    if (g.renderer) g.renderer.puffKey = '';
+  };
+  // the before/after: the grade off for a frame (the recorder's comparison) — the knobs and u_film.w, no rebuild
+  TW.filmShow = function (on) {
+    if (!TW.filmSaved || !VR.Grade) return;
+    if (!on && !TW.filmHidden) { TW.filmHidden = TW.gradeSwap(VR.Grade, TW.filmSaved); TW.filmW = 0; }
+    else if (on && TW.filmHidden) { TW.gradeSwap(VR.Grade, TW.filmHidden); TW.filmHidden = null; TW.filmW = 1; }
+  };
+  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return TW.filmDef && name === 'composite' && !d.includes('FILMG') ? d.concat(['FILMG']) : d; }; }
+  if (VR.Renderer) {
+    const RP = VR.Renderer.prototype, l2p0 = RP.l2Post;
+    RP.l2Post = function (p, E, pass, F) {
+      if (l2p0) l2p0.call(this, p, E, pass, F);
+      if (pass === 'composite' && p.u.u_film) { const f = TW.FILM_GL; this.gl.uniform4f(p.u.u_film, f[0], f[1], f[2], TW.filmDef ? TW.filmW : 0); }
+    };
+  }
+  // the fog banks (the isles' and the valleys') without the sprites by the lens, while the film plays
+  const CL = VR.Clouds;
+  if (CL && CL.field && !CL.field.__tw) {
+    const f0 = CL.field;
+    CL.field = function (cam) { const f = f0.apply(this, arguments); if (TW.run && f && f.fog) f.fog = TW.fogNear(f.fog, cam, TW.FOG_NEAR); return f; };
+    CL.field.__tw = true;
+    if (CL.valleyFog) { const v0 = CL.valleyFog; CL.valleyFog = function (eye) { const L = v0.apply(this, arguments); const g = VR.game, p = g && g.player; return TW.run && p ? TW.fogNear(L, { x: p.pos[0], y: p.pos[1] + (p.eye || 1.6), z: p.pos[2] }, TW.FOG_NEAR) : L; }; }
+  }
+  // the foreground (a recording only): the game's own flowers and grass tufts in the low shots' lower corners, put back at
+  // the stop. (from the shot's last key: the camera moves in toward the subject, the tufts stay ahead of it all along)
+  const TUFTS = ['poppy', 'dandelion', 'cornflower', 'oxeye_daisy', 'short_grass', 'fern', 'short_grass', 'lavender', 'rose_bush'];
+  TW.dress = function (g, shot) {
+    const run = TW.run, w = g.world, R = VR.R; if (!run || !w || !R || !R.byName.grass_block) return 0;
+    const gid = R.byName.grass_block.id, ids = TUFTS.map((n) => R.byName[n] ? R.byName[n].defaultState : 0).filter(Boolean); if (!ids.length) return 0;
+    const top = ground(g), can = (x, y, z) => { const b = w.getBlock(x, y - 1, z); return !!b && R.T.type[b] === gid && !w.getBlock(x, y, z) && !w.getBlock(x, y + 1, z); };
+    const k = shot.keys[shot.keys.length - 1], spots = TW.dressSpots(k[1], k[2], top, can, 14, shot.fov);
+    let n = 0;
+    for (const [x, y, z] of spots) { const id = ids[(((x * 7 + z * 13 + n) % ids.length) + ids.length) % ids.length]; if (w.setBlock(x, y, z, id, 4)) { run.dressed.push([x, y, z]); n++; } }
+    shot._dressed = n; return n;
+  };
+  TW.undress = function (g, run) { const w = g && g.world; if (!w || !run || !run.dressed) return; for (const [x, y, z] of run.dressed) w.setBlock(x, y, z, 0, 4); run.dressed.length = 0; };
   // the freeing, on a recording only (see the header)
   TW.free = function (g, shot) {
     const L = VR.Liberate, run = TW.run; if (!L || !run || !run.stage || !shot.site) return false;
@@ -208,6 +317,7 @@
     if (this.phase === 'run' && (ph0 !== 'run' || si0 !== this.si) && !shot._ready) {
       shot._ready = true;
       try { TW.ready(g, this, shot); } catch (e) { console.warn('trailer welt', e); }
+      if (VR.TrailerScore && !(run.o && run.o.silent)) VR.TrailerScore.onShot(g, this.shots, this.si);   // f-film2: the film's music
       const c = this.camAt(shot, this.t); g.player.pos = [c.pos[0], c.pos[1] - g.player.eye, c.pos[2]]; g.player.yaw = c.yaw; g.player.pitch = c.pitch;
     }
     if (this.phase === 'run' || this.phase === 'load') {
@@ -232,13 +342,14 @@
     if (was && run && !this.active) {
       const E = this.g.entities;
       if (E && E.mobs) for (const m of run.mobs) { const i = E.mobs.indexOf(m); if (i >= 0) E.mobs.splice(i, 1); }
-      this.g.zenFreezeWeather = run.wx; TW.run = null; sub(this, ''); document.body.classList.remove('r9film');
+      this.g.zenFreezeWeather = run.wx; TW.undress(this.g, run); TW.filmOff(this.g); if (VR.TrailerScore) VR.TrailerScore.stopLive(this.g);
+      TW.run = null; sub(this, ''); document.body.classList.remove('r9film');
     }
     return r;
   };
   // the look of the subtitle line
   const st = document.createElement('style');
-  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap;font-size:26px}body.r9film #cine .cap.big{font-size:104px;letter-spacing:.16em;bottom:44%}body.r9film #cine .capsub{font-size:32px;bottom:calc(44% - 58px)}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}';
+  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap;font-size:26px}body.r9film #cine .cap.big{font-size:104px;letter-spacing:.16em;bottom:44%}body.r9film #cine .capsub{font-size:32px;bottom:calc(44% - 58px)}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}body.r9film #libban{top:15%;transform:translate(-50%,-50%) scale(.6)}body.r9film #libban .sub{display:none}';
   document.head.appendChild(st);
   // 🎞 in the pause menu: which trailer
   const UI = VR.UI;
