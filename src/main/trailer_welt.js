@@ -278,12 +278,14 @@
   };
   TW.filmOn = function (g) {
     if (TW.filmSaved || (TW.run && TW.run.o && TW.run.o.nograde)) return;
-    TW.filmSaved = VR.Grade ? TW.gradeSwap(VR.Grade, TW.FILM) : {}; TW.filmDef = true; TW.filmW = 1; rebuild(g);
+    // (Very Low: the knobs only — its composite stays the one it has, no extra pass even in the film)
+    TW.filmSaved = VR.Grade ? TW.gradeSwap(VR.Grade, TW.FILM) : {}; TW.filmW = 1;
+    if (!(g.settings && g.settings.preset === 'potato')) { TW.filmDef = true; rebuild(g); }
     if (g.renderer) g.renderer.puffKey = '';
   };
   TW.filmOff = function (g) {
     if (!TW.filmSaved) return;
-    if (VR.Grade) TW.gradeSwap(VR.Grade, TW.filmSaved); TW.filmSaved = null; TW.filmDef = false; rebuild(g);
+    if (VR.Grade) TW.gradeSwap(VR.Grade, TW.filmSaved); TW.filmSaved = null; if (TW.filmDef) { TW.filmDef = false; rebuild(g); }
     if (g.renderer) g.renderer.puffKey = '';
   };
   // the before/after: the grade off for a frame (the recorder's comparison) — the knobs and u_film.w, no rebuild
