@@ -36,8 +36,8 @@ const settle = async (max = 50) => {
   let s = null;
   for (let i = 0; i < max; i++) {
     await step(20, 16);
-    s = await ev(() => { const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state }; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { state: g.state, dirty, busy: w.pool && w.pool.busy ? w.pool.busy() : 0 }; });
-    if (s.state === 'play' && !s.dirty && i > 2) break;
+    s = await ev(() => { const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state }; const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0 }; });
+    if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && i > 2) break;
     await wait(30);
   }
   return s;
@@ -50,7 +50,15 @@ const grab = async (name, frames = 4) => {
 // a page screenshot (the speech bubbles are HTML over the canvas)
 const snap = async (name) => {
   await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; });
-  await page.screenshot({ path: SHOTS + name }); console.log('  📷 ' + name); return SHOTS + name;
+  // (run 2: page.screenshot timed out at 30 s under load — a longer wait; else the canvas with the bubble's words written
+  // on it below, marked as such)
+  try { await page.screenshot({ path: SHOTS + name, timeout: 120000 }); console.log('  📷 ' + name); return SHOTS + name; }
+  catch (e) {
+    const txt = await ev(() => { const a = window.__cu; return a && a.bubble ? a.bubble.text : ''; });
+    const r = await grab(name); if (!r) return null;
+    try { execFileSync('python3', ['-c', `import sys\nfrom PIL import Image, ImageDraw, ImageFont\nim=Image.open(sys.argv[1]).convert('RGB');d=ImageDraw.Draw(im)\ntry:\n f=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',22)\nexcept Exception:\n f=ImageFont.load_default()\nt=sys.argv[2];w=d.textlength(t,font=f);x=(im.width-w)/2;y=36\nd.rounded_rectangle([x-14,y-10,x+w+14,y+36],12,fill=(255,255,255),outline=(60,60,60),width=2)\nd.text((x,y),t,fill=(30,30,30),font=f)\nd.text((8,im.height-22),'(Sprechblase nachgezeichnet: page.screenshot zu langsam)',fill=(255,255,255),font=ImageFont.load_default())\nim.save(sys.argv[1])`, r, txt]); } catch (e2) { console.log('  (no overlay: ' + String(e2.message).slice(0, 120) + ')'); }
+    console.log('  📷 ' + name + ' (the canvas, the words drawn on)'); return r;
+  }
 };
 const lookFrom = (P, T) => ev(([P, T]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(P[0], P[1] - (p.eye || 1.62), P[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; const e = p.eyePos(), dx = T[0] - e[0], dy = T[1] - e[1], dz = T[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, [P, T]);
 const loaded = async (C, r) => { for (let i = 0; i < 120; i++) { await step(10, 33); const ok = await ev(([C, r]) => { const w = VR.game.world; for (let dx = -r; dx <= r; dx += 16) for (let dz = -r; dz <= r; dz += 16) if (!w.isLoaded(C[0] + dx, C[2] + dz)) return false; return true; }, [C, r]); if (ok) return true; await wait(25); } return false; };
@@ -67,8 +75,14 @@ const prewarm = (maxMs = 120000) => ev(async (maxMs) => {
 }, maxMs);
 const photoOn = (tick) => ev((tick) => { const g = VR.game; if (!g.photoCam || !g.photoCam.on) g.photoMode(true); const pc = g.photoCam; pc.first = false; if (tick !== null && tick !== undefined) { pc.held = tick; g.env.setTime(tick); } return !!(pc && pc.on); }, tick);
 const photoOff = () => ev(() => { const g = VR.game; if (g.photoCam && g.photoCam.on) g.photoMode(false); });
+// (run 2: the player stood before the picnic's lens — the others near and the player are avoided, the player steps away
+// unless o.keepPlayer)
 const group = async (C, r, name, o) => {
-  const f = await ev(([C, r, o]) => { const g = VR.game, f = VR.Folk3.groupShot(g.photoCam, C, r, o || {}); if (f) window.__shotT = f.T; return f ? { d: +f.d.toFixed(1) } : null; }, [C, r, o || null]);
+  const f = await ev(([C, r, o]) => {
+    const g = VR.game, p = g.player, M = window.__M, mem = new Set(M ? M.members : []);
+    if (!(o && o.keepPlayer)) { p.flying = true; p.noclip = true; p.teleport(C[0] - 18, C[1] + 9, C[2] - 18); p.vel[0] = p.vel[1] = p.vel[2] = 0; }
+    const avoid = []; for (const a of g.villages.agents) if (!mem.has(a) && Math.hypot(a.pos[0] - C[0], a.pos[2] - C[2]) < r + 9) avoid.push([a.pos[0], a.pos[2]]);
+    const f = VR.Folk3.groupShot(g.photoCam, C, r, Object.assign({ avoid }, o || {})); if (f) window.__shotT = f.T; return f ? { d: +f.d.toFixed(1), n: avoid.length } : null; }, [C, r, o || null]);
   if (!f) { check(false, `${name}: a frame for the group`); return null; }
   await step(2, 33);
   return grab(name);
@@ -137,7 +151,7 @@ if (HP && want('picnic')) {
       check(sat === 2, `picnic: both on the blanket (${sat})`);
       await ev(() => { for (const a of window.__M.members) { a.bubble = null; a.expr = 'joy'; a.exprT = 30; } });
       await photoOn(9200);
-      rows.pic.push(await group(m.spot, 1.6, 'f4_picnic.png', { d: 4.2 }));
+      rows.pic.push(await group(m.spot, 1.6, 'f4_picnic.png'));
       await photoOff();
     }
   } catch (e) { check(false, 'picnic: ' + e.message); }
@@ -201,7 +215,7 @@ if (HP && want('dance')) {
       const beat = await ev(() => { const V = VR.game.villages, b = 60 / VR.Folk4.BPM; return VR.Folk4.press(V, Math.round(V.time / b) * b); });
       check(beat === 'beat', 'dance: V on the beat');
       await photoOn(12150);
-      if (D) rows.dance.push(await group(D.c, D.r + 2.2, 'f4_dance.png', { d: 7.5 }));
+      if (D) rows.dance.push(await group(D.c, D.r + 2.2, 'f4_dance.png', { keepPlayer: true }));
       await photoOff();
     }
   } catch (e) { check(false, 'dance: ' + e.message); }

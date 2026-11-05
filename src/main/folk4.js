@@ -190,12 +190,22 @@
     for (let yy = y0 + 2; yy >= y0 - 3; yy--) if (solidAt(w, x, yy - 1, z) && !solidAt(w, x, yy, z) && !solidAt(w, x, yy + 1, z) && !wetAt(w, x, yy, z) && !wetAt(w, x, yy - 1, z)) return yy;
     return null;
   }
-  // an open place r0…r1 m from (cx, cz), the direction (dir) first; w×d cells open on one floor; → [x, y, z, axis]
+  // grass (a meadow, moss, a lawn) under a floor cell: a picnic or a game prefers it to a paved square
+  let GREEN = null;
+  const greenAt = (w, x, y, z) => {
+    if (!GREEN) { GREEN = new Uint8Array(R.types.length + 1); R.types.forEach((t, i) => { if (t && /grass|moss|meadow|lawn|clover/.test(t.name || '') && !/tall|short|fern|tuft/.test(t.name || '')) GREEN[i] = 1; }); }
+    const s = w.getBlock(x, y - 1, z); return !!(s && GREEN[R.T.type[s]]);
+  };
+  // an open place r0…r1 m from (cx, cz), the direction (dir) first, on grass when there is grass; w×d cells open on one
+  // floor; → [x, y, z, axis]
   function openSpot(w, cx, cz, y, r0, r1, dir, wide) {
+    return openSpot1(w, cx, cz, y, r0, r1, dir, wide, true) || openSpot1(w, cx, cz, y, r0, r1, dir, wide, false);
+  }
+  function openSpot1(w, cx, cz, y, r0, r1, dir, wide, green) {
     for (let r = r0; r <= r1; r += 1) for (let i = 0; i < 16; i++) {
       const an = dir + (i & 1 ? 1 : -1) * Math.ceil(i / 2) * TAU / 16;
       const x = Math.floor(cx + Math.cos(an) * r), z = Math.floor(cz + Math.sin(an) * r), fy = floorAt(w, x, z, y);
-      if (fy === null) continue;
+      if (fy === null || (green && !greenAt(w, x, fy, z))) continue;
       if (!wide) return [x + 0.5, fy, z + 0.5, 0];
       for (const ax of [0, 1]) {
         let ok = true;
@@ -281,7 +291,7 @@
     if (grown.length < 2) return false;
     const a = grown[0], b = grown.slice(1).find(o => o.p.fam !== a.p.fam) || grown[1];
     const pz = vil.plan.plaza, dir = Math.atan2(pz.z + 0.5 - p[2], pz.x + 0.5 - p[0]) + 0.8;
-    const sp = openSpot(g.world, p[0], p[2], p[1], 5, 10, dir, true);
+    const sp = openSpot(g.world, p[0], p[2], p[1], 5, 12, dir, true);
     if (!sp) return false;
     M.spot = [sp[0], sp[1], sp[2]]; M.ax = sp[3]; M.yaw = sp[3] ? Math.PI / 2 : 0;
     // the seats: either end of the long side, facing each other
