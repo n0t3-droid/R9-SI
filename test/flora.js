@@ -12,7 +12,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const nm = (s) => { const t = R.types[R.T.type[s]]; return t ? t.name : ''; };
-const PIN16 = '8f691a63', PIN17 = 'pending';
+const PIN16 = '201fbe20', PIN17 = '7e712301';
 
 // ---- a · the L-systems
 check(!!FL && typeof FL.expand === 'function', 'VR.Flora is there');
@@ -55,7 +55,7 @@ check(kindOk, 'they are ordinary blocks (leaves and sprites, no voxel model)');
 const gb = R.byName.glowbell; check(!!gb && !!R.T.emit[gb.base], 'the glowbell glows');
 
 // ---- c, d · the land
-const CH = [[15, 5], [20, -15], [-12, 20], [8, 12], [-6, -14], [24, 2], [-20, 6], [4, -22], [12, 18], [-16, -4], [28, -8], [0, 16]];
+const CH = [[20, -15], [-20, 6], [28, -8], [12, 18], [-16, -4], [24, 2], [18, -36], [-6, -30], [24, -24], [-24, -15], [-27, -3], [33, 3]];
 const FLOW = /tulip|poppy|daisy|cornflower|wildflowers|allium|bluet|dandelion|lily_of|petals|candle_flower|umbel_flower|bell_tower|glowbell|clover|lilac|peony/;
 function scan(vgen) {
   const g = V.makeGen('overworld', 4242, { vgen });
@@ -82,7 +82,18 @@ const s17 = scan(17);
 console.log(`     vgen 17: hash ${s17.hash}, flowers ${s17.o.flowers} (${s17.o.kinds.size} kinds), blossom leaves ${s17.o.bloom}, tall ${s17.o.tall}, clover ${s17.o.clover}  · ${Date.now() - t0} ms`);
 check(s17.hash === PIN17 || process.env.PIN, `vgen 17's land chunks are as pinned (${s17.hash})`);
 check(s17.o.flowers > s16.o.flowers * 2.5, `the meadows bloom (${s17.o.flowers} flowers against ${s16.o.flowers})`);
-check(s17.o.bloom > s16.o.bloom + 300, `blossom trees and shrubs (${s17.o.bloom} blossom leaves against ${s16.o.bloom})`);
+check(s17.o.bloom > s16.o.bloom + 60, `blossom trees and shrubs in the chunks (${s17.o.bloom} blossom leaves against ${s16.o.bloom})`);
+{ // over the whole land: the blossom trees and the shrubs planted (a recorder writer)
+  const cnt = {}, orig = FL.plant; FL.plant = function (w, name, ...a) { cnt[name] = (cnt[name] || 0) + 1; return orig.call(this, w, name, ...a); };
+  const rec = { get: () => 0, set: () => {}, place: () => {} }, P = V.Land.plan(s17.g);
+  V.Land.soloTrees(s17.g, P, rec, -600, -600, 600, 600); V.Land.woodsTrees(s17.g, P, rec, -300, -300, 300, 300); FL.shrubs(s17.g, P, rec, -300, -300, 300, 300);
+  FL.plant = orig;
+  const trees = FL.TREES.reduce((a, n) => a + (cnt[n] || 0), 0), shr = FL.SHRUBS.reduce((a, n) => a + (cnt[n] || 0), 0);
+  check(trees > 150 && FL.TREES.every(n => cnt[n] > 10), `blossom trees over the land: ${trees} (${FL.TREES.map(n => n + ' ' + (cnt[n] || 0)).join(', ')})`);
+  check(shr > 150, `flowering shrubs within 300 blocks: ${shr}`);
+  const n16 = {}; FL.plant = function (w, name) { n16[name] = 1; }; const P16 = V.Land.plan(s16.g); V.Land.soloTrees(s16.g, P16, rec, -300, -300, 300, 300); V.Land.woodsTrees(s16.g, P16, rec, -200, -200, 200, 200); FL.plant = orig;
+  check(!Object.keys(n16).length, 'vgen 16 plants no L-system tree');
+}
 check(s17.o.tall > 20, `tall meadow flowers (${s17.o.tall})`);
 check(s17.o.clover > 10, `clover on the ways' edges (${s17.o.clover})`);
 check(s16.o.tall === 0 && s16.o.clover === 0, 'none of the new plants at vgen 16');

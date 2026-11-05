@@ -183,7 +183,7 @@
     for (const c of p.list) {
       const px = x + c[0], py = y + c[1], pz = z + c[2];
       if (!ok(px, py, pz)) continue;
-      const cur = w.get(px, py, pz);
+      const cur = w.get ? w.get(px, py, pz) : 0;
       if (c[3] === 1) {
         if (w.place) w.place(px, py, pz, wood, 1); else w.set(px, py, pz, wood);
       } else {
