@@ -4,10 +4,12 @@
 // stepped at a fixed 1/24 s; every EVERY-th frame of a running shot is drawn and photographed with its letterbox, the
 // captions and the BEFREIT banner (page.screenshot); ffmpeg turns the frames into test/shots/trailer_welt.mp4 (H.264,
 // yuv420p, faststart, 24 fps — motion-interpolated from the 12 captured), and one frame per shot (at 60 %) goes on the
-// contact sheet test/shots/trailer_welt_sheet.jpg with its German caption. Silent: the music is WebAudio played live
-// (no offline render of the game's own score exists yet).
+// contact sheet test/shots/trailer_welt_sheet.jpg with its German caption. f-film2: the music — VR.TrailerScore renders
+// the game's own score for the film's length in an OfflineAudioContext in the page (test/shots/trailer_welt_music.wav),
+// muxed into the mp4 as AAC; the film grade's before/after (GRADECMP=1: at 60 % of each shot the frame once without the
+// grade) → test/shots/trailer_welt_grade.jpg.
 // Env: W, H (1280 × 720) · EVERY (2) · SCALE (the game's render scale: 0.75 draws 0.56 of the pixels, the captions stay sharp) · ONLY=3,5 (those shots only: a test capture) · TAG (the output's name: welt)
-//      SEED (4242) · NOVIDEO=1 (frames and sheet only)
+//      SEED (4242) · NOVIDEO=1 (frames and sheet only) · NOMUSIC=1 · GRADECMP=1 (the before/after frames)
 //   nohup bash test/wt_run.sh trailer_video.mjs 14400 > .tmp_tests/trailer_video.log 2>&1 &
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -66,12 +68,29 @@ await ev(() => {
 });
 const plan = await ev(() => VR.game.director.shots.map((s) => ({ name: s.name, dur: s.dur, cap: s.caption, stage: s.stage || '', at: s.anchor ? s.anchor.map(Math.round) : null })));
 console.log(JSON.stringify(plan));
+// f-film2 · the music: the game's own score on the film's clock, rendered offline in the page (VR.TrailerScore)
+const WAV = SHOTS + 'trailer_' + TAG + '_music.wav';
+let music = null;
+if (!process.env.NOMUSIC) {
+  try {
+    const t0 = Date.now();
+    music = await ev(() => VR.TrailerScore.renderOffline(VR.game.director.shots.map((s) => ({ name: s.name, dur: s.dur }))));
+    const pcm = Buffer.from(music.b64, 'base64'), b = Buffer.alloc(44);
+    b.write('RIFF', 0); b.writeUInt32LE(36 + pcm.length, 4); b.write('WAVE', 8); b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(2, 22);
+    b.writeUInt32LE(music.sr, 24); b.writeUInt32LE(music.sr * 4, 28); b.writeUInt16LE(4, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(pcm.length, 40);
+    fs.writeFileSync(WAV, Buffer.concat([b, pcm]));
+    const db = 20 * Math.log10(Math.max(1e-9, music.peak));
+    console.log('  music: ' + music.evs + ' notes scheduled, ' + music.notes + ' played · ' + (music.len / music.sr).toFixed(1) + ' s · raw peak ' + db.toFixed(1) + ' dBFS · ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s to render');
+    check(music.notes > 80 && music.peak > 0.01 && Math.abs(music.len / music.sr - plan.reduce((a, p) => a + p.dur, 0)) < 0.1, 'the music rendered for the film (' + music.notes + ' notes)');
+  } catch (e) { check(false, 'the music: ' + String(e.message || e).slice(0, 300)); music = null; }
+}
 // a test capture: jump to the first wanted shot
 if (ONLY || START) await ev((k) => { VR.game.director.si = k - 1; }, ONLY ? ONLY[0] : START);
 let fi = START ? fs.readdirSync(FR).filter((f) => /^f_\d+\.jpg$/.test(f)).length : 0, simF = 0;
 const fi0 = fi;
 const frames = [], perShot = {}, ms = [];
 let guard = 0, loadW = 0;
+const cmpDone = {}, cmpFiles = [];
 while (guard++ < 40000) {
   st = await state();
   if (!st.active) break;
@@ -104,6 +123,14 @@ while (guard++ < 40000) {
   if (st.phase !== 'run') { await step(4); await wait(30); continue; }
   // a running shot: one simulated frame; every EVERY-th one drawn and photographed
   if (simF % EVERY === 0) {
+    // f-film2: the grade's before/after — at 60 % of the shot the same moment once without the film grade
+    if (process.env.GRADECMP && st.t >= st.dur * 0.6 && !cmpDone[st.si]) {
+      cmpDone[st.si] = true;
+      await ev(() => { window.__norender = false; const g = VR.game; VR.TrailerWelt.filmShow(false); g.last = performance.now() - 0.5; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; });
+      const off = FR + 'cmp_off_' + st.si + '.jpg'; await page.screenshot({ path: off, type: 'jpeg', quality: 92, timeout: 300000 });
+      await ev(() => VR.TrailerWelt.filmShow(true));
+      cmpFiles.push({ si: st.si, off, on: FR + 'f_' + String(fi).padStart(5, '0') + '.jpg', cap: st.cap });
+    }
     const t0 = Date.now();
     await ev((d) => { window.__norender = false; const g = VR.game; if (window.__simTick) window.__simTick(d); g.last = performance.now() - d; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; }, DT);
     const file = FR + 'f_' + String(fi).padStart(5, '0') + '.jpg';
@@ -117,6 +144,7 @@ while (guard++ < 40000) {
   } else await step(1);
   simF++;
 }
+console.log('  dressed (tufts a shot):', JSON.stringify(await ev(() => (VR.game.director.shots || []).map((s) => s._dressed || 0)).catch(() => null)));
 console.log('captured', fi, 'frames in', el(), '· median', ms.slice().sort((a, b) => a - b)[ms.length >> 1] || 0, 'ms a frame');
 fs.writeFileSync(FR + 'frames.json', JSON.stringify(frames));
 const shotsSeen = Object.keys(perShot).length;
@@ -147,13 +175,28 @@ for i, p in enumerate(P):
 S.save(out, quality=88); print(out, S.size)
 `;
 try { console.log(execFileSync('python3', ['-c', py, JSON.stringify(pick), sheet]).toString().trim()); check(pick.length > 0 && fs.existsSync(sheet), 'the contact sheet ' + sheet); } catch (e) { check(false, 'the contact sheet: ' + String(e.message).slice(0, 200)); }
+// f-film2 · the grade's before/after sheet (python3 /root/r9coord/pairs.py)
+if (cmpFiles.length) {
+  const spec = { w: 620, rows: cmpFiles.map((c) => ({ label: (c.si + 1) + ' · ' + (c.cap || '') + ' — vorher (Spielbild) · nachher (Filmlook)', imgs: [c.off, c.on] })) };
+  const sp = FR + 'cmp.json'; fs.writeFileSync(sp, JSON.stringify(spec));
+  const out = SHOTS + 'trailer_' + TAG + '_grade.jpg';
+  try { execFileSync('python3', ['/root/r9coord/pairs.py', out, sp], { stdio: 'inherit' }); check(fs.existsSync(out), 'the grade comparison ' + out); } catch (e) { check(false, 'the grade comparison: ' + String(e.message).slice(0, 200)); }
+}
 // the video: 12 captured fps → 24 fps (motion-interpolated), H.264 yuv420p, faststart
 if (!process.env.NOVIDEO && fi > 0) {
   const mp4 = SHOTS + 'trailer_' + TAG + '.mp4', inFps = FPS / EVERY;
   const vf = inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p';
   try {
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
-    const mb = fs.statSync(mp4).size / 1048576, dur = +execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();
+    const dur = +execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();
+    if (music && fs.existsSync(WAV)) {   // f-film2: the music in, as AAC
+      const tmp = mp4.replace(/\.mp4$/, '_v.mp4'); fs.renameSync(mp4, tmp);
+      execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', tmp, '-i', WAV, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', mp4], { stdio: 'inherit', timeout: 600000 });
+      fs.rmSync(tmp, { force: true });
+      const streams = execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', mp4]).toString();
+      check(/h264/.test(streams) && /aac/.test(streams), 'the film has its music (' + streams.trim().split(/\s+/).join(' + ') + ')');
+    }
+    const mb = fs.statSync(mp4).size / 1048576;
     check(mb > 0.2 && mb <= 25, 'the video ' + mp4 + ' (' + mb.toFixed(1) + ' MB ≤ 25)');
     check(ONLY || (dur > 38 && dur < 52), 'about 45 s of film (' + dur.toFixed(1) + ' s)');
   } catch (e) { check(false, 'ffmpeg: ' + String(e.message).slice(0, 300)); }

@@ -43,12 +43,14 @@
     const climAt = outAt - climax, stingLen = Math.max(4, climAt - M.reveal);
     const kW = stingLen / (3 * 4 * 60 / SC.THEMES.wonder.bpm);                  // the sting stretched to fill the gap
     const open = take('home', { lv: 0, variant: 'day' }, 0, 7, k).map((e) => (e.t + e.dur > M.reveal + 0.4 ? Object.assign(e, { dur: Math.max(0.1, M.reveal + 0.4 - e.t) }) : e)).map((e) => Object.assign(e, { gain: e.gain * 0.9 }));
-    const sting = take('wonder', { lv: 1 }, 0, 3, kW).map((e) => Object.assign(e, { gain: e.gain * 1.5 }));
+    const sting = take('wonder', { lv: 1 }, 0, 3, kW).map((e) => Object.assign(e, { gain: e.gain * 1.8 }));
+    // (the swell: the sting's string chords doubled by Heimat's warm pad)
+    for (const e of sting.slice()) if (e.layer === 'str') sting.push(Object.assign({}, e, { inst: 'pad', layer: 'swell', gain: e.gain * 0.9 }));
     const clim = take('home', { lv: 1, variant: 'day' }, 4, 8, k).map((e) => Object.assign(e, { t: e.t + (climAt - M.reveal), gain: e.gain * 1.1 }));
     const out = take('home', { lv: 1, variant: 'day' }, 8, 9, k).map((e) => Object.assign(e, { tail: Math.max(e.tail || 0, 3.2) }));
     // nothing new after the title's first moment: the outro's last chord rings (tail) into the black
     const lastB = Math.max(...out.map((e) => e.t));
-    for (const e of out) if (e.t >= lastB - 1e-6) { e.dur = Math.min(e.dur, M.total - outAt - e.t - 0.6); e.tail = Math.max(e.tail || 0, 2.4); }
+    for (const e of out) if (e.t >= lastB - 1e-6) { e.dur = Math.max(e.dur, M.total - 2.0 - outAt - e.t); e.tail = Math.max(e.tail || 0, 2.4); }   // (held under the title, then the release into the black)
     return [{ name: 'open', at: 0, evs: open }, { name: 'reveal', at: M.reveal, evs: sting.concat(clim).sort((a, b) => a.t - b.t) }, { name: 'outro', at: outAt, evs: out }];
   };
   TS.events = function (shots) {
@@ -58,7 +60,7 @@
   };
   TS.envelope = function (shots) {
     const M = TS.marks(shots);
-    return [[0, 0.0001], [1.2, 0.78], [Math.max(1.3, M.reveal - 0.4), 0.78], [M.reveal + 1.4, 1], [M.total - 1.6, 1], [M.total, 0.0001]];
+    return [[0, 0.0001], [1.2, 0.78], [Math.max(1.3, M.reveal - 1.5), 0.78], [Math.max(1.4, M.reveal - 0.1), 0.62], [M.reveal + 1.6, 1], [M.total - 1.4, 1], [M.total, 0.0001]];   // (a breath in before the reveal, the swell)
   };
   // the notes on an audio.js Audio (live or offline): a run of its own (its bus with the envelope from `at`), handed to
   // audio.js's pump. env: [[t, g]…] from the run's start, or null (the bus at 1)
