@@ -1,5 +1,5 @@
 {
- "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame \u2014 perf8.mjs \u00b7 a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds) \u00b7 v-light: lightfield, lightfield_gl set to 0 by the coordinator \u2014 inert on Very Low (lfPools off in the potato tier: no define, lfOn() false, the frame returns at once); re-measure with perf8.mjs on a quiet machine",
+ "note": "f-perf8: Very Low, seed 53, the plaza (critic_vl's eye), the game's frame without the draw, ms a frame — perf8.mjs · a-quest: tales_core, tales added from a perf8.mjs run of a-quest (cur only, 2 rounds) · v-light: lightfield, lightfield_gl set to 0 by the coordinator — inert on Very Low (lfPools off in the potato tier: no define, lfOn() false, the frame returns at once); re-measure with perf8.mjs on a quiet machine",
  "frames": 1200,
  "build": "cur",
  "totalMs": 2.395,
@@ -105,7 +105,8 @@
   "tale_end": 0,
   "folk4": 0.003,
   "wildbond": 0,
-  "wildheart": 0
+  "wildheart": 0,
+  "trailer_welt": 0
  },
  "base": {
   "tag": "v0556",
@@ -394,13 +395,15 @@
   "wildbond",
   "wildheart",
   "dusk",
-  "folk4"
+  "folk4",
+  "trailer_welt"
  ],
  "unmeasured": {
-  "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs \u2014 node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
-  "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs \u2014 without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release",
-  "wildbond": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 rules only (VR.WildBond), called by wildheart.js; nothing runs on Very Low; re-measure with perf8.mjs at the next release",
-  "wildheart": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs \u2014 on Very Low (tier 0) update() returns at its first line between once-a-second tier checks, nothing is attached to an animal (entities' hooks test m.wh), nothing drawn; re-measure with perf8.mjs at the next release",
-  "dusk": "v-dusk (2026-11-05): added by hand, not by perf8.mjs \u2014 on Very Low (tier 0) frame() returns at its first test between once-a-second tier checks; nothing allocated, nothing drawn (renderer.drawMotes is never reached, its buffer never made); re-measure with perf8.mjs at the next release"
+  "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs — node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
+  "tale_end": "f-quiet2 (2026-11-02): added by hand, not by perf8.mjs — without a staged ending (none plays on the plaza) its frame work is one test in the villages update wrapper (if (TE.cur)); re-measure with perf8.mjs at the next release",
+  "wildbond": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs — rules only (VR.WildBond), called by wildheart.js; nothing runs on Very Low; re-measure with perf8.mjs at the next release",
+  "wildheart": "u-wild2 (2026-11-02): added by hand, not by perf8.mjs — on Very Low (tier 0) update() returns at its first line between once-a-second tier checks, nothing is attached to an animal (entities' hooks test m.wh), nothing drawn; re-measure with perf8.mjs at the next release",
+  "dusk": "v-dusk (2026-11-05): added by hand, not by perf8.mjs — on Very Low (tier 0) frame() returns at its first test between once-a-second tier checks; nothing allocated, nothing drawn (renderer.drawMotes is never reached, its buffer never made); re-measure with perf8.mjs at the next release",
+  "trailer_welt": "t-film (2026-11-05): added by hand — the trailer runs only while /trailer welt plays; otherwise one check a frame (~0 ms); re-measure with perf8.mjs at the next quiet release"
  }
 }
