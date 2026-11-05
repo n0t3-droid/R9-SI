@@ -187,7 +187,7 @@ if (!process.env.NOVIDEO && fi > 0) {
   const mp4 = SHOTS + 'trailer_' + TAG + '.mp4', inFps = FPS / EVERY;
   const vf = inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p';
   try {
-    execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
+    execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', process.env.CRF || '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
     const dur = +execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();
     if (music && fs.existsSync(WAV)) {   // f-film2: the music in, as AAC
       const tmp = mp4.replace(/\.mp4$/, '_v.mp4'); fs.renameSync(mp4, tmp);
