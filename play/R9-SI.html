@@ -56707,6 +56707,9 @@ VR.I18N.add('en',{
 
 'g.set.wildHeart':'Lovable animals',
 'g.set.wildHeart.tip':'Every animal with its own coat pattern, big blinking eyes and bouncing ears; mothers with their young in a line, curious and shy animals, hopping finches; feeding, trust, friendship (Balanced and up).',
+'g.set.dusk':'Flausel lights',
+'g.set.dusk.tip':'At dusk and at night soft swarms of lights drift over meadows and forest edges: they gather round you when you stand still, part as you walk through and trail toward flowers and water (Low and up).',
+'g.dusk.ring':'The Flausel lights dance a ring round you.',
 'g.wh.shy':'{name} is still shy — hold {food} and wait.',
 'g.wh.ate':'{name} eats from your hand.',
 'g.wh.trust':'{name} trusts you and follows you a while.',
@@ -61378,6 +61381,9 @@ VR.I18N.add('de',{
 
 'g.set.wildHeart':'Tiere zum Liebhaben',
 'g.set.wildHeart.tip':'Jedes Tier mit eigenem Fellmuster, großen blinzelnden Augen und wippenden Ohren; Mütter mit Jungen in einer Reihe, neugierige und scheue Tiere, hüpfende Finken; füttern, Vertrauen, Freundschaft (ab Ausgewogen).',
+'g.set.dusk':'Flausellichter',
+'g.set.dusk.tip':'Abends und nachts schweben sanfte Lichterschwärme über Wiesen und Waldränder: sie sammeln sich um dich, wenn du stillstehst, weichen aus, wenn du hindurchgehst, und ziehen zu Blumen und Wasser (ab Niedrig).',
+'g.dusk.ring':'Die Flausellichter tanzen einen Ring um dich.',
 'g.wh.shy':'{name} ist noch scheu — halte {food} in der Hand und warte.',
 'g.wh.ate':'{name} frisst dir aus der Hand.',
 'g.wh.trust':'{name} vertraut dir und folgt dir ein Stück.',
@@ -77710,6 +77716,7 @@ if(this.l2Beams)this.l2Beams(F,E);
 if(F.precip&&F.precip.amount>0.01)this.drawPrecip(F,E);
 
 if(F.particles&&F.particles.count)this.drawParticles(F.particles,E);
+if(F.motes&&F.motes.count)this.drawMotes(F.motes,E);
 
 if(F.outline)this.drawOutline(F.outline);
 if(F.outlines)for(const o of F.outlines)this.drawOutline(o);
@@ -77932,6 +77939,36 @@ gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMa
 gl.bindVertexArray(this.partVAO);
 gl.drawArraysInstanced(gl.TRIANGLES,0,6,n);
 gl.depthMask(true);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);
+}
+
+
+drawMotes(M,E){
+const gl=this.gl,p=this.P.part,cam=this.cam;if(!p|| !cam)return;
+const cp=this._moteCam||(this._moteCam=[0,0,0]);cp[0]=cam.x;cp[1]=cam.y;cp[2]=cam.z;
+const q=M.fill(cp);if(!q)return;
+if(!this.moteVAO){
+this.moteInst=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.moteInst);gl.bufferData(gl.ARRAY_BUFFER,M.data.byteLength,gl.DYNAMIC_DRAW);
+this.moteVAO=gl.createVertexArray();gl.bindVertexArray(this.moteVAO);
+gl.bindBuffer(gl.ARRAY_BUFFER,this.partVBO);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,8,0);
+gl.bindBuffer(gl.ARRAY_BUFFER,this.moteInst);
+const st=14*4;
+gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,st,0);gl.vertexAttribDivisor(1,1);
+gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.FLOAT,false,st,16);gl.vertexAttribDivisor(2,1);
+gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,4,gl.FLOAT,false,st,32);gl.vertexAttribDivisor(3,1);
+gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,2,gl.FLOAT,false,st,48);gl.vertexAttribDivisor(4,1);
+gl.bindVertexArray(null);
+}
+gl.bindBuffer(gl.ARRAY_BUFFER,this.moteInst);
+gl.bufferSubData(gl.ARRAY_BUFFER,0,M.data,0,q*14);
+gl.useProgram(p.p);this.common(p,E);
+gl.uniformMatrix4fv(p.u.u_viewProj,false,this.viewProj);
+gl.uniform3f(p.u.u_right,this.camRight[0],this.camRight[1],this.camRight[2]);
+gl.uniform3f(p.u.u_up,this.camUp[0],this.camUp[1],this.camUp[2]);
+gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.texAlbedo);gl.uniform1i(p.u.u_albedo,0);
+gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);gl.disable(gl.CULL_FACE);
+gl.bindVertexArray(this.moteVAO);
+gl.drawArraysInstanced(gl.TRIANGLES,0,6,q);
+gl.depthMask(true);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
 }
 drawOutline(o){
 const gl=this.gl,p=this.P.line,cam=this.cam;
@@ -110594,13 +110631,20 @@ crystal_pup:[[2,5,1,-1,0],[5,5,1,1,0]],
 
 const IRIS={
 glimmer_deer:[0x1e120c,0x4a2c18],moss_boar:[0x180e08,0x3e2614],bloom_sheep:[0x140c08,0x6a4818],
-glimmer_fox:[0x1a0e08,0x6a3a12],moss_cat:[0x1a2210,0x8aa830],crystal_pup:[0x141830,0x2a3c80],
+glimmer_fox:[0x1a0e08,0x9a5a1a],moss_cat:[0x1a2210,0x8aa830],crystal_pup:[0x141830,0x2a3c80],
 };
+
+const NOBROW={glimmer_fox:1};
+
+const FULLFACE={glimmer_deer:1};
+
+const CHEST={moss_cat:[0xf2ead2,1,0.8]};
 const GLINT=0xfff6e8;
 
 const INK={glimmer_deer:'light',bloom_sheep:'dark',moss_boar:'light',glimmer_fox:'light',moss_cat:'dark',crystal_pup:'dark'};
 const COATED=['body','head','tail'];
 const rgb=(c)=>[(c>>16)&255,(c>>8)&255,c&255];
+const lumC=(c)=>(0.2126*((c>>16)&255)+0.7152*((c>>8)&255)+0.0722*(c&255))/255;
 const cdist=(a,b)=>{const A=rgb(a),Bc=rgb(b);return Math.abs(A[0]-Bc[0])+Math.abs(A[1]-Bc[1])+Math.abs(A[2]-Bc[2]);};
 const hash=(x,y,z,s)=>{let h=(x*374761393+y*668265263+z*2147483647+s*1274126177)|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;};
 const each=(g,fn)=>{for(let y=0;y<g.sy;y++)for(let z=0;z<g.sz;z++)for(let x=0;x<g.sx;x++){const v=g.get(x,y,z);if(v)fn(x,y,z,v);}};
@@ -110623,7 +110667,7 @@ const eyes=EYES[kind]||[],head=def.parts.head&&def.parts.head.grid;
 const eyeCells=new Set();
 if(head)for(const e of eyes)for(const[dx,dy,dz]of[[0,0,0],[0,1,0],[e[3],0,e[4]],[e[3],1,e[4]]])for(let k=0;k<3;k++)eyeCells.add((e[0]+dx)+','+(e[1]+dy)+','+(e[2]+dz+k));
 
-const uv=[0,0],face=Object.assign({},spec,{kInk:spec.kInk*0.5,kGnd:spec.kGnd*0.5});
+const uv=[0,0],face=Object.assign({},spec,{kInk:spec.kInk*0.5,kGnd:spec.kGnd*(FULLFACE[kind]?1:0.5)});
 for(const name of COATED){
 const pr=def.parts[name];if(!pr)continue;
 const g=pr.grid;
@@ -110636,6 +110680,25 @@ const c=val&0xffffff;if(cdist(c,base)>90)return;
 B.bodyUV(x+0.5,y+0.5,z+0.5,C,uv);
 const t=K.ring?B.sampleUV(spec.tex,uv[1],uv[0]):B.sampleUV(spec.tex,uv[0],uv[1]);
 g.set(x,y,z,B.paint(c,t/255,name==='head'?face:spec),0);
+});
+}
+
+if(head&&NOBROW[kind])for(const e of eyes){
+const y=e[1]+1,row=[];each(head,(x,yy,z,v)=>{if(yy===y&& !eyeCells.has(x+','+yy+','+z))row.push(v&0xffffff);});
+if(!row.length)continue;
+row.sort((a,b)=>lumC(a)-lumC(b));const fur=row[row.length>>1];
+for(const dx of[0,e[3]])for(let k=1;k<=2;k++)for(let dz=0;dz<=3;dz++){
+const x=e[0]+dx,yy=y+k,z=e[2]+dz;if(!filled(head,x,yy,z)||eyeCells.has(x+','+yy+','+z))continue;
+const v=head.get(x,yy,z);if(!((v>>24)&1)&&lumC(v&0xffffff)<lumC(fur)-0.03)head.set(x,yy,z,fur,0);
+}
+}
+
+if(CHEST[kind]&&body){
+const[cr,rows,k]=CHEST[kind];let y0=1e9,z0=1e9,z1= -1e9;each(body,(x,y,z)=>{y0=Math.min(y0,y);z0=Math.min(z0,z);z1=Math.max(z1,z);});
+each(body,(x,y,z,v)=>{
+if((v>>24)&1)return;
+const low=y-y0<=rows,chest=z-z0<=(z1-z0)*0.3&&y-y0<=rows+2;
+if(low||chest)body.set(x,y,z,B.mix(v&0xffffff,cr,low&&chest?k:k*0.85),0);
 });
 }
 if(head){
@@ -110655,7 +110718,7 @@ const top=y===e[1]+1;
 for(const g of[head,far,half])g.set(x,y,z,top&&g===half?lid:top?col[0]:col[1],0);
 shut.set(x,y,z,top?lid:lash,0);
 
-if(top&&filled(head,x,y+1,z)&&cdist(head.get(x,y+1,z)&0xffffff,base)<120)for(const g of[head,far,half,shut])g.set(x,y+1,z,B.mix(g.get(x,y+1,z)&0xffffff,0x000000,0.08),0);
+if(top&& !NOBROW[kind]&&filled(head,x,y+1,z)&&cdist(head.get(x,y+1,z)&0xffffff,base)<120)for(const g of[head,far,half,shut])g.set(x,y+1,z,B.mix(g.get(x,y+1,z)&0xffffff,0x000000,0.08),0);
 }
 
 
@@ -117192,6 +117255,7 @@ const E=this.envFor(eye,dt,{underwater:underwater||inLava,waterColor:inLava?[0.9
 this.skyBright=Math.max(0.12,Math.min(1,E.ambSky[1]*1.6));
 if(VR.BodyLife)VR.BodyLife.update(this,dt,eye,E);
 if(VR.Liberate&&VR.Liberate.frame)VR.Liberate.frame(this,dt,eye,E);
+if(VR.Dusk&&VR.Dusk.frame)VR.Dusk.frame(this,dt,eye,E);
 if(VR.Fairy&&VR.Fairy.frame)VR.Fairy.frame(this,dt,eye,E);
 if(VR.StoryPlay)VR.StoryPlay.frame(this,dt);
 if(this.wonders)this.wonders.update(dt,E);
@@ -117293,7 +117357,7 @@ this.damageFlash=Math.max(0,this.damageFlash-dt*2.5);
 this.smartQuality(dt,S,w);
 if(this.horizon)this.horizon.update(cam);
 this.renderer.render({
-cam,world:w,env:E,horizon:this.horizon,underwater:underwater||inLava,crossing:(this.crossT||0)/0.9,particles:this.particles,outline,crack,precip,rainMap,
+cam,world:w,env:E,horizon:this.horizon,underwater:underwater||inLava,crossing:(this.crossT||0)/0.9,particles:this.particles,motes:VR.Dusk&&VR.Dusk.out&&VR.Dusk.out.count?VR.Dusk.out:null,outline,crack,precip,rainMap,
 damage:this.damageFlash*0.8+(p.mode==='survival'&&p.health<=4?0.25+Math.sin(this.time*4)*0.1:0),
 photo:this.photo,
 outlines:gad&& !this.hideHud?gad.outlines():null,
@@ -149787,6 +149851,257 @@ escort:()=>(S.escort?{pos:S.escort.f.pos.slice(),to:[S.escort.to.x,S.escort.to.y
 clear:()=>S.sites.filter((s)=>s.y!==null).map((s)=>({kind:s.kind,c:Math.round(F.clearance(s.x,s.z,avoidOf(VR.game)))})),
 twist:()=>(S.tw?{pos:S.tw.pos.slice(),home:[S.tw.s.x,S.tw.s.y,S.tw.s.z],k:S.tw.k,who:S.tw.f.who,f:S.tw.f.pos.slice(),tw:(recOf(VR.game).q[S.tw.s.id]||{}).tw}:null),bud:()=>(S.bud?S.bud.pos.slice():null),
 wake:()=>{S.awake=S.t+240;},rec:()=>recOf(VR.game),ride:()=>(S.ride?S.ride.u: -1),bridge:()=>(S.near&&S.near.bridge)||0,
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const D=VR.Dusk={};
+const TAU=Math.PI*2;
+
+D.CAPS=[0,36,80,120,168];
+D.SWARMS=[0,1,2,2,3];
+D.plan=(tier)=>{const t=Math.max(0,Math.min(4,tier|0)),s=D.SWARMS[t];return{swarms:s,per:s?Math.floor(D.CAPS[t]/s):0,cap:D.CAPS[t]};};
+
+D.glow=(sunY)=>{const e=Math.max(0,Math.min(1,(0.22-sunY)/0.24));return e*e*(3-2*e);};
+
+D.nightOf=(ticks)=>Math.floor(((ticks||0)-6000)/24000);
+
+D.chimeOk=(mem,night)=>{if(mem.night===night)return false;mem.night=night;return true;};
+
+const rnd=(sw)=>{let t=(sw.rs=(sw.rs+0x6D2B79F5)|0);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};
+D.rnd=rnd;
+
+D.HUES=[[0.26,0.2,0.08],[0.13,0.24,0.16],[0.24,0.14,0.23],[0.14,0.19,0.26]];
+
+D.swarm=function(seed,home,n){
+const sw={n,seed:seed|0,rs:(seed|0)^0x9e3779b9,p:new Float32Array(n*3),v:new Float32Array(n*3),ph:new Float32Array(n),hue:new Uint8Array(n),
+home:[home[0],home[1],home[2]],floor:home[1],tgt:[home[0],home[1]+1.2,home[2]],tgtT:0,attract:[],t:0,fade:0,gone:false,ring:0,near:false,cx:home[0],cy:home[1]+1,cz:home[2]};
+const main=Math.floor(rnd(sw)*4);
+for(let i=0;i<n;i++){
+const a=rnd(sw)*TAU,r=Math.sqrt(rnd(sw))*2.2;
+sw.p[i*3]=home[0]+Math.cos(a)*r;sw.p[i*3+1]=home[1]+0.6+rnd(sw)*1.6;sw.p[i*3+2]=home[2]+Math.sin(a)*r;
+sw.v[i*3]=(rnd(sw)-0.5)*0.4;sw.v[i*3+1]=(rnd(sw)-0.5)*0.1;sw.v[i*3+2]=(rnd(sw)-0.5)*0.4;
+sw.ph[i]=rnd(sw)*TAU;sw.hue[i]=rnd(sw)<0.7?main:Math.floor(rnd(sw)*4);
+}
+return sw;
+};
+
+const K=D.K={rn:1.7,rs:0.6,coh:0.55,ali:0.9,sep:5,home:0.45,ring:1.8,ringR:2.3,part:16,partR:3,vmax:1.5,vrun:3.2,drag:0.7,wander:0.35,ringFrom:1.6,ringFull:4.5,ringReach:10};
+
+D.step=function(sw,dt,ctx){
+if(!(dt>0))return;if(dt>0.1)dt=0.1;
+const n=sw.n,P=sw.p,V=sw.v;sw.t+=dt;
+
+if((sw.tgtT-=dt)<=0){
+sw.tgtT=6+rnd(sw)*7;
+if(sw.attract.length&&rnd(sw)<0.6){const q=sw.attract[Math.floor(rnd(sw)*sw.attract.length)];sw.tgt[0]=q[0];sw.tgt[1]=q[1]+0.7;sw.tgt[2]=q[2];}
+else{const a=rnd(sw)*TAU,r=rnd(sw)*5;sw.tgt[0]=sw.home[0]+Math.cos(a)*r;sw.tgt[1]=sw.floor+0.9+rnd(sw)*1.2;sw.tgt[2]=sw.home[2]+Math.sin(a)*r;}
+}
+
+let cx=0,cy=0,cz=0;for(let i=0;i<n;i++){cx+=P[i*3];cy+=P[i*3+1];cz+=P[i*3+2];}cx/=n||1;cy/=n||1;cz/=n||1;
+sw.cx=cx;sw.cy=cy;sw.cz=cz;
+const px=ctx.px,py=ctx.py,pz=ctx.pz,dcp=Math.sqrt((cx-px)*(cx-px)+(cz-pz)*(cz-pz));
+const ringK=ctx.ringOk!==false&&dcp<K.ringReach?Math.max(0,Math.min(1,((ctx.still||0)-K.ringFrom)/(K.ringFull-K.ringFrom))):0;
+sw.ring+=(ringK-sw.ring)*Math.min(1,dt*1.5);
+const walking=(ctx.speed||0)>0.8,rn2=K.rn*K.rn,t=sw.t,floor=sw.floor;
+for(let i=0;i<n;i++){
+const ix=i*3,x=P[ix],y=P[ix+1],z=P[ix+2];
+let sx=0,sy=0,sz=0,mx=0,my=0,mz=0,ux=0,uy=0,uz=0,m=0;
+for(let j=0;j<n;j++){
+if(j===i)continue;
+const jx=j*3,dx=x-P[jx],dy=y-P[jx+1],dz=z-P[jx+2],d2=dx*dx+dy*dy+dz*dz;
+if(d2>rn2)continue;
+m++;mx+=P[jx];my+=P[jx+1];mz+=P[jx+2];ux+=V[jx];uy+=V[jx+1];uz+=V[jx+2];
+if(d2<K.rs*K.rs){const d=Math.sqrt(d2)+1e-4,f=(K.rs-d)/(K.rs*d);sx+=dx*f;sy+=dy*f;sz+=dz*f;}
+}
+let ax=sx*K.sep,ay=sy*K.sep,az=sz*K.sep;
+if(m){ax+=(mx/m-x)*K.coh+(ux/m-V[ix])*K.ali;ay+=(my/m-y)*K.coh+(uy/m-V[ix+1])*K.ali;az+=(mz/m-z)*K.coh+(uz/m-V[ix+2])*K.ali;}
+
+const ph=sw.ph[i];
+const lx=sw.tgt[0]+Math.cos(t*0.31+ph)*1.4,ly=sw.tgt[1]+Math.sin(t*0.53+ph*2)*0.45,lz=sw.tgt[2]+Math.sin(t*0.27+ph*1.3)*1.4;
+let gx=(lx-x)*K.home,gy=(ly-y)*K.home,gz=(lz-z)*K.home;
+const rk=sw.ring;
+if(rk>0.001){
+const a=(i/n)*TAU+t*0.22,R=K.ringR+0.3*Math.sin(t*0.7+ph);
+const rx=px+Math.cos(a)*R,ry=py+0.8+0.5*((i*7)%5)/4+0.2*Math.sin(t*0.9+ph*3),rz=pz+Math.sin(a)*R;
+gx=gx*(1-rk)+(rx-x)*K.ring*rk;gy=gy*(1-rk)+(ry-y)*K.ring*rk;gz=gz*(1-rk)+(rz-z)*K.ring*rk;
+ax*=1-0.6*rk;ay*=1-0.6*rk;az*=1-0.6*rk;
+}
+ax+=gx;ay+=gy;az+=gz;
+
+ax+=Math.sin(t*1.3+ph*7)*K.wander;ay+=Math.sin(t*0.9+ph*5)*K.wander*0.5;az+=Math.cos(t*1.1+ph*3)*K.wander;
+
+let run=false;
+if(walking){
+const dx=x-px-(ctx.vx||0)*0.3,dz=z-pz-(ctx.vz||0)*0.3,dy=y-(py+1),d=Math.sqrt(dx*dx+dz*dz);
+if(d<K.partR&&Math.abs(dy)<2.2){const f=(K.partR-d)/K.partR*K.part,inv=1/(d+0.05);ax+=dx*inv*f;az+=dz*inv*f;ay+=f*0.25;run=true;}
+}
+V[ix]+=ax*dt;V[ix+1]+=ay*dt;V[ix+2]+=az*dt;
+const dr=Math.exp(-K.drag*dt);V[ix]*=dr;V[ix+1]*=dr;V[ix+2]*=dr;
+const sp=Math.sqrt(V[ix]*V[ix]+V[ix+1]*V[ix+1]+V[ix+2]*V[ix+2]),vm=run?K.vrun:K.vmax;
+if(sp>vm){const k=vm/sp;V[ix]*=k;V[ix+1]*=k;V[ix+2]*=k;}
+P[ix]=x+V[ix]*dt;P[ix+1]=y+V[ix+1]*dt;P[ix+2]=z+V[ix+2]*dt;
+
+const lo=floor+0.25,hi=floor+3.8;
+if(P[ix+1]<lo){P[ix+1]=lo;if(V[ix+1]<0)V[ix+1]*= -0.3;}else if(P[ix+1]>hi){P[ix+1]=hi;if(V[ix+1]>0)V[ix+1]*= -0.3;}
+}
+};
+
+const RING={share:0,sectors:0,ok:false};
+D.ring=function(sw,px,py,pz,out){
+let k=0,sec=0;const n=sw.n,P=sw.p;
+for(let i=0;i<n;i++){
+const dx=P[i*3]-px,dz=P[i*3+2]-pz,dy=P[i*3+1]-py,d=Math.sqrt(dx*dx+dz*dz);
+if(d<1.5||d>3.3||dy< -0.5||dy>3)continue;
+k++;sec|=1<<(Math.floor((Math.atan2(dz,dx)/TAU+0.5)*8)&7);
+}
+let s=0;for(let b=0;b<8;b++)if(sec&(1<<b))s++;
+const share=n?k/n:0,r=out||RING;
+r.share=share;r.sectors=s;r.ok=share>=0.7&&s===8;return r;
+};
+
+
+D.fill=function(out,swarms,cam,glow,cap){
+const d=out;let o=0,q=0;const max=Math.floor(d.length/14);
+for(const sw of swarms){
+const a0=glow*sw.fade;if(a0<0.01)continue;
+const P=sw.p,t=sw.t;
+for(let i=0;i<sw.n&&q+2<=max&&q<cap*2;i++){
+const ph=sw.ph[i],s=Math.sin(t*(1.7+(i%5)*0.23)+ph*9),tw=0.45+0.55*s*s,a=a0*tw,c=D.HUES[sw.hue[i]];
+const x=P[i*3]-cam[0],y=P[i*3+1]-cam[1],z=P[i*3+2]-cam[2];
+for(let h=0;h<2;h++){
+d[o]=x;d[o+1]=y;d[o+2]=z;d[o+3]=h?0.045+0.02*tw:0.2+0.07*tw;
+d[o+4]=0;d[o+5]=0;d[o+6]=1;d[o+7]=1;
+
+const k=h?1.15:0.6,w0=h?0.035:0;d[o+8]=c[0]*k+w0;d[o+9]=c[1]*k+w0;d[o+10]=c[2]*k+w0;d[o+11]= -1;
+d[o+12]=1;d[o+13]=h?a:a*0.2;
+o+=14;q++;
+}
+}
+}
+return q;
+};
+
+if(typeof document==='undefined')return;
+
+const T=(k,v,de,en)=>(VR.I18N&&VR.I18N.tx?VR.I18N.tx(k,v,de,en):de);
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'dusk',g:'img',sec:'objects',t:'switch',lab:'g.set.dusk',tip:'g.set.dusk.tip',cost:'low',def:true});
+const S=D.state={sw:[],tier:0,tierT:0,findT:0,still:0,speed:0,last:null,mem:{night:null},floorT:0,flowers:null,cost:{ms:0,frames:0}};
+const out=D.out={data:null,count:0,fill:null};
+D.hold=false;
+const tierOf=(g)=>(VR.AirLife&&VR.AirLife.tierOf?VR.AirLife.tierOf(g.settings):2);
+const on=(g)=> !!g.settings&&g.settings.dusk!==false&&g.settings.airLife!==false;
+
+const FLOWERS=['dandelion','golden_dandelion','poppy','cornflower','oxeye_daisy','lily_of_the_valley','red_tulip','orange_tulip','white_tulip','pink_tulip','wildflowers','torchflower','sunflower','vx_flowerbed','vx_flowerbed_roses','vx_flowerbed_tulips','starfruit_flower'];
+function flowerTable(){
+const R=VR.R;if(S.flowers|| !R|| !R.T)return S.flowers;
+const t=new Uint8Array(R.T.flags.length);
+for(const nm of FLOWERS){const b=R.byName[nm];if(b)for(let s=b.base;s<b.base+b.nstates;s++)t[s]=1;}
+const gb=R.byName.grass_block;S.grassType=gb?R.T.type[gb.defaultState]: -1;
+return(S.flowers=t);
+}
+const ground=(g,x,z)=>{const w=g.world;if(!w|| !w.col)return null;const ix=Math.floor(x),iz=Math.floor(z),c=w.col(ix>>4,iz>>4);if(!c|| !c.height)return null;return c.height[((iz&15)<<4)|(ix&15)]+1;};
+const flag=(st,f)=> !!(VR.R.T.flags[st]&f);
+
+function anchor(g,p,night){
+const w=g.world,R=VR.R,FL=flowerTable();if(!w|| !FL)return null;
+let best=null,bs=0;
+for(let k=0;k<14;k++){
+const h=Math.imul(night*7919+k*104729+(S.sw.length+1)*15485863,2654435761)>>>0;
+const a=(h%3600)/3600*TAU,r=9+((h>>>12)%1300)/100;
+const x=Math.floor(p[0]+Math.cos(a)*r),z=Math.floor(p[2]+Math.sin(a)*r),gy=ground(g,x,z);if(gy===null)continue;
+if(S.sw.some((s)=>Math.hypot(s.home[0]-x,s.home[2]-z)<13))continue;
+const top=w.getBlock(x,gy-1,z),below=w.getBlock(x,gy-2,z);
+let floorY=gy,sc=0;
+if(R.T.type[top]===S.grassType)sc=1;else if(R.T.type[below]===S.grassType&& !flag(top,VR.F.SOLID)){sc=1;floorY=gy-1;}
+if(!sc)continue;
+let fl=0,edge=0,wet=0;
+for(let j=0;j<8;j++){
+const b=j*TAU/8,ex=Math.floor(x+Math.cos(b)*4.5),ez=Math.floor(z+Math.sin(b)*4.5),ey=ground(g,ex,ez);if(ey===null)continue;
+const st=w.getBlock(ex,ey-1,ez);
+if(FL[st]||FL[w.getBlock(ex,ey,ez)])fl++;
+if(flag(st,VR.F.LEAVES)||flag(w.getBlock(ex,floorY+3,ez),VR.F.LEAVES))edge++;
+if(flag(st,VR.F.WATER))wet++;
+}
+sc+=fl*0.35+(edge>0&&edge<6?1.5:0)+(wet?0.6:0);
+if(sc>bs){bs=sc;best=[x+0.5,floorY,z+0.5];}
+}
+return best;
+}
+
+function attractors(g,home){
+const w=g.world,FL=flowerTable(),out2=[];
+for(let dz= -9;dz<=9&&out2.length<6;dz+=3)for(let dx= -9;dx<=9&&out2.length<6;dx+=3){
+const x=Math.floor(home[0]+dx),z=Math.floor(home[2]+dz),gy=ground(g,x,z);if(gy===null)continue;
+const st=w.getBlock(x,gy-1,z);
+if(FL[st]||FL[w.getBlock(x,gy,z)]||flag(st,VR.F.WATER))out2.push([x+0.5,gy-(flag(st,VR.F.WATER)?0.2:0),z+0.5]);
+}
+return out2;
+}
+function chime(g){
+const a=g.audio;
+try{if(a&&a.ctx&&a.tone)[659,784,988,1175,1319,1568].forEach((f,i)=>a.tone(f,0.035,1.4,'sine',true,a.ctx.currentTime+i*0.14));}catch(e){}
+const text=T('g.dusk.ring',null,'Die Flausellichter tanzen einen Ring um dich.','The Flausel lights dance a ring round you.');
+if(VR.Quiet&&VR.Quiet.note)VR.Quiet.note(text,1,'dusk.ring');else if(g.ui&&g.ui.hint)g.ui.hint(text,3000);
+S.rings=(S.rings||0)+1;
+}
+
+D.frame=function(g,dt,eye,E){
+if((S.tierT-=dt)<=0){S.tierT=1;S.tier=g&&on(g)?tierOf(g):0;}
+if(S.tier===0||D.hold|| !g||g.state!=='play'|| !E){if(S.sw.length)S.sw.length=0;out.count=0;return;}
+const pl=g.player;if(!pl|| !pl.pos){out.count=0;return;}
+const p=pl.pos,sd=E.sunDir||[0,1,0];
+const glow=D.glow(sd[1])*(1-Math.min(1,(E.rain||0)*1.6))*(g.underwater?0:1);
+S.glow=glow;
+
+if(!S.last)S.last=[p[0],p[1],p[2]];
+const idt=1/Math.max(1e-3,dt),vx=(p[0]-S.last[0])*idt,vz=(p[2]-S.last[2])*idt,v=Math.sqrt(vx*vx+vz*vz);S.last[0]=p[0];S.last[1]=p[1];S.last[2]=p[2];
+const kv=Math.min(1,dt*6);S.vx=(S.vx||0)+((v<12?vx:0)-(S.vx||0))*kv;S.vz=(S.vz||0)+((v<12?vz:0)-(S.vz||0))*kv;
+S.speed+=(Math.min(12,v)-S.speed)*Math.min(1,dt*6);
+S.still=S.speed<0.3?S.still+dt:0;
+const plan=D.plan(S.tier),night=D.nightOf(E.ticks!==undefined?E.ticks:(g.env&&g.env.ticks)||0);
+
+if(glow>0.05&&S.sw.length<plan.swarms&&(S.findT-=dt)<=0){
+S.findT=2;
+const h=anchor(g,p,night);
+if(h){const sw=D.swarm((night*31+Math.floor(h[0])*73856093)^(Math.floor(h[2])*19349663),h,plan.per);sw.attract=attractors(g,h);S.sw.push(sw);}
+}
+let nearest=null,nd=1e9;
+for(const sw of S.sw){const d=Math.hypot(sw.cx-p[0],sw.cz-p[2]);if(d<nd){nd=d;nearest=sw;}sw.gone=sw.gone||d>44||glow<0.03;}
+if((S.floorT-=dt)<=0){S.floorT=0.5;for(const sw of S.sw){const gy=ground(g,sw.cx,sw.cz);if(gy!==null&&Math.abs(gy-sw.floor)<6)sw.floor=gy;}}
+const ctx=S.ctx||(S.ctx={px:0,py:0,pz:0,still:0,speed:0,ringOk:false});
+ctx.px=p[0];ctx.py=p[1];ctx.pz=p[2];ctx.still=S.still;ctx.speed=S.speed;ctx.vx=S.vx;ctx.vz=S.vz;
+for(let i=S.sw.length-1;i>=0;i--){
+const sw=S.sw[i];
+sw.fade=Math.max(0,Math.min(1,sw.fade+dt*(sw.gone? -0.5:0.35)));
+if(sw.gone&&sw.fade<=0){S.sw.splice(i,1);continue;}
+if(nd>60&&sw!==nearest)continue;
+ctx.ringOk=sw===nearest&& !sw.gone;
+D.step(sw,dt,ctx);
+}
+
+if(nearest&&nearest.ring>0.9&&S.still>5&&glow>0.3&&D.ring(nearest,p[0],p[1],p[2]).ok&&D.chimeOk(S.mem,night))chime(g);
+out.glow=glow;out.cap=plan.cap;out.count=S.sw.length?1:0;
+};
+
+out.fill=function(cam){
+if(!out.data)out.data=new Float32Array(D.CAPS[4]*2*14);
+return D.fill(out.data,S.sw,cam,out.glow||0,out.cap||0);
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
