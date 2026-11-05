@@ -445,8 +445,9 @@
   }
 
   // ---------------------------------------------------------------- the frame (villages' update)
+  F4.sw = { frame: true, draw: true };   // (the cost measure's switches: the frame hook, the blanket's draw)
   F4.frame = function (V, dt) {
-    const g = V.g; if (!g || !g.player || !g.env) return;
+    const g = V.g; if (!g || !g.player || !g.env || !F4.sw.frame) return;
     const M = V._f4M;
     if (M) {
       M.t = V.time - M.t0;
@@ -558,7 +559,7 @@
   const bDraw = P.draw;
   if (bDraw) P.draw = function (r, E, cam) {
     bDraw.call(this, r, E, cam);
-    const M = this._f4M; if (!M || M.kind !== 'picnic' || !M.spot || !VR.LifeKit || F4.off) return;
+    const M = this._f4M; if (!M || M.kind !== 'picnic' || !M.spot || !VR.LifeKit || F4.off || !F4.sw.draw) return;
     const g = this.g, ent = g.entities; if (!ent || !ent.beginVox || tierOf(g) < 1) return;
     if ((M.spot[0] - cam.x) ** 2 + (M.spot[2] - cam.z) ** 2 > 60 * 60) return;
     const prog = ent.beginVox(r, E);
