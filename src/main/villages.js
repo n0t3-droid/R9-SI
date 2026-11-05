@@ -1466,6 +1466,7 @@
           else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.24 : 0.31), 0.34 + 0.12 * light.sky);
         }
         if (sm) { if (VR.Folk3) VR.Folk3.drawOpts(a, opts, d2); FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }   // (u-folk3: the far face, a mood's lids)
+        if (VR.Folk5 && VR.Folk5.squintVox) VR.Folk5.squintVox(this, a, pose, opts, far);   // f-folk5: the happy squint on the voxel people (Very Low too): the lids part, lowered half an eye
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
       if (shMode !== 'none') FG.drawShadows(r, E);

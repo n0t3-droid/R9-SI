@@ -4742,6 +4742,20 @@
     "g.f4.set": "Kleine Momente im Dorf",
     "g.f4.set.tip": "Kinder spielen Fangen, Nachbarn picknicken, abends tanzt ein Kreis mit Geigenspiel – und die Leute erinnern sich an dich.",
     // ---- u-folk4 end
+    // ---- f-folk5: onlookers, the Laternenzug (folk5.js)
+    "g.f5.look.0": "Schau mal, wie schön!",
+    "g.f5.look.1": "Da geht einem das Herz auf.",
+    "g.f5.look.2": "Ach, ist das schön heute!",
+    "g.f5.lant.go": "Kommt, wir ziehen mit unseren Laternen los!",
+    "g.f5.lant.end": "Gute Nacht, ihr Lichter! Gute Nacht, alle!",
+    "g.f5.lant.wave": "Oh, wie schön die leuchten!",
+    "g.f5.lant.0": "♪ Mein Licht, mein Licht, so warm und klein …",
+    "g.f5.lant.1": "♪ Wir tragen es durch die Gassen heim …",
+    "g.f5.lant.2": "♪ Die Flausellichter tanzen mit …",
+    "g.f5.lant.3": "♪ Schritt für Schritt und Licht für Licht …",
+    "g.f5.lant.4": "♪ Der Abend summt, die Sterne glühn …",
+    "g.f5.lant.5": "♪ Leuchte, leuchte, bis wir schlafen gehn …",
+    // ---- f-folk5 end
     // ---- t-film: the second trailer „Die Welt heute“ (trailer_welt.js)
     "g.film.cmd": "Regie: „Die Welt heute“ läuft — Esc stoppt",
     "g.film.no": "Der Welt-Trailer läuft in einer Heartland-Welt (Weltart Standard, auf der Oberwelt).",

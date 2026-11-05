@@ -231,8 +231,8 @@
     }
     return null;
   }
-  const BUSY = new Set(['talk', 'joy', 'outing', 'hide', 'fight', 'sleep', 'school', 'gsplay', 'gsvisit', 'festival', 'f4', 'arrive']);
-  const free = (V, a) => a && a.pos && !a._f4 && !a.guest && !a.inBoat && a.pose !== 'sleep' && a !== V.talking && !a.dance && !(a.act && BUSY.has(a.act.type)) && a.drawn !== false;
+  const BUSY = new Set(['talk', 'joy', 'outing', 'hide', 'fight', 'sleep', 'school', 'gsplay', 'gsvisit', 'festival', 'f4', 'arrive', 'f5look', 'f5hi']);   // (f-folk5: onlookers, a friend's greeting)
+  const free = (V, a) => a && a.pos && !a._f4 && !a.guest && !a.inBoat && a.pose !== 'sleep' && a !== V.talking && !a.dance && !(a.act && BUSY.has(a.act.type) && !(a.act.type === 'joy' && (a.act.done || a.act.kind === 'follow'))) && a.drawn !== false;   // (f-folk5: a finished folkjoy act is free — the dancers right after a dance — and a child trailing you joins a game)
   const passive = (m) => m && !m.dead && m.pos && m.def && !m.def.hostile && !m.def.companion && !m.boss && !m.foe;
 
   // what is near you: the village, its free people within F4.R, the animals within 20 m
@@ -250,13 +250,14 @@
   };
 
   // ---------------------------------------------------------------- begin / end
+  F4.extra = F4.extra || {};   // (f-folk5: more kinds of moment — kind → begin(V, M, pool))
   F4.begin = function (V, vil, kind) {
     const g = V.g; if (!F4.on(g) || V._f4M || !vil) return null;
     const p = g.player.pos;
     const pool = vil.agents.filter(a => free(V, a) && d2xz(a, p) < F4.R * F4.R).sort((x, y) => d2xz(x, p) - d2xz(y, p));
-    const M = { kind, t0: V.time, len: F4.LEN[kind], members: [], vil, t: 0, said: -1e9 };
-    const ok = kind === 'tag' || kind === 'hide' ? beginPlay(V, M, pool) : kind === 'picnic' ? beginPicnic(V, M, pool) : kind === 'feed' ? beginFeed(V, M, pool) : kind === 'dance' ? beginDance(V, M, pool) : false;
-    if (!ok) { for (const a of M.members) a._f4 = null; return null; }
+    const M = { kind, t0: V.time, len: F4.LEN[kind] || 60, members: [], vil, t: 0, said: -1e9 };
+    const ok = kind === 'tag' || kind === 'hide' ? beginPlay(V, M, pool) : kind === 'picnic' ? beginPicnic(V, M, pool) : kind === 'feed' ? beginFeed(V, M, pool) : kind === 'dance' ? beginDance(V, M, pool) : F4.extra[kind] ? F4.extra[kind](V, M, pool) : false;   // (f-folk5: F4.extra — the Laternenzug, folk5.js)
+    if (!ok) { for (const a of M.members) { a._f4 = null; if (a.act && a.act.type === 'f4') { a.act = null; a.thinkT = 0; } } return null; }
     V._f4M = M;
     for (const a of M.members) a.talkCool = Math.max(a.talkCool || 0, 1e6);   // (nobody pulls them into a chat meanwhile: villages.js social)
     const c = F4.ctxOf(V) || { place: 0, night: 0 };
@@ -264,23 +265,46 @@
     F4.stats.begun[kind] = (F4.stats.begun[kind] | 0) + 1;
     return M;
   };
+  // (f-folk5: robust — every member AND every agent still marked by this moment is let go, each on its own (one that
+  // throws does not keep the others), the area, the dance and the lure cleared whatever happens; folk4.mjs run 1: the
+  // dance did not begin after the greeting)
+  const release = (a) => {
+    a._f4 = null; a.f4fiddle = false; a.f4feed = false; if (a.talkCool > 1e5) a.talkCool = 2;
+    if (a.act && (a.act.type === 'f4' || a.act.type === 'play')) { a.act = null; a.thinkT = 0; }
+    if (a.pose === 'sitground' || a.pose === 'crouch') a.pose = 'stand';
+    a.lookAt = null; a.steer = null;
+  };
+  F4.release = release;
   F4.end = function (V, M) {
     M = M || V._f4M; if (!M) return;
     const vil = M.vil;
-    if (M.kind === 'tag' || M.kind === 'hide') { if (vil._f4area) vil._f4area = null; if (vil.game) vil.game.until = 0; }
-    if (M.kind === 'dance') {
-      const D = V.joy && V.joy.dance;
-      if (D && D === M.D) { for (const o of D.members) if (o.act && o.act.type === 'joy' && V.joyEnd) V.joyEnd(o); V.joy.dance = null; }
-      if (VR.Dusk && VR.Dusk.lure) VR.Dusk.lure = null;
-      M.joined = false;
-    }
-    for (const a of M.members) {
-      a._f4 = null; a.f4fiddle = false; a.f4feed = false; if (a.talkCool > 1e5) a.talkCool = 2;
-      if (a.act && (a.act.type === 'f4' || a.act.type === 'play')) { a.act = null; a.thinkT = 0; }
-      if (a.pose === 'sitground' || a.pose === 'crouch') a.pose = 'stand';
-      a.lookAt = null; a.steer = null;
-    }
+    try {
+      if (vil && (M.kind === 'tag' || M.kind === 'hide')) { if (vil._f4area) vil._f4area = null; if (vil.game) vil.game.until = 0; }
+      if (M.kind === 'dance') {
+        const D = V.joy && V.joy.dance;
+        if (D && D === M.D) { for (const o of D.members) { try { if (o.act && o.act.type === 'joy' && V.joyEnd) { V.joyEnd(o); o.act = null; o.thinkT = 0; } } catch (e) { /* the next */ } } V.joy.dance = null; }
+        M.joined = false;
+      }
+    } catch (e) { /* the rest below still runs */ }
+    if (VR.Dusk && VR.Dusk.lure && (M.kind === 'dance' || M.lure)) VR.Dusk.lure = null;
+    if (vil && vil._f4area && (M.kind === 'tag' || M.kind === 'hide')) vil._f4area = null;
+    const all = new Set(M.members);
+    if (vil && vil.agents) for (const a of vil.agents) if (a._f4 === M) all.add(a);
+    for (const a of all) { try { release(a); } catch (e) { a._f4 = null; } }
     if (V._f4M === M) V._f4M = null;
+  };
+  // (f-folk5) everything off: the moment, a stray folkjoy dance, marks whose moment is gone, other fronts' extras
+  // (F4.onClear) — the browser test calls it before each moment; the game never needs it
+  F4.onClear = [];
+  F4.clear = function (V) {
+    if (!V) return;
+    if (V._f4M) F4.end(V, V._f4M);
+    const D = V.joy && V.joy.dance;
+    if (D) { for (const o of D.members) { try { if (o.act && o.act.type === 'joy' && V.joyEnd) { V.joyEnd(o); o.act = null; o.thinkT = 0; } } catch (e) { /* the next */ } } V.joy.dance = null; }
+    for (const a of V.agents || []) if (a._f4 || (a.act && a.act.type === 'f4')) { try { release(a); } catch (e) { a._f4 = null; } }
+    for (const vil of new Set((V.agents || []).map(a => a.vil))) if (vil && vil._f4area) vil._f4area = null;
+    if (VR.Dusk && VR.Dusk.lure) VR.Dusk.lure = null;
+    for (const f of F4.onClear) { try { f(V); } catch (e) { /* its own */ } }
   };
   const say = (V, a, key, vars, dur) => { if (V.near && !V.near(a, 26)) return; a.say(T(key, vars), dur || 3); };
 

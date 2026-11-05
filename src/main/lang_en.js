@@ -4742,6 +4742,20 @@
     "g.f4.set": "Little village moments",
     "g.f4.set.tip": "Children play tag, neighbours picnic, at dusk a circle dances to a fiddle — and people remember you.",
     // ---- u-folk4 end
+    // ---- f-folk5: onlookers, the Laternenzug (folk5.js)
+    "g.f5.look.0": "Look, how lovely!",
+    "g.f5.look.1": "That warms the heart.",
+    "g.f5.look.2": "Oh, what a lovely day!",
+    "g.f5.lant.go": "Come on, let's set off with our lanterns!",
+    "g.f5.lant.end": "Good night, little lights! Good night, everyone!",
+    "g.f5.lant.wave": "Oh, how lovely they glow!",
+    "g.f5.lant.0": "♪ My light, my light, so warm and small …",
+    "g.f5.lant.1": "♪ We carry it home through the lanes …",
+    "g.f5.lant.2": "♪ The Flausel lights dance along …",
+    "g.f5.lant.3": "♪ Step by step and light by light …",
+    "g.f5.lant.4": "♪ The evening hums, the stars aglow …",
+    "g.f5.lant.5": "♪ Shine on, shine on, till it's time for bed …",
+    // ---- f-folk5 end
     // ---- t-film: the second trailer „Die Welt heute“ (trailer_welt.js)
     "g.film.cmd": "Director: \"The world today\" is rolling — Esc stops it",
     "g.film.no": "The world trailer plays in a Heartland world (world type default, on the overworld).",
