@@ -154,6 +154,19 @@
       for (const [x, z] of [[8, 14], [10, 15], [9, 16]]) gr.set(x, 1, z, 0xE0303A, 0);
       return { unit: 16, radius: 1.4, parts: { cloth: { grid: gr, pivot: [0, 0, 0] } }, layout: { cloth: [0, 0, 0] } };
     };
+    // the fiddle (1 voxel = 3 cm): a waisted honey-brown body, a dark fingerboard and neck toward −z, a scroll
+    VM.f4_fiddle = () => {
+      const gr = new Grid(8, 3, 22, 4, 1, 6);
+      for (let z = 0; z < 12; z++) {
+        const half = z < 2 || z > 9 ? 2.5 : z >= 5 && z <= 6 ? 2 : 3.5;   // (the waist between the two bouts)
+        for (let x = 0; x < 8; x++) if (Math.abs(x + 0.5 - 4) <= half) for (let y = 0; y < 2; y++) gr.set(x, y, z, y ? 0xB86A2A : 0x8A4A1E, 0);
+      }
+      for (let z = 0; z < 22; z++) if (z < 2 || z > 11) gr.box(3, 1, 21 - z, 4, 1, 21 - z, 0x2A1A12);
+      gr.box(3, 2, 2, 4, 2, 9, 0x2A1A12);   // the fingerboard over the body
+      gr.box(3, 1, 0, 4, 2, 0, 0x5A3418);   // the scroll's end
+      for (const x of [2, 5]) gr.set(x, 2, 5, 0x1A120C, 0);   // the sound holes
+      return { unit: 32, radius: 0.5, parts: { body: { grid: gr, pivot: [0, 0, 0] } }, layout: { body: [0, 0, 0] } };
+    };
   }
 
   // ================================================================ the game
@@ -569,11 +582,22 @@
   const bDraw = P.draw;
   if (bDraw) P.draw = function (r, E, cam) {
     bDraw.call(this, r, E, cam);
-    const M = this._f4M; if (!M || M.kind !== 'picnic' || !M.spot || !VR.LifeKit || F4.off || !F4.sw.draw) return;
+    const M = this._f4M; if (!M || !VR.LifeKit || F4.off || !F4.sw.draw) return;
     const g = this.g, ent = g.entities; if (!ent || !ent.beginVox || tierOf(g) < 1) return;
-    if ((M.spot[0] - cam.x) ** 2 + (M.spot[2] - cam.z) ** 2 > 60 * 60) return;
-    const prog = ent.beginVox(r, E);
-    VR.LifeKit.drawModel(g, r, prog, 'f4_blanket', [M.spot[0], M.spot[1] + 0.005, M.spot[2]], M.yaw, cam);
+    if (M.kind === 'picnic' && M.spot) {
+      if ((M.spot[0] - cam.x) ** 2 + (M.spot[2] - cam.z) ** 2 > 60 * 60) return;
+      const prog = ent.beginVox(r, E);
+      VR.LifeKit.drawModel(g, r, prog, 'f4_blanket', [M.spot[0], M.spot[1] + 0.005, M.spot[2]], M.yaw, cam);
+    } else if (M.kind === 'dance' && M.fiddler && M.fiddler.f4fiddle) {
+      // the fiddle under the chin at the left shoulder, its neck out to the front left (drawn beside the bow arm's pose)
+      const a = M.fiddler; if ((a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2 > 40 * 40) return;
+      const y = a.yaw, sc = a.kid ? 0.82 : 1, fx = -Math.sin(y), fz = -Math.cos(y), lx = -Math.cos(y), lz = Math.sin(y);
+      const P0 = F4._fp || (F4._fp = [0, 0, 0]);
+      P0[0] = a.pos[0] + (fx * 0.2 + lx * 0.16) * sc; P0[1] = a.pos[1] + 1.3 * sc; P0[2] = a.pos[2] + (fz * 0.2 + lz * 0.16) * sc;
+      const O = F4._fo || (F4._fo = { roll: 0.35, pitch: 0.12, scale: 1 });
+      const prog = ent.beginVox(r, E);
+      VR.LifeKit.drawModel(g, r, prog, 'f4_fiddle', P0, y + 0.55, cam, O);
+    }
   };
 
   // ---------------------------------------------------------------- the Aktion key (ctx.js): step in, sway to the beat

@@ -209,7 +209,7 @@ if (HP && want('dance')) {
       for (let i = 0; i < 30; i++) { await step(20, 33); D = await ev(() => { const M = window.__M, D = M && M.D; return D ? { n: D.members.length, ring: D.members.filter(a => a.dance && a.ringDance).length, c: D.c, r: D.r, fid: !!M.fiddler.f4fiddle } : null; }); if (!D || (D.ring >= D.n && D.fid)) break; }
       run.dance = D; check(D && D.ring >= Math.min(3, D.n) && D.fid, `dance: ${D ? D.ring : 0} of ${D ? D.n : 0} in the ring, the fiddler plays`);
       const j = await ev(() => VR.Folk4.join(VR.game.villages)); check(j, 'dance: V joins');
-      await ev(() => VR.game.env.setTime(12150)); await step(240, 33);
+      await ev(() => VR.game.env.setTime(12150)); await step(150, 33);
       const lights = await ev(() => { const S = VR.Dusk; return S ? { lure: S.lure, out: S.out ? S.out.count : null } : null; });
       run.lights = lights; console.log('  · lights ' + JSON.stringify(lights));
       const beat = await ev(() => { const V = VR.game.villages, b = 60 / VR.Folk4.BPM; return VR.Folk4.press(V, Math.round(V.time / b) * b); });
@@ -228,7 +228,9 @@ if (HP && want('cost')) {
     const preset = (pr) => ev((pr) => { const g = VR.game; g.applyPreset(pr); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); }, pr);
     for (const pr of (process.env.COST ? process.env.COST.split(',') : ['potato', 'high'])) {
       await photoOff(); await preset(pr); await ev(() => VR.game.env.setTime(5200)); await stand(C0[0] + 6, C0[1], C0[2] - 6); await settle(20); await step(30, 33);
-      await begin(HV.id, 'picnic'); await step(200, 33);
+      // (run 1: on Very Low the street's budget draws fewer people — no picnic pair was free; a game or the feeding then)
+      let mm = null; for (const k of ['picnic', 'tag', 'hide', 'feed']) { mm = await begin(HV.id, k); if (mm) { console.log('  · cost with ' + k); break; } }
+      await step(120, 33);
       const CP = [C0[0] + 14, C0[1] + 6, C0[2] + 4];
       await lookFrom(CP, C0); await step(10, 33);
       const r = await ev(() => {
@@ -237,7 +239,7 @@ if (HP && want('cost')) {
         window.__norender = false;
         set('off'); for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } gl.finish();
         const a = [], b = [];
-        for (let blk = 0; blk < 10; blk++) for (const [m, arr] of [['off', a], ['on', b], ['on', b], ['off', a]]) { set(m); for (let i = 0; i < 4; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); gl.finish(); arr.push(performance.now() - t); } }
+        for (let blk = 0; blk < 6; blk++) for (const [m, arr] of [['off', a], ['on', b], ['on', b], ['off', a]]) { set(m); for (let i = 0; i < 4; i++) { const t = performance.now(); g.last = t - 33; g.loop(t); gl.finish(); arr.push(performance.now() - t); } }
         window.__norender = true; set('on');
         const med = (q) => { q.sort((x, y) => x - y); return +q[q.length >> 1].toFixed(2); };
         return { off: med(a), on: med(b), moment: !!g.villages._f4M };
