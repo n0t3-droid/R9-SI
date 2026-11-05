@@ -230,8 +230,9 @@ if (HP && want('dance')) {
 // ---------------------------------------------------------------- the Laternenzug at dusk
 if (HP && want('lantern')) {
   try {
-    await photoOff(); await ev(() => { const g = VR.game; g.env.setTime(12200); }); await stand(C0[0] + 5, C0[1], C0[2] - 5); await step(30, 33);
+    await photoOff(); await ev(() => { const g = VR.game; g.env.setTime(11950); }); await stand(C0[0] + 5, C0[1], C0[2] - 5); await step(30, 33);
     const m = await beginR(HV.id, 'lantern'); console.log('  · lantern: ' + JSON.stringify(m));
+    if (!m) console.log('  · lantern why: ' + JSON.stringify(await ev((vid) => { const g = VR.game, V = g.villages, v = V.known.get(vid), p = g.player.pos; return v.agents.filter(a => a.kid).map(a => [a.act && a.act.type, a.pose, Math.round(Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2])), a.drawn, !!a._f4]); }, HV.id)));
     check(!!m && m.n >= 3, `lantern: ${m ? m.n : 0} children set off with lanterns`);
     if (m) {
       await step(300, 33);

@@ -8,7 +8,7 @@
 //   friends    from the third meeting (F4.meet) a greeting is big: the friend comes a few steps toward you, waves with
 //              both arms (or leans in as for a hug), a heart over the head, a longer happy squint — and the squint now
 //              also shows on the voxel people (Very Low): the lids part, lowered half an eye (villages.js' voxel branch)
-//   Laternenzug on some evenings (~1 in 2 by a hash of seed, night and village; once a night; 11600–12800, after that
+//   Laternenzug on some evenings (~1 in 2 by a hash of seed, night and village; once a night; 11200–12300, after that
 //              evening's dance or late; no rain; ≥ 3 free children near you) a line of children walks a loop through the
 //              village with paper lanterns on sticks, singing a soft song of our own (the game's own tones, at their
 //              place), now and then a line of it in a bubble; the Flausellichter follow; people they pass wave
@@ -41,7 +41,7 @@
   };
 
   // ---------------------------------------------------------------- pure: the Laternenzug's evenings
-  F5.WHEN = [11600, 12800];   // env.timeOfDay (12000 sunset; villages.js: dusk 10600–12300)
+  F5.WHEN = [11200, 12300];   // env.timeOfDay (12000 sunset; villages.js: dusk 10600–12300 — the children go home one by one till 12300)
   F5.LEN = 70;                // s
   F5.SHARE = 50;              // % of the evenings
   F5.evening = (seed, night, place) => (F4 && F4.h3 ? F4.h3((seed | 0) ^ 0x4C41, night | 0, place | 0) : 0) % 100 < F5.SHARE;
@@ -51,7 +51,7 @@
     if (c.t - mem.lastAny < F4.GAP) return false;
     if (c.tod < F5.WHEN[0] || c.tod >= F5.WHEN[1] || (c.kids | 0) < 3) return false;
     if (mem.lant && mem.lant[c.place] === c.night) return false;
-    if (c.tod < 12000 && !(mem.dance && mem.dance[c.place] === c.night)) return false;   // (early dusk: the dance first)
+    if (c.tod < 11800 && !(mem.dance && mem.dance[c.place] === c.night)) return false;   // (early dusk: the dance first)
     return F5.evening(c.seed, c.night, c.place);
   };
   // n points of a loop of radius r round (cx, cz), the first at angle a0 → [[x, z]]
@@ -259,7 +259,11 @@
   };
   F4.extra.lantern = function (V, M, pool) {
     const g = V.g, p = g.player.pos, vil = M.vil;
-    const kids = pool.filter(a => a.kid).slice(0, 6); if (kids.length < 3) return false;
+    // (folk5.mjs run 1: at dusk the children walk home one by one — indoors, not drawn, so not in folk4's pool; the
+    // procession calls them out: any free child near, seen or not, the nearest first)
+    const kids = pool.filter(a => a.kid);
+    for (const a of vil.agents) if (a.kid && kids.length < 6 && kids.indexOf(a) < 0 && freeBody(V, a) && d2xz(a, p) < F4.R * F4.R) kids.push(a);
+    kids.length = Math.min(kids.length, 6); if (kids.length < 3) return false;
     const pz = vil.plan && vil.plan.plaza, dp = pz ? Math.hypot(pz.x + 0.5 - p[0], pz.z + 0.5 - p[2]) : 1e9;
     let route = null;
     const cs = [];
