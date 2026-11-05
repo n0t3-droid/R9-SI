@@ -35,13 +35,20 @@
   // f-wild3: soft eyes — per kind [pupil row (the upper, in the lid's shadow), iris (the lower, warm)]
   const IRIS = {
     glimmer_deer: [0x1e120c, 0x4a2c18], moss_boar: [0x180e08, 0x3e2614], bloom_sheep: [0x140c08, 0x6a4818],
-    glimmer_fox: [0x1a0e08, 0x6a3a12], moss_cat: [0x1a2210, 0x8aa830], crystal_pup: [0x141830, 0x2a3c80],
+    glimmer_fox: [0x1a0e08, 0x9a5a1a], moss_cat: [0x1a2210, 0x8aa830], crystal_pup: [0x141830, 0x2a3c80],
   };
+  // v-dusk: kinds whose eyes look out of the face's front — no darker brow over them (the fox's eye read as a mask)
+  const NOBROW = { glimmer_fox: 1 };
+  // v-dusk: kinds whose face takes the body's whole ground colour (only the pattern at half: a fawn's head matches it)
+  const FULLFACE = { glimmer_deer: 1 };
+  // v-dusk: a kitten's cream chest reaching up the flanks (it reads on the grass at 8 m) — [cream, rows from the belly, its strength]
+  const CHEST = { moss_cat: [0xf2ead2, 1, 0.8] };
   const GLINT = 0xfff6e8;   // (a warm catchlight: the sky in a wet eye, half a voxel, off-centre in the upper row)
   // the pattern's colour: light spots on a fawn, light stripes on a piglet, dark tabby stripes, …
   const INK = { glimmer_deer: 'light', bloom_sheep: 'dark', moss_boar: 'light', glimmer_fox: 'light', moss_cat: 'dark', crystal_pup: 'dark' };
   const COATED = ['body', 'head', 'tail'];
   const rgb = (c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+  const lumC = (c) => (0.2126 * ((c >> 16) & 255) + 0.7152 * ((c >> 8) & 255) + 0.0722 * (c & 255)) / 255;
   const cdist = (a, b) => { const A = rgb(a), Bc = rgb(b); return Math.abs(A[0] - Bc[0]) + Math.abs(A[1] - Bc[1]) + Math.abs(A[2] - Bc[2]); };
   const hash = (x, y, z, s) => { let h = (x * 374761393 + y * 668265263 + z * 2147483647 + s * 1274126177) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
   const each = (g, fn) => { for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) { const v = g.get(x, y, z); if (v) fn(x, y, z, v); } };
@@ -64,7 +71,7 @@
     const eyeCells = new Set();
     if (head) for (const e of eyes) for (const [dx, dy, dz] of [[0, 0, 0], [0, 1, 0], [e[3], 0, e[4]], [e[3], 1, e[4]]]) for (let k = 0; k < 3; k++) eyeCells.add((e[0] + dx) + ',' + (e[1] + dy) + ',' + (e[2] + dz + k));
     // the coat, mapped over each part (u along it, v around its long axis: WildBond.bodyUV), painted crisp
-    const uv = [0, 0], face = Object.assign({}, spec, { kInk: spec.kInk * 0.5, kGnd: spec.kGnd * 0.5 });   // (a face stays clean: half the coat)
+    const uv = [0, 0], face = Object.assign({}, spec, { kInk: spec.kInk * 0.5, kGnd: spec.kGnd * (FULLFACE[kind] ? 1 : 0.5) });   // (a face stays clean: half the coat)
     for (const name of COATED) {
       const pr = def.parts[name]; if (!pr) continue;
       const g = pr.grid;
@@ -77,6 +84,25 @@
         B.bodyUV(x + 0.5, y + 0.5, z + 0.5, C, uv);
         const t = K.ring ? B.sampleUV(spec.tex, uv[1], uv[0]) : B.sampleUV(spec.tex, uv[0], uv[1]);   // (a tabby's stripes run around it)
         g.set(x, y, z, B.paint(c, t / 255, name === 'head' ? face : spec), 0);
+      });
+    }
+    // v-dusk: a front-facing eye's fur above it as light as the face beside it (the model's darker brow marks lifted)
+    if (head && NOBROW[kind]) for (const e of eyes) {
+      const y = e[1] + 1, row = []; each(head, (x, yy, z, v) => { if (yy === y && !eyeCells.has(x + ',' + yy + ',' + z)) row.push(v & 0xffffff); });
+      if (!row.length) continue;
+      row.sort((a, b) => lumC(a) - lumC(b)); const fur = row[row.length >> 1];
+      for (const dx of [0, e[3]]) for (let k = 1; k <= 2; k++) for (let dz = 0; dz <= 3; dz++) {
+        const x = e[0] + dx, yy = y + k, z = e[2] + dz; if (!filled(head, x, yy, z) || eyeCells.has(x + ',' + yy + ',' + z)) continue;
+        const v = head.get(x, yy, z); if (!((v >> 24) & 1) && lumC(v & 0xffffff) < lumC(fur) - 0.03) head.set(x, yy, z, fur, 0);
+      }
+    }
+    // v-dusk: the kitten's chest and lower flanks in cream (the lowest rows, and the front third up to the middle)
+    if (CHEST[kind] && body) {
+      const [cr, rows, k] = CHEST[kind]; let y0 = 1e9, z0 = 1e9, z1 = -1e9; each(body, (x, y, z) => { y0 = Math.min(y0, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); });
+      each(body, (x, y, z, v) => {
+        if ((v >> 24) & 1) return;
+        const low = y - y0 <= rows, chest = z - z0 <= (z1 - z0) * 0.3 && y - y0 <= rows + 2;
+        if (low || chest) body.set(x, y, z, B.mix(v & 0xffffff, cr, low && chest ? k : k * 0.85), 0);
       });
     }
     if (head) {
@@ -96,7 +122,7 @@
           for (const g of [head, far, half]) g.set(x, y, z, top && g === half ? lid : top ? col[0] : col[1], 0);
           shut.set(x, y, z, top ? lid : lash, 0);
           // a soft brow: the fur over the eye a touch darker (it frames it, the eye looks set in, not stuck on)
-          if (top && filled(head, x, y + 1, z) && cdist(head.get(x, y + 1, z) & 0xffffff, base) < 120) for (const g of [head, far, half, shut]) g.set(x, y + 1, z, B.mix(g.get(x, y + 1, z) & 0xffffff, 0x000000, 0.08), 0);
+          if (top && !NOBROW[kind] && filled(head, x, y + 1, z) && cdist(head.get(x, y + 1, z) & 0xffffff, base) < 120) for (const g of [head, far, half, shut]) g.set(x, y + 1, z, B.mix(g.get(x, y + 1, z) & 0xffffff, 0x000000, 0.08), 0);
         }
         // the catchlight: in the upper row, the cell toward +x (the same side on every eye: one light), the half voxel
         // facing out, upper, the half toward the eye's middle — one eighth of the cell; the cell itself moves to glint

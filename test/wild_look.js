@@ -83,7 +83,7 @@ console.log('(b) the eyes');
     const white = []; let irisOK = E.length === 2, glintOK = true, lidOK = !!(P.head_h && P.head_c), hOK = true;
     for (const e of E) {
       for (const [x, y, z] of e.cells) { const c = head.get(x, y, z) & 0xffffff; if (!c) continue; if (c === 0xffffff || lum(c) > 0.8) white.push(c); }
-      const ir = e.iris; if (!((lum(ir) < 0.32 || kind === 'moss_cat') && (rgb(ir)[0] >= rgb(ir)[2] || kind === 'crystal_pup' || kind === 'moss_cat'))) irisOK = false;
+      const ir = e.iris; if (!((lum(ir) < 0.32 || kind === 'moss_cat' || (kind === 'glimmer_fox' && lum(ir) < 0.45)) && (rgb(ir)[0] >= rgb(ir)[2] || kind === 'crystal_pup' || kind === 'moss_cat'))) irisOK = false;
       if (e.rows / head.sy > 0.4) hOK = false;
     }
     // the glint part: half-scale voxels (a doubled grid), one bright one per eye, in the upper row of the eye, not centred
