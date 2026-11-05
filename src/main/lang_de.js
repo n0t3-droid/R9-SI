@@ -4742,5 +4742,25 @@
     "g.f4.set": "Kleine Momente im Dorf",
     "g.f4.set.tip": "Kinder spielen Fangen, Nachbarn picknicken, abends tanzt ein Kreis mit Geigenspiel – und die Leute erinnern sich an dich.",
     // ---- u-folk4 end
+    // ---- t-film: the second trailer „Die Welt heute“ (trailer_welt.js)
+    "g.film.cmd": "Regie: „Die Welt heute“ läuft — Esc stoppt",
+    "g.film.no": "Der Welt-Trailer läuft in einer Heartland-Welt (Weltart Standard, auf der Oberwelt).",
+    "g.film.btnOld": "🎞 Heartland",
+    "g.film.btnWelt": "🎞 Welt heute",
+    "g.film.btnTip": "Ein Trailer als kleiner Film — Esc stoppt",
+    "g.film.w.c1": "Eine Welt aus Blöcken — und sie lebt",
+    "g.film.w.c2": "Kleine Familien auf großen Wiesen",
+    "g.film.w.c3": "Ein Dorf, das dich kennt",
+    "g.film.w.c3b": "Hinter jedem Hügel etwas Neues",
+    "g.film.w.c4": "Und manchmal: ein Flausel",
+    "g.film.w.c4b": "Wege, die zum Staunen führen",
+    "g.film.w.c5": "Inseln über den Wolken",
+    "g.film.w.c6": "Eine Fähre nimmt dich mit",
+    "g.film.w.c7": "Alte Leuchtfeuer — wieder hell",
+    "g.film.w.c7b": "Jeder Tag ein kleines Abenteuer",
+    "g.film.w.c8": "Wenn die Sonne sinkt …",
+    "g.film.w.title": "R9-SI",
+    "g.film.w.sub": "Eine Welt, die lebt. Bau mit.",
+    // ---- t-film end
 });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
