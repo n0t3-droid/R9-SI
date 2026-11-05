@@ -1,6 +1,7 @@
 const V=require('./load_shared.js');
 require('../src/main/tex_core.js');require('../src/main/tex_recipes1.js');require('../src/main/tex_recipes2.js');
 // the same texture modules as the main bundle in build.js (a module that is missing is a load error, not a skip)
+require('../src/main/tex_flora.js');   // v-flora: the flora's textures
 require('../src/main/tex_recipes3.js');require('../src/main/tex_recipes4.js');require('../src/main/tex_recipes5.js');require('../src/main/tex_recipes6.js');require('../src/main/tex_body.js');require('../src/main/tex_exo.js');   /* u-moons1: the moons' three blocks (build.js: tex_body before tex_items) */ require('../src/main/tex_items.js');require('../src/main/tex_groceries.js');require('../src/main/tex_vox.js');
 const R=V.R, REC=V.TEXREC, PRE=V.TEXPRE;
 const missing=[], errs=[];

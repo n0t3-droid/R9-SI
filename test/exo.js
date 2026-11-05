@@ -93,7 +93,7 @@ console.log('(c) the save\'s xgen and the landscapes');
 
 console.log('(d) the blocks, the texts, the jump');
 {
-  const LT = R.types.filter(t => !/^(ferry_dock|grow_lamp|stn_gravplate|stn_clamp)$/.test(t.name)), last = LT.slice(-4).map(t => t.name).join(', ');   // (a-life: its two blocks after them)
+  const LT = R.types.filter(t => !/^(ferry_dock|grow_lamp|stn_gravplate|stn_clamp|bloom_snow_leaves|bloom_lilac_leaves|bloom_gold_leaves|bloom_rose_leaves|candle_flower|umbel_flower|bell_tower_flower|glowbell|clover)$/.test(t.name)), last = LT.slice(-4).map(t => t.name).join(', ');   // (a-life: its two blocks after them)
   check(last === 'exo_crystal, exo_moss, exo_frond, exo_glass', 'the four exo blocks are the last', last);
   const gs = R.types.find(t => t.name === 'glowspar');
   check(LT.indexOf(gs) === LT.length - 5, 'right after glowspar (u-fields2)');

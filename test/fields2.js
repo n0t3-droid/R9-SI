@@ -111,7 +111,7 @@ console.log('c · rgen 2');
 console.log('d · blocks, the shop, the codex, texts');
 {
   const iC = R.types.findIndex(t => t.name === 'carbon_rubble'), last = R.types.slice(iC, iC + 4).map(t => t.name).join(', ');   // (u-stars2: the exo blocks come after them; a-life: its two after those)
-  check(last === 'carbon_rubble, nickel_iron, ice_nodule, glowspar' && R.types.slice(iC + 4).every(t => /^(exo_|ferry_dock$|grow_lamp$|stn_)/.test(t.name)), 'the last blocks: ' + last + ' (then only u-stars2\'s exo_*)');
+  check(last === 'carbon_rubble, nickel_iron, ice_nodule, glowspar' && R.types.slice(iC + 4).every(t => /^(exo_|ferry_dock$|grow_lamp$|stn_|bloom_snow_leaves|bloom_lilac_leaves|bloom_gold_leaves|bloom_rose_leaves|candle_flower|umbel_flower|bell_tower_flower|glowbell|clover)/.test(t.name)), 'the last blocks: ' + last + ' (then only u-stars2\'s exo_*)');
   const gs = R.types[iC + 3];
   check(R.T && R.T.light ? (R.T.light[R.S('glowspar')] | 0) > 0 || true : true, 'glowspar glows (light ' + JSON.stringify(gs.light || null) + ')');
   const A = V.Adv;

@@ -63,6 +63,6 @@ check(ml(B) <= 4 && ml(B) < ml(A), `the strands shorter: ${ml(A).toFixed(1)} →
 check(B.flowers >= A.flowers * 0.9, `the flowers on top kept: ${A.flowers} → ${B.flowers}`);
 check(V.makeGen('overworld', 4242, { vgen: 16 }).generate(0, 0).blocks.length > 0, 'a vgen-16 world generates');
 const gm = require('fs').readFileSync(require('path').join(__dirname, '../src/main/game.js'), 'utf8');
-check(/vgen: o\.vgen \? \+o\.vgen : 16\b/.test(gm), 'new worlds are vgen 16 (game.js)');
+check(/vgen: o\.vgen \? \+o\.vgen : (16|17)\b/.test(gm), 'new worlds are vgen 16 or later (game.js; v-flora: 17)');
 console.log(`  (${Date.now() - t0} ms)`);
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');

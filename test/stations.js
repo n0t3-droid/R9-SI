@@ -170,7 +170,7 @@ function FYof(STA) { return STA.FY; }
 
 console.log('e · blocks and texts');
 {
-  const R = V.R, last = R.types.slice(-2).map(t => t.name).join(', ');
+  const R = V.R, last = R.types.filter(t => !/^(bloom_snow_leaves|bloom_lilac_leaves|bloom_gold_leaves|bloom_rose_leaves|candle_flower|umbel_flower|bell_tower_flower|glowbell|clover)$/.test(t.name)).slice(-2).map(t => t.name).join(', ');
   check(last === 'stn_gravplate, stn_clamp', 'the two station blocks are the last: ' + last);
   const de = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'lang_de.js'), 'utf8'), en = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'lang_en.js'), 'utf8');
   const keys = STN.keys(), miss = keys.filter(k => !de.includes('"' + k + '"') || !en.includes('"' + k + '"'));

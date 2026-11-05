@@ -24,8 +24,8 @@
     img.forEach((x, y, i) => {
       if (img.c[i * 4 + 3] < 0.5) return;
       const h = hh(x, y, s + 3);
-      if (h < 0.07) img.set(x, y, C(h < 0.035 ? 0x3d7a2a : 0x5a9a3a), 1);
-      else if (h > 0.965) img.set(x, y, C(eye), 1);
+      if (h < 0.03) img.set(x, y, C(h < 0.015 ? 0x3d7a2a : 0x5a9a3a), 1);
+      else if (h > 0.975) img.set(x, y, C(eye), 1);
     });
     return K(img);
   };
@@ -45,10 +45,10 @@
   REC.candle_flower_top = () => {
     const img = TX.sprite();
     stem(img, 15, 8, 31, C(GREEN)); leaf(img, 17, 29, 1, C(LEAFC), 6);
-    for (let y = 2; y < 27; y += 2) {
-      const t = (y - 2) / 25, w = 1.6 + 2.6 * t, col = TX.mix(C(0xc8b8ff), C(0x5a48d8), t);
-      for (const s of [-1, 1]) TX.disc(img, 15.5 + s * w, y + 1, 1.6, () => TX.scale(col, 0.9 + hh(y, s, 7) * 0.2));
-      TX.disc(img, 15.5, y + 1, 1.5, () => TX.scale(col, 1.08));
+    for (let y = 3, k = 0; y < 27; y += 3, k++) {
+      const t = (y - 3) / 24, w = 1.4 + 2.8 * t, col = TX.mix(C(0xd8ccff), C(0x5440d0), t), o = (k & 1) ? 0.8 : -0.8;
+      for (const s of [-1, 1]) TX.disc(img, 15.5 + s * w + o, y + 1, 1.25, () => TX.scale(col, 0.92 + hh(y, s, 7) * 0.2));
+      if (k & 1) TX.disc(img, 15.5 + o * 0.5, y, 1.1, () => TX.scale(col, 1.12));
     }
     TX.outline(img, 0.7);
     return img;
