@@ -36,25 +36,25 @@
     // 2 · the meadow: a deer mother and her fawns, a low hero angle looking up toward the isle's underside
     S.push(shot('wiese', 5, 58, 2200, 'g.film.w.c2', rel(M, [[0, [-5, 1.7, 7.5], [1, 2.5, -2]], [5, [-3.4, 1.6, 5.2], [1.6, 2.8, -3]]]), { stage: 'family', anchor: M.slice() }));
     // 3 · the village's life on its plaza (or, in a world without one near, the land)
-    if (A.village) S.push(shot('dorf', 5, 60, 4200, 'g.film.w.c3', rel(A.village, [[0, [13, 3.4, 9], [0, 2.6, 0]], [5, [9.5, 3.0, 6.5], [-1, 2.6, -1]]]), { stage: 'village', anchor: A.village.slice() }));
+    if (A.village) S.push(shot('dorf', 5, 60, 5600, 'g.film.w.c3', rel(A.village, [[0, [13, 3.4, 9], [0, 2.6, 0]], [5, [9.5, 3.0, 6.5], [-1, 2.6, -1]]]), { stage: 'village', anchor: A.village.slice() }));
     else { const L = add(M, [-60, 0, 30]); S.push(shot('land', 5, 60, 4200, 'g.film.w.c3b', rel(L, [[0, [14, 8, 12], [0, 3, 0]], [5, [10, 7, 9], [0, 3, 0]]]), { anchor: L })); }
     // 4 · a Flausel at the fairy tree in the golden light (or the meadow's edge)
     if (A.fairy) S.push(shot('flausel', 4.5, 55, 10400, 'g.film.w.c4', rel(A.fairy, [[0, [14, 4.5, 12], [0, 3.5, 0]], [4.5, [9, 3.4, 8], [0, 3.2, 0]]]), { stage: 'fairy', anchor: A.fairy.slice() }));
     else { const L = add(M, [30, 0, 60]); S.push(shot('pfad', 4.5, 55, 10400, 'g.film.w.c4b', rel(L, [[0, [12, 3, 10], [0, 2, 0]], [4.5, [8, 2.4, 7], [0, 2, 0]]]), { anchor: L })); }
     // 5 · the reveal: the camera rises from behind the hill, the isles appear; a freighter crosses in front of them
-    S.push(shot('inseln', 5.5, 66, 7600, 'g.film.w.c5', rel(I, [[0, [-140, -58, 40], [0, 5, 0]], [5.5, [-128, -30, 34], [0, 0, 0]]]),
-      { ships: [{ arch: 'freighter', A: add(I, [-80, 30, -120]), C: add(I, [0, 24, -10]), B: add(I, [90, 18, 110]), dur: 8, delay: 0 }] }));
+    S.push(shot('inseln', 5.5, 66, 7600, 'g.film.w.c5', rel(I, [[0, [-170, -36, 60], [0, -10, 0]], [5.5, [-162, -8, 52], [0, -2, 0]]]),
+      { ships: [{ arch: 'freighter', A: add(I, [-60, 10, -110]), C: add(I, [-40, 8, 10]), B: add(I, [-20, 6, 140]), dur: 9, delay: 0 }] }));
     // 6 · the ferry: a shuttle over your head, away toward the isles
-    S.push(shot('faehre', 4.5, 64, 8800, 'g.film.w.c6', rel(M, [[0, [-2, 1.6, 18], [14, 26, -40]], [4.5, [-2, 2.4, 15], [16, 30, -46]]]),
-      { anchor: M.slice(), ships: [{ arch: 'shuttle', A: add(M, [-6, 9, 40]), C: add(M, [6, 16, -6]), B: add(M, [30, 46, -80]), dur: 5, delay: 0 }] }));
+    S.push(shot('faehre', 4.5, 64, 8800, 'g.film.w.c6', rel(M, [[0, [0, 2.2, 8], [-14, 6, -14]], [4.5, [3, 2.4, 6], [16, 8, -16]]]),
+      { stage: 'ferry', anchor: M.slice(), ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
     // 7 · an outpost freed: the Leuchtfeuer turns cyan, the beam, the ring of light, ✦ BEFREIT ✦ (or a golden ride)
     const B = A.beacon || (A.outpost ? add(A.outpost, [0, 1, 0]) : null);
-    if (B) S.push(shot('befreit', 6, 60, 9800, 'g.film.w.c7', rel(B, [[0, [17, 6, 13], [0, 3.5, 0]], [6, [12, 4.5, 9], [0, 4.5, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
+    if (B) S.push(shot('befreit', 6, 60, 9800, 'g.film.w.c7', rel(B, [[0, [20, 18, 15], [0, 2, 0]], [6, [14, 12, 10], [0, 3, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
     else { const L = add(M, [-30, 0, -70]); S.push(shot('weite', 6, 60, 9800, 'g.film.w.c7b', rel(L, [[0, [20, 12, 16], [0, 4, 0]], [6, [14, 10, 12], [0, 4, 0]]]), { anchor: L })); }
     // 8 · the sun goes down: the sky turns from gold to night, the stars come out over the isles
-    S.push(shot('abend', 6, 64, 11000, 'g.film.w.c8', rel(I, [[0, [-150, -18, 110], [0, 0, 0]], [6, [-142, -15, 102], [0, 2, 0]]]), { todTo: 15200, fadeOut: 0 }));
+    S.push(shot('abend', 6, 64, 11000, 'g.film.w.c8', rel(I, [[0, [-160, 2, 18], [0, -6, 0]], [6, [-152, 4, 14], [0, -4, 0]]]), { todTo: 15200, fadeOut: 0 }));
     // 9 · the title over the night sky: the camera tilts up from the isles into the stars
-    S.push(shot('titel', 5, 66, 15200, 'g.film.w.title', rel(I, [[0, [-142, -15, 102], [0, 2, 0]], [5, [-138, -12, 98], [0, 90, -60]]]), { todTo: 16500, caption: 'R9-SI', big: true, capSmall: false, capAt: 1.0, subKey: 'g.film.w.sub', fadeIn: 0, fadeOut: 1.0, seam: true }));
+    S.push(shot('titel', 5, 66, 15200, 'g.film.w.title', rel(I, [[0, [-152, 4, 14], [0, -4, 0]], [5, [-148, 6, 12], [0, 34, -10]]]), { todTo: 16500, caption: 'R9-SI', big: true, capSmall: false, capAt: 1.0, subKey: 'g.film.w.sub', fadeIn: 0, fadeOut: 1.0, seam: true }));
     return S;
   };
   // every key at least `clear` over the ground (ground(x, z) → the top block's y); the look stays
@@ -163,11 +163,12 @@
     else if (shot.stage === 'family') {
       const gid = R && R.byName.grass_block ? R.byName.grass_block.id : -1;
       const isGrass = (x, y, z) => { const b = w.getBlock(x, y, z); return !!b && R.T.type[b] === gid && !w.getBlock(x, y + 2, z); };
-      const m = TW.findMeadow(top, isGrass, shot.anchor, 72); if (m) TW.reanchor(shot, m);
+      const m = TW.findMeadow(top, isGrass, shot.anchor, 72); if (m) { TW.reanchor(shot, m); run.meadow = m.slice(); }
     }
+    else if (shot.stage === 'ferry' && run.meadow) TW.reanchor(shot, run.meadow);
     else if (shot.anchor) { const gy = top(shot.anchor[0], shot.anchor[2]); if (Number.isFinite(gy) && gy > 0) TW.reanchor(shot, [shot.anchor[0], gy, shot.anchor[2]]); }
     // the fairy tree and the outpost: circle to the side whose sight line is clear (a train, a wall, a hill in front)
-    if (shot.stage === 'fairy' || shot.stage === 'liberate') {
+    if (shot.stage === 'fairy' || shot.stage === 'liberate' || shot.stage === 'village') {
       const T = shot.anchor, k0 = shot.keys[0], k1 = shot.keys[shot.keys.length - 1];
       const r0 = Math.hypot(k0[1][0] - T[0], k0[1][2] - T[2]), r1 = Math.hypot(k1[1][0] - T[0], k1[1][2] - T[2]);
       const h0 = k0[1][1] - T[1], h1 = k1[1][1] - T[1], l0 = k0[2][1] - T[1], l1 = k1[2][1] - T[1];
@@ -199,6 +200,8 @@
     const g = this.g, si0 = this.si, ph0 = this.phase;
     const r = up0.apply(this, arguments);
     if (!this.active || TW.run !== run) return r;
+    // a new shot: the last one's scripted ships go (a freighter parked at the end of its path would stand in the dusk)
+    if (this.si !== si0 && this.myShips) { for (const sh of this.myShips) sh.dead = true; this.myShips.length = 0; }
     const shot = this.shots[this.si]; if (!shot) return r;
     if (this.phase === 'run' && (ph0 !== 'run' || si0 !== this.si) && !shot._ready) {
       shot._ready = true;

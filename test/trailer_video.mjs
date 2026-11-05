@@ -47,7 +47,7 @@ await ev(() => {
   const st = document.createElement('style'); st.textContent = '#cine .fade{transition:none!important} #cine .hintc{display:none!important} #hud,#hints,.toast,#toasts{visibility:hidden!important}'; document.head.appendChild(st);
 });
 const DT = 1000 / FPS;
-const step = (n) => ev(([m, d]) => { const g = VR.game; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [n, DT]);
+const step = (n) => ev(([m, d]) => { const g = VR.game; for (let i = 0; i < m; i++) { if (window.__simTick) window.__simTick(d); g.last = performance.now() - d; g.loop(performance.now()); } }, [n, DT]);
 const state = () => ev(() => { const g = VR.game, d = g.director; const s = d.shots && d.shots[d.si]; return { active: d.active, si: d.si, phase: d.phase, t: +d.t.toFixed(3), name: s && s.name, cap: s && s.caption, n: d.shots ? d.shots.length : 0, dur: s && s.dur }; });
 // settle the start: chunks round the spawn
 for (let i = 0; i < 60; i++) { await step(10); await wait(60); }
@@ -55,6 +55,14 @@ console.log('play', await ev(() => VR.game.director.play('welt', { stage: true }
 for (let i = 0; i < 100; i++) { await wait(200); if (await ev(() => VR.game.director.active)) break; }
 let st = await state();
 check(st.active && st.n >= 8, 'the welt trailer runs (' + st.n + ' shots)');
+// the page's timers run on the film's clock from here (a banner that hides after 4.2 s stays 4.2 s of film, not of the
+// minutes the frames take to draw)
+await ev(() => {
+  const st0 = window.setTimeout.bind(window), ct0 = window.clearTimeout.bind(window); let id = 1e9, q = [], now = 0;
+  window.setTimeout = (fn, ms, ...a) => { if (typeof fn !== 'function') return st0(fn, ms); q.push({ id: ++id, at: now + (+ms || 0), fn, a }); return id; };
+  window.clearTimeout = (k) => { if (k >= 1e9) q = q.filter((x) => x.id !== k); else ct0(k); };
+  window.__simTick = (d) => { now += d; const due = q.filter((x) => x.at <= now); if (!due.length) return; q = q.filter((x) => x.at > now); for (const x of due) { try { x.fn(...x.a); } catch (e) { console.error('timer', e && e.message); } } };
+});
 const plan = await ev(() => VR.game.director.shots.map((s) => ({ name: s.name, dur: s.dur, cap: s.caption, stage: s.stage || '', at: s.anchor ? s.anchor.map(Math.round) : null })));
 console.log(JSON.stringify(plan));
 // a test capture: jump to the first wanted shot
@@ -74,7 +82,7 @@ while (guard++ < 40000) {
   // a running shot: one simulated frame; every EVERY-th one drawn and photographed
   if (simF % EVERY === 0) {
     const t0 = Date.now();
-    await ev((d) => { window.__norender = false; const g = VR.game; g.last = performance.now() - d; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; }, DT);
+    await ev((d) => { window.__norender = false; const g = VR.game; if (window.__simTick) window.__simTick(d); g.last = performance.now() - d; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; }, DT);
     const file = FR + 'f_' + String(fi).padStart(5, '0') + '.jpg';
     await page.screenshot({ path: file, type: 'jpeg', quality: 92, timeout: 300000 });
     ms.push(Date.now() - t0);
