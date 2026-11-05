@@ -91,7 +91,8 @@ const group = async (C, r, name, o) => {
 const stand = (x, y, z) => ev(([x, y, z]) => { const p = VR.game.player; p.flying = false; p.noclip = false; p.teleport(x, y + 1, z); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, [x, y, z]);
 const begin = (vid, kind) => ev(([vid, kind]) => {
   const g = VR.game, V = g.villages, F4 = VR.Folk4, v = V.known.get(vid); F4.auto = false; if (V._f4M) F4.end(V);
-  if (V.joy && V.joy.dance) V.joy.dance.t = V.joy.dance.len + 1;
+  // (run 2: a dance of folkjoy's own was still there — ended at once, not on its next tick)
+  if (V.joy && V.joy.dance) { for (const o of V.joy.dance.members) if (o.act && o.act.type === 'joy') V.joyEnd(o); V.joy.dance = null; }
   const M = F4.begin(V, v, kind); window.__M = M;
   return M ? { n: M.members.length, who: M.members.map(a => a.p.name).join(', '), spot: M.spot || (M.D && M.D.c) || null } : null;
 }, [vid, kind]);
@@ -191,7 +192,7 @@ if (HP && want('greet')) {
       rows.greet.push(await snap('f4_greet.png'));
       // the close-up of the face (the canvas): the squint and the smile
       await photoOn(4500);
-      const f = await ev(() => { const g = VR.game, a = window.__cu, f = VR.Folk3.portraitOf(g.photoCam, a, { d: 1.6, dMin: 1.2, keep: true }); if (f) window.__shotT = f.T; a.f4sq = g.villages.time + 60; a.expr = 'joy'; a.exprT = 60; a.waveT = 60; return !!f; });
+      const f = await ev(() => { const g = VR.game, a = window.__cu, f = VR.Folk3.portraitOf(g.photoCam, a, { d: 1.6, dMin: 1.2, keep: true }); if (f) { window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]]; a.yaw = Math.atan2(-(f.P[0] - a.pos[0]), -(f.P[2] - a.pos[2])); } a.f4sq = g.villages.time + 60; a.expr = 'joy'; a.exprT = 60; a.waveT = 60; return !!f; });
       if (f) { await step(2, 33); await ev(() => { const g = VR.game, a = window.__cu; a.f4sq = g.villages.time + 60; a.waveT = 60; }); rows.greet.push(await grab('f4_greet_face.png')); }
       await photoOff();
     }

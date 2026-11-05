@@ -198,9 +198,12 @@
   const solidAt = (w, x, y, z) => { const s = w.getBlock(x, y, z); return !!(s && (R.T.flags[s] & FL.SOLID)); };
   const wetAt = (w, x, y, z) => { const s = w.getBlock(x, y, z); return !!(s && (R.T.flags[s] & FL.FLUID)); };
   // the floor at column (x, z) near height y (open feet and head, solid below, no water), or null
+  // (run 2 of folk4.mjs: a picnic sank into a town's ground layer — a full-looking block that is not SOLID; an open cell
+  // is now one with nothing solid, opaque or wet in it)
+  const openAt = (w, x, y, z) => { const s = w.getBlock(x, y, z); return !s || !(R.T.flags[s] & (FL.SOLID | FL.OPAQUE | FL.FLUID)); };
   function floorAt(w, x, z, y) {
     const y0 = Math.floor(y);
-    for (let yy = y0 + 2; yy >= y0 - 3; yy--) if (solidAt(w, x, yy - 1, z) && !solidAt(w, x, yy, z) && !solidAt(w, x, yy + 1, z) && !wetAt(w, x, yy, z) && !wetAt(w, x, yy - 1, z)) return yy;
+    for (let yy = y0 + 2; yy >= y0 - 3; yy--) if (solidAt(w, x, yy - 1, z) && openAt(w, x, yy, z) && openAt(w, x, yy + 1, z) && !wetAt(w, x, yy - 1, z)) return yy;
     return null;
   }
   // grass (a meadow, moss, a lawn) under a floor cell: a picnic or a game prefers it to a paved square
