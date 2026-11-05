@@ -90,12 +90,16 @@ const group = async (C, r, name, o) => {
 // the player on the ground at (x, z) near height y, a moment of kind begun in village vid → its summary
 const stand = (x, y, z) => ev(([x, y, z]) => { const p = VR.game.player; p.flying = false; p.noclip = false; p.teleport(x, y + 1, z); p.vel[0] = p.vel[1] = p.vel[2] = 0; }, [x, y, z]);
 const begin = (vid, kind) => ev(([vid, kind]) => {
-  const g = VR.game, V = g.villages, F4 = VR.Folk4, v = V.known.get(vid); F4.auto = false; if (V._f4M) F4.end(V);
-  // (run 2: a dance of folkjoy's own was still there — ended at once, not on its next tick)
-  if (V.joy && V.joy.dance) { for (const o of V.joy.dance.members) if (o.act && o.act.type === 'joy') V.joyEnd(o); V.joy.dance = null; }
+  const g = VR.game, V = g.villages, F4 = VR.Folk4, v = V.known.get(vid); F4.auto = false;
+  // (run 2: a dance of folkjoy's own was still there; f-folk5: F4.clear ends the moment, a stray dance, stale marks and
+  // the onlookers at once — then a retry a few frames later if the first try finds nobody free)
+  if (F4.clear) F4.clear(V); else { if (V._f4M) F4.end(V); if (V.joy && V.joy.dance) { for (const o of V.joy.dance.members) if (o.act && o.act.type === 'joy') V.joyEnd(o); V.joy.dance = null; } }
   const M = F4.begin(V, v, kind); window.__M = M;
   return M ? { n: M.members.length, who: M.members.map(a => a.p.name).join(', '), spot: M.spot || (M.D && M.D.c) || null } : null;
 }, [vid, kind]);
+const begin1 = begin;
+// (f-folk5: robust — a second try after a second of the village's own time when the first finds nobody free)
+const beginR = async (vid, kind) => { let m = await begin1(vid, kind); if (!m) { await step(30, 33); m = await begin1(vid, kind); } return m; };
 const sheet = [];
 const writeSheet = () => { for (const r of sheet) r.imgs = r.imgs.filter(Boolean); for (let i = sheet.length - 1; i >= 0; i--) if (!sheet[i].imgs.length) sheet.splice(i, 1); if (!sheet.length) return; fs.writeFileSync(ROOT + '/.tmp_tests/folk4_sheet.json', JSON.stringify({ w: 620, rows: sheet })); try { console.log('  ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'folk4_sheet.jpg', ROOT + '/.tmp_tests/folk4_sheet.json']).toString().trim()); } catch (e) { console.log('  (no sheet: ' + String(e.message).slice(0, 200) + ')'); } };
 
@@ -128,7 +132,7 @@ const C0 = HP ? HP.plaza : [0, 64, 0];
 if (HP && want('tag')) {
   try {
     await photoOff(); await ev(() => VR.game.env.setTime(4000)); await stand(C0[0] + 7, C0[1], C0[2] + 7); await step(30, 33);
-    const m = await begin(HV.id, 'tag'); console.log('  · tag: ' + JSON.stringify(m));
+    const m = await beginR(HV.id, 'tag'); console.log('  · tag: ' + JSON.stringify(m));
     check(!!m && m.n >= 2, `tag: begun (${m ? m.n : 0} children)`);
     if (m) {
       await step(150, 33);
@@ -145,7 +149,7 @@ if (HP && want('tag')) {
 if (HP && want('picnic')) {
   try {
     await photoOff(); await ev(() => VR.game.env.setTime(5200)); await stand(C0[0] + 6, C0[1], C0[2] - 6); await step(20, 33);
-    const m = await begin(HV.id, 'picnic'); console.log('  · picnic: ' + JSON.stringify(m));
+    const m = await beginR(HV.id, 'picnic'); console.log('  · picnic: ' + JSON.stringify(m));
     check(!!m && m.n === 2, 'picnic: two neighbours');
     if (m) {
       let sat = 0; for (let i = 0; i < 40 && sat < 2; i++) { await step(20, 33); sat = await ev(() => window.__M.members.filter(a => a.pose === 'sitground').length); }
@@ -203,7 +207,7 @@ if (HP && want('greet')) {
 if (HP && want('dance')) {
   try {
     await photoOff(); await ev(() => VR.game.env.setTime(11000)); await stand(C0[0] + 5, C0[1], C0[2] + 5); await step(40, 33);
-    const m = await begin(HV.id, 'dance'); console.log('  · dance: ' + JSON.stringify(m));
+    const m = await beginR(HV.id, 'dance'); console.log('  · dance: ' + JSON.stringify(m));
     if (!m) console.log('  · dance why: ' + JSON.stringify(await ev((vid) => { const g = VR.game, V = g.villages, v = V.known.get(vid), F4 = VR.Folk4, p = g.player.pos; const near = v ? v.agents.filter(a => Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < F4.R) : []; return { on: F4.on(g), m: !!V._f4M, R: F4.R, agents: v ? v.agents.length : 0, near: near.length, grownNear: near.filter(a => !a.kid).length, acts: near.map(a => a.act ? a.act.type : '-'), joyState: !!V.joyState, joyBegin: !!V.joyBegin, joyDance: !!(V.joy && V.joy.dance), pos: p.map(Math.round) }; }, HV.id)));
     check(!!m, 'dance: begun');
     if (m) {
@@ -231,7 +235,7 @@ if (HP && want('cost')) {
     for (const pr of (process.env.COST ? process.env.COST.split(',') : ['potato', 'high'])) {
       await photoOff(); await preset(pr); await ev(() => VR.game.env.setTime(5200)); await stand(C0[0] + 6, C0[1], C0[2] - 6); await settle(20); await step(30, 33);
       // (run 1: on Very Low the street's budget draws fewer people — no picnic pair was free; a game or the feeding then)
-      let mm = null; for (const k of ['picnic', 'tag', 'hide', 'feed']) { mm = await begin(HV.id, k); if (mm) { console.log('  · cost with ' + k); break; } }
+      let mm = null; for (const k of ['picnic', 'tag', 'hide', 'feed']) { mm = await beginR(HV.id, k); if (mm) { console.log('  · cost with ' + k); break; } }
       await step(120, 33);
       const CP = [C0[0] + 14, C0[1] + 6, C0[2] + 4];
       await lookFrom(CP, C0); await step(10, 33);
