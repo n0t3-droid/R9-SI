@@ -88,6 +88,7 @@ while (guard++ < 40000) {
     ms.push(Date.now() - t0);
     frames.push({ i: fi, si: st.si, name: st.name, t: st.t, cap: st.cap });
     (perShot[st.si] = perShot[st.si] || []).push({ file, t: st.t, dur: st.dur, cap: st.cap, name: st.name });
+    if (process.env.DEBUG_SHIPS) console.log('   ships', JSON.stringify(await ev(() => { const g = VR.game, T = g.traffic, d = g.director; return { n: T ? T.ships.length : -1, mine: (d.myShips || []).map((s) => ({ t: +s.t.toFixed(2), p: s.pos.map(Math.round), gpu: !!(s.d && s.d.gpu), dead: !!s.dead, inT: T ? T.ships.includes(s) : false })), wait: d.shipWait, cam: g.player.pos.map(Math.round) }; })));
     if (fi % 24 === 0) console.log(`  frame ${fi} · shot ${st.si} ${st.name} t ${st.t.toFixed(2)} · ${ms[ms.length - 1]} ms · ${el()}`);
     fi++;
   } else await step(1);
