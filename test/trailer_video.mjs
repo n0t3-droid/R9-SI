@@ -69,7 +69,7 @@ console.log(JSON.stringify(plan));
 if (ONLY) await ev((k) => { VR.game.director.si = k - 1; }, ONLY[0]);
 let fi = 0, simF = 0;
 const frames = [], perShot = {}, ms = [];
-let guard = 0;
+let guard = 0, loadW = 0;
 while (guard++ < 40000) {
   st = await state();
   if (!st.active) break;
@@ -78,6 +78,23 @@ while (guard++ < 40000) {
     const nx = ONLY.find((k) => k > st.si); if (nx === undefined) { await ev(() => VR.game.director.stop()); break; }
     await ev((k) => { const d = VR.game.director; d.si = k - 1; d.phase = 'next'; }, nx); continue;
   }
+  // a shot loading: the film's clock waits for the world — the director's own 6-s limit is held off until the columns
+  // round the camera are there and shown (the workers run in real time; a fast clock would cut to half-built land)
+  if (st.phase === 'load') {
+    const k = await ev(() => {
+      const g = VR.game, w = g.world, p = g.player, d = g.director, rd = 6, pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4;
+      let miss = 0, hidden = 0;
+      for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.cols.get(VR.ckey(pcx + dx, pcz + dz)); if (!c) miss++; else if (!(c.shownAt >= 0)) hidden++; }
+      const ok = !miss && !hidden && !w.pending.size && !(g.horizon && g.horizon.inflight);
+      if (!ok) d.loadT = Math.min(d.loadT, 0.1);
+      return { ok, miss, hidden, pend: w.pending.size, busy: g.pool.busy };
+    });
+    loadW++;
+    if (loadW % 40 === 1) console.log('   loading shot ' + st.si + ' ' + JSON.stringify(k));
+    if (!k.ok && loadW > 900) await ev(() => { VR.game.director.loadT = 99; });   // (minutes: go on anyway)
+    await step(2); await wait(k.ok ? 20 : 150); continue;
+  }
+  loadW = 0;
   if (st.phase !== 'run') { await step(4); await wait(30); continue; }
   // a running shot: one simulated frame; every EVERY-th one drawn and photographed
   if (simF % EVERY === 0) {

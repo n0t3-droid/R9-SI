@@ -237,7 +237,7 @@
   };
   // the look of the subtitle line
   const st = document.createElement('style');
-  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}';
+  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap;font-size:26px}body.r9film #storycard,body.r9film #rpgfind{display:none!important}#pause .trlrow .btn{flex:1}';
   document.head.appendChild(st);
   // 🎞 in the pause menu: which trailer
   const UI = VR.UI;
