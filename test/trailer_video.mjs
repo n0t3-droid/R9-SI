@@ -10,7 +10,7 @@
 // grade) → test/shots/trailer_welt_grade.jpg.
 // Env: W, H (1280 × 720) · EVERY (2) · SCALE (the game's render scale: 0.75 draws 0.56 of the pixels, the captions stay sharp) · ONLY=3,5 (those shots only: a test capture) · TAG (the output's name: welt)
 //      SEED (4242) · NOVIDEO=1 (frames and sheet only) · NOMUSIC=1 · GRADECMP=1 (the before/after frames)
-//      x-top: OUT_W, OUT_H (the video's size: W × H captured, downscaled with Lanczos — W 1920 / OUT_W 1280 is 1.5 × supersampling)
+//      x-top: DPR (1.5: the page's pixels × 1.5 — 1.5 × supersampling with OUT_W/OUT_H = W/H) · OUT_W, OUT_H (the video's size: W × H captured, downscaled with Lanczos — W 1920 / OUT_W 1280 is 1.5 × supersampling)
 //      · XCMP=1 (at 60 % of each shot the same moment once with x-top's switches off → test/shots/top_compare.jpg; OLD=the
 //      old film for a third column) · SKIPTO=0.55, STOPAT=0.65 (a test capture: each wanted shot from / to that share of it)
 //   nohup bash test/wt_run.sh trailer_video.mjs 14400 > .tmp_tests/trailer_video.log 2>&1 &
@@ -32,7 +32,8 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const T0 = Date.now(), el = () => ((Date.now() - T0) / 60000).toFixed(1) + ' min';
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const page = await browser.newPage({ viewport: { width: W, height: H }, locale: 'de-DE' });
+const DPR = +(process.env.DPR || 1);   // x-top: DPR 1.5 draws 1920 × 1080 behind a 1280 × 720 page (the captions laid out as at 720p), the video downscaled with OUT_W/OUT_H
+const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR, locale: 'de-DE' });
 const logs = [];
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 600)));
 page.on('console', m => { const s = m.text(); if (m.type() === 'error' || /trailer welt/.test(s)) logs.push('[' + m.type() + '] ' + s.slice(0, 400)); });
@@ -215,7 +216,7 @@ if (xFiles.length) {
 // the video: 12 captured fps → 24 fps (motion-interpolated), H.264 yuv420p, faststart
 if (!process.env.NOVIDEO && fi > 0) {
   const mp4 = SHOTS + 'trailer_' + TAG + '.mp4', inFps = FPS / EVERY;
-  const OW = +(process.env.OUT_W || 0), OH = +(process.env.OUT_H || 0), sc = OW && OH && OW !== W ? `scale=${OW}:${OH}:flags=lanczos,` : '';
+  const OW = +(process.env.OUT_W || 0), OH = +(process.env.OUT_H || 0), sc = OW && OH && (OW !== W || DPR !== 1) ? `scale=${OW}:${OH}:flags=lanczos,` : '';
   const vf = sc + (inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p');
   try {
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', process.env.CRF || '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
