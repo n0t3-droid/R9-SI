@@ -1334,6 +1334,9 @@ void main() {
   blockL += lfLight(v_rel, N, v_sky);   // v-light: the light field's pools (lightfield.js)
 #endif
   float ao = 1.0 - v_ao * 0.2;
+#ifdef XDEPTH
+  ao = 1.0 - v_ao * XD_VAO;   // x-top · Tiefe: the corners deeper (xtop.js X.vao)
+#endif
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
   if (noshade) faceShade = 0.92;
   vec3 V = normalize(-v_rel);
@@ -1361,7 +1364,11 @@ void main() {
   amb = (noshade ? u_l2Sky * 0.92 : l2Hemi(n) * (face <= 1u ? u_l2K.y : 1.0)) * skyL;
 #endif
 #ifdef L2AO
-  { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z); }   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
+  { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z);   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
+#ifdef XDEPTH
+    direct *= mix(1.0, l2a, XD_SUN);   // x-top · Tiefe: a share of them on the sun too (xtop.js X.sunK)
+#endif
+  }
 #endif
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
@@ -3104,7 +3111,7 @@ uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment,
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
 ${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
-${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}
+${(VR.XTop && VR.XTop.glslPre) ? VR.XTop.glslPre() : ''}${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}${(VR.XTop && VR.XTop.glslPost) ? VR.XTop.glslPost() : ''}
 #ifdef FILMG
 // f-film2 · the trailer's cartoon-film grade (display space; the define only while the 'welt' trailer plays —
 // trailer_welt.js): the shadows lifted toward a warm floor, the lights a touch gold, a soft oval vignette
@@ -3160,6 +3167,9 @@ void main() {
     vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
     c = r / (1.0 - r);
   } else c = texture(u_scene, uv).rgb;
+#if defined(X_BLUR) && defined(LOOKV)
+  c = xBlur(c, uv);   // x-top · Filmkamera (xtop.js)
+#endif
 #ifdef LOOKV
   c = lvHdr(c, uv);   // v-look: the far softening, the light wrap, the sun's haze (look.js)
 #endif

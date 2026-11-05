@@ -283,6 +283,9 @@ vec3 lvHdr(vec3 c, vec2 uv) {
     c += max(sc - c * 1.2, vec3(0.0)) * e;
   }
 #endif
+#if defined(X_CLAR) && (defined(LV_SOFT) || defined(LV_WRAP))
+  c = xClar(c, sc, z);   // x-top · Klarheit (xtop.js): local contrast against the soft copy, near land only
+#endif
 #ifdef LV_HAZE
   {
     vec3 rd = lvRay(uv);
