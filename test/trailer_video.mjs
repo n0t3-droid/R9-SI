@@ -35,7 +35,7 @@ const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
 check(await ev(() => VR.I18N.lang) === 'de', 'the game speaks German');
-await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.settings.wildHeart = true; if (process.env.SCALE) g.settings.scale = +process.env.SCALE; g.applySettings('*'); }, process.env.PRESET || 'high');
+await ev(([p, sc]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.settings.wildHeart = true; if (sc) g.settings.scale = sc; g.applySettings('*'); }, [process.env.PRESET || 'high', +(process.env.SCALE || 0)]);
 await ev(`VR.game.createWorld({name:'Welt heute',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '4242'}',cheats:true,kit:true})`);
 for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', 'a Heartland world');
