@@ -2567,7 +2567,7 @@
     drawMotes(M, E) {
       const gl = this.gl, p = this.P.part, cam = this.cam; if (!p || !cam) return;
       const cp = this._moteCam || (this._moteCam = [0, 0, 0]); cp[0] = cam.x; cp[1] = cam.y; cp[2] = cam.z;
-      const q = M.fill(cp); if (!q) return;
+      const q = M.fill(cp, E.fog); if (!q) return;   // (f-dusk2: dusk.js fades them with the fog's distance itself, toward their own colour)
       if (!this.moteVAO) {
         this.moteInst = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.moteInst); gl.bufferData(gl.ARRAY_BUFFER, M.data.byteLength, gl.DYNAMIC_DRAW);
         this.moteVAO = gl.createVertexArray(); gl.bindVertexArray(this.moteVAO);
@@ -2583,6 +2583,13 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, this.moteInst);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, M.data, 0, q * 14);
       gl.useProgram(p.p); this.common(p, E);
+      // f-dusk2: the fog's colour mix off for this one draw (additive: the mix would add the haze's colour — a pale
+      // blue-white veil at dusk); the program's text unchanged, the next common() sets the air back
+      const u = p.u;
+      if (u.u_fog) gl.uniform4f(u.u_fog, 1e7, 2e7, 0, 0);
+      if (u.u_l2Fog) gl.uniform4f(u.u_l2Fog, 0, 0.06, 62, 64);
+      if (u.u_l2Fog2) gl.uniform4f(u.u_l2Fog2, 0, 0, 0, 0);
+      if (u.u_l2Room) gl.uniform4f(u.u_l2Room, 0, 0, 0, 0);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
       gl.uniform3f(p.u.u_right, this.camRight[0], this.camRight[1], this.camRight[2]);
       gl.uniform3f(p.u.u_up, this.camUp[0], this.camUp[1], this.camUp[2]);
