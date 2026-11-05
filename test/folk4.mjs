@@ -204,6 +204,7 @@ if (HP && want('dance')) {
   try {
     await photoOff(); await ev(() => VR.game.env.setTime(11000)); await stand(C0[0] + 5, C0[1], C0[2] + 5); await step(40, 33);
     const m = await begin(HV.id, 'dance'); console.log('  · dance: ' + JSON.stringify(m));
+    if (!m) console.log('  · dance why: ' + JSON.stringify(await ev((vid) => { const g = VR.game, V = g.villages, v = V.known.get(vid), F4 = VR.Folk4, p = g.player.pos; const near = v ? v.agents.filter(a => Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]) < F4.R) : []; return { on: F4.on(g), m: !!V._f4M, R: F4.R, agents: v ? v.agents.length : 0, near: near.length, grownNear: near.filter(a => !a.kid).length, acts: near.map(a => a.act ? a.act.type : '-'), joyState: !!V.joyState, joyBegin: !!V.joyBegin, joyDance: !!(V.joy && V.joy.dance), pos: p.map(Math.round) }; }, HV.id)));
     check(!!m, 'dance: begun');
     if (m) {
       let D = null;
