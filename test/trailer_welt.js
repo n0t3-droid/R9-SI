@@ -57,6 +57,18 @@ check(r.keys[0][1][1] >= 81.2 && r.keys[1][1][1] === 90, 'resolve lifts a key un
 const S2 = TW.plan({ meadow: [300, 84, 200], village: null, fairy: null, outpost: null, beacon: null, isles: [330, 146, 140] });
 check(S2.length >= 8 && S2.every(s => s.keys.every(k => fin(k[1]) && fin(k[2]))), 'missing places fall back to finite shots (' + S2.length + ')');
 check(!S2.some(s => s.stage === 'liberate'), 'no outpost: no freeing staged');
+// (f) the staging helpers: a clear side round a blocked target, a flat meadow away from the water
+const wall = (x, y, z) => z > 3 && z < 6 && Math.abs(x) < 30 && y < 120;   // a wall on the +z side of the target
+const ang = TW.clearAngle(wall, [0, 100, 0], 0, 14, 10, 6, 4, 3, 12);
+check(Math.cos(ang) < 0.5, 'clearAngle turns the camera away from a wall in the line of sight (' + (ang * 180 / Math.PI).toFixed(0) + '°)');
+const ok = TW.orbitKeys([0, 100, 0], ang, 5, 14, 10, 6, 4, 3, 4, 0.1);
+check(ok.length === 2 && ok[1][0] === 5 && Math.abs(Math.hypot(ok[0][1][0], ok[0][1][2]) - 14) < 1e-6 && ok[0][2][1] === 103, 'orbitKeys: a circle move in to the target');
+const top = (x, z) => (x < 20 ? 60 : 80 + ((x * 7 + z * 3) % 5));   // water-level 60 west of x = 20, rough hills east
+const grass = (x, y, z) => x >= 20 && x < 40;   // flat-ish grass only in 20…40 (hills: too rough except where flat)
+const topFlat = (x, z) => (x < 20 ? 60 : x < 44 ? 80 : 90 + (x % 4));
+const mw = TW.findMeadow(topFlat, grass, [0, 60, 0], 64);
+check(!!mw && mw[0] >= 23 && mw[0] <= 36 && mw[1] === 80, 'findMeadow: the nearest flat grass, not the lake (' + JSON.stringify(mw) + ')');
+check(TW.findMeadow(top, () => false, [0, 60, 0], 32) === null, 'findMeadow: none → null (the shot keeps its place)');
 // (e)
 const dir = fs.readFileSync(path.join(ROOT, 'src', 'main', 'director.js'), 'utf8');
 check((dir.match(/\{ name: '(Ember Canyon|The Spire Citadel|Sky Isles|The Gate Temple|Hangar Hall|Nova Haven)'/g) || []).length === 6, 'the old Heartland trailer keeps its six shots');

@@ -34,12 +34,12 @@
     // 1 · the establishing wide: high over the land under the isles, a slow push
     S.push(shot('auftakt', 5, 62, 1500, 'g.film.w.c1', rel(I, [[0, [-170, 40, 150], [-20, -30, 0]], [5, [-155, 36, 135], [-18, -30, 0]]]), { fadeIn: 1.0 }));
     // 2 · the meadow: a deer mother and her fawns, a low hero angle looking up toward the isle's underside
-    S.push(shot('wiese', 5, 58, 2200, 'g.film.w.c2', rel(M, [[0, [-7, 1.0, 11], [1, 2.2, -2]], [5, [-4.5, 0.9, 7.5], [1.5, 2.6, -3]]]), { stage: 'family', anchor: M.slice() }));
+    S.push(shot('wiese', 5, 58, 2200, 'g.film.w.c2', rel(M, [[0, [-5, 1.7, 7.5], [1, 2.5, -2]], [5, [-3.4, 1.6, 5.2], [1.6, 2.8, -3]]]), { stage: 'family', anchor: M.slice() }));
     // 3 · the village's life on its plaza (or, in a world without one near, the land)
-    if (A.village) S.push(shot('dorf', 5, 60, 4200, 'g.film.w.c3', rel(A.village, [[0, [13, 2.4, 9], [0, 1.7, 0]], [5, [9.5, 2.0, 6.5], [-1, 1.7, -1]]]), { stage: 'village', anchor: A.village.slice() }));
+    if (A.village) S.push(shot('dorf', 5, 60, 4200, 'g.film.w.c3', rel(A.village, [[0, [13, 3.4, 9], [0, 2.6, 0]], [5, [9.5, 3.0, 6.5], [-1, 2.6, -1]]]), { stage: 'village', anchor: A.village.slice() }));
     else { const L = add(M, [-60, 0, 30]); S.push(shot('land', 5, 60, 4200, 'g.film.w.c3b', rel(L, [[0, [14, 8, 12], [0, 3, 0]], [5, [10, 7, 9], [0, 3, 0]]]), { anchor: L })); }
     // 4 · a Flausel at the fairy tree in the golden light (or the meadow's edge)
-    if (A.fairy) S.push(shot('flausel', 4.5, 55, 10400, 'g.film.w.c4', rel(A.fairy, [[0, [14, 3.5, 12], [0, 3, 0]], [4.5, [9, 2.6, 8], [0, 2.6, 0]]]), { stage: 'fairy', anchor: A.fairy.slice() }));
+    if (A.fairy) S.push(shot('flausel', 4.5, 55, 10400, 'g.film.w.c4', rel(A.fairy, [[0, [14, 4.5, 12], [0, 3.5, 0]], [4.5, [9, 3.4, 8], [0, 3.2, 0]]]), { stage: 'fairy', anchor: A.fairy.slice() }));
     else { const L = add(M, [30, 0, 60]); S.push(shot('pfad', 4.5, 55, 10400, 'g.film.w.c4b', rel(L, [[0, [12, 3, 10], [0, 2, 0]], [4.5, [8, 2.4, 7], [0, 2, 0]]]), { anchor: L })); }
     // 5 · the reveal: the camera rises from behind the hill, the isles appear; a freighter crosses in front of them
     S.push(shot('inseln', 5.5, 66, 7600, 'g.film.w.c5', rel(I, [[0, [-140, -58, 40], [0, 5, 0]], [5.5, [-128, -30, 34], [0, 0, 0]]]),
@@ -74,6 +74,40 @@
     return shot;
   };
 
+  // a camera on a circle round T at the angle a (radians, 0 = +z): from r0 / h0 in to r1 / h1, looking at T + l0 → l1
+  TW.orbitKeys = function (T, a, dur, r0, r1, h0, h1, l0, l1, da) {
+    const s0 = Math.sin(a), c0 = Math.cos(a), a1 = a + (da || 0), s1 = Math.sin(a1), c1 = Math.cos(a1);
+    return [[0, [T[0] + s0 * r0, T[1] + h0, T[2] + c0 * r0], [T[0], T[1] + l0, T[2]]], [dur, [T[0] + s1 * r1, T[1] + h1, T[2] + c1 * r1], [T[0], T[1] + l1, T[2]]]];
+  };
+  // the angle round T whose sight lines (from both ends of the move) are clearest: solid(x, y, z) → true for a block
+  TW.clearAngle = function (solid, T, a0, r0, r1, h0, h1, lh, n) {
+    n = n || 12; let best = a0, bs = 1e9;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + i * Math.PI * 2 / n; let hits = 0;
+      for (const [r, h] of [[r0, h0], [r1, h1]]) {
+        const C = [T[0] + Math.sin(a) * r, T[1] + h, T[2] + Math.cos(a) * r];
+        for (let k = 1; k < 20; k++) { const u = k / 20; if (solid(C[0] + (T[0] - C[0]) * u, C[1] + (T[1] + lh - C[1]) * u, C[2] + (T[2] - C[2]) * u)) hits++; }
+      }
+      const sc = hits + i * 0.01; if (sc < bs) { bs = sc; best = a; }
+    }
+    return best;
+  };
+  // a meadow near P for the family: a grass top, flat (±1) over 7 × 7, no water — the nearest in rings of 4 m
+  TW.findMeadow = function (top, isGrass, P, R) {
+    R = R || 64;
+    for (let r = 0; r <= R; r += 4) {
+      const n = Math.max(1, Math.round(r * 1.5));
+      for (let i = 0; i < n; i++) {
+        const a = i * Math.PI * 2 / n, x = Math.round(P[0] + Math.sin(a) * r), z = Math.round(P[2] + Math.cos(a) * r);
+        const y = top(x, z); if (!Number.isFinite(y) || !isGrass(x, y, z)) continue;
+        let ok = true;
+        for (let dz = -3; dz <= 3 && ok; dz += 1) for (let dx = -3; dx <= 3 && ok; dx += 1) { const yy = top(x + dx, z + dz); if (!Number.isFinite(yy) || Math.abs(yy - y) > 1 || !isGrass(x + dx, yy, z + dz)) ok = false; }
+        if (ok) return [x, y, z];
+      }
+    }
+    return null;
+  };
+
   // ---------------------------------------------------------------- the game side
   const Dir = VR.Director;
   if (!Dir || typeof document === 'undefined') return;
@@ -106,7 +140,7 @@
       const shots = TW.plan(A);
       for (const s of shots) if (!s.caption) s.caption = tx(s.capKey, null, '', '');
       TW.run = { A, mobs: [], stage: !!(o && o.stage), wx: g.zenFreezeWeather, si: -1 };
-      g.zenFreezeWeather = true;
+      g.zenFreezeWeather = true; document.body.classList.add('r9film');
       if (!play0.call(dir, shots, o)) { g.zenFreezeWeather = TW.run.wx; TW.run = null; }
     });
     return true;
@@ -122,14 +156,30 @@
   // a shot's chunks are in: put it on its ground, stage what it shows
   TW.ready = function (g, dir, shot) {
     const run = TW.run; if (!run) return;
+    const w = g.world, R = VR.R, top = ground(g);
+    const solid = (x, y, z) => { const b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!b && !(R && R.T && R.T.type && R.byName.water && R.T.type[b] === R.byName.water.id); };
     if (shot.stage === 'fairy') { const f = fairySite(); if (f && f.y !== null && f.y !== undefined) TW.reanchor(shot, [f.x, f.y, f.z]); }
     else if (shot.stage === 'liberate') { const s = shot.site && VR.Liberate ? VR.Liberate.siteOf(shot.site) : null; if (s && s.beacon) TW.reanchor(shot, s.beacon); }
-    else if (shot.anchor) { const gy = ground(g)(shot.anchor[0], shot.anchor[2]); if (Number.isFinite(gy) && gy > 0) TW.reanchor(shot, [shot.anchor[0], gy, shot.anchor[2]]); }
-    TW.resolve(shot, ground(g), 1.2);
+    else if (shot.stage === 'family') {
+      const gid = R && R.byName.grass_block ? R.byName.grass_block.id : -1;
+      const isGrass = (x, y, z) => { const b = w.getBlock(x, y, z); return !!b && R.T.type[b] === gid && !w.getBlock(x, y + 2, z); };
+      const m = TW.findMeadow(top, isGrass, shot.anchor, 72); if (m) TW.reanchor(shot, m);
+    }
+    else if (shot.anchor) { const gy = top(shot.anchor[0], shot.anchor[2]); if (Number.isFinite(gy) && gy > 0) TW.reanchor(shot, [shot.anchor[0], gy, shot.anchor[2]]); }
+    // the fairy tree and the outpost: circle to the side whose sight line is clear (a train, a wall, a hill in front)
+    if (shot.stage === 'fairy' || shot.stage === 'liberate') {
+      const T = shot.anchor, k0 = shot.keys[0], k1 = shot.keys[shot.keys.length - 1];
+      const r0 = Math.hypot(k0[1][0] - T[0], k0[1][2] - T[2]), r1 = Math.hypot(k1[1][0] - T[0], k1[1][2] - T[2]);
+      const h0 = k0[1][1] - T[1], h1 = k1[1][1] - T[1], l0 = k0[2][1] - T[1], l1 = k1[2][1] - T[1];
+      const a0 = Math.atan2(k0[1][0] - T[0], k0[1][2] - T[2]);
+      const a = TW.clearAngle(solid, T, a0, r0, r1, h0, h1, (l0 + l1) / 2, 12);
+      shot.keys = TW.orbitKeys(T, a, shot.dur, r0, r1, h0, h1, l0, l1, 0.12);
+    }
+    TW.resolve(shot, top, 1.8);
     if (shot.stage === 'family') {
       const E = g.entities, H = g.companions && g.companions.heart, a = shot.anchor; if (!E || !E.summon) return;
       const mom = E.summon('glimmer_deer', a[0] + 0.5, a[1] + 1, a[2] + 0.5); if (!mom) return;
-      mom.yaw = -Math.PI * 0.5;
+      mom.yaw = -Math.PI * 0.5;   // (walking toward +x, across the frame)
       const kids = [1, 2, 3].map((i) => E.summon('glimmer_deer', a[0] + 0.5 - i * 1.2, a[1] + 1, a[2] + 0.5 + (i % 2) * 0.6)).filter(Boolean);
       run.mobs.push(mom, ...kids);
       try { if (H && H.on) { H.update(1.1); H.family(mom, kids); } } catch (e) { console.warn('trailer welt', e); }
@@ -177,13 +227,13 @@
     if (was && run && !this.active) {
       const E = this.g.entities;
       if (E && E.mobs) for (const m of run.mobs) { const i = E.mobs.indexOf(m); if (i >= 0) E.mobs.splice(i, 1); }
-      this.g.zenFreezeWeather = run.wx; TW.run = null; sub(this, '');
+      this.g.zenFreezeWeather = run.wx; TW.run = null; sub(this, ''); document.body.classList.remove('r9film');
     }
     return r;
   };
   // the look of the subtitle line
   const st = document.createElement('style');
-  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}#pause .trlrow .btn{flex:1}';
+  st.textContent = '#cine .capsub{position:absolute;left:50%;bottom:calc(40% - 46px);transform:translateX(-50%);color:#fff;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:24px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 2px 10px #000,0 0 18px rgba(255,190,120,.55)}#pause .trlrow{display:flex;gap:6px}body.r9film #cine .cap{white-space:nowrap}body.r9film #storycard{display:none!important}#pause .trlrow .btn{flex:1}';
   document.head.appendChild(st);
   // 🎞 in the pause menu: which trailer
   const UI = VR.UI;

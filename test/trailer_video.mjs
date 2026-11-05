@@ -65,6 +65,7 @@ let guard = 0;
 while (guard++ < 40000) {
   st = await state();
   if (!st.active) break;
+  if (st.phase === 'next') { await step(1); continue; }
   if (ONLY && !ONLY.includes(st.si)) {
     const nx = ONLY.find((k) => k > st.si); if (nx === undefined) { await ev(() => VR.game.director.stop()); break; }
     await ev((k) => { const d = VR.game.director; d.si = k - 1; d.phase = 'next'; }, nx); continue;
@@ -108,7 +109,7 @@ for i, p in enumerate(P):
     S.paste(im, (x, y + cap)); d.text((x + 4, y + 5), p['label'], font=F, fill=(245, 236, 220))
 S.save(out, quality=88); print(out, S.size)
 `;
-try { console.log(execFileSync('python3', ['-c', py, JSON.stringify(pick), sheet]).toString().trim()); check(fs.existsSync(sheet), 'the contact sheet ' + sheet); } catch (e) { check(false, 'the contact sheet: ' + String(e.message).slice(0, 200)); }
+try { console.log(execFileSync('python3', ['-c', py, JSON.stringify(pick), sheet]).toString().trim()); check(pick.length > 0 && fs.existsSync(sheet), 'the contact sheet ' + sheet); } catch (e) { check(false, 'the contact sheet: ' + String(e.message).slice(0, 200)); }
 // the video: 12 captured fps → 24 fps (motion-interpolated), H.264 yuv420p, faststart
 if (!process.env.NOVIDEO && fi > 0) {
   const mp4 = SHOTS + 'trailer_' + TAG + '.mp4', inFps = FPS / EVERY;
