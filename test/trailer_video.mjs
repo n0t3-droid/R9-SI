@@ -10,6 +10,9 @@
 // grade) → test/shots/trailer_welt_grade.jpg.
 // Env: W, H (1280 × 720) · EVERY (2) · SCALE (the game's render scale: 0.75 draws 0.56 of the pixels, the captions stay sharp) · ONLY=3,5 (those shots only: a test capture) · TAG (the output's name: welt)
 //      SEED (4242) · NOVIDEO=1 (frames and sheet only) · NOMUSIC=1 · GRADECMP=1 (the before/after frames)
+//      x-top: OUT_W, OUT_H (the video's size: W × H captured, downscaled with Lanczos — W 1920 / OUT_W 1280 is 1.5 × supersampling)
+//      · XCMP=1 (at 60 % of each shot the same moment once with x-top's switches off → test/shots/top_compare.jpg; OLD=the
+//      old film for a third column) · SKIPTO=0.55, STOPAT=0.65 (a test capture: each wanted shot from / to that share of it)
 //   nohup bash test/wt_run.sh trailer_video.mjs 14400 > .tmp_tests/trailer_video.log 2>&1 &
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -90,7 +93,8 @@ let fi = START ? fs.readdirSync(FR).filter((f) => /^f_\d+\.jpg$/.test(f)).length
 const fi0 = fi;
 const frames = [], perShot = {}, ms = [];
 let guard = 0, loadW = 0;
-const cmpDone = {}, cmpFiles = [];
+const cmpDone = {}, cmpFiles = [], xDone = {}, xFiles = [], skipDone = {};
+const XOFF = { xDepth: 0, xClar: false, xBlur: false };
 while (guard++ < 40000) {
   st = await state();
   if (!st.active) break;
@@ -122,7 +126,17 @@ while (guard++ < 40000) {
   loadW = 0;
   if (st.phase !== 'run') { await step(4); await wait(30); continue; }
   // a running shot: one simulated frame; every EVERY-th one drawn and photographed
+  if (process.env.SKIPTO && !skipDone[st.si]) { skipDone[st.si] = true; await ev((k) => { const d = VR.game.director; d.t = Math.max(d.t, d.shots[d.si].dur * k); }, +process.env.SKIPTO); continue; }
+  if (process.env.STOPAT && st.t >= st.dur * +process.env.STOPAT && (!process.env.XCMP || xDone[st.si])) { await ev(() => { const d = VR.game.director; d.t = d.shots[d.si].dur + 0.01; }); await step(1); continue; }   // (a test capture: the rest of the shot skipped)
   if (simF % EVERY === 0) {
+    // x-top: the same moment once with Tiefe, Klarheit and Filmkamera off (the programs rebuilt, then back)
+    if (process.env.XCMP && st.t >= st.dur * 0.6 && !xDone[st.si]) {
+      xDone[st.si] = true;
+      const shot = async (path, q) => { await ev((q) => { const r = VR.game.renderer, b = r.qBase; r.__xq = r.__xq || { xDepth: b.xDepth, xClar: b.xClar, xBlur: b.xBlur }; Object.assign(b, q || r.__xq); r.applyQ(false); window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 0.001; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, q); await page.screenshot({ path, type: 'jpeg', quality: 92, timeout: 300000 }); };
+      const off = FR + 'xoff_' + st.si + '.jpg', on = FR + 'xon_' + st.si + '.jpg';
+      await shot(off, XOFF); await shot(on, null);
+      xFiles.push({ si: st.si, off, on, cap: st.cap, t: frames.length });
+    }
     // f-film2: the grade's before/after — at 60 % of the shot the same moment once without the film grade
     if (process.env.GRADECMP && st.t >= st.dur * 0.6 && !cmpDone[st.si]) {
       cmpDone[st.si] = true;
@@ -182,10 +196,27 @@ if (cmpFiles.length) {
   const out = SHOTS + 'trailer_' + TAG + '_grade.jpg';
   try { execFileSync('python3', ['/root/r9coord/pairs.py', out, sp], { stdio: 'inherit' }); check(fs.existsSync(out), 'the grade comparison ' + out); } catch (e) { check(false, 'the grade comparison: ' + String(e.message).slice(0, 200)); }
 }
+// x-top · the before/after sheet: (the old film at the same moment ·) x-top off · x-top on, German captions
+if (xFiles.length) {
+  const OLD = process.env.OLD || '';
+  const rows = xFiles.map((c) => {
+    const imgs = [];
+    if (OLD && fs.existsSync(OLD)) {
+      const t = plan.slice(0, c.si).reduce((a, p) => a + p.dur, 0) + plan[c.si].dur * 0.6, f = FR + 'old_' + c.si + '.jpg';
+      try { execFileSync('/usr/local/bin/ffmpeg', ['-y', '-v', 'error', '-ss', String(t), '-i', OLD, '-frames:v', '1', '-q:v', '2', f]); imgs.push(f); } catch (e) { console.log('  old frame: ' + String(e.message).slice(0, 120)); }
+    }
+    imgs.push(c.off, c.on);
+    return { label: (c.si + 1) + ' · ' + (c.cap || '') + ' — ' + (imgs.length > 2 ? 'alter Trailer (Hoch, 75 %) · ' : '') + 'Ultra ohne Spitzenbild · Ultra mit Tiefe + Klarheit', imgs };
+  });
+  const sp = FR + 'xcmp.json'; fs.writeFileSync(sp, JSON.stringify({ w: 620, rows }));
+  const out = SHOTS + (process.env.XCMP_OUT || 'top_compare.jpg');
+  try { execFileSync('python3', ['/root/r9coord/pairs.py', out, sp], { stdio: 'inherit' }); check(fs.existsSync(out), 'the x-top comparison ' + out); } catch (e) { check(false, 'the x-top comparison: ' + String(e.message).slice(0, 200)); }
+}
 // the video: 12 captured fps → 24 fps (motion-interpolated), H.264 yuv420p, faststart
 if (!process.env.NOVIDEO && fi > 0) {
   const mp4 = SHOTS + 'trailer_' + TAG + '.mp4', inFps = FPS / EVERY;
-  const vf = inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p';
+  const OW = +(process.env.OUT_W || 0), OH = +(process.env.OUT_H || 0), sc = OW && OH && OW !== W ? `scale=${OW}:${OH}:flags=lanczos,` : '';
+  const vf = sc + (inFps < FPS ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p` : 'format=yuv420p');
   try {
     execFileSync('/usr/local/bin/ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(inFps), '-i', FR + 'f_%05d.jpg', '-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-crf', process.env.CRF || '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', String(FPS), mp4], { stdio: 'inherit', timeout: 3000000 });
     const dur = +execFileSync(fs.existsSync('/usr/local/bin/ffprobe') ? '/usr/local/bin/ffprobe' : 'ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4]).toString().trim();

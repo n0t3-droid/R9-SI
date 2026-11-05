@@ -67,7 +67,7 @@ console.log('b · the shaders');
   X.use(X.off());
   check(['terrain', 'terrainCut', 'composite', 'sky', 'folk'].every(n => X.definesFor(n).length === 0), 'off: no defines anywhere');
   const qh = X.defaults('high'), qu = X.defaults('ultra');
-  check(X.definesFor('terrain', qu).join() === 'XDEPTH,XD_VAO 0.270,XD_SUN 0.500' && X.definesFor('terrainCut', qh).join() === 'XDEPTH,XD_VAO 0.250,XD_SUN 0.350', 'Tiefe: the terrain programs, its numbers by level');
+  check(X.definesFor('terrain', qu).join() === 'XDEPTH,XD_VAO 0.280,XD_SUN 0.650,XD_AMB 0.800' && X.definesFor('terrainCut', qh).join() === 'XDEPTH,XD_VAO 0.250,XD_SUN 0.500,XD_AMB 0.880', 'Tiefe: the terrain programs, its numbers by level');
   check(X.definesFor('composite', qh).join() === 'X_CLAR,X_BLUR' && ['sky', 'water', 'prop', 'folk', 'bloom'].every(n => X.definesFor(n, qu).length === 0), 'Klarheit and Filmkamera on the composite only');
   const t = pre(S1.TERRAIN_FS, ['LIGHT2', 'L2AO', 'AIR2', 'XDEPTH']);
   check(t.includes('ao = 1.0 - v_ao * XD_VAO;') && t.includes('direct *= mix(1.0, l2a, XD_SUN);'), 'Tiefe: the corners and the sun\'s share in the terrain');
@@ -83,13 +83,13 @@ console.log('b · the shaders');
 
 console.log('c · the mirrors');
 {
-  check(Math.abs(X.vao(3, 0) - 0.4) < 1e-9 && Math.abs(X.vao(3, 2) - 0.19) < 1e-9 && X.vao(0, 2) === 1, 'Tiefe: a deep corner 0.4 → 0.19 at Kino, an open face 1');
-  check(X.sunK(0.4, 0) === 1 && Math.abs(X.sunK(0.4, 1) - 0.79) < 1e-9 && Math.abs(X.sunK(0.4, 2) - 0.7) < 1e-9 && X.sunK(1, 2) === 1, 'the sun\'s share: none before, 21 % / 30 % darker at a 0.4 contact shadow');
+  check(Math.abs(X.vao(3, 0) - 0.4) < 1e-9 && Math.abs(X.vao(3, 2) - 0.16) < 1e-9 && X.vao(0, 2) === 1, 'Tiefe: a deep corner 0.4 → 0.16 at Kino, an open face 1');
+  check(X.sunK(0.4, 0) === 1 && Math.abs(X.sunK(0.4, 1) - 0.7) < 1e-9 && Math.abs(X.sunK(0.4, 2) - 0.61) < 1e-9 && X.sunK(1, 2) === 1, 'the sun\'s share: none before, 30 % / 39 % darker at a 0.4 contact shadow');
   const A = V.Light2.AO, a2 = X.aoFor(A, 2);
-  check(Math.abs(a2.radius[3] - A.radius[3] * 1.75) < 1e-9 && Math.abs(a2.strength[3] - A.strength[3] * 1.3) < 1e-9 && a2.bias === A.bias && A.radius[3] === 1.2 && X.aoFor(A, 0) === A, 'the AO numbers: wider and stronger, light2\'s untouched');
+  check(Math.abs(a2.radius[3] - A.radius[3] * 2) < 1e-9 && Math.abs(a2.strength[3] - A.strength[3] * 1.7) < 1e-9 && a2.bias === A.bias && A.radius[3] === 1.2 && X.aoFor(A, 0) === A, 'the AO numbers: wider and stronger, light2\'s untouched');
   check(X.clarK(0.1, 0.3, 5) < 0.8 && X.clarK(0.6, 0.3, 5) > 1.15 && X.clarK(0.3, 0.3, 5) === 1, 'Klarheit: darker than the surroundings darker, brighter brighter, even unchanged');
   check(X.clarK(0.01, 1, 5) >= X.CLAR.lo - 1e-9 && X.clarK(5, 0.01, 5) <= X.CLAR.hi + 1e-9, 'clamped (no halos past ' + X.CLAR.lo + ' … ' + X.CLAR.hi + ')');
-  check(X.clarK(0.1, 0.3, 200) === 1 && X.clarK(0.1, 0.3, 100) > X.clarK(0.1, 0.3, 30), 'nothing far away (the haze stays soft), fading between 60 and 140 m');
+  check(X.clarK(0.1, 0.3, 200) === 1 && X.clarK(0.1, 0.3, 100) > X.clarK(0.1, 0.3, 30), 'nothing far away (the haze stays soft), fading between 70 and 160 m');
   check(X.shutterK(1 / 12, false) === 0.25 && X.shutterK(1 / 48, false) === 1 && X.shutterK(1 / 60, false) === 1, 'the shutter: a quarter of 1/12 s, all of 1/48 s, capped at 1');
   check(X.shutterK(1 / 24, true) === 0 && X.shutterK(0, false) === 0 && X.shutterK(-1, false) === 0 && X.shutterK(2, false) === 0, '0 at a cut, the first frame, a stall');
 }
@@ -101,7 +101,7 @@ console.log('d · the GL side');
   delete require.cache[require.resolve(SRC + '/xtop_gl.js')]; require(SRC + '/xtop_gl.js');
   const r = new V.Renderer(); r.q = { xDepth: 2 }; const A = V.Light2.AO;
   r.l2Ssao({}, {});
-  check(seen !== A && Math.abs(seen.radius[3] - 2.1) < 1e-9 && V.Light2.AO === A, 'Tiefe Kino: the pass sees 2.1 blocks, light2\'s numbers back after it');
+  check(seen !== A && Math.abs(seen.radius[3] - 2.4) < 1e-9 && V.Light2.AO === A, 'Tiefe Kino: the pass sees 2.4 blocks, light2\'s numbers back after it');
   const s1 = seen; r.l2Ssao({}, {}); check(seen === s1, 'made once (no allocation per frame)');
   r.q = { xDepth: 0 }; r.l2Ssao({}, {}); check(seen === A, 'Tiefe off: light2\'s own numbers');
   let built = 0; R.buildPrograms = function () { built++; }; r.q = { xDepth: 0 }; r.xKey = '000';

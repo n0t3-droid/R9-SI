@@ -1367,6 +1367,7 @@ void main() {
   { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z);   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
 #ifdef XDEPTH
     direct *= mix(1.0, l2a, XD_SUN);   // x-top · Tiefe: a share of them on the sun too (xtop.js X.sunK)
+    amb *= XD_AMB;   // and the shade's sky light a little lower (a firmer key-to-fill ratio)
 #endif
   }
 #endif

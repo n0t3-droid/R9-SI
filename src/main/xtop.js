@@ -44,7 +44,9 @@
   //   sun   the share of the contact shadows on the sun's light (0: never the sun, as before)
   //   rad   the contact shadows' reach × (light2 L2.AO.radius 1.2 blocks)
   //   str   their strength ×
-  X.DEPTH = [null, { vao: 0.25, sun: 0.35, rad: 1.4, str: 1.15 }, { vao: 0.27, sun: 0.5, rad: 1.75, str: 1.3 }];
+  //   amb   the sky's light in the shade × (a firmer key-to-fill ratio: the shade sides darker, the sun as it was)
+  // (browser run 1: 0.35 / 1.15 × hardly changed a frame — the std of the meadow +3 %; doubled)
+  X.DEPTH = [null, { vao: 0.25, sun: 0.5, rad: 1.5, str: 1.4, amb: 0.88 }, { vao: 0.28, sun: 0.65, rad: 2.0, str: 1.7, amb: 0.8 }];
   const DEPTH_PROGS = { terrain: 1, terrainCut: 1, terrainCutZ: 1 };
   const f3 = (x) => x.toFixed(3);
   // light2's AO numbers for a Tiefe level (xtop_gl.js swaps them in around the AO pass; made once, never per frame)
@@ -59,7 +61,8 @@
 
   // ---------------------------------------------------------------- Klarheit
   //   pow   the luma ratio's exponent · lo, hi its clamp · near, far (m) the fade out with distance
-  X.CLAR = { pow: 0.35, lo: 0.74, hi: 1.35, near: 60, far: 140 };
+  // (browser run 1: 0.35 / 0.74…1.35 was invisible at trailer distance — stronger)
+  X.CLAR = { pow: 0.6, lo: 0.6, hi: 1.5, near: 70, far: 160 };
   X.clarK = function (lc, ls, z) {
     const C = X.CLAR, r = clamp(Math.pow((lc + 0.02) / (ls + 0.02), C.pow), C.lo, C.hi);
     return 1 + (r - 1) * (1 - sstep(C.near, C.far, z));
@@ -76,7 +79,7 @@
   X.definesFor = function (name, q) {
     q = q || X.q;
     const lv = Math.max(0, Math.min(2, q.xDepth | 0));
-    if (DEPTH_PROGS[name]) return lv ? ['XDEPTH', 'XD_VAO ' + f3(X.DEPTH[lv].vao), 'XD_SUN ' + f3(X.DEPTH[lv].sun)] : [];
+    if (DEPTH_PROGS[name]) return lv ? ['XDEPTH', 'XD_VAO ' + f3(X.DEPTH[lv].vao), 'XD_SUN ' + f3(X.DEPTH[lv].sun), 'XD_AMB ' + f3(X.DEPTH[lv].amb)] : [];
     if (name !== 'composite') return [];
     const out = [];
     if (q.xClar) out.push('X_CLAR');
