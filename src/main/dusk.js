@@ -128,10 +128,11 @@
         const ph = sw.ph[i], s = Math.sin(t * (1.7 + (i % 5) * 0.23) + ph * 9), tw = 0.45 + 0.55 * s * s, a = a0 * tw, c = D.HUES[sw.hue[i]];
         const x = P[i * 3] - cam[0], y = P[i * 3 + 1] - cam[1], z = P[i * 3 + 2] - cam[2];
         for (let h = 0; h < 2; h++) {
-          d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = h ? 0.05 + 0.02 * tw : 0.34 + 0.08 * tw;
+          d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = h ? 0.045 + 0.02 * tw : 0.2 + 0.07 * tw;
           d[o + 4] = 0; d[o + 5] = 0; d[o + 6] = 1; d[o + 7] = 1;
-          const k = h ? 1.6 : 0.55; d[o + 8] = c[0] * k + (h ? 0.08 : 0); d[o + 9] = c[1] * k + (h ? 0.08 : 0); d[o + 10] = c[2] * k + (h ? 0.08 : 0); d[o + 11] = -1;
-          d[o + 12] = 1; d[o + 13] = h ? a : a * 0.32;
+          // (the core warm-white in its hue, the halo the hue itself, faint: lights, not a mist)
+          const k = h ? 1.15 : 0.6, w0 = h ? 0.035 : 0; d[o + 8] = c[0] * k + w0; d[o + 9] = c[1] * k + w0; d[o + 10] = c[2] * k + w0; d[o + 11] = -1;
+          d[o + 12] = 1; d[o + 13] = h ? a : a * 0.2;
           o += 14; q++;
         }
       }
