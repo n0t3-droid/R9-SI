@@ -46,7 +46,7 @@
       { ships: [{ arch: 'freighter', A: add(I, [-60, 10, -110]), C: add(I, [-40, 8, 10]), B: add(I, [-20, 6, 140]), dur: 9, delay: 0 }] }));
     // 6 · the ferry: a shuttle passes close over the lake under the isles, the camera pans with it
     S.push(shot('faehre', 4.5, 64, 8800, 'g.film.w.c6', rel(M, [[0, [0, 2.2, 8], [-14, 6, -14]], [4.5, [3, 2.4, 6], [16, 8, -16]]]),
-      { anchor: M.slice(), ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
+      { anchor: M.slice(), fixed: true, ships: [{ arch: 'shuttle', A: add(M, [-44, 8, -10]), C: add(M, [0, 9, -15]), B: add(M, [52, 13, -22]), dur: 4.6, delay: 0 }] }));
     // 7 · an outpost freed: the Leuchtfeuer turns cyan, the beam, the ring of light, ✦ BEFREIT ✦ (or a golden ride)
     const B = A.beacon || (A.outpost ? add(A.outpost, [0, 1, 0]) : null);
     if (B) S.push(shot('befreit', 6, 60, 9800, 'g.film.w.c7', rel(B, [[0, [20, 18, 15], [0, 2, 0]], [6, [14, 12, 10], [0, 3, 0]]]), { stage: 'liberate', anchor: B.slice(), site: A.outpost ? Math.round(A.outpost[0]) + '_' + Math.round(A.outpost[2]) : null }));
@@ -167,7 +167,8 @@
       const isGrass = (x, y, z) => { const b = w.getBlock(x, y, z); return !!b && R.T.type[b] === gid && !w.getBlock(x, y + 2, z); };
       const m = TW.findMeadow(top, isGrass, shot.anchor, 72); if (m) { TW.reanchor(shot, m); run.meadow = m.slice(); }
     }
-    else if (shot.anchor) { const gy = top(shot.anchor[0], shot.anchor[2]); if (Number.isFinite(gy) && gy > 0) TW.reanchor(shot, [shot.anchor[0], gy, shot.anchor[2]]); }
+    // (fixed: the ferry's lake — its floor is not the place)
+    else if (shot.anchor && !shot.fixed) { const gy = top(shot.anchor[0], shot.anchor[2]); if (Number.isFinite(gy) && gy > 0) TW.reanchor(shot, [shot.anchor[0], gy, shot.anchor[2]]); }
     // the fairy tree and the outpost: circle to the side whose sight line is clear (a train, a wall, a hill in front)
     if (shot.stage === 'fairy' || shot.stage === 'liberate' || shot.stage === 'village') {
       const T = shot.anchor, k0 = shot.keys[0], k1 = shot.keys[shot.keys.length - 1];
