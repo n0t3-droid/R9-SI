@@ -37,9 +37,9 @@ for (const vg of VG) {
   // (run 1: far from the spawn the views showed the horizon's stand-ins — settle returned before the columns came: now
   // it waits until every column within 3 chunks of the eye and of the target is generated, meshed and shown)
   const shown = ([f, t]) => { const W = VR.game.world; let n = 0, ok = 0; for (const p of [f, t]) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { n++; const c = W.col((Math.floor(p[0]) >> 4) + dx, (Math.floor(p[2]) >> 4) + dz); if (c && c.shownAt >= 0) ok++; } return ok / n; };
-  const look = async (from, to) => {
+  const look = async (from, to, quick) => {
     await ev(([c, t]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1], c[2]); pl.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); pl.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); }, [from, to]);
-    let f = 0; for (let i = 0; i < 200; i++) { await settle(20); f = await ev(shown, [from, to]); if (f >= 1) break; await wait(500); }
+    let f = 0; for (let i = 0; i < (quick ? 3 : 60); i++) { await settle(20); f = await ev(shown, [from, to]); if (f >= 0.97) break; await wait(500); }
     console.log('  columns shown', f.toFixed(2)); await step(40);
   };
   const shot = async (name) => {
@@ -64,7 +64,7 @@ for (const vg of VG) {
   const info = await ev(() => ({ vgen: VR.game.meta && VR.game.meta.vgen }));
   console.log(`== ${tag}: vgen ${info.vgen}`);
   res[tag] = { vgen: info.vgen, hi: {}, vl: {} };
-  for (const name of views) {
+  for (const name of (vg === VG[0] && process.env.VIEWS0 ? process.env.VIEWS0.split(',') : views)) {   // (VIEWS0: the before world's views — run 3 kept run 2's before pictures)
     const S = VIEW[name]; if (!S) continue;
     await ev((t) => VR.game.env.setTime(t), S.tod);
     await look(S.from, S.to); await step(S.run || 4);
@@ -72,7 +72,7 @@ for (const vg of VG) {
     res[tag].hi[name] = +(await timeFrames()).toFixed(1);
   }
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-  for (const name of ['meadow', 'giant']) { const S = VIEW[name]; await look(S.from, S.to); await step(6); res[tag].vl[name] = +(await timeFrames()).toFixed(1); }
+  for (const name of ['meadow', 'giant']) { const S = VIEW[name]; await look(S.from, S.to, true); await step(6); res[tag].vl[name] = +(await timeFrames()).toFixed(1); }
   res[tag].logs = logs;
   console.log('cost', tag, JSON.stringify(res[tag]));
   await ctx.close();
