@@ -88,14 +88,17 @@ while (guard++ < 40000) {
       let miss = 0, hidden = 0;
       for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.cols.get(VR.ckey(pcx + dx, pcz + dz)); if (!c) miss++; else if (!(c.shownAt >= 0)) hidden++; }
       const st = window.__ld || (window.__ld = { h: -1, n: 0 }); st.n = hidden === st.h ? st.n + 1 : 0; st.h = hidden;
-      const ok = !miss && !w.pending.size && !g.pool.busy && !(g.horizon && g.horizon.inflight) && (hidden <= 8 || st.n >= 20);   // (a few columns of a dense town stay unshown out of view)
+      const ok = !miss && !w.pending.size && !g.pool.busy && !(g.horizon && g.horizon.inflight) && (hidden <= 8 || st.n >= 30);   // (a few columns of a dense town stay unshown out of view)
       if (!ok) d.loadT = Math.min(d.loadT, 0.1);
+      // (the uploads' 2.5 ms a frame are real milliseconds — on a busy machine a hundred columns wait a long time: while a
+      // shot loads, the queue may spend 40 ms a frame; the shot itself runs on the game's own budget)
+      const q = g.renderer && g.renderer.q; if (q) { if (q.__up === undefined) q.__up = q.upload; q.upload = ok ? q.__up : 40; }
       return { ok, miss, hidden, pend: w.pending.size, busy: g.pool.busy };
     });
     loadW++;
     if (loadW % 40 === 1) console.log('   loading shot ' + st.si + ' ' + JSON.stringify(k));
     if (!k.ok && loadW > 900) await ev(() => { VR.game.director.loadT = 99; });   // (minutes: go on anyway)
-    await step(2); await wait(k.ok ? 20 : 150); continue;
+    await step(k.ok ? 2 : 6); await wait(k.ok ? 20 : 60); continue;
   }
   loadW = 0;
   if (st.phase !== 'run') { await step(4); await wait(30); continue; }
