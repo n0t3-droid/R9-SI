@@ -90,7 +90,9 @@
   const H3 = (x, y, z, s) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x85ebca6b) ^ (s | 0); h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h ^= h >>> 12; return ((h >>> 0) & 0xffff) / 65536; };
   FL.cells = function (shape, o, seed) {
     const out = new Map(), green = o.green === undefined ? 0.12 : o.green;
-    const put = (x, y, z, k) => { const key = x + ',' + y + ',' + z, cur = out.get(key); if (cur === 1) return; if (cur === 2 && k === 3) return; out.set(key, k); };
+    out.axis = new Map();   // a wood cell's log axis (0 up, 1 along x, 2 along z): its segment's main direction
+    let segAxis = 0;
+    const put = (x, y, z, k) => { const key = x + ',' + y + ',' + z, cur = out.get(key); if (cur === 1) return; if (cur === 2 && k === 3) return; out.set(key, k); if (k === 1) out.axis.set(key, segAxis); };
     for (const s of shape.balls) {
       const [bx, by, bz, br, kind] = s, R = Math.ceil(br);
       const cx = Math.round(bx), cy = Math.round(by), cz = Math.round(bz);
@@ -109,6 +111,8 @@
     }
     for (const s of shape.segs) {
       const [x0, y0, z0, x1, y1, z1, rr] = s, l = Math.hypot(x1 - x0, y1 - y0, z1 - z0), n = Math.max(1, Math.ceil(l / 0.35));
+      const ax = Math.abs(x1 - x0), ay = Math.abs(y1 - y0), az = Math.abs(z1 - z0);
+      segAxis = ay >= ax * 0.8 && ay >= az * 0.8 ? 0 : ax >= az ? 1 : 2;
       for (let k = 0; k <= n; k++) {
         const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, z = z0 + (z1 - z0) * t;
         if (rr < 0.75) { put(Math.round(x), Math.round(y), Math.round(z), 1); continue; }
@@ -133,14 +137,14 @@
       t: { len: 1.5, w: 0.7, angle: 30, pitch: 48, jit: 0.25, wr: 0.65, lr: 0.85, lb: 1.3, droop: 22, chain: [2, 4] }, wood: 'oak_log', blossom: ['bloom_lilac_leaves'], leaf: 'oak_leaves', h: [6, 12] },
     // Sonnenregen: a small golden tree, its chains shorter and denser
     sonnenregen: { kind: 'tree', axiom: 'FFF[&A]/[&A]/[&A]', n: 2, rules: { A: [[0.5, "'!F[&FA]/[&FA]/[&A]"], [0.5, "'!F[&FA]/[&A]"]] }, fin: { A: 'BH' },
-      t: { len: 1.2, w: 0.6, angle: 30, pitch: 40, jit: 0.3, wr: 0.65, lr: 0.82, br: 1.3, droop: 18, chain: [1, 3] }, wood: 'birch_log', blossom: ['bloom_gold_leaves'], leaf: 'birch_leaves', green: 0.2, h: [5, 9] },
+      t: { len: 1.2, w: 0.6, angle: 30, pitch: 40, jit: 0.3, wr: 0.65, lr: 0.82, br: 1.15, droop: 18, chain: [2, 4] }, wood: 'birch_log', blossom: ['bloom_gold_leaves'], leaf: 'birch_leaves', green: 0.2, h: [5, 9] },
     // the flowering shrubs: no trunk, green twigs (leaf cells) fanning out of the ground, blossom on the tips
     rosenbusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]/A', n: 1, rules: { A: [[0.6, "F[&B]/[&FB]"], [0.4, "FB"]] }, fin: { A: 'B' },
-      t: { len: 0.9, w: 0.3, angle: 30, pitch: 34, jit: 0.35, br: 1.05 }, wood: 'azalea_leaves', blossom: ['bloom_rose_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
+      t: { len: 1.1, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.5 }, wood: 'azalea_leaves', blossom: ['bloom_rose_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
     schneebusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]', n: 1, rules: { A: [[0.6, "F[&B]/FB"], [0.4, "FFB"]] }, fin: { A: 'B' },
-      t: { len: 0.9, w: 0.3, angle: 26, pitch: 28, jit: 0.35, br: 1.0 }, wood: 'azalea_leaves', blossom: ['bloom_snow_leaves'], leaf: 'azalea_leaves', green: 0.3, h: [2, 4] },
+      t: { len: 1.1, w: 0.3, angle: 26, pitch: 36, jit: 0.35, br: 1.45 }, wood: 'azalea_leaves', blossom: ['bloom_snow_leaves'], leaf: 'azalea_leaves', green: 0.3, h: [2, 4] },
     lilabusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]/A', n: 1, rules: { A: [[0.5, "F[&B]/[&B]"], [0.5, "FB"]] }, fin: { A: 'B' },
-      t: { len: 0.85, w: 0.3, angle: 30, pitch: 36, jit: 0.35, br: 1.0 }, wood: 'azalea_leaves', blossom: ['bloom_lilac_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
+      t: { len: 1.05, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.45 }, wood: 'azalea_leaves', blossom: ['bloom_lilac_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
     // Traumbaum: the wonder spot's giant — a thick trunk, four limbs, one more generation, a crown of pink and white
     traumbaum: { kind: 'giant', axiom: 'FFFFF[&A]/[&A]/[&A]/[&A]', n: 4, rules: { A: [[0.6, "!'F[&FA]/[&FA]/[&A]"], [0.4, "!'F[&FA]/[&A]"]] }, fin: { A: 'B' },
       t: { len: 2.1, w: 1.8, angle: 30, pitch: 34, jit: 0.25, wr: 0.66, lr: 0.8, br: 2.8 }, wood: 'cherry_log', blossom: ['cherry_leaves', 'bloom_rose_leaves', 'bloom_snow_leaves'], leaf: 'azalea_leaves', h: [14, 24] },
@@ -162,7 +166,7 @@
     for (const [k, kind] of cells) {
       const a = k.split(','), x = +a[0], y = +a[1], z = +a[2];
       if (y < 0) continue;   // nothing below the foot (a droop never digs in)
-      list.push([x, y, z, kind, H3(x * 3, y * 5, z * 7, seed ^ 0x51)]);
+      list.push([x, y, z, kind, H3(x * 3, y * 5, z * 7, seed ^ 0x51), kind === 1 ? (cells.axis.get(k) | 0) : 0]);
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
     }
     list.sort((a, b) => a[1] - b[1] || a[0] - b[0] || a[2] - b[2]);
@@ -177,7 +181,7 @@
   FL.plant = function (w, name, x, y, z, seed, st, leafState) {
     const p = FL.grow(name, seed); if (!p) return null;
     const S = FL.SPECIES[name], R = VR.R;
-    const wood = S.kind === 'shrub' ? leafState(S.wood) : st(S.wood, { axis: 0 });
+    const woodL = S.kind === 'shrub' ? leafState(S.wood) : 0, woodA = [0, 1, 2].map(a => st(S.wood, { axis: a }));
     const bl = S.blossom.map(n => R.byName[n] ? leafState(n) : leafState('cherry_leaves')), lf = leafState(S.leaf);
     const ok = w.ok ? (px, py, pz) => w.ok(px, py, pz) : () => true;
     for (const c of p.list) {
@@ -185,6 +189,7 @@
       if (!ok(px, py, pz)) continue;
       const cur = w.get ? w.get(px, py, pz) : 0;
       if (c[3] === 1) {
+        const wood = woodL || woodA[c[5]];
         if (w.place) w.place(px, py, pz, wood, 1); else w.set(px, py, pz, wood);
       } else {
         if (cur > 0 && !(R.T.flags[cur] & (VR.F.PLANT | VR.F.REPLACE))) continue;

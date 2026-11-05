@@ -146,8 +146,8 @@
       const q = LAND.woodAt(g, x, z);
       if (q.d > 0.06) continue;
       const f = FL.fieldAt(g, x, z);
-      if (!f.d || r >= f.d) continue;
       const E = Z.F[f.i];
+      if (!f.d || r >= f.d * (Array.isArray(E[0]) ? 0.45 : 1)) continue;   // (a field of tall flowers is thinner: they stand two high)
       const pick = r2 < 0.84 ? E[0] : E[1];
       if (E[2] && r2 > 0.9 && free2) { blocks[ai] = E[2][0]; blocks[ai + 256] = E[2][1]; continue; }
       if (Array.isArray(pick)) { if (free2) { blocks[ai] = pick[0]; blocks[ai + 256] = pick[1]; } continue; }

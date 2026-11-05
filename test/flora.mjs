@@ -34,7 +34,14 @@ for (const vg of VG) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(5); } };
   const settle = async (max = 300) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; return { busy: g.pool.busy, pend: g.world.pending.size, lod: g.horizon ? g.horizon.inflight : 0, want: g.world.lastWant || 0 }; }); if (s.busy === 0 && s.pend === 0 && s.lod === 0 && !s.want && i > 3) break; await wait(100); } };
-  const look = async (from, to) => { await ev(([c, t]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1], c[2]); pl.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); pl.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); }, [from, to]); await settle(); };
+  // (run 1: far from the spawn the views showed the horizon's stand-ins — settle returned before the columns came: now
+  // it waits until every column within 3 chunks of the eye and of the target is generated, meshed and shown)
+  const shown = ([f, t]) => { const W = VR.game.world; let n = 0, ok = 0; for (const p of [f, t]) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { n++; const c = W.col((Math.floor(p[0]) >> 4) + dx, (Math.floor(p[2]) >> 4) + dz); if (c && c.shownAt >= 0) ok++; } return ok / n; };
+  const look = async (from, to) => {
+    await ev(([c, t]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1], c[2]); pl.yaw = Math.atan2(-(t[0] - c[0]), -(t[2] - c[2])); pl.pitch = Math.atan2(t[1] - c[1], Math.hypot(t[0] - c[0], t[2] - c[2])); }, [from, to]);
+    let f = 0; for (let i = 0; i < 200; i++) { await settle(20); f = await ev(shown, [from, to]); if (f >= 1) break; await wait(500); }
+    console.log('  columns shown', f.toFixed(2)); await step(40);
+  };
   const shot = async (name) => {
     for (let k = 0; k < 2; k++) {
       try {
