@@ -214,7 +214,7 @@
     if (g.ui && g.ui.resume) g.ui.resume();
     setTimeout(() => {
       const ok = which === 'welt' ? TW.ok(g) && g.director.play('welt') : g.director.play('trailer');
-      if (g.ui && g.ui.toast) g.ui.toast(ok ? (which === 'welt' ? tx('g.film.cmd', null, 'Regie: „Die Welt heute" läuft — Esc stoppt', 'Director: "The world today" is rolling — Esc stops it') : tx('g.cmd.trailer', null, 'Regie: der Trailer läuft — Esc stoppt', 'Director: the trailer is rolling — Esc stops it')) : tx('g.film.no', null, 'Der Welt-Trailer läuft in einer Heartland-Welt (Weltart Standard).', 'The world trailer plays in a Heartland world (world type default).'), '', null);
+      if (g.ui && g.ui.toast) g.ui.toast(ok ? (which === 'welt' ? tx('g.film.cmd', null, 'Regie: „Die Welt heute“ läuft — Esc stoppt', 'Director: "The world today" is rolling — Esc stops it') : tx('g.cmd.trailer', null, 'Regie: der Trailer läuft — Esc stoppt', 'Director: rolling the trailer — Esc to stop')) : tx('g.film.no', null, 'Der Welt-Trailer läuft in einer Heartland-Welt (Weltart Standard, auf der Oberwelt).', 'The world trailer plays in a Heartland world (world type default, on the overworld).'), '', null);
     }, 60);
   }, true);
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
