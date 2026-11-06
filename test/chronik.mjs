@@ -120,7 +120,14 @@ if (fam) {
   if (sp) {
     await step(20, 33);
     const m = await ev((fi) => { const s = VR.ChronikGame.spawned.find(q => q.i === fi); return s ? [s.mom.pos[0], s.mom.pos[1], s.mom.pos[2]] : null; }, fam.i);
-    if (m) { await ev(() => { VR.game.env.setTime(4600); VR.game.hideHud = true; }); await stand([m[0] + 2.6, m[1] + 0.4, m[2] + 2.6], [m[0], m[1] + 0.2, m[2]]); await grab('family', 'chronik_family.png', 2); await ev(() => { VR.game.hideHud = false; }); }
+    if (m) {
+      // the family gathered in a short line in front of the camera, the eye 4 m off at a fawn's height
+      await ev((fi) => { const g = VR.game, s = VR.ChronikGame.spawned.find(q => q.i === fi); g.env.setTime(4600); g.hideHud = true; if (!s) return;
+        const m = s.mom.pos, p = g.player; s.kids.forEach((k, j) => { k.pos[0] = m[0] + 0.9 * (j + 1); k.pos[1] = m[1]; k.pos[2] = m[2] + 0.5 * (j % 2 ? 1 : -1); if (k.vel) k.vel[0] = k.vel[2] = 0; }); if (s.mom.vel) s.mom.vel[0] = s.mom.vel[2] = 0;
+        const ex = m[0] + 1 + 2.8, ez = m[2] + 2.8, ey = m[1] + 1.1; p.flying = true; p.teleport(ex, ey - 1.6, ez); p.vel = [0, 0, 0];
+        const dx = m[0] + 0.8 - ex, dy = m[1] + 0.35 - ey, dz = m[2] - ez; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.viewYaw = p.yaw; }, fam.i);
+      await grab('family', 'chronik_family.png', 1); await ev(() => { VR.game.hideHud = false; });
+    }
   }
 } else check(false, 'no family in the Chronik');
 // ---------------------------------------------------------------- gossip quoting the Chronik

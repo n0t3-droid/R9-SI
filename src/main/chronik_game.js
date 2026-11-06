@@ -65,7 +65,7 @@
       const best = m.events.slice().sort((a, b) => b.imp - a.imp || b.i - a.i)[0];
       if (best && VR.Quiet && VR.Quiet.note) VR.Quiet.note(T('g.ch.away', { ev: C.text(best, R.view) }), 2, 'chronik:away');
     }
-    for (const o of m.out || []) if (!R.tried[o.e] || R.tried[o.e] < 50) { R.tried[o.e] = (R.tried[o.e] | 0) + 1; if (CG.build(g, o)) R.took.push(o.e); }
+    for (const o of m.out || []) if ((R.tried[o.e] | 0) < 40) { const r = CG.build(g, o); if (r === true) R.took.push(o.e); else if (r === 'tried') R.tried[o.e] = (R.tried[o.e] | 0) + 1; }   // (a village not near yet: it waits, uncounted)
     CG.families(g, R);
     CG.weather(g, R);
     CG.cost.replies++; CG.cost.replyMs += performance.now() - t0;
@@ -88,7 +88,7 @@
     V.selfEdit = true;
     try { while (guard++ < 6000) { r = V.buildStep(vil, true); if (!r || r.done) break; if (r.wait) break; } } finally { V.selfEdit = false; }
     if (r && r.done) { CG.lastBuilt = { vid: o.vid, k: o.k, lot: li, at: lot ? (lot.door || lot.outside || [P.x, P.y, P.z]) : [P.x, P.y, P.z], name: vil.name }; return true; }
-    return false;
+    return 'tried';
   };
 
   // ---------------------------------------------------------------- families where the Chronik says they live
