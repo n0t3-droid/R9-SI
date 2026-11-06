@@ -689,6 +689,8 @@
     'g.set.qCrown.tip': 'Baumkronen bleiben auch in der Ferne rund, ihre Schatten haben ausgefranste Ränder statt Quadrate; Blütenkronen sind innen heller. Braucht Laubkronen. Kostet wenig.',
     'g.set.qRound': 'Runde Kronen',
     'g.set.qRound.tip': 'Baumkronen als gerundete Laubmassen statt Würfeln: Ecken und Kanten der Krone werden rund. Nur das Bild, die Blöcke bleiben, wie sie sind. Kostet wenig.',
+    'g.set.gSoft': 'Weiche Natur',
+    'g.set.gSoft.tip': 'Hügel, Wiesen, Ufer, Felsen und Schnee als eine weiche, gemalte Fläche statt Würfeltreppen: Hänge rollen, Klippen werden runde Felsnasen, Ufer laufen ins Wasser. Häuser, Mauern und Wege bleiben scharf. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Im Look Klassisch kommen die Würfel zurück. Kostet mittel.',
     'g.set.qHill': 'Runde Hänge',
     'g.set.qHill.tip': 'Im Look Nahtlos werden Kanten, Stufen und Klippen des natürlichen Bodens und die Unterseiten der Schwebeinseln rund. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
     'g.set.magic.tip': 'Wie stark der Sternenhimmel am Tag durchscheint.',

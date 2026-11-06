@@ -295,6 +295,11 @@
     const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
     const RCL = roundOn ? RC.leafTable() : null;   // (the mini-voxel crowns drawn as leaves)
     const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
+    // r-gemalt · Weiche Natur (bit 5, 16: gemalt.js; Nahtlos only): the natural ground as one sculpted surface
+    // (src/shared/softnat.js); its blocks give no cube faces, the plants on it sit on the drawn surface
+    const SNM = VR.SoftNat, softOn = (lm & 16) !== 0 && !!SNM && (!VR.LOOK || VR.LOOK.ground);
+    const SNS = softOn ? SNM.tables().soft : null;
+    let softH = null;
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
@@ -509,6 +514,8 @@
       }
     }
 
+    // r-gemalt · Weiche Natur: the sculpted ground first (the plants below read its heights)
+    if (softOn) { SNM.solve(job); softH = new Int16Array(256); SNM.mesh(job, bufs[0], (st, d) => texW3(TTEX[st * 6 + d], TF[st], d, st), softH); }
     // ---- greedy opaque cubes ----
     const mstate = new Uint16Array(256), mlight = new Uint16Array(256), mtint = new Uint16Array(256), mflag = new Uint8Array(256), mergedLight = new Uint16Array(4);
     for (let d = 0; d < 6; d++) {
@@ -520,6 +527,7 @@
           if (ax === 0) { x = s; z = u; y = v; } else if (ax === 1) { y = s; x = u; z = v; } else { z = s; x = u; y = v; }
           const bi = P(x, y, z), b = B[bi];
           if (!b) continue;
+          if (softOn && SNS[b] === 1) continue;   // (r-gemalt: drawn by the sculpted surface)
           const fl = TF[b];
           if (TSH[b] !== SH.CUBE || TL[b] !== 0 || !(fl & F.OPAQUE)) continue;
           const ni = bi + DOFF[d], nb = B[ni];
@@ -697,9 +705,10 @@
         ox = ((h & 15) / 15 - 0.5) * 0.35; oz = (((h >> 4) & 15) / 15 - 0.5) * 0.35;
       }
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
-      if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
+      if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && (y > 0 || softOn)) {
         const bb = B[bi - PSS];
-        if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
+        if (softOn && SNS[bb] === 1) oy = SNM.topAt(x, y - 1, z, 0.5 + ox, 0.5 + oz) - y;   // r-gemalt: on the sculpted surface
+        else if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
           if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
           const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;
@@ -1022,6 +1031,7 @@
     }
 
     const res = { opaque: bufs[0].out(), cutout: bufs[1].out(), trans: bufs[2].out(), vis: visMask };
+    if (softH) res.softH = softH;   // r-gemalt: the drawn ground's column heights (× 64, world y; −32768 none)
     if (vxSplit) { res.vx = bufs[3].out(); res.vxFar = bufs[4].out(); }
     if (vxSkipped) res.vxSkipped = vxSkipped;
     if (propOut) res.props = Int32Array.from(propOut);   // six ints per prop instance (see propTables)

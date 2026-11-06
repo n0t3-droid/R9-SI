@@ -22,6 +22,8 @@ const MAIN = ['gl', 'gpuprof', 'light2', 'sky3', 'look', 'xtop', 'qart', 'water_
 SHARED.splice(SHARED.indexOf('gen_dims'), 0, 'dimreg');   // u-dims: the dim registry (src/shared/dimreg.js, VR.DimReg) before the generators
 MAIN.splice(MAIN.indexOf('qart') + 1, 0, 'qart2'); MAIN.splice(MAIN.indexOf('qart_gl') + 1, 0, 'qart2_gl');   // q-art2: VR.QArt2 (src/main/qart2.js, qart2_gl.js) — Wiese, Schwebeinseln, Fernkronen
 MAIN.splice(MAIN.indexOf('qart2') + 1, 0, 'qart3');   // q-art3: VR.QArt3 (src/main/qart3.js) — Runde Kronen, Runde Hänge (the mesh: src/shared/mesher.js VR.RoundCrown)
+SHARED.splice(SHARED.indexOf('mesher') + 1, 0, 'softnat');   // r-gemalt: VR.SoftNat (src/shared/softnat.js) — Weiche Natur, the sculpted ground (main thread and workers)
+MAIN.splice(MAIN.indexOf('qart3') + 1, 0, 'gemalt'); MAIN.splice(MAIN.indexOf('qart2_gl') + 1, 0, 'gemalt_gl');   // r-gemalt: VR.Gemalt (src/main/gemalt.js) — the switch, the shader define, the bodies on the drawn ground
 MAIN.splice(MAIN.indexOf('game'), 0, 'travel');   // u-dims: VR.Travel (src/main/travel.js) — trips between the worlds of a save, the gates, Heimkehr
 MAIN.splice(MAIN.indexOf('game'), 0, 'newlife');   // u-home: VR.NewLife (src/main/newlife.js) — one home on any world, 🌍 Herzwelt one click away, Heimkehr in a moment
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure

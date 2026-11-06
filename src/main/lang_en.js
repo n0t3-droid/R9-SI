@@ -689,6 +689,8 @@
     'g.set.qCrown.tip': 'Tree crowns stay round far away too, their shadows have ragged edges instead of squares; blossom crowns are lighter inside. Needs Leafy crowns. Costs little.',
     'g.set.qRound': 'Round crowns',
     'g.set.qRound.tip': 'Tree crowns as rounded masses of leaves instead of cubes: the crown\'s corners and edges round off. Only the picture, the blocks stay as they are. Costs little.',
+    'g.set.gSoft': 'Soft nature',
+    'g.set.gSoft.tip': 'Hills, meadows, shores, rocks and snow as one soft, painted surface instead of cube stairs: slopes roll, cliffs become rounded rock, shores run into the water. Houses, walls and paths stay crisp. Only the picture, the blocks and walking stay as they are. The Classic look brings the cubes back. Costs medium.',
     'g.set.qHill': 'Round hills',
     'g.set.qHill.tip': 'In the Seamless look the edges, terraces and cliffs of the natural ground and the undersides of the floating isles round off. Only the picture, the blocks and walking stay as they are. Costs little.',
     'g.set.magic.tip': 'How strongly the starry sky shows through by day.',
