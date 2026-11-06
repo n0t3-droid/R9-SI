@@ -1,4 +1,4 @@
-// p-stream · the streaming plan (src/main/streamplan.js VR.StreamPlan + world.js streamPlan), no browser:
+// p-stream · the streaming plan (src/shared/stream.js VR.StreamPlan + world.js streamPlan), no browser:
 //  a · worth: while moving fast a column is asked for only if it is still in the view cone when it is ready; the
 //      columns round the player always; slow (walking, plain flight) everything as before
 //  b · order: the old distance order, a column outside the view cone later
@@ -9,6 +9,7 @@
 //      dropped unseen) than the old way; at 80 m/s the chunks rest (as much real terrain, half the columns made: the far
 //      tiles get the worker); walking at 5 m/s it is the old way exactly
 //  f · a queued request no longer worth it is cancelled before a worker touches it
+//  g · turning back: the columns just unloaded come from a small memory (no generation), with the same blocks and light
 //   bash test/wt_run.sh stream_plan.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -21,7 +22,6 @@ global.Worker = class {
   terminate() {}
 };
 global.Blob = class {}; global.URL = { createObjectURL: () => 'blob:x' };
-require('../src/main/streamplan.js');
 require('../src/main/world.js');
 let fails = 0;
 const check = (ok, msg, info) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg + (info !== undefined ? '  (' + info + ')' : '')); };
@@ -140,6 +140,31 @@ console.log('f · stale requests are cancelled');
   let cancelled = 0; const ahead = q.filter(j => j.msg.cz <= pz0);
   for (const j of ahead) if (j.msg.cancel()) cancelled++;
   check(ahead.length > 0 && cancelled === ahead.length, 'turned round at speed: the queued columns now behind are cancelled', `${cancelled} / ${ahead.length}`);
+}
+
+console.log('g · turning back: the columns just left come from memory (no generation), the same blocks and light');
+{
+  const run = (cacheN) => {
+    SIM.now = 0; SIM.workers.length = 0;
+    const pool = new V.WorkerPool('', 1);
+    const w = new V.World({ vents: null }, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: { freeSection() {}, uploadSection() {}, q: { vxLod: 12, upload: 2 } }, renderDist: 4 });
+    w.viewDir = [0, -1]; w.viewCos = cosH; w.uploadQ.cpuEst = w.uploadQ.msPerByte = 1e-9;
+    if (cacheN !== undefined) w.colCacheN = cacheN;
+    let gens = 0, hits = 0, same = true;
+    const oc = w.onColumn.bind(w); w.onColumn = (m) => { if (m.cached) { hits++; const r = reply({ type: 'gen', cx: m.cx, cz: m.cz }); for (let i = 0; i < r.blocks.length; i += 97) if (r.blocks[i] !== m.blocks[i] || r.light[i] !== m.light[i]) same = false; } else gens++; oc(m); };
+    let z = 8;
+    const step = () => { w.update(8, 100, z, SIM.now); for (const wk of SIM.workers) { while (wk.jobs.length && wk.jobs[0].at <= SIM.now) { const j = wk.jobs.shift(); wk.onmessage({ data: reply(j.m) }); } } SIM.now += 33.3; };
+    for (let f = 0; f < 600; f++) step();
+    for (let f = 0; f < 450; f++) { z -= 6 / 30; step(); }      // 90 blocks north at 6 m/s
+    const g0 = gens;
+    w.viewDir = [0, 1];
+    for (let f = 0; f < 450; f++) { z += 6 / 30; step(); }      // and back
+    for (let f = 0; f < 150; f++) step();
+    return { back: gens - g0, hits, same, cache: w.colCache ? w.colCache.size : 0 };
+  };
+  const off = run(0), on = run();
+  check(on.hits > 10 && on.back < off.back, 'the way back: columns from memory instead of the worker', `generated on the way back ${off.back} → ${on.back}, ${on.hits} from memory (cache ${on.cache})`);
+  check(on.same, 'a column from memory has the blocks and the light a fresh generation gives');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

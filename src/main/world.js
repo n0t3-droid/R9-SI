@@ -214,7 +214,8 @@
       this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
       this.motion = 0;        // t-motion: the mesher writes the hung pieces' sway levels (game.js: the 'motion' setting)
       this.meshBudget = 6;
-      this.streamPlan = !!VR.StreamPlan;   // p-stream (streamplan.js; game.js follows the 'streamPlan' setting)
+      this.streamPlan = !!VR.StreamPlan;   // p-stream (stream.js VR.StreamPlan; game.js follows the 'streamPlan' setting)
+      this.colCacheN = 32 + 8 * this.renderDist;   // p-stream: untouched columns kept after unloading (~130 KB each: 9 MB at render distance 5)
       this.lastCol = null;
       this.shDirty = new Set(); this.shGone = new Set(); // columns whose shadow heights must reach the GPU
     }
@@ -304,7 +305,7 @@
     // stay with the frames
     update(px, py, pz, now, off) {
       this.frame++;
-      this.now = now;
+      this.now = now; this.cacheHits = 0;
       if (!off) {
       // F10: the interval since the last update is the frame the last uploads shared: the scheduler's frame factor, its
       // adaptive scale and the hitch meter learn from it
@@ -328,7 +329,7 @@
       const ux = ahead ? (this.mvx / speed) : 0, uz = ahead ? (this.mvz / speed) : 0;
       const lcx = Math.round(pcx + ux * ahead), lcz = Math.round(pcz + uz * ahead);
       this.loadCenter = [lcx, lcz];
-      // p-stream · the streaming plan (streamplan.js): while moving fast only the columns still in view when they are ready
+      // p-stream · the streaming plan (stream.js VR.StreamPlan): while moving fast only the columns still in view when they are ready
       // are asked for, in view order; the far tiles get more of the workers the more the chunks lag behind
       const SP = this.streamPlan && VR.StreamPlan, pfast = SP ? this.planStep(speed, ux, uz, now) : false;
       // F9 · Weltgenerierung im Takt: the columns that arrived are integrated within half the frame's streaming budget
@@ -400,6 +401,15 @@
     retryAfter(k, now) { const t = this.failed && this.failed.get(k); if (t === undefined) return now; if (now - t > 5000) { this.failed.delete(k); return now; } return t + 5000; }
     requestColumn(cx, cz, k, prio) {
       this.pending.set(k, true);
+      // p-stream · the column memory: a column unloaded a moment ago (untouched) comes back without the worker — its blocks
+      // kept, its own light computed again (the same as a fresh generation: computeColumnLight), at most 2 a frame
+      const hit = this.colCache && this.colCache.get(k);
+      if (hit && (this.cacheHits | 0) < 2 && !this.savedKeys.has(k)) {
+        this.colCache.delete(k); this.cacheHits = (this.cacheHits | 0) + 1;
+        const m = { type: 'gen', cx, cz, blocks: hit.blocks, light: VR.computeColumnLight(hit.blocks, this.hasSky), biome: hit.biome, caveBiome: hit.caveBiome, grass: hit.grass, foliage: hit.foliage, water: hit.water, spawns: hit.spawns, be: hit.be, sv: hit.sv, cached: true };
+        if (this.streamTakt) { (this.arrivals || (this.arrivals = [])).push({ k, m, epoch: this.styleEpoch || 0 }); return; }
+        this.pending.delete(k); this.onColumn(m); return;
+      }
       if (this.streamPlan && this.planFast) (this.reqAt || (this.reqAt = new Map())).set(k, this.now);   // p-stream: the latency in fast flight (checkShown)
       const epoch = this.styleEpoch || 0;
       const onGen = (m) => {
@@ -485,6 +495,12 @@
       // (a 📽 replay copy — c.zr — is never saved)
       if (c.modified && this.store && !c.zr) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
+      if (!c.modified && !c.zr && c.blocks && c.biome && this.colCacheN > 0) {   // p-stream: kept for a turn back (requestColumn)
+        const C = this.colCache || (this.colCache = new Map());
+        C.delete(c.key);
+        C.set(c.key, { blocks: c.blocks, biome: c.biome, caveBiome: c.caveBiome, grass: c.grass, foliage: c.foliage, water: c.water, spawns: c.spawns, be: c.blockEntities.size ? [...c.blockEntities] : null, sv: c.sv || 0 });
+        while (C.size > this.colCacheN) C.delete(C.keys().next().value);
+      }
       this.cols.delete(c.key); this.fading.delete(c);
       if (this.reqAt) this.reqAt.delete(c.key);
       this.lastCol = null;
@@ -497,6 +513,7 @@
     restyle() {
       this.styleEpoch = (this.styleEpoch || 0) + 1;
       const epoch = this.styleEpoch;
+      if (this.colCache) this.colCache.clear();   // (p-stream: made under the old style)
       for (const k of [...this.pending.keys()]) this.pending.delete(k);
       const p = this.center || [0, 0];
       const cols = [...this.cols.values()].sort((a, b) => ((a.cx - p[0]) ** 2 + (a.cz - p[1]) ** 2) - ((b.cx - p[0]) ** 2 + (b.cz - p[1]) ** 2));
