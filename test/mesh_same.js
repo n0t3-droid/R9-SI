@@ -12,7 +12,9 @@ const PAD = V.MESH_PAD || 1, PS = V.MESH_PS || 18, PSS = PS * PS;
 // beside them in their colour) — the town scene's light words move and nothing else: 2.73 M words compared, 1 842 light
 // words in the 2 sections with its 102 line blocks, no other word, no stream of another length (scratch mesh_proof.js,
 // plan 2026-10-15-t-material.md). Before: classic 85e924f064, seamless fd3e627e68.
-const EXPECT = { classic: '8077f52d64', seamless: 'd456d66b68' };
+// v-flora (5 Nov): the flora's nine blocks (flora_blocks.js) register 12 textures — the texture words after them move up; the
+// same vertex count in every look (with R9_SKIP=flora_blocks the old hashes 8077f52d64 / d456d66b68 come back)
+const EXPECT = { classic: '63b161cd64', seamless: '640eed2b68' };
 function fnv(h, a) { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; }
 function jobs(opts, CX, CZ) {
   const g = V.makeGen('overworld', 12345, opts);

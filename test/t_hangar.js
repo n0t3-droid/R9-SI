@@ -24,7 +24,7 @@ const count = (W, x0, x1, y0, y1, z0, z1, pred) => { let n = 0; for (let x = x0;
 console.log('t_hangar — the blocks');
 for (const n of ['vx_hangar_navy', 'vx_hangar_navy_amber', 'vx_floor_hangar', 'vx_floor_hangar_line', 'vm_hangar_screen', 'vm_hangar_screen_b', 'vm_hangar_console', 'temple_stone_dark', 'temple_pilaster_dark', 'amber_window_tall', 'gate_glow'])
   ok(!!R.byName[n], 'registered: ' + n);
-ok(R.types.filter(t => !/^(sulfur_red|so2_frost|ocker_dust|carbon_rubble|nickel_iron|ice_nodule|glowspar|exo_crystal|exo_moss|exo_frond|exo_glass|ferry_dock|grow_lamp|stn_gravplate|stn_clamp)$/.test(t.name)).pop().name === 'gate_glow', 'the pieces are the last block types (after the Leuchtfeuer; u-moons2: only Zinnober\'s two after them)');
+ok(R.types.filter(t => !/^(sulfur_red|so2_frost|ocker_dust|carbon_rubble|nickel_iron|ice_nodule|glowspar|exo_crystal|exo_moss|exo_frond|exo_glass|ferry_dock|grow_lamp|stn_gravplate|stn_clamp|bloom_snow_leaves|bloom_lilac_leaves|bloom_gold_leaves|bloom_rose_leaves|candle_flower|umbel_flower|bell_tower_flower|glowbell|clover)$/.test(t.name)).pop().name === 'gate_glow', 'the pieces are the last block types (after the Leuchtfeuer; u-moons2: only Zinnober\'s two after them)');
 // the screen's face looks into the hall: facing 1 (the west wall) puts the glowing face east of the back plate
 {
   const m = VM.MODELS.vm_hangar_screen; VM.materialize(m);

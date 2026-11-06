@@ -15,6 +15,7 @@
   // whole segments (case-sensitive, as the data writes them)
   const PHRASE = {
     'Nickel Iron': 'Nickeleisen', 'Ice Nodule': 'Eisknolle', 'Glowspar': 'Glimmspat',   // u-fields2: the rubble bodies' ores
+    'Snow Blossom': 'Schneeblüte', 'Lilac Blossom': 'Lilablüte', 'Gold Blossom': 'Goldblüte', 'Rose Blossom': 'Rosenblüte', 'Candle Flower': 'Kerzenblume', 'Umbel Flower': 'Schirmblume', 'Bell Tower Flower': 'Glockenturm', 'Glowbell': 'Glimmglocke', 'Clover': 'Klee',   // v-flora: the blooming flora (flora_blocks.js)
     'Frost Prism': 'Frostprisma', 'Violet Moss': 'Violettmoos', 'Violet Frond': 'Violettwedel', 'Dune Glass': 'Dünenglas',   // u-stars2: the worlds of other stars
     'Palm Crown': 'Palmenkrone', 'Round Tree Small': 'Rundbaum klein', 'Round Tree Large': 'Rundbaum groß', 'Grass Tuft': 'Grasbüschel',
     'Flower Cluster': 'Blumenbüschel', 'Blossom Bush': 'Blütenbusch', 'Rice Row Crop': 'Reisreihen-Feld',
