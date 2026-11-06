@@ -55819,6 +55819,12 @@ VR.I18N.add('en',{
 'g.set.xBlur.tip':'Motion blur like a film camera — only in camera flights and trailers, never while playing.',
 'g.set.xRange':'Tonal range',
 'g.set.xRange.tip':'The full range of brightness: bright surfaces glow, shadows turn rich and dark by day, the middle stays. Costs almost nothing.',
+'g.set.qLeaf':'Leafy crowns',
+'g.set.qLeaf.tip':'Tree crowns as rounded leaf masses: light and shade across the whole crown, a warm rim against the sun, ragged edges instead of leaf cubes. Needs fancy leaves. Costs little.',
+'g.set.qSky':'Colour script',
+'g.set.qSky.tip':'A sky that matches the ground: by day a warm haze at the horizon and a clear blue instead of violet, space only high up. Costs nothing.',
+'g.set.qPlaza':'Plaza paving',
+'g.set.qPlaza.tip':'Light plaza floors as warm stone with slabs, joints and wear – no more glare. Costs little.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -60612,6 +60618,12 @@ VR.I18N.add('de',{
 'g.set.xBlur.tip':'Bewegungsunschärfe wie bei einer Filmkamera — nur in Kamerafahrten und Trailern, nie beim Spielen.',
 'g.set.xRange':'Tonumfang',
 'g.set.xRange.tip':'Volle Helligkeitsspanne: helle Flächen leuchten, Schatten werden tagsüber satt dunkel, die Mitte bleibt. Kostet fast nichts.',
+'g.set.qLeaf':'Laubkronen',
+'g.set.qLeaf.tip':'Baumkronen als runde Blätterballen: Licht und Schatten über die ganze Krone, warmer Rand im Gegenlicht, ausgefranste Ränder statt Blätterwürfel. Braucht schöne Blätter. Kostet wenig.',
+'g.set.qSky':'Farbdrehbuch',
+'g.set.qSky.tip':'Ein Himmel, der zum Boden passt: tagsüber warmer Dunst am Horizont und klares Blau statt Violett, das All nur ganz oben. Kostet nichts.',
+'g.set.qPlaza':'Platzbelag',
+'g.set.qPlaza.tip':'Helle Platzböden als warmer Stein mit Platten, Fugen und Gebrauchsspuren – sie blenden nicht mehr. Kostet wenig.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',
@@ -68507,6 +68519,264 @@ return s / 9.0;
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const QA=VR.QArt=VR.QArt||{};
+const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
+const sstep=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
+const fract=(x)=>x-Math.floor(x);
+const mix=(a,b,t)=>a+(b-a)*t;
+const mix3=(a,b,t)=>[mix(a[0],b[0],t),mix(a[1],b[1],t),mix(a[2],b[2],t)];
+
+
+QA.SW=['qLeaf','qSky','qPlaza'];
+const OFF={qLeaf:false,qSky:false,qPlaza:false};
+const ON={qLeaf:true,qSky:true,qPlaza:true};
+const TIERS={potato:OFF,low:OFF,balanced:ON,high:ON,ultra:ON,ultraLite:ON};
+QA.defaults=(preset)=>Object.assign({},TIERS[preset]||OFF);
+QA.off=()=>Object.assign({},OFF);
+QA.ROWS=[
+{key:'qLeaf',g:'img',sec:'light',t:'switch',lab:'g.set.qLeaf',tip:'g.set.qLeaf.tip',cost:'low',def:false},
+{key:'qSky',g:'img',sec:'light',t:'switch',lab:'g.set.qSky',tip:'g.set.qSky.tip',cost:'low',def:false},
+{key:'qPlaza',g:'img',sec:'light',t:'switch',lab:'g.set.qPlaza',tip:'g.set.qPlaza.tip',cost:'low',def:false},
+];
+
+QA.key=(q,fancy)=>(q?[q.qLeaf&&fancy!==false?1:0,q.qSky?1:0,q.qPlaza?1:0]:[0,0,0]).join('');
+QA.q=OFF;QA.fancy=true;
+QA.use=function(q,fancy){QA.q=q||OFF;if(fancy!==undefined)QA.fancy=fancy!==false;return QA.q;};
+
+
+
+
+
+
+
+
+
+
+QA.LEAF={cell:3.2,rad:1.5,k:3.5,nrm:0.85,inner:0.55,inR:[0.1,-0.7],sky:0.45,corner:[0.22,0.44],cutP:0.55,rag:0.18,far:[64,110]};
+
+const hash13=(x,y,z)=>{
+let a=fract(x*0.1031),b=fract(y*0.1031),c=fract(z*0.1031);
+const s=a*(c+31.32)+b*(b+31.32)+c*(a+31.32);
+a+=s;b+=s;c+=s;
+return fract((a+b)*c);
+};
+QA.hash13=hash13;
+
+QA.clump=function(p){
+const L=QA.LEAF,s=[L.cell,L.cell*0.85,L.cell],b=[0,1,2].map(i=>Math.floor(p[i]/s[i]-0.5));
+let acc=0;const nn=[0,0,0];
+for(let i=0;i<8;i++){
+const c=[b[0]+(i&1),b[1]+((i>>1)&1),b[2]+((i>>2)&1)];
+const h=[hash13(c[0],c[1],c[2]),hash13(c[0]+17,c[1]+31,c[2]+47),hash13(c[0]+59,c[1]+13,c[2]+71)];
+const d=[0,1,2].map(k=>p[k]-(c[k]+0.5+(h[k]-0.5)*0.6)*s[k]);
+const l=Math.hypot(d[0],d[1],d[2])+1e-4,sd=l-L.rad*(0.8+0.4*h[0]),w=Math.exp(-L.k*sd);
+acc+=w;for(let k=0;k<3;k++)nn[k]+=w*d[k]/l;
+}
+nn[1]+=0.15*acc;
+const nl=Math.hypot(nn[0],nn[1],nn[2])||1;
+return[nn[0]/nl,nn[1]/nl,nn[2]/nl,-Math.log(acc)/L.k];
+};
+
+
+QA.green=(c)=>clamp((c[1]-Math.max(c[0],c[2]))/Math.max(c[1],1e-3)*6,0,1);
+
+QA.plane=(w,face)=>(face<=1?[w[1],w[2],w[0]]:face<=3?[w[2],w[0],w[1]]:[w[0],w[1],w[2]]);
+
+QA.cut=function(w,face,dist){
+const L=QA.LEAF,pp=QA.plane(w,face),pl=Math.floor(pp[2]+0.5);
+const tq=[Math.floor(pp[0]*16),Math.floor(pp[1]*16)];
+const f=[(tq[0]+0.5)/16-Math.floor(pp[0]),(tq[1]+0.5)/16-Math.floor(pp[1])];
+const g=[Math.floor(pp[0]+0.5)-Math.floor(pp[0]),Math.floor(pp[1]+0.5)-Math.floor(pp[1])];
+const dd=[Math.abs(f[0]-g[0]),Math.abs(f[1]-g[1])];
+const fade=1-sstep(L.far[0],L.far[1],dist);
+const hv=hash13(Math.floor(pp[0])+g[0]*0.5+0.13,Math.floor(pp[1])+g[1]*0.5+0.29,pl);
+const r=hv<L.cutP?mix(L.corner[0],L.corner[1],hv/L.cutP)*fade:0;
+const n=hash13(tq[0]+0.5,tq[1]+0.5,pl*1.37+0.11);
+if(r<=0)return false;
+if(dd[0]<r&&dd[1]<r&&Math.hypot(r-dd[0],r-dd[1])>r*(0.7+0.6*n))return true;
+return Math.min(dd[0],dd[1])<1/16&&n>1-L.rag*fade&&Math.max(dd[0],dd[1])<0.5-1/16;
+};
+
+
+
+
+QA.PLAZA={knee:0.2,keep:0.25,vary:0.14,wear:0.2,joint:0.5};
+QA.PLAZA_BLOCKS=['vx_floor_plaza','vx_floor_plaza_line','vx_floor_marble','vx_floor_checker','vx_floor_tile','vx_floor_hex','travertine','granite_paver','vollton_white_gloss','smooth_quartz','polished_andesite'];
+QA.plazaLum=(l)=>(l>QA.PLAZA.knee?QA.PLAZA.knee+(l-QA.PLAZA.knee)*QA.PLAZA.keep:l);
+
+QA.plazaLayers=function(){
+const R=VR.R;if(!R|| !R.T|| !R.T.tex|| !R.byName)return[];
+const out=new Set();
+for(const n of QA.PLAZA_BLOCKS){
+const t=R.byName[n];if(!t)continue;
+for(let id=t.base,n=Math.min(t.nstates|0,16);id<t.base+n;id++){const L=R.T.tex[id*6+2];if(L!==undefined&&L>=0)out.add(L&4095);}
+}
+return[...out].sort((a,b)=>a-b).slice(0,24);
+};
+
+
+
+QA.PLAZA_VX=['vx_tile','vx_tile_gloss','vx_smooth','vx_smooth_gloss','vx_mat_marble','vx_mat_stone'];
+QA.plazaVxLayers=function(){
+const R=VR.R;if(!R|| !R.texIndex)return[];
+return QA.PLAZA_VX.map(n=>R.texIndex[n]).filter(l=>l>0).sort((a,b)=>a-b);
+};
+
+QA.vxFloor=(y)=>Math.abs(y-Math.round(y))<0.01;
+
+
+
+
+
+
+QA.SKY={
+hor:[0.57,0.585,0.56],mid:[0.12,0.27,0.56],zen:[0.04,0.105,0.33],stops:[0.34,0.28,0.88,0.22],
+space:[0.6,1.0,0.3,0.22],amb:[0.42,0.45,0.56],fog:0.5,
+};
+
+QA.dayW=(sy)=>sstep(0.03,0.2,sy);
+
+QA.skyScript=function(E,sy,rain,dark){
+const S=QA.SKY,k=QA.dayW(sy)*(1-clamp(rain||0,0,1)*0.85)*(1-clamp(dark||0,0,1)*0.6);
+if(!(k>0.001))return E;
+E.horizon=mix3(E.horizon,S.hor,k);E.skyMid=mix3(E.skyMid,S.mid,k);E.zenith=mix3(E.zenith,S.zen,k);
+if(E.skyStops)E.skyStops=E.skyStops.map((v,i)=>mix(v,S.stops[i],k));
+if(E.skySpace)E.skySpace=E.skySpace.map((v,i)=>mix(v,S.space[i],k));
+if(E.ambSky){const l0=E.ambSky[0]*0.3+E.ambSky[1]*0.59+E.ambSky[2]*0.11,l1=S.amb[0]*0.3+S.amb[1]*0.59+S.amb[2]*0.11;E.ambSky=mix3(E.ambSky,S.amb.map(v=>v*l0/l1),k);}
+if(E.fogColor)E.fogColor=mix3(E.fogColor,mix3(S.hor,S.mid,S.fog),k);
+return E;
+};
+
+
+const LEAF_PROGS={terrain:1,terrainCut:1,terrainCutZ:1};
+const f3=(x)=>x.toFixed(3);
+QA.definesFor=function(name,q,fancy){
+q=q||QA.q;if(fancy===undefined)fancy=QA.fancy;
+const out=[];
+if(q.qLeaf&&fancy&&LEAF_PROGS[name]){
+const L=QA.LEAF;
+out.push('Q_LEAF','Q_CELL '+f3(L.cell),'Q_RAD '+f3(L.rad),'Q_K '+f3(L.k),'Q_LEAF_N '+f3(L.nrm),'Q_LEAF_IN '+f3(L.inner),'Q_LEAF_SKY '+f3(L.sky));
+}
+if(q.qPlaza&&name==='terrain'){
+
+
+const lay=QA.plazaLayers(),vx=QA.plazaVxLayers(),or=(a)=>(a.length?a.map(x=>'l == '+x.toFixed(1)).join(' || '):'false');
+out.push('Q_PLAZA','Q_PLAZA_L(l) ('+or(lay)+')','Q_PLAZA_V(l) ('+or(vx)+')');
+}
+return out;
+};
+QA.hook=function(name,defines){
+const extra=QA.definesFor(name);
+if(!extra.length)return defines||[];
+return(defines||[]).concat(extra.filter(d=> !(defines||[]).includes(d)));
+};
+if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>QA.hook(name,prev?prev(name,defines):(defines||[]));}
+
+
+
+
+QA.glslVS=function(){
+return`
+#if defined(Q_LEAF) && !defined(MODEL)
+
+out vec4 v_qC;
+float qH13(vec3 p3) { p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+
+vec4 qClump(vec3 p) {
+vec3 s = vec3(Q_CELL, Q_CELL * 0.85, Q_CELL), b = floor(p / s - 0.5), nn = vec3(0.0);
+float acc = 0.0;
+for (int i = 0; i < 8; i++) {
+vec3 c = b + vec3(float(i & 1), float((i >> 1) & 1), float((i >> 2) & 1));
+vec3 h = vec3(qH13(c), qH13(c + vec3(17.0, 31.0, 47.0)), qH13(c + vec3(59.0, 13.0, 71.0)));
+vec3 d = p - (c + 0.5 + (h - 0.5) * 0.6) * s;
+float l = length(d) + 1e-4, w = exp(-Q_K * (l - Q_RAD * (0.8 + 0.4 * h.x)));
+acc += w; nn += d * (w / l);
+}
+return vec4(normalize(nn + vec3(0.0, 0.15 * acc, 0.0)), -log(acc) / Q_K);
+}
+#endif
+`;
+};
+
+QA.glslTerrain=function(){
+const L=QA.LEAF,P=QA.PLAZA;
+return`
+#if defined(Q_LEAF) && !defined(MODEL)
+
+float qGreen(vec3 c) { return clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3) * 6.0, 0.0, 1.0); }
+bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u; }
+in vec4 v_qC;
+
+bool qCut(vec3 w, uint face, float dist) {
+vec3 pp = face <= 1u ? w.yzx : face <= 3u ? w.zxy : w.xyz;
+float pl = floor(pp.z + 0.5);
+vec2 tq = floor(pp.xy * 16.0), bl = floor(pp.xy);
+vec2 f = (tq + 0.5) / 16.0 - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
+float fade = 1.0 - smoothstep(${L.far[0].toFixed(1)}, ${L.far[1].toFixed(1)}, dist);
+float hv = hash13(vec3(bl + g * 0.5 + vec2(0.13, 0.29), pl));
+float r = hv < ${f3(L.cutP)} ? mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hv / ${f3(L.cutP)}) * fade : 0.0;
+float n = hash13(vec3(tq + 0.5, pl * 1.37 + 0.11));
+if (r <= 0.0) return false;
+if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (0.7 + 0.6 * n)) return true;
+return min(dd.x, dd.y) < 0.0625 && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.4375;
+}
+
+
+vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
+float inner = smoothstep(${f3(QA.LEAF.inR[0])}, ${f3(QA.LEAF.inR[1])}, c.w);
+col *= mix(1.0, Q_LEAF_IN, inner);
+float lit = clamp(dot(c.xyz, L) * 0.5 + 0.5, 0.0, 1.0);
+col *= mix(0.83, 1.06, lit) * mix(vec3(1.0), mix(vec3(0.89, 1.01, 1.14), vec3(1.06, 1.01, 0.87), lit), qGreen(alb));
+float rim = 1.0 - clamp(dot(c.xyz, V), 0.0, 1.0); rim = rim * rim * rim;
+float back = clamp(dot(-V, L), 0.0, 1.0); back *= back; back *= back;
+col += alb * sun * vec3(1.0, 1.0, 0.55) * (rim * 0.35 + back * 0.45 * (1.0 - inner));
+col += alb * amb * rim * 0.25;
+return col;
+}
+#endif
+#if defined(Q_PLAZA) && !defined(MODEL)
+
+bool qPlazaL(float l, float y) { return Q_PLAZA_L(l) || (Q_PLAZA_V(l) && abs(y - floor(y + 0.5)) < 0.01); }
+vec3 qPlaza(vec3 a, vec3 w) {
+float l = dot(a, vec3(0.2126, 0.7152, 0.0722)) + 1e-4;
+float lt = l > ${f3(P.knee)} ? ${f3(P.knee)} + (l - ${f3(P.knee)}) * ${f3(P.keep)} : l;
+float h = hash13(vec3(floor(w.xz), 7.0));
+vec2 f = fract(w.xz), e = min(f, 1.0 - f);
+float joint = 1.0 - smoothstep(0.012, 0.05, min(e.x, e.y));
+float mott = texture(u_noise, w.xz * 0.043).r * 0.6 + texture(u_noise, w.xz * 0.19 + vec2(0.31, 0.77)).g * 0.4;
+vec3 c = a * (lt / l) * mix(vec3(1.08, 0.99, 0.84), vec3(1.0, 0.97, 0.92), h);
+c *= 1.0 + (h - 0.5) * ${f3(P.vary*2)};
+c *= 1.0 + (mott - 0.5) * ${f3(P.wear*2)};
+return c * (1.0 - ${f3(P.joint)} * joint);
+}
+#endif
+`;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const FX=VR.WaterFx={
@@ -70812,7 +71082,7 @@ out float v_sheen;
 flat out float v_ground;
 ${VR.Wind?VR.Wind.glsl():''}
 #endif
-void main() {
+${(VR.QArt&&VR.QArt.glslVS)?VR.QArt.glslVS():''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
 v_fade = u_origins[gl_DrawID].w;
@@ -70840,6 +71110,9 @@ vec3 wp = rel + u_camFrac;
 bool ctmFace = ((a_w5 >> 14u) & 1u) == 1u;
 uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
 uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
+#if defined(Q_LEAF) && !defined(MODEL)
+v_qC = (leaf > 0u && sway == 0u) ? qClump(wp + vec3(u_camInt)) : vec4(0.0, 1.0, 0.0, 0.0);
+#endif
 #ifdef MOTION
 
 
@@ -71133,7 +71406,7 @@ if (Fc > g_ssrW * 0.5) g_ssrN = nc;
 return c;
 }
 #endif
-void main() {
+${(VR.QArt&&VR.QArt.glslTerrain)?VR.QArt.glslTerrain():''}void main() {
 #ifdef MODEL
 if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -71186,6 +71459,9 @@ vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #endif
 #ifdef CUTOUT
 if (alb.a < 0.5) discard;
+#if defined(Q_LEAF) && !defined(MODEL)
+if (qLeafF() && qGreen(alb.rgb * v_tint) > 0.5 && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;
+#endif
 #ifdef ZPRE
 o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;
 #endif
@@ -71356,6 +71632,12 @@ T = u_normalMat * T; Bt = u_normalMat * Bt;
 vec3 n = normalize(N * sqrt(max(0.0, 1.0 - dot(nxy, nxy))) + T * nxy.x + Bt * nxy.y);
 if (u_matTier > 1.5) n = normalize(n - (bumpW - dot(bumpW, n) * n));
 if (noshade) n = vec3(0.0, 1.0, 0.0);
+#if defined(Q_LEAF) && !defined(MODEL)
+
+bool qLf = qLeafF();
+vec4 qC = vec4(0.0, 1.0, 0.0, 0.0);
+if (qLf) { qC = vec4(normalize(v_qC.xyz), v_qC.w); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
+#endif
 #ifdef PBR
 
 if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
@@ -71364,11 +71646,17 @@ float rough = clamp(mat.b + dRough, 0.02, 1.0);
 if (fam == 3) rough = 0.97;
 rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);
 rough = mix(rough, 0.03, pud);
+#if defined(Q_PLAZA) && !defined(MODEL)
+if (face == 2u && qPlazaL(layer, v_localPos.y + float(u_camInt.y))) alb.rgb = qPlaza(alb.rgb, v_localPos + vec3(u_camInt));
+#endif
 alb.rgb *= (1.0 + dAlb) * (1.0 - 0.55 * pud);
 float emis = mat.a;
 
 float sky = v_sky;
 float skyL = sky * sky * (3.0 - 2.0 * sky);
+#if defined(Q_LEAF) && !defined(MODEL)
+if (qLf) skyL = mix(skyL, 1.0, Q_LEAF_SKY);
+#endif
 vec3 bl = v_block;
 vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
@@ -71392,8 +71680,14 @@ float ndl = noshade ? 0.65 : max(dot(n, L), 0.0);
 
 if (!noshade && ((v_w5 >> 14u) & 1u) == 0u && ((v_w5 >> 5u) & 7u) != 0u) ndl = l2Wrap(dot(n, L), u_l2K.z) * step(-0.2, dot(N, L));
 #endif
+#if defined(Q_LEAF) && !defined(MODEL)
+if (qLf) ndl = clamp((dot(n, L) + 0.3) / 1.3, 0.0, 1.0);
+#endif
 float outdoors = smoothstep(0.55, 0.95, sky);
 float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#if defined(Q_LEAF) && !defined(MODEL)
+if (qLf && ndl > 0.0 && outdoors > 0.0 && dot(N, L) <= -0.2) sh = shadowAt(-N, L);
+#endif
 #ifdef CLOUDSH
 sh *= cloudShadow(v_localPos + vec3(u_camInt));
 #endif
@@ -71427,6 +71721,9 @@ alb.rgb *= (1.0 - wetK * (0.42 * pr + 0.12 * (1.0 - pr))) * (1.0 - 0.34 * pud); 
 if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
 #endif
 vec3 col = alb.rgb * lighting;
+#if defined(Q_LEAF) && !defined(MODEL)
+if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);
+#endif
 #if defined(PBR)
 
 if (!noshade) col = pbrShade(col, alb.rgb, n, N, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
@@ -80006,6 +80303,29 @@ B.vp.set(this.vpNJ);B.eye[0]=cam.x;B.eye[1]=cam.y;B.eye[2]=cam.z;B.t=d.t;B.si=d.
 
 
 
+(function(VR){
+'use strict';
+const QA=VR.QArt;
+if(!QA|| !VR.Renderer)return;
+const R=VR.Renderer.prototype;
+const fancyNow=()=>{const g=VR.game;return!(g&&g.settings&&g.settings.fancyLeaves===false);};
+const bp0=R.buildPrograms;
+R.buildPrograms=function(){const f=fancyNow();QA.use(this.q,f);this.qaKey=QA.key(this.q,f);return bp0.apply(this,arguments);};
+const aq0=R.applyQ;
+R.applyQ=function(full){
+const r=aq0.call(this,full);
+QA.use(this.q);
+if(QA.key(this.q,fancyNow())!==this.qaKey)this.buildPrograms();
+return r;
+};
+})(VR);
+
+
+
+
+
+
+
 
 
 
@@ -82686,6 +83006,7 @@ const Np=[Y[0]*c+X[0]*sn,Y[1]*c+X[1]*sn,Y[2]*c+X[2]*sn];
 E.ringNormal=norm([Np[0]*0.94-P[0]*0.34,Np[1]*0.94-P[1]*0.34,Np[2]*0.94-P[2]*0.34]);
 }
 }
+if(dim==='overworld'&&SKY.on&&VR.QArt&&VR.QArt.q.qSky)VR.QArt.skyScript(E,sy,rain,W.dark);
 
 const rd=(o.renderDist||8)*16;
 let fogStart=rd*0.62,fogEnd=rd*1.0,dens=0.0002+rain*0.0035;
@@ -107312,6 +107633,7 @@ if(VR.Light2&&VR.Light2.ROWS)for(const it of VR.Light2.ROWS)S.add(Object.assign(
 
 if(VR.Sky3&&VR.Sky3.ROWS)for(const it of VR.Sky3.ROWS)S.add(Object.assign({},it));
 if(VR.Look&&VR.Look.ROWS)for(const it of VR.Look.ROWS)S.add(Object.assign({},it));
+if(VR.QArt&&VR.QArt.ROWS)for(const it of VR.QArt.ROWS)S.add(Object.assign({},it));
 if(VR.XTop&&VR.XTop.ROWS)for(const it of VR.XTop.ROWS)S.add(Object.assign({},it));
 if(VR.LField&&VR.LField.ROWS_SET)for(const it of VR.LField.ROWS_SET)S.add(Object.assign({},it));
 
@@ -117380,6 +117702,9 @@ if(VR.Look)for(const p in PRESETS)Object.assign(PRESETS[p],VR.Look.defaults(p));
 const XT_SW=VR.XTop?VR.XTop.SW:[];
 if(VR.XTop)for(const p in PRESETS)Object.assign(PRESETS[p],VR.XTop.defaults(p));
 
+const QA_SW=VR.QArt?VR.QArt.SW:[];
+if(VR.QArt)for(const p in PRESETS)Object.assign(PRESETS[p],VR.QArt.defaults(p));
+
 const LF_SW=VR.LField?VR.LField.SW:[];
 if(VR.LField)for(const p in PRESETS)Object.assign(PRESETS[p],VR.LField.defaults(p));
 
@@ -117452,6 +117777,7 @@ for(const k of S3_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRES
 
 for(const k of LV_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Look.off()[k]:PRESETS.balanced[k]);
 for(const k of XT_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:VR.XTop.off()[k];
+for(const k of QA_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.QArt.off()[k]:PRESETS.balanced[k]);
 for(const k of LF_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:false;
 
 if(s.smoothFolk===undefined&&s.preset)out.smoothFolk=PRESETS[s.preset]?PRESETS[s.preset].smoothFolk:((s.vxLod|0)>=44&& !s.lite?1:0);
@@ -117538,6 +117864,7 @@ if(key!=='*'&&L2_SW.includes(key))S.preset='custom';
 if(key!=='*'&&S3_SW.includes(key))S.preset='custom';
 if(key!=='*'&&LV_SW.includes(key))S.preset='custom';
 if(key!=='*'&&XT_SW.includes(key))S.preset='custom';
+if(key!=='*'&&QA_SW.includes(key))S.preset='custom';
 if(key!=='*'&&LF_SW.includes(key))S.preset='custom';
 if(key!=='*'&&F10_SW.includes(key))S.preset='custom';
 if(key!=='*'&&MO_SW.includes(key))S.preset='custom';
@@ -117559,6 +117886,7 @@ if(r&&VR.Sky3){const qb=r.qBase||(r.qBase={}),d=VR.Sky3.off();for(const k of S3_
 if(r&&VR.LField){const qb=r.qBase||(r.qBase={});for(const k of LF_SW)qb[k]= !!S[k];}
 if(r&&VR.Look){const qb=r.qBase||(r.qBase={});for(const k of LV_SW)qb[k]= !!S[k];}
 if(r&&VR.XTop){const qb=r.qBase||(r.qBase={});for(const k of XT_SW)qb[k]=k==='xDepth'?Math.max(0,Math.min(2,S[k]|0)): !!S[k];}
+if(r&&VR.QArt){const qb=r.qBase||(r.qBase={});for(const k of QA_SW)qb[k]=S[k]===undefined?(PRESETS[S.preset]? !!PRESETS[S.preset][k]:false): !!S[k];}
 if(r&&VR.IPU){const qb=r.qBase||(r.qBase={});for(const k of F10_SW)qb[k]= !!S[k];qb.dprCap= !!S.dprLite&&S.preset==='ultraLite';}
 if(r){const qb=r.qBase||(r.qBase={});qb.pbr=S.pbr===undefined?(S.lite?0:1):Math.max(0,Math.min(2,S.pbr|0));qb.texHi= !!S.texHi&& !S.lite;}
 if(r)r.setQuality({upload:S.upload||2.5,scale:S.scale,shadows:SHADOW_RES[S.shadows],shadowDist:SHADOW_DIST[S.shadows],shadowEvery:1,bloom:S.bloom,rays:S.rays,fxaa:S.fxaa,clouds:S.clouds,magic:S.magic,horizon:S.horizon,hshadow: !!S.sunShadows,hshadowDist:hDist,sharpen:S.sharpen?(S.lite?0.5:0.35):0,tsr: !!S.tsr,fadeIn:S.fadeIn!==false,vxLod:S.vxLod||48,smoothProps:S.smoothPlants|0,smoothFurn:S.smoothFurn?1:0,lite: !!S.lite,matTier:S.matTier||0,dropShadow: !!S.dropShadow,lampGlow: !!S.lampGlow,water:S.water===undefined?1:S.water,anim:S.anim!==false,shadowTakt: !!S.shadowTakt,farCache: !!S.farCache,reflLite: !!S.reflLite,motion: !!S.motion,cloudShadow: !!S.cloudShadow,wxDrama: !!S.wxDrama});
