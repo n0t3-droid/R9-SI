@@ -1325,6 +1325,7 @@
       { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
       // F9 · Weltgenerierung im Takt (Ultra · Leicht or the switch): the world streams within the frame's headroom
       w.streamTakt = !!this.settings.streamTakt && !!VR.UL;
+      w.streamPlan = this.settings.streamPlan !== false && !!VR.StreamPlan;   // p-stream: the streaming plan in fast flight (streamplan.js)
       if (w.streamTakt) w.streamMs = VR.UL.Stream.budget(this.renderer.gpuMs, this.jsMs);
       w.frameDt = dt;   // (e-perf2: the seam light's share of the frame — World.seamBudget)
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());

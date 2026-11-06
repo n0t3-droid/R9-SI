@@ -542,6 +542,8 @@
     'g.set.farCache.tip': 'Himmel und fernes Land kommen aus einem Zwischenspeicher und wandern mit dem Blick mit — neu gezeichnet erst nach 1,5 m, 4° Drehung oder einer halben Sekunde, verteilt auf vier Bilder.',
     'g.set.shadowTakt': 'Schatten-Takt (Schatten nur dort neu, wo sich etwas ändert)',
     'g.set.shadowTakt.tip': 'Die Schattenkarte bleibt in Kacheln aktuell: nah jedes Bild, weiter weg seltener; wandert die Sonne, entsteht die neue Karte über sechs Bilder. Dieselben Schatten, viel weniger Arbeit.',
+    'g.set.streamPlan': 'Schnell fliegen: Welt voraus zuerst',
+    'g.set.streamPlan.tip': 'Im schnellen Flug wird nur noch Land erzeugt, das du noch sehen wirst, wenn es fertig ist; die grobe Fernsicht füllt den Weg voraus zuerst, damit keine Löcher entstehen.',
     'g.set.streamTakt': 'Welt im Takt (das Laden nimmt sich nur, was das Bild übrig lässt)',
     'g.set.streamTakt.tip': 'Neue Landstücke werden im Bild eingebaut statt dazwischen, nie länger als das Bild Zeit hat und höchstens 2 MB pro Bild; was hinter dir zurückbleibt, wird nicht mehr erzeugt.',
     'g.set.reflLite': 'Spiegelung leicht (Wasserspiegel kleiner gerechnet, Kanten scharf)',
