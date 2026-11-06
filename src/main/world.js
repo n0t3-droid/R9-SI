@@ -214,6 +214,8 @@
       this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
       this.motion = 0;        // t-motion: the mesher writes the hung pieces' sway levels (game.js: the 'motion' setting)
       this.meshBudget = 6;
+      this.streamPlan = !!VR.StreamPlan;   // p-stream (stream.js VR.StreamPlan; game.js follows the 'streamPlan' setting)
+      this.colCacheN = 32 + 8 * this.renderDist;   // p-stream: untouched columns kept after unloading (~130 KB each: 9 MB at render distance 5)
       this.lastCol = null;
       this.shDirty = new Set(); this.shGone = new Set(); // columns whose shadow heights must reach the GPU
     }
@@ -303,6 +305,7 @@
     // stay with the frames
     update(px, py, pz, now, off) {
       this.frame++;
+      this.now = now; this.cacheHits = 0;
       if (!off) {
       // F10: the interval since the last update is the frame the last uploads shared: the scheduler's frame factor, its
       // adaptive scale and the hitch meter learn from it
@@ -326,6 +329,9 @@
       const ux = ahead ? (this.mvx / speed) : 0, uz = ahead ? (this.mvz / speed) : 0;
       const lcx = Math.round(pcx + ux * ahead), lcz = Math.round(pcz + uz * ahead);
       this.loadCenter = [lcx, lcz];
+      // p-stream · the streaming plan (stream.js VR.StreamPlan): while moving fast only the columns still in view when they are ready
+      // are asked for, in view order; the far tiles get more of the workers the more the chunks lag behind
+      const SP = this.streamPlan && VR.StreamPlan, pfast = SP ? this.planStep(speed, ux, uz, now) : false;
       // F9 · Weltgenerierung im Takt: the columns that arrived are integrated within half the frame's streaming budget
       // (at least one a frame); the queued jobs follow the player
       if (this.arrivals && this.arrivals.length) this.integrate(pcx, pcz, lcx, lcz, this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
@@ -333,9 +339,15 @@
       if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : this.seamBudget());
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
-      if (off || (this.frame & 1)) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
+      // (p-stream: with the plan the disk reaches rd + 0.5 + √2 — every column a mesh is wanted for, out to rd + 0.5, has its 8
+      // neighbours inside it; before, the rim's off-axis columns waited for neighbours outside the disk until the player
+      // came a chunk closer: 1–4 s late at a walk)
+      // (in fast flight the worth rule's margin asks for the neighbours of what it wants shown; the rim would only add columns
+      // beside the flight that are never shown)
+      const reqR = SP && !pfast ? rd + SP.RIM : loadR + 0.5, LR = Math.ceil(reqR - 0.5);
+      if (off || (this.frame & 1)) for (let dz = -LR; dz <= LR; dz++) for (let dx = -LR; dx <= LR; dx++) {
         const d2 = dx * dx + dz * dz;
-        if (d2 > (loadR + 0.5) * (loadR + 0.5)) continue;
+        if (d2 > reqR * reqR) continue;
         const cx = lcx + dx, cz = lcz + dz, k = ckey(cx, cz);
         const c = this.cols.get(k);
         if (c) { c.lastSeen = now; continue; }
@@ -343,8 +355,9 @@
         if (this.failed && this.retryAfter(k, now) > now) continue;
         // columns ahead of the flight come first: their distance is measured from a point further ahead
         const ex = cx - pcx, ez = cz - pcz;
+        if (pfast && (this.planRest || !SP.worth(ex, ez, ux, uz, speed, this.lat || SP.LAT0, this.planCot))) continue;   // (p-stream: gone by when ready)
         const along = ahead ? Math.max(0, ex * ux + ez * uz) : 0;
-        want.push([ex * ex + ez * ez - along * along * 0.5, cx, cz, k]);
+        want.push([pfast ? SP.prio(ex, ez, ux, uz, ahead, this.viewCos || 0.6) : ex * ex + ez * ez - along * along * 0.5, cx, cz, k]);
       }
       if (want.length > 1) want.sort((a, b) => a[0] - b[0]);
       if (off || (this.frame & 1)) this.lastWant = want.length;
@@ -369,16 +382,48 @@
       this.scheduleMeshes(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, [px, py, pz]);
       this.pool.pump();
     }
+    // p-stream · one frame of the streaming plan: fast (and looking roughly the way of travel: a look aside keeps the old
+    // order), the view cone, the far lane's share, every 15 frames the queued generations re-ordered from here
+    planStep(speed, ux, uz, now) {
+      const SP = VR.StreamPlan, cosH = this.viewCos || 0.6;
+      this.planCot = cosH / Math.sqrt(Math.max(1e-6, 1 - cosH * cosH));
+      let fast = SP.moving(speed);
+      const vd = this.viewDir;
+      if (fast && vd && (vd[0] * ux + vd[1] * uz) < 0.7) fast = false;
+      this.planFast = fast; this.planSpeed = speed; this.planRest = fast && SP.rest(speed, this.lat || SP.LAT0, this.renderDist);
+      if (this.planRest) this.lat = SP.ease(this.lat || SP.LAT0);
+      const U = this.planU || (this.planU = [0, 0]); U[0] = ux; U[1] = uz;
+      const pool = this.pool;
+      if (pool && pool.farShare !== undefined) pool.farShare = SP.share(speed, this.lat || SP.LAT0, this.renderDist);
+      if (fast && !this.streamTakt && pool && pool.queue && this.frame % 15 === 0 && this.center) {
+        const pc = this.center, ahead = 1;
+        for (const j of pool.queue) { const m = j.msg; if (m && (m.type === 'gen' || m.type === 'relight') && m.cx !== undefined) j.prio = SP.prio(m.cx - pc[0], m.cz - pc[1], ux, uz, ahead, cosH); }
+        pool.queueDirty = true;
+      }
+      void now;
+      return fast;
+    }
     // when a column whose generation failed may be asked for again (5 s after the failure; a failed worker is
     // replaced meanwhile, a bug in one column costs a job every few seconds instead of every frame)
     retryAfter(k, now) { const t = this.failed && this.failed.get(k); if (t === undefined) return now; if (now - t > 5000) { this.failed.delete(k); return now; } return t + 5000; }
     requestColumn(cx, cz, k, prio) {
       this.pending.set(k, true);
+      // p-stream · the column memory: a column unloaded a moment ago (untouched) comes back without the worker — its blocks
+      // kept, its own light computed again (the same as a fresh generation: computeColumnLight), at most 2 a frame
+      const hit = this.colCache && this.colCache.get(k);
+      if (hit && (this.cacheHits | 0) < 2 && !this.savedKeys.has(k)) {
+        this.colCache.delete(k); this.cacheHits = (this.cacheHits | 0) + 1;
+        const m = { type: 'gen', cx, cz, blocks: hit.blocks, light: VR.computeColumnLight(hit.blocks, this.hasSky), biome: hit.biome, caveBiome: hit.caveBiome, grass: hit.grass, foliage: hit.foliage, water: hit.water, spawns: hit.spawns, be: hit.be, sv: hit.sv, cached: true };
+        if (this.streamTakt) { (this.arrivals || (this.arrivals = [])).push({ k, m, epoch: this.styleEpoch || 0 }); return; }
+        this.pending.delete(k); this.onColumn(m); return;
+      }
+      if (this.streamPlan && this.planFast) (this.reqAt || (this.reqAt = new Map())).set(k, this.now);   // p-stream: the latency in fast flight (checkShown)
       const epoch = this.styleEpoch || 0;
       const onGen = (m) => {
         // F9 · Weltgenerierung im Takt: the column waits for the frame (integrate); its request stays pending until then
         if (m.type === 'gen' && this.streamTakt && !this.dead) { (this.arrivals || (this.arrivals = [])).push({ k, m, epoch }); return; }
         this.pending.delete(k);
+        if (m.type === 'cancelled' && this.reqAt) this.reqAt.delete(k);
         if (m.type === 'error') { (this.failed || (this.failed = new Map())).set(k, performance.now()); return; }   // asked again after a pause
         if (m.type !== 'gen') return;
         if (!this.pending && !this.cols) return;
@@ -389,6 +434,7 @@
       // a request the player has flown away from is dropped when its turn comes
       const cancel = () => {
         if (this.dead) return true; const lc = this.loadCenter || this.center; if (!lc) return false;
+        if (this.planFast && VR.StreamPlan && this.center && (this.planRest || !VR.StreamPlan.worth(cx - this.center[0], cz - this.center[1], this.planU[0], this.planU[1], this.planSpeed, this.lat || 1, this.planCot))) return true;   // p-stream: left behind
         if (this.streamTakt && VR.UL) { const pc = this.center || lc, sp = Math.hypot(this.mvx || 0, this.mvz || 0), mv = sp > 2; return VR.UL.Stream.away(cx - lc[0], cz - lc[1], cx - pc[0], cz - pc[1], this.renderDist, mv ? this.mvx / sp : 0, mv ? this.mvz / sp : 0, mv); }   // F9: left behind
         const dx = cx - lc[0], dz = cz - lc[1], r = this.renderDist + 3; return dx * dx + dz * dz > r * r;
       };
@@ -456,7 +502,14 @@
       // (a 📽 replay copy — c.zr — is never saved)
       if (c.modified && this.store && !c.zr) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
+      if (!c.modified && !c.zr && c.blocks && c.biome && this.colCacheN > 0) {   // p-stream: kept for a turn back (requestColumn)
+        const C = this.colCache || (this.colCache = new Map());
+        C.delete(c.key);
+        C.set(c.key, { blocks: c.blocks, biome: c.biome, caveBiome: c.caveBiome, grass: c.grass, foliage: c.foliage, water: c.water, spawns: c.spawns, be: c.blockEntities.size ? [...c.blockEntities] : null, sv: c.sv || 0 });
+        while (C.size > this.colCacheN) C.delete(C.keys().next().value);
+      }
       this.cols.delete(c.key); this.fading.delete(c);
+      if (this.reqAt) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); } }   // (p-stream)
       this.lastCol = null;
       this.shDirty.delete(c.key); this.shGone.add(c.key);
       for (const l of this.listeners) if (l.onColumnUnloaded) l.onColumnUnloaded(c);
@@ -467,6 +520,7 @@
     restyle() {
       this.styleEpoch = (this.styleEpoch || 0) + 1;
       const epoch = this.styleEpoch;
+      if (this.colCache) this.colCache.clear();   // (p-stream: made under the old style)
       for (const k of [...this.pending.keys()]) this.pending.delete(k);
       const p = this.center || [0, 0];
       const cols = [...this.cols.values()].sort((a, b) => ((a.cx - p[0]) ** 2 + (a.cz - p[1]) ** 2) - ((b.cx - p[0]) ** 2 + (b.cz - p[1]) ** 2));
@@ -636,6 +690,8 @@
       // renderer has it (the TSR resolves the turning dither), else whole at once (Stream.fadePlan)
       const lp = this.lastPos, r = this.renderer;
       const plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
+      // (the latency is learnt in fast flight only: a world loading round a standing player queues far more than a flight)
+      if (this.reqAt && this.reqAt.size) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); if (this.now !== undefined && VR.StreamPlan) { if (this.planFast) this.lat = VR.StreamPlan.lat(this.lat, (this.now - t) / 1000); } } }   // (p-stream)
       c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1; c.fadeMs = plan.ms || VR.Stream.FADE_MS;   // (f-stipple2: shorter far out)
       if (c.fade < 1 || c.grow < 1) this.fading.add(c);
       for (let i = 0; i < c.sec.length; i++) { c.sec[i].fade = c.fade; c.sec[i].grow = c.grow; }

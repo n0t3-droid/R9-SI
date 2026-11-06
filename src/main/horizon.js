@@ -128,6 +128,9 @@
       let asked = 0;
       if (want.length && this.inflight < maxInflight) {
         const fo = this.focus; for (const w of want) w[4] = Horizon.prio(w[0], w[1], Horizon.focusD(fo, w[1], w[2], w[3]));
+        // p-stream: in fast flight the tiles behind the camera wait (stream.js VR.StreamPlan tileK; the world's plan knows the motion)
+        const gw = g.world, SP = VR.StreamPlan;
+        if (SP && gw && gw.streamPlan && gw.planU && SP.moving(gw.planSpeed || 0)) for (const w of want) { const S = tileSize(w[1]); w[4] += SP.tileK(w[2] * S + S / 2, w[3] * S + S / 2, S, cx, cz, gw.planU[0], gw.planU[1], gw.planSpeed); }
         want.sort((p, q) => p[4] - q[4]);
         for (const [d, L, tx, tz, k] of want) { if (this.inflight >= maxInflight) break; if (!this.tiles.has(this.key(L, tx, tz))) { this.request(L, tx, tz, d, k); asked++; } }
       }

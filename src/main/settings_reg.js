@@ -123,6 +123,8 @@
   S.snapFor = function (item, v, settings) { const hi = S.maxOf(item, settings); return hi === item.max ? S.snap(item, v) : S.snap(Object.assign({}, item, { max: hi }), v); };
   // F9 · Ultra für schwache PCs: the four switches of „Ultra · Leicht" (each makes the frame cheaper; the picture stays)
   for (const k of ['farCache', 'shadowTakt', 'streamTakt', 'reflLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
+  // p-stream: the streaming plan in fast flight (stream.js VR.StreamPlan) — on for every preset, it only saves work
+  S.add({ key: 'streamPlan', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.streamPlan', tip: 'g.set.streamPlan.tip', cost: 'low', def: true });
   // t-light2 · WOW I · Das Licht (light2.js L2.ROWS): the light model, the contact shadows, the light in the air, the air,
   // the grade — Bild · Licht & Schatten, each with its cost
   if (VR.Light2 && VR.Light2.ROWS) for (const it of VR.Light2.ROWS) S.add(Object.assign({}, it));

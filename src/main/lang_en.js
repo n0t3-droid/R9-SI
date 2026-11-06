@@ -542,6 +542,8 @@
     'g.set.farCache.tip': 'The sky and the far land come from a cache and turn with your view — redrawn only after 1.5 m, a 4° turn or half a second, spread over four frames.',
     'g.set.shadowTakt': 'Shadow takt (shadows redrawn only where something changes)',
     'g.set.shadowTakt.tip': 'The shadow map is kept up to date in tiles: near ones every frame, far ones less often; when the sun moves on, the new map is drawn over six frames. The same shadows, far less work.',
+    'g.set.streamPlan': 'Fast flight: the world ahead first',
+    'g.set.streamPlan.tip': 'In fast flight only land you will still see when it is ready is generated; the coarse far view fills the way ahead first, so no holes appear.',
     'g.set.streamTakt': 'World in step (loading takes only what the frame leaves over)',
     'g.set.streamTakt.tip': 'New land is fitted in during the frame instead of between frames, never longer than the frame has time for and at most 2 MB a frame; what you leave behind is no longer generated.',
     'g.set.reflLite': "Light mirror (the water's mirror at a quarter size, edges kept sharp)",
