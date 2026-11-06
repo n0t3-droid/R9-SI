@@ -31665,6 +31665,20 @@ return o;
 };
 
 
+
+
+
+
+LOD.FINE_VAR=0.07;
+LOD.fineNoise=function(cTop,cSide,cCliff,kind,x0,z0,step,n,N){
+const V=LOD.FINE_VAR;
+for(let j= -1;j<=n;j++)for(let i= -1;i<=n;i++){
+const k=(j+1)*N+(i+1);if(kind[k]===1)continue;
+const X=x0+i*step,Z=z0+j*step,b=1+(hh(X,Z,77)*2-1)*V,w=(hh(X,Z,78)*2-1)*V*0.35;
+const f=(c)=>(c?[Math.round(c[0]*b*(1+w)),Math.round(c[1]*b),Math.round(c[2]*b*(1-w))]:c);
+cTop[k]=f(cTop[k]);cSide[k]=f(cSide[k]);cCliff[k]=f(cCliff[k]);
+}
+};
 LOD.build=function(g,job){
 if(!g.computeClimate|| !g.n3)return null;
 const BIOMES=VR.BIOMES,SEA=VR.C.SEA;
@@ -31752,7 +31766,8 @@ const S=step;
 
 
 
-for(let k=0;k<N*N;k++){const c=cTop[k];if(c)cTop[k]=[Math.round(c[0]/8)*8,Math.round(c[1]/8)*8,Math.round(c[2]/8)*8];}
+if(L<0)LOD.fineNoise(cTop,cSide,cCliff,kind,x0,z0,step,n,N);
+else for(let k=0;k<N*N;k++){const c=cTop[k];if(c)cTop[k]=[Math.round(c[0]/8)*8,Math.round(c[1]/8)*8,Math.round(c[2]/8)*8];}
 const ckeys=new Float64Array(N*N);
 for(let k=0;k<N*N;k++){
 const c=cTop[k];if(!c)continue;
@@ -32323,6 +32338,9 @@ SP.SHARE_BASE=0.3;
 SP.SHARE_MAX=0.7;
 SP.BEHIND_K=1.5;
 SP.LAT0=1.0;SP.LAT_MIN=0.15;SP.LAT_MAX=8;
+SP.VX_SKIP=60;
+SP.IDLE_RING=1;
+SP.WALK_LATE=1;
 const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
 SP.moving=(speedB)=>speedB>=SP.FAST;
 
@@ -32380,10 +32398,15 @@ return p;
 SP.lat=function(prev,sample){const p=prev>0?prev:SP.LAT0;return clamp(p+(sample-p)*0.15,SP.LAT_MIN,SP.LAT_MAX);};
 
 
+
+
+
+
+
+SP.SHARE_FAST=0.2;SP.SHARE_HI=60;
 SP.share=function(speedB,lat,rd){
-if(!(speedB>=SP.FAST))return SP.SHARE_BASE;
-const def=(speedB/16)*lat/Math.max(1,rd*0.5);
-return SP.SHARE_BASE+(SP.SHARE_MAX-SP.SHARE_BASE)*clamp((def-0.5)/1.5,0,1);
+void lat;void rd;
+return speedB>=SP.SHARE_HI?SP.SHARE_FAST:SP.SHARE_BASE;
 };
 
 SP.tileK=function(cx,cz,S,camX,camZ,ux,uz,speedB){
@@ -35477,6 +35500,7 @@ u+=w;
 const connGroup=(s)=>{const t=R.types[TTYPE[s]];return t?(t.o.conn||0):0;};
 const HD=[5,0,4,1];
 const nbState=(bi,d)=>B[bi+DOFF[d]];
+const vxSkip= !!job.vxSkip;let vxSkipped=0;
 const vxM=VR.VX?{B,L,bufs:vxSplit?[bufs[3],bufs[1],bufs[2]]:bufs,far:vxSplit?bufs[4]:null,detail: !(vxSplit&&job.vxDetail===false),DOFF,layerTile:R.texIndex['vx_tile']|0,layerGloss:R.texIndex['vx_tile_gloss']|0,layerGlass:R.texIndex['vx_glass']|0,layerHolo:R.texIndex['vx_holo']|0,layerSmooth:R.texIndex['vx_smooth']|0,layerSmoothGloss:R.texIndex['vx_smooth_gloss']|0,layerMat:[0].concat(['fabric','leather','wood','marble','metal','plant','stone'].map(m=>R.texIndex['vx_mat_'+m]|0)),ox:job.ox|0,oy:(job.sy|0)*16,oz:job.oz|0,motion: !!job.motion}:null;
 for(let y=0;y<16;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
 const bi=P(x,y,z),b=B[bi];
@@ -35540,7 +35564,7 @@ emitCubeQuad(bufs[layer],d,x,y,z,x+1,y+1,z+1,1,1,texW3(texv,fl,d,b),w5,cornerLig
 }
 continue;
 }
-if(shape===SH.VOXEL){if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;}
+if(shape===SH.VOXEL){if(vxSkip){vxSkipped++;continue;}if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;}
 if(shape===SH.FLUID){meshFluid(x,y,z,bi,b);continue;}
 let faces=null;
 const t=R.types[TTYPE[b]];
@@ -35892,6 +35916,7 @@ if(!isLava)for(let kk=0;kk<4;kk++){const k=3-kk;buf.v(x+pts[k][0],y+pts[k][1],z+
 
 const res={opaque:bufs[0].out(),cutout:bufs[1].out(),trans:bufs[2].out(),vis:visMask};
 if(vxSplit){res.vx=bufs[3].out();res.vxFar=bufs[4].out();}
+if(vxSkipped)res.vxSkipped=vxSkipped;
 if(propOut)res.props=Int32Array.from(propOut);
 return res;
 };
@@ -49084,7 +49109,7 @@ const o=toTris(r.opaque),c=toTris(r.cutout),t=toTris(r.trans);
 const vx=r.vx?toTris(r.vx):null,vxFar=r.vxFar?toTris(r.vxFar):null;
 const tr=[o.buffer,c.buffer,t.buffer];if(vx)tr.push(vx.buffer);if(vxFar)tr.push(vxFar.buffer);
 const pr=r.props?(VR.SmoothVox?VR.SmoothVox.variants(r.props):r.props):null;if(pr)tr.push(pr.buffer);
-post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,ms:performance.now()-t0},tr);
+post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,ms:performance.now()-t0},tr);
 }else if(m.type==='smoothvox'){
 
 const r=VR.SmoothVox.job(m),tr=r.transfer;delete r.transfer;
@@ -68441,6 +68466,12 @@ VR.I18N.add('en',{
 'g.set.qSky.tip':'A sky that matches the ground: by day a warm haze at the horizon and a clear blue instead of violet, space only high up. Costs nothing.',
 'g.set.qPlaza':'Plaza paving',
 'g.set.qPlaza.tip':'Light plaza floors as warm stone with slabs, joints and wear – no more glare. Costs little.',
+'g.set.qGrass':'Meadow',
+'g.set.qGrass.tip':'Grass as a lush meadow: soft colour patches, no visible tiles, close by tufts of blades with dark roots and light tips that sway in the wind. Costs a medium amount.',
+'g.set.qIsle':'Floating isles',
+'g.set.qIsle.tip':'Floating isles with a rounded rocky underside, rock strata and moss, soft light from the land below and a soft shadow on the ground. Costs little.',
+'g.set.qCrown':'Distant crowns',
+'g.set.qCrown.tip':'Tree crowns stay round far away too, their shadows have ragged edges instead of squares; blossom crowns are lighter inside. Needs Leafy crowns. Costs little.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -73240,6 +73271,12 @@ VR.I18N.add('de',{
 'g.set.qSky.tip':'Ein Himmel, der zum Boden passt: tagsüber warmer Dunst am Horizont und klares Blau statt Violett, das All nur ganz oben. Kostet nichts.',
 'g.set.qPlaza':'Platzbelag',
 'g.set.qPlaza.tip':'Helle Platzböden als warmer Stein mit Platten, Fugen und Gebrauchsspuren – sie blenden nicht mehr. Kostet wenig.',
+'g.set.qGrass':'Wiese',
+'g.set.qGrass.tip':'Gras als üppige Wiese: weiche Farbflecken, keine sichtbaren Kacheln, in der Nähe Halmbüschel mit dunklen Wurzeln und hellen Spitzen, die sich im Wind wiegen. Kostet mittel.',
+'g.set.qIsle':'Schwebeinseln',
+'g.set.qIsle.tip':'Schwebende Inseln mit gerundeter Felsunterseite, Gesteinsschichten und Moos, sanftem Licht vom Land darunter und einem weichen Schatten auf dem Boden. Kostet wenig.',
+'g.set.qCrown':'Fernkronen',
+'g.set.qCrown.tip':'Baumkronen bleiben auch in der Ferne rund, ihre Schatten haben ausgefranste Ränder statt Quadrate; Blütenkronen sind innen heller. Braucht Laubkronen. Kostet wenig.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',

@@ -7465,7 +7465,7 @@ const o=toTris(r.opaque),c=toTris(r.cutout),t=toTris(r.trans);
 const vx=r.vx?toTris(r.vx):null,vxFar=r.vxFar?toTris(r.vxFar):null;
 const tr=[o.buffer,c.buffer,t.buffer];if(vx)tr.push(vx.buffer);if(vxFar)tr.push(vxFar.buffer);
 const pr=r.props?(VR.SmoothVox?VR.SmoothVox.variants(r.props):r.props):null;if(pr)tr.push(pr.buffer);
-post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,ms:performance.now()-t0},tr);
+post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,ms:performance.now()-t0},tr);
 }else if(m.type==='smoothvox'){
 
 const r=VR.SmoothVox.job(m),tr=r.transfer;delete r.transfer;
@@ -38110,6 +38110,20 @@ return o;
 };
 
 
+
+
+
+
+LOD.FINE_VAR=0.07;
+LOD.fineNoise=function(cTop,cSide,cCliff,kind,x0,z0,step,n,N){
+const V=LOD.FINE_VAR;
+for(let j= -1;j<=n;j++)for(let i= -1;i<=n;i++){
+const k=(j+1)*N+(i+1);if(kind[k]===1)continue;
+const X=x0+i*step,Z=z0+j*step,b=1+(hh(X,Z,77)*2-1)*V,w=(hh(X,Z,78)*2-1)*V*0.35;
+const f=(c)=>(c?[Math.round(c[0]*b*(1+w)),Math.round(c[1]*b),Math.round(c[2]*b*(1-w))]:c);
+cTop[k]=f(cTop[k]);cSide[k]=f(cSide[k]);cCliff[k]=f(cCliff[k]);
+}
+};
 LOD.build=function(g,job){
 if(!g.computeClimate|| !g.n3)return null;
 const BIOMES=VR.BIOMES,SEA=VR.C.SEA;
@@ -38197,7 +38211,8 @@ const S=step;
 
 
 
-for(let k=0;k<N*N;k++){const c=cTop[k];if(c)cTop[k]=[Math.round(c[0]/8)*8,Math.round(c[1]/8)*8,Math.round(c[2]/8)*8];}
+if(L<0)LOD.fineNoise(cTop,cSide,cCliff,kind,x0,z0,step,n,N);
+else for(let k=0;k<N*N;k++){const c=cTop[k];if(c)cTop[k]=[Math.round(c[0]/8)*8,Math.round(c[1]/8)*8,Math.round(c[2]/8)*8];}
 const ckeys=new Float64Array(N*N);
 for(let k=0;k<N*N;k++){
 const c=cTop[k];if(!c)continue;
@@ -38768,6 +38783,9 @@ SP.SHARE_BASE=0.3;
 SP.SHARE_MAX=0.7;
 SP.BEHIND_K=1.5;
 SP.LAT0=1.0;SP.LAT_MIN=0.15;SP.LAT_MAX=8;
+SP.VX_SKIP=60;
+SP.IDLE_RING=1;
+SP.WALK_LATE=1;
 const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
 SP.moving=(speedB)=>speedB>=SP.FAST;
 
@@ -38825,10 +38843,15 @@ return p;
 SP.lat=function(prev,sample){const p=prev>0?prev:SP.LAT0;return clamp(p+(sample-p)*0.15,SP.LAT_MIN,SP.LAT_MAX);};
 
 
+
+
+
+
+
+SP.SHARE_FAST=0.2;SP.SHARE_HI=60;
 SP.share=function(speedB,lat,rd){
-if(!(speedB>=SP.FAST))return SP.SHARE_BASE;
-const def=(speedB/16)*lat/Math.max(1,rd*0.5);
-return SP.SHARE_BASE+(SP.SHARE_MAX-SP.SHARE_BASE)*clamp((def-0.5)/1.5,0,1);
+void lat;void rd;
+return speedB>=SP.SHARE_HI?SP.SHARE_FAST:SP.SHARE_BASE;
 };
 
 SP.tileK=function(cx,cz,S,camX,camZ,ux,uz,speedB){
@@ -41922,6 +41945,7 @@ u+=w;
 const connGroup=(s)=>{const t=R.types[TTYPE[s]];return t?(t.o.conn||0):0;};
 const HD=[5,0,4,1];
 const nbState=(bi,d)=>B[bi+DOFF[d]];
+const vxSkip= !!job.vxSkip;let vxSkipped=0;
 const vxM=VR.VX?{B,L,bufs:vxSplit?[bufs[3],bufs[1],bufs[2]]:bufs,far:vxSplit?bufs[4]:null,detail: !(vxSplit&&job.vxDetail===false),DOFF,layerTile:R.texIndex['vx_tile']|0,layerGloss:R.texIndex['vx_tile_gloss']|0,layerGlass:R.texIndex['vx_glass']|0,layerHolo:R.texIndex['vx_holo']|0,layerSmooth:R.texIndex['vx_smooth']|0,layerSmoothGloss:R.texIndex['vx_smooth_gloss']|0,layerMat:[0].concat(['fabric','leather','wood','marble','metal','plant','stone'].map(m=>R.texIndex['vx_mat_'+m]|0)),ox:job.ox|0,oy:(job.sy|0)*16,oz:job.oz|0,motion: !!job.motion}:null;
 for(let y=0;y<16;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
 const bi=P(x,y,z),b=B[bi];
@@ -41985,7 +42009,7 @@ emitCubeQuad(bufs[layer],d,x,y,z,x+1,y+1,z+1,1,1,texW3(texv,fl,d,b),w5,cornerLig
 }
 continue;
 }
-if(shape===SH.VOXEL){if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;}
+if(shape===SH.VOXEL){if(vxSkip){vxSkipped++;continue;}if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;}
 if(shape===SH.FLUID){meshFluid(x,y,z,bi,b);continue;}
 let faces=null;
 const t=R.types[TTYPE[b]];
@@ -42337,6 +42361,7 @@ if(!isLava)for(let kk=0;kk<4;kk++){const k=3-kk;buf.v(x+pts[k][0],y+pts[k][1],z+
 
 const res={opaque:bufs[0].out(),cutout:bufs[1].out(),trans:bufs[2].out(),vis:visMask};
 if(vxSplit){res.vx=bufs[3].out();res.vxFar=bufs[4].out();}
+if(vxSkipped)res.vxSkipped=vxSkipped;
 if(propOut)res.props=Int32Array.from(propOut);
 return res;
 };
@@ -55044,7 +55069,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="e1aec6a92f3fc5c1";
+VR.TEX_SRC_HASH="3ebe6258eb629624";
 
 
 
@@ -55850,6 +55875,12 @@ VR.I18N.add('en',{
 'g.set.qSky.tip':'A sky that matches the ground: by day a warm haze at the horizon and a clear blue instead of violet, space only high up. Costs nothing.',
 'g.set.qPlaza':'Plaza paving',
 'g.set.qPlaza.tip':'Light plaza floors as warm stone with slabs, joints and wear – no more glare. Costs little.',
+'g.set.qGrass':'Meadow',
+'g.set.qGrass.tip':'Grass as a lush meadow: soft colour patches, no visible tiles, close by tufts of blades with dark roots and light tips that sway in the wind. Costs a medium amount.',
+'g.set.qIsle':'Floating isles',
+'g.set.qIsle.tip':'Floating isles with a rounded rocky underside, rock strata and moss, soft light from the land below and a soft shadow on the ground. Costs little.',
+'g.set.qCrown':'Distant crowns',
+'g.set.qCrown.tip':'Tree crowns stay round far away too, their shadows have ragged edges instead of squares; blossom crowns are lighter inside. Needs Leafy crowns. Costs little.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -60649,6 +60680,12 @@ VR.I18N.add('de',{
 'g.set.qSky.tip':'Ein Himmel, der zum Boden passt: tagsüber warmer Dunst am Horizont und klares Blau statt Violett, das All nur ganz oben. Kostet nichts.',
 'g.set.qPlaza':'Platzbelag',
 'g.set.qPlaza.tip':'Helle Platzböden als warmer Stein mit Platten, Fugen und Gebrauchsspuren – sie blenden nicht mehr. Kostet wenig.',
+'g.set.qGrass':'Wiese',
+'g.set.qGrass.tip':'Gras als üppige Wiese: weiche Farbflecken, keine sichtbaren Kacheln, in der Nähe Halmbüschel mit dunklen Wurzeln und hellen Spitzen, die sich im Wind wiegen. Kostet mittel.',
+'g.set.qIsle':'Schwebeinseln',
+'g.set.qIsle.tip':'Schwebende Inseln mit gerundeter Felsunterseite, Gesteinsschichten und Moos, sanftem Licht vom Land darunter und einem weichen Schatten auf dem Boden. Kostet wenig.',
+'g.set.qCrown':'Fernkronen',
+'g.set.qCrown.tip':'Baumkronen bleiben auch in der Ferne rund, ihre Schatten haben ausgefranste Ränder statt Quadrate; Blütenkronen sind innen heller. Braucht Laubkronen. Kostet wenig.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',
@@ -68750,6 +68787,20 @@ in vec4 v_qC;
 bool qCut(vec3 w, uint face, float dist) {
 vec3 pp = face <= 1u ? w.yzx : face <= 3u ? w.zxy : w.xyz;
 float pl = floor(pp.z + 0.5);
+#ifdef Q_CROWN
+
+vec2 bl = floor(pp.xy);
+float QS = dist > 40.0 + 12.0 * hash13(vec3(bl, pl + 0.7)) ? 4.0 : 16.0;
+vec2 tq = floor(pp.xy * QS);
+vec2 f = (tq + 0.5) / QS - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
+float fade = 1.0 - smoothstep(200.0, 260.0, dist);
+float hv = hash13(vec3(bl + g * 0.5 + vec2(0.13, 0.29), pl));
+float r = hv < ${f3(L.cutP)} ? mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hv / ${f3(L.cutP)}) * fade * (QS < 8.0 ? 1.35 : 1.0) : 0.0;
+float n = hash13(vec3(tq + 0.5, pl * 1.37 + 0.11));
+if (r <= 0.0) return false;
+if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (QS < 8.0 ? 0.55 + 0.5 * n : 0.7 + 0.6 * n)) return true;
+return QS > 8.0 && min(dd.x, dd.y) < 1.0 / QS && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.5 - 1.0 / QS;
+#else
 vec2 tq = floor(pp.xy * 16.0), bl = floor(pp.xy);
 vec2 f = (tq + 0.5) / 16.0 - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
 float fade = 1.0 - smoothstep(${L.far[0].toFixed(1)}, ${L.far[1].toFixed(1)}, dist);
@@ -68759,12 +68810,27 @@ float n = hash13(vec3(tq + 0.5, pl * 1.37 + 0.11));
 if (r <= 0.0) return false;
 if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (0.7 + 0.6 * n)) return true;
 return min(dd.x, dd.y) < 0.0625 && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.4375;
+#endif
 }
+#ifdef Q_CROWN
+
+
+bool qCarve(float sd, float dist, float sky) { float f = smoothstep(${f3(VR.QArt2?VR.QArt2.CROWN.carve[0]:30)}, ${f3(VR.QArt2?VR.QArt2.CROWN.carve[1]:55)}, dist); return f > 0.0 && sky > 0.97 && sd > mix(4.0, ${f3(VR.QArt2?VR.QArt2.CROWN.carveT:0.25)}, f); }
+#endif
 
 
 vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
 float inner = smoothstep(${f3(QA.LEAF.inR[0])}, ${f3(QA.LEAF.inR[1])}, c.w);
+#ifdef Q_CROWN
+
+
+float qNg = 1.0 - qGreen(alb);
+col *= mix(1.0, mix(Q_LEAF_IN, 0.86, qNg), inner);
+col += alb * sun * 0.16 * qNg * inner;
+col = max(col, alb * (u_ambSky * 0.65 + u_sunColor * (0.12 * max(u_sunDir.y, 0.0))) * qNg);
+#else
 col *= mix(1.0, Q_LEAF_IN, inner);
+#endif
 float lit = clamp(dot(c.xyz, L) * 0.5 + 0.5, 0.0, 1.0);
 col *= mix(0.83, 1.06, lit) * mix(vec3(1.0), mix(vec3(0.89, 1.01, 1.14), vec3(1.06, 1.01, 0.87), lit), qGreen(alb));
 float rim = 1.0 - clamp(dot(c.xyz, V), 0.0, 1.0); rim = rim * rim * rim;
@@ -68788,6 +68854,301 @@ vec3 c = a * (lt / l) * mix(vec3(1.08, 0.99, 0.84), vec3(1.0, 0.97, 0.92), h);
 c *= 1.0 + (h - 0.5) * ${f3(P.vary*2)};
 c *= 1.0 + (mott - 0.5) * ${f3(P.wear*2)};
 return c * (1.0 - ${f3(P.joint)} * joint);
+}
+#endif
+`;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const Q2=VR.QArt2=VR.QArt2||{};
+const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
+const sstep=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
+const fract=(x)=>x-Math.floor(x);
+const mix=(a,b,t)=>a+(b-a)*t;
+const norm=(v)=>{const l=Math.hypot(v[0],v[1],v[2])||1;return[v[0]/l,v[1]/l,v[2]/l];};
+
+
+Q2.SW=['qGrass','qIsle','qCrown'];
+const OFF={qGrass:false,qIsle:false,qCrown:false};
+const ON={qGrass:true,qIsle:true,qCrown:true};
+const TIERS={potato:OFF,low:OFF,balanced:ON,high:ON,ultra:ON,ultraLite:ON};
+Q2.defaults=(preset)=>Object.assign({},TIERS[preset]||OFF);
+Q2.off=()=>Object.assign({},OFF);
+Q2.ROWS=[
+{key:'qGrass',g:'img',sec:'light',t:'switch',lab:'g.set.qGrass',tip:'g.set.qGrass.tip',cost:'mid',def:false},
+{key:'qIsle',g:'img',sec:'light',t:'switch',lab:'g.set.qIsle',tip:'g.set.qIsle.tip',cost:'low',def:false},
+{key:'qCrown',g:'img',sec:'light',t:'switch',lab:'g.set.qCrown',tip:'g.set.qCrown.tip',cost:'low',def:false},
+];
+
+const STEPS={potato:0,low:0,balanced:6,high:8,ultra:8,ultraLite:6};
+Q2.tuftSteps=(preset)=>(STEPS[preset]!==undefined?STEPS[preset]:4);
+
+Q2.key=(q,preset,fancy)=>(q?[q.qGrass?1+Q2.tuftSteps(preset):0,q.qIsle?1:0,q.qCrown&&q.qLeaf&&fancy!==false?1:0]:[0,0,0]).join('');
+Q2.q=OFF;Q2.o={fancy:true,leaf:false,preset:'balanced'};
+Q2.use=function(q,o){Q2.q=q||OFF;if(o)Q2.o=Object.assign({},Q2.o,o);return Q2.q;};
+
+
+Q2.MAX=8;
+Q2.REACH=330;
+
+
+Q2.islesNear=function(g,cam){
+if(!g|| !g.islandCell|| !cam)return[];
+const out=[],C=72,k=Math.ceil(Q2.REACH/C)+1,ci=Math.floor(cam[0]/C),cj=Math.floor(cam[2]/C);
+const d=(I)=>Math.hypot(I.x-cam[0],I.z-cam[2])-I.r;
+try{
+if(g.islandAt)g.islandAt(cam[0],cam[2]);
+
+
+if(g.designedIslands)for(const[ox,oz]of[[0,0],[200,0],[-200,0],[0,200],[0,-200]]){const D=g.designedIslands(cam[0]+ox,cam[2]+oz);if(D)for(const I of D)if(d(I)<Q2.REACH&&out.indexOf(I)<0)out.push(I);}
+for(let j=cj-k;j<=cj+k;j++)for(let i=ci-k;i<=ci+k;i++){const I=g.islandCell(i,j);if(I&&d(I)<Q2.REACH&&out.indexOf(I)<0)out.push(I);}
+}catch(e){return[];}
+out.sort((a,b)=>d(a)-d(b));
+return out.slice(0,Q2.MAX);
+};
+
+Q2.pack=function(L,ci,out){
+const P=out||{A:new Float32Array(4*Q2.MAX),B:new Float32Array(4*Q2.MAX),n:0};
+P.n=Math.min(L.length,Q2.MAX);
+for(let i=0;i<P.n;i++){
+const I=L[i];
+P.A[i*4]=I.x-ci[0];P.A[i*4+1]=I.y-ci[1];P.A[i*4+2]=I.z-ci[2];P.A[i*4+3]=I.r;
+P.B[i*4]=I.deep||1;P.B[i*4+1]=I.dome!==undefined?I.dome:3;P.B[i*4+2]=0;P.B[i*4+3]=0;
+}
+return P;
+};
+
+
+
+Q2.isleNormal=function(I,p){
+const dx=p[0]-I.x,dz=p[2]-I.z,d=Math.hypot(dx,dz),R=I.r*1.12,top=I.y-2,D=I.r*(I.deep||1)*0.8;
+if(d>I.r*1.4||p[1]>I.y+(I.dome!==undefined?I.dome:3)+1.5||p[1]<top-D*1.35-2)return null;
+const t=clamp(1-d/R,0.02,1),s=Math.min(0.75*Math.pow(t,-0.25)*D/R*sstep(0,0.35,1-t),4);
+const ux=dx/Math.max(d,1e-3),uz=dz/Math.max(d,1e-3);
+const nU=norm([ux*s,-1,uz*s]),nR=norm([ux,0.6,uz]),rim=sstep(top-1,top+2,p[1]);
+return norm([mix(nU[0],nR[0],rim),mix(nU[1],nR[1],rim),mix(nU[2],nR[2],rim)]);
+};
+
+
+Q2.SHADOW={k:0.55,edge:[0.45,1.05],fall:220};
+Q2.isleShadow=function(L,p,sun){
+if(sun[1]<0.1)return 1;
+let s=0;
+for(const I of L){
+const h=I.y-3-p[1];if(h<2)continue;
+const qx=p[0]+sun[0]/sun[1]*h-I.x,qz=p[2]+sun[2]/sun[1]*h-I.z,dd=Math.hypot(qx,qz)/(I.r*0.95);
+s=Math.max(s,(1-sstep(Q2.SHADOW.edge[0],Q2.SHADOW.edge[1],dd))*clamp(1.15-h/Q2.SHADOW.fall,0.35,1));
+}
+return 1-Q2.SHADOW.k*s;
+};
+
+
+
+
+Q2.CROWN={near:40,far:[200,260],qs:4,grow:1.35,k:[0.55,0.5],carve:[30,55],carveT:0.25};
+
+
+
+Q2.carve=function(sd,dist,sky){const f=sstep(Q2.CROWN.carve[0],Q2.CROWN.carve[1],dist);return f>0&&sky>0.97&&sd>mix(4,Q2.CROWN.carveT,f);};
+const h13=(x,y,z)=>VR.QArt&&VR.QArt.hash13?VR.QArt.hash13(x,y,z):0.5;
+Q2.cutFar=function(w,face,dist){
+const L=VR.QArt.LEAF,C=Q2.CROWN,pp=VR.QArt.plane(w,face),pl=Math.floor(pp[2]+0.5);
+const bl=[Math.floor(pp[0]),Math.floor(pp[1])];
+const QS=dist>C.near+12*h13(bl[0],bl[1],pl+0.7)?C.qs:16;
+const fade=1-sstep(C.far[0],C.far[1],dist);
+const tq=[Math.floor(pp[0]*QS),Math.floor(pp[1]*QS)];
+const f=[(tq[0]+0.5)/QS-bl[0],(tq[1]+0.5)/QS-bl[1]];
+const g=[Math.floor(pp[0]+0.5)-bl[0],Math.floor(pp[1]+0.5)-bl[1]];
+const dd=[Math.abs(f[0]-g[0]),Math.abs(f[1]-g[1])];
+const hv=h13(bl[0]+g[0]*0.5+0.13,bl[1]+g[1]*0.5+0.29,pl);
+const r=hv<L.cutP?mix(L.corner[0],L.corner[1],hv/L.cutP)*fade*(QS<8?C.grow:1):0;
+const n=h13(tq[0]+0.5,tq[1]+0.5,pl*1.37+0.11);
+if(r<=0)return false;
+const k0=QS<8?C.k[0]:0.7,k1=QS<8?C.k[1]:0.6;
+if(dd[0]<r&&dd[1]<r&&Math.hypot(r-dd[0],r-dd[1])>r*(k0+k1*n))return true;
+return QS>8&&Math.min(dd[0],dd[1])<1/QS&&n>1-L.rag*fade&&Math.max(dd[0],dd[1])<0.5-1/QS;
+};
+void fract;
+
+
+
+
+Q2.GRASS={mean:0.9};
+
+
+const ISLE_PROGS={terrain:1,terrainCut:1};
+const CROWN_PROGS={terrain:1,terrainCut:1,terrainCutZ:1,shadowCut:1};
+Q2.definesFor=function(name,q,o){
+q=q||Q2.q;o=o||Q2.o;
+const out=[];
+if(q.qGrass&&name==='terrain')out.push('Q_GRASS','Q_TUFT_N '+Q2.tuftSteps(o.preset));
+if(q.qIsle&&ISLE_PROGS[name])out.push('Q_ISLE');
+if(q.qCrown&&o.fancy!==false&&o.leaf&&CROWN_PROGS[name])out.push('Q_CROWN');
+return out;
+};
+Q2.hook=function(name,defines){
+const extra=Q2.definesFor(name);
+if(!extra.length)return defines||[];
+return(defines||[]).concat(extra.filter(d=> !(defines||[]).includes(d)));
+};
+if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>Q2.hook(name,prev?prev(name,defines):(defines||[]));}
+
+
+const f3=(x)=>x.toFixed(3);
+const ISLE_U=`uniform vec4 u_qIsleA[${Q2.MAX}];
+uniform vec4 u_qIsleB[${Q2.MAX}];
+uniform int u_qIsleN;
+`;
+
+Q2.glslVS=function(){
+return`
+#if defined(Q_ISLE) && !defined(MODEL)
+
+${ISLE_U}out vec4 v_qI;
+out vec2 v_qJ;
+void qIsleV(vec3 p) {
+v_qI = vec4(0.0, -1.0, 0.0, 0.0); v_qJ = vec2(0.0, 99.0);
+for (int i = 0; i < ${Q2.MAX}; i++) {
+if (i >= u_qIsleN) break;
+vec4 A = u_qIsleA[i], B = u_qIsleB[i];
+vec2 d2 = p.xz - A.xz;
+float d = length(d2), R = A.w * 1.12, top = A.y - 2.0, D = A.w * B.x * 0.8;
+if (d > A.w * 1.4 || p.y > A.y + B.y + 1.5 || p.y < top - D * 1.35 - 2.0) continue;
+float t = clamp(1.0 - d / R, 0.02, 1.0), s = min(0.75 * pow(t, -0.25) * D / R * smoothstep(0.0, 0.35, 1.0 - t), 4.0);
+vec2 u = d2 / max(d, 1e-3);
+vec3 nU = normalize(vec3(u.x * s, -1.0, u.y * s)), nR = normalize(vec3(u.x, 0.6, u.y));
+v_qI = vec4(normalize(mix(nU, nR, smoothstep(top - 1.0, top + 2.0, p.y))), 1.0 - smoothstep(A.w * 1.2, A.w * 1.4, d));
+v_qJ = vec2(clamp((top - p.y) / max(D, 1.0), 0.0, 1.0), A.y + B.y - p.y);
+return;
+}
+}
+#endif
+`;
+};
+
+Q2.glslTerrain=function(){
+const S=Q2.SHADOW;
+return`
+#if defined(Q_GRASS) && !defined(MODEL)
+
+#ifdef MOTION
+#define Q_WIND u_windDir
+#else
+#define Q_WIND vec2(0.8, 0.6)
+#endif
+vec3 qGrass(vec3 a, vec3 mean, vec2 q, vec3 rel) {
+float dist = length(rel);
+a = mix(a, mean, 0.3 + 0.45 * smoothstep(5.0, 40.0, dist));
+
+
+float p1 = texture(u_noise, q * 0.0078125).r, p2 = texture(u_noise, q * 0.001953125 + vec2(0.37, 0.61)).g;
+float pt = smoothstep(0.3, 0.7, p1 * 0.55 + p2 * 0.45);
+a *= mix(vec3(0.78, 0.92, 0.9), vec3(1.15, 1.09, 0.78), pt);
+a *= 1.0 + (texture(u_noise, q * 0.0625 + vec2(0.11, 0.53)).g - 0.5) * 0.35;
+#if Q_TUFT_N > 0
+float k = 1.0 - smoothstep(7.0, 14.0, dist);
+if (k > 0.0) {
+
+
+
+vec3 V = normalize(-rel);
+vec2 run = -V.xz / max(V.y, 0.25) * 0.15;
+vec2 sw = Q_WIND * (sin(u_time * 1.4 + q.x * 0.6 + q.y * 0.45) * 0.025 + 0.02);
+float cl = texture(u_noise, q * 0.125 + 0.5).g;
+float tuft = 0.55 + 0.9 * smoothstep(0.35, 0.7, cl);
+float hh = 0.0, tp = 0.0, dp = 1.0;
+for (int i = 0; i < Q_TUFT_N; i++) {
+float t = (float(i) + 0.5) / float(Q_TUFT_N);
+vec2 s = q + run * t + sw * (1.0 - t) * (1.0 - t);
+float d = smoothstep(0.3, 1.0, texture(u_noise, s * 0.09765625).a) * tuft - (1.0 - t);
+if (d >= 0.0) { float u = dp / max(dp - d, 1e-3); hh = 1.0 - mix(tp, t, clamp(u, 0.0, 1.0)); break; }
+tp = t; dp = d;
+}
+vec3 bf = mix(vec3(0.4, 0.47, 0.42), vec3(1.32, 1.27, 1.0), hh) * ${f3(1/Q2.GRASS.mean)};
+a = mix(a, a * bf, k);
+}
+#endif
+return a;
+}
+#endif
+#if defined(Q_ISLE) && !defined(MODEL)
+
+
+${ISLE_U}in vec4 v_qI;
+in vec2 v_qJ;
+vec3 qIsleAlb(vec3 a, vec3 w) {
+float k = v_qI.w;
+float nz = texture(u_noise, w.xz * 0.031 + vec2(w.y * 0.004, 0.0)).r;
+float band = sin(w.y * 1.7 + nz * 7.0);
+vec3 c = a * (1.0 + 0.14 * band * k) * mix(vec3(1.0), vec3(1.08, 0.97, 0.84), k * smoothstep(0.2, 0.9, band) * 0.8);
+float mv = texture(u_noise, w.xz * 0.02 + vec2(w.y * 0.03, 0.37)).g;
+float moss = (1.0 - smoothstep(1.5, 5.5, v_qJ.y)) * 0.85 + smoothstep(0.6, 0.72, mv) * 0.6;
+float l = dot(c, vec3(0.3, 0.59, 0.11));
+c = mix(c, vec3(0.15, 0.26, 0.07) * (0.6 + l * 1.4), clamp(moss, 0.0, 0.85) * k);
+return c * mix(1.0, 0.8, v_qJ.x * k);
+}
+float qIsleShadow(vec3 p, vec3 L) {
+if (L.y < 0.1) return 1.0;
+float s = 0.0;
+for (int i = 0; i < ${Q2.MAX}; i++) {
+if (i >= u_qIsleN) break;
+vec4 A = u_qIsleA[i];
+float h = A.y - 3.0 - p.y;
+if (h < 2.0) continue;
+float dd = length(p.xz + L.xz / L.y * h - A.xz) / (A.w * 0.95);
+s = max(s, (1.0 - smoothstep(${f3(S.edge[0])}, ${f3(S.edge[1])}, dd)) * clamp(1.15 - h / ${f3(S.fall)}, 0.35, 1.0));
+}
+return 1.0 - ${f3(S.k)} * s;
+}
+#endif
+`;
+};
+
+Q2.glslShadowVS=function(){
+return`
+#ifdef Q_CROWN
+uniform vec3 u_qCamF;
+out vec3 v_qW;
+#endif
+`;
+};
+Q2.glslShadowFS=function(){
+const L=VR.QArt?VR.QArt.LEAF:{cutP:0.55,corner:[0.22,0.44]},C=Q2.CROWN;
+return`
+#if defined(Q_CROWN) && defined(CUTOUT)
+uniform ivec3 u_qCamI;
+in vec3 v_qW;
+float qH13s(vec3 p3) { p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+bool qCutS(vec3 w, uint face) {
+vec3 pp = face <= 1u ? w.yzx : face <= 3u ? w.zxy : w.xyz;
+float pl = floor(pp.z + 0.5);
+vec2 bl = floor(pp.xy), tq = floor(pp.xy * ${C.qs.toFixed(1)});
+vec2 f = (tq + 0.5) / ${C.qs.toFixed(1)} - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
+float hv = qH13s(vec3(bl + g * 0.5 + vec2(0.13, 0.29), pl));
+float r = hv < ${f3(L.cutP)} ? mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hv / ${f3(L.cutP)}) * ${f3(C.grow)} : 0.0;
+float n = qH13s(vec3(tq + 0.5, pl * 1.37 + 0.11));
+return r > 0.0 && dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (${f3(C.k[0])} + ${f3(C.k[1])} * n);
 }
 #endif
 `;
@@ -71107,7 +71468,7 @@ out float v_sheen;
 flat out float v_ground;
 ${VR.Wind?VR.Wind.glsl():''}
 #endif
-${(VR.QArt&&VR.QArt.glslVS)?VR.QArt.glslVS():''}void main() {
+${(VR.QArt&&VR.QArt.glslVS)?VR.QArt.glslVS():''}${(VR.QArt2&&VR.QArt2.glslVS)?VR.QArt2.glslVS():''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
 v_fade = u_origins[gl_DrawID].w;
@@ -71137,6 +71498,9 @@ uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
 uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
 #if defined(Q_LEAF) && !defined(MODEL)
 v_qC = (leaf > 0u && sway == 0u) ? qClump(wp + vec3(u_camInt)) : vec4(0.0, 1.0, 0.0, 0.0);
+#endif
+#if defined(Q_ISLE) && !defined(MODEL)
+qIsleV(wp);
 #endif
 #ifdef MOTION
 
@@ -71431,7 +71795,7 @@ if (Fc > g_ssrW * 0.5) g_ssrN = nc;
 return c;
 }
 #endif
-${(VR.QArt&&VR.QArt.glslTerrain)?VR.QArt.glslTerrain():''}void main() {
+${(VR.QArt&&VR.QArt.glslTerrain)?VR.QArt.glslTerrain():''}${(VR.QArt2&&VR.QArt2.glslTerrain)?VR.QArt2.glslTerrain():''}void main() {
 #ifdef MODEL
 if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -71485,7 +71849,11 @@ vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
 if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
+#ifdef Q_CROWN
+if (qLeafF() && (qCut(v_localPos + vec3(u_camInt), face, length(v_rel)) || qCarve(v_qC.w, length(v_rel), v_sky))) discard;
+#else
 if (qLeafF() && qGreen(alb.rgb * v_tint) > 0.5 && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;
+#endif
 #endif
 #ifdef ZPRE
 o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;
@@ -71525,6 +71893,12 @@ vec2 gq = v_localPos.xz + vec2(u_camInt.xz);
 float mn = texture(u_noise, gq * u_lvMeadow.y).r * 0.6 + texture(u_noise, gq * u_lvMeadow.y * 0.42 + vec2(0.37, 0.61)).g * 0.4;
 alb.rgb *= mix(vec3(1.0), mix(vec3(0.88, 0.95, 1.0), vec3(1.1, 1.05, 0.86), smoothstep(0.25, 0.75, mn)), u_lvMeadow.z * alb.a);
 }
+#endif
+#if defined(Q_GRASS) && !defined(MODEL)
+
+
+if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;
+if (qm.g > qm.r * 1.1 && qm.g > qm.b * 1.15) alb.rgb = qGrass(alb.rgb, qm, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel); }
 #endif
 #ifdef BODYGROUND
 
@@ -71663,6 +72037,11 @@ bool qLf = qLeafF();
 vec4 qC = vec4(0.0, 1.0, 0.0, 0.0);
 if (qLf) { qC = vec4(normalize(v_qC.xyz), v_qC.w); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
 #endif
+#if defined(Q_ISLE) && !defined(MODEL)
+
+bool qIs = v_qI.w > 0.01 && face != 2u;
+if (qIs) { alb.rgb = qIsleAlb(alb.rgb, v_localPos + vec3(u_camInt)); n = normalize(mix(n, normalize(v_qI.xyz), 0.6 * v_qI.w)); }
+#endif
 #ifdef PBR
 
 if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
@@ -71681,6 +72060,9 @@ float sky = v_sky;
 float skyL = sky * sky * (3.0 - 2.0 * sky);
 #if defined(Q_LEAF) && !defined(MODEL)
 if (qLf) skyL = mix(skyL, 1.0, Q_LEAF_SKY);
+#ifdef Q_CROWN
+if (qLf) skyL = mix(skyL, 1.0, 0.35 * (1.0 - qGreen(alb.rgb)));
+#endif
 #endif
 vec3 bl = v_block;
 vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
@@ -71716,6 +72098,9 @@ if (qLf && ndl > 0.0 && outdoors > 0.0 && dot(N, L) <= -0.2) sh = shadowAt(-N, L
 #ifdef CLOUDSH
 sh *= cloudShadow(v_localPos + vec3(u_camInt));
 #endif
+#if defined(Q_ISLE) && !defined(MODEL)
+if (!qIs && ndl > 0.0) sh = min(sh, qIsleShadow(v_localPos, L));
+#endif
 vec3 direct = lc * ndl * sh * outdoors;
 #if defined(SUN2) && defined(HSHADOW)
 
@@ -71746,6 +72131,9 @@ alb.rgb *= (1.0 - wetK * (0.42 * pr + 0.12 * (1.0 - pr))) * (1.0 - 0.34 * pud); 
 if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
 #endif
 vec3 col = alb.rgb * lighting;
+#if defined(Q_ISLE) && !defined(MODEL)
+if (qIs) { float qBounce = max(-normalize(v_qI.xyz).y, 0.0) * max(L.y, 0.0) * v_qI.w * skyL; col += alb.rgb * lc * vec3(0.36, 0.46, 0.24) * qBounce * 0.9; }
+#endif
 #if defined(Q_LEAF) && !defined(MODEL)
 if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);
 #endif
@@ -72742,7 +73130,7 @@ flat out uint v_w5;
 #ifdef FADE
 flat out float v_fade;
 #endif
-void main() {
+${(VR.QArt2&&VR.QArt2.glslShadowVS)?VR.QArt2.glslShadowVS():''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
 v_fade = u_origins[gl_DrawID].w;
@@ -72757,6 +73145,9 @@ vec3 org = u_origin;
 #endif
 vec3 rel = org + a_pos / 2048.0 - 4.0;
 v_uv = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 16.0; v_w3 = a_w3; v_w5 = a_w5;
+#ifdef Q_CROWN
+v_qW = rel + u_qCamF;
+#endif
 gl_Position = u_viewProj * vec4(rel, 1.0);
 }`;
 S.SHADOW_FS=`
@@ -72778,10 +73169,13 @@ if ((m & 8u) != 0u && f.x < W) f.x = 2.0 * W - f.x;
 if ((m & 2u) != 0u && f.x > 1.0 - W) f.x = 2.0 * (1.0 - W) - f.x;
 return f;
 }
-void main() {
+${(VR.QArt2&&VR.QArt2.glslShadowFS)?VR.QArt2.glslShadowFS():''}void main() {
 #ifdef CUTOUT
 vec2 fu = ((v_w5 >> 14u) & 1u) == 1u ? ctmUV(v_uv, v_w5) : fract(v_uv);
 if (textureGrad(u_albedo, vec3(fu, float(v_w3 & 4095u)), dFdx(v_uv), dFdy(v_uv)).a < 0.5) discard;
+#endif
+#if defined(Q_CROWN) && defined(CUTOUT)
+if (((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u && qCutS(v_qW + vec3(u_qCamI), v_w5 & 7u)) discard;
 #endif
 o = vec4(1.0);
 }`;
@@ -80353,6 +80747,68 @@ return r;
 
 
 
+(function(VR){
+'use strict';
+const Q2=VR.QArt2;
+if(!Q2|| !VR.Renderer)return;
+const R=VR.Renderer.prototype;
+const opts=(r)=>{const g=VR.game,s=g&&g.settings;return{fancy: !(s&&s.fancyLeaves===false),leaf: !!(r.q&&r.q.qLeaf),preset:(s&&s.preset)||'high'};};
+const keyOf=(r,o)=>Q2.key(r.q,o.preset,o.fancy);
+const bp0=R.buildPrograms;
+R.buildPrograms=function(){const o=opts(this);Q2.use(this.q,o);this.q2Key=keyOf(this,o);return bp0.apply(this,arguments);};
+const aq0=R.applyQ;
+R.applyQ=function(full){
+const res=aq0.call(this,full);
+const o=opts(this);Q2.use(this.q,o);
+if(keyOf(this,o)!==this.q2Key)this.buildPrograms();
+return res;
+};
+
+
+Q2.gen=function(g){
+const m=g&&g.meta;
+if(!m||(g.dim&&g.dim!=='overworld')|| !VR.makeGen)return null;
+const k=(m.seed>>>0)+'|'+(m.vgen||1)+'|'+m.type;
+if(Q2._gk!==k){
+Q2._gk=k;Q2._g=null;
+try{Q2._g=VR.makeGen('overworld',m.seed>>>0,{worldType:m.type==='flat'?'flat':m.type,vgen:m.vgen||1});}catch(e){Q2._g=null;}
+}
+return Q2._g;
+};
+const P=Q2.pack([],[0,0,0]);
+let list=[],at= -1e9;
+const cm0=R.common;
+R.common=function(p,E){
+const r=cm0.apply(this,arguments);
+const u=p&&p.u;
+if(u&&u.u_qIsleA){
+const gl=this.gl,c=this.cam,ci=this.camInt||[0,0,0];
+if(c&&(this.frameNo-at>30||this.frameNo<at)){at=this.frameNo;list=Q2.islesNear(Q2.gen(VR.game),[c.x,c.y,c.z]);}
+Q2.pack(list,ci,P);
+gl.uniform4fv(u.u_qIsleA,P.A);if(u.u_qIsleB)gl.uniform4fv(u.u_qIsleB,P.B);if(u.u_qIsleN)gl.uniform1i(u.u_qIsleN,P.n);
+}
+return r;
+};
+
+const ds0=R.drawSections;
+R.drawSections=function(lst,layer,prog,from){
+if(prog&&prog.u&&prog.u.u_qCamI&&from){
+const gl=this.gl,ix=Math.floor(from[0]),iy=Math.floor(from[1]),iz=Math.floor(from[2]);
+gl.uniform3i(prog.u.u_qCamI,ix,iy,iz);
+if(prog.u.u_qCamF)gl.uniform3f(prog.u.u_qCamF,from[0]-ix,from[1]-iy,from[2]-iz);
+}
+return ds0.apply(this,arguments);
+};
+})(VR);
+
+
+
+
+
+
+
+
+
 
 (function(VR){
 'use strict';
@@ -81698,10 +82154,19 @@ if(this.failed&&this.retryAfter(k,now)>now)continue;
 const ex=cx-pcx,ez=cz-pcz;
 if(pfast&&(this.planRest|| !SP.worth(ex,ez,ux,uz,speed,this.lat||SP.LAT0,this.planCot)))continue;
 const along=ahead?Math.max(0,ex*ux+ez*uz):0;
-want.push([pfast?SP.prio(ex,ez,ux,uz,ahead,this.viewCos||0.6):ex*ex+ez*ez-along*along*0.5,cx,cz,k]);
+let pr=pfast?SP.prio(ex,ez,ux,uz,ahead,this.viewCos||0.6):ex*ex+ez*ez-along*along*0.5;
+
+
+if(SP&& !pfast&&ahead&&SP.WALK_LATE&&ex*ex+ez*ez>(rd+SP.RIM)*(rd+SP.RIM))pr+=SP.WALK_LATE*rd*rd;
+want.push([pr,cx,cz,k]);
 }
 if(want.length>1)want.sort((a,b)=>a[0]-b[0]);
 if(off||(this.frame&1))this.lastWant=want.length;
+
+
+
+
+if(SP&& !pfast&& !want.length&& !this.pending.size&&(off||(this.frame&1))&&SP.IDLE_RING>0)this.idleRing(pcx,pcz,rd+SP.RIM,now);
 const maxReq=Math.max(6,this.pool.workers.length*4);
 let inflight=this.pending.size;
 for(const[d2,cx,cz,k]of want){
@@ -81722,6 +82187,26 @@ if(this.frame%8===0)this.detailReturn(px,py,pz);
 
 this.scheduleMeshes(pcx,Math.floor(py)>>4,pcz,lcx,lcz,[px,py,pz]);
 this.pool.pump();
+}
+
+idleRing(pcx,pcz,r0,now){
+if(this.pool.queue&&this.pool.queue.length)return;
+const vd=this.viewDir,r1=r0+VR.StreamPlan.IDLE_RING,L=Math.ceil(r1);
+let best=null,bp=Infinity,n=0;
+for(let dz= -L;dz<=L;dz++)for(let dx= -L;dx<=L;dx++){
+const d2=dx*dx+dz*dz;
+if(d2<=r0*r0||d2>r1*r1)continue;
+const d=Math.sqrt(d2),c=vd?(dx*vd[0]+dz*vd[1])/d:1;
+if(c<0)continue;
+const k=ckey(pcx+dx,pcz+dz);
+if(this.cols.has(k)){const col=this.cols.get(k);col.lastSeen=now;continue;}
+if(this.pending.has(k)||(this.failed&&this.retryAfter(k,now)>now))continue;
+const p=d2*(2-c);
+if(p<bp){bp=p;best=[pcx+dx,pcz+dz,k];}
+n++;
+}
+if(best)this.requestColumn(best[0],best[1],best[2],1e4+bp);
+return n;
 }
 
 
@@ -82030,7 +82515,10 @@ for(let i=0;i<c.sec.length;i++)if(!c.sec[i].meshed)return;
 
 
 const lp=this.lastPos,r=this.renderer;
-const plan=VR.Stream.fadePlan(lp?c.cx-(Math.floor(lp[0])>>4):99,lp?c.cz-(Math.floor(lp[2])>>4):99,!!(r&&r.fadeSoft));
+let plan=VR.Stream.fadePlan(lp?c.cx-(Math.floor(lp[0])>>4):99,lp?c.cz-(Math.floor(lp[2])>>4):99,!!(r&&r.fadeSoft));
+
+
+if(plan.fade<1&&this.planFast&&this.streamPlan&&lp&&VR.Horizon&&VR.Horizon.FINE_D>0){const ex=c.cx*16+8-lp[0],ez=c.cz*16+8-lp[2];if(ex*ex+ez*ez<VR.Horizon.FINE_D*VR.Horizon.FINE_D)plan={fade:1,grow:false};}
 
 if(this.reqAt&&this.reqAt.size){const t=this.reqAt.get(c.key);if(t!==undefined){this.reqAt.delete(c.key);if(this.now!==undefined&&VR.StreamPlan){if(this.planFast)this.lat=VR.StreamPlan.lat(this.lat,(this.now-t)/1000);}}}
 c.shownAt=now;c.fade=plan.fade;c.grow=plan.grow?0:1;c.fadeMs=plan.ms||VR.Stream.FADE_MS;
@@ -82145,6 +82633,7 @@ best.length=0;
 
 detailReturn(px,py,pz){
 if(this.planFast&&this.streamPlan)return;
+if(this.vxSkipN)this.vxSkipReturn(px,pz);
 const D=(this.renderer&&this.renderer.q&&this.renderer.q.vxLod)||48,back=(D*1.5+16)*0.8,back2=back*back;
 const cr=Math.ceil(back/16)+1,pcx=Math.floor(px)>>4,pcz=Math.floor(pz)>>4;
 for(const c of this.cols.values()){
@@ -82158,6 +82647,20 @@ const ey=sy*16+8-py;
 if(ex*ex+ey*ey*0.5+ez*ez<back2){s.vxDropped=false;s.dirty=true;s.ver++;}
 }
 }
+}
+
+
+vxSkipReturn(px,pz){
+const pcx=Math.floor(px)>>4,pcz=Math.floor(pz)>>4,r=this.renderDist+0.5;
+let left=0;
+for(const c of this.cols.values())for(let sy=0;sy<c.sec.length;sy++){
+const s=c.sec[sy];
+if(!s.vxSkipped)continue;
+const dx=c.cx-pcx,dz=c.cz-pcz;
+if(s.pending||dx*dx+dz*dz>r*r){left++;continue;}
+s.vxSkipped=false;s.dirty=true;s.ver++;
+}
+this.vxSkipN=left;
 }
 
 wantDetail(c,sy,pos){
@@ -82181,6 +82684,7 @@ return;
 const detail=urgent||this.wantDetail(c,sy,pos||(this.lastPos?this.lastPos:null));
 const job=this.buildJob(c,sy);
 job.vxDetail=detail;
+if(!urgent&&this.planFast&&this.streamPlan&&(this.planSpeed||0)>=VR.StreamPlan.VX_SKIP)job.vxSkip=true;
 if(VR.SmoothVox)VR.SmoothVox.tagJob(job);
 s.pending=true;
 const ver=s.ver;
@@ -82207,6 +82711,7 @@ const tok=s.uTok=(s.uTok||0)+1;
 const R=this.renderer,alive=()=> !this.dead&&this.cols.get(c.key)===c&&s.uTok===tok;
 const done=()=>{
 if(!detail&&m.vxFar&&m.vxFar.length)s.vxDropped=true;
+s.vxSkipped= !!m.vxSkipped;if(s.vxSkipped)this.vxSkipN=(this.vxSkipN|0)+1;
 s.meshVer=ver;s.meshed=true;
 s.fade=c.shownAt>=0?c.fade:0;s.grow=c.shownAt>=0&&c.grow!==undefined?c.grow:1;
 if(s.ver!==ver)s.dirty=true;
@@ -107688,6 +108193,7 @@ if(VR.Light2&&VR.Light2.ROWS)for(const it of VR.Light2.ROWS)S.add(Object.assign(
 if(VR.Sky3&&VR.Sky3.ROWS)for(const it of VR.Sky3.ROWS)S.add(Object.assign({},it));
 if(VR.Look&&VR.Look.ROWS)for(const it of VR.Look.ROWS)S.add(Object.assign({},it));
 if(VR.QArt&&VR.QArt.ROWS)for(const it of VR.QArt.ROWS)S.add(Object.assign({},it));
+if(VR.QArt2&&VR.QArt2.ROWS)for(const it of VR.QArt2.ROWS)S.add(Object.assign({},it));
 if(VR.XTop&&VR.XTop.ROWS)for(const it of VR.XTop.ROWS)S.add(Object.assign({},it));
 if(VR.LField&&VR.LField.ROWS_SET)for(const it of VR.LField.ROWS_SET)S.add(Object.assign({},it));
 
@@ -117757,6 +118263,8 @@ const XT_SW=VR.XTop?VR.XTop.SW:[];
 if(VR.XTop)for(const p in PRESETS)Object.assign(PRESETS[p],VR.XTop.defaults(p));
 
 const QA_SW=VR.QArt?VR.QArt.SW:[];
+const Q2_SW=VR.QArt2?VR.QArt2.SW:[];
+if(VR.QArt2)for(const p in PRESETS)Object.assign(PRESETS[p],VR.QArt2.defaults(p));
 if(VR.QArt)for(const p in PRESETS)Object.assign(PRESETS[p],VR.QArt.defaults(p));
 
 const LF_SW=VR.LField?VR.LField.SW:[];
@@ -117832,6 +118340,7 @@ for(const k of S3_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRES
 for(const k of LV_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.Look.off()[k]:PRESETS.balanced[k]);
 for(const k of XT_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:VR.XTop.off()[k];
 for(const k of QA_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.QArt.off()[k]:PRESETS.balanced[k]);
+for(const k of Q2_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:(s.lite?VR.QArt2.off()[k]:PRESETS.balanced[k]);
 for(const k of LF_SW)if(s[k]===undefined&&s.preset)out[k]=PRESETS[s.preset]?PRESETS[s.preset][k]:false;
 
 if(s.smoothFolk===undefined&&s.preset)out.smoothFolk=PRESETS[s.preset]?PRESETS[s.preset].smoothFolk:((s.vxLod|0)>=44&& !s.lite?1:0);
@@ -117919,6 +118428,7 @@ if(key!=='*'&&S3_SW.includes(key))S.preset='custom';
 if(key!=='*'&&LV_SW.includes(key))S.preset='custom';
 if(key!=='*'&&XT_SW.includes(key))S.preset='custom';
 if(key!=='*'&&QA_SW.includes(key))S.preset='custom';
+if(key!=='*'&&Q2_SW.includes(key))S.preset='custom';
 if(key!=='*'&&LF_SW.includes(key))S.preset='custom';
 if(key!=='*'&&F10_SW.includes(key))S.preset='custom';
 if(key!=='*'&&MO_SW.includes(key))S.preset='custom';
@@ -117941,6 +118451,7 @@ if(r&&VR.LField){const qb=r.qBase||(r.qBase={});for(const k of LF_SW)qb[k]= !!S[
 if(r&&VR.Look){const qb=r.qBase||(r.qBase={});for(const k of LV_SW)qb[k]= !!S[k];}
 if(r&&VR.XTop){const qb=r.qBase||(r.qBase={});for(const k of XT_SW)qb[k]=k==='xDepth'?Math.max(0,Math.min(2,S[k]|0)): !!S[k];}
 if(r&&VR.QArt){const qb=r.qBase||(r.qBase={});for(const k of QA_SW)qb[k]=S[k]===undefined?(PRESETS[S.preset]? !!PRESETS[S.preset][k]:false): !!S[k];}
+if(r&&VR.QArt2){const qb=r.qBase||(r.qBase={});for(const k of Q2_SW)qb[k]=S[k]===undefined?(PRESETS[S.preset]? !!PRESETS[S.preset][k]:false): !!S[k];}
 if(r&&VR.IPU){const qb=r.qBase||(r.qBase={});for(const k of F10_SW)qb[k]= !!S[k];qb.dprCap= !!S.dprLite&&S.preset==='ultraLite';}
 if(r){const qb=r.qBase||(r.qBase={});qb.pbr=S.pbr===undefined?(S.lite?0:1):Math.max(0,Math.min(2,S.pbr|0));qb.texHi= !!S.texHi&& !S.lite;}
 if(r)r.setQuality({upload:S.upload||2.5,scale:S.scale,shadows:SHADOW_RES[S.shadows],shadowDist:SHADOW_DIST[S.shadows],shadowEvery:1,bloom:S.bloom,rays:S.rays,fxaa:S.fxaa,clouds:S.clouds,magic:S.magic,horizon:S.horizon,hshadow: !!S.sunShadows,hshadowDist:hDist,sharpen:S.sharpen?(S.lite?0.5:0.35):0,tsr: !!S.tsr,fadeIn:S.fadeIn!==false,vxLod:S.vxLod||48,smoothProps:S.smoothPlants|0,smoothFurn:S.smoothFurn?1:0,lite: !!S.lite,matTier:S.matTier||0,dropShadow: !!S.dropShadow,lampGlow: !!S.lampGlow,water:S.water===undefined?1:S.water,anim:S.anim!==false,shadowTakt: !!S.shadowTakt,farCache: !!S.farCache,reflLite: !!S.reflLite,motion: !!S.motion,cloudShadow: !!S.cloudShadow,wxDrama: !!S.wxDrama});
