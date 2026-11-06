@@ -141,7 +141,12 @@
       const L = QA.LEAF;
       out.push('Q_LEAF', 'Q_CELL ' + f3(L.cell), 'Q_RAD ' + f3(L.rad), 'Q_K ' + f3(L.k), 'Q_LEAF_N ' + f3(L.nrm), 'Q_LEAF_IN ' + f3(L.inner));
     }
-    if (q.qPlaza && name === 'terrain') out.push('Q_PLAZA');
+    if (q.qPlaza && name === 'terrain') {
+      // (the floors' layers as a macro made when the program is built: the registry's tex table is not there yet when
+      //  shaders.js makes its text at load)
+      const lay = QA.plazaLayers();
+      out.push('Q_PLAZA', 'Q_PLAZA_L(l) (' + (lay.length ? lay.map(x => 'l == ' + x.toFixed(1)).join(' || ') : 'false') + ')');
+    }
     return out;
   };
   QA.hook = function (name, defines) {
@@ -153,8 +158,7 @@
 
   // ---------------------------------------------------------------- the GLSL (TERRAIN_FS, before its main)
   QA.glslTerrain = function () {
-    const L = QA.LEAF, P = QA.PLAZA, lay = QA.plazaLayers();
-    const test = lay.length ? lay.map(l => 'l == ' + l.toFixed(1)).join(' || ') : 'false';
+    const L = QA.LEAF, P = QA.PLAZA;
     return `
 #if defined(Q_LEAF) && !defined(MODEL)
 // q-art · Laubkronen (qart.js QA.clump, QA.cut): a waving leaf face (the leaf bit, no sway level, no glass frame)
@@ -201,7 +205,7 @@ vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
 #endif
 #if defined(Q_PLAZA) && !defined(MODEL)
 // q-art · Platzbelag (qart.js QA.plazaLum): the light floors to a warm stone mid-tone, slabs, wear, joints
-bool qPlazaL(float l) { return ${test}; }
+bool qPlazaL(float l) { return Q_PLAZA_L(l); }
 vec3 qPlaza(vec3 a, vec3 w) {
   float l = dot(a, vec3(0.2126, 0.7152, 0.0722)) + 1e-4;
   float lt = l > ${f3(P.knee)} ? ${f3(P.knee)} + (l - ${f3(P.knee)}) * ${f3(P.keep)} : l;

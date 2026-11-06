@@ -65,6 +65,8 @@ console.log('b · the shaders');
   const on = QA.defaults('high');
   check(QA.definesFor('terrainCut', on, true)[0] === 'Q_LEAF' && QA.definesFor('terrainCutZ', on, true)[0] === 'Q_LEAF' && QA.definesFor('terrain', on, true).includes('Q_PLAZA') && !QA.definesFor('terrainCut', on, true).includes('Q_PLAZA'), 'Laubkronen on the terrain programs (the cut-out and its depth pass alike), Platzbelag on the opaque terrain');
   check(QA.definesFor('terrainCut', on, false).length === 0 && ['sky', 'water', 'prop', 'folk', 'composite', 'shadow'].every(n => QA.definesFor(n, on, true).length === 0), 'no Laubkronen without fancy leaves; nothing on other programs');
+  const pd = QA.definesFor('terrain', on, true).find(d => d.startsWith('Q_PLAZA_L(l) ('));
+  check(!!pd && /l == \d+\.0 \|\| l == /.test(pd) && !/Q_PLAZA_L|plazaLayers/.test(S1.TERRAIN_FS.replace('return Q_PLAZA_L(l);', '')), 'Platzbelag: the floors\' layers as a macro made when the program is built (not baked at load)', pd && pd.slice(0, 60));
   const t = pre(S1.TERRAIN_FS, ['CUTOUT', 'LIGHT2', 'L2AO', 'Q_LEAF', 'Q_PLAZA']);
   check(t.includes('vec4 qClump(') && t.includes('bool qCut(') && t.includes('qC = qClump(') && t.includes('col = qCanopy(') && t.includes('alb.rgb = qPlaza('), 'on: the functions and their calls');
   const z = pre(S1.TERRAIN_FS, ['CUTOUT', 'ZPRE', 'ZINV', 'Q_LEAF']);
