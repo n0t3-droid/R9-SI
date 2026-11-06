@@ -36,7 +36,9 @@
   R.l2Post = function (p, E, pass, F) {
     if (l2Post0) l2Post0.call(this, p, E, pass, F);
     if (pass !== 'composite') return;
-    const u = p.u; if (!u.u_xBlur) return;
+    const u = p.u;
+    if (u.u_xRange) { const R = X.RANGE; this.gl.uniform4f(u.u_xRange, R.a, R.k, R.t * X.dayK(E && E.sunDir ? E.sunDir[1] : 1), 0); }   // Tonumfang
+    if (!u.u_xBlur) return;
     const gl = this.gl, B = this.xB || (this.xB = { vp: new Float32Array(16), eye: [0, 0, 0], t: -1, si: -1, ok: false });
     const d = VR.game && VR.game.director, cam = F && F.cam;
     let k = 0;

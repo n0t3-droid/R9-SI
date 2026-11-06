@@ -41,7 +41,8 @@ function pre(src, defs) {
 console.log('a · the switches');
 {
   const d = (p) => X.defaults(p);
-  check(['potato', 'low', 'balanced'].every(p => X.SW.every(k => !d(p)[k])), 'Very Low, Low and Balanced: none of them');
+  check(['potato', 'low'].every(p => X.SW.every(k => !d(p)[k])), 'Very Low and Low: none of them');
+  check(d('balanced').xRange && !d('balanced').xClar && !d('balanced').xBlur && ['high', 'ultra', 'ultraLite'].every(p => d(p).xRange), 'Tonumfang from Balanced up (no pass, no tap: Balanced gets only that)');
   check(d('high').xDepth === 1 && d('high').xClar && d('high').xBlur, 'High: Tiefe 1, Klarheit, Filmkamera');
   check(d('ultra').xDepth === 2 && d('ultra').xClar && d('ultra').xBlur, 'Ultra: Tiefe 2 (Kino), Klarheit, Filmkamera');
   check(d('ultraLite').xDepth === 1 && d('ultraLite').xClar && !d('ultraLite').xBlur, 'Ultra · Leicht: Tiefe 1, Klarheit');
@@ -53,7 +54,7 @@ console.log('a · the switches');
   check(/VR\.XTop\.defaults\(p\)/.test(g) && /XT_SW\.includes\(key\)/.test(g) && /for \(const k of XT_SW\) qb\[k\]/.test(g), 'game.js: the presets, a hand change → custom, the renderer gets them');
   check(b.indexOf("'xtop'") > b.indexOf("'look'") && b.indexOf("'xtop'") < b.indexOf("'shaders'") && b.indexOf("'xtop_gl'") > b.indexOf("'look_gl'"), 'build.js: xtop after look and before shaders, xtop_gl after look_gl');
   check(/VR\.XTop\.ROWS/.test(sr), 'settings_reg.js shows the rows');
-  check(X.key({ xDepth: 2, xBlur: true }) === '201' && X.key(null) === '000' && X.key({ xDepth: 9 }) === '200', 'the key');
+  check(X.key({ xDepth: 2, xBlur: true }) === '2010' && X.key(null) === '0000' && X.key({ xDepth: 9 }) === '2000' && X.key({ xRange: true }) === '0001', 'the key');
 }
 
 console.log('b · the shaders');
@@ -68,11 +69,14 @@ console.log('b · the shaders');
   check(['terrain', 'terrainCut', 'composite', 'sky', 'folk'].every(n => X.definesFor(n).length === 0), 'off: no defines anywhere');
   const qh = X.defaults('high'), qu = X.defaults('ultra');
   check(X.definesFor('terrain', qu).join() === 'XDEPTH,XD_VAO 0.280,XD_SUN 0.650,XD_AMB 0.800' && X.definesFor('terrainCut', qh).join() === 'XDEPTH,XD_VAO 0.250,XD_SUN 0.500,XD_AMB 0.880', 'Tiefe: the terrain programs, its numbers by level');
-  check(X.definesFor('composite', qh).join() === 'X_CLAR,X_BLUR' && ['sky', 'water', 'prop', 'folk', 'bloom'].every(n => X.definesFor(n, qu).length === 0), 'Klarheit and Filmkamera on the composite only');
+  check(X.definesFor('composite', qh).join() === 'X_CLAR,X_BLUR,X_RANGE' && X.definesFor('composite', X.defaults('balanced')).join() === 'X_RANGE' && ['sky', 'water', 'prop', 'folk', 'bloom'].every(n => X.definesFor(n, qu).length === 0), 'Klarheit and Filmkamera on the composite only');
   const t = pre(S1.TERRAIN_FS, ['LIGHT2', 'L2AO', 'AIR2', 'XDEPTH']);
   check(t.includes('ao = 1.0 - v_ao * XD_VAO;') && t.includes('direct *= mix(1.0, l2a, XD_SUN);'), 'Tiefe: the corners and the sun\'s share in the terrain');
   const c = pre(S1.COMPOSITE_FS, ['GRADE2', 'LOOKV', 'LV_HAZE', 'LV_SOFT', 'LV_WRAP', 'LV_TONE', 'LV_PAL', 'X_CLAR', 'X_BLUR']);
   check(c.includes('vec3 xClar(') && c.includes('c = xClar(c, sc, z);') && c.includes('vec3 xBlur(') && c.includes('c = xBlur(c, uv);'), 'Klarheit and Filmkamera: functions and calls');
+  const cr = pre(S1.COMPOSITE_FS, ['GRADE2', 'LOOKV', 'LV_PAL', 'LV_TONE', 'X_RANGE']);
+  check(cr.includes('vec3 xRange(') && cr.includes('c = xRange(c);') && cr.indexOf('c = xRange(c);') > cr.indexOf('c = lvTone(c);') && cr.indexOf('c = xRange(c);') < cr.indexOf('o = vec4(c, 1.0);'), 'Tonumfang: after the grade, in display space');
+  check(pre(S1.COMPOSITE_FS, ['X_RANGE']).includes('c = xRange(c);'), 'Tonumfang needs nothing of v-look (ALU only)');
   check(c.indexOf('vec3 xClar(') < c.indexOf('vec3 lvHdr(') && c.indexOf('uniform highp sampler2D u_lvDepth') < c.indexOf('vec3 xBlur('), 'declared before use');
   const nolook = pre(S1.COMPOSITE_FS, ['GRADE2', 'X_CLAR', 'X_BLUR']);
   check(!nolook.includes('xBlur(') && !nolook.includes('xClar(c'), 'without v-look\'s composite neither runs (they need its depth and soft copy)');
@@ -91,6 +95,11 @@ console.log('c · the mirrors');
   check(X.clarK(0.01, 1, 5) >= X.CLAR.lo - 1e-9 && X.clarK(5, 0.01, 5) <= X.CLAR.hi + 1e-9, 'clamped (no halos past ' + X.CLAR.lo + ' … ' + X.CLAR.hi + ')');
   check(X.clarK(0.1, 0.3, 200) === 1 && X.clarK(0.1, 0.3, 100) > X.clarK(0.1, 0.3, 30), 'nothing far away (the haze stays soft), fading between 70 and 160 m');
   check(X.shutterK(1 / 12, false) === 0.25 && X.shutterK(1 / 48, false) === 1 && X.shutterK(1 / 60, false) === 1, 'the shutter: a quarter of 1/12 s, all of 1/48 s, capped at 1');
+  const R0 = (x) => X.rangeK(x, 0), R1 = (x) => X.rangeK(x, 1);
+  let mono = true; for (let i = 1; i <= 100; i++) if (R1(i / 100) < R1((i - 1) / 100) || R0(i / 100) < R0((i - 1) / 100)) mono = false;
+  check(mono && R1(0) === 0 && Math.abs(R1(1) - 1) < 1e-9, 'Tonumfang: monotonic, 0 and 1 stay (nothing clips, no detail lost)');
+  check(R1(194 / 255) > 214 / 255 && R1(32 / 255) < 28 / 255 && Math.abs(R1(73 / 255) - 73 / 255) < 8 / 255, 'by day the highlights up (194 → ' + Math.round(R1(194 / 255) * 255) + '), the darks down (32 → ' + Math.round(R1(32 / 255) * 255) + '), the middle kept (73 → ' + Math.round(R1(73 / 255) * 255) + ')');
+  check(R0(0.04) > R1(0.04) && R0(0.04) >= 0.04, 'by night no darker darks (the night stays readable)');
   check(X.shutterK(1 / 24, true) === 0 && X.shutterK(0, false) === 0 && X.shutterK(-1, false) === 0 && X.shutterK(2, false) === 0, '0 at a cut, the first frame, a stall');
 }
 
@@ -104,9 +113,15 @@ console.log('d · the GL side');
   check(seen !== A && Math.abs(seen.radius[3] - 2.4) < 1e-9 && V.Light2.AO === A, 'Tiefe Kino: the pass sees 2.4 blocks, light2\'s numbers back after it');
   const s1 = seen; r.l2Ssao({}, {}); check(seen === s1, 'made once (no allocation per frame)');
   r.q = { xDepth: 0 }; r.l2Ssao({}, {}); check(seen === A, 'Tiefe off: light2\'s own numbers');
-  let built = 0; R.buildPrograms = function () { built++; }; r.q = { xDepth: 0 }; r.xKey = '000';
+  let built = 0; R.buildPrograms = function () { built++; }; r.q = { xDepth: 0 }; r.xKey = '0000';
   r.applyQ(); check(built === 0, 'applyQ: nothing rebuilt while the key holds');
   r.q.xClar = true; r.applyQ(); check(built === 1, 'a switch changed: the programs again');
+  const set = []; const gl = { uniform4f: (u, a, b, c, d) => set.push([u, a, b, c, d]), uniformMatrix4fv() {} }; r.gl = gl;
+  r.q = { xRange: true }; r.l2Post({ u: { u_xRange: 'R' } }, { sunDir: [0, 0.8, 0.6] }, 'composite', {});
+  const day = set.find(s => s[0] === 'R'); set.length = 0;
+  r.l2Post({ u: { u_xRange: 'R' } }, { sunDir: [0, -0.5, 0.86] }, 'composite', {});
+  const night = set.find(s => s[0] === 'R');
+  check(day && night && day[1] === X.RANGE.a && day[3] === X.RANGE.t && night[3] === 0, 'Tonumfang\'s uniform: the toe by day, none by night', day && night && day.slice(1).join('/') + ' · ' + night.slice(1).join('/'));
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

@@ -671,6 +671,8 @@
     'g.set.xClar.tip': 'Mehr Kontrast im Nahen: Dunkles hebt sich von Hellem ab, Formen werden klarer. Fast kostenlos (nutzt die Weite-Ferne-Kopie).',
     'g.set.xBlur': 'Filmkamera',
     'g.set.xBlur.tip': 'Bewegungsunschärfe wie bei einer Filmkamera — nur in Kamerafahrten und Trailern, nie beim Spielen.',
+    'g.set.xRange': 'Tonumfang',
+    'g.set.xRange.tip': 'Volle Helligkeitsspanne: helle Flächen leuchten, Schatten werden tagsüber satt dunkel, die Mitte bleibt. Kostet fast nichts.',
     'g.set.magic.tip': 'Wie stark der Sternenhimmel am Tag durchscheint.',
     'g.set.scale.tip': 'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
     'g.set.tsr.tip': 'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',

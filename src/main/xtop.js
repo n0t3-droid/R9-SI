@@ -10,7 +10,10 @@
 //           only — dark anchors, separated planes                                                  (X_CLAR, composite)
 //   xBlur   Filmkamera: while a director shot plays, the camera's motion blur at a 180° shutter (the depth, this and
 //           the last drawn frame's view-projection, the eye's move)                                (X_BLUR, composite)
-// Very Low, Low and Balanced: none of them (their programs and passes as before).
+//   xRange  Tonumfang (normal play, browser run r1: the High frame spanned only 32…194 of 255, the target stills 14…235):
+//           after the grade, in display space, the highlights opened up and by day a soft toe under the darks — the
+//           middle kept, nothing clipped; ALU only (no pass, no tap)                               (X_RANGE, composite)
+// Very Low and Low: none of them (their programs and passes as before); Balanced: Tonumfang only.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -19,14 +22,15 @@
   const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
 
   // ---------------------------------------------------------------- the switches
-  X.SW = ['xDepth', 'xClar', 'xBlur'];
+  X.SW = ['xDepth', 'xClar', 'xBlur', 'xRange'];
   X.MAX = { xDepth: 2 };
-  const OFF = { xDepth: 0, xClar: false, xBlur: false };
+  const OFF = { xDepth: 0, xClar: false, xBlur: false, xRange: false };
   const TIERS = {
-    potato: OFF, low: OFF, balanced: OFF,
-    high: { xDepth: 1, xClar: true, xBlur: true },
-    ultra: { xDepth: 2, xClar: true, xBlur: true },
-    ultraLite: { xDepth: 1, xClar: true, xBlur: false },
+    potato: OFF, low: OFF,
+    balanced: { xDepth: 0, xClar: false, xBlur: false, xRange: true },
+    high: { xDepth: 1, xClar: true, xBlur: true, xRange: true },
+    ultra: { xDepth: 2, xClar: true, xBlur: true, xRange: true },
+    ultraLite: { xDepth: 1, xClar: true, xBlur: false, xRange: true },
   };
   X.defaults = (preset) => Object.assign({}, TIERS[preset] || OFF);
   X.off = () => Object.assign({}, OFF);
@@ -34,8 +38,9 @@
     { key: 'xDepth', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.xDepth', tip: 'g.set.xDepth.tip', cost: 'low', def: 0, min: 0, max: 2, step: 1, vals: 'g.set.xDepthV' },
     { key: 'xClar', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.xClar', tip: 'g.set.xClar.tip', cost: 'low', def: false },
     { key: 'xBlur', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.xBlur', tip: 'g.set.xBlur.tip', cost: 'mid', def: false },
+    { key: 'xRange', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.xRange', tip: 'g.set.xRange.tip', cost: 'low', def: false },
   ];
-  X.key = (q) => (q ? [Math.max(0, Math.min(2, q.xDepth | 0)), q.xClar ? 1 : 0, q.xBlur ? 1 : 0] : [0, 0, 0]).join('');
+  X.key = (q) => (q ? [Math.max(0, Math.min(2, q.xDepth | 0)), q.xClar ? 1 : 0, q.xBlur ? 1 : 0, q.xRange ? 1 : 0] : [0, 0, 0, 0]).join('');
   X.q = OFF;
   X.use = function (q) { X.q = q || OFF; return X.q; };
 
@@ -75,6 +80,17 @@
   // cut (cut true), on the first frame (dt ≤ 0) or after a long stall (dt > 0.5)
   X.shutterK = (dt, cut) => (cut || !(dt > 0) || dt > 0.5 ? 0 : Math.min(1, X.BLUR.shutter / dt));
 
+  // ---------------------------------------------------------------- Tonumfang
+  //   a  the highlights' opening (x + a·x²·(1 − x): 0 and 1 stay, monotonic while a < 1)
+  //   k  the toe's knee (y²·(1 + k)/(y + k)), t its share by full day (× the day: none at night, the night stays readable)
+  X.RANGE = { a: 0.75, k: 0.15, t: 0.6 };
+  X.rangeK = function (x, day) {
+    const R = X.RANGE, y = x + R.a * x * x * (1 - x), toe = y * y * (1 + R.k) / (y + R.k);
+    return y + (toe - y) * R.t * clamp(day, 0, 1);
+  };
+  // the day's share from the sun's height (the toe fades out through the dusk)
+  X.dayK = (sunY) => sstep(-0.05, 0.2, sunY);
+
   // ---------------------------------------------------------------- the defines, by program
   X.definesFor = function (name, q) {
     q = q || X.q;
@@ -84,6 +100,7 @@
     const out = [];
     if (q.xClar) out.push('X_CLAR');
     if (q.xBlur) out.push('X_BLUR');
+    if (q.xRange) out.push('X_RANGE');
     return out;
   };
   X.hook = function (name, defines) {
@@ -104,6 +121,19 @@ vec3 xClar(vec3 c, vec3 sc, float z) {
   float lc = dot(c, vec3(0.2126, 0.7152, 0.0722)), ls = dot(sc, vec3(0.2126, 0.7152, 0.0722));
   float r = clamp(pow((lc + 0.02) / (ls + 0.02), ${f3(C.pow)}), ${f3(C.lo)}, ${f3(C.hi)});
   return c * mix(1.0, r, 1.0 - smoothstep(${C.near.toFixed(1)}, ${C.far.toFixed(1)}, z));
+}
+#endif
+`;
+  };
+  // the composite's end, after the grade (display space): Tonumfang (x X.RANGE.a, y its knee, z the toe's share × the day)
+  X.glslRange = function () {
+    return `
+#ifdef X_RANGE
+// x-top · Tonumfang (xtop.js X.rangeK): the highlights opened, by day a soft toe under the darks
+uniform vec4 u_xRange;
+vec3 xRange(vec3 x) {
+  vec3 y = x + u_xRange.x * x * x * (1.0 - x);
+  return mix(y, y * y * (1.0 + u_xRange.y) / (y + u_xRange.y), u_xRange.z);
 }
 #endif
 `;

@@ -671,6 +671,8 @@
     'g.set.xClar.tip': 'More contrast up close: dark parts stand out from bright ones, shapes read clearer. Almost free (uses the soft-distance copy).',
     'g.set.xBlur': 'Film camera',
     'g.set.xBlur.tip': 'Motion blur like a film camera — only in camera flights and trailers, never while playing.',
+    'g.set.xRange': 'Tonal range',
+    'g.set.xRange.tip': 'The full range of brightness: bright surfaces glow, shadows turn rich and dark by day, the middle stays. Costs almost nothing.',
     'g.set.magic.tip': 'How strongly the starry sky shows through by day.',
     'g.set.scale.tip': 'A lower resolution renders faster; the picture is scaled up.',
     'g.set.tsr.tip': 'Renders small and scales up sharply: more frames per second, nearly as sharp.',

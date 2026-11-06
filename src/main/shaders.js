@@ -3112,7 +3112,7 @@ uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment,
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
 ${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
-${(VR.XTop && VR.XTop.glslPre) ? VR.XTop.glslPre() : ''}${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}${(VR.XTop && VR.XTop.glslPost) ? VR.XTop.glslPost() : ''}
+${(VR.XTop && VR.XTop.glslPre) ? VR.XTop.glslPre() : ''}${(VR.Look && VR.Look.glslComposite) ? VR.Look.glslComposite() : ''}${(VR.XTop && VR.XTop.glslPost) ? VR.XTop.glslPost() : ''}${(VR.XTop && VR.XTop.glslRange) ? VR.XTop.glslRange() : ''}
 #ifdef FILMG
 // f-film2 · the trailer's cartoon-film grade (display space; the define only while the 'welt' trailer plays —
 // trailer_welt.js): the shadows lifted toward a warm floor, the lights a touch gold, a soft oval vignette
@@ -3212,6 +3212,9 @@ void main() {
 #endif
 #ifdef LV_TONE
   c = lvTone(c);   // v-look2: the night's moonlight, the worlds' palettes (look.js)
+#endif
+#ifdef X_RANGE
+  c = xRange(c);   // x-top · Tonumfang (xtop.js)
 #endif
 #ifdef FILMG
   c = filmGrade(c, v_uv);   // f-film2: the trailer's grade (trailer_welt.js)
