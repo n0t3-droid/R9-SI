@@ -2,7 +2,8 @@
 // vgen 17 (after, the land between in bloom), seed 4242, the same views — a meadow walk at eye height by a way, a lone
 // blossom tree, the Traumbaum (a wonder spot), the glow ring by day and at night, a wide vista over the Traumbaum's
 // meadow — and the cost of the meadow and the Traumbaum views on High and on Very Low.
-//   The poses come from test/flora_preview.js (node: the places found in the generated chunks → test/shots/flora_views.json).
+//   The poses: test/flora_views.json (pinned — found by test/flora_preview.js at 917ebbbb; a new run of it proposes
+//   test/shots/flora_views.json, copy it over only to move the pictures on purpose).
 //   While a view streams the uploads get 80 ms a frame and the takt is off (run 7: 424 uploads waiting). View distance 6 (the vista stands 72 blocks from the Traumbaum: inside it); a drawn frame ends in gl.finish (run 5
 //   queued drawn frames into a GPU backlog: the screenshots timed out). The world streams as critic_photo.mjs waits for it: every column within the view distance generated, meshed, shown
 //   and faded in (run 4 of the first try photographed the horizon's stand-ins: its wait looked at 7 × 7 columns only).
@@ -15,7 +16,7 @@ const ROOT = new URL('../', import.meta.url).pathname.replace(/\.tmp_tests\/$/, 
 const SHOTS = ROOT + 'test/shots/';
 fs.mkdirSync(SHOTS, { recursive: true });
 const W = 960, H = 540, T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
-const POSE = JSON.parse(fs.readFileSync(SHOTS + 'flora_views.json', 'utf8'));
+const POSE = JSON.parse(fs.readFileSync(ROOT + 'test/flora_views.json', 'utf8'));   // (the poses of the shipped pictures, pinned; flora_preview.js proposes new ones in test/shots/flora_views.json)
 const TOD = { meadow: 8200, tree: 8200, giant: 8200, ring: 8200, ringnight: 18500, vista: 8200 }, RUN = { giant: 120, ringnight: 120 };
 const views = (process.env.VIEWS || 'meadow,tree,giant,ring,ringnight,vista').split(',');
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
