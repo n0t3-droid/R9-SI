@@ -329,7 +329,7 @@ void main() {
   FG.queue = function (rec, pos, yaw, pose, light, opts) {
     let it = FG.items[FG.n];
     if (!it) it = FG.items[FG.n] = { rec: null, pos: [0, 0, 0], yaw: 0, pose: null, sky: 0, bl: [0, 0, 0], opts: null };
-    it.rec = rec; it.pos[0] = pos[0]; it.pos[1] = pos[1]; it.pos[2] = pos[2]; it.yaw = yaw; it.pose = pose;
+    it.rec = rec; it.pos[0] = pos[0]; it.pos[1] = pos[1] + (VR.Gemalt ? VR.Gemalt.lift(null, pos[0], pos[1], pos[2]) : 0); it.pos[2] = pos[2]; it.yaw = yaw; it.pose = pose;   // (r-gemalt: on the drawn ground)
     it.sky = light.sky; it.bl[0] = light.bl[0]; it.bl[1] = light.bl[1]; it.bl[2] = light.bl[2]; it.opts = opts;
     FG.n++;
   };
@@ -586,7 +586,7 @@ void main() { float r = dot(v_q, v_q); if (r > 1.0) discard; float a = 1.0 - r; 
     const d = SH.data, n = SH.n;
     if ((n + 1) * 5 > d.length) { const b = new Float32Array(d.length * 2); b.set(d); SH.data = b; }
     const o = n * 5, D = SH.data;
-    D[o] = pos[0] - cam.x; D[o + 1] = pos[1] - cam.y; D[o + 2] = pos[2] - cam.z; D[o + 3] = r; D[o + 4] = k;
+    D[o] = pos[0] - cam.x; D[o + 1] = pos[1] - cam.y + (VR.Gemalt ? VR.Gemalt.lift(null, pos[0], pos[1], pos[2]) : 0); D[o + 2] = pos[2] - cam.z; D[o + 3] = r; D[o + 4] = k;   // (r-gemalt: the shadow on the drawn ground too)
     SH.n = n + 1;
   };
   FG.drawShadows = function (r, E) {

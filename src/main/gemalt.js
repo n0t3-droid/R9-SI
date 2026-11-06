@@ -63,7 +63,7 @@
     for (let k = 0; k < 4; k++) {
       const X = x0 + (k & 1), Z = z0 + (k >> 1), h = G.colH(world, X, Z, y);
       if (h !== h) continue;
-      const wk = ((k & 1) ? tx : 1 - tx) * ((k >> 1) ? tz : 1 - tz) + 1e-4;
+      const wk = ((k & 1) ? tx : 1 - tx) * ((k >> 1) ? tz : 1 - tz) + 1e-6;
       s += h * wk; w += wk;
     }
     return w > 0 ? s / w : NaN;

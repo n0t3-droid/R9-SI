@@ -515,6 +515,12 @@
       if (m.dead) { for (const k in P) void k; }
       return H ? H.pose(m, t, P) : P;
     }
+    // r-gemalt · Weiche Natur: a walking body drawn on the drawn ground (gemalt.js G.lift, ≤ ½ block; physics unchanged)
+    gmPos(pos, fly) {
+      const G = VR.Gemalt, d = G && !fly ? G.lift(this.game.world, pos[0], pos[1], pos[2]) : 0;
+      if (!d) return pos;
+      const q = this._gmP || (this._gmP = [0, 0, 0]); q[0] = pos[0]; q[1] = pos[1] + d; q[2] = pos[2]; return q;
+    }
     draw(r, E, cam) {
       const gl = r.gl, t = this.game.time;
       const p = this.beginVox(r, E);
@@ -528,7 +534,7 @@
         const light = this.lightAt(m.pos[0], m.pos[1] + m.h * 0.6, m.pos[2]);
         if (m.def.fly === 'float') { light.sky = 1; }
         const deathRoll = m.dead ? Math.min(1.5, m.deathT * 4) : 0;
-        this.drawModel(r, p, model, m.pos, cam, m.yaw, this.pose(m, t), light, { flash: m.hurt > 0.25 ? 1 : 0, roll: deathRoll, pitch: m.def.fly === 'glide' ? Math.sin(m.age * 0.4) * 0.1 : 0, scale: m.wscale || 1, hide: m.whide || null });
+        this.drawModel(r, p, model, this.gmPos(m.pos, m.def.fly), cam, m.yaw, this.pose(m, t), light, { flash: m.hurt > 0.25 ? 1 : 0, roll: deathRoll, pitch: m.def.fly === 'glide' ? Math.sin(m.age * 0.4) * 0.1 : 0, scale: m.wscale || 1, hide: m.whide || null });
       }
       if (this.game.companions && this.game.companions.heart) this.game.companions.heart.draw(this, r, p, cam, t);   // (u-wild2: the finches)
       if (VR.Foes && VR.Foes.drawExtra) VR.Foes.drawExtra(this, r, p, cam);   // a-foes: shed plates and shards, the slow bolts, a pile of Taler
@@ -543,14 +549,14 @@
         if (hm) {
           // you, as your hero: the same armoured explorer your friends see
           const pose = Folk.heroPose({ walk: pl.bob * 1.4, walkAmt: pl.bobAmt, swing: pl.handSwing, pitch: pl.pitch, fly: pl.flying, sneak: pl.sneaking, aim: hero.tool === 'blaster' });
-          this.drawModel(r, p, hm, pl.pos, cam, pl.yaw, pose, light, { hide: { lids: true, mouth: true }, pitch: flyTilt });
+          this.drawModel(r, p, hm, this.gmPos(pl.pos, pl.flying), cam, pl.yaw, pose, light, { hide: { lids: true, mouth: true }, pitch: flyTilt });
         } else {
           const model = VR.getVoxModel(gl, 'player');
           const fake = { walk: pl.bob * 1.4, walkAmt: pl.bobAmt, id: 0, def: { model: 'player' }, swing: pl.handSwing };
           const pose = this.pose(fake, t);
           pose.head = [pl.pitch, 0, 0];
           if (pl.flying) { pose.leg_l = [0.2, 0, 0]; pose.leg_r = [0.25, 0, 0]; }
-          this.drawModel(r, p, model, pl.pos, cam, pl.yaw, pose, light, { pitch: flyTilt });
+          this.drawModel(r, p, model, this.gmPos(pl.pos, pl.flying), cam, pl.yaw, pose, light, { pitch: flyTilt });
         }
       }
       // vehicles

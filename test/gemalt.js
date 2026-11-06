@@ -180,6 +180,22 @@ function cellActive(j, X, Y, Z) {
     check(row && row.cost === 'medium' && row.t === 'switch', 'the settings row (a switch, cost medium)');
     check(!G.shaderOn({ gSoft: true, lite: true, preset: 'potato' }) && G.shaderOn({ gSoft: true, preset: 'balanced' }), 'the define: never on the lite look');
   }
+  // the bodies on the drawn ground: a fake world whose section 0 of column (0, 0) has the stair's heights
+  if (G && SN) {
+    const j = job(ground((x) => Math.max(1, Math.min(14, 2 + x))), 0, 0, 0, 16), r = V.meshSection(j);
+    const cols = new Map(); cols.set((0 + 32768) * 65536 + (0 + 32768), { sec: [{ softH: r.softH }] });
+    const W = { cols };
+    V.game = { settings: { gSoft: true }, world: W };
+    const hx = G.hAt(W, 6.5, 8.5, 8), top = 8;
+    check(Math.abs(hx - r.softH[8 * 16 + 6] / 64) < 1e-3, 'hAt: a column centre reads its column\'s height', hx.toFixed(3) + ' / ' + (r.softH[8 * 16 + 6] / 64).toFixed(3));
+    let worst = 0; for (let x = 3; x < 11; x += 0.25) { const feet = Math.max(1, Math.min(14, 2 + Math.floor(x))), d = G.lift(W, x, feet, 8.5); worst = Math.max(worst, Math.abs(d)); }
+    check(worst <= 0.5 + 1e-9, 'the lift never moves a body more than ½ block', worst.toFixed(3));
+    const air = G.lift(W, 6.5, top + 3, 8.5);
+    check(air === 0, 'a body in the air (a jump) is drawn where it is');
+    V.game.settings.gSoft = false;
+    check(G.lift(W, 6.5, top, 8.5) === 0, 'switch off: no lift');
+    delete V.game;
+  }
   const de = src('src/main/lang_de.js'), en = src('src/main/lang_en.js');
   check(de.includes("'g.set.gSoft': 'Weiche Natur'") && en.includes("'g.set.gSoft':") && de.includes("'g.set.gSoft.tip'") && en.includes("'g.set.gSoft.tip'"), 'texts in German and English');
   const b = src('build.js');
