@@ -174,6 +174,18 @@ const mk = (seed) => C.create(seed, { ox: 0, oz: 0, sample, villages: VILS });
   check(pl.length > 0 && pl.length <= 80, 'places get names from what happened there (' + pl.length + ': ' + pl.slice(0, 5).map(p => p.de + '/' + p.en).join(', ') + ')');
 }
 
+// ---------------------------------------------------------------- the weather hint (src/main/weather.js)
+{
+  require('../src/main/weather.js');
+  const Wx = VR.Weather, bio = VR.BIOMES[VR.BIOME.plains] || VR.BIOMES[VR.BIOME.meadow];
+  const runDay = (hint) => { const w = new Wx(); w.setSeed(4242); if (hint) w.chronik = hint; const kinds = []; for (let t = 0; t < 24000 * 2; t += 200) { w.update(0.05, { ticks: t % 24000, day: 3 + Math.floor(t / 24000), biome: bio, dim: 'overworld' }); kinds.push(w.kind); } return kinds; };
+  const a = runDay(null), b = runDay(null), c = runDay({ kind: 'regen', id: 1 });
+  check(a.join() === b.join(), 'the weather without the Chronik: unchanged and deterministic');
+  const changed = c.filter((k, i) => k !== a[i]).length;
+  check(changed > 0 && c.every((k, i) => k === a[i] || k === 'regen'), 'a Chronik rain front over you brings rain from the next slot (' + changed + ' samples), nothing else');
+  check(c.slice(0, 3).join() === a.slice(0, 3).join(), 'never mid-slot: the slot it was set in stays as it was');
+}
+
 // ---------------------------------------------------------------- language keys
 {
   const de = VR.I18N.dict.de, en = VR.I18N.dict.en;
