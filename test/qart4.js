@@ -70,7 +70,7 @@ function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
   const I2 = IS.anchored(g2, -1200, -1200, 1200, 1200).find(J => J.x === big.x && J.z === big.z), m2 = IS.mesh(g2, I2, 2);
   check(m1.nv === m2.nv && Buffer.compare(Buffer.from(m1.pos.buffer), Buffer.from(m2.pos.buffer)) === 0, 'the same isle gives the same form (another generator of the same world)');
   check(IS.minR(2) === 0 && IS.minR(3) > 12 && IS.minR(4) > 25, 'the coarse levels draw only the bigger isles', IS.minR(3) + ' / ' + IS.minR(4));
-  check(IS.detFor(-1) === 2 && IS.detFor(1) === 2 && IS.detFor(2) === 1 && IS.detFor(4) === 0, 'detail by tile level: near 2, middle 1, coarse 0');
+  check(IS.detFor(-1) === 2 && IS.detFor(0) === 2 && IS.detFor(1) === 1 && IS.detFor(2) === 0 && IS.detFor(4) === 0, 'detail by tile level: near 2, middle 1, coarse 0');
 }
 
 // ---- b  the far land

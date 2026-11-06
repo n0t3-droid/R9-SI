@@ -22,11 +22,13 @@
   IS.DET = [
     { seg: 7, top: [], und: [0.78, 0.4], vines: false },
     { seg: 11, top: [0.6], und: [0.86, 0.62, 0.34], vines: false },
-    { seg: 0, top: [0.42, 0.76], und: [0.93, 0.82, 0.68, 0.52, 0.36, 0.2], vines: true },
+    { seg: 0, top: [0.5], und: [0.92, 0.78, 0.6, 0.4, 0.2], vines: true },
   ];
-  IS.segs = (I, det) => (det >= 2 ? Math.max(14, Math.min(30, Math.round(I.r * 0.85))) : IS.DET[Math.max(0, det)].seg);
+  // (browser run 3: +25 % drawn far triangles on Balanced — the forms leaner: fewer segments and rows, detail 2 only on
+  //  the two nearest levels)
+  IS.segs = (I, det) => (det >= 2 ? Math.max(12, Math.min(22, Math.round(I.r * 0.6))) : IS.DET[Math.max(0, det)].seg);
   // the detail a horizon tile of level L draws its isles with (ring 1 and the near levels: 2)
-  IS.detFor = (L) => (L <= 1 ? 2 : L <= 2 ? 1 : 0);
+  IS.detFor = (L) => (L <= 0 ? 2 : L <= 1 ? 1 : 0);
   // the smallest isle a tile of level L draws (the coarse levels: about half a cell — the slabs, sampled at the cells'
   // centres, showed about as many)
   IS.minR = (L) => (L >= 3 ? LODCELL(L) * 0.45 : 0);
