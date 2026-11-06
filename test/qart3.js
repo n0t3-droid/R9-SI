@@ -81,12 +81,12 @@ if (RC && RC.solver) {
 // b2 Runde Hänge (fancyLeaves bit 4): a terraced hill of grass — rounded edges in Nahtlos, nothing in Klassisch
 {
   const GRASS = V.R.byName['grass_block'].defaultState, DIRT = V.R.byName['dirt'].defaultState;
-  const hill = (fancy) => {
+  const hill = (fancy, top, fill) => {
     const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS).fill(0xf000);
     for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) {
       const pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
       const h = 4 + Math.max(0, 6 - Math.max(Math.abs(x - 8), Math.abs(z - 8)));   // a stepped pyramid, 1 block a step, flat top
-      if (y < h) { blocks[pi] = y === h - 1 ? GRASS : DIRT; light[pi] = 0; }
+      if (y < h) { blocks[pi] = y === h - 1 ? (top || GRASS) : (fill || DIRT); light[pi] = 0; }
     }
     const t = new Uint16Array(PSS).fill(0x4d6a);
     return { blocks, light, grass: t, foliage: t, water: t, sy: 4, ox: 0, oz: 0, smooth: true, fancyLeaves: fancy, vxLod: true };
@@ -102,7 +102,11 @@ if (RC && RC.solver) {
   // the hill's flat top stays one merged face (the greedy pass): its middle has no vertex at y = 10 inside x,z 7..9
   let mid = 0; for (let i = 0; i < g4.n; i++) { const x = h4.opaque[i * 8] / 2048 - 4, y = h4.opaque[i * 8 + 1] / 2048 - 4, z = h4.opaque[i * 8 + 2] / 2048 - 4; if (Math.abs(y - 10) < 1e-3 && x > 7.5 && x < 8.5 && z > 7.5 && z < 8.5) mid++; }
   check(mid === 0, 'Runde Hänge: flat ground still merged (no vertex inside the flat top)', mid);
+  const STONE = V.R.byName['stone'].defaultState, COB = V.R.byName['cobblestone'].defaultState;
+  check(grid(V.meshSection(hill(6, STONE, STONE))).off > grid(V.meshSection(hill(true, STONE, STONE))).off + 200, 'Runde Hänge: a stone cliff rounds too (the natural rocks)');
+  check(same(V.meshSection(hill(6, COB, COB)).opaque, V.meshSection(hill(true, COB, COB)).opaque), 'Runde Hänge: a building stone (cobblestone) stays blocky');
   V.setLook('classic'); V.VX.clearCache();
+  check(same(V.meshSection(hill(true, STONE, STONE)).opaque, V.meshSection(hill(6, STONE, STONE)).opaque), 'Klassisch: stone stays blocky too');
   check(same(V.meshSection(hill(true)).opaque, V.meshSection(hill(6)).opaque), 'Klassisch: Runde Hänge changes nothing (no smooth ground there)');
   V.setLook('seamless'); V.VX.clearCache();
 }

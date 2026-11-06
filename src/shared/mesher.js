@@ -200,6 +200,18 @@
   };
   const RC_F = new Float32Array(PSS * PS), RC_T = new Float32Array(PSS * PS), RC_O = new Uint8Array(PSS * PS);
   const RCN = 18, RC_V = new Float32Array(RCN * RCN * RCN * 3), RC_OK = new Uint8Array(RCN * RCN * RCN);
+  // Runde Hänge rounds the smooth ground (F.SMOOTH, Nahtlos) and these natural rocks too (in Nahtlos only): a mountain's,
+  // a cliff's, a mesa's edges — the building stones (cobble, bricks, sandstone) are not among them
+  RC.ROCK = /^(stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|moss_block|snow_block|packed_ice|clay|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta)$/;
+  let RC_X = null;
+  RC.rockTable = function () {
+    if (RC_X && RC_X.length === R.stateCount) return RC_X;
+    RC_X = new Uint8Array(R.stateCount);
+    for (const t of R.types) if (RC.ROCK.test(t.name)) for (let s = t.defaultState; s < R.stateCount && R.T.type[s] === t.id; s++) if (R.T.shape[s] === SH.CUBE) RC_X[s] = 1;
+    // (the states of a type follow its default state — walked down too, a type whose default is not its first state)
+    for (const t of R.types) if (RC.ROCK.test(t.name)) for (let s = t.defaultState - 1; s > 0 && R.T.type[s] === t.id; s--) if (R.T.shape[s] === SH.CUBE) RC_X[s] = 1;
+    return RC_X;
+  };
   RC.solver = function (B, TF, leaves, ox, oy, oz) {
     const M = (leaves === false ? 0 : F.LEAVES) | F.OPAQUE, n = PSS * PS, LV = F.LEAVES, OP = F.OPAQUE;
     ox = ox | 0; oy = oy | 0; oz = oz | 0;
@@ -269,6 +281,8 @@
     // q-art3 · Runde Kronen / Runde Hänge: the leaves and the natural ground (F.SMOOTH: Nahtlos only) as one blob
     // (VR.RoundCrown; the solver is made at the first face that asks)
     const roundOn = (lm & 2) !== 0 && fancy, groundOn = (lm & 4) !== 0;
+    const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
+    const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
@@ -503,7 +517,7 @@
           // column one step lower vanish under the joined surface
           // q-art3 · Runde Hänge: the natural ground's exposed faces from the blob (a face toward leaves, which the blob
           // counts as inside, keeps its cube face; flat faces go on to the greedy pass)
-          if (groundOn && (fl & F.SMOOTH)) {
+          if (groundOn && rcGround(b)) {
             if (!(roundOn && (TF[nb] & F.LEAVES))) { faceCorners(bi, d); if (emitRoundQuad(bufs[0], d, x, y, z, bi, b, fl, true)) continue; }
           } else
           if ((fl & F.SMOOTH) && d !== 3 && !(TF[B[bi + PSS]] & F.OPAQUE) && smoothAt(x, y, z)) {
@@ -664,7 +678,7 @@
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
         const bb = B[bi - PSS];
-        if (groundOn && (TF[bb] & F.SMOOTH)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
+        if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
           if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
           const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;
