@@ -100,9 +100,11 @@ if (builtV) {
   if (lb && lb.at) {
     const at = lb.at;
     await settle(10);
+    // (the ground at the lot's door from the loaded column; the near chunks meshed before the picture)
+    const gy = await ev((a) => { const w = VR.game.world; return w.isLoaded(Math.floor(a[0]), Math.floor(a[2])) ? w.topAt(Math.floor(a[0]), Math.floor(a[2])) + 1 : a[1]; }, at);
     await ev(() => { VR.game.env.setTime(4200); VR.game.hideHud = true; });
-    await stand([at[0] + 11, at[1] + 7, at[2] + 11], [at[0], at[1] + 2, at[2]]);
-    await settle(10); await step(10, 33);
+    await stand([at[0] + 10, gy + 6, at[2] + 10], [at[0], gy + 2, at[2]]);
+    await settle(30); await step(10, 33);
     await grab('built', 'chronik_built.png', 6);
     await ev(() => { VR.game.hideHud = false; });
   }

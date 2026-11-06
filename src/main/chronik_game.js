@@ -23,7 +23,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const hs = (s) => { s = String(s); let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x | 0; };
   if (VR.Settings && VR.Settings.add && !(VR.Settings.byKey && VR.Settings.byKey('chronik'))) { try { VR.Settings.add({ key: 'chronik', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.chronik', tip: 'g.set.chronik.tip', cost: 'low', def: true }); } catch (e) { /* the panel's */ } }
-  CG.STEP = 3; CG.MINSTEP = 5; CG.FAM_R = 70; CG.FAM_MAX = 3; CG.LEAD_R = 700;
+  CG.STEP = 3; CG.WAIT = 6; CG.MINSTEP = 5; CG.FAM_R = 70; CG.FAM_MAX = 3; CG.LEAD_R = 700;
   CG.cost = { frames: 0, ms: 0, replies: 0, replyMs: 0, worker: 0 };
   CG.said = []; CG.spawned = []; CG.lastBuilt = null;
   const minutes = (g) => (g.env.day | 0) * 1440 + Math.floor((g.env.ticks || 0) * 1440 / 24000);
@@ -36,6 +36,7 @@
     const R = S(g);
     if (R.st === 'off' || R.busy) return;
     if ((R.acc += dt) < CG.STEP) { if (R.lead) CG.leadCheck(g, R); return; }
+    if (R.st === 'new' && ((R.age = (R.age || 0) + R.acc) < CG.WAIT || (g.pool.busy | 0) > 0)) { R.acc = 0; return; }   // (the first job waits for the world's first chunks: the workers idle, ≥ 6 s of play)
     R.acc = 0;
     const t0 = performance.now();
     if (R.st === 'new') CG.send(g, R, 'init');
