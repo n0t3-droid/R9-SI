@@ -31318,6 +31318,8 @@ return recs;
 'use strict';
 const R=VR.R,M=VR.M;
 const LOD=VR.LOD={};
+
+LOD.cell=(L)=>(L<0?2:4<<L);
 let AVG=null;
 const cc=new Map();
 LOD.setAvg=(a)=>{AVG=a;cc.clear();};
@@ -31581,7 +31583,7 @@ return g&&g.vgen>=9?mixc(mixc(P.ochre,P.umber,0.45),P.stone,0.25):P.stone;
 
 LOD.tileCells=function(g,job){
 const VG=VR.VillageGen;if(!VG||g.singleBiome>=0||job.level>1)return[];
-const L=job.level,step=4<<L,n=32,T=n*step;
+const L=job.level,step=LOD.cell(L),n=32,T=n*step;
 const x0=job.tx*n*step,z0=job.tz*n*step,x1=x0+T,z1=z0+T;
 const C=VG.cell(g),pad=VG.rad(g)+8,out=[];
 for(let j=Math.floor((z0-pad)/C);j<=Math.floor((z1+pad)/C);j++)for(let i=Math.floor((x0-pad)/C);i<=Math.floor((x1+pad)/C);i++)out.push([i,j]);
@@ -31592,7 +31594,7 @@ return out;
 LOD.plansNeeded=function(g,job){
 const VG=VR.VillageGen;
 if(!VG|| !g.computeClimate|| !g.n3||job.level>1)return[];
-const L=job.level,step=4<<L,n=32,T=n*step;
+const L=job.level,step=LOD.cell(L),n=32,T=n*step;
 const x0=job.tx*n*step,z0=job.tz*n*step;
 let vs=[];
 try{vs=villagesNear(g,x0,z0,x0+T,z0+T);}catch(e){vs=[];}
@@ -31666,7 +31668,7 @@ return o;
 LOD.build=function(g,job){
 if(!g.computeClimate|| !g.n3)return null;
 const BIOMES=VR.BIOMES,SEA=VR.C.SEA;
-const L=job.level,step=4<<L,n=32,N=n+2;
+const L=job.level,step=LOD.cell(L),n=32,N=n+2;
 const x0=job.tx*n*step,z0=job.tz*n*step,T=n*step;
 const idx=(i,j)=>(j+1)*N+(i+1);
 
@@ -31703,7 +31705,7 @@ const tr=TREES[key]||landTree(g,X,Z,key);
 if(!water&&tr&&kd!==6||(!water&&tr&&(key==='snowy_taiga'||key==='grove'))){
 const cover=tr[0];
 if(step<=(tr[3]||8)){
-if(i>=0&&j>=0&&i<n&&j<n&&hh(X,Z,91)<cover*(step===4?1:1.15)&& !(vsites.length&&inVil(X,Z,4))){
+if(i>=0&&j>=0&&i<n&&j<n&&hh(X,Z,91)<cover*(step===4?1:step<4?0.25:1.15)&& !(vsites.length&&inVil(X,Z,4))){
 const th=tr[2]*(0.75+hh(X,Z,92)*0.5);
 let lc=leafCol(tr[1],B);if(cold)lc=mixc(lc,snow,0.55);
 trees.push({i,j,g:y+1,th,lc,kind:tr[1],jx:(hh(X,Z,93)-0.5)*step*0.3,jz:(hh(X,Z,94)-0.5)*step*0.3});
@@ -32330,10 +32332,30 @@ const a=ex*ux+ez*uz+SP.MARGIN,l=Math.max(0,Math.abs(ex*uz-ez*ux)-SP.MARGIN);
 return spC>1e-6?(a-l*cotH)/spC:Infinity;
 };
 
+
+
+
+
+
+
+
+
+
+SP.CORR_MAX=3.5;SP.CORR_MIN=1.5;SP.LAT_CAP=0.8;SP.COLS=40;
+SP.corridor=(lat,speedB)=>{
+const base=Math.max(SP.CORR_MAX,speedB>0?(SP.COLS*16/speedB-1)/2:99);
+return base*(1-(1-SP.CORR_MIN/SP.CORR_MAX)*clamp(((lat>0?lat:SP.LAT0)-0.6)/0.8,0,1));
+};
+
+
+SP.REACH=3;
+SP.reach=(speedB)=>SP.REACH*clamp((speedB-40)/20,0,1);
 SP.worth=function(ex,ez,ux,uz,speedB,lat,cotH){
 if(!(speedB>=SP.FAST))return true;
 if(ex*ex+ez*ez<=SP.KEEP*SP.KEEP)return true;
-return SP.timeLeft(ex,ez,ux,uz,speedB/16,cotH)>=SP.WORTH*lat;
+const along=ex*ux+ez*uz,side=Math.abs(ex*uz-ez*ux);
+if(along< -0.5||side>SP.corridor(lat,speedB))return false;
+return SP.timeLeft(ex,ez,ux,uz,speedB/16,cotH)>=SP.WORTH*Math.min(lat,SP.LAT_CAP);
 };
 
 
@@ -32343,6 +32365,9 @@ return SP.timeLeft(ex,ez,ux,uz,speedB/16,cotH)>=SP.WORTH*lat;
 
 SP.REST=1.5;
 SP.ease=function(lat){return Math.max(SP.LAT_MIN,lat*0.998);};
+
+
+SP.REST=Infinity;
 SP.rest=function(speedB,lat,rd){return speedB>=SP.FAST&&(speedB/16)*lat>rd*SP.REST;};
 
 SP.prio=function(ex,ez,ux,uz,ahead,cosH){
