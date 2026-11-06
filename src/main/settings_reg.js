@@ -131,6 +131,7 @@
   // t-sky3 · WOW V · Der Himmel (sky3.js S3.ROWS): Himmel (0 · 1 · 2) in Licht & Schatten, Wolken mit Volumen in Dinge & Effekte
   if (VR.Sky3 && VR.Sky3.ROWS) for (const it of VR.Sky3.ROWS) S.add(Object.assign({}, it));
   if (VR.Look && VR.Look.ROWS) for (const it of VR.Look.ROWS) S.add(Object.assign({}, it));
+  if (VR.QArt && VR.QArt.ROWS) for (const it of VR.QArt.ROWS) S.add(Object.assign({}, it));   // q-art · Bildregie
   if (VR.XTop && VR.XTop.ROWS) for (const it of VR.XTop.ROWS) S.add(Object.assign({}, it));   // x-top · Spitzenbild   // v-look · Filmblick
   if (VR.LField && VR.LField.ROWS_SET) for (const it of VR.LField.ROWS_SET) S.add(Object.assign({}, it));   // v-light · Lichtpfützen
   // F10 · Bandbreite (ipu.js): the five switches for graphics chips that share the system's memory (each saves memory traffic;
