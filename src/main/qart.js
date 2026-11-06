@@ -48,9 +48,12 @@
   //   cell   the clump lattice (blocks; y × 0.85) · rad the clumps' radius (× 0.8 … 1.2 by clump) · k the blend's softness
   //   inR    the signed distances over which a fragment goes from the clump's skin to its inside (the field's median ~0)
 //   nrm    how much of the volume normal the leaf face takes (0 the flat face) · inner the light deep in a clump ×
-  //   corner the corners' cut radius (blocks, by grid vertex) · rag the share of ragged texels on the cut's rim
+  //   sky    the sky's light inside the crown lifted this far toward the open sky (the inner faces the cuts show: a deep
+  //          green, not black — browser run 1: black crosses in the cherry's crown)
+  //   corner the corners' cut radius (blocks) · cutP the share of the face corners cut (each block's corner on its own:
+  //          run 1 cut all four round a grid vertex — a '+' hole in every flat wall) · rag the share of ragged rim texels
   //   far    the cut fades out between these distances (m; texels under a pixel would shimmer)
-  QA.LEAF = { cell: 3.2, rad: 1.5, k: 3.5, nrm: 0.72, inner: 0.62, inR: [0.1, -0.7], corner: [0.2, 0.42], rag: 0.35, far: [64, 110] };
+  QA.LEAF = { cell: 3.2, rad: 1.5, k: 3.5, nrm: 0.85, inner: 0.55, inR: [0.1, -0.7], sky: 0.45, corner: [0.22, 0.44], cutP: 0.55, rag: 0.18, far: [64, 110] };
   // the hash (shaders.js hash13, the same arithmetic)
   const hash13 = (x, y, z) => {
     let a = fract(x * 0.1031), b = fract(y * 0.1031), c = fract(z * 0.1031);
@@ -84,8 +87,8 @@
     const g = [Math.floor(pp[0] + 0.5) - Math.floor(pp[0]), Math.floor(pp[1] + 0.5) - Math.floor(pp[1])];   // the nearest corner (0 or 1)
     const dd = [Math.abs(f[0] - g[0]), Math.abs(f[1] - g[1])];
     const fade = 1 - sstep(L.far[0], L.far[1], dist);
-    const hv = hash13(Math.floor(pp[0] + 0.5), Math.floor(pp[1] + 0.5), pl);
-    const r = mix(L.corner[0], L.corner[1], hv) * fade;
+    const hv = hash13(Math.floor(pp[0]) + g[0] * 0.5 + 0.13, Math.floor(pp[1]) + g[1] * 0.5 + 0.29, pl);   // this block's corner
+    const r = hv < L.cutP ? mix(L.corner[0], L.corner[1], hv / L.cutP) * fade : 0;
     const n = hash13(tq[0] + 0.5, tq[1] + 0.5, pl * 1.37 + 0.11);
     if (r <= 0) return false;
     if (dd[0] < r && dd[1] < r && Math.hypot(r - dd[0], r - dd[1]) > r * (0.7 + 0.6 * n)) return true;   // the rounded, ragged corner
@@ -139,7 +142,7 @@
     const out = [];
     if (q.qLeaf && fancy && LEAF_PROGS[name]) {
       const L = QA.LEAF;
-      out.push('Q_LEAF', 'Q_CELL ' + f3(L.cell), 'Q_RAD ' + f3(L.rad), 'Q_K ' + f3(L.k), 'Q_LEAF_N ' + f3(L.nrm), 'Q_LEAF_IN ' + f3(L.inner));
+      out.push('Q_LEAF', 'Q_CELL ' + f3(L.cell), 'Q_RAD ' + f3(L.rad), 'Q_K ' + f3(L.k), 'Q_LEAF_N ' + f3(L.nrm), 'Q_LEAF_IN ' + f3(L.inner), 'Q_LEAF_SKY ' + f3(L.sky));
     }
     if (q.qPlaza && name === 'terrain') {
       // (the floors' layers as a macro made when the program is built: the registry's tex table is not there yet when
@@ -183,7 +186,8 @@ bool qCut(vec3 w, uint face, float dist) {
   vec2 tq = floor(pp.xy * 16.0), bl = floor(pp.xy);
   vec2 f = (tq + 0.5) / 16.0 - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
   float fade = 1.0 - smoothstep(${L.far[0].toFixed(1)}, ${L.far[1].toFixed(1)}, dist);
-  float r = mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hash13(vec3(floor(pp.xy + 0.5), pl))) * fade;
+  float hv = hash13(vec3(bl + g * 0.5 + vec2(0.13, 0.29), pl));
+  float r = hv < ${f3(L.cutP)} ? mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hv / ${f3(L.cutP)}) * fade : 0.0;
   float n = hash13(vec3(tq + 0.5, pl * 1.37 + 0.11));
   if (r <= 0.0) return false;
   if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (0.7 + 0.6 * n)) return true;
@@ -195,7 +199,7 @@ vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
   float inner = smoothstep(${f3(QA.LEAF.inR[0])}, ${f3(QA.LEAF.inR[1])}, c.w);
   col *= mix(1.0, Q_LEAF_IN, inner);
   float lit = clamp(dot(c.xyz, L) * 0.5 + 0.5, 0.0, 1.0);
-  col *= mix(vec3(0.84, 0.94, 1.08), vec3(1.08, 1.03, 0.88), lit);
+  col *= mix(vec3(0.74, 0.84, 0.95), vec3(1.12, 1.07, 0.92), lit);
   float rim = 1.0 - clamp(dot(c.xyz, V), 0.0, 1.0); rim = rim * rim * rim;
   float back = clamp(dot(-V, L), 0.0, 1.0); back *= back; back *= back;
   col += alb * sun * vec3(1.0, 1.0, 0.55) * (rim * 0.35 + back * 0.45 * (1.0 - inner));

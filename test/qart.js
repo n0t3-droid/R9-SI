@@ -105,6 +105,13 @@ console.log('c · the mirrors');
   check(centre === 0, 'the cut never takes a face\'s middle (a single leaf block stays a leaf block)');
   check(sym === 3000, 'the same cut on both sides of a shared face (no gap that only one side shows)');
   check(cutN > tot * 0.05 && cutN < tot * 0.3, 'it takes the corners and some rim (a share of the face)', (cutN / tot * 100).toFixed(1) + ' %');
+  let all4 = 0, some = 0;
+  for (let i = 0; i < 2000; i++) {
+    const vx = Math.floor(Math.sin(i * 3.1) * 500), vz = Math.floor(Math.cos(i * 1.9) * 500), e = 1.5 / 16;
+    const q = [[vx + e, vz + e], [vx - e, vz + e], [vx + e, vz - e], [vx - e, vz - e]].map(([x, z]) => QA.cut([x, 70, z], 2, 10)).filter(Boolean).length;
+    if (q === 4) all4++; if (q > 0) some++;
+  }
+  check(all4 < 2000 * 0.12 && some > 2000 * 0.4, 'each block\'s corner on its own: rarely all four round a vertex (no \'+\' holes in a flat wall)', all4 + ' of 2000 all four, ' + some + ' some');
   check(far === 0, 'nothing cut far away (no shimmer past ' + QA.LEAF.far[1] + ' m)');
   check(Math.abs(QA.plazaLum(0.7) - (0.3 + 0.4 * 0.38)) < 1e-9 && QA.plazaLum(0.2) === 0.2 && QA.plazaLum(0.9) < 0.55, 'Platzbelag: the light floors compressed to a mid-tone, the darker ones untouched');
   const E0 = () => ({ horizon: [0.3941, 0.6291, 0.7533], skyMid: [0.0247, 0.0885, 0.2516], zenith: [0.0022, 0.0038, 0.0273], skyStops: [0.39, 0.35, 0.6, 0.2], skySpace: [0.18, 0.42, 1, 0.8], ambSky: [0.36, 0.44, 0.66], fogColor: [0.3, 0.45, 0.6] });

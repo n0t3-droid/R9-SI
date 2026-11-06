@@ -1337,6 +1337,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   // lighting
   float sky = v_sky;
   float skyL = sky * sky * (3.0 - 2.0 * sky);
+#if defined(Q_LEAF) && !defined(MODEL)
+  if (qLf) skyL = mix(skyL, 1.0, Q_LEAF_SKY);   // q-art · Laubkronen: light through the leaves (the crown's inside a deep green)
+#endif
   vec3 bl = v_block;
   vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
