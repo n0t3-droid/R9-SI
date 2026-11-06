@@ -82,7 +82,7 @@
       // (p-stream2: the first such job on a worker — and a second — gives its slot back while it waits: a town's plan built in
       // 20 ms slices held both slots for seconds in fast flight, nothing else ran — test/stream_real.js; the slices go on
       // between the other jobs. Its answer then frees nothing)
-      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) { st.t0 = performance.now(); if (!st.dropped && st.msg && this.dropWaiting && this.dropWaiting(st.msg)) { st.dropped = true; w.postMessage({ type: 'drop', job: m.id }); } if (!st.parked && (w.parkedN | 0) < 2) { st.parked = true; w.parkedN = (w.parkedN | 0) + 1; w.inflight = Math.max(0, w.inflight - 1); this.pump(); } } return; }
+      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) { st.t0 = performance.now(); if (!st.parked && (w.parkedN | 0) < 2) { st.parked = true; w.parkedN = (w.parkedN | 0) + 1; w.inflight = Math.max(0, w.inflight - 1); this.pump(); } } return; }
       const st = this.started.get(m.id);
       if (st && st.parked) w.parkedN = Math.max(0, (w.parkedN | 0) - 1); else w.inflight = Math.max(0, w.inflight - 1);
       if (st) { this.started.delete(m.id); if (!st.direct) { const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; } }
@@ -140,7 +140,7 @@
         const id = this.nextId++; job.msg.id = id;
         delete job.msg.cancel;
         if (job.cb) this.cb.set(id, job.cb);
-        this.started.set(id, { lane: job.lane, t0: performance.now(), q: best.inflight + 1, w: best, msg: job.msg.type === 'gen' ? job.msg : null });   // (p-stream2: a gen job's message, for dropWaiting)
+        this.started.set(id, { lane: job.lane, t0: performance.now(), q: best.inflight + 1, w: best });
         best.inflight++;
         best.postMessage(job.msg, job.transfer || []);
       }
@@ -356,7 +356,6 @@
         if (c) { c.lastSeen = now; continue; }
         if (this.pending.has(k)) continue;
         if (this.failed && this.retryAfter(k, now) > now) continue;
-        if (this.parkDrop && this.parkDrop.size && this.planFast) { const t = this.parkDrop.get(k); if (t !== undefined) { if (performance.now() - t < VR.StreamPlan.DROP_MS) continue; this.parkDrop.delete(k); } }   // (p-stream2: dropped while waiting for a plan)
         // columns ahead of the flight come first: their distance is measured from a point further ahead
         const ex = cx - pcx, ez = cz - pcz;
         if (pfast && (this.planRest || !SP.worth(ex, ez, ux, uz, speed, this.lat || SP.LAT0, this.planCot))) continue;   // (p-stream: gone by when ready)
@@ -423,15 +422,6 @@
       }
       if (this.streamPlan && this.planFast) (this.reqAt || (this.reqAt = new Map())).set(k, this.now);   // p-stream: the latency in fast flight (checkShown)
       const epoch = this.styleEpoch || 0;
-      // p-stream2 · in fast flight a column that waits for a town's plan (seconds of slices, the worker held) is dropped — the
-      // fine far tiles stand in; asked for again DROP_MS later (or when the flight slows) — the plan's slices so far are kept
-      if (!this.pool.dropWaiting && this.pool.started) this.pool.dropWaiting = (msg) => {
-        if (!this.planFast || !((this.planSpeed || 0) >= VR.StreamPlan.DROP_SPEED) || this.dead || !this.center || msg.cx === undefined) return false;   // (browser run 2: at 40 m/s a dropped column near the flight left a 2 s gap — the chunks keep up there)
-        const ex = msg.cx - this.center[0], ez = msg.cz - this.center[1];
-        if (ex * ex + ez * ez <= 2.25) return false;   // (the ground under the camera: never)
-        (this.parkDrop || (this.parkDrop = new Map())).set(ckey(msg.cx, msg.cz), performance.now());
-        return true;
-      };
       const onGen = (m) => {
         // F9 · Weltgenerierung im Takt: the column waits for the frame (integrate); its request stays pending until then
         if (m.type === 'gen' && this.streamTakt && !this.dead) { (this.arrivals || (this.arrivals = [])).push({ k, m, epoch }); return; }

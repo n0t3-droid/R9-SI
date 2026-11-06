@@ -182,7 +182,7 @@ console.log('g · turning back: the columns just left come from memory (no gener
   check(on.same, 'a column from memory has the blocks and the light a fresh generation gives');
 }
 
-console.log('h · p-stream2: a job waiting for a town plan gives its slot back; in fast flight it is dropped; bare sections first');
+console.log('h · p-stream2: a job waiting for a town plan gives its slot back; bare sections first in fast flight');
 {
   SIM.now = 0; SIM.workers.length = 0;
   const pool = new V.WorkerPool('', 1); pool.maxInflight = 2;
@@ -195,14 +195,11 @@ console.log('h · p-stream2: a job waiting for a town plan gives its slot back; 
   pool.pump();
   const gens = sent.filter(m => m.type === 'gen');
   check(gens.length === 2, 'two jobs in flight', gens.length);
-  w.planFast = false; wk.onmessage({ data: { type: 'waiting', id: gens[0].id } });
-  check(sent.filter(m => m.type === 'gen').length === 3 && !sent.some(m => m.type === 'drop'), 'a job waiting for a plan frees its slot (the next job is sent); slow: not dropped');
-  w.planFast = true; w.planSpeed = 40; wk.onmessage({ data: { type: 'waiting', id: gens[2] ? gens[2].id : -1 } });
-  check(!sent.some(m => m.type === 'drop'), 'at 40 m/s (the chunks keep up) not dropped');
-  w.planSpeed = 80; wk.onmessage({ data: { type: 'waiting', id: gens[1].id } });
-  check(sent.some(m => m.type === 'drop' && m.job === gens[1].id), 'in fast flight a waiting column is dropped (the far tiles stand in)');
-  wk.onmessage({ data: { type: 'cancelled', id: gens[1].id } });
-  check(!w.pending.has(V.ckey(6, 0)) && w.parkDrop && w.parkDrop.has(V.ckey(6, 0)), 'its request is forgotten and not asked for again for a while');
+  wk.onmessage({ data: { type: 'waiting', id: gens[0].id } });
+  check(sent.filter(m => m.type === 'gen').length === 3, 'a job waiting for a plan frees its slot (the next job is sent)');
+  wk.onmessage({ data: { type: 'waiting', id: gens[0].id } }); wk.onmessage({ data: { type: 'gen', id: gens[0].id, cx: 5, cz: 0, blocks: BL.slice(), light: LI.slice(), biome: new Uint8Array(256), caveBiome: new Int8Array(256), grass: new Uint16Array(256), foliage: new Uint16Array(256), water: new Uint16Array(256) } });
+  check(wk.inflight === 2 && (wk.parkedN | 0) === 0, 'its answer frees nothing more (two jobs in flight)', wk.inflight + ' / ' + wk.parkedN);
+  w.planFast = true;
   w.streamPlan = true;
   check(w.wantDetail({ cx: 0, cz: 0 }, 4, [8, 70, 8]) === false, 'in fast flight a section is meshed bare first (its detail later)');
   w.planFast = false;

@@ -344,13 +344,8 @@
       post({ type: 'error', id: m.id, msg: String(err && err.stack || err) });
     }
   }
-  // p-stream2 · {type:'drop', job}: a job waiting for a plan is answered 'cancelled' at its next turn (fast flight left it;
-  // world.js dropWaiting) — the plan's slices built so far are kept
-  const dropped = new Set();
   self.onmessage = function (e) {
     const m = e.data, VG = VR.VillageGen;
-    if (m.type === 'drop') { if (dropped.size > 512) dropped.clear(); dropped.add(m.job); return; }
-    if (dropped.size && dropped.has(m.id)) { dropped.delete(m.id); self.postMessage({ type: 'cancelled', id: m.id }); return; }
     if (!PLAN_JOBS[m.type] || !VG) { run(m); return; }
     try {
       if (m.epoch === undefined) m.epoch = epoch;

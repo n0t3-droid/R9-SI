@@ -386,7 +386,6 @@
   };
   // p-stream2 · the reach: faster than 40 m/s the loading centre goes up to REACH chunks further ahead (the band's columns
   // are asked for sooner: on Very Low's smaller disk the band was only ~4 chunks deep at 80 m/s — under a second)
-  SP.DROP_SPEED = 60; SP.DROP_MS = 3000;   // (world.js dropWaiting: a column waiting for a town's plan is dropped only this fast, asked again after DROP_MS)
   SP.REACH = 3;   // (2: rd 5 76 → 86.5 %, 3: 87.4 %, 4: 87.3 % — test/stream_real.js on the browser's spawn)
   SP.reach = (speedB) => SP.REACH * clamp((speedB - 40) / 20, 0, 1);
   SP.worth = function (ex, ez, ux, uz, speedB, lat, cotH) {
