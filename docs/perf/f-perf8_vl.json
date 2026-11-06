@@ -112,7 +112,9 @@
   "xtop": 0,
   "xtop_gl": 0,
   "qart": 0,
-  "qart_gl": 0
+  "qart_gl": 0,
+  "qart2": 0,
+  "qart2_gl": 0
  },
  "base": {
   "tag": "v0556",
@@ -407,8 +409,10 @@
   "trailer_score",
   "xtop",
   "qart",
+  "qart2",
   "xtop_gl",
-  "qart_gl"
+  "qart_gl",
+  "qart2_gl"
  ],
  "unmeasured": {
   "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs — node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
@@ -422,6 +426,8 @@
   "xtop": "x-top (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: its defines and uniforms exist only with Tiefe/Klarheit/Filmkamera on (High and up); the renderer wraps return at their first test; re-measure with perf8.mjs at the next release",
   "xtop_gl": "x-top (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: its defines and uniforms exist only with Tiefe/Klarheit/Filmkamera on (High and up); the renderer wraps return at their first test; re-measure with perf8.mjs at the next release",
   "qart": "q-art (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program); the renderer wraps run on a rebuild only, env.js's colour script only with Farbdrehbuch on; re-measure with perf8.mjs at the next release",
-  "qart_gl": "q-art (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program); the renderer wraps run on a rebuild only, env.js's colour script only with Farbdrehbuch on; re-measure with perf8.mjs at the next release"
+  "qart_gl": "q-art (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program); the renderer wraps run on a rebuild only, env.js's colour script only with Farbdrehbuch on; re-measure with perf8.mjs at the next release",
+  "qart2": "q-art2 (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program, no uniform); per frame only two renderer wraps (common, drawSections) that look up a uniform the potato programs do not have; re-measure with perf8.mjs at the next release",
+  "qart2_gl": "q-art2 (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program, no uniform); per frame only two renderer wraps (common, drawSections) that look up a uniform the potato programs do not have; re-measure with perf8.mjs at the next release"
  }
 }
