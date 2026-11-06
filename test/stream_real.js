@@ -182,6 +182,8 @@ if (require.main === module) {
     return SP.timeLeft(ex, ez, ux, uz, sp / 16, cot) >= SP.WORTH * Math.min(lat, cap); }; };
   const EXP = { norest: () => { SP.REST = 1e9; }, c3: corr(+(process.env.W || 3.5), +(process.env.CAP || 0.8)) };
   EXP.nodet = (w) => { const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; const dr = w.detailReturn.bind(w); w.detailReturn = function (...a) { if (!this.planFast) dr(...a); }; };
+  EXP.share5 = () => { SP.SHARE_MAX = 0.5; };
+  EXP.reach = () => { SP.REACH = +(process.env.REACH || 3); };
   EXP.c3nd = (w) => { EXP.c3(w); const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; };
   for (const rd of RDS) for (const v of SPEEDS) for (const si of DIRS) {
     const r = fly({ rd, v, yaw: yawOf(si), secs: SECS, far: !process.env.NOFAR, farK: +(process.env.FARK || 1), setup: EXP[process.env.EXP] });

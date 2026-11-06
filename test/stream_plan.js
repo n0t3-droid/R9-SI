@@ -37,6 +37,7 @@ console.log('a · worth');
   // p-stream2 · the corridor: 7 columns wide while the chunks keep up, 3 when they lag; a slow moment never makes everything too late
   check(!w(5, -7, 80, 0.5) && !w(3, -9, 80, 2) && w(1, -9, 80, 2) && w(3, -9, 80, 0.5), 'p-stream2: at 80 m/s only a corridor along the flight (half width 3.5 chunks, 1.5 when lagging)');
   check(w(6, -7, 40, 0.5) && w(9, -12, 20, 0.5), 'p-stream2: at 40 m/s and slower the band is as wide as the disk (the chunks keep up there)');
+  check(SP.reach(40) === 0 && SP.reach(80) === SP.REACH && SP.REACH > 0, 'p-stream2: faster than 40 m/s the loading centre reaches further ahead (80 m/s: ' + SP.REACH + ' chunks more)');
   check(w(0, -10, 80, 6) && w(0, -9, 80, 3), 'p-stream2: a high latency (a town, a slow moment) still asks for the land ahead (capped at ' + SP.LAT_CAP + ' s)');
   check(!w(0, 6, 40, 1.5) && !w(-5, 3, 40, 1.5), 'behind and beside-behind: not worth it (the camera has left before it is ready)');
   check(!w(6, -1, 40, 1.5), 'far to the side just ahead: leaves the cone before it is ready');

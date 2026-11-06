@@ -384,6 +384,10 @@
     const base = Math.max(SP.CORR_MAX, speedB > 0 ? (SP.COLS * 16 / speedB - 1) / 2 : 99);
     return base * (1 - (1 - SP.CORR_MIN / SP.CORR_MAX) * clamp(((lat > 0 ? lat : SP.LAT0) - 0.6) / 0.8, 0, 1));
   };
+  // p-stream2 · the reach: faster than 40 m/s the loading centre goes up to REACH chunks further ahead (the band's columns
+  // are asked for sooner: on Very Low's smaller disk the band was only ~4 chunks deep at 80 m/s — under a second)
+  SP.REACH = 3;   // (2: rd 5 76 → 86.5 %, 3: 87.4 %, 4: 87.3 % — test/stream_real.js on the browser's spawn)
+  SP.reach = (speedB) => SP.REACH * clamp((speedB - 40) / 20, 0, 1);
   SP.worth = function (ex, ez, ux, uz, speedB, lat, cotH) {
     if (!(speedB >= SP.FAST)) return true;
     if (ex * ex + ez * ez <= SP.KEEP * SP.KEEP) return true;
