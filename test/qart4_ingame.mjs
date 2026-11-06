@@ -76,6 +76,9 @@ const eyeAt = (E, T, tod) => ev(([E, T, tod]) => {
   const dx = T[0] - E[0], dy = T[1] - E[1], dz = T[2] - E[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); g.env.setTime(tod);
 }, [E, T, tod]);
 const top = (x, z) => ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [x, z]);
+// (run 1: the meadow's eye stood at y 2 — the spawn's chunks were not loaded while the eye was at the isles) the ground
+// at (x, z) with its chunks loaded: the eye above it first
+const ground = async (x, z) => { await eyeAt([x, 150, z], [x + 10, 140, z], 6000); await settle(40); return top(x, z); };
 const views = async (view, E, T, tod, kind) => {
   for (const pr of PRESETS) {
     await preset(pr); await eyeAt(E, T, tod); await settle(40); await run(20);
@@ -110,9 +113,10 @@ try {
     const TOD = 7200, I = isles.filter(J => J.r >= 12).sort((a, b) => (a.d - a.r * 4) - (b.d - b.r * 4))[0];
     if (I) {
       await eyeAt([I.x, 150, I.z - 30], [I.x, 140, I.z], TOD); await settle(40);
-      const a = (await sunA()) + 2.4, R = I.r * 1.25 + 6;
-      const E = [I.x + Math.cos(a) * R, 0, I.z + Math.sin(a) * R]; E[1] = (await top(E[0], E[2])) + 1 + 1.62;
-      const T = [I.x, I.y - I.r * I.deep * 0.35, I.z];
+      // (run 1: from r·1.25 the eye looked straight up into the undersides — now from about 2.6 r, the silhouettes)
+      const a = (await sunA()) + 2.4, R = I.r * 2.6 + 18;
+      const E = [I.x + Math.cos(a) * R, 0, I.z + Math.sin(a) * R]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62;
+      const T = [I.x, I.y - I.r * I.deep * 0.5, I.z];
       N.cams.isles = PIN.isles || { E, T };
       await views('isles', N.cams.isles.E, N.cams.isles.T, TOD, 'isle');
     } else check(false, 'a big isle near the spawn');
@@ -124,7 +128,7 @@ try {
     if (!cam) {
       const far = isles.filter(J => J.d > 60 && J.d < 330), J = far[0] || isles[0];
       const a = J ? Math.atan2(J.z - S0[2], J.x - S0[0]) : 0;
-      const M = [S0[0] - Math.cos(a) * 14, 0, S0[2] - Math.sin(a) * 14]; M[1] = (await top(M[0], M[2])) + 1 + 1.62;
+      const M = [S0[0] - Math.cos(a) * 14, 0, S0[2] - Math.sin(a) * 14]; M[1] = (await ground(M[0], M[2])) + 1 + 1.62;
       cam = { E: M, T: [M[0] + Math.cos(a) * 40, M[1] + 2, M[2] + Math.sin(a) * 40] };
     }
     N.cams.meadow = cam;
@@ -152,7 +156,7 @@ try {
     if (!cam) {
       const J = isles.filter(K => K.d > 150).sort((a, b) => b.r - a.r)[0] || isles[0];
       const a = J ? Math.atan2(J.z - S0[2], J.x - S0[0]) : 0;
-      const E = [S0[0] - Math.cos(a) * 40, 0, S0[2] - Math.sin(a) * 40]; E[1] = (await top(E[0], E[2])) + 1 + 1.62 + 28;
+      const E = [S0[0] - Math.cos(a) * 40, 0, S0[2] - Math.sin(a) * 40]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62 + 28;
       cam = { E, T: [E[0] + Math.cos(a) * 300, J ? J.y - 10 : E[1], E[2] + Math.sin(a) * 300] };
     }
     N.cams.vista = cam;
@@ -162,6 +166,7 @@ try {
   if (want('cliff') || want('hill')) {
     const NOON = 6400;
     if (!PIN.cliff || !PIN.hill) {
+      await ground(S0[0], S0[2]);
       const found = await ev((S0) => {
         const g = VR.game, w = g.world, R = VR.R; const ROCK = /^(stone|granite|diorite|andesite|deepstone|tuff|calcite|.*terracotta)$/;
         const nm = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z), t = s ? R.types[R.T.type[s]] : null; return [y, t ? t.name : '']; };
@@ -179,8 +184,8 @@ try {
         return { cliff, hill };
       }, S0);
       console.log('     found ' + JSON.stringify(found));
-      if (found.cliff && !PIN.cliff) { const c = found.cliff, D = 18; const E = [c.x + Math.cos(c.a) * D, 0, c.z + Math.sin(c.a) * D]; E[1] = (await top(E[0], E[2])) + 1 + 1.62 + 2; PIN.cliff = { E, T: [c.x, c.h - c.drop * 0.4, c.z], at: c }; }
-      if (found.hill && !PIN.hill) { const c = found.hill, a = (await sunA()) + 1.2, D = 30; const E = [c.x + Math.cos(a) * D, 0, c.z + Math.sin(a) * D]; E[1] = (await top(E[0], E[2])) + 1 + 1.62; PIN.hill = { E, T: [c.x, c.h, c.z], at: c }; }
+      if (found.cliff && !PIN.cliff) { const c = found.cliff, D = 18; const E = [c.x + Math.cos(c.a) * D, 0, c.z + Math.sin(c.a) * D]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62 + 2; PIN.cliff = { E, T: [c.x, c.h - c.drop * 0.4, c.z], at: c }; }
+      if (found.hill && !PIN.hill) { const c = found.hill, a = (await sunA()) + 1.2, D = 30; const E = [c.x + Math.cos(a) * D, 0, c.z + Math.sin(a) * D]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62; PIN.hill = { E, T: [c.x, c.h, c.z], at: c }; }
     }
     for (const v of ['cliff', 'hill']) {
       if (!want(v)) continue;
