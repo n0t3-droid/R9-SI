@@ -13,7 +13,9 @@
   'use strict';
   const Q3 = VR.QArt3 = VR.QArt3 || {};
   Q3.SW = ['qRound', 'qHill'];
-  const OFF = { qRound: false, qHill: false }, ON = { qRound: true, qHill: true };
+  // (Runde Hänge is off in every preset — a switch to turn on by hand: the final pictures showed no difference at a
+  //  thumbnail's size in the normal-play views, whose ground is one-step hills the height field already slopes; see the plan)
+  const OFF = { qRound: false, qHill: false }, ON = { qRound: true, qHill: false };
   const TIERS = { potato: OFF, low: OFF, balanced: ON, high: ON, ultra: ON, ultraLite: ON };
   Q3.defaults = (preset) => Object.assign({}, TIERS[preset] || OFF);
   Q3.off = () => Object.assign({}, OFF);
