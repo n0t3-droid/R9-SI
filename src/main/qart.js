@@ -128,10 +128,11 @@
   // ---------------------------------------------------------------- Farbdrehbuch: the day's colour script
   // linear HDR before the exposure, as env.js's VR.Sky: hor (the horizon's haze), mid (the blue), zen (the top);
   // stops [h1, h2a, h2b, halo]; space [from, to, day share, the nebula by day]; amb the sky's fill light; fog the far
-  // haze between hor and mid. The day only: the golden hour, the dusk and the night keep t-sky3's / f-sky4's palette.
+  // haze between hor and mid (classic_v2: hor 0.62 and fog 0.22 washed the Klassisch block grid out at 10–13 blocks —
+  // the haze a shade darker and bluer: hor 0.57, fog 0.5 — 3 of 4 rows again). The day only: the golden hour, the dusk and the night keep t-sky3's / f-sky4's palette.
   QA.SKY = {
-    hor: [0.62, 0.63, 0.6], mid: [0.12, 0.27, 0.56], zen: [0.04, 0.105, 0.33], stops: [0.34, 0.28, 0.88, 0.22],
-    space: [0.6, 1.0, 0.3, 0.22], amb: [0.42, 0.45, 0.56], fog: 0.22,
+    hor: [0.57, 0.585, 0.56], mid: [0.12, 0.27, 0.56], zen: [0.04, 0.105, 0.33], stops: [0.34, 0.28, 0.88, 0.22],
+    space: [0.6, 1.0, 0.3, 0.22], amb: [0.42, 0.45, 0.56], fog: 0.5,
   };
   // the share of the day palette at the sun's height sy (as env.js's wDay) and the weather's hold (rain: the grey wins)
   QA.dayW = (sy) => sstep(0.03, 0.2, sy);
