@@ -217,7 +217,7 @@ try {
   // ---------------------------------------------------------------- q-art2: a floating isle from the land, early afternoon
   if (want('isles')) {
     const TOD = 7200;
-    const I = await ev((S0) => { const Q2 = VR.QArt2, L = Q2 && Q2.islesNear(Q2.gen(VR.game), S0) || []; let best = null; for (const I of L) { const d = Math.hypot(I.x - S0[0], I.z - S0[2]); if (I.r >= 12 && d < 300 && (!best || I.r - d * 0.05 > best.r - best.d * 0.05)) best = { x: I.x, z: I.z, r: I.r, y: I.y, deep: I.deep || 1, d }; } return best; }, S0);
+    const I = await ev((S0) => { const Q2 = VR.QArt2, L = Q2 && Q2.islesNear(Q2.gen(VR.game), S0) || []; let best = null; for (const I of L) { const d = Math.hypot(I.x - S0[0], I.z - S0[2]); if (I.r >= 12 && d < 450 && (!best || I.r - d * 0.05 > best.r - best.d * 0.05)) best = { x: I.x, z: I.z, r: I.r, y: I.y, deep: I.deep || 1, d }; } return best; }, S0);
     console.log('     isle ' + JSON.stringify(I));
     if (I) {
       await eyeAt([I.x, 150, I.z - 30], [I.x, 140, I.z], TOD); await settle(40);

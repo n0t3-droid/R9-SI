@@ -82,7 +82,7 @@ console.log('b · the shaders');
   const t = pre(S1.TERRAIN_FS, ['LIGHT2', 'L2AO', 'Q_GRASS', 'Q_TUFT_N 6', 'Q_ISLE', 'MOTION']);
   check(t.includes('vec3 qGrass(') && t.includes('alb.rgb = qGrass(') && t.includes('vec3 qIsleAlb(') && t.includes('alb.rgb = qIsleAlb(') && t.includes('qIsleShadow(') && t.includes('in vec4 v_qI;'), 'on: the functions and their calls');
   check(t.indexOf('alb.rgb = qGrass(') < t.indexOf('float ndl') && t.indexOf('qIsleShadow(v_localPos') > t.indexOf('float sh =') && t.indexOf('qBounce') > t.indexOf('vec3 col = alb.rgb * lighting;'), 'the grass before the light, the isle\'s shadow after the shadow map, its bounce after the light');
-  check(!/u_blockVar < 0\.5[^\n]*qGrass/.test(t) ? false : true, 'never in the Klassisch look (its crisp ground and block grid stay)');
+  check(/face == 2u && u_blockVar < 0\.5[^\n]*\n[^\n]*qGrass\(/.test(t), 'never in the Klassisch look (its crisp ground and block grid stay)');
   const v = pre(S1.TERRAIN_VS, ['Q_ISLE']);
   check(v.includes('void qIsleV(') && v.indexOf('qIsleV(wp)') > v.indexOf('vec3 wp ='), 'the isle per vertex (after the position is known)');
   const z = pre(S1.TERRAIN_FS, ['CUTOUT', 'ZPRE', 'ZINV', 'Q_LEAF', 'Q_CROWN']);
@@ -102,7 +102,8 @@ console.log('c · the mirrors');
   check(L.length > 0 && L.length <= 8, 'the isles near the eye: at most eight', L.length);
   const dist = (I) => Math.hypot(I.x - 100, I.z - 100) - I.r;
   check(L.every((I, k) => k === 0 || dist(L[k - 1]) <= dist(I) + 1e-9), 'the nearest first');
-  const D = { designedIslands: () => [{ x: 330, z: 140, r: 42, y: 158, dome: 3, deep: 0.9 }], islandCell: () => null };
+  const D0 = [{ x: 330, z: 140, r: 42, y: 158, dome: 3, deep: 0.9 }], D = { designedIslands: (x, z) => (Math.abs(x - 330) > 220 || Math.abs(z - 140) > 220 ? null : D0), islandCell: () => null };
+  check(Q2.islesNear(D, [0, 90, 4]).length === 1, 'the designed isles found from 316 m (they answer only within 220 of their centre)');
   check(Q2.islesNear(D, [330, 90, 140]).length === 1 && Q2.islesNear({ islandCell: () => null }, [0, 0, 0]).length === 0 && Q2.islesNear(null, [0, 0, 0]).length === 0, 'the designed isles count; none without a generator');
   let real = [];
   try { const G = V.makeGen('overworld', 4242, { worldType: 'default', vgen: 16 }); real = Q2.islesNear(G, [176, 80, 44]); } catch (e) { real = [e.message]; }

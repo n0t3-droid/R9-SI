@@ -56,8 +56,9 @@
     const d = (I) => Math.hypot(I.x - cam[0], I.z - cam[2]) - I.r;
     try {
       if (g.islandAt) g.islandAt(cam[0], cam[2]);   // (its realm noise made first: islandCell reads it — browser run 1 found none)
-      const D = g.designedIslands ? g.designedIslands(cam[0], cam[2]) : null;
-      if (D) for (const I of D) if (d(I) < Q2.REACH) out.push(I);
+      // (the designed isles answer only within 220 blocks of their centre: asked round the eye too — browser run 2 stood
+      //  316 m from the Heartland's Sky Isles and found none)
+      if (g.designedIslands) for (const [ox, oz] of [[0, 0], [200, 0], [-200, 0], [0, 200], [0, -200]]) { const D = g.designedIslands(cam[0] + ox, cam[2] + oz); if (D) for (const I of D) if (d(I) < Q2.REACH && out.indexOf(I) < 0) out.push(I); }
       for (let j = cj - k; j <= cj + k; j++) for (let i = ci - k; i <= ci + k; i++) { const I = g.islandCell(i, j); if (I && d(I) < Q2.REACH && out.indexOf(I) < 0) out.push(I); }
     } catch (e) { return []; }
     out.sort((a, b) => d(a) - d(b));
@@ -238,11 +239,11 @@ vec3 qIsleAlb(vec3 a, vec3 w) {
   float nz = texture(u_noise, w.xz * 0.031 + vec2(w.y * 0.004, 0.0)).r;
   float band = sin(w.y * 1.7 + nz * 7.0);
   vec3 c = a * (1.0 + 0.14 * band * k) * mix(vec3(1.0), vec3(1.08, 0.97, 0.84), k * smoothstep(0.2, 0.9, band) * 0.8);
-  float mv = texture(u_noise, w.xz * 0.11 + vec2(w.y * 0.05, 0.37)).g;
+  float mv = texture(u_noise, w.xz * 0.02 + vec2(w.y * 0.03, 0.37)).g;   // (veins of ~3 m)
   float moss = (1.0 - smoothstep(1.5, 5.5, v_qJ.y)) * 0.85 + smoothstep(0.6, 0.72, mv) * 0.6;
   float l = dot(c, vec3(0.3, 0.59, 0.11));
   c = mix(c, vec3(0.15, 0.26, 0.07) * (0.6 + l * 1.4), clamp(moss, 0.0, 0.85) * k);
-  return c * mix(1.0, 0.66, v_qJ.x * k);
+  return c * mix(1.0, 0.8, v_qJ.x * k);   // (run 2: 0.66 with the downward normal made the whole isle a dark lump)
 }
 float qIsleShadow(vec3 p, vec3 L) {
   if (L.y < 0.1) return 1.0;

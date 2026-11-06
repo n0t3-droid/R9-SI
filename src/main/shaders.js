@@ -1196,7 +1196,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
 #if defined(Q_GRASS) && !defined(MODEL)
   // q-art2 · Wiese (qart2.js): a green top as a meadow — never in the Klassisch look
-  if (face == 2u && u_blockVar < 0.5 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5) && ((v_w5 >> 7u) & 1u) == 0u) alb.rgb = qGrass(alb.rgb, textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel);
+  // (by the face's mean colour, not the tint: run 2's village lawn is an untinted green block — it stayed flat)
+  if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;
+    if (qm.g > qm.r * 1.1 && qm.g > qm.b * 1.15) alb.rgb = qGrass(alb.rgb, qm, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel); }
 #endif
 #ifdef BODYGROUND
   // u-orbit2 (R52-09: the ground a uniform stepped grey): on an airless body from Low up (bodysky.js's define hook) the
@@ -1338,7 +1340,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #if defined(Q_ISLE) && !defined(MODEL)
   // q-art2 · Schwebeinseln: an isle's rock (not its grass) — strata, moss, the tip's shade, lit as a rounded mass
   bool qIs = v_qI.w > 0.01 && face != 2u;
-  if (qIs) { alb.rgb = qIsleAlb(alb.rgb, v_localPos + vec3(u_camInt)); n = normalize(mix(n, normalize(v_qI.xyz), 0.75 * v_qI.w)); }
+  if (qIs) { alb.rgb = qIsleAlb(alb.rgb, v_localPos + vec3(u_camInt)); n = normalize(mix(n, normalize(v_qI.xyz), 0.6 * v_qI.w)); }
 #endif
 #ifdef PBR
   // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
@@ -1430,7 +1432,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   vec3 col = alb.rgb * lighting;
 #if defined(Q_ISLE) && !defined(MODEL)
-  if (qIs) { float qBounce = max(-normalize(v_qI.xyz).y, 0.0) * max(L.y, 0.0) * v_qI.w * skyL; col += alb.rgb * lc * vec3(0.36, 0.46, 0.24) * qBounce * 0.45; }   // q-art2: the land's green light from below
+  if (qIs) { float qBounce = max(-normalize(v_qI.xyz).y, 0.0) * max(L.y, 0.0) * v_qI.w * skyL; col += alb.rgb * lc * vec3(0.36, 0.46, 0.24) * qBounce * 0.9; }   // q-art2: the land's green light from below
 #endif
 #if defined(Q_LEAF) && !defined(MODEL)
   if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);   // q-art · Laubkronen: the crown's light
