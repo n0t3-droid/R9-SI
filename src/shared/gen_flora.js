@@ -74,12 +74,16 @@
   // the shrubs: a jittered 4-grid, along the woods' edges (a third of the cells) and in the open meadow (a few)
   const SH = 4;
   function shrubs(g, P, w, x0, z0, x1, z1) {
+    const WS = P.pieces.filter(p => (p.kind === 'glow_ring' || p.kind === 'blossom_giant') && p.x > x0 - 30 && p.x < x1 + 30 && p.z > z0 - 30 && p.z < z1 + 30);
     for (let gz = Math.floor(z0 / SH); gz <= Math.floor(z1 / SH); gz++) for (let gx = Math.floor(x0 / SH); gx <= Math.floor(x1 / SH); gx++) {
       const hx = M.hash2(gx, gz, g.seed ^ 0x5b0b) >>> 0, x = gx * SH + (hx % SH), z = gz * SH + ((hx >>> 8) % SH);
       if (x < x0 || x > x1 || z < z0 || z > z1) continue;
       const q = LAND.woodAt(g, x, z), u = ((hx >>> 16) & 1023) / 1024;
-      const p = q.d > 0.06 && q.d < 0.4 ? 0.34 : q.d <= 0.06 ? 0.06 : 0;
+      // (along the woods' edges only: the pictures showed the open meadow's lone shrubs as pastel cubes in the eye's way —
+      // cut; and none near a wonder spot, which stands free in its meadow)
+      const p = q.d > 0.06 && q.d < 0.4 ? 0.34 : 0;
       if (u >= p || !LAND.treeOk(g, P, x, z)) continue;
+      if (WS.some(w2 => Math.hypot(x - w2.x, z - w2.z) < (w2.kind === 'glow_ring' ? 14 : 20))) continue;
       const y = g.surfaceY(x, z) + 1;
       if (y <= SEA + 1 || !meadowAt(g, x, z, y)) continue;
       const cur = w.get(x, y, z); if (cur > 0 && !(R.T.flags[cur] & (F.PLANT | F.REPLACE))) continue;

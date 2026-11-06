@@ -102,7 +102,7 @@ for (const vg of VG) {
 }
 if (VG.length > 1) ok(res[A0] && res[A0].vgen === VG[0] && res[A1] && res[A1].vgen === VG[1], `the worlds are vgen ${VG[0]} and ${VG[1]} (${res[A0] && res[A0].vgen}, ${res[A1] && res[A1].vgen})`);
 for (const v of views) ok(fs.existsSync(SHOTS + `flora_${v}_${A0}.png`) && fs.existsSync(SHOTS + `flora_${v}_${A1}.png`), `the ${v} view before and after`);
-for (const t of [A0, A1]) ok(Object.values(res[t].settle).every(u => u === 0), `${t}: every view's columns were shown (${JSON.stringify(res[t].settle)})`);
+for (const t of [...new Set([A0, A1])]) ok(Object.values(res[t].settle).every(u => u === 0), `${t}: every view's columns were shown (${JSON.stringify(res[t].settle)})`);
 ok(!res[A0].logs.length && !res[A1].logs.length, `no page error (${(res[A0].logs.concat(res[A1].logs)).join(' | ').slice(0, 300) || 'none'})`);
 fs.writeFileSync(SHOTS + 'flora_cost_' + VG.join('_') + '.json', JSON.stringify(res, null, 1));
 await browser.close();

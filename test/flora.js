@@ -12,7 +12,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const nm = (s) => { const t = R.types[R.T.type[s]]; return t ? t.name : ''; };
-const PIN16 = '201fbe20', PIN17 = 'acc88779', PINW = '80707dc2';
+const PIN16 = '201fbe20', PIN17 = '1ce658e6', PINW = '4ce257e9';
 
 // ---- a · the L-systems
 check(!!FL && typeof FL.expand === 'function', 'VR.Flora is there');
@@ -89,7 +89,7 @@ const s17 = scan(17);
 console.log(`     vgen 17: hash ${s17.hash}, flowers ${s17.o.flowers} (${s17.o.kinds.size} kinds), blossom leaves ${s17.o.bloom}, tall ${s17.o.tall}, clover ${s17.o.clover}  · ${Date.now() - t0} ms`);
 check(s17.hash === PIN17 || process.env.PIN, `vgen 17's land chunks are as pinned (${s17.hash})`);
 check(s17.o.flowers > s16.o.flowers * 2.5, `the meadows bloom (${s17.o.flowers} flowers against ${s16.o.flowers})`);
-check(s17.o.bloom > s16.o.bloom + 60, `blossom trees and shrubs in the chunks (${s17.o.bloom} blossom leaves against ${s16.o.bloom})`);
+check(s17.o.bloom > s16.o.bloom + 40, `blossom trees and shrubs in the chunks (${s17.o.bloom} blossom leaves against ${s16.o.bloom})`);
 { // over the whole land: the blossom trees and the shrubs planted (a recorder writer)
   const cnt = {}, orig = FL.plant; FL.plant = function (w, name, ...a) { cnt[name] = (cnt[name] || 0) + 1; return orig.call(this, w, name, ...a); };
   const rec = { get: () => 0, set: () => {}, place: () => {} }, P = V.Land.plan(s17.g);
@@ -97,7 +97,13 @@ check(s17.o.bloom > s16.o.bloom + 60, `blossom trees and shrubs in the chunks ($
   FL.plant = orig;
   const trees = FL.TREES.reduce((a, n) => a + (cnt[n] || 0), 0), shr = FL.SHRUBS.reduce((a, n) => a + (cnt[n] || 0), 0);
   check(trees > 150 && FL.TREES.every(n => cnt[n] > 10), `blossom trees over the land: ${trees} (${FL.TREES.map(n => n + ' ' + (cnt[n] || 0)).join(', ')})`);
-  check(shr > 150, `flowering shrubs within 300 blocks: ${shr}`);
+  check(shr > 50, `flowering shrubs within 300 blocks: ${shr}`);
+  // the shrubs keep to the woods' edges (the open meadow's lone ones looked like pastel cubes) and away from the wonders
+  { const at = [], W = P.pieces.filter(p => p.kind === 'glow_ring' || p.kind === 'blossom_giant');
+    FL.plant = function (w, name, x, y, z) { if (FL.SHRUBS.includes(name)) at.push([x, z]); };
+    FL.shrubs(s17.g, P, rec, -600, -600, 600, 600); FL.plant = orig;
+    const open = at.filter(([x, z]) => V.Land.woodAt(s17.g, x, z).d <= 0.06).length, near = at.filter(([x, z]) => W.some(p => Math.hypot(x - p.x, z - p.z) < (p.kind === 'glow_ring' ? 14 : 20))).length;
+    check(open === 0 && near === 0, `shrubs: ${open} in the open meadow, ${near} by a wonder spot (of ${at.length})`); }
   const n16 = {}; FL.plant = function (w, name) { n16[name] = 1; }; const P16 = V.Land.plan(s16.g); V.Land.soloTrees(s16.g, P16, rec, -300, -300, 300, 300); V.Land.woodsTrees(s16.g, P16, rec, -200, -200, 200, 200); FL.plant = orig;
   check(!Object.keys(n16).length, 'vgen 16 plants no L-system tree');
 }
