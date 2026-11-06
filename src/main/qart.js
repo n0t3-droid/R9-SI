@@ -172,6 +172,31 @@
   };
   if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => QA.hook(name, prev ? prev(name, defines) : (defines || [])); }
 
+  // the vertex side (TERRAIN_VS, before its main): the clump field per vertex — it varies over metres, the faces are one
+  // (browser run 5: per fragment it cost Balanced a fifth of its frame on SwiftShader, the fancy leaves' inner faces
+  // shading it again and again)
+  QA.glslVS = function () {
+    return `
+#if defined(Q_LEAF) && !defined(MODEL)
+// q-art · Laubkronen (qart.js QA.clump)
+out vec4 v_qC;
+float qH13(vec3 p3) { p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+// the clump field: xyz the blended clumps' normal, w the signed distance (negative inside)
+vec4 qClump(vec3 p) {
+  vec3 s = vec3(Q_CELL, Q_CELL * 0.85, Q_CELL), b = floor(p / s - 0.5), nn = vec3(0.0);
+  float acc = 0.0;
+  for (int i = 0; i < 8; i++) {
+    vec3 c = b + vec3(float(i & 1), float((i >> 1) & 1), float((i >> 2) & 1));
+    vec3 h = vec3(qH13(c), qH13(c + vec3(17.0, 31.0, 47.0)), qH13(c + vec3(59.0, 13.0, 71.0)));
+    vec3 d = p - (c + 0.5 + (h - 0.5) * 0.6) * s;
+    float l = length(d) + 1e-4, w = exp(-Q_K * (l - Q_RAD * (0.8 + 0.4 * h.x)));
+    acc += w; nn += d * (w / l);
+  }
+  return vec4(normalize(nn + vec3(0.0, 0.15 * acc, 0.0)), -log(acc) / Q_K);
+}
+#endif
+`;
+  };
   // ---------------------------------------------------------------- the GLSL (TERRAIN_FS, before its main)
   QA.glslTerrain = function () {
     const L = QA.LEAF, P = QA.PLAZA;
@@ -180,19 +205,7 @@
 // q-art · Laubkronen (qart.js QA.clump, QA.cut): a waving leaf face (the leaf bit, no sway level, no glass frame)
 float qGreen(vec3 c) { return clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3) * 6.0, 0.0, 1.0); }
 bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u; }
-// the clump field: xyz the blended clumps' normal, w the signed distance (negative inside)
-vec4 qClump(vec3 p) {
-  vec3 s = vec3(Q_CELL, Q_CELL * 0.85, Q_CELL), b = floor(p / s - 0.5), nn = vec3(0.0);
-  float acc = 0.0;
-  for (int i = 0; i < 8; i++) {
-    vec3 c = b + vec3(float(i & 1), float((i >> 1) & 1), float((i >> 2) & 1));
-    vec3 h = vec3(hash13(c), hash13(c + vec3(17.0, 31.0, 47.0)), hash13(c + vec3(59.0, 13.0, 71.0)));
-    vec3 d = p - (c + 0.5 + (h - 0.5) * 0.6) * s;
-    float l = length(d) + 1e-4, w = exp(-Q_K * (l - Q_RAD * (0.8 + 0.4 * h.x)));
-    acc += w; nn += d * (w / l);
-  }
-  return vec4(normalize(nn + vec3(0.0, 0.15 * acc, 0.0)), -log(acc) / Q_K);
-}
+in vec4 v_qC;   // the clump field at the vertices (glslVS)
 // the leaf face's corners cut along a ragged, texel-snapped rim (the same on both sides of a shared face)
 bool qCut(vec3 w, uint face, float dist) {
   vec3 pp = face <= 1u ? w.yzx : face <= 3u ? w.zxy : w.xyz;

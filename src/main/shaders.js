@@ -768,7 +768,7 @@ out float v_sheen;       // t-motion: how much a passing gust brightens this gra
 flat out float v_ground; // t-motion: a green block's top — the wind's strength (its gust bands are drawn per pixel), 0 otherwise
 ${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
-void main() {
+${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
   v_fade = u_origins[gl_DrawID].w;
@@ -796,6 +796,9 @@ void main() {
   bool ctmFace = ((a_w5 >> 14u) & 1u) == 1u;   // connected glass: bits 5-7 are its frame mask, not sway
   uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
   uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
+#if defined(Q_LEAF) && !defined(MODEL)
+  v_qC = (leaf > 0u && sway == 0u) ? qClump(wp + vec3(u_camInt)) : vec4(0.0, 1.0, 0.0, 0.0);   // q-art · Laubkronen: the clumps per vertex (qart.js)
+#endif
 #ifdef MOTION
   // t-motion · wind in everything (wind.js): the gust bands travel over the land; a plant leans into them (base stiff,
   // tip free), leaves rustle harder in them, grass and leaves brighten as they bend (the waves read from afar); a hung
@@ -1319,7 +1322,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   // q-art · Laubkronen: the leaf face takes the clumps' volume normal (qart.js QA.clump)
   bool qLf = qLeafF();
   vec4 qC = vec4(0.0, 1.0, 0.0, 0.0);
-  if (qLf) { qC = qClump(v_localPos + vec3(u_camInt) - N * 0.5); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
+  if (qLf) { qC = vec4(normalize(v_qC.xyz), v_qC.w); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
 #endif
 #ifdef PBR
   // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
