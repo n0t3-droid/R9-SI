@@ -3,7 +3,7 @@
 // blossom tree, the Traumbaum (a wonder spot), the glow ring by day and at night, a wide vista over the Traumbaum's
 // meadow — and the cost of the meadow and the Traumbaum views on High and on Very Low.
 //   The poses come from test/flora_preview.js (node: the places found in the generated chunks → test/shots/flora_views.json).
-//   View distance 6 (the vista stands 72 blocks from the Traumbaum: inside it); a drawn frame ends in gl.finish (run 5
+//   While a view streams the uploads get 80 ms a frame and the takt is off (run 7: 424 uploads waiting). View distance 6 (the vista stands 72 blocks from the Traumbaum: inside it); a drawn frame ends in gl.finish (run 5
 //   queued drawn frames into a GPU backlog: the screenshots timed out). The world streams as critic_photo.mjs waits for it: every column within the view distance generated, meshed, shown
 //   and faded in (run 4 of the first try photographed the horizon's stand-ins: its wait looked at 7 × 7 columns only).
 // Pictures test/shots/flora_<view>_v<16|17>.png, costs test/shots/flora_cost_16_17.json.
@@ -34,7 +34,7 @@ for (const vg of VG) {
   for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
   await ev(() => { const r = VR.game.renderer; if (!r._render) { r._render = r.render; r.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } });
   const step = async (n, dtms = 33, draw = false) => { for (let k = 0; k < n; k += 10) { await ev(([m, d, draw]) => { const g = VR.game; window.__norender = !draw; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } if (draw) g.renderer.gl.finish(); window.__norender = true; }, [Math.min(10, n - k), dtms, draw]); await wait(4); } };
-  const boost = (on) => ev((on) => { const q = VR.game.renderer && VR.game.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
+  const boost = (on) => ev((on) => { const w = VR.game.world; if (on) { if (w.__ub === undefined) { w.__ub = w.uploadBudget; w.uploadBudget = () => 80; w.__tk = w.streamTakt; w.streamTakt = false; } } else if (w.__ub !== undefined) { w.uploadBudget = w.__ub; w.streamTakt = w.__tk; delete w.__ub; } const q = VR.game.renderer && VR.game.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
   const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (!pool || !pool.queueFar) return 0; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return 0; }, on);
   // critic_photo.mjs's wait: within the view distance every column shown, nothing pending, uploading, fading or arriving
   const settle = async (maxS) => {
@@ -58,14 +58,11 @@ for (const vg of VG) {
     await ev(([c, yaw, pitch]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1] - 1.62, c[2]); pl.yaw = yaw; pl.pitch = pitch; pl.viewYaw = yaw; pl.vel = [0, 0, 0]; }, [P.from, P.yaw, P.pitch]);
     const s = await settle(+(process.env.SETTLE || 300)); console.log(`  settled in ${s.s} s (unshown ${s.unshown}, dirty ${s.dirty}, pend ${s.pend}, busy ${s.busy}, far ${s.far}, arr ${s.arr}, up ${s.up}) · ${secs()}`); return s;
   };
+  // the picture: the canvas read in the same task as its frame (run 8: page.screenshot waited ten minutes for the compositor)
   const shot = async (name) => {
-    for (let k = 0; k < 2; k++) {
-      try {
-        await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });
-        await page.screenshot({ path: SHOTS + `flora_${name}_${tag}.png`, timeout: 240000 }); console.log('shot', name, tag); return true;
-      } catch (e) { console.log('shot', name, 'failed:', String(e.message || e).split('\n')[0]); }
-    }
-    return false;
+    const url = await ev(() => { window.__norender = false; const g = VR.game; let u = ''; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; });
+    if (!url || url.length < 1000) { console.log('shot', name, 'failed'); return false; }
+    fs.writeFileSync(SHOTS + `flora_${name}_${tag}.png`, Buffer.from(url.split(',')[1], 'base64')); console.log('shot', name, tag, secs()); return true;
   };
   const timeFrames = async () => {
     const runs = [];

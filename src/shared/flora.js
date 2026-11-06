@@ -128,7 +128,7 @@
   FL.SPECIES = {
     // Wolkenkirsche: a short trunk, three to four scaffold limbs at a wide angle, an umbrella of pink clouds
     wolkenkirsche: { kind: 'tree', axiom: 'FFF[&A]/[&A]/A', n: 3, rules: { A: [[0.55, "!'F[&FA]/[&FA]/[&A]"], [0.45, "!'F[&FA]/[&A]"]] }, fin: { A: 'B' },
-      t: { len: 1.25, w: 0.9, angle: 30, pitch: 36, jit: 0.3, wr: 0.62, lr: 0.82, br: 2.1 }, wood: 'cherry_log', blossom: ['cherry_leaves', 'bloom_rose_leaves'], leaf: 'azalea_leaves', h: [7, 11] },
+      t: { len: 1.25, w: 0.9, angle: 30, pitch: 36, jit: 0.3, wr: 0.62, lr: 0.82, br: 2.1 }, wood: 'cherry_log', blossom: ['cherry_leaves', 'bloom_rose_leaves'], leaf: 'oak_leaves', h: [7, 11] },
     // Schneeschleier: an upright leader with short side shoots, a tall white oval
     schneeschleier: { kind: 'tree', axiom: 'FFA', n: 4, rules: { A: [[0.6, "F[&'!B]/[&'!FB]/'A"], [0.4, "F[&'!FB]/'A"]] }, fin: { A: 'FB' },
       t: { len: 1.15, w: 0.6, angle: 28, pitch: 30, jit: 0.3, wr: 0.7, lr: 0.9, br: 1.7 }, wood: 'birch_log', blossom: ['bloom_snow_leaves'], leaf: 'birch_leaves', green: 0.18, h: [7, 11] },
@@ -140,19 +140,31 @@
       t: { len: 1.2, w: 0.6, angle: 30, pitch: 40, jit: 0.3, wr: 0.65, lr: 0.82, br: 1.15, droop: 18, chain: [2, 4] }, wood: 'birch_log', blossom: ['bloom_gold_leaves'], leaf: 'birch_leaves', green: 0.2, h: [5, 9] },
     // the flowering shrubs: no trunk, green twigs (leaf cells) fanning out of the ground, blossom on the tips
     rosenbusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]/A', n: 1, rules: { A: [[0.6, "F[&B]/[&FB]"], [0.4, "FB"]] }, fin: { A: 'B' },
-      t: { len: 1.1, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.5 }, wood: 'azalea_leaves', blossom: ['bloom_rose_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
+      t: { len: 1.1, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.5 }, wood: 'oak_leaves', blossom: ['bloom_rose_leaves'], leaf: 'oak_leaves', green: 0.25, h: [2, 4] },
     schneebusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]', n: 1, rules: { A: [[0.6, "F[&B]/FB"], [0.4, "FFB"]] }, fin: { A: 'B' },
-      t: { len: 1.1, w: 0.3, angle: 26, pitch: 36, jit: 0.35, br: 1.45 }, wood: 'azalea_leaves', blossom: ['bloom_snow_leaves'], leaf: 'azalea_leaves', green: 0.3, h: [2, 4] },
+      t: { len: 1.1, w: 0.3, angle: 26, pitch: 36, jit: 0.35, br: 1.45 }, wood: 'oak_leaves', blossom: ['bloom_snow_leaves'], leaf: 'oak_leaves', green: 0.3, h: [2, 4] },
     lilabusch: { kind: 'shrub', axiom: '[&A]/[&A]/[&A]/A', n: 1, rules: { A: [[0.5, "F[&B]/[&B]"], [0.5, "FB"]] }, fin: { A: 'B' },
-      t: { len: 1.05, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.45 }, wood: 'azalea_leaves', blossom: ['bloom_lilac_leaves', 'flowering_azalea_leaves'], leaf: 'azalea_leaves', green: 0.25, h: [2, 4] },
+      t: { len: 1.05, w: 0.3, angle: 30, pitch: 40, jit: 0.35, br: 1.45 }, wood: 'oak_leaves', blossom: ['bloom_lilac_leaves'], leaf: 'oak_leaves', green: 0.25, h: [2, 4] },
     // Traumbaum: the wonder spot's giant — a thick trunk, four limbs, one more generation, a crown of pink and white
-    traumbaum: { kind: 'giant', axiom: 'FFFFF[&A]/[&A]/[&A]/[&A]', n: 4, rules: { A: [[0.6, "!'F[&FA]/[&FA]/[&A]"], [0.4, "!'F[&FA]/[&A]"]] }, fin: { A: 'B' },
-      t: { len: 2.1, w: 1.8, angle: 30, pitch: 34, jit: 0.25, wr: 0.66, lr: 0.8, br: 2.8 }, wood: 'cherry_log', blossom: ['cherry_leaves', 'bloom_rose_leaves', 'bloom_snow_leaves'], leaf: 'azalea_leaves', h: [14, 24] },
+    // (the first pictures: a thin trunk under a ball — a lollipop; now a stout trunk, wide limbs, an umbrella like the
+    // Wolkenkirsche's, pink with patches of deep rose and white)
+    traumbaum: { kind: 'giant', axiom: 'FFFF[&A]/[&A]/[&A]/[&A]', n: 4, rules: { A: [[0.6, "!'F[&FA]/[&FA]/[&A]"], [0.4, "!'F[&FA]/[&A]"]] }, fin: { A: 'B' },
+      t: { len: 2.0, w: 2.4, angle: 30, pitch: 42, jit: 0.25, wr: 0.62, lr: 0.8, br: 3.0 }, wood: 'cherry_log', blossom: ['bloom_snow_leaves', 'cherry_leaves', 'cherry_leaves', 'bloom_rose_leaves'], leaf: 'oak_leaves', h: [14, 24] },
   };
   FL.TREES = ['wolkenkirsche', 'schneeschleier', 'lilaschirm', 'sonnenregen'];
   FL.SHRUBS = ['rosenbusch', 'schneebusch', 'lilabusch'];
   // a species' plant for a seed: its cells (cached per species and seed: the generator asks for the same tree from each
   // of the chunks it reaches into) and its bounds { x0, x1, y0, y1, z0, z1 }
+  // the blossom's colour comes in patches (a value noise over cells of 3, a little jitter): the first Traumbaum's crown,
+  // its pink and white mixed cell by cell, read as a checkerboard
+  const patch = (x, y, z, s) => {
+    const fx = x / 3, fy = y / 3, fz = z / 3, ix = Math.floor(fx), iy = Math.floor(fy), iz = Math.floor(fz), tx = fx - ix, ty = fy - iy, tz = fz - iz;
+    const sm = (t) => t * t * (3 - 2 * t), u = sm(tx), v = sm(ty), w = sm(tz);
+    let a = 0;
+    for (let k = 0; k < 8; k++) { const dx = k & 1, dy = (k >> 1) & 1, dz = k >> 2; a += H3(ix + dx, iy + dy, iz + dz, s) * (dx ? u : 1 - u) * (dy ? v : 1 - v) * (dz ? w : 1 - w); }
+    a = (a - 0.5) * 1.9 + 0.5 + (H3(x, y, z, s ^ 0x77) - 0.5) * 0.12;
+    return Math.min(0.999, Math.max(0, a));
+  };
   const CACHE = new Map();
   FL.grow = function (name, seed) {
     const key = name + ':' + (seed >>> 0);
@@ -166,7 +178,7 @@
     for (const [k, kind] of cells) {
       const a = k.split(','), x = +a[0], y = +a[1], z = +a[2];
       if (y < 0) continue;   // nothing below the foot (a droop never digs in)
-      list.push([x, y, z, kind, H3(x * 3, y * 5, z * 7, seed ^ 0x51), kind === 1 ? (cells.axis.get(k) | 0) : 0]);
+      list.push([x, y, z, kind, patch(x, y, z, seed ^ 0x51), kind === 1 ? (cells.axis.get(k) | 0) : 0]);
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
     }
     list.sort((a, b) => a[1] - b[1] || a[0] - b[0] || a[2] - b[2]);

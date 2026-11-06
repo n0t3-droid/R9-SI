@@ -12,7 +12,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const nm = (s) => { const t = R.types[R.T.type[s]]; return t ? t.name : ''; };
-const PIN16 = '201fbe20', PIN17 = '399789b4', PINW = 'ca0e9315';
+const PIN16 = '201fbe20', PIN17 = 'acc88779', PINW = '80707dc2';
 
 // ---- a · the L-systems
 check(!!FL && typeof FL.expand === 'function', 'VR.Flora is there');

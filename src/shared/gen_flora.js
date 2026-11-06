@@ -115,7 +115,7 @@
   const FQ = { i: 0, d: 0 };
   FL.fieldAt = function (g, x, z) {
     const fd = g.nLandD.n2(x * 0.42 + 1300, z * 0.42 - 700);
-    FQ.d = fd > 0.02 ? 0.2 + 0.6 * ss(0.02, 0.3, fd) : 0;
+    FQ.d = fd > 0 ? 0.3 + 0.62 * ss(0, 0.2, fd) : 0;   // (the first pictures: a field read as a few flowers in the grass — now denser, a drift of colour)
     const n = g.nLandK.n2(x * 0.31 - 900, z * 0.31 + 400) * 0.5 + 0.5;
     FQ.i = Math.floor(n * 8 * 2.3) % 8;
     return FQ;
