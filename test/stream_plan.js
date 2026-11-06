@@ -35,7 +35,8 @@ console.log('a · worth');
   const w = (ex, ez, sp, lat) => SP.worth(ex, ez, 0, -1, sp, lat, cotH);
   check(w(0, -8, 40, 1.5) && w(1, -7, 40, 1.5) && w(3, -7, 40, 0.5), 'ahead, near the flight line: worth it');
   // p-stream2 · the corridor: 7 columns wide while the chunks keep up, 3 when they lag; a slow moment never makes everything too late
-  check(!w(5, -7, 40, 0.5) && !w(3, -7, 40, 2) && w(1, -7, 40, 2), 'p-stream2: only a corridor along the flight (half width 3.5 chunks, 1.5 when lagging)');
+  check(!w(5, -7, 80, 0.5) && !w(3, -9, 80, 2) && w(1, -9, 80, 2) && w(3, -9, 80, 0.5), 'p-stream2: at 80 m/s only a corridor along the flight (half width 3.5 chunks, 1.5 when lagging)');
+  check(w(6, -7, 40, 0.5) && w(9, -12, 20, 0.5), 'p-stream2: at 40 m/s and slower the band is as wide as the disk (the chunks keep up there)');
   check(w(0, -10, 80, 6) && w(0, -9, 80, 3), 'p-stream2: a high latency (a town, a slow moment) still asks for the land ahead (capped at ' + SP.LAT_CAP + ' s)');
   check(!w(0, 6, 40, 1.5) && !w(-5, 3, 40, 1.5), 'behind and beside-behind: not worth it (the camera has left before it is ready)');
   check(!w(6, -1, 40, 1.5), 'far to the side just ahead: leaves the cone before it is ready');
@@ -180,5 +181,29 @@ console.log('g · turning back: the columns just left come from memory (no gener
   check(on.same, 'a column from memory has the blocks and the light a fresh generation gives');
 }
 
+console.log('h · p-stream2: a job waiting for a town plan gives its slot back; in fast flight it is dropped; bare sections first');
+{
+  SIM.now = 0; SIM.workers.length = 0;
+  const pool = new V.WorkerPool('', 1); pool.maxInflight = 2;
+  const renderer = { freeSection() {}, uploadSection() {}, q: { vxLod: 12, upload: 2 } };
+  const w = new V.World({ vents: null }, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer, renderDist: 6 });
+  w.center = [0, 0];
+  const wk = SIM.workers[0], sent = [];
+  wk.postMessage = (m) => { sent.push(m); };
+  w.requestColumn(5, 0, V.ckey(5, 0), 1); w.requestColumn(6, 0, V.ckey(6, 0), 2); w.requestColumn(7, 0, V.ckey(7, 0), 3);
+  pool.pump();
+  const gens = sent.filter(m => m.type === 'gen');
+  check(gens.length === 2, 'two jobs in flight', gens.length);
+  w.planFast = false; wk.onmessage({ data: { type: 'waiting', id: gens[0].id } });
+  check(sent.filter(m => m.type === 'gen').length === 3 && !sent.some(m => m.type === 'drop'), 'a job waiting for a plan frees its slot (the next job is sent); slow: not dropped');
+  w.planFast = true; wk.onmessage({ data: { type: 'waiting', id: gens[1].id } });
+  check(sent.some(m => m.type === 'drop' && m.job === gens[1].id), 'in fast flight a waiting column is dropped (the far tiles stand in)');
+  wk.onmessage({ data: { type: 'cancelled', id: gens[1].id } });
+  check(!w.pending.has(V.ckey(6, 0)) && w.parkDrop && w.parkDrop.has(V.ckey(6, 0)), 'its request is forgotten and not asked for again for a while');
+  w.streamPlan = true;
+  check(w.wantDetail({ cx: 0, cz: 0 }, 4, [8, 70, 8]) === false, 'in fast flight a section is meshed bare first (its detail later)');
+  w.planFast = false;
+  check(w.wantDetail({ cx: 0, cz: 0 }, 4, [8, 70, 8]) === true, 'slow: with its detail, as before');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

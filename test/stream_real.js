@@ -46,7 +46,7 @@ global.Worker = class {
   after(r, m, it) {
     const dt = r.ms * K;
     this.free = Math.max(this.free, SIM.now) + dt;
-    LOG.push({ t: SIM.now, k: m.type === 'park' ? 'slice' : m.type, cx: m.cx, cz: m.cz, sy: m.sy, ms: dt, age: SIM.now - (it.at || SIM.now) });
+    LOG.push({ t: SIM.now, k: m.type === 'park' ? 'slice' : m.type, cx: m.cx !== undefined ? m.cx : m.ox !== undefined ? m.ox >> 4 : undefined, cz: m.cz !== undefined ? m.cz : m.oz !== undefined ? m.oz >> 4 : undefined, sy: m.sy, ms: dt, age: SIM.now - (it.at || SIM.now) });
     for (const o of r.out) this.deliver(o);
     for (const f of r.later) this.inbox.push({ m: f, at: SIM.now });
     SIM.pending.push({ at: this.free, f: () => {} });   // (the worker looks at its inbox again when the task ends)
@@ -60,7 +60,7 @@ let fails = 0;
 const check = (ok, msg, info) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg + (info !== undefined ? '  (' + info + ')' : '')); };
 const OPTS = { worldType: 'default', vgen: 17 };
 const G = V.makeGen('overworld', 1, OPTS);
-const SPAWN = G.findSpawn();
+const SPAWN = process.env.SPAWN ? process.env.SPAWN.split(',').map(Number) : G.findSpawn();
 const DIRS = (process.env.DIRS || '0,1,2,3').split(',').map(Number);
 const yawOf = (si) => si * Math.PI / 2 + 0.35;
 const hHalf = Math.atan(Math.tan(75 * Math.PI / 360) * 16 / 9), cosH = Math.cos(hHalf);
@@ -93,6 +93,7 @@ function fly(o) {
   const renderer = { freeSection() {}, uploadSection() {}, q: { vxLod: o.rd <= 4 ? 8 : 12, upload: 2 } };
   const w = new V.World({ vents: null }, { dim: 'overworld', seed: 1, genOpts: OPTS, pool, renderer, renderDist: o.rd });
   if (o.setup) o.setup(w, pool);
+  if (o.rd <= 5) { w.fancyLeaves = false; renderer.q.vxLod = 12; }   // (Very Low's mesher flags: game.js PRESETS.potato)
   w.streamPlan = true; w.viewCos = cosH;
   w.uploadQ.cpuEst = w.uploadQ.msPerByte = 1e-9;
   const fx = -Math.sin(o.yaw), fz = -Math.cos(o.yaw);
@@ -180,6 +181,7 @@ if (require.main === module) {
     const a = ex * ux + ez * uz, l = Math.abs(ex * uz - ez * ux); if (l > W || a < -0.5) return false;
     return SP.timeLeft(ex, ez, ux, uz, sp / 16, cot) >= SP.WORTH * Math.min(lat, cap); }; };
   const EXP = { norest: () => { SP.REST = 1e9; }, c3: corr(+(process.env.W || 3.5), +(process.env.CAP || 0.8)) };
+  EXP.nodet = (w) => { const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; const dr = w.detailReturn.bind(w); w.detailReturn = function (...a) { if (!this.planFast) dr(...a); }; };
   EXP.c3nd = (w) => { EXP.c3(w); const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; };
   for (const rd of RDS) for (const v of SPEEDS) for (const si of DIRS) {
     const r = fly({ rd, v, yaw: yawOf(si), secs: SECS, far: !process.env.NOFAR, farK: +(process.env.FARK || 1), setup: EXP[process.env.EXP] });

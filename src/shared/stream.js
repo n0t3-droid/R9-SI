@@ -376,13 +376,19 @@
   // CORR_MAX (7 columns made, 5 shown) to CORR_MIN as the latency grows (a weaker PC: fewer columns, but in time). The
   // latency in the worth test is capped (LAT_CAP): a slow moment no longer makes every column 'too late' — that stopped
   // all requests until the latency eased (the 5–9 s stretches of no real terrain, p-stream's self-review)
-  SP.CORR_MAX = 3.5; SP.CORR_MIN = 1.5; SP.LAT_CAP = 0.8;
-  SP.corridor = (lat) => SP.CORR_MAX - (SP.CORR_MAX - SP.CORR_MIN) * clamp(((lat > 0 ? lat : SP.LAT0) - 0.6) / 0.8, 0, 1);
+  // The band's width follows a column budget (COLS a second, ~one worker): (2W + 1) columns per chunk travelled — 3.5 at
+  // 80 m/s, the whole disk at 40 m/s and slower (where the chunks keep up: browser run 1 caught a 3.5-wide band at
+  // 20 m/s showing less than the old way)
+  SP.CORR_MAX = 3.5; SP.CORR_MIN = 1.5; SP.LAT_CAP = 0.8; SP.COLS = 40;
+  SP.corridor = (lat, speedB) => {
+    const base = Math.max(SP.CORR_MAX, speedB > 0 ? (SP.COLS * 16 / speedB - 1) / 2 : 99);
+    return base * (1 - (1 - SP.CORR_MIN / SP.CORR_MAX) * clamp(((lat > 0 ? lat : SP.LAT0) - 0.6) / 0.8, 0, 1));
+  };
   SP.worth = function (ex, ez, ux, uz, speedB, lat, cotH) {
     if (!(speedB >= SP.FAST)) return true;
     if (ex * ex + ez * ez <= SP.KEEP * SP.KEEP) return true;
     const along = ex * ux + ez * uz, side = Math.abs(ex * uz - ez * ux);
-    if (along < -0.5 || side > SP.corridor(lat)) return false;
+    if (along < -0.5 || side > SP.corridor(lat, speedB)) return false;
     return SP.timeLeft(ex, ez, ux, uz, speedB / 16, cotH) >= SP.WORTH * Math.min(lat, SP.LAT_CAP);
   };
   // the chunks rest when the flight crosses REST × the render distance within one latency (learnt from the columns that
