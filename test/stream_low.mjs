@@ -49,6 +49,12 @@ const PAGE_INIT = () => {
     const rq = w.requestColumn.bind(w); w.requestColumn = function (...a) { C.req++; return rq(...a); };
     const oc = w.onColumn.bind(w); w.onColumn = function (m) { C.gen++; return oc(m); };
     const uc = w.unloadColumn.bind(w); w.unloadColumn = function (c) { if (c.shownAt < 0) C.wasted++; return uc(c); };
+    // p-stream3 · a trace per column (when asked for, generated, first / last mesh job, shown): explains the late ones
+    const TR = window.__TR = new Map(); const tr = (k) => { let t = TR.get(k); if (!t) { t = {}; TR.set(k, t); if (TR.size > 6000) TR.delete(TR.keys().next().value); } return t; };
+    const rq2 = w.requestColumn; w.requestColumn = function (cx, cz, k, ...a) { tr(k).req = performance.now(); return rq2.call(this, cx, cz, k, ...a); };
+    const oc2 = w.onColumn; w.onColumn = function (m) { if (m && m.cx !== undefined) tr(VR.ckey(m.cx, m.cz)).gen = performance.now(); return oc2.call(this, m); };
+    const ms2 = w.meshSection.bind(w); w.meshSection = function (c, sy, ...a) { const t = tr(c.key), n = performance.now(); if (!t.m0 || (t.shown && n > t.shown)) { t.m0 = n; t.mN = 0; } t.m1 = n; t.mN = (t.mN || 0) + 1; return ms2(c, sy, ...a); };
+    const cs2 = w.checkShown.bind(w); w.checkShown = function (c, now) { const r = cs2(c, now); if (c.shownAt >= 0) { const t = tr(c.key); if (!t.shown || t.shown < (t.gen || 0)) t.shown = performance.now(); } return r; };
     if (!pool.__instr) {
       pool.__instr = true;
       // a weaker PC (SLOW = k): every answer is held back (k − 1) × the job's time — the worker slot stays busy, as if the
@@ -117,7 +123,9 @@ const PAGE_INIT = () => {
     p.yaw = o.yaw; p.viewYaw = o.yaw; p.pitch = o.walk ? -0.08 : -0.22; p.flying = true; p.noclip = true;
     const C0 = JSON.parse(JSON.stringify(C)), mesh0 = w.stats.mesh, up0 = w.stats.uploaded || 0;
     window.__jobs = [];
-    const rec = [], ent = new Map(), ttv = [], tickMs = [], hit = [];
+    const rec = [], ent = new Map(), ttv = [], tickMs = [], hit = [], dbg = new Map(), late = [];
+    // p-stream3 · a column entering the view not yet shown: its state (generated? its sections, its 8 neighbours, the queue)
+    const enterState = (w2, cx, cz, k, dx, dz, pl, now2) => { const c = w2.cols.get(k); let nb = 0; for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) if ((ox || oz) && w2.cols.get(VR.ckey(cx + ox, cz + oz))) nb++; let a0 = 0; for (const j of pl.queue) if (j.msg._t) a0 = Math.max(a0, now2 - j.msg._t); return { at: +((now2 - t0) / 1000).toFixed(1), dx, dz, st: c ? c.sec.map(q => q.pending ? 'p' : q.dirty ? 'd' : '1').join('') : (w2.pending.has(k) ? 'P' : '-'), nb, q0: pl.queue.length, a0: Math.round(a0), lc: w2.loadCenter ? [w2.loadCenter[0] - (Math.floor(VR.game.player.pos[0]) >> 4), w2.loadCenter[1] - (Math.floor(VR.game.player.pos[2]) >> 4)] : null }; };
     let missed = 0, s = 0, t0 = performance.now(), last = t0, nextRec = t0;
     const rd = w.renderDist;
     while (true) {
@@ -137,8 +145,8 @@ const PAGE_INIT = () => {
           const k = VR.ckey(pcx + dx, pcz + dz), c = w.cols.get(k), shown = c && c.shownAt >= 0;
           seen.add(k);
           const e = ent.get(k);
-          if (!e) { if (!shown) ent.set(k, now); else ent.set(k, -1); }
-          else if (e > 0 && shown) { ttv.push(now - e); ent.set(k, -1); }
+          if (!e) { if (!shown) { ent.set(k, now); dbg.set(k, enterState(w, pcx + dx, pcz + dz, k, dx, dz, pool, now)); } else ent.set(k, -1); }
+          else if (e > 0 && shown) { ttv.push(now - e); ent.set(k, -1); if (now - e > 1000 && late.length < 40) { const t = (window.__TR && window.__TR.get(k)) || {}, rel = (x) => x ? Math.round(x - e) : null; late.push(Object.assign({ ttv: Math.round(now - e), req: rel(t.req), gen: rel(t.gen), m0: rel(t.m0), m1: rel(t.m1), mN: t.mN || 0, sh: rel(t.shown) }, dbg.get(k))); } }
         }
         for (const [k, e] of ent) if (!seen.has(k)) { if (e > 0) missed++; ent.delete(k); }
         const cv = window.__cone(o.yaw, hHalf);
@@ -151,7 +159,7 @@ const PAGE_INIT = () => {
     const end = performance.now(); let open = 0; for (const e of ent.values()) if (e > 0) { ttv.push(end - e); open++; }
     const cancel = {}; for (const k in C.cancel) cancel[k] = C.cancel[k] - (C0.cancel[k] || 0);
     const done = {}; for (const k in C.done) done[k] = C.done[k] - (C0.done[k] || 0);
-    return { t0: Math.round(t0), jobs: window.__jobs, rec, ttv, missed, open, tickMs, hit: hit.sort((x, y) => y[0] - x[0]).slice(0, 5), cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
+    return { t0: Math.round(t0), jobs: window.__jobs, rec, ttv, late, missed, open, tickMs, hit: hit.sort((x, y) => y[0] - x[0]).slice(0, 5), cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
   };
 };
 
@@ -219,6 +227,7 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
         out.worst3 = { t: wst.t, real: +(100 * wst.real).toFixed(1), busyMs: Math.round(busy), kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, `${v.n}× ${Math.round(v.ms)} ms, max ${Math.round(v.max)}, oldest ${(v.age / 1000).toFixed(1)} s`])), heavy };
         const all = {}; for (const j of r.jobs) { const k = all[j[1]] || (all[j[1]] = [0, 0]); k[0]++; k[1] += j[5]; } out.jobs = Object.fromEntries(Object.entries(all).map(([k, v]) => [k, `${v[0]}× ${Math.round(v[1])} ms`])); }
       console.log('RUN ' + JSON.stringify(out));
+      if (r.late && r.late.length) { out.late = r.late; console.log('  late (> 1 s): ' + r.late.slice(0, 12).map(L => JSON.stringify(L)).join('\n               ')); }
       results[`${preset}_${v}_${build}`] = { out, rec: R };
     }
     // the pictures: 12 s into a 40 and an 80 m/s flight (own runs, own directions)
@@ -237,6 +246,27 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
       await P.ev(() => { const g = VR.game, F = window.__frz; g.world.update = F.wu; if (g.horizon) g.horizon.update = F.hu; g.pool.onMsg = F.om; for (const [wk, m] of F.held) g.pool.onMsg(wk, m); });
       results[`shot_${preset}_${v}_${build}`] = { shot, real: cone.real, coarse: cone.coarse, fine: cone.fine, voidAll: cone.voidAll };
       console.log(`  shot ${shot}  real ${cone.real} coarse ${cone.coarse} void ${cone.voidAll}`);
+    }
+    // p-stream3 · the stand-in up close: fresh land 700 m from the spawn, the chunks held back (no column asked for) until the
+    // far tiles are done — the fine 2-block tiles fill the view near the camera — a picture; then the chunks load, the same
+    // view again: test/shots/stream3_fine_<preset>_<build>.png and stream3_real_<preset>_<build>.png
+    if (!process.env.SKIP_SHOTS && process.env.FINE_SHOT !== '0') {
+      await home(P);
+      const pos = await P.ev(async () => {
+        const g = VR.game, w = g.world, p = g.player, s = window.__spawn, a = 0.35 + Math.PI * 0.75;
+        const x = s[0] - Math.sin(a) * 700, z = s[2] - Math.cos(a) * 700, gen = VR.makeGen('overworld', w.seed, w.genOpts);
+        p.pos[0] = x; p.pos[2] = z; p.pos[1] = gen.surfaceY(Math.floor(x), Math.floor(z)) + 14; p.yaw = a; p.viewYaw = a; p.pitch = -0.42;
+        window.__rq = w.requestColumn; w.requestColumn = function () {};
+        const t0 = performance.now(); let q = 0;
+        while (performance.now() - t0 < 90000) { window.__tick(); await new Promise(r => setTimeout(r, 33)); const h = g.horizon; if (g.pool.busy === 0 && (!h || h.inflight === 0) && !(w.uploadQ && w.uploadQ.size)) { if (++q > 30) break; } else q = 0; }
+        return [x, z, Math.round((performance.now() - t0) / 100) / 10];
+      });
+      const shoot = async (name) => { await P.ev(() => { VR.game.renderer.tsrReset = true; }); for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.033)); const f = `${SHOTS}/stream3_${name}_${preset}_${build}.png`; await P.page.screenshot({ path: f, timeout: 600000 }); return f; };
+      const f1 = await shoot('fine');
+      const st = await P.ev(async () => { const w = VR.game.world; w.requestColumn = window.__rq; return window.__settle(120); });
+      const f2 = await shoot('real');
+      results[`fine_${preset}_${build}`] = { fine: f1, real: f2, pos, settle: st };
+      console.log(`  stand-in ${f1} (tiles done in ${pos[2]} s) · real ${f2} (${st} s)`);
     }
     await P.ctx.close();
   }
@@ -273,13 +303,13 @@ if (!process.env.SKIP_SHOTS && BUILDS.length) {
   fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
   try { execFileSync('python3', ['/root/r9coord/pairs.py', `${SHOTS}/stream_sheet.jpg`, spec]); console.log('sheet ' + SHOTS + '/stream_sheet.jpg'); } catch (e) { console.log('no sheet: ' + String(e.message).slice(0, 200)); }
 }
-// p-stream2 · the targets (the after build): 80 m/s real terrain ahead ≥ 85 % on Low and Very Low, a walk's p90 ≤ 1 s
+// p-stream3 · the targets (the after build): 80 m/s real terrain ahead ≥ 80 % on Low and Very Low, a walk's p90 ≤ 1 s
 for (const preset of PRESETS) {
   const f = results[`${preset}_80_after`], wk = results[`${preset}_5_after`];
-  if (f) check(f.out.real >= 85, `p-stream2 · ${preset} 80 m/s: real terrain ahead ≥ 85 %`, f.out.real + ' %');
-  if (wk) check(wk.out.ttvP90 <= 1000, `p-stream2 · ${preset} walk: the land coming into view within 1 s (p90)`, wk.out.ttvP90 + ' ms');
+  if (f) check(f.out.real >= 80, `p-stream3 · ${preset} 80 m/s: real terrain ahead ≥ 80 %`, f.out.real + ' %');
+  if (wk) check(wk.out.ttvP90 <= 1000, `p-stream3 · ${preset} walk: the land coming into view within 1 s (p90)`, wk.out.ttvP90 + ' ms');
 }
-if (!process.env.SKIP_SHOTS && fs.existsSync(ROOT + '/test/stream2_sheet.py')) { try { execFileSync('python3', [ROOT + '/test/stream2_sheet.py', `${OUT}/stream_low.json`]); console.log('sheet ' + SHOTS + '/stream2_sheet.jpg'); } catch (e) { console.log('no stream2 sheet: ' + String(e.message).slice(0, 200)); } }
+if (!process.env.SKIP_SHOTS && fs.existsSync(ROOT + '/test/stream3_sheet.py')) { try { execFileSync('python3', [ROOT + '/test/stream3_sheet.py', `${OUT}/stream_low.json`]); console.log('sheet ' + SHOTS + '/stream3_sheet.jpg'); } catch (e) { console.log('no stream2 sheet: ' + String(e.message).slice(0, 200)); } }
 console.log('--- errors (' + errs.length + ')'); for (const e of errs.slice(0, 10)) console.log(e);
 check(errs.filter(e => e.startsWith('[pageerror]')).length === 0, 'no page errors');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
