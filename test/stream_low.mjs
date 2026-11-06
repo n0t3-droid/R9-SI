@@ -273,6 +273,13 @@ if (!process.env.SKIP_SHOTS && BUILDS.length) {
   fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
   try { execFileSync('python3', ['/root/r9coord/pairs.py', `${SHOTS}/stream_sheet.jpg`, spec]); console.log('sheet ' + SHOTS + '/stream_sheet.jpg'); } catch (e) { console.log('no sheet: ' + String(e.message).slice(0, 200)); }
 }
+// p-stream2 · the targets (the after build): 80 m/s real terrain ahead ≥ 85 % on Low and Very Low, a walk's p90 ≤ 1 s
+for (const preset of PRESETS) {
+  const f = results[`${preset}_80_after`], wk = results[`${preset}_5_after`];
+  if (f) check(f.out.real >= 85, `p-stream2 · ${preset} 80 m/s: real terrain ahead ≥ 85 %`, f.out.real + ' %');
+  if (wk) check(wk.out.ttvP90 <= 1000, `p-stream2 · ${preset} walk: the land coming into view within 1 s (p90)`, wk.out.ttvP90 + ' ms');
+}
+if (!process.env.SKIP_SHOTS && fs.existsSync(ROOT + '/test/stream2_sheet.py')) { try { execFileSync('python3', [ROOT + '/test/stream2_sheet.py', `${OUT}/stream_low.json`]); console.log('sheet ' + SHOTS + '/stream2_sheet.jpg'); } catch (e) { console.log('no stream2 sheet: ' + String(e.message).slice(0, 200)); } }
 console.log('--- errors (' + errs.length + ')'); for (const e of errs.slice(0, 10)) console.log(e);
 check(errs.filter(e => e.startsWith('[pageerror]')).length === 0, 'no page errors');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
