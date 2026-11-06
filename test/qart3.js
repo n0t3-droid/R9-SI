@@ -78,6 +78,17 @@ if (RC && RC.solver) {
   check(r3.cutout.length > 0 && hi - lo > 0.4, 'a lone leaf block keeps a body', (hi - lo).toFixed(2));
 }
 
+// b1 the mini-voxel crowns (an orchard's cherry crown) join the blob, drawn as cherry leaves
+{
+  const VXC = V.R.byName['vx_fruit_crown_cherry'].defaultState, CH = V.R.byName['cherry_leaves'].defaultState;
+  const j0 = job(5, 9, 6, 9, 5, 9, true), j2 = job(5, 9, 6, 9, 5, 9, 2);
+  for (const jj of [j0, j2]) for (let i = 0; i < jj.blocks.length; i++) if (jj.blocks[i] === LEAF) jj.blocks[i] = VXC;
+  const a = V.meshSection(j0), b = V.meshSection(j2);
+  const texOf = (r) => { const s = new Set(); for (let i = 0; i < r.cutout.length / 8; i++) s.add(r.cutout[i * 8 + 3] & 4095); return s; };
+  check((a.vx || []).length > 0 && b.cutout.length > 0 && (b.vx || []).length < (a.vx || []).length, 'a fruit crown: voxel pieces → a blob in the cutout stream', (a.vx || []).length / 8 + ' vx → ' + b.cutout.length / 8 + ' cutout');
+  check(texOf(b).has(V.R.T.tex[CH * 6] & 4095), 'the fruit crown drawn in cherry leaves');
+}
+
 // b2 Runde Hänge (fancyLeaves bit 4): a terraced hill of grass — rounded edges in Nahtlos, nothing in Klassisch
 {
   const GRASS = V.R.byName['grass_block'].defaultState, DIRT = V.R.byName['dirt'].defaultState;

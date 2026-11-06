@@ -212,10 +212,21 @@
     for (const t of R.types) if (RC.ROCK.test(t.name)) for (let s = t.defaultState - 1; s > 0 && R.T.type[s] === t.id; s--) if (R.T.shape[s] === SH.CUBE) RC_X[s] = 1;
     return RC_X;
   };
+  // Runde Kronen takes the mini-voxel crowns too (the orchards' fruit crowns, bushes, hedges): drawn as leaves of the
+  // kind beside them (the blob has no voxel paint) — RC.leafTable: state → the leaf state it is drawn as, 0 none
+  RC.VXLEAF = { vx_fruit_crown_apple: 'oak_leaves', vx_fruit_crown_orange: 'oak_leaves', vx_fruit_crown_cherry: 'cherry_leaves', vx_fruit_crown_plum: 'flowering_azalea_leaves', vx_bush: 'oak_leaves', vx_bush_light: 'azalea_leaves', vx_hedge: 'oak_leaves', vx_hedge_light: 'azalea_leaves' };
+  let RC_L = null;
+  RC.leafTable = function () {
+    if (RC_L && RC_L.length === R.stateCount) return RC_L;
+    RC_L = new Int32Array(R.stateCount);
+    for (const n in RC.VXLEAF) { const t = R.byName[n], l = R.byName[RC.VXLEAF[n]]; if (!t || !l) continue; for (let s = 1; s < R.stateCount; s++) if (R.T.type[s] === t.id) RC_L[s] = l.defaultState; }
+    return RC_L;
+  };
   RC.solver = function (B, TF, leaves, ox, oy, oz) {
     const M = (leaves === false ? 0 : F.LEAVES) | F.OPAQUE, n = PSS * PS, LV = F.LEAVES, OP = F.OPAQUE;
     ox = ox | 0; oy = oy | 0; oz = oz | 0;
-    for (let i = 0; i < n; i++) RC_O[i] = (TF[B[i]] & M) ? 1 : 0;
+    const XL = leaves === false ? null : RC.leafTable();
+    for (let i = 0; i < n; i++) RC_O[i] = (TF[B[i]] & M) || (XL !== null && XL[B[i]] !== 0) ? 1 : 0;
     // the blur, one axis at a time (an edge voxel keeps its own value along the cut axis)
     const pass = (src, dst, st, ax) => {
       for (let y = 0; y < PS; y++) for (let z = 0; z < PS; z++) for (let x = 0; x < PS; x++) {
@@ -254,7 +265,7 @@
           let lf = 0, op = 0, gx = 0, gy = 0, gz = 0;
           for (let c = 0; c < 8; c++) {
             const qx = cx + (c & 1), qy = cy + ((c >> 1) & 1), qz = cz + ((c >> 2) & 1), qi = P(qx, qy, qz), f = TF[B[qi]];
-            if (f & OP) op++; else if (f & LV) lf++;
+            if (f & OP) op++; else if ((f & LV) || XL[B[qi]]) lf++;
             const v = RC_T[qi]; gx += (c & 1) ? v : -v; gy += ((c >> 1) & 1) ? v : -v; gz += ((c >> 2) & 1) ? v : -v;
           }
           const gl = Math.hypot(gx, gy, gz);
@@ -282,6 +293,7 @@
     // (VR.RoundCrown; the solver is made at the first face that asks)
     const roundOn = (lm & 2) !== 0 && fancy, groundOn = (lm & 4) !== 0;
     const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
+    const RCL = roundOn ? RC.leafTable() : null;   // (the mini-voxel crowns drawn as leaves)
     const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
@@ -624,7 +636,7 @@
           }
           if ((fl & F.LEAVES) && (TF[nb] & F.LEAVES) && !fancy) continue;
           if (roundOn && (fl & F.LEAVES)) {   // q-art3 · Runde Kronen: only the crown's outside, its corners from the blob
-            if (TF[nb] & F.LEAVES) continue;
+            if ((TF[nb] & F.LEAVES) || RCL[nb]) continue;
             faceCorners(bi, d);
             emitRoundQuad(bufs[layer], d, x, y, z, bi, b, fl);
             continue;
@@ -645,7 +657,14 @@
         }
         continue;
       }
-      if (shape === SH.VOXEL) { if (vxM) VR.VX.meshBlock(vxM, x, y, z, bi, b); continue; }
+      if (shape === SH.VOXEL) {
+        if (roundOn && RCL[b]) {   // q-art3 · Runde Kronen: a mini-voxel crown as part of the blob, in leaves of its kind
+          const ls = RCL[b];
+          for (let d = 0; d < 6; d++) { const nb = B[bi + DOFF[d]]; if ((TF[nb] & (F.OPAQUE | F.LEAVES)) || RCL[nb]) continue; faceCorners(bi, d); emitRoundQuad(bufs[1], d, x, y, z, bi, ls, TF[ls]); }
+          continue;
+        }
+        if (vxM) VR.VX.meshBlock(vxM, x, y, z, bi, b); continue;
+      }
       if (shape === SH.FLUID) { meshFluid(x, y, z, bi, b); continue; }
       let faces = null;
       const t = R.types[TTYPE[b]];
