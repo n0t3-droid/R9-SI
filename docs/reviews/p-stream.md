@@ -84,7 +84,7 @@ light output are untouched (gen/mesh/light_same ALL OK); nothing changes below 1
    fresh generation gives), at most 2 a frame.
 
 Tried and dropped: holding back the meshes of columns the camera will leave (it starved the latency estimate of samples
-and rested too little); a far-lane-only flight (the chunks' last rows ahead are worth having on a fast PC).
+and rested too little); stricter and looser worth factors (0.75, 1, 1.25 — 1.5 filled the most in the simulation).
 Not done on purpose: splitting light from generation (0.4 ms of ~37 ms), more workers (the 2-core rule protects the main
 thread), a finer far-tile level near the camera (lod.js/horizon.js: the next step, see the self-review).
 
