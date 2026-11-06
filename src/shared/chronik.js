@@ -40,7 +40,7 @@
   const DECL = [[0, 0, 0, 0], [0.02, 0, 0, 0.02], [0.12, 0.03, 0.004, 0.08], [0.15, 0.04, 0.004, 0.1]];
   const HAB = [[1, 0.8, 0, 0.3, 0.3, 0.4], [0.7, 1, 0, 0.5, 0.2, 0.2], [1, 0.3, 0, 0.4, 0.5, 0.5], [0.4, 1, 0, 0.2, 0.3, 0.3]];
   const FOOD = [[0.2, 0.6, 0, 0.2], [0.3, 0.4, 0.3, 0], [0.6, 0, 0, 0.4], [0, 0.5, 0.5, 0]];
-  const KMAX = [2.5, 4, 5, 3];
+  const KMAX = [3, 4, 5, 3];
   const BIRTH = [0.5, 0.25, 0.03, 0];
   const IMP_BORN = [5, 4, 3, 3];
   C.PROJ = { bakery: [20, 30, 10, 0, 2], well: [5, 0, 25, 0, 1], mill: [30, 10, 20, 5, 3], workshop: [30, 0, 15, 5, 2], school: [35, 10, 20, 10, 3], home: [25, 5, 10, 5, 2], garden: [5, 5, 5, 0, 1], bathhouse: [25, 0, 25, 5, 2], tower: [20, 0, 35, 0, 3] };
@@ -125,9 +125,12 @@
       }
     }
   }
+  C.VIL_R = 1800;   // villages beyond the grid (to 1.8 km) take part too: their trade, their projects; the land they read is the nearest edge cell
+  const clampCell = (st, x, z) => { const i = Math.max(0, Math.min(SIDE - 1, Math.floor((x - st.ox) / C.CELL) + C.R)), j = Math.max(0, Math.min(SIDE - 1, Math.floor((z - st.oz) / C.CELL) + C.R)); return j * SIDE + i; };
   C.addVillage = function (st, v) {
-    if (!v || st.vil.some(x => x.id === v.id)) return null;
-    const c = C.cellOf(st, v.x, v.z); if (c < 0) return null;
+    if (!v || st.vil.some(x => x.id === v.id) || st.vil.length >= 16) return null;
+    if (Math.abs(v.x - st.ox) > C.VIL_R || Math.abs(v.z - st.oz) > C.VIL_R) return null;
+    const c0 = C.cellOf(st, v.x, v.z), c = c0 >= 0 ? c0 : clampCell(st, v.x, v.z);
     const s = hs(v.id) ^ st.seed, pop = 12 + (h32(s, 1, 0x31) % 19);
     const around = [0, 0, 0, 0]; let n = 0;
     const take = (j) => { for (let p = 0; p < 4; p++) around[p] += st.P[j * 4 + p]; n++; };
@@ -136,11 +139,13 @@
     const w = Math.ceil(pop / 2), wts = [0.5 + tr, 0.8 + mead, 0.4 + cold * 0.6, 0.4 + 0.3 * h01(s, 2, 0x32)], sw = wts.reduce((a, b) => a + b, 0);
     const jobs = wts.map(x => Math.max(1, Math.round(w * x / sw)));
     const order = PROJ_ORDER.slice(); for (let i = order.length - 1; i > 0; i--) { const j = h32(s, i, 0x33) % (i + 1); const t = order[i]; order[i] = order[j]; order[j] = t; }
-    const vil = { id: String(v.id), name: String(v.name || v.id), x: Math.round(v.x), z: Math.round(v.z), c, pop, jobs, res: [0, 1, 2, 3].map(k => 10 + (h32(s, k, 0x34) % 31)), built: [], proj: null, order, tr: {} };
-    st.vil.push(vil); st.vc[c] = st.vil.length - 1; NB(c, (j) => { if (st.vc[j] < 0) st.vc[j] = st.vil.length - 1; });
+    const vil = { id: String(v.id), name: String(v.name || v.id), x: Math.round(v.x), z: Math.round(v.z), c, far: c0 < 0 ? 1 : 0, pop, jobs, res: [0, 1, 2, 3].map(k => 10 + (h32(s, k, 0x34) % 31)), built: [], proj: null, order, tr: {} };
+    st.vil.push(vil); markVil(st, vil, st.vil.length - 1);
     return vil;
   };
 
+  function markVil(st, v, vi) { if (v.far) return; st.vc[v.c] = vi; NB(v.c, (j) => { if (st.vc[j] < 0) st.vc[j] = vi; }); }
+  const vcell = (v) => (v.far ? -1 : v.c);
   // ---------------------------------------------------------------- the ledger
   function ev(st, k, c, v, imp, m, force) {
     const d = m !== undefined && st.dday >= 0 ? st.dday : Math.floor(st.t / 1440);
@@ -216,7 +221,7 @@
       let born = 0;
       for (const s of order) {
         if (born >= 2 || st.fam.length >= C.MAXFAM || h01(st.seed, dd, 0x710 + s) > 0.55) continue;
-        const c = pickCell(st, dd, 0x720 + s, (i) => (A[i * 4 + s] >= 2 && A[i * 4 + s] < 0.9 * Kc[i * 4 + s] ? Kc[i * 4 + s] : 0));
+        const c = pickCell(st, dd, 0x720 + s, (i) => (A[i * 4 + s] >= Math.min(2, 0.5 * Kc[i * 4 + s]) && A[i * 4 + s] > 0.5 && A[i * 4 + s] < 0.95 * Kc[i * 4 + s] ? Kc[i * 4 + s] : 0));
         if (c < 0) continue;
         const n = 1 + (h32(st.seed, dd * 7 + s, 0x730) % 3);
         A[c * 4 + s] = q16(A[c * 4 + s] + n * 0.5);
@@ -309,13 +314,13 @@
       for (let k = 0; k < 4; k++) R0[k] = Math.min(9999, R0[k]);
       // the woodcutters thin the trees a little (never below the seed bank)
       const cut = v.jobs[0] * 0.002; NB(c, (j) => { const q = j * 4 + 2; st.P[q] = q255(Math.max(st.K[q] * 0.03, st.P[q] - cut)); });
-      if (se === 2 && dd % 3 === 1) ev(st, 'harvest', c, { vil: v.name }, 2, 900);
+      if (se === 2 && dd % 3 === 1) ev(st, 'harvest', vcell(v), { vil: v.name, x: v.x, z: v.z }, 2, 900);
       // the building project
       if (v.proj) {
         v.proj.p = Math.round((v.proj.p + 1 / C.PROJ[v.proj.k][4]) * 1000) / 1000;
         if (v.proj.p >= 0.999 && dd + 1 >= 2) {
           v.built.push(v.proj.k); if (v.proj.k === 'home') v.pop += 2; else v.pop += 1;
-          const e = ev(st, 'built', c, { vil: v.name, b: v.proj.k }, 6, 600 + (h32(st.seed, dd, 0x900 + vi) % 400));
+          const e = ev(st, 'built', vcell(v), { vil: v.name, b: v.proj.k, x: v.x, z: v.z }, 6, 600 + (h32(st.seed, dd, 0x900 + vi) % 400));
           st.out.push({ vid: v.id, k: v.proj.k, d: dd + 1, e: e ? e.i : 0 });
           if (st.out.length > 32) st.out.shift();
           v.proj = null;
@@ -325,7 +330,7 @@
         if (R0[0] >= cost[0] && R0[1] >= cost[1] + v.pop && R0[2] >= cost[2] && R0[3] >= cost[3]) {
           for (let r = 0; r < 4; r++) R0[r] -= cost[r];
           v.proj = { k, p: 0, d: dd };
-          ev(st, 'started', c, { vil: v.name, b: k }, 3, 480);
+          ev(st, 'started', vcell(v), { vil: v.name, b: k, x: v.x, z: v.z }, 2, 480);
         }
       }
     }
@@ -342,7 +347,7 @@
       va.res[give] -= n1; vb.res[give] += n1; vb.res[want] -= n2; va.res[want] += n2;
       const key = vb.id; if (!(dd - (va.tr[key] === undefined ? -99 : va.tr[key]) >= 3)) continue;
       va.tr[key] = dd;
-      ev(st, 'trade', va.c, { vil: va.name, vil2: vb.name, r: C.RES[give], r2: C.RES[want] }, 2, 700);
+      ev(st, 'trade', vcell(va), { vil: va.name, vil2: vb.name, r: C.RES[give], r2: C.RES[want], x: va.x, z: va.z }, 2, 700);
     }
   }
   function nearestOf(st, a) { const va = st.vil[a]; let b = -1, bd = 1500; for (let j = 0; j < st.vil.length; j++) { if (j === a) continue; const d = Math.hypot(st.vil[j].x - va.x, st.vil[j].z - va.z); if (d < bd) { bd = d; b = j; } } return b; }
@@ -474,7 +479,7 @@
       st.pl = o.pl && typeof o.pl === 'object' ? o.pl : {};
       st.fam = (o.fam || []).slice(-C.MAXFAM); st.fr = (o.fr || []).slice(0, 4); st.ev = o.ev.slice(-C.MAXEV); st.out = (o.out || []).slice(-32);
       st.vil = []; st.vc.fill(-1);
-      for (const v of o.vil) { if (!v || typeof v.c !== 'number' || !Array.isArray(v.res)) continue; st.vil.push(v); const vi = st.vil.length - 1; st.vc[v.c] = vi; NB(v.c, (j) => { if (st.vc[j] < 0) st.vc[j] = vi; }); }
+      for (const v of o.vil) { if (!v || typeof v.c !== 'number' || !Array.isArray(v.res)) continue; st.vil.push(v); markVil(st, v, st.vil.length - 1); }
       capacity(st); foodCap(st);
       return st;
     } catch (e) { return null; }

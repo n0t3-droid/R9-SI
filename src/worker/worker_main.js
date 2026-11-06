@@ -129,7 +129,7 @@
       if (!CHR) {
         const g = getGen('overworld'), VG = VR.VillageGen;
         if (!g || !g.climateAt || !(g.singleBiome < 0)) { out.off = true; return out; }
-        const vils = [], R = (C.R + 1) * C.CELL;
+        const vils = [], R = C.VIL_R;
         if (VG) { const Cc = VG.cell(g), R0 = Math.ceil(R / Cc) + 1, ci = Math.floor(m.ox / Cc), cj = Math.floor(m.oz / Cc);
           for (let di = -R0; di <= R0; di++) for (let dj = -R0; dj <= R0; dj++) { const st = VG.site(g, ci + di, cj + dj); if (st && Math.abs(st.x - m.ox) < R && Math.abs(st.z - m.oz) < R) vils.push({ id: st.id, name: st.name, x: st.x, z: st.z }); } }
         CHR = C.create(m.seed | 0, { ox: m.ox, oz: m.oz, sample: C.sampler(g), villages: vils, day: m.day, tod: m.tod });
