@@ -370,10 +370,20 @@
     return spC > 1e-6 ? (a - l * cotH) / spC : Infinity;
   };
   // is the column worth asking for? (speedB: blocks/s; lat: seconds)
+  // p-stream2 · the corridor: in fast flight only a band along the way of travel is asked for (its half width W chunks
+  // from the flight line, nothing behind): the land right ahead fills the view's most (the cone's near part, weighted by
+  // its screen area), a column far beside the flight is seen for a moment, far off, and costs as much. W narrows from
+  // CORR_MAX (7 columns made, 5 shown) to CORR_MIN as the latency grows (a weaker PC: fewer columns, but in time). The
+  // latency in the worth test is capped (LAT_CAP): a slow moment no longer makes every column 'too late' — that stopped
+  // all requests until the latency eased (the 5–9 s stretches of no real terrain, p-stream's self-review)
+  SP.CORR_MAX = 3.5; SP.CORR_MIN = 1.5; SP.LAT_CAP = 0.8;
+  SP.corridor = (lat) => SP.CORR_MAX - (SP.CORR_MAX - SP.CORR_MIN) * clamp(((lat > 0 ? lat : SP.LAT0) - 0.6) / 0.8, 0, 1);
   SP.worth = function (ex, ez, ux, uz, speedB, lat, cotH) {
     if (!(speedB >= SP.FAST)) return true;
     if (ex * ex + ez * ez <= SP.KEEP * SP.KEEP) return true;
-    return SP.timeLeft(ex, ez, ux, uz, speedB / 16, cotH) >= SP.WORTH * lat;
+    const along = ex * ux + ez * uz, side = Math.abs(ex * uz - ez * ux);
+    if (along < -0.5 || side > SP.corridor(lat)) return false;
+    return SP.timeLeft(ex, ez, ux, uz, speedB / 16, cotH) >= SP.WORTH * Math.min(lat, SP.LAT_CAP);
   };
   // the chunks rest when the flight crosses REST × the render distance within one latency (learnt from the columns that
   // were shown — it can only err towards resting too little): no column asked for now would be shown before the camera
@@ -383,6 +393,9 @@
   // up: the disk's outer rim is never shown by design — measured, test/stream_low.mjs run 2)
   SP.REST = 1.5;
   SP.ease = function (lat) { return Math.max(SP.LAT_MIN, lat * 0.998); };
+  // (p-stream2: the rest is off — REST = Infinity: resting asked for nothing, not even the ground under the camera, for
+  // seconds; the corridor narrows instead)
+  SP.REST = Infinity;
   SP.rest = function (speedB, lat, rd) { return speedB >= SP.FAST && (speedB / 16) * lat > rd * SP.REST; };
   // the request's place (smaller first): the old order (distance², discounted ahead) and OUT_K outside the cone
   SP.prio = function (ex, ez, ux, uz, ahead, cosH) {

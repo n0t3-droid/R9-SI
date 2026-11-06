@@ -6,7 +6,7 @@
 //  d · far tiles behind the camera wait while moving fast
 //  e · a simulated flight (the real World and WorkerPool, one simulated worker in virtual time: a generation 40 ms, a
 //      section mesh 8 ms): at 20 and 40 m/s the plan shows more of the cone ahead and wastes fewer columns (generated and
-//      dropped unseen) than the old way; at 80 m/s the chunks rest (as much real terrain, half the columns made: the far
+//      dropped unseen) than the old way; at 80 m/s (p-stream2: no rest any more — the corridor) as much real terrain (the far
 //      tiles get the worker); walking at 3 and 5 m/s the rim's columns show sooner (the disk asks for their neighbours)
 //  f · a queued request no longer worth it is cancelled before a worker touches it
 //  g · turning back: the columns just unloaded come from a small memory (no generation), with the same blocks and light
@@ -33,7 +33,10 @@ console.log('a · worth');
 {
   // flying north (uz = -1) at 40 m/s with a latency of 1.5 s: the flight covers 3.75 chunks in that time
   const w = (ex, ez, sp, lat) => SP.worth(ex, ez, 0, -1, sp, lat, cotH);
-  check(w(0, -8, 40, 1.5) && w(2, -7, 40, 1.5), 'ahead, near the flight line: worth it');
+  check(w(0, -8, 40, 1.5) && w(1, -7, 40, 1.5) && w(3, -7, 40, 0.5), 'ahead, near the flight line: worth it');
+  // p-stream2 · the corridor: 7 columns wide while the chunks keep up, 3 when they lag; a slow moment never makes everything too late
+  check(!w(5, -7, 40, 0.5) && !w(3, -7, 40, 2) && w(1, -7, 40, 2), 'p-stream2: only a corridor along the flight (half width 3.5 chunks, 1.5 when lagging)');
+  check(w(0, -10, 80, 6) && w(0, -9, 80, 3), 'p-stream2: a high latency (a town, a slow moment) still asks for the land ahead (capped at ' + SP.LAT_CAP + ' s)');
   check(!w(0, 6, 40, 1.5) && !w(-5, 3, 40, 1.5), 'behind and beside-behind: not worth it (the camera has left before it is ready)');
   check(!w(6, -1, 40, 1.5), 'far to the side just ahead: leaves the cone before it is ready');
   check(w(1, 1, 80, 3) && w(0, 1, 80, 3), 'the columns round the player: always');
@@ -53,8 +56,9 @@ console.log('c · the far lane\'s share');
 {
   check(SP.share(5, 2, 6) === SP.SHARE_BASE && SP.share(11, 2, 6) === SP.SHARE_BASE, 'walking / plain flight: 30 %, as before');
   check(SP.share(40, 1.5, 6) > SP.SHARE_BASE && SP.share(80, 1.5, 6) >= SP.share(40, 1.5, 6) && SP.share(80, 3, 4) === SP.SHARE_MAX, 'fast: more for the far tiles, the more the chunks lag behind', [SP.share(40, 1.5, 6), SP.share(80, 1.5, 6), SP.share(80, 3, 4)].map(x => x.toFixed(2)).join(' ≤ '));
-  { let l = 6, n = 0; while (SP.rest(40, l, 6) && n < 3000) { l = SP.ease(l); n++; }
-    check(SP.rest(40, 6, 6) && !SP.rest(40, 0.6, 6) && n > 150 && n < 900 && !SP.rest(8, 9, 6), 'the chunks rest when the flight outruns them (40 m/s, latency 6 s: yes; 0.6 s: no); the latency eases back and they try again (a stuck 6 s within ~15 s); slow: never', n + ' frames'); }
+  // (p-stream2: the chunks never rest — resting asked for nothing, not even the ground under the camera, for 5–9 s; the
+  // corridor narrows instead; the latency still eases back every fast frame)
+  check(!SP.rest(80, 6, 4) && !SP.rest(8, 9, 6) && SP.ease(6) < 6, 'p-stream2: the chunks never rest (80 m/s, latency 6 s); the latency eases back');
   check(SP.lat(1, 3) > 1 && SP.lat(1, 3) < 3 && SP.lat(1, 100) <= SP.LAT_MAX && SP.lat(0, 0) >= SP.LAT_MIN, 'the latency: a smoothed average, clamped');
 }
 
@@ -118,8 +122,11 @@ console.log('e · a simulated flight on Low (render distance 6, one worker)');
     // the worker — the real share stays what the old way managed, a few columns at the start)
     if (sp < 80) check(p.real > o.real, `${sp} m/s: more of the cone ahead is real terrain`, `${o.real} → ${p.real} %`);
     else check(p.real >= o.real - 0.5, `${sp} m/s: as much real terrain as the old way (it cannot keep up either)`, `${o.real} → ${p.real} %`);
-    check(p.wasted < o.wasted || p.gens < o.gens, `${sp} m/s: fewer columns generated for nothing`, `wasted ${o.wasted} → ${p.wasted}, generated ${o.gens} → ${p.gens}`);
-    check(p.share > SP.SHARE_BASE, `${sp} m/s: the far tiles get more of the worker`, p.share.toFixed(2));
+    // (p-stream2: at 80 m/s this simulated worker — a 40 ms column, ~6 × a fast core — cannot keep up either way; the plan no
+    // longer rests, so it makes about as many columns as the old way)
+    if (sp < 80) check(p.wasted < o.wasted || p.gens < o.gens, `${sp} m/s: fewer columns generated for nothing`, `wasted ${o.wasted} → ${p.wasted}, generated ${o.gens} → ${p.gens}`);
+    else check(p.wasted <= o.wasted * 1.15, `${sp} m/s: not many more columns generated for nothing`, `wasted ${o.wasted} → ${p.wasted}, generated ${o.gens} → ${p.gens}`);
+    if (sp >= 40) check(p.share > SP.SHARE_BASE, `${sp} m/s: the far tiles get more of the worker`, p.share.toFixed(2));   // (p-stream2: at 20 m/s the corridor keeps up — no deficit)
   }
   for (const sp of [3, 5]) {
     const o = fly(false, sp, 20, 6), p = fly(true, sp, 20, 6);
