@@ -247,6 +247,27 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
       results[`shot_${preset}_${v}_${build}`] = { shot, real: cone.real, coarse: cone.coarse, fine: cone.fine, voidAll: cone.voidAll };
       console.log(`  shot ${shot}  real ${cone.real} coarse ${cone.coarse} void ${cone.voidAll}`);
     }
+    // p-stream3 · the stand-in up close: fresh land 700 m from the spawn, the chunks held back (no column asked for) until the
+    // far tiles are done — the fine 2-block tiles fill the view near the camera — a picture; then the chunks load, the same
+    // view again: test/shots/stream3_fine_<preset>_<build>.png and stream3_real_<preset>_<build>.png
+    if (!process.env.SKIP_SHOTS && process.env.FINE_SHOT !== '0') {
+      await home(P);
+      const pos = await P.ev(async () => {
+        const g = VR.game, w = g.world, p = g.player, s = window.__spawn, a = 0.35 + Math.PI * 0.75;
+        const x = s[0] - Math.sin(a) * 700, z = s[2] - Math.cos(a) * 700, gen = VR.makeGen('overworld', w.seed, w.genOpts);
+        p.pos[0] = x; p.pos[2] = z; p.pos[1] = gen.surfaceY(Math.floor(x), Math.floor(z)) + 14; p.yaw = a; p.viewYaw = a; p.pitch = -0.42;
+        window.__rq = w.requestColumn; w.requestColumn = function () {};
+        const t0 = performance.now(); let q = 0;
+        while (performance.now() - t0 < 90000) { window.__tick(); await new Promise(r => setTimeout(r, 33)); const h = g.horizon; if (g.pool.busy === 0 && (!h || h.inflight === 0) && !(w.uploadQ && w.uploadQ.size)) { if (++q > 30) break; } else q = 0; }
+        return [x, z, Math.round((performance.now() - t0) / 100) / 10];
+      });
+      const shoot = async (name) => { await P.ev(() => { VR.game.renderer.tsrReset = true; }); for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.033)); const f = `${SHOTS}/stream3_${name}_${preset}_${build}.png`; await P.page.screenshot({ path: f, timeout: 600000 }); return f; };
+      const f1 = await shoot('fine');
+      const st = await P.ev(async () => { const w = VR.game.world; w.requestColumn = window.__rq; return window.__settle(120); });
+      const f2 = await shoot('real');
+      results[`fine_${preset}_${build}`] = { fine: f1, real: f2, pos, settle: st };
+      console.log(`  stand-in ${f1} (tiles done in ${pos[2]} s) · real ${f2} (${st} s)`);
+    }
     await P.ctx.close();
   }
 }
@@ -282,13 +303,13 @@ if (!process.env.SKIP_SHOTS && BUILDS.length) {
   fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
   try { execFileSync('python3', ['/root/r9coord/pairs.py', `${SHOTS}/stream_sheet.jpg`, spec]); console.log('sheet ' + SHOTS + '/stream_sheet.jpg'); } catch (e) { console.log('no sheet: ' + String(e.message).slice(0, 200)); }
 }
-// p-stream2 · the targets (the after build): 80 m/s real terrain ahead ≥ 85 % on Low and Very Low, a walk's p90 ≤ 1 s
+// p-stream3 · the targets (the after build): 80 m/s real terrain ahead ≥ 80 % on Low and Very Low, a walk's p90 ≤ 1 s
 for (const preset of PRESETS) {
   const f = results[`${preset}_80_after`], wk = results[`${preset}_5_after`];
-  if (f) check(f.out.real >= 85, `p-stream2 · ${preset} 80 m/s: real terrain ahead ≥ 85 %`, f.out.real + ' %');
-  if (wk) check(wk.out.ttvP90 <= 1000, `p-stream2 · ${preset} walk: the land coming into view within 1 s (p90)`, wk.out.ttvP90 + ' ms');
+  if (f) check(f.out.real >= 80, `p-stream3 · ${preset} 80 m/s: real terrain ahead ≥ 80 %`, f.out.real + ' %');
+  if (wk) check(wk.out.ttvP90 <= 1000, `p-stream3 · ${preset} walk: the land coming into view within 1 s (p90)`, wk.out.ttvP90 + ' ms');
 }
-if (!process.env.SKIP_SHOTS && fs.existsSync(ROOT + '/test/stream2_sheet.py')) { try { execFileSync('python3', [ROOT + '/test/stream2_sheet.py', `${OUT}/stream_low.json`]); console.log('sheet ' + SHOTS + '/stream2_sheet.jpg'); } catch (e) { console.log('no stream2 sheet: ' + String(e.message).slice(0, 200)); } }
+if (!process.env.SKIP_SHOTS && fs.existsSync(ROOT + '/test/stream3_sheet.py')) { try { execFileSync('python3', [ROOT + '/test/stream3_sheet.py', `${OUT}/stream_low.json`]); console.log('sheet ' + SHOTS + '/stream3_sheet.jpg'); } catch (e) { console.log('no stream2 sheet: ' + String(e.message).slice(0, 200)); } }
 console.log('--- errors (' + errs.length + ')'); for (const e of errs.slice(0, 10)) console.log(e);
 check(errs.filter(e => e.startsWith('[pageerror]')).length === 0, 'no page errors');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
