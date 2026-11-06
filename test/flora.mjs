@@ -34,19 +34,21 @@ for (const vg of VG) {
   for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
   await ev(() => { const r = VR.game.renderer; if (!r._render) { r._render = r.render; r.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } });
   const step = async (n, dtms = 33, draw = false) => { for (let k = 0; k < n; k += 10) { await ev(([m, d, draw]) => { const g = VR.game; window.__norender = !draw; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } if (draw) g.renderer.gl.finish(); window.__norender = true; }, [Math.min(10, n - k), dtms, draw]); await wait(4); } };
-  const boost = (on) => ev((on) => { const w = VR.game.world; if (on) { if (w.__ub === undefined) { w.__ub = w.uploadBudget; w.uploadBudget = () => 80; w.__tk = w.streamTakt; w.streamTakt = false; } } else if (w.__ub !== undefined) { w.uploadBudget = w.__ub; w.streamTakt = w.__tk; delete w.__ub; } const q = VR.game.renderer && VR.game.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
+  const boost = (on) => ev((on) => { const w = VR.game.world; if (on) { if (w.__ub === undefined) { w.__ub = w.uploadBudget; w.uploadBudget = () => 80; w.__tk = w.streamTakt; w.streamTakt = false; const U = w.uploadQ; if (U) { U.__frame = U.frame; U.frame = function () {}; } } if (w.uploadQ) { w.uploadQ.scale = 1; w.uploadQ.frameK = 1; w.uploadQ.debtMs = 0; } } else if (w.__ub !== undefined) { w.uploadBudget = w.__ub; w.streamTakt = w.__tk; delete w.__ub; const U = w.uploadQ; if (U && U.__frame) { U.frame = U.__frame; delete U.__frame; } } const q = VR.game.renderer && VR.game.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
   const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (!pool || !pool.queueFar) return 0; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return 0; }, on);
   // critic_photo.mjs's wait: within the view distance every column shown, nothing pending, uploading, fading or arriving
   const settle = async (maxS) => {
     let s = null, last = Infinity, stall = 0; const t0 = Date.now();
     await boost(true);
     for (let i = 0; ; i++) {
-      if (i % 4 === 0) await holdFar(true);   // (the far tiles' jobs wait: run 6's Traumbaum view stood in stand-ins, the workers busy with the horizon)
+      if (i % 4 === 0) await holdFar(true);
+      await boost(true);   // (the upload queue's scale and debt back to full every round: run 10's 773 uploads crawled, the hitch meter had learned SwiftShader's slow uploads)   // (the far tiles' jobs wait: run 6's Traumbaum view stood in stand-ins, the workers busy with the horizon)
       await step(10); if (i % 3 === 2) await step(1, 33, true);   // (a drawn frame now and then: the uploads and fades run in it)
       s = await ev(() => { const g = VR.game, w = g.world, p = g.player; const rd = Math.max(1, (w.renderDist | 0) - 1), ri = Math.max(1, rd - 2), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if ((sc.dirty || sc.pending) && sc.count > 0) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= ri * ri) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, far: g.pool.queueFar ? g.pool.queueFar.length : -1, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, arr: w.arrivals ? w.arrivals.length : 0 }; });
       const shown = s.pend === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && s.arr === 0;
       stall = shown && s.dirty >= last ? stall + 1 : 0; last = s.dirty;
       const el = (Date.now() - t0) / 1000; s.s = Math.round(el);
+      if (s.unshown === 0 && s.pend === 0 && s.dirty === 0 && s.fading === 0 && i > 2) break;
       if (shown && ((s.busy === 0 && s.dirty === 0) || stall >= 6) && i > 2) break;
       if (el >= maxS) break;
       await wait(60);
