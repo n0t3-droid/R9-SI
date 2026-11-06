@@ -22,7 +22,7 @@ const views = (process.env.VIEWS || 'meadow,tree,giant,ring,ringnight,vista').sp
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let bad = 0; const ok = (c, m) => { if (!c) bad++; console.log((c ? '  ✓ ' : '  ✗ ') + m); };
 const res = {};
-const VG = (process.env.VG || '16,17').split(',').map(Number), A0 = 'v' + VG[0], A1 = 'v' + VG[1];
+const VG = (process.env.VG || '16,17').split(',').map(Number), A0 = 'v' + VG[0], A1 = 'v' + VG[VG.length - 1];
 for (const vg of VG) {
   const tag = 'v' + vg;
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'de-DE' });
@@ -71,15 +71,15 @@ for (const vg of VG) {
     await shot(name);
     res[tag].hi[name] = +(await timeFrames()).toFixed(1);
   }
-  await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-  for (const name of ['meadow', 'giant']) { const S = VIEW[name]; await look(S.from, S.to, true); await step(6); res[tag].vl[name] = +(await timeFrames()).toFixed(1); }
+  if (!process.env.NOCOST) await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+  if (!process.env.NOCOST) for (const name of ['meadow', 'giant']) { const S = VIEW[name]; await look(S.from, S.to, true); await step(6); res[tag].vl[name] = +(await timeFrames()).toFixed(1); }
   res[tag].logs = logs;
   console.log('cost', tag, JSON.stringify(res[tag]));
   await ctx.close();
 }
-ok(res[A0] && res[A0].vgen === VG[0] && res[A1] && res[A1].vgen === VG[1], `the worlds are vgen ${VG[0]} and ${VG[1]} (${res[A0] && res[A0].vgen}, ${res[A1] && res[A1].vgen})`);
+if (VG.length > 1) ok(res[A0] && res[A0].vgen === VG[0] && res[A1] && res[A1].vgen === VG[1], `the worlds are vgen ${VG[0]} and ${VG[1]} (${res[A0] && res[A0].vgen}, ${res[A1] && res[A1].vgen})`);
 for (const v of views) ok(fs.existsSync(SHOTS + `flora_${v}_${A0}.png`) && fs.existsSync(SHOTS + `flora_${v}_${A1}.png`), `the ${v} view before and after`);
 ok(!res[A0].logs.length && !res[A1].logs.length, `no page error (${(res[A0].logs.concat(res[A1].logs)).join(' | ').slice(0, 300) || 'none'})`);
-fs.writeFileSync(SHOTS + 'flora_cost.json', JSON.stringify(res, null, 1));
+fs.writeFileSync(SHOTS + 'flora_cost_' + VG.join('_') + '.json', JSON.stringify(res, null, 1));
 await browser.close();
 console.log(bad ? `FAILED ${bad}` : 'ALL OK');
