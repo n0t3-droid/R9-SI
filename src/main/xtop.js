@@ -64,6 +64,15 @@
   // the sun's light at a fragment with contact shadow l2a (1 = open)
   X.sunK = (l2a, lv) => 1 + (l2a - 1) * (X.DEPTH[lv] ? X.DEPTH[lv].sun : 0);
 
+  // the people's round contact shadow under the soles (folkgpu.js FG.shadow, a negative radius; r1 in normal play: the
+  // figures stood on the white plaza without one — 0.31 blocks hid under the shoes): wider and deeper by level; the
+  // sun-stretched ellipse (no shadow map) as it was
+  X.CONTACT = [null, { r: 1.55, k: 1.5 }, { r: 1.7, k: 1.65 }];
+  X.contact = function (r, k, lv) {
+    const C = X.CONTACT[lv]; if (!C || !(r < 0)) return [r, k];
+    return [r * C.r, Math.min(0.85, k * C.k)];
+  };
+
   // ---------------------------------------------------------------- Klarheit
   //   pow   the luma ratio's exponent · lo, hi its clamp · near, far (m) the fade out with distance
   // (browser run 1: 0.35 / 0.74…1.35 was invisible at trailer distance — stronger)

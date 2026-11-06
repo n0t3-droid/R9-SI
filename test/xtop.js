@@ -100,6 +100,9 @@ console.log('c · the mirrors');
   check(mono && R1(0) === 0 && Math.abs(R1(1) - 1) < 1e-9, 'Tonumfang: monotonic, 0 and 1 stay (nothing clips, no detail lost)');
   check(R1(194 / 255) > 208 / 255 && R1(32 / 255) < 28 / 255 && Math.abs(R1(73 / 255) - 73 / 255) < 8 / 255, 'by day the highlights up (194 → ' + Math.round(R1(194 / 255) * 255) + '), the darks down (32 → ' + Math.round(R1(32 / 255) * 255) + '), the middle kept (73 → ' + Math.round(R1(73 / 255) * 255) + ')');
   check(R0(0.04) > R1(0.04) && R0(0.04) >= 0.04, 'by night no darker darks (the night stays readable)');
+  const c0 = X.contact(-0.31, 0.46, 0), c1 = X.contact(-0.31, 0.46, 1), c2 = X.contact(-0.31, 0.46, 2), ce = X.contact(0.32, 0.4, 2);
+  check(c0[0] === -0.31 && c0[1] === 0.46 && c1[0] < -0.45 && c1[1] > 0.65 && c2[0] <= c1[0] && c2[1] >= c1[1] && c2[1] <= 0.85, 'Tiefe: the round contact shadow under the soles wider and deeper (' + c1.map(x => x.toFixed(2)).join(' / ') + '), capped');
+  check(ce[0] === 0.32 && ce[1] === 0.4, 'the sun-stretched ellipse (no shadow map) untouched');
   check(X.shutterK(1 / 24, true) === 0 && X.shutterK(0, false) === 0 && X.shutterK(-1, false) === 0 && X.shutterK(2, false) === 0, '0 at a cut, the first frame, a stall');
 }
 
@@ -116,6 +119,10 @@ console.log('d · the GL side');
   let built = 0; R.buildPrograms = function () { built++; }; r.q = { xDepth: 0 }; r.xKey = '0000';
   r.applyQ(); check(built === 0, 'applyQ: nothing rebuilt while the key holds');
   r.q.xClar = true; r.applyQ(); check(built === 1, 'a switch changed: the programs again');
+  const FGs = []; V.FolkGPU = { shadow: (pos, cam, rr, k) => FGs.push([rr, k]) }; r.q = { xDepth: 1 }; X.use(r.q);
+  r.l2Post({ u: {} }, { sunDir: [0, 1, 0] }, 'bloom', {});
+  V.FolkGPU.shadow([0, 0, 0], {}, -0.31, 0.46); r.q = { xDepth: 0 }; V.FolkGPU.shadow([0, 0, 0], {}, -0.31, 0.46);
+  check(FGs.length === 2 && FGs[0][0] < -0.45 && FGs[1][0] === -0.31, 'the people\'s contact shadow goes through Tiefe (wrapped once, off: as before)', JSON.stringify(FGs));
   const set = []; const gl = { uniform4f: (u, a, b, c, d) => set.push([u, a, b, c, d]), uniformMatrix4fv() {} }; r.gl = gl;
   r.q = { xRange: true }; r.l2Post({ u: { u_xRange: 'R' } }, { sunDir: [0, 0.8, 0.6] }, 'composite', {});
   const day = set.find(s => s[0] === 'R'); set.length = 0;

@@ -31,10 +31,23 @@
     };
   }
 
+  // Tiefe: the people's contact shadow (folkgpu.js loads after this file: wrapped once, at the first post pass)
+  const wrapFolk = function (rd) {
+    const FG = VR.FolkGPU; if (!FG || !FG.shadow || FG.shadow.xTop) return;
+    const sh0 = FG.shadow;
+    FG.shadow = function (pos, cam, r, k) {
+      const q = rd.q, lv = q ? Math.max(0, Math.min(2, q.xDepth | 0)) : 0;
+      if (!lv || !(r < 0)) return sh0.call(this, pos, cam, r, k);
+      const c = X.contact(r, k, lv); return sh0.call(this, pos, cam, c[0], c[1]);
+    };
+    FG.shadow.xTop = true;
+  };
+
   // Filmkamera: the last drawn frame's view-projection and eye, the director's clock
   const l2Post0 = R.l2Post;
   R.l2Post = function (p, E, pass, F) {
     if (l2Post0) l2Post0.call(this, p, E, pass, F);
+    if (!(VR.FolkGPU && VR.FolkGPU.shadow && VR.FolkGPU.shadow.xTop)) wrapFolk(this);
     if (pass !== 'composite') return;
     const u = p.u;
     if (u.u_xRange) { const R = X.RANGE; this.gl.uniform4f(u.u_xRange, R.a, R.k, R.t * X.dayK(E && E.sunDir ? E.sunDir[1] : 1), 0); }   // Tonumfang
