@@ -83,7 +83,7 @@
   // ---------------------------------------------------------------- Tonumfang
   //   a  the highlights' opening (x + a·x²·(1 − x): 0 and 1 stay, monotonic while a < 1)
   //   k  the toe's knee (y²·(1 + k)/(y + k)), t its share by full day (× the day: none at night, the night stays readable)
-  X.RANGE = { a: 0.75, k: 0.15, t: 0.6 };
+  X.RANGE = { a: 0.6, k: 0.15, t: 0.7 };   // (r1 offline on the frames: a 0.75 blew the plaza's white tiles out)
   X.rangeK = function (x, day) {
     const R = X.RANGE, y = x + R.a * x * x * (1 - x), toe = y * y * (1 + R.k) / (y + R.k);
     return y + (toe - y) * R.t * clamp(day, 0, 1);

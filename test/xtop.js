@@ -98,7 +98,7 @@ console.log('c · the mirrors');
   const R0 = (x) => X.rangeK(x, 0), R1 = (x) => X.rangeK(x, 1);
   let mono = true; for (let i = 1; i <= 100; i++) if (R1(i / 100) < R1((i - 1) / 100) || R0(i / 100) < R0((i - 1) / 100)) mono = false;
   check(mono && R1(0) === 0 && Math.abs(R1(1) - 1) < 1e-9, 'Tonumfang: monotonic, 0 and 1 stay (nothing clips, no detail lost)');
-  check(R1(194 / 255) > 214 / 255 && R1(32 / 255) < 28 / 255 && Math.abs(R1(73 / 255) - 73 / 255) < 8 / 255, 'by day the highlights up (194 → ' + Math.round(R1(194 / 255) * 255) + '), the darks down (32 → ' + Math.round(R1(32 / 255) * 255) + '), the middle kept (73 → ' + Math.round(R1(73 / 255) * 255) + ')');
+  check(R1(194 / 255) > 208 / 255 && R1(32 / 255) < 28 / 255 && Math.abs(R1(73 / 255) - 73 / 255) < 8 / 255, 'by day the highlights up (194 → ' + Math.round(R1(194 / 255) * 255) + '), the darks down (32 → ' + Math.round(R1(32 / 255) * 255) + '), the middle kept (73 → ' + Math.round(R1(73 / 255) * 255) + ')');
   check(R0(0.04) > R1(0.04) && R0(0.04) >= 0.04, 'by night no darker darks (the night stays readable)');
   check(X.shutterK(1 / 24, true) === 0 && X.shutterK(0, false) === 0 && X.shutterK(-1, false) === 0 && X.shutterK(2, false) === 0, '0 at a cut, the first frame, a stall');
 }
