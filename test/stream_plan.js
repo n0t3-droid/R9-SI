@@ -53,8 +53,8 @@ console.log('c · the far lane\'s share');
 {
   check(SP.share(5, 2, 6) === SP.SHARE_BASE && SP.share(11, 2, 6) === SP.SHARE_BASE, 'walking / plain flight: 30 %, as before');
   check(SP.share(40, 1.5, 6) > SP.SHARE_BASE && SP.share(80, 1.5, 6) >= SP.share(40, 1.5, 6) && SP.share(80, 3, 4) === SP.SHARE_MAX, 'fast: more for the far tiles, the more the chunks lag behind', [SP.share(40, 1.5, 6), SP.share(80, 1.5, 6), SP.share(80, 3, 4)].map(x => x.toFixed(2)).join(' ≤ '));
-  { let h = 1; for (let i = 0; i < 40; i++) h = SP.hit(h, i % 5 === 0); let n = 0, r = SP.rest(40, h, false); const r0 = r; while (r && n < 3000) { h = SP.ease(h); r = SP.rest(40, h, true); n++; }
-    check(r0 && n > 100 && n < 400 && !SP.rest(8, 0, true), 'four requests in five never shown: the chunks rest; the share eases back and they try again within ~7 s; slow: never', n + ' frames'); }
+  { let l = 6, n = 0; while (SP.rest(40, l, 6) && n < 3000) { l = SP.ease(l); n++; }
+    check(SP.rest(40, 6, 6) && !SP.rest(40, 0.6, 6) && n > 150 && n < 900 && !SP.rest(8, 9, 6), 'the chunks rest when the flight outruns them (40 m/s, latency 6 s: yes; 0.6 s: no); the latency eases back and they try again (a stuck 6 s within ~15 s); slow: never', n + ' frames'); }
   check(SP.lat(1, 3) > 1 && SP.lat(1, 3) < 3 && SP.lat(1, 100) <= SP.LAT_MAX && SP.lat(0, 0) >= SP.LAT_MIN, 'the latency: a smoothed average, clamped');
 }
 

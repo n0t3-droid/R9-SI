@@ -330,25 +330,23 @@
   // and how the workers' time is split between the chunks and the far tiles. Pure functions (test/stream_plan.js);
   // world.js and horizon.js ask them when world.streamPlan is on (every preset; the 'streamPlan' setting switches it).
   //
-  // The measured problem (docs/reviews/p-stream.md): on Low and Very Low one or two workers make ~25 columns a second
-  // (a column ≈ 40 ms to generate plus its section meshes). A flight at 40 m/s needs ~40 new columns a second across
-  // the loading disk, at 80 m/s ~80: the chunks cannot keep up, whatever the order. The old order still spent the time on
-  // the whole disk — the columns beside and behind the flight, which the camera has left before they are ready — and kept
-  // the far tiles (one ≈ 40 ms for 64 columns' worth of land) to 30 % of the workers, so the land ahead came late or not
-  // at all and showed holes.
-  // The plan:
-  //  · rim      the request disk reaches rd + 0.5 + √2 chunks (was rd + 1.5): every column inside the render distance has
-//             its 8 neighbours asked for — the rim's off-axis columns no longer wait 1–4 s at a walk for neighbours outside
-//  · latency  the world measures how long a requested column takes to be shown (lat, an average in seconds)
-  //  · worth    while moving fast (FAST blocks/s and up), a column is asked for only if it will still be in the view cone
-  //             when it is ready: its time until the cone's edge passes it (timeLeft) ≥ WORTH × lat. The columns right
-  //             round the player (KEEP chunks) are always asked for. A queued request no longer worth it is cancelled.
-  //  · rest     faster still (the flight crosses the render distance within one latency) no new column is asked for at
-  //             all: the far tiles get every worker until the flight slows
+  // The measured problem (docs/reviews/p-stream.md, test/stream_low.mjs): no holes (the far tiles always stand in), but
+  // in fast flight the land near the camera stays coarse and real chunks come late — a worker makes a few dozen columns
+  // a second (fewer on a weak PC), a 40 m/s flight on Low needs ~37, 80 m/s ~75 — and up to two thirds of the columns
+  // made were never shown (beside and behind the flight); at a walk the rim's columns waited 1–4 s for neighbours outside
+  // the request disk. The plan:
+  //  · rim      the request disk reaches rd + 0.5 + √2 chunks (was rd + 1.5) while not in fast flight: every column inside
+  //             the render distance has its 8 neighbours asked for
+  //  · latency  the world learns how long a column asked for in fast flight takes to be shown (lat, an average, seconds)
+  //  · worth    in fast flight (FAST blocks/s and up, looking roughly the way of travel), a column is asked for only if it
+  //             will still be in the view cone when it is ready: the time until the cone's edge passes it (timeLeft) ≥
+  //             WORTH × lat; the columns right round the player (KEEP chunks) always. A queued request no longer worth it
+  //             is cancelled before a worker touches it
+  //  · rest     faster still (the flight crosses REST × the render distance within one latency) no new column is asked
+  //             for: the far tiles get every worker until the flight slows (the latency eases back: a retry)
   //  · order    distance, discounted ahead (as before), and OUT_K × for a column outside the view cone
-  //  · share    the far lane's share of the workers grows from 30 % with the deficit (how far the flight runs ahead of
-  //             what the chunks can fill: speed × lat against the render distance) up to SHARE_MAX: the far tiles
-  //             cover the land ahead first, the chunks refine it where they can
+  //  · share    the far lane's share of the workers grows from 30 % with the deficit (speed × lat against half the render
+  //             distance) up to SHARE_MAX: the far tiles cover the land ahead first, the chunks refine it where they can
   //  · tiles    a far tile behind the camera waits (BEHIND_K on its priority) while moving fast
   // (src/shared/stream.js: loaded by the main thread and the workers; only world.js and horizon.js call it)
   {
@@ -356,7 +354,7 @@
   SP.RIM = 0.5 + Math.SQRT2;   // the request disk's radius beyond the render distance: a shown column's 8 neighbours
   SP.FAST = 14;          // blocks/s: slower (walking, plain flight 11 m/s) the streaming works exactly as before
   SP.KEEP = 1.5;         // chunks: always asked for (the ground under the player and its neighbours)
-  SP.WORTH = 0.75;       // a column must stay in view this share of the latency after it is asked for
+  SP.WORTH = 1.5;       // a column must stay in view 1.5 × the latency after it is asked for (0.75, 1, 1.25 tried: test/stream_plan.js e)
   SP.MARGIN = 1.5;       // chunks of slack on the cone's edge (a shown column needs its 8 neighbours generated)
   SP.OUT_K = 2.5;        // order: a column outside the view cone counts this much farther
   SP.SHARE_BASE = 0.3;   // the far lane's share while walking (WorkerPool.farShare as before)
@@ -377,16 +375,15 @@
     if (ex * ex + ez * ez <= SP.KEEP * SP.KEEP) return true;
     return SP.timeLeft(ex, ez, ux, uz, speedB / 16, cotH) >= SP.WORTH * lat;
   };
-  // the chunks rest: the flight crosses the whole render distance within one latency — no column asked for now would
-  // be shown before the camera has passed it; the workers go to the far tiles until the flight slows (or the world quickens)
-  SP.REST = 1.2;
-  // the chunks rest when most of what fast flight asks for is never shown (the hit share: an average over the requests
-  // made in fast flight — 1 shown, 0 unloaded unseen); they start again above REST_OFF. While resting nothing is asked
-  // for, so nothing is learnt: the share eases back (REST_ON → REST_OFF in ~7 s at 30 fps) and the chunks try again
-  SP.REST_ON = 0.3; SP.REST_OFF = 0.45;
-  SP.hit = function (prev, shown) { const p = prev >= 0 ? prev : 1; return p + ((shown ? 1 : 0) - p) * 0.05; };
-  SP.ease = function (hit) { return Math.min(1, hit + 0.0007); };
-  SP.rest = function (speedB, hit, resting) { return speedB >= SP.FAST && hit < (resting ? SP.REST_OFF : SP.REST_ON); };
+  // the chunks rest when the flight crosses REST × the render distance within one latency (learnt from the columns that
+  // were shown — it can only err towards resting too little): no column asked for now would be shown before the camera
+  // passes it. While resting nothing is shown, so nothing is learnt: the latency eases back (halves in ~12 s at 30 fps)
+  // and the chunks try again — a slow moment (a town's plan) never keeps them resting for the rest of a flight.
+  // (A first try decided by the share of fast-flight requests never shown rested at 40 m/s on Low where the chunks kept
+  // up: the disk's outer rim is never shown by design — measured, test/stream_low.mjs run 2)
+  SP.REST = 1.5;
+  SP.ease = function (lat) { return Math.max(SP.LAT_MIN, lat * 0.998); };
+  SP.rest = function (speedB, lat, rd) { return speedB >= SP.FAST && (speedB / 16) * lat > rd * SP.REST; };
   // the request's place (smaller first): the old order (distance², discounted ahead) and OUT_K outside the cone
   SP.prio = function (ex, ez, ux, uz, ahead, cosH) {
     const d2 = ex * ex + ez * ez, along = ahead ? Math.max(0, ex * ux + ez * uz) : 0;
