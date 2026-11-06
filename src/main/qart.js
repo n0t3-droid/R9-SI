@@ -211,6 +211,20 @@ in vec4 v_qC;   // the clump field at the vertices (glslVS)
 bool qCut(vec3 w, uint face, float dist) {
   vec3 pp = face <= 1u ? w.yzx : face <= 3u ? w.zxy : w.xyz;
   float pl = floor(pp.z + 0.5);
+#ifdef Q_CROWN
+  // q-art2 · Fernkronen (qart2.js Q2.cutFar): beyond ~40 m the corners on a 4-texel grid, larger and rounder, to ~260 m
+  vec2 bl = floor(pp.xy);
+  float QS = dist > 40.0 + 12.0 * hash13(vec3(bl, pl + 0.7)) ? 4.0 : 16.0;
+  vec2 tq = floor(pp.xy * QS);
+  vec2 f = (tq + 0.5) / QS - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
+  float fade = 1.0 - smoothstep(200.0, 260.0, dist);
+  float hv = hash13(vec3(bl + g * 0.5 + vec2(0.13, 0.29), pl));
+  float r = hv < ${f3(L.cutP)} ? mix(${f3(L.corner[0])}, ${f3(L.corner[1])}, hv / ${f3(L.cutP)}) * fade * (QS < 8.0 ? 1.35 : 1.0) : 0.0;
+  float n = hash13(vec3(tq + 0.5, pl * 1.37 + 0.11));
+  if (r <= 0.0) return false;
+  if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (QS < 8.0 ? 0.55 + 0.5 * n : 0.7 + 0.6 * n)) return true;
+  return QS > 8.0 && min(dd.x, dd.y) < 1.0 / QS && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.5 - 1.0 / QS;
+#else
   vec2 tq = floor(pp.xy * 16.0), bl = floor(pp.xy);
   vec2 f = (tq + 0.5) / 16.0 - bl, g = floor(pp.xy + 0.5) - bl, dd = abs(f - g);
   float fade = 1.0 - smoothstep(${L.far[0].toFixed(1)}, ${L.far[1].toFixed(1)}, dist);
@@ -220,12 +234,27 @@ bool qCut(vec3 w, uint face, float dist) {
   if (r <= 0.0) return false;
   if (dd.x < r && dd.y < r && length(vec2(r) - dd) > r * (0.7 + 0.6 * n)) return true;
   return min(dd.x, dd.y) < 0.0625 && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.4375;
+#endif
 }
+#ifdef Q_CROWN
+// q-art2 · Fernkronen (qart2.js Q2.carve): far away an outer leaf face (open to the sky) outside the clumps is carved away —
+// the crown's outline breaks into rounded masses instead of a cube; the inner faces behind it fill the notch
+bool qCarve(float sd, float dist, float sky) { float f = smoothstep(${f3(VR.QArt2 ? VR.QArt2.CROWN.carve[0] : 30)}, ${f3(VR.QArt2 ? VR.QArt2.CROWN.carve[1] : 55)}, dist); return f > 0.0 && sky > 0.97 && sd > mix(4.0, ${f3(VR.QArt2 ? VR.QArt2.CROWN.carveT : 0.25)}, f); }
+#endif
 // the crown's light: deep in a clump its own shade, the hue with the value (warm light, cool shade), the rim and the sun
 // through the leaves from behind
 vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
   float inner = smoothstep(${f3(QA.LEAF.inR[0])}, ${f3(QA.LEAF.inR[1])}, c.w);
+#ifdef Q_CROWN
+  // q-art2 · Fernkronen: a blossom or autumn crown (now cut too) lighter inside — petals pass the light; a soft glow of its
+  // own colour from the sun through it
+  float qNg = 1.0 - qGreen(alb);
+  col *= mix(1.0, mix(Q_LEAF_IN, 0.86, qNg), inner);
+  col += alb * sun * 0.16 * qNg * inner;
+  col = max(col, alb * (u_ambSky * 0.65 + u_sunColor * (0.12 * max(u_sunDir.y, 0.0))) * qNg);   // (run 1: the cut showed the cherry's inner faces near black)
+#else
   col *= mix(1.0, Q_LEAF_IN, inner);
+#endif
   float lit = clamp(dot(c.xyz, L) * 0.5 + 0.5, 0.0, 1.0);
   col *= mix(0.83, 1.06, lit) * mix(vec3(1.0), mix(vec3(0.89, 1.01, 1.14), vec3(1.06, 1.01, 0.87), lit), qGreen(alb));
   float rim = 1.0 - clamp(dot(c.xyz, V), 0.0, 1.0); rim = rim * rim * rim;
