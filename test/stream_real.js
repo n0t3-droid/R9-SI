@@ -37,7 +37,7 @@ global.Worker = class {
   step() {
     while (this.inbox.length && this.free <= SIM.now) {
       const it = this.inbox.shift(), m = it.m;
-      if (m.type === 'lodsim') { this.free = Math.max(this.free, SIM.now) + 40 * K; this.deliver({ type: 'lodsim', id: m.id, ms: 40 }); LOG.push({ t: SIM.now, k: 'lod', ms: 40 * K }); continue; }
+      if (m.type === 'lodsim') { const ms = m.ms || 40; this.free = Math.max(this.free, SIM.now) + ms * K; this.deliver({ type: 'lodsim', id: m.id, ms }); LOG.push({ t: SIM.now, k: 'lod', ms: ms * K }); continue; }
       if (typeof m === 'function') { const r = workerRun0(m); this.after(r, { type: 'park' }, it); continue; }
       const r = workerRun(m);
       this.after(r, m, it);
@@ -104,7 +104,12 @@ function fly(o) {
     // the far lane: tile jobs while flying (the horizon keeps a few queued)
     // (the horizon asks for ~5 tiles each time the camera has crossed a fifth of a 128-block tile, and the coarser levels
     // half as many each: about one 40 ms tile per 16 blocks of travel)
-    if (o.far && o.flying) while (o.farOwed >= 16) { o.farOwed -= 16; farQ++; pool.submit({ type: 'lodsim', lane: 1 }, null, () => { farQ--; }, 0); }
+    if (o.far && o.flying && !o.farBusy) while (o.farOwed >= 16) { o.farOwed -= 16; farQ++; pool.submit({ type: 'lodsim', lane: 1 }, null, () => { farQ--; }, 0); }
+    // p-stream3 · FARQ: the far lane as the browser's horizon keeps it in flight — always FARQ tiles asked for (its
+    // maxInflight 4 + 2 per worker), each costing what the browser's log showed (stream_low.mjs, Low at 80 m/s: 448 tiles,
+    // 23 ms mean in the worker: most 8–15 ms, a quarter ~40 ms, one in twenty 150–320 ms) — the far lane takes its whole
+    // share of the worker, as in the browser.
+    if (o.far && o.flying && o.farBusy && o.v >= 14) while (farQ < o.farBusy) { farQ++; const r = (o.farN = (o.farN || 0) + 1) * 0.6180339887 % 1; pool.submit({ type: 'lodsim', lane: 1, ms: r < 0.05 ? 150 + r * 3400 : r < 0.3 ? 40 : 11 }, null, () => { farQ--; }, 0); }
     pool.pump();
     const end = SIM.now + 33.3;
     while (true) {
@@ -183,10 +188,11 @@ if (require.main === module) {
   const EXP = { norest: () => { SP.REST = 1e9; }, c3: corr(+(process.env.W || 3.5), +(process.env.CAP || 0.8)) };
   EXP.nodet = (w) => { const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; const dr = w.detailReturn.bind(w); w.detailReturn = function (...a) { if (!this.planFast) dr(...a); }; };
   EXP.share5 = () => { SP.SHARE_MAX = 0.5; };
+  EXP.share3 = () => { SP.SHARE_MAX = SP.SHARE_BASE; };
   EXP.reach = () => { SP.REACH = +(process.env.REACH || 3); };
   EXP.c3nd = (w) => { EXP.c3(w); const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; };
   for (const rd of RDS) for (const v of SPEEDS) for (const si of DIRS) {
-    const r = fly({ rd, v, yaw: yawOf(si), secs: SECS, far: !process.env.NOFAR, farK: +(process.env.FARK || 1), setup: EXP[process.env.EXP] });
+    const r = fly({ rd, v, yaw: yawOf(si), secs: SECS, far: !process.env.NOFAR, farK: +(process.env.FARK || 1), farBusy: +(process.env.FARQ || 0), setup: EXP[process.env.EXP] });
     res[`${rd}_${v}_${si}`] = r;
     console.log(`rd ${rd} · ${v} m/s · dir ${si}: real ${r.real} % · ttv p90 ${r.ttvP90} ms (${r.ttvN}, missed ${r.missed}) · gens ${r.gens} · lat ${r.lat} · share ${r.share} · worker ms ${JSON.stringify(r.tot)} · worst 3 s at ${r.worst.t} s: ${r.worst.real} % ${JSON.stringify(r.worst.kinds)} ${r.worst.heavy.join(' | ')}`);
     console.log('   timeline (real % per s): ' + Array.from({ length: SECS }, (_, i) => { const a = r.rec.filter(x => x.t >= i && x.t < i + 1); return a.length ? Math.round(100 * a.reduce((s, x) => s + x.real, 0) / a.length) : '-'; }).join(' '));
