@@ -1330,7 +1330,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
   rough = mix(rough, 0.03, pud);                          // a puddle is a mirror
 #if defined(Q_PLAZA) && !defined(MODEL)
-  if (face == 2u && qPlazaL(layer)) alb.rgb = qPlaza(alb.rgb, v_localPos + vec3(u_camInt));   // q-art · Platzbelag (qart.js)
+  if (face == 2u && qPlazaL(layer, v_localPos.y + float(u_camInt.y))) alb.rgb = qPlaza(alb.rgb, v_localPos + vec3(u_camInt));   // q-art · Platzbelag (qart.js)
 #endif
   alb.rgb *= (1.0 + dAlb) * (1.0 - 0.55 * pud);
   float emis = mat.a;

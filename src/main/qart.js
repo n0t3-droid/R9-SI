@@ -114,6 +114,16 @@
     }
     return [...out].sort((a, b) => a - b).slice(0, 24);
   };
+  // the voxel blocks' shared surfaces (voxarch.js: every vx block — the plaza's vx_floor_plaza among them — is drawn from
+  // these few layers, its colour per voxel in the tint; browser run 2's probe: the plaza is a VOXEL block, its block
+  // layer never drawn): only their top faces at a block's full height count as floor (QA.vxFloor)
+  QA.PLAZA_VX = ['vx_tile', 'vx_tile_gloss', 'vx_smooth', 'vx_smooth_gloss', 'vx_mat_marble', 'vx_mat_stone'];
+  QA.plazaVxLayers = function () {
+    const R = VR.R; if (!R || !R.texIndex) return [];
+    return QA.PLAZA_VX.map(n => R.texIndex[n]).filter(l => l > 0).sort((a, b) => a - b);
+  };
+  // a voxel top face at world height y is a floor when it lies on the block grid (a full block's top, not a table's)
+  QA.vxFloor = (y) => Math.abs(y - Math.round(y)) < 0.01;
 
   // ---------------------------------------------------------------- Farbdrehbuch: the day's colour script
   // linear HDR before the exposure, as env.js's VR.Sky: hor (the horizon's haze), mid (the blue), zen (the top);
@@ -150,8 +160,8 @@
     if (q.qPlaza && name === 'terrain') {
       // (the floors' layers as a macro made when the program is built: the registry's tex table is not there yet when
       //  shaders.js makes its text at load)
-      const lay = QA.plazaLayers();
-      out.push('Q_PLAZA', 'Q_PLAZA_L(l) (' + (lay.length ? lay.map(x => 'l == ' + x.toFixed(1)).join(' || ') : 'false') + ')');
+      const lay = QA.plazaLayers(), vx = QA.plazaVxLayers(), or = (a) => (a.length ? a.map(x => 'l == ' + x.toFixed(1)).join(' || ') : 'false');
+      out.push('Q_PLAZA', 'Q_PLAZA_L(l) (' + or(lay) + ')', 'Q_PLAZA_V(l) (' + or(vx) + ')');
     }
     return out;
   };
@@ -213,7 +223,7 @@ vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
 #endif
 #if defined(Q_PLAZA) && !defined(MODEL)
 // q-art · Platzbelag (qart.js QA.plazaLum): the light floors to a warm stone mid-tone, slabs, wear, joints
-bool qPlazaL(float l) { return Q_PLAZA_L(l); }
+bool qPlazaL(float l, float y) { return Q_PLAZA_L(l) || (Q_PLAZA_V(l) && abs(y - floor(y + 0.5)) < 0.01); }
 vec3 qPlaza(vec3 a, vec3 w) {
   float l = dot(a, vec3(0.2126, 0.7152, 0.0722)) + 1e-4;
   float lt = l > ${f3(P.knee)} ? ${f3(P.knee)} + (l - ${f3(P.knee)}) * ${f3(P.keep)} : l;

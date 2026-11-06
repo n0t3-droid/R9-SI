@@ -103,13 +103,16 @@ try {
     N.cams.meadow = { E, T };
     // (r1: the spawn stands on a kit platform — the meadow view is made beside the wood instead, see there)
     if (want('cost')) {
+      // (q-art: a rebuilt program compiles in parallel and draws nothing until it is ready — wait for every one, run 3
+      //  measured half-empty frames)
+      const ready = async () => { for (let i = 0; i < 120; i++) { const n = await ev(() => { const g = VR.game; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); g.renderer.gl.finish(); window.__norender = true; return VR.GL.pending ? VR.GL.pending.size : 0; }); if (!n) return; await wait(250); } check(false, 'the programs compiled'); };
       const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
       for (const pr of ['potato', 'balanced', 'high']) {
         await preset(pr); await eyeAt(E, T, AFT); await settle(25);
         const r = { off: [], on: [] };
         // (q-art: a switch rebuilds the programs and SwiftShader compiles them at their first draw — warm up before each
         //  measurement, so neither side pays for a compile; browser run 2 measured the compile into 'on')
-        for (const c of ['off', 'on', 'on', 'off', 'off', 'on']) { await config(c); await ms(4); r[c].push(await ms(6)); }
+        for (const c of ['off', 'on', 'on', 'off', 'off', 'on']) { await config(c); await ready(); await ms(4); r[c].push(await ms(6)); }
         r.passes = {};
         for (const c of ['off', 'on']) { await config(c); r.passes[c] = await ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; }); }
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };

@@ -66,7 +66,7 @@ console.log('b · the shaders');
   check(QA.definesFor('terrainCut', on, true)[0] === 'Q_LEAF' && QA.definesFor('terrainCutZ', on, true)[0] === 'Q_LEAF' && QA.definesFor('terrain', on, true).includes('Q_PLAZA') && !QA.definesFor('terrainCut', on, true).includes('Q_PLAZA'), 'Laubkronen on the terrain programs (the cut-out and its depth pass alike), Platzbelag on the opaque terrain');
   check(QA.definesFor('terrainCut', on, false).length === 0 && ['sky', 'water', 'prop', 'folk', 'composite', 'shadow'].every(n => QA.definesFor(n, on, true).length === 0), 'no Laubkronen without fancy leaves; nothing on other programs');
   const pd = QA.definesFor('terrain', on, true).find(d => d.startsWith('Q_PLAZA_L(l) ('));
-  check(!!pd && /l == \d+\.0 \|\| l == /.test(pd) && !/Q_PLAZA_L|plazaLayers/.test(S1.TERRAIN_FS.replace('return Q_PLAZA_L(l);', '')), 'Platzbelag: the floors\' layers as a macro made when the program is built (not baked at load)', pd && pd.slice(0, 60));
+  check(!!pd && /l == \d+\.0 \|\| l == /.test(pd) && !/plazaLayers/.test(S1.TERRAIN_FS) && QA.definesFor('terrain', on, true).some(d => /^Q_PLAZA_V\(l\) \(l == \d/.test(d)), 'Platzbelag: the floors\' layers as a macro made when the program is built (not baked at load)', pd && pd.slice(0, 60));
   const t = pre(S1.TERRAIN_FS, ['CUTOUT', 'LIGHT2', 'L2AO', 'Q_LEAF', 'Q_PLAZA']);
   check(t.includes('vec4 qClump(') && t.includes('bool qCut(') && t.includes('qC = qClump(') && t.includes('col = qCanopy(') && t.includes('alb.rgb = qPlaza('), 'on: the functions and their calls');
   const z = pre(S1.TERRAIN_FS, ['CUTOUT', 'ZPRE', 'ZINV', 'Q_LEAF']);
@@ -113,6 +113,7 @@ console.log('c · the mirrors');
   }
   check(all4 < 2000 * 0.12 && some > 2000 * 0.4, 'each block\'s corner on its own: rarely all four round a vertex (no \'+\' holes in a flat wall)', all4 + ' of 2000 all four, ' + some + ' some');
   check(far === 0, 'nothing cut far away (no shimmer past ' + QA.LEAF.far[1] + ' m)');
+  check(QA.vxFloor(81) && QA.vxFloor(80.996) && !QA.vxFloor(80.5) && !QA.vxFloor(80.9375), 'Platzbelag on the voxel blocks: a top at the block grid is floor, a table\'s top is not');
   check(QA.green([0.25, 0.55, 0.15]) === 1 && QA.green([0.95, 0.75, 0.85]) === 0 && QA.green([0.8, 0.35, 0.1]) === 0 && QA.green([0.8, 0.83, 0.9]) === 0, 'Laubkronen\'s cut and hue only on green crowns (blossom, autumn, frost keep theirs)');
   check(Math.abs(QA.plazaLum(0.7) - (0.3 + 0.4 * 0.38)) < 1e-9 && QA.plazaLum(0.2) === 0.2 && QA.plazaLum(0.9) < 0.55, 'Platzbelag: the light floors compressed to a mid-tone, the darker ones untouched');
   const E0 = () => ({ horizon: [0.3941, 0.6291, 0.7533], skyMid: [0.0247, 0.0885, 0.2516], zenith: [0.0022, 0.0038, 0.0273], skyStops: [0.39, 0.35, 0.6, 0.2], skySpace: [0.18, 0.42, 1, 0.8], ambSky: [0.36, 0.44, 0.66], fogColor: [0.3, 0.45, 0.6] });
