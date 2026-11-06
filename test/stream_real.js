@@ -8,7 +8,9 @@
 //   and the worker log: job kind, chunk, ms, queue age — the stretches with no real terrain are explained from it.
 //   bash test/wt_run.sh stream_real.js 1200     ·  env: K (1.2) · SPEEDS (80) · RD (6) · DIRS (0,1,2,3) · SECS (24)
 //   PROFILE=1: only the per-column generation cost along each path (no flight)
-// Checks: at 80 m/s the cone ahead is ≥ 85 % real on Low (rd 6) and Very Low (rd 4) in every direction's steady part.
+// Checks: at 80 m/s the cone ahead is ≥ 85 % real on Low (rd 6) and Very Low (rd 4) (mean of the directions' steady part);
+// walking 5 m/s the columns coming into view are there within 1 s (p90).
+// regress: skip  (a benchmark in measured time: under a loaded machine every job takes longer — run it alone)
 const V = require('./load_shared.js');
 global.window = undefined;
 require('../src/main/gl.js'); require('../src/main/shaders.js'); require('../src/main/ultralite.js'); require('../src/main/renderer.js');
@@ -169,7 +171,7 @@ function fly(o) {
 }
 module.exports = { fly, SPAWN, yawOf, LOG };
 if (require.main === module) {
-  const SPEEDS = (process.env.SPEEDS || '80').split(',').map(Number), SECS = +(process.env.SECS || 24);
+  const SPEEDS = (process.env.SPEEDS || '80,5').split(',').map(Number), SECS = +(process.env.SECS || 24);
   const RDS = (process.env.RD || '6,4').split(',').map(Number);
   const res = {};
   const SP = V.StreamPlan, W0 = SP.worth;
@@ -190,5 +192,6 @@ if (require.main === module) {
     const all = DIRS.map(si => res[`${rd}_${v}_${si}`].real), m = all.reduce((a, b) => a + b, 0) / all.length;
     check(m >= 85, `rd ${rd} · ${v} m/s: the cone ahead real ≥ 85 % (mean of the directions)`, all.join(' / ') + ' → ' + m.toFixed(1));
   }
+  for (const rd of RDS) if (SPEEDS.includes(5)) { const p = DIRS.map(si => res[`${rd}_5_${si}`].ttvP90); check(Math.max(...p) <= 1000, `rd ${rd} · walking 5 m/s: the land coming into view is there within 1 s (p90)`, p.join(' / ') + ' ms'); }
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 }

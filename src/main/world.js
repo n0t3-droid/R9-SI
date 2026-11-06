@@ -325,7 +325,7 @@
       }
       this.lastPos = [px, py, pz, now];
       const speed = Math.hypot(this.mvx || 0, this.mvz || 0);
-      const ahead = speed > 2 ? Math.min(rd * 0.5, speed * 1.6 / 16) : 0;   // chunks of look-ahead (1.6 s of travel)
+      const ahead = speed > 2 ? Math.max(this.streamPlan ? 1 : 0, Math.min(rd * 0.5, speed * 1.6 / 16)) : 0;   // chunks of look-ahead (1.6 s of travel; p-stream2: at least one chunk with the plan — at a walk the rim ahead is meshed before it comes into view)
       const ux = ahead ? (this.mvx / speed) : 0, uz = ahead ? (this.mvz / speed) : 0;
       const lcx = Math.round(pcx + ux * ahead), lcz = Math.round(pcz + uz * ahead);
       this.loadCenter = [lcx, lcz];
