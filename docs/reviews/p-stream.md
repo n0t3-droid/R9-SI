@@ -91,4 +91,37 @@ thread), a finer far-tile level near the camera (lod.js/horizon.js: the next ste
 
 ## 4 · Before / after
 
-RESULTS_TABLE
+Browser run 3 (`SLOW=3 bash test/wt_run.sh stream_low.mjs`, both builds in one browser, alternating; ALL OK). Time to
+visible = from a column entering the view cone (inside the render distance, not shown) until it is shown; "never" = it
+left the cone unshown; real = share of the cone ahead (screen-weighted) drawn with real chunks; void = neither chunk nor
+far tile (a hole); made / never shown = columns generated in the 30 s / of them unloaded unseen; hitches = streaming
+ticks over 16 ms (max).
+
+| preset | m/s | time to visible med/p90 ms | never % | real % | void % | columns made | never shown | hitches (max ms) |
+|---|---|---|---|---|---|---|---|---|
+| Niedrig | 5 | 814/3820 → **496/943** | 13 → 4 | 99.9 → **100** | 0 → 0 | 160 → 166 | 43 → 45 | 0 → 0 (12.2 → 15.6) |
+| Niedrig | 20 | 393/523 → **367/473** | 0 → 0 | 100 → **100** | 0 → 0 | 610 → 544 | 94 → 92 | 1 → 1 (20.1 → 23.2) |
+| Niedrig | 40 | 262/732 → **393/764** | 22 → 38 | 99.7 → **100** | 0 → 0 | 1187 → 1000 | 212 → 206 | 2 → 1 (46.7 → 81.6) |
+| Niedrig | 80 | 624/884 → **263/648** | 86 → 74 | 31.3 → **53.2** | 0 → 0 | 1371 → 1028 | 637 → 440 | 3 → 3 (23.7 → 59.5) |
+| Sehr niedrig | 5 | 859/4013 → **607/1222** | 14 → 4 | 99.7 → **99.9** | 0 → 0 | 140 → 147 | 41 → 43 | 1 → 2 (37.2 → 23.2) |
+| Sehr niedrig | 20 | 364/655 → **503/720** | 9 → 0 | 100 → **100** | 0 → 0 | 540 → 483 | 94 → 93 | 0 → 1 (8.1 → 28.8) |
+| Sehr niedrig | 40 | 767/1165 → **206/369** | 35 → 33 | 95.1 → **100** | 0 → 0 | 1027 → 887 | 242 → 201 | 1 → 1 (19.8 → 52.8) |
+| Sehr niedrig | 80 | 440/672 → **263/628** | 96 → 69 | 3.1 → **66.1** | 0 → 0 | 1550 → 1053 | 918 → 430 | 1 → 4 (65.2 → 130.6) |
+
+(Low 40 m/s: only 79 columns came into the cone unshown after, 488 before — the few left are slower, hence the median.)
+
+- **Walking: the land coming into view is there 3–4 × sooner** (p90 3.8 → 0.9 s Low, 4.0 → 1.2 s Very Low); columns that
+  left the cone unshown 13–14 % → 4 % (the rim).
+- **Fast flight: up to 21 × more real terrain ahead** at 80 m/s (Very Low 3 → 66 %, Low 31 → 53 %), 100 % at 40 m/s on both,
+  with 25–32 % fewer columns made and half the wasted ones (Very Low 918 → 430 never shown).
+- **No holes** before or after (void 0 %). Streaming tick median equal or lower (Low 1.8 → 1.7 ms at 40 m/s, 0.9 → 0.7 at
+  20); the over-16-ms count is unchanged within noise, single maxima vary both ways (both builds 50–130 ms once in a while;
+  two other agents' browsers share the 2 CPUs).
+- Very Low standing still: unchanged (frame_cost, vl_budget, vl_programs ALL OK; the bigger rim disk holds ~20 more columns
+  that are never meshed or drawn).
+- Pictures: `test/shots/stream_sheet.jpg` — the charts (real terrain over the 30 s, walk time-to-visible, wasted columns)
+  carry the mid-flight state; the pictures below them are drawn seconds after the flight stopped (software frames), when
+  the old build has caught up, so they look alike.
+- SLOW=3 holds each answer back 2 × its time; with two job slots per worker that is ≈ 1.5 × slower, not 3 × (see the
+  self-review). Run 1 (SLOW = 1, before only) gave the same picture as the before column here.
+
