@@ -32285,6 +32285,90 @@ if(frameMs<targetMs*0.7)return Math.max(0,r-1);
 return Math.max(0,Math.min(2,r));
 };
 S.streamScale=function(rung){return[1,0.5,0.25][Math.max(0,Math.min(2,rung|0))];};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{
+const SP=VR.StreamPlan={};
+SP.RIM=0.5+Math.SQRT2;
+SP.FAST=14;
+SP.KEEP=1.5;
+SP.WORTH=1.5;
+SP.MARGIN=1.5;
+SP.OUT_K=2.5;
+SP.SHARE_BASE=0.3;
+SP.SHARE_MAX=0.7;
+SP.BEHIND_K=1.5;
+SP.LAT0=1.0;SP.LAT_MIN=0.15;SP.LAT_MAX=8;
+const clamp=(x,a,b)=>(x<a?a:x>b?b:x);
+SP.moving=(speedB)=>speedB>=SP.FAST;
+
+
+SP.timeLeft=function(ex,ez,ux,uz,spC,cotH){
+const a=ex*ux+ez*uz+SP.MARGIN,l=Math.max(0,Math.abs(ex*uz-ez*ux)-SP.MARGIN);
+return spC>1e-6?(a-l*cotH)/spC:Infinity;
+};
+
+SP.worth=function(ex,ez,ux,uz,speedB,lat,cotH){
+if(!(speedB>=SP.FAST))return true;
+if(ex*ex+ez*ez<=SP.KEEP*SP.KEEP)return true;
+return SP.timeLeft(ex,ez,ux,uz,speedB/16,cotH)>=SP.WORTH*lat;
+};
+
+
+
+
+
+
+SP.REST=1.5;
+SP.ease=function(lat){return Math.max(SP.LAT_MIN,lat*0.998);};
+SP.rest=function(speedB,lat,rd){return speedB>=SP.FAST&&(speedB/16)*lat>rd*SP.REST;};
+
+SP.prio=function(ex,ez,ux,uz,ahead,cosH){
+const d2=ex*ex+ez*ez,along=ahead?Math.max(0,ex*ux+ez*uz):0;
+let p=d2-along*along*0.5;
+if(ahead&&d2>2){const c=(ex*ux+ez*uz)/Math.sqrt(d2);if(c<cosH)p=p*SP.OUT_K+4;}
+return p;
+};
+
+SP.lat=function(prev,sample){const p=prev>0?prev:SP.LAT0;return clamp(p+(sample-p)*0.15,SP.LAT_MIN,SP.LAT_MAX);};
+
+
+SP.share=function(speedB,lat,rd){
+if(!(speedB>=SP.FAST))return SP.SHARE_BASE;
+const def=(speedB/16)*lat/Math.max(1,rd*0.5);
+return SP.SHARE_BASE+(SP.SHARE_MAX-SP.SHARE_BASE)*clamp((def-0.5)/1.5,0,1);
+};
+
+SP.tileK=function(cx,cz,S,camX,camZ,ux,uz,speedB){
+if(!(speedB>=SP.FAST))return 0;
+const dx=cx-camX,dz=cz-camZ,d=Math.hypot(dx,dz);
+if(d<S)return 0;
+const c=(dx*ux+dz*uz)/d;
+return c<0?SP.BEHIND_K* -c*2:0;
+};
+}
 })(VR);
 
 
@@ -68193,6 +68277,8 @@ VR.I18N.add('en',{
 'g.set.farCache.tip':'The sky and the far land come from a cache and turn with your view — redrawn only after 1.5 m, a 4° turn or half a second, spread over four frames.',
 'g.set.shadowTakt':'Shadow takt (shadows redrawn only where something changes)',
 'g.set.shadowTakt.tip':'The shadow map is kept up to date in tiles: near ones every frame, far ones less often; when the sun moves on, the new map is drawn over six frames. The same shadows, far less work.',
+'g.set.streamPlan':'Fast flight: the world ahead first',
+'g.set.streamPlan.tip':'In fast flight only land you will still see when it is ready is generated; the coarse far view fills the way ahead first, so no holes appear.',
 'g.set.streamTakt':'World in step (loading takes only what the frame leaves over)',
 'g.set.streamTakt.tip':'New land is fitted in during the frame instead of between frames, never longer than the frame has time for and at most 2 MB a frame; what you leave behind is no longer generated.',
 'g.set.reflLite':"Light mirror (the water's mirror at a quarter size, edges kept sharp)",
@@ -72984,6 +73070,8 @@ VR.I18N.add('de',{
 'g.set.farCache.tip':'Himmel und fernes Land kommen aus einem Zwischenspeicher und wandern mit dem Blick mit — neu gezeichnet erst nach 1,5 m, 4° Drehung oder einer halben Sekunde, verteilt auf vier Bilder.',
 'g.set.shadowTakt':'Schatten-Takt (Schatten nur dort neu, wo sich etwas ändert)',
 'g.set.shadowTakt.tip':'Die Schattenkarte bleibt in Kacheln aktuell: nah jedes Bild, weiter weg seltener; wandert die Sonne, entsteht die neue Karte über sechs Bilder. Dieselben Schatten, viel weniger Arbeit.',
+'g.set.streamPlan':'Schnell fliegen: Welt voraus zuerst',
+'g.set.streamPlan.tip':'Im schnellen Flug wird nur noch Land erzeugt, das du noch sehen wirst, wenn es fertig ist; die grobe Fernsicht füllt den Weg voraus zuerst, damit keine Löcher entstehen.',
 'g.set.streamTakt':'Welt im Takt (das Laden nimmt sich nur, was das Bild übrig lässt)',
 'g.set.streamTakt.tip':'Neue Landstücke werden im Bild eingebaut statt dazwischen, nie länger als das Bild Zeit hat und höchstens 2 MB pro Bild; was hinter dir zurückbleibt, wird nicht mehr erzeugt.',
 'g.set.reflLite':'Spiegelung leicht (Wasserspiegel kleiner gerechnet, Kanten scharf)',
