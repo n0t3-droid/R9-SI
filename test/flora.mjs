@@ -3,7 +3,8 @@
 // blossom tree, the Traumbaum (a wonder spot), the glow ring by day and at night, a wide vista over the Traumbaum's
 // meadow — and the cost of the meadow and the Traumbaum views on High and on Very Low.
 //   The poses come from test/flora_preview.js (node: the places found in the generated chunks → test/shots/flora_views.json).
-//   The world streams as critic_photo.mjs waits for it: every column within the view distance generated, meshed, shown
+//   View distance 6 (the vista stands 72 blocks from the Traumbaum: inside it); a drawn frame ends in gl.finish (run 5
+//   queued drawn frames into a GPU backlog: the screenshots timed out). The world streams as critic_photo.mjs waits for it: every column within the view distance generated, meshed, shown
 //   and faded in (run 4 of the first try photographed the horizon's stand-ins: its wait looked at 7 × 7 columns only).
 // Pictures test/shots/flora_<view>_v<16|17>.png, costs test/shots/flora_cost_16_17.json.
 //   nohup bash test/wt_run.sh flora.mjs 3600 > .tmp_tests/flora.log 2>&1 &
@@ -32,7 +33,7 @@ for (const vg of VG) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title').catch(() => false)) break; }
   await ev(() => { const r = VR.game.renderer; if (!r._render) { r._render = r.render; r.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } });
-  const step = async (n, dtms = 33, draw = false) => { for (let k = 0; k < n; k += 10) { await ev(([m, d, draw]) => { const g = VR.game; window.__norender = !draw; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } window.__norender = true; }, [Math.min(10, n - k), dtms, draw]); await wait(4); } };
+  const step = async (n, dtms = 33, draw = false) => { for (let k = 0; k < n; k += 10) { await ev(([m, d, draw]) => { const g = VR.game; window.__norender = !draw; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } if (draw) g.renderer.gl.finish(); window.__norender = true; }, [Math.min(10, n - k), dtms, draw]); await wait(4); } };
   const boost = (on) => ev((on) => { const q = VR.game.renderer && VR.game.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
   // critic_photo.mjs's wait: within the view distance every column shown, nothing pending, uploading, fading or arriving
   const settle = async (maxS) => {
@@ -53,7 +54,7 @@ for (const vg of VG) {
   };
   const look = async (P) => {
     await ev(([c, yaw, pitch]) => { const pl = VR.game.player; pl.flying = true; pl.noclip = true; pl.teleport(c[0], c[1] - 1.62, c[2]); pl.yaw = yaw; pl.pitch = pitch; pl.viewYaw = yaw; pl.vel = [0, 0, 0]; }, [P.from, P.yaw, P.pitch]);
-    const s = await settle(420); console.log(`  settled in ${s.s} s (unshown ${s.unshown}, dirty ${s.dirty}, pend ${s.pend}) · ${secs()}`); return s;
+    const s = await settle(+(process.env.SETTLE || 300)); console.log(`  settled in ${s.s} s (unshown ${s.unshown}, dirty ${s.dirty}, pend ${s.pend}) · ${secs()}`); return s;
   };
   const shot = async (name) => {
     for (let k = 0; k < 2; k++) {
@@ -69,7 +70,7 @@ for (const vg of VG) {
     for (let k = 0; k < 5; k++) runs.push(await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); const t0 = performance.now(); for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; return (performance.now() - t0) / 6; }));
     return Math.min(...runs);
   };
-  await ev((rd) => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.storyOffer = false; g.applySettings('*'); }, +(process.env.RD || 8));
+  await ev((rd) => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = rd; g.settings.storyOffer = false; g.applySettings('*'); }, +(process.env.RD || 6));
   await ev(`VR.game.createWorld({name:'Flora',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '4242'}',cheats:true,kit:true,vgen:${vg}})`);
   for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   await ev(() => {

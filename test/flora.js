@@ -12,7 +12,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const nm = (s) => { const t = R.types[R.T.type[s]]; return t ? t.name : ''; };
-const PIN16 = '201fbe20', PIN17 = '399789b4';
+const PIN16 = '201fbe20', PIN17 = '399789b4', PINW = 'ca0e9315';
 
 // ---- a · the L-systems
 check(!!FL && typeof FL.expand === 'function', 'VR.Flora is there');
@@ -134,6 +134,13 @@ if (rings.length) {
     }
   }
   check(inRing <= 2 && inGiant <= 2, `the wonder spots stand in a calm meadow (${inRing} field flowers by the ring, ${inGiant} under the Traumbaum)`);
+}
+// vgen 17's reference for the wonder spots: the 3 × 3 chunks round Traumbaum 0 and glow ring 0 (CH misses them)
+{
+  let hw = 2166136261 >>> 0; const g = s17.g;
+  for (const G of [giants[0], rings[0]]) if (G) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) hw = fnv(hw, g.generate(Math.floor(G.x / 16) + dx, Math.floor(G.z / 16) + dz).blocks);
+  const hx = hw.toString(16).padStart(8, '0');
+  check(hx === PINW || process.env.PIN, `vgen 17's wonder spots are as pinned (${hx})`);
 }
 // ---- e · the wonder spots' life (landlife.js): the petals follow the season, the ring glows at night only
 try { require(__dirname + '/../src/main/landlife.js'); } catch (e) { }
