@@ -107,7 +107,9 @@ try {
       for (const pr of ['potato', 'balanced', 'high']) {
         await preset(pr); await eyeAt(E, T, AFT); await settle(25);
         const r = { off: [], on: [] };
-        for (const c of ['off', 'on', 'on', 'off', 'off', 'on']) { await config(c); r[c].push(await ms(6)); }
+        // (q-art: a switch rebuilds the programs and SwiftShader compiles them at their first draw — warm up before each
+        //  measurement, so neither side pays for a compile; browser run 2 measured the compile into 'on')
+        for (const c of ['off', 'on', 'on', 'off', 'off', 'on']) { await config(c); await ms(4); r[c].push(await ms(6)); }
         r.passes = {};
         for (const c of ['off', 'on']) { await config(c); r.passes[c] = await ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; }); }
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };
@@ -140,6 +142,9 @@ try {
           const sun = await ev(() => VR.game.env.E.sunDir.slice()), ang = Math.atan2(sun[2], sun[0]) + 0.9;
           const E = [a[0] + Math.cos(ang) * 2.3, a[1] + 1.45, a[2] + Math.sin(ang) * 2.3], T = [a[0], a[1] + 0.75, a[2]];
           N.cams['person_' + pr] = { E, T };
+          // (q-art: what the people stand on — the plaza's block, its top layer, the floors' layers, the terrain's define)
+          N.floor = await ev((a) => { const g = VR.game, w = g.world, R = VR.R, x = Math.floor(a[0]), z = Math.floor(a[2]); const out = []; for (let y = Math.floor(a[1]) + 1; y >= Math.floor(a[1]) - 2; y--) { const s = w.getBlock(x, y, z); const t = s ? R.types[R.T.type[s]] : null; out.push([y, t ? t.name : 'air', s ? (R.T.tex[s * 6 + 2] & 4095) : -1]); } VR.QArt.use(g.renderer.q); return { col: out, layers: VR.QArt.plazaLayers(), def: VR.GL.defineHook('terrain', []).filter(d => /^Q_/.test(d)).map(d => d.slice(0, 40)), q: g.renderer.q.qPlaza }; }, a);
+          console.log('     floor ' + JSON.stringify(N.floor));
           for (const c of ['off', 'on']) { N.q[pr + '_' + c] = await config(c); await eyeAt(E, T, LATE); await run(2); await grab('person_' + pr + '_' + c, LATE); }
         } else check(false, 'a villager');
         await ev(() => { const V = VR.game.villages; if (V._xUpd) { V.update = V._xUpd; delete V._xUpd; } });

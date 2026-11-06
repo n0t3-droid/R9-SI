@@ -1143,7 +1143,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
-  if (qLeafF() && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art · Laubkronen: the ragged corners (qart.js QA.cut)
+  if (qLeafF() && qGreen(alb.rgb * v_tint) > 0.5 && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art · Laubkronen: the ragged corners (qart.js QA.cut)
 #endif
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)

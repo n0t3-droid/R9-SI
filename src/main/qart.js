@@ -77,6 +77,9 @@
     const nl = Math.hypot(nn[0], nn[1], nn[2]) || 1;
     return [nn[0] / nl, nn[1] / nl, nn[2] / nl, -Math.log(acc) / L.k];
   };
+  // how green a leaf colour is (0 … 1): the cut and the hue's shift only on green crowns — blossom, autumn and frosted
+  // leaves keep their colour and their blocks (browser run 2: the cherry's pink went beige, the cuts showed its dark inside)
+  QA.green = (c) => clamp((c[1] - Math.max(c[0], c[2])) / Math.max(c[1], 1e-3) * 6, 0, 1);
   // the in-plane coordinates of a face (face 0/1 ±x, 2/3 ±y, 4/5 ±z): [u, v, the plane]
   QA.plane = (w, face) => (face <= 1 ? [w[1], w[2], w[0]] : face <= 3 ? [w[2], w[0], w[1]] : [w[0], w[1], w[2]]);
   // is the leaf face's fragment at world w cut away? (dist: from the eye, m)
@@ -165,6 +168,7 @@
     return `
 #if defined(Q_LEAF) && !defined(MODEL)
 // q-art · Laubkronen (qart.js QA.clump, QA.cut): a waving leaf face (the leaf bit, no sway level, no glass frame)
+float qGreen(vec3 c) { return clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3) * 6.0, 0.0, 1.0); }
 bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u; }
 // the clump field: xyz the blended clumps' normal, w the signed distance (negative inside)
 vec4 qClump(vec3 p) {
@@ -199,7 +203,7 @@ vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
   float inner = smoothstep(${f3(QA.LEAF.inR[0])}, ${f3(QA.LEAF.inR[1])}, c.w);
   col *= mix(1.0, Q_LEAF_IN, inner);
   float lit = clamp(dot(c.xyz, L) * 0.5 + 0.5, 0.0, 1.0);
-  col *= mix(vec3(0.74, 0.84, 0.95), vec3(1.12, 1.07, 0.92), lit);
+  col *= mix(0.83, 1.06, lit) * mix(vec3(1.0), mix(vec3(0.89, 1.01, 1.14), vec3(1.06, 1.01, 0.87), lit), qGreen(alb));
   float rim = 1.0 - clamp(dot(c.xyz, V), 0.0, 1.0); rim = rim * rim * rim;
   float back = clamp(dot(-V, L), 0.0, 1.0); back *= back; back *= back;
   col += alb * sun * vec3(1.0, 1.0, 0.55) * (rim * 0.35 + back * 0.45 * (1.0 - inner));
