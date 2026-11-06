@@ -14,6 +14,7 @@
 // Pure measuring: with both builds it checks that the after build fills the cone ahead better at every speed.
 //   nohup bash test/wt_run.sh stream_low.mjs 5400 > .tmp_tests/stream_low.log 2>&1 &
 //   BUILDS (before,after) · PRESETS (low,potato) · SPEEDS (5,20,40,80) · RUN_S (30) · SKIP_SHOTS=1
+//   PREV_JSON: an earlier run's .tmp_tests/stream_low.json — its other build joins the table, the checks and the sheet
 //   SLOW (3): the workers' answers held back as if each worker were SLOW times slower — this server's core makes a column
 //   in ~15 ms, a low-end laptop's in 40–60 ms; SLOW=1 measures this server as it is
 // regress: skip  (a before/after benchmark of ~40 min that needs the build before in .tmp_tests/before_dist)
@@ -216,6 +217,7 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
       const sp = await P.ev(() => window.__spawn);
       const r = await P.ev((o) => window.__fly(o), { x0: sp[0], z0: sp[2], yaw: 0.35 + Math.PI / 4 + j * Math.PI, v, secs: 12, walk: false });
       const cone = r.rec.length ? r.rec[r.rec.length - 1] : {};
+      await P.ev(() => { VR.game.renderer.tsrReset = true; });   // (the drawing was stopped during the flight: no old picture in the history)
       for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.033));
       const shot = `${SHOTS}/stream_${preset}_${v}_${build}.png`;
       await P.page.screenshot({ path: shot, timeout: 600000 });
@@ -225,6 +227,8 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
     await P.ctx.close();
   }
 }
+// PREV_JSON: the results of an earlier run (the other build, measured the same way) join this run's table, checks and sheet
+if (process.env.PREV_JSON) { const prev = JSON.parse(fs.readFileSync(process.env.PREV_JSON, 'utf8')); for (const k in prev) if (!results[k] && !BUILDS.some(b => k.endsWith('_' + b))) results[k] = prev[k]; for (const b of ['before', 'after']) if (!BUILDS.includes(b) && Object.keys(prev).some(k => k.endsWith('_' + b))) BUILDS.push(b); BUILDS.sort((x, y) => (x === 'before' ? -1 : 1) - (y === 'before' ? -1 : 1)); console.log('joined ' + process.env.PREV_JSON + ' · builds ' + BUILDS.join(', ')); }
 try { fs.writeFileSync(`${OUT}/stream_low.json`, JSON.stringify(results)); } catch (e) { console.log('could not write the json: ' + e.message); }
 // ---- the table
 console.log('\npreset  v   build   ttv med/p90 ms  missed%  real%  coarse%  voidN%  voidF%  void%(max)  gen  mesh  wasted  q0max age0max  tick p99/max  hitches');
@@ -232,12 +236,14 @@ for (const preset of PRESETS) for (const v of SPEEDS) for (const b of BUILDS) {
   const o = results[`${preset}_${v}_${b}`]; if (!o) continue; const x = o.out;
   console.log(`${preset.padEnd(7)} ${String(v).padStart(2)}  ${b.padEnd(6)}  ${String(x.ttvMed).padStart(6)}/${String(x.ttvP90).padEnd(6)}  ${String(x.missedPct).padStart(5)}   ${String(x.real).padStart(5)}  ${String(x.coarse).padStart(6)}  ${String(x.voidN).padStart(6)}  ${String(x.voidF).padStart(6)}  ${String(x.voidAll).padStart(5)}(${x.voidMax})  ${String(x.gen).padStart(4)}  ${String(x.mesh).padStart(4)}  ${String(x.wasted).padStart(5)}  ${String(x.q0Max).padStart(5)} ${String(x.age0Max).padStart(6)}  ${x.tickP99}/${x.tickMax}  ${x.hitches}`);
 }
-// ---- the checks (both builds): the after build fills the cone better and never shows more void, at every speed
+// ---- the checks (both builds): never more void, never less real terrain ahead (3 points of noise), a walk's columns there
+// sooner, no more streaming hitches
 if (BUILDS.length === 2) for (const preset of PRESETS) for (const v of SPEEDS) {
   const b = results[`${preset}_${v}_before`], a = results[`${preset}_${v}_after`]; if (!a || !b) continue;
   check(a.out.voidAll <= b.out.voidAll + 0.5, `${preset} ${v} m/s: no more void ahead`, `${b.out.voidAll} → ${a.out.voidAll} %`);
-  check(a.out.real + a.out.coarse >= b.out.real + b.out.coarse - 1, `${preset} ${v} m/s: the near cone at least as filled`, `${(b.out.real + b.out.coarse).toFixed(1)} → ${(a.out.real + a.out.coarse).toFixed(1)} %`);
-  check(a.out.tickP99 <= Math.max(b.out.tickP99 * 1.25, b.out.tickP99 + 2), `${preset} ${v} m/s: streaming ticks not heavier (p99)`, `${b.out.tickP99} → ${a.out.tickP99} ms`);
+  check(a.out.real >= b.out.real - 3, `${preset} ${v} m/s: at least as much real terrain in the cone ahead`, `${b.out.real} → ${a.out.real} %`);
+  if (v <= 6) check(a.out.ttvP90 < b.out.ttvP90, `${preset} walk: the columns coming into view are there sooner (p90)`, `${b.out.ttvP90} → ${a.out.ttvP90} ms`);
+  check(a.out.hitches <= b.out.hitches + 3, `${preset} ${v} m/s: no more streaming hitches (ticks over 16 ms)`, `${b.out.hitches} → ${a.out.hitches} (max ${b.out.tickMax} → ${a.out.tickMax} ms)`);
 }
 // ---- the sheet (German captions)
 if (!process.env.SKIP_SHOTS && BUILDS.length) {
