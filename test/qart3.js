@@ -30,7 +30,7 @@ const P = (x, y, z) => (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
 
 if (RC && RC.solver) {
   // a  a 6 × 5 × 6 crown at [4,10) × [6,11) × [4,10)
-  const j = job(4, 10, 6, 11, 4, 10, 2), S = RC.solver(j.blocks, V.R.T.flags), v = [0, 0, 0];
+  const j = job(4, 10, 6, 11, 4, 10, 2), bump0 = RC.bump; RC.bump = 0; const S = RC.solver(j.blocks, V.R.T.flags), v = [0, 0, 0];
   // the vertex of the dual cell at the box's top corner (corner point (10, 11, 10) → cell (9, 10, 9))
   S.vert(9, 10, 9, v);
   const dc = Math.hypot(v[0] - 10, v[1] - 11, v[2] - 10);
@@ -41,12 +41,20 @@ if (RC && RC.solver) {
   // an edge middle (point (7, 11, 10) → cell (6, 10, 9)): in from both faces
   S.vert(6, 10, 9, v);
   check(v[1] < 10.9 && v[2] < 9.9, 'a crown edge is rounded', v.map(a => a.toFixed(2)).join(','));
+  RC.bump = bump0;
+  // the leaf clumps: with the bump the crown's vertices swell and dip (world noise), never by more than the bump
+  { let mx = 0, mn = 9, n = 0; const p = [0, 0, 0];
+    // (the solver shares its scratch: compare one at a time)
+    const flat = []; RC.bump = 0; const S0 = RC.solver(j.blocks, V.R.T.flags, true, 0, 64, 0); for (let y = 5; y <= 10; y++) for (let z = 3; z <= 9; z++) for (let x = 3; x <= 9; x++) flat.push(S0.vert(x, y, z, [0, 0, 0]));
+    RC.bump = bump0; const S1 = RC.solver(j.blocks, V.R.T.flags, true, 0, 64, 0); let k = 0;
+    for (let y = 5; y <= 10; y++) for (let z = 3; z <= 9; z++) for (let x = 3; x <= 9; x++) { S1.vert(x, y, z, p); const f = flat[k++]; const d = Math.hypot(p[0] - f[0], p[1] - f[1], p[2] - f[2]); if (d > 1e-6) { n++; mx = Math.max(mx, d); mn = Math.min(mn, d); } }
+    check(n > 20 && mx <= RC.bump * 1.01 + 1e-6, 'leaf clumps: the crown swells and dips, at most the bump', n + ' vertices, ≤ ' + mx.toFixed(2)); }
   // watertight: a crown across the border x = 16 — the cells on the border from both sections alike
   const jA = job(12, 20, 6, 11, 4, 10, 2), jB = job(-4, 4, 6, 11, 4, 10, 2);
-  const SA = RC.solver(jA.blocks, V.R.T.flags), a = [0, 0, 0], b = [0, 0, 0];
+  const SA = RC.solver(jA.blocks, V.R.T.flags, true, 0, 64, 0), a = [0, 0, 0], b = [0, 0, 0];
   const vertsA = [];
   for (let y = 5; y <= 11; y++) for (let z = 3; z <= 10; z++) { SA.vert(15, y, z, a); vertsA.push(a.slice()); }
-  const SB = RC.solver(jB.blocks, V.R.T.flags);
+  const SB = RC.solver(jB.blocks, V.R.T.flags, true, 16, 64, 0);
   let worst = 0, k = 0;
   for (let y = 5; y <= 11; y++) for (let z = 3; z <= 10; z++) { SB.vert(-1, y, z, b); const A = vertsA[k++]; worst = Math.max(worst, Math.abs(A[0] - 16 - b[0]), Math.abs(A[1] - b[1]), Math.abs(A[2] - b[2])); }
   check(worst < 1e-5, 'watertight: the border cells the same from both sections', worst.toExponential(1));

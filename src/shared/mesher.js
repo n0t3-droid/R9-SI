@@ -186,11 +186,23 @@
   // were, its edges and corners round in by up to ~¾ block. A cell reads voxels −1 .. 16 and the blur one more, so both
   // sections at a border see the same neighbourhood (the pad of 2): the blob is watertight across sections.
   // Render only: the saved blocks, the generator, collision and the light stay the same.
-  const RC = VR.RoundCrown = { iso: 0.5, tMin: 0.22, tMax: 0.86 };
+  // bump: the crown's surface swells and dips along the field's outward normal by a smooth world-space noise (cells of
+  // `clump` blocks), so the blob reads as leaf clumps, not a smooth stone — only cells with leaves and no solid block
+  const RC = VR.RoundCrown = { iso: 0.5, tMin: 0.22, tMax: 0.86, bump: 0.42, clump: 2.6 };
+  const rcH = (x, y, z) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 1274126177); h = Math.imul(h ^ (h >>> 13), 1103515245); return ((h ^ (h >>> 16)) & 0xffff) / 65535; };
+  const rcS3 = (t) => t * t * (3 - 2 * t);
+  RC.noise = function (x, y, z) {   // smooth value noise in [0, 1], world block units
+    const c = RC.clump, X = x / c, Y = y / (c * 0.8), Z = z / c, x0 = Math.floor(X), y0 = Math.floor(Y), z0 = Math.floor(Z);
+    const fx = rcS3(X - x0), fy = rcS3(Y - y0), fz = rcS3(Z - z0);
+    let v = 0;
+    for (let i = 0; i < 8; i++) { const a = i & 1, b = (i >> 1) & 1, d = (i >> 2) & 1; v += rcH(x0 + a, y0 + b, z0 + d) * (a ? fx : 1 - fx) * (b ? fy : 1 - fy) * (d ? fz : 1 - fz); }
+    return v;
+  };
   const RC_F = new Float32Array(PSS * PS), RC_T = new Float32Array(PSS * PS), RC_O = new Uint8Array(PSS * PS);
   const RCN = 18, RC_V = new Float32Array(RCN * RCN * RCN * 3), RC_OK = new Uint8Array(RCN * RCN * RCN);
-  RC.solver = function (B, TF, leaves) {
-    const M = (leaves === false ? 0 : F.LEAVES) | F.OPAQUE, n = PSS * PS;
+  RC.solver = function (B, TF, leaves, ox, oy, oz) {
+    const M = (leaves === false ? 0 : F.LEAVES) | F.OPAQUE, n = PSS * PS, LV = F.LEAVES, OP = F.OPAQUE;
+    ox = ox | 0; oy = oy | 0; oz = oz | 0;
     for (let i = 0; i < n; i++) RC_O[i] = (TF[B[i]] & M) ? 1 : 0;
     // the blur, one axis at a time (an edge voxel keeps its own value along the cut axis)
     const pass = (src, dst, st, ax) => {
@@ -224,7 +236,22 @@
           sx += ax0 + (bx - ax0) * t + 0.5; sy += ay0 + (by - ay0) * t + 0.5; sz += az0 + (bz - az0) * t + 0.5; k++;
         }
         if (!k) { sx = cx + 1; sy = cy + 1; sz = cz + 1; k = 1; }
-        RC_V[ci * 3] = out[0] = sx / k; RC_V[ci * 3 + 1] = out[1] = sy / k; RC_V[ci * 3 + 2] = out[2] = sz / k; RC_OK[ci] = 1;
+        sx /= k; sy /= k; sz /= k;
+        // leaf clumps: a cell with leaves and no solid block swells or dips along the blurred field's falling gradient
+        if (RC.bump > 0 && leaves !== false) {
+          let lf = 0, op = 0, gx = 0, gy = 0, gz = 0;
+          for (let c = 0; c < 8; c++) {
+            const qx = cx + (c & 1), qy = cy + ((c >> 1) & 1), qz = cz + ((c >> 2) & 1), qi = P(qx, qy, qz), f = TF[B[qi]];
+            if (f & OP) op++; else if (f & LV) lf++;
+            const v = RC_T[qi]; gx += (c & 1) ? v : -v; gy += ((c >> 1) & 1) ? v : -v; gz += ((c >> 2) & 1) ? v : -v;
+          }
+          const gl = Math.hypot(gx, gy, gz);
+          if (lf && !op && gl > 1e-4) {
+            const a = (RC.noise(ox + sx, oy + sy, oz + sz) - 0.45) * 2 * RC.bump / gl;
+            sx -= gx * a; sy -= gy * a; sz -= gz * a;
+          }
+        }
+        RC_V[ci * 3] = out[0] = sx; RC_V[ci * 3 + 1] = out[1] = sy; RC_V[ci * 3 + 2] = out[2] = sz; RC_OK[ci] = 1;
         return out;
       },
     };
@@ -394,7 +421,7 @@
     // q-art3 · Runde Kronen: a leaf face whose corners are the blob's vertices (the cube face's winding, light, AO, uv); its
     // face index (the shader's normal and texture) the deformed quad's dominant axis
     function emitRoundQuad(buf, d, x, y, z, bi, b, fl, onlyMoved) {
-      if (!rcS) rcS = RC.solver(B, TF, roundOn);
+      if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
       facePosInto(d, x, y, z, x + 1, y + 1, z + 1);
       let moved = 0;
       for (let k = 0; k < 4; k++) { rcS.vert(FP[k * 3] - 1, FP[k * 3 + 1] - 1, FP[k * 3 + 2] - 1, rcV); rcP[k * 3] = rcV[0]; rcP[k * 3 + 1] = rcV[1]; rcP[k * 3 + 2] = rcV[2]; moved += Math.abs(rcV[0] - FP[k * 3]) + Math.abs(rcV[1] - FP[k * 3 + 1]) + Math.abs(rcV[2] - FP[k * 3 + 2]); }
@@ -638,7 +665,7 @@
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
         const bb = B[bi - PSS];
         if (groundOn && (TF[bb] & F.SMOOTH)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
-          if (!rcS) rcS = RC.solver(B, TF, roundOn);
+          if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
           const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;
           smKey = -1;   // (smC is smoothAt's cache)
