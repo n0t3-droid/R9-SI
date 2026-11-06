@@ -121,6 +121,20 @@ if (rings.length) {
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const c = g.generate(Math.floor(G.x / 16) + dx, Math.floor(G.z / 16) + dz); for (let i = 0; i < c.blocks.length; i++) if (nm(c.blocks[i]) === 'glowbell') glow++; }
   check(glow >= 10, `the glow ring stands (${glow} glowbells)`);
 }
+// the wonder spots stand in a calm meadow (the first pictures: the ring's pale bells drowned in a blue field): no field
+// flower within 11 blocks of a ring and 14 of a Traumbaum (the petals and the ring's own bells and clover are theirs)
+{
+  const g = s17.g, FIELDF = /tulip|poppy|daisy|cornflower|allium|bluet|dandelion|candle_flower|umbel_flower|bell_tower/;
+  let inRing = 0, inGiant = 0;
+  for (const [G, rr] of [[rings[0], 11], [giants[0], 14]]) {
+    if (!G) continue;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const cx = Math.floor(G.x / 16) + dx, cz = Math.floor(G.z / 16) + dz, c = g.generate(cx, cz);
+      for (let i = 0; i < c.blocks.length; i++) { if (!c.blocks[i] || !FIELDF.test(nm(c.blocks[i]))) continue; const x = cx * 16 + (i & 15), z = cz * 16 + ((i >> 4) & 15); if (Math.hypot(x - G.x, z - G.z) < rr) { if (rr === 11) inRing++; else inGiant++; } }
+    }
+  }
+  check(inRing <= 2 && inGiant <= 2, `the wonder spots stand in a calm meadow (${inRing} field flowers by the ring, ${inGiant} under the Traumbaum)`);
+}
 // ---- e · the wonder spots' life (landlife.js): the petals follow the season, the ring glows at night only
 try { require(__dirname + '/../src/main/landlife.js'); } catch (e) { }
 const LL = V.LandLife;

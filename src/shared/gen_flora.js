@@ -107,6 +107,7 @@
       EDGE: [s('dandelion'), s('oxeye_daisy'), s('azure_bluet'), st('wildflowers', { count: 1, facing: 0 })],
       CLOVER: [0, 1, 2, 3].map(c => st('clover', { count: c, facing: (c * 3) & 3 })),
       TALL0: new Set([st('tall_grass', { half: 0 }), st('large_fern', { half: 0 }), CANDLE[0], UMBEL[0], BELL[0]]),
+      FLW: new Set(['poppy', 'cornflower', 'dandelion', 'oxeye_daisy', 'allium', 'pink_tulip', 'white_tulip', 'red_tulip', 'orange_tulip', 'azure_bluet', 'lily_of_the_valley'].map(n => st(n))),
     };
   })());
   FL.fields = fields;
@@ -123,6 +124,8 @@
     baseGround(g, P, cx, cz, out);
     if (!on(g)) return;
     const blocks = out.blocks, x0 = cx * 16, z0 = cz * 16, S = LAND.plants(), Z = fields(), BIm = VR.BIOME.sky_meadow, KG = 1 | 2 | 4 | 16;
+    // the wonder spots keep a calm meadow round them (no field within 12 of a ring, 15 of a Traumbaum, thinning in 4 more)
+    const WS = P.pieces.filter(p => (p.kind === 'glow_ring' || p.kind === 'blossom_giant') && Math.abs(p.x - x0 - 8) < 40 && Math.abs(p.z - z0 - 8) < 40);
     for (let col = 0; col < 256; col++) {
       if (out.biome && out.biome[col] !== BIm) continue;
       const x = x0 + (col & 15), z = z0 + (col >> 4);
@@ -147,7 +150,10 @@
       if (q.d > 0.06) continue;
       const f = FL.fieldAt(g, x, z);
       const E = Z.F[f.i];
-      if (!f.d || r >= f.d * (Array.isArray(E[0]) ? 0.45 : 1)) continue;   // (a field of tall flowers is thinner: they stand two high)
+      let calm = 1;
+      for (const p of WS) { const r0 = p.kind === 'glow_ring' ? 12 : 15; calm = Math.min(calm, ss(r0, r0 + 4, Math.hypot(x - p.x, z - p.z))); }
+      if (calm < 1 && Z.FLW.has(cur) && r2 >= calm) { blocks[ai] = 0; continue; }   // (the meadow's older flowers thin out there too)
+      if (!f.d || r >= f.d * calm * (Array.isArray(E[0]) ? 0.45 : 1)) continue;   // (a field of tall flowers is thinner: they stand two high)
       const pick = r2 < 0.84 ? E[0] : E[1];
       if (E[2] && r2 > 0.9 && free2) { blocks[ai] = E[2][0]; blocks[ai + 256] = E[2][1]; continue; }
       if (Array.isArray(pick)) { if (free2) { blocks[ai] = pick[0]; blocks[ai + 256] = pick[1]; } continue; }
