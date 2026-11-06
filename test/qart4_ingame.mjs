@@ -48,7 +48,7 @@ const settle = async (max = 60) => {
       const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state };
       const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4;
       let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; }
-      const hz = g.horizon, hb = hz ? (hz.inflight | 0) + (hz.far ? hz.far.inflight | 0 : 0) : 0;
+      const hz = g.horizon, hb = hz ? (hz.inflight | 0) + (hz.far ? hz.far.inflight | 0 : 0) + (hz.stats.want | 0) + (hz.stats.coarse < 1 ? 1 : 0) : 0;   // (run 2: the vista's 'on' frame had no far land — the tiles wanted were not asked for yet)
       return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, hz: hb };
     });
     if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.hz <= 2 && i > 2) break;
@@ -63,7 +63,7 @@ const config = async (c, kind) => { const r = await ev(([c, kind]) => {
   else { const d = X.defaults(S._pr || S.preset); X.polish = c === 'on'; S.qIsleForm = c === 'on' ? d.qIsleForm : false; g.applySettings('qIsleForm'); }
   S.preset = S._pr || S.preset;
   return 'isle=' + S.qIsleForm + ' polish=' + X.polish + ' hill=' + !!S.qHill + ' leaf=' + g.world.fancyLeaves + ' hz=' + !!(g.horizon && g.horizon.isleForm);
-}, [c, kind]); await run(4); let st = null; for (let k = 0; k < 3; k++) { st = await settle(70); if (st && !st.dirty && !st.busy && st.hz <= 2) break; }   // (run 2: High's far tiles kept a few in flight — waiting for none took 10 min a switch) if (st && (st.dirty || st.hz)) console.log('     (not settled: ' + JSON.stringify(st) + ')'); return r; };
+}, [c, kind]); await run(4); let st = null; for (let k = 0; k < 3; k++) { st = await settle(70); if (st && !st.dirty && !st.busy && st.hz <= 2) break; } if (st && (st.dirty || st.hz)) console.log('     (not settled: ' + JSON.stringify(st) + ')'); return r; };   // (run 2: High's far tiles kept a few in flight — waiting for none took 10 min a switch)
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings._pr = p; g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.settings.qHill = false; if (VR.QArt4) VR.QArt4.polish = true; g.applySettings('*'); }, p);
 const grab = async (name, tod, K = 4) => {
   const url = await ev(([tod, K]) => { const g = VR.game; g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } window.__norender = false; for (let i = 0; i < K; i++) { g.env.setTime(tod); g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
@@ -168,26 +168,32 @@ try {
   if (want('vista')) {
     const TOD = 7600;
     let cam = PIN.vista;
-    if (!cam) {
-      const J = isles.filter(K => K.d > 150).sort((a, b) => b.r - a.r)[0] || isles[0];
-      const a = J ? Math.atan2(J.z - S0[2], J.x - S0[0]) : 0;
-      const E = [S0[0] - Math.cos(a) * 40, 0, S0[2] - Math.sin(a) * 40]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62 + 28;
-      cam = { E, T: [E[0] + Math.cos(a) * 300, J ? J.y - 10 : E[1], E[2] + Math.sin(a) * 300] };
+    if (!cam && N.cams.isles) {
+      // (run 2: from beside the spawn a station's towers filled the frame) from above the isle view's eye, 25 m up, past the
+      // Sky Isles' side over the field of isles beyond them
+      const E0 = N.cams.isles.E, T0 = N.cams.isles.T, a = Math.atan2(T0[2] - E0[2], T0[0] - E0[0]) - 0.6;
+      const E = [E0[0], E0[1] + 25, E0[2]];
+      cam = { E, T: [E[0] + Math.cos(a) * 400, 150, E[2] + Math.sin(a) * 400] };
     }
+    if (!cam) { check(false, 'a vista camera (the isle view first)'); cam = { E: [S0[0], 140, S0[2]], T: [S0[0] + 300, 140, S0[2]] }; }
     N.cams.vista = cam;
     await views('vista', cam.E, cam.T, TOD, 'isle');
   }
   // ---------------------------------------------------------------- Runde Hänge: a stone cliff and a rolling hill, pinned
   if (want('cliff') || want('hill')) {
     const NOON = 6400;
-    if (!PIN.cliff || !PIN.hill) {
-      await ground(S0[0], S0[2]);
+    // (run 2: none within 112 m of the spawn — the Heartland's town; now from five probes 0 / ±220 m, the rocks Runde Hänge
+    //  rounds: VR.RoundCrown.ROCK)
+    for (const [ox, oz] of [[0, 0], [220, 0], [-220, 0], [0, 220], [0, -220]]) {
+      if (PIN.cliff && PIN.hill) break;
+      const P0 = [S0[0] + ox, S0[1], S0[2] + oz];
+      await ground(P0[0], P0[2]);
       const found = await ev((S0) => {
-        const g = VR.game, w = g.world, R = VR.R; const ROCK = /^(stone|granite|diorite|andesite|deepstone|tuff|calcite|.*terracotta)$/;
+        const g = VR.game, w = g.world, R = VR.R; const ROCK = VR.RoundCrown && VR.RoundCrown.ROCK ? VR.RoundCrown.ROCK : /^(stone|granite|diorite|andesite|tuff|.*terracotta)$/;
         const nm = (x, z) => { const y = w.topAt(x, z), s = w.getBlock(x, y, z), t = s ? R.types[R.T.type[s]] : null; return [y, t ? t.name : '']; };
         let cliff = null, hill = null;
         for (let gx = -112; gx <= 112; gx += 3) for (let gz = -112; gz <= 112; gz += 3) {
-          const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz); if (!w.isLoaded(x, z) || !w.isLoaded(x + 30, z + 30) || !w.isLoaded(x - 30, z - 30)) continue;
+          const x = Math.floor(S0[0] + gx), z = Math.floor(S0[2] + gz); if (!w.isLoaded(x, z) || !w.isLoaded(x + 14, z + 14) || !w.isLoaded(x - 14, z - 14)) continue;
           const [h, n] = nm(x, z);
           if (ROCK.test(n)) for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, [h2] = nm(Math.floor(x + Math.cos(a) * 4), Math.floor(z + Math.sin(a) * 4)); const drop = h - h2; if (drop >= 6 && (!cliff || drop > cliff.drop)) cliff = { x, z, h, a, drop, n }; }
           if (n === 'grass_block') {
@@ -197,7 +203,7 @@ try {
           }
         }
         return { cliff, hill };
-      }, S0);
+      }, P0);
       console.log('     found ' + JSON.stringify(found));
       if (found.cliff && !PIN.cliff) { const c = found.cliff, D = 18; const E = [c.x + Math.cos(c.a) * D, 0, c.z + Math.sin(c.a) * D]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62 + 2; PIN.cliff = { E, T: [c.x, c.h - c.drop * 0.4, c.z], at: c }; }
       if (found.hill && !PIN.hill) { const c = found.hill, a = (await sunA()) + 1.2, D = 30; const E = [c.x + Math.cos(a) * D, 0, c.z + Math.sin(a) * D]; E[1] = (await ground(E[0], E[2])) + 1 + 1.62; PIN.hill = { E, T: [c.x, c.h, c.z], at: c }; }
