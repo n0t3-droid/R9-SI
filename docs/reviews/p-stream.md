@@ -60,7 +60,34 @@ What it says:
 
 ## 3 · What was changed
 
-RESULTS_FIX
+All in `VR.StreamPlan` (`src/shared/stream.js`, pure, `test/stream_plan.js`) and `world.js` / `horizon.js`; the setting
+**„Schnell fliegen: Welt voraus zuerst"** (`streamPlan`, Bild · Qualität, on for every preset). Generation, meshing and
+light output are untouched (gen/mesh/light_same ALL OK); nothing changes below 14 m/s except the rim.
+
+1. **The rim** (walking, any speed below fast flight): the request disk reaches `rd + 0.5 + √2` instead of `rd + 1.5`, so
+   every column inside the render distance has its 8 neighbours asked for and can be meshed when it comes into view —
+   not a chunk later. Costs ~13 % more columns held round a standing player (they are not meshed: no draw cost).
+2. **Worth it?** In fast flight (≥ 14 m/s, looking within ~45° of the way of travel) a column is asked for only if it
+   will still be inside the view cone 1.5 × the learnt latency after the request (`timeLeft`: when the cone's edge passes
+   it, with 1.5 chunks of slack so a shown column's neighbours are asked for too). The 3 × 3 round the player always.
+3. **Stale requests cancelled**: a queued generation that stops being worth it (the player turned or flew on) is dropped
+   before a worker touches it; the queued generations are re-sorted every 15 frames from where the player is.
+4. **View order**: outside the view cone a column counts 2.5 × farther.
+5. **The latency** is learnt from what fast flight asks for (request → shown, an average); a flight that crosses 1.5 × the
+   render distance within one latency **rests the chunks** (nothing new asked for) and the latency eases back for a retry.
+   (A first rule — rest when most fast-flight requests are never shown — rested at 40 m/s on Low where the chunks kept up:
+   the disk's outer rim is never shown by design. Browser run 2 caught it; replaced.)
+6. **The far tiles get the workers the chunks cannot use**: the far lane's share grows from 30 % to 70 % with the deficit
+   (speed × latency against half the render distance); far tiles behind the camera wait.
+7. **The column memory**: untouched columns unloaded a moment ago (32 + 8 × rd of them, ~130 KB each: ~9 MB on Very Low)
+   come back without the worker when the player turns back; their own light is computed again (the very same light a
+   fresh generation gives), at most 2 a frame.
+
+Tried and dropped: holding back the meshes of columns the camera will leave (it starved the latency estimate of samples
+and rested too little); a far-lane-only flight (the chunks' last rows ahead are worth having on a fast PC).
+Not done on purpose: splitting light from generation (0.4 ms of ~37 ms), more workers (the 2-core rule protects the main
+thread), a finer far-tile level near the camera (lod.js/horizon.js: the next step, see the self-review).
+
 
 ## 4 · Before / after
 
