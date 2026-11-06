@@ -120,7 +120,7 @@ console.log('c · the mirrors');
   check(far === 0, 'nothing cut far away (no shimmer past ' + QA.LEAF.far[1] + ' m)');
   check(QA.vxFloor(81) && QA.vxFloor(80.996) && !QA.vxFloor(80.5) && !QA.vxFloor(80.9375), 'Platzbelag on the voxel blocks: a top at the block grid is floor, a table\'s top is not');
   check(QA.green([0.25, 0.55, 0.15]) === 1 && QA.green([0.95, 0.75, 0.85]) === 0 && QA.green([0.8, 0.35, 0.1]) === 0 && QA.green([0.8, 0.83, 0.9]) === 0, 'Laubkronen\'s cut and hue only on green crowns (blossom, autumn, frost keep theirs)');
-  check(Math.abs(QA.plazaLum(0.7) - (0.3 + 0.4 * 0.38)) < 1e-9 && QA.plazaLum(0.2) === 0.2 && QA.plazaLum(0.9) < 0.55, 'Platzbelag: the light floors compressed to a mid-tone, the darker ones untouched');
+  check(Math.abs(QA.plazaLum(0.7) - (0.2 + 0.5 * 0.25)) < 1e-9 && QA.plazaLum(0.15) === 0.15 && QA.plazaLum(0.9) < 0.4, 'Platzbelag: the light floors compressed to a mid-tone, the darker ones untouched');
   const E0 = () => ({ horizon: [0.3941, 0.6291, 0.7533], skyMid: [0.0247, 0.0885, 0.2516], zenith: [0.0022, 0.0038, 0.0273], skyStops: [0.39, 0.35, 0.6, 0.2], skySpace: [0.18, 0.42, 1, 0.8], ambSky: [0.36, 0.44, 0.66], fogColor: [0.3, 0.45, 0.6] });
   const warm = (c) => c[0] / c[2], viol = (c) => (c[0] + c[2]) / 2 - c[1];
   const a = QA.skyScript(E0(), 0.8, 0, 0), b = E0();

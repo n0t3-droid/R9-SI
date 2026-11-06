@@ -101,7 +101,7 @@
   // ---------------------------------------------------------------- Platzbelag: the numbers and the floors
   //   knee  the albedo's luma above which it is compressed · keep its share kept above the knee
   //   vary  the slabs' tone (±) · wear the mottling (±) · joint the joints' darkening
-  QA.PLAZA = { knee: 0.3, keep: 0.38, vary: 0.09, wear: 0.12, joint: 0.4 };
+  QA.PLAZA = { knee: 0.2, keep: 0.25, vary: 0.14, wear: 0.2, joint: 0.5 };   // (run 6: 0.3 / 0.38 / 0.09 / 0.12 / 0.4 read too subtle under the noon sun)
   QA.PLAZA_BLOCKS = ['vx_floor_plaza', 'vx_floor_plaza_line', 'vx_floor_marble', 'vx_floor_checker', 'vx_floor_tile', 'vx_floor_hex', 'travertine', 'granite_paver', 'vollton_white_gloss', 'smooth_quartz', 'polished_andesite'];
   QA.plazaLum = (l) => (l > QA.PLAZA.knee ? QA.PLAZA.knee + (l - QA.PLAZA.knee) * QA.PLAZA.keep : l);
   // the albedo layers of the floors' top faces (the registry's tex table; the main thread has it at start)
@@ -244,7 +244,7 @@ vec3 qPlaza(vec3 a, vec3 w) {
   vec2 f = fract(w.xz), e = min(f, 1.0 - f);
   float joint = 1.0 - smoothstep(0.012, 0.05, min(e.x, e.y));
   float mott = texture(u_noise, w.xz * 0.043).r * 0.6 + texture(u_noise, w.xz * 0.19 + vec2(0.31, 0.77)).g * 0.4;
-  vec3 c = a * (lt / l) * mix(vec3(1.04, 0.99, 0.9), vec3(0.98, 0.98, 0.97), h);
+  vec3 c = a * (lt / l) * mix(vec3(1.08, 0.99, 0.84), vec3(1.0, 0.97, 0.92), h);
   c *= 1.0 + (h - 0.5) * ${f3(P.vary * 2)};
   c *= 1.0 + (mott - 0.5) * ${f3(P.wear * 2)};
   return c * (1.0 - ${f3(P.joint)} * joint);
