@@ -5,7 +5,7 @@
 // colours (grass tinted per biome, sand, snow caps, stone cliffs, badland
 // bands), water / lava / aether surfaces, tree canopies, floating sky islands
 // and the realm's giant glowing crystal spires.
-// Tile = 32 x 32 cells; level L has cells of (4 << L) blocks.
+// Tile = 32 x 32 cells; level L has cells of (4 << L) blocks (p-stream2: level -1, 2-block cells — LOD.cell).
 // Vertex (12 bytes): int16 x,y,z (1/8 block, tile-relative xz) · u8 face|kind<<3
 //                    · u8 aux (water depth / tint) · u8 r,g,b,shade
 // kinds: 0 land 1 water 2 lava 3 aether 4 glow 5 leaves 6 ice/snow 7 window (lit at night)
@@ -14,6 +14,8 @@
   'use strict';
   const R = VR.R, M = VR.M;
   const LOD = VR.LOD = {};
+  // p-stream2 · a cell's size in blocks: 4 << L, and level -1 = 2 blocks (the fine level near the camera while the chunks load)
+  LOD.cell = (L) => (L < 0 ? 2 : 4 << L);
   let AVG = null;
   const cc = new Map();
   LOD.setAvg = (a) => { AVG = a; cc.clear(); };
@@ -277,7 +279,7 @@
   // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
   LOD.tileCells = function (g, job) {
     const VG = VR.VillageGen; if (!VG || g.singleBiome >= 0 || job.level > 1) return [];
-    const L = job.level, step = 4 << L, n = 32, T = n * step;
+    const L = job.level, step = LOD.cell(L), n = 32, T = n * step;
     const x0 = job.tx * n * step, z0 = job.tz * n * step, x1 = x0 + T, z1 = z0 + T;
     const C = VG.cell(g), pad = VG.rad(g) + 8, out = [];
     for (let j = Math.floor((z0 - pad) / C); j <= Math.floor((z1 + pad) / C); j++) for (let i = Math.floor((x0 - pad) / C); i <= Math.floor((x1 + pad) / C); i++) out.push([i, j]);
@@ -288,7 +290,7 @@
   LOD.plansNeeded = function (g, job) {
     const VG = VR.VillageGen;
     if (!VG || !g.computeClimate || !g.n3 || job.level > 1) return [];
-    const L = job.level, step = 4 << L, n = 32, T = n * step;
+    const L = job.level, step = LOD.cell(L), n = 32, T = n * step;
     const x0 = job.tx * n * step, z0 = job.tz * n * step;
     let vs = [];
     try { vs = villagesNear(g, x0, z0, x0 + T, z0 + T); } catch (e) { vs = []; }
@@ -362,7 +364,7 @@
   LOD.build = function (g, job) {
     if (!g.computeClimate || !g.n3) return null;
     const BIOMES = VR.BIOMES, SEA = VR.C.SEA;
-    const L = job.level, step = 4 << L, n = 32, N = n + 2;
+    const L = job.level, step = LOD.cell(L), n = 32, N = n + 2;
     const x0 = job.tx * n * step, z0 = job.tz * n * step, T = n * step;
     const idx = (i, j) => (j + 1) * N + (i + 1);
     // villages (near & middle levels): their houses replace the trees on their ground
@@ -399,7 +401,7 @@
       if (!water && tr && kd !== 6 || (!water && tr && (key === 'snowy_taiga' || key === 'grove'))) {
         const cover = tr[0];
         if (step <= (tr[3] || 8)) {
-          if (i >= 0 && j >= 0 && i < n && j < n && hh(X, Z, 91) < cover * (step === 4 ? 1 : 1.15) && !(vsites.length && inVil(X, Z, 4))) {
+          if (i >= 0 && j >= 0 && i < n && j < n && hh(X, Z, 91) < cover * (step === 4 ? 1 : step < 4 ? 0.25 : 1.15) && !(vsites.length && inVil(X, Z, 4))) {
             const th = tr[2] * (0.75 + hh(X, Z, 92) * 0.5);
             let lc = leafCol(tr[1], B); if (cold) lc = mixc(lc, snow, 0.55);
             trees.push({ i, j, g: y + 1, th, lc, kind: tr[1], jx: (hh(X, Z, 93) - 0.5) * step * 0.3, jz: (hh(X, Z, 94) - 0.5) * step * 0.3 });

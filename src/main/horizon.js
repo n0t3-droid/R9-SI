@@ -10,7 +10,7 @@
   'use strict';
   const mat4 = VR.mat4;
   const N = 32;
-  const tileSize = (L) => N * (4 << L);
+  const tileSize = (L) => N * (L < 0 ? 2 : 4 << L);   // (p-stream2: level -1 — 2-block cells, 64-block tiles: the fine level)
   // horizon setting → radius in blocks: 1 km, 2 km, 3 km, 5 km (level 4 tiles are 2 km wide with 64-block cells)
   const RADII = [0, 1024, 2048, 3072, 5120];
   const TOP = [0, 2, 3, 3, 4];           // coarsest tile level per setting
@@ -80,7 +80,11 @@
       // wanted no tile (no request waits) and it is younger than 15 frames (its tiles are ≥ 128 blocks wide: the same tiles; the masks above stay per frame)
       if (r.q && r.q.lite && Horizon.keepSel(this, cam, w)) { if (!wasSel) { const K = this.selList; this.drawList.length = 0; for (let i = 0; i < K.length; i++) this.drawList.push(K[i]); } this.listSel = true; this.selKept = (this.selKept | 0) + 1; return; }
       // ---- quadtree selection (with ring 1 on, no tile finer than level 2: ring 1 is the land within 1 km)
-      const R = this.radius, Lr = TOP[this.level] || 2, Sr = tileSize(Lr), Lmin = far1 ? Math.min(2, Lr) : 0;
+      // p-stream2 · the fine level (-1, 2-block cells) within FINE_D blocks of the camera, only where the chunks are not shown
+      // (a child tile whose 4 x 4 columns are all shown is not needed: never built, never drawn — standing still it costs
+      // nothing); with the streaming plan on and ring 1 off (Very Low to Balanced)
+      const fine = !far1 && !!(w && w.streamPlan) && Horizon.FINE_D > 0;
+      const R = this.radius, Lr = TOP[this.level] || 2, Sr = tileSize(Lr), Lmin = far1 ? Math.min(2, Lr) : fine ? -1 : 0;
       const cx = cam.x, cz = cam.z;
       const want = [];
       const list = this.drawList; list.length = 0;
@@ -96,10 +100,10 @@
         const S = tileSize(L);
         const t = get(L, tx, tz);
         if (t) t.used = this.frame;
-        if (L > Lmin && d < this.split * S) {
+        if (L > Lmin && (L === 0 ? d < Horizon.FINE_D && Horizon.loadingNear(w, tx, tz, cx, cz) : d < this.split * S)) {
           // the four children (x, z) = (2tx + (i & 1), 2tz + (i >> 1)) — f-perf8: in a scratch row of this level, no arrays a visit
           const kt = KT[L]; let allReady = true;
-          for (let i = 0; i < 4; i++) { const k = dist(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1)) > R ? 'out' : get(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1)); kt[i] = k; if (!(k === 'out' || ready(k))) allReady = false; }
+          for (let i = 0; i < 4; i++) { const a = tx * 2 + (i & 1), b = tz * 2 + (i >> 1); const k = dist(L - 1, a, b) > R || (L === 0 && Horizon.shownUnder(w, a, b)) ? 'out' : get(L - 1, a, b); kt[i] = k; if (!(k === 'out' || ready(k))) allReady = false; }
           if (allReady || !ready(t)) {
             // descend: children draw themselves (or request themselves)
             for (let i = 0; i < 4; i++) if (kt[i] !== 'out') visit(L - 1, tx * 2 + (i & 1), tz * 2 + (i >> 1));
@@ -334,6 +338,26 @@
     farPlane() { return this.enabled() ? this.radius + 400 : 0; }
     destroy() { this.reset(); }
   }
+  // p-stream2 · the fine level: an L0 tile within FINE_D blocks of the camera splits into four 64-block tiles of 2-block
+  // cells (0: off); shownUnder — are all 16 chunk columns under fine tile (a, b) shown? (then it is not needed)
+  Horizon.FINE_D = 72;
+  Horizon.shownUnder = function (w, a, b) {
+    if (!w || !w.cols) return false;
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const c = w.cols.get(VR.ckey(a * 4 + i, b * 4 + j)); if (!c || !(c.shownAt >= 0) || (w.fading && w.fading.has(c))) return false; }   // (fading in: the tile fills the dither's other half)
+    return true;
+  };
+  // (an L0 tile splits only while a column inside it within FINE_D of the camera is not shown: standing in loaded land the
+  // tiles are exactly the old ones)
+  Horizon.loadingNear = function (w, tx, tz, cx, cz) {
+    if (!w || !w.cols) return false;
+    const D = Math.min(Horizon.FINE_D, (w.renderDist || 4) * 16 - 8), c0 = Math.max(tx * 8, Math.floor((cx - D) / 16)), c1 = Math.min(tx * 8 + 7, Math.floor((cx + D) / 16));
+    const r0 = Math.max(tz * 8, Math.floor((cz - D) / 16)), r1 = Math.min(tz * 8 + 7, Math.floor((cz + D) / 16));
+    for (let j = r0; j <= r1; j++) for (let i = c0; i <= c1; i++) {
+      const dx = i * 16 + 8 - cx, dz = j * 16 + 8 - cz; if (dx * dx + dz * dz > D * D) continue;
+      const c = w.cols.get(VR.ckey(i, j)); if (!c || !(c.shownAt >= 0)) return true;
+    }
+    return false;
+  };
   Horizon.FOCUS_K = 10; Horizon.FOCUS_MS = 300000;   // (f-first4: the landmark's tiles ahead of everything, for 5 minutes)
   Horizon.KEEP_FRAMES = 15; Horizon.KEEP_D = 1;   // (f-perf8: Very Low keeps a selection ≤ 15 frames while the camera stays within a block)
   VR.Horizon = Horizon;
