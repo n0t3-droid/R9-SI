@@ -153,10 +153,12 @@ try {
       const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
       const passes = () => ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length }; });
       const tris = () => ev(() => { const h = VR.game.horizon; return h ? { tris: h.stats.tris | 0, drawn: h.stats.drawn | 0, tiles: h.tiles.size, mb: +(h.stats.mb || 0).toFixed(1) } : null; });
+      // (run 4: High's 'on' sample had the horizon still rebuilding — drawn 0 tiles, 50 ms of uploads: wait for the far land back)
+      const hzWait = async () => { for (let i = 0; i < 90; i++) { await run(20); const s = await ev(() => { const h = VR.game.horizon; return !h || ((h.stats.drawn | 0) > 0 && !(h.inflight | 0) && !(h.far && h.far.inflight | 0) && !(h.stats.want | 0)); }); if (s) return; await wait(500); } console.log('     (the far land not back after the switch)'); };
       for (const pr of ['potato', 'balanced', 'high']) {
         await preset(pr); await eyeAt(cam.E, cam.T, AFT); await settle(25);
         const r = { off: [], on: [], p: {}, hz: {} };
-        for (const c of ['on', 'off', 'on', 'off']) { await config(c, 'isle'); await ready(); await ms(4); r[c].push(await ms(6)); r.p[c] = (await passes()).n; r.hz[c] = await tris(); }
+        for (const c of ['on', 'off', 'on', 'off']) { await config(c, 'isle'); await hzWait(); await ready(); await ms(4); r[c].push(await ms(6)); r.p[c] = (await passes()).n; r.hz[c] = await tris(); }
         const med = (a) => +Math.min.apply(null, a).toFixed(1);   // (run 2: the median of two took a compile-laden 41.6 ms — the best of the samples)
         N.cost[pr] = { off: med(r.off), on: med(r.on), all: r, passes: r.p, horizon: r.hz };
         console.log('     cost ' + pr + ' ' + JSON.stringify(N.cost[pr]) + ' (' + secs() + ')'); save();
