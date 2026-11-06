@@ -437,6 +437,7 @@
     const connGroup = (s) => { const t = R.types[TTYPE[s]]; return t ? (t.o.conn || 0) : 0; };
     const HD = [5, 0, 4, 1]; // facing idx (n,e,s,w) → face dir
     const nbState = (bi, d) => B[bi + DOFF[d]];
+    const vxSkip = !!job.vxSkip; let vxSkipped = 0;
     const vxM = VR.VX ? { B, L, bufs: vxSplit ? [bufs[3], bufs[1], bufs[2]] : bufs, far: vxSplit ? bufs[4] : null, detail: !(vxSplit && job.vxDetail === false), DOFF, layerTile: R.texIndex['vx_tile'] | 0, layerGloss: R.texIndex['vx_tile_gloss'] | 0, layerGlass: R.texIndex['vx_glass'] | 0, layerHolo: R.texIndex['vx_holo'] | 0, layerSmooth: R.texIndex['vx_smooth'] | 0, layerSmoothGloss: R.texIndex['vx_smooth_gloss'] | 0, layerMat: [0].concat(['fabric', 'leather', 'wood', 'marble', 'metal', 'plant', 'stone'].map(m => R.texIndex['vx_mat_' + m] | 0)), ox: job.ox | 0, oy: (job.sy | 0) * 16, oz: job.oz | 0, motion: !!job.motion } : null;   // (t-motion: motion — the hung pieces' sway levels, VX.hangOf)
     for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const bi = P(x, y, z), b = B[bi];
@@ -500,7 +501,7 @@
         }
         continue;
       }
-      if (shape === SH.VOXEL) { if (vxM) VR.VX.meshBlock(vxM, x, y, z, bi, b); continue; }
+      if (shape === SH.VOXEL) { if (vxSkip) { vxSkipped++; continue; } if (vxM) VR.VX.meshBlock(vxM, x, y, z, bi, b); continue; }   // (p-stream3: vxSkip — a fast flight's first mesh leaves the mini-voxel models out, world.js meshes them later)
       if (shape === SH.FLUID) { meshFluid(x, y, z, bi, b); continue; }
       let faces = null;
       const t = R.types[TTYPE[b]];
@@ -852,6 +853,7 @@
 
     const res = { opaque: bufs[0].out(), cutout: bufs[1].out(), trans: bufs[2].out(), vis: visMask };
     if (vxSplit) { res.vx = bufs[3].out(); res.vxFar = bufs[4].out(); }
+    if (vxSkipped) res.vxSkipped = vxSkipped;
     if (propOut) res.props = Int32Array.from(propOut);   // six ints per prop instance (see propTables)
     return res;
   };

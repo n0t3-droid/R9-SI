@@ -360,10 +360,19 @@
         const ex = cx - pcx, ez = cz - pcz;
         if (pfast && (this.planRest || !SP.worth(ex, ez, ux, uz, speed, this.lat || SP.LAT0, this.planCot))) continue;   // (p-stream: gone by when ready)
         const along = ahead ? Math.max(0, ex * ux + ez * uz) : 0;
-        want.push([pfast ? SP.prio(ex, ez, ux, uz, ahead, this.viewCos || 0.6) : ex * ex + ez * ez - along * along * 0.5, cx, cz, k]);
+        let pr = pfast ? SP.prio(ex, ez, ux, uz, ahead, this.viewCos || 0.6) : ex * ex + ez * ez - along * along * 0.5;
+        // p-stream3 · walking: a column the look-ahead asks for beyond the rim (no column in view needs it as a neighbour yet)
+        // waits behind the rim's meshes — its discount ahead put it first, and the rim coming into view waited (WALK_LATE)
+        if (SP && !pfast && ahead && SP.WALK_LATE && ex * ex + ez * ez > (rd + SP.RIM) * (rd + SP.RIM)) pr += SP.WALK_LATE * rd * rd;
+        want.push([pr, cx, cz, k]);
       }
       if (want.length > 1) want.sort((a, b) => a[0] - b[0]);
       if (off || (this.frame & 1)) this.lastWant = want.length;
+      // p-stream3 · the idle ring: with nothing else to do (no column wanted, none pending) and not flying fast, the columns
+      // one ring beyond the request disk on the side the player looks at are generated ahead of time (no mesh, never drawn:
+      // the renderer stops at rd + 0.5) — a walk that starts finds the neighbours of the rim it walks into already made (the
+      // late columns of a walk were all in its first second: stream_low.mjs traced 5–7 of 8 neighbours missing)
+      if (SP && !pfast && !want.length && !this.pending.size && (off || (this.frame & 1)) && SP.IDLE_RING > 0) this.idleRing(pcx, pcz, rd + SP.RIM, now);
       const maxReq = Math.max(6, this.pool.workers.length * 4);
       let inflight = this.pending.size;
       for (const [d2, cx, cz, k] of want) {
@@ -384,6 +393,26 @@
       // schedule meshing (block edits mark sections dirty and ask for an urgent mesh themselves)
       this.scheduleMeshes(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, [px, py, pz]);
       this.pool.pump();
+    }
+    // p-stream3 · the idle ring (see update): at most two columns asked for at a time, nearest the view line first
+    idleRing(pcx, pcz, r0, now) {
+      if (this.pool.queue && this.pool.queue.length) return;   // (the workers' near lane has work: not now)
+      const vd = this.viewDir, r1 = r0 + VR.StreamPlan.IDLE_RING, L = Math.ceil(r1);
+      let best = null, bp = Infinity, n = 0;
+      for (let dz = -L; dz <= L; dz++) for (let dx = -L; dx <= L; dx++) {
+        const d2 = dx * dx + dz * dz;
+        if (d2 <= r0 * r0 || d2 > r1 * r1) continue;
+        const d = Math.sqrt(d2), c = vd ? (dx * vd[0] + dz * vd[1]) / d : 1;
+        if (c < 0) continue;
+        const k = ckey(pcx + dx, pcz + dz);
+        if (this.cols.has(k)) { const col = this.cols.get(k); col.lastSeen = now; continue; }
+        if (this.pending.has(k) || (this.failed && this.retryAfter(k, now) > now)) continue;
+        const p = d2 * (2 - c);
+        if (p < bp) { bp = p; best = [pcx + dx, pcz + dz, k]; }
+        n++;
+      }
+      if (best) this.requestColumn(best[0], best[1], best[2], 1e4 + bp);
+      return n;
     }
     // p-stream · one frame of the streaming plan: fast (and looking roughly the way of travel: a look aside keeps the old
     // order), the view cone, the far lane's share, every 15 frames the queued generations re-ordered from here
@@ -807,6 +836,7 @@
     // far-meshed sections inside the inner part of the keep ring are re-meshed with their detail
     detailReturn(px, py, pz) {
       if (this.planFast && this.streamPlan) return;   // (p-stream2: not while flying fast)
+      if (this.vxSkipN) this.vxSkipReturn(px, pz);
       const D = (this.renderer && this.renderer.q && this.renderer.q.vxLod) || 48, back = (D * 1.5 + 16) * 0.8, back2 = back * back;
       const cr = Math.ceil(back / 16) + 1, pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       for (const c of this.cols.values()) {
@@ -820,6 +850,20 @@
           if (ex * ex + ey * ey * 0.5 + ez * ez < back2) { s.vxDropped = false; s.dirty = true; s.ver++; }
         }
       }
+    }
+    // p-stream3 · the sections a fast flight meshed without their mini-voxel models are meshed again with them once it slows:
+    // those inside the render distance (scheduleMeshes takes them nearest first); vxSkipN counts the ones left
+    vxSkipReturn(px, pz) {
+      const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = this.renderDist + 0.5;
+      let left = 0;
+      for (const c of this.cols.values()) for (let sy = 0; sy < c.sec.length; sy++) {
+        const s = c.sec[sy];
+        if (!s.vxSkipped) continue;
+        const dx = c.cx - pcx, dz = c.cz - pcz;
+        if (s.pending || dx * dx + dz * dz > r * r) { left++; continue; }
+        s.vxSkipped = false; s.dirty = true; s.ver++;
+      }
+      this.vxSkipN = left;
     }
     // does the section want its mini-voxel detail meshed? (inside the renderer's detail keep ring)
     wantDetail(c, sy, pos) {
@@ -843,6 +887,7 @@
       const detail = urgent || this.wantDetail(c, sy, pos || (this.lastPos ? this.lastPos : null));
       const job = this.buildJob(c, sy);
       job.vxDetail = detail;
+      if (!urgent && this.planFast && this.streamPlan && (this.planSpeed || 0) >= VR.StreamPlan.VX_SKIP) job.vxSkip = true;   // p-stream3: the first mesh in fast flight without the mini-voxel models (they cost up to half of a heavy section's mesh); back once the flight slows (detailReturn)
       if (VR.SmoothVox) VR.SmoothVox.tagJob(job);   // t-form: the smooth models that are ready (smoothvox.js)
       s.pending = true;
       const ver = s.ver;
@@ -869,6 +914,7 @@
         const R = this.renderer, alive = () => !this.dead && this.cols.get(c.key) === c && s.uTok === tok;
         const done = () => {
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
+          s.vxSkipped = !!m.vxSkipped; if (s.vxSkipped) this.vxSkipN = (this.vxSkipN | 0) + 1;   // (p-stream3: models left out — meshed again once the flight slows)
           s.meshVer = ver; s.meshed = true;
           s.fade = c.shownAt >= 0 ? c.fade : 0; s.grow = c.shownAt >= 0 && c.grow !== undefined ? c.grow : 1;
           if (s.ver !== ver) s.dirty = true;

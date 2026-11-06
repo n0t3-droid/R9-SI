@@ -345,8 +345,8 @@
   //  · rest     faster still (the flight crosses REST × the render distance within one latency) no new column is asked
   //             for: the far tiles get every worker until the flight slows (the latency eases back: a retry)
   //  · order    distance, discounted ahead (as before), and OUT_K × for a column outside the view cone
-  //  · share    the far lane's share of the workers grows from 30 % with the deficit (speed × lat against half the render
-  //             distance) up to SHARE_MAX: the far tiles cover the land ahead first, the chunks refine it where they can
+  //  · share    the far lane's share of the workers: 30 %, 20 % above 60 m/s (p-stream3: it no longer grows with the
+  //             deficit — that starved the chunks)
   //  · tiles    a far tile behind the camera waits (BEHIND_K on its priority) while moving fast
   // (src/shared/stream.js: loaded by the main thread and the workers; only world.js and horizon.js call it)
   {
@@ -361,6 +361,9 @@
   SP.SHARE_MAX = 0.7;
   SP.BEHIND_K = 1.5;     // tile priority units (horizon.js prio: distance in tile widths) added behind the camera
   SP.LAT0 = 1.0; SP.LAT_MIN = 0.15; SP.LAT_MAX = 8;
+  SP.VX_SKIP = 60;       // p-stream3: blocks/s — faster, a section's first mesh leaves the mini-voxel models out (world.meshSection)
+  SP.IDLE_RING = 1;
+  SP.WALK_LATE = 1;      // p-stream3: walking, the look-ahead's columns beyond the rim wait this × rd² (behind the rim's meshes; 0 = off)      // p-stream3: chunks beyond the request disk generated while idle, on the side the player looks (world.idleRing; 0 = off)
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   SP.moving = (speedB) => speedB >= SP.FAST;
   // seconds until the edge of the view cone (half angle h, cotH = 1 / tan h) passes a column at (ex, ez) chunks from the
@@ -418,10 +421,15 @@
   SP.lat = function (prev, sample) { const p = prev > 0 ? prev : SP.LAT0; return clamp(p + (sample - p) * 0.15, SP.LAT_MIN, SP.LAT_MAX); };
   // the far lane's share: the deficit = the chunks' reach behind the flight (speed × latency, in chunks) against half the
   // render distance; none while slow
+  // p-stream3 · no longer: the share grew with the deficit — a loop: the chunks lag, the far tiles get more, the chunks lag
+  // more (browser, Low at 80 m/s: the far lane 70 % of the worker, 0 % real for 8 s twice; the far lane is always full in
+  // flight — the horizon keeps 6 tiles asked for). The fine tiles cover what the chunks have not shown (void 0 since
+  // p-stream2), so the far lane keeps its walking share, and above SHARE_HI blocks/s less (the band's columns first):
+  // stream_real.js FARQ=6, rd 6 / 5: grow 28 / 67 % real → flat 0.3: 88 / 93 % → 0.2 above 60 m/s: 89 / 94 %
+  SP.SHARE_FAST = 0.2; SP.SHARE_HI = 60;
   SP.share = function (speedB, lat, rd) {
-    if (!(speedB >= SP.FAST)) return SP.SHARE_BASE;
-    const def = (speedB / 16) * lat / Math.max(1, rd * 0.5);
-    return SP.SHARE_BASE + (SP.SHARE_MAX - SP.SHARE_BASE) * clamp((def - 0.5) / 1.5, 0, 1);
+    void lat; void rd;
+    return speedB >= SP.SHARE_HI ? SP.SHARE_FAST : SP.SHARE_BASE;
   };
   // a far tile's priority bonus: behind the camera (relative to its centre) it waits while moving fast
   SP.tileK = function (cx, cz, S, camX, camZ, ux, uz, speedB) {

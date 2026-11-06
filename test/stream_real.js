@@ -189,6 +189,7 @@ if (require.main === module) {
   EXP.nodet = (w) => { const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; const dr = w.detailReturn.bind(w); w.detailReturn = function (...a) { if (!this.planFast) dr(...a); }; };
   EXP.share5 = () => { SP.SHARE_MAX = 0.5; };
   EXP.share3 = () => { SP.SHARE_MAX = SP.SHARE_BASE; };
+  EXP.share2 = () => { const s0 = SP.share; SP.share = (sp, lat, rd) => (sp >= 60 ? 0.2 : Math.min(SP.SHARE_BASE, s0(sp, lat, rd))); };
   EXP.reach = () => { SP.REACH = +(process.env.REACH || 3); };
   EXP.c3nd = (w) => { EXP.c3(w); const wd = w.wantDetail.bind(w); w.wantDetail = function (c, sy, pos) { return !this.planFast && wd(c, sy, pos); }; };
   for (const rd of RDS) for (const v of SPEEDS) for (const si of DIRS) {
