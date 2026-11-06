@@ -189,8 +189,8 @@
   const RC = VR.RoundCrown = { iso: 0.5, tMin: 0.22, tMax: 0.86 };
   const RC_F = new Float32Array(PSS * PS), RC_T = new Float32Array(PSS * PS), RC_O = new Uint8Array(PSS * PS);
   const RCN = 18, RC_V = new Float32Array(RCN * RCN * RCN * 3), RC_OK = new Uint8Array(RCN * RCN * RCN);
-  RC.solver = function (B, TF) {
-    const M = F.LEAVES | F.OPAQUE, n = PSS * PS;
+  RC.solver = function (B, TF, leaves) {
+    const M = (leaves === false ? 0 : F.LEAVES) | F.OPAQUE, n = PSS * PS;
     for (let i = 0; i < n; i++) RC_O[i] = (TF[B[i]] & M) ? 1 : 0;
     // the blur, one axis at a time (an edge voxel keeps its own value along the cut axis)
     const pass = (src, dst, st, ax) => {
@@ -235,9 +235,13 @@
     const T = R.T, TF = T.flags, TSH = T.shape, TL = T.layer, TTEX = T.tex, TTINT = T.tint, TTYPE = T.type, TRC = T.rc;
     if (!CTMK) ctmTables();
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
-    const fancy = job.fancyLeaves !== false, smooth = job.smooth !== false;
-    // q-art3 · Runde Kronen: the leaves as a blob (VR.RoundCrown; the solver is made at the first leaf face)
-    const roundOn = job.fancyLeaves === 2;
+    // q-art3: job.fancyLeaves may be a number — bit 1 (2) Runde Kronen, bit 2 (4) Runde Hänge, bit 3 (8) the leaves not
+    // fancy (game.js leafMode; the world passes it through as it is)
+    const lm = typeof job.fancyLeaves === 'number' ? job.fancyLeaves : 0;
+    const fancy = job.fancyLeaves !== false && !(lm & 8), smooth = job.smooth !== false;
+    // q-art3 · Runde Kronen / Runde Hänge: the leaves and the natural ground (F.SMOOTH: Nahtlos only) as one blob
+    // (VR.RoundCrown; the solver is made at the first face that asks)
+    const roundOn = (lm & 2) !== 0 && fancy, groundOn = (lm & 4) !== 0;
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
@@ -389,10 +393,13 @@
     }
     // q-art3 · Runde Kronen: a leaf face whose corners are the blob's vertices (the cube face's winding, light, AO, uv); its
     // face index (the shader's normal and texture) the deformed quad's dominant axis
-    function emitRoundQuad(buf, d, x, y, z, bi, b, fl) {
-      if (!rcS) rcS = RC.solver(B, TF);
+    function emitRoundQuad(buf, d, x, y, z, bi, b, fl, onlyMoved) {
+      if (!rcS) rcS = RC.solver(B, TF, roundOn);
       facePosInto(d, x, y, z, x + 1, y + 1, z + 1);
-      for (let k = 0; k < 4; k++) { rcS.vert(FP[k * 3] - 1, FP[k * 3 + 1] - 1, FP[k * 3 + 2] - 1, rcV); rcP[k * 3] = rcV[0]; rcP[k * 3 + 1] = rcV[1]; rcP[k * 3 + 2] = rcV[2]; }
+      let moved = 0;
+      for (let k = 0; k < 4; k++) { rcS.vert(FP[k * 3] - 1, FP[k * 3 + 1] - 1, FP[k * 3 + 2] - 1, rcV); rcP[k * 3] = rcV[0]; rcP[k * 3 + 1] = rcV[1]; rcP[k * 3 + 2] = rcV[2]; moved += Math.abs(rcV[0] - FP[k * 3]) + Math.abs(rcV[1] - FP[k * 3 + 1]) + Math.abs(rcV[2] - FP[k * 3 + 2]); }
+      // (Runde Hänge: a face whose corners all stayed on the grid — flat ground — goes the greedy way as before)
+      if (onlyMoved && moved < 1e-4) return false;
       const ux = rcP[6] - rcP[0], uy = rcP[7] - rcP[1], uz = rcP[8] - rcP[2], vx = rcP[9] - rcP[3], vy = rcP[10] - rcP[4], vz = rcP[11] - rcP[5];
       let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
       // (the cube face's own diagonals give the sign that points out)
@@ -414,6 +421,7 @@
         const k = (kk + start) & 3;
         buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
       }
+      return true;
     }
     const texW3 = (texv, flags, d, state) => {
       const layer = texv & 0xfff, rot = (texv >> 12) & 3;
@@ -466,6 +474,11 @@
           const mi = v * 16 + u;
           // smooth ground: a sloped top is its own quad, sides under it follow its corners, sides toward a smooth
           // column one step lower vanish under the joined surface
+          // q-art3 · Runde Hänge: the natural ground's exposed faces from the blob (a face toward leaves, which the blob
+          // counts as inside, keeps its cube face; flat faces go on to the greedy pass)
+          if (groundOn && (fl & F.SMOOTH)) {
+            if (!(roundOn && (TF[nb] & F.LEAVES))) { faceCorners(bi, d); if (emitRoundQuad(bufs[0], d, x, y, z, bi, b, fl, true)) continue; }
+          } else
           if ((fl & F.SMOOTH) && d !== 3 && !(TF[B[bi + PSS]] & F.OPAQUE) && smoothAt(x, y, z)) {
             if (d !== 2) {
               // the side toward a smooth column one step lower vanishes only where both corners of that edge really
@@ -624,7 +637,12 @@
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
         const bb = B[bi - PSS];
-        if ((TF[bb] & F.SMOOTH) && smoothAt(x, y - 1, z)) { const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y; }
+        if (groundOn && (TF[bb] & F.SMOOTH)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
+          if (!rcS) rcS = RC.solver(B, TF, roundOn);
+          for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
+          const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;
+          smKey = -1;   // (smC is smoothAt's cache)
+        } else if ((TF[bb] & F.SMOOTH) && smoothAt(x, y - 1, z)) { const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y; }
       }
       let rotLily = 0;
       if (t.o.randomRot) rotLily = M_hash(x + job.ox, z + job.oz) & 3;

@@ -689,6 +689,8 @@
     'g.set.qCrown.tip': 'Baumkronen bleiben auch in der Ferne rund, ihre Schatten haben ausgefranste Ränder statt Quadrate; Blütenkronen sind innen heller. Braucht Laubkronen. Kostet wenig.',
     'g.set.qRound': 'Runde Kronen',
     'g.set.qRound.tip': 'Baumkronen als gerundete Laubmassen statt Würfeln: Ecken und Kanten der Krone werden rund. Nur das Bild, die Blöcke bleiben, wie sie sind. Kostet wenig.',
+    'g.set.qHill': 'Runde Hänge',
+    'g.set.qHill.tip': 'Im Look Nahtlos werden Kanten, Stufen und Klippen des natürlichen Bodens und die Unterseiten der Schwebeinseln rund. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
     'g.set.magic.tip': 'Wie stark der Sternenhimmel am Tag durchscheint.',
     'g.set.scale.tip': 'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
     'g.set.tsr.tip': 'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',

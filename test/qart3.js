@@ -70,6 +70,35 @@ if (RC && RC.solver) {
   check(r3.cutout.length > 0 && hi - lo > 0.4, 'a lone leaf block keeps a body', (hi - lo).toFixed(2));
 }
 
+// b2 Runde Hänge (fancyLeaves bit 4): a terraced hill of grass — rounded edges in Nahtlos, nothing in Klassisch
+{
+  const GRASS = V.R.byName['grass_block'].defaultState, DIRT = V.R.byName['dirt'].defaultState;
+  const hill = (fancy) => {
+    const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS).fill(0xf000);
+    for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) {
+      const pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
+      const h = 4 + Math.max(0, 6 - Math.max(Math.abs(x - 8), Math.abs(z - 8)));   // a stepped pyramid, 1 block a step, flat top
+      if (y < h) { blocks[pi] = y === h - 1 ? GRASS : DIRT; light[pi] = 0; }
+    }
+    const t = new Uint16Array(PSS).fill(0x4d6a);
+    return { blocks, light, grass: t, foliage: t, water: t, sy: 4, ox: 0, oz: 0, smooth: true, fancyLeaves: fancy, vxLod: true };
+  };
+  const grid = (r) => { let off = 0; const n = r.opaque.length / 8; for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) { const p = r.opaque[i * 8 + c] / 2048 - 4; if (Math.abs(p - Math.round(p)) > 0.02) off++; } return { n, off }; };
+  const same = (A, B) => A.length === B.length && A.every((x, i) => x === B[i]);
+  V.setLook('seamless'); V.VX.clearCache();
+  const h0 = V.meshSection(hill(true)), h4 = V.meshSection(hill(6)), h2 = V.meshSection(hill(2));
+  const g0 = grid(h0), g4 = grid(h4);
+  check(g4.off > g0.off * 1.5 + 50, 'Runde Hänge (Nahtlos): the terraces\' edges off the grid', g0.off + ' → ' + g4.off + ' coords, ' + g0.n + ' → ' + g4.n + ' vertices');
+  check(g4.n < g0.n * 3, 'Runde Hänge: at most 3× the vertices of the height field on a terraced hill', g0.n + ' → ' + g4.n);
+  check(same(h0.opaque, h2.opaque), 'Runde Kronen alone leaves the ground as it was');
+  // the hill's flat top stays one merged face (the greedy pass): its middle has no vertex at y = 10 inside x,z 7..9
+  let mid = 0; for (let i = 0; i < g4.n; i++) { const x = h4.opaque[i * 8] / 2048 - 4, y = h4.opaque[i * 8 + 1] / 2048 - 4, z = h4.opaque[i * 8 + 2] / 2048 - 4; if (Math.abs(y - 10) < 1e-3 && x > 7.5 && x < 8.5 && z > 7.5 && z < 8.5) mid++; }
+  check(mid === 0, 'Runde Hänge: flat ground still merged (no vertex inside the flat top)', mid);
+  V.setLook('classic'); V.VX.clearCache();
+  check(same(V.meshSection(hill(true)).opaque, V.meshSection(hill(6)).opaque), 'Klassisch: Runde Hänge changes nothing (no smooth ground there)');
+  V.setLook('seamless'); V.VX.clearCache();
+}
+
 // c  the switch, row, texts, wiring
 const src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 global.window = global.window || { devicePixelRatio: 1, screen: { width: 1280, height: 720 } };
@@ -77,15 +106,15 @@ try { require(ROOT + '/src/main/qart3.js'); } catch (e) { console.log('   ' + e.
 const Q3 = V.QArt3;
 check(!!Q3, 'VR.QArt3 exists');
 if (Q3) {
-  check(Q3.SW.join() === 'qRound', 'the switches', Q3.SW.join());
-  check(!Q3.defaults('potato').qRound && !Q3.defaults('low').qRound, 'Very Low and Low: off');
-  check(Q3.defaults('balanced').qRound && Q3.defaults('high').qRound && Q3.defaults('ultra').qRound, 'Balanced, High, Ultra: on');
-  const row = Q3.ROWS.find(r => r.key === 'qRound');
-  check(row && row.cost === 'low' && row.t === 'switch', 'the row: a switch, cost low');
-  check(Q3.leafMode({ fancyLeaves: true, qRound: true }) === 2 && Q3.leafMode({ fancyLeaves: true, qRound: false }) === true && Q3.leafMode({ fancyLeaves: false, qRound: true }) === false, 'leafMode: 2 only with fancy leaves and the switch');
+  check(Q3.SW.join() === 'qRound,qHill', 'the switches', Q3.SW.join());
+  for (const k of Q3.SW) check(!Q3.defaults('potato')[k] && !Q3.defaults('low')[k], k + ': Very Low and Low off');
+  for (const k of Q3.SW) check(Q3.defaults('balanced')[k] && Q3.defaults('high')[k] && Q3.defaults('ultra')[k], k + ': Balanced, High, Ultra on');
+  for (const k of Q3.SW) { const row = Q3.ROWS.find(r => r.key === k); check(row && row.cost === 'low' && row.t === 'switch', k + ': a switch row, cost low'); }
+  const LM = (f, r, h) => Q3.leafMode({ fancyLeaves: f, qRound: r, qHill: h });
+  check(LM(true, true, false) === 2 && LM(true, false, false) === true && LM(false, true, false) === false && LM(true, true, true) === 6 && LM(false, false, true) === 12 && LM(false, false, false) === false, 'leafMode: the bits (2 crowns with fancy leaves, 4 hills, 8 not fancy), else the boolean as before');
 }
 const de = src('src/main/lang_de.js'), en = src('src/main/lang_en.js');
-for (const k of ['g.set.qRound', 'g.set.qRound.tip']) check(de.includes("'" + k + "'") && en.includes("'" + k + "'"), 'text ' + k + ' in both languages');
+for (const k of ['g.set.qRound', 'g.set.qRound.tip', 'g.set.qHill', 'g.set.qHill.tip']) check(de.includes("'" + k + "'") && en.includes("'" + k + "'"), 'text ' + k + ' in both languages');
 check(/'qart3'/.test(src('build.js')), 'build.js bundles qart3');
 check(/QArt3/.test(src('src/main/settings_reg.js')), 'settings_reg.js adds the row');
 const gm = src('src/main/game.js');
