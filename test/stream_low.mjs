@@ -14,6 +14,8 @@
 // Pure measuring: with both builds it checks that the after build fills the cone ahead better at every speed.
 //   nohup bash test/wt_run.sh stream_low.mjs 5400 > .tmp_tests/stream_low.log 2>&1 &
 //   BUILDS (before,after) · PRESETS (low,potato) · SPEEDS (5,20,40,80) · RUN_S (30) · SKIP_SHOTS=1
+//   SLOW (3): the workers' answers held back as if each worker were SLOW times slower — this server's core makes a column
+//   in ~15 ms, a low-end laptop's in 40–60 ms; SLOW=1 measures this server as it is
 // regress: skip  (a before/after benchmark of ~40 min that needs the build before in .tmp_tests/before_dist)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -27,6 +29,7 @@ const BUILDS = (process.env.BUILDS || 'before,after').split(',').filter(b => fs.
 const PRESETS = (process.env.PRESETS || 'low,potato').split(',');
 const SPEEDS = (process.env.SPEEDS || '5,20,40,80').split(',').map(Number);
 const RUN_S = +(process.env.RUN_S || 30);
+const SLOW = +(process.env.SLOW || 3);   // the worker k times slower (a low-end PC; 1 = this server)
 const SHOTS = ROOT + '/test/shots', OUT = ROOT + '/.tmp_tests';
 fs.mkdirSync(SHOTS, { recursive: true });
 let fails = 0;
@@ -46,6 +49,10 @@ const PAGE_INIT = () => {
     const uc = w.unloadColumn.bind(w); w.unloadColumn = function (c) { if (c.shownAt < 0) C.wasted++; return uc(c); };
     if (!pool.__instr) {
       pool.__instr = true;
+      // a weaker PC (SLOW = k): every answer is held back (k − 1) × the job's time — the worker slot stays busy, as if the
+      // worker were k times slower (this server's core is several times a low-end laptop's)
+      const k = window.__SLOW || 1;
+      if (k > 1) { const om = pool.onMsg.bind(pool); pool.onMsg = function (w, m) { if (m.type === 'log' || m.type === 'waiting') return om(w, m); const st = pool.started.get(m.id), ms = m.ms !== undefined ? m.ms : st ? performance.now() - st.t0 : 0; setTimeout(() => om(w, m), Math.min(2000, ms * (k - 1))); }; for (const w of pool.workers) w.onmessage = (e) => pool.onMsg(w, e.data); }
       const sb = pool.submit.bind(pool);
       pool.submit = function (msg, tr, cb, prio) {
         msg._t = performance.now(); const ty = msg.type;
@@ -61,6 +68,7 @@ const PAGE_INIT = () => {
     w.viewCos = Math.cos(Math.atan(Math.tan((g.settings.fov || 75) * Math.PI / 360) * 16 / 9));
     if (VR.StreamPlan) w.streamPlan = g.settings.streamPlan !== false;
     g.world.update(p.pos[0], p.pos[1], p.pos[2], now);
+    const t1 = performance.now(); window.__wMs = t1 - now;
     if (g.horizon) g.horizon.update({ x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: g.settings.fov * Math.PI / 180 });
     g.pool.pump();
   };
@@ -99,13 +107,14 @@ const PAGE_INIT = () => {
     const gen = VR.makeGen('overworld', w.seed, w.genOpts);
     const fx = -Math.sin(o.yaw), fz = -Math.cos(o.yaw), L = o.v * o.secs + 64;
     const prof = [];
-    for (let s = 0; s <= L; s += 16) { const x = o.x0 + fx * s, z = o.z0 + fz * s; let hh = 0; const off = o.walk ? [[0, 0]] : [[0, 0], [24, 0], [-24, 0], [0, 24], [0, -24]]; for (const [a, b] of off) hh = Math.max(hh, gen.surfaceY(Math.floor(x + a), Math.floor(z + b))); prof.push(hh); }
+    for (let s = 0; s <= L; s += 16) { const x = o.x0 + fx * s, z = o.z0 + fz * s; let hh = 0; const off = o.walk ? [[0, 0]] : [[0, 0], [32, 0], [-32, 0], [0, 32], [0, -32]]; for (const [a, b] of off) hh = Math.max(hh, gen.surfaceY(Math.floor(x + a), Math.floor(z + b))); prof.push(hh); }
+    if (!o.walk) { const raw = prof.slice(); for (let i = 0; i < prof.length; i++) for (let j = 1; j <= 4 && i + j < raw.length; j++) prof[i] = Math.max(prof[i], raw[i + j]); }   // (the hill 64 m ahead: climb before it)
     for (let i = 1; i < prof.length; i++) if (!o.walk) prof[i] = Math.max(prof[i], prof[i - 1] - 3);
     const yAt = (s) => { const i = Math.min(prof.length - 2, Math.floor(s / 16)), f = s / 16 - i; return prof[i] * (1 - f) + prof[i + 1] * f + (o.walk ? 1.62 : 35); };
     const hHalf = Math.atan(Math.tan((g.settings.fov || 75) * Math.PI / 360) * 16 / 9);
     p.yaw = o.yaw; p.viewYaw = o.yaw; p.pitch = o.walk ? -0.08 : -0.22; p.flying = true; p.noclip = true;
     const C0 = JSON.parse(JSON.stringify(C)), mesh0 = w.stats.mesh, up0 = w.stats.uploaded || 0;
-    const rec = [], ent = new Map(), ttv = [], tickMs = [];
+    const rec = [], ent = new Map(), ttv = [], tickMs = [], hit = [];
     let missed = 0, s = 0, t0 = performance.now(), last = t0, nextRec = t0;
     const rd = w.renderDist;
     while (true) {
@@ -113,7 +122,7 @@ const PAGE_INIT = () => {
       if (el >= o.secs) break;
       s += o.v * Math.min(0.1, (now - last) / 1000); last = now;
       p.pos[0] = o.x0 + fx * s; p.pos[2] = o.z0 + fz * s; p.pos[1] = yAt(s);
-      const a = performance.now(); window.__tick(); tickMs.push(performance.now() - a);
+      const a = performance.now(); window.__tick(); const tk = performance.now() - a; tickMs.push(tk); if (tk > 16) hit.push([+tk.toFixed(1), +window.__wMs.toFixed(1)]);
       if (now >= nextRec) {
         nextRec = now + 100;
         // columns entering the cone inside the render distance
@@ -139,13 +148,14 @@ const PAGE_INIT = () => {
     const end = performance.now(); let open = 0; for (const e of ent.values()) if (e > 0) { ttv.push(end - e); open++; }
     const cancel = {}; for (const k in C.cancel) cancel[k] = C.cancel[k] - (C0.cancel[k] || 0);
     const done = {}; for (const k in C.done) done[k] = C.done[k] - (C0.done[k] || 0);
-    return { rec, ttv, missed, open, tickMs, cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
+    return { rec, ttv, missed, open, tickMs, hit: hit.sort((x, y) => y[0] - x[0]).slice(0, 5), cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
   };
 };
 
 async function open(build, preset) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
   await ctx.addInitScript(PAGE_INIT);
+  await ctx.addInitScript((k) => { window.__SLOW = k; }, SLOW);
   const page = await ctx.newPage();
   page.on('pageerror', e => errs.push('[pageerror] ' + build + ': ' + (e.stack || e.message).slice(0, 500)));
   page.on('console', m => { if (m.type() === 'error') errs.push('[console] ' + build + ': ' + m.text().slice(0, 240)); });
@@ -195,7 +205,7 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
         req: R.length ? R[R.length - 1].req : 0, gen: R.length ? R[R.length - 1].gen : 0, mesh: R.length ? R[R.length - 1].mesh : 0, up: R.length ? R[R.length - 1].up : 0, wasted: r.wasted,
         q0Max: Math.max(0, ...R.map(x => x.q0)), q1Max: Math.max(0, ...R.map(x => x.q1)), age0Max: Math.max(0, ...R.map(x => x.age0)), age1Max: Math.max(0, ...R.map(x => x.age1)), upQMax: Math.max(0, ...R.map(x => x.upQ)),
         tickMed: +med(r.tickMs).toFixed(2), tickP99: +pct(r.tickMs, 0.99).toFixed(1), tickMax: +Math.max(...r.tickMs).toFixed(1), hitches: r.tickMs.filter(m => m > 16).length,
-        cancel: r.cancel, done: r.done,
+        cancel: r.cancel, done: r.done, worst: r.hit, slow: SLOW,
       };
       console.log('RUN ' + JSON.stringify(out));
       results[`${preset}_${v}_${build}`] = { out, rec: R };

@@ -376,7 +376,7 @@
   };
   // the chunks rest: the flight crosses the whole render distance within one latency — no column asked for now would
   // be shown before the camera has passed it; the workers go to the far tiles until the flight slows (or the world quickens)
-  SP.REST = 1;
+  SP.REST = 1.2;
   // while resting no column is shown, so no latency is learnt: it eases back (halves in ~12 s at 30 fps) and the chunks try
   // again — a slow moment (a town's plan) never keeps them resting for the rest of a flight
   SP.ease = function (lat) { return Math.max(SP.LAT_MIN, lat * 0.998); };
