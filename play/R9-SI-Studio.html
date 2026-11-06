@@ -35241,11 +35241,125 @@ partCache.set(key,e);
 return e;
 }
 
+
+
+
+
+
+
+
+
+
+
+const RC=VR.RoundCrown={iso:0.5,tMin:0.22,tMax:0.86,bump:0.42,clump:2.6};
+const rcH=(x,y,z)=>{let h=Math.imul(x|0,374761393)^Math.imul(y|0,668265263)^Math.imul(z|0,1274126177);h=Math.imul(h^(h>>>13),1103515245);return((h^(h>>>16))&0xffff)/65535;};
+const rcS3=(t)=>t*t*(3-2*t);
+RC.noise=function(x,y,z){
+const c=RC.clump,X=x/c,Y=y/(c*0.8),Z=z/c,x0=Math.floor(X),y0=Math.floor(Y),z0=Math.floor(Z);
+const fx=rcS3(X-x0),fy=rcS3(Y-y0),fz=rcS3(Z-z0);
+let v=0;
+for(let i=0;i<8;i++){const a=i&1,b=(i>>1)&1,d=(i>>2)&1;v+=rcH(x0+a,y0+b,z0+d)*(a?fx:1-fx)*(b?fy:1-fy)*(d?fz:1-fz);}
+return v;
+};
+const RC_F=new Float32Array(PSS*PS),RC_T=new Float32Array(PSS*PS),RC_O=new Uint8Array(PSS*PS);
+const RCN=18,RC_V=new Float32Array(RCN*RCN*RCN*3),RC_OK=new Uint8Array(RCN*RCN*RCN);
+
+
+RC.ROCK= /^(stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|moss_block|snow_block|packed_ice|clay|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta)$/;
+let RC_X=null;
+RC.rockTable=function(){
+if(RC_X&&RC_X.length===R.stateCount)return RC_X;
+RC_X=new Uint8Array(R.stateCount);
+for(const t of R.types)if(RC.ROCK.test(t.name))for(let s=t.defaultState;s<R.stateCount&&R.T.type[s]===t.id;s++)if(R.T.shape[s]===SH.CUBE)RC_X[s]=1;
+
+for(const t of R.types)if(RC.ROCK.test(t.name))for(let s=t.defaultState-1;s>0&&R.T.type[s]===t.id;s--)if(R.T.shape[s]===SH.CUBE)RC_X[s]=1;
+return RC_X;
+};
+
+
+RC.VXLEAF={vx_fruit_crown_apple:'oak_leaves',vx_fruit_crown_orange:'oak_leaves',vx_fruit_crown_cherry:'cherry_leaves',vx_fruit_crown_plum:'flowering_azalea_leaves',vx_bush:'oak_leaves',vx_bush_light:'azalea_leaves',vx_hedge:'oak_leaves',vx_hedge_light:'azalea_leaves'};
+let RC_L=null;
+RC.leafTable=function(){
+if(RC_L&&RC_L.length===R.stateCount)return RC_L;
+RC_L=new Int32Array(R.stateCount);
+for(const n in RC.VXLEAF){const t=R.byName[n],l=R.byName[RC.VXLEAF[n]];if(!t|| !l)continue;for(let s=1;s<R.stateCount;s++)if(R.T.type[s]===t.id)RC_L[s]=l.defaultState;}
+return RC_L;
+};
+RC.solver=function(B,TF,leaves,ox,oy,oz){
+const M=(leaves===false?0:F.LEAVES)|F.OPAQUE,n=PSS*PS,LV=F.LEAVES,OP=F.OPAQUE;
+ox=ox|0;oy=oy|0;oz=oz|0;
+const XL=leaves===false?null:RC.leafTable();
+for(let i=0;i<n;i++)RC_O[i]=(TF[B[i]]&M)||(XL!==null&&XL[B[i]]!==0)?1:0;
+
+const pass=(src,dst,st,ax)=>{
+for(let y=0;y<PS;y++)for(let z=0;z<PS;z++)for(let x=0;x<PS;x++){
+const i=y*PSS+z*PS+x,c=ax===0?x:ax===1?y:z;
+const a=c>0?src[i-st]:src[i],b=c<PS-1?src[i+st]:src[i];
+dst[i]=(a+2*src[i]+b)*0.25;
+}
+};
+for(let i=0;i<n;i++)RC_F[i]=RC_O[i];
+pass(RC_F,RC_T,1,0);pass(RC_T,RC_F,PSS,1);pass(RC_F,RC_T,PS,2);
+RC_OK.fill(0);
+const S={
+field:RC_T,occ:RC_O,
+
+vert(cx,cy,cz,out){
+const ci=((cy+1)*RCN+(cz+1))*RCN+(cx+1);
+if(RC_OK[ci]){out[0]=RC_V[ci*3];out[1]=RC_V[ci*3+1];out[2]=RC_V[ci*3+2];return out;}
+let sx=0,sy=0,sz=0,k=0;
+for(let e=0;e<12;e++){
+const ax=e>>2,u=e&1,w=(e>>1)&1;
+
+const ax0=cx+(ax===0?0:u),ay0=cy+(ax===1?0:(ax===0?u:w)),az0=cz+(ax===2?0:w);
+const bx=ax0+(ax===0?1:0),by=ay0+(ax===1?1:0),bz=az0+(ax===2?1:0);
+const ia=P(ax0,ay0,az0),ib=P(bx,by,bz);
+if(RC_O[ia]===RC_O[ib])continue;
+const fi=RC_O[ia]?RC_T[ia]:RC_T[ib],fo=RC_O[ia]?RC_T[ib]:RC_T[ia];
+let t=fi>fo?(fi-RC.iso)/(fi-fo):0.5;
+t=t<RC.tMin?RC.tMin:t>RC.tMax?RC.tMax:t;
+if(!RC_O[ia])t=1-t;
+sx+=ax0+(bx-ax0)*t+0.5;sy+=ay0+(by-ay0)*t+0.5;sz+=az0+(bz-az0)*t+0.5;k++;
+}
+if(!k){sx=cx+1;sy=cy+1;sz=cz+1;k=1;}
+sx/=k;sy/=k;sz/=k;
+
+if(RC.bump>0&&leaves!==false){
+let lf=0,op=0,gx=0,gy=0,gz=0;
+for(let c=0;c<8;c++){
+const qx=cx+(c&1),qy=cy+((c>>1)&1),qz=cz+((c>>2)&1),qi=P(qx,qy,qz),f=TF[B[qi]];
+if(f&OP)op++;else if((f&LV)||XL[B[qi]])lf++;
+const v=RC_T[qi];gx+=(c&1)?v: -v;gy+=((c>>1)&1)?v: -v;gz+=((c>>2)&1)?v: -v;
+}
+const gl=Math.hypot(gx,gy,gz);
+if(lf&& !op&&gl>1e-4){
+const a=(RC.noise(ox+sx,oy+sy,oz+sz)-0.45)*2*RC.bump/gl;
+sx-=gx*a;sy-=gy*a;sz-=gz*a;
+}
+}
+RC_V[ci*3]=out[0]=sx;RC_V[ci*3+1]=out[1]=sy;RC_V[ci*3+2]=out[2]=sz;RC_OK[ci]=1;
+return out;
+},
+};
+return S;
+};
+
 VR.meshSection=function(job){
 const T=R.T,TF=T.flags,TSH=T.shape,TL=T.layer,TTEX=T.tex,TTINT=T.tint,TTYPE=T.type,TRC=T.rc;
 if(!CTMK)ctmTables();
 const B=job.blocks,L=job.light,GR=job.grass,FO=job.foliage,WA=job.water;
-const fancy=job.fancyLeaves!==false,smooth=job.smooth!==false;
+
+
+const lm=typeof job.fancyLeaves==='number'?job.fancyLeaves:0;
+const fancy=job.fancyLeaves!==false&& !(lm&8),smooth=job.smooth!==false;
+
+
+const roundOn=(lm&2)!==0&&fancy,groundOn=(lm&4)!==0;
+const RCX=groundOn&&VR.LOOK&&VR.LOOK.ground?RC.rockTable():null;
+const RCL=roundOn?RC.leafTable():null;
+const rcGround=(b)=>(TF[b]&F.SMOOTH)!==0||(RCX!==null&&RCX[b]===1);
+let rcS=null;
+const rcV=[0,0,0],rcP=new Float64Array(12);
 
 
 
@@ -35393,6 +35507,38 @@ if(py===y1)py=smC[(FP[k*3]===x1?(FP[k*3+2]===z1?2:3):(FP[k*3+2]===z1?1:0))];
 buf.v(FP[k*3],py,FP[k*3+2],w3,k>=2?16:0,(k===1||k===2)?16:0,w5base|((aos?aos[k]:0)<<3),lights?lights[k]:0,tint);
 }
 }
+
+
+function emitRoundQuad(buf,d,x,y,z,bi,b,fl,onlyMoved){
+if(!rcS)rcS=RC.solver(B,TF,roundOn,job.ox,(job.sy|0)*16,job.oz);
+facePosInto(d,x,y,z,x+1,y+1,z+1);
+let moved=0;
+for(let k=0;k<4;k++){rcS.vert(FP[k*3]-1,FP[k*3+1]-1,FP[k*3+2]-1,rcV);rcP[k*3]=rcV[0];rcP[k*3+1]=rcV[1];rcP[k*3+2]=rcV[2];moved+=Math.abs(rcV[0]-FP[k*3])+Math.abs(rcV[1]-FP[k*3+1])+Math.abs(rcV[2]-FP[k*3+2]);}
+
+if(onlyMoved&&moved<1e-4)return false;
+const ux=rcP[6]-rcP[0],uy=rcP[7]-rcP[1],uz=rcP[8]-rcP[2],vx=rcP[9]-rcP[3],vy=rcP[10]-rcP[4],vz=rcP[11]-rcP[5];
+let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+
+const ax=DAXIS[d],sgn=(d&1)? -1:1;
+const fx=FP[6]-FP[0],fy=FP[7]-FP[1],fz=FP[8]-FP[2],gx=FP[9]-FP[3],gy=FP[10]-FP[4],gz=FP[11]-FP[5];
+const rn=ax===0?fy*gz-fz*gy:ax===1?fz*gx-fx*gz:fx*gy-fy*gx;
+const fl0=rn*sgn>0?1: -1;
+nx*=fl0;ny*=fl0;nz*=fl0;
+const anx=Math.abs(nx),any=Math.abs(ny),anz=Math.abs(nz);
+let dd=d;
+if(anx+any+anz>1e-6)dd=anx>=any&&anx>=anz?(nx>=0?0:1):any>=anz?(ny>=0?2:3):(nz>=0?4:5);
+const rcb=TRC[b],tint=rcb||tintAt(TTINT[b],x,z,b);
+let w5=dd|((fl&F.EMISSIVE)?1<<12:0)|(rcb?32768:0);
+if(fl&F.WAVELEAF)w5|=1<<7;
+const w3=texW3(TTEX[b*6+dd],fl,dd,b);
+const start=(bright(0)+bright(2)<bright(1)+bright(3))?1:0;
+buf.ensure(4);
+for(let kk=0;kk<4;kk++){
+const k=(kk+start)&3;
+buf.v(rcP[k*3],rcP[k*3+1],rcP[k*3+2],w3,k>=2?16:0,(k===1||k===2)?16:0,w5|(cornerAO[k]<<3),cornerLight[k],tint);
+}
+return true;
+}
 const texW3=(texv,flags,d,state)=>{
 const layer=texv&0xfff,rot=(texv>>12)&3;
 let w3=layer|(rot<<12);
@@ -35444,6 +35590,11 @@ if(TF[nb]&F.OPAQUE)continue;
 const mi=v*16+u;
 
 
+
+
+if(groundOn&&rcGround(b)){
+if(!(roundOn&&(TF[nb]&F.LEAVES))){faceCorners(bi,d);if(emitRoundQuad(bufs[0],d,x,y,z,bi,b,fl,true))continue;}
+}else
 if((fl&F.SMOOTH)&&d!==3&& !(TF[B[bi+PSS]]&F.OPAQUE)&&smoothAt(x,y,z)){
 if(d!==2){
 
@@ -35548,6 +35699,12 @@ if(fl&F.SELFCULL)continue;
 if((fl&F.LEAVES)&& !fancy)continue;
 }
 if((fl&F.LEAVES)&&(TF[nb]&F.LEAVES)&& !fancy)continue;
+if(roundOn&&(fl&F.LEAVES)){
+if((TF[nb]&F.LEAVES)||RCL[nb])continue;
+faceCorners(bi,d);
+emitRoundQuad(bufs[layer],d,x,y,z,bi,b,fl);
+continue;
+}
 if(layer===2&&(TF[nb]&F.TRANS)&&same(nb))continue;
 faceCorners(bi,d);
 
@@ -35564,7 +35721,15 @@ emitCubeQuad(bufs[layer],d,x,y,z,x+1,y+1,z+1,1,1,texW3(texv,fl,d,b),w5,cornerLig
 }
 continue;
 }
-if(shape===SH.VOXEL){if(vxSkip){vxSkipped++;continue;}if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;}
+if(shape===SH.VOXEL){
+if(roundOn&&RCL[b]){
+const ls=RCL[b];
+for(let d=0;d<6;d++){const nb=B[bi+DOFF[d]];if((TF[nb]&(F.OPAQUE|F.LEAVES))||RCL[nb])continue;faceCorners(bi,d);emitRoundQuad(bufs[1],d,x,y,z,bi,ls,TF[ls]);}
+continue;
+}
+if(vxSkip){vxSkipped++;continue;}
+if(vxM)VR.VX.meshBlock(vxM,x,y,z,bi,b);continue;
+}
 if(shape===SH.FLUID){meshFluid(x,y,z,bi,b);continue;}
 let faces=null;
 const t=R.types[TTYPE[b]];
@@ -35597,7 +35762,12 @@ ox=((h&15)/15-0.5)*0.35;oz=(((h>>4)&15)/15-0.5)*0.35;
 
 if(PH&&(shapeOf(b)===SH.CROSS||shapeOf(b)===SH.TALLCROSS||shapeOf(b)===SH.CROP)&&y>0){
 const bb=B[bi-PSS];
-if((TF[bb]&F.SMOOTH)&&smoothAt(x,y-1,z)){const fx=0.5+ox,fz=0.5+oz;oy=smC[0]*(1-fx)*(1-fz)+smC[1]*(1-fx)*fz+smC[2]*fx*fz+smC[3]*fx*(1-fz)-y;}
+if(groundOn&&rcGround(bb)){
+if(!rcS)rcS=RC.solver(B,TF,roundOn,job.ox,(job.sy|0)*16,job.oz);
+for(let k=0;k<4;k++){rcS.vert(x-1+(k>>1),y-1,z-1+(((k+1)>>1)&1),rcV);smC[k]=rcV[1];}
+const fx=0.5+ox,fz=0.5+oz;oy=smC[0]*(1-fx)*(1-fz)+smC[1]*(1-fx)*fz+smC[2]*fx*fz+smC[3]*fx*(1-fz)-y;
+smKey= -1;
+}else if((TF[bb]&F.SMOOTH)&&smoothAt(x,y-1,z)){const fx=0.5+ox,fz=0.5+oz;oy=smC[0]*(1-fx)*(1-fz)+smC[1]*(1-fx)*fz+smC[2]*fx*fz+smC[3]*fx*(1-fz)-y;}
 }
 let rotLily=0;
 if(t.o.randomRot)rotLily=M_hash(x+job.ox,z+job.oz)&3;
@@ -68472,6 +68642,10 @@ VR.I18N.add('en',{
 'g.set.qIsle.tip':'Floating isles with a rounded rocky underside, rock strata and moss, soft light from the land below and a soft shadow on the ground. Costs little.',
 'g.set.qCrown':'Distant crowns',
 'g.set.qCrown.tip':'Tree crowns stay round far away too, their shadows have ragged edges instead of squares; blossom crowns are lighter inside. Needs Leafy crowns. Costs little.',
+'g.set.qRound':'Round crowns',
+'g.set.qRound.tip':'Tree crowns as rounded masses of leaves instead of cubes: the crown\'s corners and edges round off. Only the picture, the blocks stay as they are. Costs little.',
+'g.set.qHill':'Round hills',
+'g.set.qHill.tip':'In the Seamless look the edges, terraces and cliffs of the natural ground and the undersides of the floating isles round off. Only the picture, the blocks and walking stay as they are. Costs little.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -73277,6 +73451,10 @@ VR.I18N.add('de',{
 'g.set.qIsle.tip':'Schwebende Inseln mit gerundeter Felsunterseite, Gesteinsschichten und Moos, sanftem Licht vom Land darunter und einem weichen Schatten auf dem Boden. Kostet wenig.',
 'g.set.qCrown':'Fernkronen',
 'g.set.qCrown.tip':'Baumkronen bleiben auch in der Ferne rund, ihre Schatten haben ausgefranste Ränder statt Quadrate; Blütenkronen sind innen heller. Braucht Laubkronen. Kostet wenig.',
+'g.set.qRound':'Runde Kronen',
+'g.set.qRound.tip':'Baumkronen als gerundete Laubmassen statt Würfeln: Ecken und Kanten der Krone werden rund. Nur das Bild, die Blöcke bleiben, wie sie sind. Kostet wenig.',
+'g.set.qHill':'Runde Hänge',
+'g.set.qHill.tip':'Im Look Nahtlos werden Kanten, Stufen und Klippen des natürlichen Bodens und die Unterseiten der Schwebeinseln rund. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',
