@@ -339,9 +339,13 @@
       if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : this.seamBudget());
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
-      if (off || (this.frame & 1)) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
+      // (p-stream: with the plan the disk reaches rd + 0.5 + √2 — every column a mesh is wanted for, out to rd + 0.5, has its 8
+      // neighbours inside it; before, the rim's off-axis columns waited for neighbours outside the disk until the player
+      // came a chunk closer: 1–4 s late at a walk)
+      const reqR = SP ? rd + SP.RIM : loadR + 0.5, LR = Math.ceil(reqR - 0.5);
+      if (off || (this.frame & 1)) for (let dz = -LR; dz <= LR; dz++) for (let dx = -LR; dx <= LR; dx++) {
         const d2 = dx * dx + dz * dz;
-        if (d2 > (loadR + 0.5) * (loadR + 0.5)) continue;
+        if (d2 > reqR * reqR) continue;
         const cx = lcx + dx, cz = lcz + dz, k = ckey(cx, cz);
         const c = this.cols.get(k);
         if (c) { c.lastSeen = now; continue; }
@@ -384,8 +388,9 @@
       let fast = SP.moving(speed);
       const vd = this.viewDir;
       if (fast && vd && (vd[0] * ux + vd[1] * uz) < 0.7) fast = false;
-      this.planFast = fast; this.planSpeed = speed; this.planRest = fast && SP.rest(speed, this.lat || SP.LAT0, this.renderDist);
-      if (this.planRest) this.lat = SP.ease(this.lat || SP.LAT0);
+      this.planFast = fast; this.planSpeed = speed; if (this.planHit === undefined) this.planHit = 1;
+      this.planRest = fast && SP.rest(speed, this.planHit, !!this.planRest);
+      if (this.planRest) this.planHit = SP.ease(this.planHit);
       const U = this.planU || (this.planU = [0, 0]); U[0] = ux; U[1] = uz;
       const pool = this.pool;
       if (pool && pool.farShare !== undefined) pool.farShare = SP.share(speed, this.lat || SP.LAT0, this.renderDist);
@@ -503,7 +508,7 @@
         while (C.size > this.colCacheN) C.delete(C.keys().next().value);
       }
       this.cols.delete(c.key); this.fading.delete(c);
-      if (this.reqAt) this.reqAt.delete(c.key);
+      if (this.reqAt) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); if (c.shownAt < 0) this.planHit = VR.StreamPlan.hit(this.planHit, false); } }   // (p-stream: asked for in fast flight, never shown)
       this.lastCol = null;
       this.shDirty.delete(c.key); this.shGone.add(c.key);
       for (const l of this.listeners) if (l.onColumnUnloaded) l.onColumnUnloaded(c);
@@ -685,7 +690,7 @@
       const lp = this.lastPos, r = this.renderer;
       const plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
       // (the latency is learnt in fast flight only: a world loading round a standing player queues far more than a flight)
-      if (this.reqAt && this.reqAt.size) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); if (this.now !== undefined && VR.StreamPlan && this.planFast) this.lat = VR.StreamPlan.lat(this.lat, (this.now - t) / 1000); } }   // (p-stream)
+      if (this.reqAt && this.reqAt.size) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); if (this.now !== undefined && VR.StreamPlan) { this.planHit = VR.StreamPlan.hit(this.planHit, true); if (this.planFast) this.lat = VR.StreamPlan.lat(this.lat, (this.now - t) / 1000); } } }   // (p-stream)
       c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1; c.fadeMs = plan.ms || VR.Stream.FADE_MS;   // (f-stipple2: shorter far out)
       if (c.fade < 1 || c.grow < 1) this.fading.add(c);
       for (let i = 0; i < c.sec.length; i++) { c.sec[i].fade = c.fade; c.sec[i].grow = c.grow; }

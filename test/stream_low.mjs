@@ -179,7 +179,7 @@ async function open(build, preset) {
   }, preset);
   return { build, preset, ctx, page, ev, info };
 }
-const home = (P) => P.ev(async () => { const p = VR.game.player, s = window.__spawn; p.pos[0] = s[0]; p.pos[1] = s[1] + 30; p.pos[2] = s[2]; return window.__settle(120); });
+const home = (P) => P.ev(async () => { const p = VR.game.player, s = window.__spawn; p.pos[0] = s[0]; p.pos[1] = s[1] + 30; p.pos[2] = s[2]; return window.__settle(60); });
 
 const med = (a) => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
 const pct = (a, q) => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[Math.min(b.length - 1, Math.floor(q * b.length))] : 0; };
@@ -190,7 +190,7 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
   const order = pi % 2 === 0 ? BUILDS : BUILDS.slice().reverse();   // (the order alternates: the machine's load drifts)
   for (const build of order) {
     const P = await open(build, preset);
-    const st0 = await P.ev(() => window.__settle(240));
+    const st0 = await P.ev(() => window.__settle(180));
     console.log(`== ${build} · ${preset}: ${JSON.stringify(P.info)} · spawn settled in ${st0} s`);
     for (let si = 0; si < SPEEDS.length; si++) {
       const v = SPEEDS[si];

@@ -337,7 +337,9 @@
   // the far tiles (one ≈ 40 ms for 64 columns' worth of land) to 30 % of the workers, so the land ahead came late or not
   // at all and showed holes.
   // The plan:
-  //  · latency  the world measures how long a requested column takes to be shown (lat, an average in seconds)
+  //  · rim      the request disk reaches rd + 0.5 + √2 chunks (was rd + 1.5): every column inside the render distance has
+//             its 8 neighbours asked for — the rim's off-axis columns no longer wait 1–4 s at a walk for neighbours outside
+//  · latency  the world measures how long a requested column takes to be shown (lat, an average in seconds)
   //  · worth    while moving fast (FAST blocks/s and up), a column is asked for only if it will still be in the view cone
   //             when it is ready: its time until the cone's edge passes it (timeLeft) ≥ WORTH × lat. The columns right
   //             round the player (KEEP chunks) are always asked for. A queued request no longer worth it is cancelled.
@@ -351,6 +353,7 @@
   // (src/shared/stream.js: loaded by the main thread and the workers; only world.js and horizon.js call it)
   {
   const SP = VR.StreamPlan = {};
+  SP.RIM = 0.5 + Math.SQRT2;   // the request disk's radius beyond the render distance: a shown column's 8 neighbours
   SP.FAST = 14;          // blocks/s: slower (walking, plain flight 11 m/s) the streaming works exactly as before
   SP.KEEP = 1.5;         // chunks: always asked for (the ground under the player and its neighbours)
   SP.WORTH = 0.75;       // a column must stay in view this share of the latency after it is asked for
@@ -377,10 +380,13 @@
   // the chunks rest: the flight crosses the whole render distance within one latency — no column asked for now would
   // be shown before the camera has passed it; the workers go to the far tiles until the flight slows (or the world quickens)
   SP.REST = 1.2;
-  // while resting no column is shown, so no latency is learnt: it eases back (halves in ~12 s at 30 fps) and the chunks try
-  // again — a slow moment (a town's plan) never keeps them resting for the rest of a flight
-  SP.ease = function (lat) { return Math.max(SP.LAT_MIN, lat * 0.998); };
-  SP.rest = function (speedB, lat, rd) { return speedB >= SP.FAST && (speedB / 16) * lat > rd * SP.REST; };
+  // the chunks rest when most of what fast flight asks for is never shown (the hit share: an average over the requests
+  // made in fast flight — 1 shown, 0 unloaded unseen); they start again above REST_OFF. While resting nothing is asked
+  // for, so nothing is learnt: the share eases back (REST_ON → REST_OFF in ~7 s at 30 fps) and the chunks try again
+  SP.REST_ON = 0.3; SP.REST_OFF = 0.45;
+  SP.hit = function (prev, shown) { const p = prev >= 0 ? prev : 1; return p + ((shown ? 1 : 0) - p) * 0.05; };
+  SP.ease = function (hit) { return Math.min(1, hit + 0.0007); };
+  SP.rest = function (speedB, hit, resting) { return speedB >= SP.FAST && hit < (resting ? SP.REST_OFF : SP.REST_ON); };
   // the request's place (smaller first): the old order (distance², discounted ahead) and OUT_K outside the cone
   SP.prio = function (ex, ez, ux, uz, ahead, cosH) {
     const d2 = ex * ex + ez * ez, along = ahead ? Math.max(0, ex * ux + ez * uz) : 0;

@@ -7,7 +7,7 @@
 //  e · a simulated flight (the real World and WorkerPool, one simulated worker in virtual time: a generation 40 ms, a
 //      section mesh 8 ms): at 20 and 40 m/s the plan shows more of the cone ahead and wastes fewer columns (generated and
 //      dropped unseen) than the old way; at 80 m/s the chunks rest (as much real terrain, half the columns made: the far
-//      tiles get the worker); walking at 5 m/s it is the old way exactly
+//      tiles get the worker); walking at 3 and 5 m/s the rim's columns show sooner (the disk asks for their neighbours)
 //  f · a queued request no longer worth it is cancelled before a worker touches it
 //  g · turning back: the columns just unloaded come from a small memory (no generation), with the same blocks and light
 //   bash test/wt_run.sh stream_plan.js
@@ -53,7 +53,8 @@ console.log('c · the far lane\'s share');
 {
   check(SP.share(5, 2, 6) === SP.SHARE_BASE && SP.share(11, 2, 6) === SP.SHARE_BASE, 'walking / plain flight: 30 %, as before');
   check(SP.share(40, 1.5, 6) > SP.SHARE_BASE && SP.share(80, 1.5, 6) >= SP.share(40, 1.5, 6) && SP.share(80, 3, 4) === SP.SHARE_MAX, 'fast: more for the far tiles, the more the chunks lag behind', [SP.share(40, 1.5, 6), SP.share(80, 1.5, 6), SP.share(80, 3, 4)].map(x => x.toFixed(2)).join(' ≤ '));
-  { let l = 6, n = 0; while (SP.rest(40, l, 6) && n < 3000) { l = SP.ease(l); n++; } check(SP.rest(40, 6, 6) && n > 150 && n < 900, 'resting: the latency eases back, the chunks try again (a stuck 6 s within ~15 s)', n + ' frames'); }
+  { let h = 1; for (let i = 0; i < 40; i++) h = SP.hit(h, i % 5 === 0); let n = 0, r = SP.rest(40, h, false); const r0 = r; while (r && n < 3000) { h = SP.ease(h); r = SP.rest(40, h, true); n++; }
+    check(r0 && n > 100 && n < 400 && !SP.rest(8, 0, true), 'four requests in five never shown: the chunks rest; the share eases back and they try again within ~7 s; slow: never', n + ' frames'); }
   check(SP.lat(1, 3) > 1 && SP.lat(1, 3) < 3 && SP.lat(1, 100) <= SP.LAT_MAX && SP.lat(0, 0) >= SP.LAT_MIN, 'the latency: a smoothed average, clamped');
 }
 
@@ -120,8 +121,12 @@ console.log('e · a simulated flight on Low (render distance 6, one worker)');
     check(p.wasted < o.wasted || p.gens < o.gens, `${sp} m/s: fewer columns generated for nothing`, `wasted ${o.wasted} → ${p.wasted}, generated ${o.gens} → ${p.gens}`);
     check(p.share > SP.SHARE_BASE, `${sp} m/s: the far tiles get more of the worker`, p.share.toFixed(2));
   }
-  const o = fly(false, 5, 20, 6), p = fly(true, 5, 20, 6);
-  check(o.real === p.real && o.gens === p.gens && p.share === SP.SHARE_BASE, 'walking 5 m/s: exactly as before', `${o.real} / ${p.real} %, ${o.gens} / ${p.gens} columns`);
+  for (const sp of [3, 5]) {
+    const o = fly(false, sp, 20, 6), p = fly(true, sp, 20, 6);
+    console.log(`     walk ${sp} m/s  old: ${JSON.stringify(o)}\n                plan: ${JSON.stringify(p)}`);
+    const late = (x) => x.shownN + x.missed;   // (columns that came into the cone not shown yet)
+    check(p.real > o.real && late(p) < late(o) && p.share === SP.SHARE_BASE, `walking ${sp} m/s: the rim's columns are there sooner (their neighbours asked for), the far tiles' share as before`, `real ${o.real} → ${p.real} %, late columns ${late(o)} → ${late(p)}`);
+  }
 }
 
 console.log('f · stale requests are cancelled');
