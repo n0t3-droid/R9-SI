@@ -68,7 +68,7 @@
     else if ((g.vgen | 0) >= 9) bands = [P.ochre, P.umber, P.terr, P.ochre, mixc(P.terr, P.umber, 0.5), P.umber, mixc(P.terr, [150, 60, 40], 0.4)].map(c => mixc(c, P.stone, 0.22));
     else bands = [P.stone, mulc(P.stone, 0.86), mixc(P.stone, P.dirt, 0.2)];
     const moss = cold ? mixc(P.snow, [80, 100, 70], 0.4) : ember ? mixc(P.umber, [90, 110, 50], 0.35) : [74, 104, 48];
-    return { top, bands, moss, dirt: P.dirt, tuff: [76, 74, 70], vine: cold ? [70, 92, 72] : [52, 88, 34], root: [92, 70, 50] };
+    return { cold, top, bands, moss, dirt: P.dirt, tuff: [76, 74, 70], vine: cold ? [70, 92, 72] : [52, 88, 34], root: [92, 70, 50] };
   };
 
   // the mesh of isle I at detail det, in world coordinates: { pos: Float32Array (x, y, z), col: Uint8Array (r, g, b, shade),
@@ -107,9 +107,10 @@
     if (det >= 1) ring((s) => { const p = at(s, 0.99); return vert(p[0], Math.min(rimY[s] - 2.2, I.y - 1.6), p[1], mixc(pal.dirt, pal.bands[sd % nb], 0.45), 205, 0); });
     // the underside: bands of strata, moss and tuff at the tip; the shade falls toward the tip (its own shadow)
     const U = D.und, last = U.length - 1;
-    // (browser run 2: a calm world's isles — vgen 16 — and the designed gardens are green from below: the bottom two blocks
-    //  of every column are moss in big patches, the strata show on the steps between columns — gen_realm.js calmCell)
-    const GN = VR.GEN, calm = !!(GN && ((GN.isleCalm && GN.isleCalm(g)) || (I.designed && GN.isleGarden && GN.isleGarden(g))));
+    // (browser run 2: the designed gardens are green from below: the bottom two blocks of every column are moss in big
+    //  patches, the strata show on the steps between columns — gen_realm.js gardenCell / calmCell. Browser run 4: ONLY the
+    //  designed gardens (not cold) — a plain isle's chunks are vgen 9's warm strata, its far form must match them)
+    const GN = VR.GEN, calm = !!(GN && I.designed && !pal.cold && GN.isleGarden && GN.isleGarden(g));
     U.forEach((f, k) => ring((s) => {
       // (browser run 2: smooth cones read a little like dishes from afar) rock lumps: a smooth noise swells and dents the
       // underside by up to ±9 % of its radius and ±6 % of its depth (the rim's row stays clean)

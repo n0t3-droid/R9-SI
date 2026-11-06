@@ -60,6 +60,15 @@ for (const [nm, I] of [['big', big], ['small', small]]) {
     if (det === 0) check(m.nv <= 60, nm + ' isle: detail 0 (the coarse tiles) a handful of vertices', m.nv);
   }
 }
+// (browser run 4: the far forms of the plain isles read green while their chunks are warm strata — gen_realm.js puts the
+//  calm moss only under the DESIGNED gardens; a plain isle's underside is vgen 9's ochre, umber, terracotta)
+{
+  const under = (I) => { const m = IS.build(g, I, 2, IS.palette(g, I)); let r = 0, gg = 0, n = 0; for (let v = 0; v < m.nv; v++) { if (m.kind[v] === 5 || m.pos[v * 3 + 1] > I.y - 3) continue; r += m.col[v * 4]; gg += m.col[v * 4 + 1]; n++; } return { r: r / n, g: gg / n }; };
+  const plain = all.filter(I => !I.designed && !IS.palette(g, I).cold).slice(0, 6).map(under);
+  check(plain.length > 2 && plain.every(c => c.r > c.g + 12), 'a plain isle\'s far form warm from below, as its chunks (vgen 16)', plain.map(c => (c.r - c.g).toFixed(0)).join(' '));
+  const gard = all.filter(I => I.designed && !IS.palette(g, I).cold).slice(0, 4).map(under);
+  check(!gard.length || gard.every(c => c.g >= c.r - 4), 'a designed garden\'s far form green from below (calmCell)', gard.map(c => (c.r - c.g).toFixed(0)).join(' ') || 'none near');
+}
 function isCard(m, a, b, c) { return m.col[a * 4 + 3] === 200 && m.col[b * 4 + 3] === 200 && m.col[c * 4 + 3] === 170 || (m.col[a * 4 + 3] === 200 && m.col[c * 4 + 3] === 200 && m.col[b * 4 + 3] === 170); }
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
