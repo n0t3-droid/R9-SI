@@ -178,11 +178,68 @@
     return e;
   }
 
+  // ---- q-art3 · Runde Kronen (job.fancyLeaves === 2; Balanced and up, src/main/qart3.js) ------------------------------
+  // The leaf blocks' render mesh as a surface-nets blob: one vertex per dual cell (the cell whose eight corners are the
+  // centres of voxels c .. c+1), on the mean of its sign-changing edges' crossings. The sign is the raw occupancy (leaves
+  // and solid blocks inside — a crown never pulls away from its trunk or the ground); where an edge is crossed comes from
+  // a 1-2-1 blurred occupancy at iso ½, clamped to [tMin, tMax] of the edge: a box crown's flat faces stay where they
+  // were, its edges and corners round in by up to ~¾ block. A cell reads voxels −1 .. 16 and the blur one more, so both
+  // sections at a border see the same neighbourhood (the pad of 2): the blob is watertight across sections.
+  // Render only: the saved blocks, the generator, collision and the light stay the same.
+  const RC = VR.RoundCrown = { iso: 0.5, tMin: 0.22, tMax: 0.86 };
+  const RC_F = new Float32Array(PSS * PS), RC_T = new Float32Array(PSS * PS), RC_O = new Uint8Array(PSS * PS);
+  const RCN = 18, RC_V = new Float32Array(RCN * RCN * RCN * 3), RC_OK = new Uint8Array(RCN * RCN * RCN);
+  RC.solver = function (B, TF) {
+    const M = F.LEAVES | F.OPAQUE, n = PSS * PS;
+    for (let i = 0; i < n; i++) RC_O[i] = (TF[B[i]] & M) ? 1 : 0;
+    // the blur, one axis at a time (an edge voxel keeps its own value along the cut axis)
+    const pass = (src, dst, st, ax) => {
+      for (let y = 0; y < PS; y++) for (let z = 0; z < PS; z++) for (let x = 0; x < PS; x++) {
+        const i = y * PSS + z * PS + x, c = ax === 0 ? x : ax === 1 ? y : z;
+        const a = c > 0 ? src[i - st] : src[i], b = c < PS - 1 ? src[i + st] : src[i];
+        dst[i] = (a + 2 * src[i] + b) * 0.25;
+      }
+    };
+    for (let i = 0; i < n; i++) RC_F[i] = RC_O[i];
+    pass(RC_F, RC_T, 1, 0); pass(RC_T, RC_F, PSS, 1); pass(RC_F, RC_T, PS, 2);
+    RC_OK.fill(0);
+    const S = {
+      field: RC_T, occ: RC_O,
+      // the vertex of dual cell (cx, cy, cz) (−1 .. 16), section-local block units, into out
+      vert(cx, cy, cz, out) {
+        const ci = ((cy + 1) * RCN + (cz + 1)) * RCN + (cx + 1);
+        if (RC_OK[ci]) { out[0] = RC_V[ci * 3]; out[1] = RC_V[ci * 3 + 1]; out[2] = RC_V[ci * 3 + 2]; return out; }
+        let sx = 0, sy = 0, sz = 0, k = 0;
+        for (let e = 0; e < 12; e++) {
+          const ax = e >> 2, u = e & 1, w = (e >> 1) & 1;
+          // the edge's two corners (voxel coordinates)
+          const ax0 = cx + (ax === 0 ? 0 : u), ay0 = cy + (ax === 1 ? 0 : (ax === 0 ? u : w)), az0 = cz + (ax === 2 ? 0 : w);
+          const bx = ax0 + (ax === 0 ? 1 : 0), by = ay0 + (ax === 1 ? 1 : 0), bz = az0 + (ax === 2 ? 1 : 0);
+          const ia = P(ax0, ay0, az0), ib = P(bx, by, bz);
+          if (RC_O[ia] === RC_O[ib]) continue;
+          const fi = RC_O[ia] ? RC_T[ia] : RC_T[ib], fo = RC_O[ia] ? RC_T[ib] : RC_T[ia];
+          let t = fi > fo ? (fi - RC.iso) / (fi - fo) : 0.5;
+          t = t < RC.tMin ? RC.tMin : t > RC.tMax ? RC.tMax : t;
+          if (!RC_O[ia]) t = 1 - t;   // (t measured from corner a)
+          sx += ax0 + (bx - ax0) * t + 0.5; sy += ay0 + (by - ay0) * t + 0.5; sz += az0 + (bz - az0) * t + 0.5; k++;
+        }
+        if (!k) { sx = cx + 1; sy = cy + 1; sz = cz + 1; k = 1; }
+        RC_V[ci * 3] = out[0] = sx / k; RC_V[ci * 3 + 1] = out[1] = sy / k; RC_V[ci * 3 + 2] = out[2] = sz / k; RC_OK[ci] = 1;
+        return out;
+      },
+    };
+    return S;
+  };
+
   VR.meshSection = function (job) {
     const T = R.T, TF = T.flags, TSH = T.shape, TL = T.layer, TTEX = T.tex, TTINT = T.tint, TTYPE = T.type, TRC = T.rc;
     if (!CTMK) ctmTables();
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
     const fancy = job.fancyLeaves !== false, smooth = job.smooth !== false;
+    // q-art3 · Runde Kronen: the leaves as a blob (VR.RoundCrown; the solver is made at the first leaf face)
+    const roundOn = job.fancyLeaves === 2;
+    let rcS = null;
+    const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
     // mottling; smooth ground follows the F.SMOOTH flags VR.setLook sets. w3 bit 15 is the macro mottling in Nahtlos —
     // in Klassisch (which never mottles) it marks the faces of natural blocks (random rotation, mottled rock, the
@@ -328,6 +385,34 @@
         let py = FP[k * 3 + 1];
         if (py === y1) py = smC[(FP[k * 3] === x1 ? (FP[k * 3 + 2] === z1 ? 2 : 3) : (FP[k * 3 + 2] === z1 ? 1 : 0))];
         buf.v(FP[k * 3], py, FP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
+      }
+    }
+    // q-art3 · Runde Kronen: a leaf face whose corners are the blob's vertices (the cube face's winding, light, AO, uv); its
+    // face index (the shader's normal and texture) the deformed quad's dominant axis
+    function emitRoundQuad(buf, d, x, y, z, bi, b, fl) {
+      if (!rcS) rcS = RC.solver(B, TF);
+      facePosInto(d, x, y, z, x + 1, y + 1, z + 1);
+      for (let k = 0; k < 4; k++) { rcS.vert(FP[k * 3] - 1, FP[k * 3 + 1] - 1, FP[k * 3 + 2] - 1, rcV); rcP[k * 3] = rcV[0]; rcP[k * 3 + 1] = rcV[1]; rcP[k * 3 + 2] = rcV[2]; }
+      const ux = rcP[6] - rcP[0], uy = rcP[7] - rcP[1], uz = rcP[8] - rcP[2], vx = rcP[9] - rcP[3], vy = rcP[10] - rcP[4], vz = rcP[11] - rcP[5];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      // (the cube face's own diagonals give the sign that points out)
+      const ax = DAXIS[d], sgn = (d & 1) ? -1 : 1;
+      const fx = FP[6] - FP[0], fy = FP[7] - FP[1], fz = FP[8] - FP[2], gx = FP[9] - FP[3], gy = FP[10] - FP[4], gz = FP[11] - FP[5];
+      const rn = ax === 0 ? fy * gz - fz * gy : ax === 1 ? fz * gx - fx * gz : fx * gy - fy * gx;
+      const fl0 = rn * sgn > 0 ? 1 : -1;
+      nx *= fl0; ny *= fl0; nz *= fl0;
+      const anx = Math.abs(nx), any = Math.abs(ny), anz = Math.abs(nz);
+      let dd = d;
+      if (anx + any + anz > 1e-6) dd = anx >= any && anx >= anz ? (nx >= 0 ? 0 : 1) : any >= anz ? (ny >= 0 ? 2 : 3) : (nz >= 0 ? 4 : 5);
+      const rcb = TRC[b], tint = rcb || tintAt(TTINT[b], x, z, b);
+      let w5 = dd | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (rcb ? 32768 : 0);
+      if (fl & F.WAVELEAF) w5 |= 1 << 7;
+      const w3 = texW3(TTEX[b * 6 + dd], fl, dd, b);
+      const start = (bright(0) + bright(2) < bright(1) + bright(3)) ? 1 : 0;
+      buf.ensure(4);
+      for (let kk = 0; kk < 4; kk++) {
+        const k = (kk + start) & 3;
+        buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
       }
     }
     const texW3 = (texv, flags, d, state) => {
@@ -484,6 +569,12 @@
             if ((fl & F.LEAVES) && !fancy) continue;
           }
           if ((fl & F.LEAVES) && (TF[nb] & F.LEAVES) && !fancy) continue;
+          if (roundOn && (fl & F.LEAVES)) {   // q-art3 · Runde Kronen: only the crown's outside, its corners from the blob
+            if (TF[nb] & F.LEAVES) continue;
+            faceCorners(bi, d);
+            emitRoundQuad(bufs[layer], d, x, y, z, bi, b, fl);
+            continue;
+          }
           if (layer === 2 && (TF[nb] & F.TRANS) && same(nb)) continue;
           faceCorners(bi, d);
           // a recoloured block (never connected glass: there bit 15 belongs to the frame mask)

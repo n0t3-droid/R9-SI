@@ -42,6 +42,8 @@
   const Q2_SW = VR.QArt2 ? VR.QArt2.SW : [];   // q-art2: Wiese, Schwebeinseln, Fernkronen
   if (VR.QArt2) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt2.defaults(p));
   if (VR.QArt) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt.defaults(p));
+  const Q3_SW = VR.QArt3 ? VR.QArt3.SW : [];   // q-art3: Runde Kronen (a mesh switch: the job's leaf mode)
+  if (VR.QArt3) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt3.defaults(p));
   // v-light · Lichtpfützen (lightfield.js): the light field round the eye — High and up; Very Low, Low and Balanced off
   const LF_SW = VR.LField ? VR.LField.SW : [];
   if (VR.LField) for (const p in PRESETS) Object.assign(PRESETS[p], VR.LField.defaults(p));
@@ -117,6 +119,7 @@
       for (const k of XT_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : VR.XTop.off()[k];   // (x-top: a custom one: off)
       for (const k of QA_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt.off()[k] : PRESETS.balanced[k]);   // (q-art: a custom one: Balanced's, none when lite)
       for (const k of Q2_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt2.off()[k] : PRESETS.balanced[k]);   // (q-art2: as q-art)
+      for (const k of Q3_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt3.off()[k] : PRESETS.balanced[k]);   // (q-art3: as q-art)
       for (const k of LF_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : false;   // (v-light: a custom one: off)
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
@@ -205,6 +208,7 @@
       if (key !== '*' && XT_SW.includes(key)) S.preset = 'custom';   // (x-top: the same)
       if (key !== '*' && QA_SW.includes(key)) S.preset = 'custom';   // (q-art: the same)
       if (key !== '*' && Q2_SW.includes(key)) S.preset = 'custom';   // (q-art2: the same)
+      if (key !== '*' && Q3_SW.includes(key)) S.preset = 'custom';   // (q-art3: the same)
       if (key !== '*' && LF_SW.includes(key)) S.preset = 'custom';   // (v-light: Lichtpfützen changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
@@ -240,7 +244,7 @@
       S.renderDist = Math.max(3, Math.min(S.rdMax || 24, S.renderDist));
       if (this.horizon && this.horizon.setFar) this.horizon.setFar(S.far || 0);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
-      if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
+      if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*' || Q3_SW.includes(key)) { this.world.fancyLeaves = this.leafMode(); this.remeshAll(); } }   // (q-art3: the leaf mode)
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
       if (this.audio) { this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient, voice: S.volVoice === undefined ? 0.8 : S.volVoice, calm: !!S.calmMusic, less: !!S.musicLess }); { const vl = S.preset === 'potato' || (S.preset === 'custom' && !S.shadows && !S.particles); if (this.audio.setTier) this.audio.setTier(vl ? 0 : S.preset === 'low' ? 1 : S.preset === 'balanced' ? 2 : S.preset === 'custom' ? ((S.shadows | 0) >= 2 ? 3 : (S.shadows | 0) >= 1 ? 2 : 1) : 3); else if (this.audio.setLowEnd) this.audio.setLowEnd(vl); } }   // (e-music2: the music's tier — the room on Balanced+, chorus and vibrato on High)   // (e-music: Stimmen, Ruhige Musik, Very Low)
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
@@ -278,6 +282,8 @@
     // ---------------------------------------------------------------- the block look (v0.39)
     // Klassisch / Nahtlos (Settings → Graphics → Blöcke, /look): the registry flags here and in every worker, a re-mesh,
     // and the cube textures with or without the rim on the seamless materials. A guest sees the host's look.
+    // q-art3 · Runde Kronen: the mesh job's leaf mode (2 = the crowns as rounded blobs, qart3.js)
+    leafMode() { return VR.QArt3 ? VR.QArt3.leafMode(this.settings) : this.settings.fancyLeaves; }
     lookMode() { const m = (this.meta && this.meta.guest && this.hostLook) || this.settings.look; return m === 'seamless' ? 'seamless' : 'classic'; }
     applyLook() {
       const mode = this.lookMode();
@@ -508,7 +514,7 @@
       // (the panorama is a vgen-5 world without crystals: GEN.noCry — no crystal on the start screen either)
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5, noCrystal: true }, custom: VR.CUSTOM });
       this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5, noCrystal: true }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
+      this.world.fancyLeaves = this.leafMode(); this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
       this.env.setTime(12800 + Math.random() * 1200); // golden hour → dusk: planets rising
@@ -577,7 +583,7 @@
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
+      this.world.fancyLeaves = this.leafMode(); this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       if (VR.NewLife) VR.NewLife.adopt(this);   // u-home: the columns kept for this world come back at once (Heimkehr in a moment)
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
@@ -796,7 +802,7 @@
       const dim = wel.dim && wel.dim !== 'overworld' && VR.Konvoi && VR.Konvoi.dimOk && VR.Konvoi.dimOk(wel.dim) ? wel.dim : meta.type === 'flat' ? 'flat' : 'overworld';   // a-konvoi: the host's world (Mitreisen)
       meta.dim = dim; this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
+      this.world.fancyLeaves = this.leafMode(); this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time); this.env.day = meta.day;
