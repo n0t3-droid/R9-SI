@@ -632,7 +632,10 @@
     }
     lap('structures');
     // 3. floating islands: a slab per cell from the island's bottom to its top (grass, snow or red sand over rock)
-    const I = F.slabGrid(n, cell), isles = islesNear(g, x0, z0, x1, z1);
+    // q-art4 · Runde Inseln (job.isleForm): the isles centred in this tile as rounded forms (isleshell.js, meshed after the
+    // land below), no slabs — opt-in, the slabs as before
+    const isleForm = !!(job.isleForm && VR.IsleShell);
+    const I = F.slabGrid(n, cell), isles = isleForm ? [] : islesNear(g, x0, z0, x1, z1);
     if (isles.length) {
       // each island over the cells of its own outline box only; the highest top wins a cell
       const iTop = new Float32Array(n * n).fill(-1e9), iBot = new Float32Array(n * n);
@@ -661,6 +664,7 @@
     lap('meshField');
     F.meshSlabs(Bd, S);
     F.meshSlabs(Bd, I);
+    if (isleForm) { Bd.part = 'slab'; for (const J of VR.IsleShell.anchored(g, x0, z0, x1, z1)) VR.IsleShell.emit(VR.IsleShell.mesh(g, J, 2), Bd, x0, z0); }
     lap('meshSlabs');
     // 5. trees on a 4-block grid (the near horizon tiles' density): the biome of the nearest vertex, never in a town, on a
     // slab or in the water

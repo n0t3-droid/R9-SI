@@ -93,7 +93,7 @@
       this.inflight++; this.stats.requested++;
       // stale: the tile left the set, ring 1 was switched off or reset
       const cancel = () => set.tiles.get(t.key) !== t || this.gen !== gen || !this.on();
-      g.pool.submit({ type: 'form', dim: 'overworld', tx: t.tx, tz: t.tz, cell, lane: 1, cancel }, null, (m) => {
+      g.pool.submit({ type: 'form', dim: 'overworld', tx: t.tx, tz: t.tz, cell, lane: 1, cancel, isleForm: this.hz && this.hz.isleForm ? 1 : 0 }, null, (m) => {
         if (this.gen !== gen) return;
         this.inflight = Math.max(0, this.inflight - 1);
         if (set.tiles.get(t.key) !== t) return;

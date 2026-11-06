@@ -295,6 +295,10 @@
     const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
     const RCL = roundOn ? RC.leafTable() : null;   // (the mini-voxel crowns drawn as leaves)
     const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
+    // q-art4 · Runde Inseln near the eye: bit 5 (16) — the floating isles' blocks from the blob too (job.isle: per padded
+    // column the isle's bottom and top, the worker fills it from the generator, VR.IsleShell.columns), Nahtlos only
+    const ISL = (lm & 16) !== 0 && job.isle && VR.LOOK && VR.LOOK.ground ? job.isle : null, oyW = (job.sy | 0) * 16 - PAD;
+    const rcIsle = (bi) => { const c = bi % PSS, wy = ((bi / PSS) | 0) + oyW; return wy >= ISL[c * 2] && wy <= ISL[c * 2 + 1]; };
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
@@ -529,7 +533,7 @@
           // column one step lower vanish under the joined surface
           // q-art3 · Runde Hänge: the natural ground's exposed faces from the blob (a face toward leaves, which the blob
           // counts as inside, keeps its cube face; flat faces go on to the greedy pass)
-          if (groundOn && rcGround(b)) {
+          if ((groundOn && rcGround(b)) || (ISL !== null && rcIsle(bi))) {
             if (!(roundOn && (TF[nb] & F.LEAVES))) { faceCorners(bi, d); if (emitRoundQuad(bufs[0], d, x, y, z, bi, b, fl, true)) continue; }
           } else
           if ((fl & F.SMOOTH) && d !== 3 && !(TF[B[bi + PSS]] & F.OPAQUE) && smoothAt(x, y, z)) {
@@ -699,7 +703,7 @@
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
         const bb = B[bi - PSS];
-        if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
+        if ((groundOn && rcGround(bb)) || (ISL !== null && rcIsle(bi - PSS))) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
           if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
           const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;

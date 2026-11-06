@@ -2848,7 +2848,15 @@ void main() {
   vec3 N = v_face == 6u ? normalize(cross(dFdx(v_rel), dFdy(v_rel))) : NORMALS[min(v_face, 5u)];
   if (v_face == 6u && N.y < 0.0) N = -N;
 #else
+#ifdef Q_ISLEFORM
+  vec3 N = NORMALS[min(v_face, 5u)];
+#else
   vec3 N = NORMALS[v_face];
+#endif
+#endif
+#ifdef Q_ISLEFORM
+  // q-art4 · Runde Inseln (isleshell.js): an isle's rounded form (face 7) takes its normal from the geometry, toward the eye
+  if (v_face == 7u) { N = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (dot(N, v_rel) > 0.0) N = -N; }
 #endif
   float dist = length(v_rel);
   vec3 V = -v_rel / max(dist, 1e-3);
@@ -2917,9 +2925,16 @@ void main() {
     if (v_face == 6u) faceShade = mix(0.8, 1.0, clamp(N.y, 0.0, 1.0));
 #endif
     float ndl = max(dot(N, L), 0.0);
+#ifdef Q_ISLEFORM
+    // (the form's facets soften: a wrapped sun, the shade by how far the face turns down)
+    if (v_face == 7u) { faceShade = mix(0.55, 1.0, N.y * 0.5 + 0.5); ndl = max((dot(N, L) + 0.3) / 1.3, 0.0); }
+#endif
     vec3 amb = u_ambSky * mix(0.62, 1.0, faceShade);
 #ifdef LIGHT2
     amb = l2Hemi(N) * (v_face <= 1u ? u_l2K.y : 1.0);   // t-light2: the near terrain's hemisphere
+#endif
+#ifdef Q_ISLEFORM
+    if (v_face == 7u) amb += u_ambSky * vec3(0.78, 0.95, 0.55) * max(-N.y, 0.0) * 0.3;   // the land's warm green bounce from below
 #endif
     col = alb * (amb + lc * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
     if (v_kind == 2u) col = alb * (1.5 + vnoise(wp * 0.3 + u_time * 0.2) * 1.2) * vec3(1.0, 0.8, 0.6);

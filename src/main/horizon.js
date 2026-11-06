@@ -42,6 +42,8 @@
     // (f-perf8: a number, not a string — the selection looks up ~4 keys a tile a frame; |tx|, |tz| < 2^19 tiles: ±67 M blocks)
     key(L, tx, tz) { return (L * 1048576 + tx + 524288) * 1048576 + tz + 524288; }
     free(t) { this.ver = (this.ver | 0) + 1; const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
+    // q-art4 · Runde Inseln (src/main/qart4.js): the tiles' isles as rounded forms — a change asks for every tile again
+    setIsleForm(on) { on = !!on; if (on === !!this.isleForm) return; this.isleForm = on; this.reset(); }
     reset() { this.ver = (this.ver | 0) + 1; for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; this.focus = null; if (this.far) this.far.reset(); }
     // u-dims · a trip between the worlds of one save (travel.js): the tiles on the GPU stay for the way back (the same
     // world key finds them, the coarse ring is whole on the first frame home); what was still asked for is forgotten
@@ -162,7 +164,7 @@
       this.inflight++;
       // stale when nobody has wanted it for a while (the camera moved on) or the world changed
       const cancel = () => this.tiles.get(key) !== t || this.frame - t.used > 45;
-      g.pool.submit({ type: 'lod', dim: 'overworld', level: L, tx, tz, lane: 1, cancel }, null, (m) => {
+      g.pool.submit({ type: 'lod', dim: 'overworld', level: L, tx, tz, lane: 1, cancel, isleForm: this.isleForm ? 1 : 0 }, null, (m) => {
         this.inflight = Math.max(0, this.inflight - 1);
         if (this.tiles.get(key) !== t) return;
         this.ver = (this.ver | 0) + 1;

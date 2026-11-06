@@ -44,6 +44,8 @@
   if (VR.QArt) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt.defaults(p));
   const Q3_SW = VR.QArt3 ? VR.QArt3.SW : [];   // q-art3: Runde Kronen (a mesh switch: the job's leaf mode)
   if (VR.QArt3) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt3.defaults(p));
+  const Q4_SW = VR.QArt4 ? VR.QArt4.SW : [];   // q-art4: Runde Inseln (the far land's isle forms, the near isles' blob)
+  if (VR.QArt4) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt4.defaults(p));
   // v-light · Lichtpfützen (lightfield.js): the light field round the eye — High and up; Very Low, Low and Balanced off
   const LF_SW = VR.LField ? VR.LField.SW : [];
   if (VR.LField) for (const p in PRESETS) Object.assign(PRESETS[p], VR.LField.defaults(p));
@@ -120,6 +122,7 @@
       for (const k of QA_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt.off()[k] : PRESETS.balanced[k]);   // (q-art: a custom one: Balanced's, none when lite)
       for (const k of Q2_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt2.off()[k] : PRESETS.balanced[k]);   // (q-art2: as q-art)
       for (const k of Q3_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt3.off()[k] : PRESETS.balanced[k]);   // (q-art3: as q-art)
+      for (const k of Q4_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt4.off()[k] : PRESETS.balanced[k]);   // (q-art4: as q-art)
       for (const k of LF_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : false;   // (v-light: a custom one: off)
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
@@ -209,6 +212,7 @@
       if (key !== '*' && QA_SW.includes(key)) S.preset = 'custom';   // (q-art: the same)
       if (key !== '*' && Q2_SW.includes(key)) S.preset = 'custom';   // (q-art2: the same)
       if (key !== '*' && Q3_SW.includes(key)) S.preset = 'custom';   // (q-art3: the same)
+      if (key !== '*' && Q4_SW.includes(key)) S.preset = 'custom';   // (q-art4: the same)
       if (key !== '*' && LF_SW.includes(key)) S.preset = 'custom';   // (v-light: Lichtpfützen changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
@@ -232,6 +236,7 @@
       if (r && VR.XTop) { const qb = r.qBase || (r.qBase = {}); for (const k of XT_SW) qb[k] = k === 'xDepth' ? Math.max(0, Math.min(2, S[k] | 0)) : !!S[k]; }   // x-top: Tiefe, Klarheit, Filmkamera (renderer: their defines, xtop_gl.js)
       if (r && VR.QArt) { const qb = r.qBase || (r.qBase = {}); for (const k of QA_SW) qb[k] = S[k] === undefined ? (PRESETS[S.preset] ? !!PRESETS[S.preset][k] : false) : !!S[k]; }   // q-art: Laubkronen, Farbdrehbuch, Platzbelag (renderer: their defines, qart_gl.js; env.js the sky)
       if (r && VR.QArt2) { const qb = r.qBase || (r.qBase = {}); for (const k of Q2_SW) qb[k] = S[k] === undefined ? (PRESETS[S.preset] ? !!PRESETS[S.preset][k] : false) : !!S[k]; }   // q-art2: Wiese, Schwebeinseln, Fernkronen (renderer: their defines, qart2_gl.js)
+      if (r && VR.QArt4) { const qb = r.qBase || (r.qBase = {}); for (const k of Q4_SW) qb[k] = S[k] === undefined ? (PRESETS[S.preset] ? !!PRESETS[S.preset][k] : false) : !!S[k]; }   // q-art4: Runde Inseln (renderer: Q_ISLEFORM, qart4_gl.js; the horizon's jobs)
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
       if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); qb.texHi = !!S.texHi && !S.lite; }   // t-material: the gloss tier (renderer: the PBR / SSR defines), the hero textures (TEXHI)
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, fadeIn: S.fadeIn !== false, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
@@ -239,12 +244,13 @@
       if (this.world && (this.world.motion | 0) !== (S.motion ? 1 : 0)) { this.world.motion = S.motion ? 1 : 0; this.remeshAll(); }   // (t-motion: the hung pieces' sway levels come with the mesh)
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
+      if (this.horizon && this.horizon.setIsleForm && VR.QArt4) this.horizon.setIsleForm(S.qIsleForm === undefined ? !!(PRESETS[S.preset] && PRESETS[S.preset].qIsleForm) : !!S.qIsleForm);   // q-art4: Runde Inseln (the tiles' isle forms)
       // F-Far: ring 1 as the preset asked (the governor never lowers it: no rung touches it); the render distance stays
       // within the slider's top (32 on Ultra, 24 elsewhere)
       S.renderDist = Math.max(3, Math.min(S.rdMax || 24, S.renderDist));
       if (this.horizon && this.horizon.setFar) this.horizon.setFar(S.far || 0);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
-      if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*' || (Q3_SW.includes(key) && this.world.fancyLeaves !== this.leafMode())) { this.world.fancyLeaves = this.leafMode(); this.remeshAll(); } }   // (q-art3: the leaf mode; its switches remesh only when the mode changes)
+      if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*' || ((Q3_SW.includes(key) || Q4_SW.includes(key)) && this.world.fancyLeaves !== this.leafMode())) { this.world.fancyLeaves = this.leafMode(); this.remeshAll(); } }   // (q-art3: the leaf mode; its switches remesh only when the mode changes)
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
       if (this.audio) { this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient, voice: S.volVoice === undefined ? 0.8 : S.volVoice, calm: !!S.calmMusic, less: !!S.musicLess }); { const vl = S.preset === 'potato' || (S.preset === 'custom' && !S.shadows && !S.particles); if (this.audio.setTier) this.audio.setTier(vl ? 0 : S.preset === 'low' ? 1 : S.preset === 'balanced' ? 2 : S.preset === 'custom' ? ((S.shadows | 0) >= 2 ? 3 : (S.shadows | 0) >= 1 ? 2 : 1) : 3); else if (this.audio.setLowEnd) this.audio.setLowEnd(vl); } }   // (e-music2: the music's tier — the room on Balanced+, chorus and vibrato on High)   // (e-music: Stimmen, Ruhige Musik, Very Low)
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
@@ -283,7 +289,7 @@
     // Klassisch / Nahtlos (Settings → Graphics → Blöcke, /look): the registry flags here and in every worker, a re-mesh,
     // and the cube textures with or without the rim on the seamless materials. A guest sees the host's look.
     // q-art3 · Runde Kronen: the mesh job's leaf mode (2 = the crowns as rounded blobs, qart3.js)
-    leafMode() { return VR.QArt3 ? VR.QArt3.leafMode(this.settings) : this.settings.fancyLeaves; }
+    leafMode() { const m = VR.QArt3 ? VR.QArt3.leafMode(this.settings) : this.settings.fancyLeaves; return VR.QArt4 ? VR.QArt4.leafMode(m, this.settings) : m; }   // (q-art4: the isles' bit 16)
     lookMode() { const m = (this.meta && this.meta.guest && this.hostLook) || this.settings.look; return m === 'seamless' ? 'seamless' : 'classic'; }
     applyLook() {
       const mode = this.lookMode();

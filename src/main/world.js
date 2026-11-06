@@ -973,7 +973,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0 };   // (t-motion: the hung pieces' sway levels)
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0, dim: this.dim };   // (q-art4: dim — the worker finds the isles' columns for Runde Inseln) (t-motion: the hung pieces' sway levels)
     }
     markDirty(x, y, z) {
       const sy = y >> 4;
