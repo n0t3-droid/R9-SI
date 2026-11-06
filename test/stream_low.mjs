@@ -30,7 +30,8 @@ const BUILDS = (process.env.BUILDS || 'before,after').split(',').filter(b => fs.
 const PRESETS = (process.env.PRESETS || 'low,potato').split(',');
 const SPEEDS = (process.env.SPEEDS || '5,20,40,80').split(',').map(Number);
 const RUN_S = +(process.env.RUN_S || 30);
-const SLOW = +(process.env.SLOW || 3);   // the worker k times slower (a low-end PC; 1 = this server)
+const SLOW = +(process.env.SLOW || 3);
+const HC = +(process.env.HC || 2);   // p-stream2: navigator.hardwareConcurrency as a weaker PC reports it (2 cores → one worker; 0 = the machine's own)   // the worker k times slower (a low-end PC; 1 = this server)
 const SHOTS = ROOT + '/test/shots', OUT = ROOT + '/.tmp_tests';
 fs.mkdirSync(SHOTS, { recursive: true });
 let fails = 0;
@@ -57,7 +58,7 @@ const PAGE_INIT = () => {
       const sb = pool.submit.bind(pool);
       pool.submit = function (msg, tr, cb, prio) {
         msg._t = performance.now(); const ty = msg.type;
-        const cb2 = cb ? (m) => { const C2 = window.__C; if (C2) { if (m.type === 'cancelled') C2.cancel[ty] = (C2.cancel[ty] || 0) + 1; else C2.done[ty] = (C2.done[ty] || 0) + 1; } return cb(m); } : cb;
+        const cb2 = cb ? (m) => { const C2 = window.__C; if (C2) { if (m.type === 'cancelled') C2.cancel[ty] = (C2.cancel[ty] || 0) + 1; else { C2.done[ty] = (C2.done[ty] || 0) + 1; const J = window.__jobs; if (J && J.length < 40000) { const now = performance.now(); J.push([Math.round(now), ty, msg.cx !== undefined ? msg.cx : msg.level, msg.cz !== undefined ? msg.cz : msg.tx, msg.sy !== undefined ? msg.sy : -1, +(m.ms || 0).toFixed(1), Math.round(now - msg._t)]); } } } return cb(m); } : cb;   // (p-stream2: the job log — time, kind, chunk / tile level, ms, age since asked)
         return sb(msg, tr, cb2, prio);
       };
     }
@@ -83,23 +84,23 @@ const PAGE_INIT = () => {
   const coverAt = (w, h, x, z) => {
     const c = w.cols.get(VR.ckey ? VR.ckey(Math.floor(x) >> 4, Math.floor(z) >> 4) : null);
     if (c && c.shownAt >= 0) return 2;
-    if (h && h.tiles) for (let L = 0; L <= 4; L++) { const S = 128 << L, t = h.tiles.get(h.key(L, Math.floor(x / S), Math.floor(z / S))); if (t && t.state === 1 && (t.vao || t.empty)) return 1; }
+    if (h && h.tiles) for (let L = -1; L <= 4; L++) { const S = L < 0 ? 64 : 128 << L, t = h.tiles.get(h.key(L, Math.floor(x / S), Math.floor(z / S))); if (t && t.state === 1 && (t.vao || t.empty)) return L < 0 ? 3 : 1; }   // (p-stream2: 3 = the fine level's 2-block cells)
     return 0;
   };
   window.__cone = (yaw, hHalf) => {
     const g = VR.game, w = g.world, h = g.horizon && g.horizon.enabled() ? g.horizon : null, p = g.player, rdB = w.renderDist * 16;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-    const acc = { nr: 0, nc: 0, nv: 0, nw: 0, fc: 0, fv: 0, fw: 0 };
+    const acc = { nr: 0, nc: 0, nf: 0, nv: 0, nw: 0, fc: 0, fv: 0, fw: 0 };
     for (let ai = 0; ai <= 10; ai++) {
       const a = -hHalf + 2 * hHalf * ai / 10, ca = Math.cos(a), sa = Math.sin(a);
       const dx = fx * ca - fz * sa, dz = fx * sa + fz * ca;
       for (let d = 8; d <= 600; d *= 1.12) {
         const k = coverAt(w, h, p.pos[0] + dx * d, p.pos[2] + dz * d), wt = 1 / d;
-        if (d <= rdB) { acc.nw += wt; if (k === 2) acc.nr += wt; else if (k === 1) acc.nc += wt; else acc.nv += wt; }
+        if (d <= rdB) { acc.nw += wt; if (k === 2) acc.nr += wt; else if (k === 1 || k === 3) { acc.nc += wt; if (k === 3) acc.nf += wt; } else acc.nv += wt; }
         else { acc.fw += wt; if (k === 0) acc.fv += wt; else acc.fc += wt; }
       }
     }
-    return { real: acc.nr / acc.nw, coarse: acc.nc / acc.nw, voidN: acc.nv / acc.nw, voidF: acc.fw ? acc.fv / acc.fw : 0, voidAll: (acc.nv + acc.fv) / (acc.nw + acc.fw) };
+    return { real: acc.nr / acc.nw, coarse: acc.nc / acc.nw, fine: acc.nf / acc.nw, voidN: acc.nv / acc.nw, voidF: acc.fw ? acc.fv / acc.fw : 0, voidAll: (acc.nv + acc.fv) / (acc.nw + acc.fw) };
   };
   // a straight run from (x0, z0): heading yaw, speed v (m/s), secs; walk = on the ground, else 35 blocks over the land
   window.__fly = async (o) => {
@@ -115,6 +116,7 @@ const PAGE_INIT = () => {
     const hHalf = Math.atan(Math.tan((g.settings.fov || 75) * Math.PI / 360) * 16 / 9);
     p.yaw = o.yaw; p.viewYaw = o.yaw; p.pitch = o.walk ? -0.08 : -0.22; p.flying = true; p.noclip = true;
     const C0 = JSON.parse(JSON.stringify(C)), mesh0 = w.stats.mesh, up0 = w.stats.uploaded || 0;
+    window.__jobs = [];
     const rec = [], ent = new Map(), ttv = [], tickMs = [], hit = [];
     let missed = 0, s = 0, t0 = performance.now(), last = t0, nextRec = t0;
     const rd = w.renderDist;
@@ -142,14 +144,14 @@ const PAGE_INIT = () => {
         const cv = window.__cone(o.yaw, hHalf);
         let a0 = 0, a1 = 0; for (const j of pool.queue) if (j.msg._t) a0 = Math.max(a0, now - j.msg._t); for (const j of pool.queueFar) if (j.msg._t) a1 = Math.max(a1, now - j.msg._t);
         rec.push({ t: +el.toFixed(2), req: C.req - C0.req, gen: C.gen - C0.gen, mesh: w.stats.mesh - mesh0, up: (w.stats.uploaded || 0) - up0, q0: pool.queue.length, q1: pool.queueFar.length, age0: Math.round(a0), age1: Math.round(a1), pend: w.pending.size, upQ: w.uploadQ ? w.uploadQ.size : 0,
-          real: +cv.real.toFixed(3), coarse: +cv.coarse.toFixed(3), voidN: +cv.voidN.toFixed(3), voidF: +cv.voidF.toFixed(3), voidAll: +cv.voidAll.toFixed(3), tick: +Math.max(...tickMs.slice(-4)).toFixed(1) });
+          real: +cv.real.toFixed(3), coarse: +cv.coarse.toFixed(3), fine: +cv.fine.toFixed(3), voidN: +cv.voidN.toFixed(3), voidF: +cv.voidF.toFixed(3), voidAll: +cv.voidAll.toFixed(3), tick: +Math.max(...tickMs.slice(-4)).toFixed(1) });
       }
       await new Promise(r => setTimeout(r, Math.max(0, 33 - (performance.now() - now))));
     }
     const end = performance.now(); let open = 0; for (const e of ent.values()) if (e > 0) { ttv.push(end - e); open++; }
     const cancel = {}; for (const k in C.cancel) cancel[k] = C.cancel[k] - (C0.cancel[k] || 0);
     const done = {}; for (const k in C.done) done[k] = C.done[k] - (C0.done[k] || 0);
-    return { rec, ttv, missed, open, tickMs, hit: hit.sort((x, y) => y[0] - x[0]).slice(0, 5), cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
+    return { t0: Math.round(t0), jobs: window.__jobs, rec, ttv, missed, open, tickMs, hit: hit.sort((x, y) => y[0] - x[0]).slice(0, 5), cancel, done, wasted: C.wasted - C0.wasted, pos: [p.pos[0], p.pos[1], p.pos[2]] };
   };
 };
 
@@ -157,6 +159,7 @@ async function open(build, preset) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
   await ctx.addInitScript(PAGE_INIT);
   await ctx.addInitScript((k) => { window.__SLOW = k; }, SLOW);
+  if (HC) await ctx.addInitScript((n) => { try { Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { get: () => n, configurable: true }); } catch (e) { /* (kept) */ } }, HC);   // (p-stream2: a weaker PC's worker count: VR.poolSize)
   const page = await ctx.newPage();
   page.on('pageerror', e => errs.push('[pageerror] ' + build + ': ' + (e.stack || e.message).slice(0, 500)));
   page.on('console', m => { if (m.type() === 'error') errs.push('[console] ' + build + ': ' + m.text().slice(0, 240)); });
@@ -201,13 +204,20 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
       const R = r.rec, steady = R.filter(x => x.t >= 3);
       const out = {
         build, preset, v, homeS: hs, ttvMed: Math.round(med(r.ttv)), ttvP90: Math.round(pct(r.ttv, 0.9)), entered: r.ttv.length + r.missed, missedPct: +(100 * r.missed / Math.max(1, r.ttv.length + r.missed)).toFixed(0),
-        real: +(100 * mean(steady.map(x => x.real))).toFixed(1), coarse: +(100 * mean(steady.map(x => x.coarse))).toFixed(1), voidN: +(100 * mean(steady.map(x => x.voidN))).toFixed(1), voidF: +(100 * mean(steady.map(x => x.voidF))).toFixed(1),
+        real: +(100 * mean(steady.map(x => x.real))).toFixed(1), coarse: +(100 * mean(steady.map(x => x.coarse))).toFixed(1), fine: +(100 * mean(steady.map(x => x.fine || 0))).toFixed(1), voidN: +(100 * mean(steady.map(x => x.voidN))).toFixed(1), voidF: +(100 * mean(steady.map(x => x.voidF))).toFixed(1),
         voidAll: +(100 * mean(steady.map(x => x.voidAll))).toFixed(1), voidMax: +(100 * Math.max(0, ...steady.map(x => x.voidAll))).toFixed(1),
         req: R.length ? R[R.length - 1].req : 0, gen: R.length ? R[R.length - 1].gen : 0, mesh: R.length ? R[R.length - 1].mesh : 0, up: R.length ? R[R.length - 1].up : 0, wasted: r.wasted,
         q0Max: Math.max(0, ...R.map(x => x.q0)), q1Max: Math.max(0, ...R.map(x => x.q1)), age0Max: Math.max(0, ...R.map(x => x.age0)), age1Max: Math.max(0, ...R.map(x => x.age1)), upQMax: Math.max(0, ...R.map(x => x.upQ)),
         tickMed: +med(r.tickMs).toFixed(2), tickP99: +pct(r.tickMs, 0.99).toFixed(1), tickMax: +Math.max(...r.tickMs).toFixed(1), hitches: r.tickMs.filter(m => m > 16).length,
         cancel: r.cancel, done: r.done, worst: r.hit, slow: SLOW,
       };
+      // p-stream2 · the worst 3 s (least real terrain ahead) and what the worker did in it: kinds, ms, the oldest answer's age
+      { let wst = { real: 2, t: 0 }; for (let i = 0; i + 30 <= R.length; i += 5) { const m = mean(R.slice(i, i + 30).map(x => x.real)); if (R[i].t >= 3 && m < wst.real) wst = { real: m, t: R[i].t }; }
+        const a = r.t0 + wst.t * 1000, b = a + 3000, kinds = {}; let busy = 0;
+        for (const j of r.jobs) if (j[0] >= a && j[0] < b) { const k = kinds[j[1]] || (kinds[j[1]] = { n: 0, ms: 0, max: 0, age: 0 }); k.n++; k.ms += j[5]; busy += j[5]; k.max = Math.max(k.max, j[5]); k.age = Math.max(k.age, j[6]); }
+        const heavy = r.jobs.filter(j => j[0] >= a && j[0] < b && j[5] > 40).sort((x, y) => y[5] - x[5]).slice(0, 5).map(j => `${j[1]} ${j[2]},${j[3]}${j[4] >= 0 ? '/' + j[4] : ''} ${j[5]}ms`);
+        out.worst3 = { t: wst.t, real: +(100 * wst.real).toFixed(1), busyMs: Math.round(busy), kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, `${v.n}× ${Math.round(v.ms)} ms, max ${Math.round(v.max)}, oldest ${(v.age / 1000).toFixed(1)} s`])), heavy };
+        const all = {}; for (const j of r.jobs) { const k = all[j[1]] || (all[j[1]] = [0, 0]); k[0]++; k[1] += j[5]; } out.jobs = Object.fromEntries(Object.entries(all).map(([k, v]) => [k, `${v[0]}× ${Math.round(v[1])} ms`])); }
       console.log('RUN ' + JSON.stringify(out));
       results[`${preset}_${v}_${build}`] = { out, rec: R };
     }
@@ -218,10 +228,14 @@ for (let pi = 0; pi < PRESETS.length; pi++) {
       const r = await P.ev((o) => window.__fly(o), { x0: sp[0], z0: sp[2], yaw: 0.35 + Math.PI / 4 + j * Math.PI, v, secs: 12, walk: false });
       const cone = r.rec.length ? r.rec[r.rec.length - 1] : {};
       await P.ev(() => { VR.game.renderer.tsrReset = true; });   // (the drawing was stopped during the flight: no old picture in the history)
+      // p-stream2 · the picture shows the moment the flight stopped: the streaming frozen while the software frames are drawn
+      // (no world / horizon update, no uploads, the workers' answers held back and delivered afterwards)
+      await P.ev(() => { const g = VR.game, w = g.world, h = g.horizon, pool = g.pool; window.__frz = { wu: w.update, hu: h && h.update, om: pool.onMsg, held: [] }; w.update = function () {}; if (h) h.update = function () {}; pool.onMsg = function (wk, m) { window.__frz.held.push([wk, m]); }; });
       for (let i = 0; i < 4; i++) await P.ev(() => window.__frame(0.033));
       const shot = `${SHOTS}/stream_${preset}_${v}_${build}.png`;
       await P.page.screenshot({ path: shot, timeout: 600000 });
-      results[`shot_${preset}_${v}_${build}`] = { shot, real: cone.real, coarse: cone.coarse, voidAll: cone.voidAll };
+      await P.ev(() => { const g = VR.game, F = window.__frz; g.world.update = F.wu; if (g.horizon) g.horizon.update = F.hu; g.pool.onMsg = F.om; for (const [wk, m] of F.held) g.pool.onMsg(wk, m); });
+      results[`shot_${preset}_${v}_${build}`] = { shot, real: cone.real, coarse: cone.coarse, fine: cone.fine, voidAll: cone.voidAll };
       console.log(`  shot ${shot}  real ${cone.real} coarse ${cone.coarse} void ${cone.voidAll}`);
     }
     await P.ctx.close();

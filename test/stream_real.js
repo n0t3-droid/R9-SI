@@ -86,7 +86,7 @@ if (process.env.PROFILE) {
 function fly(o) {
   SIM.now = 0; SIM.workers.length = 0; SIM.pending = []; LOG.length = 0;
   const pool = new V.WorkerPool('', 1);
-  pool.maxInflight = o.inflight || 10;
+  pool.maxInflight = o.inflight || 2;   // (as game.js)
   pool.broadcast({ type: 'init', seed: 1, opts: OPTS });
   const renderer = { freeSection() {}, uploadSection() {}, q: { vxLod: o.rd <= 4 ? 8 : 12, upload: 2 } };
   const w = new V.World({ vents: null }, { dim: 'overworld', seed: 1, genOpts: OPTS, pool, renderer, renderDist: o.rd });
