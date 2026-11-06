@@ -236,6 +236,11 @@ bool qCut(vec3 w, uint face, float dist) {
   return min(dd.x, dd.y) < 0.0625 && n > 1.0 - ${f3(L.rag)} * fade && max(dd.x, dd.y) < 0.4375;
 #endif
 }
+#ifdef Q_CROWN
+// q-art2 · Fernkronen (qart2.js Q2.carve): far away an outer leaf face (open to the sky) outside the clumps is carved away —
+// the crown's outline breaks into rounded masses instead of a cube; the inner faces behind it fill the notch
+bool qCarve(float sd, float dist, float sky) { float f = smoothstep(${f3(VR.QArt2 ? VR.QArt2.CROWN.carve[0] : 30)}, ${f3(VR.QArt2 ? VR.QArt2.CROWN.carve[1] : 55)}, dist); return f > 0.0 && sky > 0.97 && sd > mix(4.0, ${f3(VR.QArt2 ? VR.QArt2.CROWN.carveT : 0.25)}, f); }
+#endif
 // the crown's light: deep in a clump its own shade, the hue with the value (warm light, cool shade), the rim and the sun
 // through the leaves from behind
 vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
@@ -246,6 +251,7 @@ vec3 qCanopy(vec3 col, vec3 alb, vec4 c, vec3 V, vec3 L, vec3 sun, vec3 amb) {
   float qNg = 1.0 - qGreen(alb);
   col *= mix(1.0, mix(Q_LEAF_IN, 0.86, qNg), inner);
   col += alb * sun * 0.16 * qNg * inner;
+  col = max(col, alb * (u_ambSky * 0.65 + u_sunColor * (0.12 * max(u_sunDir.y, 0.0))) * qNg);   // (run 1: the cut showed the cherry's inner faces near black)
 #else
   col *= mix(1.0, Q_LEAF_IN, inner);
 #endif

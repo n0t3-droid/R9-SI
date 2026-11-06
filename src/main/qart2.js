@@ -38,7 +38,7 @@
     { key: 'qCrown', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.qCrown', tip: 'g.set.qCrown.tip', cost: 'low', def: false },
   ];
   // the blade layer's ray-march steps by preset (Balanced the cheaper one; a hand-made preset: Balanced's)
-  const STEPS = { potato: 0, low: 0, balanced: 4, high: 6, ultra: 6, ultraLite: 4 };
+  const STEPS = { potato: 0, low: 0, balanced: 6, high: 8, ultra: 8, ultraLite: 6 };
   Q2.tuftSteps = (preset) => (STEPS[preset] !== undefined ? STEPS[preset] : 4);
   // the programs' key (qart2_gl.js rebuilds them when it changes)
   Q2.key = (q, preset, fancy) => (q ? [q.qGrass ? 1 + Q2.tuftSteps(preset) : 0, q.qIsle ? 1 : 0, q.qCrown && q.qLeaf && fancy !== false ? 1 : 0] : [0, 0, 0]).join('');
@@ -54,9 +54,12 @@
     if (!g || !g.islandCell || !cam) return [];
     const out = [], C = 72, k = Math.ceil(Q2.REACH / C) + 1, ci = Math.floor(cam[0] / C), cj = Math.floor(cam[2] / C);
     const d = (I) => Math.hypot(I.x - cam[0], I.z - cam[2]) - I.r;
-    const D = g.designedIslands ? g.designedIslands(cam[0], cam[2]) : null;
-    if (D) for (const I of D) if (d(I) < Q2.REACH) out.push(I);
-    for (let j = cj - k; j <= cj + k; j++) for (let i = ci - k; i <= ci + k; i++) { const I = g.islandCell(i, j); if (I && d(I) < Q2.REACH && out.indexOf(I) < 0) out.push(I); }
+    try {
+      if (g.islandAt) g.islandAt(cam[0], cam[2]);   // (its realm noise made first: islandCell reads it — browser run 1 found none)
+      const D = g.designedIslands ? g.designedIslands(cam[0], cam[2]) : null;
+      if (D) for (const I of D) if (d(I) < Q2.REACH) out.push(I);
+      for (let j = cj - k; j <= cj + k; j++) for (let i = ci - k; i <= ci + k; i++) { const I = g.islandCell(i, j); if (I && d(I) < Q2.REACH && out.indexOf(I) < 0) out.push(I); }
+    } catch (e) { return []; }
     out.sort((a, b) => d(a) - d(b));
     return out.slice(0, Q2.MAX);
   };
@@ -99,7 +102,11 @@
   // ---------------------------------------------------------------- Fernkronen: the far cut (the mirror of qart.js
   // qCut with Q_CROWN): beyond ~40 m (± a block's hash) the corner cut on a 4-texel grid, its corners a fifth larger, no
   // ragged rim (the rounding a little deeper); it fades out at 200–260 m
-  Q2.CROWN = { near: 40, far: [200, 260], qs: 4, grow: 1.35, k: [0.55, 0.5] };
+  Q2.CROWN = { near: 40, far: [200, 260], qs: 4, grow: 1.35, k: [0.55, 0.5], carve: [30, 55], carveT: 0.25 };
+  // far away an outer leaf face (sky light ~full) where the clump field (qart.js QA.clump, per vertex) lies outside the
+  // clumps by more than carveT is carved (fading in over carve m): the crown's outline in rounded masses (browser run 1:
+  // the coarse corner cut alone is a pixel or two at 80 m — the cubes stayed cubes)
+  Q2.carve = function (sd, dist, sky) { const f = sstep(Q2.CROWN.carve[0], Q2.CROWN.carve[1], dist); return f > 0 && sky > 0.97 && sd > mix(4, Q2.CROWN.carveT, f); };
   const h13 = (x, y, z) => VR.QArt && VR.QArt.hash13 ? VR.QArt.hash13(x, y, z) : 0.5;
   Q2.cutFar = function (w, face, dist) {
     const L = VR.QArt.LEAF, C = Q2.CROWN, pp = VR.QArt.plane(w, face), pl = Math.floor(pp[2] + 0.5);
@@ -119,6 +126,11 @@
     return QS > 8 && Math.min(dd[0], dd[1]) < 1 / QS && n > 1 - L.rag * fade && Math.max(dd[0], dd[1]) < 0.5 - 1 / QS;
   };
   void fract;
+
+  // ---------------------------------------------------------------- Wiese: the numbers
+  //   mean  the blade layer's mean shade (its roots' and tips' mix over a lawn; divided out, so the near grass is not
+  //         darker than the far — run 1: it was)
+  Q2.GRASS = { mean: 0.9 };   // (a simulation of the march over independent blades: 0.88 with 6 steps, 0.91 with 8)
 
   // ---------------------------------------------------------------- the defines, by program
   const ISLE_PROGS = { terrain: 1, terrainCut: 1 };
@@ -191,19 +203,26 @@ vec3 qGrass(vec3 a, vec3 mean, vec2 q, vec3 rel) {
   a *= mix(vec3(0.78, 0.92, 0.9), vec3(1.15, 1.09, 0.78), pt);   // deep cool green ↔ warm light green
   a *= 1.0 + (texture(u_noise, q * 0.0625 + vec2(0.11, 0.53)).g - 0.5) * 0.35;   // spots of ~a metre
 #if Q_TUFT_N > 0
-  float k = 1.0 - smoothstep(8.0, 16.0, dist);
+  float k = 1.0 - smoothstep(7.0, 14.0, dist);
   if (k > 0.0) {
+    // the blade layer (browser run 1: 4 steps through 2.5 cm blades read as darker noise, not blades): blades of ~4 cm
+    // (the white channel, a 10.24 m tile), taller in tufts of ~half a metre (fbm), the ray through 15 cm of them —
+    // seen at a slant each blade is drawn as a streak up the screen, its foot dark, its tip light
     vec3 V = normalize(-rel);
-    vec2 run = -V.xz / max(V.y, 0.28) * 0.11;   // the ray's way across the 11 cm blade layer
-    vec2 sw = Q_WIND * (sin(u_time * 1.4 + q.x * 0.6 + q.y * 0.45) * 0.02 + 0.015);   // the tips lean and sway
-    float hh = 0.0;
+    vec2 run = -V.xz / max(V.y, 0.25) * 0.15;
+    vec2 sw = Q_WIND * (sin(u_time * 1.4 + q.x * 0.6 + q.y * 0.45) * 0.025 + 0.02);   // the tips lean and sway
+    float cl = texture(u_noise, q * 0.125 + 0.5).g;
+    float tuft = 0.55 + 0.9 * smoothstep(0.35, 0.7, cl);
+    float hh = 0.0, tp = 0.0, dp = 1.0;
     for (int i = 0; i < Q_TUFT_N; i++) {
       float t = (float(i) + 0.5) / float(Q_TUFT_N);   // 0 the tips' layer … 1 the roots
-      vec2 s = q + run * t + sw * (1.0 - t);
-      float bl = texture(u_noise, s * 0.15625).a * 0.6 + texture(u_noise, s * 0.125 + 0.5).g * 0.62;
-      if (smoothstep(0.45, 0.9, bl) >= 1.0 - t) { hh = 1.0 - t; break; }
+      vec2 s = q + run * t + sw * (1.0 - t) * (1.0 - t);
+      float d = smoothstep(0.3, 1.0, texture(u_noise, s * 0.09765625).a) * tuft - (1.0 - t);   // ≥ 0: inside a blade
+      if (d >= 0.0) { float u = dp / max(dp - d, 1e-3); hh = 1.0 - mix(tp, t, clamp(u, 0.0, 1.0)); break; }
+      tp = t; dp = d;
     }
-    a = mix(a, a * mix(vec3(0.5, 0.56, 0.5), vec3(1.2, 1.16, 0.95), hh), k);   // dark roots, light warm tips
+    vec3 bf = mix(vec3(0.4, 0.47, 0.42), vec3(1.32, 1.27, 1.0), hh) * ${f3(1 / Q2.GRASS.mean)};   // dark roots, light warm tips (the mean kept)
+    a = mix(a, a * bf, k);
   }
 #endif
   return a;

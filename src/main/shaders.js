@@ -1150,7 +1150,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
 #ifdef Q_CROWN
-  if (qLeafF() && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art2 · Fernkronen: every crown's corners, far ones on a coarser grid (qart.js qCut)
+  if (qLeafF() && (qCut(v_localPos + vec3(u_camInt), face, length(v_rel)) || qCarve(v_qC.w, length(v_rel), v_sky))) discard;   // q-art2 · Fernkronen: every crown's corners, far ones on a coarser grid (qart.js qCut), far outlines carved along the clumps (qart2.js)
 #else
   if (qLeafF() && qGreen(alb.rgb * v_tint) > 0.5 && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art · Laubkronen: the ragged corners (qart.js QA.cut)
 #endif

@@ -177,8 +177,8 @@ try {
       N.cams.forest = { E, T };
       if (want('forest')) await views('forest', E, T, NOON);
       if (want('farforest')) {   // q-art2: the crowns at 70–110 m (Fernkronen) — from a little above, the wood ahead
-        const fa = a + 0.35, FE = [F.c[0] + Math.cos(fa) * 85, 0, F.c[1] + Math.sin(fa) * 85]; FE[1] = Math.max(E[1], (await top(FE[0], FE[2])) + 1 + 1.62) + 7;
-        const FT = [F.c[0], FE[1] - 9, F.c[1]];
+        const fa = a + 0.35, FE = [F.c[0] + Math.cos(fa) * 85, 0, F.c[1] + Math.sin(fa) * 85]; FE[1] = Math.max(E[1], (await top(FE[0], FE[2])) + 1 + 1.62) + 16;
+        const FT = [F.c[0], FE[1] - 15, F.c[1]];
         N.cams.farforest = { E: FE, T: FT };
         await views('farforest', FE, FT, NOON);
       }

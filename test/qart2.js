@@ -53,7 +53,7 @@ console.log('a · the switches');
   check(b.includes("MAIN.splice(MAIN.indexOf('qart') + 1, 0, 'qart2')") && b.includes("MAIN.splice(MAIN.indexOf('qart_gl') + 1, 0, 'qart2_gl')"), 'build.js: qart2 right after qart (before shaders), qart2_gl right after qart_gl');
   check(/VR\.QArt2\.ROWS/.test(sr), 'settings_reg.js shows the rows');
   check(Q2.key({ qGrass: 1 }, 'balanced', true) !== Q2.key({ qGrass: 1 }, 'high', true) && Q2.key(null) === Q2.key(Q2.off()) && Q2.key({ qCrown: 1 }, 'high', false) === Q2.key(Q2.off()), 'the key (the tufts\' steps by preset; Fernkronen needs fancy leaves)');
-  check(Q2.tuftSteps('balanced') === 4 && Q2.tuftSteps('high') === 6 && Q2.tuftSteps('potato') === 0, 'the blade layer: 4 steps on Balanced, 6 on High');
+  check(Q2.tuftSteps('balanced') === 6 && Q2.tuftSteps('high') === 8 && Q2.tuftSteps('potato') === 0, 'the blade layer: 6 steps on Balanced, 8 on High');
 }
 
 console.log('b · the shaders');
@@ -74,7 +74,7 @@ console.log('b · the shaders');
   const on = Q2.defaults('high'), o = { fancy: true, leaf: true, preset: 'high' };
   const has = (n, d, oo) => Q2.definesFor(n, on, oo || o).some(x => x.split(' ')[0] === d);
   check(has('terrain', 'Q_GRASS') && !has('terrainCut', 'Q_GRASS') && !has('shadow', 'Q_GRASS'), 'Wiese on the opaque terrain only (the grass tops)');
-  check(Q2.definesFor('terrain', on, o).includes('Q_TUFT_N 6') && Q2.definesFor('terrain', on, Object.assign({}, o, { preset: 'balanced' })).includes('Q_TUFT_N 4'), 'the blade layer\'s steps by preset');
+  check(Q2.definesFor('terrain', on, o).includes('Q_TUFT_N 8') && Q2.definesFor('terrain', on, Object.assign({}, o, { preset: 'balanced' })).includes('Q_TUFT_N 6'), 'the blade layer\'s steps by preset');
   check(has('terrain', 'Q_ISLE') && has('terrainCut', 'Q_ISLE') && !has('terrainCutZ', 'Q_ISLE') && !has('shadowCut', 'Q_ISLE'), 'Schwebeinseln on the terrain and its cut-out (the plants on the land under an isle in its shadow too)');
   check(['terrain', 'terrainCut', 'terrainCutZ', 'shadowCut'].every(n => has(n, 'Q_CROWN')) && !has('shadow', 'Q_CROWN'), 'Fernkronen on the leaf programs, the depth prepass and the cut-out shadow');
   check(!has('terrainCut', 'Q_CROWN', { fancy: false, leaf: true, preset: 'high' }) && !has('shadowCut', 'Q_CROWN', { fancy: true, leaf: false, preset: 'high' }), 'no Fernkronen without fancy leaves or without Laubkronen');
@@ -104,6 +104,10 @@ console.log('c · the mirrors');
   check(L.every((I, k) => k === 0 || dist(L[k - 1]) <= dist(I) + 1e-9), 'the nearest first');
   const D = { designedIslands: () => [{ x: 330, z: 140, r: 42, y: 158, dome: 3, deep: 0.9 }], islandCell: () => null };
   check(Q2.islesNear(D, [330, 90, 140]).length === 1 && Q2.islesNear({ islandCell: () => null }, [0, 0, 0]).length === 0 && Q2.islesNear(null, [0, 0, 0]).length === 0, 'the designed isles count; none without a generator');
+  let real = [];
+  try { const G = V.makeGen('overworld', 4242, { worldType: 'default', vgen: 16 }); real = Q2.islesNear(G, [176, 80, 44]); } catch (e) { real = [e.message]; }
+  check(real.length > 0 && real.every(I => I && I.r > 0 && I.y > 100), 'the real generator (seed 4242) gives isles near the spawn (its realm noise made first)', real.length);
+  check(!Q2.carve(1, 20, 1) && Q2.carve(1, 80, 1) && !Q2.carve(0.1, 80, 1) && !Q2.carve(1, 80, 0.8), 'the far outline carved: only far, only outside the clumps, only an outer face');
   const P = Q2.pack(L, [96, 70, 99]);
   check(P.A.length === 32 && P.B.length === 32 && P.n === L.length && Math.abs(P.A[0] - (L[0].x - 96)) < 1e-4 && Math.abs(P.A[1] - (L[0].y - 70)) < 1e-4 && Math.abs(P.A[3] - L[0].r) < 1e-4, 'packed as uniforms relative to the camera\'s block');
   const I = { x: 0, z: 0, r: 30, y: 150, dome: 3, deep: 1 };
