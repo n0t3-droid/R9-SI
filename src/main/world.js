@@ -52,7 +52,7 @@
     failWorker(w, why) {
       const ids = [];
       for (const [id, st] of this.started) if (st.w === w) ids.push(id);
-      w.inflight = 0;
+      w.inflight = 0; w.parkedN = 0;
       for (const id of ids) {
         this.started.delete(id);
         const cb = this.cb.get(id);
@@ -79,9 +79,12 @@
       if (!this.workers.includes(w)) return;   // a late word from a worker already replaced
       // a job waits for a town plan the worker is building a slice at a time (worker_main.js): it keeps its slot, and
       // its time out restarts (the plan is progressing, the worker is not stuck)
-      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) st.t0 = performance.now(); return; }
-      w.inflight = Math.max(0, w.inflight - 1);
+      // (p-stream2: the first such job on a worker — and a second — gives its slot back while it waits: a town's plan built in
+      // 20 ms slices held both slots for seconds in fast flight, nothing else ran — test/stream_real.js; the slices go on
+      // between the other jobs. Its answer then frees nothing)
+      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) { st.t0 = performance.now(); if (!st.parked && (w.parkedN | 0) < 2) { st.parked = true; w.parkedN = (w.parkedN | 0) + 1; w.inflight = Math.max(0, w.inflight - 1); this.pump(); } } return; }
       const st = this.started.get(m.id);
+      if (st && st.parked) w.parkedN = Math.max(0, (w.parkedN | 0) - 1); else w.inflight = Math.max(0, w.inflight - 1);
       if (st) { this.started.delete(m.id); if (!st.direct) { const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; } }
       const cb = this.cb.get(m.id);
       if (cb) { this.cb.delete(m.id); try { cb(m); } catch (err) { console.error(err); } }
@@ -325,7 +328,7 @@
       }
       this.lastPos = [px, py, pz, now];
       const speed = Math.hypot(this.mvx || 0, this.mvz || 0);
-      const ahead = speed > 2 ? Math.min(rd * 0.5, speed * 1.6 / 16) : 0;   // chunks of look-ahead (1.6 s of travel)
+      const ahead = speed > 2 ? Math.max(this.streamPlan ? 1 : 0, Math.min(rd * 0.5 + (this.streamPlan && VR.StreamPlan ? VR.StreamPlan.reach(speed) : 0), speed * 1.6 / 16)) : 0;   // chunks of look-ahead (1.6 s of travel; p-stream2: at least one chunk with the plan — at a walk the rim ahead is meshed before it comes into view)
       const ux = ahead ? (this.mvx / speed) : 0, uz = ahead ? (this.mvz / speed) : 0;
       const lcx = Math.round(pcx + ux * ahead), lcz = Math.round(pcz + uz * ahead);
       this.loadCenter = [lcx, lcz];
@@ -391,7 +394,7 @@
       const vd = this.viewDir;
       if (fast && vd && (vd[0] * ux + vd[1] * uz) < 0.7) fast = false;
       this.planFast = fast; this.planSpeed = speed; this.planRest = fast && SP.rest(speed, this.lat || SP.LAT0, this.renderDist);
-      if (this.planRest) this.lat = SP.ease(this.lat || SP.LAT0);
+      if (fast) this.lat = SP.ease(this.lat || SP.LAT0);   // (p-stream2: always easing in fast flight — the samples pull it up; a stretch with none never leaves it stuck)
       const U = this.planU || (this.planU = [0, 0]); U[0] = ux; U[1] = uz;
       const pool = this.pool;
       if (pool && pool.farShare !== undefined) pool.farShare = SP.share(speed, this.lat || SP.LAT0, this.renderDist);
@@ -803,6 +806,7 @@
     }
     // far-meshed sections inside the inner part of the keep ring are re-meshed with their detail
     detailReturn(px, py, pz) {
+      if (this.planFast && this.streamPlan) return;   // (p-stream2: not while flying fast)
       const D = (this.renderer && this.renderer.q && this.renderer.q.vxLod) || 48, back = (D * 1.5 + 16) * 0.8, back2 = back * back;
       const cr = Math.ceil(back / 16) + 1, pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       for (const c of this.cols.values()) {
@@ -819,6 +823,7 @@
     }
     // does the section want its mini-voxel detail meshed? (inside the renderer's detail keep ring)
     wantDetail(c, sy, pos) {
+      if (this.planFast && this.streamPlan) return false;   // (p-stream2: in fast flight the bare section first — a quarter less mesh time; the detail comes back once the flight slows, detailReturn)
       if (!pos) return true;
       const D = (this.renderer && this.renderer.q && this.renderer.q.vxLod) || 48, keep = D * 1.5 + 16;
       const dx = c.cx * 16 + 8 - pos[0], dy = sy * 16 + 8 - pos[1], dz = c.cz * 16 + 8 - pos[2];
