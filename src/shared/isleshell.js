@@ -104,7 +104,10 @@
     //  of every column are moss in big patches, the strata show on the steps between columns — gen_realm.js calmCell)
     const GN = VR.GEN, calm = !!(GN && ((GN.isleCalm && GN.isleCalm(g)) || (I.designed && GN.isleGarden && GN.isleGarden(g))));
     U.forEach((f, k) => ring((s) => {
-      const p = at(s, f), t = 1 - f, y = IS.bottom(g, I, p[0], p[1], t);
+      // (browser run 2: smooth cones read a little like dishes from afar) rock lumps: a smooth noise swells and dents the
+      // underside by up to ±9 % of its radius and ±6 % of its depth (the rim's row stays clean)
+      const q = at(s, f), ln = k ? g.nIsleH.n2(q[0] * 0.13 + sd, q[1] * 0.13 - sd) : 0, ff = f * (1 + 0.09 * ln);
+      const p = at(s, ff), t = 1 - f, y0 = IS.bottom(g, I, q[0], q[1], t), y = y0 - (I.y - y0) * 0.06 * ln;
       let c = pal.bands[(k + sd) % nb];
       if (calm) { const m = g.nVein.n2(p[0] * 0.09 + sd * 0.37, p[1] * 0.09 - sd * 0.21); c = mixc(c, pal.moss, m > -0.12 ? 0.72 : 0.22); }
       if (k >= last - (det >= 2 ? 1 : 0)) c = hf(s, k, sd + 5) < 0.55 ? pal.moss : mixc(pal.tuff, pal.moss, 0.3);

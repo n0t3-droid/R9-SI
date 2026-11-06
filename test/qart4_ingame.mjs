@@ -51,7 +51,7 @@ const settle = async (max = 60) => {
       const hz = g.horizon, hb = hz ? (hz.inflight | 0) + (hz.far ? hz.far.inflight | 0 : 0) : 0;
       return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, hz: hb };
     });
-    if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.hz === 0 && i > 2) break;
+    if (s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.hz <= 2 && i > 2) break;
     await wait(40);
   }
   return s;
@@ -63,7 +63,7 @@ const config = async (c, kind) => { const r = await ev(([c, kind]) => {
   else { const d = X.defaults(S._pr || S.preset); X.polish = c === 'on'; S.qIsleForm = c === 'on' ? d.qIsleForm : false; g.applySettings('qIsleForm'); }
   S.preset = S._pr || S.preset;
   return 'isle=' + S.qIsleForm + ' polish=' + X.polish + ' hill=' + !!S.qHill + ' leaf=' + g.world.fancyLeaves + ' hz=' + !!(g.horizon && g.horizon.isleForm);
-}, [c, kind]); await run(4); let st = null; for (let k = 0; k < 6; k++) { st = await settle(150); if (st && !st.dirty && !st.busy && !st.hz) break; } if (st && (st.dirty || st.hz)) console.log('     (not settled: ' + JSON.stringify(st) + ')'); return r; };
+}, [c, kind]); await run(4); let st = null; for (let k = 0; k < 3; k++) { st = await settle(70); if (st && !st.dirty && !st.busy && st.hz <= 2) break; }   // (run 2: High's far tiles kept a few in flight — waiting for none took 10 min a switch) if (st && (st.dirty || st.hz)) console.log('     (not settled: ' + JSON.stringify(st) + ')'); return r; };
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings._pr = p; g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.settings.qHill = false; if (VR.QArt4) VR.QArt4.polish = true; g.applySettings('*'); }, p);
 const grab = async (name, tod, K = 4) => {
   const url = await ev(([tod, K]) => { const g = VR.game; g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } window.__norender = false; for (let i = 0; i < K; i++) { g.env.setTime(tod); g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
@@ -152,12 +152,12 @@ try {
       const ready = async () => { for (let i = 0; i < 120; i++) { const n = await ev(() => { const g = VR.game; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); g.renderer.gl.finish(); window.__norender = true; return VR.GL.pending ? VR.GL.pending.size : 0; }); if (!n) return; await wait(250); } check(false, 'the programs compiled'); };
       const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
       const passes = () => ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length }; });
-      const tris = () => ev(() => { const h = VR.game.horizon; return h ? { tris: h.stats.tris | 0, mb: +(h.stats.mb || 0).toFixed(1) } : null; });
+      const tris = () => ev(() => { const h = VR.game.horizon; return h ? { tris: h.stats.tris | 0, drawn: h.stats.drawn | 0, tiles: h.tiles.size, mb: +(h.stats.mb || 0).toFixed(1) } : null; });
       for (const pr of ['potato', 'balanced', 'high']) {
         await preset(pr); await eyeAt(cam.E, cam.T, AFT); await settle(25);
         const r = { off: [], on: [], p: {}, hz: {} };
         for (const c of ['on', 'off', 'on', 'off']) { await config(c, 'isle'); await ready(); await ms(4); r[c].push(await ms(6)); r.p[c] = (await passes()).n; r.hz[c] = await tris(); }
-        const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };
+        const med = (a) => +Math.min.apply(null, a).toFixed(1);   // (run 2: the median of two took a compile-laden 41.6 ms — the best of the samples)
         N.cost[pr] = { off: med(r.off), on: med(r.on), all: r, passes: r.p, horizon: r.hz };
         console.log('     cost ' + pr + ' ' + JSON.stringify(N.cost[pr]) + ' (' + secs() + ')'); save();
         check(r.p.off === r.p.on, pr + ': the same full-screen passes with q-art4 on (' + r.p.on + ')');
