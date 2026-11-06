@@ -53,6 +53,7 @@ console.log('c · the far lane\'s share');
 {
   check(SP.share(5, 2, 6) === SP.SHARE_BASE && SP.share(11, 2, 6) === SP.SHARE_BASE, 'walking / plain flight: 30 %, as before');
   check(SP.share(40, 1.5, 6) > SP.SHARE_BASE && SP.share(80, 1.5, 6) >= SP.share(40, 1.5, 6) && SP.share(80, 3, 4) === SP.SHARE_MAX, 'fast: more for the far tiles, the more the chunks lag behind', [SP.share(40, 1.5, 6), SP.share(80, 1.5, 6), SP.share(80, 3, 4)].map(x => x.toFixed(2)).join(' ≤ '));
+  { let l = 6, n = 0; while (SP.rest(40, l, 6) && n < 3000) { l = SP.ease(l); n++; } check(SP.rest(40, 6, 6) && n > 150 && n < 900, 'resting: the latency eases back, the chunks try again (a stuck 6 s within ~15 s)', n + ' frames'); }
   check(SP.lat(1, 3) > 1 && SP.lat(1, 3) < 3 && SP.lat(1, 100) <= SP.LAT_MAX && SP.lat(0, 0) >= SP.LAT_MIN, 'the latency: a smoothed average, clamped');
 }
 

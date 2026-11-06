@@ -385,6 +385,7 @@
       const vd = this.viewDir;
       if (fast && vd && (vd[0] * ux + vd[1] * uz) < 0.7) fast = false;
       this.planFast = fast; this.planSpeed = speed; this.planRest = fast && SP.rest(speed, this.lat || SP.LAT0, this.renderDist);
+      if (this.planRest) this.lat = SP.ease(this.lat || SP.LAT0);
       const U = this.planU || (this.planU = [0, 0]); U[0] = ux; U[1] = uz;
       const pool = this.pool;
       if (pool && pool.farShare !== undefined) pool.farShare = SP.share(speed, this.lat || SP.LAT0, this.renderDist);
