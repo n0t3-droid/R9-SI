@@ -163,7 +163,7 @@ const mk = (seed) => C.create(seed, { ox: 0, oz: 0, sample, villages: VILS });
     if (!p || !p.de || !p.en || !p.inDe || !p.inEn) { check(false, 'place name for ' + k + '/' + b); continue; }
     names.add(p.de);
     if (N.blocked(p.de) || N.reserved(p.de) || N.blocked(p.en)) check(false, 'blocked place name ' + p.de + ' / ' + p.en);
-    if (/^(Silbersee|Düsterwald|Auenland|Bruchtal|Nebelberge|Fangorn)$/i.test(p.de)) check(false, 'a famous fictional place: ' + p.de);
+    if (/^(Rehau|Silbersee|Düsterwald|Auenland|Bruchtal|Nebelberge|Fangorn)$/i.test(p.de)) check(false, 'a famous fictional place: ' + p.de);
   }
   check(names.size >= 60, 'many different place names (' + names.size + ': ' + [...names].slice(0, 8).join(', ') + ' …)');
   const s = mk(4242); C.advance(s, 20, 0);

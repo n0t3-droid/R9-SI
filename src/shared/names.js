@@ -266,7 +266,7 @@
     dry: [['heide', 'Heath', 'in der', 'on'], ['steppe', 'Steppe', 'in der', 'on'], ['senke', 'Dell', 'in der', 'in'], ['flur', 'Flats', 'auf der', 'on']],
     shore: [['strand', 'Strand', 'am', 'on'], ['düne', 'Dunes', 'auf der', 'on'], ['ufer', 'Shore', 'am', 'on'], ['bucht', 'Cove', 'in der', 'in']],
   };
-  const CH_DENY = /^(silbersee|düsterwald|auenland|bruchtal|nebelberge|fangorn|sturmhöhe|schattenwald|mondsee|silberwald)$/i;
+  const CH_DENY = /^(rehau|silbersee|düsterwald|auenland|bruchtal|nebelberge|fangorn|sturmhöhe|schattenwald|mondsee|silberwald)$/i;
   N.CH_PRE = CH_PRE; N.CH_LAND = CH_LAND;
   N.chronikPlace = function (kind, land, seed) {
     const L = CH_LAND[land] || CH_LAND.meadow, own = CH_PRE[kind];

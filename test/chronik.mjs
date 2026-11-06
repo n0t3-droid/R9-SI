@@ -73,19 +73,23 @@ let v1 = await ev(() => { const v = VR.game._chr.view; return { day: v.day, ev: 
 run.days3 = { ms: Date.now() - tA, events: v1.ev.length, fam: v1.fam.length, vil: v1.vil, texts: v1.texts };
 check(v1.day >= 3 && v1.ev.length >= 4, `three game days later: ${v1.ev.length} events, ${v1.fam.length} families (${((Date.now() - tA) / 1000).toFixed(0)} s)`);
 for (const t of v1.texts) console.log('      · ' + t);
-// a building and a fox family need more days now and then: up to 8
+// which villages have a free lot to build on (the worker's village plans; a village without one keeps its building in
+// the ledger only) — then on, day by day (≤ day 14), until one of them finished a project and a fox family lives
+const lots = await ev(async () => { const g = VR.game, out = {}; for (const v of g._chr.view.vil) out[v.id] = await new Promise((res) => g.pool.direct(0, { type: 'villageplan', dim: 'overworld', vid: v.id }, null, (m) => res(m.plan ? m.plan.lots.length : 0))); return out; });
+run.lots = lots;
+console.log('    lots per village: ' + JSON.stringify(lots));
 let extra = 0;
-for (let d = 4; d <= 8; d++) {
-  const has = await ev(() => { const v = VR.game._chr.view; return { b: v.ev.some(e => e.k === 'built'), f: v.fam.some(f => f.sp === 'fox') }; });
+for (let d = 4; d <= 14; d++) {
+  const has = await ev((L) => { const v = VR.game._chr.view; return { b: v.vil.some(x => x.built.length && L[x.id] > 0), f: v.fam.some(f => f.sp === 'fox') }; }, lots);
   if (has.b && has.f) break;
   for (let h = 2; h <= 24; h += 2) await advanceTo(d - 1 + Math.floor(h / 24), (h % 24) * 1000);
   extra = d;
 }
-if (extra) console.log('    (ran on to day ' + extra + ' for a building and a fox family)');
+if (extra) console.log('    (ran on to day ' + extra + ' for a building on a lot and a fox family)');
 run.extraDays = extra;
 v1 = await ev(() => { const v = VR.game._chr.view; return { day: v.day, ev: v.ev.map(e => [e.k, e.imp, e.d, e.v.vil || '', e.v.b || '']), fam: v.fam, vil: v.vil.map(x => ({ id: x.id, name: x.name, x: x.x, z: x.z, built: x.built })) }; });
 // ---------------------------------------------------------------- the newly built building
-const builtV = v1.vil.find(x => x.built.length);
+const builtV = v1.vil.filter(x => x.built.length && lots[x.id] > 0).sort((p, q) => Math.hypot(p.x, p.z) - Math.hypot(q.x, q.z))[0];
 if (builtV) {
   await stand([builtV.x + 0.5, 140, builtV.z + 0.5], [builtV.x, 80, builtV.z - 20]);
   for (let i = 0; i < 20; i++) { await settle(6); await step(10, 33); if (await ev((id) => { const v = VR.game.villages.known.get(id); return !!(v && v.active); }, builtV.id)) break; }
@@ -96,9 +100,11 @@ if (builtV) {
   if (lb && lb.at) {
     const at = lb.at;
     await settle(10);
-    await stand([at[0] + 9, at[1] + 6, at[2] + 9], [at[0], at[1] + 2, at[2]]);
+    await ev(() => { VR.game.env.setTime(4200); VR.game.hideHud = true; });
+    await stand([at[0] + 11, at[1] + 7, at[2] + 11], [at[0], at[1] + 2, at[2]]);
     await settle(10); await step(10, 33);
     await grab('built', 'chronik_built.png', 6);
+    await ev(() => { VR.game.hideHud = false; });
   }
 } else check(false, 'no village finished a building in ' + v1.day + ' days');
 // ---------------------------------------------------------------- a family where the Chronik placed it
@@ -114,12 +120,12 @@ if (fam) {
   if (sp) {
     await step(20, 33);
     const m = await ev((fi) => { const s = VR.ChronikGame.spawned.find(q => q.i === fi); return s ? [s.mom.pos[0], s.mom.pos[1], s.mom.pos[2]] : null; }, fam.i);
-    if (m) { await stand([m[0] + 4.5, m[1] + 1.2, m[2] + 4.5], [m[0], m[1] + 0.3, m[2]]); await ev(() => { for (const e of VR.game.entities.mobs || []) if (e.ai) e.frozenT = 3; }); await step(3, 33); await grab('family', 'chronik_family.png', 4); }
+    if (m) { await ev(() => { VR.game.env.setTime(4600); VR.game.hideHud = true; }); await stand([m[0] + 2.6, m[1] + 0.4, m[2] + 2.6], [m[0], m[1] + 0.2, m[2]]); await grab('family', 'chronik_family.png', 2); await ev(() => { VR.game.hideHud = false; }); }
   }
 } else check(false, 'no family in the Chronik');
 // ---------------------------------------------------------------- gossip quoting the Chronik
 let said = null;
-const vg = v1.vil.slice().sort((a, b) => b.built.length - a.built.length)[0];
+const vg = builtV || v1.vil.slice().sort((p, q) => Math.hypot(p.x, p.z) - Math.hypot(q.x, q.z)).find(x => lots[x.id] > 0);
 if (vg) {
   await ev(() => { VR.game.env.setTime(3600); });
   await stand([vg.x + 0.5, 120, vg.z + 0.5], [vg.x, 80, vg.z - 10]);
@@ -131,6 +137,8 @@ if (vg) {
     said = await ev(() => { const L = VR.ChronikGame.said; const s = L[L.length - 1]; return s && Date.now() - s.t < 8000 ? s : null; });
   }
   run.said = said;
+  if (!said) run.gossipDiag = await ev((id) => { const g = VR.game, G = VR.Gossip, V = g.villages, v = V.known.get(id), p = g.player.pos; return { why: G.why, ticks: G.cost.ticks, on: G.on(g), act: v && v.active, n: v && v.agents.length, dPlan: v && Math.round(Math.hypot(p[0] - v.plan.x, p[2] - v.plan.z)), news: v ? VR.ChronikGame.newsFor(g, v, () => false) : null, near: v ? v.agents.map(a => [Math.round(Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2])), a.kid ? 'k' : '', a.pose, !!a.bubble]).slice(0, 12) : null, talking: !!V.talking, blocking: g.ui && g.ui.blocking }; }, vg.id);
+  if (!said) console.log('    diag ' + JSON.stringify(run.gossipDiag));
   check(!!said, 'a villager quotes the Chronik: ' + (said ? '„' + said.text + '"' : 'nothing said'));
   if (said) {
     await ev((who) => {
