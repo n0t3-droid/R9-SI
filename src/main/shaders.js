@@ -2915,7 +2915,13 @@ void main() {
   vec3 N = v_face == 6u ? normalize(cross(dFdx(v_rel), dFdy(v_rel))) : NORMALS[min(v_face, 5u)];
   if (v_face == 6u && N.y < 0.0) N = -N;
 #else
+#ifdef GEMALT
+  // r-gemalt · Weiche Natur: the smooth far land (face 6, lod.js job.soft) takes its normal from the geometry, as ring 1's
+  vec3 N = v_face == 6u ? normalize(cross(dFdx(v_rel), dFdy(v_rel))) : NORMALS[min(v_face, 5u)];
+  if (v_face == 6u && N.y < 0.0) N = -N;
+#else
   vec3 N = NORMALS[v_face];
+#endif
 #endif
   float dist = length(v_rel);
   vec3 V = -v_rel / max(dist, 1e-3);
@@ -2980,7 +2986,7 @@ void main() {
     alb *= texelGrain(wp3, length(fwidth(wp3)));   // (f-stipple2: never a flat slab up close)
 #endif
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
-#ifdef FORM
+#if defined(FORM) || defined(GEMALT)
     if (v_face == 6u) faceShade = mix(0.8, 1.0, clamp(N.y, 0.0, 1.0));
 #endif
     float ndl = max(dot(N, L), 0.0);

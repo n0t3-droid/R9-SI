@@ -471,6 +471,54 @@
       ckeys[k] = ((cq * 8 + kind[k]) * 4096 + Math.max(0, Math.round(top[k] * 8))) * 1;
     }
     const done = new Uint8Array(n * n);
+    // ---- r-gemalt · Weiche Natur (job.soft: gemalt.js, the switch on in Nahtlos): the land — ground, snow, the far
+    // woods' canopies (kinds 0, 6, 5) — as ONE smooth height field instead of columns: each cell corner at the mean of
+    // its four cells' tops (the pad ring gives a tile border the same corners from both tiles), each corner's colour the
+    // mean of the cells' tops, blended toward their cliff colour where the corner is steep; face 6 (TERRAIN-like: the
+    // LOD shader under GEMALT takes the normal from the geometry, as ring 1's). Water, lava, aether and the trees stay
+    // as before; only the tile border keeps a skirt (level seams). Flat runs still merge (one colour, all corners equal).
+    const SOFTK = job.soft ? [1, 0, 0, 0, 0, 1, 1, 0] : null;
+    let CH = null, CC = null;
+    if (SOFTK) {
+      const M0 = n + 1; CH = new Float32Array(M0 * M0); CC = new Array(M0 * M0);
+      for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+        let hs = 0, hn = 0, r = 0, gc = 0, b = 0, cn = 0, lo = 1e9, hi = -1e9, cr = 0, cg = 0, cb = 0;
+        for (let q = 0; q < 4; q++) {
+          const k = idx(i - 1 + (q & 1), j - 1 + (q >> 1)), t = top[k];
+          hs += t; hn++; if (t < lo) lo = t; if (t > hi) hi = t;
+          if (!SOFTK[kind[k]] || !cTop[k]) continue;
+          const c = cTop[k], cl = cCliff[k] || c; r += c[0]; gc += c[1]; b += c[2]; cr += cl[0]; cg += cl[1]; cb += cl[2]; cn++;
+        }
+        const ci = j * M0 + i; CH[ci] = hs / hn;
+        if (cn) { const st = (hi - lo) / step, tk = st <= 0.55 ? 0 : st >= 1.3 ? 1 : (st - 0.55) / 0.75, q8 = (v) => Math.round(v / 8) * 8; r /= cn; gc /= cn; b /= cn; CC[ci] = [q8(r + (cr / cn - r) * tk), q8(gc + (cg / cn - gc) * tk), q8(b + (cb / cn - b) * tk)]; }
+        else CC[ci] = null;
+      }
+      const vtx = (x, y, z, c) => push(x, y, z, 6, 0, 0, c, 255);
+      const M1 = n + 1, sameC = (p, q) => p === q || (p && q && p[0] === q[0] && p[1] === q[1] && p[2] === q[2]);
+      // a flat cell: its four corners at one height, one colour (a run of them merges along x)
+      const flatAt = (i, j) => { const a = j * M1 + i, h = CH[a]; return SOFTK[kind[idx(i, j)]] && CH[a + 1] === h && CH[a + M1] === h && CH[a + M1 + 1] === h && CC[a] && sameC(CC[a], CC[a + 1]) && sameC(CC[a], CC[a + M1]) && sameC(CC[a], CC[a + M1 + 1]); };
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const k = idx(i, j); if (!SOFTK[kind[k]] || done[j * n + i]) continue;
+        done[j * n + i] = 1;
+        const a = j * M1 + i, c0 = cTop[k];
+        if (flatAt(i, j)) {
+          let w = 1; while (i + w < n && !done[j * n + i + w] && flatAt(i + w, j) && CH[a + w] === CH[a] && sameC(CC[a + w], CC[a])) { done[j * n + i + w] = 1; w++; }
+          const x = i * S, z = j * S, h = CH[a], c = CC[a], b0 = nv;
+          vtx(x, h, z, c); vtx(x, h, z + S, c); vtx(x + w * S, h, z + S, c); vtx(x + w * S, h, z, c);
+          if (ni + 6 > icap) { icap *= 2; const n2 = new Uint32Array(icap); n2.set(I); I = n2; }
+          I[ni++] = b0; I[ni++] = b0 + 1; I[ni++] = b0 + 2; I[ni++] = b0; I[ni++] = b0 + 2; I[ni++] = b0 + 3;
+          continue;
+        }
+        const h00 = CH[a], h01 = CH[a + M1], h11 = CH[a + M1 + 1], h10 = CH[a + 1];
+        const x = i * S, z = j * S, b0 = nv;
+        // (corner order TL, BL, BR, TR as the top quads; the split along the diagonal whose ends are closer in height)
+        const P4 = [[x, h00, z, CC[a] || c0], [x, h01, z + S, CC[a + M1] || c0], [x + S, h11, z + S, CC[a + M1 + 1] || c0], [x + S, h10, z, CC[a + 1] || c0]];
+        const st = Math.abs(h00 - h11) <= Math.abs(h01 - h10) ? 0 : 1;
+        for (let q = 0; q < 4; q++) { const p = P4[(q + st) & 3]; vtx(p[0], p[1], p[2], p[3]); }
+        if (ni + 6 > icap) { icap *= 2; const n2 = new Uint32Array(icap); n2.set(I); I = n2; }
+        I[ni++] = b0; I[ni++] = b0 + 1; I[ni++] = b0 + 2; I[ni++] = b0; I[ni++] = b0 + 2; I[ni++] = b0 + 3;
+      }
+    }
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       if (done[j * n + i]) continue;
       const k = idx(i, j), ck = ckeys[k];
@@ -504,6 +552,12 @@
         const ni = i + dx, nj = j + dz, nk = idx(ni, nj);
         const border = ni < 0 || nj < 0 || ni >= n || nj >= n;
         let nh = top[nk];
+        if (SOFTK && SOFTK[kd]) {   // (r-gemalt: the smooth land has no walls between its cells; a skirt under its edge on the tile border)
+          if (!border) continue;
+          const a = j * (n + 1) + i, hS = Math.min(CH[a], CH[a + 1], CH[a + n + 1], CH[a + n + 2]);
+          piece(face, face <= 1 ? i : j, face <= 1 ? j : i, Math.min(nh, hS) - 10, hS, 0, 0, cCliff[k] || cSide[k], face <= 1 ? 200 : 225);
+          continue;
+        }
         if (border) nh = Math.min(nh, h) - 10;
         if (nh >= h - 0.01) continue;
         const shade = face <= 1 ? 200 : 225;

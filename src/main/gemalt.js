@@ -28,6 +28,9 @@
   };
   // the shader define: the switch on and not the lite look (Very Low)
   G.shaderOn = (s) => !!(s && s.gSoft && !s.lite && s.preset !== 'potato');
+  // the far tiles soft too (lod.js job.soft): the switch on in the look Nahtlos
+  G.farOn = (g) => { const s = g && g.settings; return G.shaderOn(s) && (!VR.LOOK || VR.LOOK.ground !== false); };
+  G.PROGS = { terrain: 1, lod: 1, lodFar: 1 };
   // ---- joined to q-art3's switches (game.js reads VR.QArt3.SW, .defaults, .off, .ROWS, .leafMode at load)
   const Q3 = VR.QArt3;
   if (Q3 && !Q3._gemalt) {
@@ -39,7 +42,7 @@
     Q3.ROWS = Q3.ROWS.concat(G.ROWS);
     Q3.leafMode = (s) => G.leafMode(s, l0(s));
   }
-  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return name === 'terrain' && G.shaderOn(VR.game && VR.game.settings) && !d.includes('GEMALT') ? d.concat(['GEMALT']) : d; }; }
+  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return G.PROGS[name] === 1 && G.shaderOn(VR.game && VR.game.settings) && !d.includes('GEMALT') ? d.concat(['GEMALT']) : d; }; }
 
   // ---- the bodies on the drawn ground: the render offset at world (x, y, z) — y the feet — from the column heights of
   // the section(s) there (bilinear over the column centres, the nearest drawn top within a block of the feet); 0 where

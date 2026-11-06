@@ -19,10 +19,11 @@ try {
     const ce = console.error, el = []; console.error = (...a) => { el.push(String(a[0]).slice(0, 900)); };
     const base = [['FADE', 'GEMALT'], ['FADE', 'SHADOWS', 'LIGHT2', 'L2AO', 'PBR', 'TEXHI', 'MOTION', 'SEASON', 'LV_MEADOW', 'Q_GRASS', 'Q_TUFT_N 6', 'GEMALT'], ['FADE', 'MULTIDRAW', 'SHADOWS', 'LIGHT2', 'GEMALT'], ['FADE', 'MODEL', 'GEMALT']];
     for (const d of base) { let ok = false, info = ''; try { const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', d); ok = !!p; } catch (e) { info = String(e.message || e).slice(0, 900); } out.push(['terrain ' + d.join(','), ok, info || el.slice(-1)[0] || '']); }
+    for (const d of [['GEMALT'], ['SOFTFADE', 'GEMALT', 'LIGHT2'], ['FAR1', 'SOFTFADE', 'GEMALT']]) { let ok = false, info = ''; try { const p = GL.program(S.LOD_VS, S.LOD_FS, d.includes('FAR1') ? 'lodFar' : 'lod', d); ok = !!p; } catch (e) { info = String(e.message || e).slice(0, 900); } out.push(['far tiles ' + d.join(','), ok, info || el.slice(-1)[0] || '']); }
     GL.deferred = d0; console.error = ce;
     const G = VR.Gemalt, h = VR.GL.defineHook, g = VR.game, s0 = Object.assign({}, g.settings);
     g.settings.gSoft = true; g.settings.lite = false; g.settings.preset = 'balanced';
-    const onB = h('terrain', ['FADE']).includes('GEMALT'), cut = h('terrainCut', ['CUTOUT']).includes('GEMALT');
+    const onB = h('terrain', ['FADE']).includes('GEMALT') && h('lod', ['SOFTFADE']).includes('GEMALT'), cut = h('terrainCut', ['CUTOUT']).includes('GEMALT');
     g.settings.gSoft = true; g.settings.lite = true; g.settings.preset = 'potato';
     const onVL = h('terrain', ['FADE']).includes('GEMALT');
     g.settings.gSoft = false; g.settings.lite = false; g.settings.preset = 'high';

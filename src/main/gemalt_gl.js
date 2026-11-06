@@ -14,7 +14,14 @@
   const aq0 = R.applyQ;
   R.applyQ = function (full) {
     const res = aq0.call(this, full);
-    if (this.gmOn !== undefined && on() !== this.gmOn) this.buildPrograms();
+    if (this.gmOn !== undefined && on() !== this.gmOn) {
+      this.buildPrograms();
+      const P = this.P; if (P) for (const k in P) if (k.startsWith('far_')) delete P[k];   // (the far programs: made again on their next use)
+    }
+    // the far tiles follow the switch (and the look): made again soft or as columns
+    const g = VR.game, h = g && g.horizon, fo = G.farOn(g);
+    if (h && h.reset && this.gmFar !== undefined && fo !== this.gmFar) h.reset();
+    this.gmFar = fo;
     return res;
   };
 })(VR);

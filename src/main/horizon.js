@@ -162,7 +162,7 @@
       this.inflight++;
       // stale when nobody has wanted it for a while (the camera moved on) or the world changed
       const cancel = () => this.tiles.get(key) !== t || this.frame - t.used > 45;
-      g.pool.submit({ type: 'lod', dim: 'overworld', level: L, tx, tz, lane: 1, cancel }, null, (m) => {
+      g.pool.submit({ type: 'lod', dim: 'overworld', level: L, tx, tz, lane: 1, cancel, soft: !!(VR.Gemalt && VR.Gemalt.farOn(g)) }, null, (m) => {   // (r-gemalt: soft — the land as a smooth height field)
         this.inflight = Math.max(0, this.inflight - 1);
         if (this.tiles.get(key) !== t) return;
         this.ver = (this.ver | 0) + 1;

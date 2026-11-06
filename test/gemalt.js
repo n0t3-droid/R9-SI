@@ -157,6 +157,22 @@ if (SN && SN.mesh) {
   { let worst = 0; for (const n of [[0, 1, 0], [0.6, 0.8, 0], [-0.3, -0.9, 0.3], [0, 0, -1], [0.57, 0.57, -0.57]]) { const l = Math.hypot(...n), m = n.map(a => a / l), u = SN.unoct(SN.oct(m[0], m[1], m[2])); worst = Math.max(worst, Math.acos(Math.min(1, m[0] * u[0] + m[1] * u[1] + m[2] * u[2]))); }
     check(worst < 0.02, 'the normal survives its two bytes', (worst * 57.3).toFixed(2) + '°'); }
 }
+// ---- g  the far tiles (lod.js job.soft): the land as one smooth height field, its tile borders shared, water as before
+if (V.LOD && V.makeGen) {
+  const g = V.makeGen('overworld', 4242, {});
+  const verts12 = (t) => { const v = new Int16Array(t.verts), u = new Uint8Array(t.verts), out = []; for (let i = 0; i < u.length / 12; i++) out.push({ x: v[i * 6] / 8, y: v[i * 6 + 1] / 8, z: v[i * 6 + 2] / 8, face: u[i * 12 + 6] & 7, kind: u[i * 12 + 6] >> 3 }); return out; };
+  let A = null, A0 = null, B = null, tx = 0;
+  tx = -3; A = V.LOD.build(g, { level: 0, tx, tz: 1, soft: true }); A0 = V.LOD.build(g, { level: 0, tx, tz: 1 }); B = V.LOD.build(g, { level: 0, tx: tx + 1, tz: 1, soft: true });   // (a land tile west of the spawn)
+  if (A && A0 && B && !A.empty) {
+    const va = verts12(A), v0 = verts12(A0), vb = verts12(B);
+    const soft = va.filter(v => v.face === 6), sides0 = v0.filter(v => v.face <= 1 || v.face >= 4).length, sidesA = va.filter(v => v.face <= 1 || (v.face >= 4 && v.face <= 5)).length;
+    check(soft.length > 100 && v0.every(v => v.face !== 6), 'a soft far tile: the land as height-field faces (face 6); without soft none', soft.length + ' vertices');
+    check(sidesA < sides0, 'the columns\' walls go (only the tile border\'s skirt stays)', sides0 + ' → ' + sidesA + ' side vertices');
+    const S = 32 * V.LOD.cell(0), eA = new Map(); for (const v of soft) if (Math.abs(v.x - S) < 1e-6) eA.set(v.z, v.y);
+    let worst = 0, n = 0; for (const v of vb) if (v.face === 6 && Math.abs(v.x) < 1e-6 && eA.has(v.z)) { worst = Math.max(worst, Math.abs(eA.get(v.z) - v.y)); n++; }
+    check(n > 5 && worst < 0.13, 'tile borders: the neighbour tile\'s edge heights are the same', n + ' corners, worst ' + worst.toFixed(3));
+  } else check(false, 'a far tile to test');
+}
 function cellActive(j, X, Y, Z) {
   // a corner is on the surface when its 8 voxels hold natural ground and air
   let s = 0, a = 0; const T = SN.tables();
