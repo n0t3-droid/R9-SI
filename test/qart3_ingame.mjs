@@ -55,7 +55,7 @@ const config = async (c) => { const r = await ev((c) => {
   for (const k of X.SW) { g.settings[k] = c === 'on' ? d[k] : false; g.applySettings(k); }
   g.settings.preset = g.settings._pr || g.settings.preset;
   return X.SW.map(k => k + '=' + g.settings[k]).join(',') + ' leaf=' + g.world.fancyLeaves;
-}, c); await run(4); const st = await settle(150); if (st && st.dirty) console.log('     (not settled after a remesh: ' + JSON.stringify(st) + ')'); return r; };
+}, c); await run(4); let st = null; for (let k = 0; k < 6; k++) { st = await settle(150); if (st && !st.dirty && !st.busy) break; } if (st && st.dirty) console.log('     (not settled after a remesh: ' + JSON.stringify(st) + ')'); return r; };
 const preset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings._pr = p; g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.wowMoments = false; g.applySettings('*'); }, p);
 const grab = async (name, tod, K = 4) => {
   const url = await ev(([tod, K]) => { const g = VR.game; g.env.setTime(tod); for (let i = 0; i < 2; i++) { g.env.anim = 499; if (g.envFor) g.envFor(g.player.eyePos(), 1, { freezeTime: true, freezeWeather: true }); } window.__norender = false; for (let i = 0; i < K; i++) { g.env.setTime(tod); g.env.rain = 0; g.env.rainTarget = 0; g.last = performance.now() - 33; window.__step(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [tod, K]);
@@ -73,7 +73,7 @@ const top = (x, z) => ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.flo
 const views = async (view, E, T, tod, hold) => {
   for (const pr of PRESETS) {
     await preset(pr); await eyeAt(E, T, tod); await settle(40); await run(hold ? 2 : 20);
-    for (const c of ['off', 'on']) { N.q[pr + '_' + c] = await config(c); await eyeAt(E, T, tod); await run(2); await grab(view + '_' + pr + '_' + c, tod); }
+    for (const c of ['on', 'off']) { N.q[pr + '_' + c] = await config(c); await eyeAt(E, T, tod); await run(2); await grab(view + '_' + pr + '_' + c, tod); }   // (q-art3: on first — the preset's own mesh — then one remesh to off)
   }
 };
 
@@ -114,7 +114,7 @@ try {
         const r = { off: [], on: [] };
         // (q-art: a switch rebuilds the programs and SwiftShader compiles them at their first draw — warm up before each
         //  measurement, so neither side pays for a compile; browser run 2 measured the compile into 'on')
-        for (const c of (process.env.COSTSEQ || 'off,on,off,on').split(',')) { await config(c); await ready(); await ms(4); r[c].push(await ms(6)); }
+        for (const c of (process.env.COSTSEQ || 'on,off').split(',')) { await config(c); await ready(); await ms(4); r[c].push(await ms(6)); }
         r.passes = {};
         for (const c of ['off', 'on']) { await config(c); r.passes[c] = await ev(() => { const g = VR.game, rr = g.renderer; rr.passLog = true; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); window.__norender = true; rr.passLog = false; const L = rr.stats.fsList || []; return { n: L.length, rdMB: +(L.reduce((a, x) => a + (x.rd || 0), 0) / 1e6).toFixed(1), list: L.map(x => x.name + ' ' + x.w + 'x' + x.h).join(', ') }; }); }
         const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };
