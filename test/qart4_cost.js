@@ -6,16 +6,16 @@ const V = require('./load_shared.js');
 const IS = V.IsleShell;
 const g = V.makeGen('overworld', 12345, { vgen: 16 });
 V.LOD.setAvg(null);
-const vn = (r) => (r && !r.empty ? r.verts.byteLength / 12 : 0);
-for (const L of [-1, 0, 1, 2, 3]) {
-  const T = 32 * V.LOD.cell(L); let a = 0, b = 0, ta = 0, tb = 0, nI = 0;
-  const R = L <= 0 ? 3 : 2;
+const vn = (r) => (r && !r.empty ? r.verts.byteLength / 12 : 0), tn = (r) => (r && !r.empty ? r.count / 3 : 0);
+for (const L of [-1, 0, 1, 2, 3, 4]) {
+  const T = 32 * V.LOD.cell(L); let a = 0, b = 0, ta = 0, tb = 0, nI = 0, xa = 0, xb = 0;
+  const R = L <= 0 ? 3 : L >= 4 ? 1 : 2;
   for (let j = -R; j < R; j++) for (let i = -R; i < R; i++) {
-    let t0 = process.hrtime.bigint(); a += vn(V.LOD.build(g, { level: L, tx: i, tz: j })); ta += Number(process.hrtime.bigint() - t0) / 1e6;
-    t0 = process.hrtime.bigint(); b += vn(V.LOD.build(g, { level: L, tx: i, tz: j, isleForm: 1 })); tb += Number(process.hrtime.bigint() - t0) / 1e6;
-    nI += IS.anchored(g, i * T, j * T, (i + 1) * T, (j + 1) * T).length;
+    let t0 = process.hrtime.bigint(); const A = V.LOD.build(g, { level: L, tx: i, tz: j }); a += vn(A); xa += tn(A); ta += Number(process.hrtime.bigint() - t0) / 1e6;
+    t0 = process.hrtime.bigint(); const B = V.LOD.build(g, { level: L, tx: i, tz: j, isleForm: 1 }); b += vn(B); xb += tn(B); tb += Number(process.hrtime.bigint() - t0) / 1e6;
+    nI += IS.anchored(g, i * T, j * T, (i + 1) * T, (j + 1) * T).filter(J => J.r >= IS.minR(L)).length;
   }
-  console.log('lod level ' + L + ' (' + (2 * R) ** 2 + ' tiles, ' + nI + ' isles): verts ' + a + ' → ' + b + ' (' + ((b / a - 1) * 100).toFixed(1) + ' %), build ms ' + ta.toFixed(0) + ' → ' + tb.toFixed(0));
+  console.log('lod level ' + L + ' (' + (2 * R) ** 2 + ' tiles, ' + nI + ' isles): verts ' + a + ' → ' + b + ' (' + ((b / a - 1) * 100).toFixed(1) + ' %), tris ' + xa + ' → ' + xb + ' (' + ((xb / xa - 1) * 100).toFixed(1) + ' %), build ms ' + ta.toFixed(0) + ' → ' + tb.toFixed(0));
 }
 {
   let a = 0, b = 0;

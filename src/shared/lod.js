@@ -608,7 +608,10 @@
     if (job.isleForm && VR.IsleShell && g.islandCell) {
       const IS = VR.IsleShell, det = IS.detFor(L);
       const Bq = { vert: (x, y, z, face, kd, ax, c, sh) => { push(x, y, z, face, kd, ax, c, sh); return nv - 1; }, tri: (a, b, c) => { if (ni + 3 > icap) { icap *= 2; const n2 = new Uint32Array(icap); n2.set(I); I = n2; } I[ni++] = a; I[ni++] = b; I[ni++] = c; } };
-      for (const J of IS.anchored(g, x0, z0, x0 + T, z0 + T)) IS.emit(IS.mesh(g, J, det), Bq, x0, z0);
+      // (browser run 2: the coarse levels drew every isle — hundreds a 1–2 km tile, +25–35 % drawn triangles on Balanced/High;
+      //  the slabs had shown an isle only where it held a cell's centre) far out only the isles worth a pixel or two
+      const rMin = IS.minR(L);
+      for (const J of IS.anchored(g, x0, z0, x0 + T, z0 + T)) if (J.r >= rMin) IS.emit(IS.mesh(g, J, det), Bq, x0, z0);
     } else if (g.islandAt) {
       const isl = new Array(N * N);
       for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) { const X = x0 + i * S + (S >> 1), Z = z0 + j * S + (S >> 1); isl[idx(i, j)] = g.islandAt(X, Z); }

@@ -27,6 +27,10 @@
   IS.segs = (I, det) => (det >= 2 ? Math.max(14, Math.min(30, Math.round(I.r * 0.85))) : IS.DET[Math.max(0, det)].seg);
   // the detail a horizon tile of level L draws its isles with (ring 1 and the near levels: 2)
   IS.detFor = (L) => (L <= 1 ? 2 : L <= 2 ? 1 : 0);
+  // the smallest isle a tile of level L draws (the coarse levels: about half a cell — the slabs, sampled at the cells'
+  // centres, showed about as many)
+  IS.minR = (L) => (L >= 3 ? LODCELL(L) * 0.45 : 0);
+  const LODCELL = (L) => (L < 0 ? 2 : 4 << L);
   const hf = (a, b, s) => (M.hash2(a | 0, b | 0, s) >>> 0) / 4294967296;
   const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const mulc = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
@@ -94,10 +98,11 @@
     for (const f of D.top) ring((s) => { const p = at(s, f); return vert(p[0], IS.top(g, I, p[0], p[1], 1 - f), p[1], pal.top, 255, 0); });
     const rimY = new Float32Array(seg);
     ring((s) => { const p = at(s, 1); rimY[s] = IS.top(g, I, p[0], p[1], 0); return vert(p[0], rimY[s], p[1], mixc(pal.top, pal.moss, 0.35), 244, 0); });
-    // the moss lip: a little out over the rim and down
-    const lip = ring((s) => { const p = at(s, 1.03); return vert(p[0], rimY[s] - 1.25, p[1], pal.moss, 222, 0); });
-    // the soil wall down to the underside's start (islandShape's bottom at the rim: y − 2)
-    ring((s) => { const p = at(s, 0.99); return vert(p[0], Math.min(rimY[s] - 2.2, I.y - 1.6), p[1], mixc(pal.dirt, pal.bands[sd % nb], 0.45), 205, 0); });
+    // the moss lip: a little out over the rim and down (detail 2 only — further out it is under a pixel, and the coarse
+    // levels' triangles count: browser run 2)
+    const lip = det >= 2 ? ring((s) => { const p = at(s, 1.03); return vert(p[0], rimY[s] - 1.25, p[1], pal.moss, 222, 0); }) : null;
+    // the soil wall down to the underside's start (islandShape's bottom at the rim: y − 2); detail 0 goes straight on
+    if (det >= 1) ring((s) => { const p = at(s, 0.99); return vert(p[0], Math.min(rimY[s] - 2.2, I.y - 1.6), p[1], mixc(pal.dirt, pal.bands[sd % nb], 0.45), 205, 0); });
     // the underside: bands of strata, moss and tuff at the tip; the shade falls toward the tip (its own shadow)
     const U = D.und, last = U.length - 1;
     // (browser run 2: a calm world's isles — vgen 16 — and the designed gardens are green from below: the bottom two blocks
