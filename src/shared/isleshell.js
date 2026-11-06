@@ -100,9 +100,13 @@
     ring((s) => { const p = at(s, 0.99); return vert(p[0], Math.min(rimY[s] - 2.2, I.y - 1.6), p[1], mixc(pal.dirt, pal.bands[sd % nb], 0.45), 205, 0); });
     // the underside: bands of strata, moss and tuff at the tip; the shade falls toward the tip (its own shadow)
     const U = D.und, last = U.length - 1;
+    // (browser run 2: a calm world's isles — vgen 16 — and the designed gardens are green from below: the bottom two blocks
+    //  of every column are moss in big patches, the strata show on the steps between columns — gen_realm.js calmCell)
+    const GN = VR.GEN, calm = !!(GN && ((GN.isleCalm && GN.isleCalm(g)) || (I.designed && GN.isleGarden && GN.isleGarden(g))));
     U.forEach((f, k) => ring((s) => {
       const p = at(s, f), t = 1 - f, y = IS.bottom(g, I, p[0], p[1], t);
       let c = pal.bands[(k + sd) % nb];
+      if (calm) { const m = g.nVein.n2(p[0] * 0.09 + sd * 0.37, p[1] * 0.09 - sd * 0.21); c = mixc(c, pal.moss, m > -0.12 ? 0.72 : 0.22); }
       if (k >= last - (det >= 2 ? 1 : 0)) c = hf(s, k, sd + 5) < 0.55 ? pal.moss : mixc(pal.tuff, pal.moss, 0.3);
       return vert(p[0], y, p[1], c, Math.round(200 - 38 * (k / Math.max(1, last))), 0);
     }));

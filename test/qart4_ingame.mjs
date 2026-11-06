@@ -126,10 +126,25 @@ try {
   if (want('meadow') || want('cost')) {
     let cam = PIN.meadow;
     if (!cam) {
-      const far = isles.filter(J => J.d > 60 && J.d < 330), J = far[0] || isles[0];
+      // (run 2: 14 m from the spawn the eye faced a station's wall — the spawn stands in a town) the open grass nearest the
+      // spawn whose ground stays level for 40 m toward the isles: the meadow
+      const far = isles.filter(J => J.d > 60 && J.d < 400), J = far[0] || isles[0];
       const a = J ? Math.atan2(J.z - S0[2], J.x - S0[0]) : 0;
-      const M = [S0[0] - Math.cos(a) * 14, 0, S0[2] - Math.sin(a) * 14]; M[1] = (await ground(M[0], M[2])) + 1 + 1.62;
-      cam = { E: M, T: [M[0] + Math.cos(a) * 40, M[1] + 2, M[2] + Math.sin(a) * 40] };
+      await ground(S0[0], S0[2]);
+      const M0 = await ev(([S0, a]) => {
+        const g = VR.game, w = g.world, R = VR.R; let best = null;
+        const nm = (x, z) => { const y = w.topAt(Math.floor(x), Math.floor(z)), s = w.getBlock(Math.floor(x), y, Math.floor(z)), t = s ? R.types[R.T.type[s]] : null; return [y, t ? t.name : '']; };
+        for (let gx = -104; gx <= 104; gx += 8) for (let gz = -104; gz <= 104; gz += 8) {
+          const x = S0[0] + gx, z = S0[2] + gz; if (!w.isLoaded(Math.floor(x), Math.floor(z))) continue;
+          const [h, n] = nm(x, z); if (n !== 'grass_block') continue;
+          let ok = 0; for (let d = 4; d <= 40; d += 4) { const [y2, n2] = nm(x + Math.cos(a) * d, z + Math.sin(a) * d); if (Math.abs(y2 - h) <= 3 && /grass|leaves|flower|fern|dirt/.test(n2)) ok++; }
+          const sc = ok * 10 - Math.hypot(gx, gz) * 0.08; if (ok >= 8 && (!best || sc > best.sc)) best = { x, z, h, sc };
+        }
+        return best;
+      }, [S0, a]);
+      console.log('     meadow ' + JSON.stringify(M0));
+      const M = M0 ? [M0.x, M0.h + 1 + 1.62, M0.z] : [S0[0] - Math.cos(a) * 14, 0, S0[2] - Math.sin(a) * 14]; if (!M0) M[1] = (await ground(M[0], M[2])) + 1 + 1.62;
+      cam = { E: M, T: [M[0] + Math.cos(a) * 40, M[1] + 4, M[2] + Math.sin(a) * 40] };
     }
     N.cams.meadow = cam;
     if (want('meadow')) await views('meadow', cam.E, cam.T, AFT, 'isle');
