@@ -188,6 +188,7 @@
           E.ringNormal = norm([Np[0] * 0.94 - P[0] * 0.34, Np[1] * 0.94 - P[1] * 0.34, Np[2] * 0.94 - P[2] * 0.34]);
         }
       }
+      if (dim === 'overworld' && SKY.on && VR.QArt && VR.QArt.q.qSky) VR.QArt.skyScript(E, sy, rain, W.dark);   // q-art · Farbdrehbuch: the day's colour script (qart.js)
       // dimension overrides
       const rd = (o.renderDist || 8) * 16;
       let fogStart = rd * 0.62, fogEnd = rd * 1.0, dens = 0.0002 + rain * 0.0035;

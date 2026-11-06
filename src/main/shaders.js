@@ -1089,7 +1089,7 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
   return c;
 }
 #endif
-void main() {
+${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -1142,6 +1142,9 @@ void main() {
 #endif
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
+#if defined(Q_LEAF) && !defined(MODEL)
+  if (qLeafF() && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art · Laubkronen: the ragged corners (qart.js QA.cut)
+#endif
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif
@@ -1312,6 +1315,12 @@ void main() {
   vec3 n = normalize(N * sqrt(max(0.0, 1.0 - dot(nxy, nxy))) + T * nxy.x + Bt * nxy.y);
   if (u_matTier > 1.5) n = normalize(n - (bumpW - dot(bumpW, n) * n));
   if (noshade) n = vec3(0.0, 1.0, 0.0);
+#if defined(Q_LEAF) && !defined(MODEL)
+  // q-art · Laubkronen: the leaf face takes the clumps' volume normal (qart.js QA.clump)
+  bool qLf = qLeafF();
+  vec4 qC = vec4(0.0, 1.0, 0.0, 0.0);
+  if (qLf) { qC = qClump(v_localPos + vec3(u_camInt) - N * 0.5); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
+#endif
 #ifdef PBR
   // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
   if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
@@ -1320,6 +1329,9 @@ void main() {
   if (fam == 3) rough = 0.97;                             // fabric: matte, no highlight
   rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
   rough = mix(rough, 0.03, pud);                          // a puddle is a mirror
+#if defined(Q_PLAZA) && !defined(MODEL)
+  if (face == 2u && qPlazaL(layer)) alb.rgb = qPlaza(alb.rgb, v_localPos + vec3(u_camInt));   // q-art · Platzbelag (qart.js)
+#endif
   alb.rgb *= (1.0 + dAlb) * (1.0 - 0.55 * pud);
   float emis = mat.a;
   // lighting
@@ -1348,8 +1360,14 @@ void main() {
   // t-light2: leaves, grass and flowers take the light softly round their edges (a wrap)
   if (!noshade && ((v_w5 >> 14u) & 1u) == 0u && ((v_w5 >> 5u) & 7u) != 0u) ndl = l2Wrap(dot(n, L), u_l2K.z) * step(-0.2, dot(N, L));
 #endif
+#if defined(Q_LEAF) && !defined(MODEL)
+  if (qLf) ndl = clamp((dot(n, L) + 0.3) / 1.3, 0.0, 1.0);   // q-art · Laubkronen: the crown's light wraps (no hard face edge)
+#endif
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#if defined(Q_LEAF) && !defined(MODEL)
+  if (qLf && ndl > 0.0 && outdoors > 0.0 && dot(N, L) <= -0.2) sh = shadowAt(-N, L);   // (a leaf face turned from the sun: the shadow seen through the leaf)
+#endif
 #ifdef CLOUDSH
   sh *= cloudShadow(v_localPos + vec3(u_camInt));   // t-motion: cloud shadow (t-light2 multiplies it into its sun term)
 #endif
@@ -1383,6 +1401,9 @@ void main() {
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
 #endif
   vec3 col = alb.rgb * lighting;
+#if defined(Q_LEAF) && !defined(MODEL)
+  if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);   // q-art · Laubkronen: the crown's light
+#endif
 #if defined(PBR)
   // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight
   if (!noshade) col = pbrShade(col, alb.rgb, n, N, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
