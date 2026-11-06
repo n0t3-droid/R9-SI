@@ -245,6 +245,43 @@
     return 'Lindenau';
   };
 
+  // ---------------------------------------------------------------- r-chronik: places named by what happened there
+  // a German compound of the event's word (or a word of the mood) and a word of the land, with its English twin and
+  // the preposition each language puts before it: Fuchshain · Fox Grove („im Fuchshain“ · „in Fox Grove“), Mohnwiese ·
+  // Poppy Meadow („auf der Mohnwiese“), Nebelsee · Mist Lake („am Nebelsee“). Plain words of both languages; the
+  // deny list keeps famous fictional places out (test/chronik.js)
+  const CH_PRE = {
+    fox: [['Fuchs', 'Fox']], deer: [['Reh', 'Deer'], ['Hirsch', 'Hart']], sheep: [['Lamm', 'Lamb'], ['Schaf', 'Sheep']], boar: [['Keiler', 'Boar']],
+    fell: [['Eichen', 'Oak'], ['Sturm', 'Storm']], storm: [['Sturm', 'Storm'], ['Donner', 'Thunder'], ['Wind', 'Wind']],
+    rain: [['Regen', 'Rain'], ['Tau', 'Dew'], ['Quell', 'Spring']], bloom: [['Mohn', 'Poppy'], ['Blüten', 'Blossom'], ['Glocken', 'Bell'], ['Klee', 'Clover']],
+    snow: [['Schnee', 'Snow'], ['Frost', 'Frost']],
+    mood: [['Nebel', 'Mist'], ['Mond', 'Moon'], ['Lerchen', 'Lark'], ['Gold', 'Golden'], ['Morgen', 'Dawn'], ['Stern', 'Star'], ['Sommer', 'Summer'], ['Abend', 'Evening'], ['Bienen', 'Bee'], ['Finken', 'Finch'], ['Wolken', 'Cloud'], ['Silber', 'Silver']],
+  };
+  // [German word, English word, German preposition, English preposition]
+  const CH_LAND = {
+    meadow: [['wiese', 'Meadow', 'auf der', 'on'], ['au', 'Lea', 'in der', 'on'], ['feld', 'Field', 'auf dem', 'in'], ['hang', 'Slope', 'am', 'on']],
+    forest: [['hain', 'Grove', 'im', 'in'], ['wald', 'Wood', 'im', 'in'], ['lichtung', 'Glade', 'auf der', 'in'], ['grund', 'Hollow', 'im', 'in']],
+    water: [['see', 'Lake', 'am', 'at'], ['ufer', 'Shore', 'am', 'on'], ['weiher', 'Pond', 'am', 'at'], ['bucht', 'Bay', 'in der', 'in']],
+    cold: [['höhe', 'Heights', 'auf der', 'on'], ['kamm', 'Ridge', 'auf dem', 'on'], ['halde', 'Scree', 'an der', 'on'], ['grat', 'Crest', 'am', 'on']],
+    dry: [['heide', 'Heath', 'in der', 'on'], ['steppe', 'Steppe', 'in der', 'on'], ['senke', 'Dell', 'in der', 'in'], ['flur', 'Flats', 'auf der', 'on']],
+    shore: [['strand', 'Strand', 'am', 'on'], ['düne', 'Dunes', 'auf der', 'on'], ['ufer', 'Shore', 'am', 'on'], ['bucht', 'Cove', 'in der', 'in']],
+  };
+  const CH_DENY = /^(silbersee|düsterwald|auenland|bruchtal|nebelberge|fangorn|sturmhöhe|schattenwald|mondsee|silberwald)$/i;
+  N.CH_PRE = CH_PRE; N.CH_LAND = CH_LAND;
+  N.chronikPlace = function (kind, land, seed) {
+    const L = CH_LAND[land] || CH_LAND.meadow, own = CH_PRE[kind];
+    for (let k = 0; k < 24; k++) {
+      const pool = own && h01(seed, k, 0x7a) < 0.6 ? own : CH_PRE.mood;
+      const a = pick(pool, seed, k, 0x7b), b = pick(L, seed, k, 0x7c);
+      const al = a[0].toLowerCase();
+      if (al.slice(-2) === b[0].slice(0, 2) || al.slice(-1) === b[0].charAt(0) && /[aeiouäöü]/.test(b[0].charAt(0))) continue;
+      const de = a[0] + b[0], en = a[1] + ' ' + b[1];
+      if (de.length > 16 || CH_DENY.test(de) || N.blocked(de) || N.reserved(de) || N.blocked(en)) continue;
+      return { de, en, inDe: b[2] + ' ' + de, inEn: b[3] + ' ' + en };
+    }
+    return { de: 'Lindenhain', en: 'Linden Grove', inDe: 'im Lindenhain', inEn: 'in Linden Grove' };
+  };
+
   // ---------------------------------------------------------------- the stars
   const SON = ['A', 'Ae', 'Be', 'Ca', 'Da', 'E', 'Fa', 'Fe', 'Ha', 'I', 'Ka', 'La', 'Le', 'Li', 'Lo', 'Lu', 'Ma', 'Me', 'Mi',
     'Na', 'Ne', 'No', 'O', 'Pe', 'Ri', 'Ro', 'Sa', 'Se', 'Si', 'Ta', 'Te', 'Ti', 'U', 'Va', 'Ve', 'Vi', 'Ya', 'Za', 'Ze'];
