@@ -52,6 +52,7 @@ const settle = async (max = 60) => {
   return s;
 };
 // x-top's switches: off (the picture as before) or on (the preset's defaults; Balanced: BAL_ON when given)
+// (r2: the meadow beside the wood turned away from it; the person per preset, 2.3 m, the feet in the frame)
 const config = (c) => ev(([c, balOn]) => {
   const g = VR.game, r = g.renderer, X = VR.XTop; if (!X || !X.SW) return 'none';
   const pr = g.settings.preset, d = pr === 'balanced' && balOn ? Object.assign(X.off(), balOn) : X.defaults(pr), q = {};
@@ -106,7 +107,7 @@ try {
     const a = Math.atan2(sun[2], sun[0]) + 1.3, y = (await top(S0[0], S0[2])) + 1 + 1.62;
     const E = [S0[0], y, S0[2]], T = [S0[0] + Math.cos(a) * 40, y - 3, S0[2] + Math.sin(a) * 40];
     N.cams.meadow = { E, T };
-    if (want('meadow')) await views('meadow', E, T, AFT);
+    // (r1: the spawn stands on a kit platform — the meadow view is made beside the wood instead, see there)
     if (want('cost')) {
       const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
       for (const pr of ['potato', 'balanced', 'high']) {
@@ -137,20 +138,23 @@ try {
     }
     if (want('person')) {
       const LATE = 9000;
-      await ev(() => { const V = VR.game.villages; if (!V._xUpd) { V._xUpd = V.update; } V.update = function () {}; });
-      const a = await ev((c) => { const V = VR.game.villages; let best = null, bd = 1e9; for (const a of V.agents) { if (a.pose === 'sleep') continue; const d = Math.hypot(a.pos[0] - c[0], a.pos[2] - c[1]); if (d < bd) { bd = d; best = a; } } return best ? [best.pos[0], best.pos[1], best.pos[2]] : null; }, v.c);
-      if (a) {
-        const sun = await ev(() => VR.game.env.E.sunDir.slice()), ang = Math.atan2(sun[2], sun[0]) + 0.7;
-        const E = [a[0] + Math.cos(ang) * 2.6, a[1] + 1.55, a[2] + Math.sin(ang) * 2.6], T = [a[0], a[1] + 1.1, a[2]];
-        N.cams.person = { E, T };
-        await views('person', E, T, LATE, true);
-      } else check(false, 'a villager');
-      await ev(() => { const V = VR.game.villages; if (V._xUpd) V.update = V._xUpd; });
+      for (const pr of PRESETS) {
+        await preset(pr); await eyeAt([v.c[0], 140, v.c[1]], [v.c[0] + 10, 130, v.c[1]], LATE); await settle(40); await run(20);
+        await ev(() => { const V = VR.game.villages; if (!V._xUpd) V._xUpd = V.update; V.update = function () {}; });
+        const a = await ev((c) => { const V = VR.game.villages; let best = null, bd = 1e9; for (const a of V.agents) { if (a.pose === 'sleep' || a.pose === 'sit' || a.pose === 'sitground') continue; const d = Math.hypot(a.pos[0] - c[0], a.pos[2] - c[1]); if (d < bd) { bd = d; best = a; } } return best ? [best.pos[0], best.pos[1], best.pos[2]] : null; }, v.c);
+        if (a) {
+          const sun = await ev(() => VR.game.env.E.sunDir.slice()), ang = Math.atan2(sun[2], sun[0]) + 0.9;
+          const E = [a[0] + Math.cos(ang) * 2.3, a[1] + 1.45, a[2] + Math.sin(ang) * 2.3], T = [a[0], a[1] + 0.75, a[2]];
+          N.cams['person_' + pr] = { E, T };
+          for (const c of ['off', 'on']) { N.q[pr + '_' + c] = await config(c); await eyeAt(E, T, LATE); await run(2); await grab('person_' + pr + '_' + c, LATE); }
+        } else check(false, 'a villager');
+        await ev(() => { const V = VR.game.villages; if (V._xUpd) { V.update = V._xUpd; delete V._xUpd; } });
+      }
     }
   } else if (want('street') || want('person')) check(false, 'a village known');
 
   // ---------------------------------------------------------------- the forest's edge, noon
-  if (want('forest')) {
+  if (want('forest') || want('meadow')) {
     const NOON = 6000;
     const findWood = (S0) => ev((S0) => { const g = VR.game, w = g.world, R = VR.R, F = VR.F; let best = null, bn = 0;
       for (let gx = -112; gx <= 112; gx += 16) for (let gz = -112; gz <= 112; gz += 16) { const x0 = Math.floor(S0[0] + gx), z0 = Math.floor(S0[2] + gz); if (!w.isLoaded(x0, z0)) continue; let n = 0; for (let dx = 0; dx < 16; dx += 2) for (let dz = 0; dz < 16; dz += 2) { const y = w.topAt(x0 + dx, z0 + dz); const s = w.getBlock(x0 + dx, y, z0 + dz); if (s && (R.T.flags[s] & F.LEAVES)) n++; } if (n > bn) { bn = n; best = [x0 + 8, z0 + 8]; } }
@@ -169,6 +173,12 @@ try {
       const T = [F.c[0], E[1] + 2, F.c[1]];
       N.cams.forest = { E, T };
       await views('forest', E, T, NOON);
+      if (want('meadow')) {
+        const AFT = 8200, b = a + Math.PI, M = [E[0] + Math.cos(a) * 6, 0, E[2] + Math.sin(a) * 6]; M[1] = (await top(M[0], M[2])) + 1 + 1.62;
+        const MT = [M[0] + Math.cos(b + 0.5) * 40, M[1] - 2.5, M[2] + Math.sin(b + 0.5) * 40];
+        N.cams.meadow = { E: M, T: MT };
+        await views('meadow', M, MT, AFT);
+      }
     } else check(false, 'a wood near the spawn');
   }
 
