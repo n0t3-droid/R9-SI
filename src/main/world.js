@@ -721,7 +721,10 @@
       // (f-stipple, R50-08) near the player whole at once and growing from the ground; beyond, the soft fade where the
       // renderer has it (the TSR resolves the turning dither), else whole at once (Stream.fadePlan)
       const lp = this.lastPos, r = this.renderer;
-      const plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
+      let plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
+      // p-stream3 · in fast flight within the fine level's reach the 2-block stand-in was there: the chunk replaces it whole
+      // (the dither over a look-alike read as a seam of grain, not a fade)
+      if (plan.fade < 1 && this.planFast && this.streamPlan && lp && VR.Horizon && VR.Horizon.FINE_D > 0) { const ex = c.cx * 16 + 8 - lp[0], ez = c.cz * 16 + 8 - lp[2]; if (ex * ex + ez * ez < VR.Horizon.FINE_D * VR.Horizon.FINE_D) plan = { fade: 1, grow: false }; }
       // (the latency is learnt in fast flight only: a world loading round a standing player queues far more than a flight)
       if (this.reqAt && this.reqAt.size) { const t = this.reqAt.get(c.key); if (t !== undefined) { this.reqAt.delete(c.key); if (this.now !== undefined && VR.StreamPlan) { if (this.planFast) this.lat = VR.StreamPlan.lat(this.lat, (this.now - t) / 1000); } } }   // (p-stream)
       c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1; c.fadeMs = plan.ms || VR.Stream.FADE_MS;   // (f-stipple2: shorter far out)

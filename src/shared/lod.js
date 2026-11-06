@@ -361,6 +361,20 @@
   };
 
   // ---------------------------------------------------------------- one tile
+  // p-stream3 · the fine level (-1, 2-block cells, the stand-in near the camera while the chunks load): each cell's colours
+  // vary a little, as the chunks' blocks do (brightness ±7 %, a slight warm/cool turn), instead of one flat colour per
+  // stretch — the step from the stand-in to the chunk is detail, not a change of material. Water cells keep theirs (kind 1).
+  // Not quantised (the coarser levels round to 8 so plains merge into big quads; a fine tile is small and short-lived)
+  LOD.FINE_VAR = 0.07;
+  LOD.fineNoise = function (cTop, cSide, cCliff, kind, x0, z0, step, n, N) {
+    const V = LOD.FINE_VAR;
+    for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) {
+      const k = (j + 1) * N + (i + 1); if (kind[k] === 1) continue;
+      const X = x0 + i * step, Z = z0 + j * step, b = 1 + (hh(X, Z, 77) * 2 - 1) * V, w = (hh(X, Z, 78) * 2 - 1) * V * 0.35;
+      const f = (c) => (c ? [Math.round(c[0] * b * (1 + w)), Math.round(c[1] * b), Math.round(c[2] * b * (1 - w))] : c);
+      cTop[k] = f(cTop[k]); cSide[k] = f(cSide[k]); cCliff[k] = f(cCliff[k]);
+    }
+  };
   LOD.build = function (g, job) {
     if (!g.computeClimate || !g.n3) return null;
     const BIOMES = VR.BIOMES, SEA = VR.C.SEA;
@@ -448,7 +462,8 @@
     // greedy top faces: merge runs of equal (height, kind, colour) along x
     // quantised colours so flat stretches (plains, deserts, snowfields, seas) merge into big quads;
     // the shader's per-block speckle keeps them from looking flat. Cell keys are plain numbers (no strings).
-    for (let k = 0; k < N * N; k++) { const c = cTop[k]; if (c) cTop[k] = [Math.round(c[0] / 8) * 8, Math.round(c[1] / 8) * 8, Math.round(c[2] / 8) * 8]; }
+    if (L < 0) LOD.fineNoise(cTop, cSide, cCliff, kind, x0, z0, step, n, N);   // p-stream3: the fine level's cells vary as the blocks do
+    else for (let k = 0; k < N * N; k++) { const c = cTop[k]; if (c) cTop[k] = [Math.round(c[0] / 8) * 8, Math.round(c[1] / 8) * 8, Math.round(c[2] / 8) * 8]; }
     const ckeys = new Float64Array(N * N);
     for (let k = 0; k < N * N; k++) {
       const c = cTop[k]; if (!c) continue;
