@@ -473,10 +473,19 @@
       if (fl & F.WAVELEAF) w5 |= 1 << 7;
       const w3 = texW3(TTEX[b * 6 + dd], fl, dd, b);
       const start = (bright(0) + bright(2) < bright(1) + bright(3)) ? 1 : 0;
+      // q-art4 · the leaves' texture planar along the face's main axis (the world position in sixteenths, from the quad's
+      // lowest whole block: the texel stays one size and runs on across the blob, instead of one texture per bent quad)
+      const planar = (lm & 32) !== 0 && ((fl & F.LEAVES) !== 0 || (RCL !== null && RCL[b] !== 0));   // (bit 6, 32: qart4.js leafMode)
+      let pa = 0, pb = 0, ba = 0, bb = 0;
+      if (planar) {
+        const ax = dd >> 1; pa = ax === 0 ? 2 : 0; pb = ax === 1 ? 2 : 1;
+        ba = Math.floor(Math.min(rcP[pa], rcP[3 + pa], rcP[6 + pa], rcP[9 + pa])); bb = Math.floor(Math.min(rcP[pb], rcP[3 + pb], rcP[6 + pb], rcP[9 + pb]));
+      }
       buf.ensure(4);
       for (let kk = 0; kk < 4; kk++) {
         const k = (kk + start) & 3;
-        buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
+        const u = planar ? Math.min(255, Math.round((rcP[k * 3 + pa] - ba) * 16)) : (k >= 2 ? 16 : 0), v = planar ? Math.min(255, Math.round((rcP[k * 3 + pb] - bb) * 16)) : ((k === 1 || k === 2) ? 16 : 0);
+        buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, u, v, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
       }
       return true;
     }

@@ -1,5 +1,6 @@
 // ============================================================================
 // q-art4 · Runde Inseln (plan docs/superpowers/plans/2026-11-07-q-art4.md; q-art3's self-review 1)
+//   (and the round crowns' polish: the leaves' texture planar along the face, a softer top — leaf mode bit 32, Q_RTOP)
 //   qIsleForm  the floating isles as rounded rocky forms, near and far alike — the far land (the horizon tiles, lod.js,
 //              and ring 1's forms, far.js) draws each isle as one shell (src/shared/isleshell.js: a dome, a moss lip, a soil
 //              wall, an underside tapering in strata bands to a moss-and-tuff tip, vines and roots as thin cards) lit by
@@ -21,17 +22,29 @@
   ];
   // the far land's programs that draw the isles' forms (renderer.js: 'lod', farProgram 'form' / 'lodFar')
   const PROGS = { lod: 1, form: 1, lodFar: 1 };
-  Q4.definesFor = (name, q) => (q && q.qIsleForm && PROGS[name] ? ['Q_ISLEFORM'] : []);
+  // the round crowns' softer top (q-art3's Runde Kronen on: the terrain programs' leaf faces facing up, × RTOP)
+  Q4.RTOP = 0.86;
+  const TOP_PROGS = { terrain: 1, terrainCut: 1 };
+  Q4.definesFor = (name, q) => {
+    const out = [];
+    if (q && q.qIsleForm && PROGS[name]) out.push('Q_ISLEFORM');
+    if (q && q.qRoundTop && TOP_PROGS[name]) out.push('Q_RTOP ' + Q4.RTOP.toFixed(3));
+    return out;
+  };
   Q4.q = OFF;
   Q4.hook = function (name, defines) {
     const extra = Q4.definesFor(name, Q4.q);
     if (!extra.length) return defines || [];
     return (defines || []).concat(extra.filter(d => !(defines || []).includes(d)));
   };
+  Q4.key = (q) => (q && q.qIsleForm ? 1 : 0) + (q && q.qRoundTop ? 2 : 0);
   if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => Q4.hook(name, prev ? prev(name, defines) : (defines || [])); }
-  // the mesh job's leaf mode with the isles' bit (16): q-art3's mode (true / false / a number) → a number with bit 16, the
-  // fancy bit kept (bit 8: the leaves not fancy)
+  // the mesh job's leaf mode: q-art3's mode (true / false / a number: bit 2 round crowns, 4 round hills, 8 the leaves not
+  // fancy) with the isles' bit (16, the switch) and the round crowns' polish (32: the leaves' texture planar, the softer
+  // top Q_RTOP — always with the round crowns; Q4.polish false only for the before | after pictures)
+  Q4.polish = true;
   Q4.leafMode = (m, s) => {
+    if (typeof m === 'number' && (m & 2) && Q4.polish) m |= 32;
     if (!(s && s.qIsleForm)) return m;
     if (typeof m === 'number') return m | 16;
     return 16 | (m ? 0 : 8);

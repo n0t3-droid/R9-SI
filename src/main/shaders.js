@@ -1437,6 +1437,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #if defined(Q_LEAF) && !defined(MODEL)
   if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);   // q-art · Laubkronen: the crown's light
 #endif
+#if defined(Q_RTOP) && defined(Q_LEAF) && !defined(MODEL)
+  if (qLf && face == 2u) col *= Q_RTOP;   // q-art4 · Runde Kronen: the crown's top no pale patch (the sun and the sky both full on it)
+#endif
 #if defined(PBR)
   // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight
   if (!noshade) col = pbrShade(col, alb.rgb, n, N, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);

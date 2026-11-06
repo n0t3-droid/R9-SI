@@ -133,6 +133,22 @@ if (V.Far && V.Far.form) {
   check(hashBuf(new Uint8Array(rc0.opaque.buffer)) === hashBuf(new Uint8Array(rc1.opaque.buffer)), 'Klassisch: the isle\'s blocks as cubes (no blob)');
   V.setLook('seamless');
 }
+{
+  // the round crowns' planar texture (bit 32): a 6 × 5 × 6 crown, its leaf quads' texels one size (16 a block) along the
+  // face — without the bit every bent quad carries one whole texture (0 / 16)
+  const PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS, LEAF = V.R.byName['oak_leaves'].defaultState;
+  const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS).fill(0xf000), t = new Uint16Array(PSS).fill(0x4d6a);
+  for (let y = 6; y < 11; y++) for (let z = 4; z < 10; z++) for (let x = 4; x < 10; x++) { const pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD); blocks[pi] = LEAF; light[pi] = 0xe000; }
+  const jb = { blocks, light, grass: t, foliage: t, water: t, sy: 4, ox: 0, oz: 0, smooth: true, vxLod: true };
+  const dens = (r) => { const f = r.cutout, n = f.length / 8; let ok = 0, q = 0, whole = 0;
+    for (let i = 0; i + 3 < n; i += 4) { q++; const P = (k, c) => f[(i + k) * 8 + c] / 2048 - 4, U = (k) => f[(i + k) * 8 + 4] & 255, W = (k) => (f[(i + k) * 8 + 4] >> 8) & 255;
+      const len = Math.hypot(P(1, 0) - P(0, 0), P(1, 1) - P(0, 1), P(1, 2) - P(0, 2)), duv = Math.hypot(U(1) - U(0), W(1) - W(0)) / 16;
+      if (len > 0.3 && Math.abs(duv - len) < 0.35 * len + 0.1) ok++; if ([0, 1, 2, 3].every(k => U(k) % 16 === 0 && W(k) % 16 === 0)) whole++; }
+    return { q, ok, whole }; };
+  const a = dens(V.meshSection(Object.assign({}, jb, { fancyLeaves: 2 }))), b = dens(V.meshSection(Object.assign({}, jb, { fancyLeaves: 34 })));
+  check(b.ok > b.q * 0.6 && b.ok > a.ok + 10, 'the round crown\'s texture planar: the texels one size along the bent quads', 'quads ' + b.q + ': ' + a.ok + ' → ' + b.ok + ' one size');
+  check(a.whole === a.q, 'without bit 32 every quad one whole texture (as q-art3)', a.whole + ' / ' + a.q);
+}
 
 // ---- d  switches, rows, texts, defines, wiring
 global.VR = V; global.self = global;
@@ -143,7 +159,10 @@ check(!Q4.defaults('potato').qIsleForm && !Q4.defaults('low').qIsleForm && Q4.de
 check(Q4.ROWS.length === 1 && Q4.ROWS[0].cost === 'low' && Q4.ROWS[0].t === 'switch', 'its row: a switch, cost low');
 check(Q4.definesFor('lod', { qIsleForm: true }).join() === 'Q_ISLEFORM' && Q4.definesFor('form', { qIsleForm: true }).length === 1 && Q4.definesFor('lodFar', { qIsleForm: true }).length === 1, 'Q_ISLEFORM on the far programs');
 check(Q4.definesFor('terrain', { qIsleForm: true }).length === 0 && Q4.definesFor('lod', { qIsleForm: false }).length === 0, 'no define elsewhere or when off');
-check(Q4.leafMode(true, { qIsleForm: true }) === 16 && Q4.leafMode(false, { qIsleForm: true }) === 24 && Q4.leafMode(2, { qIsleForm: true }) === 18 && Q4.leafMode(true, { qIsleForm: false }) === true && Q4.leafMode(false, {}) === false, 'the leaf mode: bit 16 only with the switch');
+check(Q4.leafMode(true, { qIsleForm: true }) === 16 && Q4.leafMode(false, { qIsleForm: true }) === 24 && Q4.leafMode(2, { qIsleForm: true }) === 50 && Q4.leafMode(true, { qIsleForm: false }) === true && Q4.leafMode(false, {}) === false, 'the leaf mode: bit 16 only with the switch');
+check(Q4.leafMode(2, {}) === 34 && Q4.leafMode(6, {}) === 38 && Q4.leafMode(4, {}) === 4, 'the leaf mode: the crowns\' polish (32) always with the round crowns (2)');
+{ Q4.polish = false; const k = Q4.leafMode(2, {}); Q4.polish = true; check(k === 2, 'Q4.polish false: q-art3\'s mode as it was (the before pictures)'); }
+check(Q4.definesFor('terrain', { qRoundTop: true }).join() === 'Q_RTOP 0.860' && Q4.definesFor('lod', { qRoundTop: true }).length === 0, 'Q_RTOP only on the terrain programs');
 const de = fs.readFileSync(path.join(ROOT, 'src/main/lang_de.js'), 'utf8'), en = fs.readFileSync(path.join(ROOT, 'src/main/lang_en.js'), 'utf8');
 check(/'g\.set\.qIsleForm': 'Runde Inseln'/.test(de) && /'g\.set\.qIsleForm\.tip'/.test(de) && /'g\.set\.qIsleForm': 'Round isles'/.test(en) && /'g\.set\.qIsleForm\.tip'/.test(en), 'texts in German and English');
 const src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
