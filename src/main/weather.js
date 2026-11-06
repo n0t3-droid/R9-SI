@@ -228,6 +228,13 @@
       if (this.forced) kind = this.clamp(this.forced);
       else if (c.freeze) { if (this.frozen === null) this.frozen = this.kind; kind = this.frozen; }
       else { this.frozen = null; kind = calm ? 'klar' : kindAt(this.seed, A, climate, this.mode); }
+      // r-chronik: the Chronik's front over the player (chronik_game.js sets this.chronik, single player only) takes the
+      // next slot — from a slot boundary, never mid-slot; gone with the front. Unset (the default, the Chronik off): as before
+      const CH = this.chronik;
+      if (CH && !this.forced && !c.freeze && !calm && climate !== 'none' && climate !== 'dry') {
+        if (CH.slot === undefined) CH.slot = slotK;
+        if (slotK !== CH.slot && (CH.kind !== 'schnee' || climate === 'cold') && (kind === 'klar' || kind === 'bewoelkt' || kind === 'regen')) kind = this.clamp(CH.kind);
+      }
       // t-motion · the drama's timeline: from the schedule (the same for everyone), or for a forced state its own (a storm
       // forced is here at once; a storm forced away leaves a rainbow behind)
       if (WET[this.prevKind] && !WET[kind] && (this.forced || calm)) this.forcedDry = this.clock;

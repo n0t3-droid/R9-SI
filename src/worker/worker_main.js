@@ -117,6 +117,37 @@
     m.planMs = (m.planMs || 0) + (performance.now() - t0);
     setTimeout(() => self.onmessage({ data: m }), 0);
   }
+  // r-chronik: the Chronik's job (VR.Chronik, src/shared/chronik.js). op init: a save (meta.chronik) or a new region
+  // round the anchor — the cells from the overworld generator's column info, the villages from its sites (no chunk is
+  // generated); op step: drop the builds the game took, advance to the clock, reply the new events, the builds, the
+  // light view the game reads (ledger, places, villages, families) and the save; op deed: the player's deed
+  let CHR = null;
+  function chronikJob(m) {
+    const C = VR.Chronik, out = { type: 'chronik', id: m.id, op: m.op };
+    if (m.op === 'init') {
+      CHR = m.save ? C.load(m.save) : null;
+      if (!CHR) {
+        const g = getGen('overworld'), VG = VR.VillageGen;
+        if (!g || !g.climateAt || !(g.singleBiome < 0)) { out.off = true; return out; }
+        const vils = [], R = (C.R + 1) * C.CELL;
+        if (VG) { const Cc = VG.cell(g), R0 = Math.ceil(R / Cc) + 1, ci = Math.floor(m.ox / Cc), cj = Math.floor(m.oz / Cc);
+          for (let di = -R0; di <= R0; di++) for (let dj = -R0; dj <= R0; dj++) { const st = VG.site(g, ci + di, cj + dj); if (st && Math.abs(st.x - m.ox) < R && Math.abs(st.z - m.oz) < R) vils.push({ id: st.id, name: st.name, x: st.x, z: st.z }); } }
+        CHR = C.create(m.seed | 0, { ox: m.ox, oz: m.oz, sample: C.sampler(g), villages: vils, day: m.day, tod: m.tod });
+      }
+    }
+    if (!CHR) { out.off = true; return out; }
+    if (m.op === 'deed') out.ev = C.deed(CHR, m.kind, m);
+    if (m.took && m.took.length) CHR.out = CHR.out.filter(o => m.took.indexOf(o.e) < 0);
+    if (m.op === 'step' || m.op === 'init') {
+      const t0 = Date.now(), r = C.advance(CHR, m.day, m.tod);
+      out.events = r.events; out.days = r.days; out.ms = Date.now() - t0;
+      out.wx = m.px !== undefined ? C.weatherAt(CHR, m.px, m.pz) : null;
+    }
+    out.out = CHR.out.slice();
+    out.view = { day: CHR.day, ox: CHR.ox, oz: CHR.oz, ev: CHR.ev.slice(-60), pl: CHR.pl, vil: CHR.vil.map(v => ({ id: v.id, name: v.name, x: v.x, z: v.z, c: v.c, built: v.built, proj: v.proj, res: v.res, pop: v.pop })), vc: Array.from(CHR.vc), fam: CHR.fam, tot: C.totals(CHR) };
+    out.save = C.save(CHR);
+    return out;
+  }
   function run(m) {
     try {
       if (m.type === 'init') {
@@ -323,6 +354,8 @@
       } else if (m.type === 'outpostStart') {   // f-first: an Abenteuer world's start near its first outpost (gen_realm.js, read-only)
         const g = getGen(m.dim);
         post({ type: 'outpostStart', id: m.id, r: g.outpostApproach ? g.outpostApproach(m.x, m.z) : null });
+      } else if (m.type === 'chronik') {   // r-chronik: the world simulation (src/shared/chronik.js) — this worker keeps its state
+        post(VR.Chronik ? chronikJob(m) : { type: 'chronik', id: m.id, off: true });
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;
