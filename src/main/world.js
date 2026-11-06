@@ -356,7 +356,7 @@
         if (c) { c.lastSeen = now; continue; }
         if (this.pending.has(k)) continue;
         if (this.failed && this.retryAfter(k, now) > now) continue;
-        if (this.parkDrop && this.parkDrop.size && this.planFast) { const t = this.parkDrop.get(k); if (t !== undefined) { if (performance.now() - t < 5000) continue; this.parkDrop.delete(k); } }   // (p-stream2: dropped while waiting for a plan)
+        if (this.parkDrop && this.parkDrop.size && this.planFast) { const t = this.parkDrop.get(k); if (t !== undefined) { if (performance.now() - t < VR.StreamPlan.DROP_MS) continue; this.parkDrop.delete(k); } }   // (p-stream2: dropped while waiting for a plan)
         // columns ahead of the flight come first: their distance is measured from a point further ahead
         const ex = cx - pcx, ez = cz - pcz;
         if (pfast && (this.planRest || !SP.worth(ex, ez, ux, uz, speed, this.lat || SP.LAT0, this.planCot))) continue;   // (p-stream: gone by when ready)
@@ -424,9 +424,9 @@
       if (this.streamPlan && this.planFast) (this.reqAt || (this.reqAt = new Map())).set(k, this.now);   // p-stream: the latency in fast flight (checkShown)
       const epoch = this.styleEpoch || 0;
       // p-stream2 · in fast flight a column that waits for a town's plan (seconds of slices, the worker held) is dropped — the
-      // fine far tiles stand in; asked for again 5 s later (or when the flight slows) — the plan's slices so far are kept
+      // fine far tiles stand in; asked for again DROP_MS later (or when the flight slows) — the plan's slices so far are kept
       if (!this.pool.dropWaiting && this.pool.started) this.pool.dropWaiting = (msg) => {
-        if (!this.planFast || this.dead || !this.center || msg.cx === undefined) return false;
+        if (!this.planFast || !((this.planSpeed || 0) >= VR.StreamPlan.DROP_SPEED) || this.dead || !this.center || msg.cx === undefined) return false;   // (browser run 2: at 40 m/s a dropped column near the flight left a 2 s gap — the chunks keep up there)
         const ex = msg.cx - this.center[0], ez = msg.cz - this.center[1];
         if (ex * ex + ez * ez <= 2.25) return false;   // (the ground under the camera: never)
         (this.parkDrop || (this.parkDrop = new Map())).set(ckey(msg.cx, msg.cz), performance.now());
