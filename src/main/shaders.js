@@ -768,7 +768,7 @@ out float v_sheen;       // t-motion: how much a passing gust brightens this gra
 flat out float v_ground; // t-motion: a green block's top — the wind's strength (its gust bands are drawn per pixel), 0 otherwise
 ${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
-${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}void main() {
+${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}${(VR.QArt2 && VR.QArt2.glslVS) ? VR.QArt2.glslVS() : ''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
   v_fade = u_origins[gl_DrawID].w;
@@ -798,6 +798,9 @@ ${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}void main() {
   uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
 #if defined(Q_LEAF) && !defined(MODEL)
   v_qC = (leaf > 0u && sway == 0u) ? qClump(wp + vec3(u_camInt)) : vec4(0.0, 1.0, 0.0, 0.0);   // q-art · Laubkronen: the clumps per vertex (qart.js)
+#endif
+#if defined(Q_ISLE) && !defined(MODEL)
+  qIsleV(wp);   // q-art2 · Schwebeinseln: the isle this vertex belongs to, its rounded underside (qart2.js)
 #endif
 #ifdef MOTION
   // t-motion · wind in everything (wind.js): the gust bands travel over the land; a plant leans into them (base stiff,
@@ -1092,7 +1095,7 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
   return c;
 }
 #endif
-${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
+${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && VR.QArt2.glslTerrain) ? VR.QArt2.glslTerrain() : ''}void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -1146,7 +1149,11 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
+#ifdef Q_CROWN
+  if (qLeafF() && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art2 · Fernkronen: every crown's corners, far ones on a coarser grid (qart.js qCut)
+#else
   if (qLeafF() && qGreen(alb.rgb * v_tint) > 0.5 && qCut(v_localPos + vec3(u_camInt), face, length(v_rel))) discard;   // q-art · Laubkronen: the ragged corners (qart.js QA.cut)
+#endif
 #endif
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
@@ -1186,6 +1193,10 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
     float mn = texture(u_noise, gq * u_lvMeadow.y).r * 0.6 + texture(u_noise, gq * u_lvMeadow.y * 0.42 + vec2(0.37, 0.61)).g * 0.4;
     alb.rgb *= mix(vec3(1.0), mix(vec3(0.88, 0.95, 1.0), vec3(1.1, 1.05, 0.86), smoothstep(0.25, 0.75, mn)), u_lvMeadow.z * alb.a);
   }
+#endif
+#if defined(Q_GRASS) && !defined(MODEL)
+  // q-art2 · Wiese (qart2.js): a green top as a meadow — never in the Klassisch look
+  if (face == 2u && u_blockVar < 0.5 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5) && ((v_w5 >> 7u) & 1u) == 0u) alb.rgb = qGrass(alb.rgb, textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel);
 #endif
 #ifdef BODYGROUND
   // u-orbit2 (R52-09: the ground a uniform stepped grey): on an airless body from Low up (bodysky.js's define hook) the
@@ -1324,6 +1335,11 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   vec4 qC = vec4(0.0, 1.0, 0.0, 0.0);
   if (qLf) { qC = vec4(normalize(v_qC.xyz), v_qC.w); n = normalize(mix(n, qC.xyz, Q_LEAF_N)); }
 #endif
+#if defined(Q_ISLE) && !defined(MODEL)
+  // q-art2 · Schwebeinseln: an isle's rock (not its grass) — strata, moss, the tip's shade, lit as a rounded mass
+  bool qIs = v_qI.w > 0.01 && face != 2u;
+  if (qIs) { alb.rgb = qIsleAlb(alb.rgb, v_localPos + vec3(u_camInt)); n = normalize(mix(n, normalize(v_qI.xyz), 0.75 * v_qI.w)); }
+#endif
 #ifdef PBR
   // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
   if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
@@ -1342,6 +1358,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   float skyL = sky * sky * (3.0 - 2.0 * sky);
 #if defined(Q_LEAF) && !defined(MODEL)
   if (qLf) skyL = mix(skyL, 1.0, Q_LEAF_SKY);   // q-art · Laubkronen: light through the leaves (the crown's inside a deep green)
+#ifdef Q_CROWN
+  if (qLf) skyL = mix(skyL, 1.0, 0.35 * (1.0 - qGreen(alb.rgb)));   // q-art2 · Fernkronen: a blossom crown's inside lighter still
+#endif
 #endif
   vec3 bl = v_block;
   vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
@@ -1377,6 +1396,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
 #ifdef CLOUDSH
   sh *= cloudShadow(v_localPos + vec3(u_camInt));   // t-motion: cloud shadow (t-light2 multiplies it into its sun term)
 #endif
+#if defined(Q_ISLE) && !defined(MODEL)
+  if (!qIs && ndl > 0.0) sh = min(sh, qIsleShadow(v_localPos, L));   // q-art2 · Schwebeinseln: the isle's shadow on the land below
+#endif
   vec3 direct = lc * ndl * sh * outdoors;
 #if defined(SUN2) && defined(HSHADOW)
   // u-stars2: the second sun of a binary world — its own light and its own heightmap shadow (two shadows)
@@ -1407,6 +1429,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}void main() {
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
 #endif
   vec3 col = alb.rgb * lighting;
+#if defined(Q_ISLE) && !defined(MODEL)
+  if (qIs) { float qBounce = max(-normalize(v_qI.xyz).y, 0.0) * max(L.y, 0.0) * v_qI.w * skyL; col += alb.rgb * lc * vec3(0.36, 0.46, 0.24) * qBounce * 0.45; }   // q-art2: the land's green light from below
+#endif
 #if defined(Q_LEAF) && !defined(MODEL)
   if (qLf) col = qCanopy(col, alb.rgb, qC, V, L, lc * (sh * outdoors), amb);   // q-art · Laubkronen: the crown's light
 #endif
@@ -2403,7 +2428,7 @@ flat out uint v_w5;
 #ifdef FADE
 flat out float v_fade;
 #endif
-void main() {
+${(VR.QArt2 && VR.QArt2.glslShadowVS) ? VR.QArt2.glslShadowVS() : ''}void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
   v_fade = u_origins[gl_DrawID].w;
@@ -2418,6 +2443,9 @@ void main() {
 #endif
   vec3 rel = org + a_pos / 2048.0 - 4.0;
   v_uv = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 16.0; v_w3 = a_w3; v_w5 = a_w5;
+#ifdef Q_CROWN
+  v_qW = rel + u_qCamF;   // q-art2 · Fernkronen: the world position less the camera's block
+#endif
   gl_Position = u_viewProj * vec4(rel, 1.0);
 }`;
   S.SHADOW_FS = `
@@ -2439,10 +2467,13 @@ vec2 ctmUV(vec2 uv, uint w5) {
   if ((m & 2u) != 0u && f.x > 1.0 - W) f.x = 2.0 * (1.0 - W) - f.x;
   return f;
 }
-void main() {
+${(VR.QArt2 && VR.QArt2.glslShadowFS) ? VR.QArt2.glslShadowFS() : ''}void main() {
 #ifdef CUTOUT
   vec2 fu = ((v_w5 >> 14u) & 1u) == 1u ? ctmUV(v_uv, v_w5) : fract(v_uv);
   if (textureGrad(u_albedo, vec3(fu, float(v_w3 & 4095u)), dFdx(v_uv), dFdy(v_uv)).a < 0.5) discard;
+#endif
+#if defined(Q_CROWN) && defined(CUTOUT)
+  if (((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u && qCutS(v_qW + vec3(u_qCamI), v_w5 & 7u)) discard;   // q-art2 · Fernkronen: no square shadows
 #endif
   o = vec4(1.0);
 }`;

@@ -39,6 +39,8 @@
   if (VR.XTop) for (const p in PRESETS) Object.assign(PRESETS[p], VR.XTop.defaults(p));
   // q-art · Bildregie (qart.js): Laubkronen, Farbdrehbuch, Platzbelag — Balanced and up; Very Low and Low none of them
   const QA_SW = VR.QArt ? VR.QArt.SW : [];
+  const Q2_SW = VR.QArt2 ? VR.QArt2.SW : [];   // q-art2: Wiese, Schwebeinseln, Fernkronen
+  if (VR.QArt2) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt2.defaults(p));
   if (VR.QArt) for (const p in PRESETS) Object.assign(PRESETS[p], VR.QArt.defaults(p));
   // v-light · Lichtpfützen (lightfield.js): the light field round the eye — High and up; Very Low, Low and Balanced off
   const LF_SW = VR.LField ? VR.LField.SW : [];
@@ -114,6 +116,7 @@
       for (const k of LV_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.Look.off()[k] : PRESETS.balanced[k]);
       for (const k of XT_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : VR.XTop.off()[k];   // (x-top: a custom one: off)
       for (const k of QA_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt.off()[k] : PRESETS.balanced[k]);   // (q-art: a custom one: Balanced's, none when lite)
+      for (const k of Q2_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.QArt2.off()[k] : PRESETS.balanced[k]);   // (q-art2: as q-art)
       for (const k of LF_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : false;   // (v-light: a custom one: off)
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
@@ -201,6 +204,7 @@
       if (key !== '*' && LV_SW.includes(key)) S.preset = 'custom';   // (v-look: a film-look switch changed by hand)
       if (key !== '*' && XT_SW.includes(key)) S.preset = 'custom';   // (x-top: the same)
       if (key !== '*' && QA_SW.includes(key)) S.preset = 'custom';   // (q-art: the same)
+      if (key !== '*' && Q2_SW.includes(key)) S.preset = 'custom';   // (q-art2: the same)
       if (key !== '*' && LF_SW.includes(key)) S.preset = 'custom';   // (v-light: Lichtpfützen changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
@@ -223,6 +227,7 @@
       if (r && VR.Look) { const qb = r.qBase || (r.qBase = {}); for (const k of LV_SW) qb[k] = !!S[k]; }   // v-look: the film look's switches (renderer: the composite's defines, look_gl.js its soft copy)
       if (r && VR.XTop) { const qb = r.qBase || (r.qBase = {}); for (const k of XT_SW) qb[k] = k === 'xDepth' ? Math.max(0, Math.min(2, S[k] | 0)) : !!S[k]; }   // x-top: Tiefe, Klarheit, Filmkamera (renderer: their defines, xtop_gl.js)
       if (r && VR.QArt) { const qb = r.qBase || (r.qBase = {}); for (const k of QA_SW) qb[k] = S[k] === undefined ? (PRESETS[S.preset] ? !!PRESETS[S.preset][k] : false) : !!S[k]; }   // q-art: Laubkronen, Farbdrehbuch, Platzbelag (renderer: their defines, qart_gl.js; env.js the sky)
+      if (r && VR.QArt2) { const qb = r.qBase || (r.qBase = {}); for (const k of Q2_SW) qb[k] = S[k] === undefined ? (PRESETS[S.preset] ? !!PRESETS[S.preset][k] : false) : !!S[k]; }   // q-art2: Wiese, Schwebeinseln, Fernkronen (renderer: their defines, qart2_gl.js)
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
       if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); qb.texHi = !!S.texHi && !S.lite; }   // t-material: the gloss tier (renderer: the PBR / SSR defines), the hero textures (TEXHI)
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, fadeIn: S.fadeIn !== false, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
