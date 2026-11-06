@@ -114,10 +114,12 @@ function fly(o) {
   };
   const x0 = SPAWN[0], z0 = SPAWN[2];
   o.flying = false;
-  for (let f = 0; f < 30 * 40 && !(f > 60 && pool.busy === 0 && w.pending.size === 0); f++) step(x0, 120, z0);   // the spawn settled
+  const settled = () => { if (pool.busy || w.pending.size) return false; const pcx = Math.floor(x0) >> 4, pcz = Math.floor(z0) >> 4, rd = w.renderDist; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.cols.get(V.ckey(pcx + dx, pcz + dz)); if (!c || c.shownAt < 0) return false; } return true; };
+  for (let f = 0; f < 30 * 60 && !(f > 60 && f % 15 === 0 && settled()); f++) step(x0, G.surfaceY(Math.floor(x0), Math.floor(z0)) + 30, z0);   // the spawn settled (every column within the render distance shown)
   o.flying = true;
   const t0 = SIM.now, F = Math.round(o.secs * 30), rec = [];
-  const pathY = (x, z) => G.surfaceY(Math.floor(x), Math.floor(z)) + 35;
+  const pathY = (x, z) => G.surfaceY(Math.floor(x), Math.floor(z)) + (o.v <= 6 ? 2 : 35);
+  const ent = new Map(), ttv = []; let missed = 0;
   let s = 0;
   for (let f = 0; f < F; f++) {
     s += o.v / 30; o.farOwed = (o.farOwed || 0) + o.v / 30 * (o.farK || 1);
@@ -130,6 +132,17 @@ function fly(o) {
     for (let ai = 0; ai <= 10; ai++) {
       const a = -hHalf + 2 * hHalf * ai / 10, ca = Math.cos(a), sa = Math.sin(a), dx = fx * ca - fz * sa, dz = fx * sa + fz * ca;
       for (let d = 8; d <= rdB; d *= 1.12) { const c = w.cols.get(V.ckey(Math.floor(x + dx * d) >> 4, Math.floor(z + dz * d) >> 4)); nw += 1 / d; if (c && c.shownAt >= 0) nr += 1 / d; }
+    }
+    { // time to visible: the columns entering the cone inside the render distance (as stream_low.mjs)
+      const rd = w.renderDist, pcx = Math.floor(x) >> 4, pcz = Math.floor(z) >> 4, seen = new Set();
+      for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) {
+        if (dx * dx + dz * dz > (rd + 0.5) * (rd + 0.5) || (Math.abs(dx) <= 1 && Math.abs(dz) <= 1)) continue;
+        const ex = (pcx + dx) * 16 + 8 - x, ez = (pcz + dz) * 16 + 8 - z, d = Math.hypot(ex, ez);
+        if ((ex * fx + ez * fz) / d < cosH) continue;
+        const k = V.ckey(pcx + dx, pcz + dz), c = w.cols.get(k), sh = c && c.shownAt >= 0; seen.add(k);
+        const e = ent.get(k); if (e === undefined) { ent.set(k, sh ? -1 : SIM.now); if (!sh && process.env.TTVDBG) console.log(`      enter ${((SIM.now - t0) / 1000).toFixed(1)}s ${dx},${dz} d ${Math.hypot(dx, dz).toFixed(1)} gen ${!!c} sec ${c ? c.sec.map(q => q.meshed ? 1 : q.pending ? 'p' : q.dirty ? 'd' : 0).join('') : ''}`); } else if (e >= 0 && sh) { ttv.push(SIM.now - e); ent.set(k, -1); if (process.env.TTVDBG && SIM.now - e > 900) console.log(`      late ${((SIM.now - t0) / 1000).toFixed(1)}s ${dx},${dz} ${Math.round(SIM.now - e)} ms`); }
+      }
+      for (const [k, e] of ent) if (!seen.has(k)) { if (e >= 0) missed++; ent.delete(k); }
     }
     rec.push({ t: (SIM.now - t0) / 1000, real: nr / nw, q0: pool.queue.length, lat: +(w.lat || 0).toFixed(2), pend: w.pending.size, want: w.lastWant, pos: [Math.floor(x) >> 4, Math.floor(z) >> 4] });
   }
@@ -151,7 +164,8 @@ function fly(o) {
     const big = LOG.filter(L => L.t >= a && L.t < b && L.ms > 50).map(L => `${L.k}${L.cx !== undefined ? ' ' + L.cx + ',' + L.cz : ''}${L.sy !== undefined ? '/' + L.sy : ''}:${L.ms.toFixed(0)}`).slice(0, 5).join(' ');
     console.log(`   ${sec}s real ${sh}% q0 ${last.q0} lat ${last.lat} pend ${last.pend} want ${last.want} at ${last.pos} · ${Object.entries(kk).map(([k, v]) => k + ' ' + v.toFixed(0)).join(' · ')} · idle ${Math.max(0, idle).toFixed(0)} · ${big}`);
   }
-  return { tot, real: +(100 * real).toFixed(1), worst: { t: +worst.t.toFixed(1), real: +(100 * worst.real).toFixed(1), kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, `${v.n}× ${v.ms.toFixed(0)}ms max ${v.max.toFixed(0)} age ${(v.age / 1000).toFixed(1)}s`])), heavy }, gens, rec, lat: +(w.lat || 0).toFixed(2), share: +pool.farShare.toFixed(2) };
+  ttv.sort((a, b) => a - b);
+  return { ttvP90: Math.round(ttv[Math.floor(ttv.length * 0.9)] || 0), ttvN: ttv.length, missed, tot, real: +(100 * real).toFixed(1), worst: { t: +worst.t.toFixed(1), real: +(100 * worst.real).toFixed(1), kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, `${v.n}× ${v.ms.toFixed(0)}ms max ${v.max.toFixed(0)} age ${(v.age / 1000).toFixed(1)}s`])), heavy }, gens, rec, lat: +(w.lat || 0).toFixed(2), share: +pool.farShare.toFixed(2) };
 }
 module.exports = { fly, SPAWN, yawOf, LOG };
 if (require.main === module) {
@@ -168,7 +182,7 @@ if (require.main === module) {
   for (const rd of RDS) for (const v of SPEEDS) for (const si of DIRS) {
     const r = fly({ rd, v, yaw: yawOf(si), secs: SECS, far: !process.env.NOFAR, farK: +(process.env.FARK || 1), setup: EXP[process.env.EXP] });
     res[`${rd}_${v}_${si}`] = r;
-    console.log(`rd ${rd} · ${v} m/s · dir ${si}: real ${r.real} % · gens ${r.gens} · lat ${r.lat} · share ${r.share} · worker ms ${JSON.stringify(r.tot)} · worst 3 s at ${r.worst.t} s: ${r.worst.real} % ${JSON.stringify(r.worst.kinds)} ${r.worst.heavy.join(' | ')}`);
+    console.log(`rd ${rd} · ${v} m/s · dir ${si}: real ${r.real} % · ttv p90 ${r.ttvP90} ms (${r.ttvN}, missed ${r.missed}) · gens ${r.gens} · lat ${r.lat} · share ${r.share} · worker ms ${JSON.stringify(r.tot)} · worst 3 s at ${r.worst.t} s: ${r.worst.real} % ${JSON.stringify(r.worst.kinds)} ${r.worst.heavy.join(' | ')}`);
     console.log('   timeline (real % per s): ' + Array.from({ length: SECS }, (_, i) => { const a = r.rec.filter(x => x.t >= i && x.t < i + 1); return a.length ? Math.round(100 * a.reduce((s, x) => s + x.real, 0) / a.length) : '-'; }).join(' '));
   }
   if (process.env.JSON) require('fs').writeFileSync(process.env.JSON, JSON.stringify(Object.fromEntries(Object.entries(res).map(([k, r]) => [k, { real: r.real, gens: r.gens, tl: r.rec.map(x => +x.real.toFixed(3)) }]))));
