@@ -17,6 +17,7 @@ files.splice(files.indexOf('core') + 1, 0, 'names');   // n-names: VR.Names (the
 files.splice(files.indexOf('lod') + 1, 0, 'isleshell');   // q-art4: VR.IsleShell (the floating isles' round far form), after lod
 files.push('chronik');   // r-chronik: VR.Chronik (the world simulation, pure)
 files.push('wunder');   // r-wunder: VR.Wunder (the Wundertiere's rules, pure; after chronik: it adds the deeds)
+files.push('seelen');   // r-seelen: VR.Seelen (the villagers' souls, pure)
 const skip = (process.env.R9_SKIP || '').split(',');   // (test/land_v9_same.js: the shared code without some files)
 for (const f of files) { if (skip.includes(f)) continue; const p = __dirname + '/../src/shared/' + f + '.js'; if (require('fs').existsSync(p)) require(p); }
 module.exports=globalThis.VR;
