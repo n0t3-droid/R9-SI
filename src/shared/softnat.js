@@ -35,7 +35,7 @@
   // 3 rock (noses), 0 earth/sand (steep → rock)
   const PAL = {
     grass_block: [-1, 1], podzol: [0x6e5236, 1], mycelium: [0x8c7c88, 1], moss_block: [0x5f8a3a, 1], pale_moss_block: [0x9aa58a, 1], echo_moss: [0x4f7a5a, 1], exo_moss: [0x5a8a6a, 1], skyroot_soil: [0x6f8f4a, 1],
-    dirt: [0x8a6a48, 0], coarse_dirt: [0x80644a, 0], rooted_dirt: [0x7e6046, 0], mud: [0x4e3f34, 0], clay: [0x9aa3ad, 0], gravel: [0x8e8a84, 0], buried_gravel: [0x8e8a84, 0],
+    dirt: [0x7a5a3c, 0], coarse_dirt: [0x80644a, 0], rooted_dirt: [0x7e6046, 0], mud: [0x4e3f34, 0], clay: [0x9aa3ad, 0], gravel: [0x8e8a84, 0], buried_gravel: [0x8e8a84, 0],
     sand: [0xdcc896, 0], buried_sand: [0xdcc896, 0], red_sand: [0xc0703a, 0], gloom_sand: [0x5e5246, 0], gloom_soil: [0x4c4038, 0], muddy_mangrove_roots: [0x5a4634, 0],
     snow_block: [0xeef3fa, 2], snow: [0xeef3fa, 2], packed_ice: [0x9cc0ec, 2], tholin_ice: [0xc8a888, 2],
     stone: [0x8b8d91, 3], granite: [0xa07a6a, 3], diorite: [0xc8c8c4, 3], andesite: [0x8a8c88, 3], deepstone: [0x5a5a62, 3], tuff: [0x6c6c62, 3], basalt: [0x4a4a52, 3], calcite: [0xe0e0dc, 3],
@@ -45,7 +45,7 @@
     sandstone: [0xd8c48e, 3], red_sandstone: [0xb8642e, 3], cinnabar: [0x9a3a32, 3], sulfur: [0xd8c84a, 3],
     red_terracotta: [0x8f3d2e, 3], orange_terracotta: [0xa1531d, 3], yellow_terracotta: [0xba8423, 3],
   };
-  const EARTH = [0x7d / 255, 0x5f / 255, 0x40 / 255], ROCK = [0x7e / 255, 0x7f / 255, 0x84 / 255], SNOW = [0.93, 0.95, 0.98];
+  const EARTH = [0x6e / 255, 0x52 / 255, 0x36 / 255], ROCK = [0x78 / 255, 0x70 / 255, 0x68 / 255], SNOW = [0.93, 0.95, 0.98];
 
   // ---- tables per registry size: SOFT (1 natural), PIN (1 a crisp block the ground snaps to), COL (rgb, −1 the grass
   // tint), MAT (palette kind)
@@ -247,7 +247,7 @@
     const wx = jb.ox + cx + 1, wz = jb.oz + cz + 1, nz1 = SN.noise(wx, 0, wz, 5.3);
     const eT = grassW * sstep(0.84 + nz1 * 0.08, 0.6, ny);
     r += (EARTH[0] - r) * eT; g += (EARTH[1] - g) * eT; b += (EARTH[2] - b) * eT;
-    const rT = (1 - rockW) * sstep(0.5, 0.18, ny) * (wsum > 0 ? 1 : 0);
+    const rT = (1 - rockW) * sstep(0.36, 0.1, ny) * (wsum > 0 ? 1 : 0);   // (r3: rock from 0.5 washed every steep bank grey)
     r += (ROCK[0] - r) * rT; g += (ROCK[1] - g) * rT; b += (ROCK[2] - b) * rT;
     // snow caps: above the snow line, on the gentle tops
     const sT = sstep(SN.snowLine - 6 + nz1 * 14, SN.snowLine + 10 + nz1 * 14, wy) * sstep(0.55, 0.85, ny) * (1 - snowW);
