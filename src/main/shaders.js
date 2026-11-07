@@ -3080,6 +3080,9 @@ ${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void ma
       col = mix(col, vec3(1.0, 0.66, 0.32) * (1.1 + u_emissiveBoost * 0.6) * (0.8 + 0.4 * hash13(bp + 2.3)), night * lit);
     }
   }
+#ifdef GM_PAINT
+  col = gmAirCol(col, dist, u_fogColor);   // r-gemalt 2: the air in soft bands (with or without LIGHT2)
+#endif
 #ifdef LIGHT2
   // t-polish2 · the far lights at night (gap 2): the glowing kinds and the lit windows shine ×(1 + NIGHT·night) — over the
   // bloom's night threshold, so they glow — and pierce the haze: a light keeps exp(−d / PIERCE) of itself through the
@@ -3088,9 +3091,6 @@ ${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void ma
   if (v_kind == 4u) lk = 1.0;
   else if (v_kind == 7u) lk = step(0.28, hash13(floor(vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02) * 1.37 + 5.1));
   lk *= 1.0 - smoothstep(-0.06, 0.16, u_sunDir.y);
-#ifdef GM_PAINT
-  col = gmAirCol(col, dist, u_fogColor);   // r-gemalt 2: the air in soft bands
-#endif
   col *= 1.0 + ${(VR.Light2 && VR.Light2.FARLIT ? VR.Light2.FARLIT.night : 1.6).toFixed(2)} * lk;
   vec3 lit0 = col;
   col = applyFog(col, v_rel, dist);
