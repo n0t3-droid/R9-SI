@@ -145,6 +145,14 @@ void main() {
   };
   // the batch round the eye: rebuilt when the eye has moved a metre, or every 45 frames (new and changed sections)
   const tmp = [];
+  // what may stand over a clump's column: air, the short and tall grasses, ferns (not flowers, not crops)
+  let UP = null;
+  const upOk = () => {
+    const RR = VR.R; if (UP && UP.length === RR.stateCount) return UP;
+    UP = new Uint8Array(RR.stateCount); UP[0] = 1;
+    for (let st = 1; st < RR.stateCount; st++) { const t = RR.types[RR.T.type[st]]; if (t && /^(short_grass|tall_grass|short_dry_grass|tall_dry_grass|fern)$/.test(t.name)) UP[st] = 1; }
+    return UP;
+  };
   R.gmTuftBuild = function (T, w, cx, cz, Rr) {
     const SN = VR.SoftNat, TB = SN && SN.tables(), G = VR.Gemalt, st = S(), soft = G && st && st.gSoft && (!VR.LOOK || VR.LOOK.ground !== false);
     if (!TB) return;
@@ -157,7 +165,7 @@ void main() {
       if (d > Rr) continue;
       const c = w.col(x >> 4, z >> 4); if (!c || !c.height) continue;
       const ti = ((z & 15) << 4) | (x & 15), top = c.height[ti], b = w.getBlock(x, top, z);
-      if (TB.mat[b] !== 1 || w.getBlock(x, top + 1, z) !== 0) continue;   // (grass under open air: the flowers keep their models)
+      if (TB.mat[b] !== 1 || !upOk()[w.getBlock(x, top + 1, z)]) continue;   // (grass under open air or its own short grass: the flowers keep their models)
       G2.clumps(x, z, d, Rr, tmp); if (!tmp.length) continue;
       const t = c.grass ? c.grass[ti] : 0x4d6a;
       const cr = ((t >> 11) & 31) / 31 * 0.52, cg = ((t >> 5) & 63) / 63 * 0.54, cb = (t & 31) / 31 * 0.4;
@@ -201,7 +209,7 @@ void main() {
     const Rr = G2.tuftR(st._pr || st.preset); if (!Rr) return;
     const p = this.gmTuftProgram(); if (!p) return;
     const T = this.gmT, w = g.world;
-    if (T.ox === undefined || Math.abs(camPos[0] - T.cx) > 1 || Math.abs(camPos[2] - T.cz) > 1 || this.frameNo - T.f > 45 || T.w !== w) {
+    if (T.ox === undefined || Math.abs(camPos[0] - T.cx) > 1 || Math.abs(camPos[2] - T.cz) > 1 || this.frameNo - T.f > (T.n ? 45 : 10) || T.w !== w) {
       T.cx = camPos[0]; T.cz = camPos[2]; T.f = this.frameNo; T.w = w;
       this.gmTuftBuild(T, w, camPos[0], camPos[2], Rr);
     }
