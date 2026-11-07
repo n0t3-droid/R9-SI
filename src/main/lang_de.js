@@ -5027,7 +5027,7 @@
     "g.se.book.note": "Wen du kennst, was sie über dich denken und was sie zuletzt sagten.",
     "g.se.book.none": "Noch niemand. Sprich mit den Leuten in den Dörfern!",
     "g.se.book.met": "{n}× getroffen",
-    "g.se.book.gifts": "{n} Geschenke",
+    "g.se.book.gifts": "Geschenke: {n}",
     "g.se.book.quarrel": "{who} und {who2} haben Streit (um {topic}).",
     // ---- r-seelen end
 });

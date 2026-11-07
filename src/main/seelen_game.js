@@ -29,7 +29,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   if (VR.Settings && VR.Settings.add && !(VR.Settings.byKey && VR.Settings.byKey('seelen'))) { try { VR.Settings.add({ key: 'seelen', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.seelen', tip: 'g.set.seelen.tip', cost: 'low', def: true }); } catch (e) { /* the settings' own */ } }
   SG.PER_FRAME = 2; SG.COME_R = 28; SG.GREET_GAP = 360;   // villagers sensed a frame · a friend comes from this far · game minutes between two memory greetings
-  SG.cost = { frames: 0, ms: 0, max: 0, sensed: 0, plans: 0, reflect: 0, said: 0 };
+  SG.cost = { frames: 0, ms: 0, max: 0, sensed: 0, plans: 0, reflect: 0, said: 0, tickMax: 0, wantMax: 0 };
   SG.log = [];
   const FREE = { stroll: 1, plaza: 1, park: 1, lunch: 1, garden: 1, cafe: 1, learn: 1 };
   SG.on = (g) => !!(g && !SG.off && g.meta && !g.meta.guest && !(g.mp && g.mp.isClient) && !(g.settings && g.settings.seelen === false));
@@ -62,7 +62,7 @@
     const vil = a.vil, mind = SG.mind(g, a), t = now(g), R = R0(g);
     const wuName = (k) => { const W = g._wu; const n = W && W.names ? W.names[k] : ''; return T('g.se.wu.' + (k === 'tree' || k === 'deer' ? k : 'whale'), { n: n || '' }).replace(/\s+$/, ''); };
     const c = {
-      mind, now: t, name: g.playerName || T('g.talk.traveler'), me: a.p.name, meId: lid(a.p), q: R.d.q[vil.id] || null,
+      mind, now: t, name: pname(g), me: a.p.name, meId: lid(a.p), q: R.d.q[vil.id] || null,
       who: (id) => { const p = personByLid(vil, id); return p ? p.name : ''; },
       item: (id) => { const k = 'g.se.it.' + id, s = T(k, null, ''); if (s && s !== k) return s; if (/poppy|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(id)) return T('g.se.it.flower'); return T('g.se.it.any', { n: VR.itemName ? VR.itemName(id) : id }); },
       wunder: wuName,
@@ -78,6 +78,7 @@
     c.friends = S.friendsOf(G, lid(a.p), 2, ids).map(f => { const o = agentByLid(vil, f.w); return { w: f.w, mind: o ? SG.mind(g, o) : null }; }).filter(f => f.mind);
     return Object.assign(c, extra || {});
   };
+  function pname(g) { const n = (g.settings && g.settings.playerName) || g.playerName; return n && String(n).trim() ? String(n).trim().slice(0, 24) : T('g.talk.traveler'); }
   const seedNow = (a, g, k) => S.h32(a.p.seed | 0, (now(g) / 7) | 0, k | 0);
   const lastWords = (g, a, text) => { const m = SG.mind(g, a); if (!m.pl) m.pl = S.newPl(); m.pl.lw = String(text).slice(0, 100); };
   const said = (a, text, kind) => { SG.cost.said++; SG.log.push({ t: Date.now(), who: a.p.id, kind, text }); if (SG.log.length > 40) SG.log.shift(); };
@@ -144,8 +145,6 @@
       if (nq) { R.d.q[vil.id] = q = nq; R.plans.delete(vil.id); }
     }
     // the day's plans
-    let PL = R.plans.get(vil.id);
-    if (!PL || PL.day !== day) PL = makePlans(V, vil, R, day);
     // a friend comes to you
     friendComes(V, vil, R);
   }
@@ -159,37 +158,42 @@
       if (A) note(g, A, 'made_up', { w: q.b }); if (B) note(g, B, 'made_up', { w: q.a });
     }
   }
+  // the day's plans: made one villager at a time when the schedule asks (no frame makes a village's all at once)
   function makePlans(V, vil, R, day) {
-    const g = V.g, G = SG.graph(g, vil), ids = vil.people.map(lid), q = R.d.q[vil.id] || null;
-    const W = g._wu, WU = VR.Wunder, whale = !!(W && WU && WU.whaleVisit && (g.meta.vgen | 0) >= 3 && WU.whaleVisit(W.seed, day));
-    const out = { day, by: {} };
-    for (const p of vil.people) {
-      if (p.visit) continue;
-      const id = lid(p), m = R.d.p[(g.dim || 'overworld') + '/' + p.id] || null;
-      out.by[id] = S.plan({ seed: p.seed | 0, day, kid: p.age === 'child', elder: p.age === 'elder', role: p.role, mind: m, friends: S.friendsOf(G, id, 2, ids), q, me: id, whale });
-    }
-    // a meeting needs two: the friend's slot is made the same meeting (when it was free)
-    for (const id of Object.keys(out.by)) {
-      const P0 = out.by[id];
-      for (let i = 0; i < P0.length; i++) {
-        const s = P0[i]; if (s.a !== 'meet') continue;
-        const o = out.by[s.w]; if (!o) { s.a = null; continue; }
-        const so = o[i];
-        if (so.a === 'meet' && so.w === id) continue;
-        if (so.a === null) { so.a = 'meet'; so.why = 'friend'; so.w = id; } else { s.a = null; s.why = ''; s.w = ''; }
-      }
-    }
-    SG.cost.plans++;
+    const g = V.g, W = g._wu, WU = VR.Wunder;
+    const out = { day, by: {}, vil, ids: vil.people.map(lid), whale: !!(W && WU && WU.whaleVisit && (g.meta.vgen | 0) >= 3 && WU.whaleVisit(W.seed, day)) };
     R.plans.set(vil.id, out);
     return out;
   }
-  SG.planOf = (g, a) => { const R = R0(g), PL = R.plans.get(a.vil.id); return PL && PL.by ? PL.by[lid(a.p)] || null : null; };
+  function rawPlan(g, R, PL, p) {
+    const vil = PL.vil, id = lid(p), m = R.d.p[(g.dim || 'overworld') + '/' + p.id] || null;
+    SG.cost.plans++;
+    return S.plan({ seed: p.seed | 0, day: PL.day, kid: p.age === 'child', elder: p.age === 'elder', role: p.role, mind: m, friends: S.friendsOf(SG.graph(g, vil), id, 2, PL.ids), q: R.d.q[vil.id] || null, me: id, whale: PL.whale });
+  }
+  function planFor(g, R, PL, p) {
+    const id = lid(p); let P0 = PL.by[id];
+    if (P0 && P0.ok) return P0;
+    if (!P0) P0 = PL.by[id] = rawPlan(g, R, PL, p);
+    P0.ok = true;
+    // a meeting needs two: the friend's slot becomes the same meeting (when it was free), else this one is dropped
+    for (let i = 0; i < P0.length; i++) {
+      const s = P0[i]; if (s.a !== 'meet') continue;
+      let o = PL.by[s.w];
+      if (!o) { const op = personByLid(PL.vil, s.w); if (!op || op.visit) { s.a = null; s.why = ''; s.w = ''; continue; } o = PL.by[s.w] = rawPlan(g, R, PL, op); }
+      const so = o[i];
+      if (so.a === 'meet' && so.w === id) continue;
+      if (so.a === null || (so.a === 'meet' && !o.ok)) { so.a = 'meet'; so.why = 'friend'; so.w = id; } else { s.a = null; s.why = ''; s.w = ''; }
+    }
+    return P0;
+  }
+  SG.planOf = (g, a) => { const R = R0(g); let PL = R.plans.get(a.vil.id); if (!PL || PL.day !== dayOf(g)) PL = makePlans(g.villages, a.vil, R, dayOf(g)); return planFor(g, R, PL, a.p); };
 
   // ---------------------------------------------------------------- the plan feeds the schedule
   const bSched = P.schedule;
   P.schedule = function (a, tod) {
     const w = bSched.apply(this, arguments);
-    try { return SG.want(this, a, tod, w); } catch (e) { return w; }
+    const t0 = performance.now();
+    try { return SG.want(this, a, tod, w); } catch (e) { return w; } finally { const dd = performance.now() - t0; SG.cost.ms += dd; if (dd > SG.cost.wantMax) SG.cost.wantMax = dd; }
   };
   SG.want = function (V, a, tod, w) {
     const g = V.g;
@@ -254,16 +258,24 @@
     const g = V.g, act = a.act, vil = a.vil, s = a.seSlot;
     if (!s || !s.w) { act.done = true; return; }
     const me = lid(a.p), mode = s.a, other = agentByLid(vil, s.w);
-    if (act.slot !== s) { for (const k of ['spot', 'tw', 'wait', 'met', 's1', 's2', 'noted', 'k']) delete act[k]; act.slot = s; act.t = 0; if (a.pose === 'sit') a.pose = 'stand'; }
+    if (act.slot !== s) { for (const k of ['spot', 'tw', 'wait', 'met', 's1', 's2', 'noted', 'k', 'arr']) delete act[k]; act.slot = s; act.t = 0; if (a.pose === 'sit') a.pose = 'stand'; }
     if (!act.spot) act.spot = meetSpot(vil, me, s.w, mode);
     const sp = act.spot, mine = sp.seat ? sp.seat[0] : null;
     let arrived;
-    if (sp.seat) { if (a.pose === 'sit') arrived = true; else if (V.goTo(a, mine[0], mine[1], mine[2], 0.8)) { V.sit(a, mine); arrived = true; } }
+    if (sp.seat && a.pose !== 'sit' && act.t > 25) { act.spot = meetSpot(vil, me, s.w, 'meet'); return; }   // (the bench out of reach: they stand together instead)
+    if (sp.seat) {
+      if (a.pose === 'sit') arrived = true;
+      else if (V.goTo(a, mine[0], mine[1], mine[2], 0.8)) {
+        for (const o of vil.agents) if (o !== a && o.pose === 'sit' && Math.abs(o.pos[0] - mine[0] - 0.5) < 0.8 && Math.abs(o.pos[2] - mine[2] - 0.5) < 0.8) { o.pose = 'stand'; o.act = null; o.thinkT = 0; }   // (someone on their bench gets up for them)
+        V.sit(a, mine); arrived = a.pose === 'sit';
+      }
+    }
     else { const pt = sp.pts[0]; arrived = V.goTo(a, Math.floor(pt[0]), sp.c[1], Math.floor(pt[1]), 0.9); }
     if (act.t > 150) { s.used = true; act.done = true; return; }
     if (!arrived) return;
     if (!sp.seat) { a.vel[0] *= 0.5; a.vel[2] *= 0.5; }
-    const there = other && other.act && other.act.type === 'se_meet' && other.seSlot && other.seSlot.w === me && d2(other, a.pos) < 3.2 * 3.2;
+    act.arr = true;
+    const there = other && other.act && other.act.type === 'se_meet' && other.act.arr && other.seSlot && other.seSlot.w === me && d2(other, a.pos) < 3.2 * 3.2;
     if (!there && act.tw > 0) { finishBeat(V, a, s, mode); return; }   // (the other one's part is over: so is this one's)
     if (!there) { a.lookAt = other ? [other.pos[0], other.pos[1] + 1.4, other.pos[2]] : null; if ((act.wait = (act.wait || 0) + dt) > 70) { s.used = true; act.done = true; } return; }
     act.tw = (act.tw || 0) + dt;
@@ -501,7 +513,7 @@
     try {
       const R = R0(g), A = this.agents, n = A.length;
       if (n) for (let k = 0; k < SG.PER_FRAME; k++) { const a = A[(R.rr = (R.rr + 1) % n)]; if (a && !a.guest && a.p && a.vil && a.vil.active) sense(this, a, R); }
-      if ((R.vt += dt) >= 1) { R.vt = 0; for (const vil of this.known.values()) if (vil.active) villageTick(this, vil, R); }
+      if ((R.vt += dt) >= 1) { R.vt = 0; const t1 = performance.now(); for (const vil of this.known.values()) if (vil.active) villageTick(this, vil, R); const dd = performance.now() - t1; if (dd > SG.cost.tickMax) SG.cost.tickMax = dd; }
     } catch (e) { if (!SG.warned) { SG.warned = true; console.warn('seelen', e); } }
     const ms = performance.now() - t0;
     SG.cost.frames++; SG.cost.ms += ms; if (ms > SG.cost.max) SG.cost.max = ms;
@@ -551,8 +563,8 @@
     mind: (pid) => R0(VR.game).d.p[pid] || null,
     note: (a, k, o) => note(VR.game, a, k, o),
     // a quarrel between two adults of the village near (at the phase asked), their plans now
-    quarrel: (vil, a, b, ph) => { const g = VR.game, R = R0(g), q = S.qNew(lid(a.p), lid(b.p), dayOf(g), 1); q.ph = ph || 'spat'; R.d.q[vil.id] = q; R.qTried[vil.id] = dayOf(g); R.plans.delete(vil.id); makePlans(g.villages, vil, R, dayOf(g)); return q; },
-    plans: (vil) => { const g = VR.game, R = R0(g); R.plans.delete(vil.id); return makePlans(g.villages, vil, R, dayOf(g)); },
+    quarrel: (vil, a, b, ph) => { const g = VR.game, R = R0(g), q = S.qNew(lid(a.p), lid(b.p), dayOf(g), 1); q.ph = ph || 'spat'; R.d.q[vil.id] = q; R.qTried[vil.id] = dayOf(g); R.plans.delete(vil.id); return q; },
+    plans: (vil) => { const g = VR.game, R = R0(g); R.plans.delete(vil.id); const PL = makePlans(g.villages, vil, R, dayOf(g)); for (const p of vil.people) if (!p.visit) planFor(g, R, PL, p); return PL; },
     reflect: (a) => { const g = VR.game, m = SG.mind(g, a); return S.reflect(m, now(g), dayOf(g)); },
     greet: (a) => SG.greet(VR.game.villages, a, true),
     come: (a) => { const V = VR.game.villages, R = R0(VR.game); R.come = a; a.seCome = true; V.setAct(a, { type: 'se_come' }); },

@@ -131,15 +131,43 @@ let HV = null, HP = null;
 
 const rows = { greet: [], quarrel: [], book: [], storm: [] };
 const C0 = HP ? HP.plaza : [0, 64, 0];
-// the camera at eye level beside a villager (rot: radians round them from the player's side, d metres away)
-const faceCam = async (sel, d, rot, h) => {
-  const cam = await ev(([sel, d, rot, h]) => { const a = window[sel], p = VR.game.player.pos; let dx = p[0] - a.pos[0], dz = p[2] - a.pos[2]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; const c = Math.cos(rot), s = Math.sin(rot), rx = dx * c - dz * s, rz = dx * s + dz * c; return { P: [a.pos[0] + rx * d, a.pos[1] + (h || 1.5), a.pos[2] + rz * d], T: [a.pos[0], a.pos[1] + 1.2, a.pos[2]] }; }, [sel, d, rot, h]);
-  await lookFrom(cam.P, cam.T);
+// the words of the speech bubbles drawn onto a picture (photo mode hides the HTML bubbles): a white bubble at the top
+const bubble = (path, lines) => {
+  if (!path || !lines || !lines.length) return path;
+  try { execFileSync('python3', ['-c', `import sys,json
+from PIL import Image, ImageDraw, ImageFont
+im=Image.open(sys.argv[1]).convert('RGB'); d=ImageDraw.Draw(im); L=json.loads(sys.argv[2])
+try:
+  f=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',21); s=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',12)
+except Exception:
+  f=ImageFont.load_default(); s=f
+y=14
+for t in L:
+  w=d.textlength(t,font=f); x=(im.width-w)/2
+  d.rounded_rectangle([x-14,y-8,x+w+14,y+30],radius=14,fill=(255,255,255),outline=(60,60,70),width=2); d.text((x,y-2),t,fill=(30,30,40),font=f); y+=48
+d.text((8,im.height-18),'(Sprechblasen eingezeichnet – Fotomodus)',fill=(255,255,255),font=s)
+im.save(sys.argv[1])`, path, JSON.stringify(lines)]); } catch (e) { console.log('  (no bubble drawn: ' + e.message.slice(0, 80) + ')'); }
+  return path;
 };
-// a two-shot: the camera at eye level on the side of the pair, d metres from their middle
-const pairCam = async (d, side) => {
-  const cam = await ev(([d, side]) => { const A = window.__A, B = window.__B; const mx = (A.pos[0] + B.pos[0]) / 2, mz = (A.pos[2] + B.pos[2]) / 2; let ax = B.pos[0] - A.pos[0], az = B.pos[2] - A.pos[2]; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; const nx = -az * side, nz = ax * side; return { P: [mx + nx * d, A.pos[1] + 1.55, mz + nz * d], T: [mx, A.pos[1] + 1.0, mz] }; }, [d, side]);
-  await lookFrom(cam.P, cam.T);
+const portrait = async (sel, name, tod, d) => {
+  await photoOn(tod);
+  const f = await ev(([sel, d]) => { const g = VR.game, a = window[sel], f = VR.Folk3.portraitOf(g.photoCam, a, { d, dMin: d * 0.7, keep: true }); if (f) { window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]]; } return !!f; }, [sel, d]);
+  if (!f) { check(false, name + ': a frame for the portrait'); return null; }
+  await step(2, 33);
+  return grab(name);
+};
+// the pair's words: their bubbles, else the scene's last lines
+const pairWords = (kinds) => ev((kinds) => { const A = window.__A, B = window.__B, out = []; for (const a of [A, B]) if (a.bubble && a.bubble.text && !a.bubble.icon) out.push(a.p.name + ': „' + a.bubble.text + '“'); if (!out.length) for (const l of VR.SeelenGame.log.slice(-6)) if (kinds.indexOf(l.kind) >= 0) { const a = l.who === A.p.id ? A : B; out.push(a.p.name + ': „' + l.text + '“'); } return out.slice(-2); }, kinds);
+const pairShot = async (name, tod, kinds, r) => {
+  const words = await pairWords(kinds);
+  const C = await ev(() => { const A = window.__A, B = window.__B; window.__keep = [A, B]; return [(A.pos[0] + B.pos[0]) / 2, A.pos[1], (A.pos[2] + B.pos[2]) / 2]; });
+  await photoOn(tod);
+  const f = await ev(([C, r]) => { const g = VR.game, keep = new Set(window.__keep), avoid = []; for (const a of g.villages.agents) if (!keep.has(a) && Math.hypot(a.pos[0] - C[0], a.pos[2] - C[2]) < r + 9) avoid.push([a.pos[0], a.pos[2]]); const f = VR.Folk3.groupShot(g.photoCam, C, r, { avoid }); if (f) window.__shotT = f.T; return !!f; }, [C, r || 1.6]);
+  if (!f) { check(false, name + ': a frame for the pair'); await photoOff(); return null; }
+  await step(2, 33);
+  const out = bubble(await grab(name), words);
+  await photoOff();
+  return out;
 };
 if (HP) await ev(() => { VR.Folk4.auto = false; VR.Folk4.off = true; });   // (no moments of folk4's own in the pictures)
 // ---------------------------------------------------------------- a greeting with a memory
@@ -150,23 +178,23 @@ if (HP && want('greet')) {
       const g = VR.game, V = g.villages, v = V.known.get(vid), C = v.plan.plaza, S = VR.Seelen, SG = VR.SeelenGame;
       const a = v.agents.filter(a => !a.kid && a.pose === 'stand' && !(a.act && /^(talk|school|se_meet)$/.test(a.act.type))).sort((x, y) => Math.hypot(x.pos[0] - C.x, x.pos[2] - C.z) - Math.hypot(y.pos[0] - C.x, y.pos[2] - C.z))[0];
       if (!a) return null;
-      window.__G = a;
+      window.__G = a; window.__cu = a;
       const m = SG.mind(g, a), t = SG.test.now();
       S.plMeet(m, t - 3000); S.note(m, 'gift', t - 1700, { a: 'honey_bottle', w: 'pl' }); S.plAdd(m, 'g', t - 1700);
       const p = g.player, fx = -Math.sin(a.yaw), fz = -Math.cos(a.yaw);
       p.flying = false; p.noclip = false; p.teleport(a.pos[0] + fx * 3.5, a.pos[1] + 0.2, a.pos[2] + fz * 3.5); p.vel[0] = p.vel[1] = p.vel[2] = 0;
-      a.act = { type: 'stand', t: 0 }; a.path = null; a.steer = null; a.vel[0] = a.vel[2] = 0; a.greeted = false; a.bubble = null;
+      a.act = { type: 'talk', t: 0, len: 1e9 }; a.thinkT = 1e9; a.path = null; a.steer = null; a.vel[0] = a.vel[2] = 0; a.greeted = false; a.bubble = null;
       for (const o of v.agents) if (o !== a) { o.bubble = null; o.greeted = true; }
       VR.Gossip.hello(V, a);
       return { name: a.p.name, said: a.bubble ? a.bubble.text : null };
     }, HV.id);
     run.greet = who; console.log('  · greet ' + JSON.stringify(who));
-    check(!!who && /Honig/.test(who.said || ''), `greet: the greeting remembers the honey („${who && who.said}“)`);
+    check(!!who && /Honig/.test(who.said || '') && /Mira/.test(who.said || ''), `greet: the greeting remembers the honey and your name („${who && who.said}“)`);
     if (who) {
-      await faceCam('__G', 2.3, 0.4, 1.5); await step(4, 33);
-      await ev(() => { const a = window.__G; a.lookAt = VR.game.player.eyePos(); a.expr = 'joy'; a.exprT = 30; if (a.bubble) a.bubble.t = 30; });
-      await step(6, 33);
-      rows.greet.push(await snap('se_greet.png'));
+      await ev(() => { const a = window.__G; a.expr = 'joy'; a.exprT = 30; a.waveT = 2; });
+      rows.greet.push(bubble(await portrait('__G', 'se_greet.png', 4500, 1.5), [who.name + ': „' + who.said + '“']));
+      await photoOff();
+      await ev(() => { const a = window.__G; a.act = null; a.thinkT = 0; });
     }
   } catch (e) { check(false, 'greet: ' + e.message); }
   save();
@@ -191,39 +219,39 @@ if (HP && want('quarrel')) {
     check(!!q, 'quarrel: two neighbours quarrel');
     if (q) {
       let st = null;
-      for (let i = 0; i < 60; i++) { await step(15, 33); st = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, ta: A.act && A.act.type, tb: B.act && B.act.type, tw: A.act && A.act.tw, back: !!(A.seBack && B.seBack), d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), ba: A.bubble ? A.bubble.text : '', bb: B.bubble ? B.bubble.text : '' }; }, HV.id); if (st.back && (st.ba || st.bb) && st.tw > 9) break; }
+      for (let i = 0; i < 60; i++) { await step(15, 33); st = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, ta: A.act && A.act.type, tb: B.act && B.act.type, tw: A.act && A.act.tw, back: !!(A.seBack && B.seBack), d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1) }; }, HV.id); if (st.back && st.tw > 10) break; }
       console.log('  · spat ' + JSON.stringify(st));
-      check(st && st.back, `quarrel: they turn their backs (${st && st.d} m apart; „${st && (st.ba || st.bb)}“)`);
-      await pairCam(4.2, 1); await step(3, 33);
-      await ev(() => { for (const a of [window.__A, window.__B]) { if (a.bubble) a.bubble.t = 20; } });
-      await step(3, 33);
-      rows.quarrel.push(await snap('se_spat.png'));
+      check(st && st.back, `quarrel: they turn their backs on each other (${st && st.d} m apart)`);
+      rows.quarrel.push(await pairShot('se_spat.png', 10700, ['q.spat', 'q.cold'], 1.5));
       // the next evening: the bench
       await stand(C0[0] + 6, C0[1], C0[2] - 6);
       await ev(() => { const g = VR.game; g.env.day = (g.env.day | 0) + 1; g.env.setTime(10800); for (const a of [window.__A, window.__B]) { a.bubble = null; a.seBack = false; } });
-      let sat = null;
-      for (let i = 0; i < 70; i++) { await step(15, 33); sat = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, pa: A.pose, pb: B.pose, tw: A.act && A.act.tw, d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), ba: A.bubble ? A.bubble.text : '', bb: B.bubble ? B.bubble.text : '' }; }, HV.id); if (sat.pa === 'sit' && sat.pb === 'sit' && (sat.ba || sat.bb)) break; if (sat.ph === 'gift') break; }
-      console.log('  · bench ' + JSON.stringify(sat));
-      check(sat && sat.pa === 'sit' && sat.pb === 'sit', `reconcile: the next evening they share a bench (${sat && sat.d} m; „${sat && (sat.ba || sat.bb)}“)`);
-      await pairCam(3.4, -1); await step(3, 33);
-      await ev(() => { for (const a of [window.__A, window.__B]) { if (a.bubble) a.bubble.t = 20; } });
-      rows.quarrel.push(await snap('se_bench.png'));
-      for (let i = 0; i < 50; i++) { const ph = await ev((vid) => VR.SeelenGame.test.R().d.q[vid].ph, HV.id); if (ph !== 'bench') break; await step(15, 33); }
+      let sat = null, shot = false;
+      for (let i = 0; i < 90; i++) {
+        await step(15, 33);
+        sat = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, pa: A.pose, pb: B.pose, tw: A.act && A.act.tw, d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), said: VR.SeelenGame.log.filter(l => l.kind === 'q.bench').length }; }, HV.id);
+        if (!shot && ((sat.pa === 'sit' && sat.pb === 'sit' && sat.said) || (sat.tw > 8 && sat.said))) { run.bench = sat; console.log('  · bench ' + JSON.stringify(sat)); rows.quarrel.push(await pairShot('se_bench.png', 10800, ['q.bench'], 1.6)); shot = true; }
+        if (sat.ph !== 'bench') break;
+      }
+      check(shot && run.bench && run.bench.pa === 'sit' && run.bench.pb === 'sit', `reconcile: the next evening they share a bench (${run.bench ? run.bench.pa + '/' + run.bench.pb : '-'}, ${run.bench && run.bench.d} m)`);
+      check(sat.ph === 'gift', 'reconcile: the bench → the gift (' + sat.ph + ')');
       // the day after at noon: the peace gift
       await stand(C0[0] + 6, C0[1], C0[2] - 6);
       await ev(() => { const g = VR.game; g.env.day = (g.env.day | 0) + 1; g.env.setTime(5800); for (const a of [window.__A, window.__B]) a.bubble = null; });
-      let gi = null;
-      for (let i = 0; i < 70; i++) { await step(10, 33); gi = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, giver: q.g, tw: A.act && A.act.tw, d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), ba: A.bubble ? A.bubble.text : '', bb: B.bubble ? B.bubble.text : '', log: VR.SeelenGame.log.slice(-3).map(l => l.kind) }; }, HV.id); if (gi.log.indexOf('q.thanks') >= 0 || gi.ph === 'done') break; }
+      let gi = null; shot = false;
+      for (let i = 0; i < 90; i++) {
+        await step(10, 33);
+        gi = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, tw: A.act && A.act.tw, d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), log: VR.SeelenGame.log.slice(-3).map(l => l.kind) }; }, HV.id);
+        if (!shot && gi.log.indexOf('q.thanks') >= 0) { await ev(() => { const V = VR.game.villages; for (const a of [window.__A, window.__B]) { a.expr = 'joy'; a.exprT = 20; } V.hearts(window.__A); }); rows.quarrel.push(await pairShot('se_gift.png', 5800, ['q.gift', 'q.thanks'], 1.4)); shot = true; }
+        if (gi.ph === 'done') break;
+      }
       console.log('  · gift ' + JSON.stringify(gi));
-      check(gi && (gi.log.indexOf('q.thanks') >= 0 || gi.ph === 'done'), `reconcile: a peace gift and thanks („${gi && gi.ba}“ / „${gi && gi.bb}“)`);
-      await pairCam(3.4, 1); await step(2, 33);
-      await ev(() => { const V = VR.game.villages; for (const a of [window.__A, window.__B]) { a.expr = 'joy'; a.exprT = 20; if (a.bubble) a.bubble.t = 20; } V.hearts(window.__A); });
-      await step(2, 33);
-      rows.quarrel.push(await snap('se_gift.png'));
+      check(shot, 'reconcile: a peace gift and thanks');
       for (let i = 0; i < 30; i++) { const ph = await ev((vid) => VR.SeelenGame.test.R().d.q[vid].ph, HV.id); if (ph === 'done') break; await step(15, 33); }
       const end = await ev((vid) => { const g = VR.game, S = VR.Seelen, SG = VR.SeelenGame, v = g.villages.known.get(vid), A = window.__A, B = window.__B; const q = SG.test.R().d.q[vid]; return { ph: q.ph, v: +S.relV(SG.graph(g, v), SG.test.lid(A.p), SG.test.lid(B.p)).toFixed(2), mem: SG.mind(g, A).m.filter(e => e.k === 'made_up').length }; }, HV.id);
       run.quarrelEnd = end; console.log('  · after ' + JSON.stringify(end));
       check(end.ph === 'done' && end.mem >= 1, `reconciled and remembered (${end.ph}, graph ${end.v})`);
+      await ev(() => { window.__keep = null; });
     }
   } catch (e) { check(false, 'quarrel: ' + e.message); }
   save();
@@ -237,10 +265,11 @@ if (HP && want('book')) {
       const L = v.agents.filter(a => !a.guest && a.p.age !== 'child').slice(0, 4);
       L.forEach((a, k) => { const m = SG.mind(g, a); for (let n = 0; n < 2 + k * 2; n++) S.plMeet(m, t - 4000 + n * 200); if (k % 2 === 0) { S.note(m, 'gift', t - 900, { a: k ? 'bread' : 'honey_bottle', w: 'pl' }); S.plAdd(m, 'g', t - 900); } if (k === 1) { S.note(m, 'storm', t - 800, { i: 8 }); S.note(m, 'storm', t - 2000, { i: 8 }); } S.note(m, 'build', t - 600, { a: 'bakery' }); S.reflect(m, t, g.env.day | 0); });
       if (window.__G) { const m = SG.mind(g, window.__G); S.reflect(m, t, g.env.day | 0); }
+      for (const a of g.villages.agents) a.bubble = null; g.villages.updateBubbles();
       VR.Wander.open(g);
     }, HV.id);
     await wait(400);
-    const txt = await ev(() => { const el = document.querySelector('#wanderbuch .sesec'); return el ? el.textContent.slice(0, 400) : null; });
+    const txt = await ev(() => { const el = document.querySelector('#wanderbuch .sesec'); return el ? el.textContent : null; });
     run.book = txt; console.log('  · book ' + (txt || '').slice(0, 200));
     check(!!txt && /Menschen/.test(txt) && /Honig/.test(txt), 'book: the „Menschen“ page lists the people you know, their feelings and last words');
     await ev(() => { const el = document.querySelector('#wanderbuch .sesec'); if (el) el.scrollIntoView({ block: 'start' }); });
@@ -266,15 +295,17 @@ if (HP && want('storm')) {
     console.log('  · storm ' + JSON.stringify(who));
     check(!!who && who.fear, 'storm: a villager afraid of storms (two remembered)');
     if (who) {
-      await ev(() => { const g = VR.game; if (g.env.wx && g.env.wx.force) g.env.wx.force('gewitter'); VR.SeelenGame.test.storm(0.6); });
+      // the storm comes first (nobody reacts meanwhile: the sky darkens), then the souls are on again
+      await ev(() => { const g = VR.game; VR.SeelenGame.off = true; g.zenFreezeWeather = false; if (g.env.wx && g.env.wx.force) g.env.wx.force('gewitter'); const a = window.__S; a.act = { type: 'talk', t: 0, len: 1e9 }; a.thinkT = 1e9; });
+      await step(360, 33);
+      await ev(() => { const a = window.__S; VR.SeelenGame.off = false; VR.SeelenGame.test.storm(0.6); a.act = null; a.thinkT = 0; });
       let st = null;
       for (let i = 0; i < 20; i++) { await step(10, 33); st = await ev(() => { const a = window.__S; return { act: a.act && a.act.type, hurry: !!a.seHurry, speed: +a.speed.toFixed(2), sp0: +(a.seSpeed0 || 0).toFixed(2), said: a.bubble ? a.bubble.text : '', v: +Math.hypot(a.vel[0], a.vel[2]).toFixed(2) }; }); if (st.hurry && st.said && st.v > 1) break; }
       run.storm = st; console.log('  · hurry ' + JSON.stringify(st));
       check(st && st.act === 'home' && st.hurry && st.speed > st.sp0, `storm: hurries home, faster (${st && st.sp0} → ${st && st.speed} m/s; „${st && st.said}“)`);
-      await faceCam('__S', 3.2, 0.9, 1.55); await step(3, 33);
-      await ev(() => { const a = window.__S; if (a.bubble) a.bubble.t = 20; else a.say(VR.SeelenGame.log.slice(-1)[0] ? VR.SeelenGame.log.slice(-1)[0].text : '', 20); });
-      await step(2, 33);
-      rows.storm.push(await snap('se_storm.png'));
+      const words = await ev(() => { const a = window.__S, l = VR.SeelenGame.log.filter(l => l.kind === 'hurry' && l.who === a.p.id).slice(-1)[0]; return l ? a.p.name + ': „' + l.text + '“' : ''; });
+      rows.storm.push(bubble(await portrait('__S', 'se_storm.png', 3500, 2.6), words ? [words] : []));
+      await photoOff();
       await ev(() => { const g = VR.game; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); VR.SeelenGame.test.storm(0); });
     }
   } catch (e) { check(false, 'storm: ' + e.message); }

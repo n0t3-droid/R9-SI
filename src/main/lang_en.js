@@ -5027,7 +5027,7 @@
     "g.se.book.note": "Who you know, what they think of you and what they said last.",
     "g.se.book.none": "Nobody yet. Talk to the people in the villages!",
     "g.se.book.met": "met {n}×",
-    "g.se.book.gifts": "{n} gifts",
+    "g.se.book.gifts": "gifts: {n}",
     "g.se.book.quarrel": "{who} and {who2} are quarrelling (about {topic}).",
     // ---- r-seelen end
 });
