@@ -2282,6 +2282,7 @@
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
       if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }
+      if (world && this.gmTuft) this.gmTuft(E, camPos);   // r-gemalt 2 · Pinselgras: the painted grass clumps round the eye (gemalt2_gl.js)
       // far-terrain horizon (cut away where real chunks are drawn; with the Fern-Cache it is in the cache)
       if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
