@@ -101,7 +101,7 @@ try {
     const R = g.renderer, u0 = R.uploadSection; R.uploadSection = function (sec, col, sy, opaque) { sec._gmN = opaque ? opaque.length >> 3 : 0; return u0.apply(this, arguments); };   // (r3: on the instance — the prototype's was shadowed)
   });
   await settle(80);
-  check(await ev(() => VR.game.settings.gSoft === true && VR.game.world.fancyLeaves & 16), 'Balanced: Weiche Natur on by default (the leaf mode carries bit 16)');
+  check(await ev(() => VR.game.settings.gSoft === true && VR.game.world.fancyLeaves & 64), 'Balanced: Weiche Natur on by default (the leaf mode carries bit 64)');
   const S0 = await ev(() => { const p = VR.game.player.pos; return [p[0], p[1], p[2]]; });
   N.spawn = S0;
   const AFT = 8400, LATE = 9600;

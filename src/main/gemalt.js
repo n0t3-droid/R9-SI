@@ -20,11 +20,12 @@
   G.off = () => Object.assign({}, OFF);
   G.ROWS = [{ key: 'gSoft', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.gSoft', tip: 'g.set.gSoft.tip', cost: 'medium', def: false }];
   G.MAXLIFT = 0.5;
-  // the mesh job's leaf mode with Weiche Natur: bit 5 (16) — the base mode as a number (bit 4, 8: the leaves not fancy)
+  // the mesh job's leaf mode with Weiche Natur: bit 7 (64; q-art4 has 16 and 32) — the base mode as a number (8: the leaves
+  // not fancy)
   G.leafMode = (s, base) => {
     if (!(s && s.gSoft)) return base;
     const m = typeof base === 'number' ? base : (base ? 0 : 8);
-    return m | 16;
+    return m | 64;
   };
   // the shader define: the switch on and not the lite look (Very Low)
   G.shaderOn = (s) => !!(s && s.gSoft && !s.lite && s.preset !== 'potato');

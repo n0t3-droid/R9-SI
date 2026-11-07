@@ -295,9 +295,9 @@
     const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
     const RCL = roundOn ? RC.leafTable() : null;   // (the mini-voxel crowns drawn as leaves)
     const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
-    // r-gemalt · Weiche Natur (bit 5, 16: gemalt.js; Nahtlos only): the natural ground as one sculpted surface
+    // r-gemalt · Weiche Natur (bit 7, 64: gemalt.js; Nahtlos only): the natural ground as one sculpted surface
     // (src/shared/softnat.js); its blocks give no cube faces, the plants on it sit on the drawn surface
-    const SNM = VR.SoftNat, softOn = (lm & 16) !== 0 && !!SNM && (!VR.LOOK || VR.LOOK.ground);
+    const SNM = VR.SoftNat, softOn = (lm & 64) !== 0 && !!SNM && (!VR.LOOK || VR.LOOK.ground);
     const SNS = softOn ? SNM.tables().soft : null;
     let softH = null;
     let rcS = null;
