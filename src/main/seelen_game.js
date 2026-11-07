@@ -123,10 +123,13 @@
     const v = g._chr && g._chr.view;
     if (v && v.ev && v.ev.length) {
       const last = R.chr[vil.id] === undefined ? (v.ev.length ? v.ev[Math.max(0, v.ev.length - 3)].i - 1 : -1) : R.chr[vil.id];
-      let top = last;
+      let top = last, took = 0;
       for (const e of v.ev) {
-        if (e.i <= last) continue; top = Math.max(top, e.i);
+        if (e.i <= last) continue;
+        if (took >= 2) break;   // (two events a village a second at most: a long absence's news spread over a few seconds)
+        top = Math.max(top, e.i);
         if ((e.imp | 0) < 3 || Math.hypot(e.x - vil.plan.x, e.z - vil.plan.z) > 1200) continue;
+        took++;
         const ours = e.k === 'built' && e.v && e.v.vil === vil.name;
         for (const a of vil.agents) {
           if (a.guest) continue;
@@ -220,7 +223,7 @@
   function hurry(V, a, on) {
     if (on && !a.seHurry) {
       a.seHurry = true; a.seSpeed0 = a.speed; a.speed = a.speed * 1.55;
-      if (V.near && V.near(a, 24) && !a.bubble) { const c = SG.ctx(V.g, a), r = S.beat('hurry', c, TL, seedNow(a, V.g, 3)); a.say(r.text, 3); said(a, r.text, 'hurry'); }
+      if (V.near && V.near(a, 24)) { const c = SG.ctx(V.g, a), r = S.beat('hurry', c, TL, seedNow(a, V.g, 3)); a.say(r.text, 3); said(a, r.text, 'hurry'); }
     } else if (!on && a.seHurry) { a.seHurry = false; if (a.seSpeed0) a.speed = a.seSpeed0; }
   }
 
