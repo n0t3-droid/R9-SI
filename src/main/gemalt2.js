@@ -52,11 +52,11 @@
   // brightness stays; only the temperature moves). Night: moonlit blue both; dusk: rose light, violet shade; the golden
   // hour: amber light, blue-violet shade; noon: a whisper warm and cool
   G2.KEY = [
-    [-0.2, [0.86, 0.95, 1.16], [0.86, 0.93, 1.12]],
-    [0.0, [1.26, 0.9, 0.8], [0.84, 0.8, 1.2]],
-    [0.12, [1.24, 1.0, 0.72], [0.78, 0.85, 1.22]],
-    [0.35, [1.12, 1.0, 0.84], [0.84, 0.9, 1.16]],
-    [0.75, [1.06, 1.0, 0.9], [0.88, 0.94, 1.12]],
+    [-0.2, [0.86, 0.95, 1.16], [0.84, 0.92, 1.16]],
+    [0.0, [1.3, 0.88, 0.76], [0.82, 0.78, 1.26]],
+    [0.12, [1.28, 1.0, 0.68], [0.74, 0.84, 1.3]],
+    [0.35, [1.16, 1.0, 0.8], [0.8, 0.9, 1.24]],
+    [0.75, [1.1, 1.0, 0.86], [0.84, 0.93, 1.2]],
   ];
   const luma = (c) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
   G2.luma = luma;
@@ -71,7 +71,7 @@
     return o;
   };
   // strengths (u_gmK): x the paint (bands + key), y the rim, z the air, w the lawn strokes
-  G2.K = { paint: 0.85, rim: 0.42, air: 0.5, stroke: 1.0 };
+  G2.K = { paint: 0.9, rim: 0.45, air: 0.65, stroke: 1.0 };
 
   // ---------------------------------------------------------------- the GLSL (terrain and far tiles; both under GM_PAINT)
   G2.glslTerrain = () => '#if defined(GM_PAINT) || defined(GM_STROKE)\n// r-gemalt 2 · Gemaltes Licht (gemalt2.js)\nuniform vec3 u_gmLit;\nuniform vec3 u_gmShade;\nuniform vec4 u_gmK;\n#endif\n#ifdef GM_PAINT\n' + G2.glslRamp() + G2.glslAir() +
@@ -111,7 +111,7 @@
   // per grass column up to PER clumps at hashed spots; the farther from the eye, the fewer stay (a clump keeps its place:
   // it stays while its own hash is below the density there and shrinks into the threshold, so nothing pops)
   G2.TUFT = { per: 3, near: 6, R: { balanced: 13, high: 18, ultra: 18, ultraLite: 15 }, max: 4096 };
-  G2.tuftR = (preset) => G2.TUFT.R[preset] || 0;
+  G2.tuftR = (preset) => G2.TUFT.R[preset] !== undefined ? G2.TUFT.R[preset] : (preset === 'potato' || preset === 'low' ? 0 : G2.TUFT.R.balanced);   // ('custom' — a switch moved: Balanced's)
   const hash = (x, z, i) => { let h = (Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(z | 0, 0x165667b1) ^ Math.imul(i + 1, 0x9e3779b1)) >>> 0; h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0; h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
   G2.hash = hash;
   G2.density = (d, R) => d <= G2.TUFT.near ? 1 : d >= R ? 0 : 1 - (d - G2.TUFT.near) / (R - G2.TUFT.near);

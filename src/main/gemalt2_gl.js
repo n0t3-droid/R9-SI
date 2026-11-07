@@ -111,13 +111,13 @@ void main() {
   for (int k = 0; k < 5; k++) {
     float fk = float(k), hk = 0.5 + 0.5 * gmH(fk), bk = (gmH(fk + 7.0) - 0.5) * 0.5;
     float x = 0.14 + 0.18 * fk + (gmH(fk + 3.0) - 0.5) * 0.1 + bk * v_uv.y * v_uv.y;
-    float y = v_uv.y / hk, w = 0.075 * (1.0 - y);
+    float y = v_uv.y / hk, w = 0.1 * (1.0 - y * 0.85);
     if (y < 1.0 && abs(v_uv.x - x) < w) t = max(t, y);
   }
   if (t < 0.0) discard;
   float tone = floor(t * 3.99) / 3.0;   // four tones, a painter's steps
-  vec3 alb = v_col * mix(0.55, 1.3, tone) * mix(0.9, 1.1, v_tone);
-  alb = mix(alb, alb * vec3(1.12, 1.06, 0.78), tone * 0.35 * v_tone);   // the tips a touch sun-bleached
+  vec3 alb = v_col * mix(0.5, 1.08, tone) * mix(0.9, 1.08, v_tone);
+  alb = mix(alb, alb * vec3(1.12, 1.06, 0.78), tone * 0.15 * v_tone);   // the tips a touch sun-bleached
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -130,7 +130,7 @@ void main() {
 #else
   float sh = 1.0;
 #endif
-  float ndl = clamp(0.35 + 0.65 * L.y, 0.0, 1.0) * mix(0.6, 1.0, t);   // the grass takes the light softly, the roots in the clump's shade
+  float ndl = clamp(0.3 + 0.55 * L.y, 0.0, 1.0) * mix(0.55, 0.95, t);   // the grass takes the light softly, the roots in the clump's shade
   vec3 col = alb * (u_ambSky * skyL * mix(vec3(1.0), u_gmShade, u_gmK.x) * mix(0.75, 1.05, t) + lc * mix(vec3(1.0), u_gmLit, u_gmK.x) * ndl * sh * outdoors);
   col = applyFog(col, v_rel, length(v_rel));
   o_col = vec4(col, 1.0);

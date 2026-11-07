@@ -64,7 +64,7 @@ console.log('c · the warm / cool key');
   const gold = p(0.12), dusk = p(0.0), noon = p(0.9);
   check(gold.lit[0] > gold.lit[2] * 1.4 && gold.shade[2] > gold.shade[0] * 1.3, 'the golden hour: amber light, blue-violet shade', gold.lit.map(v => v.toFixed(2)) + ' | ' + gold.shade.map(v => v.toFixed(2)));
   check(dusk.lit[0] > dusk.lit[1] && dusk.shade[0] > dusk.shade[1] * 0.98 && dusk.shade[2] > dusk.shade[1] * 1.3, 'dusk: rose light, violet shade');
-  check(Math.abs(noon.lit[0] - noon.lit[2]) < 0.25 && Math.abs(noon.shade[0] - noon.shade[2]) < 0.3, 'noon: a whisper warm and cool');
+  check(Math.abs(noon.lit[0] - noon.lit[2]) < 0.35 && Math.abs(noon.shade[0] - noon.shade[2]) < 0.45, 'noon: a whisper warm and cool');
   let jump = 0; for (let y = -0.3; y < 1; y += 0.01) { const a = p(y), b = p(y + 0.01); for (let i = 0; i < 3; i++) jump = Math.max(jump, Math.abs(a.lit[i] - b.lit[i]), Math.abs(a.shade[i] - b.shade[i])); }
   check(jump < 0.05, 'smooth through the day', jump.toFixed(3));
 }

@@ -1563,6 +1563,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
+#ifdef GEMALT
+    if (gmF) e = emissiveFace ? 0.55 : 0.0;   // (r-gemalt 2: a glowing blob glows softly; a soft face's uv is its normal — no texture glow)
+#endif
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
 #ifdef PBR
