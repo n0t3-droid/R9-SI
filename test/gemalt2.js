@@ -80,6 +80,11 @@ console.log('d · the brush-stroke grass: placement');
   check(near > mid && mid > far && far > 0 && beyond === 0, 'fewer with distance, none beyond ' + R + ' m', near + ' > ' + mid + ' > ' + far + ' > ' + beyond);
   check(near === 3600 * G2.TUFT.per, 'near the eye every spot', near);
   check(inside && size, 'inside the column, sizes in range');
+  // (classic_v2 found a block grid in the Nahtlos lawn: the clumps kept 0.12 from every border — a bare line round each
+  //  block, 9–13 m out it reads as the grid; the clumps now take the whole column, a border no emptier than the middle)
+  { let edge = 0, mid2 = 0; for (let x = 0; x < 80; x++) for (let z = 0; z < 80; z++) for (const o of G2.clumps(x, z, 2, R)) { const e = Math.min(o.ox, 1 - o.ox, o.oz, 1 - o.oz); if (e < 0.1) edge++; else if (e > 0.4) mid2++; }
+    // (area: the band within 0.1 of a border is 0.36 of the column, the middle square beyond 0.4 is 0.04)
+    check(edge / 0.36 > 0.8 * (mid2 / 0.04), 'the clumps as dense at the block borders as in the middle (no grid)', (edge / 0.36).toFixed(0) + ' vs ' + (mid2 / 0.04).toFixed(0)); }
   // the eye moves away: a clump that stays keeps its spot (only its size changes)
   let kept = true; for (let x = 0; x < 30; x++) { const n0 = G2.clumps(x, 5, 6, R), n1 = G2.clumps(x, 5, 11, R); for (const o of n1) if (!n0.some(q => q.ox === o.ox && q.oz === o.oz && q.rot === o.rot)) kept = false; }
   check(kept, 'a clump keeps its spot as the eye moves (no shuffle, no pop)');
@@ -154,6 +159,7 @@ console.log('f · switches, defines, rows, texts, wiring');
   check(b.includes("'gemalt2'") && b.includes("'gemalt2_gl'"), 'build.js bundles gemalt2, gemalt2_gl');
   check(sh.includes('VR.Gemalt2.glslTerrain()') && sh.includes('VR.Gemalt2.glslWater()') && (sh.match(/gmAirCol\(col, dist, u_fogColor\)/g) || []).length === 2 && sh.includes('gmRamp(ndl * sh)') && sh.includes('gmStroke(alb.rgb') && sh.includes('gmWater(col, wp, vdep'), 'the shaders: terrain bands + key + rim + air, far tiles, lawn strokes, water');
   check(rn.includes('this.gmTuft(E, camPos)'), 'render() draws the grass clumps');
+  check(/R\.gmTuft = function[^]*?VR\.LOOK && VR\.LOOK\.ground === false\) return/.test(src('src/main/gemalt2_gl.js')), 'no clumps in the look Klassisch (every block its cube: classic_v2 measures the grid on the lawn)');
   // (run 2: the clumps read pale straw beside the lawn — the column's painted colour is sRGB, the terrain decodes it with
   //  pow 2.2; the clumps must too, or they sit a stop brighter and greyer than the ground they grow from)
   check(/v_col = pow\(a_i1\.rgb, vec3\(2\.2\)\)/.test(src('src/main/gemalt2_gl.js')), 'the clumps decode the painted green like the ground (sRGB → linear)');

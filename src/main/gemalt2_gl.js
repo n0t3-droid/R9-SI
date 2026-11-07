@@ -211,6 +211,7 @@ void main() {
   R.gmTuft = function (E, camPos) {
     const st = S(), g = VR.game;
     if (!G2.on(st, 'gTuft') || !g || !g.world || (E && E.dimId)) return;
+    if (VR.LOOK && VR.LOOK.ground === false) return;   // (Klassisch: every block its own cube — no grass over the grid)
     const Rr = G2.tuftR(st._pr || st.preset); if (!Rr) return;
     const p = this.gmTuftProgram(); if (!p) return;
     const T = this.gmT, w = g.world;

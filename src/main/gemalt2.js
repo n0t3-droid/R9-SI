@@ -123,7 +123,8 @@
       const h = hash(x, z, i * 5);
       if (h >= dn) continue;
       const s = Math.min(1, (dn - h) / 0.12);   // (shrinks into the threshold)
-      o.push({ ox: 0.12 + hash(x, z, i * 5 + 1) * 0.76, oz: 0.12 + hash(x, z, i * 5 + 2) * 0.76, rot: hash(x, z, i * 5 + 3) * Math.PI, s: s * (0.75 + 0.5 * hash(x, z, i * 5 + 4)), tone: hash(z, x, i) });
+      o.push({ ox: hash(x, z, i * 5 + 1), oz: hash(x, z, i * 5 + 2),   // (the whole column: a bare border line read as the block grid)
+       rot: hash(x, z, i * 5 + 3) * Math.PI, s: s * (0.75 + 0.5 * hash(x, z, i * 5 + 4)), tone: hash(z, x, i) });
     }
     return o;
   };
