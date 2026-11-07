@@ -59,6 +59,7 @@
     'g.ctx.travel': ['Reise {to} · {d}', 'Travel {to} · {d}'],
     'g.ctx.funke': ['Funke fragen', 'Ask Funke'],
     'g.ctx.ferry': ['Fähre nehmen', 'Take the ferry'],   // a-life
+    'g.ctx.wunder': ['{name}', '{name}'],   // r-wunder
     'g.ctx.home': ['Heimkehr …', 'Going home …'],
     'g.ctx.toPlace': ['nach {name}', 'to {name}'],
     'g.ctx.toWonder': ['zum Wunder {name}', 'to the wonder {name}'],
@@ -92,6 +93,7 @@
     bench: ['g.ctx.view', 'vista', '🌄'], pet: ['g.ctx.pet', 'pet', '🐾'], seat: ['g.ctx.sit', 'use', '🪑'],
     ferry: ['g.ctx.ferry', 'ferry', '⛴'],   // a-life: the dock of a settlement's ferries (ferries.js)
     fairy: ['g.ctx.fairy', 'fairy', '✨'],   // a-fairy: the folk, the wishes, the door, the singing stones (fairy.js)
+    wunder: ['g.ctx.wunder', 'fairy', '🌟'],   // r-wunder: the Wundertiere (wunder_game.js: climb onto the whale, sit under the tree — the name is the action)
   };
   // ---------------------------------------------------------------- the resolver (pure)
   C.resolve = function (c) {

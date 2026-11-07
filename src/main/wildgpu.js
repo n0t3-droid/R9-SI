@@ -428,7 +428,7 @@ void main() {
   // f-wild2 · a fish's flash: its silver flanks light up as it rolls into a turn (the instance's glow slot)
   if (u_mode == 1) col += alb * v_l.y * 2.2 * step(0.45, max(alb.r, max(alb.g, alb.b))) * (0.35 + 0.65 * outdoor);
   // the glow: the rays' lines (brighter at dusk and at night: the instance's glow)
-  else col = mix(col, mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));
+  else col = mix(col, (v_l.w > 1.5 ? vec3(1.0, 0.7, 0.34) : mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w)) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));   // (r-wunder: hue > 1.5 — the Wundertiere's lanterns, warm amber)
   col = applyFog(col, v_rel * u_fogK, length(v_rel) * u_fogK);
   if (u_mode == 2) col = skyFloor(col, v_rel);   // (f-polish6: the party's bird dashes too)
   o = vec4(col, 1.0);

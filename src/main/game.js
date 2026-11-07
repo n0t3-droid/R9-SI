@@ -1418,6 +1418,7 @@
       if (VR.TaleEnd && VR.TaleEnd.cur) { const te = VR.TaleEnd.cam(this, cam); if (te) cam = te; }   // f-quiet2: a tale's ending, staged (tale_end.js)
       if (VR.Liberate && VR.Liberate.mcam) { const lc = VR.Liberate.cam(this, cam); if (lc) cam = lc; }
       if (VR.Ferries && VR.Ferries.camOn) { const fc = VR.Ferries.cam(this, cam); if (fc) cam = fc; }   // a-life: the ferry ride's chase view (ferries.js)   // a-foes2: the freeing's swing over the land and back (any key: back now)
+      if (VR.WunderGame && VR.WunderGame.camOn) { const wc = VR.WunderGame.cam(this, cam); if (wc) cam = wc; }   // r-wunder: the ride on the whale's back (wunder_game.js)
       if (VR.StoryPlay && VR.StoryPlay.holds(this)) { const sc = VR.StoryPlay.cam(this, cam); if (sc) cam = sc; }   // a-story: the scene's shots (story.js)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
       if (VR.Natives && VR.Natives.cam) { const nc = VR.Natives.cam(this, cam, dt); if (nc) cam = nc; }   // u-worlds4: the portrait — talking to a native (or 📷 near one) the view frames the head (natives.js)

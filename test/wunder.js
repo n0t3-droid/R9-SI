@@ -159,5 +159,26 @@ check(Array.isArray(isles) && isles.length >= 5, 'the Sky Isles are listed (' + 
   check(VR.ITEMS && VR.ITEMS.wunder_flute && VR.ITEMS.lantern_seed && VR.ITEMS.lantern_seed.light > 0, 'the items: the flute and the lantern seed (a small light)');
 }
 
+// ---------------------------------------------------------------- the models (VR.WildGPU kinds: no new program)
+{
+  try { require('../src/main/voxmodels.js'); } catch (e) { /* (the Very Low models need the voxel grid) */ }
+  require('../src/main/wildgpu.js'); require('../src/main/wunder_models.js');
+  const G = VR.WildGPU, WM = VR.WunderModels;
+  const kinds = ['wwhale', 'wtree', 'wroot', 'wdeer', 'wleg'];
+  check(kinds.every(k => G.KINDS[k] && G.KINDS[k].make), 'the smooth models are VR.WildGPU kinds (the creatures\' program — nothing new compiled)');
+  const v = {}; for (const k of kinds) v[k] = WM.mesh(k);
+  check(kinds.every(k => v[k].length % 11 === 0 && v[k].every(Number.isFinite)), 'every vertex finite, the program\'s layout');
+  const tris = kinds.reduce((s, k) => s + v[k].length / 33, 0);
+  check(tris < 8000, 'small: ' + Math.round(tris) + ' triangles for all three (the whale ' + Math.round(v.wwhale.length / 33) + ')');
+  // the whale: nose −z, its fins and flukes beat (weight > 0), its lanterns glow (emission)
+  const W = v.wwhale; let zmin = 1, zmax = -1, wing = 0, glow = 0;
+  for (let i = 0; i < W.length; i += 11) { zmin = Math.min(zmin, W[i + 2]); zmax = Math.max(zmax, W[i + 2]); if (W[i + 9] > 0.5) wing++; if (W[i + 10] > 0.9) glow++; }
+  check(zmin <= -0.49 && zmax >= 0.4 && wing > 100 && glow > 50, 'the whale: length 1 (nose −z), fins and flukes beating, lantern spots (' + wing + ' / ' + glow + ')');
+  let ty = 0; for (let i = 0; i < v.wtree.length; i += 11) ty = Math.max(ty, v.wtree[i + 1]);
+  check(ty > 0.9 && ty < 1.05, 'the tree: height 1 (×14 m)');
+  const vm = VR.VOXMODELS && VR.VOXMODELS.wu_whale ? [VR.VOXMODELS.wu_whale(), VR.VOXMODELS.wu_tree()] : null;
+  check(vm && vm.every(d => d.parts && Object.values(d.parts).every(p => p.grid.c.some(c => c))), 'Very Low: voxel models (the whale\'s silhouette, the tree)');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
