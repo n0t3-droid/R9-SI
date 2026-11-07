@@ -46564,6 +46564,249 @@ return st;
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const WU=VR.Wunder=VR.Wunder||{};
+const TAU=Math.PI*2;
+const h01=WU.h01=(a,b,c)=>{let h=Math.imul((a|0)^0x51ed27,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b)^Math.imul((c|0)+0x1b873593,0xc2b2ae35);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;return(h>>>0)/4294967296;};
+const sm=(u)=>(u<=0?0:u>=1?1:u*u*(3-2*u));
+const DAY=24000;
+
+
+WU.GAP=2;
+WU.canEvent=(st,kind,day)=>{const e=st&&st.ev;const l=e?e[kind]:undefined;return l===undefined||(day|0)-l>=WU.GAP;};
+WU.markEvent=(st,kind,day)=>{(st.ev||(st.ev={}))[kind]=day|0;};
+
+
+
+
+
+WU.WHALE={len:34,speed:4.2,from:9000,dur:13200,arr:1800,alt:30,far:720,period:7.5,songFrom:11400,songTo:13600,songEvery:900,songLen:6,window:14,hear:170};
+
+WU.whaleVisit=(seed,day)=>(((day|0)+(seed&1))&1)===0;
+WU.isleCentre=(isles)=>{let x=0,z=0;for(const I of isles){x+=I.x;z+=I.z;}return isles.length?[x/isles.length,z/isles.length]:[330,140];};
+const topOf=(I)=>I.y+(I.dome||4);
+
+
+
+WU.whaleRoute=function(seed,isles){
+const W=WU.WHALE,L0=isles&&isles.length?isles.slice():[{x:330,z:140,y:158,r:42,dome:4}];
+const C=WU.isleCentre(L0);
+L0.sort((a,b)=>Math.atan2(a.z-C[1],a.x-C[0])-Math.atan2(b.z-C[1],b.x-C[0]));
+const k0=Math.floor(h01(seed,3,0x7e)*L0.length),order=L0.map((_,i)=>L0[(i+k0)%L0.length]);
+const pts=[],SEG=22;
+for(let i=0;i<order.length;i++){
+const A=order[i],B=order[(i+1)%order.length];
+const a=[A.x,topOf(A)+W.alt,A.z],b=[B.x,topOf(B)+W.alt,B.z];
+const dx=b[0]-a[0],dz=b[2]-a[2],d=Math.hypot(dx,dz)||1,side=(i&1? -1:1)*(0.28+0.12*h01(seed,i,0x51));
+const m=[(a[0]+b[0])/2-dz/d*d*side,Math.max(a[1],b[1])+10,(a[2]+b[2])/2+dx/d*d*side];
+for(let k=0;k<SEG;k++){const t=k/SEG,u=1-t;pts.push([u*u*a[0]+2*u*t*m[0]+t*t*b[0],u*u*a[1]+2*u*t*m[1]+t*t*b[1],u*u*a[2]+2*u*t*m[2]+t*t*b[2]]);}
+}
+const N=pts.length;
+const lift=()=>{for(const q of pts)for(const I of L0)if(Math.hypot(q[0]-I.x,q[2]-I.z)<I.r*1.45)q[1]=Math.max(q[1],topOf(I)+24);};
+lift();
+for(let it=0;it<3;it++){const cp=pts.map(q=>q.slice());for(let k=0;k<N;k++){const a=cp[(k+N-1)%N],b=cp[(k+1)%N],q=pts[k];for(let j=0;j<3;j++)q[j]=q[j]*0.5+(a[j]+b[j])*0.25;}}
+lift();
+const s=[0];
+for(let k=1;k<=N;k++){const a=pts[k-1],b=pts[k%N];s.push(s[k-1]+Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2]));}
+return{pts,s,L:s[N],N,C};
+};
+const cr=(a,b,c,d,t)=>{const t2=t*t,t3=t2*t;return 0.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);};
+const at3=(loop,s,o)=>{
+const N=loop.N,L=loop.L,S=loop.s,P=loop.pts;
+s=((s%L)+L)%L;
+let lo=0,hi=N;
+while(hi-lo>1){const m=(lo+hi)>>1;if(S[m]<=s)lo=m;else hi=m;}
+const t=(s-S[lo])/((S[lo+1]-S[lo])||1e-6);
+const a=P[(lo+N-1)%N],b=P[lo%N],c=P[(lo+1)%N],d=P[(lo+2)%N];
+o[0]=cr(a[0],b[0],c[0],d[0],t);o[1]=cr(a[1],b[1],c[1],d[1],t);o[2]=cr(a[2],b[2],c[2],d[2],t);
+return o;
+};
+const Q0=[0,0,0],Q1=[0,0,0];
+
+WU.routeAt=function(loop,s,out){
+at3(loop,s,out);at3(loop,s-3,Q0);at3(loop,s+3,Q1);
+const dx=Q1[0]-Q0[0],dy=Q1[1]-Q0[1],dz=Q1[2]-Q0[2],hl=Math.hypot(dx,dz)||1e-6;
+out[3]=Math.atan2(-dx,-dz);out[4]=Math.atan2(dy,hl);
+at3(loop,s+8,Q1);at3(loop,s-8,Q0);
+const h0=Math.atan2(out[2]-Q0[2],out[0]-Q0[0]),h1=Math.atan2(Q1[2]-out[2],Q1[0]-out[0]);
+let dh=h1-h0;if(dh>Math.PI)dh-=TAU;else if(dh< -Math.PI)dh+=TAU;
+out[5]=dh/8;
+return out;
+};
+
+
+const R0=[0,0,0,0,0,0];
+const posAt=(seed,loop,T,o)=>{
+const W=WU.WHALE,d=Math.floor((T-W.from)/DAY),u=T-(d*DAY+W.from);
+if(!WU.whaleVisit(seed,d)||u<0||u>=W.dur)return 0;
+const s=u/20*W.speed+h01(seed,d,0x3a)*loop.L;
+WU.routeAt(loop,s,R0);
+const k=sm(u/W.arr)*sm((W.dur-u)/W.arr),C=loop.C;
+let ox=R0[0]-C[0],oz=R0[2]-C[1];const ol=Math.hypot(ox,oz)||1;ox/=ol;oz/=ol;
+const far=(1-k)*W.far;
+o[0]=R0[0]+ox*far;o[1]=R0[1]+(1-k)*70;o[2]=R0[2]+oz*far;o[5]=R0[5]*k;o[8]=k;o[9]=s;
+return 1;
+};
+const P2=new Float32Array(10);
+WU.whaleAt=function(seed,loop,T,out){
+out=out||new Float32Array(10);
+if(!posAt(seed,loop,T,out)){out[7]=0;out[8]=0;return out;}
+if(posAt(seed,loop,T+10,P2)){
+const dx=P2[0]-out[0],dy=P2[1]-out[1],dz=P2[2]-out[2],hl=Math.hypot(dx,dz)||1e-6;
+out[3]=Math.atan2(-dx,-dz);out[4]=Math.max(-0.35,Math.min(0.35,Math.atan2(dy,hl)));
+}
+out[5]=Math.max(-0.4,Math.min(0.4,-out[5]*30));
+out[6]=(T/20)*TAU/WU.WHALE.period;
+out[7]=1;
+return out;
+};
+
+WU.songAt=function(seed,T){
+const W=WU.WHALE,d=Math.floor(T/DAY),tod=T-d*DAY;
+if(!WU.whaleVisit(seed,d)||tod<W.songFrom)return null;
+const k=Math.floor((tod-W.songFrom)/W.songEvery),t0=d*DAY+W.songFrom+k*W.songEvery;
+if(W.songFrom+k*W.songEvery>=W.songTo){const kl=Math.floor((W.songTo-W.songFrom-1)/W.songEvery),e=d*DAY+W.songFrom+kl*W.songEvery+W.songLen*20;return T<=e+W.window*20?{k:kl,t0:e-W.songLen*20,end:e,sing:false}:null;}
+const end=t0+W.songLen*20;
+return{k,t0,end,sing:T<end};
+};
+
+
+WU.MOTIF=[1,3,2];
+WU.NOTES={1:72,2:79,3:81};
+
+WU.answered=function(presses,songEnd){
+const W=WU.WHALE,M=WU.MOTIF,L=[];
+for(const p of presses||[])if(p.T>=songEnd-20&&p.T<=songEnd+W.window*20)L.push(p.k);
+for(let i=0;i+M.length<=L.length;i++){let ok=true;for(let j=0;j<M.length;j++)if(L[i+j]!==M[j]){ok=false;break;}if(ok)return true;}
+return false;
+};
+WU.hears=(d)=>d<=WU.WHALE.hear;
+
+
+
+
+WU.TREE={v:5/60,stopR:12,vilMargin:30,night0:13200,night1:22800,min:25,max:45,crown:13};
+WU.isNight=(tod)=>tod>=WU.TREE.night0&&tod<WU.TREE.night1;
+WU.treeTarget=function(seed,day,from,ok){
+const T=WU.TREE;
+for(let k=0;k<16;k++){
+const a=h01(seed,day*31+k,0x7a)*TAU,r=T.min+(T.max-T.min)*h01(seed,day*31+k,0x7b);
+const x=Math.round((from[0]+Math.cos(a)*r)*10)/10,z=Math.round((from[1]+Math.sin(a)*r)*10)/10;
+if(ok(x,z))return[x,z];
+}
+return null;
+};
+WU.inVillage=(x,z,vils,margin)=>{for(const v of vils||[])if(Math.hypot(x-v[0],z-v[1])<v[2]+(margin||0))return true;return false;};
+
+
+WU.treeStep=function(tr,dt,ctx){
+const T=WU.TREE,pl=ctx.players||[];
+if(!ctx.night||tr.tx===null||tr.tx===undefined){tr.walking=false;return null;}
+for(const p of pl)if(Math.hypot(p[0]-tr.x,p[1]-tr.z)<T.stopR){tr.walking=false;return null;}
+const dx=tr.tx-tr.x,dz=tr.tz-tr.z,d=Math.hypot(dx,dz);
+if(d<0.05){tr.x=tr.tx;tr.z=tr.tz;tr.tx=null;tr.walking=false;tr.stood=true;return{k:'arrive',x:tr.x,z:tr.z};}
+const st=Math.min(d,T.v*dt),nx=tr.x+dx/d*st,nz=tr.z+dz/d*st;
+if(WU.inVillage(nx,nz,ctx.vils,T.vilMargin)){tr.tx=null;tr.walking=false;return{k:'blocked',x:tr.x,z:tr.z};}
+for(const p of pl)if(Math.hypot(p[0]-nx,p[1]-nz)<T.stopR){tr.walking=false;return null;}
+let ev=null;
+if(tr.stood){ev={k:'ring',x:tr.x,z:tr.z};tr.stood=false;}
+tr.x=nx;tr.z=nz;tr.walking=true;tr.yaw=Math.atan2(-dx,-dz);
+return ev;
+};
+WU.ringSpots=function(x,z,seed){
+const out=[],n=14;
+for(let i=0;i<n;i++){const a=(i+0.35*(h01(seed,i,0x21)-0.5))/n*TAU,r=3.2+1.1*h01(seed,i,0x22);out.push([x+Math.cos(a)*r,z+Math.sin(a)*r]);}
+return out;
+};
+WU.seedToday=(st,day)=> !st||st.seedDay!==(day|0);
+
+
+WU.DEER={still:10,vilFar:110,dark:0.6,near:3,run:5.2,wait:24,ahead0:9,ahead1:14,pace:2.2,arrive:7,maxD:650,minD:25};
+WU.deerMay=(c)=>(c.night||0)>=WU.DEER.dark&&(c.stillFor||0)>=WU.DEER.still&&(c.vilDist===undefined?1e9:c.vilDist)>=WU.DEER.vilFar&&WU.canEvent(c.st,'deer',c.day);
+WU.deerPick=function(spots,seen,px,pz){
+let best=null,bd=1e9;
+for(const q of spots||[]){if(seen&&seen[q.id])continue;const d=Math.hypot(q.x-px,q.z-pz);if(d<WU.DEER.minD||d>WU.DEER.maxD)continue;if(d<bd){bd=d;best=q;}}
+return best;
+};
+
+WU.deerStep=function(d,dt,c){
+const D=WU.DEER,dp=Math.hypot(c.px-d.x,c.pz-d.z);
+if((c.speed||0)>D.run||dp<D.near)return'vanish';
+const dx=d.tx-d.x,dz=d.tz-d.z,dt2=Math.hypot(dx,dz);
+if(dt2<D.arrive&&dp<22)return'arrive';
+d.walking=false;
+if(dp>D.wait||dt2<0.5)return null;
+const spd=dp<D.ahead0?D.pace*1.4:dp>D.ahead1?D.pace*0.35:D.pace;
+const st=Math.min(dt2,spd*dt);
+d.x+=dx/dt2*st;d.z+=dz/dt2*st;d.yaw=Math.atan2(-dx,-dz);d.walking=true;
+return null;
+};
+const PATH={de:[['Laternen','Glimm','Hirsch','Schimmer','Mondlicht','Leucht','Silber','Sternen'],['pfad','weg','steig','spur']],
+en:[['Lantern','Glimmer','Stag','Shimmer','Moonlight','Glow','Silver','Star'],[' Path',' Way',' Trail',' Track']]};
+WU.pathName=function(seed,lang){
+const P=PATH[lang==='en'?'en':'de'],a=Math.floor(h01(seed,1,0x91)*P[0].length),b=Math.floor(h01(seed,2,0x92)*P[1].length);
+return P[0][a]+P[1][b];
+};
+
+
+
+const PEOPLE={whale:'aqua',tree:'basalt',deer:'flausel'};
+WU.nameOf=function(kind,seed){
+const N=VR.Names;if(!N)return kind;
+for(let k=0;k<40;k++){
+const w=kind==='deer'&&N.flausel?N.flausel(seed,k):N.word(PEOPLE[kind]||'aqua',(seed|0)*31+k*7919+(kind==='tree'?17:kind==='deer'?29:0),'elder');
+if(w&&w.length>=3&&w.length<=12&& !N.blocked(w)&& !N.reserved(w))return w;
+}
+return kind==='whale'?'Limar':kind==='tree'?'Romo':'Lichtel';
+};
+
+
+const C=VR.Chronik;
+WU.DEEDS={w_whale:6,w_ride:8,w_tree:5,w_deer:7,w_flute:4};
+WU.ICON={w_whale:'🐋',w_ride:'🐋',w_tree:'🌳',w_deer:'🦌',w_flute:'🎶'};
+if(C&&C.DEEDS&& !C.DEEDS.w_whale){
+Object.assign(C.DEEDS,WU.DEEDS);
+for(const k in WU.DEEDS)if(C.KEYS&&C.KEYS.indexOf('g.ch.ev.deed.'+k)<0)C.KEYS.push('g.ch.ev.deed.'+k);
+const oi=C.icon;
+if(oi)C.icon=(e)=>(e&&e.k==='deed'&&e.v&&WU.ICON[e.v.dk]?WU.ICON[e.v.dk]:oi(e));
+}
+
+
+
+if(VR.defItem&&VR.ITEMS&& !VR.ITEMS.wunder_flute){
+VR.defItem('wunder_flute',{cat:'tools',stack:1,use:'flute',name:'Flute'});
+VR.defItem('lantern_seed',{cat:'items',stack:16,light:9,name:'Lantern Seed'});
+}
+
+
+WU.KEYS=['g.wu.whale','g.wu.tree','g.wu.deer','g.wu.flute.learn','g.wu.flute.got','g.wu.flute.lesson','g.wu.flute.hint','g.wu.flute.prompt',
+'g.wu.whale.sing','g.wu.whale.heard','g.wu.whale.come','g.wu.whale.board','g.wu.whale.aboard','g.wu.whale.down','g.wu.whale.up','g.wu.whale.bye','g.wu.whale.seen',
+'g.wu.tree.sit','g.wu.tree.seed','g.wu.tree.rest','g.wu.tree.seen','g.wu.tree.ring','g.wu.deer.seen','g.wu.deer.gone','g.wu.deer.path','g.wu.deer.follow',
+'g.wu.book','g.wu.book.note','g.wu.book.whale','g.wu.book.tree','g.wu.book.deer','g.wu.book.none','g.wu.book.next','g.wu.book.next2','g.wu.lead','g.it.wunder_flute','g.it.lantern_seed',
+'g.set.wunder','g.set.wunder.tip','g.ctx.wunder'];
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
 (function(VR){
 'use strict';
 
@@ -49202,6 +49445,37 @@ S.bandage=()=>{const img=sprite();poly(img,[[2,9],[10,2],[14,6],[6,14]],(x,y)=>(
 S.vitamins=()=>{const img=sprite();rect(img,4,4,11,14,(x,y)=>x===4?shade(0xF0F0F0,0.75):K(0xF8F8F8));rect(img,5,7,10,11,0xF0A020);rect(img,5,2,10,4,0xF0A020);px(img,7,9,0xF8F8F8);px(img,8,9,0xF8F8F8);outline(img);return img;};
 S.first_aid_kit=()=>{const img=sprite();rect(img,2,5,13,13,(x,y)=>y===5?lighten(0xF0F0F0,0.2):K(0xE8E8EC));rect(img,6,7,9,11,0xE02A2A);rect(img,5,8,10,10,0xE02A2A);rect(img,6,3,9,5,0x9A9AA0);outline(img);return img;};
 S.sunscreen=()=>{const img=sprite();rect(img,5,5,10,14,(x,y)=>x===5?shade(0xF0C040,0.8):K(0xF0D050));rect(img,6,8,9,11,0xF8F8F0);rect(img,6,3,9,5,0xF08020);circ(img,7.5,9.5,1.2,K(0xF0A020));outline(img);return img;};
+})(VR);
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const T=VR.TEXITEM;if(!T)return;
+const{px,poly,circ,lineP,outline,sprite,shade,lighten,C}=T;
+const S=VR.ITEM_SPRITES;
+S.wunder_flute=()=>{
+const img=sprite(),wood=C(0xc8925a),dark=C(0x7a4e2a);
+
+for(let i=0;i<=11;i++){px(img,2+i,13-i,i%4===0?shade(wood,0.85):wood);px(img,3+i,13-i,lighten(wood,0.25));px(img,2+i,14-i,shade(wood,0.7));}
+px(img,13,2,dark);px(img,14,2,dark);px(img,1,14,dark);
+for(const k of[4,6,8])px(img,2+k,13-k,dark);
+lineP(img,4,12,3,15,C(0x3a7ad8));px(img,2,15,C(0x9ad8ff));
+outline(img);
+return img;
+};
+S.lantern_seed=()=>{
+const img=sprite(),husk=C(0xf2e2b8);
+poly(img,[[8,2],[12,6],[12,11],[8,15],[4,11],[4,6]],(x,y)=>(x===4||x===11?shade(husk,0.8):(y%3===0?shade(husk,0.92):husk)));
+circ(img,8,9,2.6,(x,y,d)=>(d<0.5?C(0xfff4c0):C(0xffb54a)),1);
+lineP(img,8,0,8,2,C(0x6a8a3a));
+outline(img);
+return img;
+};
 })(VR);
 
 
@@ -73642,6 +73916,53 @@ VR.I18N.add('en',{
 "g.set.chronik":"Chronicle (living world)",
 "g.set.chronik.tip":"The world lives on: animals, plants, villages and weather — and a chronicle remembers. Runs in the background.",
 
+
+"g.wu.whale":"Cloudsinger",
+"g.wu.tree":"Wandering Tree",
+"g.wu.deer":"Lantern Stag",
+"g.wu.flute.learn":"Learn the flute",
+"g.wu.flute.got":"🎶 {name} gives you a flute.",
+"g.wu.flute.lesson":"Listen: one, three, two — that is the Cloudsinger's call. When it sings at dusk, answer it.",
+"g.wu.flute.hint":"🎶 Flute: keys 1 · 2 · 3",
+"g.wu.flute.prompt":"Answer: 1 · 3 · 2",
+"g.wu.whale.sing":"🐋 The Cloudsinger {name} is singing …",
+"g.wu.whale.heard":"🐋 {name} heard you!",
+"g.wu.whale.come":"{name} glides down to you.",
+"g.wu.whale.board":"Climb onto the Cloudsinger",
+"g.wu.whale.aboard":"🐋 {name} carries you {to}.",
+"g.wu.whale.down":"down to the valley",
+"g.wu.whale.up":"to the next Sky Isle",
+"g.wu.whale.bye":"🐋 {name} sings farewell and rises back into the sky.",
+"g.wu.whale.seen":"🐋 A Cloudsinger drifts over the Sky Isles: {name}.",
+"g.wu.tree.sit":"Sit under the Wandering Tree",
+"g.wu.tree.seed":"🌳 A lantern seed drops into your hand.",
+"g.wu.tree.rest":"🌳 The Wandering Tree rustles softly above you.",
+"g.wu.tree.seen":"🌳 There stands the Wandering Tree {name}!",
+"g.wu.tree.ring":"A ring of blossoms — the Wandering Tree stood here.",
+"g.wu.deer.seen":"🦌 A Lantern Stag steps out of the dark …",
+"g.wu.deer.follow":"Follow it quietly — don't run.",
+"g.wu.deer.gone":"🦌 The Lantern Stag vanishes in a swirl of Flausel light.",
+"g.wu.deer.path":"🦌 The stag led you here. The way is called “{path}” now.",
+"g.wu.book":"Wonder creatures",
+"g.wu.book.note":"Rare, large, gentle. Villages talk about whoever meets them.",
+"g.wu.book.whale":"🐋 {name}: comes to the Sky Isles every other evening — {when}.",
+"g.wu.book.next":"tonight",
+"g.wu.book.next2":"tomorrow evening",
+"g.wu.book.tree":"🌳 {name}: last seen {in} ({when}).",
+"g.wu.book.deer":"🦌 Lantern Stag: {n} paths found.",
+"g.wu.book.none":"Not seen yet.",
+"g.wu.lead":"People talk of a tree that walks at night. Today it stands not far from here.",
+"g.it.wunder_flute":"Flute",
+"g.it.lantern_seed":"Lantern Seed",
+"g.set.wunder":"Wonder creatures",
+"g.set.wunder.tip":"Cloudsinger, Wandering Tree and Lantern Stag: rare, large and gentle. Very Low: simple shapes.",
+"g.ctx.wunder":"{name}",
+"g.ch.ev.deed.w_whale":"The Cloudsinger {who} was seen {in}.",
+"g.ch.ev.deed.w_ride":"A wanderer flew on the back of the Cloudsinger {who} {in}.",
+"g.ch.ev.deed.w_tree":"The Wandering Tree {who} stood {in} today.",
+"g.ch.ev.deed.w_deer":"A Lantern Stag led a wanderer {in} — since then the way is called “{who}”.",
+"g.ch.ev.deed.w_flute":"A wanderer learnt the Cloudsinger's flute {in}.",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -78514,6 +78835,53 @@ VR.I18N.add('de',{
 "g.ch.away":"📜 Während du fort warst: {ev}",
 "g.set.chronik":"Chronik (lebendige Welt)",
 "g.set.chronik.tip":"Die Welt lebt weiter: Tiere, Pflanzen, Dörfer und Wetter — und eine Chronik erinnert sich. Läuft im Hintergrund.",
+
+
+"g.wu.whale":"Himmelswal",
+"g.wu.tree":"Wanderbaum",
+"g.wu.deer":"Laternenhirsch",
+"g.wu.flute.learn":"Flöte lernen",
+"g.wu.flute.got":"🎶 {name} schenkt dir eine Flöte.",
+"g.wu.flute.lesson":"Hör zu: eins, drei, zwei — so ruft der Himmelswal. Wenn er abends singt, antworte ihm.",
+"g.wu.flute.hint":"🎶 Flöte: Tasten 1 · 2 · 3",
+"g.wu.flute.prompt":"Antworte: 1 · 3 · 2",
+"g.wu.whale.sing":"🐋 Der Himmelswal {name} singt …",
+"g.wu.whale.heard":"🐋 {name} hat dich gehört!",
+"g.wu.whale.come":"{name} sinkt zu dir herab.",
+"g.wu.whale.board":"Auf den Himmelswal steigen",
+"g.wu.whale.aboard":"🐋 {name} trägt dich {to}.",
+"g.wu.whale.down":"hinab ins Tal",
+"g.wu.whale.up":"zur nächsten Himmelsinsel",
+"g.wu.whale.bye":"🐋 {name} singt zum Abschied und steigt zurück in den Himmel.",
+"g.wu.whale.seen":"🐋 Über den Himmelsinseln zieht ein Himmelswal: {name}.",
+"g.wu.tree.sit":"Unter dem Wanderbaum sitzen",
+"g.wu.tree.seed":"🌳 Ein Laternensamen fällt dir in die Hand.",
+"g.wu.tree.rest":"🌳 Der Wanderbaum rauscht leise über dir.",
+"g.wu.tree.seen":"🌳 Da steht der Wanderbaum {name}!",
+"g.wu.tree.ring":"Ein Blütenring — hier stand der Wanderbaum.",
+"g.wu.deer.seen":"🦌 Ein Laternenhirsch tritt aus der Dunkelheit …",
+"g.wu.deer.follow":"Folge ihm leise — renn nicht.",
+"g.wu.deer.gone":"🦌 Der Laternenhirsch verschwindet in einem Wirbel aus Flausellicht.",
+"g.wu.deer.path":"🦌 Der Hirsch hat dich geführt. Der Weg heißt nun „{path}“.",
+"g.wu.book":"Wundertiere",
+"g.wu.book.note":"Selten, groß, sanft. Wer sie trifft, von dem erzählen die Dörfer.",
+"g.wu.book.whale":"🐋 {name}: kommt jeden zweiten Abend zu den Himmelsinseln — {when}.",
+"g.wu.book.next":"heute Abend",
+"g.wu.book.next2":"morgen Abend",
+"g.wu.book.tree":"🌳 {name}: zuletzt gesehen {in} ({when}).",
+"g.wu.book.deer":"🦌 Laternenhirsch: {n} Pfade gefunden.",
+"g.wu.book.none":"Noch nicht gesehen.",
+"g.wu.lead":"Man erzählt sich von einem Baum, der nachts wandert. Heute steht er nicht weit von hier.",
+"g.it.wunder_flute":"Flöte",
+"g.it.lantern_seed":"Laternensamen",
+"g.set.wunder":"Wundertiere",
+"g.set.wunder.tip":"Himmelswal, Wanderbaum und Laternenhirsch: selten, groß und sanft. Sehr niedrig: einfache Formen.",
+"g.ctx.wunder":"{name}",
+"g.ch.ev.deed.w_whale":"Der Himmelswal {who} wurde {in} gesehen.",
+"g.ch.ev.deed.w_ride":"Ein Wanderer flog {in} auf dem Rücken des Himmelswals {who}.",
+"g.ch.ev.deed.w_tree":"Der Wanderbaum {who} stand heute {in}.",
+"g.ch.ev.deed.w_deer":"Ein Laternenhirsch führte einen Wanderer {in} — seitdem heißt der Weg „{who}“.",
+"g.ch.ev.deed.w_flute":"Ein Wanderer lernte {in} die Flöte des Himmelswals.",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));

@@ -3826,6 +3826,37 @@ S.sunscreen=()=>{const img=sprite();rect(img,5,5,10,14,(x,y)=>x===5?shade(0xF0C0
 
 
 
+(function(VR){
+'use strict';
+const T=VR.TEXITEM;if(!T)return;
+const{px,poly,circ,lineP,outline,sprite,shade,lighten,C}=T;
+const S=VR.ITEM_SPRITES;
+S.wunder_flute=()=>{
+const img=sprite(),wood=C(0xc8925a),dark=C(0x7a4e2a);
+
+for(let i=0;i<=11;i++){px(img,2+i,13-i,i%4===0?shade(wood,0.85):wood);px(img,3+i,13-i,lighten(wood,0.25));px(img,2+i,14-i,shade(wood,0.7));}
+px(img,13,2,dark);px(img,14,2,dark);px(img,1,14,dark);
+for(const k of[4,6,8])px(img,2+k,13-k,dark);
+lineP(img,4,12,3,15,C(0x3a7ad8));px(img,2,15,C(0x9ad8ff));
+outline(img);
+return img;
+};
+S.lantern_seed=()=>{
+const img=sprite(),husk=C(0xf2e2b8);
+poly(img,[[8,2],[12,6],[12,11],[8,15],[4,11],[4,6]],(x,y)=>(x===4||x===11?shade(husk,0.8):(y%3===0?shade(husk,0.92):husk)));
+circ(img,8,9,2.6,(x,y,d)=>(d<0.5?C(0xfff4c0):C(0xffb54a)),1);
+lineP(img,8,0,8,2,C(0x6a8a3a));
+outline(img);
+return img;
+};
+})(VR);
+
+
+
+
+
+
+
 
 (function(VR){
 'use strict';
@@ -53037,6 +53068,249 @@ return st;
 }catch(e){return null;}
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const WU=VR.Wunder=VR.Wunder||{};
+const TAU=Math.PI*2;
+const h01=WU.h01=(a,b,c)=>{let h=Math.imul((a|0)^0x51ed27,0x297a2d39)^Math.imul((b|0)+0x632be5ab,0x85ebca6b)^Math.imul((c|0)+0x1b873593,0xc2b2ae35);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;return(h>>>0)/4294967296;};
+const sm=(u)=>(u<=0?0:u>=1?1:u*u*(3-2*u));
+const DAY=24000;
+
+
+WU.GAP=2;
+WU.canEvent=(st,kind,day)=>{const e=st&&st.ev;const l=e?e[kind]:undefined;return l===undefined||(day|0)-l>=WU.GAP;};
+WU.markEvent=(st,kind,day)=>{(st.ev||(st.ev={}))[kind]=day|0;};
+
+
+
+
+
+WU.WHALE={len:34,speed:4.2,from:9000,dur:13200,arr:1800,alt:30,far:720,period:7.5,songFrom:11400,songTo:13600,songEvery:900,songLen:6,window:14,hear:170};
+
+WU.whaleVisit=(seed,day)=>(((day|0)+(seed&1))&1)===0;
+WU.isleCentre=(isles)=>{let x=0,z=0;for(const I of isles){x+=I.x;z+=I.z;}return isles.length?[x/isles.length,z/isles.length]:[330,140];};
+const topOf=(I)=>I.y+(I.dome||4);
+
+
+
+WU.whaleRoute=function(seed,isles){
+const W=WU.WHALE,L0=isles&&isles.length?isles.slice():[{x:330,z:140,y:158,r:42,dome:4}];
+const C=WU.isleCentre(L0);
+L0.sort((a,b)=>Math.atan2(a.z-C[1],a.x-C[0])-Math.atan2(b.z-C[1],b.x-C[0]));
+const k0=Math.floor(h01(seed,3,0x7e)*L0.length),order=L0.map((_,i)=>L0[(i+k0)%L0.length]);
+const pts=[],SEG=22;
+for(let i=0;i<order.length;i++){
+const A=order[i],B=order[(i+1)%order.length];
+const a=[A.x,topOf(A)+W.alt,A.z],b=[B.x,topOf(B)+W.alt,B.z];
+const dx=b[0]-a[0],dz=b[2]-a[2],d=Math.hypot(dx,dz)||1,side=(i&1? -1:1)*(0.28+0.12*h01(seed,i,0x51));
+const m=[(a[0]+b[0])/2-dz/d*d*side,Math.max(a[1],b[1])+10,(a[2]+b[2])/2+dx/d*d*side];
+for(let k=0;k<SEG;k++){const t=k/SEG,u=1-t;pts.push([u*u*a[0]+2*u*t*m[0]+t*t*b[0],u*u*a[1]+2*u*t*m[1]+t*t*b[1],u*u*a[2]+2*u*t*m[2]+t*t*b[2]]);}
+}
+const N=pts.length;
+const lift=()=>{for(const q of pts)for(const I of L0)if(Math.hypot(q[0]-I.x,q[2]-I.z)<I.r*1.45)q[1]=Math.max(q[1],topOf(I)+24);};
+lift();
+for(let it=0;it<3;it++){const cp=pts.map(q=>q.slice());for(let k=0;k<N;k++){const a=cp[(k+N-1)%N],b=cp[(k+1)%N],q=pts[k];for(let j=0;j<3;j++)q[j]=q[j]*0.5+(a[j]+b[j])*0.25;}}
+lift();
+const s=[0];
+for(let k=1;k<=N;k++){const a=pts[k-1],b=pts[k%N];s.push(s[k-1]+Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2]));}
+return{pts,s,L:s[N],N,C};
+};
+const cr=(a,b,c,d,t)=>{const t2=t*t,t3=t2*t;return 0.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);};
+const at3=(loop,s,o)=>{
+const N=loop.N,L=loop.L,S=loop.s,P=loop.pts;
+s=((s%L)+L)%L;
+let lo=0,hi=N;
+while(hi-lo>1){const m=(lo+hi)>>1;if(S[m]<=s)lo=m;else hi=m;}
+const t=(s-S[lo])/((S[lo+1]-S[lo])||1e-6);
+const a=P[(lo+N-1)%N],b=P[lo%N],c=P[(lo+1)%N],d=P[(lo+2)%N];
+o[0]=cr(a[0],b[0],c[0],d[0],t);o[1]=cr(a[1],b[1],c[1],d[1],t);o[2]=cr(a[2],b[2],c[2],d[2],t);
+return o;
+};
+const Q0=[0,0,0],Q1=[0,0,0];
+
+WU.routeAt=function(loop,s,out){
+at3(loop,s,out);at3(loop,s-3,Q0);at3(loop,s+3,Q1);
+const dx=Q1[0]-Q0[0],dy=Q1[1]-Q0[1],dz=Q1[2]-Q0[2],hl=Math.hypot(dx,dz)||1e-6;
+out[3]=Math.atan2(-dx,-dz);out[4]=Math.atan2(dy,hl);
+at3(loop,s+8,Q1);at3(loop,s-8,Q0);
+const h0=Math.atan2(out[2]-Q0[2],out[0]-Q0[0]),h1=Math.atan2(Q1[2]-out[2],Q1[0]-out[0]);
+let dh=h1-h0;if(dh>Math.PI)dh-=TAU;else if(dh< -Math.PI)dh+=TAU;
+out[5]=dh/8;
+return out;
+};
+
+
+const R0=[0,0,0,0,0,0];
+const posAt=(seed,loop,T,o)=>{
+const W=WU.WHALE,d=Math.floor((T-W.from)/DAY),u=T-(d*DAY+W.from);
+if(!WU.whaleVisit(seed,d)||u<0||u>=W.dur)return 0;
+const s=u/20*W.speed+h01(seed,d,0x3a)*loop.L;
+WU.routeAt(loop,s,R0);
+const k=sm(u/W.arr)*sm((W.dur-u)/W.arr),C=loop.C;
+let ox=R0[0]-C[0],oz=R0[2]-C[1];const ol=Math.hypot(ox,oz)||1;ox/=ol;oz/=ol;
+const far=(1-k)*W.far;
+o[0]=R0[0]+ox*far;o[1]=R0[1]+(1-k)*70;o[2]=R0[2]+oz*far;o[5]=R0[5]*k;o[8]=k;o[9]=s;
+return 1;
+};
+const P2=new Float32Array(10);
+WU.whaleAt=function(seed,loop,T,out){
+out=out||new Float32Array(10);
+if(!posAt(seed,loop,T,out)){out[7]=0;out[8]=0;return out;}
+if(posAt(seed,loop,T+10,P2)){
+const dx=P2[0]-out[0],dy=P2[1]-out[1],dz=P2[2]-out[2],hl=Math.hypot(dx,dz)||1e-6;
+out[3]=Math.atan2(-dx,-dz);out[4]=Math.max(-0.35,Math.min(0.35,Math.atan2(dy,hl)));
+}
+out[5]=Math.max(-0.4,Math.min(0.4,-out[5]*30));
+out[6]=(T/20)*TAU/WU.WHALE.period;
+out[7]=1;
+return out;
+};
+
+WU.songAt=function(seed,T){
+const W=WU.WHALE,d=Math.floor(T/DAY),tod=T-d*DAY;
+if(!WU.whaleVisit(seed,d)||tod<W.songFrom)return null;
+const k=Math.floor((tod-W.songFrom)/W.songEvery),t0=d*DAY+W.songFrom+k*W.songEvery;
+if(W.songFrom+k*W.songEvery>=W.songTo){const kl=Math.floor((W.songTo-W.songFrom-1)/W.songEvery),e=d*DAY+W.songFrom+kl*W.songEvery+W.songLen*20;return T<=e+W.window*20?{k:kl,t0:e-W.songLen*20,end:e,sing:false}:null;}
+const end=t0+W.songLen*20;
+return{k,t0,end,sing:T<end};
+};
+
+
+WU.MOTIF=[1,3,2];
+WU.NOTES={1:72,2:79,3:81};
+
+WU.answered=function(presses,songEnd){
+const W=WU.WHALE,M=WU.MOTIF,L=[];
+for(const p of presses||[])if(p.T>=songEnd-20&&p.T<=songEnd+W.window*20)L.push(p.k);
+for(let i=0;i+M.length<=L.length;i++){let ok=true;for(let j=0;j<M.length;j++)if(L[i+j]!==M[j]){ok=false;break;}if(ok)return true;}
+return false;
+};
+WU.hears=(d)=>d<=WU.WHALE.hear;
+
+
+
+
+WU.TREE={v:5/60,stopR:12,vilMargin:30,night0:13200,night1:22800,min:25,max:45,crown:13};
+WU.isNight=(tod)=>tod>=WU.TREE.night0&&tod<WU.TREE.night1;
+WU.treeTarget=function(seed,day,from,ok){
+const T=WU.TREE;
+for(let k=0;k<16;k++){
+const a=h01(seed,day*31+k,0x7a)*TAU,r=T.min+(T.max-T.min)*h01(seed,day*31+k,0x7b);
+const x=Math.round((from[0]+Math.cos(a)*r)*10)/10,z=Math.round((from[1]+Math.sin(a)*r)*10)/10;
+if(ok(x,z))return[x,z];
+}
+return null;
+};
+WU.inVillage=(x,z,vils,margin)=>{for(const v of vils||[])if(Math.hypot(x-v[0],z-v[1])<v[2]+(margin||0))return true;return false;};
+
+
+WU.treeStep=function(tr,dt,ctx){
+const T=WU.TREE,pl=ctx.players||[];
+if(!ctx.night||tr.tx===null||tr.tx===undefined){tr.walking=false;return null;}
+for(const p of pl)if(Math.hypot(p[0]-tr.x,p[1]-tr.z)<T.stopR){tr.walking=false;return null;}
+const dx=tr.tx-tr.x,dz=tr.tz-tr.z,d=Math.hypot(dx,dz);
+if(d<0.05){tr.x=tr.tx;tr.z=tr.tz;tr.tx=null;tr.walking=false;tr.stood=true;return{k:'arrive',x:tr.x,z:tr.z};}
+const st=Math.min(d,T.v*dt),nx=tr.x+dx/d*st,nz=tr.z+dz/d*st;
+if(WU.inVillage(nx,nz,ctx.vils,T.vilMargin)){tr.tx=null;tr.walking=false;return{k:'blocked',x:tr.x,z:tr.z};}
+for(const p of pl)if(Math.hypot(p[0]-nx,p[1]-nz)<T.stopR){tr.walking=false;return null;}
+let ev=null;
+if(tr.stood){ev={k:'ring',x:tr.x,z:tr.z};tr.stood=false;}
+tr.x=nx;tr.z=nz;tr.walking=true;tr.yaw=Math.atan2(-dx,-dz);
+return ev;
+};
+WU.ringSpots=function(x,z,seed){
+const out=[],n=14;
+for(let i=0;i<n;i++){const a=(i+0.35*(h01(seed,i,0x21)-0.5))/n*TAU,r=3.2+1.1*h01(seed,i,0x22);out.push([x+Math.cos(a)*r,z+Math.sin(a)*r]);}
+return out;
+};
+WU.seedToday=(st,day)=> !st||st.seedDay!==(day|0);
+
+
+WU.DEER={still:10,vilFar:110,dark:0.6,near:3,run:5.2,wait:24,ahead0:9,ahead1:14,pace:2.2,arrive:7,maxD:650,minD:25};
+WU.deerMay=(c)=>(c.night||0)>=WU.DEER.dark&&(c.stillFor||0)>=WU.DEER.still&&(c.vilDist===undefined?1e9:c.vilDist)>=WU.DEER.vilFar&&WU.canEvent(c.st,'deer',c.day);
+WU.deerPick=function(spots,seen,px,pz){
+let best=null,bd=1e9;
+for(const q of spots||[]){if(seen&&seen[q.id])continue;const d=Math.hypot(q.x-px,q.z-pz);if(d<WU.DEER.minD||d>WU.DEER.maxD)continue;if(d<bd){bd=d;best=q;}}
+return best;
+};
+
+WU.deerStep=function(d,dt,c){
+const D=WU.DEER,dp=Math.hypot(c.px-d.x,c.pz-d.z);
+if((c.speed||0)>D.run||dp<D.near)return'vanish';
+const dx=d.tx-d.x,dz=d.tz-d.z,dt2=Math.hypot(dx,dz);
+if(dt2<D.arrive&&dp<22)return'arrive';
+d.walking=false;
+if(dp>D.wait||dt2<0.5)return null;
+const spd=dp<D.ahead0?D.pace*1.4:dp>D.ahead1?D.pace*0.35:D.pace;
+const st=Math.min(dt2,spd*dt);
+d.x+=dx/dt2*st;d.z+=dz/dt2*st;d.yaw=Math.atan2(-dx,-dz);d.walking=true;
+return null;
+};
+const PATH={de:[['Laternen','Glimm','Hirsch','Schimmer','Mondlicht','Leucht','Silber','Sternen'],['pfad','weg','steig','spur']],
+en:[['Lantern','Glimmer','Stag','Shimmer','Moonlight','Glow','Silver','Star'],[' Path',' Way',' Trail',' Track']]};
+WU.pathName=function(seed,lang){
+const P=PATH[lang==='en'?'en':'de'],a=Math.floor(h01(seed,1,0x91)*P[0].length),b=Math.floor(h01(seed,2,0x92)*P[1].length);
+return P[0][a]+P[1][b];
+};
+
+
+
+const PEOPLE={whale:'aqua',tree:'basalt',deer:'flausel'};
+WU.nameOf=function(kind,seed){
+const N=VR.Names;if(!N)return kind;
+for(let k=0;k<40;k++){
+const w=kind==='deer'&&N.flausel?N.flausel(seed,k):N.word(PEOPLE[kind]||'aqua',(seed|0)*31+k*7919+(kind==='tree'?17:kind==='deer'?29:0),'elder');
+if(w&&w.length>=3&&w.length<=12&& !N.blocked(w)&& !N.reserved(w))return w;
+}
+return kind==='whale'?'Limar':kind==='tree'?'Romo':'Lichtel';
+};
+
+
+const C=VR.Chronik;
+WU.DEEDS={w_whale:6,w_ride:8,w_tree:5,w_deer:7,w_flute:4};
+WU.ICON={w_whale:'🐋',w_ride:'🐋',w_tree:'🌳',w_deer:'🦌',w_flute:'🎶'};
+if(C&&C.DEEDS&& !C.DEEDS.w_whale){
+Object.assign(C.DEEDS,WU.DEEDS);
+for(const k in WU.DEEDS)if(C.KEYS&&C.KEYS.indexOf('g.ch.ev.deed.'+k)<0)C.KEYS.push('g.ch.ev.deed.'+k);
+const oi=C.icon;
+if(oi)C.icon=(e)=>(e&&e.k==='deed'&&e.v&&WU.ICON[e.v.dk]?WU.ICON[e.v.dk]:oi(e));
+}
+
+
+
+if(VR.defItem&&VR.ITEMS&& !VR.ITEMS.wunder_flute){
+VR.defItem('wunder_flute',{cat:'tools',stack:1,use:'flute',name:'Flute'});
+VR.defItem('lantern_seed',{cat:'items',stack:16,light:9,name:'Lantern Seed'});
+}
+
+
+WU.KEYS=['g.wu.whale','g.wu.tree','g.wu.deer','g.wu.flute.learn','g.wu.flute.got','g.wu.flute.lesson','g.wu.flute.hint','g.wu.flute.prompt',
+'g.wu.whale.sing','g.wu.whale.heard','g.wu.whale.come','g.wu.whale.board','g.wu.whale.aboard','g.wu.whale.down','g.wu.whale.up','g.wu.whale.bye','g.wu.whale.seen',
+'g.wu.tree.sit','g.wu.tree.seed','g.wu.tree.rest','g.wu.tree.seen','g.wu.tree.ring','g.wu.deer.seen','g.wu.deer.gone','g.wu.deer.path','g.wu.deer.follow',
+'g.wu.book','g.wu.book.note','g.wu.book.whale','g.wu.book.tree','g.wu.book.deer','g.wu.book.none','g.wu.book.next','g.wu.book.next2','g.wu.lead','g.it.wunder_flute','g.it.lantern_seed',
+'g.set.wunder','g.set.wunder.tip','g.ctx.wunder'];
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 </script>
 <script>
 
@@ -55689,6 +55963,37 @@ S.sunscreen=()=>{const img=sprite();rect(img,5,5,10,14,(x,y)=>x===5?shade(0xF0C0
 
 
 
+(function(VR){
+'use strict';
+const T=VR.TEXITEM;if(!T)return;
+const{px,poly,circ,lineP,outline,sprite,shade,lighten,C}=T;
+const S=VR.ITEM_SPRITES;
+S.wunder_flute=()=>{
+const img=sprite(),wood=C(0xc8925a),dark=C(0x7a4e2a);
+
+for(let i=0;i<=11;i++){px(img,2+i,13-i,i%4===0?shade(wood,0.85):wood);px(img,3+i,13-i,lighten(wood,0.25));px(img,2+i,14-i,shade(wood,0.7));}
+px(img,13,2,dark);px(img,14,2,dark);px(img,1,14,dark);
+for(const k of[4,6,8])px(img,2+k,13-k,dark);
+lineP(img,4,12,3,15,C(0x3a7ad8));px(img,2,15,C(0x9ad8ff));
+outline(img);
+return img;
+};
+S.lantern_seed=()=>{
+const img=sprite(),husk=C(0xf2e2b8);
+poly(img,[[8,2],[12,6],[12,11],[8,15],[4,11],[4,6]],(x,y)=>(x===4||x===11?shade(husk,0.8):(y%3===0?shade(husk,0.92):husk)));
+circ(img,8,9,2.6,(x,y,d)=>(d<0.5?C(0xfff4c0):C(0xffb54a)),1);
+lineP(img,8,0,8,2,C(0x6a8a3a));
+outline(img);
+return img;
+};
+})(VR);
+
+
+
+
+
+
+
 
 (function(VR){
 'use strict';
@@ -56022,7 +56327,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="8ef9afb7ac735720";
+VR.TEX_SRC_HASH="1dcf57f9498e986b";
 
 
 
@@ -61014,6 +61319,53 @@ VR.I18N.add('en',{
 "g.set.chronik":"Chronicle (living world)",
 "g.set.chronik.tip":"The world lives on: animals, plants, villages and weather — and a chronicle remembers. Runs in the background.",
 
+
+"g.wu.whale":"Cloudsinger",
+"g.wu.tree":"Wandering Tree",
+"g.wu.deer":"Lantern Stag",
+"g.wu.flute.learn":"Learn the flute",
+"g.wu.flute.got":"🎶 {name} gives you a flute.",
+"g.wu.flute.lesson":"Listen: one, three, two — that is the Cloudsinger's call. When it sings at dusk, answer it.",
+"g.wu.flute.hint":"🎶 Flute: keys 1 · 2 · 3",
+"g.wu.flute.prompt":"Answer: 1 · 3 · 2",
+"g.wu.whale.sing":"🐋 The Cloudsinger {name} is singing …",
+"g.wu.whale.heard":"🐋 {name} heard you!",
+"g.wu.whale.come":"{name} glides down to you.",
+"g.wu.whale.board":"Climb onto the Cloudsinger",
+"g.wu.whale.aboard":"🐋 {name} carries you {to}.",
+"g.wu.whale.down":"down to the valley",
+"g.wu.whale.up":"to the next Sky Isle",
+"g.wu.whale.bye":"🐋 {name} sings farewell and rises back into the sky.",
+"g.wu.whale.seen":"🐋 A Cloudsinger drifts over the Sky Isles: {name}.",
+"g.wu.tree.sit":"Sit under the Wandering Tree",
+"g.wu.tree.seed":"🌳 A lantern seed drops into your hand.",
+"g.wu.tree.rest":"🌳 The Wandering Tree rustles softly above you.",
+"g.wu.tree.seen":"🌳 There stands the Wandering Tree {name}!",
+"g.wu.tree.ring":"A ring of blossoms — the Wandering Tree stood here.",
+"g.wu.deer.seen":"🦌 A Lantern Stag steps out of the dark …",
+"g.wu.deer.follow":"Follow it quietly — don't run.",
+"g.wu.deer.gone":"🦌 The Lantern Stag vanishes in a swirl of Flausel light.",
+"g.wu.deer.path":"🦌 The stag led you here. The way is called “{path}” now.",
+"g.wu.book":"Wonder creatures",
+"g.wu.book.note":"Rare, large, gentle. Villages talk about whoever meets them.",
+"g.wu.book.whale":"🐋 {name}: comes to the Sky Isles every other evening — {when}.",
+"g.wu.book.next":"tonight",
+"g.wu.book.next2":"tomorrow evening",
+"g.wu.book.tree":"🌳 {name}: last seen {in} ({when}).",
+"g.wu.book.deer":"🦌 Lantern Stag: {n} paths found.",
+"g.wu.book.none":"Not seen yet.",
+"g.wu.lead":"People talk of a tree that walks at night. Today it stands not far from here.",
+"g.it.wunder_flute":"Flute",
+"g.it.lantern_seed":"Lantern Seed",
+"g.set.wunder":"Wonder creatures",
+"g.set.wunder.tip":"Cloudsinger, Wandering Tree and Lantern Stag: rare, large and gentle. Very Low: simple shapes.",
+"g.ctx.wunder":"{name}",
+"g.ch.ev.deed.w_whale":"The Cloudsinger {who} was seen {in}.",
+"g.ch.ev.deed.w_ride":"A wanderer flew on the back of the Cloudsinger {who} {in}.",
+"g.ch.ev.deed.w_tree":"The Wandering Tree {who} stood {in} today.",
+"g.ch.ev.deed.w_deer":"A Lantern Stag led a wanderer {in} — since then the way is called “{who}”.",
+"g.ch.ev.deed.w_flute":"A wanderer learnt the Cloudsinger's flute {in}.",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -65886,6 +66238,53 @@ VR.I18N.add('de',{
 "g.ch.away":"📜 Während du fort warst: {ev}",
 "g.set.chronik":"Chronik (lebendige Welt)",
 "g.set.chronik.tip":"Die Welt lebt weiter: Tiere, Pflanzen, Dörfer und Wetter — und eine Chronik erinnert sich. Läuft im Hintergrund.",
+
+
+"g.wu.whale":"Himmelswal",
+"g.wu.tree":"Wanderbaum",
+"g.wu.deer":"Laternenhirsch",
+"g.wu.flute.learn":"Flöte lernen",
+"g.wu.flute.got":"🎶 {name} schenkt dir eine Flöte.",
+"g.wu.flute.lesson":"Hör zu: eins, drei, zwei — so ruft der Himmelswal. Wenn er abends singt, antworte ihm.",
+"g.wu.flute.hint":"🎶 Flöte: Tasten 1 · 2 · 3",
+"g.wu.flute.prompt":"Antworte: 1 · 3 · 2",
+"g.wu.whale.sing":"🐋 Der Himmelswal {name} singt …",
+"g.wu.whale.heard":"🐋 {name} hat dich gehört!",
+"g.wu.whale.come":"{name} sinkt zu dir herab.",
+"g.wu.whale.board":"Auf den Himmelswal steigen",
+"g.wu.whale.aboard":"🐋 {name} trägt dich {to}.",
+"g.wu.whale.down":"hinab ins Tal",
+"g.wu.whale.up":"zur nächsten Himmelsinsel",
+"g.wu.whale.bye":"🐋 {name} singt zum Abschied und steigt zurück in den Himmel.",
+"g.wu.whale.seen":"🐋 Über den Himmelsinseln zieht ein Himmelswal: {name}.",
+"g.wu.tree.sit":"Unter dem Wanderbaum sitzen",
+"g.wu.tree.seed":"🌳 Ein Laternensamen fällt dir in die Hand.",
+"g.wu.tree.rest":"🌳 Der Wanderbaum rauscht leise über dir.",
+"g.wu.tree.seen":"🌳 Da steht der Wanderbaum {name}!",
+"g.wu.tree.ring":"Ein Blütenring — hier stand der Wanderbaum.",
+"g.wu.deer.seen":"🦌 Ein Laternenhirsch tritt aus der Dunkelheit …",
+"g.wu.deer.follow":"Folge ihm leise — renn nicht.",
+"g.wu.deer.gone":"🦌 Der Laternenhirsch verschwindet in einem Wirbel aus Flausellicht.",
+"g.wu.deer.path":"🦌 Der Hirsch hat dich geführt. Der Weg heißt nun „{path}“.",
+"g.wu.book":"Wundertiere",
+"g.wu.book.note":"Selten, groß, sanft. Wer sie trifft, von dem erzählen die Dörfer.",
+"g.wu.book.whale":"🐋 {name}: kommt jeden zweiten Abend zu den Himmelsinseln — {when}.",
+"g.wu.book.next":"heute Abend",
+"g.wu.book.next2":"morgen Abend",
+"g.wu.book.tree":"🌳 {name}: zuletzt gesehen {in} ({when}).",
+"g.wu.book.deer":"🦌 Laternenhirsch: {n} Pfade gefunden.",
+"g.wu.book.none":"Noch nicht gesehen.",
+"g.wu.lead":"Man erzählt sich von einem Baum, der nachts wandert. Heute steht er nicht weit von hier.",
+"g.it.wunder_flute":"Flöte",
+"g.it.lantern_seed":"Laternensamen",
+"g.set.wunder":"Wundertiere",
+"g.set.wunder.tip":"Himmelswal, Wanderbaum und Laternenhirsch: selten, groß und sanft. Sehr niedrig: einfache Formen.",
+"g.ctx.wunder":"{name}",
+"g.ch.ev.deed.w_whale":"Der Himmelswal {who} wurde {in} gesehen.",
+"g.ch.ev.deed.w_ride":"Ein Wanderer flog {in} auf dem Rücken des Himmelswals {who}.",
+"g.ch.ev.deed.w_tree":"Der Wanderbaum {who} stand heute {in}.",
+"g.ch.ev.deed.w_deer":"Ein Laternenhirsch führte einen Wanderer {in} — seitdem heißt der Weg „{who}“.",
+"g.ch.ev.deed.w_flute":"Ein Wanderer lernte {in} die Flöte des Himmelswals.",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
@@ -112944,7 +113343,7 @@ col += lc * pow(max(dot(reflect(-L, n), V), 0.0), 18.0) * v_l.z * outdoor;
 
 if (u_mode == 1) col += alb * v_l.y * 2.2 * step(0.45, max(alb.r, max(alb.g, alb.b))) * (0.35 + 0.65 * outdoor);
 
-else col = mix(col, mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));
+else col = mix(col, (v_l.w > 1.5 ? vec3(1.0, 0.7, 0.34) : mix(vec3(0.35, 0.95, 1.0), vec3(0.85, 0.55, 1.0), v_l.w)) * 1.6, clamp(v_em * v_l.y, 0.0, 1.0));
 col = applyFog(col, v_rel * u_fogK, length(v_rel) * u_fogK);
 if (u_mode == 2) col = skyFloor(col, v_rel);
 o = vec4(col, 1.0);
@@ -116101,6 +116500,7 @@ const LABELS=C.LABELS={
 'g.ctx.travel':['Reise {to} · {d}','Travel {to} · {d}'],
 'g.ctx.funke':['Funke fragen','Ask Funke'],
 'g.ctx.ferry':['Fähre nehmen','Take the ferry'],
+'g.ctx.wunder':['{name}','{name}'],
 'g.ctx.home':['Heimkehr …','Going home …'],
 'g.ctx.toPlace':['nach {name}','to {name}'],
 'g.ctx.toWonder':['zum Wunder {name}','to the wonder {name}'],
@@ -116134,6 +116534,7 @@ beacon:['g.ctx.fast','beacon','⚡'],machine:['g.ctx.calm','calm','🕊'],shop:[
 bench:['g.ctx.view','vista','🌄'],pet:['g.ctx.pet','pet','🐾'],seat:['g.ctx.sit','use','🪑'],
 ferry:['g.ctx.ferry','ferry','⛴'],
 fairy:['g.ctx.fairy','fairy','✨'],
+wunder:['g.ctx.wunder','fairy','🌟'],
 };
 
 C.resolve=function(c){
@@ -120869,6 +121270,7 @@ if(VR.MoveIn&&VR.MoveIn.cam){const mc=VR.MoveIn.cam(this,cam);if(mc)cam=mc;}
 if(VR.TaleEnd&&VR.TaleEnd.cur){const te=VR.TaleEnd.cam(this,cam);if(te)cam=te;}
 if(VR.Liberate&&VR.Liberate.mcam){const lc=VR.Liberate.cam(this,cam);if(lc)cam=lc;}
 if(VR.Ferries&&VR.Ferries.camOn){const fc=VR.Ferries.cam(this,cam);if(fc)cam=fc;}
+if(VR.WunderGame&&VR.WunderGame.camOn){const wc=VR.WunderGame.cam(this,cam);if(wc)cam=wc;}
 if(VR.StoryPlay&&VR.StoryPlay.holds(this)){const sc=VR.StoryPlay.cam(this,cam);if(sc)cam=sc;}
 if(this.photoCam&&this.photoCam.on){const pc=this.photoCam.cam(cam);if(pc)cam=pc;}
 if(VR.Natives&&VR.Natives.cam){const nc=VR.Natives.cam(this,cam,dt);if(nc)cam=nc;}
@@ -161684,6 +162086,827 @@ glowsNext.push([q.p[0],q.p[1],q.p[2],q.col[0]*k,q.col[1]*k,q.col[2]*k,Math.max(5
 return sgDraw0.apply(this,arguments);
 };
 }
+})(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const WM=VR.WunderModels=VR.WunderModels||{};
+const TAU=Math.PI*2;
+const lin=(c)=>c.map(v=>Math.pow(v,2.2));
+const mix3=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const ss=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
+const hh=(a,b)=>{let h=Math.imul(a^0x2c1b3c6d,0x297a2d39)^Math.imul(b+0x632be5ab,0x85ebca6b);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>13;return(h>>>0)/4294967296;};
+
+
+function B(){this.v=[];}
+B.prototype.vert=function(p,n,c,w,em){this.v.push(p[0],p[1],p[2],n[0],n[1],n[2],c[0],c[1],c[2],w||0,em||0);};
+
+
+B.prototype.grid=function(NI,NJ,wrapJ,f){
+const P=[],Nn=[];
+for(let i=0;i<=NI;i++){P.push([]);Nn.push([]);for(let j=0;j<=NJ;j++){P[i].push(wrapJ&&j===NJ?P[i][0]:f(i,j));Nn[i].push(wrapJ&&j===NJ?Nn[i][0]:[0,0,0]);}}
+const tris=[];
+const face=(a,b,c)=>{const ux=b.p[0]-a.p[0],uy=b.p[1]-a.p[1],uz=b.p[2]-a.p[2],vx=c.p[0]-a.p[0],vy=c.p[1]-a.p[1],vz=c.p[2]-a.p[2];return[uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx];};
+for(let i=0;i<NI;i++)for(let j=0;j<NJ;j++){
+for(const T of[[[i,j],[i+1,j],[i+1,j+1]],[[i,j],[i+1,j+1],[i,j+1]]]){
+const fn=face(P[T[0][0]][T[0][1]],P[T[1][0]][T[1][1]],P[T[2][0]][T[2][1]]);
+for(const[a,b]of T){const n=Nn[a][b];n[0]+=fn[0];n[1]+=fn[1];n[2]+=fn[2];}
+tris.push(T);
+}
+}
+for(const T of tris)for(const[a,b]of T){const q=P[a][b],n=Nn[a][b],l=Math.hypot(n[0],n[1],n[2])||1;this.vert(q.p,[n[0]/l,n[1]/l,n[2]/l],q.c,q.w,q.em);}
+};
+
+B.prototype.ell=function(c,r,col,w,NI,NJ,bump){
+this.grid(NI||10,NJ||14,true,(i,j)=>{
+const th=i/(NI||10)*Math.PI,ph=j/(NJ||14)*TAU,dx=Math.sin(th)*Math.cos(ph),dy=Math.cos(th),dz=Math.sin(th)*Math.sin(ph);
+const k=bump?bump(dx,dy,dz):1,p=[c[0]+dx*r[0]*k,c[1]+dy*r[1]*k,c[2]+dz*r[2]*k],q=col(dx,dy,dz,p);
+return{p,c:q[0],em:q[1]||0,w:typeof w==='function'?w(p):(w||0)};
+});
+};
+
+B.prototype.tube=function(pts,col,w,NJ){
+NJ=NJ||8;
+const n=pts.length-1;
+this.grid(n,NJ,true,(i,j)=>{
+const a=pts[Math.max(0,i-1)],b=pts[Math.min(n,i+1)],q=pts[i];
+let tx=b[0]-a[0],ty=b[1]-a[1],tz=b[2]-a[2];const tl=Math.hypot(tx,ty,tz)||1;tx/=tl;ty/=tl;tz/=tl;
+
+let ux=0,uy=1,uz=0;if(Math.abs(ty)>0.9){ux=1;uy=0;}
+let sx=ty*uz-tz*uy,sy=tz*ux-tx*uz,sz=tx*uy-ty*ux;const sl=Math.hypot(sx,sy,sz)||1;sx/=sl;sy/=sl;sz/=sl;
+const vx=sy*tz-sz*ty,vy=sz*tx-sx*tz,vz=sx*ty-sy*tx;
+const ang=j/NJ*TAU,ca=Math.cos(ang),sa=Math.sin(ang),r=q[3];
+const p=[q[0]+(sx*ca+vx*sa)*r,q[1]+(sy*ca+vy*sa)*r,q[2]+(sz*ca+vz*sa)*r],cc=col(i/n,ang);
+return{p,c:cc[0],em:cc[1]||0,w:typeof w==='function'?w(i/n,p):(w||0)};
+});
+};
+
+
+WM.WHALE={NI:72,NJ:40};
+WM.whaleR=(t)=>(t<0.24?0.115*Math.pow(Math.sin(t/0.24*Math.PI/2),0.6):0.115*Math.pow(Math.cos((t-0.24)/0.76*Math.PI/2),1.1)+0.012*ss(0.6,1,t));
+function whale(){
+const b=new B(),NI=WM.WHALE.NI,NJ=WM.WHALE.NJ;
+const back=lin([0.2,0.29,0.42]),flank=lin([0.42,0.52,0.62]),belly=lin([0.88,0.85,0.76]),freck=lin([0.62,0.72,0.82]),groove=lin([0.7,0.66,0.6]),eye=lin([0.04,0.05,0.08]);
+b.grid(NI,NJ,true,(i,j)=>{
+const t=i/NI,a=j/NJ*TAU,r=WM.whaleR(t),up=Math.sin(a),cs=Math.cos(a);
+const z= -0.5+t*0.86,ry=up<0?1.0:0.82-0.12*ss(0.1,0.0,Math.abs(t-0.12));
+const p=[cs*r*1.1,up*r*ry-0.012*Math.sin(t*Math.PI),z];
+let c=up>0.15?mix3(flank,back,ss(0.15,0.6,up)):mix3(belly,flank,ss(-0.55,0.15,up)),em=0;
+if(up>0.35&&hh(i*7+3,j*13+1)>0.9&&t>0.08&&t<0.8)c=freck;
+
+if(up< -0.55&&t>0.06&&t<0.46&&(j%3===0)){c=groove;em=0.3;}
+
+
+const k=Math.round((t-0.16)/0.05),ds=Math.hypot((t-0.16-k*0.05)*7,(up+0.4)*1.4);
+if(k>=0&&k<12&&ds<0.16){const q=1-ds/0.16;c=mix3(c,lin([1.0,0.86,0.6]),q);em=Math.max(em,q);}
+if(Math.abs(t-0.13)<0.012&&Math.abs(cs)>0.86&&up> -0.05&&up<0.3)c=eye;
+return{p,c,w:0,em};
+});
+
+const finTop=lin([0.22,0.31,0.44]),finBot=lin([0.85,0.83,0.76]);
+for(const sd of[1,-1])for(const top of[true,false]){
+b.grid(10,6,false,(i,j)=>{
+const u=i/10,v=j/6,x0=0.085,span=0.24;
+const le= -0.3+0.12*Math.pow(u,1.3),te= -0.2+0.08*u,round=Math.sqrt(Math.max(0,1-Math.pow(u,3)));
+const zc=(le+te)/2,half=(te-le)/2*(0.15+0.85*round),z=zc+(v-0.5)*2*half;
+const th=0.011*(1-u*0.7)*Math.sin(Math.PI*v),y= -0.045-0.05*u+(top?th: -th);
+return{p:[sd*(x0+span*u),y,z],c:top?finTop:finBot,w:u,em:v>0.85&&u>0.2?0.45:0};
+});
+}
+
+for(const sd of[1,-1])for(const top of[true,false]){
+b.grid(10,5,false,(i,j)=>{
+const u=i/10,v=j/5;
+const le=0.34+0.1*Math.pow(u,1.4),te=0.43-0.03*u+0.05*Math.pow(u,3)-0.025*(1-u),z=le+(te-le)*v;
+const th=0.008*(1-u)*Math.sin(Math.PI*v),y= -0.002+(top?th: -th);
+return{p:[sd*(0.006+0.15*u),y,z],c:top?finTop:finBot,w:0.25+0.75*u,em:v>0.8?0.5:0};
+});
+}
+return b.v;
+}
+
+
+WM.TREE={crownY:0.7,crownR:[0.34,0.25,0.34],seeds:12};
+function tree(){
+const b=new B(),T=WM.TREE;
+const bark=lin([0.42,0.34,0.27]),barkD=lin([0.28,0.22,0.18]);
+const pts=[];
+for(let k=0;k<=12;k++){const y=0.02+k/12*0.5;pts.push([0.012*Math.sin(y*13),y,0.01*Math.cos(y*9),0.05-0.024*(y/0.52)+0.03*Math.exp(-y*18)]);}
+b.tube(pts,(t,a)=>[(Math.floor(a/TAU*12)%3===0)?barkD:bark,0],(t)=>t*0.3,12);
+
+for(const sd of[1,-1])b.tube([[0,0.36,0,0.022],[sd*0.1,0.46,0.03,0.016],[sd*0.18,0.55,0.05,0.01]],()=>[bark,0],(t)=>0.2+t*0.4,6);
+
+const BUMPS=[];for(let k=0;k<16;k++){const th=Math.acos(1-2*hh(k,11)),ph=hh(k,12)*TAU;BUMPS.push([Math.sin(th)*Math.cos(ph),Math.cos(th),Math.sin(th)*Math.sin(ph)]);}
+const lump=(dx,dy,dz)=>{let s=0;for(const q of BUMPS)s+=Math.pow(Math.max(0,dx*q[0]+dy*q[1]+dz*q[2]),10);return 0.84+0.3*s-(dy< -0.3?0.14*(-dy-0.3):0);};
+const leaf=lin([0.38,0.56,0.34]),leafT=lin([0.66,0.78,0.48]),leafD=lin([0.24,0.38,0.26]),bloom=lin([0.96,0.82,0.88]);
+b.ell([0,T.crownY,0],T.crownR,(dx,dy,dz,p)=>{
+const h=hh(Math.round(p[0]*300),Math.round(p[2]*300)+Math.round(p[1]*300)*7);
+return[h>0.9?bloom:dy>0.2?mix3(leaf,leafT,ss(0.2,0.9,dy)):mix3(leafD,leaf,ss(-0.7,0.2,dy)),0];
+},(p)=>Math.max(0,(p[1]-0.4)*1.6),14,20,lump);
+
+const lc=lin([1.0,0.85,0.55]);
+for(let k=0;k<T.seeds;k++){
+const a=k/T.seeds*TAU+hh(k,3),r=0.17+0.12*hh(k,4),y=0.5-0.05*hh(k,5);
+b.ell([Math.cos(a)*r,y,Math.sin(a)*r],[0.016,0.022,0.016],()=>[lc,1],()=>0.25,4,6);
+}
+return b.v;
+}
+function root(){
+const b=new B(),bark=lin([0.4,0.32,0.26]);
+b.tube([[0,0.12,0,0.03],[0.04,0.1,0,0.024],[0.08,0.085,0,0.019],[0.115,0.05,0,0.015],[0.14,0.015,0,0.012],[0.16,0.0,0,0.009],[0.185,-0.004,0,0.005]],(t)=>[t>0.8?lin([0.3,0.26,0.2]):bark,0],0,7);
+return b.v;
+}
+
+
+WM.DEER={hipY:0.98,hips:[[-0.13,-0.38],[0.13,-0.38],[-0.13,0.36],[0.13,0.36]]};
+function deer(){
+const b=new B();
+const coat=lin([0.9,0.92,0.96]),coatB=lin([0.78,0.84,0.94]),belly=lin([0.97,0.96,0.93]),dapple=lin([1.0,0.9,0.66]),nose=lin([0.25,0.22,0.3]),eye=lin([0.06,0.06,0.1]);
+b.ell([0,1.06,0],[0.21,0.25,0.52],(dx,dy,dz)=>{
+const dap=dy>0.35&&Math.abs(dx)<0.7&&hh(Math.round(dz*9)+40,Math.round(dx*7)+9)>0.8;
+return[dap?dapple:dy< -0.4?belly:mix3(coat,coatB,ss(0.2,0.9,dy)),dap?0.8:0];
+},0,12,16);
+b.tube([[0,1.18,-0.38,0.12],[0,1.36,-0.5,0.085],[0,1.54,-0.58,0.07]],()=>[coat,0],0,10);
+b.ell([0,1.6,-0.66],[0.085,0.09,0.17],(dx,dy,dz)=>[dz< -0.8?nose:(Math.abs(dx)>0.75&&dy>0.1&&dy<0.45&&dz< -0.1&&dz> -0.45)?eye:coat,0],0,8,12);
+for(const sd of[1,-1])b.ell([sd*0.1,1.7,-0.6],[0.05,0.022,0.03],()=>[coatB,0],0,5,7);
+b.ell([0,1.18,0.53],[0.05,0.07,0.05],()=>[belly,0],0,5,7);
+
+const ant=lin([0.95,0.88,0.72]),bulb=lin([1.0,0.82,0.5]);
+for(const sd of[1,-1]){
+const beam=[[sd*0.05,1.68,-0.6,0.022],[sd*0.12,1.84,-0.58,0.019],[sd*0.19,1.98,-0.52,0.016],[sd*0.22,2.12,-0.46,0.013],[sd*0.2,2.24,-0.4,0.01]];
+b.tube(beam,()=>[ant,0.25],0,6);
+const tips=[beam[4],[sd*0.3,2.06,-0.62,0],[sd*0.29,2.2,-0.36,0]];
+b.tube([beam[2],[sd*0.26,2.02,-0.58,0.01],[sd*0.3,2.06,-0.62,0.008]],()=>[ant,0.25],0,5);
+b.tube([beam[3],[sd*0.27,2.16,-0.4,0.009],[sd*0.29,2.2,-0.36,0.007]],()=>[ant,0.25],0,5);
+for(const q of tips)b.ell([q[0],q[1]+0.02,q[2]],[0.03,0.036,0.03],()=>[bulb,1],0,5,7);
+}
+return b.v;
+}
+function leg(){
+const b=new B(),coat=lin([0.88,0.9,0.95]),hoof=lin([0.3,0.27,0.34]);
+b.tube([[0,0.04,0,0.07],[0,-0.3,0.015,0.045],[0,-0.52,-0.02,0.03],[0,-0.86,0.0,0.024],[0,-0.96,-0.01,0.028]],(t)=>[t>0.86?hoof:coat,t>0.6&&t<0.86?0.2:0],0,7);
+return b.v;
+}
+
+WM.KINDS={wwhale:{make:whale,mode:0,under:1},wtree:{make:tree,mode:1},wroot:{make:root,mode:1},wdeer:{make:deer,mode:1},wleg:{make:leg,mode:1}};
+WM.mesh=(name)=>WM.KINDS[name].make();
+const WG=VR.WildGPU;
+if(WG&&WG.KINDS)for(const k in WM.KINDS)if(!WG.KINDS[k])WG.KINDS[k]=WM.KINDS[k];
+
+
+const M=VR.VOXMODELS,Grid=VR.VoxGrid;
+if(M&&Grid){
+const part=(sx,sy,sz,pv,fn)=>{const g=new Grid(sx,sy,sz,pv[0],pv[1],pv[2]);fn(g);return{grid:g,pivot:[0,0,0]};};
+
+M.wu_whale=()=>({
+h:1,w:1,radius:20,parts:{
+body:part(14,11,42,[7,5,21],(g)=>{
+for(let z=0;z<36;z++){const t=z/36,r=WM.whaleR(t)*40*1.0;g.ell(7,5,z+0.5,Math.max(0.6,r*1.1),Math.max(0.6,r*0.9),0.6,(x,y)=>(y<4?0xd6d0be:y<6?0x6a7c90:0x34465e));}
+for(let z=34;z<41;z++){const s=Math.round((z-33)*0.95);g.box(Math.max(0,7-s),5,z,Math.min(13,6+s),5,z,0x34465e);}
+for(let x=0;x<3;x++){g.box(2-x,3,10+x,2-x,3,13+x,0x34465e);g.box(11+x,3,10+x,11+x,3,13+x,0x34465e);}
+for(let z=8;z<26;z+=3){g.set(3,3,z,0xffd890,true);g.set(10,3,z,0xffd890,true);}
+}),
+},
+layout:{body:[0,0,0]},order:['body'],gait:'none',
+});
+
+M.wu_tree=()=>({
+h:1,w:1,radius:8,parts:{
+tree:part(21,25,21,[10,0,10],(g)=>{
+g.box(9,0,9,11,11,11,0x6a5444,{shade:0.15});
+for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]])for(let k=1;k<5;k++)g.set(10+dx*(k+1),k<3?1:0,10+dz*(k+1),0x5e4a3c);
+g.ell(10.5,17,10.5,8.5,6.5,8.5,(x,y,z,d)=>(VR.M.hash3(x,y,z,5)%17===0?0xf4d2de:y>18?0x8cae6a:0x5e8a54),{shade:0.12});
+for(let k=0;k<8;k++){const a=k/8*TAU;g.set(Math.round(10.5+Math.cos(a)*5),10,Math.round(10.5+Math.sin(a)*5),0xffd27a,true);}
+}),
+},
+layout:{tree:[0,0,0]},order:['tree'],gait:'none',
+});
+}
+})(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const WU=VR.Wunder;if(!WU|| !VR.Game)return;
+const WG=VR.WunderGame=VR.WunderGame||{};
+const T=(k,v)=>(VR.I18N?VR.I18N.t(k,v):k);
+const TAU=Math.PI*2;
+const hs=(s)=>{s=String(s);let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619);}return x|0;};
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+const wrapA=(a)=>{while(a>Math.PI)a-=TAU;while(a< -Math.PI)a+=TAU;return a;};
+const sm=(u)=>(u<=0?0:u>=1?1:u*u*(3-2*u));
+if(VR.Settings&&VR.Settings.add&& !(VR.Settings.byKey&&VR.Settings.byKey('wunder'))){try{VR.Settings.add({key:'wunder',g:'play',sec:'play',t:'switch',lab:'g.set.wunder',tip:'g.set.wunder.tip',cost:'low',def:true});}catch(e){}}
+WG.cost={frames:0,ms:0,drawMs:0,draws:0};
+WG.camOn=false;
+const tierOf=(g)=>(VR.Wild&&VR.Wild.tierOf?VR.Wild.tierOf(g.settings):2);
+WG.on=(g)=> !!(g&&g.state==='play'&&g.world&&g.player&&g.env&&g.meta&&(g.dim||'overworld')==='overworld'&&g.meta.type!=='flat'&& !(g.settings&&g.settings.wunder===false)&& !g.zenFreezeTime);
+const ticks=(g)=>(g.env.day|0)*24000+g.env.timeOfDay;
+const mem=(g)=>{const m=g.meta.wunder||(g.meta.wunder={v:1,ev:{},learned:false,seen:{},paths:0,tree:null,seedDay: -1,whaleSeen: -9});if(!m.ev)m.ev={};if(!m.seen)m.seen={};return m;};
+const S=(g)=>{
+const key=(g.meta.id||'')+':'+(g.world&&g.world.seed);
+if(!g._wu||g._wu.key!==key){
+const seed=hs(String(g.meta.seed));
+g._wu={key,seed,loop:null,age:0,time:0,whale:{st:new Float32Array(10),mode:'route',p:[0,0,0],yaw:0,pitch:0,bank:0,ph:0,vis:0,t:0,hover:null,dest:null,glow:0.3},
+song:null,songK: -1,sangNote: -1,presses:[],deer:null,still:0,lastP:null,speed:0,deerT:0,spots:[],spotsT: -99,treeT:0,ringT:0,names:{whale:WU.nameOf('whale',seed),tree:WU.nameOf('tree',seed),deer:WU.nameOf('deer',seed)}};
+}
+return g._wu;
+};
+WG.state=S;
+const isles=(g)=>(VR.IslesGen&&VR.IslesGen.list?VR.IslesGen.list({seed:g.meta.seed}):[]);
+const F=()=>VR.F,RT=()=>VR.R&&VR.R.T;
+
+const ground=(w,x,z)=>{
+const X=Math.floor(x),Z=Math.floor(z);if(!w.isLoaded(X,Z))return null;
+const fl=RT().flags,Fx=F();let y=w.topAt(X,Z);
+for(let k=0;k<40&&y>1;k++,y--){const f=fl[w.getBlock(X,y,Z)];if((f&Fx.SOLID)&& !(f&Fx.LEAVES))break;}
+return y;
+};
+const deed=(g,kind,o)=>{try{if(VR.ChronikGame&&VR.ChronikGame.deed)VR.ChronikGame.deed(g,kind,o||{});}catch(e){}};
+const note=(g,text,key,prio)=>{if(VR.Quiet&&VR.Quiet.note)VR.Quiet.note(text,prio||2,key);else if(g.ui&&g.ui.hint)g.ui.hint(text,3600);};
+const villagesNear=(g)=>{const out=[],V=g.villages;if(V&&V.known)for(const v of V.known.values())if(v&&v.plan)out.push([v.plan.x,v.plan.z,50]);return out;};
+
+
+const AC=(g)=>{const A=g.audio;return A&&A.ctx&&A.sfx?A:null;};
+const midiF=(m)=>440*Math.pow(2,(m-69)/12);
+
+WG.sing=function(g,at,farewell){
+const A=AC(g);if(!A)return;
+const p=g.player.pos,d=at?Math.hypot(at[0]-p[0],at[1]-p[1],at[2]-p[2]):0;
+const k=clamp(1-d/(WU.WHALE.hear*1.7),0,1);if(k<=0.02)return;
+try{
+const c=A.ctx,t0=c.currentTime+0.05,M=farewell?[WU.MOTIF[2],WU.MOTIF[1],WU.MOTIF[0]]:WU.MOTIF;
+for(let i=0;i<3;i++){
+const f=midiF(WU.NOTES[M[i]]-19),t=t0+i*1.55,dur=i===2?2.6:1.7;
+const o=c.createOscillator(),o2=c.createOscillator(),lfo=c.createOscillator(),lg=c.createGain(),gn=c.createGain(),g2=c.createGain();
+o.type='sine';o2.type='triangle';
+o.frequency.setValueAtTime(f*0.93,t);o.frequency.exponentialRampToValueAtTime(f,t+0.45);
+o2.frequency.setValueAtTime(f*1.5*0.93,t);o2.frequency.exponentialRampToValueAtTime(f*1.5,t+0.5);
+lfo.frequency.value=4.6;lg.gain.value=f*0.012;lfo.connect(lg);lg.connect(o.frequency);
+gn.gain.setValueAtTime(0.0001,t);gn.gain.linearRampToValueAtTime(0.16*k,t+0.4);gn.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+g2.gain.value=0.25;
+o.connect(gn);o2.connect(g2);g2.connect(gn);gn.connect(A.sfx);if(A.rev)gn.connect(A.rev);
+for(const q of[o,o2,lfo]){q.start(t);q.stop(t+dur+0.1);}
+}
+}catch(e){}
+};
+WG.fluteNote=function(g,key){
+const A=AC(g);if(!A)return;
+try{
+const c=A.ctx,t=c.currentTime+0.01,f=midiF(WU.NOTES[key]);
+const o=c.createOscillator(),o2=c.createOscillator(),gn=c.createGain(),g2=c.createGain();
+o.type='sine';o2.type='triangle';o.frequency.value=f;o2.frequency.value=f*2;
+gn.gain.setValueAtTime(0.0001,t);gn.gain.linearRampToValueAtTime(0.12,t+0.05);gn.gain.setValueAtTime(0.11,t+0.35);gn.gain.exponentialRampToValueAtTime(0.0008,t+0.9);
+g2.gain.value=0.12;o.connect(gn);o2.connect(g2);g2.connect(gn);gn.connect(A.sfx);if(A.rev)gn.connect(A.rev);
+for(const q of[o,o2]){q.start(t);q.stop(t+1);}
+}catch(e){}
+};
+
+
+const ROUTE=[0,0,0,0,0,0];
+function fly(W,tg,dt,speed){
+const dx=tg[0]-W.p[0],dy=tg[1]-W.p[1],dz=tg[2]-W.p[2],dh=Math.hypot(dx,dz);
+const want=Math.atan2(-dx,-dz),turn=dh>1?clamp(wrapA(want-W.yaw),-0.45*dt,0.45*dt):0;
+W.yaw=wrapA(W.yaw+turn);
+const v=Math.min(speed,dh*0.35+0.6)*dt;
+if(dh<24){if(dh>1e-3){W.p[0]+=dx/dh*Math.min(dh,v);W.p[2]+=dz/dh*Math.min(dh,v);}}
+else{W.p[0]+= -Math.sin(W.yaw)*v;W.p[2]+= -Math.cos(W.yaw)*v;}
+const vy=clamp(dy*0.6,-4,4)*dt;W.p[1]+=vy;
+W.pitch+=(clamp(Math.atan2(vy/Math.max(dt,1e-3),Math.max(1,v/Math.max(dt,1e-3))),-0.3,0.3)-W.pitch)*Math.min(1,dt*2);
+W.bank+=(clamp(-turn/Math.max(dt,1e-3)*1.6,-0.35,0.35)-W.bank)*Math.min(1,dt*1.5);
+return Math.hypot(dx,dy,dz);
+}
+function whaleFrame(g,R,dt,Tk){
+const W=R.whale,m=mem(g),p=g.player.pos,day=g.env.day|0;
+if(!R.loop)R.loop=WU.whaleRoute(R.seed,isles(g));
+WU.whaleAt(R.seed,R.loop,Tk,W.st);
+W.ph+=dt*TAU/WU.WHALE.period*(W.mode==='route'?1:1.25);
+const E=g.env.E||{},tod=g.env.timeOfDay,dusk=sm((tod-10600)/1400)*(1-sm((tod-21500)/900));
+W.glow=0.22+0.78*Math.max(E.night||0,dusk);
+if(W.mode==='route'){
+W.vis=W.st[7];
+if(W.vis){W.p[0]=W.st[0];W.p[1]=W.st[1];W.p[2]=W.st[2];W.yaw=W.st[3];W.pitch=W.st[4];W.bank=W.st[5];}
+}else{
+W.vis=1;W.t+=dt;
+if(W.mode==='descend'){if(fly(W,W.hover,dt,7)<2.5){W.mode='wait';W.t=0;}}
+else if(W.mode==='wait'){
+W.p[1]+=(W.hover[1]+Math.sin(R.time*0.8)*0.4-W.p[1])*Math.min(1,dt*1.5);W.bank*=0.97;W.pitch*=0.97;
+if(W.t>75||Math.hypot(p[0]-W.p[0],p[2]-W.p[2])>90){W.mode='rejoin';W.t=0;}
+}else if(W.mode==='ride')rideFrame(g,R,W,dt);
+else if(W.mode==='rejoin'){
+const C=R.loop.C,on=W.st[7];
+const tg=on?[W.st[0],W.st[1],W.st[2]]:[C[0]+(W.p[0]-C[0])*3,W.p[1]+80,C[1]+(W.p[2]-C[1])*3];
+const d=fly(W,tg,dt,8);
+if((on&&d<14)||(!on&&Math.hypot(W.p[0]-C[0],W.p[2]-C[1])>800)||W.t>150){W.mode='route';W.t=0;}
+}
+}
+if(!W.vis)return;
+const d=Math.hypot(W.p[0]-p[0],W.p[1]-p[1],W.p[2]-p[2]);
+
+if(d<420&&W.st[8]>0.6&&WU.canEvent(m,'whale',day)){
+WU.markEvent(m,'whale',day);m.whaleSeen=day;
+note(g,T('g.wu.whale.seen',{name:R.names.whale}),'wunder:whale');
+deed(g,'w_whale',{x:W.p[0],z:W.p[2],who:R.names.whale});
+if(VR.Wander&&VR.Wander.note){try{VR.Wander.note(g.meta,'places','wu:whale',R.names.whale);}catch(e){}}
+if(VR.EventLog&&VR.EventLog.emit){try{VR.EventLog.emit('encounter','wunder_whale',3,W.p.slice(),'wunder',20);}catch(e){}}
+}
+
+const s=WU.songAt(R.seed,Tk);R.song=s;
+if(s&&s.sing&&R.songK!==s.t0&&W.mode==='route'){
+R.songK=s.t0;
+WG.sing(g,W.p);
+if(d<WU.WHALE.hear*1.3&&R.sangNote!==day){R.sangNote=day;note(g,T('g.wu.whale.sing',{name:R.names.whale})+(m.learned?' — '+T('g.wu.flute.prompt'):''),'wunder:sing');}
+}
+
+const P=g.particles;
+if(P&&tierOf(g)>=1&&d<360){
+R.moteAcc=(R.moteAcc||0)+dt*(3+5*W.glow);
+const L=WU.WHALE.len,cy=Math.cos(W.yaw),sy=Math.sin(W.yaw);
+while(R.moteAcc>=1){
+R.moteAcc-=1;
+const lx=(Math.random()-0.5)*L*0.3,lz=L*(0.38+Math.random()*0.1);
+P.spawn(W.p[0]+lx*cy+lz*sy,W.p[1]+(Math.random()-0.5)*2,W.p[2]-lx*sy+lz*cy,(Math.random()-0.5)*0.4,-0.15-Math.random()*0.25,(Math.random()-0.5)*0.4,{life:4+Math.random()*2,size:0.35+Math.random()*0.25,grav:0,drag:0.4,col:Math.random()<0.5?[1.0,0.86,0.55]:[0.7,0.92,1.0],emis:1,collide:false,fade:true});
+}
+}
+}
+
+WG.call=function(g){
+const R=S(g),W=R.whale,p=g.player.pos;
+if(!W.vis||W.mode!=='route')return false;
+let dx=W.p[0]-p[0],dz=W.p[2]-p[2];const dl=Math.hypot(dx,dz)||1;dx/=dl;dz/=dl;
+const hx=p[0]+dx*13,hz=p[2]+dz*13,gy=ground(g.world,hx,hz);
+W.hover=[hx,(gy===null?p[1]:Math.max(gy,Math.floor(p[1])-1))+7,hz];
+W.mode='descend';W.t=0;
+note(g,T('g.wu.whale.heard',{name:R.names.whale})+' '+T('g.wu.whale.come',{name:R.names.whale}),'wunder:heard',3);
+return true;
+};
+WG.board=function(g){
+const R=S(g),W=R.whale,p=g.player.pos;
+if(W.mode!=='wait')return false;
+
+const L=isles(g),C=R.loop.C;
+const on=L.find(I=>Math.hypot(p[0]-I.x,p[2]-I.z)<I.r*1.35&&p[1]>I.y-12);
+let dest;
+if(on){let dx=p[0]-C[0],dz=p[2]-C[1];const dl=Math.hypot(dx,dz)||1;dx/=dl;dz/=dl;dest={x:C[0]+dx*250,z:C[1]+dz*250,y:null,up:false};}
+else{
+let best=null,bd=1e9;for(const I of L){const dd=Math.hypot(I.x-p[0],I.z-p[2]);if(dd<bd){bd=dd;best=I;}}
+if(!best)return false;
+let dx=p[0]-best.x,dz=p[2]-best.z;const dl=Math.hypot(dx,dz)||1;
+dest={x:best.x+dx/dl*best.r*0.4,z:best.z+dz/dl*best.r*0.4,y:null,up:true,top:best.y+(best.dome||4)};
+}
+W.dest=dest;W.mode='ride';W.t=0;W.start=W.p.slice();
+WG.camOn=true;WG.camS=null;
+note(g,T('g.wu.whale.aboard',{name:R.names.whale,to:T(dest.up?'g.wu.whale.up':'g.wu.whale.down')}),'wunder:ride',3);
+return true;
+};
+function rideFrame(g,R,W,dt){
+const D=W.dest,p=g.player,w=g.world;
+const gy=ground(w,D.x,D.z);if(gy!==null)D.y=gy;else if(D.up&&D.y===null)D.y=D.top;
+const dh=Math.hypot(D.x-W.p[0],D.z-W.p[2]);
+const cruise=Math.max(W.start[1],(D.y===null?W.start[1]:D.y))+26;
+const tg=dh>45||D.y===null?[D.x,cruise,D.z]:[D.x,D.y+6,D.z];
+const d=fly(W,tg,dt,9);
+
+const back=WU.WHALE.len*0.083;
+p.pos[0]=W.p[0]+Math.sin(W.yaw)*2.5;p.pos[1]=W.p[1]+back;p.pos[2]=W.p[2]+Math.cos(W.yaw)*2.5;
+if(p.vel){p.vel[0]=0;p.vel[1]=0;p.vel[2]=0;}p.fallStart=null;
+if((D.y!==null&&dh<3.5&&d<2.5)||W.t>150){
+const sx=Math.cos(W.yaw)*6,sz= -Math.sin(W.yaw)*6,y=D.y!==null?D.y+1:p.pos[1];
+if(p.safeTeleport)p.safeTeleport(D.x+sx,y,D.z+sz);else{p.pos[0]=D.x+sx;p.pos[1]=y;p.pos[2]=D.z+sz;}
+p.fallStart=null;WG.camOn=false;
+W.mode='rejoin';W.t=0;
+WG.sing(g,W.p,true);
+note(g,T('g.wu.whale.bye',{name:R.names.whale}),'wunder:bye',3);
+deed(g,'w_ride',{x:D.x,z:D.z,who:R.names.whale});
+if(VR.EventLog&&VR.EventLog.emit){try{VR.EventLog.emit('travel','wunder_ride',4,[D.x,y+2,D.z],'wunder',20);}catch(e){}}
+}
+}
+
+WG.cam=function(g,base){
+const R=g._wu;if(!R||R.whale.mode!=='ride'){WG.camOn=false;return null;}
+const W=R.whale,fx= -Math.sin(W.yaw),fz= -Math.cos(W.yaw),rx=Math.cos(W.yaw),rz= -Math.sin(W.yaw);
+const want=[W.p[0]-fx*31+rx*9,W.p[1]+7.5,W.p[2]-fz*31+rz*9],look=[W.p[0]+fx*26,W.p[1]+1,W.p[2]+fz*26];
+const C=WG.camS||(WG.camS={p:want.slice(),l:look.slice()}),k=1-Math.exp(-2.2*Math.min(0.1,R.dt||0.016));
+for(let i=0;i<3;i++){C.p[i]+=(want[i]-C.p[i])*k;C.l[i]+=(look[i]-C.l[i])*k;}
+const dx=C.l[0]-C.p[0],dy=C.l[1]-C.p[1],dz=C.l[2]-C.p[2];
+return Object.assign({},base,{x:C.p[0],y:C.p[1],z:C.p[2],yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz)),roll:0,fixed:true,far:(base.far||600)+200});
+};
+
+
+WG.play=function(g,key){
+const R=S(g),W=R.whale,p=g.player.pos;
+WG.fluteNote(g,key);
+R.presses.push({k:key,T:ticks(g)});if(R.presses.length>8)R.presses.shift();
+R.fluteT=R.time;
+const P=g.particles;if(P)for(let i=0;i<4;i++)P.spawn(p[0]+(Math.random()-0.5)*0.6,p[1]+1.5,p[2]+(Math.random()-0.5)*0.6,(Math.random()-0.5)*0.5,0.6+Math.random()*0.4,(Math.random()-0.5)*0.5,{life:1.4,size:0.12,grav:0,drag:0.6,col:[1.0,0.9,0.6],emis:1,collide:false,fade:true});
+const s=R.song||WU.songAt(R.seed,ticks(g));
+if(s&&W.vis&&W.mode==='route'&&WU.hears(Math.hypot(W.p[0]-p[0],W.p[1]-p[1],W.p[2]-p[2]))&&WU.answered(R.presses,s.end)){R.presses.length=0;WG.call(g);}
+prompt(g,R);
+};
+const heldFlute=(g)=>{const h=g.player&&g.player.inv&&g.player.inv.held;return!!(h&&h.id==='wunder_flute');};
+const PP=VR.Player&&VR.Player.prototype;
+if(PP&&PP.interact&& !PP.interact.__wu){
+const oi=PP.interact;
+PP.interact=function(dt,input){
+const g=this.game;
+if(!(g&&heldFlute(g)&&input&&input.captured&& !(g.ui&&g.ui.blocking)))return oi.apply(this,arguments);
+const sel=this.inv.sel;let hit=0;
+for(let k=1;k<=3;k++)if(input.hit('Digit'+k)){hit=k;try{WG.play(g,k);}catch(e){}}
+const r=oi.apply(this,arguments);
+if(hit){this.inv.sel=sel;this.inv.changed=true;}
+return r;
+};
+PP.interact.__wu=true;
+}
+
+
+let promptEl=null;
+function prompt(g,R){
+if(typeof document==='undefined'|| !document.body)return;
+const W=R.whale,p=g.player.pos,held=heldFlute(g)&& !(g.ui&&g.ui.blocking);
+const s=R.song,open= !!(held&&s&&W.vis&&W.mode==='route'&&WU.hears(Math.hypot(W.p[0]-p[0],W.p[1]-p[1],W.p[2]-p[2])));
+if(!held){if(promptEl)promptEl.style.display='none';return;}
+if(!promptEl){
+promptEl=document.createElement('div');promptEl.id='wuflute';
+promptEl.style.cssText='position:fixed;left:50%;bottom:118px;transform:translateX(-50%);padding:6px 14px;border-radius:14px;background:rgba(20,24,40,.55);color:#ffe8b8;font:14px/1.3 sans-serif;pointer-events:none;z-index:40;text-align:center';
+const st=document.createElement('style');st.textContent='@keyframes wubeat{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}#wuflute .d{display:inline-block;width:22px;height:22px;margin:0 5px;border-radius:50%;background:rgba(255,220,150,.18);border:1px solid rgba(255,220,150,.6);line-height:22px;font-size:12px;animation:wubeat 1.4s ease-in-out infinite}#wuflute .on{background:#ffd27a;color:#3a2a10;box-shadow:0 0 12px #ffc860}';
+document.head.appendChild(st);document.body.appendChild(promptEl);
+}
+
+let got=0;const L=R.presses.filter(q=> !s||q.T>=s.end-20).map(q=>q.k),M=WU.MOTIF;
+for(let n=Math.min(3,L.length);n>0;n--){let ok=true;for(let j=0;j<n;j++)if(L[L.length-n+j]!==M[j]){ok=false;break;}if(ok){got=n;break;}}
+const html=open?'<div>'+T('g.wu.flute.prompt')+'</div>'+M.map((k,i)=>`<span class="d${i<got?' on':''}" style="animation-delay:${i*0.47}s">${k}</span>`).join(''):T('g.wu.flute.hint');
+if(promptEl._h!==html){promptEl.innerHTML=html;promptEl._h=html;}
+promptEl.style.display='';
+}
+
+const nearWater=(g,pos,r)=>{
+const w=g.world,Fx=F(),fl=RT().flags,X=Math.floor(pos[0]),Y=Math.floor(pos[1]),Z=Math.floor(pos[2]);
+for(let dz= -r;dz<=r;dz+=2)for(let dx= -r;dx<=r;dx+=2)for(let dy= -3;dy<=1;dy++)if(fl[w.getBlock(X+dx,Y+dy,Z+dz)]&Fx.WATER)return true;
+return false;
+};
+WG.learn=function(g,a){
+const m=mem(g),inv=g.player&&g.player.inv;if(m.learned|| !inv)return false;
+if(inv.add('wunder_flute',1)<=0)return false;
+m.learned=true;inv.changed=true;
+const name=(a&&a.name)||'';
+if(a&&a.say){a.say(T('g.wu.flute.lesson'),9);a.lookAt=[g.player.pos[0],g.player.pos[1]+1.5,g.player.pos[2]];}
+note(g,T('g.wu.flute.got',{name})+' '+T('g.wu.flute.hint'),'wunder:flute',3);
+deed(g,'w_flute',{x:a?a.pos[0]:g.player.pos[0],z:a?a.pos[2]:g.player.pos[2]});
+[0,650,1300].forEach((ms,i)=>setTimeout(()=>WG.fluteNote(g,WU.MOTIF[i]),ms+300));
+return true;
+};
+const VP=VR.Villages&&VR.Villages.prototype;
+if(VP&&VP.openTalk&& !VP.openTalk.__wu){
+const ot=VP.openTalk;
+VP.openTalk=function(a){
+const r=ot.apply(this,arguments);
+try{
+const g=this.g,elder=a&&((a.p&&a.p.look&&a.p.look.age==='elder')||a.role==='elder');
+if(elder&&WG.on(g)&& !mem(g).learned&&nearWater(g,a.pos,12))WG.learn(g,a);
+}catch(e){}
+return r;
+};
+VP.openTalk.__wu=true;
+}
+
+
+function treeOk(g,x,z,vils){
+const w=g.world,y=ground(w,x,z);if(y===null)return false;
+const b=w.getBlock(Math.floor(x),y,Math.floor(z)),R=VR.R,nm=R.types[R.T.type[b]]&&R.types[R.T.type[b]].name;
+if(nm!=='grass_block'&&nm!=='dirt'&&nm!=='moss_block')return false;
+for(const[dx,dz]of[[4,0],[-4,0],[0,4],[0,-4]]){const y2=ground(w,x+dx,z+dz);if(y2===null||Math.abs(y2-y)>2)return false;}
+if(nearWater(g,[x,y,z],4))return false;
+if(WU.inVillage(x,z,vils,WU.TREE.vilMargin+10))return false;
+return true;
+}
+const FLOWERS=['poppy','cornflower','oxeye_daisy','allium','azure_bluet','dandelion','lily_of_the_valley'];
+function placeRing(g,x,z,seed){
+const w=g.world,R=VR.R,fl=R.T.flags,Fx=F();
+if(!w.isLoaded(Math.floor(x),Math.floor(z)))return false;
+let n=0;
+for(const[rx,rz]of WU.ringSpots(x,z,seed)){
+const X=Math.floor(rx),Z=Math.floor(rz),y=ground(w,X,Z);if(y===null)continue;
+const below=R.types[R.T.type[w.getBlock(X,y,Z)]];
+if(!below||below.name!=='grass_block')continue;
+const ab=w.getBlock(X,y+1,Z);if(ab&&(fl[ab]&Fx.SOLID))continue;
+const t=R.byName[FLOWERS[(n+(seed&7))%FLOWERS.length]];if(!t)continue;
+w.setBlock(X,y+1,Z,t.defaultState);n++;
+}
+return n||true;
+}
+function treeFrame(g,R,dt){
+if(g.meta.guest)return;
+const m=mem(g),p=g.player.pos,w=g.world,tod=g.env.timeOfDay,day=g.env.day|0;
+const vils=villagesNear(g);
+if(!m.tree){
+if(R.age<15||(R.treeT-=dt)>0)return;
+R.treeT=4;
+
+for(let k=0;k<24;k++){
+const a=WU.h01(R.seed,k,0x71)*TAU,r=50+60*WU.h01(R.seed,k,0x72),x=Math.round(p[0]+Math.cos(a)*r),z=Math.round(p[2]+Math.sin(a)*r);
+if(!treeOk(g,x,z,vils)||WU.inVillage(x,z,vils,60))continue;
+m.tree={x:x+0.5,z:z+0.5,tx:null,tz:null,stood:true,planned:(tod>=WU.TREE.night0?day:day-1),rings:[],yaw:WU.h01(R.seed,k,0x73)*TAU};
+break;
+}
+return;
+}
+const tr=m.tree;
+if(Math.hypot(tr.x-p[0],tr.z-p[2])>260)return;
+const nightKey=tod>=WU.TREE.night0?day:day-1,night=WU.isNight(tod);
+const ok=(x,z)=>treeOk(g,x,z,vils);
+const ringAt=(x,z)=>{if(!placeRing(g,x,z,R.seed^Math.round(x*7+z*13))){tr.rings.push([x,z]);if(tr.rings.length>4)tr.rings.shift();}};
+if(night){
+if((tr.tx===null||tr.tx===undefined)&&tr.planned!==nightKey){const t=WU.treeTarget(R.seed,nightKey,[tr.x,tr.z],ok);tr.planned=nightKey;if(t){tr.tx=t[0];tr.tz=t[1];}}
+const e=WU.treeStep(tr,dt,{night:true,players:[[p[0],p[2]]],vils});
+if(e&&e.k==='ring')ringAt(e.x,e.z);
+if(tr.walking)R.treeWalk=(R.treeWalk||0)+dt*1.1;
+}else{
+tr.walking=false;tr.tx=null;
+
+let guard=0;
+while(tr.planned<nightKey&&guard++ <3){
+tr.planned++;
+const t=WU.treeTarget(R.seed,tr.planned,[tr.x,tr.z],ok);
+if(t){if(tr.stood!==false)ringAt(tr.x,tr.z);tr.x=t[0];tr.z=t[1];tr.stood=true;}
+}
+tr.planned=Math.max(tr.planned,nightKey);
+
+if(Math.hypot(tr.x-p[0],tr.z-p[2])<45&&WU.canEvent(m,'tree',day)){
+WU.markEvent(m,'tree',day);m.treeSeen={d:day,x:tr.x,z:tr.z};
+note(g,T('g.wu.tree.seen',{name:R.names.tree}),'wunder:tree');
+deed(g,'w_tree',{x:tr.x,z:tr.z,who:R.names.tree});
+}
+}
+if(tr.rings.length&&(R.ringT-=dt)<=0){R.ringT=3;const q=tr.rings[0];if(placeRing(g,q[0],q[1],R.seed^Math.round(q[0]*7+q[1]*13)))tr.rings.shift();}
+}
+WG.sit=function(g){
+const R=S(g),m=mem(g),day=g.env.day|0,inv=g.player.inv,tr=m.tree;if(!tr)return false;
+note(g,T('g.wu.tree.rest'),'wunder:rest');
+if(!WU.isNight(g.env.timeOfDay)&&WU.seedToday(m,day)&&inv&&inv.add('lantern_seed',1)>0){
+m.seedDay=day;inv.changed=true;
+setTimeout(()=>note(g,T('g.wu.tree.seed'),'wunder:seed',3),1600);
+const P=g.particles,y=(ground(g.world,tr.x,tr.z)||g.player.pos[1])+7;
+if(P)for(let i=0;i<10;i++)P.spawn(g.player.pos[0]+(Math.random()-0.5),y-i*0.3,g.player.pos[2]+(Math.random()-0.5),0,-1.2,0,{life:2.2,size:0.16,grav:0,drag:0.2,col:[1,0.85,0.5],emis:1,collide:false,fade:true});
+}
+void R;
+return true;
+};
+
+
+function spots(g,R){
+if(R.time-R.spotsT<5)return R.spots;
+R.spotsT=R.time;const out=[];
+const L=g.entities&&g.entities.land;
+if(L&&L.fx)for(const f of L.fx.values())if(f&&(f.kind==='petals'||f.kind==='glowring'))out.push({id:f.kind+':'+Math.round(f.x)+','+Math.round(f.z),x:f.x,z:f.z,kind:f.kind});
+const I=VR.Intent;if(I&&I.targets)for(const q of I.targets)if(q&&q.kind==='landmark'&&q.pos)out.push({id:'lm:'+q.id,x:q.pos[0],z:q.pos[2],kind:'landmark'});
+R.spots=out;
+return out;
+}
+function swirl(g,x,y,z){
+const P=g.particles;if(!P)return;
+for(let i=0;i<36;i++){const a=i/36*TAU*3,r=0.4+i*0.03;P.spawn(x+Math.cos(a)*r,y+0.3+i*0.05,z+Math.sin(a)*r,-Math.sin(a)*1.4,0.6+Math.random()*0.5,Math.cos(a)*1.4,{life:1.8+Math.random(),size:0.18+Math.random()*0.1,grav: -0.1,drag:0.8,col:i&1?[1.0,0.86,0.55]:[0.7,0.92,1.0],emis:1,collide:false,fade:true});}
+}
+function deerFrame(g,R,dt){
+if(g.meta.guest)return;
+const m=mem(g),p=g.player.pos,E=g.env.E||{},day=g.env.day|0,w=g.world;
+const lp=R.lastP||(R.lastP=[p[0],p[2]]),mv=Math.hypot(p[0]-lp[0],p[2]-lp[1]);lp[0]=p[0];lp[1]=p[2];
+R.speed=mv<60*dt?mv/Math.max(dt,1e-3):0;
+R.still=R.speed<0.25?R.still+dt:0;
+
+if((R.seenT=(R.seenT||0)-dt)<=0){R.seenT=2;for(const q of spots(g,R))if(!m.seen[q.id]&&Math.hypot(q.x-p[0],q.z-p[2])<22)m.seen[q.id]=1;}
+const D=R.deer;
+if(!D){
+if((R.deerT-=dt)>0||(E.night||0)<WU.DEER.dark)return;
+R.deerT=1;
+let vd=1e9;for(const v of villagesNear(g))vd=Math.min(vd,Math.hypot(v[0]-p[0],v[1]-p[2]));
+if(!WU.deerMay({night:E.night,stillFor:R.still,vilDist:vd,day,st:m}))return;
+const tgt=WU.deerPick(spots(g,R),m.seen,p[0],p[2]);if(!tgt)return;
+let dx=tgt.x-p[0],dz=tgt.z-p[2];const dl=Math.hypot(dx,dz)||1;dx/=dl;dz/=dl;
+const x=p[0]+dx*12+dz*3,z=p[2]+dz*12-dx*3,gy=ground(w,x,z);if(gy===null)return;
+WU.markEvent(m,'deer',day);
+R.deer={x,z,y:gy+1,tx:tgt.x,tz:tgt.z,id:tgt.id,yaw:Math.atan2(-dx,-dz),walk:0,t:0,out:0,gone:0};
+swirl(g,x,gy+1,z);
+note(g,T('g.wu.deer.seen')+' '+T('g.wu.deer.follow'),'wunder:deer',3);
+return;
+}
+D.t+=dt;
+if(D.gone>0){D.gone-=dt;if(D.gone<=0)R.deer=null;return;}
+const x0=D.x,z0=D.z;
+const r=(E.night||0)<0.3?'vanish':WU.deerStep(D,dt,{px:p[0],pz:p[2],speed:R.speed});
+D.walk+=Math.hypot(D.x-x0,D.z-z0)*2.2;
+const gy=ground(w,D.x,D.z);if(gy!==null)D.y+=(gy+1-D.y)*Math.min(1,dt*6);
+if(r==='vanish'){swirl(g,D.x,D.y,D.z);note(g,T('g.wu.deer.gone'),'wunder:deergone');D.gone=0.6;}
+else if(r==='arrive'){
+m.seen[D.id]=1;m.paths=(m.paths|0)+1;
+const lang=VR.I18N&&VR.I18N.lang==='en'?'en':'de',ps=R.seed^hs(D.id),name=WU.pathName(ps,lang);
+note(g,T('g.wu.deer.path',{path:name}),'wunder:path',3);
+deed(g,'w_deer',{x:D.tx,z:D.tz,who:name});
+if(VR.Wander&&VR.Wander.note){try{VR.Wander.note(g.meta,'places','wu:path:'+D.id,name);}catch(e){}}
+if(VR.EventLog&&VR.EventLog.emit){try{VR.EventLog.emit('discovery','wunder_path',4,[D.tx,D.y+2,D.tz],'wunder',20);}catch(e){}}
+swirl(g,D.x,D.y,D.z);D.gone=2.5;
+}
+}
+
+
+WG.frame=function(g,dt){
+if(!WG.on(g)){if(g&&g._wu&&g._wu.whale.mode==='ride'){g._wu.whale.mode='route';WG.camOn=false;}if(promptEl)promptEl.style.display='none';return;}
+if(!(dt>0))return;
+dt=Math.min(dt,0.1);
+const t0=performance.now(),R=S(g);
+R.age+=dt;R.time+=dt;R.dt=dt;
+const Tk=ticks(g);
+if((g.meta.vgen|0)>=3)whaleFrame(g,R,dt,Tk);
+treeFrame(g,R,dt);
+deerFrame(g,R,dt);
+prompt(g,R);
+WG.cost.frames++;WG.cost.ms+=performance.now()-t0;
+};
+const opf=VR.Game.prototype.playFrame;
+if(!opf.__wu){
+VR.Game.prototype.playFrame=function(dt){const r=opf.apply(this,arguments);try{WG.frame(this,dt);}catch(e){if(!WG.warned){WG.warned=true;console.warn('wunder',e);}}return r;};
+VR.Game.prototype.playFrame.__wu=true;
+}
+
+
+if(VR.Ctx&&VR.Ctx.hooks&&Array.isArray(VR.Ctx.hooks.near))VR.Ctx.hooks.near.push((g,eye,dir)=>{
+if(!WG.on(g)|| !g._wu)return null;
+const R=g._wu,W=R.whale,list=[];
+if(W.mode==='wait'&&Math.hypot(W.p[0]-eye[0],W.p[2]-eye[2])<26)list.push({kind:'wunder',name:T('g.wu.whale.board'),pos:W.p.slice(),r:11,reach:9,act:(gg)=>WG.board(gg)});
+const tr=g.meta.wunder&&g.meta.wunder.tree;
+if(tr&& !tr.walking&&Math.hypot(tr.x-eye[0],tr.z-eye[2])<12){const y=ground(g.world,tr.x,tr.z);if(y!==null)list.push({kind:'wunder',name:T('g.wu.tree.sit'),pos:[tr.x,y+3,tr.z],r:3.5,reach:6,act:(gg)=>WG.sit(gg)});}
+return list.length&&VR.Ctx.pickNear?VR.Ctx.pickNear(eye,dir,list):null;
+});
+
+
+const KCAP=8;
+WG.draw=function(g,r,E,layer,cam){
+if(layer!=='opaque'|| !WG.on(g)|| !g._wu)return;
+const t0=performance.now(),R=g._wu,W=R.whale,tier=tierOf(g),m=g.meta.wunder||{};
+const tr=m.tree,D=R.deer,w=g.world;
+cam=cam||r.cam;
+const cx=cam.x,cy=cam.y,cz=cam.z;
+let draws=0;
+const treeY=tr&&Math.hypot(tr.x-cx,tr.z-cz)<220?ground(w,tr.x,tr.z):null;
+const night=(E&&E.night)||0,tod=g.env.timeOfDay;
+if(tier>=2&&VR.WildGPU&&VR.WildGPU.kind){
+const G=VR.WildGPU,gl=r.gl,put=G.put,list=R.list||(R.list=[]);list.length=0;
+if(W.vis){
+const x=W.p[0]-cx,y=W.p[1]-cy,z=W.p[2]-cz;
+if(x*x+z*z<1400*1400){const K=G.kind(gl,'wwhale',KCAP);put(K.data,0,x,y,z,WU.WHALE.len,W.yaw,W.pitch,W.bank,W.ph,1,1,1,1,0.2,1.4,-0.04,0,W.glow,0.12,2);list.push([K,1]);}
+}
+if(tr&&treeY!==null){
+const sc=14,walk=tr.walking?R.treeWalk||0:0,bob=tr.walking?Math.abs(Math.sin(walk*2.5))*0.25:0;
+const K=G.kind(gl,'wtree',KCAP),KR=G.kind(gl,'wroot',KCAP),gw=0.3+0.7*Math.max(night,sm((tod-11000)/1500));
+put(K.data,0,tr.x-cx,treeY+0.6+bob-cy,tr.z-cz,sc,tr.yaw||0,0,tr.walking?Math.sin(walk*2.5)*0.03:0,R.time*0.7,1,1,1,1,0,0,0,0.012,gw,0,2);
+list.push([K,1]);
+for(let k=0;k<5;k++){const a=(tr.yaw||0)+k/5*TAU,lift=tr.walking?Math.max(0,Math.sin(walk*2.5+k*TAU/5))*0.4:0;put(KR.data,k,tr.x-cx,treeY+0.6+bob-cy,tr.z-cz,sc,a,0,lift,0,1,1,1,1,0,0,0,0,0,0,0);}
+list.push([KR,5]);
+}
+if(D){
+const sc=1.15*(D.gone>0&&D.gone<0.6?D.gone/0.6:1),K=G.kind(gl,'wdeer',KCAP),KL=G.kind(gl,'wleg',KCAP),cyw=Math.cos(D.yaw),syw=Math.sin(D.yaw),wa=D.walking?1:0;
+put(K.data,0,D.x-cx,D.y-cy,D.z-cz,sc,D.yaw,0,0,0,1,1,1,1,0,0,0,0,0.6+0.4*night,0.1,2);
+list.push([K,1]);
+const H=VR.WunderModels.DEER;
+H.hips.forEach((hp,i)=>{const lx=hp[0]*sc,lz=hp[1]*sc,sw=Math.sin(D.walk+(i===0||i===3?0:Math.PI))*0.45*wa;put(KL.data,i,D.x+lx*cyw+lz*syw-cx,D.y+H.hipY*sc-cy,D.z-lx*syw+lz*cyw-cz,sc,D.yaw,sw,0,0,1,1,1,1,0,0,0,0,0.6,0,2);});
+list.push([KL,4]);
+}
+if(list.length)draws+=G.draw(r,E,list);
+}else{
+const ent=g.entities;if(ent&&ent.beginVox&&VR.getVoxModel){
+let prog=null;const pg=()=>prog||(prog=ent.beginVox(r,E));
+const LT={sky:1,bl:[0,0,0]};
+if(W.vis){
+const model=VR.getVoxModel(r.gl,'wu_whale');
+if(model){
+
+let x=W.p[0],y=W.p[1],z=W.p[2],sc=13.6;
+const dx=x-cx,dy=y-cy,dz=z-cz,d=Math.hypot(dx,dy,dz),far=(cam.far||300)*0.8;
+if(d>far){const k=far/d;x=cx+dx*k;y=cy+dy*k;z=cz+dz*k;sc*=k;}
+ent.drawModel(r,pg(),model,[x,y,z],cam,W.yaw,null,LT,{scale:sc,pitch:W.pitch,roll:W.bank,noShade:true});draws++;
+}
+}
+if(tr&&treeY!==null){const model=VR.getVoxModel(r.gl,'wu_tree');if(model){ent.drawModel(r,pg(),model,[tr.x,treeY+1,tr.z],cam,tr.yaw||0,null,ent.lightAt?ent.lightAt(tr.x,treeY+3,tr.z):LT,{scale:9.3});draws++;}}
+if(D){
+const model=VR.getVoxModel(r.gl,'glimmer_deer');
+if(model){const s=Math.sin(D.walk)*0.6*(D.walking?1:0);ent.drawModel(r,pg(),model,[D.x,D.y,D.z],cam,D.yaw,{leg_fl:[s,0,0],leg_br:[s,0,0],leg_fr:[-s,0,0],leg_bl:[-s,0,0]},LT,{scale:1.3*(D.gone>0&&D.gone<0.6?D.gone/0.6:1)});draws++;}
+}
+}
+}
+WG.cost.draws=draws;WG.cost.drawMs=WG.cost.drawMs*0.9+(performance.now()-t0)*0.1;
+};
+const WA=VR.Wild&&VR.Wild.Actor&&VR.Wild.Actor.prototype;
+if(WA&&WA.draw&& !WA.draw.__wu){
+const od=WA.draw;
+WA.draw=function(r,E,layer,cam){od.apply(this,arguments);try{WG.draw(this.g,r,E,layer,cam);}catch(e){if(!WG.warnedD){WG.warnedD=true;console.warn('wunder draw',e);}}};
+WA.draw.__wu=true;
+}
+
+
+const LFd=VR.LField;
+if(LFd&&LFd.gather&& !LFd.gather.__wu){
+const og=LFd.gather;
+LFd.gather=function(g,f,E,t){
+const r=og.apply(this,arguments);
+try{
+if(!WG.on(g)|| !g._wu)return r;
+const nt=Math.max(0,Math.min(1,(E&&E.night)||0)),R=g._wu,p=g.player;
+const h=p&&p.inv&&p.inv.held;
+if(h&&h.id==='lantern_seed'&&nt>0.1){const ep=p.eyePos?p.eyePos():[p.pos[0],p.pos[1]+1.5,p.pos[2]];f.add(ep[0],ep[1]-0.5,ep[2],1.0*nt,0.7*nt,0.35*nt,8);}
+const tr=g.meta.wunder&&g.meta.wunder.tree;
+if(tr&&nt>0.2&&Math.hypot(tr.x-f.cx,tr.z-f.cz)<64){const y=ground(g.world,tr.x,tr.z);if(y!==null)f.add(tr.x,y+7,tr.z,1.1*nt,0.75*nt,0.35*nt,13);}
+const D=R.deer;if(D&&Math.hypot(D.x-f.cx,D.z-f.cz)<64)f.add(D.x,D.y+2.2,D.z,0.9,0.66,0.34,8);
+const W=R.whale;if(W.vis&&W.mode!=='route'&&Math.hypot(W.p[0]-f.cx,W.p[2]-f.cz)<64)f.add(W.p[0],W.p[1]-3,W.p[2],1.0*W.glow,0.7*W.glow,0.35*W.glow,18);
+}catch(e){}
+return r;
+};
+LFd.gather.__wu=true;
+}
+
+
+const esc=(s)=>String(s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+WG.html=function(g){
+const R=S(g),m=mem(g),day=g.env.day|0,C=VR.Chronik,v=g._chr&&g._chr.view;
+const rows=[];
+if((g.meta.vgen|0)>=3){const tonight=WU.whaleVisit(R.seed,day)&&g.env.timeOfDay<WU.WHALE.from+WU.WHALE.dur;rows.push(T('g.wu.book.whale',{name:R.names.whale,when:T(tonight?'g.wu.book.next':'g.wu.book.next2')}));}
+if(m.treeSeen){
+let where='',when='';
+if(C&&v){try{const e={k:'tree',c:C.cellOf(v,m.treeSeen.x,m.treeSeen.z),x:m.treeSeen.x,z:m.treeSeen.z,v:{},d:m.treeSeen.d};where=C.placeOf(v,e);when=C.when(e,day);}catch(er){where='';}}
+rows.push(T('g.wu.book.tree',{name:R.names.tree,in:where,when}));
+}
+if(m.paths)rows.push(T('g.wu.book.deer',{n:m.paths}));
+return`<div class="wdsec wusec"><h3>🐋 ${esc(T('g.wu.book'))}</h3><div class="note">${esc(T('g.wu.book.note'))}</div>`+
+(rows.length?rows.map(s=>`<div class="chrow"><span class="chtx">${esc(s)}</span></div>`).join(''):`<span class="note">${esc(T('g.wu.book.none'))}</span>`)+'</div>';
+};
+const Wd=VR.Wander;
+if(Wd&&Wd.html&& !Wd.html.__wu){
+const oh=Wd.html;
+Wd.html=function(meta){let h=oh.apply(this,arguments);try{const g=VR.game;if(g&&g.meta===meta&&WG.on(g))h=WG.html(g)+h;}catch(e){}return h;};
+Wd.html.__wu=true;
+}
+
+
+if(VR.Regie&&VR.Regie.addSource)VR.Regie.addSource(function wunderSource(g){
+if(!WG.on(g)|| !g.meta.wunder|| !g.meta.wunder.tree)return null;
+const m=g.meta.wunder,tr=m.tree,p=g.player.pos,day=g.env.day|0,d=Math.hypot(tr.x-p[0],tr.z-p[2]);
+if(d<70||d>600||WU.isNight(g.env.timeOfDay)|| !WU.canEvent(m,'lead',day)|| !WU.canEvent(m,'tree',day))return null;
+return[{source:'wunder',act:'wunder_lead',weight:2,kind:'discovery',place:'wunder',eta:0,start(){
+WU.markEvent(m,'lead',day);
+note(g,T('g.wu.lead'),'wunder:lead',2);
+const gad=g.gadgets;if(gad&&gad.addWaypoint){try{const y=ground(g.world,tr.x,tr.z);gad.addWaypoint(Math.round(tr.x),(y||70)+2,Math.round(tr.z),'🌳 '+T('g.wu.tree'));}catch(e){}}
+return true;
+}}];
+});
+
+WG.test={
+state:(g)=>g._wu,mem,ticks,
+
+tree:(g,x,z)=>{const m=mem(g);m.tree={x,z,tx:null,tz:null,stood:true,planned:1e9,rings:[],yaw:0.6};return m.tree;},
+ring:(g,x,z)=>placeRing(g,x,z,5),
+deer:(g,x,z,tx,tz)=>{const R=S(g),y=ground(g.world,x,z);R.deer={x,z,y:(y||64)+1,tx,tz,id:'test',yaw:Math.atan2(-(tx-x),-(tz-z)),walk:0,t:0,gone:0};return R.deer;},
+};
 })(VR);
 
 VR.GenieLazy=function(){
