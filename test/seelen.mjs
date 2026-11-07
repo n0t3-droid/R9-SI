@@ -369,7 +369,7 @@ if (HP && want('cost')) {
   } catch (e) { check(false, 'cost: ' + e.message); }
   save();
 }
-sheet.push({ label: 'Begrüßung mit Erinnerung: er weiß noch, dass du ihm Honig geschenkt hast', imgs: rows.greet });
+sheet.push({ label: 'Begrüßung mit Erinnerung an deinen Honig', imgs: rows.greet });
 sheet.push({ label: 'Streit um nichts: Rücken an Rücken – am nächsten Abend dieselbe Bank – Friedensgeschenk', imgs: rows.quarrel });
 sheet.push({ label: 'Wanderbuch: die Seite „Menschen“', imgs: rows.book });
 sheet.push({ label: 'Angst vor Stürmen: läuft vor dem Gewitter schnell nach Hause', imgs: rows.storm });
