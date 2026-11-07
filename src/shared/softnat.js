@@ -30,7 +30,7 @@
   SN.bumpSoft = 0.1;           // and on the soft ground's slopes
   SN.snowLine = 150;           // snow caps above this height (world y), ragged by noise
   // the natural blocks (cube states only; the "_cut" twins a shovel makes stay cubes, as do paths, pavers and roads)
-  SN.SOFT = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|mud|clay|gravel|sand|red_sand|moss_block|pale_moss_block|snow_block|snow|rooted_dirt|stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|packed_ice|bedrock|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta|\w*_ore|gloom_sand|gloom_soil|echo_moss|ochre_rock|umber_rock|duskrock|emberrock|tidestone|abyssal_tidestone|skyroot_soil|aether_stone|buried_sand|buried_gravel|muddy_mangrove_roots|exo_moss|tholin_ice)$/;
+  SN.SOFT = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|mud|clay|gravel|sand|red_sand|moss_block|pale_moss_block|snow_block|snow|rooted_dirt|stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|packed_ice|bedrock|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta|sandstone|red_sandstone|cinnabar|sulfur|\w*_ore|gloom_sand|gloom_soil|echo_moss|ochre_rock|umber_rock|duskrock|emberrock|tidestone|abyssal_tidestone|skyroot_soil|aether_stone|buried_sand|buried_gravel|muddy_mangrove_roots|exo_moss|tholin_ice)$/;
   // the painter's palette (sRGB): our own colours; mat 1 grass-like (slopes → earth → rock), 2 snow (steep → rock),
   // 3 rock (noses), 0 earth/sand (steep → rock)
   const PAL = {
@@ -42,6 +42,7 @@
     dripstone_block: [0x8a7060, 3], bedrock: [0x3c3c40, 3], ochre_rock: [0xb88a4a, 3], umber_rock: [0x6a4a34, 3], duskrock: [0x5a4a62, 3], emberrock: [0x6a3a30, 3], tidestone: [0x6a8a8c, 3],
     abyssal_tidestone: [0x3a5a62, 3], aether_stone: [0xb8c8e0, 3],
     terracotta: [0x985e43, 3], white_terracotta: [0xd2b2a1, 3], light_gray_terracotta: [0x876a61, 3], gray_terracotta: [0x3a2a24, 3], brown_terracotta: [0x4d3323, 3],
+    sandstone: [0xd8c48e, 3], red_sandstone: [0xb8642e, 3], cinnabar: [0x9a3a32, 3], sulfur: [0xd8c84a, 3],
     red_terracotta: [0x8f3d2e, 3], orange_terracotta: [0xa1531d, 3], yellow_terracotta: [0xba8423, 3],
   };
   const EARTH = [0x7d / 255, 0x5f / 255, 0x40 / 255], ROCK = [0x7e / 255, 0x7f / 255, 0x84 / 255], SNOW = [0.93, 0.95, 0.98];

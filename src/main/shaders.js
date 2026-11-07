@@ -975,7 +975,7 @@ vec3 gmPaint(vec3 c, vec3 wp, vec3 n, float dist) {
   float b = bx * w.x + by * w.y + bz * w.z;
   // dabs: the noise cut into tones with soft but definite edges (paint, not grain); calmer far away
   float farK = smoothstep(30.0, 140.0, dist);
-  float tone = mix(smoothstep(0.42, 0.58, b), 0.5, farK * 0.6);
+  float tone = mix(smoothstep(0.36, 0.64, b), 0.5, farK * 0.6);   // (r3: a narrower cut drew the fbm's contours — wood grain on the sand)
   // up close a finer dab layer (the brush's own bristles), gone by 24 m
   float nearK = 1.0 - smoothstep(8.0, 24.0, dist);
   float br = 0.0;
