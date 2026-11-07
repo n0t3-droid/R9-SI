@@ -67,7 +67,9 @@
       if (sh === SH.NONE || sh === SH.CROSS || sh === SH.TALLCROSS || sh === SH.CROP || sh === SH.FLUID || sh === SH.WIRE) continue;
       if (fl & (F.LEAVES | F.FLUID | F.PLANT)) continue;
       if (nm === 'snow' || nm === 'powder_snow') continue;
-      if ((fl & F.OPAQUE) || (fl & F.SOLID)) pin[s] = 1;
+      // (built shapes pin: full blocks, slabs, stairs, walls, fences, panes; a small solid model — a pebble, a flower pot,
+      //  a mini-voxel piece that is not a full block — does not, or every decorated slope would snap back into terraces)
+      if ((fl & F.OPAQUE) || ((fl & F.SOLID) && ((fl & F.FULL) || sh === SH.SLAB || sh === SH.STAIRS || sh === SH.WALL || sh === SH.FENCE || sh === SH.PANE))) pin[s] = 1;
     }
     TB = { soft, pin, col, mat };
     return TB;

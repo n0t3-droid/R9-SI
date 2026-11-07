@@ -1262,7 +1262,11 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #if defined(Q_GRASS) && !defined(MODEL)
   // q-art2 · Wiese (qart2.js): a green top as a meadow — never in the Klassisch look
   // (by the face's mean colour, not the tint: run 2's village lawn is an untinted green block — it stayed flat)
+#ifdef GEMALT
+  if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = gmF ? alb.rgb : lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;   // (r-gemalt: the sculpted ground's mean is its paint — r4: the far meadow went flat dark)
+#else
   if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;
+#endif
     if (qm.g > qm.r * 1.1 && qm.g > qm.b * 1.15) alb.rgb = qGrass(alb.rgb, qm, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel); }
 #endif
 #ifdef BODYGROUND
