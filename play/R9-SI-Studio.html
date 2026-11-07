@@ -31944,7 +31944,16 @@ let lb=null;try{lb=VR.Vista.lodBoxes(g,x0,z0,x0+T,z0+T,2);}catch(e){if(VR.Villag
 if(lb)for(const b of lb)box(b.x0-x0,b.y0,b.z0-z0,b.x1-x0,b.y1,b.z1-z0,b.c,b.k,b.k===0?1:3);
 }
 
-if(g.islandAt){
+
+
+if(job.isleForm&&VR.IsleShell&&g.islandCell){
+const IS=VR.IsleShell,det=IS.detFor(L);
+const Bq={vert:(x,y,z,face,kd,ax,c,sh)=>{push(x,y,z,face,kd,ax,c,sh);return nv-1;},tri:(a,b,c)=>{if(ni+3>icap){icap*=2;const n2=new Uint32Array(icap);n2.set(I);I=n2;}I[ni++]=a;I[ni++]=b;I[ni++]=c;}};
+
+
+const rMin=IS.minR(L);
+for(const J of IS.anchored(g,x0,z0,x0+T,z0+T))if(J.r>=rMin)IS.emit(IS.mesh(g,J,det),Bq,x0,z0);
+}else if(g.islandAt){
 const isl=new Array(N*N);
 for(let j= -1;j<=n;j++)for(let i= -1;i<=n;i++){const X=x0+i*S+(S>>1),Z=z0+j*S+(S>>1);isl[idx(i,j)]=g.islandAt(X,Z);}
 for(let j=0;j<n;j++)for(let i=0;i<n;i++){
@@ -32010,6 +32019,203 @@ const ib=nv>65535?I.slice(0,ni):Uint16Array.from(I.subarray(0,ni));
 return{verts:buf,idx:ib,count:ni,minY,maxY,big:nv>65535,bx0,bz0,bx1,bz1};
 };
 })(VR);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const M=VR.M;
+const IS=VR.IsleShell={};
+const TAU=Math.PI*2;
+
+
+IS.DET=[
+{seg:7,top:[],und:[0.78,0.4],vines:false},
+{seg:11,top:[0.6],und:[0.86,0.62,0.34],vines:false},
+{seg:0,top:[0.5],und:[0.92,0.78,0.6,0.4,0.2],vines:true},
+];
+
+
+IS.segs=(I,det)=>(det>=2?Math.max(12,Math.min(22,Math.round(I.r*0.6))):IS.DET[Math.max(0,det)].seg);
+
+IS.detFor=(L)=>(L<=0?2:L<=1?1:0);
+
+
+IS.minR=(L)=>(L>=3?LODCELL(L)*0.45:0);
+const LODCELL=(L)=>(L<0?2:4<<L);
+const hf=(a,b,s)=>(M.hash2(a|0,b|0,s)>>>0)/4294967296;
+const mixc=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const mulc=(a,k)=>[a[0]*k,a[1]*k,a[2]*k];
+
+
+IS.outline=function(g,I,th){
+const cx=Math.cos(th),sz=Math.sin(th),max=I.r*1.35+1;
+let lo=0,hi=max;
+for(let d=1;d<=max;d+=1){if(!g.islandShape(I,I.x+cx*d,I.z+sz*d)){hi=d;break;}lo=d;}
+for(let k=0;k<4;k++){const m=(lo+hi)/2;if(g.islandShape(I,I.x+cx*m,I.z+sz*m))lo=m;else hi=m;}
+return Math.max(1,lo+0.5);
+};
+
+
+IS.top=(g,I,x,z,t)=>I.y+Math.min(1,t*2.4)*I.dome+g.nVein.n2(x*0.5,z*0.5)*1.2+1;
+IS.jag=function(g,I,x,z){
+let s=0;
+for(let j= -1;j<=1;j++)for(let i= -1;i<=1;i++)s+=0.5+0.5*Math.abs(g.nIsleH.n2((x+i*1.5)*7+I.seed,(z+j*1.5)*7));
+return s/9;
+};
+IS.bottom=(g,I,x,z,t)=>I.y-2-Math.pow(Math.min(t,0.97),0.75)*I.r*I.deep*IS.jag(g,I,x,z);
+
+
+IS.palette=function(g,I){
+const LOD=VR.LOD,P=LOD.palette(),U=LOD.util;
+const cl=g.climateAt?g.climateAt(I.x,I.z):g.computeClimate(I.x,I.z);
+const B=VR.BIOMES[g.biomeFor(cl,90)]||VR.BIOMES[0];
+const ember=cl.ember>0.45&& !I.designed,prism=cl.prism>0.45&& !I.designed,cold=cl.t< -0.35;
+const top=ember?P.redsand:cold?P.snow:U.tint(P.grassTop,B.grass);
+let bands;
+if(prism)bands=[P.duskrock,mulc(P.duskrock,1.15),P.duskrock];
+else if(ember)bands=[P.ochre,P.ochre,P.umber];
+else if((g.vgen|0)>=9)bands=[P.ochre,P.umber,P.terr,P.ochre,mixc(P.terr,P.umber,0.5),P.umber,mixc(P.terr,[150,60,40],0.4)].map(c=>mixc(c,P.stone,0.22));
+else bands=[P.stone,mulc(P.stone,0.86),mixc(P.stone,P.dirt,0.2)];
+const moss=cold?mixc(P.snow,[80,100,70],0.4):ember?mixc(P.umber,[90,110,50],0.35):[74,104,48];
+return{cold,top,bands,moss,dirt:P.dirt,tuff:[76,74,70],vine:cold?[70,92,72]:[52,88,34],root:[92,70,50]};
+};
+
+
+
+const CACHE=new Map();
+IS.clearCache=()=>CACHE.clear();
+IS.mesh=function(g,I,det){
+const key=(g.seed|0)+':'+(g.vgen|0)+':'+I.x.toFixed(2)+':'+I.z.toFixed(2)+':'+I.r.toFixed(2)+':'+det;
+let m=CACHE.get(key);if(m)return m;
+if(CACHE.size>900)CACHE.clear();
+m=IS.build(g,I,det,IS.palette(g,I));
+CACHE.set(key,m);
+return m;
+};
+IS.build=function(g,I,det,pal){
+g.islandShape(I,I.x,I.z);
+const D=IS.DET[Math.max(0,Math.min(2,det))],seg=IS.segs(I,det);
+const pos=[],col=[],kind=[],idx=[];
+const vert=(x,y,z,c,sh,kd)=>{pos.push(x,y,z);col.push(Math.round(c[0]),Math.round(c[1]),Math.round(c[2]),sh);kind.push(kd|0);return pos.length/3-1;};
+const R=new Float32Array(seg),CS=new Float32Array(seg),SN=new Float32Array(seg);
+for(let s=0;s<seg;s++){const th=(s+0.5)/seg*TAU+(I.seed%7)*0.13;CS[s]=Math.cos(th);SN[s]=Math.sin(th);R[s]=IS.outline(g,I,th);}
+const at=(s,f)=>[I.x+CS[s]*R[s]*f,I.z+SN[s]*R[s]*f];
+const sd=I.seed|0,nb=pal.bands.length;
+
+const rows=[];
+const ring=(fn)=>{const r=new Array(seg);for(let s=0;s<seg;s++)r[s]=fn(s);rows.push(r);return r;};
+
+{const yc=IS.top(g,I,I.x,I.z,1);const c=vert(I.x,yc,I.z,mixc(pal.top,[255,255,230],0.04),255,0);rows.push(new Array(seg).fill(c));}
+for(const f of D.top)ring((s)=>{const p=at(s,f);return vert(p[0],IS.top(g,I,p[0],p[1],1-f),p[1],pal.top,255,0);});
+const rimY=new Float32Array(seg);
+ring((s)=>{const p=at(s,1);rimY[s]=IS.top(g,I,p[0],p[1],0);return vert(p[0],rimY[s],p[1],mixc(pal.top,pal.moss,0.35),244,0);});
+
+
+const lip=det>=2?ring((s)=>{const p=at(s,1.03);return vert(p[0],rimY[s]-1.25,p[1],pal.moss,222,0);}):null;
+
+if(det>=1)ring((s)=>{const p=at(s,0.99);return vert(p[0],Math.min(rimY[s]-2.2,I.y-1.6),p[1],mixc(pal.dirt,pal.bands[sd%nb],0.45),205,0);});
+
+const U=D.und,last=U.length-1;
+
+
+
+const GN=VR.GEN,calm= !!(GN&&I.designed&& !pal.cold&&GN.isleGarden&&GN.isleGarden(g));
+U.forEach((f,k)=>ring((s)=>{
+
+
+const q=at(s,f),ln=k?g.nIsleH.n2(q[0]*0.13+sd,q[1]*0.13-sd):0,ff=f*(1+0.09*ln);
+const p=at(s,ff),t=1-f,y0=IS.bottom(g,I,q[0],q[1],t),y=y0-(I.y-y0)*0.06*ln;
+let c=pal.bands[(k+sd)%nb];
+if(calm){const m=g.nVein.n2(p[0]*0.09+sd*0.37,p[1]*0.09-sd*0.21);c=mixc(c,pal.moss,m> -0.12?0.72:0.22);}
+if(k>=last-(det>=2?1:0))c=hf(s,k,sd+5)<0.55?pal.moss:mixc(pal.tuff,pal.moss,0.3);
+return vert(p[0],y,p[1],c,Math.round(200-38*(k/Math.max(1,last))),0);
+}));
+{const y=IS.bottom(g,I,I.x,I.z,1);const c=vert(I.x,y,I.z,mixc(pal.tuff,pal.moss,0.5),158,0);rows.push(new Array(seg).fill(c));}
+
+
+for(let r=0;r+1<rows.length;r++){
+const A=rows[r],B=rows[r+1];
+for(let s=0;s<seg;s++){
+const s1=(s+1)%seg,a0=A[s],a1=A[s1],b0=B[s],b1=B[s1];
+if(a0!==a1)idx.push(a0,a1,b1);
+if(b0!==b1)idx.push(a0,b1,b0);
+}
+}
+
+if(D.vines){
+const card=(x,y,z,ux,uz,w,len,c,kd)=>{
+const a=vert(x-ux*w,y,z-uz*w,c,200,kd),b=vert(x+ux*w,y,z+uz*w,c,200,kd);
+const tip=vert(x+(hf(x*8,z*8,3)-0.5)*0.6,y-len,z+(hf(z*8,x*8,4)-0.5)*0.6,mulc(c,0.8),170,kd);
+idx.push(a,b,tip,a,tip,b);
+};
+const calm= !!(VR.GEN&&VR.GEN.isleCalm&&VR.GEN.isleCalm(g));
+for(let s=0;s<seg;s++){
+const h=hf(s,sd,11);if(h>(calm?0.4:0.55))continue;
+const L=lip[s],x=pos[L*3]+CS[s]*0.15,y=pos[L*3+1]+0.2,z=pos[L*3+2]+SN[s]*0.15;
+const len=1.6+hf(s,sd,12)*Math.min(7,1+(I.y-IS.bottom(g,I,I.x,I.z,1))*0.25);
+card(x,y,z,-SN[s],CS[s],0.42,len,pal.vine,5);
+}
+const k=Math.max(1,Math.floor(U.length/2));
+for(let s=0;s<seg;s+=2){
+if(hf(s,sd,13)>0.5)continue;
+const p=at(s,U[k]),t=1-U[k],y=IS.bottom(g,I,p[0],p[1],t);
+card(p[0],y+0.3,p[1],-SN[s],CS[s],0.3,1.5+hf(s,sd,14)*3.5,pal.root,0);
+}
+}
+return{pos:Float32Array.from(pos),col:Uint8Array.from(col),kind:Uint8Array.from(kind),idx:Uint16Array.from(idx),nv:pos.length/3,ni:idx.length};
+};
+
+
+IS.emit=function(m,B,ox,oz){
+const base=new Array(m.nv),c=[0,0,0];
+for(let v=0;v<m.nv;v++){c[0]=m.col[v*4];c[1]=m.col[v*4+1];c[2]=m.col[v*4+2];base[v]=B.vert(m.pos[v*3]-ox,m.pos[v*3+1],m.pos[v*3+2]-oz,7,m.kind[v],0,c,m.col[v*4+3]);}
+for(let i=0;i<m.ni;i+=3)B.tri(base[m.idx[i]],base[m.idx[i+1]],base[m.idx[i+2]]);
+};
+
+
+const COLS=new Map();
+IS.columns=function(g,ox,oz){
+const key=(g.seed|0)+':'+ox+':'+oz;
+let a=COLS.get(key);if(a)return a;
+if(COLS.size>256)COLS.clear();
+const PAD=VR.MESH_PAD,PS=VR.MESH_PS;
+a=new Int16Array(PS*PS*2);
+for(let z=0;z<PS;z++)for(let x=0;x<PS;x++){
+const c=z*PS+x,sh=g.islandAt(ox+x-PAD,oz+z-PAD);
+a[c*2]=sh?sh.bottom:32767;a[c*2+1]=sh?sh.top: -32768;
+}
+COLS.set(key,a);
+return a;
+};
+
+IS.anchored=function(g,x0,z0,x1,z1){
+const out=[];
+if(!g.islandCell|| !g.islandShape|| !g.islandAt||g.singleBiome>=0)return out;
+g.islandAt(x0,z0);
+const IC=72,inT=(I)=>I.x>=x0&&I.x<x1&&I.z>=z0&&I.z<z1;
+for(let cj=Math.floor(z0/IC);cj<=Math.floor((z1-1e-6)/IC);cj++)for(let ci=Math.floor(x0/IC);ci<=Math.floor((x1-1e-6)/IC);ci++){const I=g.islandCell(ci,cj);if(I&&inT(I))out.push(I);}
+const H=VR.Heart&&VR.Heart.ISLES;
+if(g.designedIslands&&H){
+const D=g.designedIslands(Math.max(x0,Math.min(x1-1,H.x)),Math.max(z0,Math.min(z1-1,H.z)));
+if(D)for(const I of D)if(inT(I))out.push(I);
+}
+return out;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
 
 
@@ -33091,7 +33297,10 @@ F.setSlab(S,i,j,{ground:gy,bot:bBot>gy+1?bBot:gy-1,top:bTop+1,roof:roof?roof.c:G
 }
 lap('structures');
 
-const I=F.slabGrid(n,cell),isles=islesNear(g,x0,z0,x1,z1);
+
+
+const isleForm= !!(job.isleForm&&VR.IsleShell);
+const I=F.slabGrid(n,cell),isles=isleForm?[]:islesNear(g,x0,z0,x1,z1);
 if(isles.length){
 
 const iTop=new Float32Array(n*n).fill(-1e9),iBot=new Float32Array(n*n);
@@ -33120,6 +33329,7 @@ F.meshField(Bd,f);
 lap('meshField');
 F.meshSlabs(Bd,S);
 F.meshSlabs(Bd,I);
+if(isleForm){Bd.part='slab';for(const J of VR.IsleShell.anchored(g,x0,z0,x1,z1))VR.IsleShell.emit(VR.IsleShell.mesh(g,J,2),Bd,x0,z0);}
 lap('meshSlabs');
 
 
@@ -35395,6 +35605,10 @@ const roundOn=(lm&2)!==0&&fancy,groundOn=(lm&4)!==0;
 const RCX=groundOn&&VR.LOOK&&VR.LOOK.ground?RC.rockTable():null;
 const RCL=roundOn?RC.leafTable():null;
 const rcGround=(b)=>(TF[b]&F.SMOOTH)!==0||(RCX!==null&&RCX[b]===1);
+
+
+const ISL=(lm&16)!==0&&job.isle&&VR.LOOK&&VR.LOOK.ground?job.isle:null,oyW=(job.sy|0)*16-PAD;
+const rcIsle=(bi)=>{const c=bi%PSS,wy=((bi/PSS)|0)+oyW;return wy>=ISL[c*2]&&wy<=ISL[c*2+1];};
 let rcS=null;
 const rcV=[0,0,0],rcP=new Float64Array(12);
 
@@ -35569,10 +35783,19 @@ let w5=dd|((fl&F.EMISSIVE)?1<<12:0)|(rcb?32768:0);
 if(fl&F.WAVELEAF)w5|=1<<7;
 const w3=texW3(TTEX[b*6+dd],fl,dd,b);
 const start=(bright(0)+bright(2)<bright(1)+bright(3))?1:0;
+
+
+const planar=(lm&32)!==0&&((fl&F.LEAVES)!==0||(RCL!==null&&RCL[b]!==0));
+let pa=0,pb=0,ba=0,bb=0;
+if(planar){
+const ax=dd>>1;pa=ax===0?2:0;pb=ax===1?2:1;
+ba=Math.floor(Math.min(rcP[pa],rcP[3+pa],rcP[6+pa],rcP[9+pa]));bb=Math.floor(Math.min(rcP[pb],rcP[3+pb],rcP[6+pb],rcP[9+pb]));
+}
 buf.ensure(4);
 for(let kk=0;kk<4;kk++){
 const k=(kk+start)&3;
-buf.v(rcP[k*3],rcP[k*3+1],rcP[k*3+2],w3,k>=2?16:0,(k===1||k===2)?16:0,w5|(cornerAO[k]<<3),cornerLight[k],tint);
+const u=planar?Math.min(255,Math.round((rcP[k*3+pa]-ba)*16)):(k>=2?16:0),v=planar?Math.min(255,Math.round((rcP[k*3+pb]-bb)*16)):((k===1||k===2)?16:0);
+buf.v(rcP[k*3],rcP[k*3+1],rcP[k*3+2],w3,u,v,w5|(cornerAO[k]<<3),cornerLight[k],tint);
 }
 return true;
 }
@@ -35629,7 +35852,7 @@ const mi=v*16+u;
 
 
 
-if(groundOn&&rcGround(b)){
+if((groundOn&&rcGround(b))||(ISL!==null&&rcIsle(bi))){
 if(!(roundOn&&(TF[nb]&F.LEAVES))){faceCorners(bi,d);if(emitRoundQuad(bufs[0],d,x,y,z,bi,b,fl,true))continue;}
 }else
 if((fl&F.SMOOTH)&&d!==3&& !(TF[B[bi+PSS]]&F.OPAQUE)&&smoothAt(x,y,z)){
@@ -35799,7 +36022,7 @@ ox=((h&15)/15-0.5)*0.35;oz=(((h>>4)&15)/15-0.5)*0.35;
 
 if(PH&&(shapeOf(b)===SH.CROSS||shapeOf(b)===SH.TALLCROSS||shapeOf(b)===SH.CROP)&&y>0){
 const bb=B[bi-PSS];
-if(groundOn&&rcGround(bb)){
+if((groundOn&&rcGround(bb))||(ISL!==null&&rcIsle(bi-PSS))){
 if(!rcS)rcS=RC.solver(B,TF,roundOn,job.ox,(job.sy|0)*16,job.oz);
 for(let k=0;k<4;k++){rcS.vert(x-1+(k>>1),y-1,z-1+(((k+1)>>1)&1),rcV);smC[k]=rcV[1];}
 const fx=0.5+ox,fz=0.5+oz;oy=smC[0]*(1-fx)*(1-fz)+smC[1]*(1-fx)*fz+smC[2]*fx*fz+smC[3]*fx*(1-fz)-y;
@@ -49831,6 +50054,7 @@ post({type:'gen',id:m.id,dim:m.dim,cx:m.cx,cz:m.cz,blocks:m.blocks,light,biome,c
 }else if(m.type==='mesh'){
 const t0=performance.now();
 const svWant=VR.SmoothVox?VR.SmoothVox.prep(m):null;
+if(typeof m.fancyLeaves==='number'&&(m.fancyLeaves&16)&&m.dim&&VR.IsleShell){const gi=getGen(m.dim);if(gi&&gi.islandAt)m.isle=VR.IsleShell.columns(gi,m.ox,m.oz);}
 const r=VR.meshSection(m);
 const o=toTris(r.opaque),c=toTris(r.cutout),t=toTris(r.trans);
 const vx=r.vx?toTris(r.vx):null,vxFar=r.vxFar?toTris(r.vxFar):null;
@@ -69242,6 +69466,8 @@ VR.I18N.add('en',{
 'g.set.qRound.tip':'Tree crowns as rounded masses of leaves instead of cubes: the crown\'s corners and edges round off. Only the picture, the blocks stay as they are. Costs little.',
 'g.set.qHill':'Round hills',
 'g.set.qHill.tip':'In the Seamless look the edges, terraces and cliffs of the natural ground and the undersides of the floating isles round off. Only the picture, the blocks and walking stay as they are. Costs little.',
+'g.set.qIsleForm':'Round isles',
+'g.set.qIsleForm.tip':'The floating isles as rounded rocks instead of steps – far away and near: a mossy rim, bands of strata, a softly tapering underside, hanging vines. Only the picture, the blocks and walking stay as they are. Costs little.',
 'g.set.magic.tip':'How strongly the starry sky shows through by day.',
 'g.set.scale.tip':'A lower resolution renders faster; the picture is scaled up.',
 'g.set.tsr.tip':'Renders small and scales up sharply: more frames per second, nearly as sharp.',
@@ -74113,6 +74339,8 @@ VR.I18N.add('de',{
 'g.set.qRound.tip':'Baumkronen als gerundete Laubmassen statt Würfeln: Ecken und Kanten der Krone werden rund. Nur das Bild, die Blöcke bleiben, wie sie sind. Kostet wenig.',
 'g.set.qHill':'Runde Hänge',
 'g.set.qHill.tip':'Im Look Nahtlos werden Kanten, Stufen und Klippen des natürlichen Bodens und die Unterseiten der Schwebeinseln rund. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
+'g.set.qIsleForm':'Runde Inseln',
+'g.set.qIsleForm.tip':'Die Schwebeinseln als runde Felsen statt Stufen – in der Ferne und nah: Moosrand, Gesteinsbänder, eine weich zulaufende Unterseite, hängende Ranken. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
 'g.set.magic.tip':'Wie stark der Sternenhimmel am Tag durchscheint.',
 'g.set.scale.tip':'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
 'g.set.tsr.tip':'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',
