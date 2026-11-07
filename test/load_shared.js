@@ -16,6 +16,7 @@ files.push('worldeco');   // u-worlds: the worlds' ecosystems (after exoworld)
 files.splice(files.indexOf('core') + 1, 0, 'names');   // n-names: VR.Names (the one table of names)
 files.splice(files.indexOf('lod') + 1, 0, 'isleshell');   // q-art4: VR.IsleShell (the floating isles' round far form), after lod
 files.push('chronik');   // r-chronik: VR.Chronik (the world simulation, pure)
+files.push('wunder');   // r-wunder: VR.Wunder (the Wundertiere's rules, pure; after chronik: it adds the deeds)
 const skip = (process.env.R9_SKIP || '').split(',');   // (test/land_v9_same.js: the shared code without some files)
 for (const f of files) { if (skip.includes(f)) continue; const p = __dirname + '/../src/shared/' + f + '.js'; if (require('fs').existsSync(p)) require(p); }
 module.exports=globalThis.VR;
