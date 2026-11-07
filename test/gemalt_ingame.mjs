@@ -98,7 +98,7 @@ try {
     g.zenFreezeWeather = true; g.zenFreezeTime = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar');
     if (VR.UI && VR.UI.hideHud) VR.UI.hideHud(true);
     // the opaque vertices of every uploaded section (renderer.uploadSection)
-    const R = VR.Renderer.prototype, u0 = R.uploadSection; R.uploadSection = function (sec, col, sy, opaque) { sec._gmN = opaque ? opaque.length >> 3 : 0; return u0.apply(this, arguments); };
+    const R = g.renderer, u0 = R.uploadSection; R.uploadSection = function (sec, col, sy, opaque) { sec._gmN = opaque ? opaque.length >> 3 : 0; return u0.apply(this, arguments); };   // (r3: on the instance — the prototype's was shadowed)
   });
   await settle(80);
   check(await ev(() => VR.game.settings.gSoft === true && VR.game.world.fancyLeaves & 16), 'Balanced: Weiche Natur on by default (the leaf mode carries bit 16)');
@@ -240,11 +240,11 @@ try {
     const ready = async () => { for (let i = 0; i < 120; i++) { const n = await ev(() => { const g = VR.game; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); g.renderer.gl.finish(); window.__norender = true; return VR.GL.pending ? VR.GL.pending.size : 0; }); if (!n) return; await wait(250); } check(false, 'the programs compiled'); };
     const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
     const verts = () => ev(() => { let n = 0, s = 0; for (const c of VR.game.world.cols.values()) for (const sc of c.sec) if (sc._gmN) { n += sc._gmN; s++; } return { verts: n, sections: s }; });
-    const med = (a) => { const s = a.slice().sort((x, y) => x - y); return +s[s.length >> 1].toFixed(1); };
+    const med = (a) => +Math.min(...a).toFixed(1);   // (the best of the rounds: SwiftShader under a shared machine only adds; r3's 'median' of two was the worst)
     for (const pr of ['potato', 'balanced', 'high']) {
       await preset(pr); await eyeAt(C.E, C.T, AFT); await settle(25);
       const r = { off: [], on: [], verts: {} };
-      for (let round = 0; round < 2; round++) for (const c of ['on', 'off']) { N.q['cost_' + pr + '_' + c] = await config(c); await eyeAt(C.E, C.T, AFT); await run(2); await ready(); await ms(4); r[c].push(await ms(6)); if (!round) r.verts[c] = await verts(); }
+      for (let round = 0; round < 3; round++) for (const c of (round & 1 ? ['off', 'on'] : ['on', 'off'])) { N.q['cost_' + pr + '_' + c] = await config(c); await eyeAt(C.E, C.T, AFT); await run(2); await ready(); await ms(4); r[c].push(await ms(6)); if (!round) r.verts[c] = await verts(); }
       N.cost[pr] = { off: med(r.off), on: med(r.on), offAll: r.off.map(v => +v.toFixed(1)), onAll: r.on.map(v => +v.toFixed(1)), verts: r.verts };
       console.log('     cost ' + pr + ': off ' + N.cost[pr].off + ' ms · on ' + N.cost[pr].on + ' ms · opaque verts ' + JSON.stringify(r.verts));
       save();
