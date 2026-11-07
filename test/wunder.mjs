@@ -65,30 +65,31 @@ await ev(() => { VR.game.zenFreezeTime = false; });
 const info = await ev(() => { const g = VR.game, R = VR.WunderGame.state(g), WU = VR.Wunder; let d = 2; while (!WU.whaleVisit(R.seed, d)) d++; return { d, seed: R.seed, name: R.names }; });
 run.names = info.name;
 console.log('    names: ' + JSON.stringify(info.name) + ' · visit evening: day ' + info.d);
-// a moment when the whale glides near an isle (its loop at the visit's dusk), the camera outside the archipelago
+// a moment when the whale glides over an isle at dusk; the camera on that isle's outer rim, looking up at it
 const pose = await ev(([d]) => {
   const g = VR.game, R = VR.WunderGame.state(g), WU = VR.Wunder;
   if (!R.loop) R.loop = WU.whaleRoute(R.seed, VR.IslesGen.list({ seed: g.meta.seed }));
   const L = VR.IslesGen.list({ seed: g.meta.seed }), C = R.loop.C, o = new Float32Array(10);
   let best = null;
-  for (let t = 11600; t <= 12600; t += 40) {
+  for (let t = 11500; t <= 12700; t += 20) {
     WU.whaleAt(R.seed, R.loop, d * 24000 + t, o); if (!o[7] || o[8] < 0.99) continue;
-    const dc = Math.hypot(o[0] - C[0], o[2] - C[1]);
-    if (!best || dc > best.dc) best = { t, dc, p: [o[0], o[1], o[2]], yaw: o[3] };
+    for (const I of L) { const dd = Math.hypot(o[0] - I.x, o[2] - I.z); if (dd < I.r * 0.5 && (!best || dd < best.dd)) best = { t, dd, p: [o[0], o[1], o[2]], isle: { x: I.x, z: I.z, y: I.y + (I.dome || 4), r: I.r } }; }
   }
   return { best, C };
 }, [info.d]);
 const B = pose.best;
-check(!!B, 'a dusk moment on the loop (tick ' + (B && B.t) + ')');
+check(!!B, 'a dusk moment over an isle (tick ' + (B && B.t) + ')');
 let wp = null;
 if (B) {
-  const out = [B.p[0] - pose.C[0], B.p[2] - pose.C[1]], ol = Math.hypot(out[0], out[1]) || 1;
-  const cam = [B.p[0] + out[0] / ol * 95 + out[1] / ol * 40, B.p[1] - 30, B.p[2] + out[1] / ol * 95 - out[0] / ol * 40];
+  const I = B.isle; let ox = I.x - pose.C[0], oz = I.z - pose.C[1]; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+  // (the whale a few seconds ahead of the camera's moment: it glides into the frame over the isle)
+  const cam = [I.x + ox * I.r * 1.05 - oz * 8, I.y + 4, I.z + oz * I.r * 1.05 + ox * 8];
   await setT(info.d, B.t);
-  await stand(cam, [pose.C[0] * 0.3 + B.p[0] * 0.7, B.p[1] - 8, pose.C[1] * 0.3 + B.p[2] * 0.7]);
-  await settle(60); await setT(info.d, B.t); await step(10);
+  await stand(cam, [B.p[0], B.p[1] - 6, B.p[2]]);
+  await settle(80); await setT(info.d, B.t); await step(10);
   wp = await ev(() => { const W = VR.WunderGame.state(VR.game).whale; return { vis: W.vis, mode: W.mode, p: Array.from(W.p).map(Math.round), glow: W.glow }; });
   check(wp.vis === 1 && wp.mode === 'route', 'the whale is there on its loop at dusk ' + JSON.stringify(wp));
+  await stand(cam, [wp.p[0], wp.p[1] - 4, wp.p[2]]);
   await grab('whale', 'wunder_whale.png', 6);
 }
 // ---------------------------------------------------------------- 2 · the flute, the answer, the ride
@@ -131,25 +132,26 @@ if (B) {
 }
 // ---------------------------------------------------------------- 3 · the Wanderbaum at dawn, its ring
 const meadow = await ev(() => {
-  const g = VR.game, w = g.world, R = VR.R, p = g.player.pos;
-  for (let r = 10; r < 120; r += 6) for (let k = 0; k < 16; k++) {
-    const a = k / 16 * Math.PI * 2, x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r);
-    if (!w.isLoaded(x, z) || !w.isLoaded(x - 14, z)) continue;
-    const y = w.topAt(x, z), nm = R.types[R.T.type[w.getBlock(x, y, z)]].name;
-    let flat = nm === 'grass_block';
-    for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6], [-14, 0]]) { const y2 = w.topAt(x + dx, z + dz); if (Math.abs(y2 - y) > 1 || R.types[R.T.type[w.getBlock(x + dx, y2, z + dz)]].name !== 'grass_block') flat = false; }
-    if (flat) return [x + 0.5, y, z + 0.5];
+  const g = VR.game, w = g.world, R = VR.R, p = g.player.pos, F = VR.F;
+  const nm = (x, y, z) => R.types[R.T.type[w.getBlock(x, y, z)]].name;
+  const open = (x, z, r, y0) => { for (let dz = -r; dz <= r; dz += 3) for (let dx = -r; dx <= r; dx += 3) { const X = x + dx, Z = z + dz; if (!w.isLoaded(X, Z)) return false; let y = w.topAt(X, Z); while (y > 1 && !(R.T.flags[w.getBlock(X, y, Z)] & F.SOLID)) y--; if (nm(X, y, Z) !== 'grass_block' || Math.abs(y - y0) > 1 || w.topAt(X, Z) > y + 2) return false; } return true; };
+  for (let r = 0; r < 220; r += 8) for (let k = 0; k < 24; k++) {
+    const a = k / 24 * Math.PI * 2, x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r);
+    if (!w.isLoaded(x, z)) continue;
+    let y = w.topAt(x, z); while (y > 1 && !(R.T.flags[w.getBlock(x, y, z)] & F.SOLID)) y--;
+    if (nm(x, y, z) !== 'grass_block') continue;
+    if (open(x, z, 12, y) && open(x - 14, z, 6, y) && open(x + 6, z + 16, 9, y)) return [x + 0.5, y, z + 0.5];
   }
   return null;
 });
 check(!!meadow, 'a meadow near the valley spot ' + JSON.stringify(meadow));
 if (meadow) {
-  await ev(([m]) => { const g = VR.game, WGm = VR.WunderGame; WGm.test.tree(g, m[0], m[2]); WGm.test.ring(g, m[0] - 14, m[2]); }, [meadow]);
+  run.ring = await ev(([m]) => { const g = VR.game, WGm = VR.WunderGame; WGm.test.tree(g, m[0], m[2]); return WGm.test.ring(g, m[0] - 14, m[2]); }, [meadow]);
   await setT(info.d + 1, 600);
-  await stand([meadow[0] - 30, meadow[1] + 5, meadow[2] + 16], [meadow[0] - 6, meadow[1] + 4, meadow[2]]);
+  await stand([meadow[0] - 26, meadow[1] + 2.5, meadow[2] + 18], [meadow[0] - 6, meadow[1] + 5, meadow[2]]);
   await settle(30); await setT(info.d + 1, 600); await step(6);
   const flowers = await ev(([m]) => { const w = VR.game.world, R = VR.R; let n = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = Math.floor(m[0] - 14 + dx), z = Math.floor(m[2] + dz), y = w.topAt(x, z); const nm = R.types[R.T.type[w.getBlock(x, y, z)]].name; if (/poppy|cornflower|daisy|allium|bluet|dandelion|lily/.test(nm)) n++; } return n; }, [meadow]);
-  check(flowers >= 8, 'the ring of blossoms where it stood (' + flowers + ' flowers)');
+  check(flowers >= 8, 'the ring of blossoms where it stood (' + flowers + ' flowers, placed ' + run.ring + ')');
   await grab('tree', 'wunder_tree.png', 6);
   const sit = await ev(() => { const g = VR.game, n0 = g.player.inv.count('lantern_seed'); VR.WunderGame.sit(g); return [n0, g.player.inv.count('lantern_seed')]; });
   check(sit[1] === sit[0] + 1, 'sitting under it by day: a lantern seed (' + sit.join(' → ') + ')');
@@ -162,8 +164,8 @@ if (meadow) {
 // ---------------------------------------------------------------- 4 · the Laternenhirsch leading at night
 if (meadow) {
   await setT(info.d + 1, 18000);
-  await ev(([m]) => { const g = VR.game; VR.WunderGame.test.deer(g, m[0] + 10, m[2] - 4, m[0] + 120, m[2] - 40); g.player.teleport(m[0] - 2, m[1] + 1, m[2] + 2); }, [meadow]);
-  await stand([meadow[0] - 4, meadow[1] + 2.5, meadow[2] + 4], [meadow[0] + 10, meadow[1] + 1.2, meadow[2] - 4]);
+  await ev(([m]) => { const g = VR.game; VR.WunderGame.test.deer(g, m[0] + 7, m[2] + 18, m[0] + 40, m[2] + 160); }, [meadow]);
+  await stand([meadow[0] + 4, meadow[1] + 1, meadow[2] + 8], [meadow[0] + 7.5, meadow[1] + 2.4, meadow[2] + 18]);
   await ev(() => { const p = VR.game.player; p.flying = false; });
   await step(10, 33);
   const dd = await ev(() => { const D = VR.WunderGame.state(VR.game).deer; return D ? { x: D.x.toFixed(1), walking: D.walking } : null; });

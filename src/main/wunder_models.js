@@ -72,7 +72,7 @@
 
   // ---------------------------------------------------------------- the Himmelswal (length 1, nose −z)
   WM.WHALE = { NI: 56, NJ: 26 };
-  WM.whaleR = (t) => (t < 0.22 ? 0.1 * Math.pow(Math.sin(t / 0.22 * Math.PI / 2), 0.62) : 0.1 * Math.pow(Math.cos((t - 0.22) / 0.78 * Math.PI / 2), 0.95) + 0.012 * ss(0.6, 1, t));
+  WM.whaleR = (t) => (t < 0.24 ? 0.115 * Math.pow(Math.sin(t / 0.24 * Math.PI / 2), 0.6) : 0.115 * Math.pow(Math.cos((t - 0.24) / 0.76 * Math.PI / 2), 1.1) + 0.012 * ss(0.6, 1, t));
   function whale() {
     const b = new B(), NI = WM.WHALE.NI, NJ = WM.WHALE.NJ;
     const back = lin([0.2, 0.29, 0.42]), flank = lin([0.42, 0.52, 0.62]), belly = lin([0.88, 0.85, 0.76]), freck = lin([0.62, 0.72, 0.82]), groove = lin([0.7, 0.66, 0.6]), eye = lin([0.04, 0.05, 0.08]);
@@ -123,12 +123,12 @@
     // two low boughs into the crown
     for (const sd of [1, -1]) b.tube([[0, 0.36, 0, 0.022], [sd * 0.1, 0.46, 0.03, 0.016], [sd * 0.18, 0.55, 0.05, 0.01]], () => [bark, 0], (t) => 0.2 + t * 0.4, 6);
     // the crown: a lumpy soft cloud of leaves
-    const BUMPS = []; for (let k = 0; k < 9; k++) { const th = Math.acos(1 - 2 * hh(k, 11)), ph = hh(k, 12) * TAU; BUMPS.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]); }
-    const lump = (dx, dy, dz) => { let s = 0; for (const q of BUMPS) s += Math.pow(Math.max(0, dx * q[0] + dy * q[1] + dz * q[2]), 6); return 0.88 + 0.2 * s - (dy < -0.3 ? 0.12 * (-dy - 0.3) : 0); };
+    const BUMPS = []; for (let k = 0; k < 16; k++) { const th = Math.acos(1 - 2 * hh(k, 11)), ph = hh(k, 12) * TAU; BUMPS.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]); }
+    const lump = (dx, dy, dz) => { let s = 0; for (const q of BUMPS) s += Math.pow(Math.max(0, dx * q[0] + dy * q[1] + dz * q[2]), 10); return 0.84 + 0.3 * s - (dy < -0.3 ? 0.14 * (-dy - 0.3) : 0); };
     const leaf = lin([0.38, 0.56, 0.34]), leafT = lin([0.66, 0.78, 0.48]), leafD = lin([0.24, 0.38, 0.26]), bloom = lin([0.96, 0.82, 0.88]);
     b.ell([0, T.crownY, 0], T.crownR, (dx, dy, dz, p) => {
       const h = hh(Math.round(p[0] * 300), Math.round(p[2] * 300) + Math.round(p[1] * 300) * 7);
-      return [h > 0.94 ? bloom : dy > 0.2 ? mix3(leaf, leafT, ss(0.2, 0.9, dy)) : mix3(leafD, leaf, ss(-0.7, 0.2, dy)), 0];
+      return [h > 0.9 ? bloom : dy > 0.2 ? mix3(leaf, leafT, ss(0.2, 0.9, dy)) : mix3(leafD, leaf, ss(-0.7, 0.2, dy)), 0];
     }, (p) => Math.max(0, (p[1] - 0.4) * 1.6), 14, 20, lump);
     // the lantern seeds: little warm lanterns hanging under the crown
     const lc = lin([1.0, 0.85, 0.55]);
@@ -140,7 +140,7 @@
   }
   function root() {
     const b = new B(), bark = lin([0.4, 0.32, 0.26]);
-    b.tube([[0, 0.1, 0, 0.032], [0.05, 0.075, 0, 0.026], [0.1, 0.035, 0, 0.018], [0.14, 0.006, 0, 0.012], [0.165, 0.0, 0, 0.007]], () => [bark, 0], 0, 7);
+    b.tube([[0, 0.12, 0, 0.03], [0.04, 0.1, 0, 0.024], [0.08, 0.085, 0, 0.019], [0.115, 0.05, 0, 0.015], [0.14, 0.015, 0, 0.012], [0.16, 0.0, 0, 0.009], [0.185, -0.004, 0, 0.005]], (t) => [t > 0.8 ? lin([0.3, 0.26, 0.2]) : bark, 0], 0, 7);
     return b.v;
   }
 

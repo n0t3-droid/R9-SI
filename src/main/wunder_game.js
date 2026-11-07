@@ -328,7 +328,7 @@
       const t = R.byName[FLOWERS[(n + (seed & 7)) % FLOWERS.length]]; if (!t) continue;
       w.setBlock(X, y + 1, Z, t.defaultState); n++;
     }
-    return true;
+    return n || true;
   }
   function treeFrame(g, R, dt) {
     if (g.meta.guest) return;
@@ -493,7 +493,7 @@
       if (tr && treeY !== null) {
         const sc = 14, walk = tr.walking ? R.treeWalk || 0 : 0, bob = tr.walking ? Math.abs(Math.sin(walk * 2.5)) * 0.25 : 0;
         const K = G.kind(gl, 'wtree', KCAP), KR = G.kind(gl, 'wroot', KCAP), gw = 0.3 + 0.7 * Math.max(night, sm((tod - 11000) / 1500));
-        put(K.data, 0, tr.x - cx, treeY + 0.6 + bob - cy, tr.z - cz, sc, tr.yaw || 0, 0, tr.walking ? Math.sin(walk * 2.5) * 0.03 : 0, R.time * 0.7, 1, 1, 1, 1, 0, 0, 0, 0.012, gw, 0.05, 2);
+        put(K.data, 0, tr.x - cx, treeY + 0.6 + bob - cy, tr.z - cz, sc, tr.yaw || 0, 0, tr.walking ? Math.sin(walk * 2.5) * 0.03 : 0, R.time * 0.7, 1, 1, 1, 1, 0, 0, 0, 0.012, gw, 0, 2);
         list.push([K, 1]);
         for (let k = 0; k < 5; k++) { const a = (tr.yaw || 0) + k / 5 * TAU, lift = tr.walking ? Math.max(0, Math.sin(walk * 2.5 + k * TAU / 5)) * 0.4 : 0; put(KR.data, k, tr.x - cx, treeY + 0.6 + bob - cy, tr.z - cz, sc, a, 0, lift, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0); }
         list.push([KR, 5]);
