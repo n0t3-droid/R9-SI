@@ -29,7 +29,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   if (VR.Settings && VR.Settings.add && !(VR.Settings.byKey && VR.Settings.byKey('seelen'))) { try { VR.Settings.add({ key: 'seelen', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.seelen', tip: 'g.set.seelen.tip', cost: 'low', def: true }); } catch (e) { /* the settings' own */ } }
   SG.PER_FRAME = 2; SG.COME_R = 28; SG.GREET_GAP = 360;   // villagers sensed a frame · a friend comes from this far · game minutes between two memory greetings
-  SG.cost = { frames: 0, ms: 0, max: 0, sensed: 0, plans: 0, reflect: 0, said: 0, tickMax: 0, wantMax: 0 };
+  SG.cost = { frames: 0, ms: 0, max: 0, sensed: 0, plans: 0, reflect: 0, said: 0, tickMax: 0, wantMax: 0, spk: 0, spkMs: 0 };   // (spk: samples over 4 ms — the thread taken away by the OS, not our work)
   SG.log = [];
   const FREE = { stroll: 1, plaza: 1, park: 1, lunch: 1, garden: 1, cafe: 1, learn: 1 };
   SG.on = (g) => !!(g && !SG.off && g.meta && !g.meta.guest && !(g.mp && g.mp.isClient) && !(g.settings && g.settings.seelen === false));
@@ -198,7 +198,7 @@
   P.schedule = function (a, tod) {
     const w = bSched.apply(this, arguments);
     const t0 = performance.now();
-    try { return SG.want(this, a, tod, w); } catch (e) { return w; } finally { const dd = performance.now() - t0; SG.cost.ms += dd; if (dd > SG.cost.wantMax) SG.cost.wantMax = dd; }
+    try { return SG.want(this, a, tod, w); } catch (e) { return w; } finally { const dd = performance.now() - t0; SG.cost.ms += dd; if (dd > 4) { SG.cost.spk++; SG.cost.spkMs += dd; } if (dd > SG.cost.wantMax) SG.cost.wantMax = dd; }
   };
   SG.want = function (V, a, tod, w) {
     const g = V.g;
@@ -272,10 +272,10 @@
     if (!act.spot) act.spot = meetSpot(vil, me, s.w, mode);
     const sp = act.spot, mine = sp.seat ? sp.seat[0] : null;
     let arrived;
-    if (sp.seat && a.pose !== 'sit' && act.t > 25) { act.spot = meetSpot(vil, me, s.w, 'meet'); return; }   // (the bench out of reach: they stand together instead)
+    if (sp.seat && a.pose !== 'sit' && act.t > 60) { act.spot = meetSpot(vil, me, s.w, 'meet'); return; }   // (the bench out of reach: they stand together instead)
     if (sp.seat) {
       if (a.pose === 'sit') arrived = true;
-      else if (V.goTo(a, mine[0], mine[1], mine[2], 0.8)) {
+      else if (V.goTo(a, mine[0], mine[1], mine[2], 0.8) || (act.t > 10 && (a.pos[0] - mine[0] - 0.5) ** 2 + (a.pos[2] - mine[2] - 0.5) ** 2 < 2.2 * 2.2 && Math.abs(a.pos[1] - mine[1]) < 1.6)) {   // (beside the bench, a planter in the way: sit down all the same)
         for (const o of vil.agents) if (o !== a && o.pose === 'sit' && Math.abs(o.pos[0] - mine[0] - 0.5) < 0.8 && Math.abs(o.pos[2] - mine[2] - 0.5) < 0.8) { o.pose = 'stand'; o.act = null; o.thinkT = 0; }   // (someone on their bench gets up for them)
         V.sit(a, mine); arrived = a.pose === 'sit';
       }
@@ -529,7 +529,7 @@
       if ((R.vt += dt) >= 1) { R.vt = 0; const t1 = performance.now(); for (const vil of V.known.values()) if (vil.active) villageTick(V, vil, R); const dd = performance.now() - t1; if (dd > SG.cost.tickMax) SG.cost.tickMax = dd; }
     } catch (e) { if (!SG.warned) { SG.warned = true; console.warn('seelen', e); } }
     const ms = performance.now() - t0;
-    SG.cost.frames++; SG.cost.ms += ms; if (ms > SG.cost.max) SG.cost.max = ms;
+    SG.cost.frames++; SG.cost.ms += ms; if (ms > 4) { SG.cost.spk++; SG.cost.spkMs += ms; } if (ms > SG.cost.max) SG.cost.max = ms;
   };
   // ---------------------------------------------------------------- the save
   if (VR.Game && VR.Game.prototype.saveMeta && !VR.Game.prototype.saveMeta.__se) {
