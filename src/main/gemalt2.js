@@ -71,7 +71,7 @@
     return o;
   };
   // strengths (u_gmK): x the paint (bands + key), y the rim, z the air, w the lawn strokes
-  G2.K = { paint: 0.9, rim: 0.45, air: 0.65, stroke: 1.0 };
+  G2.K = { paint: 0.9, rim: 0.5, air: 0.75, stroke: 1.0 };   // (run 2: the air and the rim a step stronger — the far land read alike at 320 px)
 
   // ---------------------------------------------------------------- the GLSL (terrain and far tiles; both under GM_PAINT)
   G2.glslTerrain = () => '#if defined(GM_PAINT) || defined(GM_STROKE)\n// r-gemalt 2 · Gemaltes Licht (gemalt2.js)\nuniform vec3 u_gmLit;\nuniform vec3 u_gmShade;\nuniform vec4 u_gmK;\n#endif\n#ifdef GM_PAINT\n' + G2.glslRamp() + G2.glslAir() +
