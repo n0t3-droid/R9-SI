@@ -691,6 +691,8 @@
     'g.set.qRound.tip': 'Tree crowns as rounded masses of leaves instead of cubes: the crown\'s corners and edges round off. Only the picture, the blocks stay as they are. Costs little.',
     'g.set.qHill': 'Round hills',
     'g.set.qHill.tip': 'In the Seamless look the edges, terraces and cliffs of the natural ground and the undersides of the floating isles round off. Only the picture, the blocks and walking stay as they are. Costs little.',
+    'g.set.qIsleForm': 'Round isles',
+    'g.set.qIsleForm.tip': 'The floating isles as rounded rocks instead of steps – far away and near: a mossy rim, bands of strata, a softly tapering underside, hanging vines. Only the picture, the blocks and walking stay as they are. Costs little.',
     'g.set.magic.tip': 'How strongly the starry sky shows through by day.',
     'g.set.scale.tip': 'A lower resolution renders faster; the picture is scaled up.',
     'g.set.tsr.tip': 'Renders small and scales up sharply: more frames per second, nearly as sharp.',

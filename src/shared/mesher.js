@@ -295,6 +295,10 @@
     const RCX = groundOn && VR.LOOK && VR.LOOK.ground ? RC.rockTable() : null;   // (the rocks: Nahtlos only)
     const RCL = roundOn ? RC.leafTable() : null;   // (the mini-voxel crowns drawn as leaves)
     const rcGround = (b) => (TF[b] & F.SMOOTH) !== 0 || (RCX !== null && RCX[b] === 1);
+    // q-art4 · Runde Inseln near the eye: bit 5 (16) — the floating isles' blocks from the blob too (job.isle: per padded
+    // column the isle's bottom and top, the worker fills it from the generator, VR.IsleShell.columns), Nahtlos only
+    const ISL = (lm & 16) !== 0 && job.isle && VR.LOOK && VR.LOOK.ground ? job.isle : null, oyW = (job.sy | 0) * 16 - PAD;
+    const rcIsle = (bi) => { const c = bi % PSS, wy = ((bi / PSS) | 0) + oyW; return wy >= ISL[c * 2] && wy <= ISL[c * 2 + 1]; };
     let rcS = null;
     const rcV = [0, 0, 0], rcP = new Float64Array(12);
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
@@ -469,10 +473,19 @@
       if (fl & F.WAVELEAF) w5 |= 1 << 7;
       const w3 = texW3(TTEX[b * 6 + dd], fl, dd, b);
       const start = (bright(0) + bright(2) < bright(1) + bright(3)) ? 1 : 0;
+      // q-art4 · the leaves' texture planar along the face's main axis (the world position in sixteenths, from the quad's
+      // lowest whole block: the texel stays one size and runs on across the blob, instead of one texture per bent quad)
+      const planar = (lm & 32) !== 0 && ((fl & F.LEAVES) !== 0 || (RCL !== null && RCL[b] !== 0));   // (bit 6, 32: qart4.js leafMode)
+      let pa = 0, pb = 0, ba = 0, bb = 0;
+      if (planar) {
+        const ax = dd >> 1; pa = ax === 0 ? 2 : 0; pb = ax === 1 ? 2 : 1;
+        ba = Math.floor(Math.min(rcP[pa], rcP[3 + pa], rcP[6 + pa], rcP[9 + pa])); bb = Math.floor(Math.min(rcP[pb], rcP[3 + pb], rcP[6 + pb], rcP[9 + pb]));
+      }
       buf.ensure(4);
       for (let kk = 0; kk < 4; kk++) {
         const k = (kk + start) & 3;
-        buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
+        const u = planar ? Math.min(255, Math.round((rcP[k * 3 + pa] - ba) * 16)) : (k >= 2 ? 16 : 0), v = planar ? Math.min(255, Math.round((rcP[k * 3 + pb] - bb) * 16)) : ((k === 1 || k === 2) ? 16 : 0);
+        buf.v(rcP[k * 3], rcP[k * 3 + 1], rcP[k * 3 + 2], w3, u, v, w5 | (cornerAO[k] << 3), cornerLight[k], tint);
       }
       return true;
     }
@@ -529,7 +542,7 @@
           // column one step lower vanish under the joined surface
           // q-art3 · Runde Hänge: the natural ground's exposed faces from the blob (a face toward leaves, which the blob
           // counts as inside, keeps its cube face; flat faces go on to the greedy pass)
-          if (groundOn && rcGround(b)) {
+          if ((groundOn && rcGround(b)) || (ISL !== null && rcIsle(bi))) {
             if (!(roundOn && (TF[nb] & F.LEAVES))) { faceCorners(bi, d); if (emitRoundQuad(bufs[0], d, x, y, z, bi, b, fl, true)) continue; }
           } else
           if ((fl & F.SMOOTH) && d !== 3 && !(TF[B[bi + PSS]] & F.OPAQUE) && smoothAt(x, y, z)) {
@@ -699,7 +712,7 @@
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && y > 0) {
         const bb = B[bi - PSS];
-        if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
+        if ((groundOn && rcGround(bb)) || (ISL !== null && rcIsle(bi - PSS))) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
           if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }
           const fx = 0.5 + ox, fz = 0.5 + oz; oy = smC[0] * (1 - fx) * (1 - fz) + smC[1] * (1 - fx) * fz + smC[2] * fx * fz + smC[3] * fx * (1 - fz) - y;

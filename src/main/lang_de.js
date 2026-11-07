@@ -691,6 +691,8 @@
     'g.set.qRound.tip': 'Baumkronen als gerundete Laubmassen statt Würfeln: Ecken und Kanten der Krone werden rund. Nur das Bild, die Blöcke bleiben, wie sie sind. Kostet wenig.',
     'g.set.qHill': 'Runde Hänge',
     'g.set.qHill.tip': 'Im Look Nahtlos werden Kanten, Stufen und Klippen des natürlichen Bodens und die Unterseiten der Schwebeinseln rund. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
+    'g.set.qIsleForm': 'Runde Inseln',
+    'g.set.qIsleForm.tip': 'Die Schwebeinseln als runde Felsen statt Stufen – in der Ferne und nah: Moosrand, Gesteinsbänder, eine weich zulaufende Unterseite, hängende Ranken. Nur das Bild, die Blöcke und das Laufen bleiben, wie sie sind. Kostet wenig.',
     'g.set.magic.tip': 'Wie stark der Sternenhimmel am Tag durchscheint.',
     'g.set.scale.tip': 'Mit weniger Auflösung rechnet das Spiel schneller; das Bild wird hochgerechnet.',
     'g.set.tsr.tip': 'Rechnet klein und stellt scharf hoch: mehr Bilder pro Sekunde, fast gleich scharf.',

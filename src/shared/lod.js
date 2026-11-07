@@ -603,7 +603,16 @@
       if (lb) for (const b of lb) box(b.x0 - x0, b.y0, b.z0 - z0, b.x1 - x0, b.y1, b.z1 - z0, b.c, b.k, b.k === 0 ? 1 : 3);
     }
     // ---- floating sky islands
-    if (g.islandAt) {
+    // q-art4 · Runde Inseln (the job's isleForm, Balanced and up: src/main/qart4.js): every isle whose centre lies in this
+    // tile as one rounded form (src/shared/isleshell.js) instead of a slab per cell — opt-in, the slabs below as before
+    if (job.isleForm && VR.IsleShell && g.islandCell) {
+      const IS = VR.IsleShell, det = IS.detFor(L);
+      const Bq = { vert: (x, y, z, face, kd, ax, c, sh) => { push(x, y, z, face, kd, ax, c, sh); return nv - 1; }, tri: (a, b, c) => { if (ni + 3 > icap) { icap *= 2; const n2 = new Uint32Array(icap); n2.set(I); I = n2; } I[ni++] = a; I[ni++] = b; I[ni++] = c; } };
+      // (browser run 2: the coarse levels drew every isle — hundreds a 1–2 km tile, +25–35 % drawn triangles on Balanced/High;
+      //  the slabs had shown an isle only where it held a cell's centre) far out only the isles worth a pixel or two
+      const rMin = IS.minR(L);
+      for (const J of IS.anchored(g, x0, z0, x0 + T, z0 + T)) if (J.r >= rMin) IS.emit(IS.mesh(g, J, det), Bq, x0, z0);
+    } else if (g.islandAt) {
       const isl = new Array(N * N);
       for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) { const X = x0 + i * S + (S >> 1), Z = z0 + j * S + (S >> 1); isl[idx(i, j)] = g.islandAt(X, Z); }
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {

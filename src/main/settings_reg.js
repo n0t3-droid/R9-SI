@@ -134,6 +134,7 @@
   if (VR.QArt && VR.QArt.ROWS) for (const it of VR.QArt.ROWS) S.add(Object.assign({}, it));   // q-art · Bildregie
   if (VR.QArt2 && VR.QArt2.ROWS) for (const it of VR.QArt2.ROWS) S.add(Object.assign({}, it));   // q-art2 · Bildregie II
   if (VR.QArt3 && VR.QArt3.ROWS) for (const it of VR.QArt3.ROWS) S.add(Object.assign({}, it));   // q-art3 · Runde Kronen
+  if (VR.QArt4 && VR.QArt4.ROWS) for (const it of VR.QArt4.ROWS) S.add(Object.assign({}, it));   // q-art4 · Runde Inseln
   if (VR.XTop && VR.XTop.ROWS) for (const it of VR.XTop.ROWS) S.add(Object.assign({}, it));   // x-top · Spitzenbild   // v-look · Filmblick
   if (VR.LField && VR.LField.ROWS_SET) for (const it of VR.LField.ROWS_SET) S.add(Object.assign({}, it));   // v-light · Lichtpfützen
   // F10 · Bandbreite (ipu.js): the five switches for graphics chips that share the system's memory (each saves memory traffic;

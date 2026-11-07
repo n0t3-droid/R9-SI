@@ -201,6 +201,7 @@
       } else if (m.type === 'mesh') {
         const t0 = performance.now();
         const svWant = VR.SmoothVox ? VR.SmoothVox.prep(m) : null;   // t-form: the ready bits of the smooth models, the ones this section wants
+        if (typeof m.fancyLeaves === 'number' && (m.fancyLeaves & 16) && m.dim && VR.IsleShell) { const gi = getGen(m.dim); if (gi && gi.islandAt) m.isle = VR.IsleShell.columns(gi, m.ox, m.oz); }   // q-art4 · Runde Inseln: the isles' columns
         const r = VR.meshSection(m);
         const o = toTris(r.opaque), c = toTris(r.cutout), t = toTris(r.trans);
         const vx = r.vx ? toTris(r.vx) : null, vxFar = r.vxFar ? toTris(r.vxFar) : null;
