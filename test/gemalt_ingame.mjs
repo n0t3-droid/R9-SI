@@ -194,13 +194,13 @@ try {
   if (want('cave')) {
     let cave = null;
     {
-      for (const P of [{ x: 33, z: 151 }, cliff, hill].filter(Boolean)) {
+      for (const P of [{ x: 20, z: 184 }, { x: 33, z: 151 }, cliff, hill].filter(Boolean)) {
         await eyeAt([P.x, 160, P.z], [P.x + 10, 150, P.z], AFT); await settle(40);
-        const f = await ev((P) => { const w = VR.game.world, F = VR.F, R = VR.R; const op = (x, y, z) => { const s = w.getBlock(x, y, z); return s && (R.T.flags[s] & F.OPAQUE); };
+        const f = await ev((P) => { const w = VR.game.world, F = VR.F, R = VR.R, SNT = VR.SoftNat.tables().soft; const op = (x, y, z) => { const s = w.getBlock(x, y, z); return s && (R.T.flags[s] & F.OPAQUE); }; const nat = (x, y, z) => SNT[w.getBlock(x, y, z)] === 1;
           let best = null;
           for (let dx = -60; dx <= 60; dx++) for (let dz = -60; dz <= 60; dz++) { const x = P.x + dx, z = P.z + dz; if (!w.isLoaded(x, z)) continue; const t = w.topAt(x, z);
             for (let y = t - 3; y > t - 14; y--) { if (op(x, y, z) || op(x, y + 1, z) || !op(x, y - 1, z) || !op(x, y + 2, z)) continue;
-              for (let k = 0; k < 4; k++) { const ex = x + [1, -1, 0, 0][k] * 3, ez = z + [0, 0, 1, -1][k] * 3; if (w.isLoaded(ex, ez) && w.topAt(ex, ez) < y && !op(x + [1, -1, 0, 0][k], y, z + [0, 0, 1, -1][k])) { let air = 0; for (let a = -2; a <= 2; a++) for (let b = 0; b <= 2; b++) for (let c = -2; c <= 2; c++) if (!op(x + a, y + b, z + c)) air++; const sc = air + Math.min(8, t - y) - Math.hypot(dx, dz) * 0.02; if (air >= 30 && (!best || sc > best.sc)) best = { x, y, z, k, sc, air }; } } break; } }
+              for (let k = 0; k < 4; k++) { const ex = x + [1, -1, 0, 0][k] * 3, ez = z + [0, 0, 1, -1][k] * 3; if (w.isLoaded(ex, ez) && w.topAt(ex, ez) < y && !op(x + [1, -1, 0, 0][k], y, z + [0, 0, 1, -1][k])) { let air = 0, rock = 0, solid = 0; for (let a = -2; a <= 2; a++) for (let b = -1; b <= 3; b++) for (let c = -2; c <= 2; c++) { if (!op(x + a, y + b, z + c)) { if (b >= 0 && b <= 2) air++; } else { solid++; if (nat(x + a, y + b, z + c)) rock++; } } if (rock < solid * 0.85) continue; const sc = air + Math.min(8, t - y) - Math.hypot(dx, dz) * 0.02; if (air >= 30 && (!best || sc > best.sc)) best = { x, y, z, k, sc, air }; } } break; } }
           return best; }, { x: Math.floor(P.x), z: Math.floor(P.z) });
         if (f && (!cave || f.sc > cave.sc)) cave = f;
       }
