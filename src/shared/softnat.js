@@ -164,6 +164,25 @@
     }
     let px = P0[k * 3], py = P0[k * 3 + 1], pz = P0[k * 3 + 2];
     if (wsum > 0) { const a = SN.relax; px += (mx / wsum - px) * a; py += (my / wsum - py) * a; pz += (mz / wsum - pz) * a; }
+    // the rolling ground (r1: one relaxation left gentle slopes a washboard of rounded steps): where the cell is height-
+    // field-like (no overhang in it), its height is the column tops' B-spline mean over the 4 × 4 columns of its window
+    // (weights 1 3 3 1 — a step spreads over four blocks, its riser's cells meet at one height; clamped to the cell), and
+    // its normal the gradient of that mean; a cliff's wall (steep, or clamped) keeps the blurred field's normal
+    if (hfLike(cx, cy, cz)) {
+      let H = 0, gx2 = 0, gz2 = 0;
+      for (let b = 0; b < 4; b++) for (let a = 0; a < 4; a++) {
+        const h = colTop(cx - 1 + a, cy, cz - 1 + b) - (cy + 1), wa = HW[a], wb = HW[b];
+        H += h * wa * wb; gx2 += h * HD[a] * wb; gz2 += h * wa * HD[b];
+      }
+      py = H < -0.5 ? -0.5 : H > 0.5 ? 0.5 : H;
+      if (H >= -0.5 && H <= 0.5 && gx2 * gx2 + gz2 * gz2 < 2.6) {
+        // (a gentle slope: the corner stays on its column line — a sideways pull would stack the riser's cells into a
+        //  half-block staircase again)
+        px = 0; pz = 0;
+        const l = Math.hypot(gx2, 1, gz2); nx = -gx2 / l; ny = 1 / l; nz = -gz2 / l;
+        NRM[k * 3] = nx; NRM[k * 3 + 1] = ny; NRM[k * 3 + 2] = nz;
+      }
+    }
     // rock noses (and a soft swell on the earth's slopes): along the normal by world noise, steep ground only
     const mt = matAt(cx, cy, cz), steep = 1 - Math.abs(ny);
     const amp = (mt === 3 ? SN.bumpRock : SN.bumpSoft) * sstep(0.15, 0.6, steep);
@@ -177,6 +196,19 @@
     P1[k * 3 + 1] = py < -lim ? -lim : py > lim ? lim : py;
     P1[k * 3 + 2] = pz < -lim ? -lim : pz > lim ? lim : pz;
     return k;
+  }
+  // the height field: B-spline weights over a window of four columns (sum 1) and their derivative (per block)
+  const HW = [1 / 8, 3 / 8, 3 / 8, 1 / 8], HD = [-0.25, -0.25, 0.25, 0.25];
+  // the top of the solid in column (x, z) within the window's four voxels cy − 1 … cy + 2 (one past them when all solid,
+  // cy − 1 when none)
+  function colTop(x, cy, z) {
+    for (let y = cy + 2; y >= cy - 1; y--) if (!AIR[P(x, y, z)]) return y + 1;
+    return cy - 1;
+  }
+  // no overhang in the cell: none of its four columns has air under solid
+  function hfLike(cx, cy, cz) {
+    for (let c = 0; c < 4; c++) { const x = cx + (c & 1), z = cz + (c >> 1); if (AIR[P(x, cy, z)] && !AIR[P(x, cy + 1, z)]) return false; }
+    return true;
   }
   // the cell's palette kind: the exposed natural voxel's (air above it), else any natural one
   function matAt(cx, cy, cz) {
@@ -199,7 +231,7 @@
       let col = tb.col[st], cr, cg, cb;
       if (col < 0) {   // the grass: the biome's tint at this column, as a painted green
         const t = GR[(vz + PAD) * PS + (vx + PAD)];
-        cr = ((t >> 11) & 31) / 31 * 0.82; cg = ((t >> 5) & 63) / 63 * 0.86; cb = (t & 31) / 31 * 0.7;
+        cr = ((t >> 11) & 31) / 31 * 0.6; cg = ((t >> 5) & 63) / 63 * 0.62; cb = (t & 31) / 31 * 0.5;
       } else { cr = ((col >> 16) & 255) / 255; cg = ((col >> 8) & 255) / 255; cb = (col & 255) / 255; }
       r += cr * w; g += cg * w; b += cb * w; wsum += w;
       const m = tb.mat[st]; if (m === 1) grassW += w; else if (m === 2) snowW += w; else if (m === 3) rockW += w;

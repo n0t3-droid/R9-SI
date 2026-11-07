@@ -515,7 +515,9 @@
     }
 
     // r-gemalt · Weiche Natur: the sculpted ground first (the plants below read its heights)
-    if (softOn) { SNM.solve(job); softH = new Int16Array(256); SNM.mesh(job, bufs[0], (st, d) => texW3(TTEX[st * 6 + d], TF[st], d, st), softH); }
+    let softAny = false;
+    if (softOn) { let ns = 0; for (let i = 0; i < B.length; i++) ns += SNS[B[i]]; softAny = ns > 0 && ns < B.length; }   // (none, or all of it: nothing to draw)
+    if (softAny) { SNM.solve(job); softH = new Int16Array(256); SNM.mesh(job, bufs[0], (st, d) => texW3(TTEX[st * 6 + d], TF[st], d, st), softH); }
     // ---- greedy opaque cubes ----
     const mstate = new Uint16Array(256), mlight = new Uint16Array(256), mtint = new Uint16Array(256), mflag = new Uint8Array(256), mergedLight = new Uint16Array(4);
     for (let d = 0; d < 6; d++) {
@@ -707,7 +709,7 @@
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
       if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && (y > 0 || softOn)) {
         const bb = B[bi - PSS];
-        if (softOn && SNS[bb] === 1) oy = SNM.topAt(x, y - 1, z, 0.5 + ox, 0.5 + oz) - y;   // r-gemalt: on the sculpted surface
+        if (softAny && SNS[bb] === 1) oy = SNM.topAt(x, y - 1, z, 0.5 + ox, 0.5 + oz) - y;   // r-gemalt: on the sculpted surface
         else if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)
           if (!rcS) rcS = RC.solver(B, TF, roundOn, job.ox, (job.sy | 0) * 16, job.oz);
           for (let k = 0; k < 4; k++) { rcS.vert(x - 1 + (k >> 1), y - 1, z - 1 + (((k + 1) >> 1) & 1), rcV); smC[k] = rcV[1]; }

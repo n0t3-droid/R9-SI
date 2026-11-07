@@ -892,7 +892,7 @@ ${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}${(VR.QArt2 && VR.QArt2.gl
 #ifdef SHADOWS
   vec3 n = face == 0u ? vec3(1,0,0) : face == 1u ? vec3(-1,0,0) : face == 2u ? vec3(0,1,0) : face == 3u ? vec3(0,-1,0) : face == 4u ? vec3(0,0,1) : vec3(0,0,-1);
 #ifdef GEMALT
-  if (face == 6u) n = v_gN;
+  if (face == 6u) n = v_gN * 4.5;   // (the sculpted ground: a deeper normal offset — its slopes would self-shadow in bands)
 #endif
 #ifdef MODEL
   n = u_normalMat * n;
@@ -958,6 +958,7 @@ uniform vec4 u_seasonFx;   // w-seasons: [snow cover, petals, ice, fallen leaves
 in vec3 v_localPos;
 #ifdef GEMALT
 in vec3 v_gN;
+float gmLift = 0.0;   // the sculpted ground reads the block heightmap's shadow from a little above (its slopes cut the steps)
 // r-gemalt · Weiche Natur (softnat.js, gemalt.js): the sculpted ground painted — the vertex's palette colour (blended by
 // slope and height in the worker, interpolated over the surface) laid on in brush strokes: three planar projections of
 // the noise texture (R: fbm 8 a tile, G: fbm 16), each stretched into dabs along a direction that turns slowly over the
@@ -972,8 +973,15 @@ vec3 gmPaint(vec3 c, vec3 wp, vec3 n, float dist) {
   float bx = texture(u_noise, vec2(wp.z / 13.0, wp.y / 3.2) + 0.21).r * 0.62 + texture(u_noise, vec2(wp.z / 4.5, wp.y / 1.4) + 0.71).g * 0.38;
   float bz = texture(u_noise, vec2(wp.x / 13.0, wp.y / 3.2) + 0.53).r * 0.62 + texture(u_noise, vec2(wp.x / 4.5, wp.y / 1.4) + 0.13).g * 0.38;
   float b = bx * w.x + by * w.y + bz * w.z;
-  float k = mix(1.0, 0.4, smoothstep(24.0, 110.0, dist));
-  vec3 col = c * (1.0 + (b - 0.5) * 0.55 * k);
+  // up close a finer dab layer (the brush's own bristles), gone by 24 m
+  float nearK = 1.0 - smoothstep(8.0, 24.0, dist);
+  if (nearK > 0.0) { vec2 fq = w.y > 0.5 ? s : (w.x > w.z ? vec2(wp.z, wp.y * 2.5) : vec2(wp.x, wp.y * 2.5)); b += (texture(u_noise, vec2(fq.x / 1.9, fq.y / 0.65) + 0.43).g - 0.5) * 0.35 * nearK; }
+  float k = mix(1.0, 0.45, smoothstep(24.0, 110.0, dist));
+  vec3 col = c * (1.0 + (b - 0.5) * 0.8 * k);
+  // the greens drift between a warm yellow-green and a cool blue-green in patches of a few metres (a painter's meadow)
+  float gg = smoothstep(0.0, 0.08, c.g - max(c.r, c.b));
+  float hz = texture(u_noise, wp.xz / 19.0 + vec2(0.61, 0.17)).g;
+  col = mix(col, col * mix(vec3(1.12, 1.04, 0.72), vec3(0.82, 0.98, 1.16), smoothstep(0.3, 0.7, hz)), 0.45 * gg);
   // the painter's light and shade in the colour itself: dabs a little warmer where bright, cooler where dark
   col *= mix(vec3(0.97, 0.99, 1.04), vec3(1.03, 1.01, 0.95), smoothstep(0.35, 0.65, b));
   float wash = texture(u_noise, wp.xz / 37.0 + vec2(0.3, 0.7)).r;
@@ -1028,7 +1036,11 @@ float shadowAt(vec3 N, vec3 L) {
   }
 #endif
 #ifdef HSHADOW
+#ifdef GEMALT
+  if (cover < 0.999) s = mix(hShadow(v_localPos + N * gmLift, N, L), s, cover);
+#else
   if (cover < 0.999) s = mix(hShadow(v_localPos, N, L), s, cover);
+#endif
 #else
   s = mix(1.0, s, cover);
 #endif
@@ -1218,7 +1230,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   }
 #ifdef GEMALT
-  if (gmF) alb = vec4(gmPaint(v_tint, v_localPos + vec3(u_camInt & 4095), normalize(v_gN), length(v_rel)), 1.0);
+  if (gmF) { alb = vec4(gmPaint(v_tint, v_localPos + vec3(u_camInt & 4095), normalize(v_gN), length(v_rel)), 1.0); gmLift = 0.75; }
 #endif
 #ifdef LV_MEADOW
   // v-look2 · Wiesenruhe (look.js): a green-tinted face (grass, moss, leaves on an opaque block) calmed like a painted

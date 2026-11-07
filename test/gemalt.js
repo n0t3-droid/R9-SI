@@ -128,7 +128,7 @@ if (SN && SN.mesh) {
     const nSoft = verts(r, j).filter(v => v.face === 6).length;
     check(nSoft <= 8, 'flat ground merges into few quads (no vertex flood)', nSoft + ' vertices');
     const jx = job(ground(() => 40), 0, 0, 0, 16), rx = V.meshSection(jx);
-    check(rx.softH && rx.softH.every(v => v === -32768), 'a section with no drawn ground: no heights');
+    check(!rx.softH || rx.softH.every(v => v === -32768), 'a section with no drawn ground: no heights');
   }
   // ---- e  the cube path untouched
   {

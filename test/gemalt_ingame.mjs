@@ -121,11 +121,11 @@ try {
   for (const p of land.values()) {
     const [x, z, y, k] = p; if (k !== 1) continue;
     let lo = 999, hi = -999, maxStep = 0, nat = 0, n = 0, wet = 0;
-    for (let dx = -8; dx <= 8; dx += 2) for (let dz = -8; dz <= 8; dz += 2) { const q = H(x + dx, z + dz); if (!q) continue; n++; lo = Math.min(lo, q[2]); hi = Math.max(hi, q[2]); if (q[3] === 1) nat++; if (q[3] === 2) wet++; const r = H(x + dx + 2, z + dz); if (r) maxStep = Math.max(maxStep, Math.abs(r[2] - q[2])); }
+    for (let dx = -8; dx <= 8; dx += 2) for (let dz = -8; dz <= 8; dz += 2) { const q = H(x + dx, z + dz); if (!q) continue; n++; lo = Math.min(lo, q[2]); hi = Math.max(hi, q[2]); if (q[3] === 1) nat++; if (q[3] === 2) wet++; const r = H(x + dx + 2, z + dz); if (r && r[3] === 1 && q[3] === 1) maxStep = Math.max(maxStep, Math.abs(r[2] - q[2])); }
     if (n < 70) continue;
     const rise = hi - lo;
     if (rise >= 5 && rise <= 14 && maxStep <= 2 && nat > n * 0.85 && !wet) { const sc = rise + near(x, z); if (!hill || sc > hill.sc) hill = { x, z, y, sc, lo, hi }; }
-    if (maxStep >= 5 && nat > n * 0.7) { const sc = maxStep + near(x, z) * 2; if (!cliff || sc > cliff.sc) cliff = { x, z, y, sc }; }
+    if (maxStep >= 5 && maxStep <= 24 && nat > n * 0.7 && !wet) { const sc = maxStep + near(x, z) * 2; if (!cliff || sc > cliff.sc) cliff = { x, z, y, sc }; }
     if (wet > n * 0.25 && wet < n * 0.6 && rise >= 2 && nat > n * 0.3) { const sc = rise * 0.5 + near(x, z) * 3; if (!shore || sc > shore.sc) shore = { x, z, y, sc }; }
   }
   console.log('     hill ' + JSON.stringify(hill) + ' · cliff ' + JSON.stringify(cliff) + ' · shore ' + JSON.stringify(shore));
@@ -135,8 +135,11 @@ try {
   const camAt = async (P, D, up, aOff, tY) => {
     await eyeAt([P.x, 160, P.z], [P.x + 10, 150, P.z], AFT); await settle(40);
     const a = (await sunA()) + aOff;
-    const E = [P.x + 0.5 + Math.cos(a) * D, 0, P.z + 0.5 + Math.sin(a) * D]; E[1] = (await top(E[0], E[2])) + 1 + up;
+    const E = [P.x + 0.5 + Math.cos(a) * D, 0, P.z + 0.5 + Math.sin(a) * D];
     const T = [P.x + 0.5, (tY !== undefined ? tY : (await top(P.x, P.z)) + 1), P.z + 0.5];
+    // (r1: the eye stood in the hill's flank — never below the ground between it and the target)
+    let gmax = 0; for (let k = 0; k <= 8; k++) { const f = k / 8; gmax = Math.max(gmax, await top(E[0] + (T[0] - E[0]) * f * 0.6, E[2] + (T[2] - E[2]) * f * 0.6)); }
+    E[1] = Math.max((await top(E[0], E[2])) + 1 + up, gmax + 2.5);
     return { E, T };
   };
   // ---------------------------------------------------------------- the spawn meadow (a little above the eye, looking over its slopes)
@@ -146,7 +149,7 @@ try {
     const E = [S0[0], y, S0[2]], T = [S0[0] + Math.cos(a) * 40, y - 5, S0[2] + Math.sin(a) * 40];
     N.cams.meadow = { E, T }; await views('meadow', E, T, AFT);
   }
-  if (want('hill')) { if (hill) { const c = await camAt(hill, 26, 3, 0.9, hill.lo + (hill.hi - hill.lo) * 0.6); N.cams.hill = c; await views('hill', c.E, c.T, AFT); } else check(false, 'a rolling hill near the spawn'); }
+  if (want('hill')) { if (hill) { const c = await camAt(hill, 34, 3, 0.9, hill.lo + (hill.hi - hill.lo) * 0.6); N.cams.hill = c; await views('hill', c.E, c.T, AFT); } else check(false, 'a rolling hill near the spawn'); }
   if (want('cliff')) { if (cliff) { const c = await camAt(cliff, 16, 2, 0.6); c.T[1] -= 2; N.cams.cliff = c; await views('cliff', c.E, c.T, AFT); } else check(false, 'a cliff near the spawn'); }
   if (want('shore')) {
     if (shore) {
@@ -155,8 +158,8 @@ try {
       let best = null; for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, q = H(r2(shore.x + Math.cos(a) * 10), r2(shore.z + Math.sin(a) * 10)); if (q && q[3] === 1 && (!best || q[2] > best.y)) best = { a, y: q[2] }; }
       const a = best ? best.a : 0;
       await eyeAt([shore.x, 160, shore.z], [shore.x + 10, 150, shore.z], AFT); await settle(40);
-      const E = [shore.x + Math.cos(a) * 12, 0, shore.z + Math.sin(a) * 12]; E[1] = (await top(E[0], E[2])) + 1 + 2.2;
-      const T = [shore.x - Math.cos(a + 0.4) * 14, (await top(shore.x, shore.z)) + 0.5, shore.z - Math.sin(a + 0.4) * 14];
+      const E = [shore.x + Math.cos(a) * 16, 0, shore.z + Math.sin(a) * 16]; E[1] = Math.max((await top(E[0], E[2])) + 1 + 4, (await top(shore.x, shore.z)) + 6);
+      const T = [shore.x - Math.cos(a + 0.4) * 22, (await top(shore.x, shore.z)) - 1, shore.z - Math.sin(a + 0.4) * 22];
       N.cams.shore = { E, T }; await views('shore', E, T, AFT);
     } else check(false, 'a shore near the spawn');
   }
@@ -170,7 +173,7 @@ try {
           let best = null;
           for (let dx = -60; dx <= 60; dx++) for (let dz = -60; dz <= 60; dz++) { const x = P.x + dx, z = P.z + dz; if (!w.isLoaded(x, z)) continue; const t = w.topAt(x, z);
             for (let y = t - 3; y > t - 14; y--) { if (op(x, y, z) || op(x, y + 1, z) || !op(x, y - 1, z) || !op(x, y + 2, z)) continue;
-              for (let k = 0; k < 4; k++) { const ex = x + [1, -1, 0, 0][k] * 3, ez = z + [0, 0, 1, -1][k] * 3; if (w.isLoaded(ex, ez) && w.topAt(ex, ez) < y && !op(x + [1, -1, 0, 0][k], y, z + [0, 0, 1, -1][k])) { const sc = (t - y) - Math.hypot(dx, dz) * 0.02; if (!best || sc > best.sc) best = { x, y, z, k, sc }; } } break; } }
+              for (let k = 0; k < 4; k++) { const ex = x + [1, -1, 0, 0][k] * 3, ez = z + [0, 0, 1, -1][k] * 3; if (w.isLoaded(ex, ez) && w.topAt(ex, ez) < y && !op(x + [1, -1, 0, 0][k], y, z + [0, 0, 1, -1][k])) { let air = 0; for (let a = -2; a <= 2; a++) for (let b = 0; b <= 2; b++) for (let c = -2; c <= 2; c++) if (!op(x + a, y + b, z + c)) air++; const sc = air + Math.min(8, t - y) - Math.hypot(dx, dz) * 0.02; if (air >= 30 && (!best || sc > best.sc)) best = { x, y, z, k, sc, air }; } } break; } }
           return best; }, { x: Math.floor(P.x), z: Math.floor(P.z) });
         if (f && (!cave || f.sc > cave.sc)) cave = f;
       }
@@ -178,7 +181,7 @@ try {
     console.log('     cave ' + JSON.stringify(cave));
     if (cave) {
       const dx = [1, -1, 0, 0][cave.k], dz = [0, 0, 1, -1][cave.k];
-      const E = [cave.x + 0.5 + dx * 11 + dz * 3, cave.y + 3.5, cave.z + 0.5 + dz * 11 + dx * 3], T = [cave.x + 0.5, cave.y + 1.2, cave.z + 0.5];
+      const E = [cave.x + 0.5 + dx * 10 + dz * 2, cave.y + 2.6, cave.z + 0.5 + dz * 10 + dx * 2], T = [cave.x + 0.5 - dx * 2, cave.y + 1.0, cave.z + 0.5 - dz * 2];
       N.cams.cave = { E, T }; await views('cave', E, T, AFT);
     } else check(false, 'a cave mouth near the spawn');
   }
