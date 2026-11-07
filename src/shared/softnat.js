@@ -137,7 +137,7 @@
       }
     };
     pass(BF, BT, 1, 0); pass(BT, BF, PSS, 1); pass(BF, BT, PS, 2);   // (the blurred field in BT)
-    ACT.fill(0); PINC.fill(0); DONE.fill(0);
+    ACT.fill(0); PINC.fill(0); DONE.fill(0); TOP6.fill(127);
     for (let cy = -2; cy <= 16; cy++) for (let cz = -2; cz <= 16; cz++) for (let cx = -2; cx <= 16; cx++) {
       const k = ci(cx, cy, cz);
       let sx = 0, sy = 0, sz = 0, n = 0, pn = 0;
@@ -242,9 +242,13 @@
   // the wide window (r-gemalt2): six columns, the derivative of the 1 2 2 2 1 smoothed steps (a step every 2 or 4 blocks
   // reads as one even slope) and the cross weights 1 3 4 4 3 1; the column top within cy − 2 … cy + 3
   const HD6 = [-1 / 8, -1 / 8, 0, 0, 1 / 8, 1 / 8], HW6 = [1 / 16, 3 / 16, 4 / 16, 4 / 16, 3 / 16, 1 / 16];
+  const TOP6 = new Int8Array(N);   // (cached per column and layer: the 36 columns of neighbouring cells overlap)
   function colTop6(x, cy, z) {
-    for (let y = cy + 3; y >= cy - 2; y--) if (!AIR[P(x, y, z)]) return y + 1;
-    return cy - 2;
+    const i = P(x, cy, z), c = TOP6[i];
+    if (c !== 127) return c;
+    let t = cy - 2;
+    for (let y = cy + 3; y >= cy - 2; y--) if (!AIR[P(x, y, z)]) { t = y + 1; break; }
+    TOP6[i] = t; return t;
   }
   // no overhang in the cell: none of its four columns has air under solid
   function hfLike(cx, cy, cz) {
