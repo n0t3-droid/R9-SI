@@ -13,7 +13,7 @@ import { execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname.replace(/\/$/, '').replace(/\/\.tmp_tests$/, '');
 const DIST = process.env.DIST || 'file://' + ROOT + '/dist/index.html', SHOTS = ROOT + '/test/shots/';
 const TAG = process.env.TAG || 'after';
-const ONLY = (process.env.ONLY || 'meadow,hill,cliff,shore,cave,vista,street,cost').split(','), want = (s) => ONLY.includes(s);
+const ONLY = (process.env.ONLY || 'spawn,meadow,cliff,shore,cave,vista,street,cost').split(','), want = (s) => ONLY.includes(s);
 const PRESETS = (process.env.PRESETS || 'balanced,high').split(',');
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -143,15 +143,42 @@ try {
     E[1] = Math.max((await top(E[0], E[2])) + 1 + up, gmax + 2.5);
     return { E, T };
   };
+  // ---------------------------------------------------------------- pinned views (seed 4242; found by the scans of runs 1 and 2,
+  // the cameras that showed the land best). PIN=0 uses the scans alone.
+  const PIN = process.env.PIN !== '0';
+  const PINS = {
+    spawn: { E: [0.5, 127.4, 4.5], T: [-28.56, 122.4, -22.98] },          // run 1: from the spawn's platform over the meadows
+    meadow: { E: [-89.47, 99, 177.58], T: [-73.5, 94, 178.5] },           // run 2's rolling green by the stone pillars
+    shore: { E: [188.53, 72, 99.58], T: [204.5, 64, 100.5] },             // run 1: the meadow running down to the beach and the lake
+    vista: { E: [47.57, 103, 138.52], T: [12.3, 73, 325.22] },            // run 1: over the hills, the canyon, the far tiles
+    street: { E: [-16.7, 84.5, -54.5], T: [-0.5, 82.2, -54.5] },          // run 1: the town's square — crisp paving, soft lawn
+  };
+  const pinned = async (v) => { const c = PINS[v]; N.cams[v] = c; await views(v, c.E, c.T, v === 'street' ? LATE : AFT); };
+  if (PIN) {
+    for (const v of ['spawn', 'meadow', 'shore', 'vista', 'street']) if (want(v)) await pinned(v);
+    // the canyon beside the vista (run 1's picture, its lower right): its steepest natural wall, seen from across
+    if (want('cliff')) {
+      await eyeAt([33, 160, 151], [43, 150, 151], AFT); await settle(40);
+      const W = await ev(() => { const w = VR.game.world, T = VR.SoftNat.tables(); let best = null;
+        for (let x = 5; x <= 65; x++) for (let z = 120; z <= 185; z++) { if (!w.isLoaded(x, z)) continue; const y = w.topAt(x, z); if (!T.soft[w.getBlock(x, y, z)]) continue;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x2 = x + dx * 3, z2 = z + dz * 3; if (!w.isLoaded(x2, z2)) continue; const y2 = w.topAt(x2, z2); if (!T.soft[w.getBlock(x2, y2, z2)]) continue; const d = y - y2; if (d > 5 && d < 40 && (!best || d > best.d)) best = { x, z, y, x2, z2, y2, d, dx, dz }; } }
+        return best; });
+      console.log('     canyon wall ' + JSON.stringify(W));
+      if (W) {
+        const E = [W.x2 + 0.5 + W.dx * 15 - W.dz * 4, W.y - 1, W.z2 + 0.5 + W.dz * 15 + W.dx * 4], T = [(W.x + W.x2) / 2 + 0.5, (W.y + W.y2) / 2, (W.z + W.z2) / 2 + 0.5];
+        N.cams.cliff = { E, T }; await views('cliff', E, T, AFT);
+      } else check(false, 'a canyon wall');
+    }
+  }
   // ---------------------------------------------------------------- the spawn meadow (a little above the eye, looking over its slopes)
   // (r1: the spawn stands on the kit's platform — the meadow nearest the spawn instead: a gentle rise of 2–5 m)
-  if (want('meadow')) {
+  if (want('meadow') && !PIN) {
     if (meadow) { const c = await camAt(meadow, 22, 2.2, 1.3, meadow.lo + 1); N.cams.meadow = c; await views('meadow', c.E, c.T, AFT); }
     else check(false, 'a meadow near the spawn');
   }
-  if (want('hill')) { if (hill) { const c = await camAt(hill, 34, 3, 0.9, hill.lo + (hill.hi - hill.lo) * 0.6); N.cams.hill = c; await views('hill', c.E, c.T, AFT); } else check(false, 'a rolling hill near the spawn'); }
-  if (want('cliff')) { if (cliff) { const c = await camAt(cliff, 16, 2, 0.6); c.T[1] -= 2; N.cams.cliff = c; await views('cliff', c.E, c.T, AFT); } else check(false, 'a cliff near the spawn'); }
-  if (want('shore')) {
+  if (want('hill') && !PIN) { if (hill) { const c = await camAt(hill, 34, 3, 0.9, hill.lo + (hill.hi - hill.lo) * 0.6); N.cams.hill = c; await views('hill', c.E, c.T, AFT); } else check(false, 'a rolling hill near the spawn'); }
+  if (want('cliff') && !PIN) { if (cliff) { const c = await camAt(cliff, 16, 2, 0.6); c.T[1] -= 2; N.cams.cliff = c; await views('cliff', c.E, c.T, AFT); } else check(false, 'a cliff near the spawn'); }
+  if (want('shore') && !PIN) {
     if (shore) {
       // on the land side, low, looking along the bank toward the water
       const r2 = (v) => Math.floor(v / 2) * 2;
@@ -166,8 +193,8 @@ try {
   // ---------------------------------------------------------------- a cave mouth: air under a slope that opens to the side
   if (want('cave')) {
     let cave = null;
-    if (hill || cliff) {
-      for (const P of [cliff, hill].filter(Boolean)) {
+    {
+      for (const P of [{ x: 33, z: 151 }, cliff, hill].filter(Boolean)) {
         await eyeAt([P.x, 160, P.z], [P.x + 10, 150, P.z], AFT); await settle(40);
         const f = await ev((P) => { const w = VR.game.world, F = VR.F, R = VR.R; const op = (x, y, z) => { const s = w.getBlock(x, y, z); return s && (R.T.flags[s] & F.OPAQUE); };
           let best = null;
@@ -186,7 +213,7 @@ try {
     } else check(false, 'a cave mouth near the spawn');
   }
   // ---------------------------------------------------------------- the far vista: high over the hills, the near ground and the far tiles
-  if (want('vista')) {
+  if (want('vista') && !PIN) {
     const P = hill || { x: Math.floor(S0[0]), z: Math.floor(S0[2]) };
     await eyeAt([P.x, 160, P.z], [P.x + 10, 150, P.z], AFT); await settle(40);
     const a = (await sunA()) + 2.3;
@@ -195,7 +222,7 @@ try {
     N.cams.vista = { E, T }; await views('vista', E, T, AFT);
   }
   // ---------------------------------------------------------------- the village street: crisp houses on soft ground
-  if (want('street')) {
+  if (want('street') && !PIN) {
     const v = await ev((S0) => { const M = VR.game.villages; let best = null, bd = 1e9; for (const v of M.known.values()) { const P = v.plan && v.plan.plaza; const c = P ? [P.x, P.z] : [v.x, v.z]; if (c[0] === undefined) continue; const d = Math.hypot(c[0] - S0[0], c[1] - S0[2]); if (d < bd) { bd = d; best = { c, d } } } return best; }, S0);
     if (v) {
       await eyeAt([v.c[0], 140, v.c[1]], [v.c[0] + 10, 130, v.c[1]], 8000); await settle(40); await run(60);
@@ -209,7 +236,7 @@ try {
   save();
   // ---------------------------------------------------------------- costs at the hill (or the meadow)
   if (want('cost')) {
-    const C = N.cams.hill || N.cams.meadow;
+    const C = N.cams.meadow || N.cams.hill;
     const ready = async () => { for (let i = 0; i < 120; i++) { const n = await ev(() => { const g = VR.game; window.__norender = false; g.last = performance.now() - 33; window.__step(performance.now()); g.renderer.gl.finish(); window.__norender = true; return VR.GL.pending ? VR.GL.pending.size : 0; }); if (!n) return; await wait(250); } check(false, 'the programs compiled'); };
     const ms = (n) => ev((n) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; window.__step(performance.now()); } gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; window.__step(performance.now()); gl.finish(); } window.__norender = true; return (performance.now() - t0) / n; }, n);
     const verts = () => ev(() => { let n = 0, s = 0; for (const c of VR.game.world.cols.values()) for (const sc of c.sec) if (sc._gmN) { n += sc._gmN; s++; } return { verts: n, sections: s }; });
@@ -225,7 +252,7 @@ try {
     check(N.cost.potato && JSON.stringify(N.cost.potato.verts.on) === JSON.stringify(N.cost.potato.verts.off), 'Very Low: the same mesh with the switch as without (the preset never asks)');
   }
   // ---------------------------------------------------------------- the sheets
-  const VN = [['meadow', 'Wiese am Spawn'], ['hill', 'Sanfter Hügel'], ['cliff', 'Klippe'], ['shore', 'Ufer'], ['street', 'Dorfstraße: Haus auf weichem Boden'], ['cave', 'Höhleneingang'], ['vista', 'Fernblick']];
+  const VN = [['spawn', 'Spawn: Blick über die Wiesen'], ['meadow', 'Sanfte Hügel'], ['hill', 'Sanfter Hügel'], ['cliff', 'Klippe'], ['shore', 'Ufer'], ['street', 'Dorfstraße: Haus auf weichem Boden'], ['cave', 'Höhleneingang'], ['vista', 'Fernblick']];
   const PN = { balanced: 'Ausgewogen', high: 'Hoch', ultra: 'Ultra' };
   const rows = [];
   for (const [v, lab] of VN) for (const pr of PRESETS) { const imgs = ['off', 'on'].map(c => N.pics[v + '_' + pr + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: lab + ' — ' + (PN[pr] || pr) + ': Würfel | Weiche Natur', imgs }); }
