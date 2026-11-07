@@ -117,7 +117,7 @@ try {
   const H = (x, z) => { const p = land.get(x + ',' + z); return p ? p : null; };
   const near = (x, z) => -Math.hypot(x - S0[0], z - S0[2]) * 0.01;
   // a rolling hill: 5–14 m of rise over a 16 m window, natural tops, no step over 2 between columns 2 apart
-  let hill = null, cliff = null, shore = null;
+  let hill = null, cliff = null, shore = null, meadow = null;
   for (const p of land.values()) {
     const [x, z, y, k] = p; if (k !== 1) continue;
     let lo = 999, hi = -999, maxStep = 0, nat = 0, n = 0, wet = 0;
@@ -125,6 +125,7 @@ try {
     if (n < 70) continue;
     const rise = hi - lo;
     if (rise >= 5 && rise <= 14 && maxStep <= 2 && nat > n * 0.85 && !wet) { const sc = rise + near(x, z); if (!hill || sc > hill.sc) hill = { x, z, y, sc, lo, hi }; }
+    if (rise >= 2 && rise <= 5 && maxStep <= 1 && nat > n * 0.95 && !wet) { const sc = near(x, z) * 10; if (!meadow || sc > meadow.sc) meadow = { x, z, y, sc, lo, hi }; }
     if (maxStep >= 5 && maxStep <= 24 && nat > n * 0.7 && !wet) { const sc = maxStep + near(x, z) * 2; if (!cliff || sc > cliff.sc) cliff = { x, z, y, sc }; }
     if (wet > n * 0.25 && wet < n * 0.6 && rise >= 2 && nat > n * 0.3) { const sc = rise * 0.5 + near(x, z) * 3; if (!shore || sc > shore.sc) shore = { x, z, y, sc }; }
   }
@@ -143,11 +144,10 @@ try {
     return { E, T };
   };
   // ---------------------------------------------------------------- the spawn meadow (a little above the eye, looking over its slopes)
+  // (r1: the spawn stands on the kit's platform — the meadow nearest the spawn instead: a gentle rise of 2–5 m)
   if (want('meadow')) {
-    await eyeAt([S0[0], 160, S0[2]], [S0[0] + 10, 150, S0[2]], AFT); await settle(30);
-    const a = (await sunA()) + 1.3, y = (await top(S0[0], S0[2])) + 1 + 2.4;
-    const E = [S0[0], y, S0[2]], T = [S0[0] + Math.cos(a) * 40, y - 5, S0[2] + Math.sin(a) * 40];
-    N.cams.meadow = { E, T }; await views('meadow', E, T, AFT);
+    if (meadow) { const c = await camAt(meadow, 22, 2.2, 1.3, meadow.lo + 1); N.cams.meadow = c; await views('meadow', c.E, c.T, AFT); }
+    else check(false, 'a meadow near the spawn');
   }
   if (want('hill')) { if (hill) { const c = await camAt(hill, 34, 3, 0.9, hill.lo + (hill.hi - hill.lo) * 0.6); N.cams.hill = c; await views('hill', c.E, c.T, AFT); } else check(false, 'a rolling hill near the spawn'); }
   if (want('cliff')) { if (cliff) { const c = await camAt(cliff, 16, 2, 0.6); c.T[1] -= 2; N.cams.cliff = c; await views('cliff', c.E, c.T, AFT); } else check(false, 'a cliff near the spawn'); }
