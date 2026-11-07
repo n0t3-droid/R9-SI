@@ -153,9 +153,9 @@ im.save(sys.argv[1])`, path, JSON.stringify(lines)]); } catch (e) { console.log(
 };
 const portrait = async (sel, name, tod, d) => {
   await photoOn(tod);
-  const f = await ev(([sel, d]) => { const g = VR.game, a = window[sel], f = VR.Folk3.portraitOf(g.photoCam, a, { d, dMin: d * 0.7, keep: true }); if (f) { window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]]; a.yaw = Math.atan2(-(f.P[0] - a.pos[0]), -(f.P[2] - a.pos[2])); a.vel[0] = a.vel[2] = 0; } return !!f; }, [sel, d]);
+  const f = await ev(([sel, d]) => { const g = VR.game, a = window[sel], f = VR.Folk3.portraitOf(g.photoCam, a, { d, dMin: d * 0.7, keep: true }); if (f) { const p = g.player, ux = f.P[0] - a.pos[0], uz = f.P[2] - a.pos[2], ul = Math.hypot(ux, uz) || 1; p.flying = false; p.teleport(f.P[0] + ux / ul * 1.3, a.pos[1] + 0.2, f.P[2] + uz / ul * 1.3); p.vel[0] = p.vel[1] = p.vel[2] = 0; window.__shotT = f.T; a.lookAt = [f.P[0], f.P[1], f.P[2]]; a.yaw = Math.atan2(-(f.P[0] - a.pos[0]), -(f.P[2] - a.pos[2])); a.vel[0] = a.vel[2] = 0; } return !!f; }, [sel, d]);
   if (!f) { check(false, name + ': a frame for the portrait'); return null; }
-  await step(2, 33);
+  await step(8, 33);
   await ev((sel) => { const a = window[sel], pc = VR.game.photoCam, P = pc && pc.s ? [pc.s.x, pc.s.y, pc.s.z] : null; if (P) { a.lookAt = [P[0], P[1], P[2]]; a.yaw = Math.atan2(-(P[0] - a.pos[0]), -(P[2] - a.pos[2])); } }, sel);
   await step(1, 33);
   return grab(name);
@@ -172,7 +172,8 @@ const pairShot = async (name, tod, kinds, r) => {
     // from the side of the pair (the axis between them across the picture), at eye level; else the group frame
     let ax = B.pos[0] - A.pos[0], az = B.pos[2] - A.pos[2]; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l;
     let f = null;
-    for (const sg of [1, -1]) { const nx = -az * sg, nz = ax * sg; f = F3.frame(F3.solidW(g.world), { yaw: Math.atan2(-nx, -nz), head: [C[0], C[1] + 1.3, C[2]] }, { d: 3.6, dMax: 4.5, dMin: 2.6, avoid, side: 0, sun: F3.sunAngle(g) }); if (f) break; }
+    const fx = -Math.sin(A.yaw) - Math.sin(B.yaw), fz = -Math.cos(A.yaw) - Math.cos(B.yaw), s0 = (-az * fx + ax * fz) < 0 ? 1 : -1;
+    for (const sg of [s0, -s0]) { const nx = -az * sg, nz = ax * sg; f = F3.frame(F3.solidW(g.world), { yaw: Math.atan2(-nx, -nz), head: [C[0], C[1] + 1.3, C[2]] }, { d: 3.6, dMax: 4.5, dMin: 2.6, avoid, side: 0, sun: F3.sunAngle(g) }); if (f) break; }
     if (f) { pc.f3Fov = F3.groupFov(f.d, r, g.renderer ? g.renderer.W / Math.max(1, g.renderer.H) : 16 / 9); ps.x = f.P[0]; ps.y = f.P[1]; ps.z = f.P[2]; ps.yaw = f.yaw; ps.pitch = f.pitch; ps.vel[0] = ps.vel[1] = ps.vel[2] = 0; ps.roll = 0; if (pc.orbit) pc.orbit = null; }
     else f = F3.groupShot(pc, C, r, { avoid });
     if (f) window.__shotT = f.T; return !!f; }, [C, r || 1.6]);
@@ -232,10 +233,10 @@ if (HP && want('quarrel')) {
     check(!!q, 'quarrel: two neighbours quarrel');
     if (q) {
       let st = null;
-      for (let i = 0; i < 60; i++) { await step(15, 33); st = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, ta: A.act && A.act.type, tb: B.act && B.act.type, tw: A.act && A.act.tw, back: !!(A.seBack && B.seBack), d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1) }; }, HV.id); if (st.back && st.tw > 10) break; }
+      for (let i = 0; i < 60; i++) { await step(15, 33); st = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, ta: A.act && A.act.type, tb: B.act && B.act.type, tw: A.act && A.act.tw, back: !!(A.seBack && B.seBack), arr: [!!(A.act && A.act.arr), !!(B.act && B.act.arr)], sl: [A.seSlot && A.seSlot.a, B.seSlot && B.seSlot.a], d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1) }; }, HV.id); if (st.back && st.tw > 10) break; }
       console.log('  · spat ' + JSON.stringify(st));
       check(st && st.back, `quarrel: they turn their backs on each other (${st && st.d} m apart)`);
-      rows.quarrel.push(await pairShot('se_spat.png', 10700, ['q.spat'], 1.5));
+      rows.quarrel.push(await pairShot('se_spat.png', 10700, ['q.spat', 'q.cold'], 1.5));
       // the next evening: the bench
       await stand(C0[0] + 6, C0[1], C0[2] - 6);
       await ev(() => { const g = VR.game; g.env.day = (g.env.day | 0) + 1; g.env.setTime(10800); for (const a of [window.__A, window.__B]) { a.bubble = null; a.seBack = false; } });
@@ -309,7 +310,7 @@ if (HP && want('storm')) {
     check(!!who && who.fear, 'storm: a villager afraid of storms (two remembered)');
     if (who) {
       // the storm comes first (nobody reacts meanwhile: the sky darkens), then the souls are on again
-      await ev(() => { const g = VR.game; VR.SeelenGame.off = true; g.zenFreezeWeather = false; if (g.env.wx && g.env.wx.force) g.env.wx.force('gewitter'); const a = window.__S; a.act = { type: 'talk', t: 0, len: 1e9 }; a.thinkT = 1e9; });
+      await ev(() => { const g = VR.game; VR.SeelenGame.off = true; g.zenFreezeWeather = false; if (g.env.wx && g.env.wx.force) { if (g.env.wx.setMode) g.env.wx.setMode('normal'); g.env.wx.force('gewitter'); } const a = window.__S; a.act = { type: 'talk', t: 0, len: 1e9 }; a.thinkT = 1e9; });
       await step(360, 33);
       await ev(() => { const a = window.__S; VR.SeelenGame.off = false; VR.SeelenGame.test.storm(0.6); a.act = null; a.thinkT = 0; });
       let st = null;
@@ -360,7 +361,7 @@ if (HP && want('cost')) {
   } catch (e) { check(false, 'cost: ' + e.message); }
   save();
 }
-sheet.push({ label: 'Begrüßung mit Erinnerung: „Danke nochmal für den Honig!“', imgs: rows.greet });
+sheet.push({ label: 'Begrüßung mit Erinnerung: er weiß noch, dass du ihm Honig geschenkt hast', imgs: rows.greet });
 sheet.push({ label: 'Streit um nichts: Rücken an Rücken – am nächsten Abend dieselbe Bank – Friedensgeschenk', imgs: rows.quarrel });
 sheet.push({ label: 'Wanderbuch: die Seite „Menschen“', imgs: rows.book });
 sheet.push({ label: 'Angst vor Stürmen: läuft vor dem Gewitter schnell nach Hause', imgs: rows.storm });
