@@ -246,8 +246,11 @@ if (HP && want('quarrel')) {
       await stand(C0[0] + 6, C0[1], C0[2] - 6);
       await ev(() => { const g = VR.game; g.env.day = (g.env.day | 0) + 1; g.env.setTime(10800); for (const a of [window.__A, window.__B]) { a.bubble = null; a.seBack = false; } });
       let sat = null, shot = false;
+      let nearB = false;
       for (let i = 0; i < 90; i++) {
         await step(15, 33);
+        // (the player near their bench: the words are spoken only where someone hears them)
+        if (!nearB) { const st0 = await ev(() => { const A = window.__A, sp = A.act && A.act.type === 'se_meet' && A.act.spot; return sp && sp.seat ? sp.seat[0] : null; }); if (st0) { nearB = true; await stand(st0[0] + 3.5, st0[1], st0[2] + 3.5); } }
         sat = await ev((vid) => { const A = window.__A, B = window.__B, q = VR.SeelenGame.test.R().d.q[vid]; return { ph: q.ph, pa: A.pose, pb: B.pose, tw: A.act && A.act.tw, d: +Math.hypot(A.pos[0] - B.pos[0], A.pos[2] - B.pos[2]).toFixed(1), said: VR.SeelenGame.log.filter(l => l.kind === 'q.bench').length }; }, HV.id);
         if (!shot && ((sat.pa === 'sit' && sat.pb === 'sit' && sat.said) || (sat.tw > 8 && sat.said && i > 70))) { run.bench = sat; console.log('  · bench ' + JSON.stringify(sat)); rows.quarrel.push(await pairShot('se_bench.png', 10800, ['q.bench'], 1.6, 'faces')); shot = true; }
         if (sat.ph === 'gift' || sat.ph === 'done') break;
