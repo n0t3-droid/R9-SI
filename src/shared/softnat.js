@@ -202,6 +202,17 @@
         // (a gentle slope: the corner stays on its column line — a sideways pull would stack the riser's cells into a
         //  half-block staircase again)
         px = 0; pz = 0;
+        // (r-gemalt2, flaw 2: an uneven slope — a step every 3 or 4 blocks — gave this 4-column gradient a beat of 0 … 27°,
+        //  rows of light and shade down every hillside; the normal reads 6 × 6 columns instead where the pad holds them
+        //  in both sections — cells 0 … 14; a border cell, −1 here and 15 next door, keeps the 4-column one on both sides)
+        if (cx >= 0 && cx <= 14 && cy >= 0 && cy <= 14 && cz >= 0 && cz <= 14) {
+          let wx2 = 0, wz2 = 0;
+          for (let b = 0; b < 6; b++) for (let a = 0; a < 6; a++) {
+            const h = colTop6(cx - 2 + a, cy, cz - 2 + b);
+            wx2 += h * HD6[a] * HW6[b]; wz2 += h * HW6[a] * HD6[b];
+          }
+          gx2 = wx2; gz2 = wz2;
+        }
         const l = Math.hypot(gx2, 1, gz2); nx = -gx2 / l; ny = 1 / l; nz = -gz2 / l;
         NRM[k * 3] = nx; NRM[k * 3 + 1] = ny; NRM[k * 3 + 2] = nz;
       }
@@ -227,6 +238,13 @@
   function colTop(x, cy, z) {
     for (let y = cy + 2; y >= cy - 1; y--) if (!AIR[P(x, y, z)]) return y + 1;
     return cy - 1;
+  }
+  // the wide window (r-gemalt2): six columns, the derivative of the 1 2 2 2 1 smoothed steps (a step every 2 or 4 blocks
+  // reads as one even slope) and the cross weights 1 3 4 4 3 1; the column top within cy − 2 … cy + 3
+  const HD6 = [-1 / 8, -1 / 8, 0, 0, 1 / 8, 1 / 8], HW6 = [1 / 16, 3 / 16, 4 / 16, 4 / 16, 3 / 16, 1 / 16];
+  function colTop6(x, cy, z) {
+    for (let y = cy + 3; y >= cy - 2; y--) if (!AIR[P(x, y, z)]) return y + 1;
+    return cy - 2;
   }
   // no overhang in the cell: none of its four columns has air under solid
   function hfLike(cx, cy, cz) {

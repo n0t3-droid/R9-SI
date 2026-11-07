@@ -128,6 +128,15 @@ console.log('g · the blob rule: natural decor in the soft ground');
     const cube = q.filter(v => (v.w5 & 7) !== 6 && v.x >= 7.9 && v.x <= 9.1 && v.z >= 7.9 && v.z <= 9.1).length;
     check(T.soft[b] === 0 && T.pin[b] === 1 && cube >= 4, 'a brick in the same spot: still a crisp cube that pins the ground', cube);
   }
+  // h · flaw 2 (faint steps): an uneven slope's normals keep one tilt — no rows of light and shade down the hill
+  console.log('h · uneven slopes: one even light (the 6-column normal)');
+  for (const [nm, f, lim] of [['a step every 4 blocks', (x) => 4 + Math.floor((x + 8) / 4), 1.5], ['every 3 blocks', (x) => 4 + Math.floor((x + 9) / 3), 4], ['two in three', (x) => 3 + Math.floor((x + 9) * 2 / 3), 2.5]]) {
+    const g = (x, y, z) => { const h = f(x); return y < h - 3 ? STONE : y < h - 1 ? DIRT : y < h ? GRASS : 0; };
+    const a = V.meshSection(job(g)).opaque, tl = [];
+    for (let o = 0; o < a.length; o += 8) { if ((a[o + 5] & 7) !== 6) continue; const x = a[o] / 2048 - 4, z = a[o + 2] / 2048 - 4; if (x < 1.5 || x > 13.5 || Math.abs(z - 8) > 0.3) continue; const n = SN.unoct(a[o + 4]); tl.push(Math.atan2(Math.hypot(n[0], n[2]), n[1]) * 57.3); }
+    const m = tl.reduce((s, v) => s + v, 0) / tl.length, sd = Math.sqrt(tl.reduce((s, v) => s + (v - m) * (v - m), 0) / tl.length);
+    check(tl.length > 20 && sd < lim, nm + ': the slope\'s normals within ' + lim + '° (sd)', sd.toFixed(1) + '° over ' + tl.length);
+  }
 }
 console.log('f · switches, defines, rows, texts, wiring');
 {
