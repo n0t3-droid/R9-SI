@@ -40,12 +40,14 @@
   const d2 = (a, p) => (a.pos[0] - p[0]) ** 2 + (a.pos[2] - p[2]) ** 2;
   const night = (tod) => tod >= 13000 && tod < 23300;
   const R0 = (g) => {
+    const R = g._se; if (R && R.meta === g.meta && R.world === g.world) return R;   // (no string built per call: the hot path)
     const key = (g.meta.id || '') + ':' + (g.world ? g.world.seed : '');
-    if (!g._se || g._se.key !== key) g._se = { key, d: S.load(g.meta.seelen), G: new Map(), plans: new Map(), rr: 0, vt: 0, chr: {}, qTried: {}, build: {}, come: null, comeT: -1e9, wu: {} };
+    if (R && R.key === key) { R.meta = g.meta; R.world = g.world; return R; }
+    if (!g._se || g._se.key !== key) g._se = { key, d: S.load(g.meta.seelen), G: new Map(), plans: new Map(), rr: 0, vt: 0, chr: {}, qTried: {}, build: {}, come: null, comeT: -1e9, wu: {}, meta: g.meta, world: g.world };
     return g._se;
   };
   SG.state = R0;
-  SG.mind = function (g, a) { const R = R0(g), id = pidOf(g, a); let m = R.d.p[id]; if (!m) { m = R.d.p[id] = S.newMind(); } if (!m.nm) { m.nm = a.name; m.vn = a.vil.name || ''; } return m; };
+  SG.mind = function (g, a) { const R = R0(g); if (a.seR === R && a.seM && R.d.p[a.sePid] === a.seM) return a.seM; const id = a.sePid = pidOf(g, a); let m = R.d.p[id]; if (!m) { m = R.d.p[id] = S.newMind(); } if (!m.nm) { m.nm = a.name; m.vn = a.vil.name || ''; } a.seR = R; a.seM = m; return m; };
   const peopleOf = (vil) => vil.people.filter(p => !p.visit).map(p => ({ id: lid(p), fam: p.fam, home: p.home, role: p.role, age: p.age }));
   SG.graph = function (g, vil) {
     const R = R0(g); let G = R.G.get(vil.id);
@@ -200,7 +202,7 @@
     if (!SG.on(g) || a.guest || !a.p) return w;
     if (a.seCome) return 'se_come';
     // a storm-fearing villager hurries home when the front comes
-    const m = g._se && g._se.d.p[pidOf(g, a)];
+    const m = g._se && (a.seR === g._se ? a.seM : g._se.d.p[pidOf(g, a)]);
     const fear = m && S.has(m, 'fearStorm');
     if (fear && w !== 'sleep' && w !== 'patrol' && stormy(g) > 0.15) { hurry(V, a, true); return 'home'; }
     if (a.seHurry) hurry(V, a, false);
@@ -507,13 +509,16 @@
   const bUpd = P.update;
   P.update = function (dt) {
     bUpd.call(this, dt);
-    const g = this.g;
+    SG.frame(this, dt);
+  };
+  SG.frame = function (V, dt) {
+    const g = V.g;
     if (!SG.on(g) || !g.env || !g.player) return;
     const t0 = performance.now();
     try {
-      const R = R0(g), A = this.agents, n = A.length;
-      if (n) for (let k = 0; k < SG.PER_FRAME; k++) { const a = A[(R.rr = (R.rr + 1) % n)]; if (a && !a.guest && a.p && a.vil && a.vil.active) sense(this, a, R); }
-      if ((R.vt += dt) >= 1) { R.vt = 0; const t1 = performance.now(); for (const vil of this.known.values()) if (vil.active) villageTick(this, vil, R); const dd = performance.now() - t1; if (dd > SG.cost.tickMax) SG.cost.tickMax = dd; }
+      const R = R0(g), A = V.agents, n = A.length;
+      if (n) for (let k = 0; k < SG.PER_FRAME; k++) { const a = A[(R.rr = (R.rr + 1) % n)]; if (a && !a.guest && a.p && a.vil && a.vil.active) sense(V, a, R); }
+      if ((R.vt += dt) >= 1) { R.vt = 0; const t1 = performance.now(); for (const vil of V.known.values()) if (vil.active) villageTick(V, vil, R); const dd = performance.now() - t1; if (dd > SG.cost.tickMax) SG.cost.tickMax = dd; }
     } catch (e) { if (!SG.warned) { SG.warned = true; console.warn('seelen', e); } }
     const ms = performance.now() - t0;
     SG.cost.frames++; SG.cost.ms += ms; if (ms > SG.cost.max) SG.cost.max = ms;
