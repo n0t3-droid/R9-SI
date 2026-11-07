@@ -107,7 +107,7 @@ try {
   const AFT = 8400, LATE = 9600;
   // the land: a 3 × 3 tour of 200 m (the scan reads what is loaded at each stop)
   const land = new Map();
-  for (const [ox, oz] of [[0, 0], [160, 0], [-160, 0], [0, 160], [0, -160]]) {
+  for (const [ox, oz] of (process.env.PIN !== '0' ? [[0, 0]] : [[0, 0], [160, 0], [-160, 0], [0, 160], [0, -160]])) {   // (pinned: the spawn's scan only)
     const c0 = [S0[0] + ox, S0[1], S0[2] + oz];
     if (ox || oz) { await eyeAt([c0[0], 160, c0[2]], [c0[0] + 10, 150, c0[2]], AFT); await settle(40); }
     for (const p of await scan(c0, 120, 2)) land.set(p[0] + ',' + p[1], p);
@@ -234,6 +234,17 @@ try {
     } else check(false, 'a village known');
   }
   save();
+  // ---------------------------------------------------------------- the sheets
+  const VN = [['spawn', 'Spawn: Blick über die Wiesen'], ['meadow', 'Sanfte Hügel'], ['hill', 'Sanfter Hügel'], ['cliff', 'Klippe'], ['shore', 'Ufer'], ['street', 'Dorfstraße: Haus auf weichem Boden'], ['cave', 'Höhleneingang'], ['vista', 'Fernblick']];
+  const PN = { balanced: 'Ausgewogen', high: 'Hoch', ultra: 'Ultra' };
+  const rows = [];
+  for (const [v, lab] of VN) for (const pr of PRESETS) { const imgs = ['off', 'on'].map(c => N.pics[v + '_' + pr + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: lab + ' — ' + (PN[pr] || pr) + ': Würfel | Weiche Natur', imgs }); }
+  if (rows.length) {
+    const spec = ROOT + '/.tmp_tests/gemalt_sheet_' + TAG + '.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
+    const tspec = ROOT + '/.tmp_tests/gemalt_thumbs_' + TAG + '.json'; fs.writeFileSync(tspec, JSON.stringify({ w: 320, rows: rows.filter(r => r.label.includes('Ausgewogen') || PRESETS.length === 1).map(r => ({ label: r.label.replace(' — Ausgewogen', ' · Ausgewogen'), imgs: r.imgs })) }));
+    try { console.log('     ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + (TAG === 'after' ? 'gemalt_thumbs.jpg' : 'gemalt_thumbs_' + TAG + '.jpg'), tspec]).toString().trim()); } catch (e) { console.log('  !! thumbs ' + e.message.slice(0, 200)); }
+    try { console.log('     ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + (TAG === 'after' ? 'gemalt_compare.jpg' : 'gemalt_compare_' + TAG + '.jpg'), spec]).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message.slice(0, 200)); }
+  }
   // ---------------------------------------------------------------- costs at the hill (or the meadow)
   if (want('cost')) {
     const C = N.cams.meadow || N.cams.hill;
@@ -250,17 +261,6 @@ try {
       save();
     }
     check(N.cost.potato && JSON.stringify(N.cost.potato.verts.on) === JSON.stringify(N.cost.potato.verts.off), 'Very Low: the same mesh with the switch as without (the preset never asks)');
-  }
-  // ---------------------------------------------------------------- the sheets
-  const VN = [['spawn', 'Spawn: Blick über die Wiesen'], ['meadow', 'Sanfte Hügel'], ['hill', 'Sanfter Hügel'], ['cliff', 'Klippe'], ['shore', 'Ufer'], ['street', 'Dorfstraße: Haus auf weichem Boden'], ['cave', 'Höhleneingang'], ['vista', 'Fernblick']];
-  const PN = { balanced: 'Ausgewogen', high: 'Hoch', ultra: 'Ultra' };
-  const rows = [];
-  for (const [v, lab] of VN) for (const pr of PRESETS) { const imgs = ['off', 'on'].map(c => N.pics[v + '_' + pr + '_' + c]).filter(Boolean); if (imgs.length) rows.push({ label: lab + ' — ' + (PN[pr] || pr) + ': Würfel | Weiche Natur', imgs }); }
-  if (rows.length) {
-    const spec = ROOT + '/.tmp_tests/gemalt_sheet_' + TAG + '.json'; fs.writeFileSync(spec, JSON.stringify({ w: 620, rows }));
-    const tspec = ROOT + '/.tmp_tests/gemalt_thumbs_' + TAG + '.json'; fs.writeFileSync(tspec, JSON.stringify({ w: 320, rows: rows.filter(r => r.label.includes('Ausgewogen') || PRESETS.length === 1).map(r => ({ label: r.label.replace(' — Ausgewogen', ' · Ausgewogen'), imgs: r.imgs })) }));
-    try { console.log('     ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + (TAG === 'after' ? 'gemalt_thumbs.jpg' : 'gemalt_thumbs_' + TAG + '.jpg'), tspec]).toString().trim()); } catch (e) { console.log('  !! thumbs ' + e.message.slice(0, 200)); }
-    try { console.log('     ' + execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + (TAG === 'after' ? 'gemalt_compare.jpg' : 'gemalt_compare_' + TAG + '.jpg'), spec]).toString().trim()); } catch (e) { console.log('  !! sheet ' + e.message.slice(0, 200)); }
   }
 } catch (e) { fails++; console.log('  ✗ ' + (e.stack || e.message).slice(0, 1200)); }
 const errs = logs.filter(l => l.startsWith('[pageerror]'));
