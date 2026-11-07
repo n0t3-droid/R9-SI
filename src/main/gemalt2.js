@@ -99,13 +99,13 @@
     'vec3 gmWater(vec3 col, vec3 wp, float vdep, float dist, vec3 litC) {\n' +
     '  float far = 1.0 - smoothstep(30.0, 70.0, dist);\n' +
     '  vec3 shal = vec3(0.32, 0.78, 0.74) * litC;\n' +
-    '  col = mix(col, shal, (1.0 - smoothstep(0.05, 1.4, vdep)) * 0.35);\n' +
+    '  col = mix(col, shal, (1.0 - smoothstep(0.05, 1.8, vdep)) * 0.5 * far);\n' +
     '  float br = texture(u_noise, wp.xz / 6.5 + vec2(u_time * 0.01, 0.0)).r;\n' +
-    '  float ph = vdep * 2.6 + u_time * 0.22 + br * 0.9;\n' +
-    '  float ln = 1.0 - smoothstep(0.0, 0.16, abs(fract(ph) - 0.5) * 2.0 - 0.8);\n' +
-    '  float m = ln * (1.0 - smoothstep(0.25, 1.6, vdep)) * smoothstep(0.35, 0.6, br) * far;\n' +
-    '  float edge = (1.0 - smoothstep(0.0, 0.14, vdep)) * smoothstep(0.3, 0.55, br) * far;\n' +
-    '  return mix(col, vec3(0.95, 0.97, 1.0) * litC, clamp(max(m * 0.7, edge * 0.85), 0.0, 1.0));\n}\n#endif\n';
+    '  float ph = vdep * 1.7 + u_time * 0.18 + br * 0.6;\n' +
+    '  float ln = 1.0 - smoothstep(0.12, 0.24, abs(fract(ph) - 0.5));\n' +
+    '  float m = ln * (1.0 - smoothstep(0.4, 2.2, vdep)) * smoothstep(0.3, 0.5, br) * far;\n' +
+    '  float edge = (1.0 - smoothstep(0.0, 0.22, vdep)) * smoothstep(0.25, 0.5, br) * far;\n' +
+    '  return mix(col, vec3(0.95, 0.97, 1.0) * litC, clamp(max(m * 0.85, edge * 0.9), 0.0, 1.0));\n}\n#endif\n';
 
   // ---------------------------------------------------------------- the brush-stroke grass: placement
   // per grass column up to PER clumps at hashed spots; the farther from the eye, the fewer stay (a clump keeps its place:

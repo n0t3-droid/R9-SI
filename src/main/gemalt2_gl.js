@@ -200,7 +200,12 @@ void main() {
   const G = VR.Gemalt;
   if (G && G.lift && !G._g2feet) {
     G._g2feet = 1; const l0 = G.lift;
-    G.lift = function (world, x, y, z) { const d = l0.apply(this, arguments); const g = VR.game; if (g && g.settings && g.settings.gTuft && g.env) G2.step(marks, x, z, performance.now() / 1000); return d; };
+    G.lift = function (world, x, y, z) {
+      const d = l0.apply(this, arguments), g = VR.game, c = g && g.renderer && g.renderer.cam;
+      // (only bodies on the grass round the eye: a crowd far off would push the near marks out of the ring)
+      if (g && g.settings && g.settings.gTuft && c && Math.abs(x - c.x) < 20 && Math.abs(z - c.z) < 20) G2.step(marks, x, z, performance.now() / 1000);
+      return d;
+    };
   }
   const feet = new Float32Array(G2.TRAMPLE.n * 4);
   R.gmTuft = function (E, camPos) {
