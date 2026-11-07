@@ -6,6 +6,9 @@
 //   d  the brush-stroke grass: the placement is deterministic, fewer clumps with distance, none beyond the radius, a clump
 //      keeps its spot as the eye moves (only its size changes), inside its column
 //   e  trampling: a mark lies flat, then the grass rises; a foot nearby refreshes a mark; a ring of N
+//   g  the blob rule (flaw 1 of r-gemalt): a magma / crystal / obsidian block in the soft slope is drawn soft (face 6) in its
+//      own colour, the glowing ones with the emissive bit, the slope round it stays smooth (no pinned terrace); a brick in the
+//      same spot still pins the ground and stays a cube
 //   f  the switches by preset (Very Low, Low off), the defines by program, the rows, the texts, the wiring
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -92,6 +95,39 @@ console.log('e · trampling');
   check(M.length === 1 && M[0][2] === 11, 'a foot nearby refreshes the mark');
   for (let i = 0; i < 40; i++) G2.step(M, i * 2, 0, 12 + i);
   check(M.length === G2.TRAMPLE.n, 'a ring of ' + G2.TRAMPLE.n);
+}
+console.log('g · the blob rule: natural decor in the soft ground');
+{
+  const V = require('./load_shared.js');
+  const SN = V.SoftNat, PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS;
+  V.setLook('seamless');
+  const st = (n) => V.R.byName[n].defaultState;
+  const GRASS = st('grass_block'), DIRT = st('dirt'), STONE = st('stone');
+  const job = (fn) => {
+    const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS);
+    for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) { const pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD), b = fn(x, y, z); blocks[pi] = b; light[pi] = b ? 0 : 0xf000; }
+    const t = new Uint16Array(PSS).fill(0x4d6a);
+    return { blocks, light, grass: t, foliage: t, water: t, sy: 0, ox: 0, oz: 0, smooth: true, fancyLeaves: 64, vxLod: true };
+  };
+  const hf = (x) => 4 + Math.floor((x + 8) / 2);   // a slope, a step every 2 blocks
+  const with_ = (b) => (x, y, z) => { const h = hf(x); if (x === 8 && z === 8 && y === h - 1) return b; return y < h - 3 ? STONE : y < h - 1 ? DIRT : y < h ? GRASS : 0; };
+  const quads = (r) => { const a = r.opaque, out = []; for (let o = 0; o < a.length; o += 8) out.push({ x: a[o] / 2048 - 4, y: a[o + 1] / 2048 - 4, z: a[o + 2] / 2048 - 4, w5: a[o + 5], tint: a[o + 7] }); return out; };
+  const T = SN.tables();
+  for (const nm of ['magma_block', 'violet_crystal_block', 'obsidian']) {
+    const b = st(nm), r = V.meshSection(job(with_(b))), q = quads(r);
+    const at = q.filter(v => v.x >= 7.4 && v.x <= 9.6 && v.z >= 7.4 && v.z <= 9.6 && v.y >= hf(8) - 1.6);
+    const glow = at.filter(v => (v.w5 & 7) === 6 && (v.w5 & 4096)).length, cubes = at.filter(v => (v.w5 & 7) !== 6).length;
+    check(T.soft[b] === 1 && cubes === 0, nm + ': drawn soft (no cube faces at its place)', at.length + ' vertices');
+    check(nm === 'obsidian' ? glow === 0 : glow >= 4, nm + (nm === 'obsidian' ? ': no glow' : ': its faces glow (the emissive bit)'), glow);
+    let mono = true; for (let x = 2; x < 14; x++) if (r.softH[8 * 16 + x + 1] < r.softH[8 * 16 + x] - 1) mono = false;
+    let grid = 0; for (const v of at) if (Math.abs(v.x - Math.round(v.x)) < 1e-4 && Math.abs(v.y - Math.round(v.y)) < 1e-4 && Math.abs(v.z - Math.round(v.z)) < 1e-4) grid++;
+    check(mono && grid < at.length * 0.5, nm + ': the slope round it stays smooth (no pinned terrace)', grid + ' / ' + at.length + ' on the grid');
+  }
+  {
+    const b = st('stone_bricks'), r = V.meshSection(job(with_(b))), q = quads(r);
+    const cube = q.filter(v => (v.w5 & 7) !== 6 && v.x >= 7.9 && v.x <= 9.1 && v.z >= 7.9 && v.z <= 9.1).length;
+    check(T.soft[b] === 0 && T.pin[b] === 1 && cube >= 4, 'a brick in the same spot: still a crisp cube that pins the ground', cube);
+  }
 }
 console.log('f · switches, defines, rows, texts, wiring');
 {
