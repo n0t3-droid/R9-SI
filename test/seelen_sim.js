@@ -97,9 +97,11 @@ console.log('b · a quarrel over two days');
   run(2);
   check(q.ph === 'bench', 'the next dusk → the bench (' + q.ph + ')');
   let sat = false;
-  for (let k = 0; k < 140 && q.ph === 'bench'; k++) { run(1); if (A.pose === 'sit' && B.pose === 'sit' && dist(A, B) < 3.5) sat = true; }
+  let together = false;
+  for (let k = 0; k < 140 && q.ph === 'bench'; k++) { run(1); if (A.pose === 'sit' && B.pose === 'sit' && dist(A, B) < 1.6) sat = true; if (A.act && A.act.tw > 2 && dist(A, B) < 2.5) together = true; }
   const seats = (vil.plan.plaza.seats || []).length;
-  check(sat || seats < 2, `they share a bench (${seats} plaza seats)`);
+  const S2 = vil.plan.plaza.seats || [], two = S2.some((x, i) => S2.some((y, j) => j > i && (x[3] | 0) === (y[3] | 0) && x[1] === y[1] && Math.abs(x[0] - y[0]) + Math.abs(x[2] - y[2]) === 1));
+  check(two ? sat : together, two ? 'they share one bench, side by side' : `no bench for two on this plaza (${seats} seats): they stand together instead`);
   check(q.ph === 'gift', 'the bench → the gift (' + q.ph + ')');
   g.env.day++; g.env.timeOfDay = 5800;
   for (let k = 0; k < 140 && q.ph === 'gift'; k++) { run(1); if (process.env.DBG && k % 5 === 0) console.log('   ', k, q.ph, q.d, g.env.day, A.act && A.act.type, A.seSlot && A.seSlot.a, B.act && B.act.type, B.seSlot && B.seSlot.a, dist(A, B).toFixed(1), A.act && A.act.tw); }

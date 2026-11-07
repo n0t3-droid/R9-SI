@@ -240,9 +240,13 @@
     const pz = vil.plan.plaza, key = S.key(A, B), h = S.hs(key + vil.id);
     const seats = pz.seats || [];
     if (mode === 'bench' && seats.length >= 2) {
+      // one bench for two: two seats side by side facing the same way (the first such pair from a place of their own)
+      const pairs = [];
+      for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) { const x = seats[i], y = seats[j]; if ((x[3] | 0) === (y[3] | 0) && x[1] === y[1] && Math.abs(x[0] - y[0]) + Math.abs(x[2] - y[2]) === 1) pairs.push([x, y]); }
+      if (pairs.length) { const pr = pairs[h % pairs.length]; return { seat: A < B ? pr : [pr[1], pr[0]] }; }
       const s0 = seats[h % seats.length];
       let s1 = null, bd = 1e9; for (const s of seats) { if (s === s0) continue; const dd = (s[0] - s0[0]) ** 2 + (s[2] - s0[2]) ** 2 + (s[1] - s0[1]) ** 2 * 4; if (dd < bd) { bd = dd; s1 = s; } }
-      if (s1 && bd <= 9) return { seat: A < B ? [s0, s1] : [s1, s0] };
+      if (s1 && bd <= 2) return { seat: A < B ? [s0, s1] : [s1, s0] };
     }
     const an = (h % 628) / 100, r = 3 + (h >>> 10) % 3;
     const cx = pz.x + 0.5 + Math.cos(an) * r, cz = pz.z + 0.5 + Math.sin(an) * r;
@@ -272,7 +276,7 @@
         V.sit(a, mine); arrived = a.pose === 'sit';
       }
     }
-    else { const pt = sp.pts[0]; arrived = V.goTo(a, Math.floor(pt[0]), sp.c[1], Math.floor(pt[1]), 0.9); }
+    else { const pt = sp.pts[0]; arrived = V.goTo(a, Math.floor(pt[0]), sp.c[1], Math.floor(pt[1]), 0.9) || (act.t > 6 && (a.pos[0] - pt[0]) ** 2 + (a.pos[2] - pt[1]) ** 2 < 1.9 * 1.9); }   // (a cell taken by a planter: near is there)
     if (act.t > 150) { s.used = true; act.done = true; return; }
     if (!arrived) return;
     if (!sp.seat) { a.vel[0] *= 0.5; a.vel[2] *= 0.5; }
