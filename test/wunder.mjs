@@ -141,11 +141,11 @@ const findMeadow = (k) => ev((k) => {
   const nm = (x, y, z) => R.types[R.T.type[w.getBlock(x, y, z)]].name;
   const gy = (X, Z) => { let y = w.topAt(X, Z); while (y > 1 && !(R.T.flags[w.getBlock(X, y, Z)] & F.SOLID)) y--; return y; };
   const open = (x, z, r, y0) => { for (let dz = -r; dz <= r; dz += 3) for (let dx = -r; dx <= r; dx += 3) { const X = x + dx, Z = z + dz; if (!w.isLoaded(X, Z)) return false; const y = gy(X, Z); if (nm(X, y, Z) !== 'grass_block' || Math.abs(y - y0) > tol || w.topAt(X, Z) > y + 2) return false; } return true; };
-  for (let r = 0; r < 110; r += 6) for (let q = 0; q < 24; q++) {
+  for (let r = 0; r < 120; r += 5) for (let q = 0; q < 32; q++) {
     const a = q / 24 * Math.PI * 2, x = Math.floor(p[0] + Math.cos(a) * r), z = Math.floor(p[2] + Math.sin(a) * r);
     if (!w.isLoaded(x, z)) continue;
     const y = gy(x, z); if (nm(x, y, z) !== 'grass_block') continue;
-    if (open(x, z, k ? 7 : 10, y) && open(x - 14, z, k ? 4 : 5, y) && (k || open(x + 6, z + 16, 6, y))) return [x + 0.5, y, z + 0.5];
+    if (open(x, z, k ? 7 : 10, y) && open(x - 14, z, k ? 4 : 5, y) && open(x - 24, z + 16, 4, y) && open(x + 5, z + 12, 5, y)) return [x + 0.5, y, z + 0.5];
   }
   return null;
 }, k);
@@ -162,7 +162,7 @@ if (meadow) {
   await setT(info.d + 1, 600);
   await stand([meadow[0] - 26, meadow[1] + 2.5, meadow[2] + 18], [meadow[0] - 6, meadow[1] + 5, meadow[2]]);
   await settle(30); await setT(info.d + 1, 600); await step(6);
-  const flowers = await ev(([m]) => { const w = VR.game.world, R = VR.R; let n = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = Math.floor(m[0] - 14 + dx), z = Math.floor(m[2] + dz), y = w.topAt(x, z); const nm = R.types[R.T.type[w.getBlock(x, y, z)]].name; if (/poppy|cornflower|daisy|allium|bluet|dandelion|lily/.test(nm)) n++; } return n; }, [meadow]);
+  const flowers = await ev(([m]) => { const w = VR.game.world, R = VR.R; let n = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = Math.floor(m[0] - 14 + dx), z = Math.floor(m[2] + dz), t = w.topAt(x, z); for (let y = t + 2; y > t - 3; y--) { const nm = R.types[R.T.type[w.getBlock(x, y, z)]].name; if (/poppy|cornflower|daisy|allium|bluet|dandelion|lily/.test(nm)) { n++; break; } } } return n; }, [meadow]);
   check(flowers >= 8, 'the ring of blossoms where it stood (' + flowers + ' flowers, placed ' + run.ring + ')');
   await grab('tree', 'wunder_tree.png', 6);
   const sit = await ev(() => { const g = VR.game, n0 = g.player.inv.count('lantern_seed'); VR.WunderGame.sit(g); return [n0, g.player.inv.count('lantern_seed')]; });
