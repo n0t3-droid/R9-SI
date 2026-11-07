@@ -175,6 +175,10 @@
         H += h * wa * wb; gx2 += h * HD[a] * wb; gz2 += h * wa * HD[b];
       }
       py = H < -0.5 ? -0.5 : H > 0.5 ? 0.5 : H;
+      // (a slope steeper than the cell can follow: the clamped corner slides along the slope to where the mean surface
+      //  passes its height — a stack of clamped corners becomes a straight slope, not a zigzag)
+      const g2 = gx2 * gx2 + gz2 * gz2;
+      if (py !== H && g2 > 0.05) { const t = (py - H) / g2; px = gx2 * t; pz = gz2 * t; }
       if (H >= -0.5 && H <= 0.5 && gx2 * gx2 + gz2 * gz2 < 2.6) {
         // (a gentle slope: the corner stays on its column line — a sideways pull would stack the riser's cells into a
         //  half-block staircase again)
