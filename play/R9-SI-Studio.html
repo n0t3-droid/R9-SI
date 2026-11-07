@@ -47229,6 +47229,429 @@ WU.KEYS=['g.wu.whale','g.wu.tree','g.wu.deer','g.wu.flute.learn','g.wu.flute.got
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const S=VR.Seelen=VR.Seelen||{};
+S.V=1;
+S.MEM=48;
+S.SAVE_MEM=8;
+S.MAXP=120;
+S.MAXV=24;
+S.MAXR=32;
+S.MAXB=3;
+S.FADE=0.75;
+S.BMIN=0.15;
+S.BTH=5;
+S.HOUR=60;
+S.DAY=1440;
+
+const TG=S.TAGS={pl:1,storm:2,wunder:4,build:8,chronik:16,friend:32,quarrel:64,danger:128,fest:256};
+const tags=(s)=>s.split('|').reduce((m,k)=>m|TG[k],0);
+S.KINDS={
+seen:[2,tags('pl'),0],talk:[3,tags('pl'),1],gift:[6,tags('pl'),2],helped:[8,tags('pl'),2],hurt:[7,tags('pl'),-2],
+danced:[6,tags('pl|fest'),2],storm:[5,tags('storm'),-1],wunder:[7,tags('wunder'),2],build:[7,tags('build'),1],
+chronik:[3,tags('chronik'),0],moment:[4,tags('friend|fest'),1],hug:[2,tags('friend'),1],fgift:[5,tags('friend'),2],
+quarrel:[6,tags('quarrel'),-2],made_up:[6,tags('friend'),2],danger:[6,tags('danger'),-2],
+};
+S.BELIEFS=['fearStorm','likesWanderer','waryWanderer','proud','awed','fond','upset','worried','curious'];
+S.ACTS=['meet','spat','bench','gift','admire','skywatch','news'];
+S.SLOTS=[[900,3300],[3300,5600],[5600,6900],[6900,10600],[10600,13000]];
+S.MOMENTS=['dance','picnic','lantern','tag','hide','feed','fest'];
+S.TOPICS=8;
+
+const h32=S.h32=(a,b,c)=>{let x=(a|0)^Math.imul(b|0,0x9E3779B1)^Math.imul((c|0)+0x7F4A7C15,0x85EBCA77);x^=x>>>16;x=Math.imul(x,0x7FEB352D);x^=x>>>15;x=Math.imul(x,0x846CA68B);x^=x>>>16;return x>>>0;};
+S.hs=(s)=>{s=String(s);let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619);}return x>>>0;};
+const clamp=(v,a,b)=>(v<a?a:v>b?b:v);
+const r2=(v)=>Math.round(v*100)/100;
+
+
+S.newMind=()=>({m:[],b:[],pl:null,u:0});
+S.rec=(t,now)=>Math.pow(0.995,Math.max(0,now-t)/S.HOUR);
+const retention=(e,now)=>e.i/10+S.rec(e.t,now);
+
+S.note=function(mind,k,t,o){
+const K=S.KINDS[k];if(!K|| !mind)return null;
+o=o||{};
+const a=o.a===undefined||o.a===null?'':String(o.a).slice(0,24),w=o.w===undefined||o.w===null?'':String(o.w).slice(0,24);
+const imp=clamp(Math.round(o.i||K[0]),1,10);
+mind.u=Math.max(mind.u||0,t);
+for(let j=mind.m.length-1;j>=0;j--){
+const e=mind.m[j];
+if(t-e.t>S.HOUR)break;
+if(e.k===k&&e.a===a&&e.w===w){e.t=t;e.i=Math.min(10,Math.max(e.i,imp)+(k==='seen'?0:1));return e;}
+}
+const e={k,t,i:imp,a,w};
+if(mind.m.length>=S.MEM){
+let worst=0,ws=1e9;
+for(let j=0;j<mind.m.length;j++){const s=retention(mind.m[j],t);if(s<ws){ws=s;worst=j;}}
+mind.m.splice(worst,1);
+}
+mind.m.push(e);
+return e;
+};
+
+S.score=function(e,now,q){
+let rel=0;
+if(q){
+const K=S.KINDS[e.k];
+if(q.tags&&K&&(K[1]&q.tags))rel+=1;
+if(q.w&&e.w===q.w)rel+=0.5;
+if(q.k&&e.k===q.k)rel+=0.5;
+}
+return S.rec(e.t,now)+e.i/10+rel;
+};
+S.retrieve=function(mind,now,q,n){
+if(!mind|| !mind.m.length)return[];
+const L=[];
+for(const e of mind.m){if(q&&q.only&& !(S.KINDS[e.k][1]&q.only))continue;if(q&&q.not&&(S.KINDS[e.k][1]&q.not))continue;L.push([S.score(e,now,q),e]);}
+L.sort((x,y)=>(y[0]-x[0])||(y[1].t-x[1].t)||(x[1].k<y[1].k? -1:x[1].k>y[1].k?1:0));
+return L.slice(0,n||3).map(x=>x[1]);
+};
+
+S.reflect=function(mind,now,day){
+const votes={};
+const vote=(b,w,a,who)=>{const key=b+'|'+(a||'')+'|'+(who||'');const v=votes[key]||(votes[key]={b,a:a||'',w:who||'',s:0});v.s+=w;};
+let pos=0,neg=0;
+const made={};
+for(const e of mind.m)if(e.k==='made_up')made[e.w]=Math.max(made[e.w]||0,e.t);
+for(const e of mind.m){
+const w=e.i*S.rec(e.t,now);
+switch(e.k){
+case'storm':vote('fearStorm',w);break;
+case'danger':vote('worried',w);break;
+case'seen':pos+=w*0.25;break;
+case'talk':case'gift':case'helped':case'danced':pos+=w;break;
+case'hurt':neg+=w;break;
+case'build':vote('proud',w,e.a);break;
+case'wunder':vote('awed',w,e.a);break;
+case'moment':case'hug':case'fgift':case'made_up':if(e.w)vote('fond',w,'',e.w);break;
+case'quarrel':if(e.w&& !(made[e.w]>e.t))vote('upset',w,'',e.w);break;
+case'chronik':vote('curious',w*0.7);break;
+}
+}
+if(pos-neg>0)vote('likesWanderer',pos-neg);else if(neg>pos)vote('waryWanderer',neg-pos);
+
+const out=[];
+const old={};
+for(const b of mind.b||[])old[b.b+'|'+(b.a||'')+'|'+(b.w||'')]=b;
+const keys=Object.keys(votes).sort();
+for(const k of keys){
+const v=votes[k],o=old[k];
+if(!o&&v.s<S.BTH)continue;
+const s=clamp((o?o.s*S.FADE:0)+v.s/20,0,1);
+out.push({b:v.b,s:r2(s),a:v.a,w:v.w,d:o?o.d:day});
+delete old[k];
+}
+for(const k of Object.keys(old).sort()){
+const o=old[k];
+if(o.b==='upset'&&made[o.w])continue;
+const s=r2(o.s*S.FADE);
+if(s>=S.BMIN)out.push({b:o.b,s,a:o.a||'',w:o.w||'',d:o.d});
+}
+
+out.sort((x,y)=>(y.s-x.s)||(x.b<y.b? -1:x.b>y.b?1:0)||(x.a<y.a? -1:1)||(x.w<y.w? -1:1));
+const seen={},keep=[];
+for(const b of out){
+const kind=b.b==='waryWanderer'?'likesWanderer':b.b;
+if(seen[kind])continue;seen[kind]=1;
+keep.push(b);if(keep.length>=S.MAXB)break;
+}
+mind.b=keep;
+mind.rd=day;
+return keep;
+};
+S.has=(mind,b)=>(mind&&mind.b?mind.b.find(x=>x.b===b)||null:null);
+
+
+
+S.key=(i,j)=>(i<j?i+'|'+j:j+'|'+i);
+S.seedRel=function(people){
+const base={};
+for(let x=0;x<people.length;x++)for(let y=x+1;y<people.length;y++){
+const A=people[x],B=people[y];
+let v=0,k='';
+if(A.fam===B.fam){v=0.6;k='family';}
+else if(A.role&&A.role===B.role&&A.age!=='child'&&B.age!=='child'){v=0.3;k='work';}
+else if(Math.abs((A.home|0)-(B.home|0))===1){v=0.25;k='neighbour';}
+else if(A.age==='child'&&B.age==='child'){v=0.2;k='neighbour';}
+if(v)base[S.key(A.id,B.id)]=[v,k];
+}
+return base;
+};
+S.newGraph=(people,d)=>({base:S.seedRel(people),d:d||{}});
+S.relV=(G,i,j)=>{const k=S.key(i,j),b=G.base[k];return clamp((b?b[0]:0)+(G.d[k]||0),-1,1);};
+S.relAdd=function(G,i,j,dv){
+if(i===j)return 0;
+const k=S.key(i,j),b=G.base[k],bv=b?b[0]:0;
+const nv=clamp(bv+(G.d[k]||0)+dv,-1,1);
+const d=r2(nv-bv);
+if(Math.abs(d)<0.005)delete G.d[k];else G.d[k]=d;
+return nv;
+};
+
+S.relKind=function(G,i,j,q){
+if(q&&q.ph!=='done'&&((q.a===i&&q.b===j)||(q.a===j&&q.b===i)))return'quarrel';
+const k=S.key(i,j),b=G.base[k],v=S.relV(G,i,j);
+if(b&&b[1]==='family')return'family';
+if(v>=0.5)return'friend';
+if(v<= -0.3)return'quarrel';
+return b&&v>0?b[1]:'';
+};
+S.friendsOf=function(G,id,n,ids){
+const L=[];
+for(const o of ids){if(o===id)continue;const k=S.key(id,o),b=G.base[k];if(b&&b[1]==='family')continue;const v=S.relV(G,id,o);if(v>=0.4)L.push([v,o]);}
+L.sort((x,y)=>(y[0]-x[0])||(x[1]<y[1]? -1:1));
+return L.slice(0,n||3).map(x=>({w:x[1],v:x[0]}));
+};
+
+S.SHARE={dance:0.15,picnic:0.15,lantern:0.18,fest:0.12,tag:0.08,hide:0.08,feed:0.1,hug:0.04,talk:0.02,fgift:0.2,made_up:0.5,quarrel: -0.45};
+S.share=(G,i,j,kind)=>S.relAdd(G,i,j,S.SHARE[kind]||0.05);
+
+
+S.Q=['spat','cold','bench','gift','done'];
+S.qNew=(a,b,day,seed)=>({a,b,ph:'spat',d:day,tp:h32(seed,day,31)%S.TOPICS,g:(h32(seed,day,37)&1)?a:b});
+
+S.qPick=function(G,people,day,seed){
+if((h32(seed,day,41)&3)!==0)return null;
+const ad=people.filter(p=>p.age==='adult').map(p=>p.id).sort();
+if(ad.length<2)return null;
+const pairs=[];
+for(let x=0;x<ad.length;x++)for(let y=x+1;y<ad.length;y++){const k=S.key(ad[x],ad[y]),b=G.base[k];if(!b||b[1]==='family')continue;const v=S.relV(G,ad[x],ad[y]);if(v>0&&v<0.5)pairs.push([ad[x],ad[y]]);}
+if(!pairs.length)return null;
+const pr=pairs[h32(seed,day,43)%pairs.length];
+return S.qNew(pr[0],pr[1],day,seed);
+};
+
+S.qStep=function(q,o){
+if(!q||q.ph==='done')return q;
+const day=o.day|0,tod=o.tod||0,d0=q.d|0;
+const go=(ph)=>{q.ph=ph;q.at=day;return q;};
+switch(q.ph){
+case'spat':if(o.beat||day>d0)return go('cold');break;
+case'cold':if((day>=d0+1&&tod>=10600)||day>=d0+2)return go('bench');break;
+case'bench':if(o.beat||day>=d0+2)return go('gift');break;
+case'gift':if(o.beat||day>=d0+3)return go('done');break;
+}
+return q;
+};
+
+S.qCatch=function(q,day,tod){for(let k=0;k<6&&q&&q.ph!=='done';k++){const ph=q.ph;S.qStep(q,{day,tod});if(q.ph===ph)break;}return q;};
+
+
+
+S.plan=function(c){
+const slots=S.SLOTS.map(([f,u])=>({f,u,a:null,why:'',w:''}));
+const h=h32(c.seed|0,c.day|0,51),mind=c.mind||null;
+const q=c.q&&c.q.ph!=='done'&&(c.q.a===c.me||c.q.b===c.me)?c.q:null;
+const other=q?(q.a===c.me?q.b:q.a):'';
+const set=(i,a,why,w)=>{slots[i].a=a;slots[i].why=why||a;slots[i].w=w||'';};
+if(q){
+if(q.ph==='spat')set(4,'spat','quarrel',other);
+else if(q.ph==='cold'){set(2,'spat','cold',other);set(4,'bench','reconcile',other);}
+else if(q.ph==='bench')set(4,'bench','reconcile',other);
+else if(q.ph==='gift')set(2,'gift','reconcile',other);
+}
+const fr=(c.friends||[]).filter(f=>f.w!==other);
+if(fr.length&& !slots[4].a&& !c.kid)set(4,'meet','friend',fr[h%fr.length].w);
+else if(fr.length&& !slots[2].a&& !c.kid)set(2,'meet','friend',fr[h%fr.length].w);
+const proud=S.has(mind,'proud');
+if(proud&&(c.elder||c.kid||c.role==='gardener'||c.role==='crafter')&& !slots[3].a)set(3,'admire','proud','');
+else if(proud&& !slots[2].a)set(2,'admire','proud','');
+const awed=S.has(mind,'awed');
+if(awed&&awed.a==='whale'&&c.whale&& !slots[4].a)set(4,'skywatch','awed','');
+if(S.has(mind,'curious')&& !slots[2].a)set(2,'news','curious','');
+if(proud)for(const s of slots)if(s.a==='admire')s.arg=proud.a;
+return slots;
+};
+S.planValid=function(P){
+if(!Array.isArray(P)||P.length<4||P.length>6)return'count';
+for(let i=0;i<P.length;i++){
+const s=P[i];
+if(!(s.u>s.f))return'order '+i;
+if(i&&P[i-1].u!==s.f)return'gap '+i;
+if(s.a!==null&&S.ACTS.indexOf(s.a)<0)return'act '+s.a;
+if((s.a==='meet'||s.a==='spat'||s.a==='bench'||s.a==='gift')&& !s.w)return'who '+i;
+}
+if(P[0].f>1200||P[P.length-1].u<12300)return'span';
+return'';
+};
+S.slotAt=(P,tod)=>{if(!P)return null;for(const s of P)if(tod>=s.f&&tod<s.u)return s;return null;};
+
+
+S.newPl=()=>({n:0,g:0,h:0,x:0,d:0,t: -1e9,lw:''});
+S.plMeet=function(mind,t){const p=mind.pl||(mind.pl=S.newPl());if(t-p.t>=90){p.n++;p.t=t;mind.u=Math.max(mind.u||0,t);return true;}p.t=Math.max(p.t,t);return false;};
+S.plAdd=function(mind,what,t){const p=mind.pl||(mind.pl=S.newPl());if(p[what]!==undefined)p[what]++;mind.u=Math.max(mind.u||0,t||0);return p;};
+S.feelScore=(p)=>(p?Math.min(p.n,12)+p.g*3+p.h*5+p.d*2-p.x*4:0);
+S.FEEL=['wary','stranger','known','likes','friend','close'];
+S.feel=function(p){const s=S.feelScore(p);return!p?'stranger':s<0?'wary':s<2?'stranger':s<6?'known':s<12?'likes':s<22?'friend':'close';};
+S.feelRank=(f)=>S.FEEL.indexOf(f);
+
+
+
+
+
+S.fill=function(s,v){return String(s).replace(/\{(\w+)\}/g,(m,k)=>(v[k]!==undefined&&v[k]!==null&&v[k]!==''?String(v[k]):m));};
+const pickT=(L,key,seed)=>{const A=L(key);return A&&A.length?A[seed%A.length]:'';};
+const ok=(s)=>s&&s.indexOf('{')<0&&s.indexOf('undefined')<0;
+
+S.vars=function(e,c){
+const v={name:c.name||'',me:c.me||''};
+if(!e)return v;
+v.when=c.when?c.when(c.now-e.t):'';
+if(e.k==='gift'||e.k==='fgift')v.item=e.a&&c.item?c.item(e.a):'';
+if(e.w&&e.w!=='pl'&&c.who)v.who=c.who(e.w);
+if(e.k==='wunder')v.wunder=c.wunder?c.wunder(e.a):'';
+if(e.k==='build')v.thing=c.thing?c.thing(e.a):'';
+if(e.k==='chronik')v.ev=c.ev?c.ev(e.a):'';
+if(e.k==='moment')v.what=c.moment?c.moment(e.a):'';
+if(e.k==='quarrel')v.topic=c.topic?c.topic(e.a|0):'';
+return v;
+};
+
+const memLine=(group,e,c,L,seed)=>{
+const t=pickT(L,'g.se.'+group+'.'+e.k,seed);
+if(!t)return null;
+const s=S.fill(t,S.vars(e,c));
+return ok(s)?{key:'g.se.'+group+'.'+e.k,text:s,e}:null;
+};
+const beliefVars=(b,c)=>{
+const v={name:c.name||'',me:c.me||''};
+if(b.b==='proud')v.thing=c.thing?c.thing(b.a):'';
+if(b.b==='awed')v.wunder=c.wunder?c.wunder(b.a):'';
+if((b.b==='fond'||b.b==='upset')&&c.who)v.who=c.who(b.w);
+return v;
+};
+const beliefLine=(group,b,c,L,seed)=>{
+const t=pickT(L,'g.se.'+group+'.'+b.b,seed);
+if(!t)return null;
+const s=S.fill(t,beliefVars(b,c));
+return ok(s)?{key:'g.se.'+group+'.'+b.b,text:s,b}:null;
+};
+const plain=(key,c,L,seed,v)=>{const t=pickT(L,key,seed);const s=S.fill(t,Object.assign({name:c.name||'',me:c.me||''},v||{}));return ok(s)?{key,text:s}:{key,text:S.fill(t,{name:'',me:''}).replace(/[ ,]*\{\w+\}/g,'')};};
+
+S.greet=function(c,L,seed){
+const mind=c.mind,now=c.now;
+const pm=S.retrieve(mind,now,{only:TG.pl,tags:TG.pl},4).filter(e=>e.k!=='seen'&&e.k!=='talk');
+for(const e of pm){const r=memLine('gr',e,c,L,seed);if(r)return r;}
+const proud=S.has(mind,'proud'),awed=S.has(mind,'awed');
+if(proud&&(seed&1)){const r=beliefLine('gr',proud,c,L,seed);if(r)return r;}
+if(awed){const r=beliefLine('gr',awed,c,L,seed);if(r)return r;}
+if(proud){const r=beliefLine('gr',proud,c,L,seed);if(r)return r;}
+const f=S.feel(mind&&mind.pl);
+return plain('g.se.gr.feel.'+f,c,L,seed);
+};
+
+S.small=function(c,L,seed){
+const top=S.retrieve(c.mind,c.now,{not:TG.pl,tags:TG.storm|TG.wunder|TG.build|TG.chronik|TG.friend|TG.quarrel},4);
+for(let k=0;k<top.length;k++){const e=top[(k+(seed%Math.max(1,Math.min(2,top.length))))%top.length];const r=memLine('st',e,c,L,seed);if(r)return r;}
+return null;
+};
+S.feelLine=function(c,L,seed){
+const bs=(c.mind&&c.mind.b)||[];
+for(let k=0;k<bs.length;k++){const r=beliefLine('fe',bs[(k+seed)%bs.length],c,L,seed);if(r)return r;}
+return null;
+};
+
+S.gossip=function(c,L,seed){
+const fr=c.friends||[];
+if(c.q&&c.q.ph!=='done'&&c.who&&c.q.a!==c.meId&&c.q.b!==c.meId){
+const t=pickT(L,'g.se.go.quarrel',seed),s=S.fill(t,{who:c.who(c.q.a),who2:c.who(c.q.b),topic:c.topic?c.topic(c.q.tp):''});
+if(ok(s))return{key:'g.se.go.quarrel',text:s};
+}
+for(let k=0;k<fr.length;k++){
+const f=fr[(k+seed)%fr.length],b=f.mind&&f.mind.b&&f.mind.b[0];
+if(!b||b.b==='fond'||b.b==='upset')continue;
+const t=pickT(L,'g.se.go.'+b.b,seed);
+const v=Object.assign(beliefVars(b,c),{who:c.who?c.who(f.w):''});
+const s=S.fill(t,v);
+if(ok(s))return{key:'g.se.go.'+b.b,text:s};
+}
+return null;
+};
+S.bye=function(c,L,seed){
+if(c.stormNear&&S.has(c.mind,'fearStorm'))return plain('g.se.by.storm',c,L,seed);
+const f=S.feel(c.mind&&c.mind.pl);
+return plain(S.feelRank(f)>=4?'g.se.by.friend':'g.se.by.plain',c,L,seed);
+};
+
+S.chat=function(c,L,seed){
+const order=[S.small,S.feelLine,S.gossip];
+for(let k=0;k<3;k++){const r=order[(seed+k)%3](c,L,seed);if(r)return r;}
+return null;
+};
+
+S.beat=function(kind,c,L,seed,v){return plain('g.se.'+kind,c,L,seed,v);};
+
+
+const E2A=(e)=>{const r=[S.KINDS[e.k]?Object.keys(S.KINDS).indexOf(e.k):0,Math.round(e.t),e.i];if(e.a||e.w)r.push(e.a||'');if(e.w)r.push(e.w);return r;};
+const KN=Object.keys(S.KINDS);
+const A2E=(r)=>(Array.isArray(r)&&KN[r[0]|0]?{k:KN[r[0]|0],t: +r[1]||0,i:clamp(r[2]|0,1,10),a:r[3]?String(r[3]).slice(0,24):'',w:r[4]?String(r[4]).slice(0,24):''}:null);
+S.save=function(st){
+const out={v:S.V,p:{},r:{},q:{}};
+if(!st)return out;
+const ids=Object.keys(st.p||{}).filter(id=>{const m=st.p[id];return m&&(m.m.length||m.b.length||m.pl);});
+ids.sort((x,y)=>((st.p[y].u||0)-(st.p[x].u||0))||(x<y? -1:1));
+for(const id of ids.slice(0,S.MAXP)){
+const m=st.p[id],now=m.u||0;
+const keepM=m.m.filter(e=>e.k!=='seen').sort((x,y)=>(retention(y,now)-retention(x,now))||(y.t-x.t)).slice(0,S.SAVE_MEM).sort((x,y)=>x.t-y.t);
+const o={m:keepM.map(E2A),u:Math.round(m.u||0)};
+if(m.b.length)o.b=m.b.map(b=>[S.BELIEFS.indexOf(b.b),Math.round(b.s*100),b.a||'',b.w||'',b.d|0]);
+if(m.pl)o.pl=[m.pl.n,m.pl.g,m.pl.h,m.pl.x,m.pl.d,Math.round(m.pl.t),String(m.pl.lw||'').slice(0,100)];
+if(m.rd!==undefined)o.rd=m.rd|0;
+if(m.nm)o.nm=String(m.nm).slice(0,40);if(m.vn)o.vn=String(m.vn).slice(0,40);
+out.p[id]=o;
+}
+const vids=Object.keys(st.r||{}).sort().slice(0,S.MAXV);
+for(const vid of vids){
+const d=st.r[vid]||{},ks=Object.keys(d).sort((x,y)=>(Math.abs(d[y])-Math.abs(d[x]))||(x<y? -1:1)).slice(0,S.MAXR);
+if(!ks.length)continue;
+const o={};for(const k of ks)o[k]=Math.round(d[k]*100);out.r[vid]=o;
+}
+for(const vid of Object.keys(st.q||{}).sort().slice(0,S.MAXV)){const q=st.q[vid];if(q)out.q[vid]=[q.a,q.b,S.Q.indexOf(q.ph),q.d|0,q.tp|0,q.g===q.a?0:1,q.at|0];}
+return out;
+};
+S.load=function(o){
+const st={p:{},r:{},q:{}};
+if(!o||typeof o!=='object'||(o.v|0)!==S.V)return st;
+for(const id of Object.keys(o.p||{}).slice(0,S.MAXP)){
+const r=o.p[id];if(!r||typeof r!=='object')continue;
+const m=S.newMind();
+m.m=(Array.isArray(r.m)?r.m:[]).map(A2E).filter(Boolean).slice(-S.MEM);
+m.b=(Array.isArray(r.b)?r.b:[]).map(b=>(Array.isArray(b)&&S.BELIEFS[b[0]]?{b:S.BELIEFS[b[0]],s:clamp((+b[1]||0)/100,0,1),a:String(b[2]||''),w:String(b[3]||''),d:b[4]|0}:null)).filter(Boolean).slice(0,S.MAXB);
+if(Array.isArray(r.pl))m.pl={n:r.pl[0]|0,g:r.pl[1]|0,h:r.pl[2]|0,x:r.pl[3]|0,d:r.pl[4]|0,t: +r.pl[5]||0,lw:String(r.pl[6]||'').slice(0,100)};
+m.u= +r.u||0;if(r.rd!==undefined)m.rd=r.rd|0;
+if(typeof r.nm==='string')m.nm=r.nm.slice(0,40);if(typeof r.vn==='string')m.vn=r.vn.slice(0,40);
+st.p[id]=m;
+}
+for(const vid of Object.keys(o.r||{}).slice(0,S.MAXV)){const d=o.r[vid],g={};if(d&&typeof d==='object')for(const k of Object.keys(d).slice(0,S.MAXR)){const v= +d[k];if(isFinite(v)&&k.indexOf('|')>0)g[k]=clamp(v/100,-2,2);}st.r[vid]=g;}
+for(const vid of Object.keys(o.q||{}).slice(0,S.MAXV)){const q=o.q[vid];if(Array.isArray(q)&&S.Q[q[2]])st.q[vid]={a:String(q[0]),b:String(q[1]),ph:S.Q[q[2]],d:q[3]|0,tp:(q[4]|0)%S.TOPICS,g:q[5]?String(q[1]):String(q[0]),at:q[6]|0};}
+return st;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
 (function(VR){
 'use strict';
 
@@ -74388,6 +74811,122 @@ VR.I18N.add('en',{
 "g.ch.ev.deed.w_deer":"A Lantern Stag led a wanderer {in} — since then the way is called “{who}”.",
 "g.ch.ev.deed.w_flute":"A wanderer learnt the Cloudsinger's flute {in}.",
 
+
+"g.set.seelen":"Villagers with memory",
+"g.set.seelen.tip":"The villagers remember what they saw and what you did for them, think about it at night, plan their day, and have friends, quarrels and reconciliations.",
+"g.se.gr.gift":["Thanks again for {item}, {name}!","{name}! I still think of {item} — that was so kind of you.","There's {name}! I owe you one for {item}."],
+"g.se.gr.helped":["{name}! I'd never have managed without your help {when}.","Remember how you helped me {when}? I told everyone!","My hero! Hello, {name}!"],
+"g.se.gr.danced":["{name}! The dancing {when} was lovely. Again next time?","Hey, dancer! I'm still humming the tune from {when}.","You danced in our circle {when} — I won't forget it!"],
+"g.se.gr.hurt":["Oh … you again. Please be careful this time.","I haven't forgotten what happened {when}. But fine — hello.","Keep a little distance, all right? My arm still hurts."],
+"g.se.gr.proud":["{name}! Have you seen {thing} yet? Come and look!","Look over there: {thing}! We're so proud.","Hello! We finished {thing} — let me show you!"],
+"g.se.gr.awed":["{name}! Have you seen {wunder}? I can't think of anything else!","I saw {wunder}, really close! Do you believe me?","Since I saw {wunder}, I look at the sky every evening."],
+"g.se.gr.feel.wary":["Hm. Hello.","Oh, you."],
+"g.se.gr.feel.stranger":["Hello! I'm {me}. And you?","Greetings! New around here?"],
+"g.se.gr.feel.known":["Hello, {name}! Nice to see you back.","Ah, {name}! How was the road?"],
+"g.se.gr.feel.likes":["{name}! I was hoping you'd come by.","There you are, {name}! Come and sit with us sometime."],
+"g.se.gr.feel.friend":["{name}, my friend! At last!","My favourite wanderer! Tell me, where have you been?"],
+"g.se.gr.feel.close":["{name}! You've long been at home here.","There's my best friend, {name}!"],
+"g.se.st.storm":["The storm {when} — I hardly slept a wink.","Did you hear the thunder {when}? My knees are still shaking.","After the storm {when} we all tidied up together."],
+"g.se.st.wunder":["I saw {wunder} {when}! So big and so quiet.","I saw {wunder} {when}. I'm still dreaming of it."],
+"g.se.st.build":["We finished {thing}! I carried planks myself.","Have you seen {thing}? The whole village helped."],
+"g.se.st.chronik":["Have you heard? {ev}","People say: {ev}","News! {ev}"],
+"g.se.st.moment":["The {what} with {who} {when} — such a lovely evening!","Do you know what {who} and I did {when}? A {what}! Wonderful."],
+"g.se.st.hug":["{who} hugged me {when}, just like that. It felt good.","I like {who}. We talked for ages {when}."],
+"g.se.st.fgift":["{who} gave me {item} {when}! Just like that.","I got {item} from {who}. Just because!"],
+"g.se.st.quarrel":["I'm not talking to {who} right now. It was about {topic}. Yes, I know …","{who} and I had a quarrel. About {topic}. About nothing, really."],
+"g.se.st.made_up":["{who} and I made up. Thank goodness.","We made peace, {who} and I. Quarrelling is so tiring."],
+"g.se.st.danger":["A monster came right up to the houses {when}! Good thing the guard was there.","There was a monster at the edge of the village {when}. I always lock the door now."],
+"g.se.fe.fearStorm":["To be honest, I'm afraid of storms. When it rumbles, I run home.","When the sky goes dark, I'd rather be at home."],
+"g.se.fe.likesWanderer":["You know what, {name}? I like you.","The village is a little brighter with you around, {name}."],
+"g.se.fe.waryWanderer":["I'm not quite sure what to make of you yet.","You'll have to win my trust back first."],
+"g.se.fe.proud":["I'm so proud of {thing}. We did it together.","Every morning I walk past {thing} and smile."],
+"g.se.fe.awed":["Since I saw {wunder}, the world feels bigger.","I often think of {wunder}. Did it see me too?"],
+"g.se.fe.fond":["I'm so fond of {who}. We're meeting this evening.","{who} is my favourite company."],
+"g.se.fe.upset":["I'm still a bit cross with {who}. Just a bit.","{who} … oh, better not ask."],
+"g.se.fe.worried":["I worry about the monsters at night.","Since the monster came, I sleep badly."],
+"g.se.fe.curious":["I always want to know what's going on in the world. Tell me something!","Every noon I listen to the news on the square."],
+"g.se.go.quarrel":["{who} and {who2} are quarrelling. About {topic}! They'll make up soon, I'm sure.","Psst: {who} and {who2} aren't speaking. It was about {topic}."],
+"g.se.go.fearStorm":["By the way, {who} is afraid of thunderstorms. Don't tell anyone.","When it thunders, {who} is the first to run home."],
+"g.se.go.likesWanderer":["{who} talks about nothing but you, {name}!","{who} likes you a lot. {who} told me so!"],
+"g.se.go.waryWanderer":["{who} is still a little shy around you.","Be kind to {who} and the ice will melt."],
+"g.se.go.proud":["{who} shows {thing} to everyone. Everyone!","{who} is ever so proud of {thing}."],
+"g.se.go.awed":["{who} saw {wunder} and has been looking up ever since.","Ask {who} about {wunder} — but take your time."],
+"g.se.go.worried":["{who} sleeps badly because of the monsters.","{who} is worried, I think."],
+"g.se.go.curious":["{who} always knows first what's happening.","If you want news, ask {who}."],
+"g.se.by.storm":["I'd better go home, something's brewing!","See you — before the storm comes!"],
+"g.se.by.friend":["Come back soon, {name}!","Take care, my friend!","See you tomorrow, yes? Promise?"],
+"g.se.by.plain":["Safe travels!","Take care!","Until next time."],
+"g.se.q.spat":["That's not true at all!","Hmph!","Yes, of course it is!","Pah!"],
+"g.se.q.cold":["…","I'm not saying anything.","Hmph."],
+"g.se.q.bench":["… Nice bench, this.","Sorry about yesterday.","It was about nothing, really."],
+"g.se.q.gift":["Here, for you. Peace?","I brought you a flower. Friends again?"],
+"g.se.q.thanks":["Peace. You stubborn thing.","Thank you … friends again!","Oh, come here."],
+"g.se.meet":["{who}! Come and sit with me.","There you are, {who}!","{who}, I saved you a seat."],
+"g.se.hurry":["Quick, home — something's brewing!","A storm is coming! I must get home!","Oh no, it's rumbling already!"],
+"g.se.show":["Look: {thing}! Lovely, isn't it?","That's {thing}. We built it together!"],
+"g.se.come":["{name}! Wait, I'm coming!","There's {name}! Hello-o!","{name}! I wanted to ask you something!"],
+"g.se.sky":["Maybe {wunder} will come again tonight …","I'm waiting for {wunder}."],
+"g.se.topic":["who said hello first","the colour of the garden fence","whether clouds look like sheep","the right way to slice bread","whose hen clucks louder","whether soup is a drink","who ate the last biscuit","how to pronounce “well” properly"],
+"g.se.when.now":"earlier",
+"g.se.when.today":"today",
+"g.se.when.yesterday":"yesterday",
+"g.se.when.days":"{n} days ago",
+"g.se.mo.dance":"circle dance",
+"g.se.mo.picnic":"picnic in the meadow",
+"g.se.mo.lantern":"lantern walk through the village",
+"g.se.mo.tag":"game of tag",
+"g.se.mo.hide":"game of hide-and-seek",
+"g.se.mo.feed":"feeding of the animals",
+"g.se.mo.fest":"party at the festival",
+"g.se.b.bakery":"our new bakery",
+"g.se.b.well":"our new well",
+"g.se.b.mill":"our new mill",
+"g.se.b.workshop":"our new workshop",
+"g.se.b.school":"our new school",
+"g.se.b.home":"the new house",
+"g.se.b.garden":"our new community garden",
+"g.se.b.bathhouse":"our new bathhouse",
+"g.se.b.tower":"our new lookout tower",
+"g.se.wu.whale":"the sky whale {n}",
+"g.se.wu.tree":"the wandering tree {n}",
+"g.se.wu.deer":"the lantern stag",
+"g.se.it.any":"your gift ({n})",
+"g.se.it.honey_bottle":"the honey",
+"g.se.it.bread":"the bread",
+"g.se.it.cake":"the cake",
+"g.se.it.cookie":"the biscuits",
+"g.se.it.apple":"the apple",
+"g.se.it.golden_apple":"the golden apple",
+"g.se.it.poppy":"the poppy",
+"g.se.it.dandelion":"the dandelion",
+"g.se.it.book":"the book",
+"g.se.it.paper":"the paper",
+"g.se.it.lantern":"the lantern",
+"g.se.it.emerald":"the emerald",
+"g.se.it.wheat":"the wheat",
+"g.se.it.flower":"the flower",
+"g.se.feel.wary":"wary",
+"g.se.feel.stranger":"hardly knows you",
+"g.se.feel.known":"knows you",
+"g.se.feel.likes":"likes you",
+"g.se.feel.friend":"your friend",
+"g.se.feel.close":"close friend",
+"g.se.bl.fearStorm":"afraid of storms",
+"g.se.bl.likesWanderer":"likes you",
+"g.se.bl.waryWanderer":"careful with you",
+"g.se.bl.proud":"proud of {thing}",
+"g.se.bl.awed":"dreams of {wunder}",
+"g.se.bl.fond":"fond of {who}",
+"g.se.bl.upset":"cross with {who}",
+"g.se.bl.worried":"worried about the monsters",
+"g.se.bl.curious":"curious about the news",
+"g.se.book":"People",
+"g.se.book.note":"Who you know, what they think of you and what they said last.",
+"g.se.book.none":"Nobody yet. Talk to the people in the villages!",
+"g.se.book.met":"met {n}×",
+"g.se.book.gifts":"gifts: {n}",
+"g.se.book.quarrel":"{who} and {who2} are quarrelling (about {topic}).",
+
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -79309,6 +79848,122 @@ VR.I18N.add('de',{
 "g.ch.ev.deed.w_tree":"Der Wanderbaum {who} stand heute {in}.",
 "g.ch.ev.deed.w_deer":"Ein Laternenhirsch führte einen Wanderer {in} — seitdem heißt der Weg „{who}“.",
 "g.ch.ev.deed.w_flute":"Ein Wanderer lernte {in} die Flöte des Himmelswals.",
+
+
+"g.set.seelen":"Bewohner mit Gedächtnis",
+"g.set.seelen.tip":"Die Dorfleute erinnern sich an das, was sie sahen und was du für sie getan hast, denken nachts darüber nach, planen ihren Tag, haben Freunde, Streit und Versöhnung.",
+"g.se.gr.gift":["Danke nochmal für {item}, {name}!","{name}! Ich denke noch an {item} — das war so lieb von dir.","Da ist ja {name}! Für {item} schulde ich dir was."],
+"g.se.gr.helped":["{name}! Ohne deine Hilfe {when} hätte ich das nie geschafft.","Weißt du noch, wie du mir {when} geholfen hast? Ich hab's allen erzählt!","Mein Retter! Hallo, {name}!"],
+"g.se.gr.danced":["{name}! Das Tanzen {when} war wunderschön. Nächstes Mal wieder?","Na, Tanzbein? Ich summe die Melodie von {when} immer noch.","Du hast {when} mit uns im Reigen getanzt — das vergesse ich nicht!"],
+"g.se.gr.hurt":["Oh … du schon wieder. Bitte sei diesmal vorsichtig.","Ich hab nicht vergessen, was {when} war. Aber gut — hallo.","Halt ein bisschen Abstand, ja? Mein Arm tut noch weh."],
+"g.se.gr.proud":["{name}! Hast du {thing} schon gesehen? Komm, schau!","Schau mal da drüben: {thing}! Wir sind so stolz.","Hallo! Wir haben {thing} fertig — ich zeig's dir!"],
+"g.se.gr.awed":["{name}! Hast du {wunder} gesehen? Ich kann an nichts anderes denken!","Ich hab {wunder} gesehen, ganz nah! Glaubst du mir?","Seit ich {wunder} gesehen habe, schau ich jeden Abend zum Himmel."],
+"g.se.gr.feel.wary":["Hm. Hallo.","Ach, du."],
+"g.se.gr.feel.stranger":["Hallo! Ich bin {me}. Und du?","Grüß dich! Neu hier?"],
+"g.se.gr.feel.known":["Hallo, {name}! Schön, dass du wieder da bist.","Ah, {name}! Wie war dein Weg?"],
+"g.se.gr.feel.likes":["{name}! Ich hab gehofft, dass du vorbeikommst.","Da bist du ja, {name}! Setz dich doch mal zu uns."],
+"g.se.gr.feel.friend":["{name}, mein Freund! Endlich!","Mein liebster Wanderer! Erzähl, wo warst du?"],
+"g.se.gr.feel.close":["{name}! Du bist hier doch längst zu Hause.","Da ist ja mein bester Freund, {name}!"],
+"g.se.st.storm":["Der Sturm {when} — ich hab kaum ein Auge zugetan.","Hast du den Donner {when} gehört? Mir zittern noch die Knie.","Nach dem Sturm {when} haben wir alle zusammen aufgeräumt."],
+"g.se.st.wunder":["Ich hab {wunder} gesehen, {when}! So groß und so leise.","Ich hab {wunder} {when} gesehen. Ich träume noch davon."],
+"g.se.st.build":["Wir haben {thing} fertig! Ich hab selbst Bretter geschleppt.","Hast du {thing} gesehen? Das ganze Dorf hat mitgeholfen."],
+"g.se.st.chronik":["Hast du gehört? {ev}","Man erzählt sich: {ev}","Neuigkeiten! {ev}"],
+"g.se.st.moment":["Das {what} mit {who} {when} — so ein schöner Abend!","Weißt du, was {who} und ich {when} gemacht haben? {what}! Herrlich."],
+"g.se.st.hug":["{who} hat mich {when} einfach so umarmt. Das tat gut.","Ich mag {who}. Wir haben {when} lange geredet."],
+"g.se.st.fgift":["{who} hat mir {when} {item} geschenkt! Einfach so.","Ich hab {item} von {who} bekommen. Einfach so!"],
+"g.se.st.quarrel":["Ich rede gerade nicht mit {who}. Es ging um {topic}. Ja, ich weiß …","{who} und ich hatten Streit. Um {topic}. Um nichts, eigentlich."],
+"g.se.st.made_up":["{who} und ich haben uns wieder vertragen. Zum Glück.","Wir haben uns versöhnt, {who} und ich. Streit ist so anstrengend."],
+"g.se.st.danger":["Ein Ungeheuer kam {when} bis an die Häuser! Gut, dass die Wache da war.","Es war {when} ein Ungeheuer am Dorfrand. Ich schließe jetzt immer die Tür ab."],
+"g.se.fe.fearStorm":["Ehrlich gesagt hab ich Angst vor Stürmen. Wenn es grummelt, lauf ich heim.","Wenn der Himmel dunkel wird, bin ich am liebsten zu Hause."],
+"g.se.fe.likesWanderer":["Weißt du was, {name}? Ich mag dich.","Mit dir ist das Dorf ein bisschen heller, {name}."],
+"g.se.fe.waryWanderer":["Ich weiß noch nicht so recht, was ich von dir halten soll.","Du musst mein Vertrauen erst wieder gewinnen."],
+"g.se.fe.proud":["Ich bin so stolz auf {thing}. Das haben wir zusammen geschafft.","Jeden Morgen geh ich an {thing} vorbei und lächle."],
+"g.se.fe.awed":["Seit ich {wunder} gesehen habe, fühlt sich die Welt größer an.","Ich denke oft an {wunder}. Ob es mich auch gesehen hat?"],
+"g.se.fe.fond":["Ich hab {who} so gern. Wir treffen uns heute Abend.","{who} ist meine liebste Gesellschaft."],
+"g.se.fe.upset":["Ich bin noch ein bisschen sauer auf {who}. Nur ein bisschen.","{who} … ach, frag lieber nicht."],
+"g.se.fe.worried":["Ich mache mir Sorgen wegen der Ungeheuer in der Nacht.","Seit dem Ungeheuer schlafe ich unruhig."],
+"g.se.fe.curious":["Ich will immer wissen, was in der Welt passiert. Erzähl mir was!","Jeden Mittag hör ich mir auf dem Platz die Neuigkeiten an."],
+"g.se.go.quarrel":["{who} und {who2} streiten. Um {topic}! Die vertragen sich bestimmt bald.","Pssst: {who} und {who2} reden nicht miteinander. Es ging um {topic}."],
+"g.se.go.fearStorm":["{who} hat übrigens Angst vor Gewittern. Sag's nicht weiter.","Wenn es donnert, rennt {who} als Erstes heim."],
+"g.se.go.likesWanderer":["{who} redet nur noch von dir, {name}!","{who} mag dich sehr. Das hat {who} mir selbst verraten!"],
+"g.se.go.waryWanderer":["{who} ist noch ein bisschen scheu, was dich angeht.","Sei nett zu {who}, dann taut das Eis."],
+"g.se.go.proud":["{who} zeigt jedem {thing}. Jedem!","{who} ist ganz stolz auf {thing}."],
+"g.se.go.awed":["{who} hat {wunder} gesehen und schaut seitdem dauernd nach oben.","Frag {who} nach {wunder} — aber nimm dir Zeit."],
+"g.se.go.worried":["{who} schläft schlecht wegen der Ungeheuer.","{who} macht sich Sorgen, glaube ich."],
+"g.se.go.curious":["{who} weiß immer zuerst, was passiert.","Wenn du Neuigkeiten willst: frag {who}."],
+"g.se.by.storm":["Ich geh lieber heim, da braut sich was zusammen!","Bis dann — bevor der Sturm kommt!"],
+"g.se.by.friend":["Komm bald wieder, {name}!","Pass auf dich auf, mein Freund!","Bis morgen, ja? Versprochen?"],
+"g.se.by.plain":["Gute Reise!","Mach's gut!","Bis zum nächsten Mal."],
+"g.se.q.spat":["Das stimmt gar nicht!","Hmpf!","Doch, natürlich!","Pah!"],
+"g.se.q.cold":["…","Ich sag nichts.","Hmpf."],
+"g.se.q.bench":["… Sitzt sich gut hier.","Tut mir leid wegen gestern.","War ja eigentlich um nichts."],
+"g.se.q.gift":["Hier, für dich. Frieden?","Ich hab dir eine Blume mitgebracht. Wieder gut?"],
+"g.se.q.thanks":["Frieden. Du Dickkopf.","Danke … wieder gut!","Ach, komm her."],
+"g.se.meet":["{who}! Setz dich zu mir.","Da bist du ja, {who}!","{who}, ich hab dir einen Platz frei gehalten."],
+"g.se.hurry":["Schnell heim, da braut sich was zusammen!","Ein Sturm kommt! Ich muss nach Hause!","Oh nein, es grummelt schon!"],
+"g.se.show":["Schau mal: {thing}! Schön, oder?","Das ist {thing}. Wir haben es zusammen gebaut!"],
+"g.se.come":["{name}! Warte, ich komme!","Da ist ja {name}! Hallo-o!","{name}! Ich wollte dich was fragen!"],
+"g.se.sky":["Vielleicht kommt {wunder} heute wieder …","Ich warte auf {wunder}."],
+"g.se.topic":["wer zuerst gegrüßt hat","die Farbe des Gartenzauns","ob Wolken nach Schafen aussehen","die richtige Art, Brot zu schneiden","wessen Huhn lauter gackert","ob Suppe ein Getränk ist","wer das letzte Plätzchen gegessen hat","wie man »Brunnen« richtig ausspricht"],
+"g.se.when.now":"vorhin",
+"g.se.when.today":"heute",
+"g.se.when.yesterday":"gestern",
+"g.se.when.days":"vor {n} Tagen",
+"g.se.mo.dance":"Tanzen im Reigen",
+"g.se.mo.picnic":"Picknick auf der Wiese",
+"g.se.mo.lantern":"Laternelaufen durchs Dorf",
+"g.se.mo.tag":"Fangenspielen",
+"g.se.mo.hide":"Versteckspielen",
+"g.se.mo.feed":"Füttern der Tiere",
+"g.se.mo.fest":"Feiern auf dem Fest",
+"g.se.b.bakery":"unsere neue Bäckerei",
+"g.se.b.well":"unseren neuen Brunnen",
+"g.se.b.mill":"unsere neue Mühle",
+"g.se.b.workshop":"unsere neue Werkstatt",
+"g.se.b.school":"unsere neue Schule",
+"g.se.b.home":"das neue Haus",
+"g.se.b.garden":"unseren neuen Gemeinschaftsgarten",
+"g.se.b.bathhouse":"unser neues Badehaus",
+"g.se.b.tower":"unseren neuen Aussichtsturm",
+"g.se.wu.whale":"den Himmelswal {n}",
+"g.se.wu.tree":"den Wanderbaum {n}",
+"g.se.wu.deer":"den Laternenhirsch",
+"g.se.it.any":"dein Geschenk ({n})",
+"g.se.it.honey_bottle":"den Honig",
+"g.se.it.bread":"das Brot",
+"g.se.it.cake":"den Kuchen",
+"g.se.it.cookie":"die Kekse",
+"g.se.it.apple":"den Apfel",
+"g.se.it.golden_apple":"den goldenen Apfel",
+"g.se.it.poppy":"die Mohnblume",
+"g.se.it.dandelion":"den Löwenzahn",
+"g.se.it.book":"das Buch",
+"g.se.it.paper":"das Papier",
+"g.se.it.lantern":"die Laterne",
+"g.se.it.emerald":"den Smaragd",
+"g.se.it.wheat":"den Weizen",
+"g.se.it.flower":"die Blume",
+"g.se.feel.wary":"misstrauisch",
+"g.se.feel.stranger":"kennt dich kaum",
+"g.se.feel.known":"kennt dich",
+"g.se.feel.likes":"mag dich",
+"g.se.feel.friend":"dein Freund",
+"g.se.feel.close":"enger Freund",
+"g.se.bl.fearStorm":"hat Angst vor Stürmen",
+"g.se.bl.likesWanderer":"mag dich",
+"g.se.bl.waryWanderer":"ist vorsichtig mit dir",
+"g.se.bl.proud":"stolz auf {thing}",
+"g.se.bl.awed":"träumt von {wunder}",
+"g.se.bl.fond":"hat {who} gern",
+"g.se.bl.upset":"sauer auf {who}",
+"g.se.bl.worried":"sorgt sich wegen der Ungeheuer",
+"g.se.bl.curious":"neugierig auf Neuigkeiten",
+"g.se.book":"Menschen",
+"g.se.book.note":"Wen du kennst, was sie über dich denken und was sie zuletzt sagten.",
+"g.se.book.none":"Noch niemand. Sprich mit den Leuten in den Dörfern!",
+"g.se.book.met":"{n}× getroffen",
+"g.se.book.gifts":"Geschenke: {n}",
+"g.se.book.quarrel":"{who} und {who2} haben Streit (um {topic}).",
 
 });
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
