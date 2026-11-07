@@ -707,7 +707,7 @@
         ox = ((h & 15) / 15 - 0.5) * 0.35; oz = (((h >> 4) & 15) / 15 - 0.5) * 0.35;
       }
       // plants on smooth ground sit on the sloped surface (its height under the plant's centre)
-      if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP) && (y > 0 || softOn)) {
+      if (PH && (shapeOf(b) === SH.CROSS || shapeOf(b) === SH.TALLCROSS || shapeOf(b) === SH.CROP || (softAny && t.o.snowLayer)) && (y > 0 || softOn)) {   // (r-gemalt: a snow layer sits on the sculpted ground too)
         const bb = B[bi - PSS];
         if (softAny && SNS[bb] === 1) oy = SNM.topAt(x, y - 1, z, 0.5 + ox, 0.5 + oz) - y;   // r-gemalt: on the sculpted surface
         else if (groundOn && rcGround(bb)) {   // q-art3 · Runde Hänge: on the blob (its top corners' heights)

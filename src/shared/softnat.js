@@ -30,14 +30,14 @@
   SN.bumpSoft = 0.1;           // and on the soft ground's slopes
   SN.snowLine = 150;           // snow caps above this height (world y), ragged by noise
   // the natural blocks (cube states only; the "_cut" twins a shovel makes stay cubes, as do paths, pavers and roads)
-  SN.SOFT = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|mud|clay|gravel|sand|red_sand|moss_block|pale_moss_block|snow_block|rooted_dirt|stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|packed_ice|bedrock|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta|\w*_ore|gloom_sand|gloom_soil|echo_moss|ochre_rock|umber_rock|duskrock|emberrock|tidestone|abyssal_tidestone|skyroot_soil|aether_stone|buried_sand|buried_gravel|muddy_mangrove_roots|exo_moss|tholin_ice)$/;
+  SN.SOFT = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|mud|clay|gravel|sand|red_sand|moss_block|pale_moss_block|snow_block|snow|rooted_dirt|stone|granite|diorite|andesite|deepstone|tuff|basalt|calcite|dripstone_block|packed_ice|bedrock|terracotta|(white|light_gray|gray|brown|red|orange|yellow)_terracotta|\w*_ore|gloom_sand|gloom_soil|echo_moss|ochre_rock|umber_rock|duskrock|emberrock|tidestone|abyssal_tidestone|skyroot_soil|aether_stone|buried_sand|buried_gravel|muddy_mangrove_roots|exo_moss|tholin_ice)$/;
   // the painter's palette (sRGB): our own colours; mat 1 grass-like (slopes → earth → rock), 2 snow (steep → rock),
   // 3 rock (noses), 0 earth/sand (steep → rock)
   const PAL = {
     grass_block: [-1, 1], podzol: [0x6e5236, 1], mycelium: [0x8c7c88, 1], moss_block: [0x5f8a3a, 1], pale_moss_block: [0x9aa58a, 1], echo_moss: [0x4f7a5a, 1], exo_moss: [0x5a8a6a, 1], skyroot_soil: [0x6f8f4a, 1],
     dirt: [0x8a6a48, 0], coarse_dirt: [0x80644a, 0], rooted_dirt: [0x7e6046, 0], mud: [0x4e3f34, 0], clay: [0x9aa3ad, 0], gravel: [0x8e8a84, 0], buried_gravel: [0x8e8a84, 0],
     sand: [0xdcc896, 0], buried_sand: [0xdcc896, 0], red_sand: [0xc0703a, 0], gloom_sand: [0x5e5246, 0], gloom_soil: [0x4c4038, 0], muddy_mangrove_roots: [0x5a4634, 0],
-    snow_block: [0xeef3fa, 2], packed_ice: [0x9cc0ec, 2], tholin_ice: [0xc8a888, 2],
+    snow_block: [0xeef3fa, 2], snow: [0xeef3fa, 2], packed_ice: [0x9cc0ec, 2], tholin_ice: [0xc8a888, 2],
     stone: [0x8b8d91, 3], granite: [0xa07a6a, 3], diorite: [0xc8c8c4, 3], andesite: [0x8a8c88, 3], deepstone: [0x5a5a62, 3], tuff: [0x6c6c62, 3], basalt: [0x4a4a52, 3], calcite: [0xe0e0dc, 3],
     dripstone_block: [0x8a7060, 3], bedrock: [0x3c3c40, 3], ochre_rock: [0xb88a4a, 3], umber_rock: [0x6a4a34, 3], duskrock: [0x5a4a62, 3], emberrock: [0x6a3a30, 3], tidestone: [0x6a8a8c, 3],
     abyssal_tidestone: [0x3a5a62, 3], aether_stone: [0xb8c8e0, 3],
@@ -231,7 +231,7 @@
       let col = tb.col[st], cr, cg, cb;
       if (col < 0) {   // the grass: the biome's tint at this column, as a painted green
         const t = GR[(vz + PAD) * PS + (vx + PAD)];
-        cr = ((t >> 11) & 31) / 31 * 0.6; cg = ((t >> 5) & 63) / 63 * 0.62; cb = (t & 31) / 31 * 0.5;
+        cr = ((t >> 11) & 31) / 31 * 0.52; cg = ((t >> 5) & 63) / 63 * 0.54; cb = (t & 31) / 31 * 0.4;
       } else { cr = ((col >> 16) & 255) / 255; cg = ((col >> 8) & 255) / 255; cb = (col & 255) / 255; }
       r += cr * w; g += cg * w; b += cb * w; wsum += w;
       const m = tb.mat[st]; if (m === 1) grassW += w; else if (m === 2) snowW += w; else if (m === 3) rockW += w;

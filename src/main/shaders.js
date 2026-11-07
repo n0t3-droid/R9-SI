@@ -969,22 +969,26 @@ vec3 gmPaint(vec3 c, vec3 wp, vec3 n, float dist) {
   float ang = texture(u_noise, wp.xz / 61.0).r * 6.2832;
   vec2 cs = vec2(cos(ang), sin(ang));
   vec2 s = vec2(cs.x * wp.x + cs.y * wp.z, -cs.y * wp.x + cs.x * wp.z);
-  float by = texture(u_noise, vec2(s.x / 15.0, s.y / 4.5)).r * 0.62 + texture(u_noise, vec2(s.x / 5.5, s.y / 1.7) + 0.37).g * 0.38;
-  float bx = texture(u_noise, vec2(wp.z / 13.0, wp.y / 3.2) + 0.21).r * 0.62 + texture(u_noise, vec2(wp.z / 4.5, wp.y / 1.4) + 0.71).g * 0.38;
-  float bz = texture(u_noise, vec2(wp.x / 13.0, wp.y / 3.2) + 0.53).r * 0.62 + texture(u_noise, vec2(wp.x / 4.5, wp.y / 1.4) + 0.13).g * 0.38;
+  float by = texture(u_noise, vec2(s.x / 13.0, s.y / 4.0)).r * 0.6 + texture(u_noise, vec2(s.x / 5.0, s.y / 1.6) + 0.37).g * 0.4;
+  float bx = texture(u_noise, vec2(wp.z / 11.0, wp.y / 3.0) + 0.21).r * 0.6 + texture(u_noise, vec2(wp.z / 4.0, wp.y / 1.3) + 0.71).g * 0.4;
+  float bz = texture(u_noise, vec2(wp.x / 11.0, wp.y / 3.0) + 0.53).r * 0.6 + texture(u_noise, vec2(wp.x / 4.0, wp.y / 1.3) + 0.13).g * 0.4;
   float b = bx * w.x + by * w.y + bz * w.z;
+  // dabs: the noise cut into tones with soft but definite edges (paint, not grain); calmer far away
+  float farK = smoothstep(30.0, 140.0, dist);
+  float tone = mix(smoothstep(0.42, 0.58, b), 0.5, farK * 0.6);
   // up close a finer dab layer (the brush's own bristles), gone by 24 m
   float nearK = 1.0 - smoothstep(8.0, 24.0, dist);
-  if (nearK > 0.0) { vec2 fq = w.y > 0.5 ? s : (w.x > w.z ? vec2(wp.z, wp.y * 2.5) : vec2(wp.x, wp.y * 2.5)); b += (texture(u_noise, vec2(fq.x / 1.9, fq.y / 0.65) + 0.43).g - 0.5) * 0.35 * nearK; }
-  float k = mix(1.0, 0.45, smoothstep(24.0, 110.0, dist));
-  vec3 col = c * (1.0 + (b - 0.5) * 0.8 * k);
+  float br = 0.0;
+  if (nearK > 0.0) { vec2 fq = w.y > 0.5 ? s : (w.x > w.z ? vec2(wp.z, wp.y * 2.5) : vec2(wp.x, wp.y * 2.5)); br = (texture(u_noise, vec2(fq.x / 1.9, fq.y / 0.65) + 0.43).g - 0.5) * 0.3 * nearK; }
+  vec3 col = c * (mix(0.74, 1.16, tone) + br);
+  // the painter's light and shade in the colour itself: the light dabs warmer, the dark ones cooler
+  col *= mix(vec3(0.95, 0.98, 1.06), vec3(1.04, 1.01, 0.93), tone);
   // the greens drift between a warm yellow-green and a cool blue-green in patches of a few metres (a painter's meadow)
   float gg = smoothstep(0.0, 0.08, c.g - max(c.r, c.b));
   float hz = texture(u_noise, wp.xz / 19.0 + vec2(0.61, 0.17)).g;
-  col = mix(col, col * mix(vec3(1.12, 1.04, 0.72), vec3(0.82, 0.98, 1.16), smoothstep(0.3, 0.7, hz)), 0.45 * gg);
-  // the painter's light and shade in the colour itself: dabs a little warmer where bright, cooler where dark
-  col *= mix(vec3(0.97, 0.99, 1.04), vec3(1.03, 1.01, 0.95), smoothstep(0.35, 0.65, b));
+  col = mix(col, col * mix(vec3(1.14, 1.04, 0.7), vec3(0.8, 0.97, 1.16), smoothstep(0.3, 0.7, hz)), 0.5 * gg);
   float wash = texture(u_noise, wp.xz / 37.0 + vec2(0.3, 0.7)).r;
+  col *= 0.86 + 0.28 * smoothstep(0.25, 0.75, texture(u_noise, wp.xz / 9.0 + vec2(0.11, 0.83)).r);   // lighter and darker patches over a few metres
   return col * mix(vec3(0.92, 0.97, 1.05), vec3(1.07, 1.02, 0.9), smoothstep(0.3, 0.7, wash));
 }
 #endif
@@ -1258,9 +1262,6 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #if defined(Q_GRASS) && !defined(MODEL)
   // q-art2 · Wiese (qart2.js): a green top as a meadow — never in the Klassisch look
   // (by the face's mean colour, not the tint: run 2's village lawn is an untinted green block — it stayed flat)
-#ifdef GEMALT
-  if (!gmF)
-#endif
   if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;
     if (qm.g > qm.r * 1.1 && qm.g > qm.b * 1.15) alb.rgb = qGrass(alb.rgb, qm, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel); }
 #endif
