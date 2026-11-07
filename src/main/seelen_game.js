@@ -267,7 +267,8 @@
     const g = V.g, act = a.act, vil = a.vil, s = a.seSlot;
     if (!s || !s.w) { act.done = true; return; }
     const me = lid(a.p), mode = s.a, other = agentByLid(vil, s.w);
-    if (act.slot !== s) { for (const k of ['spot', 'tw', 'wait', 'met', 's1', 's2', 'noted', 'k', 'arr']) delete act[k]; act.slot = s; act.t = 0; if (a.pose === 'sit') a.pose = 'stand'; }
+    const sk = s.f + '|' + s.a + '|' + s.w;   // (by value: a plan made again keeps the scene going)
+    if (act.slot !== sk) { for (const k of ['spot', 'tw', 'wait', 'met', 's1', 's2', 'noted', 'k', 'arr']) delete act[k]; act.slot = sk; act.t = 0; if (a.pose === 'sit') a.pose = 'stand'; }
     if (!act.spot) act.spot = meetSpot(vil, me, s.w, mode);
     const sp = act.spot, mine = sp.seat ? sp.seat[0] : null;
     let arrived;
@@ -279,7 +280,7 @@
         V.sit(a, mine); arrived = a.pose === 'sit';
       }
     }
-    else { const pt = sp.pts[0]; arrived = V.goTo(a, Math.floor(pt[0]), sp.c[1], Math.floor(pt[1]), 0.9) || (act.t > 6 && (a.pos[0] - pt[0]) ** 2 + (a.pos[2] - pt[1]) ** 2 < 1.9 * 1.9); }   // (a cell taken by a planter: near is there)
+    else { const pt = sp.pts[0]; arrived = V.goTo(a, Math.floor(pt[0]), sp.c[1], Math.floor(pt[1]), 0.9) || (act.t > 3 && (a.pos[0] - pt[0]) ** 2 + (a.pos[2] - pt[1]) ** 2 < 1.9 * 1.9) || (act.t > 8 && other && d2(other, a.pos) < 2.4 * 2.4 && (a.pos[0] - sp.c[0]) ** 2 + (a.pos[2] - sp.c[2]) ** 2 < 3 * 3); }   // (a cell taken by a planter: near is there)
     if (act.t > 150) { s.used = true; act.done = true; return; }
     if (!arrived) return;
     if (!sp.seat) { a.vel[0] *= 0.5; a.vel[2] *= 0.5; }

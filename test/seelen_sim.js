@@ -82,6 +82,7 @@ console.log('b · a quarrel over two days');
   const v0 = S.relV(SG.graph(g, vil), q.a, q.b);
   let faced = false, backs = false, spoke = 0;
   for (let k = 0; k < 120 && q.ph === 'spat'; k++) {
+    if (k % 2 === 1) SG.test.R().plans.delete(vil.id);   // (the plans may be made again mid-scene: the scene goes on)
     run(1);
     const both = A.act && A.act.type === 'se_meet' && B.act && B.act.type === 'se_meet' && A.act.tw > 0 && B.act.tw > 0;
     if (both && A.act.tw < 5 && facing(A, B) < 0.9) faced = true;
