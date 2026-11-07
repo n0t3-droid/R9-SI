@@ -389,6 +389,7 @@
       if (m.b.length) o.b = m.b.map(b => [S.BELIEFS.indexOf(b.b), Math.round(b.s * 100), b.a || '', b.w || '', b.d | 0]);
       if (m.pl) o.pl = [m.pl.n, m.pl.g, m.pl.h, m.pl.x, m.pl.d, Math.round(m.pl.t), String(m.pl.lw || '').slice(0, 100)];
       if (m.rd !== undefined) o.rd = m.rd | 0;
+      if (m.nm) o.nm = String(m.nm).slice(0, 40); if (m.vn) o.vn = String(m.vn).slice(0, 40);
       out.p[id] = o;
     }
     const vids = Object.keys(st.r || {}).sort().slice(0, S.MAXV);
@@ -410,6 +411,7 @@
       m.b = (Array.isArray(r.b) ? r.b : []).map(b => (Array.isArray(b) && S.BELIEFS[b[0]] ? { b: S.BELIEFS[b[0]], s: clamp((+b[1] || 0) / 100, 0, 1), a: String(b[2] || ''), w: String(b[3] || ''), d: b[4] | 0 } : null)).filter(Boolean).slice(0, S.MAXB);
       if (Array.isArray(r.pl)) m.pl = { n: r.pl[0] | 0, g: r.pl[1] | 0, h: r.pl[2] | 0, x: r.pl[3] | 0, d: r.pl[4] | 0, t: +r.pl[5] || 0, lw: String(r.pl[6] || '').slice(0, 100) };
       m.u = +r.u || 0; if (r.rd !== undefined) m.rd = r.rd | 0;
+      if (typeof r.nm === 'string') m.nm = r.nm.slice(0, 40); if (typeof r.vn === 'string') m.vn = r.vn.slice(0, 40);
       st.p[id] = m;
     }
     for (const vid of Object.keys(o.r || {}).slice(0, S.MAXV)) { const d = o.r[vid], g = {}; if (d && typeof d === 'object') for (const k of Object.keys(d).slice(0, S.MAXR)) { const v = +d[k]; if (isFinite(v) && k.indexOf('|') > 0) g[k] = clamp(v / 100, -2, 2); } st.r[vid] = g; }
