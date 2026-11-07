@@ -71,7 +71,7 @@
   };
 
   // ---------------------------------------------------------------- the Himmelswal (length 1, nose −z)
-  WM.WHALE = { NI: 56, NJ: 26 };
+  WM.WHALE = { NI: 72, NJ: 40 };
   WM.whaleR = (t) => (t < 0.24 ? 0.115 * Math.pow(Math.sin(t / 0.24 * Math.PI / 2), 0.6) : 0.115 * Math.pow(Math.cos((t - 0.24) / 0.76 * Math.PI / 2), 1.1) + 0.012 * ss(0.6, 1, t));
   function whale() {
     const b = new B(), NI = WM.WHALE.NI, NJ = WM.WHALE.NJ;
@@ -83,9 +83,11 @@
       let c = up > 0.15 ? mix3(flank, back, ss(0.15, 0.6, up)) : mix3(belly, flank, ss(-0.55, 0.15, up)), em = 0;
       if (up > 0.35 && hh(i * 7 + 3, j * 13 + 1) > 0.9 && t > 0.08 && t < 0.8) c = freck;
       // the belly's grooves (pale lines from the chin back) — they glow softly at dusk
-      if (up < -0.55 && t > 0.06 && t < 0.46 && (j % 2 === 0)) { c = groove; em = 0.35; }
+      if (up < -0.55 && t > 0.06 && t < 0.46 && (j % 3 === 0)) { c = groove; em = 0.3; }
       // the lantern spots: a row along each lower flank
-      if (Math.abs(up + 0.38) < 0.11 && t > 0.14 && t < 0.72 && (i % 3 === 0)) { c = lin([1.0, 0.86, 0.6]); em = 1; }
+      // (soft round spots: the glow falls off from each spot's middle — 12 a side, 0.05 apart along the body)
+      const k = Math.round((t - 0.16) / 0.05), ds = Math.hypot((t - 0.16 - k * 0.05) * 7, (up + 0.4) * 1.4);
+      if (k >= 0 && k < 12 && ds < 0.16) { const q = 1 - ds / 0.16; c = mix3(c, lin([1.0, 0.86, 0.6]), q); em = Math.max(em, q); }
       if (Math.abs(t - 0.13) < 0.012 && Math.abs(cs) > 0.86 && up > -0.05 && up < 0.3) c = eye;
       return { p, c, w: 0, em };
     });
@@ -94,8 +96,8 @@
     for (const sd of [1, -1]) for (const top of [true, false]) {
       b.grid(10, 6, false, (i, j) => {
         const u = i / 10, v = j / 6, x0 = 0.085, span = 0.24;
-        const le = -0.29 + 0.13 * Math.pow(u, 1.2), te = -0.21 + 0.07 * u, round = Math.sqrt(Math.max(0, 1 - Math.pow(u, 6)));
-        const zc = (le + te) / 2, half = (te - le) / 2 * (0.25 + 0.75 * round), z = zc + (v - 0.5) * 2 * half;
+        const le = -0.3 + 0.12 * Math.pow(u, 1.3), te = -0.2 + 0.08 * u, round = Math.sqrt(Math.max(0, 1 - Math.pow(u, 3)));
+        const zc = (le + te) / 2, half = (te - le) / 2 * (0.15 + 0.85 * round), z = zc + (v - 0.5) * 2 * half;
         const th = 0.011 * (1 - u * 0.7) * Math.sin(Math.PI * v), y = -0.045 - 0.05 * u + (top ? th : -th);
         return { p: [sd * (x0 + span * u), y, z], c: top ? finTop : finBot, w: u, em: v > 0.85 && u > 0.2 ? 0.45 : 0 };
       });

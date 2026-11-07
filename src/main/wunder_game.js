@@ -220,7 +220,7 @@
   WG.cam = function (g, base) {
     const R = g._wu; if (!R || R.whale.mode !== 'ride') { WG.camOn = false; return null; }
     const W = R.whale, fx = -Math.sin(W.yaw), fz = -Math.cos(W.yaw), rx = Math.cos(W.yaw), rz = -Math.sin(W.yaw);
-    const want = [W.p[0] - fx * 44 + rx * 10, W.p[1] + 15, W.p[2] - fz * 44 + rz * 10], look = [W.p[0] + fx * 12, W.p[1] + 2, W.p[2] + fz * 12];
+    const want = [W.p[0] - fx * 31 + rx * 9, W.p[1] + 7.5, W.p[2] - fz * 31 + rz * 9], look = [W.p[0] + fx * 26, W.p[1] + 1, W.p[2] + fz * 26];
     const C = WG.camS || (WG.camS = { p: want.slice(), l: look.slice() }), k = 1 - Math.exp(-2.2 * Math.min(0.1, R.dt || 0.016));
     for (let i = 0; i < 3; i++) { C.p[i] += (want[i] - C.p[i]) * k; C.l[i] += (look[i] - C.l[i]) * k; }
     const dx = C.l[0] - C.p[0], dy = C.l[1] - C.p[1], dz = C.l[2] - C.p[2];

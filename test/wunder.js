@@ -169,10 +169,10 @@ check(Array.isArray(isles) && isles.length >= 5, 'the Sky Isles are listed (' + 
   const v = {}; for (const k of kinds) v[k] = WM.mesh(k);
   check(kinds.every(k => v[k].length % 11 === 0 && v[k].every(Number.isFinite)), 'every vertex finite, the program\'s layout');
   const tris = kinds.reduce((s, k) => s + v[k].length / 33, 0);
-  check(tris < 8000, 'small: ' + Math.round(tris) + ' triangles for all three (the whale ' + Math.round(v.wwhale.length / 33) + ')');
+  check(tris < 12000, 'small: ' + Math.round(tris) + ' triangles for all three (the whale ' + Math.round(v.wwhale.length / 33) + ')');
   // the whale: nose −z, its fins and flukes beat (weight > 0), its lanterns glow (emission)
   const W = v.wwhale; let zmin = 1, zmax = -1, wing = 0, glow = 0;
-  for (let i = 0; i < W.length; i += 11) { zmin = Math.min(zmin, W[i + 2]); zmax = Math.max(zmax, W[i + 2]); if (W[i + 9] > 0.5) wing++; if (W[i + 10] > 0.9) glow++; }
+  for (let i = 0; i < W.length; i += 11) { zmin = Math.min(zmin, W[i + 2]); zmax = Math.max(zmax, W[i + 2]); if (W[i + 9] > 0.5) wing++; if (W[i + 10] > 0.5) glow++; }
   check(zmin <= -0.49 && zmax >= 0.4 && wing > 100 && glow > 50, 'the whale: length 1 (nose −z), fins and flukes beating, lantern spots (' + wing + ' / ' + glow + ')');
   let ty = 0; for (let i = 0; i < v.wtree.length; i += 11) ty = Math.max(ty, v.wtree[i + 1]);
   check(ty > 0.9 && ty < 1.05, 'the tree: height 1 (×14 m)');
