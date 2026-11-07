@@ -759,6 +759,9 @@ out vec3 v_localPos;
 #ifdef FADE
 flat out float v_fade;
 #endif
+#ifdef GEMALT
+out vec3 v_gN;           // r-gemalt · Weiche Natur: the sculpted ground's smooth normal (softnat.js: w4 octahedral, face 6)
+#endif
 ${(VR.Light2 && VR.Light2.glslVS) ? VR.Light2.glslVS() : ''}
 #ifdef ZINV
 invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
@@ -853,6 +856,15 @@ ${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}${(VR.QArt2 && VR.QArt2.gl
   v_rel = rel;
   v_localPos = wp;
   v_uv = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 16.0;
+#ifdef GEMALT
+  v_gN = vec3(0.0, 1.0, 0.0);
+  if ((a_w5 & 7u) == 6u) {
+    vec2 go = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 255.0 * 2.0 - 1.0;
+    vec3 gn = vec3(go.x, 1.0 - abs(go.x) - abs(go.y), go.y);
+    if (gn.y < 0.0) gn.xz = (1.0 - abs(gn.zx)) * vec2(gn.x >= 0.0 ? 1.0 : -1.0, gn.z >= 0.0 ? 1.0 : -1.0);
+    v_gN = normalize(gn); v_uv = vec2(0.0);
+  }
+#endif
   v_w3 = a_w3; v_w5 = a_w5;
   v_sky = float(a_light >> 12u) / 15.0;
   v_block = vec3(float((a_light >> 8u) & 15u), float((a_light >> 4u) & 15u), float(a_light & 15u)) / 15.0;
@@ -879,6 +891,9 @@ ${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}${(VR.QArt2 && VR.QArt2.gl
 #endif
 #ifdef SHADOWS
   vec3 n = face == 0u ? vec3(1,0,0) : face == 1u ? vec3(-1,0,0) : face == 2u ? vec3(0,1,0) : face == 3u ? vec3(0,-1,0) : face == 4u ? vec3(0,0,1) : vec3(0,0,-1);
+#ifdef GEMALT
+  if (face == 6u) n = v_gN * 4.5;   // (the sculpted ground: a deeper normal offset — its slopes would self-shadow in bands)
+#endif
 #ifdef MODEL
   n = u_normalMat * n;
 #endif
@@ -941,6 +956,42 @@ flat in float v_seasonG;   // w-seasons: an open green top (TERRAIN_VS)
 uniform vec4 u_seasonFx;   // w-seasons: [snow cover, petals, ice, fallen leaves] (seasons.js)
 #endif
 in vec3 v_localPos;
+#ifdef GEMALT
+in vec3 v_gN;
+float gmLift = 0.0;   // the sculpted ground reads the block heightmap's shadow from a little above (its slopes cut the steps)
+// r-gemalt · Weiche Natur (softnat.js, gemalt.js): the sculpted ground painted — the vertex's palette colour (blended by
+// slope and height in the worker, interpolated over the surface) laid on in brush strokes: three planar projections of
+// the noise texture (R: fbm 8 a tile, G: fbm 16), each stretched into dabs along a direction that turns slowly over the
+// land — on the tops a meadow's strokes, on the walls horizontal strata; a warm/cool wash over tens of metres; the strokes
+// calm with distance (no texel grain anywhere)
+vec3 gmPaint(vec3 c, vec3 wp, vec3 n, float dist) {
+  vec3 w = abs(n); w = w * w * w * w; w /= w.x + w.y + w.z;
+  float ang = texture(u_noise, wp.xz / 61.0).r * 6.2832;
+  vec2 cs = vec2(cos(ang), sin(ang));
+  vec2 s = vec2(cs.x * wp.x + cs.y * wp.z, -cs.y * wp.x + cs.x * wp.z);
+  float by = texture(u_noise, vec2(s.x / 13.0, s.y / 4.0)).r * 0.6 + texture(u_noise, vec2(s.x / 5.0, s.y / 1.6) + 0.37).g * 0.4;
+  float bx = texture(u_noise, vec2(wp.z / 11.0, wp.y / 3.0) + 0.21).r * 0.6 + texture(u_noise, vec2(wp.z / 4.0, wp.y / 1.3) + 0.71).g * 0.4;
+  float bz = texture(u_noise, vec2(wp.x / 11.0, wp.y / 3.0) + 0.53).r * 0.6 + texture(u_noise, vec2(wp.x / 4.0, wp.y / 1.3) + 0.13).g * 0.4;
+  float b = bx * w.x + by * w.y + bz * w.z;
+  // dabs: the noise cut into tones with soft but definite edges (paint, not grain); calmer far away
+  float farK = smoothstep(30.0, 140.0, dist);
+  float tone = mix(smoothstep(0.36, 0.64, b), 0.5, farK * 0.6);   // (r3: a narrower cut drew the fbm's contours — wood grain on the sand)
+  // up close a finer dab layer (the brush's own bristles), gone by 24 m
+  float nearK = 1.0 - smoothstep(8.0, 24.0, dist);
+  float br = 0.0;
+  if (nearK > 0.0) { vec2 fq = w.y > 0.5 ? s : (w.x > w.z ? vec2(wp.z, wp.y * 2.5) : vec2(wp.x, wp.y * 2.5)); br = (texture(u_noise, vec2(fq.x / 1.9, fq.y / 0.65) + 0.43).g - 0.5) * 0.3 * nearK; }
+  vec3 col = c * (mix(0.74, 1.16, tone) + br);
+  // the painter's light and shade in the colour itself: the light dabs warmer, the dark ones cooler
+  col *= mix(vec3(0.95, 0.98, 1.06), vec3(1.04, 1.01, 0.93), tone);
+  // the greens drift between a warm yellow-green and a cool blue-green in patches of a few metres (a painter's meadow)
+  float gg = smoothstep(0.0, 0.08, c.g - max(c.r, c.b));
+  float hz = texture(u_noise, wp.xz / 19.0 + vec2(0.61, 0.17)).g;
+  col = mix(col, col * mix(vec3(1.14, 1.04, 0.7), vec3(0.8, 0.97, 1.16), smoothstep(0.3, 0.7, hz)), 0.5 * gg);
+  float wash = texture(u_noise, wp.xz / 37.0 + vec2(0.3, 0.7)).r;
+  col *= 0.86 + 0.28 * smoothstep(0.25, 0.75, texture(u_noise, wp.xz / 9.0 + vec2(0.11, 0.83)).r);   // lighter and darker patches over a few metres
+  return col * mix(vec3(0.92, 0.97, 1.05), vec3(1.07, 1.02, 0.9), smoothstep(0.3, 0.7, wash));
+}
+#endif
 #ifdef FADE
 flat in float v_fade;
 #endif
@@ -989,7 +1040,11 @@ float shadowAt(vec3 N, vec3 L) {
   }
 #endif
 #ifdef HSHADOW
+#ifdef GEMALT
+  if (cover < 0.999) s = mix(hShadow(v_localPos + N * gmLift, N, L), s, cover);
+#else
   if (cover < 0.999) s = mix(hShadow(v_localPos, N, L), s, cover);
+#endif
 #else
   s = mix(1.0, s, cover);
 #endif
@@ -1107,6 +1162,10 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
 #endif
   uint face = v_w5 & 7u;
+#ifdef GEMALT
+  bool gmF = face == 6u;   // r-gemalt · Weiche Natur: the sculpted ground (its face the normal's dominant axis from here on)
+  if (gmF) { vec3 an = abs(v_gN); face = an.y >= an.x && an.y >= an.z ? (v_gN.y >= 0.0 ? 2u : 3u) : an.x >= an.z ? (v_gN.x >= 0.0 ? 0u : 1u) : (v_gN.z >= 0.0 ? 4u : 5u); }
+#endif
   uint kind = (v_w5 >> 8u) & 7u;
   bool noshade = ((v_w5 >> 11u) & 1u) == 1u;
   bool emissiveFace = ((v_w5 >> 12u) & 1u) == 1u;
@@ -1174,11 +1233,17 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
   }
+#ifdef GEMALT
+  if (gmF) { alb = vec4(gmPaint(v_tint, v_localPos + vec3(u_camInt & 4095), normalize(v_gN), length(v_rel)), 1.0); gmLift = 0.75; }
+#endif
 #ifdef LV_MEADOW
   // v-look2 · Wiesenruhe (look.js): a green-tinted face (grass, moss, leaves on an opaque block) calmed like a painted
   // field — part of each texel's lime/dark noise replaced by the texture's own mean (its 1 × 1 mip: one coarse tap), and
   // large soft patches over tens of metres, deeper and cooler or lighter and warmer (the low frequencies post can't give)
   // (never in the Klassisch look: its crisp 16-texel ground and the block grid stay — classic_v2)
+#ifdef GEMALT
+  if (!gmF)
+#endif
   if (u_lvMeadow.w > 0.0 && u_blockVar < 0.5 && tint.g > tint.r * 1.08 && tint.g > tint.b * 1.08 && !lookOn(v_w5)) {
 #ifdef TEXHI
     vec3 mean = hiOn ? textureLod(u_albedoHi, vec3(fu, float(hiK - 1)), 6.0).rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb;
@@ -1197,7 +1262,11 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #if defined(Q_GRASS) && !defined(MODEL)
   // q-art2 · Wiese (qart2.js): a green top as a meadow — never in the Klassisch look
   // (by the face's mean colour, not the tint: run 2's village lawn is an untinted green block — it stayed flat)
+#ifdef GEMALT
+  if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = gmF ? alb.rgb : lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;   // (r-gemalt: the sculpted ground's mean is its paint — r4: the far meadow went flat dark)
+#else
   if (face == 2u && u_blockVar < 0.5 && ((v_w5 >> 7u) & 1u) == 0u) { vec3 qm = lookOn(v_w5) ? alb.rgb : textureLod(u_albedo, vec3(fu, layer), 4.0).rgb * tint;
+#endif
     if (qm.g > qm.r * 1.1 && qm.g > qm.b * 1.15) alb.rgb = qGrass(alb.rgb, qm, v_localPos.xz + vec2(u_camInt.xz & 4095), v_rel); }
 #endif
 #ifdef BODYGROUND
@@ -1263,6 +1332,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   // normal (smooth ground slopes: the true surface normal from the position derivatives)
   vec3 N = NORMALS[face];
   if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
+#ifdef GEMALT
+  if (gmF) N = normalize(v_gN);
+#endif
 #ifdef MODEL
   N = u_normalMat * N;
 #endif
@@ -1274,6 +1346,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   vec3 bumpW = vec3(0.0);
   if (u_matTier > 0.5) {
     fam = int(texelFetch(u_fam, ivec2(int(layer), 0), 0).r * 255.0 + 0.5);
+#ifdef GEMALT
+    if (gmF) fam = 0;
+#endif
     vec3 wpM = v_localPos + vec3(u_camInt);
     float up = smoothstep(0.55, 0.92, N.y);
     wetK = u_wet * up;
@@ -1323,6 +1398,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   // read as one); Nahtlos keeps its normals as they were
   if (u_blockVar > 0.5) { if (rot == 1u) nxy = vec2(-nxy.y, nxy.x); else if (rot == 2u) nxy = -nxy; else if (rot == 3u) nxy = vec2(nxy.y, -nxy.x); }
   nxy *= u_normalStrength;
+#ifdef GEMALT
+  if (gmF) nxy = vec2(0.0);
+#endif
   vec3 T = TANG[face], Bt = BITN[face];
 #ifdef MODEL
   T = u_normalMat * T; Bt = u_normalMat * Bt;
@@ -1378,6 +1456,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
   if (noshade) faceShade = 0.92;
+#ifdef GEMALT
+  if (gmF) { vec3 q2 = N * N; faceShade = q2.y * (N.y > 0.0 ? 1.0 : 0.55) + q2.x * 0.78 + q2.z * 0.88; }
+#endif
   vec3 V = normalize(-v_rel);
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
@@ -1410,6 +1491,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #ifdef LIGHT2
   // t-light2: the sky's light from above, the ground's bounce from below (the shade cool, its underside warm)
   amb = (noshade ? u_l2Sky * 0.92 : l2Hemi(n) * (face <= 1u ? u_l2K.y : 1.0)) * skyL;
+#ifdef GEMALT
+  if (gmF) amb = l2Hemi(n) * mix(1.0, u_l2K.y, N.x * N.x) * skyL;
+#endif
 #endif
 #ifdef L2AO
   { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z);   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
@@ -2851,8 +2935,12 @@ void main() {
   vec3 N = v_face == 6u ? normalize(cross(dFdx(v_rel), dFdy(v_rel))) : NORMALS[min(v_face, 5u)];
   if (v_face == 6u && N.y < 0.0) N = -N;
 #else
-#ifdef Q_ISLEFORM
+#if defined(GEMALT) || defined(Q_ISLEFORM)
   vec3 N = NORMALS[min(v_face, 5u)];
+#ifdef GEMALT
+  // r-gemalt · Weiche Natur: the smooth far land (face 6, lod.js job.soft) takes its normal from the geometry, as ring 1's
+  if (v_face == 6u) { N = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (N.y < 0.0) N = -N; }
+#endif
 #else
   vec3 N = NORMALS[v_face];
 #endif
@@ -2924,7 +3012,7 @@ void main() {
     alb *= texelGrain(wp3, length(fwidth(wp3)));   // (f-stipple2: never a flat slab up close)
 #endif
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
-#ifdef FORM
+#if defined(FORM) || defined(GEMALT)
     if (v_face == 6u) faceShade = mix(0.8, 1.0, clamp(N.y, 0.0, 1.0));
 #endif
     float ndl = max(dot(N, L), 0.0);

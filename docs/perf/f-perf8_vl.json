@@ -115,7 +115,9 @@
   "qart_gl": 0,
   "qart2": 0,
   "qart2_gl": 0,
-  "qart3": 0
+  "qart3": 0,
+    "gemalt": 0,
+    "gemalt_gl": 0
  },
  "base": {
   "tag": "v0556",
@@ -414,7 +416,9 @@
   "xtop_gl",
   "qart_gl",
   "qart2_gl",
-    "qart3"
+    "qart3",
+    "gemalt",
+    "gemalt_gl"
  ],
  "unmeasured": {
   "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs — node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",

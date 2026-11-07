@@ -910,6 +910,7 @@
         if (m.svWant && VR.SmoothVox) VR.SmoothVox.want(m.svWant, this, c, sy);   // t-form: ask for the smooth models this section holds
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
+        s.softH = m.softH || null;   // r-gemalt: the drawn ground's column heights (gemalt.js lifts the bodies onto it)
         const tok = s.uTok = (s.uTok || 0) + 1;   // only the newest queued mesh of a section is uploaded
         // the upload waits in the streaming queue (drainUploads spends the frame's bytes on it, in view order): meshing
         // itself never blocks; a newer mesh of the section makes this one stale (alive), so an older mesh never lands
