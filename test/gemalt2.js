@@ -145,6 +145,9 @@ console.log('f · switches, defines, rows, texts, wiring');
   check(b.includes("'gemalt2'") && b.includes("'gemalt2_gl'"), 'build.js bundles gemalt2, gemalt2_gl');
   check(sh.includes('VR.Gemalt2.glslTerrain()') && sh.includes('VR.Gemalt2.glslWater()') && (sh.match(/gmAirCol\(col, dist, u_fogColor\)/g) || []).length === 2 && sh.includes('gmRamp(ndl * sh)') && sh.includes('gmStroke(alb.rgb') && sh.includes('gmWater(col, wp, vdep'), 'the shaders: terrain bands + key + rim + air, far tiles, lawn strokes, water');
   check(rn.includes('this.gmTuft(E, camPos)'), 'render() draws the grass clumps');
+  // (run 2: the clumps read pale straw beside the lawn — the column's painted colour is sRGB, the terrain decodes it with
+  //  pow 2.2; the clumps must too, or they sit a stop brighter and greyer than the ground they grow from)
+  check(/v_col = pow\(a_i1\.rgb, vec3\(2\.2\)\)/.test(src('src/main/gemalt2_gl.js')), 'the clumps decode the painted green like the ground (sRGB → linear)');
   const t = G2.glslTerrain();
   check(t.includes('#ifdef GM_PAINT') && t.includes('#ifdef GM_STROKE') && G2.glslWater().includes('#ifdef GM_WATER'), 'all GLSL behind its define');
 }

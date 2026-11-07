@@ -79,7 +79,7 @@ void main() {
   // the wind: the tips sway (the root stays), the trampled ones lean flat
   float sw = (0.05 + 0.1 * u_wind) * sin(u_time * 1.9 + a_i2.z) + 0.06 * u_wind;
   p.xz += (u_windDir * sw * (1.0 - tr) + away * tr * 0.45) * c.y * c.y * H * 2.0;
-  v_uv = c; v_col = a_i1.rgb; v_rel = p; v_sky = a_i2.x; v_tone = a_i2.y; v_seed = a_i2.z + float(q) * 3.1;
+  v_uv = c; v_col = pow(a_i1.rgb, vec3(2.2)); v_rel = p; v_sky = a_i2.x; v_tone = a_i2.y; v_seed = a_i2.z + float(q) * 3.1;
 #ifdef SHADOWS
   v_shadow = u_shadowMat * vec4(p, 1.0);
 #endif
@@ -116,7 +116,7 @@ void main() {
   }
   if (t < 0.0) discard;
   float tone = floor(t * 3.99) / 3.0;   // four tones, a painter's steps
-  vec3 alb = v_col * mix(0.5, 1.08, tone) * mix(0.9, 1.08, v_tone);
+  vec3 alb = v_col * mix(0.5, 1.22, tone) * mix(0.9, 1.08, v_tone);   // (linear like the ground: the tips one painter's step lighter than the lawn)
   alb = mix(alb, alb * vec3(1.12, 1.06, 0.78), tone * 0.15 * v_tone);   // the tips a touch sun-bleached
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
