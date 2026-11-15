@@ -13725,6 +13725,9 @@ pet.state='follow';pet.progD=Infinity;pet.progT=pet.clock||0;
 return true;
 };
 
+
+P.parked=(pet,loaded)=> !loaded&& !!pet&&pet.state==='sit';
+
 P.mood=(pet,ctx)=>{
 if(pet.state==='sleep')return'asleep';
 if(pet.state==='sit')return'waiting';
@@ -72350,6 +72353,11 @@ VR.I18N.add('en',{
 'g.pet.renameNote':'{kind} · up to 16 characters',
 'g.pet.renameOk':'Done',
 'g.pet.renameCancel':'Cancel',
+
+'g.pet.boxHow':'Right-click your companion: stay or follow. Shift+right-click: this box.',
+'g.pet.stay':'Stay here','g.pet.follow':'Follow me','g.pet.free':'Set free',
+'g.pet.freed':'🐾 {name} is free again.','g.pet.freedSub':'A treat makes it your companion again.',
+'g.pet.teleHint':'🐾 {name} follows you everywhere. Right-click: stay here · Shift+right-click: name, stay or set free',
 'g.pet.chip':'🐾 {name}: {mood}',
 'g.pet.m.happy':'happy',
 'g.pet.m.waiting':'waiting',
@@ -73936,7 +73944,11 @@ VR.I18N.add('en',{
 "g.wd.walk.chat.3":"“See the guide balloon? It knows every way.”",
 "g.wd.walk.chat.4":"“Together the way is only half as long.”",
 "g.wd.pet.follow":"The little dog follows you",
-"g.wd.pet.home":"Bring it to {place} ({d} m) — someone is waiting there.",
+"g.wd.pet.home":"Bring it to {place} ({d} m) — someone is waiting there. Go somewhere else and it stays behind.",
+"g.wd.pet.stay":"The little dog stays behind",
+"g.wd.pet.staySub":"Go to it if you want to bring it to {place} after all.",
+"g.wd.pet.glad":"The little dog is glad to see you",
+"g.wd.pet.gladSub":"It finds its own way home.",
 "g.wd.ruins.stone":"A rune stone glows ({n} of 3)",
 "g.wd.ruins.done":"The riddle is solved — the chest in the arch is yours.",
 "g.wd.sign.line":"{place}: {d} m to the {dir}",
@@ -77394,6 +77406,11 @@ VR.I18N.add('de',{
 'g.pet.renameNote':'{kind} · bis zu 16 Zeichen',
 'g.pet.renameOk':'Fertig',
 'g.pet.renameCancel':'Abbrechen',
+
+'g.pet.boxHow':'Rechtsklick auf deinen Begleiter: bleiben oder folgen. Shift+Rechtsklick: dieses Fenster.',
+'g.pet.stay':'Bleib hier','g.pet.follow':'Folge mir','g.pet.free':'Freilassen',
+'g.pet.freed':'🐾 {name} ist wieder frei.','g.pet.freedSub':'Mit einem Leckerbissen wird es wieder dein Begleiter.',
+'g.pet.teleHint':'🐾 {name} folgt dir überallhin. Rechtsklick: bleib hier · Shift+Rechtsklick: Name, Bleiben oder Freilassen',
 'g.pet.chip':'🐾 {name} · {mood}',
 'g.pet.m.happy':'fröhlich',
 'g.pet.m.waiting':'wartet',
@@ -78980,7 +78997,11 @@ VR.I18N.add('de',{
 "g.wd.walk.chat.3":"„Siehst du den Wegballon? Er kennt jeden Weg.“",
 "g.wd.walk.chat.4":"„Gemeinsam ist der Weg nur halb so lang.“",
 "g.wd.pet.follow":"Der kleine Hund folgt dir",
-"g.wd.pet.home":"Bring ihn nach {place} ({d} m) — dort wartet jemand.",
+"g.wd.pet.home":"Bring ihn nach {place} ({d} m) — dort wartet jemand. Gehst du woanders hin, bleibt er zurück.",
+"g.wd.pet.stay":"Der kleine Hund bleibt zurück",
+"g.wd.pet.staySub":"Geh zu ihm, wenn du ihn doch nach {place} bringen willst.",
+"g.wd.pet.glad":"Der kleine Hund freut sich über dich",
+"g.wd.pet.gladSub":"Er findet allein nach Hause.",
 "g.wd.ruins.stone":"Ein Runenstein leuchtet ({n} von 3)",
 "g.wd.ruins.done":"Das Rätsel ist gelöst — die Truhe im Bogen gehört dir.",
 "g.wd.sign.line":"{place}: {d} m nach {dir}",

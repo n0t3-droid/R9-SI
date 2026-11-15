@@ -20236,6 +20236,9 @@ pet.state='follow';pet.progD=Infinity;pet.progT=pet.clock||0;
 return true;
 };
 
+
+P.parked=(pet,loaded)=> !loaded&& !!pet&&pet.state==='sit';
+
 P.mood=(pet,ctx)=>{
 if(pet.state==='sleep')return'asleep';
 if(pet.state==='sit')return'waiting';
@@ -57213,7 +57216,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="e6f6389c5d896365";
+VR.TEX_SRC_HASH="4fc28d24c1b03b27";
 
 
 
@@ -59753,6 +59756,11 @@ VR.I18N.add('en',{
 'g.pet.renameNote':'{kind} · up to 16 characters',
 'g.pet.renameOk':'Done',
 'g.pet.renameCancel':'Cancel',
+
+'g.pet.boxHow':'Right-click your companion: stay or follow. Shift+right-click: this box.',
+'g.pet.stay':'Stay here','g.pet.follow':'Follow me','g.pet.free':'Set free',
+'g.pet.freed':'🐾 {name} is free again.','g.pet.freedSub':'A treat makes it your companion again.',
+'g.pet.teleHint':'🐾 {name} follows you everywhere. Right-click: stay here · Shift+right-click: name, stay or set free',
 'g.pet.chip':'🐾 {name}: {mood}',
 'g.pet.m.happy':'happy',
 'g.pet.m.waiting':'waiting',
@@ -61339,7 +61347,11 @@ VR.I18N.add('en',{
 "g.wd.walk.chat.3":"“See the guide balloon? It knows every way.”",
 "g.wd.walk.chat.4":"“Together the way is only half as long.”",
 "g.wd.pet.follow":"The little dog follows you",
-"g.wd.pet.home":"Bring it to {place} ({d} m) — someone is waiting there.",
+"g.wd.pet.home":"Bring it to {place} ({d} m) — someone is waiting there. Go somewhere else and it stays behind.",
+"g.wd.pet.stay":"The little dog stays behind",
+"g.wd.pet.staySub":"Go to it if you want to bring it to {place} after all.",
+"g.wd.pet.glad":"The little dog is glad to see you",
+"g.wd.pet.gladSub":"It finds its own way home.",
 "g.wd.ruins.stone":"A rune stone glows ({n} of 3)",
 "g.wd.ruins.done":"The riddle is solved — the chest in the arch is yours.",
 "g.wd.sign.line":"{place}: {d} m to the {dir}",
@@ -64797,6 +64809,11 @@ VR.I18N.add('de',{
 'g.pet.renameNote':'{kind} · bis zu 16 Zeichen',
 'g.pet.renameOk':'Fertig',
 'g.pet.renameCancel':'Abbrechen',
+
+'g.pet.boxHow':'Rechtsklick auf deinen Begleiter: bleiben oder folgen. Shift+Rechtsklick: dieses Fenster.',
+'g.pet.stay':'Bleib hier','g.pet.follow':'Folge mir','g.pet.free':'Freilassen',
+'g.pet.freed':'🐾 {name} ist wieder frei.','g.pet.freedSub':'Mit einem Leckerbissen wird es wieder dein Begleiter.',
+'g.pet.teleHint':'🐾 {name} folgt dir überallhin. Rechtsklick: bleib hier · Shift+Rechtsklick: Name, Bleiben oder Freilassen',
 'g.pet.chip':'🐾 {name} · {mood}',
 'g.pet.m.happy':'fröhlich',
 'g.pet.m.waiting':'wartet',
@@ -66383,7 +66400,11 @@ VR.I18N.add('de',{
 "g.wd.walk.chat.3":"„Siehst du den Wegballon? Er kennt jeden Weg.“",
 "g.wd.walk.chat.4":"„Gemeinsam ist der Weg nur halb so lang.“",
 "g.wd.pet.follow":"Der kleine Hund folgt dir",
-"g.wd.pet.home":"Bring ihn nach {place} ({d} m) — dort wartet jemand.",
+"g.wd.pet.home":"Bring ihn nach {place} ({d} m) — dort wartet jemand. Gehst du woanders hin, bleibt er zurück.",
+"g.wd.pet.stay":"Der kleine Hund bleibt zurück",
+"g.wd.pet.staySub":"Geh zu ihm, wenn du ihn doch nach {place} bringen willst.",
+"g.wd.pet.glad":"Der kleine Hund freut sich über dich",
+"g.wd.pet.gladSub":"Er findet allein nach Hause.",
 "g.wd.ruins.stone":"Ein Runenstein leuchtet ({n} von 3)",
 "g.wd.ruins.done":"Das Rätsel ist gelöst — die Truhe im Bogen gehört dir.",
 "g.wd.sign.line":"{place}: {d} m nach {dir}",
@@ -92869,6 +92890,96 @@ on(g){return!!g&&(g.difficulty==='peaceful'|| !!(g.player&&g.player.mode==='zen'
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const PL=VR.PlaceSense=VR.PlaceSense||{};
+let SOFT=null,SOFTN= -1,GRASS=null;
+
+PL.natural=function(b){
+const R=VR.R;
+if(SOFTN!==R.stateCount){
+SOFT=VR.SoftNat&&VR.SoftNat.tables?VR.SoftNat.tables().soft:null;SOFTN=R.stateCount;
+GRASS=new Uint8Array(R.stateCount);
+for(const n of['grass_block','podzol','moss_block']){const t=R.byName[n];if(t)for(let s=1;s<R.stateCount;s++)if(R.T.type[s]===t.id)GRASS[s]=1;}
+}
+return SOFT?SOFT[b]===1: !!GRASS[b];
+};
+PL.grassy=function(b){PL.natural(b);return!!GRASS[b];};
+
+PL.ground=function(w,x,z){
+const X=Math.floor(x),Z=Math.floor(z);
+if(!w.isLoaded(X,Z))return null;
+const fl=VR.R.T.flags,F=VR.F;
+let y=w.topAt(X,Z);
+for(let k=0;k<48&&y>0;k++,y--){const f=fl[w.getBlock(X,y,Z)];if((f&F.SOLID)&& !(f&F.LEAVES)&& !(f&F.FLUID))return y;}
+return null;
+};
+PL.RING=[[1,0],[0.7,0.7],[0,1],[-0.7,0.7],[-1,0],[-0.7,-0.7],[0,-1],[0.7,-0.7]];
+PL.sense=function(w,x,z,r){
+const X=Math.floor(x),Z=Math.floor(z),y=PL.ground(w,X,Z);
+if(y===null)return null;
+const fl=VR.R.T.flags,F=VR.F,b=w.getBlock(X,y,Z),top=w.topAt(X,Z);
+const s={y,b,nat:PL.natural(b),grass:PL.grassy(b),wet:false,roofed:false,room:true,level:true,built:0};
+
+for(let k=1;k<=2;k++){const f=fl[w.getBlock(X,y+k,Z)];if(f&F.FLUID)s.wet=true;else if(f&F.SOLID)s.room=false;}
+
+for(let yy=y+3;yy<=top;yy++){const f=fl[w.getBlock(X,yy,Z)];if((f&F.SOLID)&& !(f&F.LEAVES)){s.roofed=true;break;}}
+
+const R0=r||6;let n=0,bu=0;
+for(let ring=0;ring<2;ring++)for(const d of PL.RING){
+const q=ring?R0:R0/2,gx=Math.floor(X+0.5+d[0]*q),gz=Math.floor(Z+0.5+d[1]*q),gy=PL.ground(w,gx,gz);
+if(gy===null)continue;
+n++;
+if(!PL.natural(w.getBlock(gx,gy,gz)))bu++;
+}
+s.built=n?bu/n:0;
+for(const d of[[1,0],[-1,0],[0,1],[0,-1]]){const gy=PL.ground(w,X+d[0],Z+d[1]);if(gy===null||Math.abs(gy-y)>1){s.level=false;break;}}
+return s;
+};
+
+
+
+PL.near=function(w,x,z,y0,tol){
+const X=Math.floor(x),Z=Math.floor(z);
+if(!w.isLoaded(X,Z))return null;
+const fl=VR.R.T.flags,F=VR.F,at=Math.floor(y0)-1,T=tol===undefined?3:tol;
+const stand=(y)=>{const f=fl[w.getBlock(X,y,Z)];return!!((f&F.SOLID)&& !(f&F.LEAVES)&& !(f&F.FLUID))&& !(fl[w.getBlock(X,y+1,Z)]&F.SOLID);};
+let y= -1;
+for(let k=0;k<=T&&y<0;k++){if(stand(at-k))y=at-k;else if(k&&stand(at+k))y=at+k;}
+if(y<0)return null;
+const b=w.getBlock(X,y,Z),top=w.topAt(X,Z);
+const s={y,b,nat:PL.natural(b),grass:PL.grassy(b),wet:false,roofed:false,room:true};
+for(let k=1;k<=2;k++){const f=fl[w.getBlock(X,y+k,Z)];if(f&F.FLUID)s.wet=true;else if(f&F.SOLID)s.room=false;}
+for(let yy=y+3;yy<=top;yy++){const f=fl[w.getBlock(X,yy,Z)];if((f&F.SOLID)&& !(f&F.LEAVES)){s.roofed=true;break;}}
+return s;
+};
+
+PL.wild=function(w,x,z,o){
+const s=PL.sense(w,x,z,o&&o.r);
+if(!s|| !s.nat||s.wet||s.roofed|| !s.room|| !s.level)return null;
+if(s.built>(o&&o.built!==undefined?o.built:0.2))return null;
+if(o&&o.grass&& !s.grass)return null;
+return s.y;
+};
+PL.lawn=(w,x,z,o)=>PL.wild(w,x,z,Object.assign({grass:true},o||{}));
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const R=VR.R,F=VR.F,PH=VR.PHYS,mat4=VR.mat4,SH=VR.SHAPE;
@@ -92965,20 +93076,25 @@ this.summon(kind,x+0.5,top+1,z+0.5);counts.hostile++;
 continue;
 }
 
-if(counts.wild<3&& !night&&VR.DimReg.actorsHome(g.dim)&&(ground===VR.GEN.S().grass||ground===VR.GEN.S().podzol)){
+
+
+const PS=VR.PlaceSense,wy=PS?PS.wild(w,x,z):top,wg=wy===null?0:w.getBlock(x,wy,z);
+
+if(counts.wild<3&& !night&&VR.DimReg.actorsHome(g.dim)&&(wg===VR.GEN.S().grass||wg===VR.GEN.S().podzol)){
 const opts=Object.keys(MOBS).filter(k=>MOBS[k].companion&&MOBS[k].biomes.test(key));
-if(opts.length&&Math.random()<(this.nearVillage(x,z)?0.01:0.003)){this.summon(opts[Math.floor(Math.random()*opts.length)],x+0.5,top+1,z+0.5);counts.wild++;continue;}
+if(opts.length&&Math.random()<(this.nearVillage(x,z)?0.01:0.003)){this.summon(opts[Math.floor(Math.random()*opts.length)],x+0.5,wy+1,z+0.5);counts.wild++;continue;}
 }
-if(counts.passive<14&& !night&&(ground===VR.GEN.S().grass||ground===VR.GEN.S().sand||ground===VR.GEN.S().podzol)){
+if(counts.passive<14&& !night&&(wg===VR.GEN.S().grass||wg===VR.GEN.S().sand||wg===VR.GEN.S().podzol)){
 const opts=Object.keys(MOBS).filter(k=> !MOBS[k].hostile&& !MOBS[k].ambient&& !MOBS[k].companion&&MOBS[k].biomes&&MOBS[k].biomes.test(key));
 if(!opts.length)continue;
 const kind=opts[Math.floor(Math.random()*opts.length)];
 const[g0,g1]=MOBS[kind].group||[1,2];
 const n=g0+Math.floor(Math.random()*(g1-g0+1));
 const grp=this.grp||(this.grp=[]);grp.length=0;
-for(let i=0;i<n;i++){const ox=x+Math.floor((Math.random()-0.5)*6),oz=z+Math.floor((Math.random()-0.5)*6);const ty=w.topAt(ox,oz);if(R.T.flags[w.getBlock(ox,ty,oz)]&F.SOLID)grp.push(this.summon(kind,ox+0.5,ty+1,oz+0.5));}
+
+for(let i=0;i<n;i++){const ox=x+Math.floor((Math.random()-0.5)*6),oz=z+Math.floor((Math.random()-0.5)*6);const ty=PS?PS.wild(w,ox,oz):w.topAt(ox,oz);if(ty!==null&&Math.abs(ty-wy)<=2)grp.push(this.summon(kind,ox+0.5,ty+1,oz+0.5));}
 if(g.companions&&g.companions.heart)g.companions.heart.group(grp);
-counts.passive+=n;
+counts.passive+=grp.length;
 }
 }
 }
@@ -93017,6 +93133,7 @@ if(!m.pet&&(d2>140*140||(!w.isLoaded(Math.floor(m.pos[0]),Math.floor(m.pos[2])))
 if(m.def.hostile&&(p.mode==='zen'||g.difficulty==='peaceful')){this.mobs.splice(i,1);continue;}
 m.hurt=Math.max(0,m.hurt-dt);
 this.ai(m,dt,d2);
+if(m.parked)continue;
 this.physics(m,dt,get,nb);
 }
 
@@ -93854,6 +93971,9 @@ if(h.box){x=h.box[0]+Math.random()*(h.box[2]-h.box[0]+1);z=h.box[1]+Math.random(
 else{const a=(k*2.4+tries+Math.random())%6.283,r=(A.kind==='duck'?0.3+Math.random()*0.5:0.3+Math.random()*0.7)*Math.max(1,h.r-(A.kind==='duck'?1.5:0));x=A.x+0.5+Math.cos(a)*r;z=A.z+0.5+Math.sin(a)*r;}
 if(A.kind==='duck')return[x,A.y-0.12,z];
 if(!w.isLoaded|| !w.isLoaded(Math.floor(x),Math.floor(z)))continue;
+
+const PS=VR.PlaceSense,sn= !PS?null:isFinite(A.y)?PS.near(w,x,z,A.y,3):PS.sense(w,x,z);
+if(PS){if(!sn||sn.wet|| !sn.room)continue;return[x,sn.y+1,z];}
 const top=w.topAt(Math.floor(x),Math.floor(z)),b=w.getBlock(Math.floor(x),top,Math.floor(z));
 if(!b|| !(VR.R.T.flags[b]&VR.F.SOLID)||(VR.R.T.flags[b]&VR.F.FLUID))continue;
 return[x,top+1,z];
@@ -106502,7 +106622,12 @@ el.innerHTML='<div class="panel box col gap" style="min-width:min(400px,92vw)">'
 '<h2 data-t="g.pet.renameTitle"></h2><div class="note" id="petnameNote"></div>'+
 '<input type="text" id="petnameIn" maxlength="'+P.NAME_MAX+'" autocomplete="off" spellcheck="false">'+
 '<div class="row gap"><button class="btn primary" id="petnameOk" data-t="g.pet.renameOk"></button>'+
-'<button class="btn small" id="petnameCancel" data-t="g.pet.renameCancel"></button></div></div>';
+'<button class="btn small" id="petnameCancel" data-t="g.pet.renameCancel"></button></div>'+
+
+'<div class="note" id="petnameHow" data-t="g.pet.boxHow"></div>'+
+'<div class="row gap"><button class="btn small" id="petStay" data-t="g.pet.stay"></button>'+
+'<button class="btn small" id="petFollow" data-t="g.pet.follow"></button>'+
+'<button class="btn small" id="petFree" data-t="g.pet.free"></button></div></div>';
 ui.root.appendChild(el);
 if(VR.I18N&&VR.I18N.retext)VR.I18N.retext(el);
 this.renameEl=el;this.renameIn=el.querySelector('#petnameIn');
@@ -106513,6 +106638,35 @@ else if(e.key==='Escape'){e.preventDefault();this.closeRename();}
 });
 el.querySelector('#petnameOk').addEventListener('click',()=>this.applyRename());
 el.querySelector('#petnameCancel').addEventListener('click',()=>this.closeRename());
+el.querySelector('#petStay').addEventListener('click',()=>this.wish('sit'));
+el.querySelector('#petFollow').addEventListener('click',()=>this.wish('follow'));
+el.querySelector('#petFree').addEventListener('click',()=>this.release());
+}
+
+wish(st){
+const m=this.rename;
+if(m&&m.pet){
+if(m.pet.state!==st){m.pet.state=st;if(st==='follow'){m.pet.progD=Infinity;m.pet.progT=m.pet.clock||0;}}
+this.g.ui.hint(T(st==='sit'?'g.pet.sits':'g.pet.follows',{name:m.pet.name}),2400);
+this.hearts(m,3);
+}
+this.applyRename();
+}
+
+
+release(m0){
+const g=this.g,m=m0||this.rename;
+if(m&&m.pet){
+const name=m.pet.name;
+m.pet=null;
+if(m.ai){m.ai.flee=0;m.ai.target=null;m.ai.moving=false;}
+this.hearts(m,6);
+if(g.audio)g.audio.play('pet');
+if(g.ui&&g.ui.toast)g.ui.toast(T('g.pet.freed',{name}),T('g.pet.freedSub'),'egg_'+m.kind);
+}
+this.chipT=0;
+if(this.rename)this.closeRename();
+return!!m;
 }
 openRename(m){
 const g=this.g;if(!this.renameEl|| !m.pet)return;
@@ -106577,7 +106731,14 @@ ctx.home=Array.isArray(home)&&home.length>=3?home:null;
 pet.idle=Math.hypot(m.vel[0],m.vel[2])<0.2?pet.idle+dt:0;
 pet.wig=Math.max(0,(pet.wig||0)-dt);
 
-if(m.pos[1]< -4|| !w.isLoaded(Math.floor(m.pos[0]),Math.floor(m.pos[2])))this.teleport(m);
+
+
+m.parked=false;
+if(m.pos[1]< -4)this.teleport(m);
+else if(!w.isLoaded(Math.floor(m.pos[0]),Math.floor(m.pos[2]))){
+if(P.parked(pet,false)){m.parked=true;m.vel[0]=0;m.vel[1]=0;m.vel[2]=0;if(m.ai)m.ai.moving=false;return;}
+this.teleport(m);
+}
 pet.thinkDt+=dt;pet.thinkT-=dt;
 if(pet.thinkT<=0){
 pet.thinkT=P.thinkEvery(d2);
@@ -106654,6 +106815,8 @@ else{m.pos[0]=p.pos[0];m.pos[1]=p.pos[1]+1.5;m.pos[2]=p.pos[2];}
 m.vel[0]=0;m.vel[1]=0;m.vel[2]=0;m.onGround=false;
 m.pet.path=null;m.pet.progD=Infinity;m.pet.progT=m.pet.clock||0;
 if(g.particles){g.particles.spark(m.pos[0],m.pos[1]+0.5,m.pos[2],[1,0.6,1],10,2,1);}
+
+if(!this.teleHint&&g.ui&&g.ui.hint){this.teleHint=true;g.ui.hint(T('g.pet.teleHint',{name:m.pet.name}),7000);}
 return true;
 }
 
@@ -116758,8 +116921,9 @@ const g=this.g,w=g.world,ent=g.entities;if(!ent|| !w)return null;
 for(let k=0;k<16;k++){
 const a=Math.random()*Math.PI*2,x=Math.floor(home[0]+Math.cos(a)*14),z=Math.floor(home[2]+Math.sin(a)*14);
 if(!w.isLoaded(x,z))continue;
-const top=w.topAt(x,z);
-if(!(VR.R.T.flags[w.getBlock(x,top,z)]&VR.F.SOLID)||Math.abs(top-home[1])>8)continue;
+
+const sn=VR.PlaceSense?VR.PlaceSense.near(w,x,z,home[1],3):null,top=sn?sn.y:w.topAt(x,z);
+if(VR.PlaceSense?(!sn||sn.wet|| !sn.room||sn.roofed):(!(VR.R.T.flags[w.getBlock(x,top,z)]&VR.F.SOLID)||Math.abs(top-home[1])>8))continue;
 let clear=true;
 for(let s=1;s<8&&clear;s++){const sx=Math.floor(x+(home[0]+1.5-x)*s/8),sz=Math.floor(z+(home[2]+1.5-z)*s/8),b=w.getBlock(sx,Math.floor(home[1]),sz);if(b&&(VR.R.T.flags[b]&VR.F.SOLID))clear=false;}
 if(!clear)continue;
@@ -146699,8 +146863,10 @@ return;
 if(water|| !(R.T.flags[ground]&F.SOLID)||(R.T.flags[ground]&F.FLUID))return;
 const[g0,g1]=MOBS[f.id].group||[1,2],k=g0+Math.floor(Math.random()*(g1-g0+1));
 for(let i=0;i<k&&n+i<CAP(g);i++){
-const ox=x+Math.floor((Math.random()-0.5)*6),oz=z+Math.floor((Math.random()-0.5)*6),ty=w.topAt(ox,oz);
-if(!(R.T.flags[w.getBlock(ox,ty,oz)]&F.SOLID))continue;
+const ox=x+Math.floor((Math.random()-0.5)*6),oz=z+Math.floor((Math.random()-0.5)*6);
+
+const sn=VR.PlaceSense?VR.PlaceSense.sense(w,ox,oz):null,ty=VR.PlaceSense?(sn?sn.y: -1):w.topAt(ox,oz);
+if(VR.PlaceSense?(!sn||sn.wet|| !sn.room|| !sn.level||sn.built>0.2): !(R.T.flags[w.getBlock(ox,ty,oz)]&F.SOLID))continue;
 const m=Ent.summon(f.id,ox+0.5,ty+1,oz+0.5);if(m&&f.does==='graze')m.graze=true;
 if(m)WL.stats.spawned++;
 }
@@ -152807,11 +152973,42 @@ return L.slice(0,n||3);
 };
 
 
+
+
+
+
+
+
+
+
+W.DOG={NEAR:3.2,REARM:9,LEAVE:24,PATIENCE:30,GAIN:4,MOVE:0.8,GLAD:7};
+W.dogNew=()=>({mode:'wait',armed:true,best:Infinity,stall:0,t:0});
+
+
+W.dogStep=function(s,dt,dd,dHome,moved){
+const D=W.DOG;
+if(s.mode==='wait'){
+if(!s.armed){if(dd>D.REARM)s.armed=true;return'';}
+if(dd>D.NEAR)return'';
+if(!(dHome<Infinity)){s.mode='glad';s.t=0;return'glad';}
+s.mode='follow';s.best=dHome;s.stall=0;
+return'follow';
+}
+if(s.mode==='glad'){s.t+=dt;if(s.t>=D.GLAD){s.mode='gone';return'gone';}return'';}
+if(s.mode==='follow'){
+if(dHome<=s.best-D.GAIN){s.best=dHome;s.stall=0;}
+else if(moved>D.MOVE*dt)s.stall+=dt;
+if(dd>D.LEAVE||s.stall>=D.PATIENCE){s.mode='wait';s.armed=false;return'stay';}
+}
+return'';
+};
+
+
 W.SITE_KINDS=['temple','city','hills','station','canyon','citadel','farm','lookout','grove'];
 W.keys=function(){
 const k=['g.set.wander','g.set.wander.tip','g.wd.place','g.wd.placeSub','g.wd.gift','g.wd.giftAdv','g.wd.landing','g.wd.book','g.wd.bookNote','g.wd.close',
 'g.wd.p.places','g.wd.p.people','g.wd.p.creatures','g.wd.p.stickers','g.wd.p.recipes','g.wd.none','g.wd.next','g.wd.chest','g.wd.chestSub','g.wd.mapHint',
-'g.wd.walk.with','g.wd.walk.to','g.wd.walk.arrive','g.wd.walk.chat.0','g.wd.walk.chat.1','g.wd.walk.chat.2','g.wd.walk.chat.3','g.wd.walk.chat.4','g.wd.pet.follow','g.wd.pet.home','g.wd.ruins.stone','g.wd.ruins.done','g.wd.sign.line','g.wd.recipe',
+'g.wd.walk.with','g.wd.walk.to','g.wd.walk.arrive','g.wd.walk.chat.0','g.wd.walk.chat.1','g.wd.walk.chat.2','g.wd.walk.chat.3','g.wd.walk.chat.4','g.wd.pet.follow','g.wd.pet.home','g.wd.pet.stay','g.wd.pet.staySub','g.wd.pet.glad','g.wd.pet.gladSub','g.wd.ruins.stone','g.wd.ruins.done','g.wd.sign.line','g.wd.recipe',
 'g.wd.cr.fox','g.wd.cr.rabbit','g.wd.cr.dog','g.wd.cr.pup'];
 for(const n of W.NAMES)k.push('g.wd.k.'+n,'g.wd.s.'+n);
 for(const s of W.SITE_KINDS)k.push('g.wd.site.'+s);
@@ -153390,24 +153587,46 @@ m.wT=0;
 return true;
 },
 update(D,m,dt){
-const q=m.q,d=D.dist(q.pos);
-if(!m.follow){
-D.face(q,D.pos);q.yaw=LK.yawOf(D.pos[0]-q.pos[0],D.pos[2]-q.pos[2]);
-if((m.wT-=dt)<=0&&d<30){m.wT=3;const A=D.audio;if(A&&A.ctx){A.tone(880,0.025,0.18,'sine',true);A.tone(740,0.02,0.22,'sine',true,(A.ctx.currentTime||0)+0.2);}}
-if(d<3.2){
-m.follow=true;m.dur=Math.max(m.dur,900);
+const q=m.q,p=D.pos,d=D.dist(q.pos),G=W.DOG;
+
+
+const s=m.dog||(m.dog=W.dogNew()),lp=m.lp||(m.lp=[p[0],p[2]]);
+const moved=Math.hypot(p[0]-lp[0],p[2]-lp[1]);lp[0]=p[0];lp[1]=p[2];
+if(m.home===undefined&&d<=G.NEAR){
 const v=D.places.filter(P=>P.kind==='village').sort((a,b)=>D.dist([a.x,0,a.z])-D.dist([b.x,0,b.z]))[0];
-m.home=v||null;W.note(D.g.meta,'creatures',D.species?'pup':'dog');
-D.note('🐕 '+T('g.wd.pet.follow'),v?T('g.wd.pet.home',{place:v.name,d:Math.round(D.dist([v.x,0,v.z])/10)*10}):'');
+m.home=v&&D.dist([v.x,0,v.z])<600?v:null;
 }
+const ev=m.owner?'':W.dogStep(s,dt,d,m.home?Math.hypot(m.home.x-p[0],m.home.z-p[2]):Infinity,moved);
+if(ev==='follow'){
+m.follow=true;m.dur=Math.max(m.dur,m.age+900);
+W.note(D.g.meta,'creatures',D.species?'pup':'dog');
+D.note('🐕 '+T('g.wd.pet.follow'),T('g.wd.pet.home',{place:m.home.name,d:Math.round(D.dist([m.home.x,0,m.home.z])/10)*10}));
+}else if(ev==='stay'){
+m.follow=false;m.dur=Math.min(m.dur,m.age+150);q.state='sit';
+D.note('🐕 '+T('g.wd.pet.stay'),T('g.wd.pet.staySub',{place:m.home.name}));
+}else if(ev==='glad'){
+W.note(D.g.meta,'creatures',D.species?'pup':'dog');
+D.note('🐕 '+T('g.wd.pet.glad'),T('g.wd.pet.gladSub'));
+if(D.P)D.P.spark(q.pos[0],q.pos[1]+0.8,q.pos[2],[1,0.5,0.7],8,1.2,1);
+}else if(ev==='gone')return false;
+if(s.mode==='glad'){
+
+const dx=q.pos[0]-p[0],dz=q.pos[2]-p[2],dd=Math.hypot(dx,dz)||1;
+if(s.t<3){D.face(q,p);q.state='sit';}
+else{q.pos[0]+=dx/dd*3.2*dt;q.pos[2]+=dz/dd*3.2*dt;q.state='walk';q.yaw=LK.yawOf(dx,dz);if((m.gT=(m.gT||0)-dt)<=0){m.gT=0.25;const gy=D.ground(q.pos[0],q.pos[2],q.pos[1]);if(gy!==null)q.pos[1]=gy;}}
+m.pos=q.pos;
+return;
+}
+if(!m.follow){
+D.face(q,D.pos);q.yaw=LK.yawOf(D.pos[0]-q.pos[0],D.pos[2]-q.pos[2]);q.state='sit';
+if((m.wT-=dt)<=0&&d<30){m.wT=3;const A=D.audio;if(A&&A.ctx){A.tone(880,0.025,0.18,'sine',true);A.tone(740,0.02,0.22,'sine',true,(A.ctx.currentTime||0)+0.2);}}
 if(d>70)return false;
 return;
 }
 
-const p=D.pos,dx=p[0]-q.pos[0],dz=p[2]-q.pos[2],dd=Math.hypot(dx,dz);
+const dx=p[0]-q.pos[0],dz=p[2]-q.pos[2],dd=Math.hypot(dx,dz);
 if(dd>2.2){const sp=Math.min(dd*1.5,7)*dt;q.pos[0]+=dx/dd*sp;q.pos[2]+=dz/dd*sp;q.state='walk';q.yaw=LK.yawOf(dx,dz);if((m.gT=(m.gT||0)-dt)<=0){m.gT=0.25;const gy=D.ground(q.pos[0],q.pos[2],q.pos[1]);if(gy!==null)q.pos[1]=gy;}}
 else q.state='sit';
-if(dd>40){q.pos[0]=p[0]-dx/dd*3;q.pos[2]=p[2]-dz/dd*3;q.pos[1]=p[1];}
 m.pos=q.pos;
 if(m.home&&Math.hypot(m.home.x-p[0],m.home.z-p[2])<m.home.rad*0.9){
 if(!m.owner){const o=D.spot(5,0.8)||[p[0]+3,p[1],p[2]];m.owner=D.fig(m.seed+3,o,'child','child');m.owner.state='cheer';m.oT=m.age;D.found(m);if(D.P)D.P.spark(o[0],o[1]+1.4,o[2],[1,0.5,0.7],14,1.6,1);}
@@ -162602,8 +162821,9 @@ let at=null;
 for(let k=0;k<12&& !at;k++){
 const x=Math.floor(cx+(C.h01(f.i,k,1)-0.5)*56),z=Math.floor(cz+(C.h01(f.i,k,2)-0.5)*56);
 if(!w.isLoaded(x,z)||Math.hypot(x-p[0],z-p[2])<14)continue;
-const y=w.topAt(x,z),b=w.getBlock(x,y,z),F=VR.F,RT=VR.R&&VR.R.T;
-if(RT&&F&&(RT.flags[b]&F.SOLID)&& !(RT.flags[b]&F.FLUID)&& !(RT.flags[w.getBlock(x,y+1,z)]&F.SOLID))at=[x+0.5,y+1,z+0.5];
+
+const y=VR.PlaceSense?VR.PlaceSense.wild(w,x,z):w.topAt(x,z);
+if(y!==null)at=[x+0.5,y+1,z+0.5];
 }
 if(!at)continue;
 const kind=C.MOB[f.sp];if(!kind){done.add(f.i);continue;}
@@ -164530,7 +164750,10 @@ let vd=1e9;for(const v of villagesNear(g))vd=Math.min(vd,Math.hypot(v[0]-p[0],v[
 if(!WU.deerMay({night:E.night,stillFor:R.still,vilDist:vd,day,st:m}))return;
 const tgt=WU.deerPick(spots(g,R),m.seen,p[0],p[2]);if(!tgt)return;
 let dx=tgt.x-p[0],dz=tgt.z-p[2];const dl=Math.hypot(dx,dz)||1;dx/=dl;dz/=dl;
-const x=p[0]+dx*12+dz*3,z=p[2]+dz*12-dx*3,gy=ground(w,x,z);if(gy===null)return;
+const x=p[0]+dx*12+dz*3,z=p[2]+dz*12-dx*3;let gy=ground(w,x,z);if(gy===null)return;
+
+
+if(VR.PlaceSense){const sn=VR.PlaceSense.near(w,x,z,p[1],4);if(!sn||sn.wet|| !sn.room||sn.roofed)return;gy=sn.y;}
 WU.markEvent(m,'deer',day);
 R.deer={x,z,y:gy+1,tx:tgt.x,tz:tgt.z,id:tgt.id,yaw:Math.atan2(-dx,-dz),walk:0,t:0,out:0,gone:0};
 swirl(g,x,gy+1,z);
