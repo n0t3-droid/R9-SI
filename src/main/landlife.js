@@ -149,6 +149,9 @@
         else { const a = (k * 2.4 + tries + Math.random()) % 6.283, r = (A.kind === 'duck' ? 0.3 + Math.random() * 0.5 : 0.3 + Math.random() * 0.7) * Math.max(1, h.r - (A.kind === 'duck' ? 1.5 : 0)); x = A.x + 0.5 + Math.cos(a) * r; z = A.z + 0.5 + Math.sin(a) * r; }
         if (A.kind === 'duck') return [x, A.y - 0.12, z];
         if (!w.isLoaded || !w.isLoaded(Math.floor(x), Math.floor(z))) continue;
+        // (f-spawn: the ground under the leaves, dry, with room, near the anchor's height — not the shed's roof or a crown)
+        const PS = VR.PlaceSense, sn = !PS ? null : isFinite(A.y) ? PS.near(w, x, z, A.y, 3) : PS.sense(w, x, z);
+        if (PS) { if (!sn || sn.wet || !sn.room) continue; return [x, sn.y + 1, z]; }
         const top = w.topAt(Math.floor(x), Math.floor(z)), b = w.getBlock(Math.floor(x), top, Math.floor(z));
         if (!b || !(VR.R.T.flags[b] & VR.F.SOLID) || (VR.R.T.flags[b] & VR.F.FLUID)) continue;
         return [x, top + 1, z];

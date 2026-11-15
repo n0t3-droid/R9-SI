@@ -72,6 +72,9 @@
     pet.state = 'follow'; pet.progD = Infinity; pet.progT = pet.clock || 0;
     return true;
   };
+  // f-spawn: a companion told to stay, stays — on ground that is not loaded it is parked (kept where it sits, not moved,
+  // not brought to its player) until that ground is loaded again; a follower or a sleeper comes to you instead
+  P.parked = (pet, loaded) => !loaded && !!pet && pet.state === 'sit';
   // the 🐾 chip's mood
   P.mood = (pet, ctx) => {
     if (pet.state === 'sleep') return 'asleep';

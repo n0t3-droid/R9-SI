@@ -100,7 +100,12 @@
         '<h2 data-t="g.pet.renameTitle"></h2><div class="note" id="petnameNote"></div>' +
         '<input type="text" id="petnameIn" maxlength="' + P.NAME_MAX + '" autocomplete="off" spellcheck="false">' +
         '<div class="row gap"><button class="btn primary" id="petnameOk" data-t="g.pet.renameOk"></button>' +
-        '<button class="btn small" id="petnameCancel" data-t="g.pet.renameCancel"></button></div></div>';
+        '<button class="btn small" id="petnameCancel" data-t="g.pet.renameCancel"></button></div>' +
+        // f-spawn (the owner: "an animal is tied to me, it comes along where I go"): the three wishes in plain sight
+        '<div class="note" id="petnameHow" data-t="g.pet.boxHow"></div>' +
+        '<div class="row gap"><button class="btn small" id="petStay" data-t="g.pet.stay"></button>' +
+        '<button class="btn small" id="petFollow" data-t="g.pet.follow"></button>' +
+        '<button class="btn small" id="petFree" data-t="g.pet.free"></button></div></div>';
       ui.root.appendChild(el);
       if (VR.I18N && VR.I18N.retext) VR.I18N.retext(el);
       this.renameEl = el; this.renameIn = el.querySelector('#petnameIn');
@@ -111,6 +116,35 @@
       });
       el.querySelector('#petnameOk').addEventListener('click', () => this.applyRename());
       el.querySelector('#petnameCancel').addEventListener('click', () => this.closeRename());
+      el.querySelector('#petStay').addEventListener('click', () => this.wish('sit'));
+      el.querySelector('#petFollow').addEventListener('click', () => this.wish('follow'));
+      el.querySelector('#petFree').addEventListener('click', () => this.release());
+    }
+    // f-spawn: the box's wishes — stay here / follow me (the name typed so far is kept) …
+    wish(st) {
+      const m = this.rename;
+      if (m && m.pet) {
+        if (m.pet.state !== st) { m.pet.state = st; if (st === 'follow') { m.pet.progD = Infinity; m.pet.progT = m.pet.clock || 0; } }
+        this.g.ui.hint(T(st === 'sit' ? 'g.pet.sits' : 'g.pet.follows', { name: m.pet.name }), 2400);
+        this.hearts(m, 3);
+      }
+      this.applyRename();
+    }
+    // … and go free: the companion is a wild animal again (it stays where it is, no longer follows or appears beside
+    // you, is not saved as yours; a treat makes it yours again)
+    release(m0) {
+      const g = this.g, m = m0 || this.rename;
+      if (m && m.pet) {
+        const name = m.pet.name;
+        m.pet = null;
+        if (m.ai) { m.ai.flee = 0; m.ai.target = null; m.ai.moving = false; }
+        this.hearts(m, 6);
+        if (g.audio) g.audio.play('pet');
+        if (g.ui && g.ui.toast) g.ui.toast(T('g.pet.freed', { name }), T('g.pet.freedSub'), 'egg_' + m.kind);
+      }
+      this.chipT = 0;
+      if (this.rename) this.closeRename();
+      return !!m;
     }
     openRename(m) {
       const g = this.g; if (!this.renameEl || !m.pet) return;
@@ -174,8 +208,15 @@
       ctx.home = Array.isArray(home) && home.length >= 3 ? home : null;
       pet.idle = Math.hypot(m.vel[0], m.vel[2]) < 0.2 ? pet.idle + dt : 0;
       pet.wig = Math.max(0, (pet.wig || 0) - dt);
-      // below the world, or on ground that is not loaded here: back to the player at once
-      if (m.pos[1] < -4 || !w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2]))) this.teleport(m);
+      // below the world: back to the player at once (a companion is never lost). On ground that is not loaded here: a
+      // follower appears beside its player; one told to stay is parked — it keeps its place until that ground is loaded
+      // again (f-spawn: "stay" used to hold for a few chunks only — the animal was tied to its player)
+      m.parked = false;
+      if (m.pos[1] < -4) this.teleport(m);
+      else if (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2]))) {
+        if (P.parked(pet, false)) { m.parked = true; m.vel[0] = 0; m.vel[1] = 0; m.vel[2] = 0; if (m.ai) m.ai.moving = false; return; }
+        this.teleport(m);
+      }
       pet.thinkDt += dt; pet.thinkT -= dt;
       if (pet.thinkT <= 0) {
         pet.thinkT = P.thinkEvery(d2);
@@ -252,6 +293,8 @@
       m.vel[0] = 0; m.vel[1] = 0; m.vel[2] = 0; m.onGround = false;
       m.pet.path = null; m.pet.progD = Infinity; m.pet.progT = m.pet.clock || 0;
       if (g.particles) { g.particles.spark(m.pos[0], m.pos[1] + 0.5, m.pos[2], [1, 0.6, 1], 10, 2, 1); }
+      // f-spawn: the first time it appears beside you, say how to tell it to stay or to set it free (once a session)
+      if (!this.teleHint && g.ui && g.ui.hint) { this.teleHint = true; g.ui.hint(T('g.pet.teleHint', { name: m.pet.name }), 7000); }
       return true;
     }
     // ---------------------------------------------------------------- the pose: idle (wag, twitch), walk, sit, sleep curl

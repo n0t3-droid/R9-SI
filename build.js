@@ -26,6 +26,7 @@ SHARED.splice(SHARED.indexOf('lod') + 1, 0, 'isleshell'); MAIN.splice(MAIN.index
 SHARED.splice(SHARED.indexOf('mesher') + 1, 0, 'softnat');   // r-gemalt: VR.SoftNat (src/shared/softnat.js) — Weiche Natur, the sculpted ground (main thread and workers)
 MAIN.splice(MAIN.indexOf('qart3') + 1, 0, 'gemalt'); MAIN.splice(MAIN.indexOf('qart2_gl') + 1, 0, 'gemalt_gl');   // r-gemalt: VR.Gemalt (src/main/gemalt.js) — the switch, the shader define, the bodies on the drawn ground
 MAIN.splice(MAIN.indexOf('gemalt') + 1, 0, 'gemalt2'); MAIN.splice(MAIN.indexOf('gemalt_gl') + 1, 0, 'gemalt2_gl');   // r-gemalt 2: VR.Gemalt2 (src/main/gemalt2.js) — Gemaltes Licht, Pinselgras, Gemaltes Wasser (the GL side: gemalt2_gl.js)
+MAIN.splice(MAIN.indexOf('entities'), 0, 'placesense');   // f-spawn: VR.PlaceSense (src/main/placesense.js) — one sense of place for everything that appears by itself (not VR.Place, the block placement)
 MAIN.splice(MAIN.indexOf('game'), 0, 'travel');   // u-dims: VR.Travel (src/main/travel.js) — trips between the worlds of a save, the gates, Heimkehr
 MAIN.splice(MAIN.indexOf('game'), 0, 'newlife');   // u-home: VR.NewLife (src/main/newlife.js) — one home on any world, 🌍 Herzwelt one click away, Heimkehr in a moment
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure

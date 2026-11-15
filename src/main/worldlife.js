@@ -89,8 +89,10 @@
     if (water || !(R.T.flags[ground] & F.SOLID) || (R.T.flags[ground] & F.FLUID)) return;
     const [g0, g1] = MOBS[f.id].group || [1, 2], k = g0 + Math.floor(Math.random() * (g1 - g0 + 1));
     for (let i = 0; i < k && n + i < CAP(g); i++) {
-      const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6), ty = w.topAt(ox, oz);
-      if (!(R.T.flags[w.getBlock(ox, ty, oz)] & F.SOLID)) continue;
+      const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6);
+      // (f-spawn: the ground under the crowns, dry, level, with room, no roof — not a crown, a roof or a ledge)
+      const sn = VR.PlaceSense ? VR.PlaceSense.sense(w, ox, oz) : null, ty = VR.PlaceSense ? (sn ? sn.y : -1) : w.topAt(ox, oz);
+      if (VR.PlaceSense ? (!sn || sn.wet || !sn.room || !sn.level || sn.built > 0.2) : !(R.T.flags[w.getBlock(ox, ty, oz)] & F.SOLID)) continue;
       const m = Ent.summon(f.id, ox + 0.5, ty + 1, oz + 0.5); if (m && f.does === 'graze') m.graze = true;
       if (m) WL.stats.spawned++;
     }
