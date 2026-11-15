@@ -13,14 +13,18 @@
 //           and lie flat for a moment where a foot stepped.
 //   gWater  Gemaltes Wasser (cost low, the define GM_WATER in the water's program): soft foam lines along the shore, the
 //           shallows a painted turquoise band.
-// Balanced and up (the default); Very Low and Low never (no define, no program).
+// Pinselgras and Gemaltes Wasser: Balanced and up (the default). Gemaltes Licht: a look to switch on (off by default:
+// realism first). Very Low and Low never (no define, no program).
 // ============================================================================
 (function (VR) {
   'use strict';
   const G2 = VR.Gemalt2 = VR.Gemalt2 || {};
   G2.SW = ['gPaint', 'gTuft', 'gWater'];
   const OFF = { gPaint: false, gTuft: false, gWater: false }, ON = { gPaint: true, gTuft: true, gWater: true };
-  const TIERS = { potato: OFF, low: OFF, balanced: ON, high: ON, ultra: ON, ultraLite: ON };
+  // (2026-11-15, the owner: realism first — the painted light is a look you choose, not the default; the grass and the
+  // water stay on from Balanced up)
+  const NAT = { gPaint: false, gTuft: true, gWater: true };
+  const TIERS = { potato: OFF, low: OFF, balanced: NAT, high: NAT, ultra: NAT, ultraLite: NAT };
   G2.defaults = (preset) => Object.assign({}, TIERS[preset] || OFF);
   G2.off = () => Object.assign({}, OFF);
   G2.ROWS = [

@@ -146,7 +146,7 @@ console.log('g · the blob rule: natural decor in the soft ground');
 console.log('f · switches, defines, rows, texts, wiring');
 {
   const d = (p) => G2.defaults(p);
-  check(!d('potato').gPaint && !d('low').gTuft && !d('low').gWater && d('balanced').gPaint && d('balanced').gTuft && d('balanced').gWater && d('high').gPaint, 'Balanced and up on; Very Low and Low off');
+  check(!d('potato').gPaint && !d('low').gTuft && !d('low').gWater && !d('balanced').gPaint && d('balanced').gTuft && d('balanced').gWater && !d('high').gPaint && d('high').gTuft, 'Pinselgras and Gemaltes Wasser on from Balanced up; Gemaltes Licht a look to switch on (off by default); Very Low and Low off');
   check(VR.QArt3.SW.includes('gPaint') && VR.QArt3.defaults('balanced').gTuft === true && VR.QArt3.off().gWater === false && VR.QArt3.ROWS.some(r => r.key === 'gWater'), 'joined to the switch list');
   const s = { gPaint: true, gTuft: true, gWater: true, preset: 'balanced' };
   check(G2.defs('terrain', s).join() === 'GM_PAINT,GM_STROKE' && G2.defs('lod', s).join() === 'GM_PAINT' && G2.defs('trans', s).join() === 'GM_WATER' && G2.defs('terrainCut', s).length === 0, 'the defines by program');
