@@ -9,6 +9,7 @@
 //   wild(w, x, z, o)       → y | null: a place for a wild animal — dry natural ground under the open sky (or leaves),
 //                          level, with room to stand, away from pavements, floors and roofs
 //   lawn(w, x, z, o)       → y | null: the same on grass (families, picnics, the Wanderbaum's kind of meadow)
+//   near(w, x, z, y0, tol) the ground at a walker's own height (the yard or the floor, never the roof above)
 // Pure given a world accessor (isLoaded, topAt, getBlock): test/placesense.js runs it on a made-up world.
 // (Not VR.Place: that is the block placement of place.js.)
 // ============================================================================
@@ -56,6 +57,23 @@
     }
     s.built = n ? bu / n : 0;
     for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const gy = PL.ground(w, X + d[0], Z + d[1]); if (gy === null || Math.abs(gy - y) > 1) { s.level = false; break; } }
+    return s;
+  };
+  // the ground at a walker's own height: of the blocks one can stand on within tol of the block under feet at y0, the
+  // nearest (a visitor at the door stands in the yard or on the floor — never on the roof three blocks up, which is
+  // what the column's top would answer). → { y, b, nat, grass, wet, roofed, room } or null
+  PL.near = function (w, x, z, y0, tol) {
+    const X = Math.floor(x), Z = Math.floor(z);
+    if (!w.isLoaded(X, Z)) return null;
+    const fl = VR.R.T.flags, F = VR.F, at = Math.floor(y0) - 1, T = tol === undefined ? 3 : tol;
+    const stand = (y) => { const f = fl[w.getBlock(X, y, Z)]; return !!((f & F.SOLID) && !(f & F.LEAVES) && !(f & F.FLUID)) && !(fl[w.getBlock(X, y + 1, Z)] & F.SOLID); };
+    let y = -1;
+    for (let k = 0; k <= T && y < 0; k++) { if (stand(at - k)) y = at - k; else if (k && stand(at + k)) y = at + k; }
+    if (y < 0) return null;
+    const b = w.getBlock(X, y, Z), top = w.topAt(X, Z);
+    const s = { y, b, nat: PL.natural(b), grass: PL.grassy(b), wet: false, roofed: false, room: true };
+    for (let k = 1; k <= 2; k++) { const f = fl[w.getBlock(X, y + k, Z)]; if (f & F.FLUID) s.wet = true; else if (f & F.SOLID) s.room = false; }
+    for (let yy = y + 3; yy <= top; yy++) { const f = fl[w.getBlock(X, yy, Z)]; if ((f & F.SOLID) && !(f & F.LEAVES)) { s.roofed = true; break; } }
     return s;
   };
   // a place for a wild animal → the y to stand on (the ground's), or null

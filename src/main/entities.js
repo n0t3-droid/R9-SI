@@ -97,21 +97,26 @@
           this.summon(kind, x + 0.5, top + 1, z + 0.5); counts.hostile++;
           continue;
         }
+        // f-spawn: where an animal belongs — dry natural ground under the open sky or under leaves, level, with room to
+        // stand, away from pavements, floors and roofs (VR.PlaceSense.wild: its y is the ground under the crowns, never a
+        // roof or a crown; null on a city's lawn bed, a ledge, a bridge). wg: the block it stands on.
+        const PS = VR.PlaceSense, wy = PS ? PS.wild(w, x, z) : top, wg = wy === null ? 0 : w.getBlock(x, wy, z);
         // 🐾 a wild companion is rare: meadows, a little more often near a village; never in zen (the zen check above)
-        if (counts.wild < 3 && !night && VR.DimReg.actorsHome(g.dim) && (ground === VR.GEN.S().grass || ground === VR.GEN.S().podzol)) {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
+        if (counts.wild < 3 && !night && VR.DimReg.actorsHome(g.dim) && (wg === VR.GEN.S().grass || wg === VR.GEN.S().podzol)) {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
           const opts = Object.keys(MOBS).filter(k => MOBS[k].companion && MOBS[k].biomes.test(key));
-          if (opts.length && Math.random() < (this.nearVillage(x, z) ? 0.01 : 0.003)) { this.summon(opts[Math.floor(Math.random() * opts.length)], x + 0.5, top + 1, z + 0.5); counts.wild++; continue; }
+          if (opts.length && Math.random() < (this.nearVillage(x, z) ? 0.01 : 0.003)) { this.summon(opts[Math.floor(Math.random() * opts.length)], x + 0.5, wy + 1, z + 0.5); counts.wild++; continue; }
         }
-        if (counts.passive < 14 && !night && (ground === VR.GEN.S().grass || ground === VR.GEN.S().sand || ground === VR.GEN.S().podzol)) {
+        if (counts.passive < 14 && !night && (wg === VR.GEN.S().grass || wg === VR.GEN.S().sand || wg === VR.GEN.S().podzol)) {
           const opts = Object.keys(MOBS).filter(k => !MOBS[k].hostile && !MOBS[k].ambient && !MOBS[k].companion && MOBS[k].biomes && MOBS[k].biomes.test(key));
           if (!opts.length) continue;
           const kind = opts[Math.floor(Math.random() * opts.length)];
           const [g0, g1] = MOBS[kind].group || [1, 2];
           const n = g0 + Math.floor(Math.random() * (g1 - g0 + 1));
           const grp = this.grp || (this.grp = []); grp.length = 0;
-          for (let i = 0; i < n; i++) { const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6); const ty = w.topAt(ox, oz); if (R.T.flags[w.getBlock(ox, ty, oz)] & F.SOLID) grp.push(this.summon(kind, ox + 0.5, ty + 1, oz + 0.5)); }
+          // (f-spawn: each of the group on its own good ground near the first one's height — none on the roof or the crown next door)
+          for (let i = 0; i < n; i++) { const ox = x + Math.floor((Math.random() - 0.5) * 6), oz = z + Math.floor((Math.random() - 0.5) * 6); const ty = PS ? PS.wild(w, ox, oz) : w.topAt(ox, oz); if (ty !== null && Math.abs(ty - wy) <= 2) grp.push(this.summon(kind, ox + 0.5, ty + 1, oz + 0.5)); }
           if (g.companions && g.companions.heart) g.companions.heart.group(grp);   // (u-wild2: now and then a mother and her babies)
-          counts.passive += n;
+          counts.passive += grp.length;
         }
       }
     }
@@ -150,6 +155,7 @@
         if (m.def.hostile && (p.mode === 'zen' || g.difficulty === 'peaceful')) { this.mobs.splice(i, 1); continue; }
         m.hurt = Math.max(0, m.hurt - dt);
         this.ai(m, dt, d2);
+        if (m.parked) continue;   // (f-spawn: a companion told to stay, on ground that is not loaded — it keeps its place, it does not fall)
         this.physics(m, dt, get, nb);
       }
       // items

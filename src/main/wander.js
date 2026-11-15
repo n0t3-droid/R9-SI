@@ -306,12 +306,43 @@
     return L.slice(0, n || 3);
   };
 
+  // ---------------------------------------------------------------- f-spawn: the lost dog asks, it does not cling
+  // The owner (15 Nov): „an animal is tied to me, it comes along where I go". It followed whoever came within 3 m for
+  // fifteen minutes and appeared beside them whenever they got 40 m ahead. The rules, with no game in them (test/lostdog.js):
+  //   wait    it sits and whimpers. You come within NEAR (and it is armed — after it stayed behind, only once you were
+  //           REARM m away): with a village to bring it to it follows; with none it is simply glad of you ('glad') and
+  //           goes its own way GLAD s later ('gone')
+  //   follow  it walks behind you while you bring it home. Its patience is PATIENCE s of *your walking* (standing still
+  //           costs none) and is new each time you are GAIN m nearer its village than ever before. Out of patience, or
+  //           you more than LEAVE m ahead (flying, a ride): it stays behind ('stay'). It never appears beside you.
+  W.DOG = { NEAR: 3.2, REARM: 9, LEAVE: 24, PATIENCE: 30, GAIN: 4, MOVE: 0.8, GLAD: 7 };
+  W.dogNew = () => ({ mode: 'wait', armed: true, best: Infinity, stall: 0, t: 0 });
+  // one step — dd: the dog's distance to you, dHome: yours to its village (Infinity: none known), moved: the metres you
+  // moved in this step → '' or what just happened: 'follow' | 'stay' | 'glad' | 'gone'
+  W.dogStep = function (s, dt, dd, dHome, moved) {
+    const D = W.DOG;
+    if (s.mode === 'wait') {
+      if (!s.armed) { if (dd > D.REARM) s.armed = true; return ''; }
+      if (dd > D.NEAR) return '';
+      if (!(dHome < Infinity)) { s.mode = 'glad'; s.t = 0; return 'glad'; }
+      s.mode = 'follow'; s.best = dHome; s.stall = 0;
+      return 'follow';
+    }
+    if (s.mode === 'glad') { s.t += dt; if (s.t >= D.GLAD) { s.mode = 'gone'; return 'gone'; } return ''; }
+    if (s.mode === 'follow') {
+      if (dHome <= s.best - D.GAIN) { s.best = dHome; s.stall = 0; }
+      else if (moved > D.MOVE * dt) s.stall += dt;
+      if (dd > D.LEAVE || s.stall >= D.PATIENCE) { s.mode = 'wait'; s.armed = false; return 'stay'; }
+    }
+    return '';
+  };
+
   // ---------------------------------------------------------------- the words (lang_de.js / lang_en.js)
   W.SITE_KINDS = ['temple', 'city', 'hills', 'station', 'canyon', 'citadel', 'farm', 'lookout', 'grove'];
   W.keys = function () {
     const k = ['g.set.wander', 'g.set.wander.tip', 'g.wd.place', 'g.wd.placeSub', 'g.wd.gift', 'g.wd.giftAdv', 'g.wd.landing', 'g.wd.book', 'g.wd.bookNote', 'g.wd.close',
       'g.wd.p.places', 'g.wd.p.people', 'g.wd.p.creatures', 'g.wd.p.stickers', 'g.wd.p.recipes', 'g.wd.none', 'g.wd.next', 'g.wd.chest', 'g.wd.chestSub', 'g.wd.mapHint',
-      'g.wd.walk.with', 'g.wd.walk.to', 'g.wd.walk.arrive', 'g.wd.walk.chat.0', 'g.wd.walk.chat.1', 'g.wd.walk.chat.2', 'g.wd.walk.chat.3', 'g.wd.walk.chat.4', 'g.wd.pet.follow', 'g.wd.pet.home', 'g.wd.ruins.stone', 'g.wd.ruins.done', 'g.wd.sign.line', 'g.wd.recipe',
+      'g.wd.walk.with', 'g.wd.walk.to', 'g.wd.walk.arrive', 'g.wd.walk.chat.0', 'g.wd.walk.chat.1', 'g.wd.walk.chat.2', 'g.wd.walk.chat.3', 'g.wd.walk.chat.4', 'g.wd.pet.follow', 'g.wd.pet.home', 'g.wd.pet.stay', 'g.wd.pet.staySub', 'g.wd.pet.glad', 'g.wd.pet.gladSub', 'g.wd.ruins.stone', 'g.wd.ruins.done', 'g.wd.sign.line', 'g.wd.recipe',
       'g.wd.cr.fox', 'g.wd.cr.rabbit', 'g.wd.cr.dog', 'g.wd.cr.pup'];
     for (const n of W.NAMES) k.push('g.wd.k.' + n, 'g.wd.s.' + n);
     for (const s of W.SITE_KINDS) k.push('g.wd.site.' + s);
@@ -890,24 +921,46 @@
       return true;
     },
     update(D, m, dt) {
-      const q = m.q, d = D.dist(q.pos);
+      const q = m.q, p = D.pos, d = D.dist(q.pos), G = W.DOG;
+      // f-spawn: the rules decide (W.dogStep) — it asks, it does not cling. Its village: the nearest within 600 m, looked
+      // up when you first stand beside it; none → it is only glad of you.
+      const s = m.dog || (m.dog = W.dogNew()), lp = m.lp || (m.lp = [p[0], p[2]]);
+      const moved = Math.hypot(p[0] - lp[0], p[2] - lp[1]); lp[0] = p[0]; lp[1] = p[2];
+      if (m.home === undefined && d <= G.NEAR) {
+        const v = D.places.filter(P => P.kind === 'village').sort((a, b) => D.dist([a.x, 0, a.z]) - D.dist([b.x, 0, b.z]))[0];
+        m.home = v && D.dist([v.x, 0, v.z]) < 600 ? v : null;
+      }
+      const ev = m.owner ? '' : W.dogStep(s, dt, d, m.home ? Math.hypot(m.home.x - p[0], m.home.z - p[2]) : Infinity, moved);   // (home: the child takes over)
+      if (ev === 'follow') {
+        m.follow = true; m.dur = Math.max(m.dur, m.age + 900);
+        W.note(D.g.meta, 'creatures', D.species ? 'pup' : 'dog');
+        D.note('🐕 ' + T('g.wd.pet.follow'), T('g.wd.pet.home', { place: m.home.name, d: Math.round(D.dist([m.home.x, 0, m.home.z]) / 10) * 10 }));
+      } else if (ev === 'stay') {
+        m.follow = false; m.dur = Math.min(m.dur, m.age + 150); q.state = 'sit';
+        D.note('🐕 ' + T('g.wd.pet.stay'), T('g.wd.pet.staySub', { place: m.home.name }));
+      } else if (ev === 'glad') {
+        W.note(D.g.meta, 'creatures', D.species ? 'pup' : 'dog');
+        D.note('🐕 ' + T('g.wd.pet.glad'), T('g.wd.pet.gladSub'));
+        if (D.P) D.P.spark(q.pos[0], q.pos[1] + 0.8, q.pos[2], [1, 0.5, 0.7], 8, 1.2, 1);
+      } else if (ev === 'gone') return false;
+      if (s.mode === 'glad') {
+        // glad of you for a moment, then it trots off the way it was looking (away from you)
+        const dx = q.pos[0] - p[0], dz = q.pos[2] - p[2], dd = Math.hypot(dx, dz) || 1;
+        if (s.t < 3) { D.face(q, p); q.state = 'sit'; }
+        else { q.pos[0] += dx / dd * 3.2 * dt; q.pos[2] += dz / dd * 3.2 * dt; q.state = 'walk'; q.yaw = LK.yawOf(dx, dz); if ((m.gT = (m.gT || 0) - dt) <= 0) { m.gT = 0.25; const gy = D.ground(q.pos[0], q.pos[2], q.pos[1]); if (gy !== null) q.pos[1] = gy; } }
+        m.pos = q.pos;
+        return;
+      }
       if (!m.follow) {
-        D.face(q, D.pos); q.yaw = LK.yawOf(D.pos[0] - q.pos[0], D.pos[2] - q.pos[2]);
+        D.face(q, D.pos); q.yaw = LK.yawOf(D.pos[0] - q.pos[0], D.pos[2] - q.pos[2]); q.state = 'sit';
         if ((m.wT -= dt) <= 0 && d < 30) { m.wT = 3; const A = D.audio; if (A && A.ctx) { A.tone(880, 0.025, 0.18, 'sine', true); A.tone(740, 0.02, 0.22, 'sine', true, (A.ctx.currentTime || 0) + 0.2); } }
-        if (d < 3.2) {
-          m.follow = true; m.dur = Math.max(m.dur, 900);
-          const v = D.places.filter(P => P.kind === 'village').sort((a, b) => D.dist([a.x, 0, a.z]) - D.dist([b.x, 0, b.z]))[0];
-          m.home = v || null; W.note(D.g.meta, 'creatures', D.species ? 'pup' : 'dog');
-          D.note('🐕 ' + T('g.wd.pet.follow'), v ? T('g.wd.pet.home', { place: v.name, d: Math.round(D.dist([v.x, 0, v.z]) / 10) * 10 }) : '');
-        }
         if (d > 70) return false;
         return;
       }
-      // following: two metres behind you
-      const p = D.pos, dx = p[0] - q.pos[0], dz = p[2] - q.pos[2], dd = Math.hypot(dx, dz);
+      // following: two metres behind you (f-spawn: it walks — it never appears beside you; left behind, it stays)
+      const dx = p[0] - q.pos[0], dz = p[2] - q.pos[2], dd = Math.hypot(dx, dz);
       if (dd > 2.2) { const sp = Math.min(dd * 1.5, 7) * dt; q.pos[0] += dx / dd * sp; q.pos[2] += dz / dd * sp; q.state = 'walk'; q.yaw = LK.yawOf(dx, dz); if ((m.gT = (m.gT || 0) - dt) <= 0) { m.gT = 0.25; const gy = D.ground(q.pos[0], q.pos[2], q.pos[1]); if (gy !== null) q.pos[1] = gy; } }
       else q.state = 'sit';
-      if (dd > 40) { q.pos[0] = p[0] - dx / dd * 3; q.pos[2] = p[2] - dz / dd * 3; q.pos[1] = p[1]; }   // (it runs to keep up)
       m.pos = q.pos;
       if (m.home && Math.hypot(m.home.x - p[0], m.home.z - p[2]) < m.home.rad * 0.9) {
         if (!m.owner) { const o = D.spot(5, 0.8) || [p[0] + 3, p[1], p[2]]; m.owner = D.fig(m.seed + 3, o, 'child', 'child'); m.owner.state = 'cheer'; m.oT = m.age; D.found(m); if (D.P) D.P.spark(o[0], o[1] + 1.4, o[2], [1, 0.5, 0.7], 14, 1.6, 1); }

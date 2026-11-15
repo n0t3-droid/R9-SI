@@ -69,5 +69,25 @@ check(PL.wild(W, 35, 5) === 13, 'on the level ground above: yes');
 console.log('f  lawn wants grass');
 check(PL.wild(W, -37, -37) === 10 && PL.lawn(W, -37, -37) === null, 'sand: wild ground, no lawn');
 check(PL.lawn(W, 0, 0) === 10, 'the meadow: a lawn');
+console.log('g  near(): the ground at a walker\'s own height (a visitor at the door, a farm animal at its anchor)');
+// a low cottage at x 10…16, z −16…−10: floor y = 10, two cells of room, its roof at y = 13 (three above the floor)
+for (let x = 10; x <= 16; x++) for (let z = -16; z <= -10; z++) { const a = ground(10, PLANKS); a.push((x === 10 || x === 16 || z === -16 || z === -10) ? PLANKS : 0); a.push((x === 10 || x === 16 || z === -16 || z === -10) ? PLANKS : 0); a.push(PLANKS); put(x, z, a); }
+check(typeof PL.near === 'function', 'PL.near exists');
+if (typeof PL.near === 'function') {
+  const yard = PL.near(W, 8, -13, 11, 3), inside = PL.near(W, 13, -13, 11, 3), tall = PL.near(W, 13, 13, 11, 3);
+  check(yard && yard.y === 10 && !yard.roofed && yard.room && !yard.wet, 'the yard beside the cottage: the grass, open sky, room');
+  check(inside && inside.y === 10 && inside.roofed, 'inside the low cottage (roof 3 above the floor): its floor under a roof — never the roof (' + (inside && inside.y) + ')');
+  check(tall && tall.y === 10 && tall.roofed, 'inside the tall house: its floor under a roof');
+  check(PL.sense(W, 13, -13).y === 13, '(sense() answers the roof there — a walker at door height must ask near())');
+  const pond = PL.near(W, 25, -25, 11, 3);
+  check(pond && pond.wet, 'the pond: wet');
+  const crown = PL.near(W, -11, -11, 11, 3);
+  check(crown && crown.y === 10 && !crown.roofed && crown.room, 'under the tree\'s crown: the forest floor, not roofed (leaves are no roof)');
+  const br = PL.near(W, 0, -35, 11, 3);
+  check(br && br.y === 10 && br.roofed, 'under the bridge: the grass, roofed');
+  check(PL.near(W, 0, -35, 15, 2) && PL.near(W, 0, -35, 15, 2).y === 14, 'on the bridge (a walker at deck height): the deck');
+  check(PL.near(W, 35, 5, 11, 2) === null, 'a ground three blocks higher than the walker with a tolerance of two: nothing');
+  check(PL.near(W, 999, 999, 11, 3) === null, 'not loaded: null');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
