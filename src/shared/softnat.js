@@ -45,6 +45,16 @@
     sandstone: [0xd8c48e, 3], red_sandstone: [0xb8642e, 3], cinnabar: [0x9a3a32, 3], sulfur: [0xd8c84a, 3],
     red_terracotta: [0x8f3d2e, 3], orange_terracotta: [0xa1531d, 3], yellow_terracotta: [0xba8423, 3],
   };
+  // r-gemalt 2 · the natural decor (magma, obsidian, amethyst, the coral and crystal blocks, glowspar): drawn as rounded
+  // blobs in the sculpted ground with their own colour (r-gemalt 1 kept them cubes: flat tiles and floating dice on the
+  // soft land); the ones that glow keep their glow (the face's emissive bit). Built blocks never: bricks, the _cut twins
+  SN.DECOR = /^(magma_block|glowing_obsidian|obsidian|weeping_obsidian|amethyst_block|budding_amethyst|(dead_)?(tube|brain|bubble|fire|horn)_coral_block|(violet|azure|verdant|rose|amber)_crystal_block|glowspar|exo_crystal)$/;
+  Object.assign(PAL, {
+    magma_block: [0xd2561c, 3], glowing_obsidian: [0x8a3ad0, 3], obsidian: [0x2a2034, 3], weeping_obsidian: [0x4a2a6a, 3], amethyst_block: [0x9a6ad0, 3], budding_amethyst: [0x8a5ac0, 3],
+    tube_coral_block: [0x3a5ad0, 3], brain_coral_block: [0xd06a9a, 3], bubble_coral_block: [0xa03ad0, 3], fire_coral_block: [0xc83a3a, 3], horn_coral_block: [0xd8c03a, 3],
+    violet_crystal_block: [0x9a5ae0, 3], azure_crystal_block: [0x4a9ae8, 3], verdant_crystal_block: [0x4ad08a, 3], rose_crystal_block: [0xe87aa8, 3], amber_crystal_block: [0xe8a83a, 3],
+    glowspar: [0xa8e0e8, 3], exo_crystal: [0x7ad0c8, 3],
+  });
   const EARTH = [0x6e / 255, 0x52 / 255, 0x36 / 255], ROCK = [0x78 / 255, 0x70 / 255, 0x68 / 255], SNOW = [0.93, 0.95, 0.98];
 
   // ---- tables per registry size: SOFT (1 natural), PIN (1 a crisp block the ground snaps to), COL (rgb, −1 the grass
@@ -52,7 +62,7 @@
   let TB = null;
   SN.tables = function () {
     if (TB && TB.soft.length === R.stateCount) return TB;
-    const n = R.stateCount, soft = new Uint8Array(n), pin = new Uint8Array(n), col = new Int32Array(n), mat = new Uint8Array(n);
+    const n = R.stateCount, soft = new Uint8Array(n), pin = new Uint8Array(n), col = new Int32Array(n), mat = new Uint8Array(n), glow = new Uint8Array(n);
     const T = R.T, TF = T.flags, TSH = T.shape;
     for (let s = 1; s < n; s++) {
       const t = R.types[T.type[s]]; if (!t) continue;
@@ -60,6 +70,12 @@
       if (sh === SH.CUBE && (fl & F.OPAQUE) && SN.SOFT.test(nm)) {
         soft[s] = 1;
         const p = PAL[nm] || (/_ore$/.test(nm) ? (/^deepstone/.test(nm) ? PAL.deepstone : PAL.stone) : PAL.stone);
+        col[s] = p[0]; mat[s] = p[1];
+        continue;
+      }
+      if (sh === SH.CUBE && (fl & F.OPAQUE) && SN.DECOR.test(nm)) {   // (r-gemalt 2: the natural decor, a blob)
+        soft[s] = 1; glow[s] = T.emit && T.emit[s] ? 1 : 0;
+        const p = PAL[nm] || (/^dead_/.test(nm) ? [0x8a8480, 3] : PAL.stone);
         col[s] = p[0]; mat[s] = p[1];
         continue;
       }
@@ -71,7 +87,7 @@
       //  a mini-voxel piece that is not a full block — does not, or every decorated slope would snap back into terraces)
       if ((fl & F.OPAQUE) || ((fl & F.SOLID) && ((fl & F.FULL) || sh === SH.SLAB || sh === SH.STAIRS || sh === SH.WALL || sh === SH.FENCE || sh === SH.PANE))) pin[s] = 1;
     }
-    TB = { soft, pin, col, mat };
+    TB = { soft, pin, col, mat, glow };
     return TB;
   };
 
@@ -121,7 +137,7 @@
       }
     };
     pass(BF, BT, 1, 0); pass(BT, BF, PSS, 1); pass(BF, BT, PS, 2);   // (the blurred field in BT)
-    ACT.fill(0); PINC.fill(0); DONE.fill(0);
+    ACT.fill(0); PINC.fill(0); DONE.fill(0); TOP6.fill(127);
     for (let cy = -2; cy <= 16; cy++) for (let cz = -2; cz <= 16; cz++) for (let cx = -2; cx <= 16; cx++) {
       const k = ci(cx, cy, cz);
       let sx = 0, sy = 0, sz = 0, n = 0, pn = 0;
@@ -186,6 +202,17 @@
         // (a gentle slope: the corner stays on its column line — a sideways pull would stack the riser's cells into a
         //  half-block staircase again)
         px = 0; pz = 0;
+        // (r-gemalt2, flaw 2: an uneven slope — a step every 3 or 4 blocks — gave this 4-column gradient a beat of 0 … 27°,
+        //  rows of light and shade down every hillside; the normal reads 6 × 6 columns instead where the pad holds them
+        //  in both sections — cells 0 … 14; a border cell, −1 here and 15 next door, keeps the 4-column one on both sides)
+        if (cx >= 0 && cx <= 14 && cy >= 0 && cy <= 14 && cz >= 0 && cz <= 14) {
+          let wx2 = 0, wz2 = 0;
+          for (let b = 0; b < 6; b++) for (let a = 0; a < 6; a++) {
+            const h = colTop6(cx - 2 + a, cy, cz - 2 + b);
+            wx2 += h * HD6[a] * HW6[b]; wz2 += h * HW6[a] * HD6[b];
+          }
+          gx2 = wx2; gz2 = wz2;
+        }
         const l = Math.hypot(gx2, 1, gz2); nx = -gx2 / l; ny = 1 / l; nz = -gz2 / l;
         NRM[k * 3] = nx; NRM[k * 3 + 1] = ny; NRM[k * 3 + 2] = nz;
       }
@@ -211,6 +238,17 @@
   function colTop(x, cy, z) {
     for (let y = cy + 2; y >= cy - 1; y--) if (!AIR[P(x, y, z)]) return y + 1;
     return cy - 1;
+  }
+  // the wide window (r-gemalt2): six columns, the derivative of the 1 2 2 2 1 smoothed steps (a step every 2 or 4 blocks
+  // reads as one even slope) and the cross weights 1 3 4 4 3 1; the column top within cy − 2 … cy + 3
+  const HD6 = [-1 / 8, -1 / 8, 0, 0, 1 / 8, 1 / 8], HW6 = [1 / 16, 3 / 16, 4 / 16, 4 / 16, 3 / 16, 1 / 16];
+  const TOP6 = new Int8Array(N);   // (cached per column and layer: the 36 columns of neighbouring cells overlap)
+  function colTop6(x, cy, z) {
+    const i = P(x, cy, z), c = TOP6[i];
+    if (c !== 127) return c;
+    let t = cy - 2;
+    for (let y = cy + 3; y >= cy - 2; y--) if (!AIR[P(x, y, z)]) { t = y + 1; break; }
+    TOP6[i] = t; return t;
   }
   // no overhang in the cell: none of its four columns has air under solid
   function hfLike(cx, cy, cz) {
@@ -292,6 +330,7 @@
   SN.mesh = function (job, buf, w3For, hOut) {
     const B = job.blocks, TF = R.T.flags, sy = job.sy | 0;
     if (!J || J.job !== job) SN.solve(job);
+    const GLW = J.tb.glow;
     if (hOut) hOut.fill(-32768);
     let quads = 0;
     for (let y = 0; y < 16; y++) {
@@ -303,7 +342,8 @@
         for (let d = 0; d < 6; d++) {
           if (!AIR[bi + DOFF[d]]) continue;
           const C = FPC[d];
-          let flat = d === 2;
+          const gw = GLW && GLW[b] ? 4096 : 0;   // (r-gemalt 2: a glowing blob's faces keep the glow — never merged)
+          let flat = d === 2 && !gw;
           for (let q = 0; q < 4; q++) {
             const X = x + C[q * 3], Y = y + C[q * 3 + 1], Z = z + C[q * 3 + 2];
             const k = relaxed(X - 1, Y - 1, Z - 1); attrs(X - 1, Y - 1, Z - 1, k); vk[q] = k;
@@ -324,7 +364,7 @@
           buf.ensure(4);
           for (let kk = 0; kk < 4; kk++) {
             const q = (kk + start) & 3, k = vk[q], o = VOCT[k];
-            buf.v(vp[q * 3], vp[q * 3 + 1], vp[q * 3 + 2], w3, o & 255, o >> 8, SN.FACE | (VAO[k] << 3), VLIT[k], VCOL[k]);
+            buf.v(vp[q * 3], vp[q * 3 + 1], vp[q * 3 + 2], w3, o & 255, o >> 8, SN.FACE | (VAO[k] << 3) | gw, VLIT[k], VCOL[k]);
           }
           quads++;
         }

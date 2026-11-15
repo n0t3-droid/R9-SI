@@ -1150,7 +1150,7 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
   return c;
 }
 #endif
-${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && VR.QArt2.glslTerrain) ? VR.QArt2.glslTerrain() : ''}void main() {
+${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && VR.QArt2.glslTerrain) ? VR.QArt2.glslTerrain() : ''}${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -1235,6 +1235,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   }
 #ifdef GEMALT
   if (gmF) { alb = vec4(gmPaint(v_tint, v_localPos + vec3(u_camInt & 4095), normalize(v_gN), length(v_rel)), 1.0); gmLift = 0.75; }
+#ifdef GM_STROKE
+  if (gmF && v_gN.y > 0.55 * length(v_gN) && alb.g > alb.r * 1.08 && alb.g > alb.b * 1.12) alb.rgb = gmStroke(alb.rgb, v_localPos + vec3(u_camInt & 4095), length(v_rel));   // r-gemalt 2 · Pinselgras: the lawn in strokes (gemalt2.js)
+#endif
 #endif
 #ifdef LV_MEADOW
   // v-look2 · Wiesenruhe (look.js): a green-tinted face (grass, moss, leaves on an opaque block) calmed like a painted
@@ -1483,6 +1486,15 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   if (!qIs && ndl > 0.0) sh = min(sh, qIsleShadow(v_localPos, L));   // q-art2 · Schwebeinseln: the isle's shadow on the land below
 #endif
   vec3 direct = lc * ndl * sh * outdoors;
+#ifdef GM_PAINT
+  // r-gemalt 2 · Gemaltes Licht (gemalt2.js): the sculpted ground's sun in three soft bands (lit / half / shade); the light
+  // warm and the shade cool by the hour on everything drawn here — the built things keep their light, in the same key
+#ifdef GEMALT
+  if (gmF) direct = lc * mix(ndl * sh, gmRamp(ndl * sh), u_gmK.x) * outdoors;
+#endif
+  vec3 gmLitK = mix(vec3(1.0), u_gmLit, u_gmK.x), gmShK = mix(vec3(1.0), u_gmShade, u_gmK.x);
+  direct *= gmLitK;
+#endif
 #if defined(SUN2) && defined(HSHADOW)
   // u-stars2: the second sun of a binary world — its own light and its own heightmap shadow (two shadows)
   if (u_sun2D.w > 0.0 && !noshade) direct += u_sun2C.rgb * max(dot(n, u_sun2D.xyz), 0.0) * hShadow(v_localPos, N, u_sun2D.xyz) * outdoors;
@@ -1502,6 +1514,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
     amb *= XD_AMB;   // and the shade's sky light a little lower (a firmer key-to-fill ratio)
 #endif
   }
+#endif
+#ifdef GM_PAINT
+  amb *= gmShK;
 #endif
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
@@ -1548,6 +1563,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
+#ifdef GEMALT
+    if (gmF) e = emissiveFace ? 0.55 : 0.0;   // (r-gemalt 2: a glowing blob glows softly; a soft face's uv is its normal — no texture glow)
+#endif
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
 #ifdef PBR
@@ -1653,6 +1671,12 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   }
   float dist = length(v_rel);
+#ifdef GM_PAINT
+#ifdef GEMALT
+  if (gmF) col += lc * gmLitK * (alb.rgb + 0.12) * gmRim(N, V, L, dist) * u_gmK.y * outdoors;   // r-gemalt 2: the rim of light on the land's silhouettes
+#endif
+  col = gmAirCol(col, dist, u_fogColor);   // and the air in soft bands
+#endif
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, 1.0);
 #ifdef SSR
@@ -2178,7 +2202,7 @@ float causticAt(vec2 p, float t) {
   }
   return pow(c / 3.0, 5.0);
 }
-void main() {
+${(VR.Gemalt2 && VR.Gemalt2.glslWater) ? VR.Gemalt2.glslWater() : ''}void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -2385,6 +2409,9 @@ void main() {
     col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.28 * float(face == 2u));
 #ifndef LITE
     }
+#endif
+#ifdef GM_WATER
+    if (face == 2u) col = gmWater(col, wp, vdep, dist, u_ambSky * skyL + blockL * 0.5 + lc * 0.55 * v_sky + 0.02);   // r-gemalt 2 · Gemaltes Wasser (gemalt2.js)
 #endif
 #ifdef SEASON
     // w-seasons (seasons.js): winter freezes the shallow still water — ponds, the lakes' and the sea's edges — into pale
@@ -2866,7 +2893,7 @@ vec3 waveN(vec2 p) {
   float hz = texture(u_noise, (a + vec2(0.0, e)) / 16.0).b * 0.6 + texture(u_noise, (b + vec2(0.0, e)) / 16.0).b * 0.4;
   return normalize(vec3((h0 - hx) * 1.6, 1.0, (h0 - hz) * 1.6));
 }
-void main() {
+${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void main() {
   // real chunks are drawn here: the far terrain steps aside
   float climbA = u_climbCut.y > 0.0 ? 1.0 - smoothstep(u_climbCut.x, u_climbCut.y, length(v_rel.xz)) : 1.0;   // u-ascent: Herzwelt's impostor takes the land beyond (spaceflight.js);
   if (climbA < 0.004) discard;   // u-orbitlod: a wide soft edge (blended in horizon.js), no Bayer stipple
@@ -3027,7 +3054,13 @@ void main() {
 #ifdef Q_ISLEFORM
     if (v_face == 7u) amb += u_ambSky * vec3(0.78, 0.95, 0.55) * max(-N.y, 0.0) * 0.3;   // the land's warm green bounce from below
 #endif
+#ifdef GM_PAINT
+    if (v_face == 6u) ndl = mix(ndl, gmRamp(ndl), u_gmK.x);   // r-gemalt 2: the far land's sun in the same bands, the same key
+    amb *= mix(vec3(1.0), u_gmShade, u_gmK.x);
+    col = alb * (amb + lc * mix(vec3(1.0), u_gmLit, u_gmK.x) * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
+#else
     col = alb * (amb + lc * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
+#endif
     if (v_kind == 2u) col = alb * (1.5 + vnoise(wp * 0.3 + u_time * 0.2) * 1.2) * vec3(1.0, 0.8, 0.6);
 #ifdef LIGHT2
     if (v_kind == 2u && u_dim == 5 && u_lavaTint > 0.5) {   // f-polish: the Glutsee's far melt deep orange, bright cracks
@@ -3047,6 +3080,9 @@ void main() {
       col = mix(col, vec3(1.0, 0.66, 0.32) * (1.1 + u_emissiveBoost * 0.6) * (0.8 + 0.4 * hash13(bp + 2.3)), night * lit);
     }
   }
+#ifdef GM_PAINT
+  col = gmAirCol(col, dist, u_fogColor);   // r-gemalt 2: the air in soft bands (with or without LIGHT2)
+#endif
 #ifdef LIGHT2
   // t-polish2 · the far lights at night (gap 2): the glowing kinds and the lit windows shine ×(1 + NIGHT·night) — over the
   // bloom's night threshold, so they glow — and pierce the haze: a light keeps exp(−d / PIERCE) of itself through the
