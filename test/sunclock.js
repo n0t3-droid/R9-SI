@@ -167,6 +167,31 @@ const d = [0, 0, 0];
   const free = at(6, 14, 8), next = at(6, 11, 8);
   check(free !== 0, 'j  an air cell away from surfaces takes a neighbour\'s clock');
 }
+// ---------------------------------------------------------------- l  E2 · Himmelslicht: how much of the sky a cell sees
+{
+  const floor = (set) => { for (let x = -32; x < 48; x++) for (let z = -32; z < 48; z++) for (let y = 0; y < 10; y++) set(x, y, z); };
+  const open = SC.begin(job(floor));
+  check(typeof open.sky === 'function', 'l  sky() exists');
+  if (typeof open.sky === 'function') {
+    const o = open.sky(8.5, 10.5, 8.5);
+    check(o > 0.97, 'l  an open field sees the whole sky (' + o.toFixed(2) + ')');
+    const roof = SC.begin(job((set) => { floor(set); for (let x = -20; x < 36; x++) for (let z = -20; z < 36; z++) set(x, 14, z); }));
+    const r = roof.sky(8.5, 10.5, 8.5);
+    check(r < 0.12, 'l  under a wide roof: almost none (' + r.toFixed(2) + ')');
+    const wall = SC.begin(job((set) => { floor(set); for (let z = -32; z < 48; z++) for (let y = 10; y < 30; y++) set(9, y, z); }));
+    const w = wall.sky(8.5, 10.5, 8.5);
+    check(w > 0.35 && w < 0.7, 'l  at the foot of a high wall: about half (' + w.toFixed(2) + ')');
+    const alley = SC.begin(job((set) => { floor(set); for (let z = -32; z < 48; z++) for (let y = 10; y < 13; y++) { set(9, y, z); set(7, y, z); } }));
+    const a = alley.sky(8.5, 10.5, 8.5);
+    check(a < w * 0.6 && a > 0.02, 'l  in a narrow lane between two walls three blocks high: far less, not black (' + a.toFixed(2) + ')');
+    const far = SC.begin(job((set) => { floor(set); for (let z = -32; z < 48; z++) for (let y = 10; y < 14; y++) set(20, y, z); }));
+    check(far.sky(8.5, 10.5, 8.5) > 0.9, 'l  a low wall twelve blocks away takes almost nothing (' + far.sky(8.5, 10.5, 8.5).toFixed(2) + ')');
+    const jb = job((set) => { floor(set); for (let x = 0; x < 8; x++) for (let z = 0; z < 16; z++) set(x, 13, z); });
+    const bk = SC.bakeSection(jb), sk = (x, y, z) => bk.sky[(y * 16 + z) * 16 + x];
+    check(bk.sky && bk.sky.length === 4096 && sk(14, 10, 8) > 200 && sk(3, 10, 8) < 110, 'l  the section\'s sky bytes: open ' + (bk.sky && sk(14, 10, 8)) + ', under the porch ' + (bk.sky && sk(3, 10, 8)));
+    check(bk.sky && sk(12, 9, 8) === sk(12, 10, 8), 'l  a ground cell holds the sky of the air above it');
+  }
+}
 // ---------------------------------------------------------------- k  cost of a real section's clock volume
 {
   const g = V.makeGen('overworld', 777, {}), O = SC.opaqueTable(), C = new Map();
