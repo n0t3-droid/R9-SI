@@ -75517,6 +75517,14 @@ if (qLf) ndl = clamp((dot(n, L) + 0.3) / 1.3, 0.0, 1.0);
 #endif
 float outdoors = smoothstep(0.55, 0.95, sky);
 float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#ifdef SUNCLOCK
+
+
+if (ndl > 0.0 && dot(N, L) > -0.2) {
+float cvo = clockVis(v_localPos, N);
+if (cvo >= 0.0) { sh = cvo; outdoors = max(outdoors, cvo); }
+}
+#endif
 #if defined(Q_LEAF) && !defined(MODEL)
 if (qLf && ndl > 0.0 && outdoors > 0.0 && dot(N, L) <= -0.2) sh = shadowAt(-N, L);
 #endif
@@ -129288,6 +129296,25 @@ if(u.u_clockK)gl.uniform4f(u.u_clockK,1/(2*SC.W),0,0,0);
 }
 return r;
 };
+
+
+CV.visAt=function(world,x,y,z,s){
+const X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z),c=world.col(X>>4,Z>>4);
+const sec=c&&c.sec[Y>>4];if(!sec|| !sec.clk)return null;
+const i=(((Y&15)*16+(Z&15))*16+(X&15))*4,d=sec.clk;
+return SC.vis((d[i]|(d[i+1]<<8)|(d[i+2]<<16)|(d[i+3]<<24))>>>0,s);
+};
+if(VR.Entities&&VR.Entities.prototype&&VR.Entities.prototype.sunShade){
+const ss0=VR.Entities.prototype.sunShade;
+VR.Entities.prototype.sunShade=function(pos,h){
+const g=this.game,w=g&&g.world,E=g&&g.env&&g.env.E;
+if(w&&E&&E.sunDir&& !E.dimId&&CV.on(S())&&w.dim==='overworld'){
+const v=CV.visAt(w,pos[0],pos[1]+(h||1),pos[2],CV.arcTime(E.sunDir));
+if(v!==null)return 1-v;
+}
+return ss0.apply(this,arguments);
+};
+}
 
 CV.defs=(name,s)=>((name==='terrain'||name==='terrainCut')&&CV.on(s)?['SUNCLOCK']:[]);
 if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>{let d=prev?prev(name,defines):(defines||[]);for(const k of CV.defs(name,S()))if(!d.includes(k))d=d.concat([k]);return d;};}
