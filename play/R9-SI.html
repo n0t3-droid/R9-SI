@@ -7536,7 +7536,7 @@ post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,
 if(m.ids&& !CLOCKCOL&&LASTAVG)CLOCKCOL=VR.SunClock.colorTable(LASTAVG);
 m.colors=CLOCKCOL;
 const t0=performance.now(),r=VR.SunClock.bakeSection(m);
-post({type:'clock',id:m.id,key:m.key,sy:m.sy,ver:m.ver,data:r.data,env:r.env,n:r.n,ms:performance.now()-t0},[r.data.buffer,r.env.buffer]);
+post({type:'clock',id:m.id,key:m.key,sy:m.sy,ver:m.ver,data:r.data,env:r.env,lamp:r.lamp,n:r.n,ms:performance.now()-t0},[r.data.buffer,r.env.buffer].concat(r.lamp?[r.lamp.buffer]:[]));
 }else if(m.type==='smoothvox'){
 
 const r=VR.SmoothVox.job(m),tr=r.transfer;delete r.transfer;
@@ -43534,10 +43534,12 @@ return(a+(b-a)*ax)*(1-az)+(c+(e-c)*ax)*az;
 
 let steps=0;
 const HIT=[0,0,0];
-function ray(px,py,pz,dx,dy,dz){
-const E=1e-4;
-let x=px+dx*E,y=py+dy*E,z=pz+dz*E;
-if(y<0){if(dy<=1e-9)return true;const t0= -y/dy+E;x+=dx*t0;y+=dy*t0;z+=dz*t0;}
+
+const TC=[0,0,0];
+function ray(px,py,pz,dx,dy,dz,tmax){
+const E=1e-4,lim=tmax||0;
+let x=px+dx*E,y=py+dy*E,z=pz+dz*E,T=E;
+if(y<0){if(dy<=1e-9)return true;const t0= -y/dy+E;x+=dx*t0;y+=dy*t0;z+=dz*t0;T+=t0;}
 const sx=dx>0?1: -1,sy=dy>0?1: -1,sz=dz>0?1: -1;
 const ix=dx!==0?1/Math.abs(dx):1e30,iy=dy!==0?1/Math.abs(dy):1e30,iz=dz!==0?1/Math.abs(dz):1e30;
 for(let guard=0;guard<400;guard++){
@@ -43549,15 +43551,17 @@ if(dy>0&&y>=CM[(cz>>2)*BXN+(cx>>2)]){
 
 bx=cx& ~3;bz=cz& ~3;
 const tx=(sx>0?bx+4-x:x-bx)*ix,tz=(sz>0?bz+4-z:z-bz)*iz,t=(tx<tz?tx:tz)+E;
-x+=dx*t;y+=dy*t;z+=dz*t;
+x+=dx*t;y+=dy*t;z+=dz*t;T+=t;
+if(lim&&T>=lim)return true;
 continue;
 }
 if(!BR[((cy>>2)*BZN+(cz>>2))*BXN+(cx>>2)]){size=4;bx=cx& ~3;by=cy& ~3;bz=cz& ~3;}
-else if((V[(cy*VZ+cz)*RW+(cx>>4)]>>(cx&15))&1){HIT[0]=cx;HIT[1]=cy;HIT[2]=cz;return false;}
+else if((V[(cy*VZ+cz)*RW+(cx>>4)]>>(cx&15))&1){if(lim&&cx===TC[0]&&cy===TC[1]&&cz===TC[2])return true;HIT[0]=cx;HIT[1]=cy;HIT[2]=cz;return false;}
 
 const tx=(sx>0?bx+size-x:x-bx)*ix,ty=(sy>0?by+size-y:y-by)*iy,tz=(sz>0?bz+size-z:z-bz)*iz;
 const t=(tx<ty?(tx<tz?tx:tz):(ty<tz?ty:tz))+E;
-x+=dx*t;y+=dy*t;z+=dz*t;
+x+=dx*t;y+=dy*t;z+=dz*t;T+=t;
+if(lim&&T>=lim)return true;
 }
 return true;
 }
@@ -43637,8 +43641,40 @@ BO[0]+=COL[c];BO[1]+=COL[c+1];BO[2]+=COL[c+2];
 BO[0]/=NB2;BO[1]/=NB2;BO[2]/=NB2;
 return BO;
 }
+
+
+
+
+
+
+
+const DK=1.3;
+let LAMPS=null;const LO=[0,0,0];
+if(job.lamps&&job.lamps.length){
+const keep=[];
+for(let i=0;i<job.lamps.length;i+=4){const x=job.lamps[i]-VPAD,y=job.lamps[i+1],z=job.lamps[i+2]-VPAD;if(x>= -15&&x<=30&&z>= -15&&z<=30&&y>= -15&&y<=30)keep.push(i);}
+const lev=(i)=>{const pk=job.lamps[i+3];return Math.max((pk>>8)&15,(pk>>4)&15,pk&15);};
+keep.sort((a,b)=>lev(b)-lev(a));
+LAMPS=new Int32Array(keep.length*4);keep.forEach((i,k)=>{for(let q=0;q<4;q++)LAMPS[k*4+q]=job.lamps[i+q];});
+}
+function lamp(px,py,pz){
+LO[0]=LO[1]=LO[2]=0;
+if(!LAMPS)return LO;
+const vx=px+VPAD,vz=pz+VPAD;
+for(let i=0;i<LAMPS.length;i+=4){
+const lx=LAMPS[i]+0.5,ly=LAMPS[i+1]+0.5,lz=LAMPS[i+2]+0.5,pk=LAMPS[i+3];
+const r=(pk>>8)&15,g=(pk>>4)&15,b=pk&15,L=r>g?(r>b?r:b):(g>b?g:b);
+const dx=lx-vx,dy=ly-py,dz=lz-vz,de=Math.sqrt(dx*dx+dy*dy+dz*dz),d=de*DK;
+if(d>=L)continue;
+if(r-d<=LO[0]&&g-d<=LO[1]&&b-d<=LO[2])continue;
+TC[0]=Math.floor(lx);TC[1]=Math.floor(ly);TC[2]=Math.floor(lz);
+if(de>0.9&& !ray(vx,py,vz,dx/de,dy/de,dz/de,de))continue;
+if(r-d>LO[0])LO[0]=r-d;if(g-d>LO[1])LO[1]=g-d;if(b-d>LO[2])LO[2]=b-d;
+}
+return LO;
+}
 const B={
-sky,bounce,
+sky,bounce,lamp,
 steps:()=>steps,
 lit,ycrit,
 
@@ -43674,6 +43710,7 @@ const B=SC.begin(job),V=job.vol,below=job.below||null;
 const out=new Uint8Array(4096*4),st=new Uint8Array(4096);
 const skyB=new Uint8Array(4096);
 const env=new Uint8Array(4096*4);
+const lampB=job.lamps?new Uint8Array(4096*4):null;
 const solid=(x,y,z)=>{
 if(y<0){if(!below||x<0||x>15||z<0||z>15)return 0;return(below[z]>>x)&1;}
 return(V[(y*VZ+z+VPAD)*RW+((x+VPAD)>>4)]>>((x+VPAD)&15))&1;
@@ -43687,6 +43724,7 @@ const i=(y*16+z)*16+x;
 put(i,B.probe(x+0.5,y+0.5,z+0.5));st[i]=1;n++;
 skyB[i]=Math.round(B.sky(x+0.5,y+0.5,z+0.5)*255);
 const bo=B.bounce(x+0.5,y+0.5,z+0.5);env[i*4]=bo[0];env[i*4+1]=bo[1];env[i*4+2]=bo[2];env[i*4+3]=skyB[i];
+if(lampB){const lo=B.lamp(x+0.5,y+0.5,z+0.5);lampB[i*4]=Math.round(lo[0]*17);lampB[i*4+1]=Math.round(lo[1]*17);lampB[i*4+2]=Math.round(lo[2]*17);lampB[i*4+3]=255;}
 }
 
 const NB=[[0,1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,-1,0]];
@@ -43696,8 +43734,9 @@ let u=SC.EMPTY,sv=255,ej= -1;
 for(const d of NB){const X=x+d[0],Y=y+d[1],Z=z+d[2];if(X<0||Y<0||Z<0||X>15||Y>15||Z>15)continue;const j=(Y*16+Z)*16+X;if(st[j]===1){u=out[j*4]|(out[j*4+1]<<8)|(out[j*4+2]<<16)|(out[j*4+3]<<24);u>>>=0;sv=skyB[j];ej=j;break;}}
 put(i,u);skyB[i]=sv;st[i]=2;
 if(ej>=0){env[i*4]=env[ej*4];env[i*4+1]=env[ej*4+1];env[i*4+2]=env[ej*4+2];}env[i*4+3]=sv;
+if(lampB&&ej>=0){lampB[i*4]=lampB[ej*4];lampB[i*4+1]=lampB[ej*4+1];lampB[i*4+2]=lampB[ej*4+2];lampB[i*4+3]=255;}
 }
-return{data:out,sky:skyB,env,n,steps:B.steps()};
+return{data:out,sky:skyB,env,lamp:lampB,n,steps:B.steps()};
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -57585,7 +57624,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="485317caa94441b7";
+VR.TEX_SRC_HASH="8bfdea251de4e9ae";
 
 
 
@@ -61694,6 +61733,8 @@ VR.I18N.add('en',{
 "g.set.skylight.tip":"Faces are as bright as the sky they really see: soft shade under porches, crowns and in lanes, full light in the open. Worked out in the background (needs the shadow clock).",
 "g.set.bounce":"Bounce light",
 "g.set.bounce.tip":"Light given back by sunlit walls and meadows, in their colour: a red wall tints the lane, the meadow lifts the shade under the trees. Worked out in the background.",
+"g.set.lamplight":"Lamp light",
+"g.set.lamplight.tip":"Lamps, fires and glowing blocks cast round pools of light with real shadows behind pillars and walls. Worked out in the background.",
 "g.set.wander.tip":"On foot you meet something between the places every 20–40 seconds: wanderers who walk with you to the next village, a lost pet, a picnic, kites over the meadow, a shrine, ruins with a riddle, a map scrap … and the guide balloon shows the next place. On Very Low only the simple ones, one at a time.",
 "g.wd.place":"{name} discovered",
 "g.wd.placeSub":"Now in your wander book (J).",
@@ -66753,6 +66794,8 @@ VR.I18N.add('de',{
 "g.set.skylight.tip":"Flächen sind so hell, wie viel Himmel sie wirklich sehen: unter Vordächern, Kronen und in Gassen weicher Schatten, im Freien volles Licht. Im Hintergrund berechnet (braucht die Schattenuhr).",
 "g.set.bounce":"Rückstrahlung",
 "g.set.bounce.tip":"Licht, das von besonnten Wänden und Wiesen zurückstrahlt, in ihrer Farbe: Eine rote Wand färbt die Gasse, die Wiese hellt den Schatten unter den Bäumen auf. Im Hintergrund berechnet.",
+"g.set.lamplight":"Lampenlicht",
+"g.set.lamplight.tip":"Lampen, Feuer und leuchtende Blöcke werfen runde Lichtkreise mit echten Schatten hinter Säulen und Wänden. Im Hintergrund berechnet.",
 "g.set.wander.tip":"Zu Fuß triffst du alle 20–40 Sekunden etwas zwischen den Orten: Wanderer, die dich zum nächsten Dorf begleiten, ein verlorenes Tier, ein Picknick, Drachen über der Wiese, ein Schrein, eine Ruine mit Rätsel, ein Kartenfetzen … und der Wegballon zeigt dir den nächsten Ort. Auf Sehr niedrig nur die einfachen, eines zur Zeit.",
 "g.wd.place":"{name} entdeckt",
 "g.wd.placeSub":"Steht jetzt in deinem Wanderbuch (J).",
@@ -75119,8 +75162,9 @@ return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
 vec3 skyEnvRGB = vec3(0.0);
+vec3 skyLamp = vec3(-1.0);
 float skyOpen(vec3 lp, vec3 N) {
-skyEnvRGB = vec3(0.0);
+skyEnvRGB = vec3(0.0); skyLamp = vec3(-1.0);
 if (u_clockWin.w < -1.0) return 1.0;
 vec3 wp = lp + vec3(u_camInt) + N * 0.5;
 vec3 r = wp - u_clockWin.xyz;
@@ -75131,7 +75175,10 @@ uvec4 q = u_clockOk[sl >> 7];
 int wi = (sl >> 5) & 3;
 uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
 if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
-vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);
+vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, ry / 128.0));
+vec4 lm = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 128.0));
+skyLamp = lm.a > 0.5 ? lm.rgb : vec3(-1.0);
 skyEnvRGB = e.rgb;
 return u_skyK.x < 0.5 ? 1.0 : mix(u_skyK.y, u_skyK.z, sqrt(e.a));
 }
@@ -75568,6 +75615,12 @@ if (qLf) skyL = mix(skyL, 1.0, 0.35 * (1.0 - qGreen(alb.rgb)));
 #endif
 #endif
 vec3 bl = v_block;
+#ifdef SUNCLOCK
+
+
+float skyF0 = skyOpen(v_localPos, N);
+if (u_bounceK.y > 0.5 && skyLamp.x >= 0.0) bl = max(skyLamp, bl * u_bounceK.z);
+#endif
 vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
 blockL = l2Pool(bl);
@@ -75646,7 +75699,7 @@ amb *= XD_AMB;
 }
 #endif
 #ifdef SUNCLOCK
-amb *= skyOpen(v_localPos, N);
+amb *= skyF0;
 
 
 amb += skyEnvRGB * lc * (u_bounceK.x * (1.0 - 0.7 * max(N.y, 0.0)));
@@ -129216,6 +129269,12 @@ CV.SKY_LO=0.42;CV.SKY_HI=1.08;
 
 
 CV.BOUNCE=0.42;
+
+
+CV.FILL=0.4;
+CV.noLamp=new Uint8Array(4096*4);
+CV.lampOn=(s)=>CV.on(s)&& !!(s&&s.lamplight===true);
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'lamplight',g:'img',sec:'light',t:'switch',lab:'g.set.lamplight',tip:'g.set.lamplight.tip',cost:'low',def:false});
 CV.bounce=(s)=>CV.on(s)&&(!s||s.bounce!==false);
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'bounce',g:'img',sec:'light',t:'switch',lab:'g.set.bounce',tip:'g.set.bounce.tip',cost:'low',def:true});
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'skylight',g:'img',sec:'light',t:'switch',lab:'g.set.skylight',tip:'g.set.skylight.tip',cost:'low',def:true});
@@ -129239,8 +129298,9 @@ if(s.occ&&s.occVer===ver)return s.occ;
 const O=SC.opaqueTable(),B=c.blocks,bits=s.occ||new Uint16Array(256);
 bits.fill(0);
 const H=c.H||256;
-for(let y=0;y<16;y++){const wy=sy*16+y;if(wy>=H)break;const base=wy<<8;for(let z=0;z<16;z++){let row=0;const i=base|(z<<4);for(let x=0;x<16;x++)if(O[B[i|x]])row|=1<<x;bits[y*16+z]=row;}}
-s.occ=bits;s.occVer=ver;
+const EM=VR.R.T.emit,lamps=[];
+for(let y=0;y<16;y++){const wy=sy*16+y;if(wy>=H)break;const base=wy<<8;for(let z=0;z<16;z++){let row=0;const i=base|(z<<4);for(let x=0;x<16;x++){const b=B[i|x];if(O[b])row|=1<<x;if(b&&EM[b])lamps.push(x,y,z,EM[b]);}bits[y*16+z]=row;}}
+s.occ=bits;s.occVer=ver;s.lamps=lamps;
 return bits;
 }
 
@@ -129271,6 +129331,16 @@ const n=world.col(cx+dx,cz+dz);if(!n|| !n.ready)continue;
 const B=n.blocks,H=n.H||256;
 for(let y=0;y<48;y++){const wy=oy+y;if(wy>=H)break;for(let z=0;z<16;z++){const src=(wy<<8)|(z<<4),dst=(y*48+(dz+1)*16+z)*48+(dx+1)*16;ids.set(B.subarray(src,src+16),dst);}}
 }
+
+let lamps=null;
+if(CV.lampOn(S())){
+const L=[];
+for(let dz= -2;dz<=2;dz++)for(let dx= -2;dx<=2;dx++){
+const n=world.col(cx+dx,cz+dz);if(!n|| !n.ready)continue;
+for(let k= -1;k<3;k++){if(sy+k<0|| !n.sec[sy+k])continue;slab(n,sy+k);const ls=n.sec[sy+k].lamps;if(!ls)continue;for(let i=0;i<ls.length;i+=4)L.push((dx+2)*16+ls[i],k*16+ls[i+1],(dz+2)*16+ls[i+2],ls[i+3]);}
+}
+if(L.length)lamps=new Int32Array(L);
+}
 const below=new Uint16Array(16);
 if(sy>0){const b=slab(c,sy-1);if(b)for(let z=0;z<16;z++)below[z]=b[15*16+z];}
 
@@ -129279,7 +129349,7 @@ for(let dz= -R;dz<=R;dz++)for(let dx= -R;dx<=R;dx++){
 const n=world.col(cx+dx,cz+dz);if(!n|| !n.ready|| !n.sh)continue;
 for(let z=0;z<16;z++){const o=((dz+R)*16+z)*tw+(dx+R)*16;for(let x=0;x<16;x++){const h=n.sh[((z<<4)|x)*2];top[o+x]=h?Math.min(255,h+1):0;}}
 }
-return{type:'clock',key:c.key,sy,ox:cx*16,oy,oz:cz*16,vol,below,ids,top,topX0:(cx-R)*16,topZ0:(cz-R)*16,topW:tw};
+return{type:'clock',key:c.key,sy,ox:cx*16,oy,oz:cz*16,vol,below,ids,lamps,top,topX0:(cx-R)*16,topZ0:(cz-R)*16,topW:tw};
 };
 
 
@@ -129311,7 +129381,7 @@ gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 
 this.skyTex=gl.createTexture();
 gl.bindTexture(gl.TEXTURE_3D,this.skyTex);
-gl.texStorage3D(gl.TEXTURE_3D,1,gl.RGBA8,CV.W,CV.W,CV.H);
+gl.texStorage3D(gl.TEXTURE_3D,1,gl.RGBA8,CV.W,CV.W,CV.H*2);
 for(const p of[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R])gl.texParameteri(gl.TEXTURE_3D,p,gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -129355,6 +129425,7 @@ if(up<6){
 gl.bindTexture(gl.TEXTURE_3D,this.clockTex);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
 gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.clk);
 if(s.envB){gl.bindTexture(gl.TEXTURE_3D,this.skyTex);gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.envB);}
+{gl.bindTexture(gl.TEXTURE_3D,this.skyTex);gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,64+(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.lampB||CV.noLamp);}
 gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);
 this.clockOwner[sl]=h;this.clockSig[sl]=s.clkSig;up++;CV.stats.up++;
 }
@@ -129379,11 +129450,11 @@ let all=true;for(let dz= -2;dz<=2&&all;dz++)for(let dx= -2;dx<=2&&all;dx++){cons
 if(!all)continue;
 const s=c.sec[sy],g=sig(world,c.cx,c.cz,sy),job=CV.buildJob(world,c,sy);
 s.clkPending=true;CV.inflight=(CV.inflight|0)+1;CV.stats.jobs++;
-world.pool.submit(job,[job.vol.buffer,job.top.buffer,job.below.buffer].concat(job.ids?[job.ids.buffer]:[]),(m)=>{
+world.pool.submit(job,[job.vol.buffer,job.top.buffer,job.below.buffer].concat(job.ids?[job.ids.buffer]:[],job.lamps?[job.lamps.buffer]:[]),(m)=>{
 s.clkPending=false;CV.inflight=Math.max(0,(CV.inflight|0)-1);
 if(m.type!=='clock'){CV.stats.err=(CV.stats.err|0)+1;CV.stats.last=m.type+' '+String(m.msg||m.error||'').slice(0,160);return;}
 if(world.cols.get(c.key)!==c){CV.stats.gone=(CV.stats.gone|0)+1;return;}
-s.clk=m.data;s.envB=m.env||null;s.clkSig=g;CV.stats.baked++;CV.stats.ms+=m.ms||0;
+s.clk=m.data;s.envB=m.env||null;s.lampB=m.lamp||null;s.clkSig=g;CV.stats.baked++;CV.stats.ms+=m.ms||0;
 },1e5);
 }
 }
@@ -129404,7 +129475,7 @@ const gl=this.gl,live= !!(this.clockLive&&this.clockTex&&E&&E.sunDir&& !E.dimId)
 if(this.clockTex){gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_3D,this.clockTex);}
 if(u.u_clockVol)gl.uniform1i(u.u_clockVol,5);
 if(u.u_skyVol){if(this.skyTex){gl.activeTexture(gl.TEXTURE8);gl.bindTexture(gl.TEXTURE_3D,this.skyTex);}gl.uniform1i(u.u_skyVol,8);}
-if(u.u_bounceK)gl.uniform4f(u.u_bounceK,live&&CV.bounce(S())?CV.BOUNCE:0,0,0,0);
+if(u.u_bounceK)gl.uniform4f(u.u_bounceK,live&&CV.bounce(S())?CV.BOUNCE:0,live&&CV.lampOn(S())?1:0,CV.FILL,0);
 if(u.u_skyK)gl.uniform4f(u.u_skyK,live&&(!S()||S().skylight!==false)?1:0,CV.SKY_LO,CV.SKY_HI,0);
 const w=this.clockWin||[0,0,0],s=live?CV.arcTime(E.sunDir): -9;
 gl.uniform4f(u.u_clockWin,w[0],w[1],w[2],s);
