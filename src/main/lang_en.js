@@ -3978,6 +3978,8 @@
     // ---- a-fairy end
     // ---- o-wander (src/main/wander.js)
     "g.set.wander": "Wander director: always something on the way",
+    "g.set.sunclock": "Shadow clock",
+    "g.set.sunclock.tip": "Real shadows of the sun and the moon on every PC — worked out once in the background, then only shown (Very Low too).",
     "g.set.wander.tip": "On foot you meet something between the places every 20–40 seconds: wanderers who walk with you to the next village, a lost pet, a picnic, kites over the meadow, a shrine, ruins with a riddle, a map scrap … and the guide balloon shows the next place. On Very Low only the simple ones, one at a time.",
     "g.wd.place": "{name} discovered",
     "g.wd.placeSub": "Now in your wander book (J).",
