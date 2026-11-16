@@ -277,4 +277,36 @@
     function inSolid(x, y, z) { const cx = Math.floor(x) + VPAD, cy = Math.floor(y), cz = Math.floor(z) + VPAD; return cx >= 0 && cy >= 0 && cz >= 0 && cx < VX && cy < VY && cz < VZ && ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) === 1; }
     return B;
   };
+  // ---------------------------------------------------------------- the clocks of one section's cells (the clock volume)
+  // The picture reads the clocks from a 3-D texture round the eye (renderer: u_clockVol): a face samples the air cell
+  // in front of it (its position + normal / 2), filtered between cell centres — the same linear blend of the four bytes
+  // a vertex stream would give, without a new vertex format. So a section needs the clocks of its air cells next to a
+  // surface (6-neighbours: an opaque cell, the layer under the section in job.below); a solid cell takes the clock of
+  // the air above it (or beside it) so the filter never pulls a surface into the dark; an air cell farther from any
+  // surface takes a computed neighbour's. → { data: Uint8Array(16³ · 4) (x fastest, then z, then y), n: cells traced }
+  SC.bakeSection = function (job) {
+    const B = SC.begin(job), V = job.vol, below = job.below || null;
+    const out = new Uint8Array(4096 * 4), st = new Uint8Array(4096);   // st: 0 unknown, 1 traced, 2 copied
+    const solid = (x, y, z) => {
+      if (y < 0) { if (!below || x < 0 || x > 15 || z < 0 || z > 15) return 0; return (below[z] >> x) & 1; }
+      return (V[(y * VZ + z + VPAD) * RW + ((x + VPAD) >> 4)] >> ((x + VPAD) & 15)) & 1;
+    };
+    const put = (i, u) => { out[i * 4] = u & 255; out[i * 4 + 1] = (u >>> 8) & 255; out[i * 4 + 2] = (u >>> 16) & 255; out[i * 4 + 3] = u >>> 24; };
+    let n = 0;
+    for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      if (solid(x, y, z)) continue;
+      if (!(solid(x + 1, y, z) | solid(x - 1, y, z) | solid(x, y + 1, z) | solid(x, y - 1, z) | solid(x, y, z + 1) | solid(x, y, z - 1))) continue;
+      const i = (y * 16 + z) * 16 + x;
+      put(i, B.probe(x + 0.5, y + 0.5, z + 0.5)); st[i] = 1; n++;
+    }
+    // the others: from a traced neighbour (the one above first: a solid cell shows the light on its top)
+    const NB = [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]];
+    for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const i = (y * 16 + z) * 16 + x; if (st[i]) continue;
+      let u = SC.EMPTY;
+      for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; break; } }
+      put(i, u); st[i] = 2;
+    }
+    return { data: out, n, steps: B.steps() };
+  };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

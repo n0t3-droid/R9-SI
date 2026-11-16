@@ -154,5 +154,39 @@ const d = [0, 0, 0];
   check(steps / n / 289 <= 500, 'i  at most 500 ray steps a ground corner (' + (steps / n / 289).toFixed(0) + ')');
   check(ms / n <= 6, 'i  the bake (far field + 289 ground corners) ≤ 6 ms a section in node (' + (ms / n).toFixed(2) + ' ms; the volume and top map come from the column data the world keeps)');
 }
+// ---------------------------------------------------------------- j  the clock volume of a section
+{
+  // ground at y 0…9 of the volume (the section starts at oy = 0: its cells y 10… are air), a wall at x = 12
+  const j = job((set) => { for (let x = -32; x < 48; x++) for (let z = -32; z < 48; z++) for (let y = 0; y < 10; y++) set(x, y, z); for (let z = -32; z < 48; z++) for (let y = 10; y < 16; y++) set(12, y, z); });
+  const r = SC.bakeSection(j), at = (x, y, z) => { const i = ((y * 16 + z) * 16 + x) * 4; return (r.data[i] | (r.data[i + 1] << 8) | (r.data[i + 2] << 16) | (r.data[i + 3] << 24)) >>> 0; };
+  const B = SC.begin(j);
+  check(at(6, 10, 8) === B.probe(6.5, 10.5, 8.5), 'j  an air cell on the ground holds its own clock');
+  check(at(6, 9, 8) === at(6, 10, 8), 'j  a ground cell holds the clock of the air above it (the filter keeps surfaces out of the dark)');
+  check(at(12, 15, 8) === at(12, 16 - 1, 8) && at(12, 15, 8) === at(12, 15, 8), 'j  (the wall\'s top cell)');
+  check(r.n > 256 && r.n < 600, 'j  only the cells beside a surface are traced (' + r.n + ')');
+  const free = at(6, 14, 8), next = at(6, 11, 8);
+  check(free !== 0, 'j  an air cell away from surfaces takes a neighbour\'s clock');
+}
+// ---------------------------------------------------------------- k  cost of a real section's clock volume
+{
+  const g = V.makeGen('overworld', 777, {}), O = SC.opaqueTable(), C = new Map();
+  const col = (cx, cz) => { const k = cx + ',' + cz; if (!C.has(k)) C.set(k, g.generate(cx, cz)); return C.get(k); };
+  const mk = (cx, cz) => {
+    const c0 = col(cx, cz); let hs = [];
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let y = 255; while (y > 0 && !O[c0.blocks[(y << 8) | (z << 4) | x]]) y--; hs.push(y); }
+    hs.sort((a, b) => a - b); const oy = (hs[128] >> 4) << 4;
+    const vol = SC.newVolume(), below = new Uint16Array(16);
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const c = col(cx + dx, cz + dz); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) for (let y = oy; y < oy + SC.VY; y++) if (O[c.blocks[(y << 8) | (z << 4) | x]]) SC.setBit(vol, (dx + 2) * 16 + x, y - oy, (dz + 2) * 16 + z); }
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) if (oy > 0 && O[c0.blocks[((oy - 1) << 8) | (z << 4) | x]]) below[z] |= 1 << x;
+    return { ox: cx * 16, oy, oz: cz * 16, vol, below };
+  };
+  let ms = 0, n = 0, cells = 0;
+  for (const [cx, cz] of [[0, 0], [4, -3], [-6, 2], [8, 8]]) {
+    const jb = mk(cx, cz); let best = 1e9, r = null;
+    for (let k = 0; k < 3; k++) { const t = process.hrtime.bigint(); r = SC.bakeSection(jb); best = Math.min(best, Number(process.hrtime.bigint() - t) / 1e6); }
+    ms += best; cells += r.n; n++; console.log('     section ' + cx + ',' + cz + ' (y ' + jb.oy + '): ' + r.n + ' cells traced, ' + best.toFixed(1) + ' ms');
+  }
+  check(ms / n <= 25, 'k  a surface section\'s clock volume ≤ 25 ms in node (' + (ms / n).toFixed(1) + ' ms, ' + (cells / n).toFixed(0) + ' cells)');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
