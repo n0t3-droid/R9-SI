@@ -36919,6 +36919,8 @@ return O;
 const K=SC.K=48,BIS=4,LAT=5,LSTEP=4;
 const DIRS=new Float64Array(K*3),SLOPE=new Float64Array(K),HX=new Float64Array(K),HZ=new Float64Array(K);
 (function(){const d=[0,0,0];for(let k=0;k<K;k++){SC.arc((k+0.5)/K,d);DIRS[k*3]=d[0];DIRS[k*3+1]=d[1];DIRS[k*3+2]=d[2];const h=Math.hypot(d[0],d[2]);HX[k]=d[0]/h;HZ[k]=d[2]/h;SLOPE[k]=d[1]/h;}})();
+const NS=SC.NS=24,SKY=new Float64Array(NS*3);
+(function(){for(let i=0;i<NS;i++){const u=(i+0.5)/NS,ph=i*2.399963229728653,sn=Math.sqrt(u);SKY[i*3]=Math.cos(ph)*sn;SKY[i*3+1]=Math.sqrt(1-u);SKY[i*3+2]=Math.sin(ph)*sn;}})();
 const NRM=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
 const _d=[0,0,0];
 
@@ -37077,7 +37079,15 @@ prev=st;prevK=k;
 return SC.pack(IV);
 }
 const cache=new Map();
+
+
+function sky(px,py,pz){
+let n=0;
+for(let i=0;i<NS;i++)if(ray(px+VPAD,py,pz+VPAD,SKY[i*3],SKY[i*3+1],SKY[i*3+2]))n++;
+return n/NS;
+}
 const B={
+sky,
 steps:()=>steps,
 lit,ycrit,
 
@@ -37111,6 +37121,7 @@ return B;
 SC.bakeSection=function(job){
 const B=SC.begin(job),V=job.vol,below=job.below||null;
 const out=new Uint8Array(4096*4),st=new Uint8Array(4096);
+const skyB=new Uint8Array(4096);
 const solid=(x,y,z)=>{
 if(y<0){if(!below||x<0||x>15||z<0||z>15)return 0;return(below[z]>>x)&1;}
 return(V[(y*VZ+z+VPAD)*RW+((x+VPAD)>>4)]>>((x+VPAD)&15))&1;
@@ -37122,16 +37133,17 @@ if(solid(x,y,z))continue;
 if(!(solid(x+1,y,z)|solid(x-1,y,z)|solid(x,y+1,z)|solid(x,y-1,z)|solid(x,y,z+1)|solid(x,y,z-1)))continue;
 const i=(y*16+z)*16+x;
 put(i,B.probe(x+0.5,y+0.5,z+0.5));st[i]=1;n++;
+skyB[i]=Math.round(B.sky(x+0.5,y+0.5,z+0.5)*255);
 }
 
 const NB=[[0,1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,-1,0]];
 for(let y=0;y<16;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
 const i=(y*16+z)*16+x;if(st[i])continue;
-let u=SC.EMPTY;
-for(const d of NB){const X=x+d[0],Y=y+d[1],Z=z+d[2];if(X<0||Y<0||Z<0||X>15||Y>15||Z>15)continue;const j=(Y*16+Z)*16+X;if(st[j]===1){u=out[j*4]|(out[j*4+1]<<8)|(out[j*4+2]<<16)|(out[j*4+3]<<24);u>>>=0;break;}}
-put(i,u);st[i]=2;
+let u=SC.EMPTY,sv=255;
+for(const d of NB){const X=x+d[0],Y=y+d[1],Z=z+d[2];if(X<0||Y<0||Z<0||X>15||Y>15||Z>15)continue;const j=(Y*16+Z)*16+X;if(st[j]===1){u=out[j*4]|(out[j*4+1]<<8)|(out[j*4+2]<<16)|(out[j*4+3]<<24);u>>>=0;sv=skyB[j];break;}}
+put(i,u);skyB[i]=sv;st[i]=2;
 }
-return{data:out,n,steps:B.steps()};
+return{data:out,sky:skyB,n,steps:B.steps()};
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -51541,7 +51553,7 @@ post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,
 }else if(m.type==='clock'){
 
 const t0=performance.now(),r=VR.SunClock.bakeSection(m);
-post({type:'clock',id:m.id,key:m.key,sy:m.sy,ver:m.ver,data:r.data,n:r.n,ms:performance.now()-t0},[r.data.buffer]);
+post({type:'clock',id:m.id,key:m.key,sy:m.sy,ver:m.ver,data:r.data,sky:r.sky,n:r.n,ms:performance.now()-t0},[r.data.buffer,r.sky.buffer]);
 }else if(m.type==='smoothvox'){
 
 const r=VR.SmoothVox.job(m),tr=r.transfer;delete r.transfer;
@@ -74236,6 +74248,8 @@ VR.I18N.add('en',{
 "g.set.wander":"Wander director: always something on the way",
 "g.set.sunclock":"Shadow clock",
 "g.set.sunclock.tip":"Real shadows of the sun and the moon on every PC — worked out once in the background, then only shown (Very Low too).",
+"g.set.skylight":"Sky light",
+"g.set.skylight.tip":"Faces are as bright as the sky they really see: soft shade under porches, crowns and in lanes, full light in the open. Worked out in the background (needs the shadow clock).",
 "g.set.wander.tip":"On foot you meet something between the places every 20–40 seconds: wanderers who walk with you to the next village, a lost pet, a picnic, kites over the meadow, a shrine, ruins with a riddle, a map scrap … and the guide balloon shows the next place. On Very Low only the simple ones, one at a time.",
 "g.wd.place":"{name} discovered",
 "g.wd.placeSub":"Now in your wander book (J).",
@@ -79291,6 +79305,8 @@ VR.I18N.add('de',{
 "g.set.wander":"Wanderregisseur: unterwegs gibt es immer etwas",
 "g.set.sunclock":"Schattenuhr",
 "g.set.sunclock.tip":"Echte Schatten von Sonne und Mond für jeden PC — einmal im Hintergrund berechnet, dann nur noch angezeigt (auch auf Sehr niedrig).",
+"g.set.skylight":"Himmelslicht",
+"g.set.skylight.tip":"Flächen sind so hell, wie viel Himmel sie wirklich sehen: unter Vordächern, Kronen und in Gassen weicher Schatten, im Freien volles Licht. Im Hintergrund berechnet (braucht die Schattenuhr).",
 "g.set.wander.tip":"Zu Fuß triffst du alle 20–40 Sekunden etwas zwischen den Orten: Wanderer, die dich zum nächsten Dorf begleiten, ein verlorenes Tier, ein Picknick, Drachen über der Wiese, ein Schrein, eine Ruine mit Rätsel, ein Kartenfetzen … und der Wegballon zeigt dir den nächsten Ort. Auf Sehr niedrig nur die einfachen, eines zur Zeit.",
 "g.wd.place":"{name} entdeckt",
 "g.wd.placeSub":"Steht jetzt in deinem Wanderbuch (J).",
