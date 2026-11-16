@@ -34,9 +34,9 @@ check(await ev(() => VR.game.state === 'play'), 'a new world');
 await ev(() => { window.requestAnimationFrame = () => 0; const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.settings.fov = 75; });
 // the eye over the spawn, looking down at the land
 const spawn = await ev(() => { const p = VR.game.player; return p.pos.slice().concat([p.yaw]); });
-// (the land away from the gate hall: 170 m out, over the ground there once it has loaded)
-const AT = [spawn[0] + Math.sin(spawn[3]) * -170, spawn[2] + Math.cos(spawn[3]) * -170];
-const place = () => ev(([s, A]) => { const g = VR.game, p = g.player, w = g.world, X = Math.floor(A[0]), Z = Math.floor(A[1]); const gy = w.isLoaded(X, Z) ? w.topAt(X, Z) : s[1]; p.flying = true; p.noclip = true; p.teleport(A[0], gy + 15, A[1]); p.vel[0] = p.vel[1] = p.vel[2] = 0; p.yaw = p.viewYaw = s[3] + Math.PI; p.pitch = -0.5; }, [spawn, AT]);
+// the nearest village's plaza (seed 4242: golden's plaza shot, 0 81 −54), seen from 15 m off and 16 m up
+const P0 = [0.5, 81, -53.5], EYE = [P0[0] + 15, P0[1] + 16, P0[2] + 15];
+const place = () => ev(([E, T]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(E[0], E[1] - (p.eye || 1.62), E[2]); p.vel[0] = p.vel[1] = p.vel[2] = 0; const e = p.eyePos(), dx = T[0] - e[0], dy = T[1] - e[1], dz = T[2] - e[2]; p.yaw = p.viewYaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, [EYE, [P0[0], P0[1] + 1, P0[2]]]);
 await place();
 // frames, drawn (the clock volume is filled from the renderer's frame)
 const frames = (n, draw) => ev(([n, draw]) => { const g = VR.game, r = g.renderer;
