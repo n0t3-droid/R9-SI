@@ -425,8 +425,9 @@
       for (let k = 0; k < 16; k++) {
         const a = Math.random() * Math.PI * 2, x = Math.floor(home[0] + Math.cos(a) * 14), z = Math.floor(home[2] + Math.sin(a) * 14);
         if (!w.isLoaded(x, z)) continue;
-        const top = w.topAt(x, z);
-        if (!(VR.R.T.flags[w.getBlock(x, top, z)] & VR.F.SOLID) || Math.abs(top - home[1]) > 8) continue;
+        // (f-spawn: the ground one walks on near the door's height — not a roof, a crown or a pond)
+        const sn = VR.PlaceSense ? VR.PlaceSense.near(w, x, z, home[1], 3) : null, top = sn ? sn.y : w.topAt(x, z);
+        if (VR.PlaceSense ? (!sn || sn.wet || !sn.room || sn.roofed) : (!(VR.R.T.flags[w.getBlock(x, top, z)] & VR.F.SOLID) || Math.abs(top - home[1]) > 8)) continue;
         let clear = true;   // (a straight walk to the door: no wall in the way)
         for (let s = 1; s < 8 && clear; s++) { const sx = Math.floor(x + (home[0] + 1.5 - x) * s / 8), sz = Math.floor(z + (home[2] + 1.5 - z) * s / 8), b = w.getBlock(sx, Math.floor(home[1]), sz); if (b && (VR.R.T.flags[b] & VR.F.SOLID)) clear = false; }
         if (!clear) continue;

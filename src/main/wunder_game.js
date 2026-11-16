@@ -418,7 +418,10 @@
       if (!WU.deerMay({ night: E.night, stillFor: R.still, vilDist: vd, day, st: m })) return;
       const tgt = WU.deerPick(spots(g, R), m.seen, p[0], p[2]); if (!tgt) return;
       let dx = tgt.x - p[0], dz = tgt.z - p[2]; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
-      const x = p[0] + dx * 12 + dz * 3, z = p[2] + dz * 12 - dx * 3, gy = ground(w, x, z); if (gy === null) return;
+      const x = p[0] + dx * 12 + dz * 3, z = p[2] + dz * 12 - dx * 3; let gy = ground(w, x, z); if (gy === null) return;
+      // (f-spawn: it steps out on ground one can walk, at your own height under the open sky — not on a roof, not in a
+      // house, not into a pond)
+      if (VR.PlaceSense) { const sn = VR.PlaceSense.near(w, x, z, p[1], 4); if (!sn || sn.wet || !sn.room || sn.roofed) return; gy = sn.y; }
       WU.markEvent(m, 'deer', day);
       R.deer = { x, z, y: gy + 1, tx: tgt.x, tz: tgt.z, id: tgt.id, yaw: Math.atan2(-dx, -dz), walk: 0, t: 0, out: 0, gone: 0 };
       swirl(g, x, gy + 1, z);

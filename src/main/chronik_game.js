@@ -109,8 +109,9 @@
       for (let k = 0; k < 12 && !at; k++) {
         const x = Math.floor(cx + (C.h01(f.i, k, 1) - 0.5) * 56), z = Math.floor(cz + (C.h01(f.i, k, 2) - 0.5) * 56);
         if (!w.isLoaded(x, z) || Math.hypot(x - p[0], z - p[2]) < 14) continue;
-        const y = w.topAt(x, z), b = w.getBlock(x, y, z), F = VR.F, RT = VR.R && VR.R.T;
-        if (RT && F && (RT.flags[b] & F.SOLID) && !(RT.flags[b] & F.FLUID) && !(RT.flags[w.getBlock(x, y + 1, z)] & F.SOLID)) at = [x + 0.5, y + 1, z + 0.5];
+        // (f-spawn: where an animal belongs — VR.PlaceSense.wild: natural dry level ground, no roof, crown, pavement or pond)
+        const y = VR.PlaceSense ? VR.PlaceSense.wild(w, x, z) : w.topAt(x, z);
+        if (y !== null) at = [x + 0.5, y + 1, z + 0.5];
       }
       if (!at) continue;
       const kind = C.MOB[f.sp]; if (!kind) { done.add(f.i); continue; }
