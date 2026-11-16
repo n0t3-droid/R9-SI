@@ -1508,6 +1508,14 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#ifdef SUNCLOCK
+  // e-uhr2: where the clock knows, it decides — not the sky light: a patch of sun through a window falls on the floor
+  // of a room the sky light calls indoors, a covered street in the open stays dark
+  if (ndl > 0.0 && dot(N, L) > -0.2) {
+    float cvo = clockVis(v_localPos, N);
+    if (cvo >= 0.0) { sh = cvo; outdoors = max(outdoors, cvo); }
+  }
+#endif
 #if defined(Q_LEAF) && !defined(MODEL)
   if (qLf && ndl > 0.0 && outdoors > 0.0 && dot(N, L) <= -0.2) sh = shadowAt(-N, L);   // (a leaf face turned from the sun: the shadow seen through the leaf)
 #endif

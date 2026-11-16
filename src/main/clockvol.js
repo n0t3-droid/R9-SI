@@ -197,6 +197,25 @@
     }
     return r;
   };
+  // ---------------------------------------------------------------- the figures (animals, people): the same clocks on the CPU
+  // the clock of the air cell at a world point from the section's baked bytes (null: not baked) → the light 0…1 at s
+  CV.visAt = function (world, x, y, z, s) {
+    const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), c = world.col(X >> 4, Z >> 4);
+    const sec = c && c.sec[Y >> 4]; if (!sec || !sec.clk) return null;
+    const i = (((Y & 15) * 16 + (Z & 15)) * 16 + (X & 15)) * 4, d = sec.clk;
+    return SC.vis((d[i] | (d[i + 1] << 8) | (d[i + 2] << 16) | (d[i + 3] << 24)) >>> 0, s);
+  };
+  if (VR.Entities && VR.Entities.prototype && VR.Entities.prototype.sunShade) {
+    const ss0 = VR.Entities.prototype.sunShade;
+    VR.Entities.prototype.sunShade = function (pos, h) {
+      const g = this.game, w = g && g.world, E = g && g.env && g.env.E;
+      if (w && E && E.sunDir && !E.dimId && CV.on(S()) && w.dim === 'overworld') {
+        const v = CV.visAt(w, pos[0], pos[1] + (h || 1), pos[2], CV.arcTime(E.sunDir));
+        if (v !== null) return 1 - v;
+      }
+      return ss0.apply(this, arguments);
+    };
+  }
   // the define: SUNCLOCK in the terrain's programs while the switch is on
   CV.defs = (name, s) => ((name === 'terrain' || name === 'terrainCut') && CV.on(s) ? ['SUNCLOCK'] : []);
   if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { let d = prev ? prev(name, defines) : (defines || []); for (const k of CV.defs(name, S())) if (!d.includes(k)) d = d.concat([k]); return d; }; }
