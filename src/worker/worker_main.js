@@ -148,6 +148,7 @@
     out.save = C.save(CHR);
     return out;
   }
+  let CLOCKCOL = null, LASTAVG = null;   // e-bounce: the colour table of the bounce rays (sunclock.js colorTable)
   function run(m) {
     try {
       if (m.type === 'init') {
@@ -211,8 +212,10 @@
         post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, vxSkipped: r.vxSkipped || 0, softH: r.softH || null, ms: performance.now() - t0 }, tr);
       } else if (m.type === 'clock') {
         // e-uhr · Schattenuhr: the clocks of a section's cells (sunclock.js bakeSection) for the clock volume
+        if (m.ids && !CLOCKCOL && LASTAVG) CLOCKCOL = VR.SunClock.colorTable(LASTAVG);
+        m.colors = CLOCKCOL;
         const t0 = performance.now(), r = VR.SunClock.bakeSection(m);
-        post({ type: 'clock', id: m.id, key: m.key, sy: m.sy, ver: m.ver, data: r.data, sky: r.sky, n: r.n, ms: performance.now() - t0 }, [r.data.buffer, r.sky.buffer]);
+        post({ type: 'clock', id: m.id, key: m.key, sy: m.sy, ver: m.ver, data: r.data, env: r.env, n: r.n, ms: performance.now() - t0 }, [r.data.buffer, r.env.buffer]);
       } else if (m.type === 'smoothvox') {
         // t-form: a model's surface-nets meshes (smoothvox.js): the game's furniture layout or the Studio's
         const r = VR.SmoothVox.job(m), tr = r.transfer; delete r.transfer;
@@ -250,6 +253,9 @@
         const r = VR.CabinKit.job(m), tr = r.transfer; delete r.transfer;
         r.type = 'cabin'; r.id = m.id;
         post(r, tr);
+      } else if (m.type === 'clockcol') {
+        LASTAVG = m.avg; CLOCKCOL = null;   // (e-bounce: the blocks' colours for the bounce rays, made at the next bake)
+        return;
       } else if (m.type === 'lodinit') {
         if (VR.LOD) VR.LOD.setAvg(m.avg);
         return;

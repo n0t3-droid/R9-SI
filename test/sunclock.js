@@ -192,6 +192,30 @@ const d = [0, 0, 0];
     check(bk.sky && sk(12, 9, 8) === sk(12, 10, 8), 'l  a ground cell holds the sky of the air above it');
   }
 }
+// ---------------------------------------------------------------- m  E2b · Rückstrahlung: the colour the surroundings give back
+{
+  const R = V.R, st = (n) => R.byName[n].defaultState;
+  const RED = st('red_wool') ? st('red_wool') : st('bricks'), GRASS = st('grass_block'), STONE = st('stone');
+  // a colour table as the worker gets it from the textures' averages: here a made-up one (red, green, grey by state)
+  const col = new Uint8Array(R.stateCount * 3).fill(110);
+  col[RED * 3] = 200; col[RED * 3 + 1] = 40; col[RED * 3 + 2] = 30;
+  col[GRASS * 3] = 60; col[GRASS * 3 + 1] = 170; col[GRASS * 3 + 2] = 50;
+  check(typeof SC.bounceIds === 'function', 'm  SC.bounceIds exists (the 48³ block ids for the bounce rays)');
+  if (typeof SC.bounceIds === 'function') {
+    const ids = SC.bounceIds(), set = (vol, x, y, z, s) => { SC.setBit(vol, x + SC.VPAD, y, z + SC.VPAD); SC.idSet(ids, x, y, z, s); };
+    const vol = SC.newVolume();
+    for (let x = -16; x < 32; x++) for (let z = -16; z < 32; z++) for (let y = 0; y < 10; y++) set(vol, x, y, z, y === 9 ? GRASS : STONE);
+    for (let z = -16; z < 32; z++) for (let y = 10; y < 20; y++) set(vol, 12, y, z, RED);   // a red wall
+    const r = SC.bakeSection({ ox: 0, oy: 0, oz: 0, vol, ids, colors: col });
+    check(r.env && r.env.length === 4096 * 4, 'm  the section returns its env bytes (rgb the colour given back, a the sky)');
+    const at = (x, y, z) => { const i = ((y * 16 + z) * 16 + x) * 4; return [r.env[i], r.env[i + 1], r.env[i + 2], r.env[i + 3]]; };
+    const nearWall = at(11, 10, 8), open = at(2, 10, 8);
+    console.log('     beside the red wall ' + nearWall + ' · in the open ' + open);
+    check(nearWall[0] > nearWall[1] && (nearWall[0] - nearWall[1]) - (open[0] - open[1]) > 30, 'm  beside a red wall the light given back turns red');
+    check(open[1] > open[0], 'm  on the open meadow it is green (the grass below)');
+    check(Math.abs(at(11, 10, 8)[3] - r.sky[(10 * 16 + 8) * 16 + 11]) <= 1, 'm  a carries the sky openness as before');
+  }
+}
 // ---------------------------------------------------------------- k  cost of a real section's clock volume
 {
   const g = V.makeGen('overworld', 777, {}), O = SC.opaqueTable(), C = new Map();

@@ -1050,8 +1050,10 @@ float clockVis(vec3 lp, vec3 N) {
 // filtered texel) → the factor on the sky's light: u_skyK.y where it sees none … u_skyK.z in the open; 1 where unknown
 uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
+vec3 skyEnvRGB = vec3(0.0);   // (e-bounce: the colour the surroundings give back, set by skyOpen)
 float skyOpen(vec3 lp, vec3 N) {
-  if (u_skyK.x < 0.5 || u_clockWin.w < -1.0) return 1.0;
+  skyEnvRGB = vec3(0.0);
+  if (u_clockWin.w < -1.0) return 1.0;
   vec3 wp = lp + vec3(u_camInt) + N * 0.5;
   vec3 r = wp - u_clockWin.xyz;
   if (r.x < 0.5 || r.y < 0.5 || r.z < 0.5 || r.x > 127.5 || r.y > 63.5 || r.z > 127.5) return 1.0;
@@ -1061,9 +1063,11 @@ float skyOpen(vec3 lp, vec3 N) {
   int wi = (sl >> 5) & 3;
   uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
   if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
-  float v = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0)).r;
-  return mix(u_skyK.y, u_skyK.z, sqrt(v));
+  vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+  skyEnvRGB = e.rgb;
+  return u_skyK.x < 0.5 ? 1.0 : mix(u_skyK.y, u_skyK.z, sqrt(e.a));
 }
+uniform vec4 u_bounceK;   // e-bounce: x the strength of the light given back (0: off)
 #endif
 // sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low)
 float shadowAt(vec3 N, vec3 L) {
@@ -1575,6 +1579,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
 #ifdef SUNCLOCK
   amb *= skyOpen(v_localPos, N);   // e-himmel: the sky's light by how much sky the place really sees
+  // e-bounce · Rückstrahlung: the surroundings' colour, lit by the sun, given back (less on faces that look up: their
+  // own ground is under them)
+  amb += skyEnvRGB * lc * (u_bounceK.x * (1.0 - 0.7 * max(N.y, 0.0)));
 #endif
 #ifdef GM_PAINT
   amb *= gmShK;
