@@ -97,7 +97,7 @@
   (function () { const d = [0, 0, 0]; for (let k = 0; k < K; k++) { SC.arc((k + 0.5) / K, d); DIRS[k * 3] = d[0]; DIRS[k * 3 + 1] = d[1]; DIRS[k * 3 + 2] = d[2]; const h = Math.hypot(d[0], d[2]); HX[k] = d[0] / h; HZ[k] = d[2] / h; SLOPE[k] = d[1] / h; } })();
   const NS = SC.NS = 24, SKY = new Float64Array(NS * 3);
   (function () { for (let i = 0; i < NS; i++) { const u = (i + 0.5) / NS, ph = i * 2.399963229728653, sn = Math.sqrt(u); SKY[i * 3] = Math.cos(ph) * sn; SKY[i * 3 + 1] = Math.sqrt(1 - u); SKY[i * 3 + 2] = Math.sin(ph) * sn; } })();
-  const NB2 = SC.NB2 = 32, SPH = new Float64Array(NB2 * 3);   // E2b: directions over the whole sphere (Fibonacci)
+  const NB2 = SC.NB2 = 16, SPH = new Float64Array(NB2 * 3);   // E2b: directions over the whole sphere (Fibonacci)
   (function () { for (let i = 0; i < NB2; i++) { const y = 1 - 2 * (i + 0.5) / NB2, r = Math.sqrt(1 - y * y), ph = i * 2.399963229728653; SPH[i * 3] = Math.cos(ph) * r; SPH[i * 3 + 1] = y; SPH[i * 3 + 2] = Math.sin(ph) * r; } })();
   // the block ids the bounce rays read: the 3 × 3 columns round the section (volume x, z 16…63), the volume's 48 layers
   SC.IDW = 48;

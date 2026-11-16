@@ -29,7 +29,7 @@
   CV.SKY_LO = 0.42; CV.SKY_HI = 1.08;
   // E2b · Rückstrahlung: the light the surroundings give back, in their colour (a red wall tints the street, a sunlit
   // meadow lifts the shade under the crowns); strength BOUNCE × the sun's light. Switch „Rückstrahlung" (with the clock)
-  CV.BOUNCE = 0.55;
+  CV.BOUNCE = 0.42;
   CV.bounce = (s) => CV.on(s) && (!s || s.bounce !== false);
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'bounce', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.bounce', tip: 'g.set.bounce.tip', cost: 'low', def: true });
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'skylight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.skylight', tip: 'g.set.skylight.tip', cost: 'low', def: true });
