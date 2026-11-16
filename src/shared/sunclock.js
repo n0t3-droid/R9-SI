@@ -299,7 +299,19 @@
     // E2c · Lampenlicht: the lamps' light at a point with real shadows — every lamp of job.lamps (volume x, y, z and its
     // packed rgb levels) within its reach, a ray to its cell; the light falls off with the straight distance as the flood
     // fill's does with steps (level − d), the brightest per channel wins. → [r, g, b] levels 0…15
-    const LAMPS = job.lamps || null, LO = [0, 0, 0];
+    // (only the lamps that can reach the section: within 15 of its box; the brightest first, so the test "could it add
+    // anything" ends the search early)
+    // (DK: the straight distance counts 1.3 ×, as the flood fill's steps go round — about the mean of |x|+|y|+|z| over
+    // |p| in 3-D — so a lamp's pool keeps the size it had, only rounder and with shadows)
+    const DK = 1.3;
+    let LAMPS = null; const LO = [0, 0, 0];
+    if (job.lamps && job.lamps.length) {
+      const keep = [];
+      for (let i = 0; i < job.lamps.length; i += 4) { const x = job.lamps[i] - VPAD, y = job.lamps[i + 1], z = job.lamps[i + 2] - VPAD; if (x >= -15 && x <= 30 && z >= -15 && z <= 30 && y >= -15 && y <= 30) keep.push(i); }
+      const lev = (i) => { const pk = job.lamps[i + 3]; return Math.max((pk >> 8) & 15, (pk >> 4) & 15, pk & 15); };
+      keep.sort((a, b) => lev(b) - lev(a));
+      LAMPS = new Int32Array(keep.length * 4); keep.forEach((i, k) => { for (let q = 0; q < 4; q++) LAMPS[k * 4 + q] = job.lamps[i + q]; });
+    }
     function lamp(px, py, pz) {
       LO[0] = LO[1] = LO[2] = 0;
       if (!LAMPS) return LO;
@@ -307,11 +319,11 @@
       for (let i = 0; i < LAMPS.length; i += 4) {
         const lx = LAMPS[i] + 0.5, ly = LAMPS[i + 1] + 0.5, lz = LAMPS[i + 2] + 0.5, pk = LAMPS[i + 3];
         const r = (pk >> 8) & 15, g = (pk >> 4) & 15, b = pk & 15, L = r > g ? (r > b ? r : b) : (g > b ? g : b);
-        const dx = lx - vx, dy = ly - py, dz = lz - vz, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const dx = lx - vx, dy = ly - py, dz = lz - vz, de = Math.sqrt(dx * dx + dy * dy + dz * dz), d = de * DK;
         if (d >= L) continue;
         if (r - d <= LO[0] && g - d <= LO[1] && b - d <= LO[2]) continue;   // (it could add nothing)
         TC[0] = Math.floor(lx); TC[1] = Math.floor(ly); TC[2] = Math.floor(lz);
-        if (d > 0.9 && !ray(vx, py, vz, dx / d, dy / d, dz / d, d)) continue;
+        if (de > 0.9 && !ray(vx, py, vz, dx / de, dy / de, dz / de, de)) continue;
         if (r - d > LO[0]) LO[0] = r - d; if (g - d > LO[1]) LO[1] = g - d; if (b - d > LO[2]) LO[2] = b - d;
       }
       return LO;
