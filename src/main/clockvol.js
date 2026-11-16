@@ -198,7 +198,7 @@
           if (m.type !== 'clock') { CV.stats.err = (CV.stats.err | 0) + 1; CV.stats.last = m.type + ' ' + String(m.msg || m.error || '').slice(0, 160); return; }
           if (world.cols.get(c.key) !== c) { CV.stats.gone = (CV.stats.gone | 0) + 1; return; }
           s.clk = m.data; s.envB = m.env || null; s.clkSig = g; CV.stats.baked++; CV.stats.ms += m.ms || 0;
-        }, -50);
+        }, 1e5);   // (behind every gen and mesh job: the world loads first, its light refines after)
       }
     }
   };
