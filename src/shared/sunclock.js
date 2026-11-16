@@ -95,6 +95,8 @@
   const K = SC.K = 48, BIS = 4, LAT = 5, LSTEP = 4;
   const DIRS = new Float64Array(K * 3), SLOPE = new Float64Array(K), HX = new Float64Array(K), HZ = new Float64Array(K);
   (function () { const d = [0, 0, 0]; for (let k = 0; k < K; k++) { SC.arc((k + 0.5) / K, d); DIRS[k * 3] = d[0]; DIRS[k * 3 + 1] = d[1]; DIRS[k * 3 + 2] = d[2]; const h = Math.hypot(d[0], d[2]); HX[k] = d[0] / h; HZ[k] = d[2] / h; SLOPE[k] = d[1] / h; } })();
+  const NS = SC.NS = 24, SKY = new Float64Array(NS * 3);
+  (function () { for (let i = 0; i < NS; i++) { const u = (i + 0.5) / NS, ph = i * 2.399963229728653, sn = Math.sqrt(u); SKY[i * 3] = Math.cos(ph) * sn; SKY[i * 3 + 1] = Math.sqrt(1 - u); SKY[i * 3 + 2] = Math.sin(ph) * sn; } })();
   const NRM = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];   // the mesher's face order
   const _d = [0, 0, 0];
 
@@ -253,7 +255,15 @@
       return SC.pack(IV);
     }
     const cache = new Map();
+    // E2 · Himmelslicht: the share of the sky a point sees — NS rays, cosine-weighted about straight up (each counts the
+    // same), through the bit volume; a ray that leaves it has reached the sky
+    function sky(px, py, pz) {
+      let n = 0;
+      for (let i = 0; i < NS; i++) if (ray(px + VPAD, py, pz + VPAD, SKY[i * 3], SKY[i * 3 + 1], SKY[i * 3 + 2])) n++;
+      return n / NS;
+    }
     const B = {
+      sky,
       steps: () => steps,
       lit, ycrit,
       // a cube face's corner: the lattice point (x, y, z) of the section (0…16) on a face that looks along d (0…5)
@@ -287,6 +297,7 @@
   SC.bakeSection = function (job) {
     const B = SC.begin(job), V = job.vol, below = job.below || null;
     const out = new Uint8Array(4096 * 4), st = new Uint8Array(4096);   // st: 0 unknown, 1 traced, 2 copied
+    const skyB = new Uint8Array(4096);   // (E2: the share of the sky each cell sees, 0…255)
     const solid = (x, y, z) => {
       if (y < 0) { if (!below || x < 0 || x > 15 || z < 0 || z > 15) return 0; return (below[z] >> x) & 1; }
       return (V[(y * VZ + z + VPAD) * RW + ((x + VPAD) >> 4)] >> ((x + VPAD) & 15)) & 1;
@@ -298,15 +309,16 @@
       if (!(solid(x + 1, y, z) | solid(x - 1, y, z) | solid(x, y + 1, z) | solid(x, y - 1, z) | solid(x, y, z + 1) | solid(x, y, z - 1))) continue;
       const i = (y * 16 + z) * 16 + x;
       put(i, B.probe(x + 0.5, y + 0.5, z + 0.5)); st[i] = 1; n++;
+      skyB[i] = Math.round(B.sky(x + 0.5, y + 0.5, z + 0.5) * 255);
     }
     // the others: from a traced neighbour (the one above first: a solid cell shows the light on its top)
     const NB = [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]];
     for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const i = (y * 16 + z) * 16 + x; if (st[i]) continue;
-      let u = SC.EMPTY;
-      for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; break; } }
-      put(i, u); st[i] = 2;
+      let u = SC.EMPTY, sv = 255;
+      for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; sv = skyB[j]; break; } }
+      put(i, u); skyB[i] = sv; st[i] = 2;
     }
-    return { data: out, n, steps: B.steps() };
+    return { data: out, sky: skyB, n, steps: B.steps() };
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -1046,6 +1046,24 @@ float clockVis(vec3 lp, vec3 N) {
   float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
   return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 }
+// e-himmel · E2 Himmelslicht: the share of the sky the cell in front of the face sees (baked with the clocks, one more
+// filtered texel) → the factor on the sky's light: u_skyK.y where it sees none … u_skyK.z in the open; 1 where unknown
+uniform highp sampler3D u_skyVol;
+uniform vec4 u_skyK;
+float skyOpen(vec3 lp, vec3 N) {
+  if (u_skyK.x < 0.5 || u_clockWin.w < -1.0) return 1.0;
+  vec3 wp = lp + vec3(u_camInt) + N * 0.5;
+  vec3 r = wp - u_clockWin.xyz;
+  if (r.x < 0.5 || r.y < 0.5 || r.z < 0.5 || r.x > 127.5 || r.y > 63.5 || r.z > 127.5) return 1.0;
+  ivec3 sc = ivec3(floor(wp / 16.0)) & ivec3(7, 3, 7);
+  int sl = sc.x + 8 * sc.z + 64 * sc.y;
+  uvec4 q = u_clockOk[sl >> 7];
+  int wi = (sl >> 5) & 3;
+  uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
+  if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
+  float v = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0)).r;
+  return mix(u_skyK.y, u_skyK.z, sqrt(v));
+}
 #endif
 // sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low)
 float shadowAt(vec3 N, vec3 L) {
@@ -1554,6 +1572,9 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
     amb *= XD_AMB;   // and the shade's sky light a little lower (a firmer key-to-fill ratio)
 #endif
   }
+#endif
+#ifdef SUNCLOCK
+  amb *= skyOpen(v_localPos, N);   // e-himmel: the sky's light by how much sky the place really sees
 #endif
 #ifdef GM_PAINT
   amb *= gmShK;

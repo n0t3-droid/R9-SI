@@ -212,7 +212,7 @@
       } else if (m.type === 'clock') {
         // e-uhr · Schattenuhr: the clocks of a section's cells (sunclock.js bakeSection) for the clock volume
         const t0 = performance.now(), r = VR.SunClock.bakeSection(m);
-        post({ type: 'clock', id: m.id, key: m.key, sy: m.sy, ver: m.ver, data: r.data, n: r.n, ms: performance.now() - t0 }, [r.data.buffer]);
+        post({ type: 'clock', id: m.id, key: m.key, sy: m.sy, ver: m.ver, data: r.data, sky: r.sky, n: r.n, ms: performance.now() - t0 }, [r.data.buffer, r.sky.buffer]);
       } else if (m.type === 'smoothvox') {
         // t-form: a model's surface-nets meshes (smoothvox.js): the game's furniture layout or the Studio's
         const r = VR.SmoothVox.job(m), tr = r.transfer; delete r.transfer;
