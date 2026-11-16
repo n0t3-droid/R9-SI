@@ -34,8 +34,8 @@
   // walls, not the flood fill's diamonds (FILL of the flood's light stays as the soft light that goes round corners)
   CV.FILL = 0.4;
   CV.noLamp = new Uint8Array(4096 * 4);   // (a section without lamps: a = 0, the shader keeps the flood)
-  CV.lampOn = (s) => CV.on(s) && (!s || s.lamplight !== false);
-  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'lamplight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.lamplight', tip: 'g.set.lamplight.tip', cost: 'low', def: true });
+  CV.lampOn = (s) => CV.on(s) && !!(s && s.lamplight === true);   // (off by default until a picture proves it better: the village test showed no clear win)
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'lamplight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.lamplight', tip: 'g.set.lamplight.tip', cost: 'low', def: false });
   CV.bounce = (s) => CV.on(s) && (!s || s.bounce !== false);
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'bounce', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.bounce', tip: 'g.set.bounce.tip', cost: 'low', def: true });
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'skylight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.skylight', tip: 'g.set.skylight.tip', cost: 'low', def: true });
