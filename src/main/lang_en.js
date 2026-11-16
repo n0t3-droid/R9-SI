@@ -3984,6 +3984,8 @@
     "g.set.skylight.tip": "Faces are as bright as the sky they really see: soft shade under porches, crowns and in lanes, full light in the open. Worked out in the background (needs the shadow clock).",
     "g.set.bounce": "Bounce light",
     "g.set.bounce.tip": "Light given back by sunlit walls and meadows, in their colour: a red wall tints the lane, the meadow lifts the shade under the trees. Worked out in the background.",
+    "g.set.lamplight": "Lamp light",
+    "g.set.lamplight.tip": "Lamps, fires and glowing blocks cast round pools of light with real shadows behind pillars and walls. Worked out in the background.",
     "g.set.wander.tip": "On foot you meet something between the places every 20–40 seconds: wanderers who walk with you to the next village, a lost pet, a picnic, kites over the meadow, a shrine, ruins with a riddle, a map scrap … and the guide balloon shows the next place. On Very Low only the simple ones, one at a time.",
     "g.wd.place": "{name} discovered",
     "g.wd.placeSub": "Now in your wander book (J).",

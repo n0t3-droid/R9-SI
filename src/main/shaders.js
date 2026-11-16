@@ -1051,8 +1051,9 @@ float clockVis(vec3 lp, vec3 N) {
 uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
 vec3 skyEnvRGB = vec3(0.0);   // (e-bounce: the colour the surroundings give back, set by skyOpen)
+vec3 skyLamp = vec3(-1.0);    // (e-lampe: the lamps' light by rays, 0…1 a channel; −1 unknown)
 float skyOpen(vec3 lp, vec3 N) {
-  skyEnvRGB = vec3(0.0);
+  skyEnvRGB = vec3(0.0); skyLamp = vec3(-1.0);
   if (u_clockWin.w < -1.0) return 1.0;
   vec3 wp = lp + vec3(u_camInt) + N * 0.5;
   vec3 r = wp - u_clockWin.xyz;
@@ -1063,7 +1064,10 @@ float skyOpen(vec3 lp, vec3 N) {
   int wi = (sl >> 5) & 3;
   uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
   if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
-  vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+  float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);   // (e-lampe: the volume is two halves: env below, the lamps above)
+  vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, ry / 128.0));
+  vec4 lm = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 128.0));
+  skyLamp = lm.a > 0.5 ? lm.rgb : vec3(-1.0);
   skyEnvRGB = e.rgb;
   return u_skyK.x < 0.5 ? 1.0 : mix(u_skyK.y, u_skyK.z, sqrt(e.a));
 }
@@ -1500,6 +1504,12 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
 #endif
 #endif
   vec3 bl = v_block;
+#ifdef SUNCLOCK
+  // e-lampe · Lampenlicht: the lamps' light by rays (round pools, real shadows), with a share of the flood fill as the
+  // light that goes round corners — where the volume knows (the sky factor is read later from the same texel)
+  float skyF0 = skyOpen(v_localPos, N);
+  if (u_bounceK.y > 0.5 && skyLamp.x >= 0.0) bl = max(skyLamp, bl * u_bounceK.z);
+#endif
   vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
 #ifdef LIGHT2
   blockL = l2Pool(bl);   // t-light2: the lamps' light in pools (light2.js)
@@ -1578,7 +1588,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   }
 #endif
 #ifdef SUNCLOCK
-  amb *= skyOpen(v_localPos, N);   // e-himmel: the sky's light by how much sky the place really sees
+  amb *= skyF0;   // e-himmel: the sky's light by how much sky the place really sees (read with the lamps, above)
   // e-bounce · Rückstrahlung: the surroundings' colour, lit by the sun, given back (less on faces that look up: their
   // own ground is under them)
   amb += skyEnvRGB * lc * (u_bounceK.x * (1.0 - 0.7 * max(N.y, 0.0)));
