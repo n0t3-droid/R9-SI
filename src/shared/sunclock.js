@@ -106,6 +106,14 @@
       const row = (y * VZ + z) * RW, b0 = ((y >> 2) * BZN + (z >> 2)) * BXN;
       for (let w = 0; w < RW; w++) { const v = V[row + w]; if (!v) continue; for (let n = 0; n < 4; n++) if ((v >> (n * 4)) & 15) BR[b0 + w * 4 + n] = 1; }
     }
+    // … and the height of each 4 × 4 column of cells (the first free layer above its highest set cell): a rising ray
+    // above it crosses the whole column in one step
+    const CM = new Uint8Array(BXN * BZN);
+    for (let by = BYN - 1; by >= 0; by--) for (let bz = 0; bz < BZN; bz++) for (let bx = 0; bx < BXN; bx++) {
+      const ci = bz * BXN + bx;
+      if (CM[ci] || !BR[(by * BZN + bz) * BXN + bx]) continue;
+      for (let y = by * 4 + 3; y >= by * 4; y--) { let hit = false; for (let z = bz * 4; z < bz * 4 + 4 && !hit; z++) if ((V[(y * VZ + z) * RW + (bx >> 2)] >> ((bx & 3) * 4)) & 15) hit = true; if (hit) { CM[ci] = y + 1; break; } }
+    }
     // the far field: for the 5 × 5 lattice of the section (every 4 blocks) and every bin, the height under which a
     // point is in the shadow of something beyond the bit volume: max over the columns q along the light's way of
     // H(q) − t·slope (t: the way to q on the ground). Independent of the point's own height, so one number serves a
@@ -176,6 +184,13 @@
         if (cx < 0 || cy < 0 || cz < 0 || cx >= VX || cy >= VY || cz >= VZ) return true;
         steps++;
         let size = 1, bx = cx, by = cy, bz = cz;
+        if (dy > 0 && y >= CM[(cz >> 2) * BXN + (cx >> 2)]) {
+          // above everything in this 4 × 4 column and rising: out of the column sideways in one step
+          bx = cx & ~3; bz = cz & ~3;
+          const tx = (sx > 0 ? bx + 4 - x : x - bx) * ix, tz = (sz > 0 ? bz + 4 - z : z - bz) * iz, t = (tx < tz ? tx : tz) + E;
+          x += dx * t; y += dy * t; z += dz * t;
+          continue;
+        }
         if (!BR[((cy >> 2) * BZN + (cz >> 2)) * BXN + (cx >> 2)]) { size = 4; bx = cx & ~3; by = cy & ~3; bz = cz & ~3; }
         else if ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) return false;
         // to the box's far wall along the ray
@@ -193,6 +208,13 @@
       return ray(px + VPAD, py, pz + VPAD, _d[0], _d[1], _d[2]);
     }
     const ST = new Uint8Array(K), IV = [];
+    const Q = { o00: 0, o10: 0, o01: 0, o11: 0, w00: 0, w10: 0, w01: 0, w11: 0, wy: 0, vx: 0, vz: 0, py: 0, nx: 0, ny: 0, nz: 0, all: false };
+    function bin(k) {
+      const dx = DIRS[k * 3], dy = DIRS[k * 3 + 1], dz = DIRS[k * 3 + 2];
+      if (!Q.all && Q.nx * dx + Q.ny * dy + Q.nz * dz <= 0.02) return 2;
+      if (Q.wy < YC[Q.o00 + k] * Q.w00 + YC[Q.o10 + k] * Q.w10 + YC[Q.o01 + k] * Q.w01 + YC[Q.o11 + k] * Q.w11) return 0;
+      return ray(Q.vx, Q.py, Q.vz, dx, dy, dz) ? 1 : 0;
+    }
     // the clock of a point with a normal (nx, ny, nz): bins where the face looks away from the light are "don't care"
     // (they take their neighbour's state: no false edge at the terminator; the n·l of the picture is zero there)
     function clock(px, py, pz, nx, ny, nz, all) {
@@ -201,14 +223,14 @@
       let fx = px / LSTEP, fz = pz / LSTEP;
       fx = fx < 0 ? 0 : fx > LAT - 1 ? LAT - 1 : fx; fz = fz < 0 ? 0 : fz > LAT - 1 ? LAT - 1 : fz;
       const ix = fx >= LAT - 1 ? LAT - 2 : fx | 0, iz = fz >= LAT - 1 ? LAT - 2 : fz | 0, ax = fx - ix, az = fz - iz;
-      const o00 = (iz * LAT + ix) * (K + 2) + 1, o10 = o00 + (K + 2), o01 = o00 + LAT * (K + 2), o11 = o01 + (K + 2);
-      const w00 = (1 - ax) * (1 - az), w10 = ax * (1 - az), w01 = (1 - ax) * az, w11 = ax * az, wy = py + oy, vx = px + VPAD, vz = pz + VPAD;
-      for (let k = 0; k < K; k++) {
-        const dx = DIRS[k * 3], dy = DIRS[k * 3 + 1], dz = DIRS[k * 3 + 2];
-        if (!all && nx * dx + ny * dy + nz * dz <= 0.02) { ST[k] = 2; continue; }
-        if (wy < YC[o00 + k] * w00 + YC[o10 + k] * w10 + YC[o01 + k] * w01 + YC[o11 + k] * w11) { ST[k] = 0; continue; }
-        if (ray(vx, py, vz, dx, dy, dz)) { ST[k] = 1; any = true; } else ST[k] = 0;
-      }
+      Q.o00 = (iz * LAT + ix) * (K + 2) + 1; Q.o10 = Q.o00 + (K + 2); Q.o01 = Q.o00 + LAT * (K + 2); Q.o11 = Q.o01 + (K + 2);
+      Q.w00 = (1 - ax) * (1 - az); Q.w10 = ax * (1 - az); Q.w01 = (1 - ax) * az; Q.w11 = ax * az; Q.wy = py + oy; Q.vx = px + VPAD; Q.vz = pz + VPAD; Q.py = py;
+      Q.nx = nx; Q.ny = ny; Q.nz = nz; Q.all = all;
+      // coarse to fine: the even bins first, an odd bin only where its two neighbours disagree (a shadow shorter than
+      // two bins — a thin far trunk — may slip through; its penumbra would be wider than itself anyway)
+      for (let k = 0; k < K; k += 2) ST[k] = bin(k);
+      for (let k = 1; k < K; k += 2) { const a = ST[k - 1], b = k + 1 < K ? ST[k + 1] : a; ST[k] = a === b && a !== 2 ? a : bin(k); }
+      for (let k = 0; k < K; k++) if (ST[k] === 1) { any = true; break; }
       if (!any) return SC.EMPTY;
       // edges: between two bins that know (bisected), at the arc's ends (bisected), in the middle of a don't-care run
       IV.length = 0;
