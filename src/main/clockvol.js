@@ -30,6 +30,12 @@
   // E2b · Rückstrahlung: the light the surroundings give back, in their colour (a red wall tints the street, a sunlit
   // meadow lifts the shade under the crowns); strength BOUNCE × the sun's light. Switch „Rückstrahlung" (with the clock)
   CV.BOUNCE = 0.42;
+  // E2c · Lampenlicht: lamps, fires and glowing blocks light by rays — round pools with real shadows behind pillars and
+  // walls, not the flood fill's diamonds (FILL of the flood's light stays as the soft light that goes round corners)
+  CV.FILL = 0.4;
+  CV.noLamp = new Uint8Array(4096 * 4);   // (a section without lamps: a = 0, the shader keeps the flood)
+  CV.lampOn = (s) => CV.on(s) && !!(s && s.lamplight === true);   // (off by default until a picture proves it better: the village test showed no clear win)
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'lamplight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.lamplight', tip: 'g.set.lamplight.tip', cost: 'low', def: false });
   CV.bounce = (s) => CV.on(s) && (!s || s.bounce !== false);
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'bounce', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.bounce', tip: 'g.set.bounce.tip', cost: 'low', def: true });
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'skylight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.skylight', tip: 'g.set.skylight.tip', cost: 'low', def: true });
@@ -53,8 +59,9 @@
     const O = SC.opaqueTable(), B = c.blocks, bits = s.occ || new Uint16Array(256);
     bits.fill(0);
     const H = c.H || 256;
-    for (let y = 0; y < 16; y++) { const wy = sy * 16 + y; if (wy >= H) break; const base = wy << 8; for (let z = 0; z < 16; z++) { let row = 0; const i = base | (z << 4); for (let x = 0; x < 16; x++) if (O[B[i | x]]) row |= 1 << x; bits[y * 16 + z] = row; } }
-    s.occ = bits; s.occVer = ver;
+    const EM = VR.R.T.emit, lamps = [];   // (e-lampe: the lamps of the section, x y z local and their packed levels)
+    for (let y = 0; y < 16; y++) { const wy = sy * 16 + y; if (wy >= H) break; const base = wy << 8; for (let z = 0; z < 16; z++) { let row = 0; const i = base | (z << 4); for (let x = 0; x < 16; x++) { const b = B[i | x]; if (O[b]) row |= 1 << x; if (b && EM[b]) lamps.push(x, y, z, EM[b]); } bits[y * 16 + z] = row; } }
+    s.occ = bits; s.occVer = ver; s.lamps = lamps;
     return bits;
   }
   // the signature of a bake: the versions of the 5 × 5 × 3 sections it read
@@ -85,6 +92,16 @@
       const B = n.blocks, H = n.H || 256;
       for (let y = 0; y < 48; y++) { const wy = oy + y; if (wy >= H) break; for (let z = 0; z < 16; z++) { const src = (wy << 8) | (z << 4), dst = (y * 48 + (dz + 1) * 16 + z) * 48 + (dx + 1) * 16; ids.set(B.subarray(src, src + 16), dst); } }
     }
+    // e-lampe: the lamps of the 5 × 5 columns, the section below up to the two above (volume coordinates)
+    let lamps = null;
+    if (CV.lampOn(S())) {
+      const L = [];
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const n = world.col(cx + dx, cz + dz); if (!n || !n.ready) continue;
+        for (let k = -1; k < 3; k++) { if (sy + k < 0 || !n.sec[sy + k]) continue; slab(n, sy + k); const ls = n.sec[sy + k].lamps; if (!ls) continue; for (let i = 0; i < ls.length; i += 4) L.push((dx + 2) * 16 + ls[i], k * 16 + ls[i + 1], (dz + 2) * 16 + ls[i + 2], ls[i + 3]); }
+      }
+      if (L.length) lamps = new Int32Array(L);
+    }
     const below = new Uint16Array(16);
     if (sy > 0) { const b = slab(c, sy - 1); if (b) for (let z = 0; z < 16; z++) below[z] = b[15 * 16 + z]; }
     // the far field: the columns' tops (c.sh: the top of the sun-blocking layer) 13 × 13 columns round
@@ -93,7 +110,7 @@
       const n = world.col(cx + dx, cz + dz); if (!n || !n.ready || !n.sh) continue;
       for (let z = 0; z < 16; z++) { const o = ((dz + R) * 16 + z) * tw + (dx + R) * 16; for (let x = 0; x < 16; x++) { const h = n.sh[((z << 4) | x) * 2]; top[o + x] = h ? Math.min(255, h + 1) : 0; } }
     }
-    return { type: 'clock', key: c.key, sy, ox: cx * 16, oy, oz: cz * 16, vol, below, ids, top, topX0: (cx - R) * 16, topZ0: (cz - R) * 16, topW: tw };
+    return { type: 'clock', key: c.key, sy, ox: cx * 16, oy, oz: cz * 16, vol, below, ids, lamps, top, topX0: (cx - R) * 16, topZ0: (cz - R) * 16, topW: tw };
   };
   // does a section meet the land (so a face in it, or on its floor, can ask for a clock)? the columns' sun-blocking
   // layers [bottom − 16, top + 1]
@@ -125,7 +142,7 @@
     // E2 · Himmelslicht: the share of the sky each cell sees, beside the clocks (R8, the same window and slots)
     this.skyTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.skyTex);
-    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H);   // (e-bounce: rgb the colour given back, a the sky)
+    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H * 2);   // (e-bounce: rgb the colour given back, a the sky; e-lampe: the upper half the lamps' light)
     for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, p, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -169,6 +186,7 @@
               gl.bindTexture(gl.TEXTURE_3D, this.clockTex); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
               gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.clk);
               if (s.envB) { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.envB); }
+              { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, 64 + (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.lampB || CV.noLamp); }
               gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
               this.clockOwner[sl] = h; this.clockSig[sl] = s.clkSig; up++; CV.stats.up++;
             }
@@ -193,11 +211,11 @@
         if (!all) continue;
         const s = c.sec[sy], g = sig(world, c.cx, c.cz, sy), job = CV.buildJob(world, c, sy);
         s.clkPending = true; CV.inflight = (CV.inflight | 0) + 1; CV.stats.jobs++;
-        world.pool.submit(job, [job.vol.buffer, job.top.buffer, job.below.buffer].concat(job.ids ? [job.ids.buffer] : []), (m) => {
+        world.pool.submit(job, [job.vol.buffer, job.top.buffer, job.below.buffer].concat(job.ids ? [job.ids.buffer] : [], job.lamps ? [job.lamps.buffer] : []), (m) => {
           s.clkPending = false; CV.inflight = Math.max(0, (CV.inflight | 0) - 1);
           if (m.type !== 'clock') { CV.stats.err = (CV.stats.err | 0) + 1; CV.stats.last = m.type + ' ' + String(m.msg || m.error || '').slice(0, 160); return; }
           if (world.cols.get(c.key) !== c) { CV.stats.gone = (CV.stats.gone | 0) + 1; return; }
-          s.clk = m.data; s.envB = m.env || null; s.clkSig = g; CV.stats.baked++; CV.stats.ms += m.ms || 0;
+          s.clk = m.data; s.envB = m.env || null; s.lampB = m.lamp || null; s.clkSig = g; CV.stats.baked++; CV.stats.ms += m.ms || 0;
         }, 1e5);   // (behind every gen and mesh job: the world loads first, its light refines after)
       }
     }
@@ -218,7 +236,7 @@
       if (this.clockTex) { gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_3D, this.clockTex); }
       if (u.u_clockVol) gl.uniform1i(u.u_clockVol, 5);
       if (u.u_skyVol) { if (this.skyTex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_3D, this.skyTex); } gl.uniform1i(u.u_skyVol, 8); }
-      if (u.u_bounceK) gl.uniform4f(u.u_bounceK, live && CV.bounce(S()) ? CV.BOUNCE : 0, 0, 0, 0);
+      if (u.u_bounceK) gl.uniform4f(u.u_bounceK, live && CV.bounce(S()) ? CV.BOUNCE : 0, live && CV.lampOn(S()) ? 1 : 0, CV.FILL, 0);
       if (u.u_skyK) gl.uniform4f(u.u_skyK, live && (!S() || S().skylight !== false) ? 1 : 0, CV.SKY_LO, CV.SKY_HI, 0);
       const w = this.clockWin || [0, 0, 0], s = live ? CV.arcTime(E.sunDir) : -9;
       gl.uniform4f(u.u_clockWin, w[0], w[1], w[2], s);

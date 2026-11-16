@@ -216,6 +216,25 @@ const d = [0, 0, 0];
     check(Math.abs(at(11, 10, 8)[3] - r.sky[(10 * 16 + 8) * 16 + 11]) <= 1, 'm  a carries the sky openness as before');
   }
 }
+// ---------------------------------------------------------------- n  E2c · Lampenlicht: lamps with real shadows
+{
+  const floor = (set) => { for (let x = -32; x < 48; x++) for (let z = -32; z < 48; z++) for (let y = 0; y < 10; y++) set(x, y, z); };
+  // a lamp (level 14 warm: r 14, g 12, b 8) at (4, 11, 8), a pillar at (7, 10…13, 8) between it and (10, 10, 8)
+  const jb = job((set) => { floor(set); for (let y = 10; y < 14; y++) set(7, y, 8); });
+  jb.lamps = new Int32Array([4 + SC.VPAD, 11, 8 + SC.VPAD, V.packLight(14, 12, 8)]);
+  const B = SC.begin(jb);
+  check(typeof B.lamp === 'function', 'n  lamp() exists');
+  if (typeof B.lamp === 'function') {
+    const near = B.lamp(5.5, 10.5, 8.5).slice(), behind = B.lamp(10.5, 10.5, 8.5).slice(), side = B.lamp(10.5, 10.5, 12.5).slice(), far = B.lamp(25.5, 10.5, 8.5).slice();
+    console.log('     beside ' + near.map(v => v.toFixed(1)) + ' · behind the pillar ' + behind.map(v => v.toFixed(1)) + ' · beside the pillar ' + side.map(v => v.toFixed(1)));
+    check(near[0] > 11.5 && near[0] > near[2], 'n  beside the lamp: bright and warm');
+    check(behind[0] === 0, 'n  behind a pillar: its shadow (no light from that lamp)');
+    check(side[0] > 3.5, 'n  beside the pillar, in view of the lamp: lit');
+    check(far[0] === 0, 'n  21 blocks away: out of reach');
+    const r = SC.bakeSection(jb);
+    check(r.lamp && r.lamp[((10 * 16 + 8) * 16 + 5) * 4] > 200 && r.lamp[((10 * 16 + 8) * 16 + 10) * 4] === 0, 'n  the section\'s lamp bytes: lit beside, dark in the shadow');
+  }
+}
 // ---------------------------------------------------------------- k  cost of a real section's clock volume
 {
   const g = V.makeGen('overworld', 777, {}), O = SC.opaqueTable(), C = new Map();

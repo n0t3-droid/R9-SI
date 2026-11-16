@@ -189,10 +189,12 @@
     // the volume unhindered. Two levels: empty 4³ bricks in one step, cells inside the others.
     let steps = 0;
     const HIT = [0, 0, 0];   // (the cell a blocked ray hit, volume coordinates — the bounce asks what it was)
-    function ray(px, py, pz, dx, dy, dz) {
-      const E = 1e-4;
-      let x = px + dx * E, y = py + dy * E, z = pz + dz * E;
-      if (y < 0) { if (dy <= 1e-9) return true; const t0 = -y / dy + E; x += dx * t0; y += dy * t0; z += dz * t0; }   // (from under the volume's floor: up into it; what lies below is not known)
+    // (e-lampe: with tmax > 0 the ray ends there — a lamp's light: true when nothing hides the lamp's cell TC)
+    const TC = [0, 0, 0];
+    function ray(px, py, pz, dx, dy, dz, tmax) {
+      const E = 1e-4, lim = tmax || 0;
+      let x = px + dx * E, y = py + dy * E, z = pz + dz * E, T = E;
+      if (y < 0) { if (dy <= 1e-9) return true; const t0 = -y / dy + E; x += dx * t0; y += dy * t0; z += dz * t0; T += t0; }   // (from under the volume's floor: up into it; what lies below is not known)
       const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
       const ix = dx !== 0 ? 1 / Math.abs(dx) : 1e30, iy = dy !== 0 ? 1 / Math.abs(dy) : 1e30, iz = dz !== 0 ? 1 / Math.abs(dz) : 1e30;
       for (let guard = 0; guard < 400; guard++) {
@@ -204,15 +206,17 @@
           // above everything in this 4 × 4 column and rising: out of the column sideways in one step
           bx = cx & ~3; bz = cz & ~3;
           const tx = (sx > 0 ? bx + 4 - x : x - bx) * ix, tz = (sz > 0 ? bz + 4 - z : z - bz) * iz, t = (tx < tz ? tx : tz) + E;
-          x += dx * t; y += dy * t; z += dz * t;
+          x += dx * t; y += dy * t; z += dz * t; T += t;
+          if (lim && T >= lim) return true;
           continue;
         }
         if (!BR[((cy >> 2) * BZN + (cz >> 2)) * BXN + (cx >> 2)]) { size = 4; bx = cx & ~3; by = cy & ~3; bz = cz & ~3; }
-        else if ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) { HIT[0] = cx; HIT[1] = cy; HIT[2] = cz; return false; }
+        else if ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) { if (lim && cx === TC[0] && cy === TC[1] && cz === TC[2]) return true; HIT[0] = cx; HIT[1] = cy; HIT[2] = cz; return false; }
         // to the box's far wall along the ray
         const tx = (sx > 0 ? bx + size - x : x - bx) * ix, ty = (sy > 0 ? by + size - y : y - by) * iy, tz = (sz > 0 ? bz + size - z : z - bz) * iz;
         const t = (tx < ty ? (tx < tz ? tx : tz) : (ty < tz ? ty : tz)) + E;
-        x += dx * t; y += dy * t; z += dz * t;
+        x += dx * t; y += dy * t; z += dz * t; T += t;
+        if (lim && T >= lim) return true;
       }
       return true;
     }
@@ -292,8 +296,40 @@
       BO[0] /= NB2; BO[1] /= NB2; BO[2] /= NB2;
       return BO;
     }
+    // E2c · Lampenlicht: the lamps' light at a point with real shadows — every lamp of job.lamps (volume x, y, z and its
+    // packed rgb levels) within its reach, a ray to its cell; the light falls off with the straight distance as the flood
+    // fill's does with steps (level − d), the brightest per channel wins. → [r, g, b] levels 0…15
+    // (only the lamps that can reach the section: within 15 of its box; the brightest first, so the test "could it add
+    // anything" ends the search early)
+    // (DK: the straight distance counts 1.3 ×, as the flood fill's steps go round — about the mean of |x|+|y|+|z| over
+    // |p| in 3-D — so a lamp's pool keeps the size it had, only rounder and with shadows)
+    const DK = 1.3;
+    let LAMPS = null; const LO = [0, 0, 0];
+    if (job.lamps && job.lamps.length) {
+      const keep = [];
+      for (let i = 0; i < job.lamps.length; i += 4) { const x = job.lamps[i] - VPAD, y = job.lamps[i + 1], z = job.lamps[i + 2] - VPAD; if (x >= -15 && x <= 30 && z >= -15 && z <= 30 && y >= -15 && y <= 30) keep.push(i); }
+      const lev = (i) => { const pk = job.lamps[i + 3]; return Math.max((pk >> 8) & 15, (pk >> 4) & 15, pk & 15); };
+      keep.sort((a, b) => lev(b) - lev(a));
+      LAMPS = new Int32Array(keep.length * 4); keep.forEach((i, k) => { for (let q = 0; q < 4; q++) LAMPS[k * 4 + q] = job.lamps[i + q]; });
+    }
+    function lamp(px, py, pz) {
+      LO[0] = LO[1] = LO[2] = 0;
+      if (!LAMPS) return LO;
+      const vx = px + VPAD, vz = pz + VPAD;
+      for (let i = 0; i < LAMPS.length; i += 4) {
+        const lx = LAMPS[i] + 0.5, ly = LAMPS[i + 1] + 0.5, lz = LAMPS[i + 2] + 0.5, pk = LAMPS[i + 3];
+        const r = (pk >> 8) & 15, g = (pk >> 4) & 15, b = pk & 15, L = r > g ? (r > b ? r : b) : (g > b ? g : b);
+        const dx = lx - vx, dy = ly - py, dz = lz - vz, de = Math.sqrt(dx * dx + dy * dy + dz * dz), d = de * DK;
+        if (d >= L) continue;
+        if (r - d <= LO[0] && g - d <= LO[1] && b - d <= LO[2]) continue;   // (it could add nothing)
+        TC[0] = Math.floor(lx); TC[1] = Math.floor(ly); TC[2] = Math.floor(lz);
+        if (de > 0.9 && !ray(vx, py, vz, dx / de, dy / de, dz / de, de)) continue;
+        if (r - d > LO[0]) LO[0] = r - d; if (g - d > LO[1]) LO[1] = g - d; if (b - d > LO[2]) LO[2] = b - d;
+      }
+      return LO;
+    }
     const B = {
-      sky, bounce,
+      sky, bounce, lamp,
       steps: () => steps,
       lit, ycrit,
       // a cube face's corner: the lattice point (x, y, z) of the section (0…16) on a face that looks along d (0…5)
@@ -329,6 +365,7 @@
     const out = new Uint8Array(4096 * 4), st = new Uint8Array(4096);   // st: 0 unknown, 1 traced, 2 copied
     const skyB = new Uint8Array(4096);   // (E2: the share of the sky each cell sees, 0…255)
     const env = new Uint8Array(4096 * 4);   // (E2b: rgb the colour given back, a the sky)
+    const lampB = job.lamps ? new Uint8Array(4096 * 4) : null;   // (E2c: rgb the lamps' light, levels × 17; a 255 known)
     const solid = (x, y, z) => {
       if (y < 0) { if (!below || x < 0 || x > 15 || z < 0 || z > 15) return 0; return (below[z] >> x) & 1; }
       return (V[(y * VZ + z + VPAD) * RW + ((x + VPAD) >> 4)] >> ((x + VPAD) & 15)) & 1;
@@ -342,6 +379,7 @@
       put(i, B.probe(x + 0.5, y + 0.5, z + 0.5)); st[i] = 1; n++;
       skyB[i] = Math.round(B.sky(x + 0.5, y + 0.5, z + 0.5) * 255);
       const bo = B.bounce(x + 0.5, y + 0.5, z + 0.5); env[i * 4] = bo[0]; env[i * 4 + 1] = bo[1]; env[i * 4 + 2] = bo[2]; env[i * 4 + 3] = skyB[i];
+      if (lampB) { const lo = B.lamp(x + 0.5, y + 0.5, z + 0.5); lampB[i * 4] = Math.round(lo[0] * 17); lampB[i * 4 + 1] = Math.round(lo[1] * 17); lampB[i * 4 + 2] = Math.round(lo[2] * 17); lampB[i * 4 + 3] = 255; }
     }
     // the others: from a traced neighbour (the one above first: a solid cell shows the light on its top)
     const NB = [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]];
@@ -351,7 +389,8 @@
       for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; sv = skyB[j]; ej = j; break; } }
       put(i, u); skyB[i] = sv; st[i] = 2;
       if (ej >= 0) { env[i * 4] = env[ej * 4]; env[i * 4 + 1] = env[ej * 4 + 1]; env[i * 4 + 2] = env[ej * 4 + 2]; } env[i * 4 + 3] = sv;
+      if (lampB && ej >= 0) { lampB[i * 4] = lampB[ej * 4]; lampB[i * 4 + 1] = lampB[ej * 4 + 1]; lampB[i * 4 + 2] = lampB[ej * 4 + 2]; lampB[i * 4 + 3] = 255; }
     }
-    return { data: out, sky: skyB, env, n, steps: B.steps() };
+    return { data: out, sky: skyB, env, lamp: lampB, n, steps: B.steps() };
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
