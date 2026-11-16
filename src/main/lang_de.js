@@ -3982,6 +3982,8 @@
     "g.set.sunclock.tip": "Echte Schatten von Sonne und Mond für jeden PC — einmal im Hintergrund berechnet, dann nur noch angezeigt (auch auf Sehr niedrig).",
     "g.set.skylight": "Himmelslicht",
     "g.set.skylight.tip": "Flächen sind so hell, wie viel Himmel sie wirklich sehen: unter Vordächern, Kronen und in Gassen weicher Schatten, im Freien volles Licht. Im Hintergrund berechnet (braucht die Schattenuhr).",
+    "g.set.bounce": "Rückstrahlung",
+    "g.set.bounce.tip": "Licht, das von besonnten Wänden und Wiesen zurückstrahlt, in ihrer Farbe: Eine rote Wand färbt die Gasse, die Wiese hellt den Schatten unter den Bäumen auf. Im Hintergrund berechnet.",
     "g.set.wander.tip": "Zu Fuß triffst du alle 20–40 Sekunden etwas zwischen den Orten: Wanderer, die dich zum nächsten Dorf begleiten, ein verlorenes Tier, ein Picknick, Drachen über der Wiese, ein Schrein, eine Ruine mit Rätsel, ein Kartenfetzen … und der Wegballon zeigt dir den nächsten Ort. Auf Sehr niedrig nur die einfachen, eines zur Zeit.",
     "g.wd.place": "{name} entdeckt",
     "g.wd.placeSub": "Steht jetzt in deinem Wanderbuch (J).",

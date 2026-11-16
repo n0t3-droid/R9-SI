@@ -97,6 +97,19 @@
   (function () { const d = [0, 0, 0]; for (let k = 0; k < K; k++) { SC.arc((k + 0.5) / K, d); DIRS[k * 3] = d[0]; DIRS[k * 3 + 1] = d[1]; DIRS[k * 3 + 2] = d[2]; const h = Math.hypot(d[0], d[2]); HX[k] = d[0] / h; HZ[k] = d[2] / h; SLOPE[k] = d[1] / h; } })();
   const NS = SC.NS = 24, SKY = new Float64Array(NS * 3);
   (function () { for (let i = 0; i < NS; i++) { const u = (i + 0.5) / NS, ph = i * 2.399963229728653, sn = Math.sqrt(u); SKY[i * 3] = Math.cos(ph) * sn; SKY[i * 3 + 1] = Math.sqrt(1 - u); SKY[i * 3 + 2] = Math.sin(ph) * sn; } })();
+  const NB2 = SC.NB2 = 32, SPH = new Float64Array(NB2 * 3);   // E2b: directions over the whole sphere (Fibonacci)
+  (function () { for (let i = 0; i < NB2; i++) { const y = 1 - 2 * (i + 0.5) / NB2, r = Math.sqrt(1 - y * y), ph = i * 2.399963229728653; SPH[i * 3] = Math.cos(ph) * r; SPH[i * 3 + 1] = y; SPH[i * 3 + 2] = Math.sin(ph) * r; } })();
+  // the block ids the bounce rays read: the 3 × 3 columns round the section (volume x, z 16…63), the volume's 48 layers
+  SC.IDW = 48;
+  SC.bounceIds = () => new Uint16Array(48 * 48 * 48);
+  SC.idSet = (ids, x, y, z, s) => { const X = x + 16, Z = z + 16; if (X >= 0 && Z >= 0 && X < 48 && Z < 48 && y >= 0 && y < 48) ids[(y * 48 + Z) * 48 + X] = s; };
+  // the colour of every block state from the textures' averages (the top face's layer), as RGB bytes (the worker's table)
+  SC.colorTable = function (avg) {
+    const R = VR.R, n = R.stateCount, out = new Uint8Array(n * 3).fill(110);
+    if (!avg) return out;
+    for (let st = 1; st < n; st++) { const layer = R.T.tex[st * 6 + 2] & 0xfff; if (avg[layer * 4 + 3] > 0.05) { out[st * 3] = Math.min(255, avg[layer * 4] * 255); out[st * 3 + 1] = Math.min(255, avg[layer * 4 + 1] * 255); out[st * 3 + 2] = Math.min(255, avg[layer * 4 + 2] * 255); } }
+    return out;
+  };
   const NRM = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];   // the mesher's face order
   const _d = [0, 0, 0];
 
@@ -175,6 +188,7 @@
     // one ray through the bit volume from (px, py, pz) (volume-local) along a unit direction: true when it leaves
     // the volume unhindered. Two levels: empty 4³ bricks in one step, cells inside the others.
     let steps = 0;
+    const HIT = [0, 0, 0];   // (the cell a blocked ray hit, volume coordinates — the bounce asks what it was)
     function ray(px, py, pz, dx, dy, dz) {
       const E = 1e-4;
       let x = px + dx * E, y = py + dy * E, z = pz + dz * E;
@@ -194,7 +208,7 @@
           continue;
         }
         if (!BR[((cy >> 2) * BZN + (cz >> 2)) * BXN + (cx >> 2)]) { size = 4; bx = cx & ~3; by = cy & ~3; bz = cz & ~3; }
-        else if ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) return false;
+        else if ((V[(cy * VZ + cz) * RW + (cx >> 4)] >> (cx & 15)) & 1) { HIT[0] = cx; HIT[1] = cy; HIT[2] = cz; return false; }
         // to the box's far wall along the ray
         const tx = (sx > 0 ? bx + size - x : x - bx) * ix, ty = (sy > 0 ? by + size - y : y - by) * iy, tz = (sz > 0 ? bz + size - z : z - bz) * iz;
         const t = (tx < ty ? (tx < tz ? tx : tz) : (ty < tz ? ty : tz)) + E;
@@ -262,8 +276,24 @@
       for (let i = 0; i < NS; i++) if (ray(px + VPAD, py, pz + VPAD, SKY[i * 3], SKY[i * 3 + 1], SKY[i * 3 + 2])) n++;
       return n / NS;
     }
+    // E2b · Rückstrahlung: what colour the surroundings give back — NB2 rays over the sphere, each that hits a block
+    // within the ids' window brings its colour; → [r, g, b] (0…255, the mean over ALL rays: open sky gives nothing)
+    const IDS = job.ids || null, COL = job.colors || null, BO = [0, 0, 0];
+    function bounce(px, py, pz) {
+      BO[0] = BO[1] = BO[2] = 0;
+      if (!IDS || !COL) return BO;
+      for (let i = 0; i < NB2; i++) {
+        if (ray(px + VPAD, py, pz + VPAD, SPH[i * 3], SPH[i * 3 + 1], SPH[i * 3 + 2])) continue;
+        const X = HIT[0] - 16, Y = HIT[1], Z = HIT[2] - 16;
+        if (X < 0 || Z < 0 || X >= 48 || Z >= 48) { BO[0] += 110; BO[1] += 110; BO[2] += 110; continue; }
+        const st = IDS[(Y * 48 + Z) * 48 + X], c = st * 3;
+        BO[0] += COL[c]; BO[1] += COL[c + 1]; BO[2] += COL[c + 2];
+      }
+      BO[0] /= NB2; BO[1] /= NB2; BO[2] /= NB2;
+      return BO;
+    }
     const B = {
-      sky,
+      sky, bounce,
       steps: () => steps,
       lit, ycrit,
       // a cube face's corner: the lattice point (x, y, z) of the section (0…16) on a face that looks along d (0…5)
@@ -298,6 +328,7 @@
     const B = SC.begin(job), V = job.vol, below = job.below || null;
     const out = new Uint8Array(4096 * 4), st = new Uint8Array(4096);   // st: 0 unknown, 1 traced, 2 copied
     const skyB = new Uint8Array(4096);   // (E2: the share of the sky each cell sees, 0…255)
+    const env = new Uint8Array(4096 * 4);   // (E2b: rgb the colour given back, a the sky)
     const solid = (x, y, z) => {
       if (y < 0) { if (!below || x < 0 || x > 15 || z < 0 || z > 15) return 0; return (below[z] >> x) & 1; }
       return (V[(y * VZ + z + VPAD) * RW + ((x + VPAD) >> 4)] >> ((x + VPAD) & 15)) & 1;
@@ -310,15 +341,17 @@
       const i = (y * 16 + z) * 16 + x;
       put(i, B.probe(x + 0.5, y + 0.5, z + 0.5)); st[i] = 1; n++;
       skyB[i] = Math.round(B.sky(x + 0.5, y + 0.5, z + 0.5) * 255);
+      const bo = B.bounce(x + 0.5, y + 0.5, z + 0.5); env[i * 4] = bo[0]; env[i * 4 + 1] = bo[1]; env[i * 4 + 2] = bo[2]; env[i * 4 + 3] = skyB[i];
     }
     // the others: from a traced neighbour (the one above first: a solid cell shows the light on its top)
     const NB = [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]];
     for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const i = (y * 16 + z) * 16 + x; if (st[i]) continue;
-      let u = SC.EMPTY, sv = 255;
-      for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; sv = skyB[j]; break; } }
+      let u = SC.EMPTY, sv = 255, ej = -1;
+      for (const d of NB) { const X = x + d[0], Y = y + d[1], Z = z + d[2]; if (X < 0 || Y < 0 || Z < 0 || X > 15 || Y > 15 || Z > 15) continue; const j = (Y * 16 + Z) * 16 + X; if (st[j] === 1) { u = out[j * 4] | (out[j * 4 + 1] << 8) | (out[j * 4 + 2] << 16) | (out[j * 4 + 3] << 24); u >>>= 0; sv = skyB[j]; ej = j; break; } }
       put(i, u); skyB[i] = sv; st[i] = 2;
+      if (ej >= 0) { env[i * 4] = env[ej * 4]; env[i * 4 + 1] = env[ej * 4 + 1]; env[i * 4 + 2] = env[ej * 4 + 2]; } env[i * 4 + 3] = sv;
     }
-    return { data: out, sky: skyB, n, steps: B.steps() };
+    return { data: out, sky: skyB, env, n, steps: B.steps() };
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

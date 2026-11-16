@@ -27,6 +27,11 @@
   // E2 · Himmelslicht: the sky's light on a face by how much of the sky its cell really sees — ×SKY_LO where it sees
   // none (under a porch, a crown, deep in a lane), ×SKY_HI in the open. Switch „Himmelslicht" (with the Schattenuhr).
   CV.SKY_LO = 0.42; CV.SKY_HI = 1.08;
+  // E2b · Rückstrahlung: the light the surroundings give back, in their colour (a red wall tints the street, a sunlit
+  // meadow lifts the shade under the crowns); strength BOUNCE × the sun's light. Switch „Rückstrahlung" (with the clock)
+  CV.BOUNCE = 0.55;
+  CV.bounce = (s) => CV.on(s) && (!s || s.bounce !== false);
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'bounce', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.bounce', tip: 'g.set.bounce.tip', cost: 'low', def: true });
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'skylight', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.skylight', tip: 'g.set.skylight.tip', cost: 'low', def: true });
 
   // ---------------------------------------------------------------- the arc time of the light that is up (from env's sun)
@@ -72,6 +77,14 @@
         for (let y = 0; y < 16; y++) { const vy = k * 16 + y, rowBase = (vy * VZ + (dz + 2) * 16) * 5 + w; for (let z = 0; z < 16; z++) vol[rowBase + z * 5] = b[y * 16 + z]; }
       }
     }
+    // E2b · Rückstrahlung: the block ids of the 3 × 3 columns round the section, the volume's 48 layers (what a bounce
+    // ray hit), row by row out of the columns
+    const ids = CV.bounce(S()) ? SC.bounceIds() : null;
+    if (ids) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const n = world.col(cx + dx, cz + dz); if (!n || !n.ready) continue;
+      const B = n.blocks, H = n.H || 256;
+      for (let y = 0; y < 48; y++) { const wy = oy + y; if (wy >= H) break; for (let z = 0; z < 16; z++) { const src = (wy << 8) | (z << 4), dst = (y * 48 + (dz + 1) * 16 + z) * 48 + (dx + 1) * 16; ids.set(B.subarray(src, src + 16), dst); } }
+    }
     const below = new Uint16Array(16);
     if (sy > 0) { const b = slab(c, sy - 1); if (b) for (let z = 0; z < 16; z++) below[z] = b[15 * 16 + z]; }
     // the far field: the columns' tops (c.sh: the top of the sun-blocking layer) 13 × 13 columns round
@@ -80,7 +93,7 @@
       const n = world.col(cx + dx, cz + dz); if (!n || !n.ready || !n.sh) continue;
       for (let z = 0; z < 16; z++) { const o = ((dz + R) * 16 + z) * tw + (dx + R) * 16; for (let x = 0; x < 16; x++) { const h = n.sh[((z << 4) | x) * 2]; top[o + x] = h ? Math.min(255, h + 1) : 0; } }
     }
-    return { type: 'clock', key: c.key, sy, ox: cx * 16, oy, oz: cz * 16, vol, below, top, topX0: (cx - R) * 16, topZ0: (cz - R) * 16, topW: tw };
+    return { type: 'clock', key: c.key, sy, ox: cx * 16, oy, oz: cz * 16, vol, below, ids, top, topX0: (cx - R) * 16, topZ0: (cz - R) * 16, topW: tw };
   };
   // does a section meet the land (so a face in it, or on its floor, can ask for a clock)? the columns' sun-blocking
   // layers [bottom − 16, top + 1]
@@ -112,7 +125,7 @@
     // E2 · Himmelslicht: the share of the sky each cell sees, beside the clocks (R8, the same window and slots)
     this.skyTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.skyTex);
-    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, CV.W, CV.W, CV.H);
+    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H);   // (e-bounce: rgb the colour given back, a the sky)
     for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, p, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -129,6 +142,8 @@
     this.clockLive = false;
     if (!CV.on(st) || !world || !cam || world.dim !== 'overworld' || !world.hasSky || !world.pool) return;
     this.ensureClockVol();
+    // (e-bounce: the workers need the blocks' colours — the textures' averages, as the far land gets them)
+    if (!CV.sentAvg && VR.game && VR.game.tex && VR.game.tex.avgColor && world.pool.broadcast) { world.pool.broadcast({ type: 'clockcol', avg: VR.game.tex.avgColor }); CV.sentAvg = true; }
     const gl = this.gl, pcx = Math.floor(cam.x / 16), pcz = Math.floor(cam.z / 16), psy = Math.floor(cam.y / 16);
     const wx = pcx - 4, wz = pcz - 4, wy = Math.max(0, psy - 1);
     this.clockWin[0] = wx * 16; this.clockWin[1] = wy * 16; this.clockWin[2] = wz * 16;
@@ -153,7 +168,7 @@
             if (up < 6) {
               gl.bindTexture(gl.TEXTURE_3D, this.clockTex); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
               gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.clk);
-              if (s.skyB) { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RED, gl.UNSIGNED_BYTE, s.skyB); }
+              if (s.envB) { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.envB); }
               gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
               this.clockOwner[sl] = h; this.clockSig[sl] = s.clkSig; up++; CV.stats.up++;
             }
@@ -178,11 +193,11 @@
         if (!all) continue;
         const s = c.sec[sy], g = sig(world, c.cx, c.cz, sy), job = CV.buildJob(world, c, sy);
         s.clkPending = true; CV.inflight = (CV.inflight | 0) + 1; CV.stats.jobs++;
-        world.pool.submit(job, [job.vol.buffer, job.top.buffer, job.below.buffer], (m) => {
+        world.pool.submit(job, [job.vol.buffer, job.top.buffer, job.below.buffer].concat(job.ids ? [job.ids.buffer] : []), (m) => {
           s.clkPending = false; CV.inflight = Math.max(0, (CV.inflight | 0) - 1);
           if (m.type !== 'clock') { CV.stats.err = (CV.stats.err | 0) + 1; CV.stats.last = m.type + ' ' + String(m.msg || m.error || '').slice(0, 160); return; }
           if (world.cols.get(c.key) !== c) { CV.stats.gone = (CV.stats.gone | 0) + 1; return; }
-          s.clk = m.data; s.skyB = m.sky || null; s.clkSig = g; CV.stats.baked++; CV.stats.ms += m.ms || 0;
+          s.clk = m.data; s.envB = m.env || null; s.clkSig = g; CV.stats.baked++; CV.stats.ms += m.ms || 0;
         }, -50);
       }
     }
@@ -203,6 +218,7 @@
       if (this.clockTex) { gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_3D, this.clockTex); }
       if (u.u_clockVol) gl.uniform1i(u.u_clockVol, 5);
       if (u.u_skyVol) { if (this.skyTex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_3D, this.skyTex); } gl.uniform1i(u.u_skyVol, 8); }
+      if (u.u_bounceK) gl.uniform4f(u.u_bounceK, live && CV.bounce(S()) ? CV.BOUNCE : 0, 0, 0, 0);
       if (u.u_skyK) gl.uniform4f(u.u_skyK, live && (!S() || S().skylight !== false) ? 1 : 0, CV.SKY_LO, CV.SKY_HI, 0);
       const w = this.clockWin || [0, 0, 0], s = live ? CV.arcTime(E.sunDir) : -9;
       gl.uniform4f(u.u_clockWin, w[0], w[1], w[2], s);
