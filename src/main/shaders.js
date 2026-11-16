@@ -1021,6 +1021,32 @@ vec2 famPattern(vec2 dp, int fam) {
 vec3 matEnv(vec3 R) {
   return mix(u_skyHorizon * 0.5, mix(u_skyHorizon, u_skyMid, smoothstep(0.0, 0.8, R.y)), smoothstep(-0.05, 0.6, R.y));
 }
+#ifdef SUNCLOCK
+// e-uhr · Schattenuhr (clockvol.js, sunclock.js): when the sun (or the moon, on the same arc) reaches the air cell in
+// front of the face, from the clock volume round the eye — 128 × 128 × 64 blocks, toroidal (x & 127, z & 127, y & 63).
+// One filtered texel: the four bytes (r1, e1, r2, e2) blended between cell centres; the signed time to the nearest
+// shadow edge d = max(min(s − r1, e1 − s), min(s − r2, e2 − s)) — its zero line is the moving edge, sharp near, soft far.
+uniform highp sampler3D u_clockVol;
+uniform highp uvec4 u_clockOk[2];   // which of the window's 8 × 8 × 4 slots hold a baked section of this window
+uniform vec4 u_clockWin;            // xyz the window's origin (world blocks), w the arc time s of the light that is up (< −1: none)
+uniform vec4 u_clockK;              // x the edge's sharpness (1 / its width in arc time)
+float clockVis(vec3 lp, vec3 N) {
+  if (u_clockWin.w < -1.0) return -1.0;
+  vec3 wp = lp + vec3(u_camInt) + N * 0.5;
+  vec3 r = wp - u_clockWin.xyz;
+  if (r.x < 0.5 || r.y < 0.5 || r.z < 0.5 || r.x > 127.5 || r.y > 63.5 || r.z > 127.5) return -1.0;
+  ivec3 sc = ivec3(floor(wp / 16.0)) & ivec3(7, 3, 7);
+  int sl = sc.x + 8 * sc.z + 64 * sc.y;
+  uvec4 q = u_clockOk[sl >> 7];
+  int wi = (sl >> 5) & 3;
+  uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
+  if ((word & (1u << uint(sl & 31))) == 0u) return -1.0;
+  vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+  float s = u_clockWin.w;
+  float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
+  return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
+}
+#endif
 // sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low)
 float shadowAt(vec3 N, vec3 L) {
   float s = 1.0, cover = 0.0;
@@ -1037,6 +1063,12 @@ float shadowAt(vec3 N, vec3 L) {
     s *= 0.25;
     vec2 edge = smoothstep(vec2(0.0), vec2(0.08), sc.xy) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - sc.xy);
     cover = edge.x * edge.y;
+  }
+#endif
+#ifdef SUNCLOCK
+  {   // e-uhr: the clock where the volume holds it (with the shadow map near the eye, if there is one: the darker)
+    float cv = clockVis(v_localPos, N);
+    if (cv >= 0.0) return min(cv, mix(1.0, s, cover));
   }
 #endif
 #ifdef HSHADOW
