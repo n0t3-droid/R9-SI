@@ -4000,6 +4000,8 @@
     "g.album.del": "Delete",
     "g.album.close": "Close",
     "g.album.back": "Back",
+    "g.set.moments": "Keep moments",
+    "g.set.moments.tip": "Special moments (a companion tamed, a wandering moment found) go into the photo album by themselves — at most one a minute.",
     "g.pfx.film0": "Film flight — four shots over this place (K or Esc: end)",
     "g.pfx.film1": "Film flight over",
     "g.pfx.rec0": "Recording the film flight as a video …",

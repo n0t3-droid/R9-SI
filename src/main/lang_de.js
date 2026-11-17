@@ -4000,6 +4000,8 @@
     "g.album.del": "Löschen",
     "g.album.close": "Schließen",
     "g.album.back": "Zurück",
+    "g.set.moments": "Momente festhalten",
+    "g.set.moments.tip": "Besondere Momente (ein Begleiter gezähmt, ein Wandermoment gefunden) landen von selbst als Foto im Fotoalbum — höchstens eins pro Minute.",
     "g.pfx.film0": "Kinoflug — vier Einstellungen über diesen Ort (K oder Esc: Ende)",
     "g.pfx.film1": "Kinoflug zu Ende",
     "g.pfx.rec0": "Kinoflug wird als Video aufgenommen …",
