@@ -253,6 +253,12 @@
     const i = (((Y & 15) * 16 + (Z & 15)) * 16 + (X & 15)) * 4, d = sec.clk;
     return SC.vis((d[i] | (d[i + 1] << 8) | (d[i + 2] << 16) | (d[i + 3] << 24)) >>> 0, s);
   };
+  // f-klang · how much sky the cell at a world point sees (the env bytes' alpha), 0…1, null where not baked
+  CV.skyAt = function (world, x, y, z) {
+    const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), c = world && world.col(X >> 4, Z >> 4);
+    const sec = c && c.sec[Y >> 4]; if (!sec || !sec.envB) return null;
+    return sec.envB[((((Y & 15) * 16 + (Z & 15)) * 16 + (X & 15)) * 4) + 3] / 255;
+  };
   if (VR.Entities && VR.Entities.prototype && VR.Entities.prototype.sunShade) {
     const ss0 = VR.Entities.prototype.sunShade;
     VR.Entities.prototype.sunShade = function (pos, h) {

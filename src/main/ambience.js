@@ -108,6 +108,9 @@
   let LEAF = null;
   const isLeaf = (s) => { if (!LEAF) { LEAF = new Uint8Array(R.stateCount); for (let k = 0; k < R.stateCount; k++) { const t = R.types[R.T.type[k]]; LEAF[k] = t && /leaves|leaf/.test(t.name) ? 1 : 0; } } return LEAF[s] === 1; };
 
+  // f-klang: the open sky's share → how open the sound is (0 shut … 1 open): a wall's foot (half the sky) already sounds
+  // nearly open, a narrow lane (a quarter) half, under a roof shut
+  const AMB = { openK: (v) => { const x = clamp01((v - 0.04) / 0.5); return Math.pow(x, 0.75); } };
   class Ambience {
     constructor(audio) {
       this.audio = audio; this.ctx = null; this.L = null;
@@ -155,6 +158,11 @@
       if (!w || !e) return;
       const x = Math.floor(e[0]), y = Math.floor(e[1]), z = Math.floor(e[2]);
       S.indoors = (w.getLight(x, y, z) >>> 12) < 4 || !!o.underwater;
+      // f-klang · Klangbild: how open the place really is (the share of the sky the ear's cell sees, from the light
+      // worked out in the background — clockvol.js) — a lane half muffled, a porch a little, the meadow wide open;
+      // without it the old rule (indoors or not)
+      const sk = VR.ClockVol && VR.ClockVol.skyAt ? VR.ClockVol.skyAt(w, e[0], e[1], e[2]) : null;
+      S.open = o.underwater ? 0 : sk === null ? (S.indoors ? 0 : 1) : sk;
       // water and leaves in a 25 × 25 block square (a grid every 4 blocks around the ear)
       let water = 0, trees = 0;
       for (let dz = -12; dz <= 12; dz += 4) for (let dx = -12; dx <= 12; dx += 4) {
@@ -191,9 +199,13 @@
       if (b.moon || o.space) for (const k in g) g[k] = 0;
       if (o.space) g.cabin = 0.2;   // e-music2: space is silent — only the cockpit's hum and air (or the suit's: bodylife.js)   // u-moons1: no air on a moon — no wind, no birds, nothing carries (the suit's own sound: bodylife.js)
       for (const k in g) L[k].g.gain.setTargetAtTime(g[k], t, 0.4);
-      const muffled = S.indoors && !o.space;
-      this.muffle.frequency.setTargetAtTime(muffled ? 800 : 20000, t, 0.3);
-      this.busGain.gain.setTargetAtTime(muffled ? 0.355 : 1, t, 0.3);   // −9 dB indoors
+      // f-klang: the muffle follows the openness — 800 Hz and −9 dB shut in, 20 kHz and 0 dB under the open sky, in
+      // between on a log scale (the open part of the sky is what carries the outside's sound in)
+      const op = o.space ? 1 : AMB.openK(S.open === undefined ? (S.indoors ? 0 : 1) : S.open);
+      this.muffle.frequency.setTargetAtTime(800 * Math.pow(25, op), t, 0.3);
+      this.busGain.gain.setTargetAtTime(0.355 + 0.645 * op, t, 0.3);
+      // the birds and the wind come from the sky: a lane hears less of them than the meadow
+      for (const k of ['wind', 'birds']) L[k].g.gain.setTargetAtTime(g[k] * (0.45 + 0.55 * op), t, 0.4);
     }
     // one line for the F3 overlay: the layer levels and what the place reads as
     info() {
@@ -214,5 +226,5 @@
       this.thunders++;
     }
   }
-  VR.Ambience = Ambience;
+  VR.Ambience = Ambience; Ambience.openK = AMB.openK;
 })(VR);
