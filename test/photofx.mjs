@@ -67,6 +67,20 @@ const base = await raw(bufs[0]); let allDiff = true;
 for (let k = 1; k < 6; k++) { const A = await raw(bufs[k]); let d = 0; for (let i = 0; i < A.length; i++) d += Math.abs(A[i] - base[i]); d /= A.length; console.log('     ' + NAMES[k] + ' vs Natur: mean |Δ| ' + d.toFixed(1)); if (d < 2) allDiff = false; }
 check(allDiff, 'every style changes the picture');
 await ev(() => { VR.PhotoFx.cur = 0; VR.PhotoFx.apply(VR.game); });
+// f-kino2: the Kinoflug — the photo mode on, K's film started, a frame from each of the four shots
+await ev(() => { const g = VR.game; g.photoMode(true); VR.PhotoFx.startFilm(g.photoCam); });
+const filmShots = [];
+for (const at of [2.5, 7.5, 12.5, 17.5]) {
+  await ev((at) => { const g = VR.game; window.__norender = true; let guard = 0; while (VR.PhotoFx.film && VR.PhotoFx.film.t < at && guard++ < 2000) { g.last = performance.now() - 33; g.loop(performance.now()); } }, at);
+  const url = await ev(() => { const g = VR.game; window.__norender = false; for (let i = 0; i < 2; i++) { g.last = performance.now() - 16; g.loop(performance.now()); } return g.renderer.gl.canvas.toDataURL('image/png'); });
+  filmShots.push(Buffer.from(url.split(',')[1], 'base64'));
+}
+const filmOk = await ev(() => !!VR.PhotoFx.film);
+check(filmOk && filmShots.length === 4, 'the Kinoflug runs through its four shots');
+const fcomp = []; for (let k = 0; k < 4; k++) { fcomp.push({ input: await sharp(filmShots[k]).resize(TW, TH).toBuffer(), left: k * TW, top: LAB }); fcomp.push({ input: label('Kinoflug · Einstellung ' + (k + 1), TW), left: k * TW, top: 0 }); }
+await sharp({ create: { width: TW * 4, height: TH + LAB, channels: 3, background: { r: 20, g: 24, b: 32 } } }).composite(fcomp).jpeg({ quality: 86 }).toFile(SHOTS + 'kinoflug.jpg');
+console.log('strip test/shots/kinoflug.jpg');
+await ev(() => VR.game.photoMode(false));
 await sharp({ create: { width: TW * 3, height: 2 * (TH + LAB), channels: 3, background: { r: 20, g: 24, b: 32 } } }).composite(comp).jpeg({ quality: 88 }).toFile(SHOTS + 'stil_compare.jpg');
 console.log('sheet test/shots/stil_compare.jpg');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);

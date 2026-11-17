@@ -46,6 +46,8 @@
   if (PM && PM.Photo) {
     const P = PM.Photo.prototype, up = P.update, lv = P.leave;
     P.update = function (dt, I) {
+      if (this.on && !this.first && I.hit('KeyK')) { if (PF.film) { PF.film.t = 1e9; PF.stepFilm(this, 0); } else PF.startFilm(this); }
+      if (this.on && PF.film) { if (I.hit('Escape')) { PF.film.t = 1e9; PF.stepFilm(this, 0); } else if (PF.stepFilm(this, dt)) { I.mouse.dx = 0; I.mouse.dy = 0; const keepS = this.s; this.s = { x: keepS.x, y: keepS.y, z: keepS.z, yaw: keepS.yaw, pitch: keepS.pitch, roll: keepS.roll, vel: [0, 0, 0] }; const r = up.apply(this, arguments); this.s = keepS; return r; } }
       if (this.on && !this.first && I.hit('KeyT')) {
         PF.cur = PF.next(PF.cur);
         PF.apply(this.g);
@@ -53,8 +55,43 @@
       }
       return up.apply(this, arguments);
     };
-    P.leave = function () { if (PF.cur) { PF.cur = 0; PF.apply(this.g); } return lv.apply(this, arguments); };
+    P.leave = function () { if (PF.film) { Object.assign(this.s, PF.film.keep); PF.film = null; } if (PF.cur) { PF.cur = 0; PF.apply(this.g); } return lv.apply(this, arguments); };
   }
+  // ---------------------------------------------------------------- Kinoflug (K in the Fotomodus): a short film of the place
+  // Four shots of ~5 s round what is near (the eye's point on the ground ahead; ShotCraft-like grammar of our own):
+  // a slow orbit · a crane up and over · a dolly in at eye height · a low hero angle turning away — each eased, the
+  // time held; the Film style while it runs, the camera back where it was afterwards. Pure: PF.shot(k, t, T, base) → pose.
+  PF.SHOT = 5;
+  const ease = (x) => x * x * (3 - 2 * x);
+  PF.shot = function (k, t, base) {
+    const u = ease(Math.min(1, Math.max(0, t / PF.SHOT))), T = base.t, a0 = base.yaw;
+    let x, y, z;
+    if (k === 0) { const a = a0 + 0.9 * u, r = 16; x = T[0] + Math.sin(a) * r; z = T[2] + Math.cos(a) * r; y = T[1] + 7; }
+    else if (k === 1) { const a = a0 + 2.2, r = 12 + 6 * u; x = T[0] + Math.sin(a) * r; z = T[2] + Math.cos(a) * r; y = T[1] + 2 + 20 * u; }
+    else if (k === 2) { const a = a0 - 1.4, r = 22 - 14 * u; x = T[0] + Math.sin(a) * r; z = T[2] + Math.cos(a) * r; y = T[1] + 1.7; }
+    else { const a = a0 + 3.4 + 0.5 * u, r = 7; x = T[0] + Math.sin(a) * r; z = T[2] + Math.cos(a) * r; y = T[1] + 0.6 + 1.2 * u; }
+    const dx = T[0] - x, dy = (T[1] + (k === 3 ? 4 : 1.2)) - y, dz = T[2] - z;
+    return { x, y, z, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), roll: k === 0 ? Math.sin(u * 3.1416) * 0.04 : 0 };
+  };
+  PF.film = null;
+  PF.startFilm = function (ph) {
+    const g = ph.g, s = ph.s, w = g.world; if (!s || !w) return;
+    // the point: the ground 14 m ahead of the camera
+    const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), px = s.x + fx * 14, pz = s.z + fz * 14;
+    const X = Math.floor(px), Z = Math.floor(pz), py = w.isLoaded(X, Z) ? w.topAt(X, Z) + 1 : s.y - 2;
+    PF.film = { t: 0, base: { t: [px, py, pz], yaw: s.yaw }, keep: { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: s.pitch, roll: s.roll }, style: PF.cur };
+    if (PF.cur !== 3) { PF.cur = 3; PF.apply(g); }
+    PM.note('🎬 ' + tx('g.pfx.film0'), 2500);
+  };
+  PF.stepFilm = function (ph, dt) {
+    const F = PF.film; if (!F) return false;
+    F.t += dt;
+    const k = Math.floor(F.t / PF.SHOT);
+    if (k >= 4) { Object.assign(ph.s, F.keep); if (PF.cur !== F.style) { PF.cur = F.style; PF.apply(ph.g); } PF.film = null; PM.note('🎬 ' + tx('g.pfx.film1'), 2000); return false; }
+    Object.assign(ph.s, PF.shot(k, F.t - k * PF.SHOT, F.base));
+    if (ph.s.vel) { ph.s.vel[0] = ph.s.vel[1] = ph.s.vel[2] = 0; }
+    return true;
+  };
   PF.apply = function (g) { const r = g && g.renderer; if (r && r.P && r.buildPrograms) r.buildPrograms(); };
   if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return PF.cur && name === 'composite' && !d.includes('PHOTOFX') ? d.concat(['PHOTOFX']) : d; }; }
   if (VR.Renderer) {
