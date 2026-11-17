@@ -59114,8 +59114,8 @@ VR.I18N.add('en',{
 'g.chat.noShot':'Screenshot not available here.',
 'g.chat.photo':'Photo mode — F2 to capture · Esc to exit',
 
-'g.photo.hint':'📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight · F2, Enter or click: photo (2×) · Esc: back',
-'g.photo.short':'📷 Photo mode · T: style · K: film flight · F2 or click: photo · Esc: back',
+'g.photo.hint':'📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight (Shift+K: as a video) · F2, Enter or click: photo (2×) · Esc: back',
+'g.photo.short':'📷 Photo mode · T: style · K: film flight (Shift+K: as a video) · F2 or click: photo · Esc: back',
 'g.photo.saved':'Saved: {n} ({w} × {h})',
 'g.photo.fail':'📷 That photo did not work — the graphics memory is too small for twice the size.',
 'g.chat.bedGone':'Your bed is missing — back to your spot.',
@@ -61743,6 +61743,10 @@ VR.I18N.add('en',{
 "g.pfx.key":"T: next style",
 "g.pfx.film0":"Film flight — four shots over this place (K or Esc: end)",
 "g.pfx.film1":"Film flight over",
+"g.pfx.rec0":"Recording the film flight as a video …",
+"g.pfx.recNo":"This browser cannot record video — the film flight runs without recording.",
+"g.pfx.recSaved":"Video saved: {n} ({mb} MB)",
+"g.pfx.recClose":"Close",
 "g.set.lightBeat":"Light to the beat",
 "g.set.lightBeat.tip":"Lanterns, glowing blocks and the Flausel breathe with the beat of the music.",
 "g.set.lamplight":"Lamp light",
@@ -64187,8 +64191,8 @@ VR.I18N.add('de',{
 'g.chat.noShot':'Hier geht kein Foto.',
 'g.chat.photo':'Foto-Modus — F2 macht das Foto · Esc beendet',
 
-'g.photo.hint':'📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück',
-'g.photo.short':'📷 Fotomodus · T: Bildstil · K: Kinoflug · F2 oder Klick: Foto · Esc: zurück',
+'g.photo.hint':'📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück',
+'g.photo.short':'📷 Fotomodus · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2 oder Klick: Foto · Esc: zurück',
 'g.photo.saved':'Gespeichert: {n} ({w} × {h})',
 'g.photo.fail':'📷 Dieses Foto ging nicht — der Grafikspeicher reicht nicht für die doppelte Größe.',
 'g.chat.bedGone':'Dein Bett ist weg — zurück an deinen Platz.',
@@ -66816,6 +66820,10 @@ VR.I18N.add('de',{
 "g.pfx.key":"T: nächster Stil",
 "g.pfx.film0":"Kinoflug — vier Einstellungen über diesen Ort (K oder Esc: Ende)",
 "g.pfx.film1":"Kinoflug zu Ende",
+"g.pfx.rec0":"Kinoflug wird als Video aufgenommen …",
+"g.pfx.recNo":"Video-Aufnahme geht in diesem Browser nicht — der Kinoflug läuft ohne Aufnahme.",
+"g.pfx.recSaved":"Video gespeichert: {n} ({mb} MB)",
+"g.pfx.recClose":"Schließen",
 "g.set.lightBeat":"Licht im Takt",
 "g.set.lightBeat.tip":"Laternen, leuchtende Blöcke und die Flausel atmen mit dem Takt der Musik.",
 "g.set.lamplight":"Lampenlicht",
@@ -90626,7 +90634,13 @@ const indoors=L.sky<4||L.underwater,cave=indoors&&eye[1]<60;
 if(cave!==this.cave){this.cave=cave;this.room.gain.setTargetAtTime(0,t,0.02);this.irAt=t+0.09;this.roomT= -1;}
 if(this.irAt&&t>=this.irAt){this.setRev(this.cave?this.irCave:this.irRoom);this.irAt=0;}
 if(!this.irAt){
-const want=this.cave?CAVE_SEND:indoors?ROOM_SEND:0;
+let want=this.cave?CAVE_SEND:indoors?ROOM_SEND:0;
+
+
+if(!indoors&&w&&VR.ClockVol&&VR.ClockVol.skyAt&&VR.Ambience&&VR.Ambience.openK){
+const sk=VR.ClockVol.skyAt(w,eye[0],eye[1],eye[2]);
+if(sk!==null)want=Math.round(ROOM_SEND*(1-VR.Ambience.openK(sk))*0.6*10)/10;
+}
 if(want!==this.roomT){this.roomT=want;this.room.gain.setTargetAtTime(want,t,0.25);}
 }
 const mu=L.underwater?900:VR.BodyLife&&VR.BodyLife.vacuum?(VR.BodyLife.thin?2500:700):20000;
@@ -91299,6 +91313,9 @@ function birdK(b){if(!b)return 1;if(b.temp>=1.5&&b.down<=0.05)return 0.25;if(b.t
 let LEAF=null;
 const isLeaf=(s)=>{if(!LEAF){LEAF=new Uint8Array(R.stateCount);for(let k=0;k<R.stateCount;k++){const t=R.types[R.T.type[k]];LEAF[k]=t&& /leaves|leaf/.test(t.name)?1:0;}}return LEAF[s]===1;};
 
+
+
+const AMB={openK:(v)=>{const x=clamp01((v-0.04)/0.5);return Math.pow(x,0.75);}};
 class Ambience{
 constructor(audio){
 this.audio=audio;this.ctx=null;this.L=null;
@@ -91347,6 +91364,11 @@ if(!w|| !e)return;
 const x=Math.floor(e[0]),y=Math.floor(e[1]),z=Math.floor(e[2]);
 S.indoors=(w.getLight(x,y,z)>>>12)<4|| !!o.underwater;
 
+
+
+const sk=VR.ClockVol&&VR.ClockVol.skyAt?VR.ClockVol.skyAt(w,e[0],e[1],e[2]):null;
+S.open=o.underwater?0:sk===null?(S.indoors?0:1):sk;
+
 let water=0,trees=0;
 for(let dz= -12;dz<=12;dz+=4)for(let dx= -12;dx<=12;dx+=4){
 const X=x+dx,Z=z+dz;
@@ -91382,9 +91404,13 @@ rain:wx&& !(b.down<=0)?rain*0.5:0,
 if(b.moon||o.space)for(const k in g)g[k]=0;
 if(o.space)g.cabin=0.2;
 for(const k in g)L[k].g.gain.setTargetAtTime(g[k],t,0.4);
-const muffled=S.indoors&& !o.space;
-this.muffle.frequency.setTargetAtTime(muffled?800:20000,t,0.3);
-this.busGain.gain.setTargetAtTime(muffled?0.355:1,t,0.3);
+
+
+const op=o.space?1:AMB.openK(S.open===undefined?(S.indoors?0:1):S.open);
+this.muffle.frequency.setTargetAtTime(800*Math.pow(25,op),t,0.3);
+this.busGain.gain.setTargetAtTime(0.355+0.645*op,t,0.3);
+
+for(const k of['wind','birds'])L[k].g.gain.setTargetAtTime(g[k]*(0.45+0.55*op),t,0.4);
 }
 
 info(){
@@ -91405,7 +91431,7 @@ src.start(t,Math.random()*1.5,4.6);
 this.thunders++;
 }
 }
-VR.Ambience=Ambience;
+VR.Ambience=Ambience;Ambience.openK=AMB.openK;
 })(VR);
 
 
@@ -125193,7 +125219,7 @@ this.timeOk= !(g.meta&&g.meta.guest)&& !(g.mp&&g.mp.remote&&g.mp.remote.size>0);
 g.hideHud=true;
 if(g.input&&g.input.requestLock)g.input.requestLock();
 let seen=false;try{seen=localStorage.getItem(HINT_KEY)==='1';localStorage.setItem(HINT_KEY,'1');}catch(err){seen=false;}
-PM.note(seen?tx('g.photo.short',null,'📷 Fotomodus · T: Bildstil · K: Kinoflug · F2 oder Klick: Foto · Esc: zurück','📷 Photo mode · T: style · K: film flight · F2 or click: photo · Esc: back'):tx('g.photo.hint',null,'📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück','📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight · F2, Enter or click: photo (2×) · Esc: back'),seen?2600:9000);
+PM.note(seen?tx('g.photo.short',null,'📷 Fotomodus · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2 oder Klick: Foto · Esc: zurück','📷 Photo mode · T: style · K: film flight (Shift+K: as a video) · F2 or click: photo · Esc: back'):tx('g.photo.hint',null,'📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück','📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight (Shift+K: as a video) · F2, Enter or click: photo (2×) · Esc: back'),seen?2600:9000);
 }
 leave(){
 const g=this.g;if(!this.on)return;
@@ -129576,6 +129602,12 @@ const sec=c&&c.sec[Y>>4];if(!sec|| !sec.clk)return null;
 const i=(((Y&15)*16+(Z&15))*16+(X&15))*4,d=sec.clk;
 return SC.vis((d[i]|(d[i+1]<<8)|(d[i+2]<<16)|(d[i+3]<<24))>>>0,s);
 };
+
+CV.skyAt=function(world,x,y,z){
+const X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z),c=world&&world.col(X>>4,Z>>4);
+const sec=c&&c.sec[Y>>4];if(!sec|| !sec.envB)return null;
+return sec.envB[((((Y&15)*16+(Z&15))*16+(X&15))*4)+3]/255;
+};
 if(VR.Entities&&VR.Entities.prototype&&VR.Entities.prototype.sunShade){
 const ss0=VR.Entities.prototype.sunShade;
 VR.Entities.prototype.sunShade=function(pos,h){
@@ -129649,7 +129681,7 @@ const PM=VR.PhotoMode;
 if(PM&&PM.Photo){
 const P=PM.Photo.prototype,up=P.update,lv=P.leave;
 P.update=function(dt,I){
-if(this.on&& !this.first&&I.hit('KeyK')){if(PF.film){PF.film.t=1e9;PF.stepFilm(this,0);}else PF.startFilm(this);}
+if(this.on&& !this.first&&I.hit('KeyK')){if(PF.film){PF.film.t=1e9;PF.stepFilm(this,0);}else{PF.startFilm(this);if(PF.film&&(I.down('ShiftLeft')||I.down('ShiftRight'))){PF.film.rec=PF.startRec(this.g);if(PF.film.rec)PM.note('🎬 '+tx('g.pfx.rec0'),2500);}}}
 if(this.on&&PF.film){if(I.hit('Escape')){PF.film.t=1e9;PF.stepFilm(this,0);}else if(PF.stepFilm(this,dt)){I.mouse.dx=0;I.mouse.dy=0;const keepS=this.s;this.s={x:keepS.x,y:keepS.y,z:keepS.z,yaw:keepS.yaw,pitch:keepS.pitch,roll:keepS.roll,vel:[0,0,0]};const r=up.apply(this,arguments);this.s=keepS;return r;}}
 if(this.on&& !this.first&&I.hit('KeyT')){
 PF.cur=PF.next(PF.cur);
@@ -129658,7 +129690,7 @@ PM.note('🎨 '+tx('g.pfx.'+PF.STYLES[PF.cur])+' · '+tx('g.pfx.key'),2600);
 }
 return up.apply(this,arguments);
 };
-P.leave=function(){if(PF.film){Object.assign(this.s,PF.film.keep);PF.film=null;}if(PF.cur){PF.cur=0;PF.apply(this.g);}return lv.apply(this,arguments);};
+P.leave=function(){if(PF.film){if(PF.film.rec)PF.stopRec();Object.assign(this.s,PF.film.keep);PF.film=null;}if(PF.cur){PF.cur=0;PF.apply(this.g);}return lv.apply(this,arguments);};
 }
 
 
@@ -129690,15 +129722,69 @@ PF.stepFilm=function(ph,dt){
 const F=PF.film;if(!F)return false;
 F.t+=dt;
 const k=Math.floor(F.t/PF.SHOT);
-if(k>=4){Object.assign(ph.s,F.keep);if(PF.cur!==F.style){PF.cur=F.style;PF.apply(ph.g);}PF.film=null;PM.note('🎬 '+tx('g.pfx.film1'),2000);return false;}
+if(k>=4){if(F.rec)PF.stopRec();Object.assign(ph.s,F.keep);if(PF.cur!==F.style){PF.cur=F.style;PF.apply(ph.g);}PF.film=null;PM.note('🎬 '+tx('g.pfx.film1'),2000);return false;}
 Object.assign(ph.s,PF.shot(k,F.t-k*PF.SHOT,F.base));
 if(ph.s.vel){ph.s.vel[0]=ph.s.vel[1]=ph.s.vel[2]=0;}
 return true;
 };
+
+
+
+
+PF.mime=function(){
+const MR=typeof MediaRecorder!=='undefined'?MediaRecorder:null;if(!MR)return null;
+for(const m of['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']){try{if(!MR.isTypeSupported||MR.isTypeSupported(m))return m;}catch(e){}}
+return null;
+};
+PF.rec=null;
+PF.startRec=function(g){
+const cv=g&&g.renderer&&g.renderer.gl&&g.renderer.gl.canvas,mime=PF.mime();
+if(!cv|| !cv.captureStream|| !mime){PM.note('🎬 '+tx('g.pfx.recNo'),3500);return false;}
+try{
+
+
+const k=Math.min(1,1280/cv.width),rc=document.createElement('canvas');
+rc.width=Math.round(cv.width*k)& ~1;rc.height=Math.round(cv.height*k)& ~1;
+rc.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1';
+document.body.appendChild(rc);
+PF.recCtx=rc.getContext('2d',{alpha:false,desynchronized:false});PF.recSrc=cv;
+const st=rc.captureStream(30),mr=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:6e6}),chunks=[];
+mr.ondataavailable=(e)=>{if(e.data&&e.data.size)chunks.push(e.data);};
+mr.onstop=()=>{PF.saveRec(g,new Blob(chunks,{type:'video/webm'}));try{st.getTracks().forEach((t)=>t.stop());}catch(e){}};
+mr.start(500);
+PF.rec=mr;
+return true;
+}catch(e){PF.rec=null;PM.note('🎬 '+tx('g.pfx.recNo'),3500);return false;}
+};
+PF.stopRec=function(){const mr=PF.rec;PF.rec=null;const cx=PF.recCtx;PF.recCtx=null;if(cx)setTimeout(()=>{try{cx.canvas.remove();}catch(e){}},1500);if(mr&&mr.state!=='inactive'){try{mr.stop();}catch(e){}}};
+PF.saveRec=function(g,blob){
+if(!blob||typeof document==='undefined')return;
+if(!blob.size){PM.note('🎬 '+tx('g.pfx.recNo'),3500);return;}
+const m=(g&&g.meta)||{};m.filmN=(m.filmN|0)+1;
+const name=PM.fileName(m.name,m.filmN).replace(/-(\d+)\.png$/,'-film-$1.webm');
+const url=URL.createObjectURL(blob);
+let embedded=true;try{embedded=window.self!==window.top;}catch(e){embedded=true;}
+if(!embedded){try{const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}catch(e){embedded=true;}}
+if(embedded){
+let d=document.getElementById('filmshot');
+if(!d){d=document.createElement('div');d.id='filmshot';d.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;background:#141820;padding:10px;border-radius:10px;max-width:80vw;color:#f0e6d0;font:14px sans-serif;text-align:center';(document.getElementById('app')||document.body).appendChild(d);}
+d.innerHTML='';
+const v=document.createElement('video');v.src=url;v.controls=true;v.autoplay=true;v.loop=true;v.style.cssText='max-width:76vw;max-height:60vh;display:block;margin:0 auto 8px';
+const a=document.createElement('a');a.href=url;a.download=name;a.textContent='⬇ '+name;a.style.color='#ffd27a';
+const x=document.createElement('div');x.textContent=tx('g.pfx.recClose');x.style.cssText='opacity:.7;margin-top:6px;cursor:pointer';
+x.onclick=()=>{d.remove();};
+d.appendChild(v);d.appendChild(a);d.appendChild(x);
+}
+PM.note('🎬 '+tx('g.pfx.recSaved',{n:name,mb:(blob.size/1048576).toFixed(1)}),4000);
+setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},300000);
+};
 PF.apply=function(g){const r=g&&g.renderer;if(r&&r.P&&r.buildPrograms)r.buildPrograms();};
 if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>{const d=prev?prev(name,defines):(defines||[]);return PF.cur&&name==='composite'&& !d.includes('PHOTOFX')?d.concat(['PHOTOFX']):d;};}
 if(VR.Renderer){
-const RP=VR.Renderer.prototype,l2p0=RP.l2Post;
+
+
+const RP=VR.Renderer.prototype,l2p0=RP.l2Post,rd0=RP.render;
+RP.render=function(){const r=rd0.apply(this,arguments);const cx=PF.recCtx;if(cx){try{cx.drawImage(PF.recSrc,0,0,cx.canvas.width,cx.canvas.height);cx.fillStyle=(PF.recN=(PF.recN|0)+1)&1?'#010101':'#020202';cx.fillRect(0,0,1,1);}catch(e){}}return r;};
 RP.l2Post=function(p,E,pass,F){
 if(l2p0)l2p0.call(this,p,E,pass,F);
 if(pass==='composite'&&p&&p.u&&p.u.u_pfx)this.gl.uniform4f(p.u.u_pfx,PF.cur,(performance.now()/1000)%1000,0.52,0);
