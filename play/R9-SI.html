@@ -69232,7 +69232,7 @@ const p=gl.createProgram();
 gl.attachShader(p,GL.shader(gl.VERTEX_SHADER,vsFull,name+'.vs'));
 gl.attachShader(p,GL.shader(gl.FRAGMENT_SHADER,fsFull,name+'.fs'));
 gl.linkProgram(p);
-if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error('Link failed '+name+': '+gl.getProgramInfoLog(p));
+if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const log=String(gl.getProgramInfoLog(p));if(GL.onLinkFail)GL.onLinkFail(name,log);throw new Error('Link failed '+name+': '+log);}
 const u={};
 const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
 for(let i=0;i<n;i++){const info=gl.getActiveUniform(p,i);const nm=info.name.replace(/\[0\]$/,'');u[nm]=gl.getUniformLocation(p,info.name);}
@@ -69262,9 +69262,12 @@ for(const[s,src,nm]of[[vs,vsFull,name+'.vs'],[fs,fsFull,name+'.fs']]){
 if(gl.getShaderParameter(s,gl.COMPILE_STATUS))continue;
 const log=gl.getShaderInfoLog(s);
 console.error('Shader compile error ('+nm+'):\n'+log+'\n'+src.split('\n').map((l,i)=>(i+1)+': '+l).join('\n'));
+if(GL.onLinkFail)GL.onLinkFail(name,String(log));
 throw new Error('Shader compile failed: '+nm+': '+log);
 }
-throw new Error('Link failed '+name+': '+gl.getProgramInfoLog(p));
+const log=String(gl.getProgramInfoLog(p));
+if(GL.onLinkFail)GL.onLinkFail(name,log);
+throw new Error('Link failed '+name+': '+log);
 }
 u={};
 const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
@@ -69275,7 +69278,7 @@ if(hooks){const h=hooks;hooks=null;for(const f of h)f(prog);}
 Object.defineProperty(prog,'p',{get(){ready();return p;},enumerable:true});
 Object.defineProperty(prog,'u',{get(){ready();return u;},enumerable:true});
 prog.onReady=(f)=>{if(u)f(prog);else(hooks||(hooks=[])).push(f);};
-prog.settle=(ext)=>{if(u||err)return true;if(ext&& !gl.getProgramParameter(p,ext.COMPLETION_STATUS_KHR))return false;try{ready();}catch(e){console.error(e);}return true;};
+prog.settle=(ext)=>{if(u||err)return true;if(ext&& !gl.getProgramParameter(p,ext.COMPLETION_STATUS_KHR))return false;try{ready();}catch(e){if(GL.onFail)GL.onFail(e);else console.error(e);}return true;};
 GL.pending.add(prog);
 return prog;
 };
@@ -75204,14 +75207,13 @@ uvec4 q = u_clockOk[sl >> 7];
 int wi = (sl >> 5) & 3;
 uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
 if ((word & (1u << uint(sl & 31))) == 0u) return -1.0;
-vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));
 float s = u_clockWin.w;
 float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
 return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 }
 
 
-uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
 uniform vec4 u_bounceK;
 vec3 skyEnvRGB = vec3(0.0);
@@ -75229,10 +75231,10 @@ int wi = (sl >> 5) & 3;
 uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
 if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
 float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);
-vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, ry / 128.0));
+vec4 e = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 192.0));
 
 if (max(v_block.r, max(v_block.g, v_block.b)) > 0.004 && u_bounceK.y > 0.5) {
-vec4 lm = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 128.0));
+vec4 lm = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 128.0) / 192.0));
 skyLamp = lm.a > 0.5 ? lm.rgb : vec3(-1.0);
 }
 skyEnvRGB = e.rgb;
@@ -122852,6 +122854,7 @@ catch(e){this.fatal(T('g.fatal.webgl',{msg:e.message}));return;}
 
 
 
+VR.GL.onFail=(e)=>this.frameError(e);
 this.canvas.addEventListener('webglcontextlost',(e)=>{
 e.preventDefault();
 if(this.glLost)return;
@@ -123353,6 +123356,18 @@ onBlockChanged(x,y,z,old,s){if(this.sim&& !(this.mp&&this.mp.isClient))this.sim.
 onColumnLoaded(c){if(this.sim&&this.sim.onColumnLoaded)this.sim.onColumnLoaded(c);if(this.entities&&this.entities.onColumnLoaded)this.entities.onColumnLoaded(c);if(this.villages)this.villages.onColumnLoaded(c);if(this.starships)this.starships.onColumnLoaded(c);if(this.hall)this.hall.onColumnLoaded(c);if(this.wow&&c.spawns)this.wow.absorb(c.spawns);if(this.gadgets)this.gadgets.onColumnLoaded(c);}
 
 
+
+frameError(e){
+console.error(e);
+const msg=String((e&&e.message)||e).slice(0,160);
+const at=((e&&e.stack)||'').split('\n').map(l=>l.trim()).find(l=> /^at /.test(l))||'';
+const seen=this.errSeen||(this.errSeen=new Set());
+if(seen.has(msg)||seen.size>=5)return;
+seen.add(msg);this.errShown=true;
+(this.lastErrors||(this.lastErrors=[])).push(msg+(at?' · '+at.slice(0,120):''));
+if(this.ui&&this.ui.chatLine)this.ui.chatLine(T('g.chat.error',{msg:msg+(at?' ('+at.replace(/^at /,'').slice(0,90)+')':'')}),'#ff8a8a');
+}
+
 loop(t){
 if(this.glLost)return;
 requestAnimationFrame((tt)=>this.loop(tt));
@@ -123382,7 +123397,7 @@ if(this.mp)this.mp.update(dt);
 if(this.bench)this.benchTick();
 if(this.sweep)this.sweep.tick();
 this.capturePreview();
-}catch(e){console.error(e);if(!this.errShown){this.errShown=true;this.ui&&this.ui.chatLine&&this.ui.chatLine(T('g.chat.error',{msg:e.message}),'#ff8a8a');}}
+}catch(e){this.frameError(e);}
 this.input.endFrame();
 this.jsMs+=(performance.now()-tj0-this.jsMs)*0.08;
 }
@@ -124176,6 +124191,8 @@ if(!text.startsWith('/')){if(this.mp&&this.mp.active)this.mp.chat(text);else thi
 const[c0,...a0]=text.slice(1).split(/\s+/);
 const say0=(m,c)=>this.ui.chatLine(m,c||'#cfe6ff');
 if(c0==='home'){this.goHome();return;}
+
+if(c0==='diag'){try{const r=this.renderer,w=this.world,q=r.q||{},st=r.stats||{};say0('diag '+this.state+' gfx '+(this.settings.preset||'?')+' rd '+this.settings.renderDist+' scale '+q.scale+' far '+(q.far||'')+' · sec '+st.sections+' draws '+st.draws+' tris '+st.tris+' · cols '+w.cols.size+' pend '+w.pending.size+' · dbg '+ !!this.debugOn+' hide '+ !!this.hideHud+' · progs '+(VR.GL.pending?VR.GL.pending.size:'-')+' · cv '+(VR.ClockVol?VR.ClockVol.short+(VR.ClockVol.on(this.settings)?' on':' off'):'-')+' · '+(VR.GL.rendererName||''));for(const e of(this.lastErrors||[]))say0('err '+e,'#ff8a8a');const P=r.P||{};const bad=Object.keys(P).filter(k=>P[k]&&P[k].deferred&& !P[k].isReady);say0('notReady '+bad.slice(0,12).join(','));}catch(e){say0('diag '+e.message);}return;}
 if(c0==='look'){this.lookCommand(a0[0]);return;}
 if(c0==='lang'||c0==='sprache'){this.langCommand(a0[0]);return;}
 if(c0==='spawn'&&VR.Travel&&VR.Travel.goHome(this,'spawn'))return;
@@ -124664,7 +124681,7 @@ const pn=$('#pausenote'),g=this.game;if(pn&&g.meta&& !prefs().pro)pn.textContent
 
 
 
-ST.einfachCmd=(text)=> /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen|raum)(\s|$)/i.test(text);
+ST.einfachCmd=(text)=> /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen|raum|diag)(\s|$)/i.test(text);
 if(VR.Game){
 const origChat=VR.Game.prototype.chat;
 VR.Game.prototype.chat=function(text){
@@ -129392,7 +129409,20 @@ CV.W=128;CV.H=64;CV.SX=8;CV.SY=4;
 CV.INFLIGHT=2;CV.REACH=6;
 CV.stats={baked:0,ms:0,up:0,jobs:0};
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'sunclock',g:'img',sec:'light',t:'switch',lab:'g.set.sunclock',tip:'g.set.sunclock.tip',cost:'low',def:true});
-CV.on=(s)=> !s||s.sunclock!==false;
+
+
+
+
+CV.short=0;CV.pending=false;
+CV.on=(s)=>CV.short<2&&(!s||s.sunclock!==false);
+CV.UNITS= /texture image units|MAX_TEXTURE_IMAGE_UNITS|too many samplers/i;
+CV.linkFail=function(name,msg){
+if(CV.pending||CV.short>=2||(name!=='terrain'&&name!=='terrainCut')|| !CV.UNITS.test(String(msg||'')))return;
+CV.short++;CV.pending=true;
+if(typeof console!=='undefined')console.warn('clockvol: the terrain needs more texture units than this GPU has — step '+CV.short+(CV.short===1?' (no height-map shadows in the terrain)':' (Schattenuhr off for this session)'));
+};
+CV.rebuildIfShort=function(r){if(!CV.pending|| !r.P)return;CV.pending=false;if(CV.short>=2)r.cvKey=0;r.buildPrograms();};
+if(VR.GL){const lf0=VR.GL.onLinkFail||null;VR.GL.onLinkFail=(n,m)=>{CV.linkFail(n,m);if(lf0)lf0(n,m);};}
 
 
 CV.SKY_LO=0.42;CV.SKY_HI=1.08;
@@ -129504,17 +129534,13 @@ if(this.clockTex)return;
 const gl=this.gl;
 this.clockTex=gl.createTexture();
 gl.bindTexture(gl.TEXTURE_3D,this.clockTex);
-gl.texStorage3D(gl.TEXTURE_3D,1,gl.RGBA8,CV.W,CV.W,CV.H);
-for(const p of[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R])gl.texParameteri(gl.TEXTURE_3D,p,gl.REPEAT);
-gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 
-this.skyTex=gl.createTexture();
-gl.bindTexture(gl.TEXTURE_3D,this.skyTex);
-gl.texStorage3D(gl.TEXTURE_3D,1,gl.RGBA8,CV.W,CV.W,CV.H*2);
+
+gl.texStorage3D(gl.TEXTURE_3D,1,gl.RGBA8,CV.W,CV.W,CV.H*3);
 for(const p of[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R])gl.texParameteri(gl.TEXTURE_3D,p,gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+this.skyTex=this.clockTex;
 this.clockOwner=new Int32Array(CV.SX*CV.SX*CV.SY).fill(-1);
 this.clockSig=new Int32Array(CV.SX*CV.SX*CV.SY);
 this.clockOk=new Uint32Array(8);
@@ -129554,8 +129580,8 @@ if(this.clockOwner[sl]!==h||this.clockSig[sl]!==s.clkSig){
 if(up<6){
 gl.bindTexture(gl.TEXTURE_3D,this.clockTex);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
 gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.clk);
-if(s.envB){gl.bindTexture(gl.TEXTURE_3D,this.skyTex);gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.envB);}
-{gl.bindTexture(gl.TEXTURE_3D,this.skyTex);gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,64+(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.lampB||CV.noLamp);}
+if(s.envB){gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,64+(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.envB);}
+{gl.texSubImage3D(gl.TEXTURE_3D,0,(cx&7)*16,(cz&7)*16,128+(sy&3)*16,16,16,16,gl.RGBA,gl.UNSIGNED_BYTE,s.lampB||CV.noLamp);}
 gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);
 this.clockOwner[sl]=h;this.clockSig[sl]=s.clkSig;up++;CV.stats.up++;
 }
@@ -129592,7 +129618,7 @@ s.clk=m.data;s.envB=m.env||null;s.lampB=m.lamp||null;s.clkSig=g;CV.stats.baked++
 const uh0=RP.updateHmap;
 RP.updateHmap=function(world){
 const r=uh0.apply(this,arguments);
-try{this.updateClockVol(world);}catch(e){if(!CV.warned){CV.warned=true;console.warn('clockvol',e);}}
+try{CV.rebuildIfShort(this);this.updateClockVol(world);}catch(e){if(!CV.warned){CV.warned=true;console.warn('clockvol',e);}}
 return r;
 };
 
@@ -129604,7 +129630,6 @@ if(u&&u.u_clockWin){
 const gl=this.gl,live= !!(this.clockLive&&this.clockTex&&E&&E.sunDir&& !E.dimId);
 if(this.clockTex){gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_3D,this.clockTex);}
 if(u.u_clockVol)gl.uniform1i(u.u_clockVol,5);
-if(u.u_skyVol){if(this.skyTex){gl.activeTexture(gl.TEXTURE8);gl.bindTexture(gl.TEXTURE_3D,this.skyTex);}gl.uniform1i(u.u_skyVol,8);}
 if(u.u_bounceK)gl.uniform4f(u.u_bounceK,live&&CV.bounce(S())?CV.BOUNCE:0,live&&CV.lampOn(S())?1:0,CV.FILL,0);
 if(u.u_skyK)gl.uniform4f(u.u_skyK,live&&(!S()||S().skylight!==false)?1:0,CV.SKY_LO,CV.SKY_HI,0);
 const w=this.clockWin||[0,0,0],s=live?CV.arcTime(E.sunDir): -9;
@@ -129640,8 +129665,8 @@ return ss0.apply(this,arguments);
 };
 }
 
-CV.defs=(name,s)=>((name==='terrain'||name==='terrainCut')&&CV.on(s)?['SUNCLOCK']:[]);
-if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>{let d=prev?prev(name,defines):(defines||[]);for(const k of CV.defs(name,S()))if(!d.includes(k))d=d.concat([k]);return d;};}
+CV.defs=(name,s,d)=>((name==='terrain'||name==='terrainCut')&&CV.on(s)&& !(d&&d.includes('BODYSKY'))?['SUNCLOCK']:[]);
+if(VR.GL){const prev=VR.GL.defineHook||null;VR.GL.defineHook=(name,defines)=>{let d=prev?prev(name,defines):(defines||[]);const add=CV.defs(name,S(),d);for(const k of add)if(!d.includes(k))d=d.concat([k]);if(CV.short===1&&add.length)d=d.filter(k=>k!=='HSHADOW');return d;};}
 const aq0=RP.applyQ;
 RP.applyQ=function(full){
 const res=aq0.call(this,full);
