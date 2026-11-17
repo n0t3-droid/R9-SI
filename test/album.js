@@ -17,5 +17,7 @@ check(AL.label({ world: 'Wiesental', when: t }, 'de') === 'Wiesental · 17.11. 1
 check(AL.label({ world: 'Vale', when: t }, 'en') === 'Vale · 17/11 14:05', 'b  ' + AL.label({ world: 'Vale', when: t }, 'en'));
 const miss = []; for (const lang of ['de', 'en']) for (const k of ['btn', 'title', 'empty', 'count', 'dl', 'del', 'close', 'back']) if (!(V.I18N.dict[lang] && V.I18N.dict[lang]['g.album.' + k])) miss.push(lang + ':' + k);
 check(!miss.length, 'c  every text in both tables' + (miss.length ? ' — ' + miss.join(', ') : ''));
+check(AL.due(100, 30, 60) && !AL.due(100, 50, 60), 'd  the moments: at most one a minute');
+check(['g.set.moments', 'g.set.moments.tip'].every(k => V.I18N.dict.de[k] && V.I18N.dict.en[k]), 'd  the switch\'s texts in both tables');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

@@ -39,11 +39,11 @@
   const toBlob = (c, q) => new Promise((res) => { try { c.toBlob((b) => res(b), 'image/jpeg', q); } catch (e) { res(null); } });
   function scaled(src, w) { const k = Math.min(1, w / src.width), c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height); return c; }
   // a picture in: a canvas (any size) and the world's name
-  AL.add = async function (canvas, world) {
+  AL.add = async function (canvas, world, caption) {
     if (!canvas || typeof document === 'undefined') return null;
     const full = await toBlob(scaled(canvas, AL.FULL_W), 0.9), thumb = await toBlob(scaled(canvas, AL.THUMB_W), 0.8);
     if (!full || !thumb) return null;
-    const rec = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), when: Date.now(), world: String(world || ''), w: canvas.width, h: canvas.height, full, thumb };
+    const rec = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), when: Date.now(), world: String(world || ''), caption: caption ? String(caption).slice(0, 80) : '', w: canvas.width, h: canvas.height, full, thumb };
     const d = await db();
     if (!d) { mem.push(rec); for (const id of AL.trim(mem, AL.MAX)) { const i = mem.findIndex((r) => r.id === id); if (i >= 0) mem.splice(i, 1); } return rec; }
     try { await done(tr(d, 'readwrite').put(rec)); const all = await AL.list(); for (const id of AL.trim(all, AL.MAX)) await AL.del(id); } catch (e) { mem.push(rec); }
@@ -69,6 +69,46 @@
     };
   }
 
+  // ---------------------------------------------------------------- Momente: the album takes a picture by itself
+  // When something happens worth remembering — a companion tamed, a Wanderbuch moment found, a new place reached — the
+  // next frame is kept (no flash, the screen's own size, the HUD hidden for that frame), with a line saying what it was.
+  // At most one a minute; switch ⚙ Spiel „Momente festhalten" (moments, on).
+  AL.GAP = 60;
+  AL.last = -1e9;
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'moments', g: 'game', sec: 'misc', t: 'switch', lab: 'g.set.moments', tip: 'g.set.moments.tip', def: true });
+  AL.due = (now, last, gap) => now - last >= gap;
+  AL.moment = function (g, caption) {
+    if (!g || !g.renderer || g.state !== 'play' || (g.settings && g.settings.moments === false)) return false;
+    const now = performance.now() / 1000;
+    if (!AL.due(now, AL.last, AL.GAP) || g.renderer.capNext || (g.photoCam && g.photoCam.on)) return false;
+    AL.last = now;
+    const hud0 = g.hideHud;
+    // a moment later (the toast and the hearts in the picture's place), one frame at the screen's size
+    setTimeout(() => {
+      if (!g.renderer || g.renderer.capNext) return;
+      g.renderer.capNext = { k: 1, cb: (img) => {
+        if (!img) return;
+        try {
+          const c = document.createElement('canvas'); c.width = img.w; c.height = img.h;
+          const ctx = c.getContext('2d'), id = ctx.createImageData(img.w, img.h), row = img.w * 4;
+          for (let y = 0; y < img.h; y++) id.data.set(img.data.subarray((img.h - 1 - y) * row, (img.h - y) * row), y * row);
+          ctx.putImageData(id, 0, 0);
+          AL.add(c, g.meta && g.meta.name, caption);
+        } catch (e) { /* the album is a convenience */ }
+      } };
+      void hud0;
+    }, 700);
+    return true;
+  };
+  // the moments: a companion tamed, a Wanderbuch moment found, a place reached
+  if (VR.Companions && VR.Companions.prototype && VR.Companions.prototype.tame) {
+    const t0 = VR.Companions.prototype.tame;
+    VR.Companions.prototype.tame = function (m, p) { const had = !!m.pet; const r = t0.apply(this, arguments); if (!had && m.pet) AL.moment(this.g, '🐾 ' + m.pet.name); return r; };
+  }
+  if (VR.Wander && VR.Wander.Actor && VR.Wander.Actor.prototype && VR.Wander.Actor.prototype.found) {
+    const f0 = VR.Wander.Actor.prototype.found;
+    VR.Wander.Actor.prototype.found = function (m, sub) { const first = !m.found; const r = f0.apply(this, arguments); if (first && VR.Wander.KINDS[m.kind]) AL.moment(this.g, VR.Wander.KINDS[m.kind].ico + ' ' + tx('g.wd.k.' + m.kind)); return r; };
+  }
   // ---------------------------------------------------------------- the album screen (the pause menu's 📒)
   let urls = [];
   const free = () => { for (const u of urls) { try { URL.revokeObjectURL(u); } catch (e) { /* */ } } urls = []; };
@@ -103,11 +143,11 @@
     for (const r of recs) {
       const f = document.createElement('figure'); f.style.cssText = 'margin:0;cursor:pointer;background:#0d1018;border-radius:6px;overflow:hidden';
       const im = document.createElement('img'); im.src = url(r.thumb); im.style.cssText = 'width:100%;display:block;aspect-ratio:16/9;object-fit:cover';
-      const cap = document.createElement('figcaption'); cap.textContent = AL.label(r, lang); cap.style.cssText = 'font-size:11px;opacity:.8;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      const cap = document.createElement('figcaption'); cap.textContent = (r.caption ? r.caption + ' · ' : '') + AL.label(r, lang); cap.style.cssText = 'font-size:11px;opacity:.8;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       f.appendChild(im); f.appendChild(cap); grid.appendChild(f);
       f.addEventListener('click', () => {
         const v = el.querySelector('#albumView'), big = url(r.full), name = (PM && PM.fileName ? PM.fileName(r.world, 1).replace(/-1\.png$/, '') : 'R9-SI') + '-' + r.id + '.jpg';
-        el.querySelector('#albumBig').src = big; el.querySelector('#albumCap').textContent = AL.label(r, lang) + ' · ' + r.w + ' × ' + r.h;
+        el.querySelector('#albumBig').src = big; el.querySelector('#albumCap').textContent = (r.caption ? r.caption + ' · ' : '') + AL.label(r, lang) + ' · ' + r.w + ' × ' + r.h;
         const a = el.querySelector('#albumDl'); a.href = big; a.download = name;
         el.querySelector('#albumDel').onclick = async () => { await AL.del(r.id); v.style.display = 'none'; AL.open(ui); };
         v.style.display = 'flex';
