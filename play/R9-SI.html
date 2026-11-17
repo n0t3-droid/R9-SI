@@ -61731,6 +61731,7 @@ VR.I18N.add('en',{
 "g.set.sunclock.tip":"Real shadows of the sun and the moon on every PC — worked out once in the background, then only shown (Very Low too).",
 "g.set.skylight":"Sky light",
 "g.set.skylight.tip":"Faces are as bright as the sky they really see: soft shade under porches, crowns and in lanes, full light in the open. Worked out in the background (needs the shadow clock).",
+"g.sweep.bare":"Very Low without the shadow clock",
 "g.set.bounce":"Bounce light",
 "g.set.bounce.tip":"Light given back by sunlit walls and meadows, in their colour: a red wall tints the lane, the meadow lifts the shade under the trees. Worked out in the background.",
 "g.set.lamplight":"Lamp light",
@@ -66792,6 +66793,7 @@ VR.I18N.add('de',{
 "g.set.sunclock.tip":"Echte Schatten von Sonne und Mond für jeden PC — einmal im Hintergrund berechnet, dann nur noch angezeigt (auch auf Sehr niedrig).",
 "g.set.skylight":"Himmelslicht",
 "g.set.skylight.tip":"Flächen sind so hell, wie viel Himmel sie wirklich sehen: unter Vordächern, Kronen und in Gassen weicher Schatten, im Freien volles Licht. Im Hintergrund berechnet (braucht die Schattenuhr).",
+"g.sweep.bare":"Sehr niedrig ohne Schattenuhr",
 "g.set.bounce":"Rückstrahlung",
 "g.set.bounce.tip":"Licht, das von besonnten Wänden und Wiesen zurückstrahlt, in ihrer Farbe: Eine rote Wand färbt die Gasse, die Wiese hellt den Schatten unter den Bäumen auf. Im Hintergrund berechnet.",
 "g.set.lamplight":"Lampenlicht",
@@ -112063,21 +112065,26 @@ VR.Bench={LADDER,median,summarize,stepOf,decide,clampStep,integrated,ladder};
 'use strict';
 const KEY='r9si.sweep';
 const ORDER=['potato','low','balanced','high','ultraLite','ultra'];
+
+
+
+const BARE='potato0';
 const SETTLE=1200,MEASURE=3000,SKIP=500;
 const SMOOTH_FPS=50,PLAYABLE_FPS=30;
-const NAMES={potato:'g.set.pVeryLow',low:'g.set.pLow',balanced:'g.set.pBalanced',high:'g.set.pHigh',ultraLite:'g.set.pUltraLite',ultra:'g.set.pUltra'};
+const NAMES={potato0:'g.sweep.bare',potato:'g.set.pVeryLow',low:'g.set.pLow',balanced:'g.set.pBalanced',high:'g.set.pHigh',ultraLite:'g.set.pUltraLite',ultra:'g.set.pUltra'};
 const T=(k,v,fb)=>(VR.I18N?VR.I18N.t(k,v,fb):(fb!==undefined?fb:k));
 const sane=(x)=>Number.isFinite(x)&&x>0&&x<=5000;
 class Sweep{
 constructor(game){this.game=game;this.results=[];this.phase='idle';this.plan=[];this.at= -1;this.was=null;this.t=0;this.last=0;this.dts=[];}
 
-static plan(presets){return ORDER.filter((p)=>presets&&presets[p]);}
+static plan(presets,bare){const o=ORDER.filter((p)=>presets&&presets[p]);if(bare&&presets&&presets.potato)o.unshift(BARE);return o;}
 
 static pick(results){
 const out={smooth:null,playable:null,smoothOk:false,playableOk:false};
 if(!results|| !results.length)return out;
 const rank=(p)=>ORDER.indexOf(p);
-const sorted=results.slice().sort((a,b)=>rank(a.preset)-rank(b.preset));
+const sorted=results.filter((r)=>r.preset!==BARE).sort((a,b)=>rank(a.preset)-rank(b.preset));
+if(!sorted.length)return out;
 for(const r of sorted){if(r.p90fps>=SMOOTH_FPS){out.smooth=r.preset;out.smoothOk=true;}if(r.fps>=PLAYABLE_FPS){out.playable=r.preset;out.playableOk=true;}}
 
 if(!out.smooth)out.smooth=sorted[0].preset;
@@ -112097,11 +112104,11 @@ const sm=r.smoothOk===false?T('g.sweep.noSmooth',{s:Sweep.name(r.smooth)},'Rucke
 const pl=r.playableOk===false?T('g.sweep.noPlayable',{p:Sweep.name(r.playable)},'Spielbar: keine Stufe ganz ({p} kommt am nächsten).'):T('g.sweep.playable',{p:Sweep.name(r.playable)},'Spielbar: {p}.');
 return steps+' — '+sm+' '+pl;
 }
-start(){
+start(opts){
 const g=this.game;
 if(this.phase!=='idle'||g.bench||g.state!=='play'|| !g.world)return false;
 const P=g.PRESETS||(VR.Game&&VR.Game.PRESETS);
-this.plan=Sweep.plan(P);
+this.plan=Sweep.plan(P,!!(opts&&opts.bare));
 if(!this.plan.length)return false;
 this.was=JSON.parse(JSON.stringify(g.settings));
 this.results=[];this.at= -1;
@@ -112113,7 +112120,8 @@ const g=this.game;
 this.at++;
 if(this.at>=this.plan.length)return this.finish();
 const p=this.plan[this.at];
-g.applyPreset(p);
+g.applyPreset(p===BARE?'potato':p);
+if(p===BARE)g.settings.sunclock=false;else if(this.was)g.settings.sunclock=this.was.sunclock;
 g.settings.dynRes=false;
 g.applySettings('*');
 this.phase='settle';this.t=0;this.last=0;this.dts=[];
@@ -123305,7 +123313,7 @@ return this.benchResult;
 sweepStart(){
 if(this.sweep||this.bench|| !VR.Sweep)return false;
 const sw=new VR.Sweep(this);
-if(!sw.start())return false;
+if(!sw.start({bare: !!(this.settings&&this.settings.sunclock!==false)}))return false;
 this.sweep=sw;
 return true;
 }
