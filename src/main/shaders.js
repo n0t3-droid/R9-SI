@@ -3435,6 +3435,54 @@ vec3 tonemap(vec3 x) {
   if (m > 1.0) h = mix(h / m, vec3(1.0), clamp((m - 1.0) * 0.35, 0.0, 1.0)); // very bright: fade toward white gently
   return mix(f, clamp(h, 0.0, 1.0), u_vivid);
 }
+#ifdef PHOTOFX
+// f-kino · the Fotomodus' styles (photofx.js): x the style (1 Miniatur, 2 Pixelkunst, 3 Film, 4 Aquarell, 5 Comic),
+// y the time, z the focus line of the miniature. Neighbours come from the raw scene; their ratio to the centre carries
+// the finished colour across (the grade stays as it was)
+uniform vec4 u_pfx;
+float pfxL(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+float pfxH(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+vec3 pfxR(vec3 c, vec3 a, vec3 b) { return c * clamp((b + 0.02) / (a + 0.02), 0.3, 2.0); }
+float pfxEdge(vec2 uv, vec2 px, vec3 rc) {
+  float lx = pfxL(texture(u_scene, uv + vec2(px.x * 1.5, 0.0)).rgb) - pfxL(texture(u_scene, uv - vec2(px.x * 1.5, 0.0)).rgb);
+  float ly = pfxL(texture(u_scene, uv + vec2(0.0, px.y * 1.5)).rgb) - pfxL(texture(u_scene, uv - vec2(0.0, px.y * 1.5)).rgb);
+  return clamp(length(vec2(lx, ly)) / (pfxL(rc) + 0.08), 0.0, 1.0);
+}
+vec3 photoFx(vec3 c, vec2 uv) {
+  int f = int(u_pfx.x + 0.5);
+  vec3 rc = texture(u_scene, uv).rgb;
+  vec2 px = 1.0 / u_screen;
+  if (f == 1) {   // Miniatur: sharp in a band, soft above and below, the colours of a painted model
+    float r = smoothstep(0.06, 0.42, abs(uv.y - u_pfx.z)) * 7.0;
+    vec3 acc = vec3(0.0);
+    for (int i = 0; i < 12; i++) { float a = float(i) * 2.39996; float rr = r * sqrt((float(i) + 0.5) / 12.0); acc += texture(u_scene, uv + vec2(cos(a), sin(a)) * rr * px * 2.0).rgb; }
+    c = pfxR(c, rc, acc / 12.0);
+    c = mix(vec3(pfxL(c)), c, 1.18); c = (c - 0.5) * 1.06 + 0.5;
+  } else if (f == 2) {   // Pixelkunst: blocks, five steps a channel, an ordered dither
+    vec2 cell = 4.0 * px * max(1.0, u_screen.y / 400.0);
+    vec2 q = floor(uv / cell);
+    c = pfxR(c, rc, texture(u_scene, (q + 0.5) * cell).rgb);
+    float b = mod(q.x, 2.0) + 2.0 * mod(q.y, 2.0);
+    float th = ((b < 0.5 ? 0.0 : b < 1.5 ? 2.0 : b < 2.5 ? 3.0 : 1.0) / 4.0 - 0.375) * 0.5;
+    c = floor(clamp(c, 0.0, 1.0) * 6.0 + 0.5 + th) / 6.0;
+  } else if (f == 3) {   // Film: warm, grain, the edges darker, black bars
+    c = c * vec3(1.06, 1.0, 0.9) + (pfxH(uv * u_screen + fract(u_pfx.y) * 91.7) - 0.5) * 0.07;
+    vec2 v = uv - 0.5; c *= 1.0 - dot(v, v) * 0.95;
+    if (abs(uv.y - 0.5) > 0.41) c = vec3(0.0);
+  } else if (f == 4) {   // Aquarell: soft colour steps, the edges a darker wash, paper
+    float e = pfxEdge(uv, px, rc);
+    c = mix(c, floor(c * 6.0 + 0.5) / 6.0, 0.5);
+    c = mix(c, c * 0.6, e * 0.9);
+    c = mix(vec3(1.0), c, 0.9) * (0.96 + pfxH(floor(uv * u_screen / 2.0)) * 0.05);
+  } else if (f == 5) {   // Comic: flat colours, ink lines
+    float e = pfxEdge(uv, px, rc);
+    c = mix(vec3(pfxL(c)), c, 1.08);
+    c = floor(clamp(c, 0.0, 1.0) * 5.0 + 0.5) / 5.0;
+    c = mix(c, vec3(0.03), smoothstep(0.42, 0.6, e));
+  }
+  return c;
+}
+#endif
 void main() {
   vec2 uv = v_uv;
   if (u_underwaterFx > 0.0) uv += vec2(sin(uv.y * 28.0 + u_time * 2.2), cos(uv.x * 22.0 + u_time * 1.7)) * 0.0022 * u_underwaterFx;
@@ -3501,6 +3549,9 @@ void main() {
 #endif
 #ifdef FILMG
   c = filmGrade(c, v_uv);   // f-film2: the trailer's grade (trailer_welt.js)
+#endif
+#ifdef PHOTOFX
+  c = photoFx(c, v_uv);   // f-kino: the Fotomodus' styles (photofx.js)
 #endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;

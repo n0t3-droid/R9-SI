@@ -424,7 +424,8 @@
   "gemalt2",
   "gemalt2_gl",
   "placesense",
-  "clockvol"
+  "clockvol",
+  "photofx"
  ],
  "unmeasured": {
   "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs — node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
@@ -442,6 +443,7 @@
   "qart2": "q-art2 (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program, no uniform); per frame only two renderer wraps (common, drawSections) that look up a uniform the potato programs do not have; re-measure with perf8.mjs at the next release",
   "qart2_gl": "q-art2 (2026-11-06): added by hand, not by perf8.mjs — no frame work on Very Low: every switch is off in the potato tier (no define, no program, no uniform); per frame only two renderer wraps (common, drawSections) that look up a uniform the potato programs do not have; re-measure with perf8.mjs at the next release",
   "placesense": "f-spawn (2026-11-15): added by hand, not by perf8.mjs — rules only (VR.PlaceSense), no frame hook: the spawners ask it (entities.trySpawn every 1.2 s: at most 3 places and a group; Chronik families, landlife, wildheart's visit, the Laternenhirsch, worldlife each a few times a minute). node: wild() 0.5 µs a call on a stand-in world (21 ground scans); 8 calls every 1.2 s ≈ 0.0001 ms a frame; re-measure with perf8.mjs at the next quiet release",
-  "clockvol": "e-uhr (2026-11-16): added by hand, not by perf8.mjs — on Very Low it is ON (real sun shadows for the first time): per frame one wrap of updateHmap whose scan of the 8 × 4 × 8 window runs every 4th frame (or when the window moves), at most 6 texSubImage3D of 16 KB, bake jobs in the workers; the terrain FS does one 3-D texture fetch per sunlit pixel instead of nothing. Re-measure with perf8.mjs and on the owner's PC at the next quiet release"
+  "clockvol": "e-uhr (2026-11-16): added by hand, not by perf8.mjs — on Very Low it is ON (real sun shadows for the first time): per frame one wrap of updateHmap whose scan of the 8 × 4 × 8 window runs every 4th frame (or when the window moves), at most 6 texSubImage3D of 16 KB, bake jobs in the workers; the terrain FS does one 3-D texture fetch per sunlit pixel instead of nothing. Re-measure with perf8.mjs and on the owner's PC at the next quiet release",
+  "photofx": "f-kino (2026-11-17): added by hand, not by perf8.mjs — the styles' composite define exists only while a style is chosen in the Fotomodus; per frame one multiply of env's emissive boost by the beat's swell (a few arithmetic operations); re-measure with perf8.mjs at the next quiet release"
  }
 }
