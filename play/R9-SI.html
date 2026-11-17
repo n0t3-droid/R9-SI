@@ -75161,6 +75161,7 @@ return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 
 uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
+uniform vec4 u_bounceK;
 vec3 skyEnvRGB = vec3(0.0);
 vec3 skyLamp = vec3(-1.0);
 float skyOpen(vec3 lp, vec3 N) {
@@ -75177,12 +75178,14 @@ uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
 if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
 float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);
 vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, ry / 128.0));
+
+if (max(v_block.r, max(v_block.g, v_block.b)) > 0.004 && u_bounceK.y > 0.5) {
 vec4 lm = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 128.0));
 skyLamp = lm.a > 0.5 ? lm.rgb : vec3(-1.0);
+}
 skyEnvRGB = e.rgb;
 return u_skyK.x < 0.5 ? 1.0 : mix(u_skyK.y, u_skyK.z, sqrt(e.a));
 }
-uniform vec4 u_bounceK;
 #endif
 
 float shadowAt(vec3 N, vec3 L) {
@@ -129273,8 +129276,8 @@ CV.BOUNCE=0.42;
 
 CV.FILL=0.4;
 CV.noLamp=new Uint8Array(4096*4);
-CV.lampOn=(s)=>CV.on(s)&& !!(s&&s.lamplight===true);
-if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'lamplight',g:'img',sec:'light',t:'switch',lab:'g.set.lamplight',tip:'g.set.lamplight.tip',cost:'low',def:false});
+CV.lampOn=(s)=>CV.on(s)&&(!s||s.lamplight!==false);
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'lamplight',g:'img',sec:'light',t:'switch',lab:'g.set.lamplight',tip:'g.set.lamplight.tip',cost:'low',def:true});
 CV.bounce=(s)=>CV.on(s)&&(!s||s.bounce!==false);
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'bounce',g:'img',sec:'light',t:'switch',lab:'g.set.bounce',tip:'g.set.bounce.tip',cost:'low',def:true});
 if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'skylight',g:'img',sec:'light',t:'switch',lab:'g.set.skylight',tip:'g.set.skylight.tip',cost:'low',def:true});
