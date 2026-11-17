@@ -1480,9 +1480,10 @@
       }
       this.damageFlash = Math.max(0, this.damageFlash - dt * 2.5);
       // R9 Smart Quality: keeps the picture sharp when the frame rate drops
-      this.smartQuality(dt, S, w);
+      if (!this.renderer.lastWasWarp) this.smartQuality(dt, S, w);   // (Bildwarp: Smart Quality measures the whole frames only)
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
+        warpOk: true,   // (Bildwarp, warp.js: the play view may be a warp frame)
         cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, motes: VR.Dusk && VR.Dusk.out && VR.Dusk.out.count ? VR.Dusk.out : null, outline, crack, precip, rainMap,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
