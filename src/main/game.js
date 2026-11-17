@@ -399,6 +399,7 @@
       // the graphics context can be taken away (a driver reset, the GPU out of memory on a small machine, a tab
       // in the background too long): everything on the GPU is gone. The world is saved and the page starts again —
       // seconds, and nothing lost — instead of a black view that never comes back.
+      VR.GL.onFail = (e) => this.frameError(e);   // a program that failed to compile: named in the chat, not only in the console
       this.canvas.addEventListener('webglcontextlost', (e) => {
         e.preventDefault();
         if (this.glLost) return;
@@ -899,6 +900,18 @@
     // the hall reads its crew before gadgets clears the column's spawns (gadgets sets c.spawns = null)
     onColumnLoaded(c) { if (this.sim && this.sim.onColumnLoaded) this.sim.onColumnLoaded(c); if (this.entities && this.entities.onColumnLoaded) this.entities.onColumnLoaded(c); if (this.villages) this.villages.onColumnLoaded(c); if (this.starships) this.starships.onColumnLoaded(c); if (this.hall) this.hall.onColumnLoaded(c); if (this.wow && c.spawns) this.wow.absorb(c.spawns); if (this.gadgets) this.gadgets.onColumnLoaded(c); }
 
+    // a frame that throws: the message in the chat (each different one once, up to five, with where it came from — the
+    // first line of the stack: a player's report then names the place), kept in this.lastErrors for the F3 overlay
+    frameError(e) {
+      console.error(e);
+      const msg = String((e && e.message) || e).slice(0, 160);
+      const at = ((e && e.stack) || '').split('\n').map(l => l.trim()).find(l => /^at /.test(l)) || '';
+      const seen = this.errSeen || (this.errSeen = new Set());
+      if (seen.has(msg) || seen.size >= 5) return;
+      seen.add(msg); this.errShown = true;
+      (this.lastErrors || (this.lastErrors = [])).push(msg + (at ? ' · ' + at.slice(0, 120) : ''));
+      if (this.ui && this.ui.chatLine) this.ui.chatLine(T('g.chat.error', { msg: msg + (at ? ' (' + at.replace(/^at /, '').slice(0, 90) + ')' : '') }), '#ff8a8a');
+    }
     // ---------------------------------------------------------------- main loop
     loop(t) {
       if (this.glLost) return;   // the context is gone: no more frames (the page reloads)
@@ -929,7 +942,7 @@
         if (this.bench) this.benchTick();
         if (this.sweep) this.sweep.tick();   // 📊 Stufentest
         this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
-      } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
+      } catch (e) { this.frameError(e); }
       this.input.endFrame();
       this.jsMs += (performance.now() - tj0 - this.jsMs) * 0.08;
     }
@@ -1723,6 +1736,8 @@
         const [c0, ...a0] = text.slice(1).split(/\s+/);
         const say0 = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
         if (c0 === 'home') { this.goHome(); return; }
+        // /diag: what a player's report needs when the picture is wrong — the renderer's numbers in the chat (no secrets)
+        if (c0 === 'diag') { try { const r = this.renderer, w = this.world, q = r.q || {}, st = r.stats || {}; say0('diag ' + this.state + ' gfx ' + (this.settings.preset || '?') + ' rd ' + this.settings.renderDist + ' scale ' + q.scale + ' far ' + (q.far || '') + ' · sec ' + st.sections + ' draws ' + st.draws + ' tris ' + st.tris + ' · cols ' + w.cols.size + ' pend ' + w.pending.size + ' · dbg ' + !!this.debugOn + ' hide ' + !!this.hideHud + ' · progs ' + (VR.GL.pending ? VR.GL.pending.size : '-') + ' · cv ' + (VR.ClockVol ? VR.ClockVol.short + (VR.ClockVol.on(this.settings) ? ' on' : ' off') : '-') + ' · ' + (VR.GL.rendererName || '')); for (const e of (this.lastErrors || [])) say0('err ' + e, '#ff8a8a'); const P = r.P || {}; const bad = Object.keys(P).filter(k => P[k] && P[k].deferred && !P[k].isReady); say0('notReady ' + bad.slice(0, 12).join(',')); } catch (e) { say0('diag ' + e.message); } return; }
         if (c0 === 'look') { this.lookCommand(a0[0]); return; }
         if (c0 === 'lang' || c0 === 'sprache') { this.langCommand(a0[0]); return; }
         if (c0 === 'spawn' && VR.Travel && VR.Travel.goHome(this, 'spawn')) return;   // u-dims: from another world /spawn leads home to the world's spawn

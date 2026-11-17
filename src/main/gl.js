@@ -52,7 +52,7 @@
     gl.attachShader(p, GL.shader(gl.VERTEX_SHADER, vsFull, name + '.vs'));
     gl.attachShader(p, GL.shader(gl.FRAGMENT_SHADER, fsFull, name + '.fs'));
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('Link failed ' + name + ': ' + gl.getProgramInfoLog(p));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { const log = String(gl.getProgramInfoLog(p)); if (GL.onLinkFail) GL.onLinkFail(name, log); throw new Error('Link failed ' + name + ': ' + log); }
     const u = {};
     const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
     for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const nm = info.name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, info.name); }
@@ -82,9 +82,12 @@
           if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
           const log = gl.getShaderInfoLog(s);
           console.error('Shader compile error (' + nm + '):\n' + log + '\n' + src.split('\n').map((l, i) => (i + 1) + ': ' + l).join('\n'));
+          if (GL.onLinkFail) GL.onLinkFail(name, String(log));
           throw new Error('Shader compile failed: ' + nm + ': ' + log);
         }
-        throw new Error('Link failed ' + name + ': ' + gl.getProgramInfoLog(p));
+        const log = String(gl.getProgramInfoLog(p));
+        if (GL.onLinkFail) GL.onLinkFail(name, log);   // (clockvol.js: too many texture units on a 16-unit GPU → its define off)
+        throw new Error('Link failed ' + name + ': ' + log);
       }
       u = {};
       const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
@@ -95,7 +98,7 @@
     Object.defineProperty(prog, 'p', { get() { ready(); return p; }, enumerable: true });
     Object.defineProperty(prog, 'u', { get() { ready(); return u; }, enumerable: true });
     prog.onReady = (f) => { if (u) f(prog); else (hooks || (hooks = [])).push(f); };
-    prog.settle = (ext) => { if (u || err) return true; if (ext && !gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR)) return false; try { ready(); } catch (e) { console.error(e); } return true; };
+    prog.settle = (ext) => { if (u || err) return true; if (ext && !gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR)) return false; try { ready(); } catch (e) { if (GL.onFail) GL.onFail(e); else console.error(e); } return true; };
     GL.pending.add(prog);
     return prog;
   };

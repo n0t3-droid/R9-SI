@@ -23,7 +23,20 @@
   CV.INFLIGHT = 2; CV.REACH = 6;                 // bake jobs at once; the far field's columns each way
   CV.stats = { baked: 0, ms: 0, up: 0, jobs: 0 };
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'sunclock', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.sunclock', tip: 'g.set.sunclock.tip', cost: 'low', def: true });
-  CV.on = (s) => !s || s.sunclock !== false;
+  // v0.55.61 · Nur Himmel: a GPU with 16 texture units (most PCs under ANGLE) could not link Ultra's terrain programs
+  // with the Schattenuhr's samplers — no terrain at all, only the sky. A link failure for too many units on the terrain
+  // steps down, one step per build: 1 the height-map shadows give way in the terrain (the clock covers its window,
+  // the shadow map the near land), 2 the Schattenuhr off for this session. The programs are rebuilt the next frame.
+  CV.short = 0; CV.pending = false;
+  CV.on = (s) => CV.short < 2 && (!s || s.sunclock !== false);
+  CV.UNITS = /texture image units|MAX_TEXTURE_IMAGE_UNITS|too many samplers/i;
+  CV.linkFail = function (name, msg) {
+    if (CV.pending || CV.short >= 2 || (name !== 'terrain' && name !== 'terrainCut') || !CV.UNITS.test(String(msg || ''))) return;
+    CV.short++; CV.pending = true;
+    if (typeof console !== 'undefined') console.warn('clockvol: the terrain needs more texture units than this GPU has — step ' + CV.short + (CV.short === 1 ? ' (no height-map shadows in the terrain)' : ' (Schattenuhr off for this session)'));
+  };
+  CV.rebuildIfShort = function (r) { if (!CV.pending || !r.P) return; CV.pending = false; if (CV.short >= 2) r.cvKey = 0; r.buildPrograms(); };
+  if (VR.GL) { const lf0 = VR.GL.onLinkFail || null; VR.GL.onLinkFail = (n, m) => { CV.linkFail(n, m); if (lf0) lf0(n, m); }; }
   // E2 · Himmelslicht: the sky's light on a face by how much of the sky its cell really sees — ×SKY_LO where it sees
   // none (under a porch, a crown, deep in a lane), ×SKY_HI in the open. Switch „Himmelslicht" (with the Schattenuhr).
   CV.SKY_LO = 0.42; CV.SKY_HI = 1.08;
@@ -135,17 +148,13 @@
     const gl = this.gl;
     this.clockTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.clockTex);
-    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H);   // (x, z, y: a section's 16³ bytes go in as they are)
+    // (v0.55.61: ONE texture for the clocks, the sky and the lamps — layers 0…63 the clocks, 64…127 the colour given back
+    // and the sky's share, 128…191 the lamps' light: one texture unit where two did not fit on a 16-unit GPU)
+    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H * 3);   // (x, z, y: a section's 16³ bytes go in as they are)
     for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, p, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    // E2 · Himmelslicht: the share of the sky each cell sees, beside the clocks (R8, the same window and slots)
-    this.skyTex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_3D, this.skyTex);
-    gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, CV.W, CV.W, CV.H * 2);   // (e-bounce: rgb the colour given back, a the sky; e-lampe: the upper half the lamps' light)
-    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, p, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    this.skyTex = this.clockTex;
     this.clockOwner = new Int32Array(CV.SX * CV.SX * CV.SY).fill(-1);   // the slot's section (a hash) or −1
     this.clockSig = new Int32Array(CV.SX * CV.SX * CV.SY);
     this.clockOk = new Uint32Array(8);
@@ -185,8 +194,8 @@
             if (up < 6) {
               gl.bindTexture(gl.TEXTURE_3D, this.clockTex); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
               gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.clk);
-              if (s.envB) { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.envB); }
-              { gl.bindTexture(gl.TEXTURE_3D, this.skyTex); gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, 64 + (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.lampB || CV.noLamp); }
+              if (s.envB) { gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, 64 + (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.envB); }
+              { gl.texSubImage3D(gl.TEXTURE_3D, 0, (cx & 7) * 16, (cz & 7) * 16, 128 + (sy & 3) * 16, 16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, s.lampB || CV.noLamp); }
               gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
               this.clockOwner[sl] = h; this.clockSig[sl] = s.clkSig; up++; CV.stats.up++;
             }
@@ -223,7 +232,7 @@
   const uh0 = RP.updateHmap;
   RP.updateHmap = function (world) {
     const r = uh0.apply(this, arguments);
-    try { this.updateClockVol(world); } catch (e) { if (!CV.warned) { CV.warned = true; console.warn('clockvol', e); } }
+    try { CV.rebuildIfShort(this); this.updateClockVol(world); } catch (e) { if (!CV.warned) { CV.warned = true; console.warn('clockvol', e); } }
     return r;
   };
   // the uniforms (every program that has them: the terrain's)
@@ -235,7 +244,6 @@
       const gl = this.gl, live = !!(this.clockLive && this.clockTex && E && E.sunDir && !E.dimId);
       if (this.clockTex) { gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_3D, this.clockTex); }
       if (u.u_clockVol) gl.uniform1i(u.u_clockVol, 5);
-      if (u.u_skyVol) { if (this.skyTex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_3D, this.skyTex); } gl.uniform1i(u.u_skyVol, 8); }
       if (u.u_bounceK) gl.uniform4f(u.u_bounceK, live && CV.bounce(S()) ? CV.BOUNCE : 0, live && CV.lampOn(S()) ? 1 : 0, CV.FILL, 0);
       if (u.u_skyK) gl.uniform4f(u.u_skyK, live && (!S() || S().skylight !== false) ? 1 : 0, CV.SKY_LO, CV.SKY_HI, 0);
       const w = this.clockWin || [0, 0, 0], s = live ? CV.arcTime(E.sunDir) : -9;
@@ -271,8 +279,8 @@
     };
   }
   // the define: SUNCLOCK in the terrain's programs while the switch is on
-  CV.defs = (name, s) => ((name === 'terrain' || name === 'terrainCut') && CV.on(s) ? ['SUNCLOCK'] : []);
-  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { let d = prev ? prev(name, defines) : (defines || []); for (const k of CV.defs(name, S())) if (!d.includes(k)) d = d.concat([k]); return d; }; }
+  CV.defs = (name, s, d) => ((name === 'terrain' || name === 'terrainCut') && CV.on(s) && !(d && d.includes('BODYSKY')) ? ['SUNCLOCK'] : []);   // (a body's sky: its u_bsAir takes unit 5)
+  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { let d = prev ? prev(name, defines) : (defines || []); const add = CV.defs(name, S(), d); for (const k of add) if (!d.includes(k)) d = d.concat([k]); if (CV.short === 1 && add.length) d = d.filter(k => k !== 'HSHADOW'); return d; }; }
   const aq0 = RP.applyQ;
   RP.applyQ = function (full) {
     const res = aq0.call(this, full);
