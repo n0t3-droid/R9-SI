@@ -25,7 +25,8 @@ MAIN.splice(MAIN.indexOf('qart2') + 1, 0, 'qart3');   // q-art3: VR.QArt3 (src/m
 SHARED.splice(SHARED.indexOf('lod') + 1, 0, 'isleshell'); MAIN.splice(MAIN.indexOf('qart3') + 1, 0, 'qart4'); MAIN.splice(MAIN.indexOf('qart2_gl') + 1, 0, 'qart4_gl');   // q-art4: VR.IsleShell (src/shared/isleshell.js — the isles' round far form, main and workers) and VR.QArt4 (src/main/qart4.js — Runde Inseln, its switch)
 SHARED.splice(SHARED.indexOf('mesher') + 1, 0, 'softnat');
 SHARED.splice(SHARED.indexOf('softnat') + 1, 0, 'sunclock');   // e-uhr: VR.SunClock — the Schattenuhr (the bake in the workers, the arc on the main thread)
-MAIN.push('clockvol');   // e-uhr: the clock volume (src/main/clockvol.js): the bakes' scheduling, the 3-D texture, the define SUNCLOCK   // r-gemalt: VR.SoftNat (src/shared/softnat.js) — Weiche Natur, the sculpted ground (main thread and workers)
+MAIN.push('clockvol');
+MAIN.push('photofx');   // f-kino: Bildstile im Fotomodus, Licht im Takt (src/main/photofx.js)   // e-uhr: the clock volume (src/main/clockvol.js): the bakes' scheduling, the 3-D texture, the define SUNCLOCK   // r-gemalt: VR.SoftNat (src/shared/softnat.js) — Weiche Natur, the sculpted ground (main thread and workers)
 MAIN.splice(MAIN.indexOf('qart3') + 1, 0, 'gemalt'); MAIN.splice(MAIN.indexOf('qart2_gl') + 1, 0, 'gemalt_gl');   // r-gemalt: VR.Gemalt (src/main/gemalt.js) — the switch, the shader define, the bodies on the drawn ground
 MAIN.splice(MAIN.indexOf('gemalt') + 1, 0, 'gemalt2'); MAIN.splice(MAIN.indexOf('gemalt_gl') + 1, 0, 'gemalt2_gl');   // r-gemalt 2: VR.Gemalt2 (src/main/gemalt2.js) — Gemaltes Licht, Pinselgras, Gemaltes Wasser (the GL side: gemalt2_gl.js)
 MAIN.splice(MAIN.indexOf('entities'), 0, 'placesense');   // f-spawn: VR.PlaceSense (src/main/placesense.js) — one sense of place for everything that appears by itself (not VR.Place, the block placement)
