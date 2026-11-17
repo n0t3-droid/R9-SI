@@ -3442,7 +3442,7 @@ vec3 tonemap(vec3 x) {
 uniform vec4 u_pfx;
 float pfxL(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 float pfxH(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-vec3 pfxR(vec3 c, vec3 a, vec3 b) { return c * clamp((b + 1e-3) / (a + 1e-3), 0.0, 4.0); }
+vec3 pfxR(vec3 c, vec3 a, vec3 b) { return c * clamp((b + 0.02) / (a + 0.02), 0.3, 2.0); }
 float pfxEdge(vec2 uv, vec2 px, vec3 rc) {
   float lx = pfxL(texture(u_scene, uv + vec2(px.x * 1.5, 0.0)).rgb) - pfxL(texture(u_scene, uv - vec2(px.x * 1.5, 0.0)).rgb);
   float ly = pfxL(texture(u_scene, uv + vec2(0.0, px.y * 1.5)).rgb) - pfxL(texture(u_scene, uv - vec2(0.0, px.y * 1.5)).rgb);
@@ -3457,14 +3457,14 @@ vec3 photoFx(vec3 c, vec2 uv) {
     vec3 acc = vec3(0.0);
     for (int i = 0; i < 12; i++) { float a = float(i) * 2.39996; float rr = r * sqrt((float(i) + 0.5) / 12.0); acc += texture(u_scene, uv + vec2(cos(a), sin(a)) * rr * px * 2.0).rgb; }
     c = pfxR(c, rc, acc / 12.0);
-    c = mix(vec3(pfxL(c)), c, 1.4); c = (c - 0.5) * 1.1 + 0.5;
+    c = mix(vec3(pfxL(c)), c, 1.18); c = (c - 0.5) * 1.06 + 0.5;
   } else if (f == 2) {   // Pixelkunst: blocks, five steps a channel, an ordered dither
     vec2 cell = 4.0 * px * max(1.0, u_screen.y / 400.0);
     vec2 q = floor(uv / cell);
     c = pfxR(c, rc, texture(u_scene, (q + 0.5) * cell).rgb);
     float b = mod(q.x, 2.0) + 2.0 * mod(q.y, 2.0);
-    float th = (b < 0.5 ? 0.0 : b < 1.5 ? 2.0 : b < 2.5 ? 3.0 : 1.0) / 4.0 - 0.375;
-    c = floor(clamp(c, 0.0, 1.0) * 5.0 + 0.5 + th) / 5.0;
+    float th = ((b < 0.5 ? 0.0 : b < 1.5 ? 2.0 : b < 2.5 ? 3.0 : 1.0) / 4.0 - 0.375) * 0.5;
+    c = floor(clamp(c, 0.0, 1.0) * 6.0 + 0.5 + th) / 6.0;
   } else if (f == 3) {   // Film: warm, grain, the edges darker, black bars
     c = c * vec3(1.06, 1.0, 0.9) + (pfxH(uv * u_screen + fract(u_pfx.y) * 91.7) - 0.5) * 0.07;
     vec2 v = uv - 0.5; c *= 1.0 - dot(v, v) * 0.95;
@@ -3476,9 +3476,9 @@ vec3 photoFx(vec3 c, vec2 uv) {
     c = mix(vec3(1.0), c, 0.9) * (0.96 + pfxH(floor(uv * u_screen / 2.0)) * 0.05);
   } else if (f == 5) {   // Comic: flat colours, ink lines
     float e = pfxEdge(uv, px, rc);
-    c = mix(vec3(pfxL(c)), c, 1.3);
-    c = floor(clamp(c, 0.0, 1.0) * 4.0 + 0.5) / 4.0;
-    c = mix(c, vec3(0.03), smoothstep(0.3, 0.45, e));
+    c = mix(vec3(pfxL(c)), c, 1.08);
+    c = floor(clamp(c, 0.0, 1.0) * 5.0 + 0.5) / 5.0;
+    c = mix(c, vec3(0.03), smoothstep(0.42, 0.6, e));
   }
   return c;
 }
