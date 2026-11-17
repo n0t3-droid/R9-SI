@@ -46,7 +46,7 @@
   if (PM && PM.Photo) {
     const P = PM.Photo.prototype, up = P.update, lv = P.leave;
     P.update = function (dt, I) {
-      if (this.on && !this.first && I.hit('KeyK')) { if (PF.film) { PF.film.t = 1e9; PF.stepFilm(this, 0); } else PF.startFilm(this); }
+      if (this.on && !this.first && I.hit('KeyK')) { if (PF.film) { PF.film.t = 1e9; PF.stepFilm(this, 0); } else { PF.startFilm(this); if (PF.film && (I.down('ShiftLeft') || I.down('ShiftRight'))) { PF.film.rec = PF.startRec(this.g); if (PF.film.rec) PM.note('🎬 ' + tx('g.pfx.rec0'), 2500); } } }
       if (this.on && PF.film) { if (I.hit('Escape')) { PF.film.t = 1e9; PF.stepFilm(this, 0); } else if (PF.stepFilm(this, dt)) { I.mouse.dx = 0; I.mouse.dy = 0; const keepS = this.s; this.s = { x: keepS.x, y: keepS.y, z: keepS.z, yaw: keepS.yaw, pitch: keepS.pitch, roll: keepS.roll, vel: [0, 0, 0] }; const r = up.apply(this, arguments); this.s = keepS; return r; } }
       if (this.on && !this.first && I.hit('KeyT')) {
         PF.cur = PF.next(PF.cur);
@@ -55,7 +55,7 @@
       }
       return up.apply(this, arguments);
     };
-    P.leave = function () { if (PF.film) { Object.assign(this.s, PF.film.keep); PF.film = null; } if (PF.cur) { PF.cur = 0; PF.apply(this.g); } return lv.apply(this, arguments); };
+    P.leave = function () { if (PF.film) { if (PF.film.rec) PF.stopRec(); Object.assign(this.s, PF.film.keep); PF.film = null; } if (PF.cur) { PF.cur = 0; PF.apply(this.g); } return lv.apply(this, arguments); };
   }
   // ---------------------------------------------------------------- Kinoflug (K in the Fotomodus): a short film of the place
   // Four shots of ~5 s round what is near (the eye's point on the ground ahead; ShotCraft-like grammar of our own):
@@ -87,15 +87,69 @@
     const F = PF.film; if (!F) return false;
     F.t += dt;
     const k = Math.floor(F.t / PF.SHOT);
-    if (k >= 4) { Object.assign(ph.s, F.keep); if (PF.cur !== F.style) { PF.cur = F.style; PF.apply(ph.g); } PF.film = null; PM.note('🎬 ' + tx('g.pfx.film1'), 2000); return false; }
+    if (k >= 4) { if (F.rec) PF.stopRec(); Object.assign(ph.s, F.keep); if (PF.cur !== F.style) { PF.cur = F.style; PF.apply(ph.g); } PF.film = null; PM.note('🎬 ' + tx('g.pfx.film1'), 2000); return false; }
     Object.assign(ph.s, PF.shot(k, F.t - k * PF.SHOT, F.base));
     if (ph.s.vel) { ph.s.vel[0] = ph.s.vel[1] = ph.s.vel[2] = 0; }
     return true;
   };
+  // ---------------------------------------------------------------- Shift+K: the Kinoflug as a video file (WebM)
+  // The canvas' own stream (captureStream, 30 frames a second) into the browser's MediaRecorder — all in the browser, no
+  // request leaves it. When the flight ends the clip is saved as 'R9-SI-<world>-film-<n>.webm' (or, inside the claude.ai
+  // page where downloads are blocked, shown in a player with a save link).
+  PF.mime = function () {
+    const MR = typeof MediaRecorder !== 'undefined' ? MediaRecorder : null; if (!MR) return null;
+    for (const m of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) { try { if (!MR.isTypeSupported || MR.isTypeSupported(m)) return m; } catch (e) { /* the next */ } }
+    return null;
+  };
+  PF.rec = null;
+  PF.startRec = function (g) {
+    const cv = g && g.renderer && g.renderer.gl && g.renderer.gl.canvas, mime = PF.mime();
+    if (!cv || !cv.captureStream || !mime) { PM.note('🎬 ' + tx('g.pfx.recNo'), 3500); return false; }
+    try {
+      // (each drawn frame copied into a 2-D canvas right after it is drawn — the WebGL canvas keeps no picture between
+      // frames — and that canvas recorded at 30 frames a second; at most 1280 px wide)
+      const k = Math.min(1, 1280 / cv.width), rc = document.createElement('canvas');
+      rc.width = Math.round(cv.width * k) & ~1; rc.height = Math.round(cv.height * k) & ~1;
+      rc.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1';   // (in the page: a canvas outside it is never painted, its stream stays empty)
+      document.body.appendChild(rc);
+      PF.recCtx = rc.getContext('2d', { alpha: false, desynchronized: false }); PF.recSrc = cv;
+      const st = rc.captureStream(30), mr = new MediaRecorder(st, { mimeType: mime, videoBitsPerSecond: 6e6 }), chunks = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = () => { PF.saveRec(g, new Blob(chunks, { type: 'video/webm' })); try { st.getTracks().forEach((t) => t.stop()); } catch (e) { /* */ } };
+      mr.start(500);
+      PF.rec = mr;
+      return true;
+    } catch (e) { PF.rec = null; PM.note('🎬 ' + tx('g.pfx.recNo'), 3500); return false; }
+  };
+  PF.stopRec = function () { const mr = PF.rec; PF.rec = null; const cx = PF.recCtx; PF.recCtx = null; if (cx) setTimeout(() => { try { cx.canvas.remove(); } catch (e) { /* */ } }, 1500); if (mr && mr.state !== 'inactive') { try { mr.stop(); } catch (e) { /* */ } } };
+  PF.saveRec = function (g, blob) {
+    if (!blob || typeof document === 'undefined') return;
+    if (!blob.size) { PM.note('🎬 ' + tx('g.pfx.recNo'), 3500); return; }
+    const m = (g && g.meta) || {}; m.filmN = (m.filmN | 0) + 1;
+    const name = PM.fileName(m.name, m.filmN).replace(/-(\d+)\.png$/, '-film-$1.webm');
+    const url = URL.createObjectURL(blob);
+    let embedded = true; try { embedded = window.self !== window.top; } catch (e) { embedded = true; }
+    if (!embedded) { try { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { embedded = true; } }
+    if (embedded) {
+      let d = document.getElementById('filmshot');
+      if (!d) { d = document.createElement('div'); d.id = 'filmshot'; d.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;background:#141820;padding:10px;border-radius:10px;max-width:80vw;color:#f0e6d0;font:14px sans-serif;text-align:center'; (document.getElementById('app') || document.body).appendChild(d); }
+      d.innerHTML = '';
+      const v = document.createElement('video'); v.src = url; v.controls = true; v.autoplay = true; v.loop = true; v.style.cssText = 'max-width:76vw;max-height:60vh;display:block;margin:0 auto 8px';
+      const a = document.createElement('a'); a.href = url; a.download = name; a.textContent = '⬇ ' + name; a.style.color = '#ffd27a';
+      const x = document.createElement('div'); x.textContent = tx('g.pfx.recClose'); x.style.cssText = 'opacity:.7;margin-top:6px;cursor:pointer';
+      x.onclick = () => { d.remove(); };
+      d.appendChild(v); d.appendChild(a); d.appendChild(x);
+    }
+    PM.note('🎬 ' + tx('g.pfx.recSaved', { n: name, mb: (blob.size / 1048576).toFixed(1) }), 4000);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* */ } }, 300000);
+  };
   PF.apply = function (g) { const r = g && g.renderer; if (r && r.P && r.buildPrograms) r.buildPrograms(); };
   if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return PF.cur && name === 'composite' && !d.includes('PHOTOFX') ? d.concat(['PHOTOFX']) : d; }; }
   if (VR.Renderer) {
-    const RP = VR.Renderer.prototype, l2p0 = RP.l2Post;
+    // (the recording: each drawn frame into the 2-D canvas, and its corner pixel touched — some browsers see a canvas
+    // changed by drawImage from WebGL alone as unchanged and send no frame)
+    const RP = VR.Renderer.prototype, l2p0 = RP.l2Post, rd0 = RP.render;
+    RP.render = function () { const r = rd0.apply(this, arguments); const cx = PF.recCtx; if (cx) { try { cx.drawImage(PF.recSrc, 0, 0, cx.canvas.width, cx.canvas.height); cx.fillStyle = (PF.recN = (PF.recN | 0) + 1) & 1 ? '#010101' : '#020202'; cx.fillRect(0, 0, 1, 1); } catch (e) { /* */ } } return r; };
     RP.l2Post = function (p, E, pass, F) {
       if (l2p0) l2p0.call(this, p, E, pass, F);
       if (pass === 'composite' && p && p.u && p.u.u_pfx) this.gl.uniform4f(p.u.u_pfx, PF.cur, (performance.now() / 1000) % 1000, 0.52, 0);
