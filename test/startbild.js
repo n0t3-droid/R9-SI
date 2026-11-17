@@ -3,6 +3,7 @@
 //   a  a link failure for too many texture units turns the Schattenuhr off for this session (CV.short): CV.on false,
 //      no SUNCLOCK define any more; any other failure leaves it as it was
 //   b  the next updateClockVol rebuilds the programs once (the terrain is back the frame after)
+//   f  the clock, the sky and the lamps share ONE 3-D texture (192 layers): one texture unit, not two
 //   c  GL: a deferred program's failed link calls GL.onLinkFail(name, message) before it throws
 //   d  a body's sky (BODYSKY: its u_bsAir uses unit 5, the clock volume's) never gets SUNCLOCK
 //   e  the frame's errors: each different message once in the chat, with where it came from
@@ -18,17 +19,25 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 check(typeof CV.linkFail === 'function', 'a  CV.linkFail exists');
 if (CV.linkFail) {
-  CV.linkFail('fxaa', 'Link failed: FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)');
+  const UN = 'Link failed terrainCut: FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)';
+  CV.linkFail('fxaa', UN);
   check(!CV.short, 'a  too many units in another program leaves the Schattenuhr');
   CV.linkFail('fxaa', 'Shader compile failed: syntax error');
   check(!CV.short && CV.on({}), 'a  another failure leaves it');
-  CV.linkFail('terrainCut', 'Link failed terrainCut: FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)');
-  check(CV.short && !CV.on({}), 'a  too many units on the terrain: off for this session');
-  check(!GL.defineHook('terrain', ['SHADOWS']).includes('SUNCLOCK'), 'a  no SUNCLOCK define any more');
+  CV.linkFail('terrainCut', UN); CV.linkFail('terrain', UN);   // (both programs of one build: one step)
+  check(CV.short === 1 && CV.on({}), 'a  step 1: the Schattenuhr stays (' + CV.short + ')');
+  const d1 = GL.defineHook('terrain', ['SHADOWS', 'HSHADOW']);
+  check(d1.includes('SUNCLOCK') && !d1.includes('HSHADOW'), 'a  step 1: the height-map shadows give way (the clock covers its window) — ' + d1.join(','));
+  check(GL.defineHook('water', ['HSHADOW']).includes('HSHADOW'), 'a  other programs keep theirs');
   const r = Object.create(RP); r.cvKey = 1; r.P = {};
-  if (CV.rebuildIfShort) { CV.rebuildIfShort(r); CV.rebuildIfShort(r); }
-  check(built === 1 && r.cvKey === 0, 'b  the programs rebuilt once (' + built + ')');
-  CV.short = false;
+  CV.rebuildIfShort(r); CV.rebuildIfShort(r);
+  check(built === 1, 'b  the programs rebuilt once (' + built + ')');
+  CV.linkFail('terrain', UN);
+  check(CV.short === 2 && !CV.on({}), 'a  step 2 (still too many): the Schattenuhr off for this session');
+  check(!GL.defineHook('terrain', ['SHADOWS', 'HSHADOW']).includes('SUNCLOCK'), 'a  no SUNCLOCK define any more');
+  CV.rebuildIfShort(r);
+  check(built === 2 && r.cvKey === 0, 'b  rebuilt again (' + built + ')');
+  CV.short = 0; CV.pending = false;
 }
 check(!GL.defineHook('terrain', ['BODYSKY']).includes('SUNCLOCK'), 'd  BODYSKY: no SUNCLOCK');
 check(GL.defineHook('terrain', ['SHADOWS']).includes('SUNCLOCK'), 'd  the overworld keeps it');
@@ -41,6 +50,11 @@ check(GL.defineHook('terrain', ['SHADOWS']).includes('SUNCLOCK'), 'd  the overwo
   const p = G.deferProgram('vs', 'fs', 'opaque');
   let threw = false; try { void p.p; } catch (e) { threw = true; }
   check(threw && seen && seen[0] === 'opaque' && /TEXTURE_IMAGE_UNITS/.test(seen[1]), 'c  GL.onLinkFail(name, message) before the throw');
+}
+// f  one volume
+{
+  const sh = require('fs').readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
+  check(!/u_skyVol/.test(sh), 'f  no u_skyVol in the shaders (the clock volume holds all three)');
 }
 // e  game.frameError
 {

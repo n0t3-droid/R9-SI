@@ -1041,14 +1041,13 @@ float clockVis(vec3 lp, vec3 N) {
   int wi = (sl >> 5) & 3;
   uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
   if ((word & (1u << uint(sl & 31))) == 0u) return -1.0;
-  vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, wp.y / 64.0));
+  vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));   // (layers 0…63 of the one volume)
   float s = u_clockWin.w;
   float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
   return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 }
 // e-himmel · E2 Himmelslicht: the share of the sky the cell in front of the face sees (baked with the clocks, one more
 // filtered texel) → the factor on the sky's light: u_skyK.y where it sees none … u_skyK.z in the open; 1 where unknown
-uniform highp sampler3D u_skyVol;
 uniform vec4 u_skyK;
 uniform vec4 u_bounceK;   // e-bounce: x the strength of the light given back (0: off), y lamps by rays on, z the flood's share
 vec3 skyEnvRGB = vec3(0.0);   // (e-bounce: the colour the surroundings give back, set by skyOpen)
@@ -1065,11 +1064,11 @@ float skyOpen(vec3 lp, vec3 N) {
   int wi = (sl >> 5) & 3;
   uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
   if ((word & (1u << uint(sl & 31))) == 0u) return 1.0;
-  float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);   // (e-lampe: the volume is two halves: env below, the lamps above)
-  vec4 e = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, ry / 128.0));
+  float ry = clamp(mod(wp.y, 64.0), 0.5, 63.5);   // (the clock volume's thirds: 64… the colour given back and the sky, 128… the lamps)
+  vec4 e = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 192.0));
   // (the lamps' texel only where the flood fill says a lamp is near — by day outdoors one fetch fewer)
   if (max(v_block.r, max(v_block.g, v_block.b)) > 0.004 && u_bounceK.y > 0.5) {
-    vec4 lm = texture(u_skyVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 64.0) / 128.0));
+    vec4 lm = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, (ry + 128.0) / 192.0));
     skyLamp = lm.a > 0.5 ? lm.rgb : vec3(-1.0);
   }
   skyEnvRGB = e.rgb;
