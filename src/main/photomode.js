@@ -77,7 +77,7 @@
       g.hideHud = true;
       if (g.input && g.input.requestLock) g.input.requestLock();   // (the mouse looks round at once — a click is a photo)
       let seen = false; try { seen = localStorage.getItem(HINT_KEY) === '1'; localStorage.setItem(HINT_KEY, '1'); } catch (err) { seen = false; }
-      PM.note(seen ? tx('g.photo.short', null, '📷 Fotomodus · T: Bildstil · K: Kinoflug · F2 oder Klick: Foto · Esc: zurück', '📷 Photo mode · T: style · K: film flight · F2 or click: photo · Esc: back') : tx('g.photo.hint', null, '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück', '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight · F2, Enter or click: photo (2×) · Esc: back'), seen ? 2600 : 9000);
+      PM.note(seen ? tx('g.photo.short', null, '📷 Fotomodus · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2 oder Klick: Foto · Esc: zurück', '📷 Photo mode · T: style · K: film flight (Shift+K: as a video) · F2 or click: photo · Esc: back') : tx('g.photo.hint', null, '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · T: Bildstil · K: Kinoflug (Umschalt+K: als Video) · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück', '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · T: style · K: film flight (Shift+K: as a video) · F2, Enter or click: photo (2×) · Esc: back'), seen ? 2600 : 9000);
     }
     leave() {
       const g = this.g; if (!this.on) return;
