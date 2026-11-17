@@ -23,7 +23,19 @@
   CV.INFLIGHT = 2; CV.REACH = 6;                 // bake jobs at once; the far field's columns each way
   CV.stats = { baked: 0, ms: 0, up: 0, jobs: 0 };
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'sunclock', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.sunclock', tip: 'g.set.sunclock.tip', cost: 'low', def: true });
-  CV.on = (s) => !s || s.sunclock !== false;
+  // v0.55.61 · Nur Himmel: a GPU with 16 texture units (most PCs under ANGLE) could not link Ultra's terrain programs
+  // with the two volumes (18 samplers) — no terrain at all, only the sky. A link failure for too many units on the
+  // terrain turns the Schattenuhr off for this session (CV.short) and the programs are rebuilt the next frame.
+  CV.short = false;
+  CV.on = (s) => !CV.short && (!s || s.sunclock !== false);
+  CV.UNITS = /texture image units|MAX_TEXTURE_IMAGE_UNITS|too many samplers/i;
+  CV.linkFail = function (name, msg) {
+    if (CV.short || (name !== 'terrain' && name !== 'terrainCut') || !CV.UNITS.test(String(msg || ''))) return;
+    CV.short = true;
+    if (typeof console !== 'undefined') console.warn('clockvol: the terrain needs more texture units than this GPU has — Schattenuhr off for this session');
+  };
+  CV.rebuildIfShort = function (r) { if (CV.short && r.cvKey === 1 && r.P) { r.cvKey = 0; r.buildPrograms(); } };
+  if (VR.GL) { const lf0 = VR.GL.onLinkFail || null; VR.GL.onLinkFail = (n, m) => { CV.linkFail(n, m); if (lf0) lf0(n, m); }; }
   // E2 · Himmelslicht: the sky's light on a face by how much of the sky its cell really sees — ×SKY_LO where it sees
   // none (under a porch, a crown, deep in a lane), ×SKY_HI in the open. Switch „Himmelslicht" (with the Schattenuhr).
   CV.SKY_LO = 0.42; CV.SKY_HI = 1.08;
@@ -223,7 +235,7 @@
   const uh0 = RP.updateHmap;
   RP.updateHmap = function (world) {
     const r = uh0.apply(this, arguments);
-    try { this.updateClockVol(world); } catch (e) { if (!CV.warned) { CV.warned = true; console.warn('clockvol', e); } }
+    try { CV.rebuildIfShort(this); this.updateClockVol(world); } catch (e) { if (!CV.warned) { CV.warned = true; console.warn('clockvol', e); } }
     return r;
   };
   // the uniforms (every program that has them: the terrain's)
@@ -271,8 +283,8 @@
     };
   }
   // the define: SUNCLOCK in the terrain's programs while the switch is on
-  CV.defs = (name, s) => ((name === 'terrain' || name === 'terrainCut') && CV.on(s) ? ['SUNCLOCK'] : []);
-  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { let d = prev ? prev(name, defines) : (defines || []); for (const k of CV.defs(name, S())) if (!d.includes(k)) d = d.concat([k]); return d; }; }
+  CV.defs = (name, s, d) => ((name === 'terrain' || name === 'terrainCut') && CV.on(s) && !(d && d.includes('BODYSKY')) ? ['SUNCLOCK'] : []);   // (a body's sky: its u_bsAir takes unit 5)
+  if (VR.GL) { const prev = VR.GL.defineHook || null; VR.GL.defineHook = (name, defines) => { let d = prev ? prev(name, defines) : (defines || []); for (const k of CV.defs(name, S(), d)) if (!d.includes(k)) d = d.concat([k]); return d; }; }
   const aq0 = RP.applyQ;
   RP.applyQ = function (full) {
     const res = aq0.call(this, full);
