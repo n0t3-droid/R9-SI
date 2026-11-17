@@ -184,7 +184,13 @@
       if (cave !== this.cave) { this.cave = cave; this.room.gain.setTargetAtTime(0, t, 0.02); this.irAt = t + 0.09; this.roomT = -1; }
       if (this.irAt && t >= this.irAt) { this.setRev(this.cave ? this.irCave : this.irRoom); this.irAt = 0; }
       if (!this.irAt) {                                   // automation is sent only when a target changes (Very Low: no per-frame cost)
-        const want = this.cave ? CAVE_SEND : indoors ? ROOM_SEND : 0;
+        let want = this.cave ? CAVE_SEND : indoors ? ROOM_SEND : 0;
+        // f-klang: between walls under the open sky (a lane, a courtyard) a little of the room's echo, by how shut the
+        // place is (the light worked out in the background knows; steps of a tenth: no automation every frame)
+        if (!indoors && w && VR.ClockVol && VR.ClockVol.skyAt && VR.Ambience && VR.Ambience.openK) {
+          const sk = VR.ClockVol.skyAt(w, eye[0], eye[1], eye[2]);
+          if (sk !== null) want = Math.round(ROOM_SEND * (1 - VR.Ambience.openK(sk)) * 0.6 * 10) / 10;
+        }
         if (want !== this.roomT) { this.roomT = want; this.room.gain.setTargetAtTime(want, t, 0.25); }
       }
       const mu = L.underwater ? 900 : VR.BodyLife && VR.BodyLife.vacuum ? (VR.BodyLife.thin ? 2500 : 700) : 20000;   // (u-moons2: thin)   // u-moons1: in vacuum the world is heard only through the suit (bodylife.js)

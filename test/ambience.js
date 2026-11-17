@@ -149,6 +149,21 @@ check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets', 'surf', 'cabin'].e
   run(amb, 3, out);
   check(amb.muffle.frequency.value > 10000 && Math.abs(amb.busGain.gain.value - 1) < 0.01, 'outdoors the bus is open again');
 }
+// ---- f-klang · Klangbild: where the light worked out in the background knows how much sky the ear's cell sees, the
+// muffle follows it — a narrow lane half, a wall's foot nearly open, under a roof shut (sky light says nothing here)
+{
+  const keep = VR.ClockVol; let sky = 0.25;
+  VR.ClockVol = { skyAt: () => sky };
+  const lane = { w: makeWorld({ sky: 15 }), eye: [0.5, 66, 0.5], E: env({ night: 0 }), biome: B('meadow'), speed: 0, dim: 'overworld', underwater: false };
+  run(amb, 3, lane); const fLane = amb.muffle.frequency.value, gLane = amb.busGain.gain.value;
+  sky = 0.5; run(amb, 3, lane); const fWall = amb.muffle.frequency.value;
+  sky = 0.0; run(amb, 3, lane); const fRoof = amb.muffle.frequency.value, gRoof = amb.busGain.gain.value;
+  sky = 1.0; run(amb, 3, lane); const fOpen = amb.muffle.frequency.value;
+  check(fRoof < 900 && Math.abs(gRoof - 0.355) < 0.02, 'f-klang: under a roof (no sky): shut (' + Math.round(fRoof) + ' Hz)');
+  check(fLane > 2000 && fLane < 8000 && gLane > 0.5 && gLane < 0.8, 'f-klang: a narrow lane (a quarter of the sky): half muffled (' + Math.round(fLane) + ' Hz, ' + gLane.toFixed(2) + ')');
+  check(fWall > 12000 && fOpen > 19000, 'f-klang: a wall\'s foot nearly open (' + Math.round(fWall) + ' Hz), the open meadow wide open (' + Math.round(fOpen) + ' Hz)');
+  VR.ClockVol = keep;
+}
 // ---- the switches: nature sounds off, weather sounds off; both off is silence
 {
   const ctxS = { w: makeWorld({ lake: 6, trees: true }), eye: [0.5, 66, 0.5], E: env({ rain: 1, wind: 3, night: 1 }), biome: B('meadow'), speed: 0, dim: 'overworld', underwater: false };
