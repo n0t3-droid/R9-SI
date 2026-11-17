@@ -14,21 +14,26 @@
   'use strict';
   const KEY = 'r9si.sweep';
   const ORDER = ['potato', 'low', 'balanced', 'high', 'ultraLite', 'ultra'];
+  // e-uhr · the price of the light worked out in the background, on the player's own GPU: Very Low once more without
+  // the Schattenuhr (and with it everything it carries: Himmelslicht, Rückstrahlung, Lampenlicht) — a row of the table,
+  // never part of the verdict
+  const BARE = 'potato0';
   const SETTLE = 1200, MEASURE = 3000, SKIP = 500;
   const SMOOTH_FPS = 50, PLAYABLE_FPS = 30;
-  const NAMES = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultraLite: 'g.set.pUltraLite', ultra: 'g.set.pUltra' };
+  const NAMES = { potato0: 'g.sweep.bare', potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultraLite: 'g.set.pUltraLite', ultra: 'g.set.pUltra' };
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const sane = (x) => Number.isFinite(x) && x > 0 && x <= 5000;   // a frame of 0 is a glitch; a stall over 5 s a tab switch (a software renderer's 2 s frame still counts)
   class Sweep {
     constructor(game) { this.game = game; this.results = []; this.phase = 'idle'; this.plan = []; this.at = -1; this.was = null; this.t = 0; this.last = 0; this.dts = []; }
     // the steps in order, those the build has
-    static plan(presets) { return ORDER.filter((p) => presets && presets[p]); }
+    static plan(presets, bare) { const o = ORDER.filter((p) => presets && presets[p]); if (bare && presets && presets.potato) o.unshift(BARE); return o; }
     // the verdict from a table of { preset, fps (median), p90fps }
     static pick(results) {
       const out = { smooth: null, playable: null, smoothOk: false, playableOk: false };
       if (!results || !results.length) return out;
       const rank = (p) => ORDER.indexOf(p);
-      const sorted = results.slice().sort((a, b) => rank(a.preset) - rank(b.preset));
+      const sorted = results.filter((r) => r.preset !== BARE).sort((a, b) => rank(a.preset) - rank(b.preset));
+      if (!sorted.length) return out;
       for (const r of sorted) { if (r.p90fps >= SMOOTH_FPS) { out.smooth = r.preset; out.smoothOk = true; } if (r.fps >= PLAYABLE_FPS) { out.playable = r.preset; out.playableOk = true; } }
       // no step reaches the mark: the lowest step is named, and the text says that it falls short
       if (!out.smooth) out.smooth = sorted[0].preset;
@@ -48,11 +53,11 @@
       const pl = r.playableOk === false ? T('g.sweep.noPlayable', { p: Sweep.name(r.playable) }, 'Spielbar: keine Stufe ganz ({p} kommt am nächsten).') : T('g.sweep.playable', { p: Sweep.name(r.playable) }, 'Spielbar: {p}.');
       return steps + ' — ' + sm + ' ' + pl;
     }
-    start() {
+    start(opts) {
       const g = this.game;
       if (this.phase !== 'idle' || g.bench || g.state !== 'play' || !g.world) return false;
       const P = g.PRESETS || (VR.Game && VR.Game.PRESETS);
-      this.plan = Sweep.plan(P);
+      this.plan = Sweep.plan(P, !!(opts && opts.bare));
       if (!this.plan.length) return false;
       this.was = JSON.parse(JSON.stringify(g.settings));
       this.results = []; this.at = -1;
@@ -64,7 +69,8 @@
       this.at++;
       if (this.at >= this.plan.length) return this.finish();
       const p = this.plan[this.at];
-      g.applyPreset(p);
+      g.applyPreset(p === BARE ? 'potato' : p);
+      if (p === BARE) g.settings.sunclock = false; else if (this.was) g.settings.sunclock = this.was.sunclock;
       g.settings.dynRes = false;   // the governor would take steps while we measure
       g.applySettings('*');
       this.phase = 'settle'; this.t = 0; this.last = 0; this.dts = [];

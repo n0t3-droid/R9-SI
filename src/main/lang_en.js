@@ -3982,6 +3982,7 @@
     "g.set.sunclock.tip": "Real shadows of the sun and the moon on every PC — worked out once in the background, then only shown (Very Low too).",
     "g.set.skylight": "Sky light",
     "g.set.skylight.tip": "Faces are as bright as the sky they really see: soft shade under porches, crowns and in lanes, full light in the open. Worked out in the background (needs the shadow clock).",
+    "g.sweep.bare": "Very Low without the shadow clock",
     "g.set.bounce": "Bounce light",
     "g.set.bounce.tip": "Light given back by sunlit walls and meadows, in their colour: a red wall tints the lane, the meadow lifts the shade under the trees. Worked out in the background.",
     "g.set.lamplight": "Lamp light",

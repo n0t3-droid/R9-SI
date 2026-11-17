@@ -979,7 +979,7 @@
     sweepStart() {
       if (this.sweep || this.bench || !VR.Sweep) return false;
       const sw = new VR.Sweep(this);
-      if (!sw.start()) return false;
+      if (!sw.start({ bare: !!(this.settings && this.settings.sunclock !== false) })) return false;   // (e-uhr: Very Low once more without the Schattenuhr — its price on this GPU)
       this.sweep = sw;
       return true;
     }

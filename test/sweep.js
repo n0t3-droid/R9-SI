@@ -121,5 +121,14 @@ console.log('f · refusals');
   check(sw3.start() === false, 'the Automatik runs: refused');
 }
 
+// ---------------------------------------------------------------- d  e-uhr: Very Low without the Schattenuhr (a row, no verdict)
+{
+  const P = { potato: {}, low: {}, balanced: {}, high: {}, ultra: {} };
+  const pl = VR.Sweep.plan(P, true);
+  check(pl[0] === 'potato0' && pl[1] === 'potato' && pl.length === 6, 'd  with bare: Very Low without the Schattenuhr first  (' + JSON.stringify(pl) + ')');
+  check(VR.Sweep.plan(P).indexOf('potato0') < 0, 'd  without it: the plan as before');
+  const v = VR.Sweep.pick([{ preset: 'potato0', fps: 200, p90fps: 200 }, { preset: 'potato', fps: 40, p90fps: 35 }]);
+  check(v.playable === 'potato' && v.smooth === 'potato', 'd  the bare row never decides the verdict  (' + JSON.stringify(v) + ')');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
