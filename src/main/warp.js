@@ -47,7 +47,8 @@
   W.SQ = 38;
   W.sqTarget = (s) => (W.on(s) ? W.SQ : 55);
   W.done = function (st, k) { if (k === 'w') st.warps++; else st.warps = 0; };
-  W.blocked = function (g) { return !g || g.state !== 'play' || !!(g.ui && (g.ui.screen || g.ui.blocking)) || !!g.photo || !!g.studioOpen || !!(VR.PhotoFx && VR.PhotoFx.rec); };
+  W.blocked = function (g) { return !g || g.state !== 'play' || !!g.hideHud || !!(g.renderer && g.renderer.skyProbe) ||   // (no warps under a hidden HUD — screenshots, the tests' pictures — nor in the sky probe)
+     !!(g.ui && (g.ui.screen || g.ui.blocking)) || !!g.photo || !!g.studioOpen || !!(VR.PhotoFx && VR.PhotoFx.rec); };
 
   const RP = VR.Renderer && VR.Renderer.prototype;
   if (!RP || !VR.GL) return;
@@ -55,7 +56,8 @@
   // picture's depth (the point seen there, put into the new view: how far off from this pixel → move the lookup back)
   const FS = `
 uniform sampler2D u_src;
-uniform highp sampler2D u_depth;
+uniform highp sampler2D u_depth;   // the opaque world's depth (the refraction copy, before the hand's pass cleared it)
+uniform highp sampler2D u_hand;    // the scene's depth: the hand alone where it was drawn
 uniform mat4 u_M;        // new clip → old clip (the turn)
 uniform mat4 u_invOld;   // old clip → old camera-relative world
 uniform mat4 u_vpNew;    // new camera-relative world → new clip
@@ -64,6 +66,12 @@ uniform float u_step;    // 1: correct the step
 in vec2 v_uv;
 out vec4 o;
 void main() {
+  // the hand and the held thing move with the eye: a pixel under 1.5 blocks away in the old picture stays where it was
+  if (u_step > -0.5) {
+    float z0 = texture(u_hand, v_uv).r;
+    vec4 w0 = u_invOld * vec4(v_uv * 2.0 - 1.0, z0 * 2.0 - 1.0, 1.0);
+    if (z0 < 0.99999 && dot(w0.xyz / w0.w, w0.xyz / w0.w) < 2.25) { o = texture(u_src, v_uv); return; }
+  }
   vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
   vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;
   if (u_step > 0.5) {
@@ -107,9 +115,11 @@ void main() {
     gl.uniformMatrix4fv(p.u.u_M, false, this.warpM);
     const dp = this.warpCam ? [cam.x - this.warpCam.x, cam.y - this.warpCam.y, cam.z - this.warpCam.z] : [0, 0, 0];
     const step = W.stepOn && this.warpInvOld && this.sceneDepth && Math.hypot(dp[0], dp[1], dp[2]) > 0.002 ? 1 : 0;
-    gl.uniform1f(p.u.u_step, step);
-    if (step) {
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sceneDepth); gl.uniform1i(p.u.u_depth, 1);
+    const depthOk = !!(this.warpInvOld && this.sceneDepth);
+    gl.uniform1f(p.u.u_step, step ? 1 : depthOk ? 0 : -1);   // (−1: no depth — the turn alone)
+    if (depthOk) {
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.warpDepTex || this.sceneDepth); gl.uniform1i(p.u.u_depth, 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.sceneDepth); gl.uniform1i(p.u.u_hand, 2);
       gl.uniformMatrix4fv(p.u.u_invOld, false, this.warpInvOld); gl.uniformMatrix4fv(p.u.u_vpNew, false, this.warpNew);
       gl.uniform3f(p.u.u_dpos, dp[0], dp[1], dp[2]);
       gl.activeTexture(gl.TEXTURE0);
@@ -142,6 +152,7 @@ void main() {
       this.warpOk = this.warpCapture();
       this.warpVP = this.warpVP || M4.create(); this.warpVP.set(this.vpNJ);
       this.warpInvOld = this.warpInvOld || M4.create(); M4.invert(this.warpInvOld, this.vpNJ);
+      this.warpDepTex = this.depCopied && this.copyDepth ? this.copyDepth : null;
       this.warpCam = { x: c.x, y: c.y, z: c.z, fov: c.fov, roll: c.roll || 0 };
     } else this.warpCam = null;
     return r;

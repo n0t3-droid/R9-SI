@@ -37,8 +37,11 @@
     static prio(d, L, fd) { const S = tileSize(L); return d / S - L * 0.6 - (fd < S ? Horizon.FOCUS_K : 0); }
     // f-perf8: may this frame keep the last selection? (Very Low; pure on the horizon's fields — test/vl_budget.js)
     static keepSel(h, cam, w) { return !!h.selList && h.selWant === 0 && h.selVer === (h.ver | 0) && h.selW === w && h.selR === h.radius && h.selFar === h.farOn() && h.frame - h.selF < Horizon.KEEP_FRAMES && Math.abs(cam.x - h.selX) < Horizon.KEEP_D && Math.abs(cam.z - h.selZ) < Horizon.KEEP_D; }
+    // the screen's share of the split: pixels per unit of view angle against a 1080-line picture at 70° (1 at most: a
+    // bigger screen keeps today's detail), at least SCREEN_MIN
+    static screenK(h, fov) { if (!(h > 0)) return 1; const f = fov > 0.2 && fov < 3 ? fov : 1.22; const px = h / (2 * Math.tan(f / 2)); return Math.max(Horizon.SCREEN_MIN, Math.min(1, px / 771)); }
     static radiusFor(level) { return RADII[Math.max(0, Math.min(4, level | 0))]; }
-    setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level] * (Horizon.SPLIT_MUL || 1); if (r !== this.radius) { this.radius = r; } }
+    setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level] * (Horizon.SPLIT_MUL || 1) * (this.splitK || 1); if (r !== this.radius) { this.radius = r; } }
     // (f-perf8: a number, not a string — the selection looks up ~4 keys a tile a frame; |tx|, |tz| < 2^19 tiles: ±67 M blocks)
     key(L, tx, tz) { return (L * 1048576 + tx + 524288) * 1048576 + tz + 524288; }
     free(t) { this.ver = (this.ver | 0) + 1; const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
@@ -59,6 +62,11 @@
       // array gives its storage back, and filling it again each frame was the horizon's garbage)
       const wasSel = this.listSel; this.listSel = false;
       if (!this.enabled() || !r) { this.drawList.length = 0; return; }
+      // v0.55.67 · Ferne nach Bildpunkten: a tile splits when its cells would look coarse ON SCREEN — so the split follows
+      // the picture's own pixel height (and the field of view): at a render height of 600 the far land is coarser where
+      // a cell is smaller than a pixel anyway (measured on a Radeon APU: the far pass was a third of the GPU frame)
+      { const k = Horizon.screenK(r.H, cam && cam.fov), kq = this.splitK;
+        if (kq === undefined || Math.abs(k - kq) > 0.08) { this.splitK = Math.round(k * 20) / 20; const sp = SPLIT[this.level] * (Horizon.SPLIT_MUL || 1) * this.splitK; if (sp !== this.split) { this.split = sp; this.ver = (this.ver | 0) + 1; } } }
       // the mask is filtered linearly: the cut between far tiles and chunks is a soft band over a chunk (F8), not a step
       if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.LINEAR }); }
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
@@ -343,6 +351,7 @@
   // p-stream2 · the fine level: an L0 tile within FINE_D blocks of the camera splits into four 64-block tiles of 2-block
   // cells (0: off); shownUnder — are all 16 chunk columns under fine tile (a, b) shown? (then it is not needed)
   Horizon.FINE_D = 72;
+  Horizon.SCREEN_MIN = 0.5;   // (v0.55.67: the far land at most twice as coarse by the screen — screenK)
   Horizon.shownUnder = function (w, a, b) {
     if (!w || !w.cols) return false;
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const c = w.cols.get(VR.ckey(a * 4 + i, b * 4 + j)); if (!c || !(c.shownAt >= 0) || (w.fading && w.fading.has(c))) return false; }   // (fading in: the tile fills the dither's other half)
