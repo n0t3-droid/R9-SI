@@ -26,7 +26,8 @@ SHARED.splice(SHARED.indexOf('lod') + 1, 0, 'isleshell'); MAIN.splice(MAIN.index
 SHARED.splice(SHARED.indexOf('mesher') + 1, 0, 'softnat');
 SHARED.splice(SHARED.indexOf('softnat') + 1, 0, 'sunclock');   // e-uhr: VR.SunClock — the Schattenuhr (the bake in the workers, the arc on the main thread)
 MAIN.push('clockvol');
-MAIN.push('warp');   // Bildwarp: warp frames between whole ones on a slow PC (src/main/warp.js)
+MAIN.push('warp');
+MAIN.push('kosten');   // /kosten: the parts' GPU cost measured on the player's own card (src/main/kosten.js)   // Bildwarp: warp frames between whole ones on a slow PC (src/main/warp.js)
 MAIN.push('photofx');
 MAIN.push('album');   // f-album: 📒 Fotoalbum (src/main/album.js)   // f-kino: Bildstile im Fotomodus, Licht im Takt (src/main/photofx.js)   // e-uhr: the clock volume (src/main/clockvol.js): the bakes' scheduling, the 3-D texture, the define SUNCLOCK   // r-gemalt: VR.SoftNat (src/shared/softnat.js) — Weiche Natur, the sculpted ground (main thread and workers)
 MAIN.splice(MAIN.indexOf('qart3') + 1, 0, 'gemalt'); MAIN.splice(MAIN.indexOf('qart2_gl') + 1, 0, 'gemalt_gl');   // r-gemalt: VR.Gemalt (src/main/gemalt.js) — the switch, the shader define, the bodies on the drawn ground

@@ -38,7 +38,7 @@
     // f-perf8: may this frame keep the last selection? (Very Low; pure on the horizon's fields — test/vl_budget.js)
     static keepSel(h, cam, w) { return !!h.selList && h.selWant === 0 && h.selVer === (h.ver | 0) && h.selW === w && h.selR === h.radius && h.selFar === h.farOn() && h.frame - h.selF < Horizon.KEEP_FRAMES && Math.abs(cam.x - h.selX) < Horizon.KEEP_D && Math.abs(cam.z - h.selZ) < Horizon.KEEP_D; }
     static radiusFor(level) { return RADII[Math.max(0, Math.min(4, level | 0))]; }
-    setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level]; if (r !== this.radius) { this.radius = r; } }
+    setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level] * (Horizon.SPLIT_MUL || 1); if (r !== this.radius) { this.radius = r; } }
     // (f-perf8: a number, not a string — the selection looks up ~4 keys a tile a frame; |tx|, |tz| < 2^19 tiles: ±67 M blocks)
     key(L, tx, tz) { return (L * 1048576 + tx + 524288) * 1048576 + tz + 524288; }
     free(t) { this.ver = (this.ver | 0) + 1; const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }

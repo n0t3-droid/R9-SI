@@ -1739,6 +1739,7 @@
         const [c0, ...a0] = text.slice(1).split(/\s+/);
         const say0 = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
         if (c0 === 'home') { this.goHome(); return; }
+        if (c0 === 'kosten' || c0 === 'costs') { if (VR.Kosten) VR.Kosten.run(this, a0[0]); return; }   // (kosten.js: what each part costs on this GPU)
         // /diag: what a player's report needs when the picture is wrong — the renderer's numbers in the chat (no secrets)
         if (c0 === 'diag') { try { const r = this.renderer, w = this.world, q = r.q || {}, st = r.stats || {}; say0('diag ' + this.state + ' gfx ' + (this.settings.preset || '?') + ' rd ' + this.settings.renderDist + ' scale ' + q.scale + ' far ' + (q.far || '') + ' · sec ' + st.sections + ' draws ' + st.draws + ' tris ' + st.tris + ' · cols ' + w.cols.size + ' pend ' + w.pending.size + ' · dbg ' + !!this.debugOn + ' hide ' + !!this.hideHud + ' · progs ' + (VR.GL.pending ? VR.GL.pending.size : '-') + ' · cv ' + (VR.ClockVol ? VR.ClockVol.short + (VR.ClockVol.on(this.settings) ? ' on' : ' off') : '-') + ' · ' + (VR.GL.rendererName || '')); for (const e of (this.lastErrors || [])) say0('err ' + e, '#ff8a8a'); const P = r.P || {}; const bad = Object.keys(P).filter(k => P[k] && P[k].deferred && !P[k].isReady); say0('notReady ' + bad.slice(0, 12).join(',')); } catch (e) { say0('diag ' + e.message); } return; }
         if (c0 === 'look') { this.lookCommand(a0[0]); return; }
