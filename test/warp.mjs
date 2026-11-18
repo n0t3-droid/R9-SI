@@ -53,6 +53,30 @@ check(r1.dWarp < r1.dOld * 0.5, '1 the warp matches the new look (' + r1.dWarp.t
   await sharp({ create: { width: TW * 3, height: TH + LAB, channels: 3, background: '#141820' } }).composite(comp).jpeg({ quality: 88 }).toFile(SHOTS + 'bildwarp.jpg');
   console.log('sheet test/shots/bildwarp.jpg');
 }
+// 1b a step: 0.4 blocks forward and a small turn — with the depth's correction closer to the real frame than without
+const r2 = await ev(() => {
+  const g = VR.game, r = g.renderer, p = g.player;
+  const read = () => { const gl = r.gl, w = r.W, h = r.H, b = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, b); return b; };
+  const frame = (ms) => { r.warpPrevFull = undefined; r.warpFullMs = ms; g.last = performance.now() - 33; g.loop(performance.now()); };
+  const d = (A, B) => { let s = 0, n = 0; for (let i = 0; i < A.length; i += 4) { s += Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]); n += 3; } return s / n; };
+  p.flying = true; p.noclip = true; p.vel[0] = p.vel[1] = p.vel[2] = 0;
+  const x0 = p.pos[0], z0 = p.pos[2], y0 = p.yaw;
+  const go = (k) => { p.pos[0] = x0 - Math.sin(y0) * 0.4 * k; p.pos[2] = z0 - Math.cos(y0) * 0.4 * k; p.yaw = p.viewYaw = y0 + 0.02 * k; p.vel[0] = p.vel[1] = p.vel[2] = 0; };
+  const res = {};
+  for (const stepOn of [false, true]) {
+    VR.Warp.stepOn = stepOn; go(0);
+    for (let i = 0; i < 8; i++) frame(0);
+    r.warpSt = VR.Warp.state(); frame(40);
+    go(1); frame(40);
+    const warped = read();
+    for (let i = 0; i < 8; i++) { go(1); frame(0); }
+    res[stepOn ? 'on' : 'off'] = d(warped, read());
+  }
+  VR.Warp.stepOn = true; go(0);
+  return res;
+});
+console.log('     step: |warp − real| with the depth ' + r2.on.toFixed(2) + ', turn only ' + r2.off.toFixed(2));
+check(r2.on < r2.off, '1b a step: the depth\'s correction is closer to the real frame (' + r2.on.toFixed(2) + ' < ' + r2.off.toFixed(2) + ')');
 // 2 / 3 the running game: natural frames for a few seconds, warp on, then off
 const runFor = (on, ms) => ev(async ([on, ms]) => {
   const g = VR.game, r = g.renderer; g.settings.warp = on; r.warpFullMs = undefined; r.warpSt = VR.Warp.state();

@@ -36,7 +36,7 @@ const map = (M, x, y) => { const v = [M[0] * x + M[4] * y + M[8] + M[12], M[1] *
   const s2 = run(34, 6); check(s2 === 'wfwfwf' || s2 === 'fwfwfw', 'c  30 fps: whole | warp alternate (' + s2 + ')');
   const s3 = run(60, 6); check(/^(fww|wfw|wwf)+$/.test(s3) && (s3.match(/w/g) || []).length === 4, 'c  16 fps: two warps a whole (' + s3 + ')');
   const one = (o) => W.decide(W.state(), Object.assign({ fullMs: 40 }, base, o));
-  check(one({ on: false }) === 'f' && one({ blocked: true }) === 'f' && one({ moved: 0.6 }) === 'f' && one({ fovSame: false }) === 'f' && one({ have: false }) === 'f', 'd  off, a menu, a step, another fov, no picture yet: whole');
+  check(one({ on: false }) === 'f' && one({ blocked: true }) === 'f' && one({ moved: 1.5 }) === 'f' && one({ fovSame: false }) === 'f' && one({ have: false }) === 'f', 'd  off, a menu, a step, another fov, no picture yet: whole');
   check(one({}) === 'w', 'd  otherwise a warp');
 }
 const miss = ['g.set.warp', 'g.set.warp.tip'].filter(k => !(V.I18N.dict.de[k] && V.I18N.dict.en[k]));
