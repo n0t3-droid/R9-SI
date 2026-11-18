@@ -83162,7 +83162,7 @@ refrCopy(F,E,vis){
 const gl=this.gl;
 let col=true,dep=true;
 if(this.q.postLite&&this.q.plCopy!==false){col=this.waterInView(vis)||((this.q.pbr|0)>=2&&this.glassInView(vis));dep=col|| !!this.jit||this.raysAt(F,E)>0.02;}
-this.copied=col;
+this.copied=col;this.depCopied= !!dep;
 if(!col&& !dep)return;
 const n=this.w*this.h,sb=this.sceneFmt().bytes;
 gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.sceneFB);
@@ -84889,8 +84889,11 @@ static focusD(F,L,tx,tz){if(!F)return Infinity;const S=tileSize(L),x0=tx*S,z0=tz
 static prio(d,L,fd){const S=tileSize(L);return d/S-L*0.6-(fd<S?Horizon.FOCUS_K:0);}
 
 static keepSel(h,cam,w){return!!h.selList&&h.selWant===0&&h.selVer===(h.ver|0)&&h.selW===w&&h.selR===h.radius&&h.selFar===h.farOn()&&h.frame-h.selF<Horizon.KEEP_FRAMES&&Math.abs(cam.x-h.selX)<Horizon.KEEP_D&&Math.abs(cam.z-h.selZ)<Horizon.KEEP_D;}
+
+
+static screenK(h,fov){if(!(h>0))return 1;const f=fov>0.2&&fov<3?fov:1.22;const px=h/(2*Math.tan(f/2));return Math.max(Horizon.SCREEN_MIN,Math.min(1,px/771));}
 static radiusFor(level){return RADII[Math.max(0,Math.min(4,level|0))];}
-setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level]*(Horizon.SPLIT_MUL||1);if(r!==this.radius){this.radius=r;}}
+setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level]*(Horizon.SPLIT_MUL||1)*(this.splitK||1);if(r!==this.radius){this.radius=r;}}
 
 key(L,tx,tz){return(L*1048576+tx+524288)*1048576+tz+524288;}
 free(t){this.ver=(this.ver|0)+1;const gl=this.g.renderer.gl;if(t.vao){gl.deleteVertexArray(t.vao);gl.deleteBuffer(t.vbo);gl.deleteBuffer(t.ibo);t.vao=null;this.bytes-=t.bytes||0;t.bytes=0;}}
@@ -84911,6 +84914,11 @@ const g=this.g,w=g.world,r=g.renderer;
 
 const wasSel=this.listSel;this.listSel=false;
 if(!this.enabled()|| !r){this.drawList.length=0;return;}
+
+
+
+{const k=Horizon.screenK(r.H,cam&&cam.fov),kq=this.splitK;
+if(kq===undefined||Math.abs(k-kq)>0.08){this.splitK=Math.round(k*20)/20;const sp=SPLIT[this.level]*(Horizon.SPLIT_MUL||1)*this.splitK;if(sp!==this.split){this.split=sp;this.ver=(this.ver|0)+1;}}}
 
 if(!this.maskTex){const gl=r.gl;this.maskTex=VR.GL.tex2D(64,64,gl.R8,gl.RED,gl.UNSIGNED_BYTE,{data:this.mask,filter:gl.LINEAR});}
 if(!this.sentAvg&&g.tex&&g.tex.avgColor){g.pool.broadcast({type:'lodinit',avg:g.tex.avgColor});this.sentAvg=true;}
@@ -85195,6 +85203,7 @@ destroy(){this.reset();}
 
 
 Horizon.FINE_D=72;
+Horizon.SCREEN_MIN=0.5;
 Horizon.shownUnder=function(w,a,b){
 if(!w|| !w.cols)return false;
 for(let j=0;j<4;j++)for(let i=0;i<4;i++){const c=w.cols.get(VR.ckey(a*4+i,b*4+j));if(!c|| !(c.shownAt>=0)||(w.fading&&w.fading.has(c)))return false;}
@@ -129735,7 +129744,8 @@ W.vsyncStep=(v,iv)=>{if(!(iv>2&&iv<100))return v;if(v===undefined)return iv<15.5
 W.SQ=38;
 W.sqTarget=(s)=>(W.on(s)?W.SQ:55);
 W.done=function(st,k){if(k==='w')st.warps++;else st.warps=0;};
-W.blocked=function(g){return!g||g.state!=='play'|| !!(g.ui&&(g.ui.screen||g.ui.blocking))|| !!g.photo|| !!g.studioOpen|| !!(VR.PhotoFx&&VR.PhotoFx.rec);};
+W.blocked=function(g){return!g||g.state!=='play'|| !!g.hideHud|| !!(g.renderer&&g.renderer.skyProbe)||
+!!(g.ui&&(g.ui.screen||g.ui.blocking))|| !!g.photo|| !!g.studioOpen|| !!(VR.PhotoFx&&VR.PhotoFx.rec);};
 
 const RP=VR.Renderer&&VR.Renderer.prototype;
 if(!RP|| !VR.GL)return;
@@ -129744,6 +129754,7 @@ if(!RP|| !VR.GL)return;
 const FS=`
 uniform sampler2D u_src;
 uniform highp sampler2D u_depth;
+uniform highp sampler2D u_hand;
 uniform mat4 u_M;
 uniform mat4 u_invOld;
 uniform mat4 u_vpNew;
@@ -129752,6 +129763,12 @@ uniform float u_step;
 in vec2 v_uv;
 out vec4 o;
 void main() {
+
+if (u_step > -0.5) {
+float z0 = texture(u_hand, v_uv).r;
+vec4 w0 = u_invOld * vec4(v_uv * 2.0 - 1.0, z0 * 2.0 - 1.0, 1.0);
+if (z0 < 0.99999 && dot(w0.xyz / w0.w, w0.xyz / w0.w) < 2.25) { o = texture(u_src, v_uv); return; }
+}
 vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
 vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;
 if (u_step > 0.5) {
@@ -129795,9 +129812,11 @@ gl.uniform1i(p.u.u_src,0);
 gl.uniformMatrix4fv(p.u.u_M,false,this.warpM);
 const dp=this.warpCam?[cam.x-this.warpCam.x,cam.y-this.warpCam.y,cam.z-this.warpCam.z]:[0,0,0];
 const step=W.stepOn&&this.warpInvOld&&this.sceneDepth&&Math.hypot(dp[0],dp[1],dp[2])>0.002?1:0;
-gl.uniform1f(p.u.u_step,step);
-if(step){
-gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.sceneDepth);gl.uniform1i(p.u.u_depth,1);
+const depthOk= !!(this.warpInvOld&&this.sceneDepth);
+gl.uniform1f(p.u.u_step,step?1:depthOk?0: -1);
+if(depthOk){
+gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.warpDepTex||this.sceneDepth);gl.uniform1i(p.u.u_depth,1);
+gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.sceneDepth);gl.uniform1i(p.u.u_hand,2);
 gl.uniformMatrix4fv(p.u.u_invOld,false,this.warpInvOld);gl.uniformMatrix4fv(p.u.u_vpNew,false,this.warpNew);
 gl.uniform3f(p.u.u_dpos,dp[0],dp[1],dp[2]);
 gl.activeTexture(gl.TEXTURE0);
@@ -129830,6 +129849,7 @@ if(on&&(this.warpFullMs||0)>W.limits(this.warpVsync)[0]&&this.vpNJ){
 this.warpOk=this.warpCapture();
 this.warpVP=this.warpVP||M4.create();this.warpVP.set(this.vpNJ);
 this.warpInvOld=this.warpInvOld||M4.create();M4.invert(this.warpInvOld,this.vpNJ);
+this.warpDepTex=this.depCopied&&this.copyDepth?this.copyDepth:null;
 this.warpCam={x:c.x,y:c.y,z:c.z,fov:c.fov,roll:c.roll||0};
 }else this.warpCam=null;
 return r;
