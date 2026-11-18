@@ -16,8 +16,9 @@
   'use strict';
   const W = VR.Warp = {};
   const M4 = VR.mat4;
-  W.MOVE = 0.35; W.T1 = 22; W.T2 = 45;
+  W.MOVE = 1.0; W.T1 = 22; W.T2 = 45;   // (v0.55.63: steps are corrected by the depth — two iterations; beyond a block: a whole frame)
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'warp', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.warp', tip: 'g.set.warp.tip', cost: 'low', def: true });
+  W.stepOn = true;   // (the step's correction; a test turns it off to compare)
   W.on = (s) => !s || s.warp !== false;
   // the camera's turn and projection (as renderer.setupCamera, without the jitter)
   W.vp = function (cam, aspect, out) {
@@ -41,14 +42,31 @@
 
   const RP = VR.Renderer && VR.Renderer.prototype;
   if (!RP || !VR.GL) return;
+  // the turn maps a pixel into the old picture; a step moves near things more than far ones: two iterations with the old
+  // picture's depth (the point seen there, put into the new view: how far off from this pixel → move the lookup back)
   const FS = `
 uniform sampler2D u_src;
-uniform mat4 u_M;
+uniform highp sampler2D u_depth;
+uniform mat4 u_M;        // new clip → old clip (the turn)
+uniform mat4 u_invOld;   // old clip → old camera-relative world
+uniform mat4 u_vpNew;    // new camera-relative world → new clip
+uniform vec3 u_dpos;     // the new eye − the old eye
+uniform float u_step;    // 1: correct the step
 in vec2 v_uv;
 out vec4 o;
 void main() {
   vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
   vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;
+  if (u_step > 0.5) {
+    for (int i = 0; i < 2; i++) {
+      float z = texture(u_depth, clamp(uv, vec2(0.0), vec2(1.0))).r;
+      if (z >= 0.99999) break;   // the sky: as far as the turn says
+      vec4 w = u_invOld * vec4(uv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
+      vec4 c = u_vpNew * vec4(w.xyz / w.w - u_dpos, 1.0);
+      if (c.w <= 0.0) break;
+      uv -= (c.xy / c.w - (v_uv * 2.0 - 1.0)) * 0.5;
+    }
+  }
   o = texture(u_src, clamp(uv, vec2(0.0), vec2(1.0)));
 }`;
   RP.warpCapture = function () {
@@ -78,6 +96,15 @@ void main() {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
     gl.uniform1i(p.u.u_src, 0);
     gl.uniformMatrix4fv(p.u.u_M, false, this.warpM);
+    const dp = this.warpCam ? [cam.x - this.warpCam.x, cam.y - this.warpCam.y, cam.z - this.warpCam.z] : [0, 0, 0];
+    const step = W.stepOn && this.warpInvOld && this.sceneDepth && Math.hypot(dp[0], dp[1], dp[2]) > 0.002 ? 1 : 0;
+    gl.uniform1f(p.u.u_step, step);
+    if (step) {
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sceneDepth); gl.uniform1i(p.u.u_depth, 1);
+      gl.uniformMatrix4fv(p.u.u_invOld, false, this.warpInvOld); gl.uniformMatrix4fv(p.u.u_vpNew, false, this.warpNew);
+      gl.uniform3f(p.u.u_dpos, dp[0], dp[1], dp[2]);
+      gl.activeTexture(gl.TEXTURE0);
+    }
     this.fs(p);
     W.stats.warps++;
   };
@@ -104,6 +131,7 @@ void main() {
     if (on && (this.warpFullMs || 0) > W.T1 && this.vpNJ) {
       this.warpOk = this.warpCapture();
       this.warpVP = this.warpVP || M4.create(); this.warpVP.set(this.vpNJ);
+      this.warpInvOld = this.warpInvOld || M4.create(); M4.invert(this.warpInvOld, this.vpNJ);
       this.warpCam = { x: c.x, y: c.y, z: c.z, fov: c.fov, roll: c.roll || 0 };
     } else this.warpCam = null;
     return r;
