@@ -15,6 +15,7 @@
     { id: 'far0', de: 'Ferne aus', en: 'Far land off', set: { horizon: 0 }, grp: 'far' },
     { id: 'farS', de: 'Ferne gröber (Teilung ×0.75)', en: 'Far land coarser (split ×0.75)', set: {}, split: 0.75, grp: 'far' },
     { id: 'farS2', de: 'Ferne viel gröber (×0.55)', en: 'Far land much coarser (×0.55)', set: {}, split: 0.55, grp: 'far' },
+    { id: 'farZ', de: 'Ferne mit Tiefenvorlauf', en: 'Far land depth pre-pass', set: {}, knob: ['Horizon', 'ZPRE', true], grp: 'far' },
     { id: 'fade0', de: 'Sanftes Einblenden aus', en: 'Soft fade-in off', set: { fadeIn: false }, grp: 'far' },
     { id: 'uhr0', de: 'Schattenuhr aus', en: 'Sun clock off', set: { sunclock: false } },
     { id: 'sky0', de: 'Himmelslicht + Rückstrahlung + Lampen aus', en: 'Sky light, bounce, lamps off', set: { skylight: false, bounce: false, lamplight: false } },
@@ -53,6 +54,7 @@
         const oldSplit = VR.Horizon && VR.Horizon.SPLIT_MUL, oldScale = S.scale;
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = e.split; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = (S.scale || 1) * e.scale;
+        const kOld = e.knob && VR[e.knob[0]] ? VR[e.knob[0]][e.knob[1]] : undefined; if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = e.knob[2];
         if (Object.keys(e.set).length || e.scale) g.applySettings('*');
         await wait(K.SETTLE);
         r.prof.times = {}; r.prof.total = undefined;
@@ -64,6 +66,7 @@
         for (const k in old) S[k] = old[k];
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = oldSplit || 1; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = oldScale;
+        if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = kOld;
         if (Object.keys(e.set).length || e.scale) g.applySettings('*');
       }
     } finally { S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false; }

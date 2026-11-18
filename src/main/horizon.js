@@ -330,6 +330,35 @@
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(p.u.u_noise, 1);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE);
       let n = 0, tris = 0;
+      // v0.55.68 · Ferne mit Tiefenvorlauf (Horizon.ZPRE): the far shader cuts with discard, which stops a GPU from testing
+      // depth before it shades — every far pixel behind a nearer hill was shaded too. First the tiles' depth alone (a
+      // shader that returns after the cuts, no colour), then the colour with depth EQUAL from a copy of the shader without
+      // a discard: the early depth test works, each visible pixel is shaded once. Front to back for the first pass.
+      const zpre = Horizon.ZPRE && p === r.P.lod && !(E.climb && E.climb.cut1 > 0) && !refl && !far1;
+      if (zpre) {
+        const defs = r.q.lite ? [] : ['SOFTFADE'];
+        const inv = (vs) => vs.replace(/(void main\(\)\s*\{)/, 'invariant gl_Position;\n$1');
+        if (!r.P.lodZ) r.P.lodZ = VR.GL.program(inv(VR.SHADERS.LOD_VS), VR.SHADERS.LOD_FS, 'lodZ', defs.concat(['DEPTHONLY']));
+        if (!r.P.lodEq) r.P.lodEq = VR.GL.program(inv(VR.SHADERS.LOD_VS), Horizon.noDiscard(VR.SHADERS.LOD_FS), 'lodEq', defs);
+        list.sort((a, b) => Math.hypot(a.x0 + 64 - cam.x, a.z0 + 64 - cam.z) - Math.hypot(b.x0 + 64 - cam.x, b.z0 + 64 - cam.z));
+        const lodNear = under ? near : 4;
+        const setup = (q) => {
+          gl.useProgram(q.p); r.common(q, E);
+          gl.uniformMatrix4fv(q.u.u_viewProj, false, r.viewProj);
+          gl.uniform3f(q.u.u_camFrac, r.camFrac[0], r.camFrac[1], r.camFrac[2]);
+          gl.uniform3i(q.u.u_camInt, r.camInt[0], r.camInt[1], r.camInt[2]);
+          if (q.u.u_emissiveBoost) gl.uniform1f(q.u.u_emissiveBoost, E.emissiveBoost);
+          gl.uniform1f(q.u.u_lodNear, lodNear);
+          gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.maskTex); gl.uniform1i(q.u.u_mask, 0);
+          gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(q.u.u_noise, 1);
+        };
+        const pass = (q) => { for (const t of list) { const ox = t.x0 - cam.x, oz = t.z0 - cam.z; const cv = r.uCurve ? r.uCurve * (Math.max((ox + t.bx0) ** 2, (ox + t.bx1) ** 2) + Math.max((oz + t.bz0) ** 2, (oz + t.bz1) ** 2)) : 0; if (!mat4.boxInFrustum(r.planes, ox + t.bx0, t.minY - cam.y - cv, oz + t.bz0, ox + t.bx1, t.maxY - cam.y, oz + t.bz1)) continue; gl.uniform3f(q.u.u_tileOrigin, ox, -cam.y, oz); gl.bindVertexArray(t.vao); gl.drawElements(gl.TRIANGLES, t.count, t.type, 0); if (q === r.P.lodEq) { n++; tris += t.count / 3; } } };
+        setup(r.P.lodZ); gl.colorMask(false, false, false, false); pass(r.P.lodZ);
+        gl.colorMask(true, true, true, true); setup(r.P.lodEq); gl.depthFunc(gl.EQUAL); gl.depthMask(false); pass(r.P.lodEq);
+        gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.bindVertexArray(null);
+        this.stats.drawn = n; this.stats.tris = tris; r.stats.draws += n * 2; r.stats.tris += tris * 2;
+        return;
+      }
       const soft = !!(E.climb && E.climb.cut1 > 0); if (soft) { gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }   // u-orbitlod: the climb's far edge blends softly into Herzwelt's impostor (LOD_FS climbA)
       for (const t of list) {
         const ox = t.x0 - cam.x, oz = t.z0 - cam.z;
@@ -351,7 +380,10 @@
   // p-stream2 · the fine level: an L0 tile within FINE_D blocks of the camera splits into four 64-block tiles of 2-block
   // cells (0: off); shownUnder — are all 16 chunk columns under fine tile (a, b) shown? (then it is not needed)
   Horizon.FINE_D = 72;
-  Horizon.SCREEN_MIN = 0.5;   // (v0.55.67: the far land at most twice as coarse by the screen — screenK)
+  Horizon.SCREEN_MIN = 0.5;
+  Horizon.ZPRE = false;   // (v0.55.68: the far tiles' depth pass — /kosten measures it, the default follows the numbers)
+  // the far shader without its cuts (the colour pass after the depth pass: depth EQUAL does the cutting)
+  Horizon.noDiscard = (fs) => { const i = fs.indexOf('void main()'); return fs.slice(0, i) + fs.slice(i).replace(/\bdiscard;/g, ';'); };   // (v0.55.67: the far land at most twice as coarse by the screen — screenK)
   Horizon.shownUnder = function (w, a, b) {
     if (!w || !w.cols) return false;
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const c = w.cols.get(VR.ckey(a * 4 + i, b * 4 + j)); if (!c || !(c.shownAt >= 0) || (w.fading && w.fading.has(c))) return false; }   // (fading in: the tile fills the dither's other half)
