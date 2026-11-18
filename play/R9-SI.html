@@ -77206,6 +77206,9 @@ if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 #endif
 #endif
+#ifdef DEPTHONLY
+o = vec4(0.0); return;
+#endif
 vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
 #ifdef FORM
 
@@ -85182,6 +85185,35 @@ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.maskTex);gl.unif
 gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,r.texNoise);gl.uniform1i(p.u.u_noise,1);
 gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.enable(gl.CULL_FACE);
 let n=0,tris=0;
+
+
+
+
+const zpre=Horizon.ZPRE&&p===r.P.lod&& !(E.climb&&E.climb.cut1>0)&& !refl&& !far1;
+if(zpre){
+const defs=r.q.lite?[]:['SOFTFADE'];
+const inv=(vs)=>vs.replace(/(void main\(\)\s*\{)/,'invariant gl_Position;\n$1');
+if(!r.P.lodZ)r.P.lodZ=VR.GL.program(inv(VR.SHADERS.LOD_VS),VR.SHADERS.LOD_FS,'lodZ',defs.concat(['DEPTHONLY']));
+if(!r.P.lodEq)r.P.lodEq=VR.GL.program(inv(VR.SHADERS.LOD_VS),Horizon.noDiscard(VR.SHADERS.LOD_FS),'lodEq',defs);
+list.sort((a,b)=>Math.hypot(a.x0+64-cam.x,a.z0+64-cam.z)-Math.hypot(b.x0+64-cam.x,b.z0+64-cam.z));
+const lodNear=under?near:4;
+const setup=(q)=>{
+gl.useProgram(q.p);r.common(q,E);
+gl.uniformMatrix4fv(q.u.u_viewProj,false,r.viewProj);
+gl.uniform3f(q.u.u_camFrac,r.camFrac[0],r.camFrac[1],r.camFrac[2]);
+gl.uniform3i(q.u.u_camInt,r.camInt[0],r.camInt[1],r.camInt[2]);
+if(q.u.u_emissiveBoost)gl.uniform1f(q.u.u_emissiveBoost,E.emissiveBoost);
+gl.uniform1f(q.u.u_lodNear,lodNear);
+gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.maskTex);gl.uniform1i(q.u.u_mask,0);
+gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,r.texNoise);gl.uniform1i(q.u.u_noise,1);
+};
+const pass=(q)=>{for(const t of list){const ox=t.x0-cam.x,oz=t.z0-cam.z;const cv=r.uCurve?r.uCurve*(Math.max((ox+t.bx0)**2,(ox+t.bx1)**2)+Math.max((oz+t.bz0)**2,(oz+t.bz1)**2)):0;if(!mat4.boxInFrustum(r.planes,ox+t.bx0,t.minY-cam.y-cv,oz+t.bz0,ox+t.bx1,t.maxY-cam.y,oz+t.bz1))continue;gl.uniform3f(q.u.u_tileOrigin,ox,-cam.y,oz);gl.bindVertexArray(t.vao);gl.drawElements(gl.TRIANGLES,t.count,t.type,0);if(q===r.P.lodEq){n++;tris+=t.count/3;}}};
+setup(r.P.lodZ);gl.colorMask(false,false,false,false);pass(r.P.lodZ);
+gl.colorMask(true,true,true,true);setup(r.P.lodEq);gl.depthFunc(gl.EQUAL);gl.depthMask(false);pass(r.P.lodEq);
+gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.bindVertexArray(null);
+this.stats.drawn=n;this.stats.tris=tris;r.stats.draws+=n*2;r.stats.tris+=tris*2;
+return;
+}
 const soft= !!(E.climb&&E.climb.cut1>0);if(soft){gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);}
 for(const t of list){
 const ox=t.x0-cam.x,oz=t.z0-cam.z;
@@ -85204,6 +85236,9 @@ destroy(){this.reset();}
 
 Horizon.FINE_D=72;
 Horizon.SCREEN_MIN=0.5;
+Horizon.ZPRE=false;
+
+Horizon.noDiscard=(fs)=>{const i=fs.indexOf('void main()');return fs.slice(0,i)+fs.slice(i).replace(/\bdiscard;/g,';');};
 Horizon.shownUnder=function(w,a,b){
 if(!w|| !w.cols)return false;
 for(let j=0;j<4;j++)for(let i=0;i<4;i++){const c=w.cols.get(VR.ckey(a*4+i,b*4+j));if(!c|| !(c.shownAt>=0)||(w.fading&&w.fading.has(c)))return false;}
@@ -129874,6 +129909,7 @@ K.LIST=[
 {id:'far0',de:'Ferne aus',en:'Far land off',set:{horizon:0},grp:'far'},
 {id:'farS',de:'Ferne gröber (Teilung ×0.75)',en:'Far land coarser (split ×0.75)',set:{},split:0.75,grp:'far'},
 {id:'farS2',de:'Ferne viel gröber (×0.55)',en:'Far land much coarser (×0.55)',set:{},split:0.55,grp:'far'},
+{id:'farZ',de:'Ferne mit Tiefenvorlauf',en:'Far land depth pre-pass',set:{},knob:['Horizon','ZPRE',true],grp:'far'},
 {id:'fade0',de:'Sanftes Einblenden aus',en:'Soft fade-in off',set:{fadeIn:false},grp:'far'},
 {id:'uhr0',de:'Schattenuhr aus',en:'Sun clock off',set:{sunclock:false}},
 {id:'sky0',de:'Himmelslicht + Rückstrahlung + Lampen aus',en:'Sky light, bounce, lamps off',set:{skylight:false,bounce:false,lamplight:false}},
@@ -129912,6 +129948,7 @@ const old={};for(const k in e.set){old[k]=S[k];S[k]=e.set[k];}
 const oldSplit=VR.Horizon&&VR.Horizon.SPLIT_MUL,oldScale=S.scale;
 if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=e.split;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
 if(e.scale)S.scale=(S.scale||1)*e.scale;
+const kOld=e.knob&&VR[e.knob[0]]?VR[e.knob[0]][e.knob[1]]:undefined;if(e.knob&&VR[e.knob[0]])VR[e.knob[0]][e.knob[1]]=e.knob[2];
 if(Object.keys(e.set).length||e.scale)g.applySettings('*');
 await wait(K.SETTLE);
 r.prof.times={};r.prof.total=undefined;
@@ -129923,6 +129960,7 @@ const ln=K.fmt(lang,e,res,base);say(ln);lines.push(ln);K.panel(lines.concat(out.
 for(const k in old)S[k]=old[k];
 if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=oldSplit||1;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
 if(e.scale)S.scale=oldScale;
+if(e.knob&&VR[e.knob[0]])VR[e.knob[0]][e.knob[1]]=kOld;
 if(Object.keys(e.set).length||e.scale)g.applySettings('*');
 }
 }finally{S.dynRes=dyn;S.warp=warp;r.profDetail= !!g.debugOn;K.busy=false;}
