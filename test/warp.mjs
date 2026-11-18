@@ -20,7 +20,7 @@ for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR
 await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.renderDist = 3; g.settings.dynRes = false; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Warp',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true})`);
 for (let i = 0; i < 300; i++) { await wait(500); if (await ev(() => VR.game.state === 'play')) break; }
-await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.hideHud = true; });
+await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.hideHud = false; });   // (warp.js: no warps under a hidden HUD)
 await wait(15000);
 // 1 the mapping: a whole frame at yaw0 (kept for warps), a warp to yaw0 + d, the real whole frame at yaw0 + d
 const r1 = await ev(() => {
