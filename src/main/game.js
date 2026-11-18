@@ -1037,7 +1037,9 @@
       }
       // F9: the steps this GPU held last time (aqRestoreStart) go on again once the world runs
       if (aq.pending && this.world) { const s = aq.pending; aq.pending = ''; this.aqRestoreSteps(aq, S, this.world, s); }
-      const target = 55, budget = 1000 / target;
+      // (Bildwarp: whole frames at 38 a second are enough — the warps between them keep the look and the mouse at the screen's
+      // rate — so Smart Quality keeps the picture's resolution and effects where it lowered them for 55 before)
+      const target = VR.Warp && VR.Warp.sqTarget ? VR.Warp.sqTarget(S) : 55, budget = 1000 / target;
       const gpuMs = r.gpuMs, jsMs = this.jsMs;
       // who is the bottleneck? measured when the browser exposes GPU timing, estimated otherwise
       let gpuBound, cpuBound;

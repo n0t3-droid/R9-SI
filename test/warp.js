@@ -39,6 +39,20 @@ const map = (M, x, y) => { const v = [M[0] * x + M[4] * y + M[8] + M[12], M[1] *
   check(one({ on: false }) === 'f' && one({ blocked: true }) === 'f' && one({ moved: 1.5 }) === 'f' && one({ fovSame: false }) === 'f' && one({ have: false }) === 'f', 'd  off, a menu, a step, another fov, no picture yet: whole');
   check(one({}) === 'w', 'd  otherwise a warp');
 }
+{
+  // c2 a 144 Hz monitor: the thresholds follow the screen's frame (measured), not 60 Hz
+  const v = 1000 / 144, L = W.limits(v);
+  check(L[0] < 12 && L[1] < 20, 'c2 144 Hz: a warp from ' + L[0].toFixed(1) + ' ms, two from ' + L[1].toFixed(1) + ' ms');
+  const st = W.state(), base = { on: true, blocked: false, moved: 0, fovSame: true, have: true, vsync: v };
+  const run = (ms, n) => { const out = []; for (let i = 0; i < n; i++) { const k = W.decide(st, Object.assign({ fullMs: ms }, base)); out.push(k); W.done(st, k); } return out.join(''); };
+  check(run(14, 4) === 'wfwf', 'c2 144 Hz, 70 fps whole: whole | warp (144 shown)');
+  const L60 = W.limits(1000 / 60); check(Math.abs(L60[0] - 22) < 2.5 && Math.abs(L60[1] - 45) < 3, 'c2 60 Hz: as before (' + L60.map(x => x.toFixed(1)).join(' / ') + ')');
+  let ve; for (const iv of [33, 33, 34, 50]) ve = W.vsyncStep(ve, iv);
+  check(ve === undefined, 'c2 slow frames only: the screen stays 60 Hz (unknown)');
+  for (const iv of [7, 6.9, 33, 6.95, 20, 7]) ve = W.vsyncStep(ve, iv);
+  check(Math.abs(ve - 6.95) < 1, 'c2 the screen\'s frame from the intervals (' + ve.toFixed(2) + ' ms at 144 Hz; slow frames barely move it)');
+}
+check(W.sqTarget({ warp: true }) === 38 && W.sqTarget({ warp: false }) === 55, 'c3 Smart Quality: whole frames at 38 with the warps (the picture keeps its quality), 55 without');
 const miss = ['g.set.warp', 'g.set.warp.tip'].filter(k => !(V.I18N.dict.de[k] && V.I18N.dict.en[k]));
 check(!miss.length, 'e  texts in both tables ' + miss.join(','));
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
