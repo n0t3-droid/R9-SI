@@ -39,7 +39,7 @@
     static keepSel(h, cam, w) { return !!h.selList && h.selWant === 0 && h.selVer === (h.ver | 0) && h.selW === w && h.selR === h.radius && h.selFar === h.farOn() && h.frame - h.selF < Horizon.KEEP_FRAMES && Math.abs(cam.x - h.selX) < Horizon.KEEP_D && Math.abs(cam.z - h.selZ) < Horizon.KEEP_D; }
     // the screen's share of the split: pixels per unit of view angle against a 1080-line picture at 70° (1 at most: a
     // bigger screen keeps today's detail), at least SCREEN_MIN
-    static screenK(h, fov) { if (!(h > 0)) return 1; const f = fov > 0.2 && fov < 3 ? fov : 1.22; const px = h / (2 * Math.tan(f / 2)); return Math.max(Horizon.SCREEN_MIN, Math.min(1, px / 771)); }
+    static screenK(h, fov) { if (!(h > 0)) return 1; const f = fov > 0.2 && fov < 3 ? fov : 1.22; const px = h / (2 * Math.tan(f / 2)); return Math.max(Horizon.SCREEN_MIN, Math.min(1, px / Horizon.SCREEN_REF)); }
     static radiusFor(level) { return RADII[Math.max(0, Math.min(4, level | 0))]; }
     setLevel(level) { this.level = Math.max(0, Math.min(4, level | 0)); const r = Horizon.radiusFor(this.level); this.split = SPLIT[this.level] * (Horizon.SPLIT_MUL || 1) * (this.splitK || 1); if (r !== this.radius) { this.radius = r; } }
     // (f-perf8: a number, not a string — the selection looks up ~4 keys a tile a frame; |tx|, |tz| < 2^19 tiles: ±67 M blocks)
@@ -381,7 +381,11 @@
   // cells (0: off); shownUnder — are all 16 chunk columns under fine tile (a, b) shown? (then it is not needed)
   Horizon.FINE_D = 72;
   Horizon.SCREEN_MIN = 0.5;
-  Horizon.ZPRE = false;   // (v0.55.68: the far tiles' depth pass — /kosten measures it, the default follows the numbers)
+  // pixels per radian of the reference picture: 1028 = a 1440-line picture at 70° keeps today's detail, 1080 lines 0.75.
+  // Measured with /kosten on a Radeon APU: the far pass is bound by its triangles (a depth pre-pass made it 3.7 ms
+  // slower; a coarser split ×0.75 2.4 ms faster) — small far triangles cost, the cells may be a few pixels wide
+  Horizon.SCREEN_REF = 1028;
+  Horizon.ZPRE = false;   // (v0.55.68: the far tiles' depth pass — measured on a Radeon APU: +3.7 ms, the far pass is triangle-bound; kept off)
   // the far shader without its cuts (the colour pass after the depth pass: depth EQUAL does the cutting)
   Horizon.noDiscard = (fs) => { const i = fs.indexOf('void main()'); return fs.slice(0, i) + fs.slice(i).replace(/\bdiscard;/g, ';'); };   // (v0.55.67: the far land at most twice as coarse by the screen — screenK)
   Horizon.shownUnder = function (w, a, b) {
