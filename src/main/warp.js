@@ -34,9 +34,18 @@
   W.state = () => ({ warps: 0 });
   W.decide = function (st, o) {
     if (!o.on || o.blocked || !o.have || !o.fovSame || !(o.moved <= W.MOVE)) return 'f';
-    const n = o.fullMs > W.T2 ? 2 : o.fullMs > W.T1 ? 1 : 0;
+    const L = W.limits(o.vsync || 0), n = o.fullMs > L[1] ? 2 : o.fullMs > L[0] ? 1 : 0;
     return st.warps < n ? 'w' : 'f';
   };
+  // v0.55.64 · the thresholds by the screen's own frame v (a 144 Hz monitor shows warps from 10 ms whole frames on):
+  // one warp when a whole frame takes over 1.35 v, two over 2.7 v (60 Hz: 22.5 / 45 ms, as before); v unknown: 60 Hz
+  W.limits = (v) => { v = v > 3 && v < 40 ? v : 1000 / 60; return [Math.max(7, v * 1.35), v * 2.7]; };
+  // the screen's frame from the intervals between drawn frames: it follows short intervals at once, long ones barely
+  W.vsyncStep = (v, iv) => { if (!(iv > 2 && iv < 100)) return v; if (v === undefined) return iv < 15.5 ? iv : undefined; return iv < v ? v * 0.6 + iv * 0.4 : Math.min(1000 / 60, v * 0.998 + iv * 0.002); };   // (unknown → 60 Hz; a slow frame never teaches it: only a short interval does — the title screen's, a warp's)
+  // v0.55.64 · Smart Quality's whole-frame target with the warps on (game.js smartQuality): 38 instead of 55 — whole | warp
+  // shows 76 a second, so the picture keeps its sharpness and its effects where it gave them up for 55 before
+  W.SQ = 38;
+  W.sqTarget = (s) => (W.on(s) ? W.SQ : 55);
   W.done = function (st, k) { if (k === 'w') st.warps++; else st.warps = 0; };
   W.blocked = function (g) { return !g || g.state !== 'play' || !!(g.ui && (g.ui.screen || g.ui.blocking)) || !!g.photo || !!g.studioOpen || !!(VR.PhotoFx && VR.PhotoFx.rec); };
 
@@ -112,11 +121,12 @@ void main() {
   const r0 = RP.render;
   RP.render = function (F) {
     if (!F || !F.warpOk) { this.lastWasWarp = false; return r0.apply(this, arguments); }
-    const now = performance.now(), g = VR.game, S = g && g.settings, st = this.warpSt || (this.warpSt = W.state());
+    const now0 = performance.now(); if (this.warpLastCall !== undefined) this.warpVsync = W.vsyncStep(this.warpVsync, now0 - this.warpLastCall); this.warpLastCall = now0;
+    const now = now0, g = VR.game, S = g && g.settings, st = this.warpSt || (this.warpSt = W.state());
     if (this.warpPrevFull !== undefined) { const ms = now - this.warpPrevFull; this.warpFullMs = this.warpFullMs === undefined ? ms : this.warpFullMs * 0.8 + ms * 0.2; this.warpPrevFull = undefined; }
     const c = F.cam, last = this.warpCam, on = W.on(S);
     const k = W.decide(st, {
-      on, blocked: W.blocked(g), fullMs: this.warpFullMs || 0,
+      on, blocked: W.blocked(g), fullMs: this.warpFullMs || 0, vsync: this.warpVsync,
       have: !!(this.warpOk && last && this.warpW === this.W && this.warpH === this.H && this.gl.canvas.width === this.W && this.gl.canvas.height === this.H),
       fovSame: !!(last && Math.abs(last.fov - c.fov) < 1e-4 && (last.roll || 0) === (c.roll || 0)),
       moved: last ? Math.hypot(c.x - last.x, c.y - last.y, c.z - last.z) : 9,
@@ -128,7 +138,7 @@ void main() {
     const r = r0.apply(this, arguments);
     // the picture for the warps after it: only while warps are planned (a fast PC copies nothing)
     this.warpOk = false;
-    if (on && (this.warpFullMs || 0) > W.T1 && this.vpNJ) {
+    if (on && (this.warpFullMs || 0) > W.limits(this.warpVsync)[0] && this.vpNJ) {
       this.warpOk = this.warpCapture();
       this.warpVP = this.warpVP || M4.create(); this.warpVP.set(this.vpNJ);
       this.warpInvOld = this.warpInvOld || M4.create(); M4.invert(this.warpInvOld, this.vpNJ);
