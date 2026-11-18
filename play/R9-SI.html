@@ -129870,14 +129870,22 @@ let big='',bd=0;for(const k in base.times){const dd=(r.times[k]||0)-base.times[k
 return`${name}: ${d>=0?'+':'−'}${ms(Math.abs(d))} ms${big?' ('+big+' '+(bd>=0?'+':'−')+ms(Math.abs(bd))+')':''}`;
 };
 K.top=(t)=>Object.entries(t||{}).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>k+' '+v.toFixed(1)).join(' · ');
-const wait=(ms)=>new Promise((r)=>setTimeout(r,ms));
+
+const wait=(ms)=>new Promise((res)=>{const t0=performance.now();const raf=(typeof requestAnimationFrame==='function')?requestAnimationFrame:(f)=>setTimeout(f,16);const f=()=>(performance.now()-t0>=ms?res():raf(f));raf(f);});
+
+K.panel=function(lines){
+if(typeof document==='undefined')return;
+let el=document.getElementById('r9kosten');
+if(!el){el=document.createElement('div');el.id='r9kosten';el.style.cssText='position:fixed;left:8px;top:8px;z-index:9999;max-width:92vw;background:rgba(10,14,22,.88);color:#cfe6ff;font:12px/1.45 monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;pointer-events:auto;cursor:pointer';el.onclick=()=>el.remove();document.body.appendChild(el);}
+el.textContent=lines.join('\n');
+};
 K.run=async function(g,arg){
 const r=g.renderer,S=g.settings,lang=(VR.I18N&&VR.I18N.lang)||'de',say=(t)=>g.ui.chatLine(t,'#bfe3ff');
 if(!r|| !r.prof|| !r.prof.ext){say(lang==='de'?'Kosten: dieser Browser verrät keine GPU-Zeiten.':'Costs: this browser hides GPU timing.');return;}
 if(K.busy)return;K.busy=true;
 const dyn=S.dynRes;S.dynRes=false;const warp=S.warp;S.warp=false;r.profDetail=true;
 say(lang==='de'?'Kosten werden gemessen … (bitte nicht bewegen, ca. '+Math.round(K.plan(arg).length*(K.SETTLE+K.MEASURE)/1000)+' s)':'Measuring costs … (keep still, about '+Math.round(K.plan(arg).length*(K.SETTLE+K.MEASURE)/1000)+' s)');
-const out=[];let base=null;
+const out=[];let base=null;const lines=['R9 /kosten · '+(VR.GL&&VR.GL.rendererName||'')+' · '+(S.preset||'')];K.panel(lines.concat('…'));
 try{
 for(const e of K.plan(arg)){
 const old={};for(const k in e.set){old[k]=S[k];S[k]=e.set[k];}
@@ -129891,7 +129899,7 @@ await wait(K.MEASURE);
 const res={total:r.prof.total||0,times:Object.assign({},r.prof.times)};
 if(e.id==='base')base=res;
 out.push({id:e.id,total:res.total,times:res.times});
-say(K.fmt(lang,e,res,base));
+const ln=K.fmt(lang,e,res,base);say(ln);lines.push(ln);K.panel(lines.concat(out.length<K.plan(arg).length?['…']:[]));
 for(const k in old)S[k]=old[k];
 if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=oldSplit||1;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
 if(e.scale)S.scale=oldScale;
