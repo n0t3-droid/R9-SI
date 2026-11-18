@@ -84894,7 +84894,7 @@ static prio(d,L,fd){const S=tileSize(L);return d/S-L*0.6-(fd<S?Horizon.FOCUS_K:0
 static keepSel(h,cam,w){return!!h.selList&&h.selWant===0&&h.selVer===(h.ver|0)&&h.selW===w&&h.selR===h.radius&&h.selFar===h.farOn()&&h.frame-h.selF<Horizon.KEEP_FRAMES&&Math.abs(cam.x-h.selX)<Horizon.KEEP_D&&Math.abs(cam.z-h.selZ)<Horizon.KEEP_D;}
 
 
-static screenK(h,fov){if(!(h>0))return 1;const f=fov>0.2&&fov<3?fov:1.22;const px=h/(2*Math.tan(f/2));return Math.max(Horizon.SCREEN_MIN,Math.min(1,px/771));}
+static screenK(h,fov){if(!(h>0))return 1;const f=fov>0.2&&fov<3?fov:1.22;const px=h/(2*Math.tan(f/2));return Math.max(Horizon.SCREEN_MIN,Math.min(1,px/Horizon.SCREEN_REF));}
 static radiusFor(level){return RADII[Math.max(0,Math.min(4,level|0))];}
 setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level]*(Horizon.SPLIT_MUL||1)*(this.splitK||1);if(r!==this.radius){this.radius=r;}}
 
@@ -85236,6 +85236,10 @@ destroy(){this.reset();}
 
 Horizon.FINE_D=72;
 Horizon.SCREEN_MIN=0.5;
+
+
+
+Horizon.SCREEN_REF=1028;
 Horizon.ZPRE=false;
 
 Horizon.noDiscard=(fs)=>{const i=fs.indexOf('void main()');return fs.slice(0,i)+fs.slice(i).replace(/\bdiscard;/g,';');};
