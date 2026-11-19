@@ -795,6 +795,65 @@ html:not(.pro) #zenpanel .field { display: none; }
   .key { min-height: 46px; }
 }
 
+/* ---- Handy-Steuerung 2 (v0.55.72, touch.js): the stick floats under the left thumb, the picture is the tool (tap places,
+   holding breaks), a few big round buttons on the right, the menu top left — everything inside the phone's safe area */
+#touch #tZone { position: absolute; left: 0; top: 30%; bottom: 70px; width: 46%; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+#touch .tstick { left: max(20px, env(safe-area-inset-left)); bottom: calc(84px + env(safe-area-inset-bottom)); width: 128px; height: 128px; opacity: .5; transition: opacity .15s, border-color .15s; z-index: 1; }
+#touch .tstick.on { opacity: 1; }
+#touch .tstick i { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+#touch .tstick.sprint { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 209, 102, .45); }
+#touch .tstick.sprint i { background: rgba(255, 209, 102, .45); border-color: rgba(255, 209, 102, .9); }
+#touch .tb-menu { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); width: 50px; height: 50px; min-height: 50px; border-radius: 16px; pointer-events: auto; padding: 0; }
+#touch .tb-menu .ti { font-size: 24px; }
+#touch.gesten .tb-place, #touch.gesten .tb-break, #touch.gesten .tb-sprint { display: none; }
+#touch.gesten .tbtns { display: block; right: max(16px, env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); width: 0; height: 0; }
+#touch.gesten .tb { position: absolute; pointer-events: auto; touch-action: none; }
+#touch.gesten .tb-jump { right: 0; bottom: 0; width: 86px; height: 86px; border-radius: 50%; }
+#touch.gesten .tb-jump .ti { font-size: 30px; }
+#touch.gesten .tb-inv { right: 98px; bottom: 4px; width: 62px; height: 62px; min-height: 62px; border-radius: 18px; }
+#touch.gesten .tb-act { right: 7px; bottom: 98px; width: 72px; height: 72px; }
+#touch.gesten .tb .tl { font-size: 11px; }
+#tRing { position: fixed; left: 0; top: 0; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 3px solid var(--accent); box-shadow: 0 0 16px rgba(58, 240, 255, .5); pointer-events: none; z-index: 31; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+#tRing.on { opacity: 1; transform: scale(1); animation: tRingPulse .6s ease-in-out infinite alternate; }
+@keyframes tRingPulse { from { transform: scale(.92); } to { transform: scale(1.08); } }
+/* the HUD around it: the hotbar at the bottom (its slots fit a narrow phone and answer a tap), the chips beside the menu,
+   the hints at the top, the 🖐 above the round buttons */
+#ui.touchon #hotbar { bottom: max(6px, env(safe-area-inset-bottom)); pointer-events: auto; gap: 3px; padding: 4px; }
+#ui.touchon #hotbar .slot { width: min(52px, calc((100vw - 52px) / 9)) !important; height: min(52px, calc((100vw - 52px) / 9)) !important; min-width: 0 !important; }
+#ui.touchon #hotbar.hf-off { opacity: 1 !important; pointer-events: auto !important; }   /* (a phone picks blocks from it: it never hides) */
+#ui.touchon #hotbar .slot canvas { width: 78%; height: 78%; }
+#ui.touchon #modebadge { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); bottom: auto; }
+#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; }
+#ui.touchon #hints { top: calc(max(10px, env(safe-area-inset-top)) + 132px); bottom: auto; width: min(76vw, 460px); max-width: min(76vw, 460px); }
+#ui.touchon .bh-btn { right: max(18px, env(safe-area-inset-right)); bottom: calc(262px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px; }
+#ui.touchon #crosshair { opacity: .55; }
+/* a short phone held sideways: everything a little lower and smaller */
+@media (max-height: 430px) {
+  #touch.gesten .tbtns { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #touch.gesten .tb-jump { width: 74px; height: 74px; }
+  #touch.gesten .tb-act { bottom: 84px; width: 60px; height: 60px; }
+  #touch.gesten .tb-inv { right: 86px; width: 54px; height: 54px; min-height: 54px; }
+  #ui.touchon .bh-btn { bottom: calc(196px + env(safe-area-inset-bottom)); width: 50px; height: 50px; }
+  #touch .tstick { bottom: calc(64px + env(safe-area-inset-bottom)); width: 112px; height: 112px; }
+  #ui.touchon #hints { top: 10px; left: auto; right: 12px; transform: none; max-width: 48vw; }
+}
+/* narrow phones: a menu's button pairs wrap instead of running off the panel */
+@media (max-width: 520px) {
+  .screen .row.gap { flex-wrap: wrap; }
+  .screen .row.gap > .btn { flex: 1 1 100% !important; min-width: 0; white-space: normal; }
+  .screen .panel { max-width: calc(100vw - 16px); box-sizing: border-box; }
+}
+/* a phone held sideways (short screen): the start tiles in one row of four, short; menus scroll inside themselves */
+@media (max-height: 460px) and (min-width: 560px) {
+  #title .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; width: min(100%, 820px) !important; }
+  #title .tile { aspect-ratio: auto !important; min-height: 0 !important; height: 118px; padding: 8px 6px !important; gap: 4px !important; }
+  #title .tile svg { width: 34px; height: 34px; }
+}
+@media (max-height: 460px) {
+  .screen .panel { max-height: calc(100vh - 16px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #ui.touchon .bh-btn { bottom: calc(216px + env(safe-area-inset-bottom)) !important; }
+}
+
 /* ============================================================================
    💡 Erfinden — the Erfinderwerkstatt (src/main/invent.js). Big picture cards, a two-slot workbench, warm amber
    for the idea; the game's dark glass for the rest. 44 px targets, works at 360 px wide, the keyboard ring comes from
@@ -59057,6 +59116,16 @@ VR.I18N.add('en',{
 'g.chat.you':'You',
 'g.set.warp':'Frame warp',
 'g.set.warp.tip':'Slow PC: between two expensive frames comes a quick one, the last picture turned to your newest mouse move. Looking around feels as smooth as your monitor, the mouse answers sooner. Fast PCs: no change.',
+'g.set.touchStyle':'Finger style',
+'g.set.touchStyle.tip':'Gestures: tap the picture to place a block, hold a finger to break, push the stick to its rim to run. Buttons: own buttons to place, break and run.',
+'g.set.touchStyle.gesten':'Gestures',
+'g.set.touchStyle.gesten.tip':'Tap places, hold breaks, stick at the rim runs.',
+'g.set.touchStyle.tasten':'Buttons',
+'g.set.touchStyle.tasten.tip':'Buttons to place, break and run.',
+'touch.menu':'Menu',
+'ux.h.moveTouch2':'🕹 left: walk · tap: place · hold: break',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'A short buzz when placing, breaking and running (phones that can vibrate).',
 'g.chat.error':'Error: {msg}',
 'g.chat.noWorld':'That world is not here (any more).',
 'g.chat.landFirst':'Land or get off first.',
@@ -64146,6 +64215,16 @@ VR.I18N.add('de',{
 'g.chat.you':'Du',
 'g.set.warp':'Bildwarp',
 'g.set.warp.tip':'Schwacher PC: Zwischen zwei teuren Bildern kommt ein schnelles Zwischenbild, gedreht zur neuesten Mausbewegung. Umsehen wirkt so flüssig wie dein Monitor, die Maus reagiert früher. Auf schnellen PCs ändert sich nichts.',
+'g.set.touchStyle':'Finger-Stil',
+'g.set.touchStyle.tip':'Gesten: aufs Bild tippen setzt einen Block, Finger halten baut ab, am Rand des Sticks rennst du. Tasten: eigene Knöpfe zum Setzen, Abbauen und Rennen.',
+'g.set.touchStyle.gesten':'Gesten',
+'g.set.touchStyle.gesten.tip':'Tippen setzt, Halten baut ab, Stick am Rand rennt.',
+'g.set.touchStyle.tasten':'Tasten',
+'g.set.touchStyle.tasten.tip':'Knöpfe für Setzen, Abbauen und Rennen.',
+'touch.menu':'Menü',
+'ux.h.moveTouch2':'🕹 links: laufen · tippen: setzen · halten: abbauen',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'Ein kurzes Brummen beim Setzen, Abbauen und Rennen (Handys, die vibrieren können).',
 'g.chat.error':'Fehler: {msg}',
 'g.chat.noWorld':'Diese Welt gibt es hier nicht (mehr).',
 'g.chat.landFirst':'Erst landen oder absteigen.',
@@ -88214,6 +88293,7 @@ window.addEventListener('blur',()=>{this.keys.clear();this.mouse.down=[false,fal
 c.addEventListener('contextmenu',(e)=>e.preventDefault());
 c.addEventListener('mousedown',(e)=>{
 if(!this.enabled)return;
+if(this.lastTouchT&&performance.now()-this.lastTouchT<900)return;
 
 if(!this.locked&&this.captured&& !this.lockFailed)this.requestLock();
 this.mouse.down[e.button]=true;this.mouse.clicked[e.button]=true;
@@ -88241,10 +88321,24 @@ if(this.onLockChange)this.onLockChange(this.locked);
 });
 document.addEventListener('pointerlockerror',()=>{this.failLock();});
 
+
 let touch=null;
-c.addEventListener('touchstart',(e)=>{if(!this.captured)return;const t=e.changedTouches[0];touch={id:t.identifier,x:t.clientX,y:t.clientY,t:performance.now(),moved:0};e.preventDefault();},{passive:false});
-c.addEventListener('touchmove',(e)=>{if(!touch)return;for(const t of e.changedTouches)if(t.identifier===touch.id){const dx=t.clientX-touch.x,dy=t.clientY-touch.y;this.mouse.dx+=dx*1.5;this.mouse.dy+=dy*1.5;touch.moved+=Math.abs(dx)+Math.abs(dy);touch.x=t.clientX;touch.y=t.clientY;}e.preventDefault();},{passive:false});
-c.addEventListener('touchend',(e)=>{if(touch&&touch.moved<10){this.mouse.clicked[performance.now()-touch.t>350?0:2]=true;}touch=null;});
+const TO=()=>VR.Touch||{HOLD_MS:260,TAP_PX:12,ring(){},buzz(){}};
+const aimAt=(x,y)=>{const r=c.getBoundingClientRect();this.touchAim={nx:((x-r.left)/r.width)*2-1,ny:1-((y-r.top)/r.height)*2};};
+const holdStart=()=>{if(!touch||touch.hold||touch.moved>=TO().TAP_PX)return;touch.hold=true;this.mouse.down[0]=true;this.mouse.clicked[0]=true;TO().ring(touch.cx,touch.cy,true);TO().buzz(12);};
+c.addEventListener('touchstart',(e)=>{this.lastTouchT=performance.now();if(!this.captured){const g=VR.game;if(g&&g.state==='play'&&g.ui&& !g.ui.blocking)this.captured=true;else return;}
+const t=e.changedTouches[0];if(touch)return;touch={id:t.identifier,x:t.clientX,y:t.clientY,cx:t.clientX,cy:t.clientY,t:performance.now(),moved:0,hold:false};this.touchActive=true;this.holdCheck=holdStart;this.tch=touch;aimAt(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+c.addEventListener('touchmove',(e)=>{if(!touch)return;for(const t of e.changedTouches)if(t.identifier===touch.id){const dx=t.clientX-touch.x,dy=t.clientY-touch.y;this.mouse.dx+=dx*1.5;this.mouse.dy+=dy*1.5;touch.moved+=Math.abs(dx)+Math.abs(dy);touch.x=t.clientX;touch.y=t.clientY;if(touch.hold){TO().ring(t.clientX,t.clientY,true);aimAt(t.clientX,t.clientY);}}e.preventDefault();},{passive:false});
+const tEnd=(e)=>{
+if(!touch)return;
+let mine= !e.touches||e.touches.length===0;for(const t of e.changedTouches)if(t.identifier===touch.id)mine=true;
+if(!mine)return;
+if(touch.hold){this.mouse.down[0]=false;this.mouse.releasedBtn[0]=true;TO().ring(0,0,false);}
+else if(touch.moved<TO().TAP_PX){this.mouse.clicked[2]=true;TO().buzz(6);}
+else this.touchAim=null;
+touch=null;this.tch=null;this.touchActive=false;
+};
+c.addEventListener('touchend',tEnd);c.addEventListener('touchcancel',tEnd);
 }
 
 
@@ -88299,6 +88393,8 @@ return this.mouse.down[b];
 }
 
 beginFrame(dt){
+
+if(this.tch&& !this.tch.hold&&this.holdCheck&&performance.now()-this.tch.t>=((VR.Touch&&VR.Touch.HOLD_MS)||260))this.holdCheck();
 const k=clamp(dt||0.016,0,0.1);
 
 if(this.smooth){
@@ -88348,6 +88444,7 @@ this.padMove={fwd:clamp(pf+tm.fwd,-1,1),str:clamp(ps+tm.str,-1,1)};
 if(VR.A11y&&VR.A11y.inputFrame)VR.A11y.inputFrame(this,k);
 }
 endFrame(){
+if(this.touchAim&& !this.touchActive&& !this.mouse.down[0])this.touchAim=null;
 if(this.tRelease.size){for(const id of this.tRelease)this.tDown.delete(id);this.tRelease.clear();}
 this.pressed.clear();this.released.clear();this.doubleTap.clear();
 this.padPressed.clear();this.tPressed.clear();this.vPhys.clear();this.shipPressed.clear();
@@ -88969,10 +89066,14 @@ return true;
 
 interact(dt,input){
 const g=this.game,world=g.world;
-const eye=this.eyePos(),dir=this.lookDir();
+const eye=this.eyePos();let dir=this.lookDir();
+
+const ta=input&&input.touchAim,R=g.renderer;
+if(ta&&R&&R.invVPNJ){const m=R.invVPNJ,x=ta.nx,y=ta.ny,w=m[3]*x+m[7]*y+m[11]+m[15];const d=[(m[0]*x+m[4]*y+m[8]+m[12])/w,(m[1]*x+m[5]*y+m[9]+m[13])/w,(m[2]*x+m[6]*y+m[10]+m[14])/w],l=Math.hypot(d[0],d[1],d[2]);if(l>0)dir=[d[0]/l,d[1]/l,d[2]/l];}
 this.target=g.ui&&g.ui.blocking?null:PH.raycast((x,y,z)=>world.getBlock(x,y,z),eye[0],eye[1],eye[2],dir[0],dir[1],dir[2],this.reach,{nb:(x,y,z,d)=>world.getBlock(x+VR.HF_DX[d],y,z+VR.HF_DZ[d])});
 if(g.ui&&g.ui.blocking){this.breaking=null;return;}
 if(!input.captured)return;
+const dragL=input.dragLook&& !input.touchAim;
 this.breakCooldown-=dt;this.placeCooldown-=dt;
 
 if(input.mouse.wheel){this.inv.sel=((this.inv.sel+input.mouse.wheel)%9+9)%9;this.inv.changed=true;}
@@ -88983,12 +89084,12 @@ const hdef=held?VR.itemDef(held.id):null;
 const gu=g.gadgets&&g.gadgets.update(dt,input,this,hdef);
 if(gu){if(gu!=='keep')this.breaking=null;return;}
 
-const lmb=input.dragLook?input.clickAction(0):input.mouse.down[0];
+const lmb=dragL?input.clickAction(0):input.mouse.down[0];
 if(lmb&&this.target){
 const t=this.target;
 const s=t.state;
 if(this.creative){
-if(this.breakCooldown<=0){this.breakBlock(t.x,t.y,t.z,s,false,true);this.breakCooldown=input.dragLook?0:0.22;this.handSwing=1;}
+if(this.breakCooldown<=0){this.breakBlock(t.x,t.y,t.z,s,false,true);this.breakCooldown=dragL?0:0.22;this.handSwing=1;}
 }else{
 if(!this.breaking||this.breaking.x!==t.x||this.breaking.y!==t.y||this.breaking.z!==t.z)this.breaking={x:t.x,y:t.y,z:t.z,p:0};
 const time=this.breakTime(s,hdef);
@@ -89009,8 +89110,8 @@ if(t&&(t.cat||(VR.SMOOTH_OF&&VR.SMOOTH_OF[t.name])))this.pickBlock((VR.SMOOTH_OF
 
 
 
-const rmbClick=input.dragLook?input.clickAction(2):input.mouse.clicked[2];
-const rmbHold= !input.dragLook&&input.mouse.down[2]&&this.placeCooldown<=0&&this.placeHeld;
+const rmbClick=dragL?input.clickAction(2):input.mouse.clicked[2];
+const rmbHold= !dragL&&input.mouse.down[2]&&this.placeCooldown<=0&&this.placeHeld;
 if(rmbClick){
 this.placed=false;
 const ok=this.use(hdef,held);
@@ -119877,7 +119978,25 @@ function slotOf(id,code){const S=VR.Binds.current.slots(id);return S[0]===code?0
 const TOUCH=VR.Touch={};
 const T=(k,v,fb)=>(VR.I18N?VR.I18N.t(k,v,fb):(fb!==undefined?fb:k));
 const R=56;
-let root=null,stick=null,knob=null,game=null,sid=null,origin=null;
+let root=null,stick=null,knob=null,game=null,sid=null,origin=null,zone=null,sprinting=false;
+
+
+
+TOUCH.HOLD_MS=260;TOUCH.TAP_PX=12;TOUCH.SPRINT_K=0.9;
+TOUCH.classify=(ms,moved,holding)=>(holding?'hold':moved>=TOUCH.TAP_PX?'drag':ms>=TOUCH.HOLD_MS?'hold':'tap');
+TOUCH.sprintAt=(len)=>len>=TOUCH.SPRINT_K;
+TOUCH.styleOf=(S)=>(S&&S.touchStyle==='tasten'?'tasten':'gesten');
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'touchStyle',g:'play',sec:'steer',t:'choice',lab:'g.set.touchStyle',tip:'g.set.touchStyle.tip',def:'gesten',opts:[['gesten','g.set.touchStyle.gesten','g.set.touchStyle.gesten.tip'],['tasten','g.set.touchStyle.tasten','g.set.touchStyle.tasten.tip']]});
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'haptics',g:'play',sec:'steer',t:'switch',lab:'g.set.haptics',tip:'g.set.haptics.tip',def:true});
+
+let ringEl=null;
+TOUCH.ring=function(x,y,on){
+if(typeof document==='undefined')return;
+if(!ringEl){ringEl=document.createElement('div');ringEl.id='tRing';(document.getElementById('ui')||document.body).appendChild(ringEl);}
+ringEl.classList.toggle('on',!!on);
+if(on){ringEl.style.left=x+'px';ringEl.style.top=y+'px';}
+};
+TOUCH.buzz=function(ms){try{if(game&&game.settings&&game.settings.haptics===false)return;if(typeof navigator!=='undefined'&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}};
 TOUCH.wanted=function(S){
 const v=S&&S.touch;
 if(v==='on')return true;
@@ -119899,6 +120018,12 @@ if(typeof document==='undefined'||document.getElementById('touch'))return;
 root=document.createElement('div');
 root.id='touch';root.setAttribute('role','group');root.setAttribute('aria-label','Touch');
 root.style.display='none';
+
+zone=document.createElement('div');zone.id='tZone';root.appendChild(zone);
+const menu=document.createElement('button');menu.type='button';menu.id='tMenu';menu.className='tb tb-menu';
+menu.innerHTML='<span class="ti" aria-hidden="true">☰</span>';menu.setAttribute('aria-label',T('touch.menu',null,'Menü'));
+menu.addEventListener('pointerdown',(e)=>{e.preventDefault();if(game&&game.ui&&game.ui.pause)game.ui.pause();});
+root.appendChild(menu);
 stick=document.createElement('div');stick.id='tStick';stick.className='tstick';stick.innerHTML='<i></i>';
 knob=stick.querySelector('i');
 root.appendChild(stick);
@@ -119913,19 +120038,34 @@ bar.appendChild(e);
 root.appendChild(bar);
 (document.getElementById('ui')||document.body).appendChild(root);
 wireStick();
+
+const hb=document.getElementById('hotbar');
+if(hb)hb.addEventListener('pointerdown',(e)=>{
+if(!TOUCH.wanted(game&&game.settings))return;
+const sl=e.target&&e.target.closest?e.target.closest('.slot'):null;if(!sl|| !game|| !game.player)return;
+const i=Array.prototype.indexOf.call(hb.querySelectorAll('.slot'),sl);if(i<0)return;
+game.player.inv.sel=i;game.player.inv.changed=true;TOUCH.buzz(6);e.preventDefault();
+});
 };
 function input(){return game&&game.input;}
 function wireStick(){
-stick.addEventListener('pointerdown',(e)=>{
+
+const down=(src)=>(e)=>{
+if(sid!==null)return;
 sid=e.pointerId;origin={x:e.clientX,y:e.clientY};stick.classList.add('on');
-try{stick.setPointerCapture(e.pointerId);}catch(err){}
+const zr=root.getBoundingClientRect();
+stick.style.left=(e.clientX-zr.left-stick.offsetWidth/2)+'px';stick.style.top=(e.clientY-zr.top-stick.offsetHeight/2)+'px';stick.style.bottom='auto';
+try{src.setPointerCapture(e.pointerId);}catch(err){}
 moveStick(e);
 e.preventDefault();
-});
-stick.addEventListener('pointermove',(e)=>{if(e.pointerId===sid){moveStick(e);e.preventDefault();}});
-const end=(e)=>{if(e.pointerId!==sid)return;sid=null;origin=null;stick.classList.remove('on');knob.style.transform='';const i=input();if(i)i.touchMove={fwd:0,str:0};};
-stick.addEventListener('pointerup',end);
-stick.addEventListener('pointercancel',end);
+};
+const move=(e)=>{if(e.pointerId===sid){moveStick(e);e.preventDefault();}};
+const end=(e)=>{
+if(e.pointerId!==sid)return;
+sid=null;origin=null;stick.classList.remove('on');knob.style.transform='';stick.style.left='';stick.style.top='';stick.style.bottom='';
+const i=input();if(i){i.touchMove={fwd:0,str:0};if(sprinting){sprinting=false;if(i.tRelease)i.tRelease.add('sprint');else i.tDown.delete('sprint');}}
+};
+for(const el of[stick,zone]){el.addEventListener('pointerdown',down(el));el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
 }
 function moveStick(e){
 const dx=Math.max(-R,Math.min(R,e.clientX-origin.x)),dy=Math.max(-R,Math.min(R,e.clientY-origin.y));
@@ -119934,6 +120074,10 @@ const i=input();if(!i|| !VR.Pad)return;
 
 const v=VR.Pad.stick(dx/R,dy/R);
 i.touchMove={fwd: -v[1],str:v[0]};
+
+const len=Math.hypot(dx,dy)/R,sp=TOUCH.styleOf(game&&game.settings)==='gesten'&&TOUCH.sprintAt(len)&& -v[1]>0.5;
+if(sp!==sprinting){sprinting=sp;if(sp){i.tDown.add('sprint');i.tPressed.add('sprint');TOUCH.buzz(8);}else if(i.tRelease)i.tRelease.add('sprint');else i.tDown.delete('sprint');}
+stick.classList.toggle('sprint',sp);
 }
 function wireButton(e,id){
 const press=(ev)=>{
@@ -119966,6 +120110,7 @@ if(!root|| !g)return;
 const open= !!(g.ui&&g.ui.screen);
 const on=g.state==='play'&& !open&&TOUCH.wanted(g.settings);
 if(root.style.display!==(on?'':'none'))root.style.display=on?'':'none';
+const ges=TOUCH.styleOf(g.settings)==='gesten';if(root.classList.contains('gesten')!==ges)root.classList.toggle('gesten',ges);
 if(root.parentNode&&root.parentNode.classList.contains('touchon')!==on)root.parentNode.classList.toggle('touchon',on);
 if(!on&&input())input().touchMove={fwd:0,str:0};
 };
@@ -144099,7 +144244,7 @@ if(show){const r=el.getBoundingClientRect();X.stripBox={w:innerWidth-r.left+8,h:
 const firstMin={active:false,quiet:0,last:0,pos:null,yaw:0,look:0,playing:false};
 const hintOf=(id)=>{
 const touch=document.getElementById('ui')&&document.getElementById('ui').classList.contains('touchon');
-if(id==='move')return touch?{text:tx('ux.h.moveTouch',null,'🕹 links ziehen = laufen','🕹 drag on the left = walk'),picto:[]}:{text:tx('ux.h.move',null,'laufen','walk'),picto:['W','A','S','D']};
+if(id==='move')return touch?(VR.Touch&&VR.Touch.styleOf&&VR.Touch.styleOf(VR.game&&VR.game.settings)==='gesten'?{text:tx('ux.h.moveTouch2',null,'🕹 links: laufen · tippen: setzen · halten: abbauen','🕹 left: walk · tap: place · hold: break'),picto:[]}:{text:tx('ux.h.moveTouch',null,'🕹 links ziehen = laufen','🕹 drag on the left = walk'),picto:[]}):{text:tx('ux.h.move',null,'laufen','walk'),picto:['W','A','S','D']};
 if(id==='look')return touch?{text:tx('ux.h.lookTouch',null,'rechts ziehen = umschauen','drag on the right = look around'),picto:['finger']}:{text:tx('ux.h.look',null,'Maus bewegen = umschauen','move the mouse = look around'),picto:['mouse']};
 if(id==='v')return{text:tx('ux.h.v',null,'tut das Passende: reden, einsteigen, reisen','does the right thing: talk, get in, travel'),picto:[keyOf('KeyV',lang())]};
 return null;

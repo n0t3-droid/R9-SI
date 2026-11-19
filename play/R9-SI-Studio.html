@@ -1217,6 +1217,65 @@ html:not(.pro) #zenpanel .field { display: none; }
   .key { min-height: 46px; }
 }
 
+/* ---- Handy-Steuerung 2 (v0.55.72, touch.js): the stick floats under the left thumb, the picture is the tool (tap places,
+   holding breaks), a few big round buttons on the right, the menu top left — everything inside the phone's safe area */
+#touch #tZone { position: absolute; left: 0; top: 30%; bottom: 70px; width: 46%; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+#touch .tstick { left: max(20px, env(safe-area-inset-left)); bottom: calc(84px + env(safe-area-inset-bottom)); width: 128px; height: 128px; opacity: .5; transition: opacity .15s, border-color .15s; z-index: 1; }
+#touch .tstick.on { opacity: 1; }
+#touch .tstick i { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+#touch .tstick.sprint { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 209, 102, .45); }
+#touch .tstick.sprint i { background: rgba(255, 209, 102, .45); border-color: rgba(255, 209, 102, .9); }
+#touch .tb-menu { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); width: 50px; height: 50px; min-height: 50px; border-radius: 16px; pointer-events: auto; padding: 0; }
+#touch .tb-menu .ti { font-size: 24px; }
+#touch.gesten .tb-place, #touch.gesten .tb-break, #touch.gesten .tb-sprint { display: none; }
+#touch.gesten .tbtns { display: block; right: max(16px, env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); width: 0; height: 0; }
+#touch.gesten .tb { position: absolute; pointer-events: auto; touch-action: none; }
+#touch.gesten .tb-jump { right: 0; bottom: 0; width: 86px; height: 86px; border-radius: 50%; }
+#touch.gesten .tb-jump .ti { font-size: 30px; }
+#touch.gesten .tb-inv { right: 98px; bottom: 4px; width: 62px; height: 62px; min-height: 62px; border-radius: 18px; }
+#touch.gesten .tb-act { right: 7px; bottom: 98px; width: 72px; height: 72px; }
+#touch.gesten .tb .tl { font-size: 11px; }
+#tRing { position: fixed; left: 0; top: 0; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 3px solid var(--accent); box-shadow: 0 0 16px rgba(58, 240, 255, .5); pointer-events: none; z-index: 31; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+#tRing.on { opacity: 1; transform: scale(1); animation: tRingPulse .6s ease-in-out infinite alternate; }
+@keyframes tRingPulse { from { transform: scale(.92); } to { transform: scale(1.08); } }
+/* the HUD around it: the hotbar at the bottom (its slots fit a narrow phone and answer a tap), the chips beside the menu,
+   the hints at the top, the 🖐 above the round buttons */
+#ui.touchon #hotbar { bottom: max(6px, env(safe-area-inset-bottom)); pointer-events: auto; gap: 3px; padding: 4px; }
+#ui.touchon #hotbar .slot { width: min(52px, calc((100vw - 52px) / 9)) !important; height: min(52px, calc((100vw - 52px) / 9)) !important; min-width: 0 !important; }
+#ui.touchon #hotbar.hf-off { opacity: 1 !important; pointer-events: auto !important; }   /* (a phone picks blocks from it: it never hides) */
+#ui.touchon #hotbar .slot canvas { width: 78%; height: 78%; }
+#ui.touchon #modebadge { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); bottom: auto; }
+#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; }
+#ui.touchon #hints { top: calc(max(10px, env(safe-area-inset-top)) + 132px); bottom: auto; width: min(76vw, 460px); max-width: min(76vw, 460px); }
+#ui.touchon .bh-btn { right: max(18px, env(safe-area-inset-right)); bottom: calc(262px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px; }
+#ui.touchon #crosshair { opacity: .55; }
+/* a short phone held sideways: everything a little lower and smaller */
+@media (max-height: 430px) {
+  #touch.gesten .tbtns { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #touch.gesten .tb-jump { width: 74px; height: 74px; }
+  #touch.gesten .tb-act { bottom: 84px; width: 60px; height: 60px; }
+  #touch.gesten .tb-inv { right: 86px; width: 54px; height: 54px; min-height: 54px; }
+  #ui.touchon .bh-btn { bottom: calc(196px + env(safe-area-inset-bottom)); width: 50px; height: 50px; }
+  #touch .tstick { bottom: calc(64px + env(safe-area-inset-bottom)); width: 112px; height: 112px; }
+  #ui.touchon #hints { top: 10px; left: auto; right: 12px; transform: none; max-width: 48vw; }
+}
+/* narrow phones: a menu's button pairs wrap instead of running off the panel */
+@media (max-width: 520px) {
+  .screen .row.gap { flex-wrap: wrap; }
+  .screen .row.gap > .btn { flex: 1 1 100% !important; min-width: 0; white-space: normal; }
+  .screen .panel { max-width: calc(100vw - 16px); box-sizing: border-box; }
+}
+/* a phone held sideways (short screen): the start tiles in one row of four, short; menus scroll inside themselves */
+@media (max-height: 460px) and (min-width: 560px) {
+  #title .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; width: min(100%, 820px) !important; }
+  #title .tile { aspect-ratio: auto !important; min-height: 0 !important; height: 118px; padding: 8px 6px !important; gap: 4px !important; }
+  #title .tile svg { width: 34px; height: 34px; }
+}
+@media (max-height: 460px) {
+  .screen .panel { max-height: calc(100vh - 16px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #ui.touchon .bh-btn { bottom: calc(216px + env(safe-area-inset-bottom)) !important; }
+}
+
 /* ============================================================================
    💡 Erfinden — the Erfinderwerkstatt (src/main/invent.js). Big picture cards, a two-slot workbench, warm amber
    for the idea; the game's dark glass for the rest. 44 px targets, works at 360 px wide, the keyboard ring comes from
@@ -71654,6 +71713,16 @@ VR.I18N.add('en',{
 'g.chat.you':'You',
 'g.set.warp':'Frame warp',
 'g.set.warp.tip':'Slow PC: between two expensive frames comes a quick one, the last picture turned to your newest mouse move. Looking around feels as smooth as your monitor, the mouse answers sooner. Fast PCs: no change.',
+'g.set.touchStyle':'Finger style',
+'g.set.touchStyle.tip':'Gestures: tap the picture to place a block, hold a finger to break, push the stick to its rim to run. Buttons: own buttons to place, break and run.',
+'g.set.touchStyle.gesten':'Gestures',
+'g.set.touchStyle.gesten.tip':'Tap places, hold breaks, stick at the rim runs.',
+'g.set.touchStyle.tasten':'Buttons',
+'g.set.touchStyle.tasten.tip':'Buttons to place, break and run.',
+'touch.menu':'Menu',
+'ux.h.moveTouch2':'🕹 left: walk · tap: place · hold: break',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'A short buzz when placing, breaking and running (phones that can vibrate).',
 'g.chat.error':'Error: {msg}',
 'g.chat.noWorld':'That world is not here (any more).',
 'g.chat.landFirst':'Land or get off first.',
@@ -76743,6 +76812,16 @@ VR.I18N.add('de',{
 'g.chat.you':'Du',
 'g.set.warp':'Bildwarp',
 'g.set.warp.tip':'Schwacher PC: Zwischen zwei teuren Bildern kommt ein schnelles Zwischenbild, gedreht zur neuesten Mausbewegung. Umsehen wirkt so flüssig wie dein Monitor, die Maus reagiert früher. Auf schnellen PCs ändert sich nichts.',
+'g.set.touchStyle':'Finger-Stil',
+'g.set.touchStyle.tip':'Gesten: aufs Bild tippen setzt einen Block, Finger halten baut ab, am Rand des Sticks rennst du. Tasten: eigene Knöpfe zum Setzen, Abbauen und Rennen.',
+'g.set.touchStyle.gesten':'Gesten',
+'g.set.touchStyle.gesten.tip':'Tippen setzt, Halten baut ab, Stick am Rand rennt.',
+'g.set.touchStyle.tasten':'Tasten',
+'g.set.touchStyle.tasten.tip':'Knöpfe für Setzen, Abbauen und Rennen.',
+'touch.menu':'Menü',
+'ux.h.moveTouch2':'🕹 links: laufen · tippen: setzen · halten: abbauen',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'Ein kurzes Brummen beim Setzen, Abbauen und Rennen (Handys, die vibrieren können).',
 'g.chat.error':'Fehler: {msg}',
 'g.chat.noWorld':'Diese Welt gibt es hier nicht (mehr).',
 'g.chat.landFirst':'Erst landen oder absteigen.',
