@@ -10,7 +10,7 @@
 
   // ----------------------------------------------------------------- arena allocator
   class Arena {
-    constructor(gl, capVerts) {
+    constructor(gl, capVerts, ib) {
       this.gl = gl; this.cap = capVerts;
       this.buf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -19,6 +19,7 @@
       gl.bindVertexArray(this.vao);
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.UNSIGNED_SHORT, false, 16, 0);
       for (let i = 1; i <= 5; i++) { gl.enableVertexAttribArray(i); gl.vertexAttribIPointer(i, 1, gl.UNSIGNED_SHORT, 16, 4 + i * 2); }
+      if (ib) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);   // Viereck-Index: the shared quad indices (part of the VAO's state)
       gl.bindVertexArray(null);
       this.free = [[0, capVerts]];
       this.used = 0;
@@ -55,6 +56,7 @@
       const gl = this.gl = GL.init(canvas);
       if (!gl) throw new Error('WebGL2 is not available on this device/browser.');
       this.multi = !!GL.ext.multiDraw;
+      this.idx = Renderer.IDX !== false;   // Viereck-Index (quadIB): the world asks the workers for quads (world.quads)
       this.hdr = !!(GL.ext.cbf || GL.ext.cbhf);
       this.arenas = [];
       this.arenaSize = 1 << 21; // 2M vertices = 32 MB
@@ -552,11 +554,26 @@
     gpuTimerEnd() { if (this.prof) this.prof.end(); }
 
     // ------------------------------------------------ section meshes
+    // Viereck-Index: ONE index buffer for every arena — quad k is 4k 4k+1 4k+2, 4k 4k+2 4k+3 (the old expansion's
+    // triangles). A quad mesh at vertex off (a multiple of 4: arena blocks are multiples of 96) draws the elements from
+    // byte off·6 (off/4 quads · 6 indices · 4 bytes), count n·1.5. Grown with the biggest arena, re-bound into every VAO.
+    quadIB(capVerts) {
+      const gl = this.gl;
+      if (this._qib && this._qibCap >= capVerts) return this._qib;
+      const ib = this._qib || (this._qib = gl.createBuffer()), cap = Math.max(capVerts, this._qibCap || 0);
+      gl.bindVertexArray(null);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Renderer.quadIndices(cap >> 2), gl.STATIC_DRAW);
+      this._qibCap = cap;
+      for (const a of this.arenas) { gl.bindVertexArray(a.vao); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); }
+      gl.bindVertexArray(null);
+      return ib;
+    }
     allocMesh(n) {
       const gl = this.gl;
       const cap = Math.ceil(n / 96) * 96;
       for (const a of this.arenas) { const off = a.alloc(cap); if (off >= 0) return { arena: a, off, cap, count: n }; }
-      const a = new Arena(gl, Math.max(this.arenaSize, cap));
+      const a = new Arena(gl, Math.max(this.arenaSize, cap), this.idx ? this.quadIB(Math.max(this.arenaSize, cap)) : null);
       this.arenas.push(a);
       const off = a.alloc(cap);
       return { arena: a, off, cap, count: n };
@@ -574,7 +591,7 @@
         if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
         if (l === 3) { sec.vxOld = false; sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
         if (!n) continue;
-        const m = this.allocMesh(n);
+        const m = this.allocMesh(n); m.q = !!d.q;   // (Viereck-Index: the worker's quads, world.js marks them)
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
         gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
         sec.mesh[l] = m;
@@ -606,7 +623,7 @@
         if (st.o >= n) { st.l++; st.o = 0; continue; }
         const k = Math.min(n - st.o, Math.floor((maxBytes - done) / VSTRIDE));
         if (k <= 0) break;
-        if (!st.m[l]) st.m[l] = this.allocMesh(n);
+        if (!st.m[l]) { st.m[l] = this.allocMesh(n); st.m[l].q = !!d.q; }
         const m = st.m[l];
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
         gl.bufferSubData(gl.ARRAY_BUFFER, (m.off + st.o) * VSTRIDE, d, st.o * 8, k * 8);
@@ -732,7 +749,7 @@
         step: (max) => {
           const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
           if (k <= 0) return 0;
-          if (!it.m) it.m = R.allocMesh(n);
+          if (!it.m) { it.m = R.allocMesh(n); it.m.q = !!d.q; }
           const gl = R.gl;
           gl.bindBuffer(gl.ARRAY_BUFFER, it.m.arena.buf);
           gl.bufferSubData(gl.ARRAY_BUFFER, (it.m.off + it.o) * VSTRIDE, d, it.o * 8, k * 8);
@@ -782,13 +799,14 @@
     }
     uploadVx(s) {
       const gl = this.gl, d = s.vxData, n = d.length >> 3;
-      const m = this.allocMesh(n);
+      const m = this.allocMesh(n); m.q = !!d.q;
       gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
       gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
       if (s.mesh[3]) s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap);
       s.mesh[3] = m; s.vxOld = false;
       this.nearShadow(s);
     }
+    arenaMax() { let c = this.arenaSize; for (const a of this.arenas) c = Math.max(c, a.cap); return c; }
     gpuMemoryMB() { let u = 0; for (const a of this.arenas) u += a.used; return (u * VSTRIDE / 1048576); }
 
     // ------------------------------------------------ visibility (cave culling BFS + frustum)
@@ -1054,17 +1072,22 @@
     drawSections(list, layer, prog, originsFrom, planes, reverse) {
       const gl = this.gl, cam = this.cam;
       const n = list.length;
-      let batchArena = null, cnt = 0;
+      let batchArena = null, batchQ = false, cnt = 0;
       const firsts = this.firsts, counts = this.counts, org = this.origins;
       const flush = () => {
         if (!cnt) return;
         gl.bindVertexArray(batchArena.vao);
+        // Viereck-Index: a batch of quad meshes draws elements of the shared index buffer (firsts: byte offsets)
         if (this.multi) {
           gl.bindBuffer(gl.UNIFORM_BUFFER, this.ubo);
           gl.bufferSubData(gl.UNIFORM_BUFFER, 0, org, 0, cnt * 4);
-          GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, cnt);
+          if (batchQ) GL.ext.multiDraw.multiDrawElementsWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_INT, firsts, 0, cnt);
+          else GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, cnt);
         } else {
-          for (let i = 0; i < cnt; i++) { gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); if (prog.u.u_fade) gl.uniform1f(prog.u.u_fade, org[i * 4 + 3]); gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]); }
+          for (let i = 0; i < cnt; i++) {
+            gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); if (prog.u.u_fade) gl.uniform1f(prog.u.u_fade, org[i * 4 + 3]);
+            if (batchQ) gl.drawElements(gl.TRIANGLES, counts[i], gl.UNSIGNED_INT, firsts[i]); else gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]);
+          }
         }
         this.stats.draws += this.multi ? 1 : cnt;
         cnt = 0;
@@ -1080,11 +1103,12 @@
         if (this.mirrorPass && fade < 1) { if (fade < 0.5) continue; fade = 1; }   // (f-stipple: no dither in the planar mirror — it has no TSR; a fading column shows there from its half way)
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
-        if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
-        firsts[cnt] = m.off; counts[cnt] = m.count;
+        const q = !!m.q;
+        if (m.arena !== batchArena || q !== batchQ || cnt === 512) { flush(); batchArena = m.arena; batchQ = q; if (q && !this._qib && this.quadIB) this.quadIB(this.arenaMax()); }
+        if (q) { firsts[cnt] = m.off * 6; counts[cnt] = m.count * 1.5; } else { firsts[cnt] = m.off; counts[cnt] = m.count; }
         org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = s.grow !== undefined && s.grow < 1 ? 2 + s.grow : fade;   // (f-stipple: Stream.originW — a near column growing)
         cnt++;
-        this.stats.tris += m.count / 3;
+        this.stats.tris += q ? m.count / 2 : m.count / 3;
       }
       flush();
       void cam;
@@ -2008,7 +2032,7 @@
           const m = s.mesh[layer]; if (!m) continue;
           gl.bindVertexArray(m.arena.vao);
           gl.uniform3f(p.u.u_origin, s.ox, s.oy, s.oz);
-          gl.drawArrays(gl.TRIANGLES, m.off, m.count);
+          if (m.q) gl.drawElements(gl.TRIANGLES, m.count * 1.5, gl.UNSIGNED_INT, m.off * 6); else gl.drawArrays(gl.TRIANGLES, m.off, m.count);
           this.stats.draws++;
         }
         gl.enable(gl.CULL_FACE);
@@ -2815,5 +2839,10 @@
       }
     }
   }
+  Renderer.quadIndices = function (nq) {
+    const a = new Uint32Array(nq * 6);
+    for (let k = 0, i = 0, v = 0; k < nq; k++, i += 6, v += 4) { a[i] = v; a[i + 1] = v + 1; a[i + 2] = v + 2; a[i + 3] = v; a[i + 4] = v + 2; a[i + 5] = v + 3; }
+    return a;
+  };
   VR.Renderer = Renderer;
 })(VR);

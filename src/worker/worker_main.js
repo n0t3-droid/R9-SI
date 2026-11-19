@@ -204,12 +204,15 @@
         const svWant = VR.SmoothVox ? VR.SmoothVox.prep(m) : null;   // t-form: the ready bits of the smooth models, the ones this section wants
         if (typeof m.fancyLeaves === 'number' && (m.fancyLeaves & 16) && m.dim && VR.IsleShell) { const gi = getGen(m.dim); if (gi && gi.islandAt) m.isle = VR.IsleShell.columns(gi, m.ox, m.oz); }   // q-art4 · Runde Inseln: the isles' columns
         const r = VR.meshSection(m);
-        const o = toTris(r.opaque), c = toTris(r.cutout), t = toTris(r.trans);
-        const vx = r.vx ? toTris(r.vx) : null, vxFar = r.vxFar ? toTris(r.vxFar) : null;
+        // Viereck-Index: the renderer draws quads through its shared index buffer (m.quads) — the mesher's 4 vertices go
+        // as they are; without it (an old job, the fallback) the triangle lists as before
+        const X = m.quads ? (a) => a : toTris;
+        const o = X(r.opaque), c = X(r.cutout), t = X(r.trans);
+        const vx = r.vx ? X(r.vx) : null, vxFar = r.vxFar ? X(r.vxFar) : null;
         const tr = [o.buffer, c.buffer, t.buffer]; if (vx) tr.push(vx.buffer); if (vxFar) tr.push(vxFar.buffer);
         const pr = r.props ? (VR.SmoothVox ? VR.SmoothVox.variants(r.props) : r.props) : null; if (pr) tr.push(pr.buffer);
         if (r.softH) tr.push(r.softH.buffer);   // r-gemalt: the drawn ground's column heights   // smooth props: six ints an instance (mesher.js; t-form: a piece's look by its position)
-        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, vxSkipped: r.vxSkipped || 0, softH: r.softH || null, ms: performance.now() - t0 }, tr);
+        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, q: !!m.quads, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, vxSkipped: r.vxSkipped || 0, softH: r.softH || null, ms: performance.now() - t0 }, tr);
       } else if (m.type === 'clock') {
         // e-uhr · Schattenuhr: the clocks of a section's cells (sunclock.js bakeSection) for the clock volume
         if (m.ids && !CLOCKCOL && LASTAVG) CLOCKCOL = VR.SunClock.colorTable(LASTAVG);

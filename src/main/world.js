@@ -915,6 +915,7 @@
         // the upload waits in the streaming queue (drainUploads spends the frame's bytes on it, in view order): meshing
         // itself never blocks; a newer mesh of the section makes this one stale (alive), so an older mesh never lands
         // after a newer one
+        if (m.q) for (const a of [m.opaque, m.cutout, m.trans, m.vx, m.vxFar]) if (a) a.q = true;   // (Viereck-Index: quads — the renderer draws them indexed)
         const R = this.renderer, alive = () => !this.dead && this.cols.get(c.key) === c && s.uTok === tok;
         const done = () => {
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
@@ -974,7 +975,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0, dim: this.dim };   // (q-art4: dim — the worker finds the isles' columns for Runde Inseln) (t-motion: the hung pieces' sway levels)
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0, dim: this.dim, quads: !!(this.renderer && this.renderer.idx) };   // (Viereck-Index: quads for the shared index buffer, renderer.js quadIB)   // (q-art4: dim — the worker finds the isles' columns for Runde Inseln) (t-motion: the hung pieces' sway levels)
     }
     markDirty(x, y, z) {
       const sy = y >> 4;
