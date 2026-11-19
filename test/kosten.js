@@ -10,6 +10,7 @@ check(K.LIST.every(e => e.de && e.en && e.set) && K.LIST[0].id === 'base', 'a  n
 check(K.plan('geo').some(e => e.id === 'rd2') && !K.plan().some(e => e.grp === 'geo'), 'a  /kosten geo: ' + K.plan('geo').map(e => e.id).join(','));
 check(K.plan('ultra').some(e => e.id === 'vx44') && K.plan('ultra').some(e => e.id === 'rd4') && !K.plan().some(e => e.grp === 'ultra'), 'a  /kosten ultra: ' + K.plan('ultra').map(e => e.id).join(','));
 check(K.plan('far').every(e => e.id === 'base' || e.id === 'base2' || e.grp === 'far') && K.plan('far').length >= 3, 'a  /kosten far: ' + K.plan('far').map(e => e.id).join(','));
+check(K.plan('idx0').length === 3 && K.plan('idx0')[1].id === 'idx0', 'a  /kosten idx0: one experiment by its name');
 const base = { total: 8.6, times: { far: 4.5, opaque: 2.0, sky: 0.8 } };
 const l0 = K.fmt('de', K.LIST[0], base, base), l1 = K.fmt('de', K.LIST[1], { total: 4.2, times: { far: 0, opaque: 2.1, sky: 0.8 } }, base);
 check(/8\.6 ms GPU · far 4\.5/.test(l0), 'b  ' + l0);
