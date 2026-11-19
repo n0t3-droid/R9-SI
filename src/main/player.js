@@ -398,10 +398,14 @@
     // ---------------------------------------------------------------- targeting / break / place
     interact(dt, input) {
       const g = this.game, world = g.world;
-      const eye = this.eyePos(), dir = this.lookDir();
+      const eye = this.eyePos(); let dir = this.lookDir();
+      // Handy-Steuerung 2: a tap or a held finger aims through the finger's point on the picture, not the crosshair
+      const ta = input && input.touchAim, R = g.renderer;
+      if (ta && R && R.invVPNJ) { const m = R.invVPNJ, x = ta.nx, y = ta.ny, w = m[3] * x + m[7] * y + m[11] + m[15]; const d = [(m[0] * x + m[4] * y + m[8] + m[12]) / w, (m[1] * x + m[5] * y + m[9] + m[13]) / w, (m[2] * x + m[6] * y + m[10] + m[14]) / w], l = Math.hypot(d[0], d[1], d[2]); if (l > 0) dir = [d[0] / l, d[1] / l, d[2] / l]; }
       this.target = g.ui && g.ui.blocking ? null : PH.raycast((x, y, z) => world.getBlock(x, y, z), eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], this.reach, { nb: (x, y, z, d) => world.getBlock(x + VR.HF_DX[d], y, z + VR.HF_DZ[d]) });
       if (g.ui && g.ui.blocking) { this.breaking = null; return; }
       if (!input.captured) return;
+      const dragL = input.dragLook && !input.touchAim;   // (Handy-Steuerung 2: a finger's tap or hold acts at once, not as a mouse drag-look click)
       this.breakCooldown -= dt; this.placeCooldown -= dt;
       // scroll hotbar
       if (input.mouse.wheel) { this.inv.sel = ((this.inv.sel + input.mouse.wheel) % 9 + 9) % 9; this.inv.changed = true; }
@@ -412,12 +416,12 @@
       const gu = g.gadgets && g.gadgets.update(dt, input, this, hdef);
       if (gu) { if (gu !== 'keep') this.breaking = null; return; }
       // --- break ---
-      const lmb = input.dragLook ? input.clickAction(0) : input.mouse.down[0];
+      const lmb = dragL ? input.clickAction(0) : input.mouse.down[0];
       if (lmb && this.target) {
         const t = this.target;
         const s = t.state;
         if (this.creative) {
-          if (this.breakCooldown <= 0) { this.breakBlock(t.x, t.y, t.z, s, false, true); this.breakCooldown = input.dragLook ? 0 : 0.22; this.handSwing = 1; }
+          if (this.breakCooldown <= 0) { this.breakBlock(t.x, t.y, t.z, s, false, true); this.breakCooldown = dragL ? 0 : 0.22; this.handSwing = 1; }
         } else {
           if (!this.breaking || this.breaking.x !== t.x || this.breaking.y !== t.y || this.breaking.z !== t.z) this.breaking = { x: t.x, y: t.y, z: t.z, p: 0 };
           const time = this.breakTime(s, hdef);
@@ -438,8 +442,8 @@
       // a click uses what the crosshair is on (a door, a lever, a bed, a chest, a lamp …) or the held item, or places the
       // held block. Holding the button keeps PLACING (a row of blocks) — never a use: a held click on a door used to open
       // it and shut it again 0.22 s later, as if nothing had happened.
-      const rmbClick = input.dragLook ? input.clickAction(2) : input.mouse.clicked[2];
-      const rmbHold = !input.dragLook && input.mouse.down[2] && this.placeCooldown <= 0 && this.placeHeld;
+      const rmbClick = dragL ? input.clickAction(2) : input.mouse.clicked[2];
+      const rmbHold = !dragL && input.mouse.down[2] && this.placeCooldown <= 0 && this.placeHeld;
       if (rmbClick) {
         this.placed = false;
         const ok = this.use(hdef, held);
