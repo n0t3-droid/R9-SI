@@ -37,6 +37,7 @@
     { id: 'shd2', de: 'Schattenkarte 3 → 2', en: 'Shadow map 3 → 2', set: { shadows: 2 }, grp: 'ultra' },
     { id: 'leafU', de: 'Feines Laub aus', en: 'Fancy leaves off', set: { fancyLeaves: false }, grp: 'ultra' },
     { id: 'resU', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8, grp: 'ultra' },
+    { id: 'idx0', de: 'Viereck-Index aus (Dreieckslisten wie früher)', en: 'Indexed quads off (triangle lists as before)', set: {}, idx: false, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
   K.plan = (arg) => (arg === 'far' || arg === 'geo' || arg === 'ultra' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra')).concat([K.END]);
@@ -106,8 +107,10 @@
         if (e.scale) S.scale = (S.scale || 1) * e.scale;
         const oldRd = S.renderDist; if (e.rd) S.renderDist = Math.max(2, (S.renderDist | 0) + e.rd);
         const kOld = e.knob && VR[e.knob[0]] ? VR[e.knob[0]][e.knob[1]] : undefined; if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = e.knob[2];
+        const idxOld = r.idx; if (e.idx !== undefined) { r.idx = e.idx; if (g.remeshAll) g.remeshAll(); }   // (Viereck-Index: every section meshed again)
         g.applySettings('*');
         const b = await measure();
+        if (e.idx !== undefined) { r.idx = idxOld; if (g.remeshAll) g.remeshAll(); }
         for (const k in old) S[k] = old[k];
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = oldSplit || 1; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = oldScale;
