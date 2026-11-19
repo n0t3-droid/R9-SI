@@ -26,6 +26,7 @@ SHARED.splice(SHARED.indexOf('lod') + 1, 0, 'isleshell'); MAIN.splice(MAIN.index
 SHARED.splice(SHARED.indexOf('mesher') + 1, 0, 'softnat');
 SHARED.splice(SHARED.indexOf('softnat') + 1, 0, 'sunclock');   // e-uhr: VR.SunClock — the Schattenuhr (the bake in the workers, the arc on the main thread)
 MAIN.push('clockvol');
+MAIN.push('daysense');   // Lichträtsel: the daylight detector reads the real light (src/main/daysense.js)
 MAIN.push('warp');
 MAIN.push('kosten');   // /kosten: the parts' GPU cost measured on the player's own card (src/main/kosten.js)   // Bildwarp: warp frames between whole ones on a slow PC (src/main/warp.js)
 MAIN.push('photofx');

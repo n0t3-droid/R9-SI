@@ -1306,6 +1306,8 @@
     'g.wp.set': '◆ {name} gesetzt bei {x} {y} {z}',
     // ---- Chat-Zeilen (game.js)
     'g.chat.you': 'Du',
+    'g.day.inv': 'Tageslichtsensor umgedreht: an, wenn es dunkel ist.',
+    'g.day.norm': 'Tageslichtsensor: an, wenn Licht auf ihn fällt.',
     'g.set.warp': 'Bildwarp',
     'g.set.warp.tip': 'Schwacher PC: Zwischen zwei teuren Bildern kommt ein schnelles Zwischenbild, gedreht zur neuesten Mausbewegung. Umsehen wirkt so flüssig wie dein Monitor, die Maus reagiert früher. Auf schnellen PCs ändert sich nichts.',
     'g.set.touchStyle': 'Finger-Stil',

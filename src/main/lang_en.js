@@ -1306,6 +1306,8 @@
     'g.wp.set': '◆ {name} set at {x} {y} {z}',
     // ---- chat lines (game.js)
     'g.chat.you': 'You',
+    'g.day.inv': 'Daylight detector turned round: on when it is dark.',
+    'g.day.norm': 'Daylight detector: on when light falls on it.',
     'g.set.warp': 'Frame warp',
     'g.set.warp.tip': 'Slow PC: between two expensive frames comes a quick one, the last picture turned to your newest mouse move. Looking around feels as smooth as your monitor, the mouse answers sooner. Fast PCs: no change.',
     'g.set.touchStyle': 'Finger style',
