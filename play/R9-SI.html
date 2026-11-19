@@ -130202,7 +130202,7 @@ K.LIST=[
 {id:'idx0',de:'Viereck-Index aus (Dreieckslisten wie früher)',en:'Indexed quads off (triangle lists as before)',set:{},idx:false,grp:'ultra'},
 ];
 K.END={id:'base2',de:'So wie jetzt (nochmal: die Streuung)',en:'As it is (again: the spread)',set:{}};
-K.plan=(arg)=>(arg==='far'||arg==='geo'||arg==='ultra'?K.LIST.filter(e=>e.id==='base'||e.grp===arg):K.LIST.filter(e=>e.grp!=='geo'&&e.grp!=='ultra')).concat([K.END]);
+K.plan=(arg)=>K.LIST.some(e=>e.id===arg&&e.id!=='base')?[K.LIST[0],K.LIST.find(e=>e.id===arg),K.END]:(arg==='far'||arg==='geo'||arg==='ultra'?K.LIST.filter(e=>e.id==='base'||e.grp===arg):K.LIST.filter(e=>e.grp!=='geo'&&e.grp!=='ultra')).concat([K.END]);
 K.fmt=(lang,e,r,base)=>{
 const name=lang==='de'?e.de:e.en,ms=(x)=>x.toFixed(1);
 if(!base||e.id==='base')return`${name}: ${ms(r.total)} ms GPU · `+K.top(r.times);
