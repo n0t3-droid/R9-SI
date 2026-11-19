@@ -25,14 +25,14 @@ await ev(`VR.game.createWorld({name:'Licht',mode:'creative',difficulty:'peaceful
 for (let i = 0; i < 300; i++) { await wait(500); if (await ev(() => VR.game.state === 'play')) break; }
 check(await ev(() => VR.game.state === 'play'), 'a new world');
 await ev(() => { window.requestAnimationFrame = () => 0; const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.force) g.env.wx.force('klar'); g.env.rain = 0; g.hideHud = true; });
-// the scene, high in the air over the spawn: a stone floor, detector D (test) with a 2 × 2 pillar on its −x side, C (control) 8 east
+// the scene, high in the air over the spawn: a stone floor, detector D (test) with a 2 × 2 pillar on its −x side, C (control) 8 east and 5 south (out of the pillar's long evening shadow, which runs along +x)
 const S = await ev(() => {
   const g = VR.game, w = g.world, p = g.player, R = VR.R, st = R.byName.stone.defaultState;
   const X = Math.floor(p.pos[0]), Z = Math.floor(p.pos[2]), Y = 140;
   for (let dx = -6; dx <= 14; dx++) for (let dz = -6; dz <= 6; dz++) w.setBlock(X + dx, Y - 1, Z + dz, st, 3);
   for (let dy = 0; dy < 6; dy++) for (const [dx, dz] of [[-2, 0], [-3, 0], [-2, 1], [-3, 1], [-2, -1], [-3, -1]]) w.setBlock(X + dx, Y + dy, Z + dz, st, 3);
   const det = R.byName.daylight_detector.defaultState, lamp = R.byName.volt_lamp.defaultState;
-  for (const dx of [0, 8]) { w.setBlock(X + dx, Y, Z, det, 4); w.setBlock(X + dx, Y, Z - 1, lamp, 4); }
+  for (const [dx, dz] of [[0, 0], [8, 5]]) { w.setBlock(X + dx, Y, Z + dz, det, 4); w.setBlock(X + dx, Y, Z + dz - 1, lamp, 4); }
   w.flushChanged && w.flushChanged();
   return { X, Y, Z };
 });
@@ -41,13 +41,13 @@ await place();
 const frames = (n) => ev((n) => { const g = VR.game; for (let i = 0; i < n; i++) { g.last = performance.now() - 50; g.loop(performance.now()); } return VR.ClockVol.stats; }, n);
 // the clocks of the detectors' cells
 let ok = false;
-for (let i = 0; i < 300 && !ok; i++) { await frames(12); if (i % 5 === 0) await place(); ok = await ev((S) => { const CV = VR.ClockVol, w = VR.game.world; return CV.visAt(w, S.X + 0.5, S.Y + 1.2, S.Z + 0.5, 0.5) !== null && CV.visAt(w, S.X + 8.5, S.Y + 1.2, S.Z + 0.5, 0.5) !== null; }, S); }
+for (let i = 0; i < 300 && !ok; i++) { await frames(12); if (i % 5 === 0) await place(); ok = await ev((S) => { const CV = VR.ClockVol, w = VR.game.world; return CV.visAt(w, S.X + 0.5, S.Y + 1.2, S.Z + 0.5, 0.5) !== null && CV.visAt(w, S.X + 8.5, S.Y + 1.2, S.Z + 5.5, 0.5) !== null; }, S); }
 check(ok, '1 the clocks above both detectors are baked');
 const at = async (tick) => {
   await ev((tick) => { const g = VR.game; g.env.setTime(tick); }, tick);
   await frames(30);   // (the sim measures once a second; 30 frames ≈ 1.5 s at 20 ticks a second)
   await ev(() => { VR.game.sim.daySenseTick(); }); await frames(10);
-  return ev((S) => { const R = VR.R, w = VR.game.world, DT = R.byName.daylight_detector, L = R.byName.volt_lamp; const pw = (x) => DT.get(w.getBlock(x, S.Y, S.Z), 'power'), lit = (x) => { const s = w.getBlock(x, S.Y, S.Z - 1); return L.has('lit') ? L.get(s, 'lit') : -1; }; return { d: pw(S.X), c: pw(S.X + 8), ld: lit(S.X), lc: lit(S.X + 8) }; }, S);
+  return ev((S) => { const R = VR.R, w = VR.game.world, DT = R.byName.daylight_detector, L = R.byName.volt_lamp; const pw = (x, z) => DT.get(w.getBlock(x, S.Y, S.Z + z), 'power'), lit = (x, z) => { const s = w.getBlock(x, S.Y, S.Z + z - 1); return L.has('lit') ? L.get(s, 'lit') : -1; }; return { d: pw(S.X, 0), c: pw(S.X + 8, 5), ld: lit(S.X, 0), lc: lit(S.X + 8, 5) }; }, S);
 };
 const shot = async (name) => { const url = await ev(() => { const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); return g.renderer.gl.canvas.toDataURL('image/png'); }); const b = Buffer.from(url.split(',')[1], 'base64'); fs.writeFileSync(SHOTS + 'licht_' + name + '.png', b); return b; };
 const m = await at(1800); console.log('     morgens ' + JSON.stringify(m)); const bm = await shot('morgens');
