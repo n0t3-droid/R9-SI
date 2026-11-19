@@ -14,6 +14,14 @@ const base = { total: 8.6, times: { far: 4.5, opaque: 2.0, sky: 0.8 } };
 const l0 = K.fmt('de', K.LIST[0], base, base), l1 = K.fmt('de', K.LIST[1], { total: 4.2, times: { far: 0, opaque: 2.1, sky: 0.8 } }, base);
 check(/8\.6 ms GPU · far 4\.5/.test(l0), 'b  ' + l0);
 check(/Ferne aus: −4\.4 ms \(far −4\.5\)/.test(l1), 'b  ' + l1);
+// d  robust numbers: a trimmed mean of the frames (a shadow redraw's spikes don't swing it), the delta against the mean
+//    of the bases before AND after (A/B/A: drift cancels), quiet = the pool idle and two windows within 5 %
+const frames = []; for (let i = 0; i < 50; i++) frames.push({ sum: 20 + (i % 10 === 0 ? 30 : 0), t: { opaque: 10 + (i % 10 === 0 ? 2 : 0), shadow: i % 10 === 0 ? 28 : 0 } });
+const st = K.stat ? K.stat(frames) : null;
+check(st && Math.abs(st.total - 20) < 0.5 && Math.abs(st.times.opaque - 10) < 0.3, 'd  trimmed mean ignores the spikes ' + (st && st.total.toFixed(2)));
+const dd = K.aba ? K.aba({ total: 30, times: { opaque: 20 } }, { total: 24, times: { opaque: 15 } }, { total: 34, times: { opaque: 22 } }) : null;
+check(dd && Math.abs(dd.total + 8) < 1e-9 && Math.abs(dd.times.opaque + 6) < 1e-9, 'd  A/B/A delta −8 (opaque −6)');
+check(K.quiet && K.quiet(0, 20.0, 20.6) && !K.quiet(3, 20, 20) && !K.quiet(0, 20, 23), 'd  quiet: pool idle, windows within 5 %');
 const fs = require('fs');
 check(/kosten/.test(fs.readFileSync(__dirname + '/../src/main/start.js', 'utf8')) && /SPLIT_MUL/.test(fs.readFileSync(__dirname + '/../src/main/horizon.js', 'utf8')), 'c  Einfach mode command, the split knob');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK'); process.exit(fails ? 1 : 0);

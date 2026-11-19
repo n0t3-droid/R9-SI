@@ -48,6 +48,23 @@
     const op = e.grp === 'ultra' && big !== 'opaque' && base.times.opaque !== undefined ? ' · opaque ' + (((r.times.opaque || 0) - base.times.opaque) >= 0 ? '+' : '−') + ms(Math.abs((r.times.opaque || 0) - base.times.opaque)) : '';
     return `${name}: ${d >= 0 ? '+' : '−'}${ms(Math.abs(d))} ms${big ? ' (' + big + ' ' + (bd >= 0 ? '+' : '−') + ms(Math.abs(bd)) + ')' : ''}${op}`;
   };
+  // robust numbers (owner's APU, Ultra: an EMA after a settings apply swung by ±15 ms — the shadow map's redraw, the
+  // re-meshed chunks): the frames' trimmed mean (10 % off each end), deltas against the bases before AND after (A/B/A),
+  // and a row is measured only once the world is quiet (the worker pool idle, two 1-s windows within 5 %)
+  K.TRIM = 0.1; K.WIN = 1000; K.QUIET_MAX = 20000; K.PRE = 2000;
+  const tmean = (a) => { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y), k = Math.floor(b.length * K.TRIM), c = b.slice(k, b.length - k || b.length); let s = 0; for (const v of c) s += v; return s / c.length; };
+  K.stat = function (frames) {
+    const keys = new Set(); for (const f of frames) for (const k in f.t) keys.add(k);
+    const times = {}; for (const k of keys) times[k] = tmean(frames.map(f => f.t[k] || 0));
+    return { total: tmean(frames.map(f => f.sum)), times, n: frames.length };
+  };
+  K.aba = function (a0, b, a1) {
+    const d = { total: b.total - (a0.total + a1.total) / 2, times: {} };
+    for (const k in b.times) d.times[k] = b.times[k] - ((a0.times[k] || 0) + (a1.times[k] || 0)) / 2;
+    for (const k in a0.times) if (!(k in d.times)) d.times[k] = -((a0.times[k] || 0) + (a1.times[k] || 0)) / 2;
+    return d;
+  };
+  K.quiet = (busy, w1, w2) => !busy && Math.abs(w1 - w2) <= 0.05 * Math.max(w1, w2, 0.001);
   K.top = (t) => Object.entries(t || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' ' + v.toFixed(1)).join(' · ');
   // (waits by frames, not timers: a hidden or background window throttles timers to one a minute, its frames go on)
   const wait = (ms) => new Promise((res) => { const t0 = performance.now(); const raf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : (f) => setTimeout(f, 16); const f = () => (performance.now() - t0 >= ms ? res() : raf(f)); raf(f); });
@@ -66,31 +83,45 @@
     const snap = arg === 'ultra' && S.preset !== 'ultra' && g.applyPreset ? Object.assign({}, S) : null;
     if (snap) { g.applyPreset('ultra'); g.applySettings('*'); await wait(K.SETTLE * 3); }   // (16 chunks stream in)
     const dyn = S.dynRes; S.dynRes = false; const warp = S.warp; S.warp = false; r.profDetail = true;
-    say(lang === 'de' ? 'Kosten werden gemessen … (bitte nicht bewegen, ca. ' + Math.round(K.plan(arg).length * (K.SETTLE + K.MEASURE) / 1000) + ' s)' : 'Measuring costs … (keep still, about ' + Math.round(K.plan(arg).length * (K.SETTLE + K.MEASURE) / 1000) + ' s)');
+    say(lang === 'de' ? 'Kosten werden gemessen … (bitte nicht bewegen, ca. ' + Math.round(K.plan(arg).length * 2 * (K.MEASURE + 4000) / 1000) + ' s)' : 'Measuring costs … (keep still, about ' + Math.round(K.plan(arg).length * 2 * (K.MEASURE + 4000) / 1000) + ' s)');
     const out = []; let base = null; const lines = ['R9 /kosten · ' + (VR.GL && VR.GL.rendererName || '') + ' · ' + (S.preset || '')]; K.panel(lines.concat('…'));
+    // one measurement: wait until the world is quiet, then the frames of K.MEASURE ms → their trimmed mean
+    const pool = () => (g.pool && g.pool.busy) | 0;
+    const grab = async (ms) => { r.prof.rec = []; await wait(ms); const f = r.prof.rec; r.prof.rec = null; return f; };
+    const measure = async () => {
+      await wait(K.PRE);
+      let prev = K.stat(await grab(K.WIN)).total; const t0 = performance.now();
+      while (performance.now() - t0 < K.QUIET_MAX) { const cur = K.stat(await grab(K.WIN)).total; if (K.quiet(pool(), prev, cur)) break; prev = cur; }
+      return K.stat(await grab(K.MEASURE));
+    };
+    const mid = (a, b) => { const m = { total: (a.total + b.total) / 2, times: {} }; for (const k of new Set(Object.keys(a.times).concat(Object.keys(b.times)))) m.times[k] = ((a.times[k] || 0) + (b.times[k] || 0)) / 2; return m; };
     try {
-      for (const e of K.plan(arg)) {
+      const plan = K.plan(arg).filter(e => e.id !== 'base' && e.id !== 'base2');
+      let a0 = await measure(), first = a0;
+      { const ln = K.fmt(lang, K.LIST[0], a0, null); say(ln); lines.push(ln); K.panel(lines.concat(['…'])); out.push({ id: 'base', total: a0.total, times: a0.times }); }
+      for (const e of plan) {
         const old = {}; for (const k in e.set) { old[k] = S[k]; S[k] = e.set[k]; }
         const oldSplit = VR.Horizon && VR.Horizon.SPLIT_MUL, oldScale = S.scale;
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = e.split; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = (S.scale || 1) * e.scale;
         const oldRd = S.renderDist; if (e.rd) S.renderDist = Math.max(2, (S.renderDist | 0) + e.rd);
         const kOld = e.knob && VR[e.knob[0]] ? VR[e.knob[0]][e.knob[1]] : undefined; if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = e.knob[2];
-        g.applySettings('*');   // (the base too: every row pays the same apply)
-        await wait(K.SETTLE);
-        r.prof.times = {}; r.prof.total = undefined;
-        await wait(K.MEASURE);
-        const res = { total: r.prof.total || 0, times: Object.assign({}, r.prof.times) };
-        if (e.id === 'base') base = res;
-        out.push({ id: e.id, total: res.total, times: res.times });
-        const ln = K.fmt(lang, e, res, base); say(ln); lines.push(ln); K.panel(lines.concat(out.length < K.plan(arg).length ? ['…'] : []));
+        g.applySettings('*');
+        const b = await measure();
         for (const k in old) S[k] = old[k];
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = oldSplit || 1; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = oldScale;
         if (e.rd) S.renderDist = oldRd;
         if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = kOld;
         g.applySettings('*');
+        const a1 = await measure();   // A/B/A: the base again after every row, the delta against both
+        const ref = mid(a0, a1);
+        out.push({ id: e.id, total: b.total, times: b.times, ref: ref.total });
+        const ln = K.fmt(lang, e, b, ref); say(ln); lines.push(ln); K.panel(lines.concat(['…']));
+        a0 = a1;
       }
+      const sp = lang === 'de' ? 'Streuung der Basis: ' : 'Base spread: ';
+      const ln = sp + (a0.total - first.total >= 0 ? '+' : '−') + Math.abs(a0.total - first.total).toFixed(1) + ' ms'; say(ln); lines.push(ln); K.panel(lines);
     } finally {
       S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false;
       if (snap) { for (const k in snap) S[k] = snap[k]; g.applySettings('*'); }   // (the snapshot holds the player's own dynRes and warp)
