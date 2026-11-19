@@ -27,15 +27,26 @@
     { id: 'sh0', de: 'Sonnenschatten (Karte) aus', en: 'Sun shadow map off', set: { sunShadows: false, shadows: 0 }, grp: 'geo' },
     { id: 'rd2', de: 'Sichtweite −2 Chunks', en: 'View distance −2 chunks', set: {}, rd: -2, grp: 'geo' },
     { id: 'res8', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8 },
+    // /kosten ultra · where Ultra's terrain time goes (on the owner's APU 3× Balanced's): each row takes ONE Ultra part
+    // down to Balanced's value; the opaque pass's delta is what counts (the shadow map's redraw lands in 'shadow')
+    { id: 'rd4', de: 'Sichtweite 16 → 12', en: 'View distance 16 → 12', set: {}, rd: -4, grp: 'ultra' },
+    { id: 'vx44', de: 'Mini-Voxel-Detail 96 → 44 Blöcke', en: 'Mini-voxel detail 96 → 44 blocks', set: { vxLod: 44 }, grp: 'ultra' },
+    { id: 'mat2', de: 'Material-Stufe 3 → 2 (Spiegelung)', en: 'Material tier 3 → 2 (mirror)', set: { matTier: 2 }, grp: 'ultra' },
+    { id: 'wat1', de: 'Wasser 2 → 1', en: 'Water 2 → 1', set: { water: 1 }, grp: 'ultra' },
+    { id: 'ray0', de: 'Lichtstrahlen aus', en: 'Light rays off', set: { rays: false }, grp: 'ultra' },
+    { id: 'shd2', de: 'Schattenkarte 3 → 2', en: 'Shadow map 3 → 2', set: { shadows: 2 }, grp: 'ultra' },
+    { id: 'leafU', de: 'Feines Laub aus', en: 'Fancy leaves off', set: { fancyLeaves: false }, grp: 'ultra' },
+    { id: 'resU', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
-  K.plan = (arg) => (arg === 'far' || arg === 'geo' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo')).concat([K.END]);
+  K.plan = (arg) => (arg === 'far' || arg === 'geo' || arg === 'ultra' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra')).concat([K.END]);
   K.fmt = (lang, e, r, base) => {
     const name = lang === 'de' ? e.de : e.en, ms = (x) => x.toFixed(1);
     if (!base || e.id === 'base') return `${name}: ${ms(r.total)} ms GPU · ` + K.top(r.times);
     const d = r.total - base.total;
     let big = '', bd = 0; for (const k in base.times) { const dd = (r.times[k] || 0) - base.times[k]; if (Math.abs(dd) > Math.abs(bd)) { bd = dd; big = k; } }
-    return `${name}: ${d >= 0 ? '+' : '−'}${ms(Math.abs(d))} ms${big ? ' (' + big + ' ' + (bd >= 0 ? '+' : '−') + ms(Math.abs(bd)) + ')' : ''}`;
+    const op = e.grp === 'ultra' && big !== 'opaque' && base.times.opaque !== undefined ? ' · opaque ' + (((r.times.opaque || 0) - base.times.opaque) >= 0 ? '+' : '−') + ms(Math.abs((r.times.opaque || 0) - base.times.opaque)) : '';
+    return `${name}: ${d >= 0 ? '+' : '−'}${ms(Math.abs(d))} ms${big ? ' (' + big + ' ' + (bd >= 0 ? '+' : '−') + ms(Math.abs(bd)) + ')' : ''}${op}`;
   };
   K.top = (t) => Object.entries(t || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' ' + v.toFixed(1)).join(' · ');
   // (waits by frames, not timers: a hidden or background window throttles timers to one a minute, its frames go on)
@@ -51,6 +62,9 @@
     const r = g.renderer, S = g.settings, lang = (VR.I18N && VR.I18N.lang) || 'de', say = (t) => g.ui.chatLine(t, '#bfe3ff');
     if (!r || !r.prof || !r.prof.ext) { say(lang === 'de' ? 'Kosten: dieser Browser verrät keine GPU-Zeiten.' : 'Costs: this browser hides GPU timing.'); return; }
     if (K.busy) return; K.busy = true;
+    // /kosten ultra measures Ultra whatever the player runs: the preset goes on for the run, everything comes back after
+    const snap = arg === 'ultra' && S.preset !== 'ultra' && g.applyPreset ? Object.assign({}, S) : null;
+    if (snap) { g.applyPreset('ultra'); g.applySettings('*'); await wait(K.SETTLE * 3); }   // (16 chunks stream in)
     const dyn = S.dynRes; S.dynRes = false; const warp = S.warp; S.warp = false; r.profDetail = true;
     say(lang === 'de' ? 'Kosten werden gemessen … (bitte nicht bewegen, ca. ' + Math.round(K.plan(arg).length * (K.SETTLE + K.MEASURE) / 1000) + ' s)' : 'Measuring costs … (keep still, about ' + Math.round(K.plan(arg).length * (K.SETTLE + K.MEASURE) / 1000) + ' s)');
     const out = []; let base = null; const lines = ['R9 /kosten · ' + (VR.GL && VR.GL.rendererName || '') + ' · ' + (S.preset || '')]; K.panel(lines.concat('…'));
@@ -77,7 +91,10 @@
         if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = kOld;
         g.applySettings('*');
       }
-    } finally { S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false; }
+    } finally {
+      S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false;
+      if (snap) { for (const k in snap) S[k] = snap[k]; g.applySettings('*'); }   // (the snapshot holds the player's own dynRes and warp)
+    }
     K.last = out; if (typeof console !== 'undefined') console.log('R9 kosten', JSON.stringify(out));
     return out;
   };
