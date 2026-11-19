@@ -91,6 +91,7 @@
               this.peakN++;
               for (const k in t) if (!(this.peak[k] >= t[k])) this.peak[k] = t[k];
             }
+            if (this.rec && this.rec.length < 4000) this.rec.push({ sum, t });   // /kosten's frames, each as it came (kosten.js)
           }
         }
         for (const p of f.passes) this.free.push(p.q);
