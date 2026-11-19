@@ -21,9 +21,14 @@
     { id: 'sky0', de: 'Himmelslicht + Rückstrahlung + Lampen aus', en: 'Sky light, bounce, lamps off', set: { skylight: false, bounce: false, lamplight: false } },
     { id: 'pbr0', de: 'Material-Glanz (PBR) aus', en: 'Material shine (PBR) off', set: { pbr: 0 } },
     { id: 'hi0', de: 'Detail-Texturen aus', en: 'Hero textures off', set: { texHi: false } },
+    { id: 'anim0', de: 'Wind & Animationen aus', en: 'Wind & animation off', set: { anim: false }, grp: 'geo' },
+    { id: 'leaf0', de: 'Feines Laub aus', en: 'Fancy leaves off', set: { fancyLeaves: false }, grp: 'geo' },
+    { id: 'plant0', de: 'Runde Pflanzen/Möbel aus', en: 'Smooth plants/furniture off', set: { smoothPlants: 0, smoothFurn: 0 }, grp: 'geo' },
+    { id: 'sh0', de: 'Sonnenschatten (Karte) aus', en: 'Sun shadow map off', set: { sunShadows: false, shadows: 0 }, grp: 'geo' },
+    { id: 'rd2', de: 'Sichtweite −2 Chunks', en: 'View distance −2 chunks', set: {}, rd: -2, grp: 'geo' },
     { id: 'res8', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8 },
   ];
-  K.plan = (arg) => (arg === 'far' ? K.LIST.filter(e => e.id === 'base' || e.grp === 'far') : K.LIST);
+  K.plan = (arg) => (arg === 'far' || arg === 'geo' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo'));
   K.fmt = (lang, e, r, base) => {
     const name = lang === 'de' ? e.de : e.en, ms = (x) => x.toFixed(1);
     if (!base || e.id === 'base') return `${name}: ${ms(r.total)} ms GPU · ` + K.top(r.times);
@@ -54,8 +59,9 @@
         const oldSplit = VR.Horizon && VR.Horizon.SPLIT_MUL, oldScale = S.scale;
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = e.split; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = (S.scale || 1) * e.scale;
+        const oldRd = S.renderDist; if (e.rd) S.renderDist = Math.max(2, (S.renderDist | 0) + e.rd);
         const kOld = e.knob && VR[e.knob[0]] ? VR[e.knob[0]][e.knob[1]] : undefined; if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = e.knob[2];
-        if (Object.keys(e.set).length || e.scale) g.applySettings('*');
+        if (Object.keys(e.set).length || e.scale || e.rd) g.applySettings('*');
         await wait(K.SETTLE);
         r.prof.times = {}; r.prof.total = undefined;
         await wait(K.MEASURE);
@@ -66,8 +72,9 @@
         for (const k in old) S[k] = old[k];
         if (e.split && VR.Horizon) { VR.Horizon.SPLIT_MUL = oldSplit || 1; if (g.horizon) g.horizon.setLevel(g.horizon.level); }
         if (e.scale) S.scale = oldScale;
+        if (e.rd) S.renderDist = oldRd;
         if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = kOld;
-        if (Object.keys(e.set).length || e.scale) g.applySettings('*');
+        if (Object.keys(e.set).length || e.scale || e.rd) g.applySettings('*');
       }
     } finally { S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false; }
     K.last = out; if (typeof console !== 'undefined') console.log('R9 kosten', JSON.stringify(out));
