@@ -427,7 +427,9 @@
   "clockvol",
   "photofx",
   "album",
-  "daysense"
+  "daysense",
+  "warp",
+  "kosten"
  ],
  "unmeasured": {
   "folk4": "u-folk4 (2026-11-05): added by hand, not by perf8.mjs — node test/folk4.js times its frame hook in the villages' simulation: 0.003 ms with a moment running, 0.002 ms idle (a 2-s clock); every tier runs the same logic, the blanket is drawn Low and up only; re-measure with perf8.mjs at the next release",
@@ -448,6 +450,8 @@
   "clockvol": "e-uhr (2026-11-16): added by hand, not by perf8.mjs — on Very Low it is ON (real sun shadows for the first time): per frame one wrap of updateHmap whose scan of the 8 × 4 × 8 window runs every 4th frame (or when the window moves), at most 6 texSubImage3D of 16 KB, bake jobs in the workers; the terrain FS does one 3-D texture fetch per sunlit pixel instead of nothing. Re-measure with perf8.mjs and on the owner's PC at the next quiet release",
   "photofx": "f-kino (2026-11-17): added by hand, not by perf8.mjs — the styles' composite define exists only while a style is chosen in the Fotomodus; per frame one multiply of env's emissive boost by the beat's swell (a few arithmetic operations); re-measure with perf8.mjs at the next quiet release",
   "album": "f-album (2026-11-17): added by hand — no frame work (a photo's save and the pause menu's screen only)",
-  "daysense": "Lichträtsel (2026-11-17): added by hand — once a second (sim tick % 20) the daylight detectors within 96 blocks; none in a world: one Map size check"
+  "daysense": "Lichträtsel (2026-11-17): added by hand — once a second (sim tick % 20) the daylight detectors within 96 blocks; none in a world: one Map size check",
+  "warp": "Bildwarp (2026-11-18): added by hand — a frame under 22 ms: one decide() and nothing else; slower: one picture copy a whole frame and ≈1 ms warp frames (fewer whole frames drawn, not more work)",
+  "kosten": "/kosten (2026-11-18): added by hand — only while the player runs /kosten; no frame work otherwise"
  }
 }

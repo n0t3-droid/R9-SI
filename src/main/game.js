@@ -1037,7 +1037,9 @@
       }
       // F9: the steps this GPU held last time (aqRestoreStart) go on again once the world runs
       if (aq.pending && this.world) { const s = aq.pending; aq.pending = ''; this.aqRestoreSteps(aq, S, this.world, s); }
-      const target = 55, budget = 1000 / target;
+      // (Bildwarp: whole frames at 38 a second are enough — the warps between them keep the look and the mouse at the screen's
+      // rate — so Smart Quality keeps the picture's resolution and effects where it lowered them for 55 before)
+      const target = VR.Warp && VR.Warp.sqTarget ? VR.Warp.sqTarget(S) : 55, budget = 1000 / target;
       const gpuMs = r.gpuMs, jsMs = this.jsMs;
       // who is the bottleneck? measured when the browser exposes GPU timing, estimated otherwise
       let gpuBound, cpuBound;
@@ -1480,9 +1482,10 @@
       }
       this.damageFlash = Math.max(0, this.damageFlash - dt * 2.5);
       // R9 Smart Quality: keeps the picture sharp when the frame rate drops
-      this.smartQuality(dt, S, w);
+      if (!this.renderer.lastWasWarp) this.smartQuality(dt, S, w);   // (Bildwarp: Smart Quality measures the whole frames only)
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
+        warpOk: true,   // (Bildwarp, warp.js: the play view may be a warp frame)
         cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, motes: VR.Dusk && VR.Dusk.out && VR.Dusk.out.count ? VR.Dusk.out : null, outline, crack, precip, rainMap,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
@@ -1736,6 +1739,7 @@
         const [c0, ...a0] = text.slice(1).split(/\s+/);
         const say0 = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
         if (c0 === 'home') { this.goHome(); return; }
+        if (c0 === 'kosten' || c0 === 'costs') { if (VR.Kosten) VR.Kosten.run(this, a0[0]); return; }   // (kosten.js: what each part costs on this GPU)
         // /diag: what a player's report needs when the picture is wrong — the renderer's numbers in the chat (no secrets)
         if (c0 === 'diag') { try { const r = this.renderer, w = this.world, q = r.q || {}, st = r.stats || {}; say0('diag ' + this.state + ' gfx ' + (this.settings.preset || '?') + ' rd ' + this.settings.renderDist + ' scale ' + q.scale + ' far ' + (q.far || '') + ' · sec ' + st.sections + ' draws ' + st.draws + ' tris ' + st.tris + ' · cols ' + w.cols.size + ' pend ' + w.pending.size + ' · dbg ' + !!this.debugOn + ' hide ' + !!this.hideHud + ' · progs ' + (VR.GL.pending ? VR.GL.pending.size : '-') + ' · cv ' + (VR.ClockVol ? VR.ClockVol.short + (VR.ClockVol.on(this.settings) ? ' on' : ' off') : '-') + ' · ' + (VR.GL.rendererName || '')); for (const e of (this.lastErrors || [])) say0('err ' + e, '#ff8a8a'); const P = r.P || {}; const bad = Object.keys(P).filter(k => P[k] && P[k].deferred && !P[k].isReady); say0('notReady ' + bad.slice(0, 12).join(',')); } catch (e) { say0('diag ' + e.message); } return; }
         if (c0 === 'look') { this.lookCommand(a0[0]); return; }

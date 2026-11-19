@@ -13,7 +13,25 @@
   const TOUCH = VR.Touch = {};
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = 56;          // the stick's travel in pixels
-  let root = null, stick = null, knob = null, game = null, sid = null, origin = null;
+  let root = null, stick = null, knob = null, game = null, sid = null, origin = null, zone = null, sprinting = false;
+  // ---- Handy-Steuerung 2 (v0.55.72): the picture itself is the tool — tap places (or uses), a finger held still breaks
+  // for as long as it stays (aiming while it mines), a drag turns; the stick floats under the left thumb wherever it lands
+  // and sprints when pushed to its rim. Style „Gesten" (default) or „Tasten" (the place / break / sprint buttons as before)
+  TOUCH.HOLD_MS = 260; TOUCH.TAP_PX = 12; TOUCH.SPRINT_K = 0.9;
+  TOUCH.classify = (ms, moved, holding) => (holding ? 'hold' : moved >= TOUCH.TAP_PX ? 'drag' : ms >= TOUCH.HOLD_MS ? 'hold' : 'tap');
+  TOUCH.sprintAt = (len) => len >= TOUCH.SPRINT_K;
+  TOUCH.styleOf = (S) => (S && S.touchStyle === 'tasten' ? 'tasten' : 'gesten');
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'touchStyle', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.touchStyle', tip: 'g.set.touchStyle.tip', def: 'gesten', opts: [['gesten', 'g.set.touchStyle.gesten', 'g.set.touchStyle.gesten.tip'], ['tasten', 'g.set.touchStyle.tasten', 'g.set.touchStyle.tasten.tip']] });
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'haptics', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.haptics', tip: 'g.set.haptics.tip', def: true });
+  // the ring under a held finger (it mines there)
+  let ringEl = null;
+  TOUCH.ring = function (x, y, on) {
+    if (typeof document === 'undefined') return;
+    if (!ringEl) { ringEl = document.createElement('div'); ringEl.id = 'tRing'; (document.getElementById('ui') || document.body).appendChild(ringEl); }
+    ringEl.classList.toggle('on', !!on);
+    if (on) { ringEl.style.left = x + 'px'; ringEl.style.top = y + 'px'; }
+  };
+  TOUCH.buzz = function (ms) { try { if (game && game.settings && game.settings.haptics === false) return; if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* no vibration */ } };
   TOUCH.wanted = function (S) {
     const v = S && S.touch;
     if (v === 'on') return true;
@@ -35,6 +53,12 @@
     root = document.createElement('div');
     root.id = 'touch'; root.setAttribute('role', 'group'); root.setAttribute('aria-label', 'Touch');
     root.style.display = 'none';
+    // the left thumb's zone: the stick appears where it lands
+    zone = document.createElement('div'); zone.id = 'tZone'; root.appendChild(zone);
+    const menu = document.createElement('button'); menu.type = 'button'; menu.id = 'tMenu'; menu.className = 'tb tb-menu';
+    menu.innerHTML = '<span class="ti" aria-hidden="true">☰</span>'; menu.setAttribute('aria-label', T('touch.menu', null, 'Menü'));
+    menu.addEventListener('pointerdown', (e) => { e.preventDefault(); if (game && game.ui && game.ui.pause) game.ui.pause(); });
+    root.appendChild(menu);
     stick = document.createElement('div'); stick.id = 'tStick'; stick.className = 'tstick'; stick.innerHTML = '<i></i>';
     knob = stick.querySelector('i');
     root.appendChild(stick);
@@ -49,19 +73,34 @@
     root.appendChild(bar);
     (document.getElementById('ui') || document.body).appendChild(root);
     wireStick();
+    // a tap on a hotbar slot picks it (the number keys of a phone)
+    const hb = document.getElementById('hotbar');
+    if (hb) hb.addEventListener('pointerdown', (e) => {
+      if (!TOUCH.wanted(game && game.settings)) return;
+      const sl = e.target && e.target.closest ? e.target.closest('.slot') : null; if (!sl || !game || !game.player) return;
+      const i = Array.prototype.indexOf.call(hb.querySelectorAll('.slot'), sl); if (i < 0) return;
+      game.player.inv.sel = i; game.player.inv.changed = true; TOUCH.buzz(6); e.preventDefault();
+    });
   };
   function input() { return game && game.input; }
   function wireStick() {
-    stick.addEventListener('pointerdown', (e) => {
+    // the stick floats: wherever the left thumb lands in the zone (or on the stick itself), that is its middle
+    const down = (src) => (e) => {
+      if (sid !== null) return;
       sid = e.pointerId; origin = { x: e.clientX, y: e.clientY }; stick.classList.add('on');
-      try { stick.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+      const zr = root.getBoundingClientRect();
+      stick.style.left = (e.clientX - zr.left - stick.offsetWidth / 2) + 'px'; stick.style.top = (e.clientY - zr.top - stick.offsetHeight / 2) + 'px'; stick.style.bottom = 'auto';
+      try { src.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
       moveStick(e);
       e.preventDefault();
-    });
-    stick.addEventListener('pointermove', (e) => { if (e.pointerId === sid) { moveStick(e); e.preventDefault(); } });
-    const end = (e) => { if (e.pointerId !== sid) return; sid = null; origin = null; stick.classList.remove('on'); knob.style.transform = ''; const i = input(); if (i) i.touchMove = { fwd: 0, str: 0 }; };
-    stick.addEventListener('pointerup', end);
-    stick.addEventListener('pointercancel', end);
+    };
+    const move = (e) => { if (e.pointerId === sid) { moveStick(e); e.preventDefault(); } };
+    const end = (e) => {
+      if (e.pointerId !== sid) return;
+      sid = null; origin = null; stick.classList.remove('on'); knob.style.transform = ''; stick.style.left = ''; stick.style.top = ''; stick.style.bottom = '';
+      const i = input(); if (i) { i.touchMove = { fwd: 0, str: 0 }; if (sprinting) { sprinting = false; if (i.tRelease) i.tRelease.add('sprint'); else i.tDown.delete('sprint'); } }
+    };
+    for (const el of [stick, zone]) { el.addEventListener('pointerdown', down(el)); el.addEventListener('pointermove', move); el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); }
   }
   function moveStick(e) {
     const dx = Math.max(-R, Math.min(R, e.clientX - origin.x)), dy = Math.max(-R, Math.min(R, e.clientY - origin.y));
@@ -70,6 +109,10 @@
     // the same dead zone as the pad; up is forward
     const v = VR.Pad.stick(dx / R, dy / R);
     i.touchMove = { fwd: -v[1], str: v[0] };
+    // Gesten: pushed to the rim, forward, it sprints (no button needed); the knob glows
+    const len = Math.hypot(dx, dy) / R, sp = TOUCH.styleOf(game && game.settings) === 'gesten' && TOUCH.sprintAt(len) && -v[1] > 0.5;
+    if (sp !== sprinting) { sprinting = sp; if (sp) { i.tDown.add('sprint'); i.tPressed.add('sprint'); TOUCH.buzz(8); } else if (i.tRelease) i.tRelease.add('sprint'); else i.tDown.delete('sprint'); }
+    stick.classList.toggle('sprint', sp);
   }
   function wireButton(e, id) {
     const press = (ev) => {
@@ -102,6 +145,7 @@
     const open = !!(g.ui && g.ui.screen);
     const on = g.state === 'play' && !open && TOUCH.wanted(g.settings);
     if (root.style.display !== (on ? '' : 'none')) root.style.display = on ? '' : 'none';
+    const ges = TOUCH.styleOf(g.settings) === 'gesten'; if (root.classList.contains('gesten') !== ges) root.classList.toggle('gesten', ges);
     if (root.parentNode && root.parentNode.classList.contains('touchon') !== on) root.parentNode.classList.toggle('touchon', on);   // the hotbar moves up (controls.css)
     if (!on && input()) input().touchMove = { fwd: 0, str: 0 };
   };

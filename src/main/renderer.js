@@ -2073,7 +2073,7 @@
       const gl = this.gl;
       let col = true, dep = true;
       if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis) || ((this.q.pbr | 0) >= 2 && this.glassInView(vis)); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement; t-material: the window panes read it on High)
-      this.copied = col;
+      this.copied = col; this.depCopied = !!dep;   // (warp.js reads the opaque depth from the copy: the hand's pass clears the scene's)
       if (!col && !dep) return;
       const n = this.w * this.h, sb = this.sceneFmt().bytes;
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);

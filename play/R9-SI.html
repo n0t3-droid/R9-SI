@@ -795,6 +795,65 @@ html:not(.pro) #zenpanel .field { display: none; }
   .key { min-height: 46px; }
 }
 
+/* ---- Handy-Steuerung 2 (v0.55.72, touch.js): the stick floats under the left thumb, the picture is the tool (tap places,
+   holding breaks), a few big round buttons on the right, the menu top left — everything inside the phone's safe area */
+#touch #tZone { position: absolute; left: 0; top: 30%; bottom: 70px; width: 46%; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+#touch .tstick { left: max(20px, env(safe-area-inset-left)); bottom: calc(84px + env(safe-area-inset-bottom)); width: 128px; height: 128px; opacity: .5; transition: opacity .15s, border-color .15s; z-index: 1; }
+#touch .tstick.on { opacity: 1; }
+#touch .tstick i { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+#touch .tstick.sprint { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 209, 102, .45); }
+#touch .tstick.sprint i { background: rgba(255, 209, 102, .45); border-color: rgba(255, 209, 102, .9); }
+#touch .tb-menu { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); width: 50px; height: 50px; min-height: 50px; border-radius: 16px; pointer-events: auto; padding: 0; }
+#touch .tb-menu .ti { font-size: 24px; }
+#touch.gesten .tb-place, #touch.gesten .tb-break, #touch.gesten .tb-sprint { display: none; }
+#touch.gesten .tbtns { display: block; right: max(16px, env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); width: 0; height: 0; }
+#touch.gesten .tb { position: absolute; pointer-events: auto; touch-action: none; }
+#touch.gesten .tb-jump { right: 0; bottom: 0; width: 86px; height: 86px; border-radius: 50%; }
+#touch.gesten .tb-jump .ti { font-size: 30px; }
+#touch.gesten .tb-inv { right: 98px; bottom: 4px; width: 62px; height: 62px; min-height: 62px; border-radius: 18px; }
+#touch.gesten .tb-act { right: 7px; bottom: 98px; width: 72px; height: 72px; }
+#touch.gesten .tb .tl { font-size: 11px; }
+#tRing { position: fixed; left: 0; top: 0; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 3px solid var(--accent); box-shadow: 0 0 16px rgba(58, 240, 255, .5); pointer-events: none; z-index: 31; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+#tRing.on { opacity: 1; transform: scale(1); animation: tRingPulse .6s ease-in-out infinite alternate; }
+@keyframes tRingPulse { from { transform: scale(.92); } to { transform: scale(1.08); } }
+/* the HUD around it: the hotbar at the bottom (its slots fit a narrow phone and answer a tap), the chips beside the menu,
+   the hints at the top, the 🖐 above the round buttons */
+#ui.touchon #hotbar { bottom: max(6px, env(safe-area-inset-bottom)); pointer-events: auto; gap: 3px; padding: 4px; }
+#ui.touchon #hotbar .slot { width: min(52px, calc((100vw - 52px) / 9)) !important; height: min(52px, calc((100vw - 52px) / 9)) !important; min-width: 0 !important; }
+#ui.touchon #hotbar.hf-off { opacity: 1 !important; pointer-events: auto !important; }   /* (a phone picks blocks from it: it never hides) */
+#ui.touchon #hotbar .slot canvas { width: 78%; height: 78%; }
+#ui.touchon #modebadge { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); bottom: auto; }
+#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; }
+#ui.touchon #hints { top: calc(max(10px, env(safe-area-inset-top)) + 132px); bottom: auto; width: min(76vw, 460px); max-width: min(76vw, 460px); }
+#ui.touchon .bh-btn { right: max(18px, env(safe-area-inset-right)); bottom: calc(262px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px; }
+#ui.touchon #crosshair { opacity: .55; }
+/* a short phone held sideways: everything a little lower and smaller */
+@media (max-height: 430px) {
+  #touch.gesten .tbtns { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #touch.gesten .tb-jump { width: 74px; height: 74px; }
+  #touch.gesten .tb-act { bottom: 84px; width: 60px; height: 60px; }
+  #touch.gesten .tb-inv { right: 86px; width: 54px; height: 54px; min-height: 54px; }
+  #ui.touchon .bh-btn { bottom: calc(196px + env(safe-area-inset-bottom)); width: 50px; height: 50px; }
+  #touch .tstick { bottom: calc(64px + env(safe-area-inset-bottom)); width: 112px; height: 112px; }
+  #ui.touchon #hints { top: 10px; left: auto; right: 12px; transform: none; max-width: 48vw; }
+}
+/* narrow phones: a menu's button pairs wrap instead of running off the panel */
+@media (max-width: 520px) {
+  .screen .row.gap { flex-wrap: wrap; }
+  .screen .row.gap > .btn { flex: 1 1 100% !important; min-width: 0; white-space: normal; }
+  .screen .panel { max-width: calc(100vw - 16px); box-sizing: border-box; }
+}
+/* a phone held sideways (short screen): the start tiles in one row of four, short; menus scroll inside themselves */
+@media (max-height: 460px) and (min-width: 560px) {
+  #title .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; width: min(100%, 820px) !important; }
+  #title .tile { aspect-ratio: auto !important; min-height: 0 !important; height: 118px; padding: 8px 6px !important; gap: 4px !important; }
+  #title .tile svg { width: 34px; height: 34px; }
+}
+@media (max-height: 460px) {
+  .screen .panel { max-height: calc(100vh - 16px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #ui.touchon .bh-btn { bottom: calc(216px + env(safe-area-inset-bottom)) !important; }
+}
+
 /* ============================================================================
    💡 Erfinden — the Erfinderwerkstatt (src/main/invent.js). Big picture cards, a two-slot workbench, warm amber
    for the idea; the game's dark glass for the rest. 44 px targets, works at 360 px wide, the keyboard ring comes from
@@ -59055,6 +59114,18 @@ VR.I18N.add('en',{
 'g.wp.set':'◆ {name} set at {x} {y} {z}',
 
 'g.chat.you':'You',
+'g.set.warp':'Frame warp',
+'g.set.warp.tip':'Slow PC: between two expensive frames comes a quick one, the last picture turned to your newest mouse move. Looking around feels as smooth as your monitor, the mouse answers sooner. Fast PCs: no change.',
+'g.set.touchStyle':'Finger style',
+'g.set.touchStyle.tip':'Gestures: tap the picture to place a block, hold a finger to break, push the stick to its rim to run. Buttons: own buttons to place, break and run.',
+'g.set.touchStyle.gesten':'Gestures',
+'g.set.touchStyle.gesten.tip':'Tap places, hold breaks, stick at the rim runs.',
+'g.set.touchStyle.tasten':'Buttons',
+'g.set.touchStyle.tasten.tip':'Buttons to place, break and run.',
+'touch.menu':'Menu',
+'ux.h.moveTouch2':'🕹 left: walk · tap: place · hold: break',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'A short buzz when placing, breaking and running (phones that can vibrate).',
 'g.chat.error':'Error: {msg}',
 'g.chat.noWorld':'That world is not here (any more).',
 'g.chat.landFirst':'Land or get off first.',
@@ -64142,6 +64213,18 @@ VR.I18N.add('de',{
 'g.wp.set':'◆ {name} gesetzt bei {x} {y} {z}',
 
 'g.chat.you':'Du',
+'g.set.warp':'Bildwarp',
+'g.set.warp.tip':'Schwacher PC: Zwischen zwei teuren Bildern kommt ein schnelles Zwischenbild, gedreht zur neuesten Mausbewegung. Umsehen wirkt so flüssig wie dein Monitor, die Maus reagiert früher. Auf schnellen PCs ändert sich nichts.',
+'g.set.touchStyle':'Finger-Stil',
+'g.set.touchStyle.tip':'Gesten: aufs Bild tippen setzt einen Block, Finger halten baut ab, am Rand des Sticks rennst du. Tasten: eigene Knöpfe zum Setzen, Abbauen und Rennen.',
+'g.set.touchStyle.gesten':'Gesten',
+'g.set.touchStyle.gesten.tip':'Tippen setzt, Halten baut ab, Stick am Rand rennt.',
+'g.set.touchStyle.tasten':'Tasten',
+'g.set.touchStyle.tasten.tip':'Knöpfe für Setzen, Abbauen und Rennen.',
+'touch.menu':'Menü',
+'ux.h.moveTouch2':'🕹 links: laufen · tippen: setzen · halten: abbauen',
+'g.set.haptics':'Vibration',
+'g.set.haptics.tip':'Ein kurzes Brummen beim Setzen, Abbauen und Rennen (Handys, die vibrieren können).',
 'g.chat.error':'Fehler: {msg}',
 'g.chat.noWorld':'Diese Welt gibt es hier nicht (mehr).',
 'g.chat.landFirst':'Erst landen oder absteigen.',
@@ -77202,6 +77285,9 @@ if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 #endif
 #endif
+#ifdef DEPTHONLY
+o = vec4(0.0); return;
+#endif
 vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
 #ifdef FORM
 
@@ -83158,7 +83244,7 @@ refrCopy(F,E,vis){
 const gl=this.gl;
 let col=true,dep=true;
 if(this.q.postLite&&this.q.plCopy!==false){col=this.waterInView(vis)||((this.q.pbr|0)>=2&&this.glassInView(vis));dep=col|| !!this.jit||this.raysAt(F,E)>0.02;}
-this.copied=col;
+this.copied=col;this.depCopied= !!dep;
 if(!col&& !dep)return;
 const n=this.w*this.h,sb=this.sceneFmt().bytes;
 gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.sceneFB);
@@ -84885,8 +84971,11 @@ static focusD(F,L,tx,tz){if(!F)return Infinity;const S=tileSize(L),x0=tx*S,z0=tz
 static prio(d,L,fd){const S=tileSize(L);return d/S-L*0.6-(fd<S?Horizon.FOCUS_K:0);}
 
 static keepSel(h,cam,w){return!!h.selList&&h.selWant===0&&h.selVer===(h.ver|0)&&h.selW===w&&h.selR===h.radius&&h.selFar===h.farOn()&&h.frame-h.selF<Horizon.KEEP_FRAMES&&Math.abs(cam.x-h.selX)<Horizon.KEEP_D&&Math.abs(cam.z-h.selZ)<Horizon.KEEP_D;}
+
+
+static screenK(h,fov){if(!(h>0))return 1;const f=fov>0.2&&fov<3?fov:1.22;const px=h/(2*Math.tan(f/2));return Math.max(Horizon.SCREEN_MIN,Math.min(1,px/Horizon.SCREEN_REF));}
 static radiusFor(level){return RADII[Math.max(0,Math.min(4,level|0))];}
-setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level];if(r!==this.radius){this.radius=r;}}
+setLevel(level){this.level=Math.max(0,Math.min(4,level|0));const r=Horizon.radiusFor(this.level);this.split=SPLIT[this.level]*(Horizon.SPLIT_MUL||1)*(this.splitK||1);if(r!==this.radius){this.radius=r;}}
 
 key(L,tx,tz){return(L*1048576+tx+524288)*1048576+tz+524288;}
 free(t){this.ver=(this.ver|0)+1;const gl=this.g.renderer.gl;if(t.vao){gl.deleteVertexArray(t.vao);gl.deleteBuffer(t.vbo);gl.deleteBuffer(t.ibo);t.vao=null;this.bytes-=t.bytes||0;t.bytes=0;}}
@@ -84907,6 +84996,11 @@ const g=this.g,w=g.world,r=g.renderer;
 
 const wasSel=this.listSel;this.listSel=false;
 if(!this.enabled()|| !r){this.drawList.length=0;return;}
+
+
+
+{const k=Horizon.screenK(r.H,cam&&cam.fov),kq=this.splitK;
+if(kq===undefined||Math.abs(k-kq)>0.08){this.splitK=Math.round(k*20)/20;const sp=SPLIT[this.level]*(Horizon.SPLIT_MUL||1)*this.splitK;if(sp!==this.split){this.split=sp;this.ver=(this.ver|0)+1;}}}
 
 if(!this.maskTex){const gl=r.gl;this.maskTex=VR.GL.tex2D(64,64,gl.R8,gl.RED,gl.UNSIGNED_BYTE,{data:this.mask,filter:gl.LINEAR});}
 if(!this.sentAvg&&g.tex&&g.tex.avgColor){g.pool.broadcast({type:'lodinit',avg:g.tex.avgColor});this.sentAvg=true;}
@@ -85170,6 +85264,35 @@ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.maskTex);gl.unif
 gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,r.texNoise);gl.uniform1i(p.u.u_noise,1);
 gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.enable(gl.CULL_FACE);
 let n=0,tris=0;
+
+
+
+
+const zpre=Horizon.ZPRE&&p===r.P.lod&& !(E.climb&&E.climb.cut1>0)&& !refl&& !far1;
+if(zpre){
+const defs=r.q.lite?[]:['SOFTFADE'];
+const inv=(vs)=>vs.replace(/(void main\(\)\s*\{)/,'invariant gl_Position;\n$1');
+if(!r.P.lodZ)r.P.lodZ=VR.GL.program(inv(VR.SHADERS.LOD_VS),VR.SHADERS.LOD_FS,'lodZ',defs.concat(['DEPTHONLY']));
+if(!r.P.lodEq)r.P.lodEq=VR.GL.program(inv(VR.SHADERS.LOD_VS),Horizon.noDiscard(VR.SHADERS.LOD_FS),'lodEq',defs);
+list.sort((a,b)=>Math.hypot(a.x0+64-cam.x,a.z0+64-cam.z)-Math.hypot(b.x0+64-cam.x,b.z0+64-cam.z));
+const lodNear=under?near:4;
+const setup=(q)=>{
+gl.useProgram(q.p);r.common(q,E);
+gl.uniformMatrix4fv(q.u.u_viewProj,false,r.viewProj);
+gl.uniform3f(q.u.u_camFrac,r.camFrac[0],r.camFrac[1],r.camFrac[2]);
+gl.uniform3i(q.u.u_camInt,r.camInt[0],r.camInt[1],r.camInt[2]);
+if(q.u.u_emissiveBoost)gl.uniform1f(q.u.u_emissiveBoost,E.emissiveBoost);
+gl.uniform1f(q.u.u_lodNear,lodNear);
+gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.maskTex);gl.uniform1i(q.u.u_mask,0);
+gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,r.texNoise);gl.uniform1i(q.u.u_noise,1);
+};
+const pass=(q)=>{for(const t of list){const ox=t.x0-cam.x,oz=t.z0-cam.z;const cv=r.uCurve?r.uCurve*(Math.max((ox+t.bx0)**2,(ox+t.bx1)**2)+Math.max((oz+t.bz0)**2,(oz+t.bz1)**2)):0;if(!mat4.boxInFrustum(r.planes,ox+t.bx0,t.minY-cam.y-cv,oz+t.bz0,ox+t.bx1,t.maxY-cam.y,oz+t.bz1))continue;gl.uniform3f(q.u.u_tileOrigin,ox,-cam.y,oz);gl.bindVertexArray(t.vao);gl.drawElements(gl.TRIANGLES,t.count,t.type,0);if(q===r.P.lodEq){n++;tris+=t.count/3;}}};
+setup(r.P.lodZ);gl.colorMask(false,false,false,false);pass(r.P.lodZ);
+gl.colorMask(true,true,true,true);setup(r.P.lodEq);gl.depthFunc(gl.EQUAL);gl.depthMask(false);pass(r.P.lodEq);
+gl.depthFunc(gl.LEQUAL);gl.depthMask(true);gl.bindVertexArray(null);
+this.stats.drawn=n;this.stats.tris=tris;r.stats.draws+=n*2;r.stats.tris+=tris*2;
+return;
+}
 const soft= !!(E.climb&&E.climb.cut1>0);if(soft){gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);}
 for(const t of list){
 const ox=t.x0-cam.x,oz=t.z0-cam.z;
@@ -85191,6 +85314,14 @@ destroy(){this.reset();}
 
 
 Horizon.FINE_D=72;
+Horizon.SCREEN_MIN=0.5;
+
+
+
+Horizon.SCREEN_REF=1028;
+Horizon.ZPRE=false;
+
+Horizon.noDiscard=(fs)=>{const i=fs.indexOf('void main()');return fs.slice(0,i)+fs.slice(i).replace(/\bdiscard;/g,';');};
 Horizon.shownUnder=function(w,a,b){
 if(!w|| !w.cols)return false;
 for(let j=0;j<4;j++)for(let i=0;i<4;i++){const c=w.cols.get(VR.ckey(a*4+i,b*4+j));if(!c|| !(c.shownAt>=0)||(w.fading&&w.fading.has(c)))return false;}
@@ -88162,6 +88293,7 @@ window.addEventListener('blur',()=>{this.keys.clear();this.mouse.down=[false,fal
 c.addEventListener('contextmenu',(e)=>e.preventDefault());
 c.addEventListener('mousedown',(e)=>{
 if(!this.enabled)return;
+if(this.lastTouchT&&performance.now()-this.lastTouchT<900)return;
 
 if(!this.locked&&this.captured&& !this.lockFailed)this.requestLock();
 this.mouse.down[e.button]=true;this.mouse.clicked[e.button]=true;
@@ -88189,10 +88321,24 @@ if(this.onLockChange)this.onLockChange(this.locked);
 });
 document.addEventListener('pointerlockerror',()=>{this.failLock();});
 
+
 let touch=null;
-c.addEventListener('touchstart',(e)=>{if(!this.captured)return;const t=e.changedTouches[0];touch={id:t.identifier,x:t.clientX,y:t.clientY,t:performance.now(),moved:0};e.preventDefault();},{passive:false});
-c.addEventListener('touchmove',(e)=>{if(!touch)return;for(const t of e.changedTouches)if(t.identifier===touch.id){const dx=t.clientX-touch.x,dy=t.clientY-touch.y;this.mouse.dx+=dx*1.5;this.mouse.dy+=dy*1.5;touch.moved+=Math.abs(dx)+Math.abs(dy);touch.x=t.clientX;touch.y=t.clientY;}e.preventDefault();},{passive:false});
-c.addEventListener('touchend',(e)=>{if(touch&&touch.moved<10){this.mouse.clicked[performance.now()-touch.t>350?0:2]=true;}touch=null;});
+const TO=()=>VR.Touch||{HOLD_MS:260,TAP_PX:12,ring(){},buzz(){}};
+const aimAt=(x,y)=>{const r=c.getBoundingClientRect();this.touchAim={nx:((x-r.left)/r.width)*2-1,ny:1-((y-r.top)/r.height)*2};};
+const holdStart=()=>{if(!touch||touch.hold||touch.moved>=TO().TAP_PX)return;touch.hold=true;this.mouse.down[0]=true;this.mouse.clicked[0]=true;TO().ring(touch.cx,touch.cy,true);TO().buzz(12);};
+c.addEventListener('touchstart',(e)=>{this.lastTouchT=performance.now();if(!this.captured){const g=VR.game;if(g&&g.state==='play'&&g.ui&& !g.ui.blocking)this.captured=true;else return;}
+const t=e.changedTouches[0];if(touch)return;touch={id:t.identifier,x:t.clientX,y:t.clientY,cx:t.clientX,cy:t.clientY,t:performance.now(),moved:0,hold:false};this.touchActive=true;this.holdCheck=holdStart;this.tch=touch;aimAt(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+c.addEventListener('touchmove',(e)=>{if(!touch)return;for(const t of e.changedTouches)if(t.identifier===touch.id){const dx=t.clientX-touch.x,dy=t.clientY-touch.y;this.mouse.dx+=dx*1.5;this.mouse.dy+=dy*1.5;touch.moved+=Math.abs(dx)+Math.abs(dy);touch.x=t.clientX;touch.y=t.clientY;if(touch.hold){TO().ring(t.clientX,t.clientY,true);aimAt(t.clientX,t.clientY);}}e.preventDefault();},{passive:false});
+const tEnd=(e)=>{
+if(!touch)return;
+let mine= !e.touches||e.touches.length===0;for(const t of e.changedTouches)if(t.identifier===touch.id)mine=true;
+if(!mine)return;
+if(touch.hold){this.mouse.down[0]=false;this.mouse.releasedBtn[0]=true;TO().ring(0,0,false);}
+else if(touch.moved<TO().TAP_PX){this.mouse.clicked[2]=true;TO().buzz(6);}
+else this.touchAim=null;
+touch=null;this.tch=null;this.touchActive=false;
+};
+c.addEventListener('touchend',tEnd);c.addEventListener('touchcancel',tEnd);
 }
 
 
@@ -88247,6 +88393,8 @@ return this.mouse.down[b];
 }
 
 beginFrame(dt){
+
+if(this.tch&& !this.tch.hold&&this.holdCheck&&performance.now()-this.tch.t>=((VR.Touch&&VR.Touch.HOLD_MS)||260))this.holdCheck();
 const k=clamp(dt||0.016,0,0.1);
 
 if(this.smooth){
@@ -88296,6 +88444,7 @@ this.padMove={fwd:clamp(pf+tm.fwd,-1,1),str:clamp(ps+tm.str,-1,1)};
 if(VR.A11y&&VR.A11y.inputFrame)VR.A11y.inputFrame(this,k);
 }
 endFrame(){
+if(this.touchAim&& !this.touchActive&& !this.mouse.down[0])this.touchAim=null;
 if(this.tRelease.size){for(const id of this.tRelease)this.tDown.delete(id);this.tRelease.clear();}
 this.pressed.clear();this.released.clear();this.doubleTap.clear();
 this.padPressed.clear();this.tPressed.clear();this.vPhys.clear();this.shipPressed.clear();
@@ -88917,10 +89066,14 @@ return true;
 
 interact(dt,input){
 const g=this.game,world=g.world;
-const eye=this.eyePos(),dir=this.lookDir();
+const eye=this.eyePos();let dir=this.lookDir();
+
+const ta=input&&input.touchAim,R=g.renderer;
+if(ta&&R&&R.invVPNJ){const m=R.invVPNJ,x=ta.nx,y=ta.ny,w=m[3]*x+m[7]*y+m[11]+m[15];const d=[(m[0]*x+m[4]*y+m[8]+m[12])/w,(m[1]*x+m[5]*y+m[9]+m[13])/w,(m[2]*x+m[6]*y+m[10]+m[14])/w],l=Math.hypot(d[0],d[1],d[2]);if(l>0)dir=[d[0]/l,d[1]/l,d[2]/l];}
 this.target=g.ui&&g.ui.blocking?null:PH.raycast((x,y,z)=>world.getBlock(x,y,z),eye[0],eye[1],eye[2],dir[0],dir[1],dir[2],this.reach,{nb:(x,y,z,d)=>world.getBlock(x+VR.HF_DX[d],y,z+VR.HF_DZ[d])});
 if(g.ui&&g.ui.blocking){this.breaking=null;return;}
 if(!input.captured)return;
+const dragL=input.dragLook&& !input.touchAim;
 this.breakCooldown-=dt;this.placeCooldown-=dt;
 
 if(input.mouse.wheel){this.inv.sel=((this.inv.sel+input.mouse.wheel)%9+9)%9;this.inv.changed=true;}
@@ -88931,12 +89084,12 @@ const hdef=held?VR.itemDef(held.id):null;
 const gu=g.gadgets&&g.gadgets.update(dt,input,this,hdef);
 if(gu){if(gu!=='keep')this.breaking=null;return;}
 
-const lmb=input.dragLook?input.clickAction(0):input.mouse.down[0];
+const lmb=dragL?input.clickAction(0):input.mouse.down[0];
 if(lmb&&this.target){
 const t=this.target;
 const s=t.state;
 if(this.creative){
-if(this.breakCooldown<=0){this.breakBlock(t.x,t.y,t.z,s,false,true);this.breakCooldown=input.dragLook?0:0.22;this.handSwing=1;}
+if(this.breakCooldown<=0){this.breakBlock(t.x,t.y,t.z,s,false,true);this.breakCooldown=dragL?0:0.22;this.handSwing=1;}
 }else{
 if(!this.breaking||this.breaking.x!==t.x||this.breaking.y!==t.y||this.breaking.z!==t.z)this.breaking={x:t.x,y:t.y,z:t.z,p:0};
 const time=this.breakTime(s,hdef);
@@ -88957,8 +89110,8 @@ if(t&&(t.cat||(VR.SMOOTH_OF&&VR.SMOOTH_OF[t.name])))this.pickBlock((VR.SMOOTH_OF
 
 
 
-const rmbClick=input.dragLook?input.clickAction(2):input.mouse.clicked[2];
-const rmbHold= !input.dragLook&&input.mouse.down[2]&&this.placeCooldown<=0&&this.placeHeld;
+const rmbClick=dragL?input.clickAction(2):input.mouse.clicked[2];
+const rmbHold= !dragL&&input.mouse.down[2]&&this.placeCooldown<=0&&this.placeHeld;
 if(rmbClick){
 this.placed=false;
 const ok=this.use(hdef,held);
@@ -119825,7 +119978,25 @@ function slotOf(id,code){const S=VR.Binds.current.slots(id);return S[0]===code?0
 const TOUCH=VR.Touch={};
 const T=(k,v,fb)=>(VR.I18N?VR.I18N.t(k,v,fb):(fb!==undefined?fb:k));
 const R=56;
-let root=null,stick=null,knob=null,game=null,sid=null,origin=null;
+let root=null,stick=null,knob=null,game=null,sid=null,origin=null,zone=null,sprinting=false;
+
+
+
+TOUCH.HOLD_MS=260;TOUCH.TAP_PX=12;TOUCH.SPRINT_K=0.9;
+TOUCH.classify=(ms,moved,holding)=>(holding?'hold':moved>=TOUCH.TAP_PX?'drag':ms>=TOUCH.HOLD_MS?'hold':'tap');
+TOUCH.sprintAt=(len)=>len>=TOUCH.SPRINT_K;
+TOUCH.styleOf=(S)=>(S&&S.touchStyle==='tasten'?'tasten':'gesten');
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'touchStyle',g:'play',sec:'steer',t:'choice',lab:'g.set.touchStyle',tip:'g.set.touchStyle.tip',def:'gesten',opts:[['gesten','g.set.touchStyle.gesten','g.set.touchStyle.gesten.tip'],['tasten','g.set.touchStyle.tasten','g.set.touchStyle.tasten.tip']]});
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'haptics',g:'play',sec:'steer',t:'switch',lab:'g.set.haptics',tip:'g.set.haptics.tip',def:true});
+
+let ringEl=null;
+TOUCH.ring=function(x,y,on){
+if(typeof document==='undefined')return;
+if(!ringEl){ringEl=document.createElement('div');ringEl.id='tRing';(document.getElementById('ui')||document.body).appendChild(ringEl);}
+ringEl.classList.toggle('on',!!on);
+if(on){ringEl.style.left=x+'px';ringEl.style.top=y+'px';}
+};
+TOUCH.buzz=function(ms){try{if(game&&game.settings&&game.settings.haptics===false)return;if(typeof navigator!=='undefined'&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}};
 TOUCH.wanted=function(S){
 const v=S&&S.touch;
 if(v==='on')return true;
@@ -119847,6 +120018,12 @@ if(typeof document==='undefined'||document.getElementById('touch'))return;
 root=document.createElement('div');
 root.id='touch';root.setAttribute('role','group');root.setAttribute('aria-label','Touch');
 root.style.display='none';
+
+zone=document.createElement('div');zone.id='tZone';root.appendChild(zone);
+const menu=document.createElement('button');menu.type='button';menu.id='tMenu';menu.className='tb tb-menu';
+menu.innerHTML='<span class="ti" aria-hidden="true">☰</span>';menu.setAttribute('aria-label',T('touch.menu',null,'Menü'));
+menu.addEventListener('pointerdown',(e)=>{e.preventDefault();if(game&&game.ui&&game.ui.pause)game.ui.pause();});
+root.appendChild(menu);
 stick=document.createElement('div');stick.id='tStick';stick.className='tstick';stick.innerHTML='<i></i>';
 knob=stick.querySelector('i');
 root.appendChild(stick);
@@ -119861,19 +120038,34 @@ bar.appendChild(e);
 root.appendChild(bar);
 (document.getElementById('ui')||document.body).appendChild(root);
 wireStick();
+
+const hb=document.getElementById('hotbar');
+if(hb)hb.addEventListener('pointerdown',(e)=>{
+if(!TOUCH.wanted(game&&game.settings))return;
+const sl=e.target&&e.target.closest?e.target.closest('.slot'):null;if(!sl|| !game|| !game.player)return;
+const i=Array.prototype.indexOf.call(hb.querySelectorAll('.slot'),sl);if(i<0)return;
+game.player.inv.sel=i;game.player.inv.changed=true;TOUCH.buzz(6);e.preventDefault();
+});
 };
 function input(){return game&&game.input;}
 function wireStick(){
-stick.addEventListener('pointerdown',(e)=>{
+
+const down=(src)=>(e)=>{
+if(sid!==null)return;
 sid=e.pointerId;origin={x:e.clientX,y:e.clientY};stick.classList.add('on');
-try{stick.setPointerCapture(e.pointerId);}catch(err){}
+const zr=root.getBoundingClientRect();
+stick.style.left=(e.clientX-zr.left-stick.offsetWidth/2)+'px';stick.style.top=(e.clientY-zr.top-stick.offsetHeight/2)+'px';stick.style.bottom='auto';
+try{src.setPointerCapture(e.pointerId);}catch(err){}
 moveStick(e);
 e.preventDefault();
-});
-stick.addEventListener('pointermove',(e)=>{if(e.pointerId===sid){moveStick(e);e.preventDefault();}});
-const end=(e)=>{if(e.pointerId!==sid)return;sid=null;origin=null;stick.classList.remove('on');knob.style.transform='';const i=input();if(i)i.touchMove={fwd:0,str:0};};
-stick.addEventListener('pointerup',end);
-stick.addEventListener('pointercancel',end);
+};
+const move=(e)=>{if(e.pointerId===sid){moveStick(e);e.preventDefault();}};
+const end=(e)=>{
+if(e.pointerId!==sid)return;
+sid=null;origin=null;stick.classList.remove('on');knob.style.transform='';stick.style.left='';stick.style.top='';stick.style.bottom='';
+const i=input();if(i){i.touchMove={fwd:0,str:0};if(sprinting){sprinting=false;if(i.tRelease)i.tRelease.add('sprint');else i.tDown.delete('sprint');}}
+};
+for(const el of[stick,zone]){el.addEventListener('pointerdown',down(el));el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
 }
 function moveStick(e){
 const dx=Math.max(-R,Math.min(R,e.clientX-origin.x)),dy=Math.max(-R,Math.min(R,e.clientY-origin.y));
@@ -119882,6 +120074,10 @@ const i=input();if(!i|| !VR.Pad)return;
 
 const v=VR.Pad.stick(dx/R,dy/R);
 i.touchMove={fwd: -v[1],str:v[0]};
+
+const len=Math.hypot(dx,dy)/R,sp=TOUCH.styleOf(game&&game.settings)==='gesten'&&TOUCH.sprintAt(len)&& -v[1]>0.5;
+if(sp!==sprinting){sprinting=sp;if(sp){i.tDown.add('sprint');i.tPressed.add('sprint');TOUCH.buzz(8);}else if(i.tRelease)i.tRelease.add('sprint');else i.tDown.delete('sprint');}
+stick.classList.toggle('sprint',sp);
 }
 function wireButton(e,id){
 const press=(ev)=>{
@@ -119914,6 +120110,7 @@ if(!root|| !g)return;
 const open= !!(g.ui&&g.ui.screen);
 const on=g.state==='play'&& !open&&TOUCH.wanted(g.settings);
 if(root.style.display!==(on?'':'none'))root.style.display=on?'':'none';
+const ges=TOUCH.styleOf(g.settings)==='gesten';if(root.classList.contains('gesten')!==ges)root.classList.toggle('gesten',ges);
 if(root.parentNode&&root.parentNode.classList.contains('touchon')!==on)root.parentNode.classList.toggle('touchon',on);
 if(!on&&input())input().touchMove={fwd:0,str:0};
 };
@@ -123492,7 +123689,9 @@ return;
 }
 
 if(aq.pending&&this.world){const s=aq.pending;aq.pending='';this.aqRestoreSteps(aq,S,this.world,s);}
-const target=55,budget=1000/target;
+
+
+const target=VR.Warp&&VR.Warp.sqTarget?VR.Warp.sqTarget(S):55,budget=1000/target;
 const gpuMs=r.gpuMs,jsMs=this.jsMs;
 
 let gpuBound,cpuBound;
@@ -123935,9 +124134,10 @@ precip={amount:dry?0:Math.max(E.rain,E.snow),snow,budget:[0.3,0.6,1][S.particles
 }
 this.damageFlash=Math.max(0,this.damageFlash-dt*2.5);
 
-this.smartQuality(dt,S,w);
+if(!this.renderer.lastWasWarp)this.smartQuality(dt,S,w);
 if(this.horizon)this.horizon.update(cam);
 this.renderer.render({
+warpOk:true,
 cam,world:w,env:E,horizon:this.horizon,underwater:underwater||inLava,crossing:(this.crossT||0)/0.9,particles:this.particles,motes:VR.Dusk&&VR.Dusk.out&&VR.Dusk.out.count?VR.Dusk.out:null,outline,crack,precip,rainMap,
 damage:this.damageFlash*0.8+(p.mode==='survival'&&p.health<=4?0.25+Math.sin(this.time*4)*0.1:0),
 photo:this.photo,
@@ -124191,6 +124391,7 @@ if(!text.startsWith('/')){if(this.mp&&this.mp.active)this.mp.chat(text);else thi
 const[c0,...a0]=text.slice(1).split(/\s+/);
 const say0=(m,c)=>this.ui.chatLine(m,c||'#cfe6ff');
 if(c0==='home'){this.goHome();return;}
+if(c0==='kosten'||c0==='costs'){if(VR.Kosten)VR.Kosten.run(this,a0[0]);return;}
 
 if(c0==='diag'){try{const r=this.renderer,w=this.world,q=r.q||{},st=r.stats||{};say0('diag '+this.state+' gfx '+(this.settings.preset||'?')+' rd '+this.settings.renderDist+' scale '+q.scale+' far '+(q.far||'')+' · sec '+st.sections+' draws '+st.draws+' tris '+st.tris+' · cols '+w.cols.size+' pend '+w.pending.size+' · dbg '+ !!this.debugOn+' hide '+ !!this.hideHud+' · progs '+(VR.GL.pending?VR.GL.pending.size:'-')+' · cv '+(VR.ClockVol?VR.ClockVol.short+(VR.ClockVol.on(this.settings)?' on':' off'):'-')+' · '+(VR.GL.rendererName||''));for(const e of(this.lastErrors||[]))say0('err '+e,'#ff8a8a');const P=r.P||{};const bad=Object.keys(P).filter(k=>P[k]&&P[k].deferred&& !P[k].isReady);say0('notReady '+bad.slice(0,12).join(','));}catch(e){say0('diag '+e.message);}return;}
 if(c0==='look'){this.lookCommand(a0[0]);return;}
@@ -124681,7 +124882,7 @@ const pn=$('#pausenote'),g=this.game;if(pn&&g.meta&& !prefs().pro)pn.textContent
 
 
 
-ST.einfachCmd=(text)=> /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen|raum|diag)(\s|$)/i.test(text);
+ST.einfachCmd=(text)=> /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen|raum|diag|kosten|costs)(\s|$)/i.test(text);
 if(VR.Game){
 const origChat=VR.Game.prototype.chat;
 VR.Game.prototype.chat=function(text){
@@ -129674,6 +129875,254 @@ const k=CV.on(S())?1:0;
 if(this.cvKey!==undefined&&k!==this.cvKey&&this.P)this.buildPrograms();
 this.cvKey=k;
 return res;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const W=VR.Warp={};
+const M4=VR.mat4;
+W.MOVE=1.0;W.T1=22;W.T2=45;
+if(VR.Settings&&VR.Settings.add)VR.Settings.add({key:'warp',g:'img',sec:'quality',t:'switch',lab:'g.set.warp',tip:'g.set.warp.tip',cost:'low',def:true});
+W.stepOn=true;
+W.on=(s)=> !s||s.warp!==false;
+
+W.vp=function(cam,aspect,out){
+const P=M4.create(),V=M4.create();
+M4.perspective(P,cam.fov,aspect,0.06,cam.far||1200);
+const cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw),cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);
+M4.lookAt(V,0,0,0,-sy*cp,sp,-cy*cp,0,1,0);
+if(cam.roll){const Rz=M4.create();M4.rotZ(Rz,M4.create(),cam.roll);M4.mul(V,Rz,V);}
+return M4.mul(out||M4.create(),P,V);
+};
+
+W.mat=function(vpOld,vpNew,out){const inv=M4.create();M4.invert(inv,vpNew);return M4.mul(out||M4.create(),vpOld,inv);};
+W.state=()=>({warps:0});
+W.decide=function(st,o){
+if(!o.on||o.blocked|| !o.have|| !o.fovSame|| !(o.moved<=W.MOVE))return'f';
+const L=W.limits(o.vsync||0),n=o.fullMs>L[1]?2:o.fullMs>L[0]?1:0;
+return st.warps<n?'w':'f';
+};
+
+
+W.limits=(v)=>{v=v>3&&v<40?v:1000/60;return[Math.max(7,v*1.35),v*2.7];};
+
+W.vsyncStep=(v,iv)=>{if(!(iv>2&&iv<100))return v;if(v===undefined)return iv<15.5?iv:undefined;return iv<v?v*0.6+iv*0.4:Math.min(1000/60,v*0.998+iv*0.002);};
+
+
+W.SQ=38;
+W.sqTarget=(s)=>(W.on(s)?W.SQ:55);
+W.done=function(st,k){if(k==='w')st.warps++;else st.warps=0;};
+W.blocked=function(g){return!g||g.state!=='play'|| !!g.hideHud|| !!(g.renderer&&g.renderer.skyProbe)||
+!!(g.ui&&(g.ui.screen||g.ui.blocking))|| !!g.photo|| !!g.studioOpen|| !!(VR.PhotoFx&&VR.PhotoFx.rec);};
+
+const RP=VR.Renderer&&VR.Renderer.prototype;
+if(!RP|| !VR.GL)return;
+
+
+const FS=`
+uniform sampler2D u_src;
+uniform highp sampler2D u_depth;
+uniform highp sampler2D u_hand;
+uniform mat4 u_M;
+uniform mat4 u_invOld;
+uniform mat4 u_vpNew;
+uniform vec3 u_dpos;
+uniform float u_step;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+
+if (u_step > -0.5) {
+float z0 = texture(u_hand, v_uv).r;
+vec4 w0 = u_invOld * vec4(v_uv * 2.0 - 1.0, z0 * 2.0 - 1.0, 1.0);
+if (z0 < 0.99999 && dot(w0.xyz / w0.w, w0.xyz / w0.w) < 2.25) { o = texture(u_src, v_uv); return; }
+}
+vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
+vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;
+if (u_step > 0.5) {
+for (int i = 0; i < 2; i++) {
+float z = texture(u_depth, clamp(uv, vec2(0.0), vec2(1.0))).r;
+if (z >= 0.99999) break;
+vec4 w = u_invOld * vec4(uv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
+vec4 c = u_vpNew * vec4(w.xyz / w.w - u_dpos, 1.0);
+if (c.w <= 0.0) break;
+uv -= (c.xy / c.w - (v_uv * 2.0 - 1.0)) * 0.5;
+}
+}
+o = texture(u_src, clamp(uv, vec2(0.0), vec2(1.0)));
+}`;
+RP.warpCapture=function(){
+const gl=this.gl,w=this.W,h=this.H;
+if(!this.warpFB||this.warpW!==w||this.warpH!==h){
+if(this.warpTex){gl.deleteTexture(this.warpTex);gl.deleteFramebuffer(this.warpFB);}
+this.warpTex=VR.GL.tex2D(w,h,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,{filter:gl.LINEAR});
+this.warpFB=VR.GL.fbo([this.warpTex]);this.warpW=w;this.warpH=h;
+if(!this.warpFB)return false;
+}
+gl.bindFramebuffer(gl.READ_FRAMEBUFFER,null);
+gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,this.warpFB);
+gl.blitFramebuffer(0,0,w,h,0,0,w,h,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+return true;
+};
+RP.warpDraw=function(cam){
+const gl=this.gl;
+if(!this.P.warp)this.P.warp=VR.GL.program(VR.SHADERS.FS_VS,FS,'warp');
+const p=this.P.warp;
+this.warpNew=W.vp(cam,this.W/this.H,this.warpNew);
+this.warpM=W.mat(this.warpVP,this.warpNew,this.warpM);
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+gl.viewport(0,0,this.W,this.H);
+gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
+gl.useProgram(p.p);
+gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.warpTex);
+gl.uniform1i(p.u.u_src,0);
+gl.uniformMatrix4fv(p.u.u_M,false,this.warpM);
+const dp=this.warpCam?[cam.x-this.warpCam.x,cam.y-this.warpCam.y,cam.z-this.warpCam.z]:[0,0,0];
+const step=W.stepOn&&this.warpInvOld&&this.sceneDepth&&Math.hypot(dp[0],dp[1],dp[2])>0.002?1:0;
+const depthOk= !!(this.warpInvOld&&this.sceneDepth);
+gl.uniform1f(p.u.u_step,step?1:depthOk?0: -1);
+if(depthOk){
+gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.warpDepTex||this.sceneDepth);gl.uniform1i(p.u.u_depth,1);
+gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.sceneDepth);gl.uniform1i(p.u.u_hand,2);
+gl.uniformMatrix4fv(p.u.u_invOld,false,this.warpInvOld);gl.uniformMatrix4fv(p.u.u_vpNew,false,this.warpNew);
+gl.uniform3f(p.u.u_dpos,dp[0],dp[1],dp[2]);
+gl.activeTexture(gl.TEXTURE0);
+}
+this.fs(p);
+W.stats.warps++;
+};
+W.stats={warps:0,whole:0};
+const r0=RP.render;
+RP.render=function(F){
+if(!F|| !F.warpOk){this.lastWasWarp=false;return r0.apply(this,arguments);}
+const now0=performance.now();if(this.warpLastCall!==undefined)this.warpVsync=W.vsyncStep(this.warpVsync,now0-this.warpLastCall);this.warpLastCall=now0;
+const now=now0,g=VR.game,S=g&&g.settings,st=this.warpSt||(this.warpSt=W.state());
+if(this.warpPrevFull!==undefined){const ms=now-this.warpPrevFull;this.warpFullMs=this.warpFullMs===undefined?ms:this.warpFullMs*0.8+ms*0.2;this.warpPrevFull=undefined;}
+const c=F.cam,last=this.warpCam,on=W.on(S);
+const k=W.decide(st,{
+on,blocked:W.blocked(g),fullMs:this.warpFullMs||0,vsync:this.warpVsync,
+have: !!(this.warpOk&&last&&this.warpW===this.W&&this.warpH===this.H&&this.gl.canvas.width===this.W&&this.gl.canvas.height===this.H),
+fovSame: !!(last&&Math.abs(last.fov-c.fov)<1e-4&&(last.roll||0)===(c.roll||0)),
+moved:last?Math.hypot(c.x-last.x,c.y-last.y,c.z-last.z):9,
+});
+W.done(st,k);
+this.lastWasWarp=k==='w';
+if(k==='w'){this.warpDraw(c);return;}
+this.warpPrevFull=now;W.stats.whole++;
+const r=r0.apply(this,arguments);
+
+this.warpOk=false;
+if(on&&(this.warpFullMs||0)>W.limits(this.warpVsync)[0]&&this.vpNJ){
+this.warpOk=this.warpCapture();
+this.warpVP=this.warpVP||M4.create();this.warpVP.set(this.vpNJ);
+this.warpInvOld=this.warpInvOld||M4.create();M4.invert(this.warpInvOld,this.vpNJ);
+this.warpDepTex=this.depCopied&&this.copyDepth?this.copyDepth:null;
+this.warpCam={x:c.x,y:c.y,z:c.z,fov:c.fov,roll:c.roll||0};
+}else this.warpCam=null;
+return r;
+};
+})(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const K=VR.Kosten={};
+K.SETTLE=4000;K.MEASURE=3000;
+
+K.LIST=[
+{id:'base',de:'So wie jetzt',en:'As it is',set:{}},
+{id:'far0',de:'Ferne aus',en:'Far land off',set:{horizon:0},grp:'far'},
+{id:'farS',de:'Ferne gröber (Teilung ×0.75)',en:'Far land coarser (split ×0.75)',set:{},split:0.75,grp:'far'},
+{id:'farS2',de:'Ferne viel gröber (×0.55)',en:'Far land much coarser (×0.55)',set:{},split:0.55,grp:'far'},
+{id:'farZ',de:'Ferne mit Tiefenvorlauf',en:'Far land depth pre-pass',set:{},knob:['Horizon','ZPRE',true],grp:'far'},
+{id:'fade0',de:'Sanftes Einblenden aus',en:'Soft fade-in off',set:{fadeIn:false},grp:'far'},
+{id:'uhr0',de:'Schattenuhr aus',en:'Sun clock off',set:{sunclock:false}},
+{id:'sky0',de:'Himmelslicht + Rückstrahlung + Lampen aus',en:'Sky light, bounce, lamps off',set:{skylight:false,bounce:false,lamplight:false}},
+{id:'pbr0',de:'Material-Glanz (PBR) aus',en:'Material shine (PBR) off',set:{pbr:0}},
+{id:'hi0',de:'Detail-Texturen aus',en:'Hero textures off',set:{texHi:false}},
+{id:'anim0',de:'Wind & Animationen aus',en:'Wind & animation off',set:{anim:false},grp:'geo'},
+{id:'leaf0',de:'Feines Laub aus',en:'Fancy leaves off',set:{fancyLeaves:false},grp:'geo'},
+{id:'plant0',de:'Runde Pflanzen/Möbel aus',en:'Smooth plants/furniture off',set:{smoothPlants:0,smoothFurn:0},grp:'geo'},
+{id:'sh0',de:'Sonnenschatten (Karte) aus',en:'Sun shadow map off',set:{sunShadows:false,shadows:0},grp:'geo'},
+{id:'rd2',de:'Sichtweite −2 Chunks',en:'View distance −2 chunks',set:{},rd: -2,grp:'geo'},
+{id:'res8',de:'Auflösung ×0.8',en:'Resolution ×0.8',set:{},scale:0.8},
+];
+K.END={id:'base2',de:'So wie jetzt (nochmal: die Streuung)',en:'As it is (again: the spread)',set:{}};
+K.plan=(arg)=>(arg==='far'||arg==='geo'?K.LIST.filter(e=>e.id==='base'||e.grp===arg):K.LIST.filter(e=>e.grp!=='geo')).concat([K.END]);
+K.fmt=(lang,e,r,base)=>{
+const name=lang==='de'?e.de:e.en,ms=(x)=>x.toFixed(1);
+if(!base||e.id==='base')return`${name}: ${ms(r.total)} ms GPU · `+K.top(r.times);
+const d=r.total-base.total;
+let big='',bd=0;for(const k in base.times){const dd=(r.times[k]||0)-base.times[k];if(Math.abs(dd)>Math.abs(bd)){bd=dd;big=k;}}
+return`${name}: ${d>=0?'+':'−'}${ms(Math.abs(d))} ms${big?' ('+big+' '+(bd>=0?'+':'−')+ms(Math.abs(bd))+')':''}`;
+};
+K.top=(t)=>Object.entries(t||{}).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>k+' '+v.toFixed(1)).join(' · ');
+
+const wait=(ms)=>new Promise((res)=>{const t0=performance.now();const raf=(typeof requestAnimationFrame==='function')?requestAnimationFrame:(f)=>setTimeout(f,16);const f=()=>(performance.now()-t0>=ms?res():raf(f));raf(f);});
+
+K.panel=function(lines){
+if(typeof document==='undefined')return;
+let el=document.getElementById('r9kosten');
+if(!el){el=document.createElement('div');el.id='r9kosten';el.style.cssText='position:fixed;left:8px;top:8px;z-index:9999;max-width:92vw;background:rgba(10,14,22,.88);color:#cfe6ff;font:12px/1.45 monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;pointer-events:auto;cursor:pointer';el.onclick=()=>el.remove();document.body.appendChild(el);}
+el.textContent=lines.join('\n');
+};
+K.run=async function(g,arg){
+const r=g.renderer,S=g.settings,lang=(VR.I18N&&VR.I18N.lang)||'de',say=(t)=>g.ui.chatLine(t,'#bfe3ff');
+if(!r|| !r.prof|| !r.prof.ext){say(lang==='de'?'Kosten: dieser Browser verrät keine GPU-Zeiten.':'Costs: this browser hides GPU timing.');return;}
+if(K.busy)return;K.busy=true;
+const dyn=S.dynRes;S.dynRes=false;const warp=S.warp;S.warp=false;r.profDetail=true;
+say(lang==='de'?'Kosten werden gemessen … (bitte nicht bewegen, ca. '+Math.round(K.plan(arg).length*(K.SETTLE+K.MEASURE)/1000)+' s)':'Measuring costs … (keep still, about '+Math.round(K.plan(arg).length*(K.SETTLE+K.MEASURE)/1000)+' s)');
+const out=[];let base=null;const lines=['R9 /kosten · '+(VR.GL&&VR.GL.rendererName||'')+' · '+(S.preset||'')];K.panel(lines.concat('…'));
+try{
+for(const e of K.plan(arg)){
+const old={};for(const k in e.set){old[k]=S[k];S[k]=e.set[k];}
+const oldSplit=VR.Horizon&&VR.Horizon.SPLIT_MUL,oldScale=S.scale;
+if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=e.split;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
+if(e.scale)S.scale=(S.scale||1)*e.scale;
+const oldRd=S.renderDist;if(e.rd)S.renderDist=Math.max(2,(S.renderDist|0)+e.rd);
+const kOld=e.knob&&VR[e.knob[0]]?VR[e.knob[0]][e.knob[1]]:undefined;if(e.knob&&VR[e.knob[0]])VR[e.knob[0]][e.knob[1]]=e.knob[2];
+g.applySettings('*');
+await wait(K.SETTLE);
+r.prof.times={};r.prof.total=undefined;
+await wait(K.MEASURE);
+const res={total:r.prof.total||0,times:Object.assign({},r.prof.times)};
+if(e.id==='base')base=res;
+out.push({id:e.id,total:res.total,times:res.times});
+const ln=K.fmt(lang,e,res,base);say(ln);lines.push(ln);K.panel(lines.concat(out.length<K.plan(arg).length?['…']:[]));
+for(const k in old)S[k]=old[k];
+if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=oldSplit||1;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
+if(e.scale)S.scale=oldScale;
+if(e.rd)S.renderDist=oldRd;
+if(e.knob&&VR[e.knob[0]])VR[e.knob[0]][e.knob[1]]=kOld;
+g.applySettings('*');
+}
+}finally{S.dynRes=dyn;S.warp=warp;r.profDetail= !!g.debugOn;K.busy=false;}
+K.last=out;if(typeof console!=='undefined')console.log('R9 kosten',JSON.stringify(out));
+return out;
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
 
@@ -143795,7 +144244,7 @@ if(show){const r=el.getBoundingClientRect();X.stripBox={w:innerWidth-r.left+8,h:
 const firstMin={active:false,quiet:0,last:0,pos:null,yaw:0,look:0,playing:false};
 const hintOf=(id)=>{
 const touch=document.getElementById('ui')&&document.getElementById('ui').classList.contains('touchon');
-if(id==='move')return touch?{text:tx('ux.h.moveTouch',null,'🕹 links ziehen = laufen','🕹 drag on the left = walk'),picto:[]}:{text:tx('ux.h.move',null,'laufen','walk'),picto:['W','A','S','D']};
+if(id==='move')return touch?(VR.Touch&&VR.Touch.styleOf&&VR.Touch.styleOf(VR.game&&VR.game.settings)==='gesten'?{text:tx('ux.h.moveTouch2',null,'🕹 links: laufen · tippen: setzen · halten: abbauen','🕹 left: walk · tap: place · hold: break'),picto:[]}:{text:tx('ux.h.moveTouch',null,'🕹 links ziehen = laufen','🕹 drag on the left = walk'),picto:[]}):{text:tx('ux.h.move',null,'laufen','walk'),picto:['W','A','S','D']};
 if(id==='look')return touch?{text:tx('ux.h.lookTouch',null,'rechts ziehen = umschauen','drag on the right = look around'),picto:['finger']}:{text:tx('ux.h.look',null,'Maus bewegen = umschauen','move the mouse = look around'),picto:['mouse']};
 if(id==='v')return{text:tx('ux.h.v',null,'tut das Passende: reden, einsteigen, reisen','does the right thing: talk, get in, travel'),picto:[keyOf('KeyV',lang())]};
 return null;

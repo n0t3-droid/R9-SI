@@ -3036,6 +3036,9 @@ ${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void ma
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
 #endif
 #endif
+#ifdef DEPTHONLY
+  o = vec4(0.0); return;   // (horizon.js ZPRE: the far tiles' depth first, every cut decided — the colour pass then shades each pixel once)
+#endif
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
 #ifdef FORM
   // ring 1's height field (face 6) takes its normal from the geometry: a slope toward the sun is lit, one away shaded

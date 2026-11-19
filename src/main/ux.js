@@ -137,7 +137,7 @@
   const firstMin = { active: false, quiet: 0, last: 0, pos: null, yaw: 0, look: 0, playing: false };
   const hintOf = (id) => {
     const touch = document.getElementById('ui') && document.getElementById('ui').classList.contains('touchon');
-    if (id === 'move') return touch ? { text: tx('ux.h.moveTouch', null, '🕹 links ziehen = laufen', '🕹 drag on the left = walk'), picto: [] } : { text: tx('ux.h.move', null, 'laufen', 'walk'), picto: ['W', 'A', 'S', 'D'] };
+    if (id === 'move') return touch ? (VR.Touch && VR.Touch.styleOf && VR.Touch.styleOf(VR.game && VR.game.settings) === 'gesten' ? { text: tx('ux.h.moveTouch2', null, '🕹 links: laufen · tippen: setzen · halten: abbauen', '🕹 left: walk · tap: place · hold: break'), picto: [] } : { text: tx('ux.h.moveTouch', null, '🕹 links ziehen = laufen', '🕹 drag on the left = walk'), picto: [] }) : { text: tx('ux.h.move', null, 'laufen', 'walk'), picto: ['W', 'A', 'S', 'D'] };
     if (id === 'look') return touch ? { text: tx('ux.h.lookTouch', null, 'rechts ziehen = umschauen', 'drag on the right = look around'), picto: ['finger'] } : { text: tx('ux.h.look', null, 'Maus bewegen = umschauen', 'move the mouse = look around'), picto: ['mouse'] };
     if (id === 'v') return { text: tx('ux.h.v', null, 'tut das Passende: reden, einsteigen, reisen', 'does the right thing: talk, get in, travel'), picto: [keyOf('KeyV', lang())] };
     return null;
