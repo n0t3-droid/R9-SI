@@ -7584,12 +7584,15 @@ const t0=performance.now();
 const svWant=VR.SmoothVox?VR.SmoothVox.prep(m):null;
 if(typeof m.fancyLeaves==='number'&&(m.fancyLeaves&16)&&m.dim&&VR.IsleShell){const gi=getGen(m.dim);if(gi&&gi.islandAt)m.isle=VR.IsleShell.columns(gi,m.ox,m.oz);}
 const r=VR.meshSection(m);
-const o=toTris(r.opaque),c=toTris(r.cutout),t=toTris(r.trans);
-const vx=r.vx?toTris(r.vx):null,vxFar=r.vxFar?toTris(r.vxFar):null;
+
+
+const X=m.quads?(a)=>a:toTris;
+const o=X(r.opaque),c=X(r.cutout),t=X(r.trans);
+const vx=r.vx?X(r.vx):null,vxFar=r.vxFar?X(r.vxFar):null;
 const tr=[o.buffer,c.buffer,t.buffer];if(vx)tr.push(vx.buffer);if(vxFar)tr.push(vxFar.buffer);
 const pr=r.props?(VR.SmoothVox?VR.SmoothVox.variants(r.props):r.props):null;if(pr)tr.push(pr.buffer);
 if(r.softH)tr.push(r.softH.buffer);
-post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,softH:r.softH||null,ms:performance.now()-t0},tr);
+post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,q: !!m.quads,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,softH:r.softH||null,ms:performance.now()-t0},tr);
 }else if(m.type==='clock'){
 
 if(m.ids&& !CLOCKCOL&&LASTAVG)CLOCKCOL=VR.SunClock.colorTable(LASTAVG);
@@ -57683,7 +57686,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="8bfdea251de4e9ae";
+VR.TEX_SRC_HASH="93b170682fd6658a";
 
 
 
@@ -81186,7 +81189,7 @@ const VSTRIDE=16;
 
 
 class Arena{
-constructor(gl,capVerts){
+constructor(gl,capVerts,ib){
 this.gl=gl;this.cap=capVerts;
 this.buf=gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
@@ -81195,6 +81198,7 @@ this.vao=gl.createVertexArray();
 gl.bindVertexArray(this.vao);
 gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.UNSIGNED_SHORT,false,16,0);
 for(let i=1;i<=5;i++){gl.enableVertexAttribArray(i);gl.vertexAttribIPointer(i,1,gl.UNSIGNED_SHORT,16,4+i*2);}
+if(ib)gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
 gl.bindVertexArray(null);
 this.free=[[0,capVerts]];
 this.used=0;
@@ -81231,6 +81235,7 @@ this.canvas=canvas;
 const gl=this.gl=GL.init(canvas);
 if(!gl)throw new Error('WebGL2 is not available on this device/browser.');
 this.multi= !!GL.ext.multiDraw;
+this.idx=Renderer.IDX!==false;
 this.hdr= !!(GL.ext.cbf||GL.ext.cbhf);
 this.arenas=[];
 this.arenaSize=1<<21;
@@ -81728,11 +81733,26 @@ gpuPass(name){if(this.prof)this.prof.mark(name);}
 gpuTimerEnd(){if(this.prof)this.prof.end();}
 
 
+
+
+
+quadIB(capVerts){
+const gl=this.gl;
+if(this._qib&&this._qibCap>=capVerts)return this._qib;
+const ib=this._qib||(this._qib=gl.createBuffer()),cap=Math.max(capVerts,this._qibCap||0);
+gl.bindVertexArray(null);
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,Renderer.quadIndices(cap>>2),gl.STATIC_DRAW);
+this._qibCap=cap;
+for(const a of this.arenas){gl.bindVertexArray(a.vao);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);}
+gl.bindVertexArray(null);
+return ib;
+}
 allocMesh(n){
 const gl=this.gl;
 const cap=Math.ceil(n/96)*96;
 for(const a of this.arenas){const off=a.alloc(cap);if(off>=0)return{arena:a,off,cap,count:n};}
-const a=new Arena(gl,Math.max(this.arenaSize,cap));
+const a=new Arena(gl,Math.max(this.arenaSize,cap),this.idx?this.quadIB(Math.max(this.arenaSize,cap)):null);
 this.arenas.push(a);
 const off=a.alloc(cap);
 return{arena:a,off,cap,count:n};
@@ -81750,7 +81770,7 @@ if(l===3&&sec.mesh[3]&&n){sec.vxOld=true;sec.vxData=d;sec.vxDropped=false;contin
 if(sec.mesh[l]){sec.mesh[l].arena.release(sec.mesh[l].off,sec.mesh[l].cap);sec.mesh[l]=null;}
 if(l===3){sec.vxOld=false;sec.vxData=n?d:null;sec.vxDropped=false;continue;}
 if(!n)continue;
-const m=this.allocMesh(n);
+const m=this.allocMesh(n);m.q= !!d.q;
 gl.bindBuffer(gl.ARRAY_BUFFER,m.arena.buf);
 gl.bufferSubData(gl.ARRAY_BUFFER,m.off*VSTRIDE,d);
 sec.mesh[l]=m;
@@ -81782,7 +81802,7 @@ const l=st.l,d=st.d[l],n=d?d.length>>3:0;
 if(st.o>=n){st.l++;st.o=0;continue;}
 const k=Math.min(n-st.o,Math.floor((maxBytes-done)/VSTRIDE));
 if(k<=0)break;
-if(!st.m[l])st.m[l]=this.allocMesh(n);
+if(!st.m[l]){st.m[l]=this.allocMesh(n);st.m[l].q= !!d.q;}
 const m=st.m[l];
 gl.bindBuffer(gl.ARRAY_BUFFER,m.arena.buf);
 gl.bufferSubData(gl.ARRAY_BUFFER,(m.off+st.o)*VSTRIDE,d,st.o*8,k*8);
@@ -81908,7 +81928,7 @@ alive:()=>s.vxData===d&&(!s.mesh[3]||s.vxOld),
 step:(max)=>{
 const k=Math.min(n-it.o,Math.floor(max/VSTRIDE));
 if(k<=0)return 0;
-if(!it.m)it.m=R.allocMesh(n);
+if(!it.m){it.m=R.allocMesh(n);it.m.q= !!d.q;}
 const gl=R.gl;
 gl.bindBuffer(gl.ARRAY_BUFFER,it.m.arena.buf);
 gl.bufferSubData(gl.ARRAY_BUFFER,(it.m.off+it.o)*VSTRIDE,d,it.o*8,k*8);
@@ -81958,13 +81978,14 @@ if(best&&uploads<6)this.uploadVx(best);
 }
 uploadVx(s){
 const gl=this.gl,d=s.vxData,n=d.length>>3;
-const m=this.allocMesh(n);
+const m=this.allocMesh(n);m.q= !!d.q;
 gl.bindBuffer(gl.ARRAY_BUFFER,m.arena.buf);
 gl.bufferSubData(gl.ARRAY_BUFFER,m.off*VSTRIDE,d);
 if(s.mesh[3])s.mesh[3].arena.release(s.mesh[3].off,s.mesh[3].cap);
 s.mesh[3]=m;s.vxOld=false;
 this.nearShadow(s);
 }
+arenaMax(){let c=this.arenaSize;for(const a of this.arenas)c=Math.max(c,a.cap);return c;}
 gpuMemoryMB(){let u=0;for(const a of this.arenas)u+=a.used;return(u*VSTRIDE/1048576);}
 
 
@@ -82230,17 +82251,22 @@ return{near,far};
 drawSections(list,layer,prog,originsFrom,planes,reverse){
 const gl=this.gl,cam=this.cam;
 const n=list.length;
-let batchArena=null,cnt=0;
+let batchArena=null,batchQ=false,cnt=0;
 const firsts=this.firsts,counts=this.counts,org=this.origins;
 const flush=()=>{
 if(!cnt)return;
 gl.bindVertexArray(batchArena.vao);
+
 if(this.multi){
 gl.bindBuffer(gl.UNIFORM_BUFFER,this.ubo);
 gl.bufferSubData(gl.UNIFORM_BUFFER,0,org,0,cnt*4);
-GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES,firsts,0,counts,0,cnt);
+if(batchQ)GL.ext.multiDraw.multiDrawElementsWEBGL(gl.TRIANGLES,counts,0,gl.UNSIGNED_INT,firsts,0,cnt);
+else GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES,firsts,0,counts,0,cnt);
 }else{
-for(let i=0;i<cnt;i++){gl.uniform3f(prog.u.u_origin,org[i*4],org[i*4+1],org[i*4+2]);if(prog.u.u_fade)gl.uniform1f(prog.u.u_fade,org[i*4+3]);gl.drawArrays(gl.TRIANGLES,firsts[i],counts[i]);}
+for(let i=0;i<cnt;i++){
+gl.uniform3f(prog.u.u_origin,org[i*4],org[i*4+1],org[i*4+2]);if(prog.u.u_fade)gl.uniform1f(prog.u.u_fade,org[i*4+3]);
+if(batchQ)gl.drawElements(gl.TRIANGLES,counts[i],gl.UNSIGNED_INT,firsts[i]);else gl.drawArrays(gl.TRIANGLES,firsts[i],counts[i]);
+}
 }
 this.stats.draws+=this.multi?1:cnt;
 cnt=0;
@@ -82256,11 +82282,12 @@ if(fade<=0&& !this.shtAll)continue;
 if(this.mirrorPass&&fade<1){if(fade<0.5)continue;fade=1;}
 const ox=s.ox-originsFrom[0],oy=s.oy-originsFrom[1],oz=s.oz-originsFrom[2];
 if(planes&& !mat4.boxInFrustum(planes,ox,oy,oz,ox+16,oy+16,oz+16))continue;
-if(m.arena!==batchArena||cnt===512){flush();batchArena=m.arena;}
-firsts[cnt]=m.off;counts[cnt]=m.count;
+const q= !!m.q;
+if(m.arena!==batchArena||q!==batchQ||cnt===512){flush();batchArena=m.arena;batchQ=q;if(q&& !this._qib&&this.quadIB)this.quadIB(this.arenaMax());}
+if(q){firsts[cnt]=m.off*6;counts[cnt]=m.count*1.5;}else{firsts[cnt]=m.off;counts[cnt]=m.count;}
 org[cnt*4]=ox;org[cnt*4+1]=oy;org[cnt*4+2]=oz;org[cnt*4+3]=s.grow!==undefined&&s.grow<1?2+s.grow:fade;
 cnt++;
-this.stats.tris+=m.count/3;
+this.stats.tris+=q?m.count/2:m.count/3;
 }
 flush();
 void cam;
@@ -83184,7 +83211,7 @@ for(const s of ship.gpu){
 const m=s.mesh[layer];if(!m)continue;
 gl.bindVertexArray(m.arena.vao);
 gl.uniform3f(p.u.u_origin,s.ox,s.oy,s.oz);
-gl.drawArrays(gl.TRIANGLES,m.off,m.count);
+if(m.q)gl.drawElements(gl.TRIANGLES,m.count*1.5,gl.UNSIGNED_INT,m.off*6);else gl.drawArrays(gl.TRIANGLES,m.off,m.count);
 this.stats.draws++;
 }
 gl.enable(gl.CULL_FACE);
@@ -83991,6 +84018,11 @@ this.fs(q);
 }
 }
 }
+Renderer.quadIndices=function(nq){
+const a=new Uint32Array(nq*6);
+for(let k=0,i=0,v=0;k<nq;k++,i+=6,v+=4){a[i]=v;a[i+1]=v+1;a[i+2]=v+2;a[i+3]=v;a[i+4]=v+2;a[i+5]=v+3;}
+return a;
+};
 VR.Renderer=Renderer;
 })(VR);
 
@@ -86891,6 +86923,7 @@ const tok=s.uTok=(s.uTok||0)+1;
 
 
 
+if(m.q)for(const a of[m.opaque,m.cutout,m.trans,m.vx,m.vxFar])if(a)a.q=true;
 const R=this.renderer,alive=()=> !this.dead&&this.cols.get(c.key)===c&&s.uTok===tok;
 const done=()=>{
 if(!detail&&m.vxFar&&m.vxFar.length)s.vxDropped=true;
@@ -86950,7 +86983,7 @@ if(nR&&y<nR.H){blocks[o+PAD+16+k]=nR.blocks[iR];light[o+PAD+16+k]=nR.light[iR];}
 }
 }
 }
-return{type:'mesh',key:c.key,sy,ver:c.sec[sy].ver,blocks,light,grass,foliage,water,ox:c.cx*16,oz:c.cz*16,fancyLeaves:this.fancyLeaves,smooth:this.smooth,smoothProps:this.smoothProps===true?1:(this.smoothProps|0),vxLod:true,motion:this.motion?1:0,dim:this.dim};
+return{type:'mesh',key:c.key,sy,ver:c.sec[sy].ver,blocks,light,grass,foliage,water,ox:c.cx*16,oz:c.cz*16,fancyLeaves:this.fancyLeaves,smooth:this.smooth,smoothProps:this.smoothProps===true?1:(this.smoothProps|0),vxLod:true,motion:this.motion?1:0,dim:this.dim,quads: !!(this.renderer&&this.renderer.idx)};
 }
 markDirty(x,y,z){
 const sy=y>>4;
@@ -130166,6 +130199,7 @@ K.LIST=[
 {id:'shd2',de:'Schattenkarte 3 → 2',en:'Shadow map 3 → 2',set:{shadows:2},grp:'ultra'},
 {id:'leafU',de:'Feines Laub aus',en:'Fancy leaves off',set:{fancyLeaves:false},grp:'ultra'},
 {id:'resU',de:'Auflösung ×0.8',en:'Resolution ×0.8',set:{},scale:0.8,grp:'ultra'},
+{id:'idx0',de:'Viereck-Index aus (Dreieckslisten wie früher)',en:'Indexed quads off (triangle lists as before)',set:{},idx:false,grp:'ultra'},
 ];
 K.END={id:'base2',de:'So wie jetzt (nochmal: die Streuung)',en:'As it is (again: the spread)',set:{}};
 K.plan=(arg)=>(arg==='far'||arg==='geo'||arg==='ultra'?K.LIST.filter(e=>e.id==='base'||e.grp===arg):K.LIST.filter(e=>e.grp!=='geo'&&e.grp!=='ultra')).concat([K.END]);
@@ -130235,8 +130269,10 @@ if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=e.split;if(g.horizon)g.horizon.setL
 if(e.scale)S.scale=(S.scale||1)*e.scale;
 const oldRd=S.renderDist;if(e.rd)S.renderDist=Math.max(2,(S.renderDist|0)+e.rd);
 const kOld=e.knob&&VR[e.knob[0]]?VR[e.knob[0]][e.knob[1]]:undefined;if(e.knob&&VR[e.knob[0]])VR[e.knob[0]][e.knob[1]]=e.knob[2];
+const idxOld=r.idx;if(e.idx!==undefined){r.idx=e.idx;if(g.remeshAll)g.remeshAll();}
 g.applySettings('*');
 const b=await measure();
+if(e.idx!==undefined){r.idx=idxOld;if(g.remeshAll)g.remeshAll();}
 for(const k in old)S[k]=old[k];
 if(e.split&&VR.Horizon){VR.Horizon.SPLIT_MUL=oldSplit||1;if(g.horizon)g.horizon.setLevel(g.horizon.level);}
 if(e.scale)S.scale=oldScale;
