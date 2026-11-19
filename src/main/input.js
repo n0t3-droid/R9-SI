@@ -66,6 +66,7 @@
       c.addEventListener('contextmenu', (e) => e.preventDefault());
       c.addEventListener('mousedown', (e) => {
         if (!this.enabled) return;
+        if (this.lastTouchT && performance.now() - this.lastTouchT < 900) return;   // (the mouse a browser fakes after a touch: the touch handled it)
         // a click on the game always tries to (re)capture the mouse; drag-look is only a temporary fallback
         if (!this.locked && this.captured && !this.lockFailed) this.requestLock();
         this.mouse.down[e.button] = true; this.mouse.clicked[e.button] = true;
@@ -92,11 +93,25 @@
         if (this.onLockChange) this.onLockChange(this.locked);
       });
       document.addEventListener('pointerlockerror', () => { this.failLock(); });
-      // touch: one finger look, two finger tap = place
+      // touch (Handy-Steuerung 2, touch.js): a drag turns; a short tap places or uses (the right button); a finger held
+      // still for TOUCH.HOLD_MS breaks (the left button held) for as long as it stays — moving it then aims while it mines
       let touch = null;
-      c.addEventListener('touchstart', (e) => { if (!this.captured) return; const t = e.changedTouches[0]; touch = { id: t.identifier, x: t.clientX, y: t.clientY, t: performance.now(), moved: 0 }; e.preventDefault(); }, { passive: false });
-      c.addEventListener('touchmove', (e) => { if (!touch) return; for (const t of e.changedTouches) if (t.identifier === touch.id) { const dx = t.clientX - touch.x, dy = t.clientY - touch.y; this.mouse.dx += dx * 1.5; this.mouse.dy += dy * 1.5; touch.moved += Math.abs(dx) + Math.abs(dy); touch.x = t.clientX; touch.y = t.clientY; } e.preventDefault(); }, { passive: false });
-      c.addEventListener('touchend', (e) => { if (touch && touch.moved < 10) { this.mouse.clicked[performance.now() - touch.t > 350 ? 0 : 2] = true; } touch = null; });
+      const TO = () => VR.Touch || { HOLD_MS: 260, TAP_PX: 12, ring() {}, buzz() {} };
+      const aimAt = (x, y) => { const r = c.getBoundingClientRect(); this.touchAim = { nx: ((x - r.left) / r.width) * 2 - 1, ny: 1 - ((y - r.top) / r.height) * 2 }; };   // (the ray goes through the finger, not the crosshair)
+      const holdStart = () => { if (!touch || touch.hold || touch.moved >= TO().TAP_PX) return; touch.hold = true; this.mouse.down[0] = true; this.mouse.clicked[0] = true; TO().ring(touch.cx, touch.cy, true); TO().buzz(12); };
+      c.addEventListener('touchstart', (e) => { this.lastTouchT = performance.now(); if (!this.captured) { const g = VR.game; if (g && g.state === 'play' && g.ui && !g.ui.blocking) this.captured = true; else return; }   // (a finger on the picture in a game is always the game's: no lock to ask for)
+       const t = e.changedTouches[0]; if (touch) return; touch = { id: t.identifier, x: t.clientX, y: t.clientY, cx: t.clientX, cy: t.clientY, t: performance.now(), moved: 0, hold: false }; this.touchActive = true; this.holdCheck = holdStart; this.tch = touch; aimAt(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
+      c.addEventListener('touchmove', (e) => { if (!touch) return; for (const t of e.changedTouches) if (t.identifier === touch.id) { const dx = t.clientX - touch.x, dy = t.clientY - touch.y; this.mouse.dx += dx * 1.5; this.mouse.dy += dy * 1.5; touch.moved += Math.abs(dx) + Math.abs(dy); touch.x = t.clientX; touch.y = t.clientY; if (touch.hold) { TO().ring(t.clientX, t.clientY, true); aimAt(t.clientX, t.clientY); } } e.preventDefault(); }, { passive: false });
+      const tEnd = (e) => {
+        if (!touch) return;
+        let mine = !e.touches || e.touches.length === 0; for (const t of e.changedTouches) if (t.identifier === touch.id) mine = true;   // (no finger left: ours ended too)
+        if (!mine) return;
+        if (touch.hold) { this.mouse.down[0] = false; this.mouse.releasedBtn[0] = true; TO().ring(0, 0, false); }
+        else if (touch.moved < TO().TAP_PX) { this.mouse.clicked[2] = true; TO().buzz(6); }
+        else this.touchAim = null;   // (a drag: the look moved, nothing to aim)
+        touch = null; this.tch = null; this.touchActive = false;
+      };
+      c.addEventListener('touchend', tEnd); c.addEventListener('touchcancel', tEnd);
     }
     // ---- the names the game asks for, through the player's bindings (VR.Binds.current)
     // a name owned by an action is answered by that action's keys, and by the pad or the touch layer naming the action;
@@ -151,6 +166,8 @@
     }
     // ---- once per frame, before the game reads the input: smoothing, the gamepad, the stick look, the touch stick
     beginFrame(dt) {
+      // (Handy-Steuerung 2: a finger held still becomes a hold here, at a frame's start — after any touchend that came in)
+      if (this.tch && !this.tch.hold && this.holdCheck && performance.now() - this.tch.t >= ((VR.Touch && VR.Touch.HOLD_MS) || 260)) this.holdCheck();
       const k = clamp(dt || 0.016, 0, 0.1);
       // mouse smoothing (F5, off by default): an exponential glide on the look delta; the total turn is kept
       if (this.smooth) {
@@ -200,6 +217,7 @@
       if (VR.A11y && VR.A11y.inputFrame) VR.A11y.inputFrame(this, k);   // e-access: the device in use, the one-hand modes
     }
     endFrame() {
+      if (this.touchAim && !this.touchActive && !this.mouse.down[0]) this.touchAim = null;   // (the tap's aim lives until its click was played)
       if (this.tRelease.size) { for (const id of this.tRelease) this.tDown.delete(id); this.tRelease.clear(); }
       this.pressed.clear(); this.released.clear(); this.doubleTap.clear();
       this.padPressed.clear(); this.tPressed.clear(); this.vPhys.clear(); this.shipPressed.clear();
