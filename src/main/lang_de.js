@@ -1306,6 +1306,8 @@
     'g.wp.set': '◆ {name} gesetzt bei {x} {y} {z}',
     // ---- Chat-Zeilen (game.js)
     'g.chat.you': 'Du',
+    'g.day.inv': 'Tageslichtsensor umgedreht: an, wenn es dunkel ist.',
+    'g.day.norm': 'Tageslichtsensor: an, wenn Licht auf ihn fällt.',
     'g.chat.error': 'Fehler: {msg}',
     'g.chat.noWorld': 'Diese Welt gibt es hier nicht (mehr).',
     'g.chat.landFirst': 'Erst landen oder absteigen.',

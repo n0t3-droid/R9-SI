@@ -1306,6 +1306,8 @@
     'g.wp.set': '◆ {name} set at {x} {y} {z}',
     // ---- chat lines (game.js)
     'g.chat.you': 'You',
+    'g.day.inv': 'Daylight detector turned round: on when it is dark.',
+    'g.day.norm': 'Daylight detector: on when light falls on it.',
     'g.chat.error': 'Error: {msg}',
     'g.chat.noWorld': 'That world is not here (any more).',
     'g.chat.landFirst': 'Land or get off first.',
