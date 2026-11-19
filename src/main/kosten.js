@@ -8,7 +8,7 @@
 (function (VR) {
   'use strict';
   const K = VR.Kosten = {};
-  K.SETTLE = 2500; K.MEASURE = 2500;
+  K.SETTLE = 4000; K.MEASURE = 3000;   // (the settings' apply redraws the shadow map over some frames: the settle waits it out)
   // the experiments: name (de, en), the settings it changes, an optional extra knob
   K.LIST = [
     { id: 'base', de: 'So wie jetzt', en: 'As it is', set: {} },
@@ -28,7 +28,8 @@
     { id: 'rd2', de: 'Sichtweite −2 Chunks', en: 'View distance −2 chunks', set: {}, rd: -2, grp: 'geo' },
     { id: 'res8', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8 },
   ];
-  K.plan = (arg) => (arg === 'far' || arg === 'geo' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo'));
+  K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
+  K.plan = (arg) => (arg === 'far' || arg === 'geo' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo')).concat([K.END]);
   K.fmt = (lang, e, r, base) => {
     const name = lang === 'de' ? e.de : e.en, ms = (x) => x.toFixed(1);
     if (!base || e.id === 'base') return `${name}: ${ms(r.total)} ms GPU · ` + K.top(r.times);
@@ -61,7 +62,7 @@
         if (e.scale) S.scale = (S.scale || 1) * e.scale;
         const oldRd = S.renderDist; if (e.rd) S.renderDist = Math.max(2, (S.renderDist | 0) + e.rd);
         const kOld = e.knob && VR[e.knob[0]] ? VR[e.knob[0]][e.knob[1]] : undefined; if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = e.knob[2];
-        if (Object.keys(e.set).length || e.scale || e.rd) g.applySettings('*');
+        g.applySettings('*');   // (the base too: every row pays the same apply)
         await wait(K.SETTLE);
         r.prof.times = {}; r.prof.total = undefined;
         await wait(K.MEASURE);
@@ -74,7 +75,7 @@
         if (e.scale) S.scale = oldScale;
         if (e.rd) S.renderDist = oldRd;
         if (e.knob && VR[e.knob[0]]) VR[e.knob[0]][e.knob[1]] = kOld;
-        if (Object.keys(e.set).length || e.scale || e.rd) g.applySettings('*');
+        g.applySettings('*');
       }
     } finally { S.dynRes = dyn; S.warp = warp; r.profDetail = !!g.debugOn; K.busy = false; }
     K.last = out; if (typeof console !== 'undefined') console.log('R9 kosten', JSON.stringify(out));
