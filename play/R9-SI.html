@@ -75261,6 +75261,9 @@ uniform float u_gust;
 ${VR.Wind?VR.Wind.glsl():''}
 #endif
 layout(location=0) out vec4 o_col;
+#ifndef LITE
+uniform float u_probeFlat;
+#endif
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 const vec3 TANG[6] = vec3[6](vec3(0,0,-1), vec3(0,0,1), vec3(1,0,0), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0));
 const vec3 BITN[6] = vec3[6](vec3(0,-1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1), vec3(0,-1,0), vec3(0,-1,0));
@@ -75468,6 +75471,9 @@ return c;
 }
 #endif
 ${(VR.QArt&&VR.QArt.glslTerrain)?VR.QArt.glslTerrain():''}${(VR.QArt2&&VR.QArt2.glslTerrain)?VR.QArt2.glslTerrain():''}${(VR.Gemalt2&&VR.Gemalt2.glslTerrain)?VR.Gemalt2.glslTerrain():''}void main() {
+#ifndef LITE
+if (u_probeFlat > 0.5) { o_col = vec4(0.35, 0.45, 0.3, 1.0); return; }
+#endif
 #ifdef MODEL
 if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
@@ -83464,6 +83470,7 @@ gl.uniform3i(p.u.u_camInt,this.camInt[0],this.camInt[1],this.camInt[2]);
 if(p.u.u_wind)gl.uniform1f(p.u.u_wind,E.wind);if(p.u.u_windDir&&E.windDir)gl.uniform2f(p.u.u_windDir,E.windDir[0],E.windDir[1]);if(p.u.u_gust)gl.uniform1f(p.u.u_gust,E.gust||0);
 if(p.u.u_emissiveBoost)gl.uniform1f(p.u.u_emissiveBoost,E.emissiveBoost);
 if(p.u.u_normalStrength)gl.uniform1f(p.u.u_normalStrength,this.q.normals===0?0:1);
+if(p.u.u_probeFlat)gl.uniform1f(p.u.u_probeFlat,Renderer.PROBE==='flatFS'?1:0);
 if(p.u.u_mipScale)gl.uniform1f(p.u.u_mipScale,VR.Stream.mipK(!!this.jit,VR.Stream.softOk(this.drawGap),this.w/this.W,!!this.q.lite));
 if(p.u.u_shadowMat)gl.uniformMatrix4fv(p.u.u_shadowMat,false,this.shadowMat);
 if(p.u.u_shadowTexel)gl.uniform1f(p.u.u_shadowTexel,1/(this.shadowSize||1024));
@@ -130205,6 +130212,8 @@ K.LIST=[
 {id:'resU',de:'Auflösung ×0.8',en:'Resolution ×0.8',set:{},scale:0.8,grp:'ultra'},
 {id:'halfSec',de:'Probe: jeder zweite Abschnitt (halbe Aufrufe + Dreiecke)',en:'Probe: every second section (half the draws + triangles)',set:{},knob:['Renderer','PROBE','halfSec'],grp:'probe'},
 {id:'halfTri',de:'Probe: alle Abschnitte, halbe Dreiecke',en:'Probe: all sections, half the triangles',set:{},knob:['Renderer','PROBE','halfTri'],grp:'probe'},
+{id:'flatFS',de:'Probe: Gelände nur einfarbig (ohne Pixelarbeit)',en:'Probe: terrain one flat colour (no pixel work)',set:{},knob:['Renderer','PROBE','flatFS'],grp:'probe'},
+{id:'res5',de:'Probe: Auflösung ×0.5',en:'Probe: resolution ×0.5',set:{},scale:0.5,grp:'probe'},
 {id:'idx0',de:'Viereck-Index aus (Dreieckslisten wie früher)',en:'Indexed quads off (triangle lists as before)',set:{},idx:false,grp:'ultra'},
 ];
 K.END={id:'base2',de:'So wie jetzt (nochmal: die Streuung)',en:'As it is (again: the spread)',set:{}};
