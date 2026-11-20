@@ -39,6 +39,8 @@
     { id: 'resU', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8, grp: 'ultra' },
     { id: 'halfSec', de: 'Probe: jeder zweite Abschnitt (halbe Aufrufe + Dreiecke)', en: 'Probe: every second section (half the draws + triangles)', set: {}, knob: ['Renderer', 'PROBE', 'halfSec'], grp: 'probe' },
     { id: 'halfTri', de: 'Probe: alle Abschnitte, halbe Dreiecke', en: 'Probe: all sections, half the triangles', set: {}, knob: ['Renderer', 'PROBE', 'halfTri'], grp: 'probe' },
+    { id: 'flatFS', de: 'Probe: Gelände nur einfarbig (ohne Pixelarbeit)', en: 'Probe: terrain one flat colour (no pixel work)', set: {}, knob: ['Renderer', 'PROBE', 'flatFS'], grp: 'probe' },
+    { id: 'res5', de: 'Probe: Auflösung ×0.5', en: 'Probe: resolution ×0.5', set: {}, scale: 0.5, grp: 'probe' },
     { id: 'idx0', de: 'Viereck-Index aus (Dreieckslisten wie früher)', en: 'Indexed quads off (triangle lists as before)', set: {}, idx: false, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };

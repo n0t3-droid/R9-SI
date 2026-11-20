@@ -1004,6 +1004,7 @@ uniform float u_gust;
 ${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
 layout(location=0) out vec4 o_col;
+uniform float u_probeFlat;   // /kosten probe flatFS: a flat colour, nothing else (is the terrain bound by its pixels' work?)
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 const vec3 TANG[6] = vec3[6](vec3(0,0,-1), vec3(0,0,1), vec3(1,0,0), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0));
 const vec3 BITN[6] = vec3[6](vec3(0,-1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1), vec3(0,-1,0), vec3(0,-1,0));
@@ -1211,6 +1212,7 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
 }
 #endif
 ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && VR.QArt2.glslTerrain) ? VR.QArt2.glslTerrain() : ''}${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void main() {
+  if (u_probeFlat > 0.5) { o_col = vec4(0.35, 0.45, 0.3, 1.0); return; }
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
