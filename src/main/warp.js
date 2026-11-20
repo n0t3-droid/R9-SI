@@ -7,7 +7,8 @@
 //   · the scene is drawn camera-relative (renderer.setupCamera: the view is a pure turn), so a turn maps the new view's
 //     pixels into the old picture exactly: M = VP_old · VP_new⁻¹ (the direction of each pixel, depth does not matter)
 //   · a step does not warp (moved > 0.35 blocks since the picture: a whole frame), nor another field of view, a menu,
-//     the photo mode or a recording; the pixels the turn brings in from outside the old picture take its edge
+//     the photo mode or a recording; a turn that reaches past W.EDGE_MAX outside the old picture; the thin strip a small
+//     turn brings in is filled soft from the band inside the edge (v0.55.82; the clamped edge smeared as streaks)
 //   · the plan (W.decide): a whole frame under 22 ms → every frame whole (nothing changes on a fast PC); 22–45 ms →
 //     whole | warp; over 45 ms → whole | warp | warp. Smart Quality measures only the whole frames.
 // Switch ⚙ Bild · Qualität „Bildwarp" (on). The picture is copied once a whole frame only while warps are planned.
@@ -32,8 +33,22 @@
   // new clip → old clip
   W.mat = function (vpOld, vpNew, out) { const inv = M4.create(); M4.invert(inv, vpNew); return M4.mul(out || M4.create(), vpOld, inv); };
   W.state = () => ({ warps: 0 });
+  // v0.55.82 · the edge (owner's video, Ultra at 10 fps): a fast turn brings in pixels the old picture never had — the
+  // clamped edge smeared as long streaks across a fifth of the screen. edgeOut: how far the new view's corners land outside
+  // the old picture (uv units, the worst corner); past EDGE_MAX a whole frame instead, below it the strip is filled soft
+  W.EDGE_MAX = 0.06;
+  W.edgeOut = function (M) {
+    let worst = 0;
+    for (const x of [-1, 1]) for (const y of [-1, 1]) {
+      const X = M[0] * x + M[4] * y + M[8] + M[12], Y = M[1] * x + M[5] * y + M[9] + M[13], Wc = M[3] * x + M[7] * y + M[11] + M[15];
+      if (!(Wc > 0)) return 9;
+      const u = X / Wc * 0.5 + 0.5, v = Y / Wc * 0.5 + 0.5;
+      worst = Math.max(worst, -u, u - 1, -v, v - 1);
+    }
+    return worst;
+  };
   W.decide = function (st, o) {
-    if (!o.on || o.blocked || !o.have || !o.fovSame || !(o.moved <= W.MOVE)) return 'f';
+    if (!o.on || o.blocked || !o.have || !o.fovSame || !(o.moved <= W.MOVE) || (o.edge || 0) > W.EDGE_MAX) return 'f';
     const L = W.limits(o.vsync || 0), n = o.fullMs > L[1] ? 2 : o.fullMs > L[0] ? 1 : 0;
     return st.warps < n ? 'w' : 'f';
   };
@@ -84,7 +99,20 @@ void main() {
       uv -= (c.xy / c.w - (v_uv * 2.0 - 1.0)) * 0.5;
     }
   }
-  o = texture(u_src, clamp(uv, vec2(0.0), vec2(1.0)));
+  vec2 e = clamp(uv, vec2(0.0), vec2(1.0));
+  vec2 out2 = abs(uv - e);
+  if (out2.x + out2.y > 0.0) {
+    // EDGE_BLUR: outside the old picture — not the stretched edge (streaks) but the band just inside it, blurred along the
+    // edge and wider the farther out: a soft continuation that a whole frame replaces a moment later
+    float d = max(out2.x, out2.y);
+    vec2 t = out2.x > out2.y ? vec2(0.0, 1.0) : vec2(1.0, 0.0);
+    vec2 in2 = e - sign(uv - e) * (0.004 + d * 0.5);
+    vec4 acc = vec4(0.0);
+    for (int k = -4; k <= 4; k++) acc += texture(u_src, clamp(in2 + t * float(k) * (0.006 + d * 0.6), vec2(0.0), vec2(1.0)));
+    o = acc / 9.0;
+    return;
+  }
+  o = texture(u_src, uv);
 }`;
   RP.warpCapture = function () {
     const gl = this.gl, w = this.W, h = this.H;
@@ -140,6 +168,7 @@ void main() {
       have: !!(this.warpOk && last && this.warpW === this.W && this.warpH === this.H && this.gl.canvas.width === this.W && this.gl.canvas.height === this.H),
       fovSame: !!(last && Math.abs(last.fov - c.fov) < 1e-4 && (last.roll || 0) === (c.roll || 0)),
       moved: last ? Math.hypot(c.x - last.x, c.y - last.y, c.z - last.z) : 9,
+      edge: last && this.warpVP ? W.edgeOut(W.mat(this.warpVP, (this.warpNew = W.vp(c, this.W / this.H, this.warpNew)), this.warpEdgeM || (this.warpEdgeM = M4.create()))) : 0,
     });
     W.done(st, k);
     this.lastWasWarp = k === 'w';

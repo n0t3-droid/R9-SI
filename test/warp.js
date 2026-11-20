@@ -53,6 +53,17 @@ const map = (M, x, y) => { const v = [M[0] * x + M[4] * y + M[8] + M[12], M[1] *
   check(Math.abs(ve - 6.95) < 1, 'c2 the screen\'s frame from the intervals (' + ve.toFixed(2) + ' ms at 144 Hz; slow frames barely move it)');
 }
 check(W.sqTarget({ warp: true }) === 38 && W.sqTarget({ warp: false }) === 55, 'c3 Smart Quality: whole frames at 38 with the warps (the picture keeps its quality), 55 without');
+// f  the edge (owner's video, Ultra at 10 fps: a fast turn smeared the old picture's edge across a fifth of the screen):
+//    W.edgeOut — how far the turned view reaches outside the old picture (uv units); past W.EDGE_MAX no warp, a whole frame
+{
+  const fov = 1.2, asp = 16 / 9;
+  const Ms = W.mat(W.vp(cam(0, 0, fov), asp), W.vp(cam(0.01, 0, fov), asp)), Mb = W.mat(W.vp(cam(0, 0, fov), asp), W.vp(cam(0.25, 0, fov), asp));
+  const es = W.edgeOut ? W.edgeOut(Ms) : -1, eb = W.edgeOut ? W.edgeOut(Mb) : -1;
+  check(es >= 0 && es < 0.02 && eb > 0.15, 'f  edgeOut: a small turn ' + (+es).toFixed(3) + ', a big one ' + (+eb).toFixed(3));
+  const base = { on: true, blocked: false, have: true, fovSame: true, moved: 0, vsync: 1000 / 60 };
+  check(W.decide(W.state(), Object.assign({ fullMs: 40, edge: es }, base)) === 'w' && W.decide(W.state(), Object.assign({ fullMs: 40, edge: eb }, base)) === 'f', 'f  a big turn draws whole instead of smearing the edge');
+  check(/EDGE_BLUR|edgeBlur/.test(require('fs').readFileSync(__dirname + '/../src/main/warp.js', 'utf8')), 'f  a small overshoot is filled soft (blurred along the edge), not a stretched streak');
+}
 const miss = ['g.set.warp', 'g.set.warp.tip'].filter(k => !(V.I18N.dict.de[k] && V.I18N.dict.en[k]));
 check(!miss.length, 'e  texts in both tables ' + miss.join(','));
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
