@@ -1104,8 +1104,12 @@
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         const q = !!m.q;
+        // /kosten probe (Renderer.PROBE): 'halfSec' draws every second section (half the draws AND triangles), 'halfTri'
+        // every section with half its triangles (all the draws, half the triangles) — what the terrain's time follows
+        const PR = Renderer.PROBE; if (PR === 'halfSec' && (k & 1)) continue;
         if (m.arena !== batchArena || q !== batchQ || cnt === 512) { flush(); batchArena = m.arena; batchQ = q; if (q && !this._qib && this.quadIB) this.quadIB(this.arenaMax()); }
         if (q) { firsts[cnt] = m.off * 6; counts[cnt] = m.count * 1.5; } else { firsts[cnt] = m.off; counts[cnt] = m.count; }
+        if (PR === 'halfTri') counts[cnt] = Math.max(q ? 6 : 3, Math.floor(counts[cnt] / (q ? 12 : 6)) * (q ? 6 : 3));
         org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = s.grow !== undefined && s.grow < 1 ? 2 + s.grow : fade;   // (f-stipple: Stream.originW — a near column growing)
         cnt++;
         this.stats.tris += q ? m.count / 2 : m.count / 3;

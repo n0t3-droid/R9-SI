@@ -37,10 +37,12 @@
     { id: 'shd2', de: 'Schattenkarte 3 → 2', en: 'Shadow map 3 → 2', set: { shadows: 2 }, grp: 'ultra' },
     { id: 'leafU', de: 'Feines Laub aus', en: 'Fancy leaves off', set: { fancyLeaves: false }, grp: 'ultra' },
     { id: 'resU', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8, grp: 'ultra' },
+    { id: 'halfSec', de: 'Probe: jeder zweite Abschnitt (halbe Aufrufe + Dreiecke)', en: 'Probe: every second section (half the draws + triangles)', set: {}, knob: ['Renderer', 'PROBE', 'halfSec'], grp: 'probe' },
+    { id: 'halfTri', de: 'Probe: alle Abschnitte, halbe Dreiecke', en: 'Probe: all sections, half the triangles', set: {}, knob: ['Renderer', 'PROBE', 'halfTri'], grp: 'probe' },
     { id: 'idx0', de: 'Viereck-Index aus (Dreieckslisten wie früher)', en: 'Indexed quads off (triangle lists as before)', set: {}, idx: false, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
-  K.plan = (arg) => K.LIST.some(e => e.id === arg && e.id !== 'base') ? [K.LIST[0], K.LIST.find(e => e.id === arg), K.END] : (arg === 'far' || arg === 'geo' || arg === 'ultra' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra')).concat([K.END]);
+  K.plan = (arg) => K.LIST.some(e => e.id === arg && e.id !== 'base') ? [K.LIST[0], K.LIST.find(e => e.id === arg), K.END] : (arg === 'far' || arg === 'geo' || arg === 'ultra' || arg === 'probe' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra' && e.grp !== 'probe')).concat([K.END]);
   K.fmt = (lang, e, r, base) => {
     const name = lang === 'de' ? e.de : e.en, ms = (x) => x.toFixed(1);
     if (!base || e.id === 'base') return `${name}: ${ms(r.total)} ms GPU · ` + K.top(r.times);
