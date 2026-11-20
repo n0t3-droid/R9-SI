@@ -2285,6 +2285,7 @@
           if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
           if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
           if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
+          if (p.u.u_probeFlat) gl.uniform1f(p.u.u_probeFlat, Renderer.PROBE === 'flatFS' ? 1 : 0);
           if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, VR.Stream.mipK(!!this.jit, VR.Stream.softOk(this.drawGap), this.w / this.W, !!this.q.lite));   // (f-stipple2)   // lite: natural mips (cheaper texture reads on weak GPUs)
           if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
