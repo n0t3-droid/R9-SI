@@ -214,6 +214,7 @@
       this.qA = new Int32Array(1 << 16); this.qB = new Int32Array(1 << 16);
       this.changed = new Set();
       this.fancyLeaves = true; this.smooth = true;
+      this.farMesh = true;   // Ferne schlicht (game.js: settings.farPlain)
       this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
       this.motion = 0;        // t-motion: the mesher writes the hung pieces' sway levels (game.js: the 'motion' setting)
       this.meshBudget = 6;
@@ -319,6 +320,7 @@
       }
       const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       this.center = [pcx, pcz];
+      this.farCheck();
       const rd = this.renderDist, loadR = rd + 1;
       // smoothed movement (blocks per second) → look-ahead
       const lp = this.lastPos;
@@ -945,6 +947,28 @@
     // the padded section for the mesher: 20³ blocks and light (16 + 2 of the neighbours on every side), 20² tints.
     // A row of 16 blocks along x is one contiguous run in a column (y-major, then z, then x), so the middle of every
     // padded row is one straight copy; only the two pad cells at each end come from the side neighbours one by one.
+    // Ferne schlicht: the column's mesh detail (0 full, 1 plain) — chosen when its first job is built, changed by
+    // farCheck (the hysteresis band keeps it from flickering); farD: the distance in chunks (0: off, World.farD)
+    colLod(c) {
+      const D = this.farMesh ? World.farD(this.renderDist) : 0;
+      if (!D) return 0;
+      if (c.lod === undefined) { const p = this.center || [0, 0]; c.lod = World.lodWant(Math.hypot(c.cx - p[0], c.cz - p[1]), 0, D); }
+      return c.lod;
+    }
+    // every 20th frame: the columns that crossed the band are meshed again (nearest first, a few at a time)
+    farCheck() {
+      if (this.frame % 20 !== 0 || !this.center) return;
+      const D = this.farMesh ? World.farD(this.renderDist) : 0, p = this.center, ch = [];
+      for (const c of this.cols.values()) {
+        if (c.lod === undefined) continue;
+        const d = Math.hypot(c.cx - p[0], c.cz - p[1]), w = D ? World.lodWant(d, c.lod, D) : 0;
+        if (w !== c.lod) ch.push([d, c, w]);
+      }
+      if (!ch.length) return;
+      ch.sort((a, b) => a[0] - b[0]);
+      for (let i = 0; i < Math.min(6, ch.length); i++) { const c = ch[i][1]; c.lod = ch[i][2]; for (const s of c.sec) if (s.meshed || s.hasMesh) { s.dirty = true; s.ver++; } }
+      this.farSwaps = (this.farSwaps | 0) + Math.min(6, ch.length);
+    }
     buildJob(c, sy) {
       const blocks = new Uint16Array(PS * PS * PS), light = new Uint16Array(PS * PS * PS);
       const grass = new Uint16Array(PS * PS), foliage = new Uint16Array(PS * PS), water = new Uint16Array(PS * PS);
@@ -975,7 +999,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0, dim: this.dim, quads: !!(this.renderer && this.renderer.idx) };   // (Viereck-Index: quads for the shared index buffer, renderer.js quadIB)   // (q-art4: dim — the worker finds the isles' columns for Runde Inseln) (t-motion: the hung pieces' sway levels)
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0, dim: this.dim, quads: !!(this.renderer && this.renderer.idx), lod: this.colLod(c) };   // (Ferne schlicht: World.lodWant)   // (Viereck-Index: quads for the shared index buffer, renderer.js quadIB)   // (q-art4: dim — the worker finds the isles' columns for Runde Inseln) (t-motion: the hung pieces' sway levels)
     }
     markDirty(x, y, z) {
       const sy = y >> 4;
@@ -1292,5 +1316,9 @@
       this.changed.clear();
     }
   }
+  // Ferne schlicht: inside D chunks full detail, beyond D + 1 plain, in the band between it keeps what it has
+  World.lodWant = (dist, cur, D) => (!D ? 0 : dist > D + 1 ? 1 : dist < D ? 0 : (cur | 0));
+  // D by the view: off below 10 chunks (Very Low … Balanced's small views never change), then 40 % of the view, 5 … 12
+  World.farD = (rd) => (rd < 10 ? 0 : Math.min(12, Math.max(5, Math.round(rd * 0.4))));
   VR.World = World;
 })(VR);
