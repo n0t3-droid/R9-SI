@@ -852,6 +852,9 @@ html:not(.pro) #zenpanel .field { display: none; }
 @media (max-height: 460px) {
   .screen .panel { max-height: calc(100vh - 16px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
   #ui.touchon .bh-btn { bottom: calc(216px + env(safe-area-inset-bottom)) !important; }
+  /* the hint between the ☰ column and the right buttons, under the top chips — never over 🖐 or the ✕ (phone sideways) */
+  #ui.touchon #hints { top: calc(max(8px, env(safe-area-inset-top)) + 46px) !important; left: calc(max(10px, env(safe-area-inset-left)) + 66px) !important; right: calc(max(18px, env(safe-area-inset-right)) + 74px) !important; transform: none !important; width: auto !important; max-width: none !important; }
+  #ui.touchon #hints .hint { font-size: 13px; line-height: 1.3; }
 }
 
 /* ============================================================================
