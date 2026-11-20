@@ -287,8 +287,11 @@
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
     // q-art3: job.fancyLeaves may be a number — bit 1 (2) Runde Kronen, bit 2 (4) Runde Hänge, bit 3 (8) the leaves not
     // fancy (game.js leafMode; the world passes it through as it is)
-    const lm = typeof job.fancyLeaves === 'number' ? job.fancyLeaves : 0;
-    const fancy = job.fancyLeaves !== false && !(lm & 8), smooth = job.smooth !== false;
+    // Ferne schlicht (job.lod 1, world.js World.lodWant): a far section plainly — no sloped smooth ground, no round
+    // hills, crowns or isles, no sculpted ground, plain leaves. The owner's APU spends Ultra's terrain time per triangle.
+    const lodF = job.lod === 1;
+    const lm = lodF ? (((typeof job.fancyLeaves === 'number' ? job.fancyLeaves : 0) & ~(2 | 4 | 16 | 64)) | 8) : (typeof job.fancyLeaves === 'number' ? job.fancyLeaves : 0);
+    const fancy = !lodF && job.fancyLeaves !== false && !(lm & 8), smooth = !lodF && job.smooth !== false;
     // q-art3 · Runde Kronen / Runde Hänge: the leaves and the natural ground (F.SMOOTH: Nahtlos only) as one blob
     // (VR.RoundCrown; the solver is made at the first face that asks)
     const roundOn = (lm & 2) !== 0 && fancy, groundOn = (lm & 4) !== 0;

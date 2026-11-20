@@ -34,6 +34,7 @@
     // ---- Bild · Licht & Schatten
     { key: 'preset', g: 'img', sec: 'auto', t: 'preset', lab: 'g.set.preset', tip: 'g.set.preset.tip', def: 'balanced' },
     { key: 'renderDist', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.renderDist', tip: 'g.set.renderDist.tip', cost: 'high', def: 10, min: 3, max: 24, maxKey: 'rdMax', step: 1, fmt: 'chunks' },   // (F-Far: the top follows the preset's rdMax — 32 on Ultra)
+    { key: 'farPlain', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.farPlain', tip: 'g.set.farPlain.tip', cost: 'low', def: true },   // Ferne schlicht (world.js World.lodWant): from 10 chunks of view up
     { key: 'horizon', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.horizon', tip: 'g.set.horizon.tip', cost: 'high', def: 4, min: 0, max: 4, step: 1, vals: 'g.set.horizonV' },
     { key: 'shadows', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.shadows', tip: 'g.set.shadows.tip', cost: 'mid', def: 1, min: 0, max: 3, step: 1, vals: 'g.set.shadowsV' },
     { key: 'matTier', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.matTier', tip: 'g.set.matTier.tip', cost: 'mid', def: 2, min: 0, max: 3, step: 1, vals: 'g.set.matTierV' },   // F2 materials
