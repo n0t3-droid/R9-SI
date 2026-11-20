@@ -42237,8 +42237,11 @@ if(!CTMK)ctmTables();
 const B=job.blocks,L=job.light,GR=job.grass,FO=job.foliage,WA=job.water;
 
 
-const lm=typeof job.fancyLeaves==='number'?job.fancyLeaves:0;
-const fancy=job.fancyLeaves!==false&& !(lm&8),smooth=job.smooth!==false;
+
+
+const lodF=job.lod===1;
+const lm=lodF?(((typeof job.fancyLeaves==='number'?job.fancyLeaves:0)& ~(2|4|16|64))|8):(typeof job.fancyLeaves==='number'?job.fancyLeaves:0);
+const fancy= !lodF&&job.fancyLeaves!==false&& !(lm&8),smooth= !lodF&&job.smooth!==false;
 
 
 const roundOn=(lm&2)!==0&&fancy,groundOn=(lm&4)!==0;
@@ -57686,7 +57689,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="93b170682fd6658a";
+VR.TEX_SRC_HASH="b8bae311fcec3463";
 
 
 
@@ -58265,6 +58268,7 @@ VR.I18N.add('en',{
 'g.set.rays':'God rays',
 'g.set.fxaa':'Anti-aliasing (FXAA — only used when Super Resolution is off)',
 'g.set.fancyLeaves':'Fancy leaves',
+'g.set.farPlain':'Plain distance',
 'g.set.anim':'Animated displays (screens, portal, lights)',
 'g.set.smoothPlants':'Smooth plants',
 'g.set.dynRes':'Smart quality (keeps the picture sharp: trims shadows, rays and detail radius first when FPS drop, never blurs)',
@@ -58530,6 +58534,7 @@ VR.I18N.add('en',{
 'g.set.clouds.tip':'Clouds in the sky: fast or beautiful, with shadows and depth.',
 'g.set.bloom.tip':'Bright lights glow a little.',
 'g.set.fancyLeaves.tip':'Leaves with gaps and depth instead of flat cards.',
+'g.set.farPlain.tip':'With a long view: far land is built without round slopes and crowns. A third fewer triangles far away, much smoother on weak graphics chips; nothing changes up close.',
 'g.set.smoothPlants.tip':'Palms with real fronds instead of block crowns, slim and soft as in the trailer. Off = the block look.',
 'g.set.smoothPlantsV':['Off','Simple','Full'],
 'g.set.smoothFurn':'Real furniture',
@@ -63366,6 +63371,7 @@ VR.I18N.add('de',{
 'g.set.rays':'Sonnenstrahlen',
 'g.set.fxaa':'Kantenglättung (FXAA — nur ohne Super Resolution)',
 'g.set.fancyLeaves':'Schöne Blätter',
+'g.set.farPlain':'Ferne schlicht',
 'g.set.anim':'Animierte Anzeigen (Bildschirme, Portal, Lichter)',
 'g.set.smoothPlants':'Glatte Pflanzen',
 'g.set.dynRes':'Schlaue Qualität (hält das Bild scharf: bei wenig FPS zuerst weniger Schatten, Strahlen und Details — nie unscharf)',
@@ -63631,6 +63637,7 @@ VR.I18N.add('de',{
 'g.set.clouds.tip':'Wolken am Himmel: schnell oder schön, mit Schatten und Tiefe.',
 'g.set.bloom.tip':'Helle Lichter strahlen ein wenig.',
 'g.set.fancyLeaves.tip':'Blätter mit Lücken und Tiefe statt flacher Karten.',
+'g.set.farPlain.tip':'Ab großer Sichtweite: weit entfernte Landschaft ohne runde Hänge und Kronen gebaut. Ein Drittel weniger Dreiecke in der Ferne, viel flüssiger auf schwachen Grafikchips; aus der Nähe ändert sich nichts.',
 'g.set.smoothPlants.tip':'Palmen mit echten Wedeln statt Blockkronen, schlank und weich wie im Trailer. Aus = Blockbild.',
 'g.set.smoothPlantsV':['Aus','Einfach','Voll'],
 'g.set.smoothFurn':'Echte Möbel',
@@ -86233,6 +86240,7 @@ this.stats={gen:0,mesh:0,genMs:0,meshMs:0};
 this.qA=new Int32Array(1<<16);this.qB=new Int32Array(1<<16);
 this.changed=new Set();
 this.fancyLeaves=true;this.smooth=true;
+this.farMesh=true;
 this.smoothProps=0;
 this.motion=0;
 this.meshBudget=6;
@@ -86338,6 +86346,7 @@ this.drainUploads(px,pz,now);
 }
 const pcx=Math.floor(px)>>4,pcz=Math.floor(pz)>>4;
 this.center=[pcx,pcz];
+this.farCheck();
 const rd=this.renderDist,loadR=rd+1;
 
 const lp=this.lastPos;
@@ -86964,6 +86973,28 @@ this.uploadQ.push(it);
 
 
 
+
+
+colLod(c){
+const D=this.farMesh?World.farD(this.renderDist):0;
+if(!D)return 0;
+if(c.lod===undefined){const p=this.center||[0,0];c.lod=World.lodWant(Math.hypot(c.cx-p[0],c.cz-p[1]),0,D);}
+return c.lod;
+}
+
+farCheck(){
+if(this.frame%20!==0|| !this.center)return;
+const D=this.farMesh?World.farD(this.renderDist):0,p=this.center,ch=[];
+for(const c of this.cols.values()){
+if(c.lod===undefined)continue;
+const d=Math.hypot(c.cx-p[0],c.cz-p[1]),w=D?World.lodWant(d,c.lod,D):0;
+if(w!==c.lod)ch.push([d,c,w]);
+}
+if(!ch.length)return;
+ch.sort((a,b)=>a[0]-b[0]);
+for(let i=0;i<Math.min(6,ch.length);i++){const c=ch[i][1];c.lod=ch[i][2];for(const s of c.sec)if(s.meshed||s.hasMesh){s.dirty=true;s.ver++;}}
+this.farSwaps=(this.farSwaps|0)+Math.min(6,ch.length);
+}
 buildJob(c,sy){
 const blocks=new Uint16Array(PS*PS*PS),light=new Uint16Array(PS*PS*PS);
 const grass=new Uint16Array(PS*PS),foliage=new Uint16Array(PS*PS),water=new Uint16Array(PS*PS);
@@ -86994,7 +87025,7 @@ if(nR&&y<nR.H){blocks[o+PAD+16+k]=nR.blocks[iR];light[o+PAD+16+k]=nR.light[iR];}
 }
 }
 }
-return{type:'mesh',key:c.key,sy,ver:c.sec[sy].ver,blocks,light,grass,foliage,water,ox:c.cx*16,oz:c.cz*16,fancyLeaves:this.fancyLeaves,smooth:this.smooth,smoothProps:this.smoothProps===true?1:(this.smoothProps|0),vxLod:true,motion:this.motion?1:0,dim:this.dim,quads: !!(this.renderer&&this.renderer.idx)};
+return{type:'mesh',key:c.key,sy,ver:c.sec[sy].ver,blocks,light,grass,foliage,water,ox:c.cx*16,oz:c.cz*16,fancyLeaves:this.fancyLeaves,smooth:this.smooth,smoothProps:this.smoothProps===true?1:(this.smoothProps|0),vxLod:true,motion:this.motion?1:0,dim:this.dim,quads: !!(this.renderer&&this.renderer.idx),lod:this.colLod(c)};
 }
 markDirty(x,y,z){
 const sy=y>>4;
@@ -87311,6 +87342,10 @@ const s=c.sec[sy];if(!s)continue;s.dirty=true;s.ver++;
 this.changed.clear();
 }
 }
+
+World.lodWant=(dist,cur,D)=>(!D?0:dist>D+1?1:dist<D?0:(cur|0));
+
+World.farD=(rd)=>(rd<10?0:Math.min(12,Math.max(5,Math.round(rd*0.4))));
 VR.World=World;
 })(VR);
 
@@ -112523,6 +112558,7 @@ const ITEMS=[
 
 {key:'preset',g:'img',sec:'auto',t:'preset',lab:'g.set.preset',tip:'g.set.preset.tip',def:'balanced'},
 {key:'renderDist',g:'img',sec:'light',t:'slider',lab:'g.set.renderDist',tip:'g.set.renderDist.tip',cost:'high',def:10,min:3,max:24,maxKey:'rdMax',step:1,fmt:'chunks'},
+{key:'farPlain',g:'img',sec:'light',t:'switch',lab:'g.set.farPlain',tip:'g.set.farPlain.tip',cost:'low',def:true},
 {key:'horizon',g:'img',sec:'light',t:'slider',lab:'g.set.horizon',tip:'g.set.horizon.tip',cost:'high',def:4,min:0,max:4,step:1,vals:'g.set.horizonV'},
 {key:'shadows',g:'img',sec:'light',t:'slider',lab:'g.set.shadows',tip:'g.set.shadows.tip',cost:'mid',def:1,min:0,max:3,step:1,vals:'g.set.shadowsV'},
 {key:'matTier',g:'img',sec:'light',t:'slider',lab:'g.set.matTier',tip:'g.set.matTier.tip',cost:'mid',def:2,min:0,max:3,step:1,vals:'g.set.matTierV'},
@@ -122951,6 +122987,7 @@ if(this.horizon&&this.horizon.setIsleForm&&VR.QArt4)this.horizon.setIsleForm(S.q
 S.renderDist=Math.max(3,Math.min(S.rdMax||24,S.renderDist));
 if(this.horizon&&this.horizon.setFar)this.horizon.setFar(S.far||0);
 if(this.aq&&this.aq.stack.length)this.aqApply(this.aq,S,this.world);
+if(this.world)this.world.farMesh=S.farPlain!==false;
 if(this.world){this.world.renderDist=Math.max(5,S.renderDist-(this.aq&&this.aq.over&&this.aq.over.rd||0));if(key==='fancyLeaves'||key==='*'||((Q3_SW.includes(key)||Q4_SW.includes(key))&&this.world.fancyLeaves!==this.leafMode())){this.world.fancyLeaves=this.leafMode();this.remeshAll();}}
 if(this.input){this.input.sensitivity=0.0024*S.sens;this.input.invertY=S.invertY;this.input.raw=S.rawInput!==false;this.input.smooth= !!S.mouseSmooth;}
 if(this.audio){this.audio.setVolumes({master:S.volMaster,sfx:S.volSfx,music:S.volMusic,ambient:S.volAmbient,voice:S.volVoice===undefined?0.8:S.volVoice,calm: !!S.calmMusic,less: !!S.musicLess});{const vl=S.preset==='potato'||(S.preset==='custom'&& !S.shadows&& !S.particles);if(this.audio.setTier)this.audio.setTier(vl?0:S.preset==='low'?1:S.preset==='balanced'?2:S.preset==='custom'?((S.shadows|0)>=2?3:(S.shadows|0)>=1?2:1):3);else if(this.audio.setLowEnd)this.audio.setLowEnd(vl);}}
@@ -130214,6 +130251,7 @@ K.LIST=[
 {id:'halfTri',de:'Probe: alle Abschnitte, halbe Dreiecke',en:'Probe: all sections, half the triangles',set:{},knob:['Renderer','PROBE','halfTri'],grp:'probe'},
 {id:'flatFS',de:'Probe: Gelände nur einfarbig (ohne Pixelarbeit)',en:'Probe: terrain one flat colour (no pixel work)',set:{},knob:['Renderer','PROBE','flatFS'],grp:'probe'},
 {id:'res5',de:'Probe: Auflösung ×0.5',en:'Probe: resolution ×0.5',set:{},scale:0.5,grp:'probe'},
+{id:'far1',de:'Ferne schlicht aus',en:'Plain distance off',set:{farPlain:false},grp:'ultra'},
 {id:'idx0',de:'Viereck-Index aus (Dreieckslisten wie früher)',en:'Indexed quads off (triangle lists as before)',set:{},idx:false,grp:'ultra'},
 ];
 K.END={id:'base2',de:'So wie jetzt (nochmal: die Streuung)',en:'As it is (again: the spread)',set:{}};

@@ -35713,8 +35713,11 @@ if(!CTMK)ctmTables();
 const B=job.blocks,L=job.light,GR=job.grass,FO=job.foliage,WA=job.water;
 
 
-const lm=typeof job.fancyLeaves==='number'?job.fancyLeaves:0;
-const fancy=job.fancyLeaves!==false&& !(lm&8),smooth=job.smooth!==false;
+
+
+const lodF=job.lod===1;
+const lm=lodF?(((typeof job.fancyLeaves==='number'?job.fancyLeaves:0)& ~(2|4|16|64))|8):(typeof job.fancyLeaves==='number'?job.fancyLeaves:0);
+const fancy= !lodF&&job.fancyLeaves!==false&& !(lm&8),smooth= !lodF&&job.smooth!==false;
 
 
 const roundOn=(lm&2)!==0&&fancy,groundOn=(lm&4)!==0;
@@ -70862,6 +70865,7 @@ VR.I18N.add('en',{
 'g.set.rays':'God rays',
 'g.set.fxaa':'Anti-aliasing (FXAA — only used when Super Resolution is off)',
 'g.set.fancyLeaves':'Fancy leaves',
+'g.set.farPlain':'Plain distance',
 'g.set.anim':'Animated displays (screens, portal, lights)',
 'g.set.smoothPlants':'Smooth plants',
 'g.set.dynRes':'Smart quality (keeps the picture sharp: trims shadows, rays and detail radius first when FPS drop, never blurs)',
@@ -71127,6 +71131,7 @@ VR.I18N.add('en',{
 'g.set.clouds.tip':'Clouds in the sky: fast or beautiful, with shadows and depth.',
 'g.set.bloom.tip':'Bright lights glow a little.',
 'g.set.fancyLeaves.tip':'Leaves with gaps and depth instead of flat cards.',
+'g.set.farPlain.tip':'With a long view: far land is built without round slopes and crowns. A third fewer triangles far away, much smoother on weak graphics chips; nothing changes up close.',
 'g.set.smoothPlants.tip':'Palms with real fronds instead of block crowns, slim and soft as in the trailer. Off = the block look.',
 'g.set.smoothPlantsV':['Off','Simple','Full'],
 'g.set.smoothFurn':'Real furniture',
@@ -75963,6 +75968,7 @@ VR.I18N.add('de',{
 'g.set.rays':'Sonnenstrahlen',
 'g.set.fxaa':'Kantenglättung (FXAA — nur ohne Super Resolution)',
 'g.set.fancyLeaves':'Schöne Blätter',
+'g.set.farPlain':'Ferne schlicht',
 'g.set.anim':'Animierte Anzeigen (Bildschirme, Portal, Lichter)',
 'g.set.smoothPlants':'Glatte Pflanzen',
 'g.set.dynRes':'Schlaue Qualität (hält das Bild scharf: bei wenig FPS zuerst weniger Schatten, Strahlen und Details — nie unscharf)',
@@ -76228,6 +76234,7 @@ VR.I18N.add('de',{
 'g.set.clouds.tip':'Wolken am Himmel: schnell oder schön, mit Schatten und Tiefe.',
 'g.set.bloom.tip':'Helle Lichter strahlen ein wenig.',
 'g.set.fancyLeaves.tip':'Blätter mit Lücken und Tiefe statt flacher Karten.',
+'g.set.farPlain.tip':'Ab großer Sichtweite: weit entfernte Landschaft ohne runde Hänge und Kronen gebaut. Ein Drittel weniger Dreiecke in der Ferne, viel flüssiger auf schwachen Grafikchips; aus der Nähe ändert sich nichts.',
 'g.set.smoothPlants.tip':'Palmen mit echten Wedeln statt Blockkronen, schlank und weich wie im Trailer. Aus = Blockbild.',
 'g.set.smoothPlantsV':['Aus','Einfach','Voll'],
 'g.set.smoothFurn':'Echte Möbel',
