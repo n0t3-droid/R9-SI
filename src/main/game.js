@@ -487,6 +487,7 @@
         this.settings.autoPreset = false; this.saveSettings();
       }
       if (this.ipuDefaults && this.ipuDefaults(false)) this.saveSettings();
+      if (!this.settings.trees18) { this.settings.trees18 = true; this.settings.qRound = false; this.saveSettings(); }   // (t-trees2: Runde Kronen off once — the clearer crowns; the player may turn it on again)
       if (!this.settings.zpre87) { this.settings.zpre87 = true; this.settings.zPre = false; this.saveSettings(); }   // (v0.55.87: the integrated GPUs' saved zPre off once — measured −18.5 ms on a Radeon Vega; the player may turn it on again)   // (F10: the first start on an integrated GPU turns the five switches on)
       this.applySettings('*');
       this.aqRestoreStart();   // F9: this GPU's remembered smart-quality steps (aqRestoreSteps, at the first frame of play)

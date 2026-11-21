@@ -50,7 +50,7 @@
       const y = g.surfaceY(x, z) + 1;
       if (y <= SEA + 2 || !meadowAt(g, x, z, y)) continue;
       const rng = new VR.RNG((hx ^ 0x2545f491) >>> 0), r = rng.next();
-      if (r < 0.74) plantFlora(w, FL.treeAt(g, x, z, rng.next()), x, y, z, hx);
+      if (r < (G.trees2 && G.trees2(g) ? 0.3 : 0.74)) plantFlora(w, FL.treeAt(g, x, z, rng.next()), x, y, z, hx);   // (t-trees2, vgen 18: the blossom a lone tree's accent — most stand green, in the new forms)
       else if (r < 0.88) G.TREES.fancyOak(w, x, y, z, rng); else G.TREES.roundTree(w, x, y, z, rng, { r: 3.2, h: 4 });
     }
   };

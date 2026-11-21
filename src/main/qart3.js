@@ -16,7 +16,11 @@
   // (Runde Hänge is off in every preset — a switch to turn on by hand: the final pictures showed no difference at a
   //  thumbnail's size in the normal-play views, whose ground is one-step hills the height field already slopes; see the plan)
   const OFF = { qRound: false, qHill: false }, ON = { qRound: true, qHill: false };
-  const TIERS = { potato: OFF, low: OFF, balanced: ON, high: ON, ultra: ON, ultraLite: ON };
+  // (t-trees2, 21 Nov 2026: off in every preset — the owner found the trees not beautiful; the blob melted the new crowns'
+  //  leaf clusters into one lump, stretched the leaf texture over its facets and showed its holes; the clusters read clearer
+  //  as leaves. A switch to turn on by hand)
+  const TIERS = { potato: OFF, low: OFF, balanced: OFF, high: OFF, ultra: OFF, ultraLite: OFF };
+  void ON;
   Q3.defaults = (preset) => Object.assign({}, TIERS[preset] || OFF);
   Q3.off = () => Object.assign({}, OFF);
   Q3.ROWS = [

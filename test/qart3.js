@@ -131,7 +131,7 @@ check(!!Q3, 'VR.QArt3 exists');
 if (Q3) {
   check(Q3.SW.join() === 'qRound,qHill', 'the switches', Q3.SW.join());
   for (const k of Q3.SW) check(!Q3.defaults('potato')[k] && !Q3.defaults('low')[k], k + ': Very Low and Low off');
-  check(Q3.defaults('balanced').qRound && Q3.defaults('high').qRound && Q3.defaults('ultra').qRound, 'qRound: Balanced, High, Ultra on');
+  check(!Q3.defaults('balanced').qRound && !Q3.defaults('high').qRound && !Q3.defaults('ultra').qRound, 'qRound: off in every preset (t-trees2: the clearer crowns; a switch by hand)');
   check(!Q3.defaults('balanced').qHill && !Q3.defaults('high').qHill, 'qHill: off in every preset (a switch by hand: not visible at thumbnail size in the views)');
   for (const k of Q3.SW) { const row = Q3.ROWS.find(r => r.key === k); check(row && row.cost === 'low' && row.t === 'switch', k + ': a switch row, cost low'); }
   const LM = (f, r, h) => Q3.leafMode({ fancyLeaves: f, qRound: r, qHill: h });

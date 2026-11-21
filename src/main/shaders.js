@@ -878,9 +878,9 @@ ${(VR.QArt && VR.QArt.glslVS) ? VR.QArt.glslVS() : ''}${(VR.QArt2 && VR.QArt2.gl
   float ssum = u_season.x + u_season.y + u_season.z + u_season.w;
   if (ssum > 0.001 && !ctmFace && kind != 1u && kind != 6u && v_tint.g > v_tint.r * 1.05 && v_tint.g > v_tint.b * 1.05) {
     bool sLeaf = leaf > 0u && sway == 0u, sTop = face == 2u && !sLeaf && sway == 0u;
-    float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(5.0, 6.0, 5.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(11.0, 14.0, 11.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);   // (t-trees2: a cell about a crown's size — the 5 × 6 × 5 cells cut every crown into patches)
     vec3 c = v_tint;
-    vec3 sSp = sLeaf && sh < 0.38 ? mix(vec3(0.92, 0.5, 0.64), vec3(0.95, 0.86, 0.9), sh / 0.38) : c * vec3(0.88, 1.12, 0.78);
+    vec3 sSp = c * vec3(0.88, 1.12, 0.78);   // (t-trees2: spring fresh green only — the pink cells on green crowns read as purple stains; the real blossom trees bloom anyway)
     float sl = dot(c, vec3(0.3, 0.59, 0.11));
     vec3 sSu = mix(c * vec3(1.1, 1.0, 0.7), sl * vec3(1.5, 1.15, 0.3), 0.3);
     vec3 sAu = !sLeaf ? mix(c, sl * vec3(1.9, 1.25, 0.45), 0.7) : sh < 0.3 ? vec3(0.6, 0.09, 0.04) : sh < 0.58 ? mix(vec3(0.82, 0.3, 0.05), vec3(0.6, 0.09, 0.04), (0.58 - sh) / 0.28 * 0.3) : sh < 0.86 ? vec3(0.84, 0.6, 0.08) : c * vec3(1.6, 0.95, 0.45);

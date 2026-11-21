@@ -61,8 +61,8 @@
   const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   S.seasonTint = function (c, i, o) {
     const h = o.h, lum = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
-    if (i === 0) {   // spring: fresh green; a third of the trees in blossom (pink and white)
-      if (o.leaf && h < 0.38) return mix(PAL.blossomA, PAL.blossomB, h / 0.38);
+    if (i === 0) {   // spring: fresh green
+      // (t-trees2: no more pink cells on the green crowns — they read as purple stains; the blossom trees bloom on their own)
       return mul(c, [0.88, 1.12, 0.78]);
     }
     if (i === 1) return mix(mul(c, [1.1, 1.0, 0.7]), [lum * 1.5, lum * 1.15, lum * 0.3], 0.3);   // summer: gold (a hue shift: the saturated greens turn too)
