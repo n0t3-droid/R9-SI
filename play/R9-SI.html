@@ -81038,7 +81038,9 @@ IPU.integrated=(name)=> !!(VR.Bench&&VR.Bench.integrated&&VR.Bench.integrated(na
 
 
 
-IPU.OPT_IN=['texLite'];
+
+
+IPU.OPT_IN=['texLite','zPre'];
 IPU.defaults=function(preset,gpu){
 const on=preset==='ultraLite'||IPU.integrated(gpu),o={};
 for(const k of IPU.SW)o[k]=on&& !IPU.OPT_IN.includes(k)&& !(k==='zPre'&&preset==='potato');
@@ -122801,7 +122803,7 @@ if(VR.LField)for(const p in PRESETS)Object.assign(PRESETS[p],VR.LField.defaults(
 
 
 const F10_SW=['hdrLite','postLite','zPre','texLite','dprLite'];
-for(const p in PRESETS)for(const k of F10_SW)PRESETS[p][k]=p==='ultraLite'&&k!=='texLite';
+for(const p in PRESETS)for(const k of F10_SW)PRESETS[p][k]=p==='ultraLite'&&k!=='texLite'&&k!=='zPre';
 PRESETS.potato.smoothFolk=0;PRESETS.low.smoothFolk=0;PRESETS.balanced.smoothFolk=1;PRESETS.high.smoothFolk=1;PRESETS.ultra.smoothFolk=1;PRESETS.ultraLite.smoothFolk=1;
 
 for(const p in PRESETS)PRESETS[p].folkShadow=PRESETS[p].shadows>0?1:0;
@@ -123233,6 +123235,7 @@ if(want!==cur){this.settings.preset=want;Object.assign(this.settings,PRESETS[wan
 this.settings.autoPreset=false;this.saveSettings();
 }
 if(this.ipuDefaults&&this.ipuDefaults(false))this.saveSettings();
+if(!this.settings.zpre87){this.settings.zpre87=true;this.settings.zPre=false;this.saveSettings();}
 this.applySettings('*');
 this.aqRestoreStart();
 document.getElementById('gpuinfo').textContent=(VR.GL.rendererName||'WebGL2')+(this.renderer.multi?' · multi-draw':'');
