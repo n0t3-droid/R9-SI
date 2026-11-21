@@ -1,0 +1,124 @@
+{
+ "preset": "ultra",
+ "rd": 6,
+ "size": [
+  1600,
+  900
+ ],
+ "shots": [
+  {
+   "name": "vista",
+   "de": "Ankunftsblick zur goldenen Stunde",
+   "pos": [
+    287.3,
+    91,
+    -192.3
+   ],
+   "yaw": 2.127311324929438,
+   "pitch": 0.0796170595975852,
+   "tod": 10498,
+   "settle": {
+    "dirty": 567,
+    "busy": 0,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 742
+  },
+  {
+   "name": "isles",
+   "de": "Himmelsinseln am Tag",
+   "pos": [
+    115.3,
+    80,
+    26.4
+   ],
+   "yaw": -2.2171727303279325,
+   "pitch": 0.624642724791258,
+   "tod": 8200,
+   "settle": {
+    "dirty": 590,
+    "busy": 0,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 663
+  },
+  {
+   "name": "pond",
+   "de": "Teich am Morgen",
+   "pos": [
+    -219.6,
+    84,
+    -179.5
+   ],
+   "yaw": 1.3718503805903381,
+   "pitch": -0.5126688393778056,
+   "tod": 5599,
+   "settle": {
+    "dirty": 735,
+    "busy": 0,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 785
+  },
+  {
+   "name": "pier",
+   "de": "Am Steg",
+   "pos": [
+    270.4,
+    66.2,
+    73.9
+   ],
+   "yaw": -1.9665597359306168,
+   "pitch": -0.32434417492452566,
+   "tod": 6451,
+   "settle": {
+    "dirty": 600,
+    "busy": 0,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 1070
+  },
+  {
+   "name": "citadel",
+   "de": "Turmzitadelle bei Nacht",
+   "pos": [
+    -307.6,
+    111,
+    -233.1
+   ],
+   "yaw": 2.9609067893564305,
+   "pitch": 0.15358336047705382,
+   "tod": 18098,
+   "settle": {
+    "dirty": 703,
+    "busy": 0,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 665
+  },
+  {
+   "name": "aurora",
+   "de": "Nova Haven bei Nacht",
+   "pos": [
+    -18.3,
+    81,
+    -130
+   ],
+   "yaw": -0.15011221675576547,
+   "pitch": 0.43847324390081743,
+   "tod": 19492,
+   "settle": {
+    "dirty": 745,
+    "busy": 1,
+    "pend": 0,
+    "up": 0
+   },
+   "s": 665
+  }
+ ]
+}

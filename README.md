@@ -1,7 +1,37 @@
 # R9-SI
 
+<p align="center"><img src="docs/media/banner.jpg" alt="R9-SI — eine Voxelwelt im Browser" width="100%"></p>
+
+<p align="center">
+<img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0f8a8f">
+<img alt="Free" src="https://img.shields.io/badge/kostenlos-free-e0752f">
+<img alt="No install" src="https://img.shields.io/badge/install-none%20%C2%B7%20one%20HTML%20file-1b2130">
+<img alt="WebGL 2" src="https://img.shields.io/badge/WebGL-2-5b6478">
+</p>
+
+
 A browser voxel world (WebGL 2, web workers, no engine, no install) with its editor R9 Studio. Everything in it is
 procedural and our own: the terrain, the cities, the textures, the sky, the water, the sounds, the people.
+
+## Gallery · Bilder
+
+Every picture below is the game itself on its Ultra preset, rendered headless in software (SwiftShader) by
+[`test/marketing_shots.mjs`](test/marketing_shots.mjs) — no paint-over, no other engine. *Jedes Bild ist das Spiel selbst.*
+
+<table>
+<tr><td><img src="docs/media/shot_vista.jpg" alt="The arrival vista at the golden hour"></td><td><img src="docs/media/shot_isles.jpg" alt="The Sky Isles by day"></td></tr>
+<tr><td><img src="docs/media/shot_pier.jpg" alt="Water at the pier: waves, refraction, fish"></td><td><img src="docs/media/shot_aurora.jpg" alt="Nova Haven at night"></td></tr>
+<tr><td colspan="2"><img src="docs/media/shot_citadel.jpg" alt="The Spire Citadel at night"></td></tr>
+</table>
+
+## The mathematics as a book · Die Mathematik als Heft
+
+**[R9-SI — Die Mathematik und Physik einer Voxelwelt im Browser (PDF)](docs/R9-SI_Mathematik_und_Physik.pdf)** — 16
+chapters, 178 formulas, each one as the game computes it, with the file it lives in: simplex noise and the terrain's
+climate fields, light and ambient occlusion, surface nets, collision, Gerstner-like water with Lengyel's oblique mirror,
+wind, Rayleigh/Mie skies after Hillaire, GGX materials, ACES, the R9 Super Resolution, Kepler orbits with universal
+variables, the upload budget and the synthesized music. The source of the book is
+[`docs/math/r9si_mathematik.html`](docs/math/r9si_mathematik.html) (`node docs/math/build_pdf.mjs`).
 
 ## Play
 

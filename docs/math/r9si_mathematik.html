@@ -1,0 +1,392 @@
+<!-- R9-SI · Mathematik und Physik. Quelle des PDFs docs/R9-SI_Mathematik_und_Physik.pdf (node docs/math/build_pdf.mjs).
+     Formeln in \( … \) und \[ … \] werden beim Bauen mit KaTeX gesetzt. Alle Zahlen stammen aus dem Quelltext (Datei genannt). -->
+<section class="cover">
+  <div class="cover-img" style="background-image:url('{{HERO}}')"></div>
+  <div class="cover-text">
+    <div class="kicker">Open Source · kostenlos · ohne Installation</div>
+    <h1>R9-SI</h1>
+    <div class="sub">Die Mathematik und Physik einer Voxelwelt im Browser</div>
+    <div class="meta">Version {{VERSION}} · {{DATE}}<br>Jede Formel in diesem Heft steht so im Quelltext — mit Datei und Zahl.</div>
+  </div>
+</section>
+
+<section class="toc">
+  <h2>Inhalt</h2>
+  {{TOC}}
+  <div class="note">
+    <b>Wie man dieses Heft liest.</b> Jedes Kapitel beginnt mit der Idee in einem Satz, dann folgen die Formeln, genau
+    so, wie das Spiel sie rechnet, und am Rand die Datei, in der sie stehen. Einheiten: ein Block ist ein Meter, die Zeit
+    in Sekunden, Winkel im Bogenmaß. Ein Spieltag hat 24 000 Ticks (20 Minuten echte Zeit).
+  </div>
+</section>
+
+<section class="gallery">
+  <h2 class="nob">Das Spiel, das diese Formeln rechnet</h2>
+  <div class="g2"><img src="{{MEDIA}}shot_isles.jpg"><img src="{{MEDIA}}shot_pier.jpg"><img src="{{MEDIA}}shot_aurora.jpg"><img src="{{MEDIA}}shot_citadel.jpg"></div>
+  <p class="small">Alle Bilder: das Spiel selbst auf der Stufe Ultra, ohne Nachbearbeitung (test/marketing_shots.mjs). Himmelsinseln am
+  Tag · Wasser am Steg mit Wellen, Brechung und Fischen · Nova Haven bei Nacht · die Turmzitadelle bei Nacht.</p>
+</section>
+
+<h2 id="zufall">1 · Zufall mit Gedächtnis</h2>
+<p class="lead">Die ganze Welt folgt aus einer einzigen Zahl, dem Seed. Derselbe Seed ergibt auf jedem Rechner und in jeder
+Version Byte für Byte dieselbe Welt.</p>
+
+<h3>1.1 Der Zahlengenerator (mulberry32)</h3>
+<p class="src">src/main/weather.js · src/shared/core.js</p>
+<p>Ein 32-Bit-Zustand \(s\) wird pro Zahl um eine ungerade Konstante weitergedreht und dann durchmischt:</p>
+\[ s \leftarrow s + \texttt{0x6D2B79F5} \pmod{2^{32}},\qquad t = (s \oplus s\gg15)\cdot(s\,|\,1),\qquad t \mathrel{\oplus}= t + (t\oplus t\gg 7)\cdot(t\,|\,61) \]
+\[ u = \frac{(t \oplus t\gg14) \bmod 2^{32}}{2^{32}} \in [0,1) \]
+<p>Das Wetter braucht keinen Zustand: ein Hash aus Seed, Tag und Klima liefert dieselbe Entscheidung bei Gastgeber und
+Gästen, ohne dass eine einzige Nachricht verschickt wird.</p>
+\[ \mathrm{hash01}(\sigma,a,b,c) = \frac{m(m(m(m(\sigma\oplus k_0)\oplus a k_1)\oplus b k_2)\oplus c k_3)}{2^{32}} \]
+
+<h3>1.2 Simplex-Rauschen</h3>
+<p class="src">src/shared/noise.js</p>
+<p>Der Raum wird schief gestellt, damit die Gitterzellen zu Dreiecken (2D) bzw. Tetraedern (3D) werden. Für einen Punkt
+\(\mathbf x\in\mathbb R^n\):</p>
+\[ F_2=\tfrac12(\sqrt3-1),\quad G_2=\tfrac{3-\sqrt3}{6},\qquad F_3=\tfrac13,\quad G_3=\tfrac16 \]
+\[ \mathbf i=\Big\lfloor \mathbf x + F_n\textstyle\sum_k x_k \Big\rfloor,\qquad \mathbf d_0=\mathbf x-\big(\mathbf i - G_n\textstyle\sum_k i_k\big) \]
+<p>Jede Ecke \(j\) der Zelle trägt einen Gradienten \(\mathbf g_j\) aus einer gemischten Permutationstabelle und
+liefert einen weichen, kurzreichweitigen Beitrag:</p>
+\[ n(\mathbf x)= c_n\sum_{j=0}^{n} \max\!\big(0,\; r^2-|\mathbf d_j|^2\big)^4\,\big(\mathbf g_j\cdot \mathbf d_j\big),\qquad
+(r^2,c_n)=\begin{cases}(0{,}5;\,70) & n=2\\ (0{,}6;\,32) & n=3\end{cases} \]
+<p>Die Konstanten \(c_n\) bringen das Ergebnis in etwa auf \([-1,1]\). Die Permutation wird mit dem Seed gemischt
+(Fisher–Yates), dazu ein Versatz \(\mathbf o\in[0,1000)^3\).</p>
+
+<h3>1.3 Fraktale Summen</h3>
+<p>Mehrere Oktaven, jede mit eigenem Seed \(\sigma+7919\,i\), doppelter Frequenz und halber Amplitude:</p>
+\[ \mathrm{fbm}(\mathbf x)=\frac{\sum_{i=0}^{N-1} p^i\, n_i(\lambda^i f\,\mathbf x)}{\sum_{i=0}^{N-1} p^i},\qquad p=0{,}5,\;\lambda=2 \]
+\[ \mathrm{ridged}(\mathbf x)=\frac{\sum_i p^i\big(1-|n_i(\lambda^i f\,\mathbf x)|\big)}{\sum_i p^i} \]
+<p>Die Gratfunktion macht aus den Nulldurchgängen des Rauschens scharfe Kämme — Bergrücken und Flussläufe.</p>
+
+<h2 id="gelaende">2 · Das Gelände</h2>
+<p class="lead">Fünf Klimafelder entscheiden über Höhe, Biom und Pflanzen. Ein Dichtefeld macht daraus Überhänge, Klippen und
+Höhlen.</p>
+<p class="src">src/shared/gen_overworld.js</p>
+<h3>2.1 Die Klimafelder</h3>
+<p>Zuerst wird der Ort verzerrt (domain warping), damit Küsten nicht wie Rauschen aussehen:</p>
+\[ \tilde x = x + 60\, n_w(x,z),\qquad \tilde z = z + 60\, n_w(x+5000,\,z-5000) \]
+\[ c=\mathrm{clamp}(1{,}75\,n_C(\tilde x,\tilde z)+0{,}1),\quad e=\mathrm{clamp}(1{,}7\,n_E),\quad w,t,h=\mathrm{clamp}(1{,}8\,n_{W,T,H}) \]
+<p>\(c\) ist die Kontinentalität (Meer … Binnenland), \(e\) die Erosion, \(w\) die Verwerfung, \(t\) die Temperatur,
+\(h\) die Feuchte. Aus \(w\) wird das Gipfel-und-Tal-Feld:</p>
+\[ p_v = 1-\big|\,3|w|-2\,\big| \]
+
+<h3>2.2 Die Höhe</h3>
+<p>Eine Stützkurve über die Kontinentalität, stückweise mit Hermite-Glättung \(s(t)=t^2(3-2t)\):</p>
+\[ B(c)=y_{k-1}+(y_k-y_{k-1})\, s\!\Big(\tfrac{c-c_{k-1}}{c_k-c_{k-1}}\Big),\quad
+(c_k,y_k)\in\{(-1,22),(-0{,}6,26),(-0{,}4,38),\dots,(0{,}55,84),(1,96)\} \]
+\[ \iota=\mathrm{ss}(-0{,}12;0{,}3;c),\qquad \mu=\mathrm{ss}(0{,}1;-0{,}62;e),\qquad \pi=\max(0,\,0{,}6\,p_v+0{,}4) \]
+\[ H = B(c) + \iota\,\mu\,(18+108\,\pi^2) + \iota(1-\mu)\,11\,p_v\,\big(1-\mathrm{ss}(-0{,}2;0{,}6;e)\big) \]
+<p>Danach formen weiche Masken die Landschaft weiter — jede ist ein Produkt von smoothsteps:</p>
+\[ \text{Plateau: } H\leftarrow \mathrm{lerp}\big(H,\max(H,118+10p_v),\,0{,}6\,P\big),\quad P=\mathrm{ss}(0{,}35;0{,}7;c)\,\mathrm{ss}(-0{,}45;-0{,}2;e)\,\big(1-\mathrm{ss}(-0{,}1;0{,}2;e)\big) \]
+\[ \text{Fluss: } \rho=\big(1-\mathrm{ss}(0{,}018;0{,}085;|w|)\big)\,\mathrm{ss}(-0{,}16;-0{,}04;c)\,(1-0{,}8\mu),\qquad H\leftarrow\mathrm{lerp}(H,\,y_{\text{Meer}}-4,\,\rho) \]
+<p>Die Flüsse liegen also genau dort, wo das Verwerfungsfeld \(w\) durch null geht — ein schmales Band, das sich über
+Kontinente schlängelt.</p>
+
+<h3>2.3 Das Dichtefeld</h3>
+<p>Ein Block ist fest, wenn die Dichte positiv ist. Die Rauhigkeit \(A\) wächst in den Bergen:</p>
+\[ D(x,y,z) = (H-y) + A\; n_3(x,\,1{,}15\,y,\,z),\qquad A = 3{,}5+\iota\,(24\mu+16\,\omega) \]
+<p>Weit über und unter der Oberfläche (\(|y-H| > 1{,}2A+8\)) wird das Rauschen gar nicht erst berechnet. Das Feld wird nur
+an jeder vierten Ecke in \(x,z\) und jeder achten Höhe ausgewertet und dazwischen bilinear bzw. linear interpoliert —
+33 Rauschproben pro Säule statt 256.</p>
+<div class="box">Versionierung: jede Welt speichert ihre Generator-Version <code>vgen</code>. <code>test/gen_same.js</code>
+prüft mit Referenz-Hashes, dass eine alte Welt für immer byte-gleich entsteht.</div>
+
+<h2 id="licht">3 · Licht und Schatten der Blöcke</h2>
+<p class="lead">Zwei Lichtfelder mit je 16 Stufen, eine Umgebungsverdeckung pro Ecke und ein Vertex in 16 Bytes.</p>
+<p class="src">src/shared/mesher.js · src/shared/light_local.js</p>
+<h3>3.1 Himmelslicht und Blocklicht</h3>
+\[ L_{\text{Himmel}}(y)=\begin{cases}15 & \text{über dem höchsten Block}\\ \max(0,\,L(y+1)-1-\delta) & \text{sonst}\end{cases} \qquad
+L_{\text{Block}}(\mathbf p)=\max\Big(E(\mathbf p),\;\max_{\mathbf q\in N_6(\mathbf p)} L(\mathbf q)-1\Big) \]
+<p>Das Blocklicht ist eine Breitensuche (flood fill) über die sechs Nachbarn, gleichzeitig für die drei Kanäle R, G, B;
+farbiges Glas filtert pro Kanal. Ein Lichtwort hält vier Nibbles: \(\ell = 4096\,s + 256\,r + 16\,g + b\).</p>
+
+<h3>3.2 Umgebungsverdeckung (Ambient Occlusion)</h3>
+<p>Für jede Ecke einer Fläche zählen die zwei Seitennachbarn \(o_1,o_2\) und der Ecknachbar \(o_c\):</p>
+\[ \mathrm{ao}=\begin{cases}3 & o_1\wedge o_2\\ o_1+o_2+o_c & \text{sonst}\end{cases}\qquad
+\beta_k = 4\max(s,r,g,b)_k - 3\,\mathrm{ao}_k \]
+<p>Das Viereck wird entlang der Diagonale geteilt, deren Ecken ähnlicher hell sind — so entsteht keine falsche Kante.</p>
+
+<h3>3.3 Ein Vertex in acht 16-Bit-Wörtern</h3>
+<table><tr><th>Wort</th><th>Inhalt</th></tr>
+<tr><td>w0–w2</td><td>Position im Abschnitt (Festkomma)</td></tr>
+<tr><td>w3</td><td>Texturschicht und Drehung</td></tr>
+<tr><td>w4</td><td>\(u + 256\,v\) in 1/16-Einheiten</td></tr>
+<tr><td>w5</td><td>Fläche \(|\) AO\(\ll3\) \(|\) Wiegen\(\ll5\) \(|\) Laub\(\ll7\) \(|\) Art\(\ll8\) \(|\) … \(|\) Look\(\ll15\)</td></tr>
+<tr><td>w6</td><td>Lichtwort \(\ell\)</td></tr>
+<tr><td>w7</td><td>Färbung (Gras, Laub, Wasser)</td></tr></table>
+<p>Ein Viereck braucht vier Vertices und einen gemeinsamen Indexpuffer \((4k,4k{+}1,4k{+}2),(4k,4k{+}2,4k{+}3)\) — ein
+Drittel weniger Daten als zwei Dreiecke mit je drei Vertices.</p>
+
+<h2 id="form">4 · Glatte Formen aus Voxeln</h2>
+<p class="lead">Möbel, Palmen und die Modelle im Studio sind Voxel — gezeichnet werden sie als glatte Fläche.</p>
+<p class="src">src/shared/smoothvox.js</p>
+<h3>4.1 Naive Surface Nets</h3>
+<p>Eine Zelle des dualen Gitters liegt auf der Oberfläche, wenn ihre acht Voxel-Ecken weder alle voll noch alle leer sind.
+Sie bekommt genau einen Vertex — den Mittelwert der Mittelpunkte ihrer Kanten mit Vorzeichenwechsel:</p>
+\[ \mathbf v_c=\frac1{|E_c|}\sum_{(\mathbf a,\mathbf b)\in E_c}\frac{\mathbf a+\mathbf b}{2},\qquad E_c=\{\text{Kanten mit }\chi(\mathbf a)\ne\chi(\mathbf b)\} \]
+<p>Jede Voxelkante mit Vorzeichenwechsel erzeugt ein Viereck zwischen den vier Zellen um sie herum.</p>
+<h3>4.2 Glätten mit Grenze</h3>
+\[ \mathbf v^{(k+1)}=\mathbf v^{(0)}+\mathrm{clamp}\Big(\tfrac{1}{|N(\mathbf v)|}\textstyle\sum_{\mathbf u\in N(\mathbf v)}\mathbf u^{(k)}-\mathbf v^{(0)},\;-0{,}35,\;0{,}35\Big),\qquad k=1,2,3 \]
+<p>Die Klammer auf \(\pm0{,}35\) Voxel verhindert, dass ein dünnes Stuhlbein zusammenfällt. Wo sich Material oder Farbe
+scharf ändern, wird die Zelle geteilt: ein Vertex pro Region, damit Kanten Kanten bleiben. Normalen sind flächengewichtete
+Mittel der geglätteten Dreiecke.</p>
+<div class="box">Gemessen: ab 16 Zellen pro Block liest sich ein Surface-Nets-Mesh als Gegenstand statt als Würfelhaufen; 32
+lohnt sich nur innerhalb weniger Blöcke.</div>
+
+<h2 id="bewegung">5 · Bewegung und Kollision</h2>
+<p class="lead">Ein Körper ist eine Box, die Welt ein Gitter. Beschleunigung als exponentielle Annäherung, Kollision als
+Sweep Achse für Achse.</p>
+<p class="src">src/main/player.js · src/shared/physics.js</p>
+<h3>5.1 Geschwindigkeit</h3>
+<p>Statt fester Beschleunigung nähert sich die Geschwindigkeit dem Ziel exponentiell — unabhängig von der Bildrate:</p>
+\[ \mathbf v \leftarrow \mathbf v + (\mathbf v^{*}-\mathbf v)\,\big(1-e^{-k\,\Delta t}\big),\qquad
+k=\begin{cases}14 & \text{am Boden}\\ 3{,}2 & \text{in der Luft}\\ 5 & \text{im Wasser}\\ 9 & \text{fliegend}\end{cases} \]
+<table><tr><th>Gangart</th><th>\(|\mathbf v^*|\) in Blöcken/s</th></tr>
+<tr><td>Schleichen · Gehen · Sprinten</td><td>1,3 · 4,3 · 5,6</td></tr>
+<tr><td>Schwimmen · schnell schwimmen</td><td>3,2 · 5,2</td></tr>
+<tr><td>Fliegen · Sprint-Fliegen</td><td>11 · 23,1</td></tr></table>
+<h3>5.2 Schwerkraft und Sprung</h3>
+\[ v_y \leftarrow \max\big(v_y - g\,\Delta t,\; -78\big),\qquad g = 30\cdot\frac{g_{\text{Welt}}}{9{,}81}\ \tfrac{\text{Blöcke}}{\text{s}^2} \]
+\[ v_{y,0}=9{,}1\ \tfrac{\text{Blöcke}}{\text{s}}\quad\Rightarrow\quad h_{\max}=\frac{v_{y,0}^2}{2g}=\frac{9{,}1^2}{60}\approx 1{,}38\ \text{Blöcke},\qquad t_{\text{Flug}}=\frac{2v_{y,0}}{g}\approx0{,}61\,\text{s} \]
+<p>Ein Block (1 m) passt also mit 0,38 m Luft darüber — und auf einem Mond mit kleinerem \(g\) springt man entsprechend höher.
+Im Wasser dämpft \(v_y\leftarrow v_y\,e^{-2{,}2\Delta t}\) den Auftrieb.</p>
+<h3>5.3 Der Sweep gegen das Gitter</h3>
+<p>Die Bewegung \(\Delta\mathbf p\) wird in der Reihenfolge \(y, x, z\) aufgelöst. Pro Achse wird die erlaubte Strecke gegen
+jede Box \(b\) der Blöcke in der Umgebung gekürzt:</p>
+\[ \Delta y' = \begin{cases}\min\big(\Delta y,\; b_{y0}-a_{y1}\big) & \Delta y>0\\ \max\big(\Delta y,\; b_{y1}-a_{y0}\big) & \Delta y<0\end{cases}\quad\text{falls sich die Boxen in }x\text{ und }z\text{ überlappen} \]
+<p>Stufensteigen: blockiert eine Wand, wird der Versuch um die Stufenhöhe angehoben wiederholt und danach wieder abgesenkt; er
+gilt nur, wenn er horizontal weiter kommt. Ein Schritt ist auf 64 Blöcke begrenzt, ungültige Zahlen zählen als Stillstand.</p>
+<h3>5.4 Der Zielstrahl</h3>
+<p>Der Strahl \(\mathbf o+t\,\mathbf d\) läuft von Zelle zu Zelle (DDA). Die nächste Grenze je Achse liegt bei</p>
+\[ t_{\max,k}=\frac{\lfloor o_k\rfloor+[d_k>0]-o_k}{d_k},\qquad \Delta t_k=\frac{1}{|d_k|} \]
+<p>und in jeder Zelle wird gegen die echten Auswahlboxen des Blocks geschnitten (Slab-Test: \(t_{\min}=\max_k t_{k,0}\),
+\(t_{\max}=\min_k t_{k,1}\), Treffer wenn \(t_{\min}\le t_{\max}\)).</p>
+
+<h2 id="wasser">6 · Wasser</h2>
+<p class="lead">Drei Wellen-Oktaven, ein Spiegel mit schräger Nahebene und Licht, das im Wasser verschluckt wird.</p>
+<p class="src">src/shared/water_wave.js · src/main/shaders.js</p>
+<h3>6.1 Die Oberfläche</h3>
+<p>Eine Summe aus Sinuswellen mit Kammschärfung. Für jede Oktave \(i\) mit Wellenlänge \(\lambda_i\):</p>
+\[ k_i=\frac{2\pi}{\lambda_i},\qquad \omega_i=\sqrt{G\,k_i}\ \ (G=2{,}2),\qquad \theta_i=k_i\,(\mathbf d_i\cdot\mathbf x)-\omega_i t \]
+\[ h(\mathbf x,t)=a\sum_i A_i\sin\theta_i,\qquad \nabla h = a\sum_i A_i k_i\,\mathbf d_i\cos\theta_i \]
+\[ \mathbf n=\frac{\big(-\partial_x h,\;1-a\sum_i q_i\sin\theta_i,\;-\partial_z h\big)}{\|\cdot\|},\qquad q_i=0{,}2\,s_i \]
+<table><tr><th>Oktave</th><th>\(\lambda\) [Blöcke]</th><th>\(A\) [Blöcke]</th><th>Schärfe \(s\)</th><th>Drehung zum Wind</th></tr>
+<tr><td>Dünung</td><td>9,0</td><td>0,10</td><td>0,35</td><td>0</td></tr>
+<tr><td>Wellen</td><td>4,2</td><td>0,045</td><td>0,45</td><td>0,62 rad</td></tr>
+<tr><td>Kräuseln</td><td>1,9</td><td>0,016</td><td>0,30</td><td>−0,9 rad</td></tr></table>
+<p>Die Dispersion \(c=\omega/k=\sqrt{G/k}\) lässt lange Wellen schneller laufen als kurze: die Dünung zieht mit etwa
+1,4 Blöcken pro Sekunde. Der Faktor \(a\) verbindet Wassertiefe und Sturm:</p>
+\[ a = s\Big(\mathrm{clamp}\big(\tfrac{d-0{,}5}{6-0{,}5}\big)\Big)\cdot\mathrm{clamp}(0{,}6+0{,}4\,W;\;0{,}6;\;2{,}2) \]
+<p>Ein Teich bleibt ruhig, das Meer rollt. Dieselbe Tabelle erzeugt den GLSL-Code und das Wippen des schwimmenden Spielers auf
+der CPU — Bild und Physik können nicht auseinanderlaufen.</p>
+<h3>6.2 Der Spiegel</h3>
+<p>Die Spiegelung an der Ebene \(y=d\) (relativ zur Kamera) und Lengyels schräge Nahebene, die alles unter Wasser abschneidet:</p>
+\[ M=\begin{pmatrix}1&0&0&0\\0&-1&0&2d\\0&0&1&0\\0&0&0&1\end{pmatrix},\qquad
+\mathbf q = P^{-1}\big(\mathrm{sgn}\,c_x,\;\mathrm{sgn}\,c_y,\;1,\;1\big)^{\!T},\qquad
+P'_{3,\cdot}=\frac{2\,\mathbf c}{\mathbf c\cdot\mathbf q}-P_{4,\cdot} \]
+<p>Nur die dritte Zeile der Projektion ändert sich; die Clip-Ebene \(\mathbf c\) im Kameraraum wird zur Nahebene, ohne
+einen einzigen zusätzlichen Test im Shader.</p>
+<h3>6.3 Absorption und Fresnel</h3>
+\[ T(\lambda)=e^{-\sigma_\lambda L}\quad(\text{Beer–Lambert}),\qquad F(\theta)=F_0+(1-F_0)(1-\cos\theta)^5,\quad F_0=0{,}02 \]
+<p>Rot verschwindet nach wenigen Blöcken zuerst, deshalb wird tiefes Wasser blau-grün. Am Rand schauen wir fast flach auf
+die Oberfläche: \(F\to1\), das Wasser wird zum Spiegel.</p>
+
+<h2 id="wind">7 · Wind in allem</h2>
+<p class="lead">Ein einziger Wind für die ganze Welt: Pflanzen, Wasser, Wolken und Klang lesen dieselbe Funktion.</p>
+<p class="src">src/shared/wind.js</p>
+<p>Mit der Koordinate längs des Windes \(s=\mathbf x\cdot\mathbf w\) und quer dazu \(c\) läuft ein Böenmuster über das Land:</p>
+\[ \beta = 1{,}6\sin(0{,}045\,c+1{,}3)+0{,}9\sin(0{,}11\,c-0{,}02\,s) \]
+\[ g = \mathrm{clamp}\big(0{,}5+0{,}36\sin(0{,}2417\,(s-7{,}5\,t)+\beta)+0{,}24\sin(0{,}103\,(s-6\,t)+0{,}7\beta+2{,}1)\big) \]
+\[ G = g^2\,\big(0{,}45+0{,}55\,\gamma\big),\qquad \text{Neigung} = \Big(\tfrac{\ell}{3}\Big)^2\cdot0{,}22\cdot W\cdot G \]
+<p>Die Böen laufen mit 7,5 Blöcken pro Sekunde windabwärts, ihre Fronten sind durch \(\beta\) gebogen — man sieht Wellen
+über die Wiese laufen statt eines Sinus pro Halm. Der Stamm bleibt steif, die Spitze frei: die Auslenkung wächst mit dem
+Quadrat der Höhe \(\ell\). Die Zeitterme wiederholen sich in Dritteln eines Tages, sodass um Mitternacht nichts springt.</p>
+
+<h2 id="himmel">8 · Himmel und Atmosphäre</h2>
+<p class="lead">Rayleigh- und Mie-Streuung in drei Wellenlängen, nach Hillaires Verfahren (EGSR 2020), mit echten Konstanten.</p>
+<p class="src">src/main/atmo_lut.js · src/main/light2.js · src/main/shaders.js</p>
+<h3>8.1 Das Medium</h3>
+\[ \beta_R(h)=\beta_R^0\,e^{-h/H_R},\qquad \beta_M(h)=\beta_M^0\,e^{-h/H_M},\qquad \rho_{O_3}(h)=\max\Big(0,\,1-\frac{|h-25\,\text{km}|}{15\,\text{km}}\Big) \]
+<table><tr><th>Größe</th><th>Wert (Herzwelt = Erde)</th></tr>
+<tr><td>\(\beta_R^0\) bei 680 / 550 / 440 nm</td><td>5,802 · 13,558 · 33,1 \(\times10^{-6}\,\text{m}^{-1}\)</td></tr>
+<tr><td>\(H_R\) · \(H_M\)</td><td>8000 m · 1200 m</td></tr>
+<tr><td>Mie: Streuung · Absorption</td><td>3,996 · 0,444 \(\times10^{-6}\,\text{m}^{-1}\)</td></tr>
+<tr><td>Ozon-Absorption</td><td>0,650 · 1,881 · 0,085 \(\times10^{-6}\,\text{m}^{-1}\)</td></tr>
+<tr><td>Planet · Atmosphärenrand</td><td>6360 km · 6460 km</td></tr></table>
+<p>Weil \(\beta_R\propto\lambda^{-4}\), streut Blau etwa 5,7-mal stärker als Rot — der Himmel ist blau, die tiefe Sonne rot.</p>
+<h3>8.2 Phasenfunktionen</h3>
+\[ p_R(\cos\theta)=\frac{3}{16\pi}\,(1+\cos^2\theta),\qquad
+p_{HG}(\cos\theta,g)=\frac{1-g^2}{4\pi\,(1+g^2-2g\cos\theta)^{3/2}},\quad g=0{,}8 \]
+<h3>8.3 Transmission und Mehrfachstreuung</h3>
+\[ T(\mathbf a,\mathbf b)=\exp\Big(-\int_{\mathbf a}^{\mathbf b}\big(\beta_R+\beta_M^{\text{ext}}+\beta_{O_3}\big)\,\mathrm ds\Big) \]
+\[ L(\mathbf x,\mathbf v)=\int_0^{\ell} T(\mathbf x,\mathbf x_t)\Big[\sum_{i\in\{R,M\}}\beta_i(\mathbf x_t)\,p_i(\mathbf v\cdot\mathbf l)\,T_{\text{Sonne}}(\mathbf x_t)\,E+\Psi_{ms}\Big]\mathrm dt,\qquad
+\Psi_{ms}=\frac{L_2}{1-f_{ms}} \]
+<p>Die unendliche Reihe der Mehrfachstreuung wird als geometrische Reihe geschlossen summiert (Hillaire §5.5). Drei Tabellen
+(LUTs) halten das Ergebnis: Transmission \(64\times16\), Mehrfachstreuung \(16\times8\), Himmelsansicht bis \(96\times50\) — und
+werden zeilenweise über mehrere Bilder aufgebaut, damit kein einzelnes Bild die ganze Rechnung zahlt.</p>
+<h3>8.4 Andere Welten</h3>
+<p>Aquamarin hat 0,5 bar bei \(g=2{,}01\,\text{m/s}^2\): die Skalenhöhen wachsen mit \(9{,}81/2{,}01=4{,}88\), die Säule ist
+2,4-mal so dick wie die der Erde — weißer Horizont, tiefrote Sonnenuntergänge. Ocker ist Mars: Staub mit optischer Dicke
+\(\tau=0{,}3\ldots4{,}5\), Skalenhöhe 11,6 km, farbige Albedo \(\omega=(0{,}97;0{,}875;0{,}62)\) und eine Henyey-Greenstein-Keule
+pro Wellenlänge, \(g=(0{,}62;0{,}67;0{,}77)\) — deshalb wird der Himmel um die untergehende Sonne blau.</p>
+<h3>8.5 Dunst</h3>
+\[ f=\max\Big(\mathrm{ss}(d_0,d_1,\hat d),\;0{,}85\big(1-e^{-k\,d}\big)\Big),\qquad \hat d=\max\big(\|\mathbf r_{xz}\|,\;0{,}35\,|r_y|\big),\qquad
+C=\mathrm{lerp}(C_{\text{Szene}},\,C_{\text{Horizont}},\,f) \]
+<p>Der Dunst nimmt die Farbe des Horizonts an, deshalb gibt es keine Naht zwischen ferner Welt und Himmel.</p>
+
+<h2 id="material">9 · Material und Glanz</h2>
+<p class="lead">Ein physikalisch basiertes Glanzmodell — nur dort gerechnet, wo etwas glänzt.</p>
+<p class="src">src/main/shaders.js (pbrSun, pbrShade)</p>
+\[ D_{GGX}=\min\!\Big(\frac{\alpha^2}{\pi\big((\mathbf n\cdot\mathbf h)^2(\alpha^2-1)+1\big)^2},\,48\Big),\qquad \alpha=r^2 \]
+\[ F=F_0+(1-F_0)(1-\mathbf v\cdot\mathbf h)^5,\qquad V_{\text{Kelemen}}=\frac{1}{4\,\max\big((\mathbf v\cdot\mathbf h)^2,\,0{,}06\big)} \]
+\[ f_{\text{spec}} = D\,F\,V,\qquad F_0=\mathrm{lerp}(0{,}04,\;\text{Albedo},\;\text{Metall}) \]
+\[ F_r=F_0+\big(\max(1-r,F_0)-F_0\big)(1-\mathbf n\cdot\mathbf v)^5\qquad(\text{Schlick mit Rauheit}) \]
+\[ C = C_{\text{diffus}}(1-0{,}8m)\big(1-F_r(1-m)\big)+E_{\text{Himmel}}(\mathbf r)\,F_r+L_{\text{Sonne}}\,(\mathbf n\cdot\mathbf l)\,f_{\text{spec}} \]
+<p>Die Kappung von \(D\) bei 48 verhindert „Glühwürmchen“: einzelne überhelle Pixel, die unter dem Sub-Pixel-Zittern
+der Super-Resolution flackern würden. Raue, matte, nichtmetallische Flächen (\(r>0{,}8\)) überspringen die ganze Rechnung.</p>
+<p>Die Grundbeleuchtung einer Fläche:</p>
+\[ C_{\text{diffus}} = \text{Albedo}\cdot\Big[\big(E_{\text{amb}}\,s\,\mathrm{lerp}(0{,}62,1,\phi)+L_{\text{Sonne}}\max(0,\mathbf n\cdot\mathbf l)\,S\big)\,\mathrm{ao}+L_{\text{Block}}\,\mathrm{ao}\Big] \]
+<p>mit der Flächenschattierung \(\phi\in\{1;\,0{,}88;\,0{,}78;\,0{,}55\}\) für oben, Seiten und unten — der klassische Voxel-Look,
+der Formen auch ohne Sonne lesbar macht.</p>
+
+<h2 id="schatten">10 · Schatten</h2>
+<p class="src">src/main/renderer.js · src/main/shaders.js (shadowAt)</p>
+<p>Eine Schattenkarte aus Sicht der Sonne (3072² auf Ultra). Vier hardware-gefilterte Vergleiche glätten den Rand:</p>
+\[ S=\frac14\sum_{(i,j)\in\{\pm0{,}6\}^2}\mathrm{cmp}\Big(\mathrm{SM}\big(\mathbf u+(i,j)\,\tau\big),\;z-b\Big),\qquad b=0{,}0006 \]
+<p>Die Karte ist toroidal adressiert: wandert die Kamera, wird nur der neu sichtbare Streifen gezeichnet
+(\(\mathbf u'=\mathrm{fract}(\mathbf u+\mathbf o)\)). Neu gezeichnet wird nur, wenn die Sonne um 0,25° weitergezogen ist, die
+Kamera die mittleren 18 % verlassen hat oder sich Blöcke in der Nähe geändert haben. Jenseits der Karte schätzt ein
+Strahl durch die Höhenkarte die Sicht zur Sonne.</p>
+
+<h2 id="bild">11 · Vom Licht zum Bild</h2>
+<p class="lead">Gerechnet wird in HDR. Erst am Ende wird daraus ein Bild, das ein Bildschirm zeigen kann.</p>
+<p class="src">src/main/shaders.js (tonemap, POST_FS)</p>
+<h3>11.1 Tonkurve</h3>
+\[ \mathrm{ACES}(x)=\mathrm{clamp}\Big(\frac{x(2{,}51x+0{,}03)}{x(2{,}43x+0{,}59)+0{,}14},\,0,\,1\Big) \]
+<p>Pro Kanal angewandt verwäscht ACES gesättigte Farben zu Weiß. Deshalb wird mit einer farbtonerhaltenden Version gemischt:</p>
+\[ \ell=0{,}2126R+0{,}7152G+0{,}0722B,\qquad \mathbf h=\mathbf x\,\frac{\mathrm{ACES}(\ell)}{\ell},\qquad
+\mathbf c=\mathrm{lerp}\big(\mathrm{ACES}(\mathbf x),\,\mathbf h,\,v\big) \]
+<p>So bleiben Sonnenuntergänge orange, Kristalle cyan und Lava rot.</p>
+<h3>11.2 Die Kette</h3>
+\[ \mathbf c \;\xrightarrow{\times\,\text{Belichtung}}\;\xrightarrow{\text{Tonkurve}}\;\mathrm{lerp}(\ell,\mathbf c,\text{Sättigung})\;\xrightarrow{\;c+\kappa\,(c^2(3-2c)-c)\;}\;\big(1-\nu\,|\mathbf u-\tfrac12|^2\big)\,\mathbf c\;\xrightarrow{\;c^{1/2{,}2}\;} \text{Bildschirm} \]
+<p>Die S-Kurve \(c^2(3-2c)\) vertieft die Schatten und hebt die Lichter, ohne die Enden zu verschieben.</p>
+<h3>11.3 Weiches Einblenden</h3>
+<p>Ein neuer Abschnitt der Welt erscheint über 300 ms. Statt Transparenz (teuer, Sortierung) wird gerastert verworfen, mit
+einer geordneten 4×4-Bayer-Matrix:</p>
+\[ b_2(\mathbf a)=\mathrm{fract}\big(\tfrac12 a_x+\tfrac34 a_y^2\big),\qquad b_4(\mathbf a)=\tfrac14\,b_2(\tfrac12\mathbf a)+b_2(\mathbf a),\qquad
+\text{verwerfen, wenn } b_4(\mathbf p)\ge\text{fade} \]
+<p>Regel: nie über dem eigenen Fade des Chunks — so entsteht nie ein Loch, durch das man den Himmel sieht.</p>
+
+<h2 id="tsr">12 · R9 Super Resolution</h2>
+<p class="lead">Weniger Pixel rechnen und trotzdem scharf zeigen: jedes Bild leicht versetzt, die Geschichte aufbewahren.</p>
+<p class="src">src/main/renderer.js · src/main/shaders.js (TSR_FS)</p>
+<h3>12.1 Zittern nach Halton</h3>
+\[ H_b(i)=\sum_k d_k\,b^{-k-1}\quad\text{für } i=\sum_k d_k b^k,\qquad
+\boldsymbol\delta_n=\Big(\tfrac{2(H_2(n)-\frac12)}{W},\;\tfrac{2(H_3(n)-\frac12)}{H}\Big),\quad n=1\ldots8 \]
+<p>Der Versatz wird direkt in die Projektionsmatrix geschrieben (\(P_{0,2}\mathrel{+}=\delta_x,\;P_{1,2}\mathrel{+}=\delta_y\)).</p>
+<h3>12.2 Rekonstruktion</h3>
+<p>Das neue Bild an einem Ausgabepixel aus den neun nächsten Proben, gewichtet nach Abstand \(\mathbf d\) in Ausgabepixeln:</p>
+\[ w_j=e^{-4\,|\mathbf d_j|^2},\qquad \mathbf c=\frac{\sum_j w_j\,\mathbf y_j}{\sum_j w_j},\qquad
+\mathbf y=\mathrm{YCoCg}\Big(\frac{\mathbf x}{1+\max_k x_k}\Big) \]
+<p>Die umkehrbare Tonkurve \(\mathbf x/(1+\max x)\) verhindert, dass ein einzelnes helles Pixel den Durchschnitt dominiert.</p>
+<h3>12.3 Geschichte und Varianz-Klammer</h3>
+<p>Wo war dieser Punkt im letzten Bild? Rückprojektion über die Tiefe (die nächste der Nachbarn, damit Kanten nicht
+schmieren):</p>
+\[ \mathbf p_w = (VP)^{-1}\,(\mathbf u_{\text{ndc}},\,z_{\min},\,1),\qquad \mathbf u_{\text{alt}}=\pi\big(VP_{\text{alt}}\,(\mathbf p_w+\Delta\mathbf c)\big) \]
+\[ \boldsymbol\mu=\tfrac19\textstyle\sum\mathbf y_j,\quad \boldsymbol\sigma=\sqrt{\tfrac19\sum\mathbf y_j^2-\boldsymbol\mu^2},\qquad
+\mathbf h'=\mathrm{clamp}\big(\mathbf h,\;\boldsymbol\mu-\gamma\boldsymbol\sigma,\;\boldsymbol\mu+\gamma\boldsymbol\sigma\big),\quad \gamma=\mathrm{lerp}(1;0{,}7;m) \]
+\[ \mathbf r=\mathrm{lerp}(\mathbf h',\,\mathbf c,\,\alpha),\qquad \alpha = \mathrm{lerp}(0{,}12;\,0{,}3;\,\max(m,v_{\text{Kamera}}))\cdot\mathrm{clamp}\big(\tfrac{\sum w}{0{,}9}\big)+0{,}02 \]
+<h3>12.4 Catmull-Rom mit fünf Abfragen</h3>
+<p>Damit die Geschichte über viele Bilder nicht weich wird, wird sie bikubisch gelesen:</p>
+\[ w_0=f\big(-\tfrac12+f(1-\tfrac f2)\big),\quad w_1=1+f^2\big(-\tfrac52+\tfrac32f\big),\quad w_2=f\big(\tfrac12+f(2-\tfrac32f)\big),\quad w_3=f^2\big(-\tfrac12+\tfrac12f\big) \]
+<p>Die beiden mittleren Gewichte werden zu einer bilinearen Abfrage an \(t_{12}=t_c+w_2/(w_1+w_2)\) zusammengelegt; die vier
+Eckabfragen fallen weg (ihr Gewicht ist klein) — fünf Texturzugriffe statt sechzehn.</p>
+
+<h2 id="raum">13 · Das Sonnensystem</h2>
+<p class="lead">Helia, der Ringriese Amarant und seine Monde laufen auf Kepler-Bahnen; ein Raumschiff folgt gepatchten
+Kegelschnitten.</p>
+<p class="src">src/shared/universe.js</p>
+<h3>13.1 Keplers Gleichung</h3>
+\[ M = M_0 + n\,(t-t_0),\qquad n=\sqrt{\mu/a^3},\qquad E - e\sin E = M \]
+<p>Startwert nach Mikkola (1987), genau auf etwa \(10^{-3}\):</p>
+\[ \alpha=\frac{1-e}{4e+\frac12},\quad \beta=\frac{M/2}{4e+\frac12},\quad z=\sqrt[3]{\beta\pm\sqrt{\beta^2+\alpha^3}},\quad s=z-\frac{\alpha}{z},\quad s\leftarrow s-\frac{0{,}078\,s^5}{1+e} \]
+\[ E_0=M+e\,s\,(3-4s^2),\qquad E_{k+1}=E_k-\frac{E_k-e\sin E_k-M}{1-e\cos E_k} \]
+<p>Newton verdoppelt die Stellen pro Schritt: nach vier Schritten ist die Grenze einer Gleitkommazahl erreicht
+(\(e\le0{,}97\)). Hyperbolisch: \(e\sinh H-H=M\), Newton von rechts der Wurzel, wo \(f\) konvex ist und nie überschießt.</p>
+<h3>13.2 Bahnelemente → Ort</h3>
+\[ \mathbf r = a(\cos E-e)\,\mathbf P + a\sqrt{1-e^2}\,\sin E\,\mathbf Q \]
+\[ \mathbf P=\begin{pmatrix}\cos\Omega\cos\omega-\sin\Omega\sin\omega\cos i\\ \sin\Omega\cos\omega+\cos\Omega\sin\omega\cos i\\ \sin\omega\sin i\end{pmatrix},\quad
+\mathbf Q=\begin{pmatrix}-\cos\Omega\sin\omega-\sin\Omega\cos\omega\cos i\\ -\sin\Omega\sin\omega+\cos\Omega\cos\omega\cos i\\ \cos\omega\sin i\end{pmatrix} \]
+<h3>13.3 Gleiten: universelle Variablen</h3>
+<p>Ohne Schub fliegt ein Schiff exakt — nichts wird integriert. Mit \(\alpha=2/r_0-v_0^2/\mu\) (Ellipse, Parabel und Hyperbel
+in einer Formel) und den Stumpff-Funktionen</p>
+\[ C(z)=\frac{1-\cos\sqrt z}{z},\qquad S(z)=\frac{\sqrt z-\sin\sqrt z}{\sqrt{z^3}}\qquad(z=\alpha\chi^2;\ \text{für }z<0\text{ mit cosh, sinh; nahe 0 als Reihe}) \]
+<p>wird die universelle Anomalie \(\chi\) aus</p>
+\[ \sqrt\mu\,\Delta t=\frac{\mathbf r_0\cdot\mathbf v_0}{\sqrt\mu}\chi^2C(z)+(1-\alpha r_0)\,\chi^3S(z)+r_0\,\chi \]
+<p>mit eingeklammertem Newton-Verfahren gelöst, dann</p>
+\[ f=1-\frac{\chi^2}{r_0}C,\quad g=\Delta t-\frac{\chi^3}{\sqrt\mu}S,\quad \mathbf r=f\mathbf r_0+g\mathbf v_0,\quad
+\dot f=\frac{\sqrt\mu}{r\,r_0}\chi(zS-1),\quad \dot g=1-\frac{\chi^2}{r}C,\quad \mathbf v=\dot f\mathbf r_0+\dot g\mathbf v_0 \]
+<p>Energie und Drehimpuls bleiben über hundert Umläufe auf \(10^{-12}\) erhalten.</p>
+<h3>13.4 Schub: Velocity Verlet</h3>
+\[ \mathbf v_{n+\frac12}=\mathbf v_n+\tfrac{\Delta t}{2}(\mathbf a_n+\mathbf a_T),\qquad \mathbf r_{n+1}=\mathbf r_n+\Delta t\,\mathbf v_{n+\frac12},\qquad
+\mathbf a_{n+1}=-\frac{\mu\,\mathbf r_{n+1}}{|\mathbf r_{n+1}|^3},\qquad \mathbf v_{n+1}=\mathbf v_{n+\frac12}+\tfrac{\Delta t}{2}(\mathbf a_{n+1}+\mathbf a_T) \]
+<p>Symplektisch: bei \(\Delta t=1/120\,\text{s}\) bleibt die Energie über zehn niedrige Umläufe auf \(10^{-8}\).</p>
+<h3>13.5 Zweikörper-Werkzeuge</h3>
+\[ v_{\text{kreis}}=\sqrt{\frac\mu r},\quad v_{\text{flucht}}=\sqrt{\frac{2\mu}{r}},\quad T=2\pi\sqrt{\frac{a^3}{\mu}},\quad
+v^2=\mu\Big(\frac2r-\frac1a\Big)\ (\text{vis-viva}) \]
+\[ \text{Hohmann: } a_t=\tfrac{r_1+r_2}{2},\quad \Delta v=\Big|\sqrt{\mu(\tfrac{2}{r_1}-\tfrac1{a_t})}-\sqrt{\tfrac\mu{r_1}}\Big|+\Big|\sqrt{\tfrac\mu{r_2}}-\sqrt{\mu(\tfrac{2}{r_2}-\tfrac1{a_t})}\Big|,\quad t=\pi\sqrt{\tfrac{a_t^3}{\mu}} \]
+\[ r_{\text{SOI}}=a\Big(\frac{\mu}{\mu_P}\Big)^{2/5},\qquad r_{\text{Hill}}=a(1-e)\sqrt[3]{\frac{\mu}{3\mu_P}},\qquad
+\Delta v_{\text{aus Orbit}}=\sqrt{v_\infty^2+\frac{2\mu}{r}}-\sqrt{\frac\mu r} \]
+<h3>13.6 Der Maßstab</h3>
+<p>Längen sind \(1/64\) der echten, die Schwerkraft an der Oberfläche ist echt: \(\mu=gR^2\). Damit</p>
+\[ \mu_{\text{Spiel}}=\frac{\mu_{\text{echt}}}{64^2},\qquad T_{\text{Spiel}}=2\pi\sqrt{\frac{(a/64)^3}{\mu/64^2}}=\frac{T_{\text{echt}}}{\sqrt{64}}=\frac{T_{\text{echt}}}{8} \]
+<p>Eine Bahn in 3 km Höhe um Herzwelt dauert 11 Minuten. Beim Aufstieg krümmt sich die Welt um \(y-\frac{d^2}{2R}\), die Luft
+wird mit einer Skalenhöhe von 400 m dünner, und die Krater der Monde folgen der echten Größenverteilung
+\(N(>D)\propto D^{-2{,}9}\) mit dem Übergang von einfachen zu komplexen Kratern bei 18 km.</p>
+
+<h2 id="leistung">14 · Rechnen mit dem Budget</h2>
+<p class="lead">Ein schwacher Rechner soll flüssig bleiben. Dafür misst das Spiel sich selbst — und regelt.</p>
+<p class="src">src/shared/stream.js · src/main/kosten.js · src/main/ipu.js</p>
+<h3>14.1 Was kostet ein Byte?</h3>
+<p>Die Verzögerung der GPU pro Bild wird über Fences gemessen und gewichtet linear gefittet:</p>
+\[ \text{lag}(b)=a+\hat\beta\,b,\qquad
+\hat\beta=\frac{\sum w\sum wxy-\sum wx\sum wy}{\sum w\sum wx^2-\big(\sum wx\big)^2} \]
+\[ \text{Budget}_{\text{Bytes}}=\frac{t_{\text{Preset}}\cdot\text{Stufe}\cdot s\cdot\max\!\big(1,\tfrac{\tilde t_{\text{Bild}}}{33\,\text{ms}}\big)-\text{Schuld}}{\max(\text{ms/Byte}_{\text{CPU}},\,\text{ms/Byte}_{\text{GPU}})} \]
+<p>Der Faktor \(s\) folgt AIMD (wie TCP): ein zu langes Bild halbiert ihn, ein schnelles erhöht ihn um 0,05.</p>
+<h3>14.2 A/B/A-Messung</h3>
+<p>Ob eine Einstellung Zeit spart, wird nicht geschätzt, sondern gemessen: Basis, Versuch, Basis — mit getrimmtem Mittel
+und erst, wenn die Welt ruhig ist.</p>
+\[ \Delta = \bar t_{\text{trim}}(B)-\tfrac12\big(\bar t_{\text{trim}}(A_1)+\bar t_{\text{trim}}(A_2)\big) \]
+<table><tr><th>Gemessen auf einer AMD-Vega-APU (Ultra)</th><th>Ersparnis pro Bild</th></tr>
+<tr><td>Laub-Vorlauf aus (zPre)</td><td>−18,5 ms</td></tr>
+<tr><td>halbe Dreiecke · halbe Abschnitte</td><td>−11,7 · −11,3 ms</td></tr>
+<tr><td>Sichtweite 16 → 12</td><td>−7,2 ms</td></tr>
+<tr><td>Wasser Stufe 2 → 1</td><td>−7,2 ms</td></tr>
+<tr><td>Ferne schlicht</td><td>−2 … −3 ms</td></tr>
+<tr><td>Auflösung ×0,8</td><td>−2 ms</td></tr></table>
+<p>Die Lehre: das Gelände auf einer integrierten GPU kostet nach Dreiecken, nicht nach Pixeln. Darum wird die Ferne mit
+schlichteren Meshes gezeichnet statt die Auflösung zu senken.</p>
+<h3>14.3 Die Automatik</h3>
+<p>Drei Sekunden Messung, dann eine Stufe auf einer Leiter aus neun (Preset × Sichtweite) nach dem Verhältnis
+\(\rho=\tilde t_{\text{Bild}}/t_{\text{Ziel}}\). Der Stufentest nennt die Stufe, die flüssig ist (auch die langsamen Bilder
+schaffen 50 fps), und die, die spielbar ist (Median 30 fps).</p>
+
+<h2 id="klang">15 · Klang aus Formeln</h2>
+<p class="src">src/main/audio.js · src/main/ambience.js</p>
+<p>Kein einziger Ton ist aufgenommen. Jeder wird beim Start synthetisiert.</p>
+\[ f(m)=440\,\text{Hz}\cdot2^{(m-69)/12},\qquad \text{Pentatonik: } m\in m_0+S+12k,\quad S_{\text{Dur}}=\{0,2,4,7,9\},\ S_{\text{Moll}}=\{0,3,5,7,10\} \]
+<p>Eine Stufe \(d\) wird zu \(m=m_0+S[d \bmod 5]+12\lfloor d/5\rfloor\); ein Akkord sind die Stufen \(d, d{+}2, d{+}4\). In der
+Pentatonik gibt es keine Halbtonreibung — jede Kombination klingt, darum kann der Plan frei würfeln.</p>
+<p>Eine Glocke ist ein Sinus mit leicht verstimmter Oktave darüber (\(2{,}01f\), 30 % Lautstärke, 70 % Dauer) — die
+Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag klingt in derselben Welt gleich. Unter
+Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
+
+<h2 id="schluss">16 · Offen und frei</h2>
+<p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist
+eine einzige HTML-Datei, die ohne Installation im Browser läuft. Jede Formel in diesem Heft lässt sich dort nachlesen und
+mit den Node-Tests nachprüfen — jeder Test endet mit <code>ALL OK</code> oder <code>FAILED n</code>.</p>
+<div class="box"><b>github.com/n0t3-droid/R9-SI</b><br>Spielen: <code>play/R9-SI.html</code> herunterladen, doppelklicken.
+Selbst bauen: <code>node build.js</code>.</div>
+<p class="small">Nicht offiziell. Nicht verbunden mit Mojang oder Microsoft. Alle Texturen, Klänge, Modelle und Welten sind
+prozedural und eigene Arbeit.</p>

@@ -1,11 +1,11 @@
-# Builds the game and the Studio from the sources and publishes dist/ to GitHub Pages on every push to master.
+# Builds the game and the Studio from the sources and publishes dist/ to GitHub Pages on every push to master or main.
 # Enable once in the repository: Settings → Pages → Source: "GitHub Actions". The game is then at
 # https://<user>.github.io/R9-SI/ (index.html) and the Studio at …/R9-SI/studio.html — single-player; playing
 # together needs the copy on claude.ai (its room service), the game says so itself.
 name: Pages
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   workflow_dispatch:
 permissions:
   contents: read
