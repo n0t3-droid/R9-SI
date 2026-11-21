@@ -1077,7 +1077,10 @@
         const gOk = aq.g < gLadder.length && !(aq.bad.g && now - aq.bad.g < 30);
         const cOk = aq.c < cLadder.length && !(aq.bad.c && now - aq.bad.c < 30);
         let kind = null;
-        if (gpuBound && gOk) kind = 'g'; else if (cpuBound && cOk) kind = 'c'; else if (gOk) kind = 'g'; else if (cOk) kind = 'c';
+        // v0.55.91: a GPU-bound frame never takes the CPU ladder — its first rungs slow the streaming, which buys a GPU-bound
+        // machine no frame rate but left the land, the trees and the mountains coming in late (grey forms, late crowns)
+        const measured = gpuMs !== undefined;
+        if (gpuBound && gOk) kind = 'g'; else if (cpuBound && cOk) kind = 'c'; else if (gOk) kind = 'g'; else if (cOk && !(measured && gpuBound)) kind = 'c';
         if (kind) { this.aqPush(aq, kind, S, w); aq.probe = { kind, fps0: fps }; aq.hold = 2.5; }
       } else if (fine && aq.stack.length) {
         aq.good += dt;

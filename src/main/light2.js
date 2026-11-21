@@ -676,6 +676,9 @@ uniform vec2 u_l2nf;
 vec3 l2VolAt(vec2 uv) {
   float zd = texture(u_l2Depth, uv).r * 2.0 - 1.0;
   float z = 2.0 * u_l2nf.x * u_l2nf.y / (u_l2nf.y + u_l2nf.x - zd * (u_l2nf.y - u_l2nf.x));
+  // v0.55.91: by now the depth holds the hand alone (its pass cleared the world's) — the hand and the held block get no light
+  // of the air behind them (they turned pale, almost white, in every frame with the god rays when looking at the sky)
+  if (z < 2.0) return vec3(0.0);
   vec2 t = uv * u_l2VolSize - 0.5, f = fract(t), b = (floor(t) + 0.5) / u_l2VolSize, e = 1.0 / u_l2VolSize;
   vec4 a = texture(u_l2Vol, b), bb = texture(u_l2Vol, b + vec2(e.x, 0.0)), c = texture(u_l2Vol, b + vec2(0.0, e.y)), d = texture(u_l2Vol, b + e);
   vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);

@@ -267,8 +267,39 @@
         if (dx < -32 || dz < -32 || dx > 31 || dz > 31) continue;
         m[(dz + 32) * 64 + dx + 32] = Math.round(255 * s.fade);
       }
+      this.holdMask(m, 64, ccx, ccz, w ? w.renderDist : 0, 'h0');
       gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.UNSIGNED_BYTE, m);
+    }
+    // v0.55.91 · no one-frame flashes of the far land: the visible list comes from the cave-culling flood, and a column it
+    // misses for a frame or two (the camera crossing a section, the flood's cache renewed) lost its cut, so the coarse far
+    // land showed through for that frame (grey slabs behind a mountain). A column that was in the mask keeps its last fade
+    // for HOLD frames after it drops out — inside the view distance only (at the edge a column really leaves).
+    holdMask(m, N, ccx, ccz, rd, tag) {
+      const HOLD = 12, H = N >> 1;
+      let st = this[tag];
+      if (!st || st.n !== N) st = this[tag] = { n: N, prev: new Uint8Array(N * N), hold: new Uint8Array(N * N), cx: ccx, cz: ccz, tmp: new Uint8Array(N * N) };
+      if (st.cx !== ccx || st.cz !== ccz) {   // (the camera's column moved: the held texels move with the land)
+        const ox = ccx - st.cx, oz = ccz - st.cz;
+        for (const a of [st.prev, st.hold]) {
+          const t = st.tmp; t.fill(0);
+          for (let z = 0; z < N; z++) { const sz = z + oz; if (sz < 0 || sz >= N) continue; for (let x = 0; x < N; x++) { const sx = x + ox; if (sx >= 0 && sx < N) t[z * N + x] = a[sz * N + sx]; } }
+          a.set(t);
+        }
+        st.cx = ccx; st.cz = ccz;
+      }
+      const lim = Math.max(0, rd - 1.5), lim2 = lim * lim, prev = st.prev, hold = st.hold;
+      for (let z = 0; z < N; z++) {
+        const dz = z - H;
+        for (let x = 0; x < N; x++) {
+          const i = z * N + x;
+          if (m[i]) { prev[i] = m[i]; hold[i] = HOLD; continue; }
+          if (!hold[i]) continue;
+          const dx = x - H;
+          if (dx * dx + dz * dz > lim2) { hold[i] = 0; continue; }
+          hold[i]--; m[i] = prev[i];
+        }
+      }
     }
     // F-Far: the far mask while ring 1 is on — 136 x 136 columns around the camera's (ring 0 reaches 32 chunks on Ultra,
     // ring 1 64): maskF = the chunks' fades (rebuilt every frame from the renderer's visible list, as updateMask),
@@ -290,6 +321,7 @@
         if (dx < -H || dz < -H || dx >= H || dz >= H) continue;
         m[(dz + H) * N + dx + H] = Math.round(255 * s.fade);
       }
+      this.holdMask(m, N, ccx, ccz, w ? w.renderDist : 0, 'hF');
       gl.bindTexture(gl.TEXTURE_2D, this.maskTexF);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RED, gl.UNSIGNED_BYTE, m);
       if (this.far.maskUp) { gl.bindTexture(gl.TEXTURE_2D, this.maskTex1); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RED, gl.UNSIGNED_BYTE, this.far.maskG); this.far.maskUp = false; }

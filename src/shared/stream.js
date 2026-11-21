@@ -324,7 +324,7 @@
     if (frameMs < targetMs * 0.7) return Math.max(0, r - 1);
     return Math.max(0, Math.min(2, r));
   };
-  S.streamScale = function (rung) { return [1, 0.5, 0.25][Math.max(0, Math.min(2, rung | 0))]; };
+  S.streamScale = function (rung) { return [1, 0.7, 0.5][Math.max(0, Math.min(2, rung | 0))]; };   // (v0.55.91: 0.5 / 0.25 starved the streaming — the land came in late)
 
   // p-stream · the streaming plan: which chunk columns are worth asking for while the player moves fast, in what order,
   // and how the workers' time is split between the chunks and the far tiles. Pure functions (test/stream_plan.js);

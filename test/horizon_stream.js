@@ -185,8 +185,8 @@ function run(budget, items, opts) {
   r = S.streamRung(60, target, r); check('rung: the stream never goes below a quarter (stays at 2)', r === 2);
   r = S.streamRung(10, target, r); check('rung: a fine frame steps it back up (2 → 1)', r === 1);
   r = S.streamRung(16.9, target, 1); check('rung: frames near the target keep the rung (hysteresis)', r === 1);
-  check('rung: the scale is 1, 1/2, 1/4', S.streamScale(0) === 1 && S.streamScale(1) === 0.5 && S.streamScale(2) === 0.25);
-  check('rung: the scale is clamped', S.streamScale(9) === 0.25 && S.streamScale(-3) === 1);
+  check('rung: the scale is 1, 0.7, 0.5 (v0.55.91)', S.streamScale(0) === 1 && S.streamScale(1) === 0.7 && S.streamScale(2) === 0.5);
+  check('rung: the scale is clamped', S.streamScale(9) === 0.5 && S.streamScale(-3) === 1);
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

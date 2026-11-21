@@ -1044,9 +1044,25 @@ float clockVis(vec3 lp, vec3 N) {
   int wi = (sl >> 5) & 3;
   uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
   if ((word & (1u << uint(sl & 31))) == 0u) return -1.0;
-  vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));   // (layers 0…63 of the one volume)
   float s = u_clockWin.w;
+#ifdef LITE
+  vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));   // (layers 0…63 of the one volume)
   float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
+#else
+  // v0.55.91: the edge time d per texel, then blended — blending the intervals' ends instead lit thin false bands between a
+  // cell lit in the morning and one lit in the afternoon (bright arcs on trunks and ground under the crowns at noon)
+  vec3 p = vec3(wp.x - 0.5, wp.z - 0.5, clamp(mod(wp.y, 64.0), 0.5, 63.5) - 0.5);
+  vec3 i0 = floor(p), f = p - i0;
+  ivec3 a = ivec3(i0);
+  int y0 = clamp(a.z, 0, 63), y1 = min(y0 + 1, 63);
+  float d = 0.0;
+  for (int k = 0; k < 8; k++) {
+    int ox = k & 1, oz = (k >> 1) & 1, oy = k >> 2;
+    vec4 u = texelFetch(u_clockVol, ivec3((a.x + ox) & 127, (a.y + oz) & 127, oy == 0 ? y0 : y1), 0);
+    float w = (ox == 0 ? 1.0 - f.x : f.x) * (oz == 0 ? 1.0 - f.y : f.y) * (oy == 0 ? 1.0 - f.z : f.z);
+    d += w * max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
+  }
+#endif
   return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 }
 // e-himmel · E2 Himmelslicht: the share of the sky the cell in front of the face sees (baked with the clocks, one more
