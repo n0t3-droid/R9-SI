@@ -66,7 +66,7 @@ for (let k = 0; k < 40; k++) {
   if (s[0] > s[1]) blos++;
 }
 check(reds >= 8 && yell >= 8, `autumn: the trees red and gold, tree by tree (${reds} red, ${yell} gold of 40)`);
-check(blos >= 8 && blos <= 24, `spring: some trees in blossom (${blos} of 40)`);
+check(blos === 0, `spring: the green crowns stay green — no pink cells (t-trees2) (${blos} of 40)`);
 const wl = tint(leaf, 3, { leaf: true });
 check(lum(wl) > lum(leaf) * 2.5, 'winter: the leaves frosted');
 const half = S.tint(grass, [0.5, 0.5, 0, 0], { top: true, h: 0.3 });

@@ -479,6 +479,7 @@
       const rcb = TRC[b], tint = rcb || tintAt(TTINT[b], x, z, b);
       let w5 = dd | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (rcb ? 32768 : 0);
       if (fl & F.WAVELEAF) w5 |= 1 << 7;
+      if ((fl & F.LEAVES) || (RCL !== null && RCL[b] !== 0)) w5 |= (1 << 7) | (1 << 13);   // (t-trees2: a round crown's leaf face — the shader fills the texture's holes: the blob has no inside to see through)
       const w3 = texW3(TTEX[b * 6 + dd], fl, dd, b);
       const start = (bright(0) + bright(2) < bright(1) + bright(3)) ? 1 : 0;
       // q-art4 · the leaves' texture planar along the face's main axis (the world position in sixteenths, from the quad's

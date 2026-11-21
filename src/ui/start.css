@@ -73,6 +73,18 @@ html.pro #title .foot .credit { margin-left: auto; }
   html.pro #title .foot #gpuinfo, html.pro #title .foot .credit { margin: 0; }
 }
 
+/* a phone on its side and other short screens (≤ 480 px high, wider than 760): the logo to the left of the strip (it sat
+   under the buttons), smaller tiles, the foot in the flow (it lay over the R9-Paket button) — start_audit.mjs */
+@media (max-height: 480px) and (min-width: 761px) {
+  #title .start { justify-content: flex-start; padding: 8px 16px 10px; gap: 8px; }
+  #title .brand { align-self: flex-start; margin: 2px 0 0 4px; min-height: 52px; justify-content: center; }   /* (as high as the strip: the tiles start under it) */
+  #title .brand .logo { font-size: 30px; letter-spacing: 3px; }
+  #title .tiles { grid-template-columns: repeat(4, minmax(120px, 190px)); gap: 12px; }
+  .tile { aspect-ratio: auto; min-height: 112px; padding: 8px; gap: 4px; }
+  .tile .pic { width: 40px; height: 40px; }
+  #title .foot { position: static; margin-top: auto; }
+}
+
 /* the language picker (i18n.js) */
 .langpick { position: relative; }
 .langpick .lp-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-bg); color: var(--st-ink); font: 700 var(--st-fs) var(--st-font); cursor: pointer; }
