@@ -61,7 +61,9 @@ for (const S of SHOTS) {
     const fl = (x, y, z) => { const s = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return s ? R.T.flags[s] : 0; };
     const cp = Math.cos(pitch), dx = -Math.sin(yaw) * cp, dy = Math.sin(pitch), dz = -Math.cos(yaw) * cp, hx = Math.hypot(dx, dz) || 1;
     const box = (x, y, z) => { for (const b of [-0.6, 0, 0.9]) for (let a = -1; a <= 1; a++) for (let c = -1; c <= 1; c++) if (fl(x + a * 0.9, y + b, z + c * 0.9) & F.SOLID) return false; return true; };
-    const ray = (x, y, z) => { for (let t = 0.5; t <= 8; t += 0.25) if (fl(x + dx * t, y + dy * t, z + dz * t) & (F.OPAQUE | F.LEAVES | F.SOLID)) return false; return true; };
+    const ray1 = (x, y, z, ex, ez, far) => { for (let t = 0.5; t <= far; t += 0.25) if (fl(x + ex * t, y + dy * t, z + ez * t) & (F.OPAQUE | F.LEAVES | F.SOLID)) return false; return true; };
+    // (v0.55.92: the centre and ±18° clear for 24 blocks — a big crown beside the eye filled half the vista before)
+    const ray = (x, y, z) => { if (!ray1(x, y, z, dx, dz, 24)) return false; for (const a of [-0.31, 0.31]) { const c = Math.cos(a), s = Math.sin(a); if (!ray1(x, y, z, dx * c - dz * s, dx * s + dz * c, 18)) return false; } return true; };
     for (let back = 0; back <= 12; back += 2) { const bx = x - dx / hx * back, bz = z - dz / hx * back; for (let up = 0; up <= 24; up++) if (box(bx, y + up, bz) && ray(bx, y + up, bz)) return { x: bx, y: y + up, z: bz }; }
     return { x, y, z };
   }, [S.x, feet + EYE, S.z, yaw, pitch]);

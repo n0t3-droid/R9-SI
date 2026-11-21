@@ -35,7 +35,7 @@ console.log('b · the shore-distance mask');
   const f0 = frac(0), f04 = frac(0.4), f08 = frac(0.8), f14 = frac(1.4);
   console.log(`     foam over the noise at 0 / 0.4 / 0.8 / 1.4 blocks deep: ${f0.toFixed(2)} · ${f04.toFixed(2)} · ${f08.toFixed(2)} · ${f14.toFixed(2)}`);
   check(f0 >= 0.4 && f0 <= 0.65, 'at the bank about half the noise foams: a broken line, never a solid white band (run 2: the river\'s banks looked snowed in)');
-  check(f04 < f0 * 0.8 && f08 < f04 && f04 > 0.1, 'further out it breaks up with the noise');
+  check(f04 < f0 * 0.5 && f08 === 0, 'further out it breaks up fast and is gone by 0.6 deep (v0.55.92: shallow lakes and rivers foamed all over)');
   check(f14 === 0 && FX.shore(2, 1) === 0, 'past a block and a half there is none');
 }
 
