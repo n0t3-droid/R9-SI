@@ -953,7 +953,13 @@
         if (!ev.wet && LD.ACTS[ev.kind].wx === 'dry' && this.ctx && this.ctx.wet && this.ctx.place !== 'hall') { ev.wet = true; if (!A.wet || A.wet(this, ev) === false) ev.dur = 0; }
         if (LD.ACTS[ev.kind].tier > this.tier || far) alive = false;
         else try { alive = A.update(this, ev, dt) !== false && ev.age < ev.dur; } catch (e) { alive = false; if (!this.warned) { this.warned = true; console.warn('life director', ev.kind, e); } }
-        if (!alive) { if (A.end) A.end(this, ev); this.events.splice(i, 1); }
+        if (!alive) {
+          this.events.splice(i, 1);
+          // nicht vor deinen Augen: an act you are looking at fades out (lifekit.js VR.Appear), then ends
+          const AP = VR.Appear;
+          if (AP && A.draw && ev.pos && !far && AP.seen(g, ev.pos[0], ev.pos[1] + 1, ev.pos[2], 2)) { AP.out(ev); (this.fading || (this.fading = [])).push(ev); }
+          else if (A.end) A.end(this, ev);
+        }
       }
     }
     slot(k) {
@@ -1002,11 +1008,14 @@
       try { return !!this.start(kind, o || {}); } finally { this.forcing = false; }
     }
     draw(r, E, layer, cam) {
-      if (!this.on || layer !== 'opaque' || !this.events.length) return;
+      if (!this.on || layer !== 'opaque' || (!this.events.length && !(this.fading && this.fading.length))) return;
       const g = this.g, ent = g.entities; if (!ent) return;
       let p = null; const prog = () => p || (p = ent.beginVox(r, E));
       cam = cam || r.cam;
-      for (const ev of this.events) { const A = ACT[ev.kind]; if (A.draw) { try { A.draw(this, ev, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('life director draw', ev.kind, e); } } } }
+      const AP = VR.Appear;
+      const de = (ev) => { const A = ACT[ev.kind]; if (!A.draw) return; const c0 = AP ? AP.cur : 1; if (AP) AP.cur = AP.k(ev); try { if (!AP || AP.cur > 0) A.draw(this, ev, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('life director draw', ev.kind, e); } } finally { if (AP) AP.cur = c0; } };
+      for (const ev of this.events) de(ev);
+      if (this.fading && this.fading.length) for (let i = this.fading.length - 1; i >= 0; i--) { const ev = this.fading[i]; if (AP && AP.gone(ev)) { this.fading.splice(i, 1); const A = ACT[ev.kind]; if (A.end) { try { A.end(this, ev); } catch (e) { /* ended */ } } } else de(ev); }
     }
     stats() {
       const kinds = {}; for (const ev of this.events) kinds[ev.kind] = (kinds[ev.kind] || 0) + 1;

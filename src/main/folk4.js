@@ -292,6 +292,8 @@
     if (vil && vil.agents) for (const a of vil.agents) if (a._f4 === M) all.add(a);
     for (const a of all) { try { release(a); } catch (e) { a._f4 = null; } }
     if (V._f4M === M) V._f4M = null;
+    // (nicht vor deinen Augen: a laid blanket folds away softly — drawn fading out until it is gone)
+    if (M.kind === 'picnic' && M.laid && M.spot && VR.Appear) { VR.Appear.out(M.laid); F4.folding = { spot: M.spot, yaw: M.yaw, laid: M.laid }; }
   };
   // (f-folk5) everything off: the moment, a stray folkjoy dance, marks whose moment is gone, other fronts' extras
   // (F4.onClear) — the browser test calls it before each moment; the game never needs it
@@ -326,6 +328,16 @@
   P.playArea = function (vil) { return vil._f4area || bpa.call(this, vil); };
 
   // two neighbours on a blanket
+  // nicht vor deinen Augen (test/appear.js e): the blanket is laid when one of its two reaches the spot (within 1.6 m) —
+  // or at once where you do not look; then it fades in (lifekit.js VR.Appear). → the draw factor 0..1
+  F4.blanketK = function (M, g) {
+    if (!M.laid) {
+      const near = M.members.some(o => o && o.pos && Math.hypot(o.pos[0] - M.spot[0], o.pos[2] - M.spot[2]) < 1.6);
+      if (!near && VR.Appear && VR.Appear.seen(g, M.spot[0], M.spot[1] + 0.3, M.spot[2], 1.5)) return 0;
+      M.laid = {};
+    }
+    return VR.Appear ? VR.Appear.k(M.laid) : 1;
+  };
   function beginPicnic(V, M, pool) {
     const g = V.g, p = g.player.pos, vil = M.vil, grown = pool.filter(a => !a.kid);
     if (grown.length < 2) return false;
@@ -344,7 +356,7 @@
     const M = a._f4, s = M.seats[act.k], o = M.seats[1 - act.k];
     if (a.pose !== 'sitground') {
       const d = Math.hypot(s[0] - a.pos[0], s[1] - a.pos[2]);
-      const there = d < 0.6 || V.goTo(a, Math.floor(s[0]), M.spot[1], Math.floor(s[1]), 0.6) || (act.t > 15 && d < 3) || act.t > 28;
+      const there = d < 0.6 || V.goTo(a, Math.floor(s[0]), M.spot[1], Math.floor(s[1]), 0.6) || (act.t > 15 && d < 3) || (act.t > 28 && !(VR.Appear && (VR.Appear.seen(V.g, a.pos[0], a.pos[1] + 1, a.pos[2], 1) || VR.Appear.seen(V.g, s[0], M.spot[1] + 1, s[1], 1))));   // (nicht vor deinen Augen: no hop to the seat where you look)
       if (!there) return;
       a.pos[0] = s[0]; a.pos[1] = M.spot[1]; a.pos[2] = s[1]; a.vel[0] = 0; a.vel[2] = 0; a.path = null; a.steer = null;
       a.pose = 'sitground'; smile(a, 3);
@@ -609,12 +621,20 @@
   const bDraw = P.draw;
   if (bDraw) P.draw = function (r, E, cam) {
     bDraw.call(this, r, E, cam);
+    const Fd = F4.folding;
+    if (Fd && VR.Appear && VR.LifeKit && this.g.entities && this.g.entities.beginVox) {
+      if (VR.Appear.gone(Fd.laid)) F4.folding = null;
+      else { const AP = VR.Appear, c0 = AP.cur; AP.cur = AP.k(Fd.laid); try { VR.LifeKit.drawModel(this.g, r, this.g.entities.beginVox(r, E), 'f4_blanket', [Fd.spot[0], Fd.spot[1] + 0.005, Fd.spot[2]], Fd.yaw, cam); } finally { AP.cur = c0; } }
+    }
     const M = this._f4M; if (!M || !VR.LifeKit || F4.off || !F4.sw.draw) return;
     const g = this.g, ent = g.entities; if (!ent || !ent.beginVox || tierOf(g) < 1) return;
     if (M.kind === 'picnic' && M.spot) {
       if ((M.spot[0] - cam.x) ** 2 + (M.spot[2] - cam.z) ** 2 > 60 * 60) return;
-      const prog = ent.beginVox(r, E);
-      VR.LifeKit.drawModel(g, r, prog, 'f4_blanket', [M.spot[0], M.spot[1] + 0.005, M.spot[2]], M.yaw, cam);
+      const k = F4.blanketK(M, this.g);
+      if (k <= 0) return;
+      const prog = ent.beginVox(r, E), AP = VR.Appear, c0 = AP ? AP.cur : 1;
+      if (AP) AP.cur = k;
+      try { VR.LifeKit.drawModel(g, r, prog, 'f4_blanket', [M.spot[0], M.spot[1] + 0.005, M.spot[2]], M.yaw, cam); } finally { if (AP) AP.cur = c0; }
     } else if (M.kind === 'dance' && M.fiddler && M.fiddler.f4fiddle) {
       // the fiddle under the chin at the left shoulder, its neck out to the front left (drawn beside the bow arm's pose)
       const a = M.fiddler; if ((a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2 > 40 * 40) return;

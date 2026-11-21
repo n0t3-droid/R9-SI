@@ -219,8 +219,10 @@
         const n = 5 + Math.floor(Math.random() * 5);
         if (this.birdT <= 0 && this.birds() + n <= cap.bird) {
           this.birdT = 50 + Math.random() * 70;
-          const a = Math.random() * Math.PI * 2, Dx = Math.cos(a), Dz = Math.sin(a);
-          this.flocks.push({ x: eye[0] - Dx * 55, y: eye[1] + 20 + Math.random() * 16, z: eye[2] - Dz * 55, dx: Dx, dz: Dz, speed: 9 + Math.random() * 3, n, ph: Math.random() * 6.28, life: 22 });
+          // (nicht vor deinen Augen: the flock starts behind or beside the view and flies past — it never pops up where you
+          //  look; it flies on until it is a speck in the haze, ~260 m past the eye)
+          const st = AirLife.flockStart(eye, o.fwd || [0, 0, -1], o.half || 1.0, Math.random);
+          if (st) { const sp = 9 + Math.random() * 3; this.flocks.push({ x: st.x, y: eye[1] + 20 + Math.random() * 16, z: st.z, dx: st.dx, dz: st.dz, speed: sp, n, ph: Math.random() * 6.28, life: (AirLife.FLOCK_D + 260) / sp }); }
         }
       } else if (!sunUp || rain) this.flocks.length = 0;
       for (let fi = this.flocks.length - 1; fi >= 0; fi--) {
@@ -243,5 +245,17 @@
       this.ms = this.ms * 0.9 + ms * 0.1; this.msSum += ms; this.msN++;
     }
   }
+  // where a flock starts: FLOCK_D m from the eye, off the view cone (half: the horizontal half angle of the view, rad) by
+  // FLOCK_M more, heading back across the eye's ground; fwd the view's direction. Twelve tries, else null (no flock now).
+  AirLife.FLOCK_D = 70; AirLife.FLOCK_M = 0.25;
+  AirLife.flockStart = function (eye, fwd, half, rnd) {
+    const fl = Math.hypot(fwd[0], fwd[2]) || 1, fx = fwd[0] / fl, fz = fwd[2] / fl, need = Math.cos(Math.min(Math.PI, half + AirLife.FLOCK_M));
+    for (let k = 0; k < 12; k++) {
+      const a = rnd() * Math.PI * 2, Dx = Math.cos(a), Dz = Math.sin(a);
+      if (-Dx * fx - Dz * fz >= need) continue;   // the start (eye − D·FLOCK_D) would lie inside the view
+      return { x: eye[0] - Dx * AirLife.FLOCK_D, z: eye[2] - Dz * AirLife.FLOCK_D, dx: Dx, dz: Dz };
+    }
+    return null;
+  };
   VR.AirLife = Object.assign(AirLife, { KINDS, CAPS, tierOf, budgetFor });
 })(VR);

@@ -293,10 +293,20 @@
     if (O.phase === 'sail' || O.phase === 'dock') { a.path = null; a.steer = null; return; }
   };
   // ---------------------------------------------------------------- boats
+  // nicht vor deinen Augen: a village by the water keeps its boat moored at the launch from the start (it never pops up
+  // when a family arrives): the moored boat, made once (test/appear.js d)
+  P.mooredBoat = function (vil, S) {
+    vil.boats = vil.boats || [];
+    if (vil.boats.length) return vil.boats[0];
+    const L = S.launch, dx = S.water[0] - L[0], dz = S.water[2] - L[2];
+    const b = { pos: [L[0] + 0.5, S.level - 0.18, L[2] + 0.5], yaw: Math.atan2(-dx, -dz), vel: 0, wp: 0, lap: 0, bob: Math.random() * 10, O: null, style: vil.plan.style, home: [L[0] + 0.5, S.level - 0.18, L[2] + 0.5], moored: this.time };
+    vil.boats.push(b);
+    return b;
+  };
   P.launchBoat = function (vil, O) {
-    const S = O.shore, L = S.launch;
-    const dx = S.water[0] - L[0], dz = S.water[2] - L[2];
-    const b = { pos: [L[0] + 0.5, S.level - 0.18, L[2] + 0.5], yaw: Math.atan2(-dx, -dz), vel: 0, wp: 0, lap: 0, bob: Math.random() * 10, O, style: vil.plan.style, home: [L[0] + 0.5, S.level - 0.18, L[2] + 0.5] };
+    const S = O.shore;
+    const b = this.mooredBoat(vil, S);
+    b.O = O; b.vel = 0; b.wp = 0; b.lap = 0; b.pos[0] = b.home[0]; b.pos[1] = b.home[1]; b.pos[2] = b.home[2];
     O.boat = b; O.phase = 'sail'; O.route = [[S.water[0] + 0.5, S.water[2] + 0.5]].concat(S.loop, S.loop.slice(0, 1), [[S.water[0] + 0.5, S.water[2] + 0.5], [L[0] + 0.5, L[2] + 0.5]]);
     O.agents.forEach((a, i) => { a.inBoat = b; a.seat = i; a.pose = 'sit'; a.path = null; a.steer = null; a.vel = [0, 0, 0]; });
     vil.boats = (vil.boats || []).filter(x => x !== b);
@@ -307,6 +317,12 @@
     for (const vil of this.known.values()) {
       if (!vil.active) continue;
       const O = vil.outing;
+      // the village's boat is at its launch before anyone needs it — laid there only while you do not look (every 3 s a look)
+      if (!O && !(vil.boats && vil.boats.length) && (vil.boatLook = (vil.boatLook || 0) - dt) <= 0) {
+        vil.boatLook = 3;
+        const S = vil.shore !== undefined && (vil.shore || vil.shoreTries > 3) ? vil.shore : this.shoreOf(vil);
+        if (S && !(VR.Appear && VR.Appear.seen(this.g, S.launch[0] + 0.5, S.level, S.launch[2] + 0.5, 2.5))) this.mooredBoat(vil, S);
+      }
       if (O && O.boat && O.phase === 'sail') {
         const b = O.boat, tgt = O.route[b.wp];
         if (!tgt) { O.phase = 'dock'; }
@@ -340,7 +356,8 @@
         }
       }
       // moored boats drift gently, then are pulled ashore
-      if (vil.boats) vil.boats = vil.boats.filter(b => this.time - (b.moored || 0) < 240);
+      // (a moored boat stays at its launch: it is the village's own — test/appear.js d)
+      if (vil.boats && vil.boats.length > 1) vil.boats.length = 1;
     }
   };
   P.drawBoats = function (r, E, cam) {
