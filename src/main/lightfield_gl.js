@@ -122,7 +122,11 @@
     }
     const ox = c.x - 128 * Math.floor(c.x / 128), oz = c.z - 128 * Math.floor(c.z / 128);
     this.lfU = this.lfU || [0, 0, 0, 0];
-    this.lfU[0] = ox; this.lfU[1] = oz; this.lfU[2] = c.y - f.Y0; this.lfU[3] = LF.K.str;
+    this.lfU[0] = ox; this.lfU[1] = oz; this.lfU[2] = c.y - f.Y0;
+    // v0.55.91: by day the pools are a quarter as strong — in full sun they lay as hard yellow discs on the paving round a
+    // passing glow (the fairies, a lantern); from dusk on they grow to their full strength
+    const nk = E && E.night !== undefined ? Math.min(1, Math.max(0, E.night / 0.6)) : 1;
+    this.lfU[3] = LF.K.str * (0.25 + 0.75 * nk * nk * (3 - 2 * nk));
     this.lfLive = this.lfDone = true;
     const ms = performance.now() - t0; LF.cost.ms = LF.cost.ms * 0.95 + ms * 0.05; LF.cost.n++; LF.cost.last = ms;
   };
