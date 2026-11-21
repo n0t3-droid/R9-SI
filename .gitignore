@@ -3,7 +3,6 @@ test/shots/
 test/ships/
 .tmp_tests/
 .worktrees/
-.claude/
 node_modules/
 *.log
 .DS_Store

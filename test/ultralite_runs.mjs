@@ -8,7 +8,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 const ROOT = '/home/dev/vr';                      // (test/wt_run.sh rewrites this to the checkout's root)
-const ORIG = ['', 'home', 'claude', 'vr'].join('/'); // (and this not: the path the tests are written for)
+const ORIG = ['', 'home', 'dev', 'vr'].join('/'); // (and this not: the path the tests are written for)
 const TMP = ROOT + '/.tmp_tests';
 // (the copy wt_run.sh would run: every path the test was written for rewritten to this checkout)
 const prep = (b) => { const s = fs.readFileSync(`${ROOT}/test/${b}`, 'utf8').split(ORIG).join(ROOT); fs.writeFileSync(`${TMP}/${b}`, s); return `${TMP}/${b}`; };

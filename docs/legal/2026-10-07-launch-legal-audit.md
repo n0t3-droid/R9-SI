@@ -45,7 +45,7 @@ Everything else (TDDDG consent for localStorage, COPPA, UK Children's Code, GDPR
 | What messages carry | `welcome`: world name, seed, mode, host name, host position, world style; `chat`: ≤ 200 chars, control chars stripped; `pdata`: inventory etc. guest → host; block diffs. All ≤ 4 KiB JSON through the platform's lobby room. | `src/main/mp.js:12-29,185-193,436-447,325-331` |
 | Guest side | The guest's browser stores a world entry named "<world> · with <host name>". | `src/main/game.js:445` |
 | Who can connect | Signed-in members of the owner's organisation and invited guests; public-link visitors cannot (`room` returns null → "Multiplayer · not available here"). Event topics are admin-only unless opened to Contributors at publish time; the code handles `not_permitted` with a hint. | platform `room.d.ts` (Who is here / Who may SEND); `src/main/mp.js:133`; `ui.js:32,384` |
-| Platform side-channel | The platform may hand a viewer's **own** lobby presence object to that viewer's own Claude conversation (never to others). | `room.d.ts` header comment |
+| Platform side-channel | The platform may hand a viewer's **own** lobby presence object to that viewer's own session (never to others). | `room.d.ts` header comment |
 | Export / import | 📦 r9-paket = favourites + house/furniture designs + Bauteile (no names, no ids); `.schem/.vox/.json` = block data; images are processed locally (`new Image()` on the dropped file). Downloads go through the `downloads` capability (viewer confirms) or an `<a download>`. | `src/main/pack.js:45-48`; `bridge.js:27-41`; `workbench.js:427-441`; `imagine.js:44` |
 | Screenshots | Overlay only on claude.ai; `<a download>` only when not embedded. | `src/main/game.js:881-893`, `build.js:39` |
 | Children | No age gate, no age question, no data collection. The all-ages spec explicitly targets children and grandparents. | `all-ages-workflow-design.md:9,15` |
@@ -140,7 +140,7 @@ Only the four fonts. OFL 1.1 in one paragraph: you may bundle, embed, subset and
 - A published artifact can be copied by any signed-in viewer → treat the HTML as public source.
 - "Anyone with the link" viewers may be signed out → no `room`, no `user`: the page must (and does) work alone.
 - Guests invited by e-mail see other guests' names only when the platform shows them; the game ships name strings itself, so everyone in the lobby sees everyone's chosen/profile name.
-- The platform never hands names to the owner's Claude session; only a viewer's own presence may reach that viewer's own conversation.
+- The platform never hands names to the owner's own session on the platform; only a viewer's own presence may reach that viewer's own conversation.
 
 ---
 

@@ -36,7 +36,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | far_presets.js | node | F-Far presets: ring 1 on High and Ultra only, the render distance's top 32 on Ultra; the governor never lowers a ring; settings saved before; the slider's top; the tip names the rings. | 2 † | – | yes |
 | far_rings.js | node | F-Far ring bookkeeping (VR.Far.RingSet): which ring a column is in, the band of ring-1 tiles, promotion, demotion and the outer edge with hysteresis, the far mask's rule (no pixel undrawn, a settled column drawn once), no rescan in a steady camera, the byte budget, no draw call for a form wholly under ring 0. | 1 † | – | yes |
 | far_worker.js | node | F-Far: the worker's form job with a fake self — the open sea answers, Nova Haven waits for its plan a slice at a time and then answers VR.Far.form's bytes, another dimension answers empty. | 4 † | – | yes |
-| genie_brain.js | node | The Genie without Claude: wishes become houses and things (geometry and words). | 4 (4–5) | 2/2 | yes |
+| genie_brain.js | node | The Genie, fully offline: wishes become houses and things (geometry and words). | 4 (4–5) | 2/2 | yes |
 | genie_raster.js | node | Genie answer parser and the shape-to-block rasteriser (geometry only). | 1 (1–1) | 3/3 | yes |
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
 | lod_same.js | node | The horizon tiles (LOD.build) are unchanged by F-Far's shared surface look (LOD.look): a hash of eight tiles of seed 1 on levels 0–3. | 2 † | – | yes |

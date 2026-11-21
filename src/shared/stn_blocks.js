@@ -4,7 +4,7 @@
 //                  the hall's middle (the plates are what holds you to the floor up there)
 //   stn_clamp      the docking clamp at a berth's corners — a grey foot, two yellow-black jaws, an amber lamp
 // Placed only by the station generator (src/shared/forge_station.js, the stn.* dims): every older world stays as it is.
-// Registered LATE, after every older pack (a-life's grow_lamp), so every saved world keeps its state ids (AGENTS.md
+// Registered LATE, after every older pack (a-life's grow_lamp), so every saved world keeps its state ids (CONTRIBUTING.md
 // rule 1, test/id_snapshot.js). Faces from textures that exist already.
 // ============================================================================
 (function (VR) {

@@ -1,4 +1,4 @@
-// ✨ the Genie's own brain: wishes → houses and things, without Claude (node test, geometry + words)
+// ✨ the Genie's own brain: wishes → houses and things, fully offline (node test, geometry + words)
 global.window = global; global.self = global;
 const VR = require('/home/dev/vr/test/load_shared.js');
 require('/home/dev/vr/src/studio/housekit.js');

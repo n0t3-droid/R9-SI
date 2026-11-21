@@ -1,7 +1,7 @@
 // v0.35 ✨ Erschaffen: the 🏠 Haus-Baukasten and the ✨ Genie end to end.
 // A flat world in the game; the Studio opens it on the Werkbank; 🏠 builds a house (roof switch, 🎲), it goes into the
 // hand, is placed on the ground (floor flush with the grass, the door where it belongs) and the game builds it.
-// ✨ Genie (v0.37: its own brain, no Claude): a wish for a house lands in the Baukasten, a fire engine becomes blocks
+// ✨ Genie (v0.37: its own brain, offline): a wish for a house lands in the Baukasten, a fire engine becomes blocks
 // (glass, lamps, metal), a photo alone becomes a relief and "🏠 Als Haus bauen" makes a house of it, ✏️ Ändern and ⟲,
 // the 🏠 tab's ✨ line, a word it does not know → ideas to click. The page offers only `downloads` (no `sample`) and
 // the Genie never asks for anything else. Then the same inside the game's overlay.
@@ -240,7 +240,7 @@ console.log('  overlay', JSON.stringify(fr));
 const frDl = await frame.evaluate(async () => { const WB = VR.StudioWorld.wb, IM = VR.StudioWorld.imagine; const g = IM.result; WB.setClip({ sx: g.sx, sy: g.sy, sz: g.sz, blocks: g.blocks.slice(), name: g.name, dy: g.dy || 0 }); await WB.exportClip('json'); await WB.exportClip('schem'); return { saved: window.parent.__genie.saved || [], used: window.parent.__genie.used }; });
 console.log('  overlay saves', JSON.stringify(frDl));
 check(frDl.saved.length === 2 && frDl.saved.every(x => x.plain && x.u8 && x.n > 50) && /\.json$/.test(frDl.saved[0].filename) && /\.zip$/.test(frDl.saved[1].filename), 'downloads from the overlay go to the game\'s page as its own plain request with its own bytes (.json, .schem in a .zip)');
-check(fr.type === 'car' && fr.n > 250 && /^#[0-3]/.test(fr.body || '') && !frDl.used.includes('sample'), 'in the game\'s overlay: photo + “Auto” → a car in the photo’s green, without Claude (' + fr.body + ')');
+check(fr.type === 'car' && fr.n > 250 && /^#[0-3]/.test(fr.body || '') && !frDl.used.includes('sample'), 'in the game\'s overlay: photo + “Auto” → a car in the photo’s green, offline (' + fr.body + ')');
 
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 20)) console.log(l);
 check(!logs.some(l => /pageerror/.test(l)), 'no page errors');

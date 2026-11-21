@@ -1,4 +1,4 @@
-// v0.37 🏘 Ort planen end to end on natural terrain, planned right here (no Claude): the Studio surveys the piece of the
+// v0.37 🏘 Ort planen end to end on natural terrain, planned right here (offline): the Studio surveys the piece of the
 // world in view (heights, water, trees) and draws it as a map; 🎲 plans a village by chance; a wish (six houses with red
 // roofs around a market square, a church, fields with a fence, a campfire, cobbled paths) is planned and laid out to
 // fit the ground; ✏️ Ändern adds to the wish ("ohne Kirche, mehr Häuser") on the same seed; ✓ Bauen levels the

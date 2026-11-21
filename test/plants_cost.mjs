@@ -1,5 +1,5 @@
 // The trailer's plants (voxplants.js, vgen 7) on Very Low: the same town, the same camera, the frame cost with the
-// v0.41 town (vgen 6) and with the plants (vgen 7). AGENTS.md rule 5: the potato preset must not get slower — the
+// v0.41 town (vgen 6) and with the plants (vgen 7). CONTRIBUTING.md rule 5: the potato preset must not get slower — the
 // plants may cost at most 6 % more per frame on the palm avenue and the palm road (the two spots with most of them),
 // measured as SwiftShader CPU frames on this machine (a comparison of two builds in one run, not a GPU timing).
 //   bash test/wt_run.sh plants_cost.mjs      · SEED=4242 (the trailer_plants.mjs town) · N=6 frames per spot

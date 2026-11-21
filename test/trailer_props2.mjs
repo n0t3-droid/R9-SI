@@ -8,7 +8,7 @@
 // running game (the loaded world is remeshed), so both pictures stand at the same camera and light.
 // Also measured: the frame cost of the living room with the props off and on, the cost of the props in the water's
 // reflection at the pool and the lake (renderer.noReflProps on / off, High), and — with OLD_DIST naming the v042 build —
-// the Very Low (potato) frame cost of both builds side by side, frames alternating (AGENTS.md rule 5).
+// the Very Low (potato) frame cost of both builds side by side, frames alternating (CONTRIBUTING.md rule 5).
 // Writes test/shots/trailer_props2_<place>_{voxel,<TAG>}.png
 //   nohup bash test/wt_run.sh trailer_props2.mjs 3600 > .tmp_tests/trailer_props2.log 2>&1 &
 //   TAG=before|after|run3 · DIST=… (the build to shoot) · OLD_DIST=… (the potato comparison) · VOXEL=all|some|none

@@ -1,6 +1,6 @@
 // ============================================================================
 // R9 Studio · ✨ the Genie's own brain (v0.37) — wishes understood and built
-// right here in the page: no Claude, no account, no limit, the same for every
+// right here in the page: no online service, no account, no limit, the same for every
 // player. A sentence in German or English (or a photo, or both) becomes
 //  · a house for the 🏠 Baukasten — its kind (Villa, Hütte, Bungalow, Strandhaus,
 //    Fachwerk, Toskana …), style, size, floors, roof, walls, colours, windows, door

@@ -13,7 +13,7 @@ import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/inde
 import fs from 'fs';
 const MODE = process.env.MODE || 'both';
 // (the path is put together so that wt_run.sh, which points every path of the main checkout at this worktree, leaves it alone)
-const BEFORE_URL = process.env.BEFORE_URL || 'file://' + ['', 'home', 'claude', 'vr', '.worktrees', 'v042', 'dist', 'index.html'].join('/');
+const BEFORE_URL = process.env.BEFORE_URL || 'file://' + ['', 'home', 'dev', 'vr', '.worktrees', 'v042', 'dist', 'index.html'].join('/');
 const AFTER_URL = process.env.AFTER_URL || 'file:///home/dev/vr/dist/index.html';
 const SEED = process.env.SEED || '1';
 const SETTLE_HIGH = +(process.env.SETTLE_HIGH || 900), SETTLE_LOW = +(process.env.SETTLE_LOW || 420);

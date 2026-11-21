@@ -3,12 +3,12 @@
 set -e
 cd /home/dev/vr
 node build.js
-ST=/tmp/r9-scratch/stage
+ST=/tmp/r9-stage
 rm -rf $ST && mkdir -p $ST
 cp dist/index.html $ST/index.html
 cp dist/studio.html $ST/studio.html
 cp -r src $ST/src
-cp build.js README.md ROADMAP.md TRAILER.md $ST/
+cp build.js README.md ROADMAP.md $ST/
 mkdir -p $ST/tools
 cp test/browser.mjs test/load_shared.js test/tex_check.js test/realm_test.js $ST/tools/ 2>/dev/null || true
 cat > $ST/.gitignore <<'G'

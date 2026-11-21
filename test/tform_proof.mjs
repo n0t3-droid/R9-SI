@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { spawnSync } from 'child_process';
 const ROOT = '/home/dev/vr';                                   // (test/wt_run.sh writes this checkout's root here)
-const ORIG = ['', 'home', 'claude', 'vr'].join('/');              // (the tests' own spelling, not rewritten)
+const ORIG = ['', 'home', 'dev', 'vr'].join('/');              // (the tests' own spelling, not rewritten)
 const TMP = ROOT + '/.tmp_tests';
 mkdirSync(TMP, { recursive: true });
 let fails = 0;

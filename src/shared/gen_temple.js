@@ -284,7 +284,7 @@
     const K14 = g.vgen >= 14 ? mats14(mats()) : null, v14 = !!K14;
     const K = K14 || mats(), mat = makeMat(K, g.vgen >= 11, v14);
     // vgen 6 (the trailer's Gate Temple: landing-strip lights, the 7-high hex corridor). Older worlds keep the temple they
-    // were made with (AGENTS.md: old worlds' generated chunks stay identical), so their terrain is the HEAD one.
+    // were made with (CONTRIBUTING.md: old worlds' generated chunks stay identical), so their terrain is the HEAD one.
     const v6 = g.vgen >= 6;
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };

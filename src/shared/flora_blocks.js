@@ -8,7 +8,7 @@
 //   clover (Klee): ground cover, round leaves with white and pink heads, on the ways' edges
 // All are ordinary blocks (cubes, crossed sprites, ground cover): Very Low draws them as any leaf or flower.
 // Registered LATE — one VR.BL.late push after every older pack (u-stations' stn_clamp is the block before them):
-// build.js puts this file right before blocks4 after stn_blocks (AGENTS.md rule 1, test/id_snapshot.js).
+// build.js puts this file right before blocks4 after stn_blocks (CONTRIBUTING.md rule 1, test/id_snapshot.js).
 // Textures: src/main/tex_flora.js.
 // ============================================================================
 (function (VR) {

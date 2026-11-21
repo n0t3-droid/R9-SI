@@ -4,7 +4,7 @@
 //               board; [V] there opens the ferries' panel (src/main/ferries.js)
 //   grow_lamp   the greenhouses' lamp bar under the glass — warm pink-white, so a settlement shows its greenhouses at night
 // Placed at runtime by the settlements only (the generator and every world stay as they are). Registered LATE, after
-// every older pack (fields_blocks.js' glowspar), so every saved world keeps its state ids (AGENTS.md rule 1,
+// every older pack (fields_blocks.js' glowspar), so every saved world keeps its state ids (CONTRIBUTING.md rule 1,
 // test/id_snapshot.js). Faces from textures that exist already.
 // ============================================================================
 (function (VR) {

@@ -5,7 +5,7 @@
 // 13–15 it painted a 13-block ellipse of the ground lilac or cyan). It is placed at
 // runtime on the pads of the outposts in Abenteuer worlds only (liberate.js) — the generator and every builder's world
 // stay as they are. Registered LATE, after every older block (and after the moons' blocks of u-moons1), so every saved
-// world keeps its state ids (AGENTS.md rule 1, test/id_snapshot.js). Its faces use textures that exist already.
+// world keeps its state ids (CONTRIBUTING.md rule 1, test/id_snapshot.js). Its faces use textures that exist already.
 // ============================================================================
 (function (VR) {
   'use strict';

@@ -1,4 +1,4 @@
-// ✨ Genie without Claude: the answer parser and the shapes → blocks rasteriser (geometry only; colours need textures)
+// ✨ Genie, offline: the answer parser and the shapes → blocks rasteriser (geometry only; colours need textures)
 global.window = global; global.self = global;
 const VR = require('/home/dev/vr/test/load_shared.js');
 require('/home/dev/vr/src/studio/housekit.js');
@@ -44,10 +44,10 @@ const at = (g, x, y, z) => g.blocks[(y * g.sz + z) * g.sx + x];
   let threw = null; try { G.parse({ kind: 'model', parts: [] }); } catch (e) { threw = e.code; }
   ok(threw === 'invalid_json', 'a model without parts → invalid_json');
 }
-// no Claude anywhere: always available, no prompt, no sampling
+// no online helper anywhere: always available, no prompt, no sampling
 {
   const src = require('fs').readFileSync('/home/dev/vr/src/studio/genie.js', 'utf8');
-  ok(typeof G.prompt === 'undefined' && typeof G.askRaw === 'undefined' && !/claude\.use|\bsample\b/.test(src), 'the Genie never asks Claude (no prompt, no sample)');
+  ok(typeof G.prompt === 'undefined' && typeof G.askRaw === 'undefined' && !/\.use\(|\bsample\b/.test(src), 'the Genie never asks an online helper (no prompt, no sample)');
   ok(G.available() instanceof Promise && /LOCAL = Object\.freeze\(\{ local: true, images: true/.test(src), 'the Genie is always available, photos included');
 }
 // rings and clipped parts: a ring is hollow, a clipped ball is a dome

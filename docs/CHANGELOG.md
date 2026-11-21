@@ -649,7 +649,7 @@ Storage: `r9si.land.<world>` (the newest thing and a spawn point set in the Stud
 has already shown you, so a thing is new only once.
 
 ### 🧱 Teile, 🎯 Finden, ★ Favoriten — and the Genie needs no account (v0.37)
-**Everything runs in the game itself.** The ✨ Genie and 🏘 Ort planen no longer ask Claude: there is no account, no
+**Everything runs in the game itself.** The ✨ Genie and 🏘 Ort planen no longer need any online service: there is no account, no
 sign-in and no usage limit, and every player gets the same results. The Genie's own library knows 177 things (cars,
 ships, castles, lighthouses, windmills, a Ferris wheel, animals, statues, …) with their variants, reads colours, sizes,
 numbers and changes ("rotes Dach", "größer", "ohne Kamin"), turns photos into reliefs and house wishes into Baukasten

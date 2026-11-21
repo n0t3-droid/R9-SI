@@ -5,7 +5,7 @@
 // regress: skip  (a runner, not a test: its two tests are in the regression on their own)
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-const ORIG = ['', 'home', 'claude', 'vr'].join('/');   // (built, so the slot runner's rewrite leaves it alone)
+const ORIG = ['', 'home', 'dev', 'vr'].join('/');   // (built, so the slot runner's rewrite leaves it alone)
 const ROOT = '/home/dev/vr';                          // (the slot runner rewrites this one to the checkout)
 fs.mkdirSync(`${ROOT}/.tmp_tests`, { recursive: true });
 const res = [];

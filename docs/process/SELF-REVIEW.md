@@ -8,7 +8,7 @@ holds for every wave from wave 3 on (`docs/superpowers/specs/2026-10-22-waves.md
 
 1. **Fronts build** — each ends its plan with its own self-review (§4).
 2. **The coordinator merges and gates** — the release regression (`R9_EXCLUSIVE=1 bash test/regress.sh`), the hard
-   rules of AGENTS.md, then the release candidate.
+   rules of CONTRIBUTING.md, then the release candidate.
 3. **An independent critic looks** — fresh eyes on everything (§2); the result is a ranked list of what is weak:
    `docs/reviews/v0.NN.md` (§6).
 4. **The owner reads the top five** — in plain German, two sentences each; his comments go to the very top of the list.

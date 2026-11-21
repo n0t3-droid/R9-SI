@@ -51,7 +51,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 Axiom, Litematica, MCEdit and MagicaVoxel are names or trademarks of their respective owners, named only to describe
 which files the Studio reads and writes. Share only what is yours — every export says so in one line.
 
-The long release notes live in [docs/CHANGELOG.md](docs/CHANGELOG.md); how to work on the code in [AGENTS.md](AGENTS.md).
+The long release notes live in [docs/CHANGELOG.md](docs/CHANGELOG.md); how to work on the code in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## The mathematics and physics inside
 

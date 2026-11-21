@@ -46,7 +46,7 @@ NEU IN v0.38 — 📍 Wo du landest, ▶ Spielen
 
 
 NEU IN v0.37 — 🧱 Teile, 🎯 Finden, ★ Favoriten, alles ohne Konto
-- ✨ Genie und 🏘 Ort planen laufen jetzt komplett im Spiel selbst: kein Claude, kein Konto, kein Nutzungslimit, für
+- ✨ Genie und 🏘 Ort planen laufen jetzt komplett im Spiel selbst: kein Online-Dienst, kein Konto, kein Nutzungslimit, für
   jeden Spieler gleich. Das Genie kennt 177 Dinge (Auto, Schiff, Burg, Leuchtturm, Windmühle, Riesenrad, Tiere,
   Statuen …) in vielen Varianten, versteht Farben, Größen, Zahlen und Änderungen („rotes Dach“, „größer“, „ohne
   Kamin“), macht aus Fotos Reliefs und aus Häuser-Wünschen Baukasten-Häuser. Der Ortsplaner liest den Wunsch
@@ -106,7 +106,7 @@ NEU IN v0.35 (2) — ✨ Erschaffen: 🏠 Haus-Baukasten, ✨ Genie, 🏘 Ort pl
   Teppich vor TV oder Kamin, Pflanzen, Bilder; oben ein gefliestes Bad, Schlafzimmer (Nachttische, Lampen, Schrank),
   Kinderzimmer oder Arbeitsecke; Licht in jedem Raum; außen Dachrinnen und Fallrohre, Hausnummer, Briefkasten.
   „In die Werkbank“ → auf die Welt zeigen → Klick (sitzt mit dem Boden bündig im Gras), R dreht es samt Möbeln.
-- ✨ Genie (seit v0.37 ohne Claude, siehe oben): Foto, Skizze oder ein Satz → das Genie plant: ein Haus kommt in den Baukasten,
+- ✨ Genie (seit v0.37 offline, siehe oben): Foto, Skizze oder ein Satz → das Genie plant: ein Haus kommt in den Baukasten,
   alles andere (Auto, Schiff, Baum, Leuchtturm …) wird aus Formen gebaut. ✏️ Ändern („größere Räder“), ⟲ zurück,
   ⚡ / ✨ / 🧠 wie gründlich. In 🏠 Haus: die ✨-Zeile ändert das Haus, an dem du gerade baust.
 - 🏘 Ort (mit offener Welt): ein ganzer Ort aus einem Satz. Das Gebiet ist, wo die Kamera hinschaut (oder ▣ deine

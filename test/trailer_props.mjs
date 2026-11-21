@@ -8,7 +8,7 @@
 // sight to the look point is clear and the palms / pieces stand in the view.
 // Also measured: the frame cost with the props off and on (SwiftShader CPU frames, the method of plants_cost.mjs), and,
 // with OLD_DIST naming a build from before the pass (the commit ea240cf), the Very Low (potato) frame cost of both builds
-// (AGENTS.md rule 5: the new build at most 6 % slower; Very Low has no prop pass).
+// (CONTRIBUTING.md rule 5: the new build at most 6 % slower; Very Low has no prop pass).
 // Writes test/shots/trailer_props_<place>_{before,after}.png for the places avenue, garden, road (the town), living,
 // dining (the villa), show, showclose (the showroom), village (the villages' own pieces: joined sofas, table, chairs, bed).
 //   nohup bash test/wt_run.sh trailer_props.mjs 3000 > .tmp_tests/trailer_props.log 2>&1 &

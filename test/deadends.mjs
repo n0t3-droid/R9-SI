@@ -7,7 +7,7 @@
 // · ▶ Spielen takes the plan drafts and the 🎨 Stil preview along — from the Studio's page and from the Studio over the
 //   open game — and you land in front of the new house;
 // · a full browser storage shows "⚠ Browser-Speicher voll" with 🧹 Platz schaffen — never a ✓ after a failed write;
-// · the developer tabs wait behind ⚙ Profi, no text says you need Claude; small ones: 🗑 asks twice, ↻ on screen,
+// · the developer tabs wait behind ⚙ Profi, no text says you need an online service; small ones: 🗑 asks twice, ↻ on screen,
 //   ✋ Benutzen with a world open → the Werkbank's hand, a skin-only design is kept, house saves do not re-mesh the game.
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'child_process';
@@ -36,9 +36,9 @@ const done = async () => { console.log('--- logs (' + logs.length + ')'); for (c
 const section = async (name, fn) => { console.log(name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
 
 await section('0 · the built pages', async () => {
-  const bad = /schick mir|Claude liest|übernehme ich/;
+  const bad = /schick mir|übernehme ich/;
   const html = fs.readFileSync('/home/dev/vr/dist/studio.html', 'utf8'), sa = fs.readFileSync('/home/dev/vr/dist/studio_artifact.html', 'utf8');
-  check(!bad.test(html) && !bad.test(sa), 'no text in either Studio says it needs Claude (schick mir · Claude liest · übernehme ich)');
+  check(!bad.test(html) && !bad.test(sa), 'no text in either Studio says it needs an online helper (schick mir · übernehme ich)');
 });
 
 // ---- the Studio, every catalogue house built

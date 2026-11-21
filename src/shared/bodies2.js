@@ -5,7 +5,7 @@
 //   so2_frost   the white sulfur-dioxide frost the plumes snow down and the cold plains keep
 //   ocker_dust  (u-moons3) Ocker's plains: butterscotch dust — iron oxide on fine basalt grains, browner than red sand
 // Registered LATE — one VR.BL.late push after every older pack (bodies.js, foeblocks.js, voxhangar.js): build.js puts
-// this file right before blocks4, so both come after the last block a save knows (AGENTS.md rule 1, test/id_snapshot.js).
+// this file right before blocks4, so both come after the last block a save knows (CONTRIBUTING.md rule 1, test/id_snapshot.js).
 // ============================================================================
 (function (VR) {
   'use strict';

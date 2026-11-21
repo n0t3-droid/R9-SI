@@ -8,7 +8,7 @@
 //   exo_frond    Violettwedel — its fronds (a cross plant)
 //   exo_glass    Dünenglas — sand fused to dark green-brown glass grains by a hot star's heat, heaped into dunes
 // Registered LATE — one VR.BL.late push after every older pack (fields_blocks.js's glowspar is the block before them):
-// build.js puts this file right before blocks4 after fields_blocks (AGENTS.md rule 1, test/id_snapshot.js).
+// build.js puts this file right before blocks4 after fields_blocks (CONTRIBUTING.md rule 1, test/id_snapshot.js).
 // ============================================================================
 (function (VR) {
   'use strict';
