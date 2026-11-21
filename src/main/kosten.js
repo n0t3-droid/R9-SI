@@ -47,6 +47,7 @@
     { id: 'wW0', de: 'Wasser 0 (nur Himmel, kein Spiegel)', en: 'Water 0 (sky only, no mirror)', set: { water: 0 }, grp: 'wasser' },
     { id: 'wRl', de: 'Spiegel jedes 2. Bild', en: 'Mirror every 2nd frame', set: { reflLite: true }, grp: 'wasser' },
     { id: 'wRes', de: 'Auflösung ×0.7', en: 'Resolution ×0.7', set: {}, scale: 0.7, grp: 'wasser' },
+    { id: 'zpre0', de: 'Tiefenvorlauf Laub aus (zPre)', en: 'Foliage depth pre-pass off (zPre)', set: { zPre: false }, grp: 'ultra' },
     { id: 'idx0', de: 'Viereck-Index aus (Dreieckslisten wie früher)', en: 'Indexed quads off (triangle lists as before)', set: {}, idx: false, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
