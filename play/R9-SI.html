@@ -124510,7 +124510,7 @@ case'help':say(T('g.cmd.help1'));say(T('g.cmd.help2'));say(T('g.cmd.help3'));say
 case'time':{const v=a[0]==='set'?a[1]:a[0];const n=TIMES[v]!==undefined?TIMES[v]:parseInt(v,10);if(!isNaN(n)){this.env.setTime(n);say(T('g.cmd.time',{n}));}break;}
 case'wetter':case'weather':this.wetterCommand(a);break;
 case'gamemode':case'gm':{const m={s:'survival',c:'creative',z:'zen',0:'survival',1:'creative',survival:'survival',creative:'creative',zen:'zen'}[a[0]];if(m){p.setMode(m);say(T('g.cmd.gamemode',{m:T('g.mode.'+m)}));}break;}
-case'tp':if(a.length>=3){const v=a.map((s,i)=>s.startsWith('~')?p.pos[i]+(parseFloat(s.slice(1))||0):parseFloat(s));if(p.teleport(v[0],v[1],v[2]))say(T('g.cmd.tp'));else say(T('g.cmd.tpBad'),'#ff8a8a');}break;
+case'tp':if(a.length>=3){const v=a.map((s,i)=>s.startsWith('~')?p.pos[i]+(parseFloat(s.slice(1))||0):parseFloat(s));if(p.teleport(v[0],v[1],v[2])){if(a.length>=5&&isFinite(parseFloat(a[3]))&&isFinite(parseFloat(a[4]))){p.yaw=p.viewYaw=parseFloat(a[3])*Math.PI/180;p.pitch=Math.max(-1.55,Math.min(1.55,parseFloat(a[4])*Math.PI/180));}say(T('g.cmd.tp'));}else say(T('g.cmd.tpBad'),'#ff8a8a');}break;
 case'give':{const id=a[0],n=parseInt(a[1]||'1',10)||1;if(VR.itemDef(id)){p.inv.add(id,n);say(T('g.cmd.gave',{n,item:VR.itemName(id)}));}else say(T('g.cmd.noItem',{id}),'#ff8a8a');break;}
 case'seed':say(T('g.cmd.seed',{seed:this.meta.seed}));break;
 case'dim':if(VR.Travel)VR.Travel.command(this,a);break;
