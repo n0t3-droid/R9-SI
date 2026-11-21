@@ -42,10 +42,15 @@
     { id: 'flatFS', de: 'Probe: Gelände nur einfarbig (ohne Pixelarbeit)', en: 'Probe: terrain one flat colour (no pixel work)', set: {}, knob: ['Renderer', 'PROBE', 'flatFS'], grp: 'probe' },
     { id: 'res5', de: 'Probe: Auflösung ×0.5', en: 'Probe: resolution ×0.5', set: {}, scale: 0.5, grp: 'probe' },
     { id: 'far1', de: 'Ferne schlicht aus', en: 'Plain distance off', set: { farPlain: false }, grp: 'ultra' },
+    // /kosten wasser · what the water costs where it fills the picture (the owner's video: Ultra, full window, water 20–57 ms)
+    { id: 'wW1', de: 'Wasser 2 → 1', en: 'Water 2 → 1', set: { water: 1 }, grp: 'wasser' },
+    { id: 'wW0', de: 'Wasser 0 (nur Himmel, kein Spiegel)', en: 'Water 0 (sky only, no mirror)', set: { water: 0 }, grp: 'wasser' },
+    { id: 'wRl', de: 'Spiegel jedes 2. Bild', en: 'Mirror every 2nd frame', set: { reflLite: true }, grp: 'wasser' },
+    { id: 'wRes', de: 'Auflösung ×0.7', en: 'Resolution ×0.7', set: {}, scale: 0.7, grp: 'wasser' },
     { id: 'idx0', de: 'Viereck-Index aus (Dreieckslisten wie früher)', en: 'Indexed quads off (triangle lists as before)', set: {}, idx: false, grp: 'ultra' },
   ];
   K.END = { id: 'base2', de: 'So wie jetzt (nochmal: die Streuung)', en: 'As it is (again: the spread)', set: {} };
-  K.plan = (arg) => K.LIST.some(e => e.id === arg && e.id !== 'base') ? [K.LIST[0], K.LIST.find(e => e.id === arg), K.END] : (arg === 'far' || arg === 'geo' || arg === 'ultra' || arg === 'probe' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra' && e.grp !== 'probe')).concat([K.END]);
+  K.plan = (arg) => K.LIST.some(e => e.id === arg && e.id !== 'base') ? [K.LIST[0], K.LIST.find(e => e.id === arg), K.END] : (arg === 'far' || arg === 'geo' || arg === 'ultra' || arg === 'probe' || arg === 'wasser' ? K.LIST.filter(e => e.id === 'base' || e.grp === arg) : K.LIST.filter(e => e.grp !== 'geo' && e.grp !== 'ultra' && e.grp !== 'probe' && e.grp !== 'wasser')).concat([K.END]);
   K.fmt = (lang, e, r, base) => {
     const name = lang === 'de' ? e.de : e.en, ms = (x) => x.toFixed(1);
     if (!base || e.id === 'base') return `${name}: ${ms(r.total)} ms GPU · ` + K.top(r.times);
