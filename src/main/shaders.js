@@ -1272,6 +1272,12 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #endif
 #ifdef CUTOUT
+#ifndef LITE
+  // t-trees2 · a round crown's leaf face (mesher.js: leaf bit 7 with bit 13): no holes — the blob has no inside, so a
+  // cut-out texel showed the dark through it (the owner: the trees did not look good); the gaps take the leaves' own
+  // deeper colour from the texture's small mip instead
+  if (((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 13u) & 1u) == 1u) { vec4 lm = textureLod(u_albedo, vec3(fu, layer), 4.0); float ll = clamp(dot(lm.rgb, vec3(0.3, 0.59, 0.11)) / max(lm.a, 0.25), 0.0, 1.0); alb = vec4(mix(vec3(ll * 0.62), alb.rgb, alb.a), 1.0); }   // (a grey of the leaves' own lightness: the tint colours it; the cut-out texels' own colour is no leaf's)
+#endif
   if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
 #ifdef Q_CROWN
@@ -1362,7 +1368,7 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   }
   alb.rgb *= 1.0 + sheen;
   alb.rgb = mix(alb.rgb, alb.rgb * vec3(1.06, 1.04, 0.86), clamp(sheen * 1.5, 0.0, 0.4));
-  if (u_snowCover > 0.001 && (face == 2u || ((v_w5 >> 13u) & 1u) == 1u)) {   // a snow day: the flakes settle on the open tops
+  if (u_snowCover > 0.001 && (face == 2u || (((v_w5 >> 13u) & 1u) == 1u && ((v_w5 >> 7u) & 1u) == 0u))) {   // a snow day: the flakes settle on the open tops
     vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
     float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);
     alb.rgb = mix(alb.rgb, vec3(0.9, 0.92, 0.97), u_snowCover * patchy * smoothstep(0.86, 1.0, v_sky));
@@ -1400,7 +1406,11 @@ ${(VR.QArt && VR.QArt.glslTerrain) ? VR.QArt.glslTerrain() : ''}${(VR.QArt2 && V
   }
   // normal (smooth ground slopes: the true surface normal from the position derivatives)
   vec3 N = NORMALS[face];
+#ifdef LITE
   if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
+#else
+  if (((v_w5 >> 13u) & 1u) == 1u && ((v_w5 >> 7u) & 1u) == 0u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }   // (t-trees2: not a round crown's leaf face — leaf bit 7 with 13)
+#endif
 #ifdef GEMALT
   if (gmF) N = normalize(v_gN);
 #endif

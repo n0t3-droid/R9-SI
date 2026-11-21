@@ -478,6 +478,33 @@
   TREES.boulder = function (w, x, y, z, rng, s) { blob(w, x, y, z, 1 + rng.int(2), 1 + rng.int(2), 1 + rng.int(2), s || GEN.S().mossycobble, rng, 0.6); };
 
   // ---------------------------------------------------------------------------
+  // t-trees2 (vgen 18; the owner, 21 Nov 2026: „die Bäume sehen wirklich nicht schön aus" — a new design for every
+  // tree): in a writer flagged t18 (a vgen-18 world's chunk writer: gen_overworld.js, gen_land.js, gen_vista.js) the old
+  // builders grow the L-system trees of VR.Flora instead (flora.js FL.GREEN: crowns of leaf clusters with air between
+  // them, tapering trunks, the spruce a true cone). A tree's grammar seed comes from the caller's stream, so a world grows
+  // the same trees every time. Older worlds keep their trees (the flag unset there; gen_same's pins unchanged).
+  GEN.TREE2_VGEN = 18;
+  GEN.trees2 = (g) => !!g && (g.vgen | 0) >= GEN.TREE2_VGEN;
+  const plant2 = (w, name, x, y, z, rng) => {
+    const FL = VR.Flora; if (!FL || !FL.SPECIES[name]) return false;
+    ground(w, x, y, z, GEN.S().dirt);
+    FL.plant(w, name, x, y, z, (rng.next() * 4294967296) >>> 0, st, leafState);
+    return true;
+  };
+  const OLD = {};
+  const swap = (key, pick) => { const f = OLD[key] = TREES[key]; TREES[key] = function (w, x, y, z, rng, o) { const n = w && w.t18 ? pick(rng, o) : null; if (n && plant2(w, n, x, y, z, rng)) return; return f.apply(this, arguments); }; };
+  swap('oak', (rng, o) => (o && (o.log && o.log !== 'oak_log')) ? (o.log === 'birch_log' ? 'haengebirke' : null) : 'kronenbaum');
+  swap('fancyOak', () => 'grosskrone');
+  swap('roundTree', (rng, o) => (o && o.leaf) ? null : 'kronenbaum');
+  swap('spruce', (rng, o) => (o && o.pine) ? 'bergkiefer' : 'tannenspitz');
+  swap('megaSpruce', (rng, o) => (o && o.pine) ? 'bergkiefer' : 'tannenspitz');
+  swap('darkOak', () => 'dunkelkrone');
+  swap('jungle', () => 'urwaldbaum');
+  swap('megaJungle', () => 'urwaldriese');
+  swap('acacia', () => 'schirmakazie');
+  GEN.TREES_OLD = OLD;
+
+  // ---------------------------------------------------------------------------
   // Structures (small, ≤ 16 blocks across) ------------------------------------
   const STRUCT = GEN.STRUCT = {};
   STRUCT.dungeon = function (w, x, y, z, rng, chestList) {

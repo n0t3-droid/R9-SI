@@ -32,7 +32,7 @@ if (FL) {
       if (p !== q) same = false;
       hs.push(p.b.y1 + 1); spread.push(Math.max(-p.b.x0, p.b.x1, -p.b.z0, p.b.z1));
       if (!p.list.some(c => c[3] === 1)) woodOk = false;
-      if (!p.list.some(c => c[3] === 2)) bloomOk = false;
+      if (!p.list.some(c => c[3] === ((FL.GREEN || []).includes(name) ? 3 : 2))) bloomOk = false;   // (t-trees2: the green trees carry leaf clusters, kind 3)
     }
     const hmin = Math.min(...hs), hmax = Math.max(...hs), smax = Math.max(...spread);
     const reach = Sp.kind === 'giant' ? 13 : Sp.kind === 'shrub' ? 3 : 7;

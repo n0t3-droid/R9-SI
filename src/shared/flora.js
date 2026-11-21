@@ -55,10 +55,11 @@
     for (let i = 0; i < str.length; i++) {
       const c = str[i];
       switch (c) {
-        case 'F': case 'f': {
+        case 'F': case 'f': case 'G': {
           const l = len * (1 + (r() - 0.5) * jit * 0.6);
           const nx = px + H[0] * l, ny = py + H[1] * l, nz = pz + H[2] * l;
           if (c === 'F') segs.push([px, py, pz, nx, ny, nz, w]);
+          else if (c === 'G') segs.push([px, py, pz, nx, ny, nz, 0, 3]);   // (t-trees2: a leafy strand — a frond, a twig of needles)
           px = nx; py = ny; pz = nz;
           break;
         }
@@ -111,6 +112,7 @@
     }
     for (const s of shape.segs) {
       const [x0, y0, z0, x1, y1, z1, rr] = s, l = Math.hypot(x1 - x0, y1 - y0, z1 - z0), n = Math.max(1, Math.ceil(l / 0.35));
+      if (s[7] === 3) { for (let k = 0; k <= n; k++) { const t = k / n; put(Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t), Math.round(z0 + (z1 - z0) * t), 3); } continue; }
       const ax = Math.abs(x1 - x0), ay = Math.abs(y1 - y0), az = Math.abs(z1 - z0);
       segAxis = ay >= ax * 0.8 && ay >= az * 0.8 ? 0 : ax >= az ? 1 : 2;
       for (let k = 0; k <= n; k++) {
@@ -151,6 +153,39 @@
     traumbaum: { kind: 'giant', axiom: 'FFFF[&A]/[&A]/[&A]/[&A]', n: 4, rules: { A: [[0.6, "!'F[&FA]/[&FA]/[&A]"], [0.4, "!'F[&FA]/[&A]"]] }, fin: { A: 'B' },
       t: { len: 2.0, w: 2.4, angle: 30, pitch: 42, jit: 0.25, wr: 0.62, lr: 0.8, br: 3.0 }, wood: 'cherry_log', blossom: ['bloom_snow_leaves', 'cherry_leaves', 'cherry_leaves', 'bloom_rose_leaves'], leaf: 'oak_leaves', h: [14, 24] },
   };
+  // t-trees2 (vgen 18; the owner, 21 Nov: „die Bäume sehen wirklich nicht schön aus" — a new look for every tree): the
+  // green trees grown the same way — a trunk that tapers, scaffold limbs rolled by the golden angle, the crown a cloud of
+  // leaf clusters with air between them (not one ball), the needles' whorls narrowing to a point. GEN.TREES plants them
+  // in a writer flagged t18 (gen_common.js), so every caller of the old builders gets the new trees in a vgen-18 world.
+  Object.assign(FL.SPECIES, {
+    // Kronenbaum: the meadow's broadleaf — a stout trunk, three to four limbs, a crown of a dozen leaf clusters
+    kronenbaum: { kind: 'tree', axiom: 'FFF[&A]/[&A]/[&A]/[^FFL]', n: 3, rules: { A: [[0.55, "!'F[&FA]/[&L]/[&FA]"], [0.45, "!'F[&FA]/[&FL]"]] }, fin: { A: 'L' },
+      t: { len: 1.3, w: 0.9, angle: 32, pitch: 38, jit: 0.3, wr: 0.62, lr: 0.8, lb: 1.75 }, wood: 'oak_log', blossom: ['oak_leaves'], leaf: 'oak_leaves', h: [8, 12] },
+    // Großkrone: the old lone oak — a thick trunk, wide low limbs, one generation more, a broad dome of clusters
+    grosskrone: { kind: 'tree', axiom: 'FFFF[&A]/[&A]/[&A]/[&A]/[^FFFL]', n: 4, rules: { A: [[0.6, "!'F[&FA]/[&FL]/[&A]"], [0.4, "!'F[&FA]/[&A]"]] }, fin: { A: 'L' },
+      t: { len: 1.5, w: 1.5, angle: 30, pitch: 44, jit: 0.25, wr: 0.62, lr: 0.8, lb: 1.9 }, wood: 'oak_log', blossom: ['oak_leaves'], leaf: 'oak_leaves', h: [11, 16] },
+    // Hängebirke: a slender white stem, short side shoots that droop, small clusters hanging along them
+    haengebirke: { kind: 'tree', axiom: 'FFFA', n: 6, rules: { A: [[0.55, "F[&&!GGDGDGL]/[&&!GGDGL]/[&&!GDGL]/'A"], [0.45, "F[&&!GGDGDGL]/[&&!GDGL]/'A"]] }, fin: { A: 'FLL' },
+      t: { len: 1.1, w: 0.5, angle: 26, pitch: 24, jit: 0.3, wr: 0.7, lr: 0.9, lb: 1.2, droop: 26, roll: 120 }, wood: 'birch_log', blossom: ['birch_leaves'], leaf: 'birch_leaves', h: [9, 14] },
+    // Tannenspitz: the spruce — a straight leader, a whorl of drooping branches every step, each shorter toward the top
+    tannenspitz: { kind: 'tree', cone: { h: [11, 15], rb: [3.6, 4.6], y0: 2 }, wood: 'spruce_log', blossom: ['spruce_leaves'], leaf: 'spruce_leaves', h: [12, 18] },
+    // Bergkiefer: the pine — a long bare stem, a flat-topped crown of a few clusters high up
+    bergkiefer: { kind: 'tree', axiom: 'FFFFFFF[&A]/[&A]/[&A]/[&A]/[^L]', n: 2, rules: { A: [[0.6, "!'F[&GL]/[&FL]/[^L]"], [0.4, "!'F[&FL]"]] }, fin: { A: 'L' },
+      t: { len: 1.25, w: 0.5, angle: 30, pitch: 62, jit: 0.3, wr: 0.7, lr: 0.85, lb: 1.5 }, wood: 'spruce_log', blossom: ['spruce_leaves'], leaf: 'spruce_leaves', h: [11, 16] },
+    // Dunkelkrone: the dark oak — short, very stout, a low dense roof of big clusters
+    dunkelkrone: { kind: 'tree', axiom: 'FF[&A]/[&A]/[&A]/[&A]/[^FL]', n: 3, rules: { A: [[0.6, "!'F[&FL]/[&A]/[&FA]"], [0.4, "!'F[&FA]/[&L]"]] }, fin: { A: 'L' },
+      t: { len: 1.3, w: 1.4, angle: 30, pitch: 52, jit: 0.25, wr: 0.65, lr: 0.82, lb: 2.0 }, wood: 'dark_oak_log', blossom: ['dark_oak_leaves'], leaf: 'dark_oak_leaves', h: [7, 11] },
+    // Urwaldriese: the jungle giant — a tall trunk, a high umbrella of clusters, vines hanging from the limbs
+    urwaldriese: { kind: 'tree', axiom: 'FFFFFFFFF[&A]/[&A]/[&A]/[&A]/[^L]', n: 2, rules: { A: [[0.6, "!F[&FFLH]/[&FA]/[&FL]"], [0.4, "!F[&FFLH]/[&FA]"]] }, fin: { A: 'LH' },
+      t: { len: 1.5, w: 1.1, angle: 30, pitch: 66, jit: 0.25, wr: 0.62, lr: 0.82, lb: 2.2, chain: [3, 6] }, wood: 'jungle_log', blossom: ['jungle_leaves'], leaf: 'jungle_leaves', h: [16, 26] },
+    // Urwaldbaum: the jungle's own — a bent trunk, a few clusters, a vine or two
+    urwaldbaum: { kind: 'tree', axiom: 'FFFF[&A]/[&A]/[^FL]', n: 2, rules: { A: [[0.6, "!'F[&FLH]/[&FA]"], [0.4, "!'F[&L]"]] }, fin: { A: 'L' },
+      t: { len: 1.3, w: 0.5, angle: 30, pitch: 46, jit: 0.3, wr: 0.7, lr: 0.85, lb: 1.6, chain: [2, 4] }, wood: 'jungle_log', blossom: ['jungle_leaves'], leaf: 'jungle_leaves', h: [8, 13] },
+    // Schirmakazie: the savanna's — a forked stem leaning out, a wide flat roof of low clusters
+    schirmakazie: { kind: 'tree', axiom: 'FF[&&FFA]/[&&FFA]', n: 2, rules: { A: [[0.6, "'^F[&GL]/[&FL]/[^L]"], [0.4, "'^F[&FL]/[^L]"]] }, fin: { A: 'L' },
+      t: { len: 1.3, w: 0.5, angle: 30, pitch: 22, jit: 0.25, wr: 0.75, lr: 0.85, lb: 1.8 }, wood: 'acacia_log', blossom: ['acacia_leaves'], leaf: 'acacia_leaves', h: [6, 9] },
+  });
+  FL.GREEN = ['kronenbaum', 'grosskrone', 'haengebirke', 'tannenspitz', 'bergkiefer', 'dunkelkrone', 'urwaldriese', 'urwaldbaum', 'schirmakazie'];
   FL.TREES = ['wolkenkirsche', 'schneeschleier', 'lilaschirm', 'sonnenregen'];
   FL.SHRUBS = ['rosenbusch', 'schneebusch', 'lilabusch'];
   // a species' plant for a seed: its cells (cached per species and seed: the generator asks for the same tree from each
@@ -165,14 +200,37 @@
     a = (a - 0.5) * 1.9 + 0.5 + (H3(x, y, z, s ^ 0x77) - 0.5) * 0.12;
     return Math.min(0.999, Math.max(0, a));
   };
+  // t-trees2 · a conifer's cells (a cone, not a grammar: the spruce's silhouette is its whole character): the trunk to
+  // the top; whorls every second layer as ragged discs whose radius falls from rb at the crown's foot to a point, a
+  // smaller disc between them (the serrated edge), the outer ring of every whorl drooping a cell (the branches' tips
+  // bend down), the tip three cells over the trunk. o {h: [min, max], rb: [min, max], y0} → the cells Map (FL.cells')
+  FL.coneCells = function (o, seed) {
+    const r = rnd(seed ^ 0x51ed), out = new Map(); out.axis = new Map();
+    const H = o.h[0] + Math.floor(r() * (o.h[1] - o.h[0] + 1)), rb = o.rb[0] + r() * (o.rb[1] - o.rb[0]), y0 = o.y0 || 2, top = H + 1;
+    const put = (x, y, z, k) => { const key = x + ',' + y + ',' + z, cur = out.get(key); if (cur === 1) return; out.set(key, k); if (k === 1) out.axis.set(key, 0); };
+    for (let y = 0; y < H; y++) put(0, y, 0, 1);
+    const ph = r() * 6.283;
+    for (let y = top - 1; y >= y0; y--) {
+      const u = (top - y) / (top - y0), whorl = ((top - y) & 1) === 0, rr = Math.max(1.05, rb * Math.pow(u, 0.92) * (whorl ? 1 : 0.6) + (whorl ? 0.35 : 0.2));
+      const R = Math.ceil(rr);
+      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+        const a = Math.atan2(dz, dx), wob = 1 + 0.16 * Math.sin(a * 5 + ph + y * 1.7), d = Math.hypot(dx, dz) / wob;
+        if (d > rr) continue;
+        if (d > rr - 0.9 && H3(dx, y, dz, seed) < 0.22) continue;   // (a ragged rim)
+        put(dx, y, dz, 3);
+        if (whorl && d > rr - 1.1 && d > 1.5 && y > y0) put(dx, y - 1, dz, 3);   // the tips droop
+      }
+    }
+    for (let k = 0; k < 2; k++) put(0, top + k, 0, 3);
+    return out;
+  };
   const CACHE = new Map();
   FL.grow = function (name, seed) {
     const key = name + ':' + (seed >>> 0);
     let p = CACHE.get(key); if (p) return p;
     const S = FL.SPECIES[name]; if (!S) return null;
-    const str = FL.expand(S.axiom, S.rules, S.n, seed, S.fin);
-    const shape = FL.turtle(str, S.t, seed);
-    const cells = FL.cells(shape, S, seed);
+    const str = S.cone ? '' : FL.expand(S.axiom, S.rules, S.n, seed, S.fin);
+    const cells = S.cone ? FL.coneCells(S.cone, seed) : FL.cells(FL.turtle(str, S.t, seed), S, seed);
     const list = [];   // [dx, dy, dz, kind, mix] — sorted for a stable write order
     let x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0;
     for (const [k, kind] of cells) {

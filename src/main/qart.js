@@ -205,7 +205,7 @@ vec4 qClump(vec3 p) {
 #if defined(Q_LEAF) && !defined(MODEL)
 // q-art · Laubkronen (qart.js QA.clump, QA.cut): a waving leaf face (the leaf bit, no sway level, no glass frame)
 float qGreen(vec3 c) { return clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3) * 6.0, 0.0, 1.0); }
-bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u; }
+bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u && ((v_w5 >> 13u) & 1u) == 0u; }   // (t-trees2: a round crown's face — bit 13 — is never cut: the blob has no inside)
 in vec4 v_qC;   // the clump field at the vertices (glslVS)
 // the leaf face's corners cut along a ragged, texel-snapped rim (the same on both sides of a shared face)
 bool qCut(vec3 w, uint face, float dist) {

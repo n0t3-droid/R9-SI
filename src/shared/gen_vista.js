@@ -1004,6 +1004,7 @@
     // (only the trees whose crown may reach into the frame: their foot within its horizontal wedge, 10 blocks to spare)
     const half = Math.atan(B.th * ASPECT / Math.max(0.2, Math.cos(Math.abs(cam.pitch) + Math.atan(B.th)))) + 4 * DEG;
     const inWedge = (x, z) => { const vx = x + 0.5 - e[0], vz = z + 0.5 - e[2], dd = Math.hypot(vx, vz); if (dd < 12) return true; if (dd > reach + 12) return false; let a = Math.atan2(-vx, -vz) - cam.yaw; a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))); return a <= half + Math.atan2(10, dd); };
+    rec.t18 = GEN.trees2(g);   // (t-trees2: the sight model plants the trees the world grows)
     if (LAND.woodsTrees) { LAND.woodsTrees(g, P, rec, bx0 + 6, bz0 + 6, bx1 - 6, bz1 - 6, inWedge); LAND.soloTrees(g, P, rec, bx0 + 6, bz0 + 6, bx1 - 6, bz1 - 6, inWedge); }
     if (P.trees && LAND.planTree) for (const t of P.trees) if (t.x >= bx0 + 6 && t.x <= bx1 - 6 && t.z >= bz0 + 6 && t.z <= bz1 - 6 && inWedge(t.x, t.z)) LAND.planTree(g, rec, t);
     let maxY = 0; for (let i = 0; i < colTop.length; i++) if (colTop[i] > maxY) maxY = colTop[i];

@@ -1008,7 +1008,7 @@
   LAND.planTree = function (g, w, t) { const rng = new VR.RNG(M.hash2(t.x, t.z, g.seed ^ 0x9091) >>> 0); if (t.kind === 'poplar') GEN.TREES.poplar(w, t.x, t.y, t.z, rng, { color: t.color }); else plantTree(w, t.kind, t.x, t.y, t.z, rng, true); };
   function dressTrees(g, P, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks);
-    w.v13 = GEN.treeFix(g);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
+    w.v13 = GEN.treeFix(g); w.t18 = GEN.trees2(g);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
     LAND.woodsTrees(g, P, w, x0 - 7, z0 - 7, x0 + 22, z0 + 22);
     LAND.soloTrees(g, P, w, x0 - 8, z0 - 8, x0 + 23, z0 + 23);
     // the plan's own trees (the poplar rows along the farm lanes, the orchards' neighbours)

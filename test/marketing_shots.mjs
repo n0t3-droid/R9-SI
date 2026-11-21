@@ -8,7 +8,7 @@ import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/inde
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
 const ROOT = new URL('../', import.meta.url).pathname;
-const OUT = ROOT + 'docs/media/';
+const OUT = process.env.OUT || ROOT + 'docs/media/';
 fs.mkdirSync(OUT, { recursive: true });
 const VW = +(process.env.W || 1920), VH = +(process.env.H || 1080), RD = +(process.env.RD || 8), PRESET = process.env.PRESET || 'ultra';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
@@ -23,6 +23,7 @@ let SHOTS = [
   { name: 'citadel', de: 'Turmzitadelle bei Nacht', x: -307.6, z: -233.1, at: [-419.6, 215.1, 380], tod: 18098 },
   { name: 'aurora', de: 'Nova Haven bei Nacht', x: -18.3, z: -130.0, at: [5.9, 158.5, -290], tod: 19492, aurora: true },
 ];
+if (process.env.SHOTS_JSON) SHOTS = JSON.parse(process.env.SHOTS_JSON);   // (a list of {name, de, x, z, at, tod} of its own)
 if (ONLY) SHOTS = SHOTS.filter(s => ONLY.includes(s.name));
 const aimAt = (x, y, z, at) => { const dx = at[0] - x, dy = at[1] - y, dz = at[2] - z; return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))]; };
 
@@ -32,7 +33,7 @@ const logs = []; page.on('pageerror', e => logs.push(e.message)); page.on('conso
 await page.goto('file://' + ROOT + 'dist/index.html');
 const ev = (f, a) => page.evaluate(f, a), wait = (ms) => page.waitForTimeout(ms);
 for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title'))) break; }
-await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.applySettings('*'); }, [PRESET, RD]);
+await ev(([p, rd, set]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; Object.assign(g.settings, set); g.applySettings('*'); }, [PRESET, RD, JSON.parse(process.env.SET_JSON || '{}')]);
 await ev(`VR.game.createWorld({name:'Galerie',mode:'creative',difficulty:'peaceful',type:'default',seed:'53',cheats:true})`);
 for (let i = 0; i < 300; i++) { await wait(500); if (await ev(() => VR.game.state === 'play')) break; }
 console.log('world (' + secs() + ')');

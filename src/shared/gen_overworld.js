@@ -318,7 +318,7 @@
       // features & structures from 3x3 neighborhood
       const chests = [];
       const w = new GEN.ColumnWriter(cx, cz, blocks);
-      w.v13 = GEN.treeFix(this);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
+      w.v13 = GEN.treeFix(this); w.t18 = GEN.trees2(this);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.features(w, cx + dx, cz + dz, chests);
       // vegetation (own column)
       this.vegetation(blocks, cx, cz, biome, climate, rng);
@@ -670,6 +670,16 @@
         const bio = this.biomeFor(cl, y - 1), key = BIOMES[bio].key;
         if (key.indexOf('ocean') >= 0 || key === 'river' || key === 'beach' || key === 'stony_shore' || key === 'desert') continue;
         this.tree(w, key, x, y, z, rng);
+      }
+      // t-trees2 (vgen 18; the owner: „bei Beaches wären Palmen super"): palms along the beaches — up to two a chunk, on
+      // the sand a few blocks over the sea, each leaning a little its own way (GEN.palmTree: the ringed trunk, the crown)
+      if (this.vgen >= GEN.TREE2_VGEN) for (let i = 0; i < 2; i++) {
+        if (rng.next() > 0.5) continue;
+        const x = fx0 + 2 + rng.int(12), z = fz0 + 2 + rng.int(12), y = this.surfaceY(x, z) + 1;
+        if (y < SEA + 2 || y > SEA + 7) continue;
+        const cl = this._treeCl = this.climateAt(x, z, this._treeCl);
+        if (BIOMES[this.biomeFor(cl, y - 1)].key !== 'beach') continue;
+        GEN.palmTree((px, py, pz, name, props) => w.place(px, py, pz, R.S(name, props), 1), x, y, z, 0, rng);
       }
       // special vegetation / rocks
       if ((key0 === 'old_growth_pine_taiga' || key0 === 'old_growth_spruce_taiga') && rng.chance(0.5)) { const x = fx0 + rng.int(16), z = fz0 + rng.int(16); T.boulder(w, x, this.surfaceY(x, z) + 1, z, rng); }
