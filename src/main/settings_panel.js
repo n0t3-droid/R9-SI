@@ -100,6 +100,7 @@
       pv.innerHTML = `<canvas class="pv" width="240" height="135" aria-label="${esc(T('g.set.preview'))}"></canvas><div class="pvnote">${esc(T('g.set.preview'))}</div><div class="aqline" hidden></div>`;
       body.appendChild(pv);
       ui.previewCtx = pv.querySelector('canvas').getContext('2d');
+      if (!(game.state === 'play' || game.state === 'paused')) { pv.querySelector('canvas').style.display = 'none'; const nt = pv.querySelector('.pvnote'); if (nt) nt.style.display = 'none'; ui.previewCtx = null; }   // (start_audit.mjs: no world behind the menu — no empty black box)
       if (game.requestPreview) game.requestPreview();   // a new canvas (after a redraw of the group) gets a fresh picture
       SP.aqLine(ui);
     }

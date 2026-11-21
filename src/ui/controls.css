@@ -117,7 +117,7 @@
 #ui.touchon #hotbar.hf-off { opacity: 1 !important; pointer-events: auto !important; }   /* (a phone picks blocks from it: it never hides) */
 #ui.touchon #hotbar .slot canvas { width: 78%; height: 78%; }
 #ui.touchon #modebadge { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); bottom: auto; }
-#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; }
+#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; min-height: 40px; padding-top: 0; padding-bottom: 0; }   /* (start_audit.mjs: 31 px was too small to tap) */
 #ui.touchon #hints { top: calc(max(10px, env(safe-area-inset-top)) + 132px); bottom: auto; width: min(76vw, 460px); max-width: min(76vw, 460px); }
 #ui.touchon .bh-btn { right: max(18px, env(safe-area-inset-right)); bottom: calc(262px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px; }
 #ui.touchon #crosshair { opacity: .55; }

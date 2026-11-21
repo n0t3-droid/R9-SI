@@ -514,11 +514,16 @@
     const mkb = (cls, text, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.onclick = fn; return b; };
     tabs.appendChild(mkb('on', tx('g.first2.simple', null, 'Einfach', 'Simple'), () => {}));
     tabs.appendChild(mkb('', tx('g.first2.all', null, 'Alle Einstellungen …', 'All settings …'), () => { ui.setAll = true; ui.showSettings('img'); }));
-    const pv = document.createElement('div'); pv.className = 'pvwrap f2pv';
-    pv.innerHTML = '<canvas class="pv" width="320" height="180"></canvas>';
-    body.appendChild(pv);
-    ui.previewCtx = pv.querySelector('canvas').getContext('2d');
-    if (F.paintThumb) F.paintThumb(ui.previewCtx);   // f-first3: the world at once (the copy kept when the menu opened)
+    // the preview: only with a world behind the menu (on the start screen it stayed an empty black box — start_audit.mjs)
+    // and not on a short screen (a phone on its side: the sliders went under the fold)
+    const inWorld = g.state === 'play' || g.state === 'paused', shortScr = typeof innerHeight === 'number' && innerHeight < 480;
+    if (inWorld && !shortScr) {
+      const pv = document.createElement('div'); pv.className = 'pvwrap f2pv';
+      pv.innerHTML = '<canvas class="pv" width="320" height="180"></canvas>';
+      body.appendChild(pv);
+      ui.previewCtx = pv.querySelector('canvas').getContext('2d');
+      if (F.paintThumb) F.paintThumb(ui.previewCtx);   // f-first3: the world at once (the copy kept when the menu opened)
+    } else ui.previewCtx = null;
     const row = (lab, tip, val, min, max, step, show, set) => {
       const d = document.createElement('div'); d.className = 'setrow f2row';
       d.innerHTML = '<div class="sethead"><label></label><span class="val"></span></div>';
