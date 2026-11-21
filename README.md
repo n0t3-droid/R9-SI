@@ -135,30 +135,6 @@ map, roughness and emission — and forged in a worker, cached in IndexedDB. Eve
 starts: material families for steps, placing and breaking, bounded variations, a seeded pentatonic music plan, and an
 ambience (wind, rain, thunder, birds, crickets, water) on one bus that is muffled indoors and under water.
 
-## What we found
-
-- **Why the shadows stuttered.** The shadow map was cached — but invalidated whole whenever any section within reach
-  uploaded, so walking through a town re-rendered a 3072² map nearly every frame. The redraw is now moving to tiles
-  (toroidal addressing, dirty tiles only, outer rings on a slower cadence, a sun step rebuilt over four frames).
-- **Why world generation "hung".** A generated column's arrival (section counts, heights, the seam light flood)
-  ran inside the worker's message handler between two frames, invisible to the loop's own time; six workers landing
-  in one gap made a hitch. The arrivals now queue and are integrated within the frame's headroom.
-- **An integrated GPU is bandwidth-bound, not shading-bound.** On a Ryzen's Vega (shared DDR4), the frame took
-  17–21 ms with the shadows off at 960 × 540 shaded pixels — far too much for the shading alone; the cost is the
-  16-bit-float targets, the copies and the full-screen passes. That is where the next work goes (11-bit float targets,
-  merged post passes). The F3 overlay's second line (the GPU-Profil) names the cost per pass on any machine.
-- **A blur knob is the wrong governor.** Dynamic resolution alone blurred the picture near villages without helping,
-  because the main thread was the bottleneck there; measuring both sides and probing cheap steps first fixed it.
-- **149 people cost less than 38** once nobody computes what nobody sees.
-- **16 cells a block is the threshold** at which a surface-nets mesh of a voxel piece reads as an object instead of a
-  pile of cubes; 32 only pays within a few blocks.
-
-- **Two good fixes can make one bad picture.** Two fronts each fitted the golden hour to the trailer's colour bands and
-  both passed; merged, the sky went pale and lost its sun. Colour means are not enough — the tests now also measure
-  contrast, saturation and the sun's disc, and one front owns each look.
-- **What a test measures is what improves.** The never-boring sessions counted every event the same, so a ship passing
-  every 12 s looked like a busy world; weighed by how much of the screen they fill, and with a director that varies its
-  acts, the same five minutes became honest.
 
 ## Tests
 
