@@ -39295,7 +39295,7 @@ if(frameMs>targetMs*1.25)return Math.min(2,r+1);
 if(frameMs<targetMs*0.7)return Math.max(0,r-1);
 return Math.max(0,Math.min(2,r));
 };
-S.streamScale=function(rung){return[1,0.5,0.25][Math.max(0,Math.min(2,rung|0))];};
+S.streamScale=function(rung){return[1,0.7,0.5][Math.max(0,Math.min(2,rung|0))];};
 
 
 
@@ -57801,7 +57801,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="38686a949cb962bd";
+VR.TEX_SRC_HASH="732d172f8642045e";
 
 
 
@@ -70386,6 +70386,9 @@ uniform vec2 u_l2nf;
 vec3 l2VolAt(vec2 uv) {
 float zd = texture(u_l2Depth, uv).r * 2.0 - 1.0;
 float z = 2.0 * u_l2nf.x * u_l2nf.y / (u_l2nf.y + u_l2nf.x - zd * (u_l2nf.y - u_l2nf.x));
+
+
+if (z < 2.0) return vec3(0.0);
 vec2 t = uv * u_l2VolSize - 0.5, f = fract(t), b = (floor(t) + 0.5) / u_l2VolSize, e = 1.0 / u_l2VolSize;
 vec4 a = texture(u_l2Vol, b), bb = texture(u_l2Vol, b + vec2(e.x, 0.0)), c = texture(u_l2Vol, b + vec2(0.0, e.y)), d = texture(u_l2Vol, b + e);
 vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
@@ -75478,9 +75481,25 @@ uvec4 q = u_clockOk[sl >> 7];
 int wi = (sl >> 5) & 3;
 uint word = wi == 0 ? q.x : wi == 1 ? q.y : wi == 2 ? q.z : q.w;
 if ((word & (1u << uint(sl & 31))) == 0u) return -1.0;
-vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));
 float s = u_clockWin.w;
+#ifdef LITE
+vec4 u = texture(u_clockVol, vec3(wp.x / 128.0, wp.z / 128.0, clamp(mod(wp.y, 64.0), 0.5, 63.5) / 192.0));
 float d = max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
+#else
+
+
+vec3 p = vec3(wp.x - 0.5, wp.z - 0.5, clamp(mod(wp.y, 64.0), 0.5, 63.5) - 0.5);
+vec3 i0 = floor(p), f = p - i0;
+ivec3 a = ivec3(i0);
+int y0 = clamp(a.z, 0, 63), y1 = min(y0 + 1, 63);
+float d = 0.0;
+for (int k = 0; k < 8; k++) {
+int ox = k & 1, oz = (k >> 1) & 1, oy = k >> 2;
+vec4 u = texelFetch(u_clockVol, ivec3((a.x + ox) & 127, (a.y + oz) & 127, oy == 0 ? y0 : y1), 0);
+float w = (ox == 0 ? 1.0 - f.x : f.x) * (oz == 0 ? 1.0 - f.y : f.y) * (oy == 0 ? 1.0 - f.z : f.z);
+d += w * max(min(s - u.r, u.g - s), min(s - u.b, u.a - s));
+}
+#endif
 return clamp(d * u_clockK.x + 0.5, 0.0, 1.0);
 }
 
@@ -85450,8 +85469,39 @@ const dx=(s.ox>>4)-ccx,dz=(s.oz>>4)-ccz;
 if(dx< -32||dz< -32||dx>31||dz>31)continue;
 m[(dz+32)*64+dx+32]=Math.round(255*s.fade);
 }
+this.holdMask(m,64,ccx,ccz,w?w.renderDist:0,'h0');
 gl.bindTexture(gl.TEXTURE_2D,this.maskTex);
 gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,64,64,gl.RED,gl.UNSIGNED_BYTE,m);
+}
+
+
+
+
+holdMask(m,N,ccx,ccz,rd,tag){
+const HOLD=12,H=N>>1;
+let st=this[tag];
+if(!st||st.n!==N)st=this[tag]={n:N,prev:new Uint8Array(N*N),hold:new Uint8Array(N*N),cx:ccx,cz:ccz,tmp:new Uint8Array(N*N)};
+if(st.cx!==ccx||st.cz!==ccz){
+const ox=ccx-st.cx,oz=ccz-st.cz;
+for(const a of[st.prev,st.hold]){
+const t=st.tmp;t.fill(0);
+for(let z=0;z<N;z++){const sz=z+oz;if(sz<0||sz>=N)continue;for(let x=0;x<N;x++){const sx=x+ox;if(sx>=0&&sx<N)t[z*N+x]=a[sz*N+sx];}}
+a.set(t);
+}
+st.cx=ccx;st.cz=ccz;
+}
+const lim=Math.max(0,rd-1.5),lim2=lim*lim,prev=st.prev,hold=st.hold;
+for(let z=0;z<N;z++){
+const dz=z-H;
+for(let x=0;x<N;x++){
+const i=z*N+x;
+if(m[i]){prev[i]=m[i];hold[i]=HOLD;continue;}
+if(!hold[i])continue;
+const dx=x-H;
+if(dx*dx+dz*dz>lim2){hold[i]=0;continue;}
+hold[i]--;m[i]=prev[i];
+}
+}
 }
 
 
@@ -85473,6 +85523,7 @@ const dx=(s.ox>>4)-ccx,dz=(s.oz>>4)-ccz;
 if(dx< -H||dz< -H||dx>=H||dz>=H)continue;
 m[(dz+H)*N+dx+H]=Math.round(255*s.fade);
 }
+this.holdMask(m,N,ccx,ccz,w?w.renderDist:0,'hF');
 gl.bindTexture(gl.TEXTURE_2D,this.maskTexF);
 gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RED,gl.UNSIGNED_BYTE,m);
 if(this.far.maskUp){gl.bindTexture(gl.TEXTURE_2D,this.maskTex1);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,N,N,gl.RED,gl.UNSIGNED_BYTE,this.far.maskG);this.far.maskUp=false;}
@@ -124255,7 +124306,10 @@ aq.good=0;
 const gOk=aq.g<gLadder.length&& !(aq.bad.g&&now-aq.bad.g<30);
 const cOk=aq.c<cLadder.length&& !(aq.bad.c&&now-aq.bad.c<30);
 let kind=null;
-if(gpuBound&&gOk)kind='g';else if(cpuBound&&cOk)kind='c';else if(gOk)kind='g';else if(cOk)kind='c';
+
+
+const measured=gpuMs!==undefined;
+if(gpuBound&&gOk)kind='g';else if(cpuBound&&cOk)kind='c';else if(gOk)kind='g';else if(cOk&& !(measured&&gpuBound))kind='c';
 if(kind){this.aqPush(aq,kind,S,w);aq.probe={kind,fps0:fps};aq.hold=2.5;}
 }else if(fine&&aq.stack.length){
 aq.good+=dt;
