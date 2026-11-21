@@ -1388,7 +1388,7 @@
       if (VR.Fairy && VR.Fairy.frame) VR.Fairy.frame(this, dt, eye, E);   // a-fairy: the enchanted places, their folk and adventures (fairy.js)
       if (VR.StoryPlay) VR.StoryPlay.frame(this, dt);   // a-story: the story's offer and scene, the Regie (story.js, regie.js)
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
-      if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
+      if (this.airLife) { const pl = this.player, vy = pl.viewYaw !== undefined ? pl.viewYaw : pl.yaw, rr = this.renderer, asp = rr && rr.W > 0 && rr.H > 0 ? rr.W / rr.H : 16 / 9, fv = (this.settings.fov || 70) * Math.PI / 180; this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, fwd: [-Math.sin(vy), 0, -Math.cos(vy)], half: Math.atan(Math.tan(fv / 2) * asp) }); }   // the living air is spawned before the particles move (F3)
       if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
       if (this.particles.setWind) this.particles.setWind(E, dt);   // (t-motion: smoke and mist take up the world's wind)
       // t-motion · Wetter-Drama: the morning's fog banks in the valleys round the eye (where the clouds are sprites), every 3 s

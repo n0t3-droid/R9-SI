@@ -358,7 +358,7 @@
     constructor(g) {
       this.g = g; this.time = 0; this.clock = 0; this.on = false; this.tier = 2;
       this.seed = ((((g.meta && g.meta.seed) | 0) ^ 0x3a7d) + nameHash(String(g.dim || 'overworld'))) | 0;
-      this.ms = []; this.recent = []; this.timeline = []; this.lastK = null; this.retry = null; this.ctx = null; this.ctxT = 0;
+      this.ms = []; this.fading = []; this.recent = []; this.timeline = []; this.lastK = null; this.retry = null; this.ctx = null; this.ctxT = 0;
       this.places = []; this.placeT = 0; this.next = null; this.bc = [0, 0, 0]; this.bcY = null; this.bcT = 0;
       this.st = { started: 0, quiet: 0, kinds: {}, found: 0, cost: 0 };
       this.mapChest = null;
@@ -742,7 +742,13 @@
       if (this.timeline.length > 400) this.timeline.shift();
       return m;
     }
-    end(m) { const A = ACT[m.kind]; if (A && A.end) { try { A.end(this, m); } catch (e) { /* ends anyway */ } } const i = this.ms.indexOf(m); if (i >= 0) this.ms.splice(i, 1); }
+    end(m) {
+      const i = this.ms.indexOf(m); if (i >= 0) this.ms.splice(i, 1);
+      // nicht vor deinen Augen: a moment you are looking at fades out (lifekit.js VR.Appear) and ends after that
+      const AP = VR.Appear, A = ACT[m.kind];
+      if (AP && m.pos && A && A.draw && AP.seen(this.g, m.pos[0], m.pos[1] + 1, m.pos[2], 2)) { AP.out(m); (this.fading || (this.fading = [])).push(m); return; }
+      if (A && A.end) { try { A.end(this, m); } catch (e) { /* ends anyway */ } }
+    }
     endAll() { while (this.ms.length) this.end(this.ms[0]); this.b = null; }
     // ---- the treasure map's chest: at its X (a real place), drawn when near, found when reached
     mapUpdate() {
@@ -776,11 +782,15 @@
     }
     draw(r, E, layer, cam) {
       if (!this.on || layer !== 'opaque') return;
-      if (!this.ms.length && !this.bcOn && !this.mapChest && !this.b) return;
+      if (!this.ms.length && !this.bcOn && !this.mapChest && !this.b && !(this.fading && this.fading.length)) return;
       const g = this.g, ent = g.entities; if (!ent) return;
       let p = null; const prog = () => p || (p = ent.beginVox(r, E));
       cam = cam || r.cam;
-      for (const m of this.ms) { const A = ACT[m.kind]; if (A.draw) { try { A.draw(this, m, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('wander draw', m.kind, e); } } } }
+      const AP = VR.Appear;
+      const dm = (m) => { const A = ACT[m.kind]; if (!A.draw) return; const c0 = AP ? AP.cur : 1; if (AP) AP.cur = AP.k(m); try { if (!AP || AP.cur > 0) A.draw(this, m, r, E, cam, prog); } catch (e) { if (!this.warnedD) { this.warnedD = true; console.warn('wander draw', m.kind, e); } } finally { if (AP) AP.cur = c0; } };
+      for (const m of this.ms) dm(m);
+      // (the moments fading out where you look: drawn until they are gone, then ended)
+      if (this.fading && this.fading.length) for (let i = this.fading.length - 1; i >= 0; i--) { const m = this.fading[i]; if (AP && AP.gone(m)) { this.fading.splice(i, 1); const A = ACT[m.kind]; if (A && A.end) { try { A.end(this, m); } catch (e) { /* ended */ } } } else dm(m); }
       if (this.b) { try { this.drawBeat(r, cam, prog); } catch (e) { /* drawn next frame */ } }
       if (this.tier === 0) this.drawLamp(r, cam, prog);   // (o-wander2: Very Low's dusk cue — one warm lamp)
       if (this.bcOn) LK.drawModel(g, r, prog(), 'wander_balloon', this.bcPos, this.time * 0.2, cam, BAL_O);

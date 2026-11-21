@@ -3253,8 +3253,14 @@ in vec3 v_n;
 in vec4 v_color;
 in vec3 v_rel;
 out vec4 o;
+#ifdef APPEAR
+uniform float u_appear;   // 0..1: a figure fading in (or out) where you look, dithered (lifekit.js VR.Appear)
+#endif
 void main() {
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
+#ifdef APPEAR
+  if (u_appear < 1.0 && bayer4(gl_FragCoord.xy) >= u_appear) discard;
+#endif
   vec3 alb = v_color.rgb * u_tint;
   vec3 n = normalize(v_n);
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);

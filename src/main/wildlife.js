@@ -796,6 +796,7 @@
         for (let t = 0; t < 8 && RB.length < nR; t++) {
           const c = C[Math.floor(W.h(this.seed, Math.floor(this.time * 0.4), t) * C.length) % C.length], d = Math.hypot(c[0] - eye[0], c[2] - eye[2]);
           if (d < 14 || d > 48 || RB.some(r => Math.hypot(r.home[0] - c[0], r.home[2] - c[2]) < 4)) continue;
+          if (VR.Appear && VR.Appear.seen(this.g, c[0] + 0.5, c[1] + 0.4, c[2] + 0.5, 0.6)) continue;   // (nicht vor deinen Augen: a rabbit is found where you do not look)
           RB.push({ home: [c[0], c[1], c[2]], cover: [c[3], c[4]], pos: [c[0], c[1], c[2]], yaw: W.h(c[0], c[2], 1) * TAU, state: 'graze', t: 0, hop: null, id: RB.length + 7, walk: 0, walkAmt: 0, alert: 0, sky: lightOf(this.g.world, c[0], c[1] + 0.5, c[2]) });
         }
       }
@@ -806,7 +807,10 @@
       else if (!this.fox && S.done && !S.miss && (this.foxT = (this.foxT || 0) - dt) <= 0) {
         // (only on a whole scan — run 2's first look met a hedge whose columns had not come and waited 20 s; no hedge:
         //  another look in 6 s)
-        const path = this.hedgeRun(eye);
+        let path = this.hedgeRun(eye);
+        // (nicht vor deinen Augen: the fox trots in from an end of the hedge you do not look at — else another look in 6 s)
+        if (path && VR.Appear) { const AP = VR.Appear, p0 = path.pts[0], p1 = path.pts[path.pts.length - 1], s0 = AP.seen(this.g, p0[0], p0[1] + 0.4, p0[2], 0.8);
+          if (s0) { if (path.pts.length > 1 && !AP.seen(this.g, p1[0], p1[1] + 0.4, p1[2], 0.8)) path.pts.reverse(); else path = null; } }
         this.foxT = path ? 0 : 6;
         if (path) this.fox = { path, s: 0, state: 'trot', t: 0, pos: [path.pts[0][0], path.pts[0][1], path.pts[0][2]], yaw: 0, walk: 0, walkAmt: 1, id: 5, pounced: false, jump: 0, pet: { state: 'follow' }, kind: 'wild_fox' };
       }

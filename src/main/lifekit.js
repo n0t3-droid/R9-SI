@@ -9,6 +9,27 @@
 (function (VR) {
   'use strict';
   const LK = VR.LifeKit = {};
+  // ---- Nicht vor deinen Augen (VR.Appear; test/appear.js): a thing of the living world that has to come into being where
+  // you look fades in over AP.T s instead of popping up, and out the same way. k(o) is o's factor (its first call starts the
+  // fade); out(o) starts the fade-out; gone(o) once it is out. A module sets AP.cur = AP.k(o) around o's draws and back to 1;
+  // the shared vox draw (entities.js) gives it to the shader (u_appear: an ordered dither, Low and up — Very Low pops).
+  const AP = VR.Appear = VR.Appear || {};
+  AP.T = 0.9; AP.cur = 1;
+  AP.now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  AP.k = function (o) {
+    if (!o) return 1;
+    const t = AP.now();
+    if (o._apT === undefined) o._apT = t;
+    let k = Math.min(1, (t - o._apT) / AP.T);
+    if (o._apOut !== undefined) k = Math.min(k, Math.max(0, 1 - (t - o._apOut) / AP.T));
+    return k;
+  };
+  AP.out = function (o) { if (o && o._apOut === undefined) o._apOut = AP.now(); };
+  AP.gone = (o) => !!o && o._apOut !== undefined && AP.now() - o._apOut >= AP.T;
+  // is (x, y, z) (a sphere of r m) in view now (eventlog.js's test: the frustum and the line over the height map)
+  AP.seen = function (g, x, y, z, r) { const L = VR.EventLog; if (!L || !L.inView) return true; try { return !!L.inView([x, y, z], r || 1.5, g).inView; } catch (e) { return true; } };
+  // draw fn with the factor of o (nothing when it is 0)
+  AP.with = function (o, fn) { const k = AP.k(o); if (k <= 0) return; const c0 = AP.cur; AP.cur = Math.min(c0, k); try { fn(); } finally { AP.cur = c0; } };
   const TAU = Math.PI * 2;
   // a hash of up to three integers in [0, 1) (the same in every browser: the director and the pads are multiplayer-consistent)
   LK.h = function (a, b, c) {

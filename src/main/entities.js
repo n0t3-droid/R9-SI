@@ -475,6 +475,7 @@
       gl.uniform1f(p.u.u_flash, opts.flash || 0);
       gl.uniform3f(p.u.u_tint, 1, 1, 1);
       gl.uniform1f(p.u.u_noFog, opts.noFog ? 1 : 0);
+      if (p.u.u_appear) gl.uniform1f(p.u.u_appear, VR.Appear ? VR.Appear.cur : 1);   // (nicht vor deinen Augen: lifekit.js VR.Appear)
       const base = this.mm;
       base.set(IDENT);
       if (opts.baseMat) base.set(opts.baseMat);

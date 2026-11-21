@@ -238,7 +238,7 @@
       P.tsr = GL.program(S.FS_VS, S.TSR_FS, 'tsr');
       P.copy = GL.program(S.FS_VS, S.COPY_FS, 'copy');
       P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh');
-      P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox');
+      P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox', this.q.lite ? undefined : ['APPEAR']);   // (APPEAR: the soft fade-in of the living world's figures, Low and up — lifekit.js VR.Appear)
       P.voxInst = GL.program(S.VOX_VS, S.VOX_FS, 'voxInst', ['INST']);   // (the Baustelle's scaffold: one mesh, many instances)
       P.part = GL.program(S.PART_VS, S.PART_FS, 'part');
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
