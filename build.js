@@ -43,7 +43,7 @@ MAIN.splice(MAIN.indexOf('photomode') + 1, 0, 'funke');   // e-funke: VR.Funke (
 MAIN.push('quests');   // a-quests: VR.Quests (src/main/quests.js) — after adventure.js and photomode.js, whose parts it wraps (shop.js is listed already)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.indexOf('gen_dims') + 1, 0, 'gen_body'); TEX.splice(TEX.indexOf('tex_items'), 0, 'tex_body');   // u-moons1: the bodies' profiles and blocks (before blocks4 closes the registry), their generator, their textures
 MAIN.splice(MAIN.indexOf('space_shaders'), 1); MAIN.splice(MAIN.indexOf('shaders'), 0, 'space_shaders'); MAIN.push('bodysky', 'bodylife');   // u-moons1: the space GLSL before shaders.js (its COMMON takes the airless sky from it), the moons' sky and life
-MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', 'hudfade');   // e-ctx: the travel camera, travel by intent, the Aktion key, the fading HUD (src/main/)
+MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', 'zauber', 'hudfade');   // e-ctx: the travel camera, travel by intent, the Aktion key, the fading HUD (src/main/)
 MAIN.push('ascent', 'spaceflight', 'entry');   // u-ascent: the climb, space, the way down (after the space scene: they draw with it and wrap the play frame after it)
 MAIN.push('cruise');
 SHARED.push('galaxy'); MAIN.push('starjump', 'starmap');   // u-stars: VR.Galaxy (src/shared/galaxy.js, after universe), the Sternensprung and the other systems (starjump.js), the star map (starmap.js)   // u-cruise: the Reiseantrieb between the worlds, the descent into a moon's world, the Konvoi (src/main/cruise.js)

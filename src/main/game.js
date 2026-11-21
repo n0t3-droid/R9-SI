@@ -1451,7 +1451,7 @@
       if (this.hf && VR.HitFeel) VR.HitFeel.cam(this, cam, dt);   // f-hud: the hit's jolt (the switch Bildschirmwackeln, off by default)
       this.cam = cam;
       if (VR.EventLog) VR.EventLog.frame(this, dt);   // e-log: the event log's clock, input and 1-Hz sample (eventlog.js)
-      if (VR.Ctx) VR.Ctx.tick(this, dt); if (VR.Intent) VR.Intent.ui(this); if (VR.HudFade) VR.HudFade.tick(this, dt);   // e-ctx: the Aktion key and its prompt, the aimed target's marker, the fading HUD
+      if (VR.Ctx) VR.Ctx.tick(this, dt); if (VR.Zauber) VR.Zauber.frame(this, dt); if (VR.Intent) VR.Intent.ui(this); if (VR.HudFade) VR.HudFade.tick(this, dt);   // e-ctx: the Aktion key and its prompt, the aimed target's marker, the fading HUD
       // selection / crack
       const t = p.target;
       const outline = t && !this.hideHud ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state) } : null;

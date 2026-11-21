@@ -58,6 +58,7 @@
     'g.ctx.sit': ['Hinsetzen', 'Sit down'],
     'g.ctx.travel': ['Reise {to} · {d}', 'Travel {to} · {d}'],
     'g.ctx.funke': ['Funke fragen', 'Ask Funke'],
+    'g.ctx.zauber': ['Zauberblick', 'Magic view'],
     'g.ctx.ferry': ['Fähre nehmen', 'Take the ferry'],   // a-life
     'g.ctx.wunder': ['{name}', '{name}'],   // r-wunder
     'g.ctx.home': ['Heimkehr …', 'Going home …'],
@@ -76,7 +77,7 @@
     'g.ctx.to.hills': ['zu den Kuppelhügeln', 'to the Pod Hills'],
   };
   const R = (row, id, key, act, icon, vars) => ({ row, id, key, act, icon, vars: vars || null });
-  const NONE = R(6, 'none', null, 'whisper', '◉'), FUNKE = R(6, 'funke', 'g.ctx.funke', 'funke', '✨');
+  const NONE = R(6, 'none', null, 'whisper', '◉'), FUNKE = R(6, 'funke', 'g.ctx.funke', 'funke', '✨'), ZAUBER = R(6, 'zauber', 'g.ctx.zauber', 'zauber', '🔮');
   const TOOL = { paste: R(1, 'tool', 'g.ctx.paste', 'tool', '📋') };
   const VEH = {
     flying: R(2, 'vehicle', 'g.ctx.land', 'vehicle', '🛬'), landed: R(2, 'vehicle', 'g.ctx.getOut', 'vehicle', '⏏'), landing: R(2, 'vehicle', 'g.ctx.landCancel', 'vehicle', '⤴'),
@@ -117,7 +118,7 @@
     }
     const a = c.aim;
     if (a && a.dist >= C.NEAR_MIN && a.dist <= C.FAR_MAX) return { row: 5, id: 'travel', key: 'g.ctx.travel', act: 'travel', icon: '🧭', vars: { toKey: a.toKey || 'g.ctx.toThing', name: a.name || '', m: a.dist }, target: a.target || a };
-    return c.funke ? FUNKE : NONE;
+    return c.zauber ? ZAUBER : c.funke ? FUNKE : NONE;   // (zauber.js: the Zauberblick, the owner's choice for V with nothing near)
   };
   // ---------------------------------------------------------------- words
   const lang = () => (VR.I18N && VR.I18N.lang === 'en' ? 'en' : 'de');
@@ -143,7 +144,7 @@
     return tr(res.key, res.vars);
   };
   C.text = function (res, code) {
-    if (res && res.id === 'funke') return '';   // f-quiet: V still asks Funke, but no standing „[V] Funke fragen"
+    if (res && (res.id === 'funke' || res.id === 'zauber')) return '';   // f-quiet: V still asks Funke, but no standing „[V] Funke fragen"
     const s = C.label(res); if (!s) return '';
     const B = VR.Binds, k = B ? B.label(code || 'KeyV', lang()) : 'V';
     return '[' + k + '] ' + s;
@@ -210,7 +211,7 @@
   C.cost = { frames: 0, ms: 0, worst: 0, gathers: 0, gatherMs: 0 };
   C.on = true;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const GC = { tool: null, vehicle: null, story: null, near: null, aim: null, funke: false };
+  const GC = { tool: null, vehicle: null, story: null, near: null, aim: null, funke: false, zauber: false };
   const VEHC = { kind: '', state: '', space: null };
   let typeKind = null;
   // a block type → its row-4 kind (once per registry)
@@ -235,7 +236,7 @@
   // the situation now → GC (one object, refilled)
   C.gather = function (g) {
     const t0 = now(), c = GC;
-    c.tool = null; c.vehicle = null; c.story = null; c.near = null; c.aim = null; c.funke = funkeOn(g);
+    c.tool = null; c.vehicle = null; c.story = null; c.near = null; c.aim = null; c.funke = funkeOn(g); c.zauber = !!(VR.Zauber && VR.Zauber.open && !(g.settings && g.settings.zauber === false));
     const p = g && g.player; if (!p) return c;
     // 1 · the wand holding a copy claims V (gadgets.js wandInput pastes)
     const h = p.inv && p.inv.held, hd = h && VR.itemDef ? VR.itemDef(h.id) : null, gad = g.gadgets;
@@ -328,6 +329,7 @@
       case 'story': if (VR.Story && typeof VR.Story.watch === 'function') { VR.Story.watch(g); return true; } return false;
       case 'travel': return !!(VR.Intent && VR.Intent.start && VR.Intent.start(g, res.target));
       case 'funke': if (VR.Funke && VR.Funke.ask) { VR.Funke.ask(g); return true; } return false;
+      case 'zauber': if (VR.Zauber && VR.Zauber.open) { VR.Zauber.toggle(g); return true; } return false;
       case 'whisper': C.whisper(g); return true;
       default: return false;   // tool, vehicle: theirs (on press, in their own code)
     }
