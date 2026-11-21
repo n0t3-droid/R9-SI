@@ -55,7 +55,7 @@
   // Leicht; on an integrated GPU every preset turns them on (ipuDefaults: a preset change, and once at the first start there).
   // texLite on no preset (it softens far slopes: the player's choice)
   const F10_SW = ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite'];
-  for (const p in PRESETS) for (const k of F10_SW) PRESETS[p][k] = p === 'ultraLite' && k !== 'texLite';
+  for (const p in PRESETS) for (const k of F10_SW) PRESETS[p][k] = p === 'ultraLite' && k !== 'texLite' && k !== 'zPre';   // (v0.55.87: zPre on no preset — ipu.js OPT_IN)
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // t-folk2: the people in the shadow map (folkgpu.js castShadows) where there is one — Balanced and up
   for (const p in PRESETS) PRESETS[p].folkShadow = PRESETS[p].shadows > 0 ? 1 : 0;
@@ -486,7 +486,8 @@
         if (want !== cur) { this.settings.preset = want; Object.assign(this.settings, PRESETS[want]); }
         this.settings.autoPreset = false; this.saveSettings();
       }
-      if (this.ipuDefaults && this.ipuDefaults(false)) this.saveSettings();   // (F10: the first start on an integrated GPU turns the five switches on)
+      if (this.ipuDefaults && this.ipuDefaults(false)) this.saveSettings();
+      if (!this.settings.zpre87) { this.settings.zpre87 = true; this.settings.zPre = false; this.saveSettings(); }   // (v0.55.87: the integrated GPUs' saved zPre off once — measured −18.5 ms on a Radeon Vega; the player may turn it on again)   // (F10: the first start on an integrated GPU turns the five switches on)
       this.applySettings('*');
       this.aqRestoreStart();   // F9: this GPU's remembered smart-quality steps (aqRestoreSteps, at the first frame of play)
       document.getElementById('gpuinfo').textContent = (VR.GL.rendererName || 'WebGL2') + (this.renderer.multi ? ' · multi-draw' : '');

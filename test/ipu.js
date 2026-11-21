@@ -63,8 +63,9 @@ console.log('a · the defaults');
   const all = (o, v) => IPU.SW.every(k => o[k] === v);
   check(IPU.SW.join() === 'hdrLite,postLite,zPre,texLite,dprLite', 'five switches', IPU.SW.join(' · '));
   // (texLite on no preset and no GPU — every form of it changed far slopes, plan: the player's choice; zPre not on Very Low)
-  const lite = (o, potato) => IPU.SW.every(k => o[k] === (k !== 'texLite' && !(potato && k === 'zPre')));
-  check(IPU.OPT_IN.join() === 'texLite' && IPU.SW.every(k => IPU.defaults('ultraLite', VEGA).texLite === false), 'texLite: turned on by no preset and no GPU (it softens far slopes: the player\'s choice)');
+  // (v0.55.87: zPre on no preset — measured on the owner's Radeon (Vega, Ultra): its prepass 14.3 ms, the frame −18.5 ms without it, the cut-out pass no slower: the GPU is bound by its triangles, the prepass draws them twice)
+  const lite = (o, potato) => IPU.SW.every(k => o[k] === (k !== 'texLite' && k !== 'zPre'));
+  check(IPU.OPT_IN.join() === 'texLite,zPre' && IPU.SW.every(k => IPU.defaults('ultraLite', VEGA).texLite === false), 'texLite: turned on by no preset and no GPU (it softens far slopes: the player\'s choice)');
   check(lite(IPU.defaults('ultraLite', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11)')), 'Ultra · Leicht: on (any GPU), texLite aside');
   check(['low', 'balanced', 'high', 'ultra'].every(p => lite(IPU.defaults(p, VEGA))), 'the owner\'s Radeon Graphics (an integrated Vega): on for every preset from Low up, texLite aside');
   const vl = IPU.defaults('potato', VEGA);

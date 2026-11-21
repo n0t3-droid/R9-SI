@@ -23,7 +23,9 @@
   // gain (plan), so Very Low — never slower — keeps one pass. texLite is on nowhere: every form of it measured (2×
   // anisotropic, the far mip bias, the material's filtering alone) changed the grass slopes at a glancing angle (ΔE 0.7–1.3,
   // 8–16 % of the pixels above 2.3 at the lake: plan) — a switch for the player who trades that softness for speed
-  IPU.OPT_IN = ['texLite'];
+  // v0.55.87: zPre the player's choice too — on the owner's Radeon (Vega, Ultra) its prepass took 14.3 ms and the frame was
+  // 18.5 ms faster without it (the cut-out pass no slower): such a GPU is bound by its triangles and the prepass draws them twice
+  IPU.OPT_IN = ['texLite', 'zPre'];
   IPU.defaults = function (preset, gpu) {
     const on = preset === 'ultraLite' || IPU.integrated(gpu), o = {};
     for (const k of IPU.SW) o[k] = on && !IPU.OPT_IN.includes(k) && !(k === 'zPre' && preset === 'potato');
