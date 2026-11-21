@@ -349,6 +349,18 @@ html.pro #title .foot .credit { margin-left: auto; }
   html.pro #title .foot #gpuinfo, html.pro #title .foot .credit { margin: 0; }
 }
 
+/* a phone on its side and other short screens (≤ 480 px high, wider than 760): the logo to the left of the strip (it sat
+   under the buttons), smaller tiles, the foot in the flow (it lay over the R9-Paket button) — start_audit.mjs */
+@media (max-height: 480px) and (min-width: 761px) {
+  #title .start { justify-content: flex-start; padding: 8px 16px 10px; gap: 8px; }
+  #title .brand { align-self: flex-start; margin: 2px 0 0 4px; min-height: 52px; justify-content: center; }   /* (as high as the strip: the tiles start under it) */
+  #title .brand .logo { font-size: 30px; letter-spacing: 3px; }
+  #title .tiles { grid-template-columns: repeat(4, minmax(120px, 190px)); gap: 12px; }
+  .tile { aspect-ratio: auto; min-height: 112px; padding: 8px; gap: 4px; }
+  .tile .pic { width: 40px; height: 40px; }
+  #title .foot { position: static; margin-top: auto; }
+}
+
 /* the language picker (i18n.js) */
 .langpick { position: relative; }
 .langpick .lp-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-bg); color: var(--st-ink); font: 700 var(--st-fs) var(--st-font); cursor: pointer; }
@@ -823,7 +835,7 @@ html:not(.pro) #zenpanel .field { display: none; }
 #ui.touchon #hotbar.hf-off { opacity: 1 !important; pointer-events: auto !important; }   /* (a phone picks blocks from it: it never hides) */
 #ui.touchon #hotbar .slot canvas { width: 78%; height: 78%; }
 #ui.touchon #modebadge { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); bottom: auto; }
-#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; }
+#ui.touchon #mirrorchip { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); bottom: auto; font-size: 12px; min-height: 40px; padding-top: 0; padding-bottom: 0; }   /* (start_audit.mjs: 31 px was too small to tap) */
 #ui.touchon #hints { top: calc(max(10px, env(safe-area-inset-top)) + 132px); bottom: auto; width: min(76vw, 460px); max-width: min(76vw, 460px); }
 #ui.touchon .bh-btn { right: max(18px, env(safe-area-inset-right)); bottom: calc(262px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px; }
 #ui.touchon #crosshair { opacity: .55; }
@@ -21308,6 +21320,33 @@ TREES.boulder=function(w,x,y,z,rng,s){blob(w,x,y,z,1+rng.int(2),1+rng.int(2),1+r
 
 
 
+
+
+
+
+GEN.TREE2_VGEN=18;
+GEN.trees2=(g)=> !!g&&(g.vgen|0)>=GEN.TREE2_VGEN;
+const plant2=(w,name,x,y,z,rng)=>{
+const FL=VR.Flora;if(!FL|| !FL.SPECIES[name])return false;
+ground(w,x,y,z,GEN.S().dirt);
+FL.plant(w,name,x,y,z,(rng.next()*4294967296)>>>0,st,leafState);
+return true;
+};
+const OLD={};
+const swap=(key,pick)=>{const f=OLD[key]=TREES[key];TREES[key]=function(w,x,y,z,rng,o){const n=w&&w.t18?pick(rng,o):null;if(n&&plant2(w,n,x,y,z,rng))return;return f.apply(this,arguments);};};
+swap('oak',(rng,o)=>(o&&(o.log&&o.log!=='oak_log'))?(o.log==='birch_log'?'haengebirke':null):'kronenbaum');
+swap('fancyOak',()=>'grosskrone');
+swap('roundTree',(rng,o)=>(o&&o.leaf)?null:'kronenbaum');
+swap('spruce',(rng,o)=>(o&&o.pine)?'bergkiefer':'tannenspitz');
+swap('megaSpruce',(rng,o)=>(o&&o.pine)?'bergkiefer':'tannenspitz');
+swap('darkOak',()=>'dunkelkrone');
+swap('jungle',()=>'urwaldbaum');
+swap('megaJungle',()=>'urwaldriese');
+swap('acacia',()=>'schirmakazie');
+GEN.TREES_OLD=OLD;
+
+
+
 const STRUCT=GEN.STRUCT={};
 STRUCT.dungeon=function(w,x,y,z,rng,chestList){
 const rx=3+rng.int(2),rz=3+rng.int(2);
@@ -21480,10 +21519,11 @@ const norm=(v)=>{const l=Math.hypot(v[0],v[1],v[2])||1;v[0]/=l;v[1]/=l;v[2]/=l;}
 for(let i=0;i<str.length;i++){
 const c=str[i];
 switch(c){
-case'F':case'f':{
+case'F':case'f':case'G':{
 const l=len*(1+(r()-0.5)*jit*0.6);
 const nx=px+H[0]*l,ny=py+H[1]*l,nz=pz+H[2]*l;
 if(c==='F')segs.push([px,py,pz,nx,ny,nz,w]);
+else if(c==='G')segs.push([px,py,pz,nx,ny,nz,0,3]);
 px=nx;py=ny;pz=nz;
 break;
 }
@@ -21536,6 +21576,7 @@ for(let k=0;k<c[3];k++,y--)put(x,y,z,2);
 }
 for(const s of shape.segs){
 const[x0,y0,z0,x1,y1,z1,rr]=s,l=Math.hypot(x1-x0,y1-y0,z1-z0),n=Math.max(1,Math.ceil(l/0.35));
+if(s[7]===3){for(let k=0;k<=n;k++){const t=k/n;put(Math.round(x0+(x1-x0)*t),Math.round(y0+(y1-y0)*t),Math.round(z0+(z1-z0)*t),3);}continue;}
 const ax=Math.abs(x1-x0),ay=Math.abs(y1-y0),az=Math.abs(z1-z0);
 segAxis=ay>=ax*0.8&&ay>=az*0.8?0:ax>=az?1:2;
 for(let k=0;k<=n;k++){
@@ -21576,6 +21617,39 @@ t:{len:1.05,w:0.3,angle:30,pitch:40,jit:0.35,br:1.45},wood:'oak_leaves',blossom:
 traumbaum:{kind:'giant',axiom:'FFFF[&A]/[&A]/[&A]/[&A]',n:4,rules:{A:[[0.6,"!'F[&FA]/[&FA]/[&A]"],[0.4,"!'F[&FA]/[&A]"]]},fin:{A:'B'},
 t:{len:2.0,w:2.4,angle:30,pitch:42,jit:0.25,wr:0.62,lr:0.8,br:3.0},wood:'cherry_log',blossom:['bloom_snow_leaves','cherry_leaves','cherry_leaves','bloom_rose_leaves'],leaf:'oak_leaves',h:[14,24]},
 };
+
+
+
+
+Object.assign(FL.SPECIES,{
+
+kronenbaum:{kind:'tree',axiom:'FFF[&A]/[&A]/[&A]/[^FFL]',n:3,rules:{A:[[0.55,"!'F[&FA]/[&L]/[&FA]"],[0.45,"!'F[&FA]/[&FL]"]]},fin:{A:'L'},
+t:{len:1.3,w:0.9,angle:32,pitch:38,jit:0.3,wr:0.62,lr:0.8,lb:1.75},wood:'oak_log',blossom:['oak_leaves'],leaf:'oak_leaves',h:[8,12]},
+
+grosskrone:{kind:'tree',axiom:'FFFF[&A]/[&A]/[&A]/[&A]/[^FFFL]',n:4,rules:{A:[[0.6,"!'F[&FA]/[&FL]/[&A]"],[0.4,"!'F[&FA]/[&A]"]]},fin:{A:'L'},
+t:{len:1.5,w:1.5,angle:30,pitch:44,jit:0.25,wr:0.62,lr:0.8,lb:1.9},wood:'oak_log',blossom:['oak_leaves'],leaf:'oak_leaves',h:[11,16]},
+
+haengebirke:{kind:'tree',axiom:'FFFA',n:6,rules:{A:[[0.55,"F[&&!GGDGDGL]/[&&!GGDGL]/[&&!GDGL]/'A"],[0.45,"F[&&!GGDGDGL]/[&&!GDGL]/'A"]]},fin:{A:'FLL'},
+t:{len:1.1,w:0.5,angle:26,pitch:24,jit:0.3,wr:0.7,lr:0.9,lb:1.2,droop:26,roll:120},wood:'birch_log',blossom:['birch_leaves'],leaf:'birch_leaves',h:[9,14]},
+
+tannenspitz:{kind:'tree',cone:{h:[11,15],rb:[3.6,4.6],y0:2},wood:'spruce_log',blossom:['spruce_leaves'],leaf:'spruce_leaves',h:[12,18]},
+
+bergkiefer:{kind:'tree',axiom:'FFFFFFF[&A]/[&A]/[&A]/[&A]/[^L]',n:2,rules:{A:[[0.6,"!'F[&GL]/[&FL]/[^L]"],[0.4,"!'F[&FL]"]]},fin:{A:'L'},
+t:{len:1.25,w:0.5,angle:30,pitch:62,jit:0.3,wr:0.7,lr:0.85,lb:1.5},wood:'spruce_log',blossom:['spruce_leaves'],leaf:'spruce_leaves',h:[11,16]},
+
+dunkelkrone:{kind:'tree',axiom:'FF[&A]/[&A]/[&A]/[&A]/[^FL]',n:3,rules:{A:[[0.6,"!'F[&FL]/[&A]/[&FA]"],[0.4,"!'F[&FA]/[&L]"]]},fin:{A:'L'},
+t:{len:1.3,w:1.4,angle:30,pitch:52,jit:0.25,wr:0.65,lr:0.82,lb:2.0},wood:'dark_oak_log',blossom:['dark_oak_leaves'],leaf:'dark_oak_leaves',h:[7,11]},
+
+urwaldriese:{kind:'tree',axiom:'FFFFFFFFF[&A]/[&A]/[&A]/[&A]/[^L]',n:2,rules:{A:[[0.6,"!F[&FFLH]/[&FA]/[&FL]"],[0.4,"!F[&FFLH]/[&FA]"]]},fin:{A:'LH'},
+t:{len:1.5,w:1.1,angle:30,pitch:66,jit:0.25,wr:0.62,lr:0.82,lb:2.2,chain:[3,6]},wood:'jungle_log',blossom:['jungle_leaves'],leaf:'jungle_leaves',h:[16,26]},
+
+urwaldbaum:{kind:'tree',axiom:'FFFF[&A]/[&A]/[^FL]',n:2,rules:{A:[[0.6,"!'F[&FLH]/[&FA]"],[0.4,"!'F[&L]"]]},fin:{A:'L'},
+t:{len:1.3,w:0.5,angle:30,pitch:46,jit:0.3,wr:0.7,lr:0.85,lb:1.6,chain:[2,4]},wood:'jungle_log',blossom:['jungle_leaves'],leaf:'jungle_leaves',h:[8,13]},
+
+schirmakazie:{kind:'tree',axiom:'FF[&&FFA]/[&&FFA]',n:2,rules:{A:[[0.6,"'^F[&GL]/[&FL]/[^L]"],[0.4,"'^F[&FL]/[^L]"]]},fin:{A:'L'},
+t:{len:1.3,w:0.5,angle:30,pitch:22,jit:0.25,wr:0.75,lr:0.85,lb:1.8},wood:'acacia_log',blossom:['acacia_leaves'],leaf:'acacia_leaves',h:[6,9]},
+});
+FL.GREEN=['kronenbaum','grosskrone','haengebirke','tannenspitz','bergkiefer','dunkelkrone','urwaldriese','urwaldbaum','schirmakazie'];
 FL.TREES=['wolkenkirsche','schneeschleier','lilaschirm','sonnenregen'];
 FL.SHRUBS=['rosenbusch','schneebusch','lilabusch'];
 
@@ -21590,14 +21664,37 @@ for(let k=0;k<8;k++){const dx=k&1,dy=(k>>1)&1,dz=k>>2;a+=H3(ix+dx,iy+dy,iz+dz,s)
 a=(a-0.5)*1.9+0.5+(H3(x,y,z,s^0x77)-0.5)*0.12;
 return Math.min(0.999,Math.max(0,a));
 };
+
+
+
+
+FL.coneCells=function(o,seed){
+const r=rnd(seed^0x51ed),out=new Map();out.axis=new Map();
+const H=o.h[0]+Math.floor(r()*(o.h[1]-o.h[0]+1)),rb=o.rb[0]+r()*(o.rb[1]-o.rb[0]),y0=o.y0||2,top=H+1;
+const put=(x,y,z,k)=>{const key=x+','+y+','+z,cur=out.get(key);if(cur===1)return;out.set(key,k);if(k===1)out.axis.set(key,0);};
+for(let y=0;y<H;y++)put(0,y,0,1);
+const ph=r()*6.283;
+for(let y=top-1;y>=y0;y--){
+const u=(top-y)/(top-y0),whorl=((top-y)&1)===0,rr=Math.max(1.05,rb*Math.pow(u,0.92)*(whorl?1:0.6)+(whorl?0.35:0.2));
+const R=Math.ceil(rr);
+for(let dx= -R;dx<=R;dx++)for(let dz= -R;dz<=R;dz++){
+const a=Math.atan2(dz,dx),wob=1+0.16*Math.sin(a*5+ph+y*1.7),d=Math.hypot(dx,dz)/wob;
+if(d>rr)continue;
+if(d>rr-0.9&&H3(dx,y,dz,seed)<0.22)continue;
+put(dx,y,dz,3);
+if(whorl&&d>rr-1.1&&d>1.5&&y>y0)put(dx,y-1,dz,3);
+}
+}
+for(let k=0;k<2;k++)put(0,top+k,0,3);
+return out;
+};
 const CACHE=new Map();
 FL.grow=function(name,seed){
 const key=name+':'+(seed>>>0);
 let p=CACHE.get(key);if(p)return p;
 const S=FL.SPECIES[name];if(!S)return null;
-const str=FL.expand(S.axiom,S.rules,S.n,seed,S.fin);
-const shape=FL.turtle(str,S.t,seed);
-const cells=FL.cells(shape,S,seed);
+const str=S.cone?'':FL.expand(S.axiom,S.rules,S.n,seed,S.fin);
+const cells=S.cone?FL.coneCells(S.cone,seed):FL.cells(FL.turtle(str,S.t,seed),S,seed);
 const list=[];
 let x0=0,x1=0,y0=0,y1=0,z0=0,z1=0;
 for(const[k,kind]of cells){
@@ -21958,7 +22055,7 @@ this.decorateCaves(blocks,cx,cz,topY,climate,caveBiome);
 
 const chests=[];
 const w=new GEN.ColumnWriter(cx,cz,blocks);
-w.v13=GEN.treeFix(this);
+w.v13=GEN.treeFix(this);w.t18=GEN.trees2(this);
 for(let dz= -1;dz<=1;dz++)for(let dx= -1;dx<=1;dx++)this.features(w,cx+dx,cz+dz,chests);
 
 this.vegetation(blocks,cx,cz,biome,climate,rng);
@@ -22310,6 +22407,16 @@ const cl=this._treeCl=this.climateAt(x,z,this._treeCl);
 const bio=this.biomeFor(cl,y-1),key=BIOMES[bio].key;
 if(key.indexOf('ocean')>=0||key==='river'||key==='beach'||key==='stony_shore'||key==='desert')continue;
 this.tree(w,key,x,y,z,rng);
+}
+
+
+if(this.vgen>=GEN.TREE2_VGEN)for(let i=0;i<2;i++){
+if(rng.next()>0.5)continue;
+const x=fx0+2+rng.int(12),z=fz0+2+rng.int(12),y=this.surfaceY(x,z)+1;
+if(y<SEA+2||y>SEA+7)continue;
+const cl=this._treeCl=this.climateAt(x,z,this._treeCl);
+if(BIOMES[this.biomeFor(cl,y-1)].key!=='beach')continue;
+GEN.palmTree((px,py,pz,name,props)=>w.place(px,py,pz,R.S(name,props),1),x,y,z,0,rng);
 }
 
 if((key0==='old_growth_pine_taiga'||key0==='old_growth_spruce_taiga')&&rng.chance(0.5)){const x=fx0+rng.int(16),z=fz0+rng.int(16);T.boulder(w,x,this.surfaceY(x,z)+1,z,rng);}
@@ -23058,7 +23165,7 @@ if(!blocks[i]|| !(R.T.flags[blocks[i]]&F.SOLID))blocks[i]=lip;
 }
 
 const w=new GEN.ColumnWriter(cx,cz,blocks);
-w.v13=GEN.treeFix(g);
+w.v13=GEN.treeFix(g);w.t18=GEN.trees2(g);
 for(let dz= -1;dz<=1;dz++)for(let dx= -1;dx<=1;dx++)realmFeatures(g,w,cx+dx,cz+dz,out.chests);
 
 structures(g,w,cx,cz,out);
@@ -35993,7 +36100,7 @@ if(r<0.5)GEN.TREES.fancyOak(w,x,y,z,rng);else if(r<0.8)GEN.TREES.roundTree(w,x,y
 LAND.planTree=function(g,w,t){const rng=new VR.RNG(M.hash2(t.x,t.z,g.seed^0x9091)>>>0);if(t.kind==='poplar')GEN.TREES.poplar(w,t.x,t.y,t.z,rng,{color:t.color});else plantTree(w,t.kind,t.x,t.y,t.z,rng,true);};
 function dressTrees(g,P,cx,cz,out){
 const x0=cx*16,z0=cz*16,w=new GEN.ColumnWriter(cx,cz,out.blocks);
-w.v13=GEN.treeFix(g);
+w.v13=GEN.treeFix(g);w.t18=GEN.trees2(g);
 LAND.woodsTrees(g,P,w,x0-7,z0-7,x0+22,z0+22);
 LAND.soloTrees(g,P,w,x0-8,z0-8,x0+23,z0+23);
 
@@ -36670,7 +36777,7 @@ if(LAND.keepAt(P,x+2,z)||LAND.keepAt(P,x-2,z)||LAND.keepAt(P,x,z+2)||LAND.keepAt
 const y=g.surfaceY(x,z)+1;
 if(y<=SEA+2|| !meadowAt(g,x,z,y))continue;
 const rng=new VR.RNG((hx^0x2545f491)>>>0),r=rng.next();
-if(r<0.74)plantFlora(w,FL.treeAt(g,x,z,rng.next()),x,y,z,hx);
+if(r<(G.trees2&&G.trees2(g)?0.3:0.74))plantFlora(w,FL.treeAt(g,x,z,rng.next()),x,y,z,hx);
 else if(r<0.88)G.TREES.fancyOak(w,x,y,z,rng);else G.TREES.roundTree(w,x,y,z,rng,{r:3.2,h:4});
 }
 };
@@ -37862,6 +37969,7 @@ return false;
 
 const half=Math.atan(B.th*ASPECT/Math.max(0.2,Math.cos(Math.abs(cam.pitch)+Math.atan(B.th))))+4*DEG;
 const inWedge=(x,z)=>{const vx=x+0.5-e[0],vz=z+0.5-e[2],dd=Math.hypot(vx,vz);if(dd<12)return true;if(dd>reach+12)return false;let a=Math.atan2(-vx,-vz)-cam.yaw;a=Math.abs(Math.atan2(Math.sin(a),Math.cos(a)));return a<=half+Math.atan2(10,dd);};
+rec.t18=GEN.trees2(g);
 if(LAND.woodsTrees){LAND.woodsTrees(g,P,rec,bx0+6,bz0+6,bx1-6,bz1-6,inWedge);LAND.soloTrees(g,P,rec,bx0+6,bz0+6,bx1-6,bz1-6,inWedge);}
 if(P.trees&&LAND.planTree)for(const t of P.trees)if(t.x>=bx0+6&&t.x<=bx1-6&&t.z>=bz0+6&&t.z<=bz1-6&&inWedge(t.x,t.z))LAND.planTree(g,rec,t);
 let maxY=0;for(let i=0;i<colTop.length;i++)if(colTop[i]>maxY)maxY=colTop[i];
@@ -42432,6 +42540,7 @@ if(anx+any+anz>1e-6)dd=anx>=any&&anx>=anz?(nx>=0?0:1):any>=anz?(ny>=0?2:3):(nz>=
 const rcb=TRC[b],tint=rcb||tintAt(TTINT[b],x,z,b);
 let w5=dd|((fl&F.EMISSIVE)?1<<12:0)|(rcb?32768:0);
 if(fl&F.WAVELEAF)w5|=1<<7;
+if((fl&F.LEAVES)||(RCL!==null&&RCL[b]!==0))w5|=(1<<7)|(1<<13);
 const w3=texW3(TTEX[b*6+dd],fl,dd,b);
 const start=(bright(0)+bright(2)<bright(1)+bright(3))?1:0;
 
@@ -57692,7 +57801,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="b8bae311fcec3463";
+VR.TEX_SRC_HASH="38686a949cb962bd";
 
 
 
@@ -72058,7 +72167,7 @@ return`
 #if defined(Q_LEAF) && !defined(MODEL)
 
 float qGreen(vec3 c) { return clamp((c.g - max(c.r, c.b)) / max(c.g, 1e-3) * 6.0, 0.0, 1.0); }
-bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u; }
+bool qLeafF() { return ((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 5u) & 3u) == 0u && ((v_w5 >> 14u) & 1u) == 0u && ((v_w5 >> 13u) & 1u) == 0u; }
 in vec4 v_qC;
 
 bool qCut(vec3 w, uint face, float dist) {
@@ -72451,7 +72560,11 @@ Q3.SW=['qRound','qHill'];
 
 
 const OFF={qRound:false,qHill:false},ON={qRound:true,qHill:false};
-const TIERS={potato:OFF,low:OFF,balanced:ON,high:ON,ultra:ON,ultraLite:ON};
+
+
+
+const TIERS={potato:OFF,low:OFF,balanced:OFF,high:OFF,ultra:OFF,ultraLite:OFF};
+void ON;
 Q3.defaults=(preset)=>Object.assign({},TIERS[preset]||OFF);
 Q3.off=()=>Object.assign({},OFF);
 Q3.ROWS=[
@@ -75199,9 +75312,9 @@ v_seasonG = 0.0;
 float ssum = u_season.x + u_season.y + u_season.z + u_season.w;
 if (ssum > 0.001 && !ctmFace && kind != 1u && kind != 6u && v_tint.g > v_tint.r * 1.05 && v_tint.g > v_tint.b * 1.05) {
 bool sLeaf = leaf > 0u && sway == 0u, sTop = face == 2u && !sLeaf && sway == 0u;
-float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(5.0, 6.0, 5.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+float sh = fract(sin(dot(floor((wp + vec3(u_camInt)) / vec3(11.0, 14.0, 11.0)), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 vec3 c = v_tint;
-vec3 sSp = sLeaf && sh < 0.38 ? mix(vec3(0.92, 0.5, 0.64), vec3(0.95, 0.86, 0.9), sh / 0.38) : c * vec3(0.88, 1.12, 0.78);
+vec3 sSp = c * vec3(0.88, 1.12, 0.78);
 float sl = dot(c, vec3(0.3, 0.59, 0.11));
 vec3 sSu = mix(c * vec3(1.1, 1.0, 0.7), sl * vec3(1.5, 1.15, 0.3), 0.3);
 vec3 sAu = !sLeaf ? mix(c, sl * vec3(1.9, 1.25, 0.45), 0.7) : sh < 0.3 ? vec3(0.6, 0.09, 0.04) : sh < 0.58 ? mix(vec3(0.82, 0.3, 0.05), vec3(0.6, 0.09, 0.04), (0.58 - sh) / 0.28 * 0.3) : sh < 0.86 ? vec3(0.84, 0.6, 0.08) : c * vec3(1.6, 0.95, 0.45);
@@ -75593,6 +75706,12 @@ vec4 alb = hiOn ? textureGrad(u_albedoHi, vec3(fu, float(hiK - 1)), dx, dy) : te
 vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #endif
 #ifdef CUTOUT
+#ifndef LITE
+
+
+
+if (((v_w5 >> 7u) & 1u) == 1u && ((v_w5 >> 13u) & 1u) == 1u) { vec4 lm = textureLod(u_albedo, vec3(fu, layer), 4.0); float ll = clamp(dot(lm.rgb, vec3(0.3, 0.59, 0.11)) / max(lm.a, 0.25), 0.0, 1.0); alb = vec4(mix(vec3(ll * 0.62), alb.rgb, alb.a), 1.0); }
+#endif
 if (alb.a < 0.5) discard;
 #if defined(Q_LEAF) && !defined(MODEL)
 #ifdef Q_CROWN
@@ -75683,7 +75802,7 @@ sheen = windGroundSheen(windGust(gp.x, gp.z, u_time, u_windDir.x, u_windDir.y, u
 }
 alb.rgb *= 1.0 + sheen;
 alb.rgb = mix(alb.rgb, alb.rgb * vec3(1.06, 1.04, 0.86), clamp(sheen * 1.5, 0.0, 0.4));
-if (u_snowCover > 0.001 && (face == 2u || ((v_w5 >> 13u) & 1u) == 1u)) {
+if (u_snowCover > 0.001 && (face == 2u || (((v_w5 >> 13u) & 1u) == 1u && ((v_w5 >> 7u) & 1u) == 0u))) {
 vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
 float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);
 alb.rgb = mix(alb.rgb, vec3(0.9, 0.92, 0.97), u_snowCover * patchy * smoothstep(0.86, 1.0, v_sky));
@@ -75721,7 +75840,11 @@ alb.rgb *= 0.9 + m * 0.2;
 }
 
 vec3 N = NORMALS[face];
+#ifdef LITE
 if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
+#else
+if (((v_w5 >> 13u) & 1u) == 1u && ((v_w5 >> 7u) & 1u) == 0u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
+#endif
 #ifdef GEMALT
 if (gmF) N = normalize(v_gN);
 #endif
@@ -120266,6 +120389,7 @@ const pv=el('div','pvwrap');
 pv.innerHTML=`<canvas class="pv" width="240" height="135" aria-label="${esc(T('g.set.preview'))}"></canvas><div class="pvnote">${esc(T('g.set.preview'))}</div><div class="aqline" hidden></div>`;
 body.appendChild(pv);
 ui.previewCtx=pv.querySelector('canvas').getContext('2d');
+if(!(game.state==='play'||game.state==='paused')){pv.querySelector('canvas').style.display='none';const nt=pv.querySelector('.pvnote');if(nt)nt.style.display='none';ui.previewCtx=null;}
 if(game.requestPreview)game.requestPreview();
 SP.aqLine(ui);
 }
@@ -123541,6 +123665,7 @@ if(want!==cur){this.settings.preset=want;Object.assign(this.settings,PRESETS[wan
 this.settings.autoPreset=false;this.saveSettings();
 }
 if(this.ipuDefaults&&this.ipuDefaults(false))this.saveSettings();
+if(!this.settings.trees18){this.settings.trees18=true;this.settings.qRound=false;this.saveSettings();}
 if(!this.settings.zpre87){this.settings.zpre87=true;this.settings.zPre=false;this.saveSettings();}
 this.applySettings('*');
 this.aqRestoreStart();
@@ -123623,7 +123748,7 @@ this.renderer&&(this.renderer.visDirty=true);
 async createWorld(o){
 const seedStr=o.seed;
 let seed=seedStr?(/^-?\d+$/.test(seedStr)?(parseInt(seedStr,10)>>>0):VR.seedFromString(seedStr)):(Math.floor(Math.random()*4294967295)>>>0);
-const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:17};
+const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:18};
 if(o.first&&VR.First)VR.First.mark(this,meta);
 await this.store.saveWorld(meta);
 this.startWorld(meta,true);
@@ -151760,11 +151885,16 @@ tabs.innerHTML='';body.innerHTML='';
 const mkb=(cls,text,fn)=>{const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=text;b.onclick=fn;return b;};
 tabs.appendChild(mkb('on',tx('g.first2.simple',null,'Einfach','Simple'),()=>{}));
 tabs.appendChild(mkb('',tx('g.first2.all',null,'Alle Einstellungen …','All settings …'),()=>{ui.setAll=true;ui.showSettings('img');}));
+
+
+const inWorld=g.state==='play'||g.state==='paused',shortScr=typeof innerHeight==='number'&&innerHeight<480;
+if(inWorld&& !shortScr){
 const pv=document.createElement('div');pv.className='pvwrap f2pv';
 pv.innerHTML='<canvas class="pv" width="320" height="180"></canvas>';
 body.appendChild(pv);
 ui.previewCtx=pv.querySelector('canvas').getContext('2d');
 if(F.paintThumb)F.paintThumb(ui.previewCtx);
+}else ui.previewCtx=null;
 const row=(lab,tip,val,min,max,step,show,set)=>{
 const d=document.createElement('div');d.className='setrow f2row';
 d.innerHTML='<div class="sethead"><label></label><span class="val"></span></div>';
@@ -160032,7 +160162,7 @@ const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
 S.seasonTint=function(c,i,o){
 const h=o.h,lum=c[0]*0.3+c[1]*0.59+c[2]*0.11;
 if(i===0){
-if(o.leaf&&h<0.38)return mix(PAL.blossomA,PAL.blossomB,h/0.38);
+
 return mul(c,[0.88,1.12,0.78]);
 }
 if(i===1)return mix(mul(c,[1.1,1.0,0.7]),[lum*1.5,lum*1.15,lum*0.3],0.3);
