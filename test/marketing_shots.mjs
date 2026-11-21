@@ -16,11 +16,11 @@ const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s'
 const EYE = 1.62;
 // the places (seed 53, vgen 12: the critic's photo picks, test/critic_photo.mjs PICK_SEED 4949)
 let SHOTS = [
-  { name: 'vista', de: 'Ankunftsblick zur goldenen Stunde', x: 287.3, z: -192.3, at: [2.3, 120.4, -15], tod: 10498 },
-  { name: 'isles', de: 'Himmelsinseln am Tag', x: 115.3, z: 26.4, at: [220.8, 176.9, 106], tod: 8200 },
+  { name: 'vista', de: 'Ankunftsblick zur goldenen Stunde', x: 287.3, z: -192.3, at: [2.3, 120.4, -15], tod: 10498, up: 16 },
+  { name: 'isles', de: 'Himmelsinseln am Tag', x: 115.3, z: 26.4, at: [220.8, 176.9, 106], tod: 8200, up: 22 },
   { name: 'pond', de: 'Teich am Morgen', x: -219.6, z: -179.5, at: [-232, 80.5, -182], tod: 5599 },
   { name: 'pier', de: 'Am Steg', feet: 66.2, x: 270.4, z: 73.9, at: [285, 63.5, 80], tod: 6451 },
-  { name: 'citadel', de: 'Turmzitadelle bei Nacht', x: -307.6, z: -233.1, at: [-419.6, 215.1, 380], tod: 18098 },
+  { name: 'citadel', de: 'Turmzitadelle bei Nacht', x: -307.6, z: -233.1, at: [-419.6, 215.1, 380], tod: 18098, up: 18 },
   { name: 'aurora', de: 'Nova Haven bei Nacht', x: -18.3, z: -130.0, at: [5.9, 158.5, -290], tod: 19492, aurora: true },
 ];
 if (process.env.SHOTS_JSON) SHOTS = JSON.parse(process.env.SHOTS_JSON);   // (a list of {name, de, x, z, at, tod} of its own)
@@ -53,7 +53,7 @@ for (const S of SHOTS) {
   const t1 = Date.now();
   await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 160, z); }, [S.x, S.z]);
   await settle(240);
-  const feet = S.feet !== undefined ? S.feet : (await groundY(S.x, S.z)) + 1;
+  const feet = (S.feet !== undefined ? S.feet : (await groundY(S.x, S.z)) + 1) + (S.up || 0);   // (up: over the new crowns, v0.55.92)
   let [yaw, pitch] = aimAt(S.x, feet + EYE, S.z, S.at);
   // nothing solid round the eye or in the first blocks of the view (critic_photo.mjs's rule): up, else back along the view
   const C2 = await ev(([x, y, z, yaw, pitch]) => {

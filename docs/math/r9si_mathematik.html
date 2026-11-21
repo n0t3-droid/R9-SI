@@ -382,7 +382,133 @@ Pentatonik gibt es keine Halbtonreibung — jede Kombination klingt, darum kann 
 Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag klingt in derselben Welt gleich. Unter
 Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
 
-<h2 id="schluss">16 · Offen und frei</h2>
+<h2 id="eigen">16 · Eigene Verfahren</h2>
+<p class="lead">Fünf Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden: für einen Browser,
+eine integrierte Grafikkarte und eine Welt, die sich jederzeit ändert. Jedes läuft im Spiel und hat einen Node-Test.</p>
+
+<h3>16.1 Die Schattenuhr — Schatten als Zeit</h3>
+<p class="src">src/shared/sunclock.js · src/main/clockvol.js · src/main/shaders.js (clockVis)</p>
+<p>Die Grundidee: In R9-SI laufen Sonne und Mond auf <i>einem</i> festen Bogen über das Land. Mit dem Bogenparameter
+\(s\in[0,1]\) (0 Aufgang, 1 Untergang) und dem Azimut-Versatz \(\alpha_0=0{,}4\) ist die Lichtrichtung</p>
+\[ \theta=\pi s,\qquad \varepsilon(s)=0{,}42\,\sin\theta,\qquad
+\mathbf L(s)=\big(\cos(\theta+\alpha_0)\cos\varepsilon,\;\sin\varepsilon,\;\sin(\theta+\alpha_0)\cos\varepsilon\big) \]
+<p>Der Mond ist die Sonne zwölf Stunden später, also derselbe Bogen. Damit hängt der Schatten an einem Punkt
+\(\mathbf p\) nur noch von <b>einer</b> Zahl ab, der Zeit. Alles, was ein Punkt über seine Schatten wissen muss, ist die
+Menge der Zeiten, in denen die Sonnenscheibe nicht verdeckt ist:</p>
+\[ \Lambda(\mathbf p)=\{\,s\in[0,1]:\ \text{der Strahl } \mathbf p+t\,\mathbf L(s),\ t>0,\ \text{trifft keinen Block}\,\} \]
+<p>Für fast jede Luftzelle ist \(\Lambda\) eine Vereinigung von höchstens zwei Intervallen, etwa morgens frei, mittags
+hinter einem Turm, nachmittags wieder frei. Darum speichert das Spiel pro Zelle genau vier Bytes:</p>
+\[ \Lambda(\mathbf p)\approx[r_1,e_1]\cup[r_2,e_2],\qquad (r_1,e_1,r_2,e_2)\in\{0,\dots,255\}^4/255,\qquad
+\varnothing\equiv(1,0) \]
+<h3>Das Backen</h3>
+<p>Ein Worker tastet den Bogen an \(K=48\) Stellen \(s_k=(k+\tfrac12)/K\) ab und verfolgt pro Richtung einen exakten
+3-D-Voxelstrahl, der leere \(4\times4\times4\)-Bricks und \(4\times4\)-Spalten oberhalb ihres höchsten Blocks in einem Schritt
+überspringt, durch ein Bitvolumen der \(5\times5\times3\) Abschnitte um den Abschnitt (Reichweite
+\(\ge32\) Blöcke). Dahinter übernehmen zwei Höhenkarten (1 m und 8 m Raster) das Fernfeld. Jeder Wechsel
+frei ↔ verdeckt zwischen \(s_k\) und \(s_{k+1}\) wird mit vier Bisektionsschritten verfeinert:</p>
+\[ \Delta s=\frac{1}{K\cdot2^{4}}=\frac1{768}\approx0{,}0013,\qquad\text{also rund }0{,}23^\circ\text{ Sonnenweg} \]
+<p>Gebacken wird einmal pro Abschnitt und Blockänderung, nicht pro Bild. Die Ergebnisse liegen in einer 3-D-Textur von
+\(128\times128\times64\) Zellen um das Auge, toroidal adressiert (\(x\,\&\,127,\ z\,\&\,127,\ y\,\&\,63\)): Wandert die
+Kamera, wird kein Byte verschoben.</p>
+<h3>Das Lesen: die vorzeichenbehaftete Kantenzeit</h3>
+<p>Der Fragment-Shader liest zur aktuellen Zeit \(s\) die Zelle vor der Fläche und bildet den Abstand zur nächsten
+Schattenkante, <i>in Zeit gemessen</i>:</p>
+\[ d(s)=\max\big(\min(s-r_1,\;e_1-s),\ \min(s-r_2,\;e_2-s)\big),\qquad d>0\ \Leftrightarrow\ s\in\Lambda \]
+\[ V(s)=\mathrm{clamp}\Big(\frac{d(s)}{2W}+\tfrac12,\;0,\;1\Big),\qquad W=0{,}006 \]
+<p>\(V\) ist die Sichtbarkeit der Sonne. Weil \(d\) in \(s\) 1-Lipschitz ist, ist die Kante genau \(2W\) Zeiteinheiten breit.
+Das ergibt einen Halbschatten, der von selbst richtig aussieht: Ein naher Werfer verschiebt seinen Schatten langsam
+(schmale Kante), ein ferner schnell (breite Kante), wie bei einer echten Sonne mit Scheibe. Kosten pro Pixel:
+ein Texturzugriff (seit v0.55.91 acht, siehe unten). Kein Schattenpass, keine Strahlverfolgung pro Pixel, und das auf
+jeder Stufe, auch „Sehr niedrig“, die vorher gar keine Sonnenschatten hatte.</p>
+<h3>Satz: Man muss die Kantenzeit mischen, nicht die Intervalle</h3>
+<p>Zwischen den Zellmitten wird interpoliert. Die naheliegende Variante, die Hardware die vier Bytes linear filtern zu
+lassen, ist <b>falsch</b>. Gegenbeispiel mit zwei Nachbarzellen, Gewicht \(w=\tfrac12\):</p>
+\[ A=[0;\,0{,}4]\ (\text{morgens frei}),\quad B=[0{,}6;\,1]\ (\text{nachmittags frei})\ \Rightarrow\
+\tfrac12A+\tfrac12B=[0{,}3;\,0{,}7]\ni\tfrac12 \]
+<p>Mittags ist keine der beiden Zellen beleuchtet, die gefilterte aber schon. Auf einer Fläche entsteht genau dort, wo
+das Gewicht durch \(\tfrac12\) läuft, ein schmales helles Band entlang einer Iso-Linie der Interpolation. Das waren die
+hellen Bögen auf Stämmen und Waldboden unter großen Kronen, die in den Spielvideos auffielen. Die Korrektur
+(v0.55.91): erst pro Zelle \(d_i(s)\) bilden, dann mischen.</p>
+\[ \bar d(s)=\sum_{i=1}^{8}w_i\,d_i(s),\qquad w_i\ge0,\ \ \sum w_i=1\ \text{(trilinear)} \]
+<div class="box"><b>Beweis.</b> Ist an einem Pixel jede der acht Nachbarzellen zur Zeit \(s\) im Schatten, so ist
+\(d_i(s)<0\) für alle \(i\), also \(\bar d(s)=\sum w_i d_i(s)<0\): eine Konvexkombination negativer Zahlen ist negativ.
+Ein falsches Licht ist damit ausgeschlossen. Umgekehrt ist \(\bar d\) als Konvexkombination von 1-Lipschitz-Funktionen
+selbst 1-Lipschitz in \(s\); die Kantenbreite \(2W\) bleibt erhalten. ∎</div>
+<p>Der Preis sind acht <code>texelFetch</code> statt eines gefilterten Zugriffs. „Sehr niedrig“ behält den alten Pfad,
+damit seine Programme Byte für Byte gleich bleiben (Test <code>vl_programs</code>).</p>
+
+<h3>16.2 Lichtpfützen — Licht in einem Durchgang</h3>
+<p class="src">src/main/lightfield.js · src/main/lightfield_gl.js</p>
+<p>Lampen, Feuer, Fenster und bewegte Lichter (die Laterne eines Dorfbewohners, Feuerwerk, die Glühlichter der Feen)
+werfen weiche Pfützen mit echten Schatten hinter Wänden. Grundlage ist ein Draufsicht-Lichtfeld von
+\(128\times128\) Zellen zu je 1 m um die Kamera, wieder toroidal. Ein Licht der Stärke \(I\) wird als Scheibe vom
+Radius \(R=14\) gestempelt, die Zellen in der Reihenfolge ihres Abstands. Jede Zelle erbt die Sichtbarkeit ihres
+<i>Elternteils</i>, der Zelle einen Schritt zurück zum Licht:</p>
+\[ \nu(c)=\nu\big(\mathrm{par}(c)\big)\cdot o(c),\qquad
+L(c)\mathrel{+}=I\cdot\nu(c)\cdot\frac{1}{1+k\,\lVert c-\ell\rVert^2}\cdot\tau\big(\lVert c-\ell\rVert\big),\quad k=0{,}07 \]
+<p>Dabei ist \(o(c)\in[0,1]\) die Durchlässigkeit der Zelle in Lichthöhe (Glas, Zäune und Laub lassen durch) und
+\(\tau\) eine Verjüngung auf 0 bei \(R\). Das ist ein Strahlwurf auf dem Gitter in <i>einem</i> Durchgang: Weil die Zellen
+nach Abstand sortiert sind, ist der Elternteil immer schon fertig. Wände werfen Schatten; ihre eigene Zelle ist hell,
+ihre Rückseite nicht. Damit eine Straße voller Lampen nie weiß wird, wird weich begrenzt und √-kodiert in 8 Bit
+gepackt:</p>
+\[ L'=\frac{L}{1+L/L_{\max}},\qquad \text{rgb}=\sqrt{L'/L_{\max}},\qquad L_{\max}=1{,}15 \]
+<p>Statische Lichter werden über viele Bilder in einen Hintergrundpuffer gestempelt und dann getauscht. Bis zu 32 bewegte
+Lichter kommen jedes Bild auf eine Kopie. Pro Bild geht genau eine 64-KB-Textur hoch. Im Shader kommen eine
+Höhenabnahme zur mittleren Lichthöhe und ein hemisphärischer Kosinus dazu. Seit v0.55.92 ist die Stärke bei Tag auf ein
+Viertel gesenkt (\(\text{str}=0{,}25+0{,}75\,\mathrm{ss}(n)\), \(n\) die Nacht), damit Pfützen nicht als harte gelbe Scheiben
+auf sonnigem Pflaster liegen.</p>
+
+<h3>16.3 Drei Ringe Ferne und die Dither-Maske</h3>
+<p class="src">src/shared/far.js · src/main/farring.js · src/main/horizon.js</p>
+<p>Ring 0 sind die echten Chunks bis zur Sichtweite \(r_d\). Ring 1 sind grobe Formen aus \(4\times4\) Chunk-Spalten bis
+64 Chunks (2-Block-Zellen bis 32 Chunks, dahinter 4-Block-Zellen), mit Bäumen als Kronen und Gebäuden als Quadern.
+Ring 2 sind die Horizontkacheln. Welchen Ring eine Spalte im Abstand \(d\) (in Chunks) zeichnet:</p>
+\[ \mathrm{ring}(d)=\begin{cases}0,& d\le r_d+\tfrac12\\ 1,& d\le r_1+\tfrac12\\ 2,&\text{sonst}\end{cases} \]
+<p>Kein harter Rand: Jeder Pixel entscheidet mit einer \(4\times4\)-Dither-Schwelle \(t\) gegen die Einblendwerte
+\(n_R\) (Chunk der Spalte) und \(n_G\) (Form der Spalte), jeweils als nächster Texel \(n\) und bilinear \(b\):</p>
+\[ \text{Ring 0: } t<n_R,\qquad \text{Ring 1: } t\ge\min(b_R,n_R)\ \wedge\ t<n_G,\qquad
+\text{Ring 2: } t\ge\max\big(\min(b_R,n_R),\,\min(b_G,n_G)\big) \]
+<p>So zeichnet jeder Pixel mindestens einen Ring und eine eingeschwungene Spalte genau einen. Die Formen liegen einen
+Block unter den Blockoberkanten (\(\text{SINK}=1\)): Wo Ring 0 endet, ist die letzte Chunkkante nie tiefer als die Form
+dahinter, also öffnet sich kein Spalt zum Himmel.</p>
+<p><b>Halte-Hysterese (v0.55.91).</b> Die Maske entsteht aus der Liste der Abschnitte, die die Höhlen-Sichtprüfung (eine
+Flutung durch die Abschnitte) für sichtbar hält. Verpasst die Flutung eine Spalte für ein Bild, etwa beim Wechsel des
+Kamera-Abschnitts, verlor sie ihren Schnitt, und die grobe Ferne blitzte für ein Bild als graue Klötze auf. Jetzt behält
+eine Spalte ihren letzten Wert \(H=12\) Bilder lang, aber nur innerhalb von \(r_d-1{,}5\), wo eine Spalte nicht wirklich
+verschwindet:</p>
+\[ m_t(c)=\begin{cases} m^{\text{neu}}_t(c),& m^{\text{neu}}_t(c)>0\\ m_{t-1}(c),& h_t(c)>0\ \wedge\ \lVert c\rVert\le r_d-1{,}5\\ 0,&\text{sonst}\end{cases}
+\qquad h_t(c)=\begin{cases}H,& m^{\text{neu}}_t(c)>0\\ h_{t-1}(c)-1,&\text{sonst}\end{cases} \]
+<p>Wandert die Kamera in eine andere Spalte, wandern Wert und Haltezeit mit dem Land mit.</p>
+
+<h3>16.4 Smart Quality — eine Regelung, die sich selbst prüft</h3>
+<p class="src">src/main/game.js (smartQuality)</p>
+<p>Statt die Auflösung blind zu senken, misst das Spiel beide Seiten, GPU-Zeit (Timer-Query) und Hauptthread-Zeit, und
+steigt zwei Leitern hinab. Mit Ziel \(f^*\) (55 fps, mit Bildwarp 38) und Budget \(B=1000/f^*\) ms:</p>
+\[ \text{gpu-gebunden}\iff t_{\text{GPU}}>0{,}85B\ \wedge\ t_{\text{GPU}}\ge0{,}9\,t_{\text{JS}},\qquad
+\text{cpu-gebunden}\iff t_{\text{JS}}>0{,}7B\ \wedge\ t_{\text{JS}}>0{,}8\,t_{\text{GPU}} \]
+<p>Jeder Schritt ist ein <b>Versuch</b>: Nach 2,5 s wird mit dem geglätteten 2-s-Fenster verglichen. Bringt er weniger als
+6 %, wird er zurückgenommen und die Leiter 30 s gesperrt:</p>
+\[ g=\frac{f_{\text{nachher}}}{f_{\text{vorher}}}<1{,}06\ \wedge\ f<f^*-4\ \Rightarrow\ \text{zurück} \]
+<p>Läuft es wieder gut, wird ein Schritt nach \(T_b\) Sekunden zurückgenommen. Fällt die Bildrate innerhalb von 8 s wieder,
+verdoppelt sich die Wartezeit (bis 60 s), sonst schrumpft sie um den Faktor 0,7, ein exponentielles Backoff wie bei
+Netzwerkprotokollen. Was zehn Sekunden hält, merkt sich der Browser pro Grafikkarte und Preset. Seit v0.55.91 nimmt ein
+gemessen GPU-gebundenes Bild nie die CPU-Leiter. Deren erste Stufen drosseln das Nachladen, und das kostete Bäume, die
+spät kamen, ohne ein einziges Bild pro Sekunde zu bringen.</p>
+
+<h3>16.5 Bildwarp — Zwischenbilder aus Tiefe</h3>
+<p class="src">src/main/warp.js</p>
+<p>Zwischen zwei ganz gerechneten Bildern wird das letzte Bild für die neue Kamera umgeworfen. Für einen Pixel
+\(\mathbf u\) des neuen Bildes führt die Drehung \(M=P_{\text{alt}}V_{\text{alt}}(P_{\text{neu}}V_{\text{neu}})^{-1}\) zur
+Startstelle im alten Bild. Die Verschiebung der Kamera um \(\Delta\mathbf x\) bewegt Nahes stärker als Fernes, darum
+folgen zwei Fixpunkt-Iterationen mit der alten Tiefe \(z\):</p>
+\[ \mathbf X=\mathrm{proj}^{-1}_{\text{alt}}(\mathbf u_k,z(\mathbf u_k)),\qquad
+\mathbf u_{k+1}=\mathbf u_k-\tfrac12\Big(\mathrm{proj}_{\text{neu}}(\mathbf X-\Delta\mathbf x)-\mathbf u\Big),\quad k=0,1 \]
+<p>Die Hand bewegt sich mit dem Auge: Ein Pixel, der im alten Bild näher als 1,5 Blöcke war, bleibt stehen. Was aus dem
+alten Bild herausfällt, wird nicht gestreckt (Schlieren), sondern aus dem Streifen knapp innerhalb des Randes längs
+weichgezeichnet, umso breiter, je weiter draußen. Ein ganzes Bild ersetzt es einen Augenblick später. So zeigt eine
+GPU, die 38 ganze Bilder schafft, 76 pro Sekunde.</p>
+
+<h2 id="schluss">17 · Offen und frei</h2>
 <p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist
 eine einzige HTML-Datei, die ohne Installation im Browser läuft. Jede Formel in diesem Heft lässt sich dort nachlesen und
 mit den Node-Tests nachprüfen — jeder Test endet mit <code>ALL OK</code> oder <code>FAILED n</code>.</p>
