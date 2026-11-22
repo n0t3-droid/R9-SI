@@ -77556,8 +77556,15 @@ if (ti == 1u) body = mix(body, vec3(0.05, 0.45, 0.55), 0.45); else if (ti == 2u)
 float ripple = clamp(0.5 + dot(n.xz, normalize(L.xz + vec2(1e-4))) * 2.6, 0.0, 1.0);
 body *= 0.84 + ripple * 0.32;
 vec3 deep = body * (u_ambSky * 0.74 + lc * 0.095) + body * 0.012;
+#ifndef SOFTFADE
 float absorb = 1.0 - exp(-depth * 0.5);
 vec3 floorC = v_col * (u_ambSky * 0.9 + lc * 0.35) * vec3(0.3, 0.62, 0.9);
+#else
+
+
+float absorb = 1.0 - exp(-(depth + 0.8) * 0.5);
+vec3 floorC = v_col * (u_ambSky * 0.9 + lc * 0.35) * vec3(0.16, 0.56, 0.62);
+#endif
 vec3 under = mix(floorC, deep, clamp(absorb, 0.0, 0.96));
 vec3 R = reflect(-V, n); R.y = abs(R.y);
 vec3 refl = skyColor(R, false);
