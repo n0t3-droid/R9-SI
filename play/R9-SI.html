@@ -21325,6 +21325,7 @@ TREES.boulder=function(w,x,y,z,rng,s){blob(w,x,y,z,1+rng.int(2),1+rng.int(2),1+r
 
 
 GEN.TREE2_VGEN=18;
+GEN.STRATA2_VGEN=19;
 GEN.trees2=(g)=> !!g&&(g.vgen|0)>=GEN.TREE2_VGEN;
 const plant2=(w,name,x,y,z,rng)=>{
 const FL=VR.Flora;if(!FL|| !FL.SPECIES[name])return false;
@@ -22184,7 +22185,12 @@ if(key==='frozen_peaks'&&pn>0.2)topB=S.packed;else if(key==='frozen_peaks'&&pn< 
 if(this.steep(H,col)>3){topB=S.stone;}
 }
 else if(key==='snowy_slopes'||key==='grove'){topB=pn>0.3?S.powder:S.snowblock;if(key==='grove'&&pn< -0.2)topB=S.grass;if(this.steep(H,col)>3)topB=S.stone;}
-else if(key==='stony_peaks'){const strip=this.stripN.n3(x*0.02,y*0.2,z*0.02)>0.2;topB=strip?S.calcite:S.stone;fill=strip?S.calcite:S.stone;}
+else if(key==='stony_peaks'){
+
+
+if(this.vgen>=GEN.STRATA2_VGEN){const sn=this.stripN.n3(x*0.02,y*0.14,z*0.02);const b=sn>0.62?S.calcite:sn>0.25?S.andesite:S.stone;topB=b;fill=b;}
+else{const strip=this.stripN.n3(x*0.02,y*0.2,z*0.02)>0.2;topB=strip?S.calcite:S.stone;fill=strip?S.calcite:S.stone;}
+}
 else if(key==='windswept_hills'||key==='windswept_forest'){if(pn>0.15){topB=S.stone;fill=S.stone;}}
 else if(key==='windswept_gravelly_hills'){if(pn>0.1){topB=S.gravel;fill=S.gravel;}else if(pn< -0.3){topB=S.stone;fill=S.stone;}}
 else if(key==='windswept_savanna'){if(pn>0.2){topB=S.stone;fill=S.stone;}else if(pn< -0.2)topB=S.coarse;}
@@ -57801,7 +57807,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="732d172f8642045e";
+VR.TEX_SRC_HASH="618da227c1aa3b32";
 
 
 
@@ -123807,7 +123813,7 @@ this.renderer&&(this.renderer.visDirty=true);
 async createWorld(o){
 const seedStr=o.seed;
 let seed=seedStr?(/^-?\d+$/.test(seedStr)?(parseInt(seedStr,10)>>>0):VR.seedFromString(seedStr)):(Math.floor(Math.random()*4294967295)>>>0);
-const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:18};
+const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:19};
 if(o.first&&VR.First)VR.First.mark(this,meta);
 await this.store.saveWorld(meta);
 this.startWorld(meta,true);

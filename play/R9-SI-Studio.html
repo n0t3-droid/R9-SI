@@ -14801,6 +14801,7 @@ TREES.boulder=function(w,x,y,z,rng,s){blob(w,x,y,z,1+rng.int(2),1+rng.int(2),1+r
 
 
 GEN.TREE2_VGEN=18;
+GEN.STRATA2_VGEN=19;
 GEN.trees2=(g)=> !!g&&(g.vgen|0)>=GEN.TREE2_VGEN;
 const plant2=(w,name,x,y,z,rng)=>{
 const FL=VR.Flora;if(!FL|| !FL.SPECIES[name])return false;
@@ -15660,7 +15661,12 @@ if(key==='frozen_peaks'&&pn>0.2)topB=S.packed;else if(key==='frozen_peaks'&&pn< 
 if(this.steep(H,col)>3){topB=S.stone;}
 }
 else if(key==='snowy_slopes'||key==='grove'){topB=pn>0.3?S.powder:S.snowblock;if(key==='grove'&&pn< -0.2)topB=S.grass;if(this.steep(H,col)>3)topB=S.stone;}
-else if(key==='stony_peaks'){const strip=this.stripN.n3(x*0.02,y*0.2,z*0.02)>0.2;topB=strip?S.calcite:S.stone;fill=strip?S.calcite:S.stone;}
+else if(key==='stony_peaks'){
+
+
+if(this.vgen>=GEN.STRATA2_VGEN){const sn=this.stripN.n3(x*0.02,y*0.14,z*0.02);const b=sn>0.62?S.calcite:sn>0.25?S.andesite:S.stone;topB=b;fill=b;}
+else{const strip=this.stripN.n3(x*0.02,y*0.2,z*0.02)>0.2;topB=strip?S.calcite:S.stone;fill=strip?S.calcite:S.stone;}
+}
 else if(key==='windswept_hills'||key==='windswept_forest'){if(pn>0.15){topB=S.stone;fill=S.stone;}}
 else if(key==='windswept_gravelly_hills'){if(pn>0.1){topB=S.gravel;fill=S.gravel;}else if(pn< -0.3){topB=S.stone;fill=S.stone;}}
 else if(key==='windswept_savanna'){if(pn>0.2){topB=S.stone;fill=S.stone;}else if(pn< -0.2)topB=S.coarse;}
