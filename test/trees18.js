@@ -5,7 +5,7 @@
 //      FL.grow's), the old builders stay for an unflagged writer
 //   c  the spruce is a cone: its leaves' radius falls from the foot of the crown to the top
 //   d  a vgen-18 world grows palms on a beach (a beach of seed 53 found by its climate), a vgen-17 world none there
-//   e  new worlds are vgen 18
+//   e  new worlds are vgen 18 or later (v0.55.94: 19, the grey strata)
 const V = require('./load_shared.js');
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
@@ -55,6 +55,6 @@ check(okB === CASES.length, 'b  the eight builders grow the new species in a t18
 }
 // e
 const gs = require('fs').readFileSync(__dirname + '/../src/main/game.js', 'utf8');
-check(/vgen: o\.vgen \? \+o\.vgen : 18/.test(gs), 'e  new worlds are vgen 18');
+check(/vgen: o\.vgen \? \+o\.vgen : (18|19)/.test(gs), 'e  new worlds are vgen 18 or later (19 since v0.55.94)');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

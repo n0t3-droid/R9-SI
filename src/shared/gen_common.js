@@ -484,6 +484,7 @@
   // them, tapering trunks, the spruce a true cone). A tree's grammar seed comes from the caller's stream, so a world grows
   // the same trees every time. Older worlds keep their trees (the flag unset there; gen_same's pins unchanged).
   GEN.TREE2_VGEN = 18;
+  GEN.STRATA2_VGEN = 19;   // v0.55.94: the stony peaks' strata in grey tones (gen_overworld.js)
   GEN.trees2 = (g) => !!g && (g.vgen | 0) >= GEN.TREE2_VGEN;
   const plant2 = (w, name, x, y, z, rng) => {
     const FL = VR.Flora; if (!FL || !FL.SPECIES[name]) return false;

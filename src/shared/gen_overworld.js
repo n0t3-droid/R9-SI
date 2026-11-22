@@ -447,7 +447,12 @@
           if (this.steep(H, col) > 3) { topB = S.stone; }
         }
         else if (key === 'snowy_slopes' || key === 'grove') { topB = pn > 0.3 ? S.powder : S.snowblock; if (key === 'grove' && pn < -0.2) topB = S.grass; if (this.steep(H, col) > 3) topB = S.stone; }
-        else if (key === 'stony_peaks') { const strip = this.stripN.n3(x * 0.02, y * 0.2, z * 0.02) > 0.2; topB = strip ? S.calcite : S.stone; fill = strip ? S.calcite : S.stone; }
+        else if (key === 'stony_peaks') {
+          // vgen 19 (v0.55.94): the strata in grey tones — white calcite bands every few blocks on near-black stone drew the
+          // peaks as zebras; now andesite bands, a thin calcite seam only here and there
+          if (this.vgen >= GEN.STRATA2_VGEN) { const sn = this.stripN.n3(x * 0.02, y * 0.14, z * 0.02); const b = sn > 0.62 ? S.calcite : sn > 0.25 ? S.andesite : S.stone; topB = b; fill = b; }
+          else { const strip = this.stripN.n3(x * 0.02, y * 0.2, z * 0.02) > 0.2; topB = strip ? S.calcite : S.stone; fill = strip ? S.calcite : S.stone; }
+        }
         else if (key === 'windswept_hills' || key === 'windswept_forest') { if (pn > 0.15) { topB = S.stone; fill = S.stone; } }
         else if (key === 'windswept_gravelly_hills') { if (pn > 0.1) { topB = S.gravel; fill = S.gravel; } else if (pn < -0.3) { topB = S.stone; fill = S.stone; } }
         else if (key === 'windswept_savanna') { if (pn > 0.2) { topB = S.stone; fill = S.stone; } else if (pn < -0.2) topB = S.coarse; }
