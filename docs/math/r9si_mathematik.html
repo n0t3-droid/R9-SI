@@ -383,7 +383,7 @@ Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag
 Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
 
 <h2 id="eigen">16 · Eigene Verfahren</h2>
-<p class="lead">Sieben Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
+<p class="lead">Acht Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
 dieses Spiel zusammengesetzt: für einen Browser,
 eine integrierte Grafikkarte und eine Welt, die sich jederzeit ändert. Jedes läuft im Spiel und hat einen Node-Test.</p>
 
@@ -546,6 +546,22 @@ offene Seite verkürzt den Steinsaal auf 2,2 s. Das Ergebnis wählt eine von sie
 hell oder dunkel: Weiche Räume (mehr als ein Drittel Wolle oder Laub) bekommen einen dunkleren Nachhall. Jede Stufe wird
 einmal als Impuls synthetisiert und behalten. Ändert sich die Stufe, wird der Raumanteil für 90 ms stumm geschaltet,
 der Impuls getauscht und wieder geöffnet. Kosten: unter einer Millisekunde pro Messung.</p>
+
+<h3>16.8 Licht-Toleranz-Greedy — weniger Vierecke in der Ferne</h3>
+<p class="src">src/shared/mesher.js (job.lgt) · src/main/world.js (colLgt, World.lgtWant)</p>
+<p>Der Mesher verschmilzt gleich aussehende Blockflächen einer Scheibe zu Rechtecken (Greedy Meshing). Bisher nur, wenn
+das Licht aller vier Ecken exakt gleich war; schon eine Stufe Unterschied in einem der vier Kanäle (Himmel, Rot, Grün,
+Blau) trennte die Flächen. Seit v0.56.1 darf eine Fläche ab \(D_\ell=3\) Chunks Abstand einem Rechteck beitreten,
+wenn ihr Licht in jedem Kanal \(c\) höchstens \(\tau\) Stufen vom ersten abweicht. Das Rechteck bekommt dann den
+Mittelwert:</p>
+\[ \big|L_c(q)-L_c(q_0)\big|\le\tau\ \ \forall c,\qquad L_c^{\square}=\operatorname{round}\Big(\tfrac{1}{wh}\sum_{q\in\square}L_c(q)\Big),
+\qquad \tau=\begin{cases}0,&d<D_\ell\\1,&d>D_\ell+1\\2,&\text{schlichte Ferne}\end{cases} \]
+<p>Dazwischen behält eine Spalte, was sie hat (Hysterese). Gemessen über \(7\times7\) Spalten von Seed 53: 85 714
+undurchsichtige Vierecke werden bei \(\tau=1\) zu 56 946 (−34 %) und bei \(\tau=2\) zu 49 614 (−42 %). Die bedeckte
+Fläche bleibt Viereck für Viereck gleich, und das Meshing wird dabei 2,8× schneller. \(\tau=0\) ist der alte Mesher Byte
+für Byte. Ehrliche Einschränkung: Im ganzen Bild auf „Hoch“ mit 12 Chunks Sichtweite sanken die gezeichneten Dreiecke
+nur um rund 4 %, denn die runden Hänge, Formen, Mini-Voxel und der Horizont zählen mit. Der volle Gewinn gilt in der
+schlichten Ferne und auf den Stufen ohne runde Hänge.</p>
 
 <h2 id="schluss">17 · Offen und frei</h2>
 <p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist

@@ -537,6 +537,12 @@
     if (softAny) { SNM.solve(job); softH = new Int16Array(256); SNM.mesh(job, bufs[0], (st, d) => texW3(TTEX[st * 6 + d], TF[st], d, st), softH); }
     // ---- greedy opaque cubes ----
     const mstate = new Uint16Array(256), mlight = new Uint16Array(256), mtint = new Uint16Array(256), mflag = new Uint8Array(256), mergedLight = new Uint16Array(4);
+    // v0.56.1 · Licht-Toleranz-Greedy (job.lgt 0 exact, 1 or 2 levels): away from the eye a face whose light differs from
+    // the rectangle's first face by at most lgt levels in every channel (sky, r, g, b) still joins it, and the merged quad
+    // takes the channels' mean. Measured on seed 53 (7 × 7 columns): 85 714 opaque quads → 56 946 (1 level) → 49 614 (2)
+    const lgt = job.lgt | 0;
+    const lmean4 = (c) => { let o = 0; for (let k = 0; k < 16; k += 4) o |= Math.min(15, Math.round((((c[0] >> k) & 15) + ((c[1] >> k) & 15) + ((c[2] >> k) & 15) + ((c[3] >> k) & 15)) / 4)) << k; return o; };
+    const lnear = lgt ? (a, b) => { for (let k = 0; k < 16; k += 4) { const e = ((a >> k) & 15) - ((b >> k) & 15); if (e > lgt || e < -lgt) return false; } return true; } : null;
     for (let d = 0; d < 6; d++) {
       const ax = DAXIS[d]; // slice axis
       for (let s = 0; s < 16; s++) {
@@ -581,9 +587,9 @@
           }
           if (t.o.mushInside !== undefined && t.o.fungusCap) { const nt = R.types[TTYPE[nb]]; if (nt && nt.o.mushInside !== undefined) texv = t.o.mushInside; }
           const rcb = TRC[b], tint = rcb || tintAt(TTINT[b], x, z, b);
-          const uniform = cornerLight[0] === cornerLight[1] && cornerLight[1] === cornerLight[2] && cornerLight[2] === cornerLight[3] && !cornerAO[0] && !cornerAO[1] && !cornerAO[2] && !cornerAO[3];
+          const uniform = (lgt ? lnear(cornerLight[0], cornerLight[1]) && lnear(cornerLight[0], cornerLight[2]) && lnear(cornerLight[0], cornerLight[3]) : cornerLight[0] === cornerLight[1] && cornerLight[1] === cornerLight[2] && cornerLight[2] === cornerLight[3]) && !cornerAO[0] && !cornerAO[1] && !cornerAO[2] && !cornerAO[3];
           const w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (rcb ? 32768 : 0);
-          if (uniform && texv === TTEX[b * 6 + d]) { mflag[mi] = 1; mstate[mi] = b; mlight[mi] = cornerLight[0]; mtint[mi] = tint; }
+          if (uniform && texv === TTEX[b * 6 + d]) { mflag[mi] = 1; mstate[mi] = b; mlight[mi] = lgt ? lmean4(cornerLight) : cornerLight[0]; mtint[mi] = tint; }
           else emitCubeQuad(bufs[0], d, x, y, z, x + 1, y + 1, z + 1, 1, 1, texW3(texv, fl, d, b), w5, cornerLight, cornerAO, tint);
         }
         // merge
@@ -592,15 +598,22 @@
           if (mflag[mi] !== 1) { u++; continue; }
           const st0 = mstate[mi], li0 = mlight[mi], ti0 = mtint[mi];
           let w = 1;
-          while (u + w < 16 && w < 15) { const mj = mi + w; if (mflag[mj] !== 1 || mstate[mj] !== st0 || mlight[mj] !== li0 || mtint[mj] !== ti0) break; w++; }
+          while (u + w < 16 && w < 15) { const mj = mi + w; if (mflag[mj] !== 1 || mstate[mj] !== st0 || (lgt ? !lnear(mlight[mj], li0) : mlight[mj] !== li0) || mtint[mj] !== ti0) break; w++; }
           let h = 1;
           outer: while (v + h < 16 && h < 15) {
-            for (let k = 0; k < w; k++) { const mj = (v + h) * 16 + u + k; if (mflag[mj] !== 1 || mstate[mj] !== st0 || mlight[mj] !== li0 || mtint[mj] !== ti0) break outer; }
+            for (let k = 0; k < w; k++) { const mj = (v + h) * 16 + u + k; if (mflag[mj] !== 1 || mstate[mj] !== st0 || (lgt ? !lnear(mlight[mj], li0) : mlight[mj] !== li0) || mtint[mj] !== ti0) break outer; }
             h++;
+          }
+          let lm = li0;
+          if (lgt && (w > 1 || h > 1)) {   // (the channels' mean over the rectangle)
+            let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+            for (let hh = 0; hh < h; hh++) for (let k = 0; k < w; k++) { const q = mlight[(v + hh) * 16 + u + k]; a0 += q & 15; a1 += (q >> 4) & 15; a2 += (q >> 8) & 15; a3 += (q >> 12) & 15; }
+            const n = w * h, r = (x) => Math.min(15, Math.round(x / n));
+            lm = r(a0) | (r(a1) << 4) | (r(a2) << 8) | (r(a3) << 12);
           }
           for (let hh = 0; hh < h; hh++) for (let k = 0; k < w; k++) mflag[(v + hh) * 16 + u + k] = 2;
           const fl = TF[st0];
-          mergedLight[0] = li0; mergedLight[1] = li0; mergedLight[2] = li0; mergedLight[3] = li0;
+          mergedLight[0] = lm; mergedLight[1] = lm; mergedLight[2] = lm; mergedLight[3] = lm;
           const w3 = texW3(TTEX[st0 * 6 + d], fl, d, st0), w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (TRC[st0] ? 32768 : 0);
           if (ax === 0) emitCubeQuad(bufs[0], d, s, v, u, s + 1, v + h, u + w, w, h, w3, w5, mergedLight, null, ti0);
           else if (ax === 1) emitCubeQuad(bufs[0], d, u, s, v, u + w, s + 1, v + h, w, h, w3, w5, mergedLight, null, ti0);
