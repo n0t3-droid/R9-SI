@@ -383,7 +383,8 @@ Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag
 Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
 
 <h2 id="eigen">16 · Eigene Verfahren</h2>
-<p class="lead">Fünf Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden: für einen Browser,
+<p class="lead">Sieben Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
+dieses Spiel zusammengesetzt: für einen Browser,
 eine integrierte Grafikkarte und eine Welt, die sich jederzeit ändert. Jedes läuft im Spiel und hat einen Node-Test.</p>
 
 <h3>16.1 Die Schattenuhr — Schatten als Zeit</h3>
@@ -507,6 +508,44 @@ folgen zwei Fixpunkt-Iterationen mit der alten Tiefe \(z\):</p>
 alten Bild herausfällt, wird nicht gestreckt (Schlieren), sondern aus dem Streifen knapp innerhalb des Randes längs
 weichgezeichnet, umso breiter, je weiter draußen. Ein ganzes Bild ersetzt es einen Augenblick später. So zeigt eine
 GPU, die 38 ganze Bilder schafft, 76 pro Sekunde.</p>
+
+<h3>16.6 Gezupfte Saiten — Karplus–Strong mit Feinstimmung</h3>
+<p class="src">src/main/klangphys.js (VR.KS) · src/main/audio.js (ksNote)</p>
+<p>Seit v0.56 sind die Zupfinstrumente der Musik und der Dorfkapelle keine Oszillatoren mehr, sondern <b>physikalisch
+modellierte Saiten</b> (Karplus &amp; Strong 1983, Erweiterungen nach Jaffe &amp; Smith 1983). Eine Verzögerungsleitung von
+einer Periode Länge wird mit einem Rauschstoß gefüllt und über ein Verlustfilter zurückgeführt:</p>
+\[ y[n]=\rho\cdot\mathcal A_C\!\Big(\tfrac12\big(y[n-N_i]+y[n-N_i-1]\big)\Big),\qquad N=\frac{f_s}{f} \]
+<p>Der Zweipunkt-Mittelwert ist ein Tiefpass, \(|H(f)|=\cos(\pi f/f_s)\). Bei jedem Umlauf nimmt er ein wenig von den
+Höhen: Der Ton beginnt hell und wird weicher, während er verklingt, wie bei einer echten Saite. Der Mittelwert verzögert
+um einen halben Abtastwert; der ganzzahlige Rest ist \(N_i=\lfloor N-\tfrac12\rfloor\). Den Bruchteil
+\(\eta=N-\tfrac12-N_i\) macht ein Allpass erster Ordnung, dessen Verzögerung bei tiefen Frequenzen \(\eta\) ist:</p>
+\[ \mathcal A_C:\ y[n]=C\,x[n]+x[n-1]-C\,y[n-1],\qquad C=\frac{1-\eta}{1+\eta} \]
+<p>Ohne ihn läge ein C6 bei 48 kHz um 14 Cent daneben; mit ihm liegen alle Töne von E2 bis A5 im Test unter 0,2 Cent.
+Damit der Grundton in \(T_{60}\) Sekunden um 60 dB fällt, gibt es einen Verlustfaktor pro Umlauf:</p>
+\[ \rho=\frac{10^{-3/(T_{60}\,f)}}{|H(f)|} \]
+<p>Der Anschlag: Der Rauschstoß ist je nach Helligkeit tiefpassgefiltert. Davon wird er selbst, \(\beta N\) Abtastwerte
+später, abgezogen. Das ist der Kamm, den ein Zupfpunkt bei \(\beta\) der Saitenlänge erzeugt; die Obertöne bei Vielfachen
+von \(1/\beta\) fehlen. Jede Tonhöhe wird einmal in einen Puffer gerechnet (unter 1 ms für 2 s Klang) und
+zwischengespeichert. Ein Ton kostet danach eine einzige Pufferquelle.</p>
+
+<h3>16.7 Wie lange ein Ort nachhallt — Eyring aus 48 Strahlen</h3>
+<p class="src">src/main/klangphys.js (VR.RoomAcoustics) · src/main/audio.js (listen, irOf)</p>
+<p>Statt zweier fester Nachhalle (Raum und Höhle) wird der Raum um das Ohr zweimal pro Sekunde <b>vermessen</b>. 48 Strahlen
+in einer Fibonacci-Kugel laufen durch die Blöcke, höchstens 48 m weit. Wo ein Strahl trifft, zählt der
+Absorptionsgrad \(\alpha\) der Fläche:</p>
+<table><tr><th>Fläche</th><th>Stein</th><th>Holz</th><th>Wolle, Polster</th><th>Laub</th><th>Glas</th><th>Wasser</th><th>offen</th></tr>
+<tr><td>\(\alpha\)</td><td>0,05</td><td>0,12</td><td>0,45</td><td>0,30</td><td>0,04</td><td>0,02</td><td>1</td></tr></table>
+<p>Ein Strahl, der den Raum verlässt (Himmel, eine ferne Öffnung), ist ein offenes Fenster: \(\alpha=1\). Die mittlere
+Trefferweite ist nach Kuttruff die mittlere freie Weglänge eines geschlossenen Raumes, \(\bar\ell=4V/S\). Daraus folgt
+Eyrings Nachhallzeit mit der Absorption der Luft \(m\approx0{,}0012\,\text{m}^{-1}\):</p>
+\[ T_{60}=\frac{0{,}161\,V}{-S\ln(1-\bar\alpha)+4mV}=\frac{0{,}161\cdot\bar\ell/4}{-\ln(1-\bar\alpha)+m\,\bar\ell},
+\qquad \bar\alpha=\frac1{48}\sum_k\alpha_k \]
+<p>Im Test: Ein geschlossener Steinsaal von \(13\times8\times13\) Blöcken misst \(\bar\ell=6{,}7\) m (die Formel sagt
+7,2 m) und hallt bis zur Obergrenze von 4 s. Derselbe Raum aus Holz hallt 2,0 s, mit Wolle ausgekleidet 0,45 s, und eine
+offene Seite verkürzt den Steinsaal auf 2,2 s. Das Ergebnis wählt eine von sieben Nachhallstufen (0,3 bis 3,6 s), jeweils
+hell oder dunkel: Weiche Räume (mehr als ein Drittel Wolle oder Laub) bekommen einen dunkleren Nachhall. Jede Stufe wird
+einmal als Impuls synthetisiert und behalten. Ändert sich die Stufe, wird der Raumanteil für 90 ms stumm geschaltet,
+der Impuls getauscht und wieder geöffnet. Kosten: unter einer Millisekunde pro Messung.</p>
 
 <h2 id="schluss">17 · Offen und frei</h2>
 <p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist

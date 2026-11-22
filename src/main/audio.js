@@ -21,7 +21,7 @@
 
   // the room's impulse, synthesized: a noise tail that darkens as it decays, with a few early reflections. The room is
   // 1.3 s; a cave is 2.6 s and darker. Made once; seeded, so every start sounds the same.
-  function impulse(c, secs, t60, cave, pre, seed) {
+  function impulse(c, secs, t60, cave, pre, seed, dark) {
     const sr = c.sampleRate, n = Math.floor(sr * secs), buf = c.createBuffer(2, n, sr);
     const p0 = Math.floor(pre * sr), decay = Math.pow(10, -3 / (t60 * sr));
     const taps = cave ? [[0.021, 0.5], [0.048, 0.36], [0.083, 0.24], [0.127, 0.16]] : [[0.007, 0.5], [0.013, 0.4], [0.019, 0.32], [0.027, 0.26], [0.035, 0.18], [0.046, 0.12]];
@@ -30,7 +30,7 @@
       let s = (seed + ch * 7919) >>> 0, y = 0, env = 1;
       for (let i = p0; i < n; i++) {
         s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
-        const x = s / 2147483648 - 1, a = cave ? 0.22 - 0.1 * (i / n) : 0.6 - 0.35 * (i / n);
+        const x = s / 2147483648 - 1, a = (cave ? 0.22 - 0.1 * (i / n) : 0.6 - 0.35 * (i / n)) * (dark ? 0.45 : 1);
         y += a * (x - y);
         d[i] = y * env; env *= decay;
       }
@@ -139,10 +139,39 @@
     stats() { return { voices: this.prune(), counts: this.counts, notes: this.noteCount }; }
     // the state the tests and the overlay read: the targets the ear has set (the audio params follow them over a few
     // tenths of a second of audio time, so these read at once, also before the audio clock has moved)
-    state() { return { indoors: this.L.sky < 4 || this.L.underwater, cave: !!this.cave, underwater: this.L.underwater, muffle: this.muT < 0 ? 20000 : this.muT, room: this.roomT < 0 ? 0 : this.roomT, duck: this.music.duckT }; }
+    state() { return { indoors: this.L.sky < 4 || this.L.underwater, cave: !!this.cave, underwater: this.L.underwater, muffle: this.muT < 0 ? 20000 : this.muT, room: this.roomT < 0 ? 0 : this.roomT, duck: this.music.duckT, t60: this.room3 ? Math.round(this.room3.t60 * 100) / 100 : 0, roomClass: this.raB === undefined ? null : this.raB }; }
 
     // the room's convolver. A ConvolverNode takes its buffer once, so the cave's impulse is played by a new node; the old
     // one is cut off (listen mutes the room send for 90 ms before the swap, so its tail has gone by then)
+    // v0.56: the impulse of a measured room class (RA.bucket: T60 step × 2 + dark), made once and kept
+    irOf(b) {
+      this.irs = this.irs || new Map();
+      let ir = this.irs.get(b);
+      if (!ir) {
+        const T = VR.RoomAcoustics.BUCKETS[b >> 1], long = T >= 1.8;
+        ir = impulse(this.ctx, Math.min(4.2, T * 1.15 + 0.15), T, long, long ? 0.02 : 0.005, 0x51ed1 + b * 977, (b & 1) === 1);
+        this.irs.set(b, ir);
+      }
+      return ir;
+    }
+    // v0.56 · a plucked string (VR.KS, Karplus–Strong): one rendered buffer per pitch and brightness, cached
+    ksNote(f, t, dur, gain, dest, bright) {
+      const c = this.ctx; if (!c || !VR.KS) return this.tone(f, gain, dur, 'triangle', false, t, dest);
+      this.ksCache = this.ksCache || new Map();
+      const br = bright === undefined ? 0.55 : bright, key = Math.round(f * 4) * 8 + Math.round(br * 7);
+      let buf = this.ksCache.get(key);
+      if (!buf) {
+        const len = Math.min(2.6, Math.max(0.7, 2.2 - Math.log2(f / 110) * 0.35));
+        const x = VR.KS.render(f, c.sampleRate, { dur: len, t60: len * 0.75, bright: br, pick: 0.13, seed: key });
+        buf = c.createBuffer(1, x.length, c.sampleRate); buf.getChannelData(0).set(x);
+        if (this.ksCache.size > 96) this.ksCache.delete(this.ksCache.keys().next().value);
+        this.ksCache.set(key, buf);
+      }
+      const src = c.createBufferSource(), g = c.createGain(), end = t + Math.min(buf.duration, Math.max(dur * 1.6, 0.35));
+      src.buffer = buf; g.gain.setValueAtTime(gain * 1.6, t); g.gain.setValueAtTime(gain * 1.6, end - 0.06); g.gain.linearRampToValueAtTime(0, end);
+      src.connect(g); g.connect(dest || this.sfx); src.start(t); src.stop(end + 0.01);
+      return src;
+    }
     setRev(buf) {
       const c = this.ctx;
       if (this.rev) { this.room.disconnect(); this.musRev.disconnect(); this.rev.disconnect(); }
@@ -181,8 +210,17 @@
       L.sky = w ? (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12) : 15;
       const indoors = L.sky < 4 || L.underwater, cave = indoors && eye[1] < 60;
       // the room: when the cave changes, the send is muted, the impulse is swapped 90 ms later, then the send returns
+      // v0.56 · Klangphysik: twice a second the room is measured from the blocks round the ear (VR.RoomAcoustics: 48 rays,
+      // Kuttruff's mean free path, Eyring's T60) and its impulse class picked; the open air keeps the old two impulses
+      const RA = VR.RoomAcoustics;
+      if (RA && w && t - (this.raAt || 0) > 0.5) {
+        this.raAt = t;
+        const m = RA.measure((x, y, z) => w.getBlock(x, y, z), eye[0], eye[1], eye[2]);
+        this.room3 = m; const b = RA.bucket(m);
+        if (b !== this.raB) { this.raB = b; this.room.gain.setTargetAtTime(0, t, 0.02); this.irAt = t + 0.09; this.roomT = -1; }
+      }
       if (cave !== this.cave) { this.cave = cave; this.room.gain.setTargetAtTime(0, t, 0.02); this.irAt = t + 0.09; this.roomT = -1; }
-      if (this.irAt && t >= this.irAt) { this.setRev(this.cave ? this.irCave : this.irRoom); this.irAt = 0; }
+      if (this.irAt && t >= this.irAt) { this.setRev(this.raB !== undefined && this.raB !== null ? this.irOf(this.raB) : this.cave ? this.irCave : this.irRoom); this.irAt = 0; }
       if (!this.irAt) {                                   // automation is sent only when a target changes (Very Low: no per-frame cost)
         let want = this.cave ? CAVE_SEND : indoors ? ROOM_SEND : 0;
         // f-klang: between walls under the open sky (a lane, a courtyard) a little of the room's echo, by how shut the
@@ -542,7 +580,7 @@
       const f = 440 * Math.pow(2, (midi - 69) / 12);
       if (kind === 'pad') this.padNote(f, dur, t, gain);
       else if (kind === 'bass') this.tone(f, gain, dur, 'sine', false, t, this.musDuck);
-      else this.tone(f, gain, dur, 'triangle', false, t, this.musDuck);
+      else this.ksNote(f, t, dur, gain, this.musDuck, 0.5);   // (v0.56: a plucked string, Karplus–Strong)
     }
     // a village tick: a band of noise a few milliseconds long, in the ducked music bus
     tick(t, gain) {
@@ -586,7 +624,7 @@
       for (const det of [-6, 6]) { const o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = det; o.connect(flt); o.start(t); o.stop(t + dur + 0.1); }
       flt.connect(g); g.connect(this.musDuck);
     }
-    pluck(f, t, dur, gain, type) { this.tone(f, gain, dur, type || 'triangle', false, t, this.musDuck); }
+    pluck(f, t, dur, gain, type) { this.ksNote(f, t, dur, gain, this.musDuck, type === 'sawtooth' ? 0.8 : 0.45); }   // (v0.56: Karplus–Strong; the band's downbeats brighter)
 
     // ---------------- e-music · the adaptive score: the director looks four times a second (score.js), the cue's notes are
     // scheduled half a second ahead on the audio clock (scoresynth.js), within the voice cap; per frame only a compare
