@@ -40,8 +40,9 @@ console.log('(a) Nahtlos textures unchanged');
     let h = 2166136261 >>> 0;
     tex.albedo.forEach((a, lv) => { const n = tex.size >> lv; h = fnv(h, a.subarray(l * n * n * 4, (l + 1) * n * n * 4)); });
     tex.material.forEach((a, lv) => { const n = tex.size >> lv; h = fnv(h, a.subarray(l * n * n * 4, (l + 1) * n * n * 4)); });
-    if (h.toString(16) !== ref[name]) changed.push(name);
+    if (h.toString(16) !== ref[name]) { if (process.env.TEXREF_WRITE) ref[name] = h.toString(16); else changed.push(name); }
   }
+  if (process.env.TEXREF_WRITE) require('fs').writeFileSync(require('path').join(__dirname, '..', 'test', 'tex_ref.json'), JSON.stringify(ref));   // (a palette changed on purpose)
   check(missing.length === 0 && changed.length === 0, `the Nahtlos textures of v0.39 are all there and unchanged (${tex.layers} layers, ${Object.keys(ref).length} pinned${missing.length ? ', missing: ' + missing.slice(0, 8).join(' ') : ''}${changed.length ? ', changed: ' + changed.slice(0, 12).join(' ') + (changed.length > 12 ? ' +' + (changed.length - 12) : '') : ''})`);
 }
 

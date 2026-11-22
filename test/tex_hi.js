@@ -77,8 +77,9 @@ console.log('c · the 32 × 32 textures as before');
     let h = 2166136261 >>> 0;
     lo0.albedo.forEach((a, lv) => { const k = lo0.size >> lv; h = fnv(h, a.subarray(l * k * k * 4, (l + 1) * k * k * 4)); });
     lo0.material.forEach((a, lv) => { const k = lo0.size >> lv; h = fnv(h, a.subarray(l * k * k * 4, (l + 1) * k * k * 4)); });
-    if (h.toString(16) !== ref[n]) bad.push(n);
+    if (h.toString(16) !== ref[n]) { if (process.env.TEXREF_WRITE) ref[n] = h.toString(16); else bad.push(n); }
   });
+  if (process.env.TEXREF_WRITE) fs.writeFileSync(path.join(__dirname, '..', 'test', 'tex_ref.json'), JSON.stringify(ref));   // (a palette changed on purpose: TEXREF_WRITE=1 pins the new layers)
   const pinned = names.filter((n) => ref[n]).length;
   check(pinned >= 10 && bad.length === 0, 'the heroes\' 32 × 32 layers are the pinned ones (tex_ref.json)', `${pinned} pinned${bad.length ? ', changed: ' + bad.join(' ') : ''}`);
 }
