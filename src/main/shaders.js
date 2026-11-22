@@ -3165,6 +3165,17 @@ ${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void ma
     }
 #ifdef SOFTFADE
     alb *= texelGrain(wp3, length(fwidth(wp3)));   // (f-stipple2: never a flat slab up close)
+    // v0.55.95 · Ferne schöner: a stand-in's top up to ~140 m reads as many blocks and as a meadow, not a pale slab — each
+    // block its own shade (wider than the far speckle), clumps of two blocks a little darker, the whole a touch darker,
+    // as the real ground's texture, ambient occlusion and grass blades make it
+    if (v_face == 2u && v_kind != 1u) {
+      float nk = 1.0 - smoothstep(60.0, 140.0, dist), mk = 1.0 - smoothstep(160.0, 320.0, dist);
+      float clump = step(0.55, hash13(floor(wp3 * 0.5) + 3.7));
+      alb *= mix(1.0, (0.88 + hash13(bp + 1.3) * 0.2) * (1.0 - 0.08 * clump) * 0.93, nk);
+      // (and from the air: meadow patches a few blocks wide, darker and lighter, out to ~300 m)
+      float pm = texture(u_noise, wp / 9.0 + 0.31).g * 0.6 + texture(u_noise, wp / 3.5 + 0.77).r * 0.4;
+      alb *= mix(1.0, 0.86 + pm * 0.26, mk);
+    }
 #endif
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
 #if defined(FORM) || defined(GEMALT)

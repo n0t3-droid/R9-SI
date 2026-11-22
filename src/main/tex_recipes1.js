@@ -11,7 +11,7 @@
 
   // ---------------- palettes ----------------
   const PAL = VR.PAL = {
-    stone: [0x4a4c50, 0x66696d, 0x7f8286, 0x9a9da0],
+    stone: [0x5e6165, 0x7b7e82, 0x94979b, 0xadb0b3],   // (v0.55.95: a step lighter — mountains and cliffs read near-black under the low sun)
     deep: [0x25252c, 0x36363f, 0x494a53, 0x5c5d67],
     granite: [0x6e4034, 0x915847, 0xad705b, 0xc48d78],
     diorite: [0x8a8a88, 0xb0b0ad, 0xd3d3cf, 0xededea],
