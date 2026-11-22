@@ -3118,8 +3118,15 @@ ${(VR.Gemalt2 && VR.Gemalt2.glslTerrain) ? VR.Gemalt2.glslTerrain() : ''}void ma
     float ripple = clamp(0.5 + dot(n.xz, normalize(L.xz + vec2(1e-4))) * 2.6, 0.0, 1.0);
     body *= 0.84 + ripple * 0.32;
     vec3 deep = body * (u_ambSky * 0.74 + lc * 0.095) + body * 0.012;
+#ifndef SOFTFADE
     float absorb = 1.0 - exp(-depth * 0.5);
     vec3 floorC = v_col * (u_ambSky * 0.9 + lc * 0.35) * vec3(0.3, 0.62, 0.9);
+#else
+    // v0.55.93: a stand-in's shallows as the real water shows them — the floor through a turquoise body that takes a third
+    // of it at once (the sand under a block of water lit as bare sand drew pale beige and light-blue squares from the air)
+    float absorb = 1.0 - exp(-(depth + 0.8) * 0.5);
+    vec3 floorC = v_col * (u_ambSky * 0.9 + lc * 0.35) * vec3(0.16, 0.56, 0.62);
+#endif
     vec3 under = mix(floorC, deep, clamp(absorb, 0.0, 0.96));
     vec3 R = reflect(-V, n); R.y = abs(R.y);
     vec3 refl = skyColor(R, false);
