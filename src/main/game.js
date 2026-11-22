@@ -1015,6 +1015,14 @@
       if (!h) { h = document.createElement('div'); h.id = 'aqhint'; h.setAttribute('role', 'status'); h.hidden = true; (document.getElementById('ui') || document.body).appendChild(h); }
       h.hidden = !on;
       if (on) { h.textContent = T('g.aq.hint'); h.title = T('g.aq.tip', { what: this.aqWhat() }); }
+      // v0.55.96: the chip shows for five seconds when the governor takes or gives back a step, then fades (it stood over the
+      // picture the whole time on a slow PC); the settings keep the full line
+      const depth = on ? aq.stack.length : 0;
+      if (depth !== this.aqShown) {
+        this.aqShown = depth; h.classList.remove('quiet');
+        clearTimeout(this.aqQuietT);
+        if (on) this.aqQuietT = setTimeout(() => h.classList.add('quiet'), 5000);
+      }
       if (this.ui && this.ui.screen === 'settings' && VR.SettingsPanel) VR.SettingsPanel.aqLine(this.ui);
     }
     // ---------------------------------------------------------------- R9 Smart Quality
