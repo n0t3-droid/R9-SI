@@ -89898,6 +89898,142 @@ VR.Klang={FAMILIES,RECIPES,HIT,NAME_RULES,SOUND,familyOf,pitchFactor,timbre,step
 
 
 
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+
+
+const KS=VR.KS={};
+
+KS.render=function(f,sr,o){
+o=o||{};
+const dur=o.dur||1.6,t60=o.t60||1.2,bright=o.bright===undefined?0.6:o.bright,beta=o.pick===undefined?0.13:o.pick;
+const n=Math.max(1,Math.floor(dur*sr)),out=new Float32Array(n);
+const N=sr/f,Ni=Math.max(2,Math.floor(N-0.5-1e-3)),eta=N-0.5-Ni,C=(1-eta)/(1+eta);
+const H=Math.cos(Math.PI*f/sr),rho=Math.min(0.99995,Math.pow(10,-3/(t60*f))/Math.max(1e-6,H));
+
+const buf=new Float32Array(Ni);
+let s=(o.seed===undefined?0x2545f491:o.seed)>>>0,lp=0;
+const a=0.08+0.9*bright;
+const ex=new Float32Array(Ni);
+for(let i=0;i<Ni;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;lp+=a*((s/2147483648-1)-lp);ex[i]=lp;}
+const pd=Math.max(1,Math.round(beta*Ni));
+let mean=0;
+for(let i=0;i<Ni;i++){buf[i]=ex[i]-(i>=pd?ex[i-pd]:0);mean+=buf[i];}
+mean/=Ni;let peak=1e-9;
+for(let i=0;i<Ni;i++){buf[i]-=mean;peak=Math.max(peak,Math.abs(buf[i]));}
+for(let i=0;i<Ni;i++)buf[i]/=peak;
+
+let p=0,prev=0,apX=0,apY=0;
+for(let i=0;i<n;i++){
+const x=buf[p];
+const avg=0.5*(x+prev);prev=x;
+const y=C*avg+apX-C*apY;apX=avg;apY=y;
+const v=rho*y;
+buf[p]=v;out[i]=x;
+p=p+1===Ni?0:p+1;
+}
+
+const fo=Math.min(n,Math.floor(sr*0.02));
+for(let i=0;i<fo;i++)out[n-1-i]*=i/fo;
+return out;
+};
+
+KS.pitchOf=function(x,sr,fMin,fMax){
+const lo=Math.floor(sr/fMax),hi=Math.ceil(sr/fMin),from=Math.floor(sr*0.05),len=Math.min(x.length-hi-from,Math.floor(sr*0.25));
+let best= -Infinity,bl=lo;const r=new Float64Array(hi+2);
+for(let l=lo;l<=hi+1;l++){let acc=0;for(let i=0;i<len;i++)acc+=x[from+i]*x[from+i+l];r[l]=acc;if(l<=hi&&acc>best){best=acc;bl=l;}}
+const y0=r[bl-1],y1=r[bl],y2=r[bl+1],d=(y0-y2)/(2*(y0-2*y1+y2)||1);
+return sr/(bl+(isFinite(d)?d:0));
+};
+
+
+const RA=VR.RoomAcoustics={};
+RA.NRAYS=48;RA.REACH=48;RA.STEP=0.4;RA.AIR=0.0012;
+RA.ALPHA={stone:0.05,wood:0.12,soft:0.45,leaves:0.3,glass:0.04,water:0.02,metal:0.04,open:1};
+RA.T_MIN=0.25;RA.T_MAX=4.0;
+const DIRS=new Float64Array(RA.NRAYS*3);
+(function(){const n=RA.NRAYS;for(let i=0;i<n;i++){const y=1-(2*i+1)/n,r=Math.sqrt(1-y*y),ph=i*2.399963229728653;DIRS[i*3]=Math.cos(ph)*r;DIRS[i*3+1]=y;DIRS[i*3+2]=Math.sin(ph)*r;}})();
+
+let cls=null,clsN=0;
+RA.classOf=function(state){
+const R=VR.R,F=VR.F;
+if(!state)return null;
+if(!cls||clsN!==R.T.flags.length){cls=new Int8Array(R.T.flags.length).fill(-2);clsN=R.T.flags.length;}
+let c=cls[state];
+if(c=== -2){
+const fl=R.T.flags[state],t=R.types[R.T.type[state]],nm=(t&&t.name)||'';
+if(fl&F.LEAVES)c=4;
+else if(fl&F.FLUID)c=6;
+else if(!(fl&(F.SOLID|F.OPAQUE)))c= -1;
+else if(/wool|carpet|hay|bed|cushion|sofa|curtain|banner/.test(nm))c=2;
+else if(/glass|pane/.test(nm))c=5;
+else if(/plank|log|wood|_door|bookshelf|barrel|crate/.test(nm))c=1;
+else if(/iron|copper|metal|steel|gold_block/.test(nm))c=7;
+else c=0;
+cls[state]=c;
+}
+return c<0?null:c;
+};
+const AL=[RA.ALPHA.stone,RA.ALPHA.wood,RA.ALPHA.soft,0,RA.ALPHA.leaves,RA.ALPHA.glass,RA.ALPHA.water,RA.ALPHA.metal];
+
+
+RA.measure=function(getBlock,ex,ey,ez){
+const n=RA.NRAYS,step=RA.STEP,reach=RA.REACH;
+let sumD=0,hits=0,sumA=0,open=0,soft=0;
+for(let k=0;k<n;k++){
+const dx=DIRS[k*3],dy=DIRS[k*3+1],dz=DIRS[k*3+2];
+let hit= -1,d=0;
+for(let t=step;t<=reach;t+=step){
+const c=RA.classOf(getBlock(Math.floor(ex+dx*t),Math.floor(ey+dy*t),Math.floor(ez+dz*t)));
+if(c!==null){hit=c;d=t;break;}
+}
+if(hit<0){open++;sumA+=RA.ALPHA.open;continue;}
+hits++;sumD+=d;sumA+=AL[hit];if(hit===2||hit===4)soft++;
+}
+const mfp=hits?sumD/hits:reach,alpha=Math.min(0.999,sumA/n);
+return{mfp,alpha,open:open/n,soft:hits?soft/hits:0,t60:RA.eyring(mfp,alpha)};
+};
+
+RA.eyring=function(mfp,alpha){
+const vs=mfp/4,t=0.161*vs/(-Math.log(1-Math.min(0.999,alpha))+4*RA.AIR*vs);
+return Math.max(RA.T_MIN,Math.min(RA.T_MAX,t));
+};
+
+
+RA.BUCKETS=[0.3,0.5,0.8,1.2,1.8,2.6,3.6];
+RA.bucket=function(m){
+if(!m||m.open>0.5)return null;
+let b=0;for(let i=1;i<RA.BUCKETS.length;i++)if(Math.abs(Math.log(m.t60/RA.BUCKETS[i]))<Math.abs(Math.log(m.t60/RA.BUCKETS[b])))b=i;
+return b*2+(m.soft>0.35?1:0);
+};
+})(typeof VR!=='undefined'?VR:(globalThis.VR=globalThis.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const MODES={
@@ -91002,7 +91138,7 @@ metal:{f:2400,q:8,d:0.25,g:0.35,clang:1},
 
 
 
-function impulse(c,secs,t60,cave,pre,seed){
+function impulse(c,secs,t60,cave,pre,seed,dark){
 const sr=c.sampleRate,n=Math.floor(sr*secs),buf=c.createBuffer(2,n,sr);
 const p0=Math.floor(pre*sr),decay=Math.pow(10,-3/(t60*sr));
 const taps=cave?[[0.021,0.5],[0.048,0.36],[0.083,0.24],[0.127,0.16]]:[[0.007,0.5],[0.013,0.4],[0.019,0.32],[0.027,0.26],[0.035,0.18],[0.046,0.12]];
@@ -91011,7 +91147,7 @@ const d=buf.getChannelData(ch);
 let s=(seed+ch*7919)>>>0,y=0,env=1;
 for(let i=p0;i<n;i++){
 s=(Math.imul(s,1664525)+1013904223)>>>0;
-const x=s/2147483648-1,a=cave?0.22-0.1*(i/n):0.6-0.35*(i/n);
+const x=s/2147483648-1,a=(cave?0.22-0.1*(i/n):0.6-0.35*(i/n))*(dark?0.45:1);
 y+=a*(x-y);
 d[i]=y*env;env*=decay;
 }
@@ -91120,10 +91256,39 @@ prune(){const live=this.live,now=this.ctx?this.ctx.currentTime:0;let k=0;for(let
 stats(){return{voices:this.prune(),counts:this.counts,notes:this.noteCount};}
 
 
-state(){return{indoors:this.L.sky<4||this.L.underwater,cave: !!this.cave,underwater:this.L.underwater,muffle:this.muT<0?20000:this.muT,room:this.roomT<0?0:this.roomT,duck:this.music.duckT};}
+state(){return{indoors:this.L.sky<4||this.L.underwater,cave: !!this.cave,underwater:this.L.underwater,muffle:this.muT<0?20000:this.muT,room:this.roomT<0?0:this.roomT,duck:this.music.duckT,t60:this.room3?Math.round(this.room3.t60*100)/100:0,roomClass:this.raB===undefined?null:this.raB};}
 
 
 
+
+irOf(b){
+this.irs=this.irs||new Map();
+let ir=this.irs.get(b);
+if(!ir){
+const T=VR.RoomAcoustics.BUCKETS[b>>1],long=T>=1.8;
+ir=impulse(this.ctx,Math.min(4.2,T*1.15+0.15),T,long,long?0.02:0.005,0x51ed1+b*977,(b&1)===1);
+this.irs.set(b,ir);
+}
+return ir;
+}
+
+ksNote(f,t,dur,gain,dest,bright){
+const c=this.ctx;if(!c|| !VR.KS)return this.tone(f,gain,dur,'triangle',false,t,dest);
+this.ksCache=this.ksCache||new Map();
+const br=bright===undefined?0.55:bright,key=Math.round(f*4)*8+Math.round(br*7);
+let buf=this.ksCache.get(key);
+if(!buf){
+const len=Math.min(2.6,Math.max(0.7,2.2-Math.log2(f/110)*0.35));
+const x=VR.KS.render(f,c.sampleRate,{dur:len,t60:len*0.75,bright:br,pick:0.13,seed:key});
+buf=c.createBuffer(1,x.length,c.sampleRate);buf.getChannelData(0).set(x);
+if(this.ksCache.size>96)this.ksCache.delete(this.ksCache.keys().next().value);
+this.ksCache.set(key,buf);
+}
+const src=c.createBufferSource(),g=c.createGain(),end=t+Math.min(buf.duration,Math.max(dur*1.6,0.35));
+src.buffer=buf;g.gain.setValueAtTime(gain*1.6,t);g.gain.setValueAtTime(gain*1.6,end-0.06);g.gain.linearRampToValueAtTime(0,end);
+src.connect(g);g.connect(dest||this.sfx);src.start(t);src.stop(end+0.01);
+return src;
+}
 setRev(buf){
 const c=this.ctx;
 if(this.rev){this.room.disconnect();this.musRev.disconnect();this.rev.disconnect();}
@@ -91162,8 +91327,17 @@ L.x=eye[0];L.y=eye[1];L.z=eye[2];L.yaw= +yaw||0;L.w=w||null;L.underwater= !!unde
 L.sky=w?(w.getLight(Math.floor(eye[0]),Math.floor(eye[1]),Math.floor(eye[2]))>>>12):15;
 const indoors=L.sky<4||L.underwater,cave=indoors&&eye[1]<60;
 
+
+
+const RA=VR.RoomAcoustics;
+if(RA&&w&&t-(this.raAt||0)>0.5){
+this.raAt=t;
+const m=RA.measure((x,y,z)=>w.getBlock(x,y,z),eye[0],eye[1],eye[2]);
+this.room3=m;const b=RA.bucket(m);
+if(b!==this.raB){this.raB=b;this.room.gain.setTargetAtTime(0,t,0.02);this.irAt=t+0.09;this.roomT= -1;}
+}
 if(cave!==this.cave){this.cave=cave;this.room.gain.setTargetAtTime(0,t,0.02);this.irAt=t+0.09;this.roomT= -1;}
-if(this.irAt&&t>=this.irAt){this.setRev(this.cave?this.irCave:this.irRoom);this.irAt=0;}
+if(this.irAt&&t>=this.irAt){this.setRev(this.raB!==undefined&&this.raB!==null?this.irOf(this.raB):this.cave?this.irCave:this.irRoom);this.irAt=0;}
 if(!this.irAt){
 let want=this.cave?CAVE_SEND:indoors?ROOM_SEND:0;
 
@@ -91523,7 +91697,7 @@ this.noteLog[i]=midi;this.noteCount++;
 const f=440*Math.pow(2,(midi-69)/12);
 if(kind==='pad')this.padNote(f,dur,t,gain);
 else if(kind==='bass')this.tone(f,gain,dur,'sine',false,t,this.musDuck);
-else this.tone(f,gain,dur,'triangle',false,t,this.musDuck);
+else this.ksNote(f,t,dur,gain,this.musDuck,0.5);
 }
 
 tick(t,gain){
@@ -91567,7 +91741,7 @@ const flt=c.createBiquadFilter();flt.type='lowpass';flt.frequency.value=900;flt.
 for(const det of[-6,6]){const o=c.createOscillator();o.type='triangle';o.frequency.value=f;o.detune.value=det;o.connect(flt);o.start(t);o.stop(t+dur+0.1);}
 flt.connect(g);g.connect(this.musDuck);
 }
-pluck(f,t,dur,gain,type){this.tone(f,gain,dur,type||'triangle',false,t,this.musDuck);}
+pluck(f,t,dur,gain,type){this.ksNote(f,t,dur,gain,this.musDuck,type==='sawtooth'?0.8:0.45);}
 
 
 
