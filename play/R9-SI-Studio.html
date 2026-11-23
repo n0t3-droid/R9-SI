@@ -14804,6 +14804,8 @@ TREES.boulder=function(w,x,y,z,rng,s){blob(w,x,y,z,1+rng.int(2),1+rng.int(2),1+r
 
 GEN.TREE2_VGEN=18;
 GEN.STRATA2_VGEN=19;
+GEN.TREES3_VGEN=20;
+GEN.trees3=(g)=> !!g&&(g.vgen|0)>=GEN.TREES3_VGEN;
 GEN.trees2=(g)=> !!g&&(g.vgen|0)>=GEN.TREE2_VGEN;
 const plant2=(w,name,x,y,z,rng)=>{
 const FL=VR.Flora;if(!FL|| !FL.SPECIES[name])return false;
@@ -16657,6 +16659,7 @@ structures(g,w,cx,cz,out);
 
 
 VR.RealmFeatures=(g,w,fcx,fcz,chests)=>realmFeatures(g,w,fcx,fcz,chests);
+GEN.sakura=(w,x,y,z,rng)=>sakura(w,x,y,z,rng);
 function realmFeatures(g,w,fcx,fcz,chests){
 const rng=new VR.RNG(M.hash2(fcx,fcz,g.seed+4242));
 const fx0=fcx*16,fz0=fcz*16;
@@ -16676,11 +16679,21 @@ const cc=CRY[Math.floor((g.nCry.n2(x,z)*0.5+0.5)*4.999)];
 if(noCry)rockSpire(g,w,x,y,z,rng,key0==='crystal_highlands'?1.25:1);
 else spire(w,x,y,z,rng,cc,key0==='crystal_highlands'?1.25:1);
 }
+if(GEN.trees3&&GEN.trees3(g)){
+
+
+const hx=(Math.imul(fx0>>4,0x27d4eb2d)^Math.imul(fz0>>4,0x165667b1)^g.seed)>>>0;
+if((hx&1023)/1024<0.62){
+const x=fx0+4+((hx>>>10)%8),z=fz0+4+((hx>>>14)%8),y=g.surfaceY(x,z)+1;
+if(y>SEA+1&& !inVillage(x,z,6))sakura(w,x,y,z,new VR.RNG((hx^0x9e3779b9)>>>0));
+}
+}else{
 const trees=rng.chance(0.7)?1+rng.int(3):0;
 for(let i=0;i<trees;i++){
 const x=fx0+rng.int(16),z=fz0+rng.int(16),y=g.surfaceY(x,z)+1;
 if(y<=SEA+1||inVillage(x,z,6))continue;
 prismTree(w,x,y,z,rng);
+}
 }
 }else if(key0==='ember_canyons'){
 if(rng.chance(0.18)){const x=fx0+4+rng.int(8),z=fz0+4+rng.int(8),y=g.surfaceY(x,z)+1;if(!inVillage(x,z,8))basaltPillar(w,x,y,z,rng);}
@@ -16692,7 +16705,7 @@ const I=g.islandAt(x,z);
 if(!I||I.k<0.35||(I.isle&&I.isle.designed))continue;
 const cl=g.climateAt(x,z);
 if(cl.ember>0.45)continue;
-if(cl.prism>0.45&&rng.chance(0.35)){if(noCry)prismTree(w,x,I.top+1,z,rng);else spire(w,x,I.top+1,z,rng,CRY[rng.int(5)],0.6);}
+if(cl.prism>0.45&&rng.chance(0.35)){if(noCry){if(GEN.trees3&&GEN.trees3(g))sakura(w,x,I.top+1,z,rng);else prismTree(w,x,I.top+1,z,rng);}else spire(w,x,I.top+1,z,rng,CRY[rng.int(5)],0.6);}
 else if(rng.chance(0.75)){if(rng.chance(0.3))GEN.TREES.cherry(w,x,I.top+1,z,rng);else if(cl.t< -0.3)GEN.TREES.spruce(w,x,I.top+1,z,rng);else GEN.TREES.fancyOak?GEN.TREES.fancyOak(w,x,I.top+1,z,rng):GEN.TREES.oak(w,x,I.top+1,z,rng);}
 }
 void chests;
@@ -16771,6 +16784,28 @@ for(let i=0;i<h;i++)w.place(x,y+i,z,log,1);
 GEN.blob(w,x,y+h,z,3,2,3,leaf,rng,0.6);
 GEN.blob(w,x+1,y+h+1,z-1,2,2,2,leaf,rng,0.6);
 if(rng.chance(0.5))w.place(x,y+h+2,z,st('glow_lichen',{faces:32}));
+}
+
+
+function sakura(w,x,y,z,rng){
+const log=st('cherry_log',{axis:0}),pink=GEN.leafState('cherry_leaves');
+const h=4+rng.int(2),lx=rng.chance(0.5)?1: -1,lz=rng.chance(0.5)?1: -1;
+for(let i=0;i<h;i++)w.place(x,y+i,z,log,1);
+
+const tips=[[x+2*lx,z],[x,z+2*lz]];
+for(const[tx,tz]of tips){
+const mx=(x+tx)>>1,mz=(z+tz)>>1;
+w.place(mx,y+h,mz,log,1);
+w.place(tx,y+h+1,tz,log,1);
+}
+for(const[tx,tz]of tips)GEN.blob(w,tx,y+h+2,tz,3,2,3,pink,rng,0.6);
+GEN.blob(w,x,y+h+2,z,2,2,2,pink,rng,0.6);
+
+for(let k=0;k<5;k++){
+const a=rng.next()*Math.PI*2,sx=Math.round(x+lx*0.5+Math.cos(a)*3),sz=Math.round(z+lz*0.5+Math.sin(a)*3);
+const n=1+rng.int(2);
+for(let j=1;j<=n;j++)if(!w.get(sx,y+h+1-j,sz))w.place(sx,y+h+1-j,sz,pink);
+}
 }
 function basaltPillar(w,x,y,z,rng){
 const S=states();
@@ -30257,11 +30292,13 @@ if((hx&1023)/1024>0.66)continue;
 const x=gx*SOLO+3+((hx>>>10)%(SOLO-6)),z=gz*SOLO+3+((hx>>>18)%(SOLO-6));
 if(x<x0||x>x1||z<z0||z>z1||(keep&& !keep(x,z)))continue;
 if(LAND.woodAt(g,x,z).d>0.05|| !LAND.treeOk(g,P,x,z))continue;
+
+if(G.trees3&&G.trees3(g)&&(LAND.woodAt(g,x+7,z).d>0.05||LAND.woodAt(g,x-7,z).d>0.05||LAND.woodAt(g,x,z+7).d>0.05||LAND.woodAt(g,x,z-7).d>0.05))continue;
 if(LAND.keepAt(P,x+2,z)||LAND.keepAt(P,x-2,z)||LAND.keepAt(P,x,z+2)||LAND.keepAt(P,x,z-2))continue;
 const y=g.surfaceY(x,z)+1;
 if(y<=SEA+2|| !meadowAt(g,x,z,y))continue;
 const rng=new VR.RNG((hx^0x2545f491)>>>0),r=rng.next();
-if(r<(G.trees2&&G.trees2(g)?0.3:0.74))plantFlora(w,FL.treeAt(g,x,z,rng.next()),x,y,z,hx);
+if(r<(G.trees2&&G.trees2(g)?0.3:0.74)){const tn=FL.treeAt(g,x,z,rng.next());plantFlora(w,G.trees3&&G.trees3(g)?'wolkenkirsche':tn,x,y,z,hx);}
 else if(r<0.88)G.TREES.fancyOak(w,x,y,z,rng);else G.TREES.roundTree(w,x,y,z,rng,{r:3.2,h:4});
 }
 };
@@ -30277,8 +30314,10 @@ const y=g.surfaceY(x,z)+1;
 if(y<=SEA+2|| !meadowAt(g,x,z,y))continue;
 const rng=new VR.RNG((hx^0x5bd1e995)>>>0),u=h01(x,z,g.seed^0xf10a);
 
-if(kind===4&&u<0.7)plantFlora(w,u<0.45?'wolkenkirsche':'schneeschleier',x,y,z,hx);
-else if((kind===0||kind===1)&&d<0.55&&u<0.14)plantFlora(w,u<0.07?'lilaschirm':'sonnenregen',x,y,z,hx);
+const t3=G.trees3&&G.trees3(g);
+if(kind===4&&u<0.7)plantFlora(w,t3||u<0.45?'wolkenkirsche':'schneeschleier',x,y,z,hx);
+else if(!t3&&(kind===0||kind===1)&&d<0.55&&u<0.14)plantFlora(w,u<0.07?'lilaschirm':'sonnenregen',x,y,z,hx);
+else if(t3&&kind===4)G.TREES.cherry(w,x,y,z,rng);
 else LAND.plantTree(w,kind,x,y,z,rng);
 }
 };
@@ -74063,6 +74102,7 @@ VR.I18N.add('en',{
 "g.fe.legend":"Ferries · freighters · small craft — {n} under way",
 "g.fe.terminal":"Heartworld ferry port",
 "g.ctx.ferry":"Take the ferry",
+"g.ctx.takeCraft":"Board and fly off",
 "g.set.spaceLife":"Life between the worlds",
 "g.set.spaceLife.tip":"Settlements on the moons, ferries and traffic in space",
 
@@ -79193,6 +79233,7 @@ VR.I18N.add('de',{
 "g.fe.legend":"Fähren · Frachter · Kleinschiffe — {n} unterwegs",
 "g.fe.terminal":"Fährhafen Herzwelt",
 "g.ctx.ferry":"Fähre nehmen",
+"g.ctx.takeCraft":"Einsteigen und losfliegen",
 "g.set.spaceLife":"Leben zwischen den Welten",
 "g.set.spaceLife.tip":"Siedlungen auf den Monden, Fähren und Verkehr im All",
 

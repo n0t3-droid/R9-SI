@@ -21328,6 +21328,8 @@ TREES.boulder=function(w,x,y,z,rng,s){blob(w,x,y,z,1+rng.int(2),1+rng.int(2),1+r
 
 GEN.TREE2_VGEN=18;
 GEN.STRATA2_VGEN=19;
+GEN.TREES3_VGEN=20;
+GEN.trees3=(g)=> !!g&&(g.vgen|0)>=GEN.TREES3_VGEN;
 GEN.trees2=(g)=> !!g&&(g.vgen|0)>=GEN.TREE2_VGEN;
 const plant2=(w,name,x,y,z,rng)=>{
 const FL=VR.Flora;if(!FL|| !FL.SPECIES[name])return false;
@@ -23181,6 +23183,7 @@ structures(g,w,cx,cz,out);
 
 
 VR.RealmFeatures=(g,w,fcx,fcz,chests)=>realmFeatures(g,w,fcx,fcz,chests);
+GEN.sakura=(w,x,y,z,rng)=>sakura(w,x,y,z,rng);
 function realmFeatures(g,w,fcx,fcz,chests){
 const rng=new VR.RNG(M.hash2(fcx,fcz,g.seed+4242));
 const fx0=fcx*16,fz0=fcz*16;
@@ -23200,11 +23203,21 @@ const cc=CRY[Math.floor((g.nCry.n2(x,z)*0.5+0.5)*4.999)];
 if(noCry)rockSpire(g,w,x,y,z,rng,key0==='crystal_highlands'?1.25:1);
 else spire(w,x,y,z,rng,cc,key0==='crystal_highlands'?1.25:1);
 }
+if(GEN.trees3&&GEN.trees3(g)){
+
+
+const hx=(Math.imul(fx0>>4,0x27d4eb2d)^Math.imul(fz0>>4,0x165667b1)^g.seed)>>>0;
+if((hx&1023)/1024<0.62){
+const x=fx0+4+((hx>>>10)%8),z=fz0+4+((hx>>>14)%8),y=g.surfaceY(x,z)+1;
+if(y>SEA+1&& !inVillage(x,z,6))sakura(w,x,y,z,new VR.RNG((hx^0x9e3779b9)>>>0));
+}
+}else{
 const trees=rng.chance(0.7)?1+rng.int(3):0;
 for(let i=0;i<trees;i++){
 const x=fx0+rng.int(16),z=fz0+rng.int(16),y=g.surfaceY(x,z)+1;
 if(y<=SEA+1||inVillage(x,z,6))continue;
 prismTree(w,x,y,z,rng);
+}
 }
 }else if(key0==='ember_canyons'){
 if(rng.chance(0.18)){const x=fx0+4+rng.int(8),z=fz0+4+rng.int(8),y=g.surfaceY(x,z)+1;if(!inVillage(x,z,8))basaltPillar(w,x,y,z,rng);}
@@ -23216,7 +23229,7 @@ const I=g.islandAt(x,z);
 if(!I||I.k<0.35||(I.isle&&I.isle.designed))continue;
 const cl=g.climateAt(x,z);
 if(cl.ember>0.45)continue;
-if(cl.prism>0.45&&rng.chance(0.35)){if(noCry)prismTree(w,x,I.top+1,z,rng);else spire(w,x,I.top+1,z,rng,CRY[rng.int(5)],0.6);}
+if(cl.prism>0.45&&rng.chance(0.35)){if(noCry){if(GEN.trees3&&GEN.trees3(g))sakura(w,x,I.top+1,z,rng);else prismTree(w,x,I.top+1,z,rng);}else spire(w,x,I.top+1,z,rng,CRY[rng.int(5)],0.6);}
 else if(rng.chance(0.75)){if(rng.chance(0.3))GEN.TREES.cherry(w,x,I.top+1,z,rng);else if(cl.t< -0.3)GEN.TREES.spruce(w,x,I.top+1,z,rng);else GEN.TREES.fancyOak?GEN.TREES.fancyOak(w,x,I.top+1,z,rng):GEN.TREES.oak(w,x,I.top+1,z,rng);}
 }
 void chests;
@@ -23295,6 +23308,28 @@ for(let i=0;i<h;i++)w.place(x,y+i,z,log,1);
 GEN.blob(w,x,y+h,z,3,2,3,leaf,rng,0.6);
 GEN.blob(w,x+1,y+h+1,z-1,2,2,2,leaf,rng,0.6);
 if(rng.chance(0.5))w.place(x,y+h+2,z,st('glow_lichen',{faces:32}));
+}
+
+
+function sakura(w,x,y,z,rng){
+const log=st('cherry_log',{axis:0}),pink=GEN.leafState('cherry_leaves');
+const h=4+rng.int(2),lx=rng.chance(0.5)?1: -1,lz=rng.chance(0.5)?1: -1;
+for(let i=0;i<h;i++)w.place(x,y+i,z,log,1);
+
+const tips=[[x+2*lx,z],[x,z+2*lz]];
+for(const[tx,tz]of tips){
+const mx=(x+tx)>>1,mz=(z+tz)>>1;
+w.place(mx,y+h,mz,log,1);
+w.place(tx,y+h+1,tz,log,1);
+}
+for(const[tx,tz]of tips)GEN.blob(w,tx,y+h+2,tz,3,2,3,pink,rng,0.6);
+GEN.blob(w,x,y+h+2,z,2,2,2,pink,rng,0.6);
+
+for(let k=0;k<5;k++){
+const a=rng.next()*Math.PI*2,sx=Math.round(x+lx*0.5+Math.cos(a)*3),sz=Math.round(z+lz*0.5+Math.sin(a)*3);
+const n=1+rng.int(2);
+for(let j=1;j<=n;j++)if(!w.get(sx,y+h+1-j,sz))w.place(sx,y+h+1-j,sz,pink);
+}
 }
 function basaltPillar(w,x,y,z,rng){
 const S=states();
@@ -36781,11 +36816,13 @@ if((hx&1023)/1024>0.66)continue;
 const x=gx*SOLO+3+((hx>>>10)%(SOLO-6)),z=gz*SOLO+3+((hx>>>18)%(SOLO-6));
 if(x<x0||x>x1||z<z0||z>z1||(keep&& !keep(x,z)))continue;
 if(LAND.woodAt(g,x,z).d>0.05|| !LAND.treeOk(g,P,x,z))continue;
+
+if(G.trees3&&G.trees3(g)&&(LAND.woodAt(g,x+7,z).d>0.05||LAND.woodAt(g,x-7,z).d>0.05||LAND.woodAt(g,x,z+7).d>0.05||LAND.woodAt(g,x,z-7).d>0.05))continue;
 if(LAND.keepAt(P,x+2,z)||LAND.keepAt(P,x-2,z)||LAND.keepAt(P,x,z+2)||LAND.keepAt(P,x,z-2))continue;
 const y=g.surfaceY(x,z)+1;
 if(y<=SEA+2|| !meadowAt(g,x,z,y))continue;
 const rng=new VR.RNG((hx^0x2545f491)>>>0),r=rng.next();
-if(r<(G.trees2&&G.trees2(g)?0.3:0.74))plantFlora(w,FL.treeAt(g,x,z,rng.next()),x,y,z,hx);
+if(r<(G.trees2&&G.trees2(g)?0.3:0.74)){const tn=FL.treeAt(g,x,z,rng.next());plantFlora(w,G.trees3&&G.trees3(g)?'wolkenkirsche':tn,x,y,z,hx);}
 else if(r<0.88)G.TREES.fancyOak(w,x,y,z,rng);else G.TREES.roundTree(w,x,y,z,rng,{r:3.2,h:4});
 }
 };
@@ -36801,8 +36838,10 @@ const y=g.surfaceY(x,z)+1;
 if(y<=SEA+2|| !meadowAt(g,x,z,y))continue;
 const rng=new VR.RNG((hx^0x5bd1e995)>>>0),u=h01(x,z,g.seed^0xf10a);
 
-if(kind===4&&u<0.7)plantFlora(w,u<0.45?'wolkenkirsche':'schneeschleier',x,y,z,hx);
-else if((kind===0||kind===1)&&d<0.55&&u<0.14)plantFlora(w,u<0.07?'lilaschirm':'sonnenregen',x,y,z,hx);
+const t3=G.trees3&&G.trees3(g);
+if(kind===4&&u<0.7)plantFlora(w,t3||u<0.45?'wolkenkirsche':'schneeschleier',x,y,z,hx);
+else if(!t3&&(kind===0||kind===1)&&d<0.55&&u<0.14)plantFlora(w,u<0.07?'lilaschirm':'sonnenregen',x,y,z,hx);
+else if(t3&&kind===4)G.TREES.cherry(w,x,y,z,rng);
 else LAND.plantTree(w,kind,x,y,z,rng);
 }
 };
@@ -57822,7 +57861,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="c4565a0dec938850";
+VR.TEX_SRC_HASH="2eb23732e1f9337a";
 
 
 
@@ -61466,6 +61505,7 @@ VR.I18N.add('en',{
 "g.fe.legend":"Ferries · freighters · small craft — {n} under way",
 "g.fe.terminal":"Heartworld ferry port",
 "g.ctx.ferry":"Take the ferry",
+"g.ctx.takeCraft":"Board and fly off",
 "g.set.spaceLife":"Life between the worlds",
 "g.set.spaceLife.tip":"Settlements on the moons, ferries and traffic in space",
 
@@ -66596,6 +66636,7 @@ VR.I18N.add('de',{
 "g.fe.legend":"Fähren · Frachter · Kleinschiffe — {n} unterwegs",
 "g.fe.terminal":"Fährhafen Herzwelt",
 "g.ctx.ferry":"Fähre nehmen",
+"g.ctx.takeCraft":"Einsteigen und losfliegen",
 "g.set.spaceLife":"Leben zwischen den Welten",
 "g.set.spaceLife.tip":"Siedlungen auf den Monden, Fähren und Verkehr im All",
 
@@ -103435,6 +103476,7 @@ PL.alphaOf=(padFade,dist)=>padFade*(1-LK.smooth((dist-PL.FADE0)/(PL.FADE1-PL.FAD
 
 PL.Actor=class{
 constructor(game){
+if(PL.hookCtx)PL.hookCtx();
 this.g=game;
 const E=game.env;
 this.clock=E?((E.day||0)*24000+(E.ticks||0))/20:0;
@@ -103482,6 +103524,7 @@ if(pad.kind==='outpost'&&pad.ship&&this.occupied(pad)){pad.live=null;this.ground
 pad.ground=null;
 pad.outs=pad.outs||[{},{},{}];
 const list=PL.active(pad,pad.seed,this.clock,pad.cache||(pad.cache={seed:pad.seed,n:0,T:PL.t0(pad.seed)}),pad.outs,null,pad.list||(pad.list=[]));
+if(pad.taken)for(let i=list.length-1;i>=0;i--)if(pad.taken.has(list[i].m))list.splice(i,1);
 pad.live=list;
 for(const q of list)this.craft(pad,q,dt,d,night);
 }
@@ -103660,8 +103703,54 @@ this.clock=c.T+want;
 const Tr=this.g.trails;if(Tr&&Tr.map)for(const k of[...Tr.map.keys()])if(String(k).startsWith('pl'))Tr.map.delete(k);
 return true;
 }
+
+
+
+
+nearCrafts(eye,out){
+out.length=0;
+if(!this.on)return out;
+for(const pad of this.pads.values()){
+if(!pad.live)continue;
+for(const q of pad.live){
+if(q.phase!=='parked')continue;
+const c=pad.crafts.get(q.m);if(!c|| !c.d|| !c.d.meta)continue;
+const m=c.d.meta,I=c.inst,r=Math.max(m.length,m.width)*0.5;
+if(Math.abs(I.pos[0]-eye[0])>r+6||Math.abs(I.pos[2]-eye[2])>r+6)continue;
+out.push({pad,c,pos:[I.pos[0],I.pos[1]+m.height*0.5,I.pos[2]],r:Math.min(r,Math.max(1.5,m.height)),reach:6});
+}
+}
+return out;
+}
+takeCraft(pad,c){
+const g=this.g,SS=g.starships,pl=g.player;
+if(!SS|| !pl|| !c|| !c.d|| !c.d.meta|| !c.q||c.q.phase!=='parked')return null;
+const I=c.inst,key='pl-'+pad.key+'-'+c.m;
+const ship=SS.spawn(c.d.seed,c.arch,PL.PALS[c.m%3]||null,I.pos.slice(),I.yaw,key);
+(pad.taken||(pad.taken=new Set())).add(c.m);
+pad.crafts.delete(c.m);
+if(pad.live){const i=pad.live.indexOf(c.q);if(i>=0)pad.live.splice(i,1);}
+PL.stats.taken=(PL.stats.taken||0)+1;
+try{if(SS.board)SS.board(ship,pl);}catch(e){console.error('padlife take',e);}
+return ship;
+}
 destroy(){this.pads.clear();}
 };
+PL.stats=PL.stats||{};
+const NEARL=[];
+
+PL.hookCtx=()=>{if(PL.__ctx|| !(VR.Ctx&&VR.Ctx.hooks&&Array.isArray(VR.Ctx.hooks.near)))return;PL.__ctx=true;VR.Ctx.hooks.near.push((g,eye,dir)=>{
+const A=g&&g.padLife;if(!A|| !A.nearCrafts||g.starships&&g.starships.pilot)return null;
+const list=A.nearCrafts(eye,NEARL);if(!list.length)return null;
+
+
+const C=VR.Ctx,SS=g.starships;let best=null;
+for(const o of list){
+const I=o.c.inst,hd=C.hullAlong&&SS&&SS.inOcc?C.hullAlong(eye,dir,o.reach,(x,y,z)=>SS.inOcc(I,x,y,z)):null;
+if(hd!==null&&hd!==undefined&&(!best||hd<best.dist))best={kind:'craft',name:o.c.d.meta.name||'',dist:hd,ang:0,r:0.3,reach:o.reach,pos:[eye[0]+dir[0]*(hd+0.3),eye[1]+dir[1]*(hd+0.3),eye[2]+dir[2]*(hd+0.3)],act:(gg)=>A.takeCraft(o.pad,o.c)};
+}
+return best;
+});};
 })(VR);
 
 
@@ -117115,6 +117204,8 @@ const m0=g.meta,sp0=m0&&(Array.isArray(m0.worldSpawn)?m0.worldSpawn:g.player.spa
 if(this.fresh&&m0&&m0.vistaId&&Number.isFinite(m0.spawnYaw)&&sp0&& !st.lake)W.stageAside(st,sp0,m0.spawnYaw,W.MURM_ASIDE);
 if(st.y===null){const w=g.world,X=Math.floor(st.x),Z=Math.floor(st.z);st.y=(w.isLoaded(X,Z)?w.topAt(X,Z):ctx.eye[1]-1.6)+40;}
 if(Math.hypot(st.x-ctx.eye[0],st.z-ctx.eye[2])>700)return;
+
+if(ph==='perch'&&VR.Appear&&VR.Appear.seen(g,st.x,st.y-30,st.z,24))return;
 const fl=new W.Flock(n,(W.h(this.seed,key,0x6b)*4294967295)>>>0);
 
 Mu=this.murm={key,n,st,fl,S:W.murmPlaces(n),bofs:new Float32Array(n*3),perch:null,roost:null,roostScan:null,noRoost:false,landed:new Uint8Array(n),acc:0,ex:0,ph,state:'away',t:0};
@@ -117229,7 +117320,11 @@ const heart= !!(g.meta&&(g.meta.vgen|0)>=3&&g.meta.type!=='flat');
 let cx=null,cz=null;
 if(heart&&L&&Math.hypot(ctx.eye[0]-L.x,ctx.eye[2]-L.z)<330){cx=L.x;cz=L.z;}
 else if((this.seaT=(this.seaT||0)-dt)<=0){
-this.seaT=3;this.sea=null;
+
+
+this.seaT=3;
+const keep=this.sea&&Math.hypot(this.sea[0]-ctx.eye[0],this.sea[1]-ctx.eye[2])<120;
+if(!keep)this.sea=null;
 const w=g.world,MK=mask();
 for(let k=0;k<12&& !this.sea;k++){const a=k/12*TAU,x=Math.floor(ctx.eye[0]+Math.cos(a)*20),z=Math.floor(ctx.eye[2]+Math.sin(a)*20);if(!w.isLoaded(x,z))continue;const y=w.topAt(x,z);if(y<=SEA&&(MK[w.getBlock(x,y,z)]&8))this.sea=[x,z];}
 }
@@ -117237,15 +117332,19 @@ if(cx===null&&this.sea){cx=this.sea[0];cz=this.sea[1];}
 if(cx===null){this.gulls.length=0;return;}
 const G=this.gulls;
 while(G.length>n)G.pop();
+
+if(this.gullC&&(this.gullC[0]!==cx||this.gullC[1]!==cz))G.length=0;
+this.gullC=[cx,cz];
 while(G.length<n){
 const i=G.length,h=(k)=>W.h(this.seed,i,0x9a+k);
 const lake=heart&&L&&cx===L.x;
-G.push({i,ox:(h(1)-0.5)*(lake?150:60),oz:(h(2)-0.5)*(lake?110:60),R:9+h(3)*16,y:SEA+12+h(4)*20,w:(h(5)<0.5? -1:1)*(6+h(6)*2),a:h(7)*TAU,ph:h(8)*TAU,flapT:h(9)*6,pos:[0,0,0],yaw:0,bank:0,amp:0});
+G.push({i,ox:(h(1)-0.5)*(lake?150:60),oz:(h(2)-0.5)*(lake?110:60),R:9+h(3)*16,y:SEA+12+h(4)*20,w:(h(5)<0.5? -1:1)*(6+h(6)*2),a:h(7)*TAU,ph:h(8)*TAU,flapT:h(9)*6,pos:[0,0,0],yaw:0,bank:0,amp:0,hide:true});
 }
 for(const q of G){
 q.a+=q.w/q.R*dt;
 const ccx=cx+q.ox+Math.sin(this.time*0.03+q.i)*20,ccz=cz+q.oz+Math.cos(this.time*0.027+q.i*1.3)*20;
 q.pos[0]=ccx+Math.cos(q.a)*q.R;q.pos[2]=ccz+Math.sin(q.a)*q.R;q.pos[1]=q.y+Math.sin(q.a*0.7+q.i)*2.5;
+if(q.hide&& !(VR.Appear&&VR.Appear.seen(g,q.pos[0],q.pos[1],q.pos[2],1.5)))q.hide=false;
 const tx= -Math.sin(q.a)*Math.sign(q.w),tz=Math.cos(q.a)*Math.sign(q.w);
 q.yaw=yawOf(tx,tz);q.bank= -Math.sign(q.w)*0.42;
 q.flapT-=dt;if(q.flapT< -1.6)q.flapT=3+W.h(q.i,Math.floor(this.time),7)*5;
@@ -117265,7 +117364,7 @@ if(H.length<n&&(this.heronT=(this.heronT||0)-dt)<=0){
 this.heronT=2;
 const cand=A.duck.filter(a=>Math.hypot(a.x-eye[0],a.z-eye[2])<110&&Math.hypot(a.x-eye[0],a.z-eye[2])>18&& !H.some(h=>h.pond===a));
 cand.sort((a,b)=>Math.hypot(a.x-eye[0],a.z-eye[2])-Math.hypot(b.x-eye[0],b.z-eye[2]));
-for(const a of cand){if(H.length>=n)break;const h=this.heronAt(a,W.h(this.seed,a.x,a.z)*TAU);if(h)H.push(h);}
+for(const a of cand){if(H.length>=n)break;if(VR.Appear&&VR.Appear.seen(this.g,a.x+0.5,(a.y||ctx.eye[1])+1,a.z+0.5,1.5))continue;const h=this.heronAt(a,W.h(this.seed,a.x,a.z)*TAU);if(h)H.push(h);}
 }
 for(const h of H)this.heronStep(h,dt,ctx);
 }
@@ -117746,7 +117845,7 @@ for(let t=0;t<PT.length;t++)if(KT[t].nn)list.push([KT[t],KT[t].nn]);
 }
 if(this.gulls.length){
 const K=WG.kind(gl,'gull',KINDCAP.gull),D=K.data;let n=0;
-for(const q of this.gulls){const x=q.pos[0]-cx,y=q.pos[1]-cy,z=q.pos[2]-cz,d=Math.hypot(x,z);if(d>320)continue;put(D,n++,x,y,z,1.25*Math.max(1,Math.min(1.8,d/120)),q.yaw,0,q.bank,q.ph,1,1,1,1,q.amp,0,0.08,0,0,0.3);}
+for(const q of this.gulls){if(q.hide)continue;const x=q.pos[0]-cx,y=q.pos[1]-cy,z=q.pos[2]-cz,d=Math.hypot(x,z);if(d>320)continue;put(D,n++,x,y,z,1.25*Math.max(1,Math.min(1.8,d/120)),q.yaw,0,q.bank,q.ph,1,1,1,1,q.amp,0,0.08,0,0,0.3);}
 if(n)list.push([K,n]);
 }
 
@@ -119878,6 +119977,7 @@ const LABELS=C.LABELS={
 'g.ctx.funke':['Funke fragen','Ask Funke'],
 'g.ctx.zauber':['Zauberblick','Magic view'],
 'g.ctx.ferry':['Fähre nehmen','Take the ferry'],
+'g.ctx.takeCraft':['Einsteigen und losfliegen','Board and fly off'],
 'g.ctx.wunder':['{name}','{name}'],
 'g.ctx.home':['Heimkehr …','Going home …'],
 'g.ctx.toPlace':['nach {name}','to {name}'],
@@ -119911,6 +120011,7 @@ chest:['g.ctx.chest','use','🧰'],bed:['g.ctx.sleep','use','🛏'],ship:['g.ctx
 beacon:['g.ctx.fast','beacon','⚡'],machine:['g.ctx.calm','calm','🕊'],shop:['g.ctx.shop','shop','🛒'],portal:['g.ctx.portal','portal','🌀'],
 bench:['g.ctx.view','vista','🌄'],pet:['g.ctx.pet','pet','🐾'],seat:['g.ctx.sit','use','🪑'],
 ferry:['g.ctx.ferry','ferry','⛴'],
+craft:['g.ctx.takeCraft','ferry','🚀'],
 fairy:['g.ctx.fairy','fairy','✨'],
 wunder:['g.ctx.wunder','fairy','🌟'],
 };
@@ -124024,7 +124125,7 @@ this.renderer&&(this.renderer.visDirty=true);
 async createWorld(o){
 const seedStr=o.seed;
 let seed=seedStr?(/^-?\d+$/.test(seedStr)?(parseInt(seedStr,10)>>>0):VR.seedFromString(seedStr)):(Math.floor(Math.random()*4294967295)>>>0);
-const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:19};
+const meta={id:'w'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),name:o.name,seed,mode:o.mode,difficulty:o.difficulty||(VR.Peace?VR.Peace.DEFAULT:'peaceful'),type:o.type,cheats:o.cheats!==false,keep: !!o.keep,kit:o.kit!==false,created:Date.now(),lastPlayed:Date.now(),player:null,time:1000,dim:'overworld',vgen:o.vgen? +o.vgen:20};
 if(o.first&&VR.First)VR.First.mark(this,meta);
 await this.store.saveWorld(meta);
 this.startWorld(meta,true);
@@ -130861,9 +130962,11 @@ out vec4 o;
 void main() {
 
 if (u_step > -0.5) {
+
+
+
 float z0 = texture(u_hand, v_uv).r;
-vec4 w0 = u_invOld * vec4(v_uv * 2.0 - 1.0, z0 * 2.0 - 1.0, 1.0);
-if (z0 < 0.99999 && dot(w0.xyz / w0.w, w0.xyz / w0.w) < 2.25) { o = texture(u_src, v_uv); return; }
+if (z0 < 0.99999) { o = texture(u_src, v_uv); return; }
 }
 vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
 vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;
@@ -162646,14 +162749,14 @@ const s=w.getBlock(x,y-1,z);return!!(s&&GREEN[R.T.type[s]]);
 };
 
 
-function openSpot(w,cx,cz,y,r0,r1,dir,wide){
-return openSpot1(w,cx,cz,y,r0,r1,dir,wide,true)||openSpot1(w,cx,cz,y,r0,r1,dir,wide,false);
+function openSpot(w,cx,cz,y,r0,r1,dir,wide,bad){
+return openSpot1(w,cx,cz,y,r0,r1,dir,wide,true,bad)||openSpot1(w,cx,cz,y,r0,r1,dir,wide,false,bad);
 }
-function openSpot1(w,cx,cz,y,r0,r1,dir,wide,green){
+function openSpot1(w,cx,cz,y,r0,r1,dir,wide,green,bad){
 for(let r=r0;r<=r1;r+=1)for(let i=0;i<16;i++){
 const an=dir+(i&1?1: -1)*Math.ceil(i/2)*TAU/16;
 const x=Math.floor(cx+Math.cos(an)*r),z=Math.floor(cz+Math.sin(an)*r),fy=floorAt(w,x,z,y);
-if(fy===null||(green&& !greenAt(w,x,fy,z)))continue;
+if(fy===null||(green&& !greenAt(w,x,fy,z))||(bad&&bad(x+0.5,fy,z+0.5)))continue;
 if(!wide)return[x+0.5,fy,z+0.5,0];
 for(const ax of[0,1]){
 let ok=true;
@@ -162775,7 +162878,10 @@ const g=V.g,p=g.player.pos,vil=M.vil,grown=pool.filter(a=> !a.kid);
 if(grown.length<2)return false;
 const a=grown[0],b=grown.slice(1).find(o=>o.p.fam!==a.p.fam)||grown[1];
 const pz=vil.plan.plaza,dir=Math.atan2(pz.z+0.5-p[2],pz.x+0.5-p[0])+0.8;
-const sp=openSpot(g.world,p[0],p[2],p[1],5,12,dir,true);
+
+
+const bad=(x,y,z)=>Math.hypot(x-p[0],z-p[2])<7;
+const sp=openSpot(g.world,pz.x+0.5,pz.z+0.5,a.pos[1],4,16,dir,true,bad);
 if(!sp)return false;
 M.spot=[sp[0],sp[1],sp[2]];M.ax=sp[3];M.yaw=sp[3]?Math.PI/2:0;
 
