@@ -3519,6 +3519,7 @@
     "g.fe.legend": "Ferries · freighters · small craft — {n} under way",
     "g.fe.terminal": "Heartworld ferry port",
     "g.ctx.ferry": "Take the ferry",
+    "g.ctx.takeCraft": "Board and fly off",
     "g.set.spaceLife": "Life between the worlds",
     "g.set.spaceLife.tip": "Settlements on the moons, ferries and traffic in space",
     // ---- a-life end

@@ -83,9 +83,11 @@ out vec4 o;
 void main() {
   // the hand and the held thing move with the eye: a pixel under 1.5 blocks away in the old picture stays where it was
   if (u_step > -0.5) {
+    // v0.56.2: the depth here holds the hand alone (its pass cleared the world's), drawn with its own projection (70°,
+    // near 0.02) — read through the world's inverse the far corners of a held block came out beyond 1.5 blocks, were
+    // moved with the world in every warp frame and jumped back in the next whole one: the hand shook in fast flight
     float z0 = texture(u_hand, v_uv).r;
-    vec4 w0 = u_invOld * vec4(v_uv * 2.0 - 1.0, z0 * 2.0 - 1.0, 1.0);
-    if (z0 < 0.99999 && dot(w0.xyz / w0.w, w0.xyz / w0.w) < 2.25) { o = texture(u_src, v_uv); return; }
+    if (z0 < 0.99999) { o = texture(u_src, v_uv); return; }
   }
   vec4 p = u_M * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
   vec2 uv = p.w > 0.0 ? p.xy / p.w * 0.5 + 0.5 : v_uv;

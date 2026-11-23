@@ -320,6 +320,7 @@
   // ---------------------------------------------------------------- in the game
   PL.Actor = class {
     constructor(game) {
+      if (PL.hookCtx) PL.hookCtx();
       this.g = game;
       const E = game.env;
       this.clock = E ? ((E.day || 0) * 24000 + (E.ticks || 0)) / 20 : 0;   // the world's clock (as the trams')
@@ -367,6 +368,7 @@
         pad.ground = null;
         pad.outs = pad.outs || [{}, {}, {}];
         const list = PL.active(pad, pad.seed, this.clock, pad.cache || (pad.cache = { seed: pad.seed, n: 0, T: PL.t0(pad.seed) }), pad.outs, null, pad.list || (pad.list = []));
+        if (pad.taken) for (let i = list.length - 1; i >= 0; i--) if (pad.taken.has(list[i].m)) list.splice(i, 1);   // (v0.56.2: a craft you flew off in is gone from its visit)
         pad.live = list;
         for (const q of list) this.craft(pad, q, dt, d, night);
       }
@@ -545,6 +547,52 @@
       const Tr = this.g.trails; if (Tr && Tr.map) for (const k of [...Tr.map.keys()]) if (String(k).startsWith('pl')) Tr.map.delete(k);
       return true;
     }
+    // v0.56.2 · „Einsteigen und losfliegen" (the owner: the visiting craft could not be boarded): a parked visitor near
+    // you becomes a ship of yours — the same design (seed, arch, palette) at the same pose, a Starships ship you sit in at
+    // once; its visit is struck from the pad (its crew stays behind, the next visitor comes on its slot), and the ship is
+    // kept with the world's ships (Starships.save). The near rows for the Aktion: parked crafts within reach of the hull.
+    nearCrafts(eye, out) {
+      out.length = 0;
+      if (!this.on) return out;
+      for (const pad of this.pads.values()) {
+        if (!pad.live) continue;
+        for (const q of pad.live) {
+          if (q.phase !== 'parked') continue;
+          const c = pad.crafts.get(q.m); if (!c || !c.d || !c.d.meta) continue;
+          const m = c.d.meta, I = c.inst, r = Math.max(m.length, m.width) * 0.5;
+          if (Math.abs(I.pos[0] - eye[0]) > r + 6 || Math.abs(I.pos[2] - eye[2]) > r + 6) continue;
+          out.push({ pad, c, pos: [I.pos[0], I.pos[1] + m.height * 0.5, I.pos[2]], r: Math.min(r, Math.max(1.5, m.height)), reach: 6 });
+        }
+      }
+      return out;
+    }
+    takeCraft(pad, c) {
+      const g = this.g, SS = g.starships, pl = g.player;
+      if (!SS || !pl || !c || !c.d || !c.d.meta || !c.q || c.q.phase !== 'parked') return null;
+      const I = c.inst, key = 'pl-' + pad.key + '-' + c.m;
+      const ship = SS.spawn(c.d.seed, c.arch, PL.PALS[c.m % 3] || null, I.pos.slice(), I.yaw, key);
+      (pad.taken || (pad.taken = new Set())).add(c.m);
+      pad.crafts.delete(c.m);
+      if (pad.live) { const i = pad.live.indexOf(c.q); if (i >= 0) pad.live.splice(i, 1); }
+      PL.stats.taken = (PL.stats.taken || 0) + 1;
+      try { if (SS.board) SS.board(ship, pl); } catch (e) { console.error('padlife take', e); }
+      return ship;
+    }
     destroy() { this.pads.clear(); }
   };
+  PL.stats = PL.stats || {};
+  const NEARL = [];
+  // (padlife.js loads before ctx.js: the row is hooked in when the first actor is made)
+  PL.hookCtx = () => { if (PL.__ctx || !(VR.Ctx && VR.Ctx.hooks && Array.isArray(VR.Ctx.hooks.near))) return; PL.__ctx = true; VR.Ctx.hooks.near.push((g, eye, dir) => {
+    const A = g && g.padLife; if (!A || !A.nearCrafts || g.starships && g.starships.pilot) return null;
+    const list = A.nearCrafts(eye, NEARL); if (!list.length) return null;
+    // (the hull along the look ray, like a ship of yours — ctx.js hullAlong — not its box: beside a long craft you stand
+    //  inside its box whatever you look at)
+    const C = VR.Ctx, SS = g.starships; let best = null;
+    for (const o of list) {
+      const I = o.c.inst, hd = C.hullAlong && SS && SS.inOcc ? C.hullAlong(eye, dir, o.reach, (x, y, z) => SS.inOcc(I, x, y, z)) : null;
+      if (hd !== null && hd !== undefined && (!best || hd < best.dist)) best = { kind: 'craft', name: o.c.d.meta.name || '', dist: hd, ang: 0, r: 0.3, reach: o.reach, pos: [eye[0] + dir[0] * (hd + 0.3), eye[1] + dir[1] * (hd + 0.3), eye[2] + dir[2] * (hd + 0.3)], act: (gg) => A.takeCraft(o.pad, o.c) };
+    }
+    return best;
+  }); };
 })(VR);

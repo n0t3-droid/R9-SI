@@ -214,14 +214,14 @@
   };
   // an open place r0…r1 m from (cx, cz), the direction (dir) first, on grass when there is grass; w×d cells open on one
   // floor; → [x, y, z, axis]
-  function openSpot(w, cx, cz, y, r0, r1, dir, wide) {
-    return openSpot1(w, cx, cz, y, r0, r1, dir, wide, true) || openSpot1(w, cx, cz, y, r0, r1, dir, wide, false);
+  function openSpot(w, cx, cz, y, r0, r1, dir, wide, bad) {
+    return openSpot1(w, cx, cz, y, r0, r1, dir, wide, true, bad) || openSpot1(w, cx, cz, y, r0, r1, dir, wide, false, bad);
   }
-  function openSpot1(w, cx, cz, y, r0, r1, dir, wide, green) {
+  function openSpot1(w, cx, cz, y, r0, r1, dir, wide, green, bad) {
     for (let r = r0; r <= r1; r += 1) for (let i = 0; i < 16; i++) {
       const an = dir + (i & 1 ? 1 : -1) * Math.ceil(i / 2) * TAU / 16;
       const x = Math.floor(cx + Math.cos(an) * r), z = Math.floor(cz + Math.sin(an) * r), fy = floorAt(w, x, z, y);
-      if (fy === null || (green && !greenAt(w, x, fy, z))) continue;
+      if (fy === null || (green && !greenAt(w, x, fy, z)) || (bad && bad(x + 0.5, fy, z + 0.5))) continue;
       if (!wide) return [x + 0.5, fy, z + 0.5, 0];
       for (const ax of [0, 1]) {
         let ok = true;
@@ -343,7 +343,10 @@
     if (grown.length < 2) return false;
     const a = grown[0], b = grown.slice(1).find(o => o.p.fam !== a.p.fam) || grown[1];
     const pz = vil.plan.plaza, dir = Math.atan2(pz.z + 0.5 - p[2], pz.x + 0.5 - p[0]) + 0.8;
-    const sp = openSpot(g.world, p[0], p[2], p[1], 5, 12, dir, true);
+    // v0.56.2: the blanket by the plaza, on the villagers' own ground — no longer 5–12 blocks from you (on a roof, a
+    // hill or in flight that put it in odd places, and right before your eyes); never closer than 7 blocks to you
+    const bad = (x, y, z) => Math.hypot(x - p[0], z - p[2]) < 7;
+    const sp = openSpot(g.world, pz.x + 0.5, pz.z + 0.5, a.pos[1], 4, 16, dir, true, bad);
     if (!sp) return false;
     M.spot = [sp[0], sp[1], sp[2]]; M.ax = sp[3]; M.yaw = sp[3] ? Math.PI / 2 : 0;
     // the seats: either end of the long side, facing each other

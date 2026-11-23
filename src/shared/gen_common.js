@@ -485,6 +485,8 @@
   // the same trees every time. Older worlds keep their trees (the flag unset there; gen_same's pins unchanged).
   GEN.TREE2_VGEN = 18;
   GEN.STRATA2_VGEN = 19;   // v0.55.94: the stony peaks' strata in grey tones (gen_overworld.js)
+  GEN.TREES3_VGEN = 20;   // v0.56.2: lone trees keep clear of the woods, the lone blossom tree a sakura, no blossom mixed into broadleaf edges
+  GEN.trees3 = (g) => !!g && (g.vgen | 0) >= GEN.TREES3_VGEN;
   GEN.trees2 = (g) => !!g && (g.vgen | 0) >= GEN.TREE2_VGEN;
   const plant2 = (w, name, x, y, z, rng) => {
     const FL = VR.Flora; if (!FL || !FL.SPECIES[name]) return false;

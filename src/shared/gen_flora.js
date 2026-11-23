@@ -46,11 +46,13 @@
       const x = gx * SOLO + 3 + ((hx >>> 10) % (SOLO - 6)), z = gz * SOLO + 3 + ((hx >>> 18) % (SOLO - 6));
       if (x < x0 || x > x1 || z < z0 || z > z1 || (keep && !keep(x, z))) continue;
       if (LAND.woodAt(g, x, z).d > 0.05 || !LAND.treeOk(g, P, x, z)) continue;
+      // vgen 20: a lone tree stands clear — no wood within 7 blocks, so its crown never grows into a different kind's
+      if (G.trees3 && G.trees3(g) && (LAND.woodAt(g, x + 7, z).d > 0.05 || LAND.woodAt(g, x - 7, z).d > 0.05 || LAND.woodAt(g, x, z + 7).d > 0.05 || LAND.woodAt(g, x, z - 7).d > 0.05)) continue;
       if (LAND.keepAt(P, x + 2, z) || LAND.keepAt(P, x - 2, z) || LAND.keepAt(P, x, z + 2) || LAND.keepAt(P, x, z - 2)) continue;
       const y = g.surfaceY(x, z) + 1;
       if (y <= SEA + 2 || !meadowAt(g, x, z, y)) continue;
       const rng = new VR.RNG((hx ^ 0x2545f491) >>> 0), r = rng.next();
-      if (r < (G.trees2 && G.trees2(g) ? 0.3 : 0.74)) plantFlora(w, FL.treeAt(g, x, z, rng.next()), x, y, z, hx);   // (t-trees2, vgen 18: the blossom a lone tree's accent — most stand green, in the new forms)
+      if (r < (G.trees2 && G.trees2(g) ? 0.3 : 0.74)) { const tn = FL.treeAt(g, x, z, rng.next()); plantFlora(w, G.trees3 && G.trees3(g) ? 'wolkenkirsche' : tn, x, y, z, hx); }   // (t-trees2, vgen 18: the blossom a lone tree's accent — most stand green, in the new forms)
       else if (r < 0.88) G.TREES.fancyOak(w, x, y, z, rng); else G.TREES.roundTree(w, x, y, z, rng, { r: 3.2, h: 4 });
     }
   };
@@ -66,8 +68,10 @@
       if (y <= SEA + 2 || !meadowAt(g, x, z, y)) continue;
       const rng = new VR.RNG((hx ^ 0x5bd1e995) >>> 0), u = h01(x, z, g.seed ^ 0xf10a);
       // the cherry groves bloom in L-system trees; the broadleaf woods' edges carry a blossom tree now and then
-      if (kind === 4 && u < 0.7) plantFlora(w, u < 0.45 ? 'wolkenkirsche' : 'schneeschleier', x, y, z, hx);
-      else if ((kind === 0 || kind === 1) && d < 0.55 && u < 0.14) plantFlora(w, u < 0.07 ? 'lilaschirm' : 'sonnenregen', x, y, z, hx);
+      const t3 = G.trees3 && G.trees3(g);   // vgen 20: the cherry groves all sakura, the broadleaf edges stay green (the colours never clash)
+      if (kind === 4 && u < 0.7) plantFlora(w, t3 || u < 0.45 ? 'wolkenkirsche' : 'schneeschleier', x, y, z, hx);
+      else if (!t3 && (kind === 0 || kind === 1) && d < 0.55 && u < 0.14) plantFlora(w, u < 0.07 ? 'lilaschirm' : 'sonnenregen', x, y, z, hx);
+      else if (t3 && kind === 4) G.TREES.cherry(w, x, y, z, rng);   // (vgen 20: no lime azalea balls among the cherries)
       else LAND.plantTree(w, kind, x, y, z, rng);
     }
   };

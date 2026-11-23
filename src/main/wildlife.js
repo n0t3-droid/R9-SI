@@ -315,6 +315,8 @@
         if (this.fresh && m0 && m0.vistaId && Number.isFinite(m0.spawnYaw) && sp0 && !st.lake) W.stageAside(st, sp0, m0.spawnYaw, W.MURM_ASIDE);
         if (st.y === null) { const w = g.world, X = Math.floor(st.x), Z = Math.floor(st.z); st.y = (w.isLoaded(X, Z) ? w.topAt(X, Z) : ctx.eye[1] - 1.6) + 40; }
         if (Math.hypot(st.x - ctx.eye[0], st.z - ctx.eye[2]) > 700) return;
+        // v0.56.2 (nicht vor deinen Augen): a flock that would start already seated in the trees comes only where you do not look
+        if (ph === 'perch' && VR.Appear && VR.Appear.seen(g, st.x, st.y - 30, st.z, 24)) return;
         const fl = new W.Flock(n, (W.h(this.seed, key, 0x6b) * 4294967295) >>> 0);
         // (f-wild2: each bird its own place in the murmuration's figures — W.murmTargets fills the offsets while it swirls)
         Mu = this.murm = { key, n, st, fl, S: W.murmPlaces(n), bofs: new Float32Array(n * 3), perch: null, roost: null, roostScan: null, noRoost: false, landed: new Uint8Array(n), acc: 0, ex: 0, ph, state: 'away', t: 0 };
@@ -429,7 +431,11 @@
       let cx = null, cz = null;
       if (heart && L && Math.hypot(ctx.eye[0] - L.x, ctx.eye[2] - L.z) < 330) { cx = L.x; cz = L.z; }
       else if ((this.seaT = (this.seaT || 0) - dt) <= 0) {
-        this.seaT = 3; this.sea = null;
+        // v0.56.2: the gulls' sea stays where it is while the eye is within 120 blocks of it (a fresh scan every 3 s moved
+        // their whole circle to the nearest water — every gull jumped across the sky at once); only then a new one
+        this.seaT = 3;
+        const keep = this.sea && Math.hypot(this.sea[0] - ctx.eye[0], this.sea[1] - ctx.eye[2]) < 120;
+        if (!keep) this.sea = null;
         const w = g.world, MK = mask();
         for (let k = 0; k < 12 && !this.sea; k++) { const a = k / 12 * TAU, x = Math.floor(ctx.eye[0] + Math.cos(a) * 20), z = Math.floor(ctx.eye[2] + Math.sin(a) * 20); if (!w.isLoaded(x, z)) continue; const y = w.topAt(x, z); if (y <= SEA && (MK[w.getBlock(x, y, z)] & 8)) this.sea = [x, z]; }
       }
@@ -437,15 +443,19 @@
       if (cx === null) { this.gulls.length = 0; return; }
       const G = this.gulls;
       while (G.length > n) G.pop();
+      // (a new sea: the old flock is let go, the new one comes in unseen — a gull is only added where you do not look)
+      if (this.gullC && (this.gullC[0] !== cx || this.gullC[1] !== cz)) G.length = 0;
+      this.gullC = [cx, cz];
       while (G.length < n) {
         const i = G.length, h = (k) => W.h(this.seed, i, 0x9a + k);
         const lake = heart && L && cx === L.x;
-        G.push({ i, ox: (h(1) - 0.5) * (lake ? 150 : 60), oz: (h(2) - 0.5) * (lake ? 110 : 60), R: 9 + h(3) * 16, y: SEA + 12 + h(4) * 20, w: (h(5) < 0.5 ? -1 : 1) * (6 + h(6) * 2), a: h(7) * TAU, ph: h(8) * TAU, flapT: h(9) * 6, pos: [0, 0, 0], yaw: 0, bank: 0, amp: 0 });
+        G.push({ i, ox: (h(1) - 0.5) * (lake ? 150 : 60), oz: (h(2) - 0.5) * (lake ? 110 : 60), R: 9 + h(3) * 16, y: SEA + 12 + h(4) * 20, w: (h(5) < 0.5 ? -1 : 1) * (6 + h(6) * 2), a: h(7) * TAU, ph: h(8) * TAU, flapT: h(9) * 6, pos: [0, 0, 0], yaw: 0, bank: 0, amp: 0, hide: true });
       }
       for (const q of G) {
         q.a += q.w / q.R * dt;
         const ccx = cx + q.ox + Math.sin(this.time * 0.03 + q.i) * 20, ccz = cz + q.oz + Math.cos(this.time * 0.027 + q.i * 1.3) * 20;
         q.pos[0] = ccx + Math.cos(q.a) * q.R; q.pos[2] = ccz + Math.sin(q.a) * q.R; q.pos[1] = q.y + Math.sin(q.a * 0.7 + q.i) * 2.5;
+        if (q.hide && !(VR.Appear && VR.Appear.seen(g, q.pos[0], q.pos[1], q.pos[2], 1.5))) q.hide = false;   // (v0.56.2: a new gull shows first where you do not look — it flies into view, it never pops up in it)
         const tx = -Math.sin(q.a) * Math.sign(q.w), tz = Math.cos(q.a) * Math.sign(q.w);
         q.yaw = yawOf(tx, tz); q.bank = -Math.sign(q.w) * 0.42;
         q.flapT -= dt; if (q.flapT < -1.6) q.flapT = 3 + W.h(q.i, Math.floor(this.time), 7) * 5;
@@ -465,7 +475,7 @@
         this.heronT = 2;
         const cand = A.duck.filter(a => Math.hypot(a.x - eye[0], a.z - eye[2]) < 110 && Math.hypot(a.x - eye[0], a.z - eye[2]) > 18 && !H.some(h => h.pond === a));
         cand.sort((a, b) => Math.hypot(a.x - eye[0], a.z - eye[2]) - Math.hypot(b.x - eye[0], b.z - eye[2]));
-        for (const a of cand) { if (H.length >= n) break; const h = this.heronAt(a, W.h(this.seed, a.x, a.z) * TAU); if (h) H.push(h); }
+        for (const a of cand) { if (H.length >= n) break; if (VR.Appear && VR.Appear.seen(this.g, a.x + 0.5, (a.y || ctx.eye[1]) + 1, a.z + 0.5, 1.5)) continue; const h = this.heronAt(a, W.h(this.seed, a.x, a.z) * TAU); if (h) H.push(h); }   // (v0.56.2: a heron only at a pond you are not looking at)
       }
       for (const h of H) this.heronStep(h, dt, ctx);
     }
@@ -946,7 +956,7 @@
       }
       if (this.gulls.length) {
         const K = WG.kind(gl, 'gull', KINDCAP.gull), D = K.data; let n = 0;
-        for (const q of this.gulls) { const x = q.pos[0] - cx, y = q.pos[1] - cy, z = q.pos[2] - cz, d = Math.hypot(x, z); if (d > 320) continue; put(D, n++, x, y, z, 1.25 * Math.max(1, Math.min(1.8, d / 120)), q.yaw, 0, q.bank, q.ph, 1, 1, 1, 1, q.amp, 0, 0.08, 0, 0, 0.3); }
+        for (const q of this.gulls) { if (q.hide) continue; const x = q.pos[0] - cx, y = q.pos[1] - cy, z = q.pos[2] - cz, d = Math.hypot(x, z); if (d > 320) continue; put(D, n++, x, y, z, 1.25 * Math.max(1, Math.min(1.8, d / 120)), q.yaw, 0, q.bank, q.ph, 1, 1, 1, 1, q.amp, 0, 0.08, 0, 0, 0.3); }
         if (n) list.push([K, n]);
       }
       // the fish: shoals (silver, flashing), carp (gold)

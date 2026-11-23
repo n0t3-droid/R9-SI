@@ -568,6 +568,7 @@
 
   // ---------------- per-column features ----------------
   VR.RealmFeatures = (g, w, fcx, fcz, chests) => realmFeatures(g, w, fcx, fcz, chests);
+  GEN.sakura = (w, x, y, z, rng) => sakura(w, x, y, z, rng);   // (for the preview and the tests)
   function realmFeatures(g, w, fcx, fcz, chests) {
     const rng = new VR.RNG(M.hash2(fcx, fcz, g.seed + 4242));
     const fx0 = fcx * 16, fz0 = fcz * 16;
@@ -587,11 +588,21 @@
         if (noCry) rockSpire(g, w, x, y, z, rng, key0 === 'crystal_highlands' ? 1.25 : 1);   // vgen 9: a rock pinnacle of the biome's duskrock
         else spire(w, x, y, z, rng, cc, key0 === 'crystal_highlands' ? 1.25 : 1);
       }
+      if (GEN.trees3 && GEN.trees3(g)) {
+        // vgen 20 (v0.56.2): one sakura per chunk at most, 4 blocks in from the chunk's edge — trees at least 8 apart, so
+        // the crowns never fuse; all of them pink (the old mix of pink and lime crowns clashed on the violet meadow)
+        const hx = (Math.imul(fx0 >> 4, 0x27d4eb2d) ^ Math.imul(fz0 >> 4, 0x165667b1) ^ g.seed) >>> 0;
+        if ((hx & 1023) / 1024 < 0.62) {
+          const x = fx0 + 4 + ((hx >>> 10) % 8), z = fz0 + 4 + ((hx >>> 14) % 8), y = g.surfaceY(x, z) + 1;
+          if (y > SEA + 1 && !inVillage(x, z, 6)) sakura(w, x, y, z, new VR.RNG((hx ^ 0x9e3779b9) >>> 0));
+        }
+      } else {
       const trees = rng.chance(0.7) ? 1 + rng.int(3) : 0;
       for (let i = 0; i < trees; i++) {
         const x = fx0 + rng.int(16), z = fz0 + rng.int(16), y = g.surfaceY(x, z) + 1;
         if (y <= SEA + 1 || inVillage(x, z, 6)) continue;
         prismTree(w, x, y, z, rng);
+      }
       }
     } else if (key0 === 'ember_canyons') {
       if (rng.chance(0.18)) { const x = fx0 + 4 + rng.int(8), z = fz0 + 4 + rng.int(8), y = g.surfaceY(x, z) + 1; if (!inVillage(x, z, 8)) basaltPillar(w, x, y, z, rng); }
@@ -603,7 +614,7 @@
       if (!I || I.k < 0.35 || (I.isle && I.isle.designed)) continue; // the Sky Isles plant their own gardens
       const cl = g.climateAt(x, z);
       if (cl.ember > 0.45) continue;
-      if (cl.prism > 0.45 && rng.chance(0.35)) { if (noCry) prismTree(w, x, I.top + 1, z, rng); else spire(w, x, I.top + 1, z, rng, CRY[rng.int(5)], 0.6); }   // (vgen 9: a blossom tree)
+      if (cl.prism > 0.45 && rng.chance(0.35)) { if (noCry) { if (GEN.trees3 && GEN.trees3(g)) sakura(w, x, I.top + 1, z, rng); else prismTree(w, x, I.top + 1, z, rng); } else spire(w, x, I.top + 1, z, rng, CRY[rng.int(5)], 0.6); }   // (vgen 9: a blossom tree)
       else if (rng.chance(0.75)) { if (rng.chance(0.3)) GEN.TREES.cherry(w, x, I.top + 1, z, rng); else if (cl.t < -0.3) GEN.TREES.spruce(w, x, I.top + 1, z, rng); else GEN.TREES.fancyOak ? GEN.TREES.fancyOak(w, x, I.top + 1, z, rng) : GEN.TREES.oak(w, x, I.top + 1, z, rng); }
     }
     void chests;
@@ -682,6 +693,28 @@
     GEN.blob(w, x, y + h, z, 3, 2, 3, leaf, rng, 0.6);
     GEN.blob(w, x + 1, y + h + 1, z - 1, 2, 2, 2, leaf, rng, 0.6);
     if (rng.chance(0.5)) w.place(x, y + h + 2, z, st('glow_lichen', { faces: 32 }));
+  }
+  // the sakura (vgen 20): a dark trunk that leans and forks into two limbs, a wide flat cloud of blossom over each,
+  // a few blossom strands hanging below the cloud's rim, fallen petals on the ground under it
+  function sakura(w, x, y, z, rng) {
+    const log = st('cherry_log', { axis: 0 }), pink = GEN.leafState('cherry_leaves');
+    const h = 4 + rng.int(2), lx = rng.chance(0.5) ? 1 : -1, lz = rng.chance(0.5) ? 1 : -1;
+    for (let i = 0; i < h; i++) w.place(x, y + i, z, log, 1);
+    // two limbs: one each way, out two and up two
+    const tips = [[x + 2 * lx, z], [x, z + 2 * lz]];
+    for (const [tx, tz] of tips) {
+      const mx = (x + tx) >> 1, mz = (z + tz) >> 1;
+      w.place(mx, y + h, mz, log, 1);
+      w.place(tx, y + h + 1, tz, log, 1);
+    }
+    for (const [tx, tz] of tips) GEN.blob(w, tx, y + h + 2, tz, 3, 2, 3, pink, rng, 0.6);
+    GEN.blob(w, x, y + h + 2, z, 2, 2, 2, pink, rng, 0.6);
+    // hanging strands at the rim
+    for (let k = 0; k < 5; k++) {
+      const a = rng.next() * Math.PI * 2, sx = Math.round(x + lx * 0.5 + Math.cos(a) * 3), sz = Math.round(z + lz * 0.5 + Math.sin(a) * 3);
+      const n = 1 + rng.int(2);
+      for (let j = 1; j <= n; j++) if (!w.get(sx, y + h + 1 - j, sz)) w.place(sx, y + h + 1 - j, sz, pink);
+    }
   }
   function basaltPillar(w, x, y, z, rng) {
     const S = states();

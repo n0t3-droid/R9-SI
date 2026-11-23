@@ -60,6 +60,7 @@
     'g.ctx.funke': ['Funke fragen', 'Ask Funke'],
     'g.ctx.zauber': ['Zauberblick', 'Magic view'],
     'g.ctx.ferry': ['Fähre nehmen', 'Take the ferry'],   // a-life
+    'g.ctx.takeCraft': ['Einsteigen und losfliegen', 'Board and fly off'],   // v0.56.2: a visiting craft on its pad (padlife.js)
     'g.ctx.wunder': ['{name}', '{name}'],   // r-wunder
     'g.ctx.home': ['Heimkehr …', 'Going home …'],
     'g.ctx.toPlace': ['nach {name}', 'to {name}'],
@@ -92,7 +93,8 @@
     chest: ['g.ctx.chest', 'use', '🧰'], bed: ['g.ctx.sleep', 'use', '🛏'], ship: ['g.ctx.board', 'board', '🚀'], vehicle: ['g.ctx.board', 'board', '🛵'],
     beacon: ['g.ctx.fast', 'beacon', '⚡'], machine: ['g.ctx.calm', 'calm', '🕊'], shop: ['g.ctx.shop', 'shop', '🛒'], portal: ['g.ctx.portal', 'portal', '🌀'],
     bench: ['g.ctx.view', 'vista', '🌄'], pet: ['g.ctx.pet', 'pet', '🐾'], seat: ['g.ctx.sit', 'use', '🪑'],
-    ferry: ['g.ctx.ferry', 'ferry', '⛴'],   // a-life: the dock of a settlement's ferries (ferries.js)
+    ferry: ['g.ctx.ferry', 'ferry', '⛴'],
+    craft: ['g.ctx.takeCraft', 'ferry', '🚀'],   // v0.56.2: the act is the row's own (padlife.js takeCraft)   // a-life: the dock of a settlement's ferries (ferries.js)
     fairy: ['g.ctx.fairy', 'fairy', '✨'],   // a-fairy: the folk, the wishes, the door, the singing stones (fairy.js)
     wunder: ['g.ctx.wunder', 'fairy', '🌟'],   // r-wunder: the Wundertiere (wunder_game.js: climb onto the whale, sit under the tree — the name is the action)
   };

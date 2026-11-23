@@ -3519,6 +3519,7 @@
     "g.fe.legend": "Fähren · Frachter · Kleinschiffe — {n} unterwegs",
     "g.fe.terminal": "Fährhafen Herzwelt",
     "g.ctx.ferry": "Fähre nehmen",
+    "g.ctx.takeCraft": "Einsteigen und losfliegen",
     "g.set.spaceLife": "Leben zwischen den Welten",
     "g.set.spaceLife.tip": "Siedlungen auf den Monden, Fähren und Verkehr im All",
     // ---- a-life end
