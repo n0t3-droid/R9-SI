@@ -383,7 +383,7 @@ Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag
 Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
 
 <h2 id="eigen">16 · Eigene Verfahren</h2>
-<p class="lead">Acht Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
+<p class="lead">Neun Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
 dieses Spiel zusammengesetzt: für einen Browser,
 eine integrierte Grafikkarte und eine Welt, die sich jederzeit ändert. Jedes läuft im Spiel und hat einen Node-Test.</p>
 
@@ -562,6 +562,38 @@ Fläche bleibt Viereck für Viereck gleich, und das Meshing wird dabei 2,8× sch
 für Byte. Ehrliche Einschränkung: Im ganzen Bild auf „Hoch“ mit 12 Chunks Sichtweite sanken die gezeichneten Dreiecke
 nur um rund 4 %, denn die runden Hänge, Formen, Mini-Voxel und der Horizont zählen mit. Der volle Gewinn gilt in der
 schlichten Ferne und auf den Stufen ohne runde Hänge.</p>
+
+<h3>16.9 Vorausschauende Qualität — handeln, bevor es ruckelt</h3>
+<p class="src">src/main/aqpredict.js · src/main/game.js (smartQuality)</p>
+<p>Die Regelung aus 16.4 urteilt über ein 2-s-Fenster der Bildrate und wartet 2,5 s pro Versuch. Dreht man sich zum Meer,
+steigen die Kosten pro Bild in einer halben Sekunde auf das Dreifache, und das Fenster merkt es erst zwei Sekunden später.
+Seit v0.56.3 kommen drei Größen dazu. Die erste ist der <b>Trend</b>: eine Ausgleichsgerade durch die Bildkosten \(m_i\)
+(GPU-Zeit) der letzten \(W=0{,}6\) s, eine halbe Sekunde vorausgelesen:</p>
+\[ \beta=\frac{n\sum t_i m_i-\sum t_i\sum m_i}{n\sum t_i^2-\big(\sum t_i\big)^2},\qquad
+\hat m=\max\!\big(\bar m,\ \bar m+\beta\,(0{,}5-\bar t)\big) \]
+<p>Eine fallende Gerade wird nie unter ihren Mittelwert gelesen: Auf eine Vermutung hin wird keine Stufe zurückgegeben. Die
+zweite Größe ist die <b>Überraschung</b>: ein schneller Mittelwert (\(\tau_f=0{,}15\) s) gegen einen langsamen
+(\(\tau_s=3\) s) und dessen Streuung. Die Streuung lernt nur aus auf \(3\sigma\) gekappten Abweichungen, damit ein Sprung
+überraschend bleibt und nicht sofort die eigene Messlatte hebt:</p>
+\[ z=\frac{\mu_f-\mu_s}{\sqrt{\sigma_s^2+1\,\text{ms}^2}},\qquad
+\text{früher Schritt}\iff \hat m>1{,}25\,B\ \wedge\ z>3 \]
+<p>Die dritte ist die <b>Entlastung</b> jeder Stufe \(i\), gelernt aus ihren Versuchen auf genau dieser Grafikkarte, als
+laufender Mittelwert über etwa die letzten acht. Werden \(k\) Stufen zusammen genommen, teilen sie sich das Ergebnis
+geometrisch. Ungeprüft gilt \(r_i=0{,}12\):</p>
+\[ r=1-\Big(\frac{m_{\text{nachher}}}{m_{\text{vorher}}}\Big)^{1/k},\qquad
+k=\min\Big\{k\le3:\ \hat m\prod_{j<k}(1-r_{i_0+j})\le0{,}95\,B\Big\}\quad(\text{nur wenn }\hat m>1{,}3\,B,\ \text{sonst }k=1) \]
+<p>Eine Stufe wird nur zurückgegeben, wenn das Bild danach noch passt. Sonst würde sie nach ein paar Sekunden wieder
+genommen, und das Bild pumpt:</p>
+\[ \frac{\bar m}{1-r_{\text{oben}}}<0{,}85\,B \]
+<p>Zwei Fehler der alten Prüfung sind dabei aufgefallen und behoben. Erstens enthielt das 2-s-Fenster nach einem Schritt
+noch die langsamen Bilder von davor. Mit GPU-Zeit wird der Versuch jetzt an den Kosten der letzten 0,6 s gemessen,
+\(g=m_{\text{vorher}}/\bar m\). Zweitens: Wird ein Bild trotz Schritt teurer (\(g<0{,}94\)), ist die Szene schwerer
+geworden, denn ein Schritt macht kein Bild teurer. Der Versuch zählt dann nicht, und die Stufe bleibt. Zwischen den
+beiden Leitern wählt UCB1 die vielversprechendere: \(\bar r+c\sqrt{\ln N/n}\), eine ungeprüfte zuerst. Im Node-Test
+(Kosten 12 → 45 ms in 0,6 s) kam der erste Schritt nach 0,21 s statt 2,04 s, und die Zeit mit Bildern über 25 ms sank
+von 21,8 s auf 2,4 s. An der Grenze (eine Stufe macht aus 45 fps 60 fps) fiel die Zahl der Wechsel in zwei Minuten von
+19 auf 1. Ehrliche Einschränkung: Das sind simulierte Szenen. Ohne GPU-Zeitmessung (manche Browser) bleibt es bei
+Trend und Überraschung, und eine Stufe wird wie früher zurückgegeben.</p>
 
 <h2 id="schluss">17 · Offen und frei</h2>
 <p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist
