@@ -1064,14 +1064,27 @@
       const fps = aq.fpsWin || this.fps;
       aq.hold = Math.max(0, aq.hold - dt);
       const now = this.time;
+      // v0.56.3 · Vorausschauend (aqpredict.js): the frame's cost line read half a second ahead, the surprise of a jump, what
+      // each rung bought on this machine. measured: the GPU's own timing (a frame time alone cannot tell a cap from a load)
+      const AP = VR.AQPredict, measured = gpuMs !== undefined, pp = AP ? (aq.pp || (aq.pp = AP.make())) : null;
+      const msNow = measured ? Math.max(gpuMs, jsMs) : dt * 1000;
+      if (pp) AP.push(pp, dt, msNow);
       // probe result: did the last step help?
       if (aq.probe && aq.hold <= 0) {
         const pr = aq.probe; aq.probe = null;
-        const gain = fps / Math.max(1, pr.fps0);
-        if (gain < 1.06 && fps < target - 4) {
-          // no gain: undo it, remember that this ladder does not help right now
+        // (timed by the GPU: the probe judges the cost of the last 0.6 s against the cost before the step — the 2 s frame-rate
+        //  window still held the slow frames from before it, so a step that helped was judged useless and taken back)
+        const msAfter = pp && measured && pr.ms0 > 0 ? AP.trend(pp).mean : 0;
+        const gain = msAfter > 0 ? pr.ms0 / msAfter : fps / Math.max(1, pr.fps0), fpsNow = msAfter > 0 ? 1000 / msAfter : fps;
+        // (dearer than before the step: the scene got heavier meanwhile — a step never makes a frame dearer — so the probe
+        //  says nothing: the step stays, nothing is learnt, and the next one may follow at once)
+        const rose = msAfter > 0 && gain < 0.94;
+        if (msAfter > 0 && !rose) AP.learn(pp, pr.kind, pr.i, pr.ms0, msAfter, pr.k);
+        if (rose) aq.hold = 0;
+        else if (gain < 1.06 && fpsNow < target - 4) {
+          // no gain: undo it (all the rungs taken together), remember that this ladder does not help right now
           aq.bad[pr.kind] = now;
-          this.aqPop(aq, S, w);
+          for (let j = 0; j < (pr.k || 1); j++) this.aqPop(aq, S, w);
           aq.hold = 1.5;
         }
       }
@@ -1079,7 +1092,12 @@
       // a frame-rate cap (vsync at 30 Hz, battery saver, a background tab) is not a bottleneck: both sides idle
       const capped = gpuMs !== undefined && fps > 0 && (gpuMs + jsMs) < (1000 / fps) * 0.55;
       const struggling = fps < target - 8 && !capped && this.time > 4, fine = fps > target + 3 || capped;
-      if (struggling && aq.hold <= 0 && !aq.probe) {
+      // (a jump the line sees coming — a quarter over the budget half a second ahead, and a surprise, not noise — is met now,
+      //  not after the 2 s window has fallen)
+      const msAhead = pp ? AP.predict(pp) : 0;
+      const early = !!pp && !struggling && !capped && this.time > 4 && aq.hold <= 0 && !aq.probe && msAhead > budget * 1.25 && AP.surprise(pp) > 3;
+      if (early) aq.earlyN = (aq.earlyN || 0) + 1;
+      if ((struggling || early) && aq.hold <= 0 && !aq.probe) {
         aq.good = 0;
         // preferred ladder: the measured bottleneck, unless that ladder just proved useless
         const gOk = aq.g < gLadder.length && !(aq.bad.g && now - aq.bad.g < 30);
@@ -1089,10 +1107,20 @@
         // machine no frame rate but left the land, the trees and the mountains coming in late (grey forms, late crowns)
         const measured = gpuMs !== undefined;
         if (gpuBound && gOk) kind = 'g'; else if (cpuBound && cOk) kind = 'c'; else if (gOk) kind = 'g'; else if (cOk && !(measured && gpuBound)) kind = 'c';
-        if (kind) { this.aqPush(aq, kind, S, w); aq.probe = { kind, fps0: fps }; aq.hold = 2.5; }
+        if (kind) {
+          const len = kind === 'g' ? gLadder.length : cLadder.length, i0 = kind === 'g' ? aq.g : aq.c;
+          // (as many rungs as the predicted cost needs, by what each bought here — one, unless it is a big jump; measured only)
+          const k = pp && measured ? AP.plan(pp, kind, i0, len, Math.max(msAhead, AP.trend(pp).mean), budget) : 1;
+          for (let j = 0; j < k; j++) this.aqPush(aq, kind, S, w);
+          aq.probe = { kind, fps0: fps, i: i0, k, ms0: pp ? AP.trend(pp).mean : 0 }; aq.hold = 2.5;
+        }
       } else if (fine && aq.stack.length) {
         aq.good += dt;
-        if (aq.good > aq.backoff && aq.hold <= 0) {
+        // (a give-back that would not fit — this rung bought more than the headroom — waits: it would only be taken again)
+        const topK = aq.stack[aq.stack.length - 1], topI = topK === 'g' ? aq.g - 1 : aq.c - 1;
+        const safe = !(pp && measured && !capped) || AP.popSafe(pp, topK, topI, AP.trend(pp).mean, budget);
+        if (!safe) aq.heldN = (aq.heldN || 0) + 1;
+        if (aq.good > aq.backoff && aq.hold <= 0 && safe) {
           this.aqPop(aq, S, w); aq.good = 0; aq.hold = 3; aq.upT = now;
         }
       } else if (!fine) aq.good = 0;
