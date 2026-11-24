@@ -122518,6 +122518,105 @@ VR.TexCache={key,get,put,unpack,READ_MS,MAX_BYTES,DB,STORE};
 
 
 
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const P=VR.AQPredict={};
+P.WIN=0.6;
+P.AHEAD=0.5;
+P.FAST=0.15;P.SLOW=3;
+P.PRIOR=0.12;
+P.MAXK=3;
+P.UCB_C=0.25;
+
+P.make=function(){
+return{t:0,ts:new Float64Array(64),ms:new Float64Array(64),n:0,head:0,fast:0,slow:0,varS:0,init:false,rel:{g:[],c:[]}};
+};
+
+P.push=function(s,dt,ms){
+if(!(ms>=0)|| !(dt>0))return;
+s.t+=dt;
+s.ts[s.head]=s.t;s.ms[s.head]=ms;s.head=(s.head+1)&63;if(s.n<64)s.n++;
+if(!s.init){s.fast=s.slow=ms;s.varS=0;s.init=true;return;}
+const af=1-Math.exp(-dt/P.FAST),as=1-Math.exp(-dt/P.SLOW);
+s.fast+=af*(ms-s.fast);
+const d=ms-s.slow,lim=3*Math.sqrt(s.varS+1),dc=d>lim?lim:d< -lim? -lim:d;
+s.slow+=as*d;
+s.varS=(1-as)*(s.varS+as*dc*dc);
+};
+
+P.trend=function(s){
+let n=0,st=0,sm=0,stt=0,stm=0;
+for(let k=0;k<s.n;k++){
+const i=(s.head-1-k+64)&63,t=s.ts[i]-s.t;
+if(t< -P.WIN)break;
+const m=s.ms[i];n++;st+=t;sm+=m;stt+=t*t;stm+=t*m;
+}
+if(n<3)return{mean:n?sm/n:0,slope:0,n};
+const den=n*stt-st*st,slope=Math.abs(den)>1e-12?(n*stm-st*sm)/den:0,mean=sm/n;
+return{mean,slope,n,tMean:st/n};
+};
+
+
+P.predict=function(s,ahead){
+const T=P.trend(s);if(T.n<3)return T.mean;
+const at=(ahead===undefined?P.AHEAD:ahead)-(T.tMean||0);
+return Math.max(T.mean,T.mean+T.slope*at);
+};
+P.surprise=(s)=>(s.init?(s.fast-s.slow)/Math.sqrt(s.varS+1):0);
+
+
+
+P.learn=function(s,kind,i,msBefore,msAfter,k){
+if(!(msBefore>0)|| !(msAfter>0))return;
+k=Math.max(1,k|0);
+const r1=Math.max(-0.2,Math.min(0.8,1-Math.pow(msAfter/msBefore,1/k)));
+for(let j=0;j<k;j++)learn1(s,kind,i+j,r1);
+};
+function learn1(s,kind,i,r){
+const L=s.rel[kind]||(s.rel[kind]=[]),e=L[i]||(L[i]={n:0,mean:0});
+e.n++;e.mean+=(r-e.mean)/Math.min(e.n,8);
+}
+P.relief=function(s,kind,i){const e=(s.rel[kind]||[])[i];return e&&e.n?Math.max(0,e.mean):P.PRIOR;};
+
+P.plan=function(s,kind,i0,len,ms,budget){
+let k=0,m=ms;
+if(ms<=budget*1.3)return Math.min(1,len-i0);
+while(i0+k<len&&k<P.MAXK&&m>budget*0.95){m*=1-P.relief(s,kind,i0+k);k++;}
+return Math.max(1,Math.min(k,len-i0));
+};
+
+P.popSafe=function(s,kind,i,ms,budget){return ms/Math.max(0.2,1-P.relief(s,kind,i))<budget*0.85;};
+
+P.ucb=function(s,kind,i){
+let N=1;for(const k of['g','c'])for(const e of s.rel[k]||[])if(e)N+=e.n;
+const e=(s.rel[kind]||[])[i];
+if(!e|| !e.n)return Infinity;
+return e.mean+P.UCB_C*Math.sqrt(Math.log(N)/e.n);
+};
+})(typeof VR!=='undefined'?VR:(globalThis.VR=globalThis.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const D=VR.DimReg;
@@ -124620,13 +124719,26 @@ const fps=aq.fpsWin||this.fps;
 aq.hold=Math.max(0,aq.hold-dt);
 const now=this.time;
 
+
+const AP=VR.AQPredict,measured=gpuMs!==undefined,pp=AP?(aq.pp||(aq.pp=AP.make())):null;
+const msNow=measured?Math.max(gpuMs,jsMs):dt*1000;
+if(pp)AP.push(pp,dt,msNow);
+
 if(aq.probe&&aq.hold<=0){
 const pr=aq.probe;aq.probe=null;
-const gain=fps/Math.max(1,pr.fps0);
-if(gain<1.06&&fps<target-4){
+
+
+const msAfter=pp&&measured&&pr.ms0>0?AP.trend(pp).mean:0;
+const gain=msAfter>0?pr.ms0/msAfter:fps/Math.max(1,pr.fps0),fpsNow=msAfter>0?1000/msAfter:fps;
+
+
+const rose=msAfter>0&&gain<0.94;
+if(msAfter>0&& !rose)AP.learn(pp,pr.kind,pr.i,pr.ms0,msAfter,pr.k);
+if(rose)aq.hold=0;
+else if(gain<1.06&&fpsNow<target-4){
 
 aq.bad[pr.kind]=now;
-this.aqPop(aq,S,w);
+for(let j=0;j<(pr.k||1);j++)this.aqPop(aq,S,w);
 aq.hold=1.5;
 }
 }
@@ -124634,7 +124746,12 @@ const gLadder=this.aqGpuRungs(S),cLadder=this.aqCpuRungs(S);
 
 const capped=gpuMs!==undefined&&fps>0&&(gpuMs+jsMs)<(1000/fps)*0.55;
 const struggling=fps<target-8&& !capped&&this.time>4,fine=fps>target+3||capped;
-if(struggling&&aq.hold<=0&& !aq.probe){
+
+
+const msAhead=pp?AP.predict(pp):0;
+const early= !!pp&& !struggling&& !capped&&this.time>4&&aq.hold<=0&& !aq.probe&&msAhead>budget*1.25&&AP.surprise(pp)>3;
+if(early)aq.earlyN=(aq.earlyN||0)+1;
+if((struggling||early)&&aq.hold<=0&& !aq.probe){
 aq.good=0;
 
 const gOk=aq.g<gLadder.length&& !(aq.bad.g&&now-aq.bad.g<30);
@@ -124644,10 +124761,20 @@ let kind=null;
 
 const measured=gpuMs!==undefined;
 if(gpuBound&&gOk)kind='g';else if(cpuBound&&cOk)kind='c';else if(gOk)kind='g';else if(cOk&& !(measured&&gpuBound))kind='c';
-if(kind){this.aqPush(aq,kind,S,w);aq.probe={kind,fps0:fps};aq.hold=2.5;}
+if(kind){
+const len=kind==='g'?gLadder.length:cLadder.length,i0=kind==='g'?aq.g:aq.c;
+
+const k=pp&&measured?AP.plan(pp,kind,i0,len,Math.max(msAhead,AP.trend(pp).mean),budget):1;
+for(let j=0;j<k;j++)this.aqPush(aq,kind,S,w);
+aq.probe={kind,fps0:fps,i:i0,k,ms0:pp?AP.trend(pp).mean:0};aq.hold=2.5;
+}
 }else if(fine&&aq.stack.length){
 aq.good+=dt;
-if(aq.good>aq.backoff&&aq.hold<=0){
+
+const topK=aq.stack[aq.stack.length-1],topI=topK==='g'?aq.g-1:aq.c-1;
+const safe= !(pp&&measured&& !capped)||AP.popSafe(pp,topK,topI,AP.trend(pp).mean,budget);
+if(!safe)aq.heldN=(aq.heldN||0)+1;
+if(aq.good>aq.backoff&&aq.hold<=0&&safe){
 this.aqPop(aq,S,w);aq.good=0;aq.hold=3;aq.upT=now;
 }
 }else if(!fine)aq.good=0;
