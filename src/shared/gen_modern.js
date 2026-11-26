@@ -323,6 +323,33 @@
     for (let u = cu - 8; u <= cu + 8; u += 4) if (u !== cu) P(u, F, -4, null);
     for (const u of [-2, w + 1]) for (let v = 0; v < d; v += 4) P(u, F, v, 'vx_urn');
     K.tree(-1, d - 2, F, true); K.tree(w, d - 2, F, true);
+    // v0.56.5 · the approach. The owner, at the town hall: "this part where this elevates to the house is also so unrealistic,
+    // how is this even approachable and playable". A hall on rising ground stands up to a few blocks above the plaza's
+    // forecourt (lot.py: its paving's height): its forecourt paving ended in a drop over dirt, with no way up. Now the
+    // paved front is a solid podium of stone bricks down to the ground (no dirt under it, no overhang), and two flights of
+    // steps, one each side of the fountain, lead down from it to the forecourt — one row and one block lower per step
+    if (Number.isFinite(lot.py)) {
+      const top = F - 1, n = top - lot.py;
+      for (let v = -5; v <= -1; v++) for (let u = -2; u <= w + 1; u++) {
+        if (v < -3 && Math.abs(u - cu) > 2) continue;   // (the fountain's ring juts out two rows in the middle)
+        const gy = o.ground(u, v); for (let y = gy + 1; y < top; y++) P(u, y, v, 'stone_bricks');
+      }
+      if (n > 0) {
+        for (const [ua, ub] of [[cu - 5, cu - 3], [cu + 3, cu + 5]]) for (let k = 1; k <= n; k++) {
+          const v = -3 - k, y = top + 1 - k;   // the first row beside the paving, its step up to the paving's top
+          for (let u = ua; u <= ub; u++) {
+            const gy = o.ground(u, v);
+            for (let yy = gy + 1; yy < y; yy++) P(u, yy, v, 'stone_bricks');
+            P(u, y, v, 'stone_brick_stairs', { facing: 2, half: 0 });
+            for (let yy = y + 1; yy <= y + 3; yy++) P(u, yy, v, null);
+          }
+          // the flight's cheeks: a low stone wall along its outer side, as high as the step beside it
+          const uc = ua === cu - 5 ? ua - 1 : ub + 1, gyc = o.ground(uc, v);
+          for (let yy = gyc + 1; yy <= y; yy++) P(uc, yy, v, 'stone_bricks');
+        }
+        info.stairs = n;
+      }
+    }
     info.door = [cu, F + 1, V0]; info.outside = [cu, F, -2]; info.inside = [cu, F + 1, V0 + 4]; info.lights.push([cu, F + 7, V0 + 4]); info.roofTop = TOP + 7;
     return info;
   };

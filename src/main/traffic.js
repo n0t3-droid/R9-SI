@@ -26,6 +26,7 @@
   class Traffic {
     constructor(g) {
       this.g = g;
+      if (Traffic.hookCtx) Traffic.hookCtx();
       this.ships = [];
       this.t = 6 + Math.random() * 8;
       this.time = 0;
@@ -291,7 +292,56 @@
       }
       if (prog) SS.end(r, layer);
     }
+    // v0.56.5 · Kapern. The owner, flying over the Sky Isles as two craft passed below: "i cant hijack the planes or one of
+    // them". Now the Aktion (V) takes a passing craft when you are close to its hull (within HIJACK m along your look):
+    // the same design becomes a ship of yours at the craft's pose, you sit at its controls, and it keeps flying at the
+    // speed it had (the lever set to it); the traffic craft is gone, its wingmen fly on. The ship stays in the world.
+    hijackable(eye, dir) {
+      const SS = this.g.starships; if (!SS || !SS.inOcc || !VR.Ctx || !VR.Ctx.hullAlong) return null;
+      if (SS.pilot || (this.g.gadgets && this.g.gadgets.riding)) return null;
+      let best = null;
+      for (const s of this.ships) {
+        if (!s || s.dead || s.t < 0 || !s.d || !s.d.meta || !s.d.occ || !s.d.cells || (s.alpha !== undefined && s.alpha < 0.6) || s.warpOut) continue;
+        const m = s.d.meta, dx = s.pos[0] - eye[0], dy = s.pos[1] - eye[1], dz = s.pos[2] - eye[2], rad = Math.max(m.length, m.width, m.height) * 0.6;
+        if (dx * dx + dy * dy + dz * dz > (Traffic.HIJACK + rad) ** 2) continue;
+        const I = { d: s.d, pos: [s.pos[0], s.pos[1] - m.height * 0.5, s.pos[2]], yaw: s.heading, kneel: 0 };
+        const hd = VR.Ctx.hullAlong(eye, dir, Traffic.HIJACK, (x, y, z) => SS.inOcc(I, x, y, z), 0.25);
+        if (hd !== null && hd !== undefined && (!best || hd < best.hd)) best = { s, hd };
+      }
+      return best;
+    }
+    hijack(s) {
+      const g = this.g, SS = g.starships, p = g.player;
+      if (!SS || !p || !s || s.dead || !s.d || !s.d.meta || !s.d.cells || SS.pilot) return null;
+      const m = s.d.meta, key = 'tr-' + ((s.d.seed >>> 0).toString(36)) + '-' + Math.floor(this.time).toString(36);
+      const ship = SS.spawn(s.d.seed, m.arch, s.d.palette || null, [s.pos[0], s.pos[1] - m.height * 0.5, s.pos[2]], s.heading, key);
+      s.dead = true;
+      SS.board(ship, p);
+      const fl = ship.flight;
+      if (fl && SS.pilot === ship) {
+        const v = Math.max(0, s.speed || 0), b = fl.b, h = s.heading;
+        if (b && b.vel) { b.vel[0] = -Math.sin(h) * v; b.vel[1] = 0; b.vel[2] = -Math.cos(h) * v; }
+        fl.vF = v; fl.throttle = Math.max(0, Math.min(1, v / Math.max(1, fl.cruise || 40)));
+        fl.holdAlt = ship.pos[1];
+      }
+      Traffic.stats.hijacked = (Traffic.stats.hijacked | 0) + 1;
+      if (g.ui && g.ui.hint) g.ui.hint(T('g.tr.hijacked', { name: m.name || '' }, 'Gekapert: {name}'), 4500);
+      return ship;
+    }
     destroy() { this.ships = []; }
   }
+  Traffic.HIJACK = 16;   // m: how far along your look a passing craft's hull may be for the Aktion to take it
+  Traffic.stats = {};
+  // (traffic.js loads before ctx.js: the Aktion's row is hooked in when the first Traffic is made)
+  Traffic.hookCtx = () => {
+    if (Traffic.__ctx || !(VR.Ctx && VR.Ctx.hooks && Array.isArray(VR.Ctx.hooks.near))) return;
+    Traffic.__ctx = true;
+    VR.Ctx.hooks.near.push((g, eye, dir) => {
+      const Tr = g && g.traffic; if (!Tr || !Tr.hijackable || g.state !== 'play') return null;
+      const b = Tr.hijackable(eye, dir); if (!b) return null;
+      const t = Math.max(0, b.hd + 0.3);
+      return { kind: 'hijack', name: b.s.d.meta.name || '', dist: b.hd, ang: 0, r: 0.3, reach: Traffic.HIJACK + 1, pos: [eye[0] + dir[0] * t, eye[1] + dir[1] * t, eye[2] + dir[2] * t], act: () => Tr.hijack(b.s) };
+    });
+  };
   VR.Traffic = Traffic;
 })(VR);

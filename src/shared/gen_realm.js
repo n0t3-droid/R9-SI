@@ -608,6 +608,12 @@
       if (rng.chance(0.18)) { const x = fx0 + 4 + rng.int(8), z = fz0 + 4 + rng.int(8), y = g.surfaceY(x, z) + 1; if (!inVillage(x, z, 8)) basaltPillar(w, x, y, z, rng); }
     }
     // island decorations
+    // vgen 21 (v0.56.5): the owner, on a sky island: "trees are not right fused, it doesn't look appealing together, even the
+    // colours are not right matching, we need sakura". Three random spots a chunk planted a cherry ball and a broad oak a
+    // few blocks apart — the crowns grew into each other, pink into olive. Now the island trees stand on a jittered grid
+    // (one spot per 11 × 11 blocks, 9 blocks apart at the least), and each island has one kind: sakura, or (cold) spruce,
+    // or green oaks — never pink and olive on one island
+    if (g.vgen >= 21) { isleTrees(g, w, fx0, fz0, noCry); void chests; return; }
     for (let k = 0; k < 3; k++) {
       const x = fx0 + rng.int(16), z = fz0 + rng.int(16);
       const I = g.islandAt(x, z);
@@ -693,6 +699,26 @@
     GEN.blob(w, x, y + h, z, 3, 2, 3, leaf, rng, 0.6);
     GEN.blob(w, x + 1, y + h + 1, z - 1, 2, 2, 2, leaf, rng, 0.6);
     if (rng.chance(0.5)) w.place(x, y + h + 2, z, st('glow_lichen', { faces: 32 }));
+  }
+  // vgen 21: the island trees of one feature chunk (see realmFeatures) — a grid cell's spot is planted by the chunk holding it
+  const ISLE_G = 11;
+  function isleTrees(g, w, fx0, fz0, noCry) {
+    for (let gj = Math.floor(fz0 / ISLE_G); gj <= Math.floor((fz0 + 15) / ISLE_G); gj++) for (let gi = Math.floor(fx0 / ISLE_G); gi <= Math.floor((fx0 + 15) / ISLE_G); gi++) {
+      const hx = M.hash2(gi, gj, g.seed ^ 0x15e7) >>> 0;
+      const x = gi * ISLE_G + 4 + (hx % 3), z = gj * ISLE_G + 4 + ((hx >>> 4) % 3);
+      if (x < fx0 || x > fx0 + 15 || z < fz0 || z > fz0 + 15) continue;
+      if (((hx >>> 8) & 1023) / 1024 > 0.62) continue;
+      const I = g.islandAt(x, z);
+      if (!I || I.k < 0.35 || (I.isle && I.isle.designed)) continue;
+      const cl = g.climateAt(x, z);
+      if (cl.ember > 0.45) continue;
+      const rng = new VR.RNG((hx ^ 0x7f4a7c15) >>> 0), y = I.top + 1;
+      const isle = I.isle || { seed: 0, x, z }, kh = (M.hash2(isle.seed | 0, Math.round(isle.x), g.seed ^ 0x5a1c) >>> 0) % 100;
+      if (cl.prism > 0.45 && !noCry) { spire(w, x, y, z, rng, CRY[rng.int(5)], 0.6); continue; }
+      if (cl.prism > 0.45 || (cl.t >= -0.3 && kh < 55)) sakura(w, x, y, z, rng);
+      else if (cl.t < -0.3) GEN.TREES.spruce(w, x, y, z, rng);
+      else if (GEN.TREES.fancyOak) GEN.TREES.fancyOak(w, x, y, z, rng); else GEN.TREES.oak(w, x, y, z, rng);
+    }
   }
   // the sakura (vgen 20): a dark trunk that leans and forks into two limbs, a wide flat cloud of blossom over each,
   // a few blossom strands hanging below the cloud's rim, fallen petals on the ground under it

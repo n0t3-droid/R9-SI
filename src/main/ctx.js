@@ -61,6 +61,7 @@
     'g.ctx.zauber': ['Zauberblick', 'Magic view'],
     'g.ctx.ferry': ['Fähre nehmen', 'Take the ferry'],   // a-life
     'g.ctx.takeCraft': ['Einsteigen und losfliegen', 'Board and fly off'],   // v0.56.2: a visiting craft on its pad (padlife.js)
+    'g.ctx.hijack': ['Kapern', 'Hijack'],   // v0.56.5: a passing craft of the sky traffic (traffic.js)
     'g.ctx.wunder': ['{name}', '{name}'],   // r-wunder
     'g.ctx.home': ['Heimkehr …', 'Going home …'],
     'g.ctx.toPlace': ['nach {name}', 'to {name}'],
@@ -93,8 +94,9 @@
     chest: ['g.ctx.chest', 'use', '🧰'], bed: ['g.ctx.sleep', 'use', '🛏'], ship: ['g.ctx.board', 'board', '🚀'], vehicle: ['g.ctx.board', 'board', '🛵'],
     beacon: ['g.ctx.fast', 'beacon', '⚡'], machine: ['g.ctx.calm', 'calm', '🕊'], shop: ['g.ctx.shop', 'shop', '🛒'], portal: ['g.ctx.portal', 'portal', '🌀'],
     bench: ['g.ctx.view', 'vista', '🌄'], pet: ['g.ctx.pet', 'pet', '🐾'], seat: ['g.ctx.sit', 'use', '🪑'],
-    ferry: ['g.ctx.ferry', 'ferry', '⛴'],
-    craft: ['g.ctx.takeCraft', 'ferry', '🚀'],   // v0.56.2: the act is the row's own (padlife.js takeCraft)   // a-life: the dock of a settlement's ferries (ferries.js)
+    ferry: ['g.ctx.ferry', 'ferry', '⛴'],   // a-life: the dock of a settlement's ferries (ferries.js)
+    craft: ['g.ctx.takeCraft', 'ferry', '🚀'],   // v0.56.2: the act is the row's own (padlife.js takeCraft)
+    hijack: ['g.ctx.hijack', 'ferry', '🛩'],   // v0.56.5: the act is the row's own (traffic.js hijack)
     fairy: ['g.ctx.fairy', 'fairy', '✨'],   // a-fairy: the folk, the wishes, the door, the singing stones (fairy.js)
     wunder: ['g.ctx.wunder', 'fairy', '🌟'],   // r-wunder: the Wundertiere (wunder_game.js: climb onto the whale, sit under the tree — the name is the action)
   };
@@ -110,7 +112,7 @@
     }
     if (c.story) return STORY;
     const n = c.near;
-    if (n && NEAR[n.kind] && n.dist <= C.REACH && (n.ang || 0) <= C.CONE) {
+    if (n && NEAR[n.kind] && n.dist <= Math.max(C.REACH, n.reach || 0) && (n.ang || 0) <= C.CONE) {   // (a row may reach farther: pickNear's q.reach — v0.56.5's passing craft)
       const m = NEAR[n.kind];
       let key = m[0];
       if ((n.kind === 'door' || n.kind === 'gate') && n.open) key = 'g.ctx.close';

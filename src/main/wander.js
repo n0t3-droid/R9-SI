@@ -181,6 +181,18 @@
     for (const d of [mid, mid + (b - mid) * 0.6, a + (mid - a) * 0.4, b, a]) for (const s of [0.18, -0.18, 0, 0.34, -0.34, S.cone, -S.cone]) out.push([Math.max(a, Math.min(b, d)), s]);
     return out;
   };
+  // v0.56.5: the stage's candidates beside the view [d, side]: the stage's distances, a tenth to a third of a radian past
+  // the view's horizontal edge hh, left and right (the nearer half of the range and the side nearer the edge first)
+  const ACANDS = [];
+  W.ASIDE = [0.1, 0.22, 0.35];
+  W.asideCands = function (R, hh) {
+    const k = Math.round(hh * 1000);
+    for (let i = 0; i < ACANDS.length; i++) { const C = ACANDS[i]; if (C.a === R[0] && C.b === R[1] && C.k === k) return C.out; }
+    const a = R[0], b = R[1], mid = a + (b - a) * 0.35, out = [];
+    for (const d of [mid, mid + (b - mid) * 0.6, a + (mid - a) * 0.4, b, a]) for (const m of W.ASIDE) for (const sg of [1, -1]) out.push([Math.max(a, Math.min(b, d)), sg * (hh + m)]);
+    ACANDS.push({ a, b, k, out }); if (ACANDS.length > 24) ACANDS.shift();
+    return out;
+  };
   // a voxel raycast eye → target: false when a solid cell lies between (the first 0.5 m and the last 0.9 m skipped —
   // the eye's own cell, the ground the figure stands on and its own body)
   W.clearLine = function (solidAt, a, b) {
@@ -206,6 +218,9 @@
     flock: { tier: 0, dur: 12, fly: true, fig: 1.6, hours: DAYD, ico: '🕊' },
     glow: { tier: 0, dur: 11, fly: true, fig: 1.2, hours: ['dusk', 'night'], ico: '✨' },
   };
+  // v0.56.5: the horizontal half angle of the view (vertical fov, the picture's aspect), and the bird beat's glide
+  W.halfH = (fov, asp) => Math.atan(Math.tan((fov || W.STAGE.fov) / 2) * (asp || 16 / 9));
+  W.BIRD_H = 13; W.BIRD_T = 2.3;
   W.beatFor = function (seed, n, ctx, flying) {
     const L = Object.keys(W.BEATS).filter(b => { const B = W.BEATS[b]; if (flying && !B.fly) return false; if (!flying && B.fly && b !== 'glow') return false; if (B.hours.indexOf(ctx.hour) < 0) return false; if (B.dry && ctx.wet) return false; return true; });
     if (!L.length) return flying ? 'glow' : 'song';
@@ -403,7 +418,11 @@
       if (this.stg) {
         // (f-polish7: at most W.BUDGET[tier] candidates a frame — the search goes on next frame from where it stopped; open
         // ground only, the line to the figure's head and feet free of trunks, leaves and tall grass)
-        const K = W.KINDS[this.stg], fh = W.figH(this.stg), R = W.stageRange(fh, this.fov()), cands = W.stageCands(R);
+        // v0.56.5 · nicht vor deinen Augen (the owner: "people who picnic also just spawn somewhere in front of us"): a moment
+        // came into being 8–15 m ahead in the middle of the view. Now its stage lies just beside the view (a tenth to a third
+        // of a radian past its edge, at the same distances, with the same clear line to the figure's head and feet), so it
+        // is there when you look round — and never pops up where you look
+        const K = W.KINDS[this.stg], fh = W.figH(this.stg), R = W.stageRange(fh, this.fov()), cands = W.asideCands(R, W.halfH(this.fov(), this.aspect()));
         const cur = this.cur || (this.cur = {});
         for (let i = cur[this.stg] || 0; i < cands.length; i++) {
           if (this.sb <= 0) { cur[this.stg] = i; this.more = true; return null; }
@@ -416,7 +435,7 @@
           const q = [x, y + Math.min(1.4, fh * 0.75), z];
           if (!this.clear(q, true)) { SG.head++; continue; }
           if (!this.clear([x, y + Math.min(0.35, fh * 0.3), z])) { SG.feet++; continue; }
-          if (!this.inSight(q)) { SG.sight++; continue; }   // (the head past leaves and plants, the feet past trunks and walls)
+          if (this.inSight(q)) { SG.sight++; continue; }   // (v0.56.5: beside the view — the clear lines above: seen once you look)
           SG.ok++;
           cur[this.stg] = 0;
           return [x, y, z];
@@ -438,6 +457,7 @@
     inSight(q) { const L = VR.EventLog; if (!L || !L.inView) return true; try { return !!L.inView(q, 1.2, this.g).inView; } catch (e) { return true; } }
     // the highest ground of a few spots ahead (the cairn's hilltop)
     fov() { const S = this.g.settings; return S && Number.isFinite(S.fov) ? S.fov * Math.PI / 180 : W.STAGE.fov; }
+    aspect() { const r = this.g.renderer; return r && r.W > 0 && r.H > 0 ? r.W / r.H : 16 / 9; }
     high(d) {
       if (this.stg) d = 12;   // (o-wander2: the hilltop within the stage's reach — 12 … 32 m was 26 … 46)
       const f = this.fwd, a0 = Math.atan2(f[1], f[0]), p = this.pos; let best = null;
@@ -617,9 +637,19 @@
       const b = { kind, age: 0, dur: B.dur, seed: (h(this.seed, P.n, 0xbea7) * 0x7fffffff) | 0, pos: null, vel: [0, 0, 0], F: null, y0: 0 };
       const side = (h(b.seed, 1, 3) - 0.5) * 0.5;
       if (B.fly) {
-        const d = kind === 'flock' ? 15 : 11, a = a0 + side * 1.4;
-        b.pos = [eye[0] + Math.cos(a) * d, eye[1] + (kind === 'glow' ? -2 : 0.5), eye[2] + Math.sin(a) * d];
-        b.vel = [f[0] * (kind === 'flock' ? 6 : 0.4), kind === 'glow' ? 0.8 : 0, f[1] * (kind === 'flock' ? 6 : 0.4)];
+        // v0.56.5 · nicht vor deinen Augen (the owner: "saw that? birds just spawn everywhere"): the three birds of a flock
+        // came into being 15 m in front of the eye. Now they start beside the view (a quarter radian past its edge, the side
+        // by the seed) and fly across it, 12 m ahead; the glow rises into the view from below it
+        if (kind === 'flock') {
+          const hh = W.halfH(this.fov(), this.aspect()), sg = side < 0 ? -1 : 1, a = a0 + sg * (hh + 0.25), d = 15;
+          b.pos = [eye[0] + Math.cos(a) * d, eye[1] + 0.5, eye[2] + Math.sin(a) * d];
+          const tx = eye[0] + Math.cos(a0) * 12 - b.pos[0], tz = eye[2] + Math.sin(a0) * 12 - b.pos[2], tl = Math.hypot(tx, tz) || 1;
+          b.vel = [tx / tl * 6.5, 0, tz / tl * 6.5];
+        } else {
+          const d = 11, a = a0 + side * 1.4, vh = this.fov() / 2;
+          b.pos = [eye[0] + Math.cos(a) * d, eye[1] - d * Math.tan(Math.min(1.3, vh + 0.2)), eye[2] + Math.sin(a) * d];
+          b.vel = [f[0] * 0.4, 1.3, f[1] * 0.4];
+        }
       } else {
         const R = kind === 'song' ? [12, 16] : kind === 'breeze' ? [7, 10] : [6, 9], cands = W.stageCands(R);
         for (let i = this.bi || 0; i < cands.length; i++) {
@@ -635,7 +665,7 @@
         this.bi = 0;
         if (!b.pos) return false;
         if (kind === 'song') { b.F = this.fig(b.seed, b.pos, 'farmer'); this.face(b.F, this.pos); b.F.state = 'cheer'; b.F.talking = true; }
-        if (kind === 'bird') { b.y0 = b.pos[1]; b.pos[1] += 6; }
+        if (kind === 'bird') { b.y0 = b.pos[1]; b.pos[1] += W.BIRD_H; }   // (v0.56.5: it glides down from above the view, BIRD_H m up — 6 m was inside it)
       }
       b.yaw = LK.yawOf(this.pos[0] - b.pos[0], this.pos[2] - b.pos[2]);
       this.b = b; P.seen(this.now, 2); this.st.beats = (this.st.beats | 0) + 1;
@@ -653,7 +683,7 @@
       if (u >= 1) { this.b = null; return; }
       if (b.kind === 'bird') {
         // it glides down, lands, hops and pecks, sings twice, flies off
-        if (b.age < 1.6) b.pos[1] = b.y0 + 6 * Math.pow(1 - b.age / 1.6, 2);
+        if (b.age < W.BIRD_T) b.pos[1] = b.y0 + W.BIRD_H * Math.pow(1 - b.age / W.BIRD_T, 2);
         else if (u > 0.82) { b.pos[1] += dt * 5; b.pos[0] += Math.sin(b.yaw) * -dt * 4; b.pos[2] += Math.cos(b.yaw) * -dt * 4; }
         else { b.pos[1] = b.y0 + Math.abs(Math.sin(b.age * 3.1)) * 0.12; if (Math.floor(b.age * 1.3) !== Math.floor((b.age - dt) * 1.3) && Math.floor(b.age) % 3 === 0 && A && A.ctx && A.tone) { A.tone(2400, 0.02, 0.07, 'sine', true); A.tone(2900, 0.018, 0.09, 'sine', true, (A.ctx.currentTime || 0) + 0.1); } }
       } else if (b.kind === 'flock' || b.kind === 'glow') {
@@ -668,7 +698,7 @@
     drawBeat(r, cam, prog) {
       const b = this.b, g = this.g; if (!b) return;
       const t = this.time, flap = Math.sin(t * 22) * 0.8;
-      if (b.kind === 'bird') { BEAT_O.scale = 1.6; BEAT_O.pose = birdPose(b.age < 1.6 || b.age / b.dur > 0.82 ? flap : 0); LK.drawModel(g, r, prog(), 'wander_bird', b.pos, b.yaw + Math.sin(t * 1.7) * 0.4, cam, BEAT_O); BEAT_O.pose = null; }
+      if (b.kind === 'bird') { BEAT_O.scale = 1.6; BEAT_O.pose = birdPose(b.age < W.BIRD_T || b.age / b.dur > 0.82 ? flap : 0); LK.drawModel(g, r, prog(), 'wander_bird', b.pos, b.yaw + Math.sin(t * 1.7) * 0.4, cam, BEAT_O); BEAT_O.pose = null; }
       else if (b.kind === 'flock') { BEAT_O.scale = 2.2; BEAT_O.pose = birdPose(flap); const yaw = Math.atan2(-b.vel[0], -b.vel[2]); for (let i = 0; i < 3; i++) { const q = FLOCK_P[i]; q[0] = b.pos[0] + (i - 1) * 1.6; q[1] = b.pos[1] + (i === 1 ? 0.8 : 0) + Math.sin(t * 2 + i) * 0.2; q[2] = b.pos[2] + (i === 1 ? -1 : 0.6); LK.drawModel(g, r, prog(), 'wander_bird', q, yaw, cam, BEAT_O); } BEAT_O.pose = null; }
       else if (b.kind === 'flutter') { BEAT_O.scale = 1.5; for (let i = 0; i < 2; i++) { const q = FLOCK_P[i], a = t * 1.3 + i * 2.6; q[0] = b.pos[0] + Math.cos(a) * 0.9; q[1] = b.pos[1] + 1.1 + Math.sin(t * 3.1 + i) * 0.3; q[2] = b.pos[2] + Math.sin(a) * 0.9; BEAT_O.pose = flyPose(Math.sin(t * 18 + i) * 0.9); LK.drawModel(g, r, prog(), 'wander_fly' + i, q, -a, cam, BEAT_O); } BEAT_O.pose = null; }
       else if (b.kind === 'breeze') { BEAT_O.scale = 1; BEAT_O.pose = swayPose(Math.sin(t * 2.4) * 0.22 + Math.sin(t * 5.3) * 0.06); LK.drawModel(g, r, prog(), 'wander_flowers', b.pos, b.yaw, cam, BEAT_O); BEAT_O.pose = null; if (this.tier >= 1 && this.P && Math.random() < 0.15) this.P.spawn(b.pos[0], b.pos[1] + 0.8, b.pos[2], 1.2, 0.3, 0.4, { life: 2, size: 0.08, grav: 0.02, col: [1, 0.8, 0.9], emis: 0, drag: 0.6, collide: false }); }
@@ -791,7 +821,7 @@
       for (const m of this.ms) dm(m);
       // (the moments fading out where you look: drawn until they are gone, then ended)
       if (this.fading && this.fading.length) for (let i = this.fading.length - 1; i >= 0; i--) { const m = this.fading[i]; if (AP && AP.gone(m)) { this.fading.splice(i, 1); const A = ACT[m.kind]; if (A && A.end) { try { A.end(this, m); } catch (e) { /* ended */ } } } else dm(m); }
-      if (this.b) { try { this.drawBeat(r, cam, prog); } catch (e) { /* drawn next frame */ } }
+      if (this.b) { const c0 = AP ? AP.cur : 1; if (AP) AP.cur = Math.min(c0, AP.k(this.b)); try { if (!AP || AP.cur > 0) this.drawBeat(r, cam, prog); } catch (e) { /* drawn next frame */ } finally { if (AP) AP.cur = c0; } }   // (v0.56.5: a beat fades in where it has to come into being in view)
       if (this.tier === 0) this.drawLamp(r, cam, prog);   // (o-wander2: Very Low's dusk cue — one warm lamp)
       if (this.bcOn) LK.drawModel(g, r, prog(), 'wander_balloon', this.bcPos, this.time * 0.2, cam, BAL_O);
       if (this.mapChest) LK.drawModel(g, r, prog(), 'wander_chest', this.mapChest, 0.4, cam, {});

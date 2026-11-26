@@ -55,6 +55,6 @@ check(okB === CASES.length, 'b  the eight builders grow the new species in a t18
 }
 // e
 const gs = require('fs').readFileSync(__dirname + '/../src/main/game.js', 'utf8');
-check(/vgen: o\.vgen \? \+o\.vgen : (18|19|20)/.test(gs), 'e  new worlds are vgen 18 or later (19 since v0.55.94)');
+check(/vgen: o\.vgen \? \+o\.vgen : (18|19|20|21)/.test(gs), 'e  new worlds are vgen 18 or later (19 since v0.55.94)');
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

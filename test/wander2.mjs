@@ -136,9 +136,12 @@ if (want('walk')) {
   check(W.pairs.length <= 1, `pairs closer than 8 s: ${W.pairs.length} in ${WALK_S} s (≤ 1 ≙ ≤ 2 / 10 min)`);
   const sh = W.shots.filter(x => !x.kind.startsWith('b:') && x.kind !== 'rainbow');
   const oursSeen = W.events.filter(e => e.src === 'wander').length, oursAll = (W.started | 0) + (W.beats | 0);
-  check(oursAll >= 8 && oursSeen >= oursAll * 0.9, `ours in view as they start (the event log): ${oursSeen}/${oursAll}`);
-  check(sh.length >= 4 && sh.filter(x => x.inView).length >= sh.length * 0.8, `…and still in view in the picture 0.8 s on: ${sh.filter(x => x.inView).length}/${sh.length}`);
-  check(sh.length && sh.filter(x => x.share >= 0.06).length >= sh.length * 0.8, `the main figure ≥ 6 % of the frame: ${sh.map(x => x.kind + ' ' + (x.share * 100).toFixed(0) + '% ' + x.d + 'm').join(', ')}`);
+  // v0.56.5 · nicht vor deinen Augen (the owner: "people ... just spawn somewhere in front of us"): a moment is staged
+  // beside the view, never in it — it is there when you look round; a beat comes in from outside it (or fades in)
+  const momSeen = W.events.filter(e => e.src === 'wander' && e.sub && e.sub.startsWith('wd:')).length;
+  check(oursAll >= 8, `ours started: ${oursAll} (${W.started} moments, ${W.beats} beats)`);
+  check(momSeen <= Math.max(1, (W.started | 0) * 0.1), `no moment comes into being in view (the event log): ${momSeen} of ${W.started} seen as they start`);
+  check(sh.length >= 2 && sh.filter(x => !x.inView).length >= sh.length * 0.8, `…beside the view in the picture 0.8 s on: ${sh.filter(x => !x.inView).length}/${sh.length} out of it`);
   check(W.beats > 0, `beats filled the gaps (${W.beats}), incl. the flight: ${W.events.filter(e => e.sub && e.sub.startsWith('wb:') && e.t >= 180 && e.t < 245).map(e => e.sub).join(', ')}`);
   const F = (W.files || []);
   for (let i = 0; i < F.length; i += 2) sheet.push({ label: F.slice(i, i + 2).map(x => x.label).join('  |  '), imgs: F.slice(i, i + 2).map(x => x.f) });
