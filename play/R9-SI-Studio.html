@@ -16699,6 +16699,12 @@ prismTree(w,x,y,z,rng);
 if(rng.chance(0.18)){const x=fx0+4+rng.int(8),z=fz0+4+rng.int(8),y=g.surfaceY(x,z)+1;if(!inVillage(x,z,8))basaltPillar(w,x,y,z,rng);}
 }
 
+
+
+
+
+
+if(g.vgen>=21){isleTrees(g,w,fx0,fz0,noCry);void chests;return;}
 for(let k=0;k<3;k++){
 const x=fx0+rng.int(16),z=fz0+rng.int(16);
 const I=g.islandAt(x,z);
@@ -16784,6 +16790,26 @@ for(let i=0;i<h;i++)w.place(x,y+i,z,log,1);
 GEN.blob(w,x,y+h,z,3,2,3,leaf,rng,0.6);
 GEN.blob(w,x+1,y+h+1,z-1,2,2,2,leaf,rng,0.6);
 if(rng.chance(0.5))w.place(x,y+h+2,z,st('glow_lichen',{faces:32}));
+}
+
+const ISLE_G=11;
+function isleTrees(g,w,fx0,fz0,noCry){
+for(let gj=Math.floor(fz0/ISLE_G);gj<=Math.floor((fz0+15)/ISLE_G);gj++)for(let gi=Math.floor(fx0/ISLE_G);gi<=Math.floor((fx0+15)/ISLE_G);gi++){
+const hx=M.hash2(gi,gj,g.seed^0x15e7)>>>0;
+const x=gi*ISLE_G+4+(hx%3),z=gj*ISLE_G+4+((hx>>>4)%3);
+if(x<fx0||x>fx0+15||z<fz0||z>fz0+15)continue;
+if(((hx>>>8)&1023)/1024>0.62)continue;
+const I=g.islandAt(x,z);
+if(!I||I.k<0.35||(I.isle&&I.isle.designed))continue;
+const cl=g.climateAt(x,z);
+if(cl.ember>0.45)continue;
+const rng=new VR.RNG((hx^0x7f4a7c15)>>>0),y=I.top+1;
+const isle=I.isle||{seed:0,x,z},kh=(M.hash2(isle.seed|0,Math.round(isle.x),g.seed^0x5a1c)>>>0)%100;
+if(cl.prism>0.45&& !noCry){spire(w,x,y,z,rng,CRY[rng.int(5)],0.6);continue;}
+if(cl.prism>0.45||(cl.t>= -0.3&&kh<55))sakura(w,x,y,z,rng);
+else if(cl.t< -0.3)GEN.TREES.spruce(w,x,y,z,rng);
+else if(GEN.TREES.fancyOak)GEN.TREES.fancyOak(w,x,y,z,rng);else GEN.TREES.oak(w,x,y,z,rng);
+}
 }
 
 
@@ -19949,6 +19975,7 @@ const stalls=[];
 if(V2)for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])put(cx+sx*(PR-2),py+1,cz+sz*(PR-2),st(site.style==='snowy'?'vx_planter':'vx_flowerbed'));
 for(const[dx,dz,f]of(V2?[[PR-1,-3,3],[PR-1,0,3],[PR-1,3,3],[-PR+1,-3,1],[-PR+1,0,1]]:[[PR-1,-2,3],[PR-1,2,3],[-PR+1,-2,1]])){
 if(!rng.chance(0.7))continue;
+if(S.modern&& !HOME&&g.vgen>=21&&dz===0)continue;
 const x=cx+dx,z=cz+dz;
 put(x,py+1,z,st('vx_counter',{facing:f}));
 put(x,py+3,z,st('vx_awning_'+rng.pick(['red','blue','green','yellow']),{facing:f}));
@@ -19959,7 +19986,11 @@ plan.plaza.seats=seats;plan.plaza.stalls=stalls;
 yield;
 
 const nR=HOME?6:S.modern?4:V2?4+rng.int(3):3+rng.int(3);
-const a0=HOME?Math.PI/2:S.modern?Math.PI/4:rng.next()*Math.PI*2;
+
+
+
+const AXIS= !!(S.modern&& !HOME&&g.vgen>=21);
+const a0=HOME?Math.PI/2:S.modern?(AXIS?0:Math.PI/4):rng.next()*Math.PI*2;
 
 let mansionLot=null;
 if(S.modern&&VG.modern){
@@ -19969,7 +20000,7 @@ let ok=true,mn=999,mx= -999;
 for(let u= -3;u<mw+3&&ok;u++)for(let v= -3;v<md+3;v++){const x=ox-u,z=oz-v,o=oi(x,z);if(o<0||occ[o]===2){ok=false;break;}if(u>=0&&u<mw&&v>=0&&v<md){const y=ground(x,z);if(y<=SEA){ok=false;break;}mn=Math.min(mn,y);mx=Math.max(mx,y);}}
 if(ok&&mx-mn<=12){
 for(let u= -3;u<mw+3;u++)for(let v= -3;v<md+3;v++){const o=oi(ox-u,oz-v);const inner=u>=0&&u<mw&&v>=0&&v<md;occ[o]=inner?3:7;}
-mansionLot={kind:'hall',w:mw,d:md,r:2,ox,oz,F:Math.max(py,mx-3)+1,road:0,fcx,fcz,mn};
+mansionLot={kind:'hall',w:mw,d:md,r:2,ox,oz,F:Math.max(py,mx-3)+1,road:0,fcx,fcz,mn,py:g.vgen>=21?py:undefined};
 
 for(let x=cx-8;x<=cx+8;x++)for(let z=fcz+4;z<=cz-PR-1;z++){const gy=ground(x,z),o=oi(x,z);if(o<0)continue;if(occ[o]===7)occ[o]=5;fill(x,z,gy+1,py-1,st('dirt'));fill(x,z,py+1,py+6,AIR);put(x,py,z,st('granite_paver'));}
 }
@@ -19977,6 +20008,7 @@ for(let x=cx-8;x<=cx+8;x++)for(let z=fcz+4;z<=cz-PR-1;z++){const gy=ground(x,z),
 const roadCells=[];
 const pathS=st(S.path),pathAlt=S.pathAlt?st(S.pathAlt):st(site.style==='desert'?'sandstone':'coarse_dirt');
 const roads=[];
+const bandRoads=[];
 const lineCells=new Set();
 const ringR=V2?(S.modern?(RAD>=200?[72+rng.int(3),158+rng.int(3)]:[40+rng.int(3),82+rng.int(3)]):[Math.round((31+rng.int(8))*(AIRY?1.35:1))]):[];
 const zebra=new Map();
@@ -19984,17 +20016,19 @@ const zebraAt=(px,pz,nx,nz,pa)=>{const ax=Math.abs(Math.cos(pa))>=Math.abs(Math.
 for(let r=0;r<nR;r++){
 yield;
 let ang=a0+r*Math.PI*2/nR+(HOME&&r===0?0:(rng.next()-0.5)*0.5);
+if(AXIS)ang=a0+r*Math.PI*2/nR;
 const L=HOME?(r===0?140:70+rng.int(24)):S.modern?RAD-6:V2?Math.round((54+rng.int(20))*(AIRY?1.3:1)):30+rng.int(20);
 const pts=[];
 let x=cx+Math.cos(ang)*(PR+1),z=cz+Math.sin(ang)*(PR+1);
-const curve=HOME&&r===0?0:(rng.next()-0.5)*(HOME?0.05:0.03);
+let curve=HOME&&r===0?0:(rng.next()-0.5)*(HOME?0.05:0.03);
+if(AXIS){curve=0;if(mansionLot&&Math.sin(ang)< -0.7)continue;}
 for(let t=0;t<L;t++){
 ang+=curve;
 x+=Math.cos(ang);z+=Math.sin(ang);
 const ix=Math.round(x),iz=Math.round(z);
 const o0=oi(ix,iz);
 if(o0<0||Math.hypot(ix-cx,iz-cz)>RAD-4||occ[o0]===7)break;
-pts.push([ix,iz,ang]);
+pts.push([ix,iz,ang,x,z]);
 }
 
 const hs=pts.map(p=>ground(p[0],p[1]));
@@ -20002,6 +20036,7 @@ const sm=hs.map((h,k)=>{let s2=0,n2=0;for(let q= -3;q<=3;q++){const hh2=hs[k+q];
 
 for(let k=0;k<Math.min(6,sm.length);k++)sm[k]=Math.round(py+(sm[k]-py)*(k/6));
 const road={pts:[],ang:pts.length?pts[0][2]:ang};
+const zk=[];
 let lastC=null;
 for(let k=0;k<pts.length;k++){
 const[px,pz,pa]=pts[k];
@@ -20040,7 +20075,7 @@ if(free){for(let a= -1;a<=1;a++)for(let b= -1;b<=1;b++)occ[oi(tx+a,tz+b)]=6;cons
 else{const ph=7+((tx+tz)&3)+((tx*7+tz)%3===0?2:0);fill(tx,tz,ty+1,ty+14,AIR);VG.palm(put,tx,ty+1,tz,ph);palms.push(['street',r,tx,tz,ph]);}}
 }
 road.pts.push([px,ry+1,pz]);
-if(S.modern){const dist=Math.hypot(px-cx,pz-cz);if(k===4||ringR.some(Rr=>Math.abs(Math.round(dist)-Rr)===4))zebraAt(px,pz,nx,nz,pa);}
+if(S.modern){const dist=Math.hypot(px-cx,pz-cz);if(k===4||ringR.some(Rr=>Math.abs(Math.round(dist)-Rr)===4)){zebraAt(px,pz,nx,nz,pa);zk.push(k);}}
 if(k%9===5){
 const side=(k/9|0)%2?1: -1;
 const lx=Math.round(px+nx*(AIRY?3:2)*side),lz=Math.round(pz+nz*(AIRY?3:2)*side);
@@ -20049,6 +20084,7 @@ if(o>=0&&occ[o]===0){occ[o]=6;const gy=ground(lx,lz);const ly=Math.max(gy,ry);fi
 }
 }
 if(detOn&&S.modern)decorJobs.push(()=>VR.Detail.roadDecor({P:detP,occ,oi,ground,st,fill,AIR,rng:detRng,plan},pts,sm,S));
+bandRoads.push({pts,sm,RW:S.sidewalk||AIRY?2:1,zk});
 roads.push(road);
 plan.roads.push(road.pts.filter((_,k)=>k%3===0));
 }
@@ -20065,7 +20101,7 @@ last=[ix,iz];
 const o=oi(ix,iz),gy=ground(ix,iz);
 if(o<0||occ[o]===2||occ[o]===7||gy<=SEA+1){seg=null;continue;}
 if(!seg){seg=[];segs.push(seg);}
-seg.push([ix,iz,an+Math.PI/2]);
+seg.push([ix,iz,an+Math.PI/2,cx+Math.cos(an)*Rr,cz+Math.sin(an)*Rr]);
 }
 for(const pts of segs){
 yield;
@@ -20074,7 +20110,7 @@ const pin=pts.map(p=>roadY.get(p[0]+','+p[1]));
 const hs=pts.map((p,k)=>pin[k]!==undefined?pin[k]:ground(p[0],p[1]));
 const sm=hs.map((h,k)=>{if(pin[k]!==undefined)return pin[k];let s2=0,n2=0;for(let q= -3;q<=3;q++){const hh2=hs[k+q];if(hh2!==undefined){s2+=hh2;n2++;}}return Math.round(s2/n2);});
 for(let it=0;it<3;it++){for(let k=1;k<sm.length;k++)if(pin[k]===undefined)sm[k]=Math.max(sm[k-1]-1,Math.min(sm[k-1]+1,sm[k]));for(let k=sm.length-2;k>=0;k--)if(pin[k]===undefined)sm[k]=Math.max(sm[k+1]-1,Math.min(sm[k+1]+1,sm[k]));}
-const road={pts:[],ang:pts[0][2],ring:true};
+const road={pts:[],ang:pts[0][2],ring:true},zk=[];
 for(let k=0;k<pts.length;k++){
 const[px,pz,pa]=pts[k],ry=sm[k],nx= -Math.sin(pa),nz=Math.cos(pa);
 const RW=S.sidewalk||AIRY?2:1;
@@ -20086,6 +20122,8 @@ occ[o]=1;roadCells.push([qx,qz,ry,Math.abs(wv)===2?1:0]);
 road.pts.push([px,ry+1,pz]);
 if(S.modern){
 
+if(pin[k]!==undefined&&pin[k-1]===undefined&&k>=4)zk.push(k-4);
+if(pin[k]!==undefined&&pin[k+1]===undefined&&k+4<pts.length)zk.push(k+4);
 if(pin[k]!==undefined&&pin[k-1]===undefined&&k>=4)zebraAt(pts[k-4][0],pts[k-4][1],-Math.sin(pts[k-4][2]),Math.cos(pts[k-4][2]),pts[k-4][2]);
 if(pin[k]!==undefined&&pin[k+1]===undefined&&k+4<pts.length)zebraAt(pts[k+4][0],pts[k+4][1],-Math.sin(pts[k+4][2]),Math.cos(pts[k+4][2]),pts[k+4][2]);
 
@@ -20108,6 +20146,7 @@ const side=(k/11|0)%2?1: -1,lx=Math.round(px+nx*(AIRY?3:2)*side),lz=Math.round(p
 if(o>=0&&occ[o]===0){occ[o]=6;const gy=ground(lx,lz),ly=Math.max(gy,ry);fill(lx,lz,gy+1,ly,st('dirt'));put(lx,ly+1,lz,st(S.lamp,{head:0}));put(lx,ly+2,lz,st(S.lamp,{head:1}));fill(lx,lz,ly+3,ly+5,AIR);plan.lamps.push([lx,ly+2,lz]);}
 }
 }
+bandRoads.push({pts,sm,RW:S.sidewalk||AIRY?2:1,zk});
 roads.push(road);
 plan.roads.push(road.pts.filter((_,k)=>k%3===0));
 }
@@ -20668,8 +20707,109 @@ if(Math.max(Math.abs(dx),Math.abs(dz))!==ring)continue;
 const x=px+dx,z=pz+dz;
 const base=fits(x,base0,z,h);if(base<0)continue;
 VR.Plants.palm(putRec,x,base,z,h);palms.push([kind,road,x,z,h]);done=true;
+if(g.vgen>=21){const o6=oi(x,z);if(o6>=0&&occ[o6]===0)occ[o6]=6;}
 }
 if(!done)drops.push([kind,road,px,pz,base0,h0]);
+}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+if(bandRoads.length&&g.vgen>=21){
+const keyOf=(x,z)=>x+','+z;
+const laneW=(rw)=>rw>=2?1.5:rw+0.5;
+const near=(a)=>Math.abs(Math.cos(a))>=0.906||Math.abs(Math.sin(a))>=0.906;
+const axisOf=(a)=>Math.abs(Math.cos(a))>=Math.abs(Math.sin(a))?1:0;
+const cellAt=new Map();
+for(const R of bandRoads){
+const P=R.pts,n=P.length;R.cells=[];R.s=new Float64Array(n);
+if(n<2)continue;
+for(let k=1;k<n;k++)R.s[k]=R.s[k-1]+Math.hypot(P[k][3]-P[k-1][3],P[k][4]-P[k-1][4]);
+const BW=R.RW+0.5,LW=laneW(R.RW),mine=new Map();
+for(let k=0;k+1<n;k++){
+if((k&127)===0)yield;
+const ax=P[k][3],az=P[k][4],ex=P[k+1][3]-ax,ez=P[k+1][4]-az,L2=ex*ex+ez*ez;
+if(L2<1e-9)continue;
+const L=Math.sqrt(L2);
+const x0=Math.floor(Math.min(ax,ax+ex)-BW),x1=Math.ceil(Math.max(ax,ax+ex)+BW),z0=Math.floor(Math.min(az,az+ez)-BW),z1=Math.ceil(Math.max(az,az+ez)+BW);
+for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){
+let t=((x-ax)*ex+(z-az)*ez)/L2;t=t<0?0:t>1?1:t;
+const qx=ax+t*ex,qz=az+t*ez,sd=((x-qx)* -ez+(z-qz)*ex)/L,d=Math.abs(sd);
+if(d>BW+1e-9)continue;
+const kk=keyOf(x,z),e=mine.get(kk);
+if(!e||d<e.d)mine.set(kk,{x,z,d,sd,k,t,s:R.s[k]+t*L,ang:P[k][2]});
+}
+}
+for(const[kk,e]of mine){
+const k1=Math.min(n-1,e.k+1),y=Math.round(R.sm[e.k]+(R.sm[k1]-R.sm[e.k])*e.t);
+let c=cellAt.get(kk);
+if(!c){c={x:e.x,z:e.z,d:e.d,y,laneN:0,cover:0};cellAt.set(kk,c);}
+else if(e.d<c.d){c.d=e.d;c.y=y;}
+c.cover++;if(e.d<=LW+1e-9)c.laneN++;
+R.cells.push([kk,e.sd,e.s,e.ang]);
+}
+}
+const entry=new Map();for(const c of roadCells)entry.set(keyOf(c[0],c[1]),c);
+const surf=(x,z)=>(M.hash2(x,z,5)&7)===0?pathAlt:pathS;
+const dirtS=st(site.style==='desert'?'sandstone':'dirt');
+let nFix=0;
+for(const[kk,c]of cellAt){
+if((++nFix&1023)===0)yield;
+const o=oi(c.x,c.z);if(o<0)continue;
+const walk=walkS&&c.laneN===0?1:0,en=entry.get(kk);
+if(en){
+c.y=en[2];c.road=true;
+if(walkS&&en[3]!==walk&& !zebra.has(kk)){en[3]=walk;put(c.x,en[2],c.z,walk?walkS:surf(c.x,c.z));}
+}else if(occ[o]===0){
+occ[o]=1;c.road=true;
+const gy=ground(c.x,c.z);
+if(gy<c.y)fill(c.x,c.z,gy+1,c.y-1,dirtS);
+fill(c.x,c.z,c.y+1,Math.max(c.y+4,gy+2),AIR);
+put(c.x,c.y,c.z,walk?walkS:surf(c.x,c.z));
+entry.set(kk,[c.x,c.z,c.y,walk]);
+plan.roadFix=(plan.roadFix|0)+1;
+}else if(occ[o]===2&&Math.max(Math.abs(c.x-cx),Math.abs(c.z-cz))===PR+1){
+c.y=py;c.road=true;c.rim=true;
+put(c.x,py,c.z,walk?walkS:surf(c.x,c.z));
+entry.set(kk,[c.x,c.z,py,walk]);
+}
+}
+if(S.modern&&lineS){
+const mark=new Map();
+for(const R of bandRoads){
+if(!R.cells.length)continue;
+const LW=laneW(R.RW);
+for(const[kk,sd,,ang]of R.cells){
+const c=cellAt.get(kk);
+if(!c|| !c.road||c.rim||c.cover>1|| !(sd> -0.5&&sd<=0.5)|| !near(ang))continue;
+if(Math.max(Math.abs(c.x-cx),Math.abs(c.z-cz))<=PR+2)continue;
+mark.set(kk,st('asphalt_dash',{axis:axisOf(ang)}));
+}
+for(const k0 of R.zk){
+if(k0<0||k0>=R.pts.length)continue;
+const a0=R.pts[k0][2],s0=R.s[k0];
+if(!near(a0))continue;
+for(const[kk,sd,sv]of R.cells){
+if(Math.abs(sv-s0)>0.5||Math.abs(sd)>LW+1e-9)continue;
+const c=cellAt.get(kk);if(!c|| !c.road||(c.cover>1&& !c.rim))continue;
+mark.set(kk,st('asphalt_zebra',{axis:axisOf(a0)}));
+}
+}
+}
+
+for(const kk of lineCells){if(mark.has(kk))continue;const en=entry.get(kk);if(en)put(en[0],en[2],en[1],en[3]&&walkS?walkS:surf(en[0],en[1]));}
+for(const kk of zebra.keys()){if(mark.has(kk))continue;const en=entry.get(kk);if(en)put(en[0],en[2],en[1],en[3]&&walkS?walkS:surf(en[0],en[1]));}
+for(const[kk,stt]of mark){const en=entry.get(kk);if(en)put(en[0],en[2],en[1],stt);}
+plan.roadMarks=mark.size;
 }
 }
 
@@ -23316,6 +23456,33 @@ for(const u of[cu-7,cu+7]){P(u,F,-1,'vx_urn');P(u,F,-2,'vx_bollard');}
 for(let u=cu-8;u<=cu+8;u+=4)if(u!==cu)P(u,F,-4,null);
 for(const u of[-2,w+1])for(let v=0;v<d;v+=4)P(u,F,v,'vx_urn');
 K.tree(-1,d-2,F,true);K.tree(w,d-2,F,true);
+
+
+
+
+
+if(Number.isFinite(lot.py)){
+const top=F-1,n=top-lot.py;
+for(let v= -5;v<= -1;v++)for(let u= -2;u<=w+1;u++){
+if(v< -3&&Math.abs(u-cu)>2)continue;
+const gy=o.ground(u,v);for(let y=gy+1;y<top;y++)P(u,y,v,'stone_bricks');
+}
+if(n>0){
+for(const[ua,ub]of[[cu-5,cu-3],[cu+3,cu+5]])for(let k=1;k<=n;k++){
+const v= -3-k,y=top+1-k;
+for(let u=ua;u<=ub;u++){
+const gy=o.ground(u,v);
+for(let yy=gy+1;yy<y;yy++)P(u,yy,v,'stone_bricks');
+P(u,y,v,'stone_brick_stairs',{facing:2,half:0});
+for(let yy=y+1;yy<=y+3;yy++)P(u,yy,v,null);
+}
+
+const uc=ua===cu-5?ua-1:ub+1,gyc=o.ground(uc,v);
+for(let yy=gyc+1;yy<=y;yy++)P(uc,yy,v,'stone_bricks');
+}
+info.stairs=n;
+}
+}
 info.door=[cu,F+1,V0];info.outside=[cu,F,-2];info.inside=[cu,F+1,V0+4];info.lights.push([cu,F+7,V0+4]);info.roofTop=TOP+7;
 return info;
 };
@@ -74103,6 +74270,8 @@ VR.I18N.add('en',{
 "g.fe.terminal":"Heartworld ferry port",
 "g.ctx.ferry":"Take the ferry",
 "g.ctx.takeCraft":"Board and fly off",
+"g.ctx.hijack":"Hijack",
+"g.tr.hijacked":"Hijacked: {name}",
 "g.set.spaceLife":"Life between the worlds",
 "g.set.spaceLife.tip":"Settlements on the moons, ferries and traffic in space",
 
@@ -79234,6 +79403,8 @@ VR.I18N.add('de',{
 "g.fe.terminal":"Fährhafen Herzwelt",
 "g.ctx.ferry":"Fähre nehmen",
 "g.ctx.takeCraft":"Einsteigen und losfliegen",
+"g.ctx.hijack":"Kapern",
+"g.tr.hijacked":"Gekapert: {name}",
 "g.set.spaceLife":"Leben zwischen den Welten",
 "g.set.spaceLife.tip":"Siedlungen auf den Monden, Fähren und Verkehr im All",
 
