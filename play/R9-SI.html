@@ -40399,6 +40399,221 @@ const GREY=[128,128,128],ISLE_SHADE=[20,20,30];
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const HC=VR.HzCull=VR.HzCull||{};
+HC.RUN=2;
+HC.E=1;
+HC.BINS=1024;
+HC.PAD=1.25;
+HC.MARGIN=0.002;
+
+
+
+
+
+HC.runs=function(blocks,H,opaque,out){
+const run=out&&out.run?out.run:new Int16Array(512),NS=H>>4;
+const top=out&&out.top&&out.top.length===NS?out.top:new Int16Array(NS);
+top.fill(-1);
+for(let col=0;col<256;col++){
+let y=H-1;
+while(y>=0&& !blocks[(y<<8)|col])y--;
+if(y<0){run[col*2]=0;run[col*2+1]=0;continue;}
+
+const sy=y>>4;if(y+1>top[sy])top[sy]=y+1;
+for(let s2=0;s2<sy;s2++)top[s2]=(s2+1)*16;
+
+let yo=y;while(yo>=0&& !opaque(blocks[(yo<<8)|col]))yo--;
+if(yo<0){run[col*2]=0;run[col*2+1]=0;continue;}
+let yb=yo;while(yb>0&&opaque(blocks[((yb-1)<<8)|col]))yb--;
+run[col*2]=yb;run[col*2+1]=yo+1;
+}
+return{run,top};
+};
+
+
+
+
+
+
+
+HC.cells=function(run,nb,Ein,out){
+const o=out||new Int16Array(42),RUN=HC.RUN;
+const E=typeof Ein==='number'?Ein:Ein[0],Et=typeof Ein==='number'?Ein:Ein[1],Eb=typeof Ein==='number'?Ein:Ein[2];
+for(let ci=0;ci<16;ci++){
+const x0=(ci&3)*4,z0=(ci>>2)*4;
+let bot= -32768,top=32767,ok=true;
+for(let z=z0-E;z<z0+4+E&&ok;z++)for(let x=x0-E;x<x0+4+E;x++){
+const dx=x<0? -1:x>15?1:0,dz=z<0? -1:z>15?1:0;
+const r=dx||dz?nb(dx,dz):run;
+if(!r){ok=false;break;}
+const i=(((z&15)<<4)|(x&15))<<1,b=r[i],t=r[i+1];
+if(t<=b){ok=false;break;}
+if(b>bot)bot=b;if(t<top)top=t;
+}
+bot+=Eb;top-=Et;
+if(!ok||top-bot<RUN){o[ci*2]=0;o[ci*2+1]= -1;}else{o[ci*2]=bot;o[ci*2+1]=top;}
+}
+
+const merge=(dst,a,b,c,d)=>{
+let bot= -32768,top=32767;
+for(const k of[a,b,c,d]){const kb=o[k*2],kt=o[k*2+1];if(kt<=kb){o[dst*2]=0;o[dst*2+1]= -1;return;}if(kb>bot)bot=kb;if(kt<top)top=kt;}
+if(top-bot<RUN){o[dst*2]=0;o[dst*2+1]= -1;}else{o[dst*2]=bot;o[dst*2+1]=top;}
+};
+merge(16,0,1,4,5);merge(17,2,3,6,7);merge(18,8,9,12,13);merge(19,10,11,14,15);
+merge(20,16,17,18,19);
+return o;
+};
+
+HC.cellRect=(k)=>(k<16?[(k&3)*4,(k>>2)*4,4]:k<20?[((k-16)&1)*8,((k-16)>>1)*8,8]:[0,0,16]);
+
+
+
+
+
+let S=null;
+function scratch(n,nb){
+if(!S||S.cap<n){const cap=Math.max(n,S?S.cap*2:4096);S={cap,a0:new Float64Array(cap),a1:new Float64Array(cap),lo:new Float64Array(cap),hi:new Float64Array(cap),key:new Float64Array(cap),ord:new Int32Array(cap),tix:new Int32Array(cap),cnt:null,binLo:null,binHi:null,bins:0};}
+if(S.bins!==nb){S.bins=nb;S.binLo=new Float64Array(nb);S.binHi=new Float64Array(nb);}
+return S;
+}
+
+const pang=(dx,dz)=>{const s=Math.abs(dx)+Math.abs(dz);if(s===0)return 0;const t=dz/s;return dx>=0?(dz>=0?t:4+t):2-t;};
+
+const ARC=[0,0],PA=[0,0,0,0];
+function arc(px,pz,x0,x1,z0,z1){
+if(px>=x0&&px<=x1&&pz>=z0&&pz<=z1)return false;
+PA[0]=pang(x0-px,z0-pz);PA[1]=pang(x1-px,z0-pz);PA[2]=pang(x0-px,z1-pz);PA[3]=pang(x1-px,z1-pz);
+let best=9;
+for(let i=0;i<4;i++){let w=0;for(let j=0;j<4;j++){let d=PA[j]-PA[i];if(d<0)d+=4;if(d>w)w=d;}if(w<best){best=w;ARC[0]=PA[i];ARC[1]=PA[i]+w;}}
+return true;
+}
+
+const UV=[0,0];
+function dirOf(p){p=p%4;if(p<0)p+=4;if(p<1){UV[0]=1-p;UV[1]=p;}else if(p<2){UV[0]=1-p;UV[1]=2-p;}else if(p<3){UV[0]=p-3;UV[1]=2-p;}else{UV[0]=p-3;UV[1]=p-4;}}
+
+
+
+const SUB=[0,0];
+function subDist(px,pz,x0,x1,z0,z1,al,be){
+let dn=Infinity,df=0;
+const w=be-al+1e-9;
+const inArc=(p)=>{let q=p-al;q-=Math.floor(q/4)*4;return q<=w||q>=4-1e-9;};
+const pt=(x,z)=>{const dd=Math.sqrt((x-px)*(x-px)+(z-pz)*(z-pz));if(dd<dn)dn=dd;if(dd>df)df=dd;};
+if(inArc(pang(x0-px,z0-pz)))pt(x0,z0);if(inArc(pang(x1-px,z0-pz)))pt(x1,z0);
+if(inArc(pang(x0-px,z1-pz)))pt(x0,z1);if(inArc(pang(x1-px,z1-pz)))pt(x1,z1);
+for(let r=0;r<2;r++){
+dirOf(r?be:al);const ux=UV[0],uz=UV[1];
+let t0=0,t1=Infinity;
+if(ux!==0){let a=(x0-px)/ux,b=(x1-px)/ux;if(a>b){const t=a;a=b;b=t;}if(a>t0)t0=a;if(b<t1)t1=b;}else if(px<x0||px>x1)continue;
+if(uz!==0){let a=(z0-pz)/uz,b=(z1-pz)/uz;if(a>b){const t=a;a=b;b=t;}if(a>t0)t0=a;if(b<t1)t1=b;}else if(pz<z0||pz>z1)continue;
+if(t1<t0)continue;
+pt(px+ux*t0,pz+uz*t0);pt(px+ux*t1,pz+uz*t1);
+}
+if(pz>=z0&&pz<=z1){if(inArc(pang(x0-px,0)))pt(x0,pz);if(inArc(pang(x1-px,0)))pt(x1,pz);}
+if(px>=x0&&px<=x1){if(inArc(pang(0,z0-pz)))pt(px,z0);if(inArc(pang(0,z1-pz)))pt(px,z1);}
+SUB[0]=Math.max(0.25,dn);SUB[1]=df;
+return df>0&&dn<=df;
+}
+HC.SLICE=48;
+
+
+HC.cull=function(eye,delta,occ,nOcc,tgt,nTgt,hidden){
+const px=eye[0],py=eye[1],pz=eye[2],d=Math.max(0,delta||0),grow=d+HC.PAD,M=HC.MARGIN;
+const BINS=HC.BINS,bw=4/BINS,cap=nOcc*8+nTgt;
+const sc=scratch(cap,BINS),a0=sc.a0,a1=sc.a1,lo=sc.lo,hi=sc.hi,key=sc.key,ord=sc.ord;
+const tix=sc.tix&&sc.tix.length>=cap?sc.tix:(sc.tix=new Int32Array(Math.max(cap,sc.cap)));
+let dMax=0,ne=0;
+
+for(let i=0;i<nOcc;i++){
+const o=i*6,x0=occ[o]+d,x1=occ[o+1]-d,z0=occ[o+2]+d,z1=occ[o+3]-d,bot=occ[o+4]+d,top=occ[o+5]-d;
+if(x1<=x0||z1<=z0||top<=bot|| !arc(px,pz,x0,x1,z0,z1))continue;
+
+const A0=ARC[0],A1=ARC[1],B0=Math.ceil(A0/bw),B1=Math.floor(A1/bw)-1,nb=B1-B0+1;
+if(nb<1)continue;
+const k=Math.max(1,Math.min(8,Math.round(nb/HC.SLICE)));
+for(let q=0;q<k;q++){
+const c0=B0+Math.floor(nb*q/k),c1=B0+Math.floor(nb*(q+1)/k)-1;
+if(c1<c0)continue;
+const al=k===1?A0:c0*bw,be=k===1?A1:(c1+1)*bw;
+let dn,df;
+if(k===1){
+const dx=Math.max(x0-px,0,px-x1),dz=Math.max(z0-pz,0,pz-z1);dn=Math.max(0.25,Math.sqrt(dx*dx+dz*dz));
+const fx=Math.max(Math.abs(x0-px),Math.abs(x1-px)),fz=Math.max(Math.abs(z0-pz),Math.abs(z1-pz));df=Math.sqrt(fx*fx+fz*fz);
+}else{if(!subDist(px,pz,x0,x1,z0,z1,al,be))continue;dn=SUB[0];df=SUB[1];}
+
+const sTop=(top-py)/(top>=py?df:dn),sBot=(bot-py)/(bot>=py?dn:df);
+if(!(sTop>sBot))continue;
+a0[ne]=al;a1[ne]=be;lo[ne]=sBot;hi[ne]=sTop;key[ne]=df;tix[ne]= -1;ne++;
+if(df>dMax)dMax=df;
+}
+}
+for(let j=0;j<nTgt;j++){
+const o=j*6,x0=tgt[o]-grow,x1=tgt[o+1]+grow,y0=tgt[o+2]-grow,y1=tgt[o+3]+grow,z0=tgt[o+4]-grow,z1=tgt[o+5]+grow;
+hidden[j]=0;
+if(!arc(px,pz,x0,x1,z0,z1))continue;
+const dx=Math.max(x0-px,0,px-x1),dz=Math.max(z0-pz,0,pz-z1),dn=Math.max(0.25,Math.sqrt(dx*dx+dz*dz));
+const fx=Math.max(Math.abs(x0-px),Math.abs(x1-px)),fz=Math.max(Math.abs(z0-pz),Math.abs(z1-pz)),df=Math.sqrt(fx*fx+fz*fz);
+const sHi=(y1-py)/(y1>=py?dn:df),sLo=(y0-py)/(y0>=py?df:dn);
+a0[ne]=ARC[0];a1[ne]=ARC[1];lo[ne]=sLo;hi[ne]=sHi;key[ne]=dn;tix[ne]=j;ne++;
+if(dn>dMax)dMax=dn;
+}
+
+
+const NB=Math.ceil(dMax*2)+2,K=NB*2;
+if(!sc.cnt||sc.cnt.length<K+1)sc.cnt=new Int32Array(K+1);
+const cnt=sc.cnt;cnt.fill(0,0,K+1);
+for(let i=0;i<ne;i++){const b=Math.floor(key[i]*2)*2+(tix[i]<0?1:0);key[i]=b;cnt[b+1]++;}
+for(let k=0;k<K;k++)cnt[k+1]+=cnt[k];
+const m=ne;for(let i=0;i<ne;i++)ord[cnt[key[i]]++]=i;
+const bL=sc.binLo,bH=sc.binHi;bL.fill(Infinity);bH.fill(-Infinity);
+let nh=0;
+for(let k=0;k<m;k++){
+const i=ord[k],s0=a0[i],s1=a1[i],l=lo[i],h=hi[i];
+if(tix[i]<0){
+
+const b0=Math.ceil(s0/bw),b1=Math.floor(s1/bw)-1;
+for(let b=b0;b<=b1;b++){
+const q=b>=BINS?b-BINS:b,cl=bL[q],ch=bH[q];
+if(ch<cl){bL[q]=l;bH[q]=h;}
+else if(l<=ch&&h>=cl){if(l<cl)bL[q]=l;if(h>ch)bH[q]=h;}
+else if(h>ch){bL[q]=l;bH[q]=h;}
+}
+}else{
+const b0=Math.floor(s0/bw),b1=Math.floor(s1/bw);
+let hid=true;
+for(let b=b0;b<=b1;b++){const q=b>=BINS?b-BINS:b;if(!(bL[q]<l-M&&bH[q]>h+M)){hid=false;break;}}
+if(hid){hidden[tix[i]]=1;nh++;}
+}
+}
+return nh;
+};
+})(VR);
+
+
+
+
+
+
+
+
+
+
+
+
 (function(VR){
 'use strict';
 const G_HOME=9.81,GRAV_HOME=30;
@@ -43305,12 +43520,13 @@ function meshFluid(x,y,z,bi,b){
 const type=TTYPE[b],t=R.types[type];
 const isLava=(TF[b]&F.LAVA)!==0;
 if(fluidHidden(bi,type,isLava))return;
-const lvl=t.get(b,'level');
+
+const lvl=t.has('level')?t.get(b,'level'):0;
 const aboveSame=TTYPE[B[bi+PSS]]===type||(!isLava&&(TF[B[bi+PSS]]&F.WATER));
 const heightOf=(s)=>{
 const tt=TTYPE[s];
 if(tt!==type&& !(!isLava&&(TF[s]&F.WATER)&&(TF[s]&F.FLUID)))return-1;
-const lv=R.types[tt].get(s,'level');
+const lv=R.types[tt].has('level')?R.types[tt].get(s,'level'):0;
 if(lv===0)return 0.875;
 if(lv>=8)return 1;
 return(8-lv)/9;
@@ -58073,7 +58289,7 @@ return m;
 HI.bytes=function(layers){let n=0;for(let lv=0;lv<HI.LEVELS;lv++)n+=(HI.N>>lv)*(HI.N>>lv)*4*2*layers;return n;};
 })(VR);
 
-VR.TEX_SRC_HASH="c8c7311f13deb90c";
+VR.TEX_SRC_HASH="b9886927995f0fe8";
 
 
 
@@ -83957,7 +84173,10 @@ gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 if(world&&this.q.farCache&&VR.UL)this.gpuPass('farcache');
 const fc=world&&this.q.farCache&&VR.UL?this.farFrame(F,E,world,vis,camPos):null;
 if(!this.q.farCache&&this.fc)this.fcDrop();
-const near=fc?fc.near:vis;
+const nearAll=fc?fc.near:vis;
+
+
+const near=VR.HzGame&&world&&this.q.hzCull!==false?VR.HzGame.frame(this,world,F.cam,nearAll,vis):nearAll;
 
 this.gpuPass('sky');
 gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.disable(gl.CULL_FACE);
@@ -87610,7 +87829,7 @@ const i=(y<<8)|((z&15)<<4)|(x&15);
 const old=c.blocks[i];
 if(old===state)return false;
 c.blocks[i]=state;
-c.modified=true;
+c.modified=true;c.bv=(c.bv|0)+1;
 if((flags&8)&&this.zr)this.zr.one(x,y,z,old,state,this.dim,(flags&16)?6:1);
 const s=c.sec[y>>4];
 if(!old&&state)s.count++;else if(old&& !state)s.count--;
@@ -87641,7 +87860,7 @@ const c=this.col(x>>4,z>>4);if(!c)continue;
 if(y>=c.H){if(!state)continue;this.growColumn(c,y);}
 const i=(y<<8)|((z&15)<<4)|(x&15);
 const old=c.blocks[i];if(old===state)continue;
-c.blocks[i]=state;c.modified=true;
+c.blocks[i]=state;c.modified=true;c.bv=(c.bv|0)+1;
 if(Z){if(!zb){Z.begin(kind,this.dim);zb=true;}Z.add(x,y,z,old,state);}
 const s=c.sec[y>>4];
 if(!old&&state)s.count++;else if(old&& !state)s.count--;
@@ -87673,7 +87892,7 @@ const c=this.col(x>>4,z>>4);if(!c)continue;
 if(y>=c.H){if(!state)continue;this.growColumn(c,y);}
 const i=(y<<8)|((z&15)<<4)|(x&15);
 const old=c.blocks[i];if(old===state)continue;
-c.blocks[i]=state;c.modified=true;n++;
+c.blocks[i]=state;c.modified=true;c.bv=(c.bv|0)+1;n++;
 const s=c.sec[y>>4];
 if(!old&&state)s.count++;else if(old&& !state)s.count--;
 const col=i&255;
@@ -129789,7 +130008,7 @@ const e=le;if(!e)return;
 const c=e.rc;if(y<0||y>=c.H)return;
 const i=(y<<8)|((z&15)<<4)|(x&15),old=c.blocks[i];
 if(old===s)return;
-c.blocks[i]=s;
+c.blocks[i]=s;c.bv=(c.bv|0)+1;
 const sy=y>>4,sec=c.sec[sy];
 if(!old&&s)sec.count++;else if(old&& !s)sec.count--;
 if(e.ds){
@@ -131511,6 +131730,8 @@ K.LIST=[
 {id:'plant0',de:'Runde Pflanzen/Möbel aus',en:'Smooth plants/furniture off',set:{smoothPlants:0,smoothFurn:0},grp:'geo'},
 {id:'sh0',de:'Sonnenschatten (Karte) aus',en:'Sun shadow map off',set:{sunShadows:false,shadows:0},grp:'geo'},
 {id:'rd2',de:'Sichtweite −2 Chunks',en:'View distance −2 chunks',set:{},rd: -2,grp:'geo'},
+
+{id:'hz0',de:'Horizontschatten aus (zeigt, was er spart)',en:'Horizon culling off (shows what it saves)',set:{},knob:['HzGame','on',false],grp:'geo'},
 {id:'res8',de:'Auflösung ×0.8',en:'Resolution ×0.8',set:{},scale:0.8},
 
 
@@ -131851,6 +132072,187 @@ if(typeof console!=='undefined')console.log('R9 pruefstand',JSON.stringify(A));
 return A;
 };
 })(typeof VR!=='undefined'?VR:(self.VR=self.VR||{}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(function(VR){
+'use strict';
+const R=VR.R,F=VR.F;
+const HG=VR.HzGame={
+on:true,
+stats:{hidden:0,of:0,ms:0,delta:0,off:'',runs:0,occ:0},
+tok:0,hidTok:0,runsN:0,last:null,out:[],prev:null,
+};
+let OCCT=null;
+const occT=()=>{
+if(OCCT&&OCCT.length===R.stateCount+1)return OCCT;
+OCCT=new Uint8Array(R.stateCount+1);
+for(let s=1;s<=R.stateCount;s++){const f=R.T.flags[s];OCCT[s]=f&F.OPAQUE&&f&F.FULL?1:0;}
+return OCCT;
+};
+const OCC=(s)=>OCCT[s]===1;
+const RECT=new Int8Array(63);for(let k=0;k<21;k++){const q=k<16?[(k&3)*4,(k>>2)*4,4]:k<20?[((k-16)&1)*8,((k-16)>>1)*8,8]:[0,0,16];RECT[k*3]=q[0];RECT[k*3+1]=q[1];RECT[k*3+2]=q[2];}
+
+
+function clearance(world,eye){
+const T=occT(),bx=Math.floor(eye[0]),by=Math.floor(eye[1]),bz=Math.floor(eye[2]);
+let best=9;
+for(let dy= -1;dy<=1;dy++)for(let dz= -1;dz<=1;dz++)for(let dx= -1;dx<=1;dx++){
+const x=bx+dx,y=by+dy,z=bz+dz;
+if(!T[world.getBlock(x,y,z)])continue;
+const ex=Math.max(x-eye[0],0,eye[0]-(x+1)),ey=Math.max(y-eye[1],0,eye[1]-(y+1)),ez=Math.max(z-eye[2],0,eye[2]-(z+1));
+const d=Math.sqrt(ex*ex+ey*ey+ez*ez);if(d<best)best=d;
+}
+return best;
+}
+
+const settled=(s)=>s.count===0||(s.meshVer===s.ver&&(s.fade===undefined||s.fade>=1)&&(s.grow===undefined||s.grow>=1));
+
+HG.frame=function(r,world,cam,near,vis){
+const st=HG.stats;
+if(!HG.on|| !VR.HzCull|| !world|| !near|| !near.length){st.hidden=0;st.of=near?near.length:0;st.off='aus';return near;}
+occT();
+const now=performance.now(),eye=[cam.x,cam.y,cam.z];
+
+const P=HG.prev;
+if(P){const dt=Math.max(1e-3,(now-P.t)/1000),v=Math.hypot(eye[0]-P.e[0],eye[1]-P.e[1],eye[2]-P.e[2])/dt;HG.speed=HG.speed===undefined?v:(v>HG.speed?v:HG.speed*0.8+v*0.2);}
+HG.prev={t:now,e:eye};
+const speed=HG.speed||0;
+st.of=near.length;
+if(speed>16){st.hidden=0;st.off='schnell';HG.last=null;return near;}
+if(clearance(world,eye)<0.35){st.hidden=0;st.off='nah';HG.last=null;return near;}
+const ground=world.col(Math.floor(eye[0])>>4,Math.floor(eye[2])>>4);
+if(ground&&ground.height&&eye[1]-ground.height[((Math.floor(eye[2])&15)<<4)|(Math.floor(eye[0])&15)]>48){st.hidden=0;st.off='hoch';HG.last=null;return near;}
+st.off='';
+
+
+
+const tok= ++HG.tok;
+if(vis&&vis!==near)for(let i=0;i<vis.length;i++)vis[i].hzV=tok;
+for(let i=0;i<near.length;i++){near[i].hzN=tok;near[i].hzV=tok;}
+const L=HG.last;
+const moved=L?Math.hypot(eye[0]-L.eye[0],eye[1]-L.eye[1],eye[2]-L.eye[2]):Infinity;
+
+
+
+if(!L||moved>L.delta||L.world!==world||now-L.t>500|| !HG.holds(tok))HG.compute(r,world,eye,near,speed,tok,now);
+const out=HG.out;out.length=0;
+const H=HG.hidTok;
+for(let i=0;i<near.length;i++){const s=near[i];if(s.hzH!==H)out.push(s);}
+st.hidden=near.length-out.length;
+return out;
+};
+
+
+const stampOf=(c,mask)=>{let h=c.fade>=1?1:2;for(let k=0;k<c.sec.length&&k<32;k++)if(mask&(1<<k)){const s=c.sec[k];h=(Math.imul(h,31)+(s.meshVer|0)*3+(s.hasMesh?1:0))|0;}return h;};
+HG.holds=function(tok){
+const D=HG.dep,n=HG.depN|0;
+for(let i=0;i<n;i++){
+const c=D[i*3],mask=D[i*3+1];
+for(let k=0;k<c.sec.length&&k<32;k++)if(mask&(1<<k)){const s=c.sec[k];if(s.hasMesh&&s.hzV===tok&&s.hzN!==tok)return false;}
+if(stampOf(c,mask)!==D[i*3+2])return false;
+}
+return true;
+};
+HG.compute=function(r,world,eye,near,speed,tok,now){
+const t0=performance.now(),HC=VR.HzCull,st=HG.stats;
+const delta=Math.min(1.5,Math.max(0.05,speed*0.12));
+const lm=typeof world.fancyLeaves==='number'?world.fancyLeaves:0;
+const blob=(lm&(4|16|64))!==0,slopes=world.smooth!==false;
+const E0=blob?[1,1,1]:slopes?[0,1,0]:0,Ecode=blob?2:slopes?1:0;
+const rd=world.renderDist,pcx=Math.floor(eye[0])>>4,pcz=Math.floor(eye[2])>>4,W=2*rd+3;
+
+const cols=HG.cols&&HG.cols.length>=W*W?HG.cols:(HG.cols=new Array(W*W));
+const good=HG.good&&HG.good.length>=W*W?HG.good:(HG.good=new Uint32Array(W*W));
+const at=(dx,dz)=>(dz+rd+1)*W+dx+rd+1;
+for(let dz= -rd-1;dz<=rd+1;dz++)for(let dx= -rd-1;dx<=rd+1;dx++){
+const i=at(dx,dz),c=world.col(pcx+dx,pcz+dz);
+cols[i]=null;good[i]=0;
+if(!c|| !c.ready|| !c.blocks)continue;
+
+
+const R0=c.hzR;
+if(!R0||R0.blocks!==c.blocks||R0.bv!==(c.bv|0)||R0.H!==c.H){const rr=HC.runs(c.blocks,c.H,OCC,R0);c.hzR={blocks:c.blocks,bv:c.bv|0,H:c.H,stamp: ++HG.runsN,run:rr.run,top:rr.top};}
+cols[i]=c;
+if(!(c.shownAt>=0)||c.fade<1||(c.grow!==undefined&&c.grow<1))continue;
+let m=0;
+for(let k=0;k<c.sec.length&&k<32;k++){const s=c.sec[k];if(settled(s)&&(!s.hasMesh||s.hzN===tok||s.hzV!==tok))m|=1<<k;}
+good[i]=m;
+}
+
+const goodN=HG.goodN&&HG.goodN.length>=W*W?HG.goodN:(HG.goodN=new Uint32Array(W*W));
+const used=HG.used&&HG.used.length>=W*W?HG.used:(HG.used=new Uint8Array(W*W));
+used.fill(0,0,W*W);
+const rd2=(rd+0.5)*(rd+0.5);
+for(let dz= -rd;dz<=rd;dz++)for(let dx= -rd;dx<=rd;dx++){
+const i=at(dx,dz);let m=good[i];
+if(m)for(let oz= -1;oz<=1;oz++)for(let ox= -1;ox<=1;ox++)m&=good[at(dx+ox,dz+oz)];
+goodN[i]=m;
+}
+
+
+const occ=HG.occ&&HG.occ.length>=(2*rd+1)*(2*rd+1)*21*6?HG.occ:(HG.occ=new Float64Array((2*rd+1)*(2*rd+1)*21*6));
+let no=0;
+for(let dz= -rd;dz<=rd;dz++)for(let dx= -rd;dx<=rd;dx++){
+if(dx*dx+dz*dz>rd2)continue;
+const i=at(dx,dz),c=cols[i],gn=goodN[i];
+if(!c|| !gn)continue;
+const E=c.lod===1?0:E0,ec=c.lod===1?0:Ecode;
+
+let key=ec;for(let oz= -1;oz<=1;oz++)for(let ox= -1;ox<=1;ox++){const n=cols[at(dx+ox,dz+oz)];key=(Math.imul(key,31)+(n?n.hzR.stamp:7))|0;}
+if(!c.hzC||c.hzC.key!==key)c.hzC={key,cells:HC.cells(c.hzR.run,(ox,oz)=>{const n=cols[at(dx+ox,dz+oz)];return n?n.hzR.run:null;},E,c.hzC?c.hzC.cells:null)};
+const cells=c.hzC.cells,X0=c.cx*16,Z0=c.cz*16;
+let any=false;
+for(let k=0;k<21;k++){
+const b=cells[k*2],t=cells[k*2+1];if(t<=b)continue;
+
+const s0=Math.max(0,(b-1)>>4),s1=Math.min(31,t>>4);
+const need=(s1>=31? -1:((1<<(s1+1))-1))& ~((1<<s0)-1);
+if((gn&need)!==need)continue;
+const x0=RECT[k*3],z0=RECT[k*3+1],sz=RECT[k*3+2];
+occ[no++]=X0+x0;occ[no++]=X0+x0+sz;occ[no++]=Z0+z0;occ[no++]=Z0+z0+sz;occ[no++]=b;occ[no++]=t;
+any=true;
+}
+if(any)for(let oz= -1;oz<=1;oz++)for(let ox= -1;ox<=1;ox++)used[at(dx+ox,dz+oz)]=1;
+}
+
+const D=HG.dep&&HG.dep.length>=W*W*3?HG.dep:(HG.dep=new Array(W*W*3));
+let nd=0;
+for(let i=0;i<W*W;i++)if(used[i]&&cols[i]){D[nd*3]=cols[i];D[nd*3+1]=good[i];D[nd*3+2]=stampOf(cols[i],good[i]);nd++;}
+HG.depN=nd;
+
+const nT=near.length;
+const tg=HG.tg&&HG.tg.length>=nT*6?HG.tg:(HG.tg=new Float64Array(Math.max(nT,256)*6*2));
+const hid=HG.hid&&HG.hid.length>=nT?HG.hid:(HG.hid=new Uint8Array(Math.max(nT,256)*2));
+for(let j=0;j<nT;j++){
+const s=near[j],ex=(s.ox>>4)-pcx,ez=(s.oz>>4)-pcz,sy=s.oy>>4;
+const c=ex>= -rd-1&&ex<=rd+1&&ez>= -rd-1&&ez<=rd+1?cols[at(ex,ez)]:world.col(s.ox>>4,s.oz>>4);
+const top=c&&c.hzR&&sy<c.hzR.top.length?c.hzR.top[sy]:s.oy+16;
+const o=j*6;tg[o]=s.ox;tg[o+1]=s.ox+16;tg[o+2]=s.oy;tg[o+3]=top<0?s.oy+16:Math.min(s.oy+16,top);tg[o+4]=s.oz;tg[o+5]=s.oz+16;
+}
+const nh=HC.cull(eye,delta,occ,no/6,tg,nT,hid);
+const H= ++HG.hidTok;
+for(let j=0;j<nT;j++)if(hid[j])near[j].hzH=H;
+HG.last={eye,delta,world,t:now};
+st.runs++;st.occ=no/6;st.delta=delta;st.ms=st.ms?st.ms*0.8+(performance.now()-t0)*0.2:performance.now()-t0;
+void nh;
+};
+})(VR);
 
 
 
