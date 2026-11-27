@@ -26,6 +26,8 @@
     { id: 'plant0', de: 'Runde Pflanzen/Möbel aus', en: 'Smooth plants/furniture off', set: { smoothPlants: 0, smoothFurn: 0 }, grp: 'geo' },
     { id: 'sh0', de: 'Sonnenschatten (Karte) aus', en: 'Sun shadow map off', set: { sunShadows: false, shadows: 0 }, grp: 'geo' },
     { id: 'rd2', de: 'Sichtweite −2 Chunks', en: 'View distance −2 chunks', set: {}, rd: -2, grp: 'geo' },
+    // (v0.56.8 · Horizontschatten: its own row shows what it saves on this card — the opaque pass with it off)
+    { id: 'hz0', de: 'Horizontschatten aus (zeigt, was er spart)', en: 'Horizon culling off (shows what it saves)', set: {}, knob: ['HzGame', 'on', false], grp: 'geo' },
     { id: 'res8', de: 'Auflösung ×0.8', en: 'Resolution ×0.8', set: {}, scale: 0.8 },
     // /kosten ultra · where Ultra's terrain time goes (on the owner's APU 3× Balanced's): each row takes ONE Ultra part
     // down to Balanced's value; the opaque pass's delta is what counts (the shadow map's redraw lands in 'shadow')

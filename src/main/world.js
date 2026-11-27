@@ -1038,7 +1038,7 @@
       const old = c.blocks[i];
       if (old === state) return false;
       c.blocks[i] = state;
-      c.modified = true;
+      c.modified = true; c.bv = (c.bv | 0) + 1;   // (bv: the blocks' own version — light changes leave it; hzgame.js keys its runs on it)
       if ((flags & 8) && this.zr) this.zr.one(x, y, z, old, state, this.dim, (flags & 16) ? 6 : 1);
       const s = c.sec[y >> 4];
       if (!old && state) s.count++; else if (old && !state) s.count--;
@@ -1069,7 +1069,7 @@
         if (y >= c.H) { if (!state) continue; this.growColumn(c, y); }
         const i = (y << 8) | ((z & 15) << 4) | (x & 15);
         const old = c.blocks[i]; if (old === state) continue;
-        c.blocks[i] = state; c.modified = true;
+        c.blocks[i] = state; c.modified = true; c.bv = (c.bv | 0) + 1;
         if (Z) { if (!zb) { Z.begin(kind, this.dim); zb = true; } Z.add(x, y, z, old, state); }
         const s = c.sec[y >> 4];
         if (!old && state) s.count++; else if (old && !state) s.count--;
@@ -1101,7 +1101,7 @@
         if (y >= c.H) { if (!state) continue; this.growColumn(c, y); }
         const i = (y << 8) | ((z & 15) << 4) | (x & 15);
         const old = c.blocks[i]; if (old === state) continue;
-        c.blocks[i] = state; c.modified = true; n++;
+        c.blocks[i] = state; c.modified = true; c.bv = (c.bv | 0) + 1; n++;
         const s = c.sec[y >> 4];
         if (!old && state) s.count++; else if (old && !state) s.count--;
         const col = i & 255;

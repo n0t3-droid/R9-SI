@@ -183,7 +183,7 @@
       const c = e.rc; if (y < 0 || y >= c.H) return;
       const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i];
       if (old === s) return;
-      c.blocks[i] = s;
+      c.blocks[i] = s; c.bv = (c.bv | 0) + 1;   // (the blocks' version: hzgame.js)
       const sy = y >> 4, sec = c.sec[sy];
       if (!old && s) sec.count++; else if (old && !s) sec.count--;
       if (e.ds) {

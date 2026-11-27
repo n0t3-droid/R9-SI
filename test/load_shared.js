@@ -5,6 +5,7 @@ files.splice(files.indexOf('blocks4'), 0, 'foeblocks');   // a-foes: the Leuchtf
 files.splice(files.indexOf('blocks4'), 0, 'voxhangar');   // t-hangar: the hall's and the temple's pieces (vgen 14), after the Leuchtfeuer
 files.splice(files.indexOf('blocks4'), 0, 'bodies2'); files.splice(files.indexOf('gen_body') + 1, 0, 'gen_body2');   // u-moons2: Zinnober's blocks (last), the three new kinds
 files.splice(files.indexOf('blocks4'), 0, 'fields_blocks'); files.splice(files.indexOf('gen_body2') + 1, 0, 'gen_rubble');   // u-fields: carbon_rubble (last), the rubble bodies
+files.push('hzcull');   // (the horizon culling: main thread only, VR.HzCull)
 files.push('galaxy');   // u-stars: the neighbourhood (VR.Galaxy), after universe
 files.splice(files.indexOf('blocks4'), 0, 'exo_blocks'); files.push('exoworld');   // u-stars2: the exo blocks (last), VR.Exo
 files.splice(files.indexOf('blocks4'), 0, 'lifeblocks');   // a-life: the ferry dock and the grow lamp (the last blocks, after u-stars2's exo blocks)

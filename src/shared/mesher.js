@@ -987,12 +987,13 @@
       const type = TTYPE[b], t = R.types[type];
       const isLava = (TF[b] & F.LAVA) !== 0;
       if (fluidHidden(bi, type, isLava)) return;
-      const lvl = t.get(b, 'level');
+      // (a fluid without a level — bubble_column — is a full source: found by the lab's random census, it threw here)
+      const lvl = t.has('level') ? t.get(b, 'level') : 0;
       const aboveSame = TTYPE[B[bi + PSS]] === type || (!isLava && (TF[B[bi + PSS]] & F.WATER));
       const heightOf = (s) => {
         const tt = TTYPE[s];
         if (tt !== type && !(!isLava && (TF[s] & F.WATER) && (TF[s] & F.FLUID))) return -1;
-        const lv = R.types[tt].get(s, 'level');
+        const lv = R.types[tt].has('level') ? R.types[tt].get(s, 'level') : 0;
         if (lv === 0) return 0.875;
         if (lv >= 8) return 1;
         return (8 - lv) / 9;

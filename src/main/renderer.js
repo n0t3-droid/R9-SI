@@ -2251,7 +2251,10 @@
       if (world && this.q.farCache && VR.UL) this.gpuPass('farcache');
       const fc = world && this.q.farCache && VR.UL ? this.farFrame(F, E, world, vis, camPos) : null;
       if (!this.q.farCache && this.fc) this.fcDrop();
-      const near = fc ? fc.near : vis;
+      const nearAll = fc ? fc.near : vis;
+      // Horizontschatten (hzgame.js, src/shared/hzcull.js): the live sections hidden behind solid ground leave the opaque,
+      // cutout, mini-voxel and depth passes — the picture is the same; shadows, mirror, far cache and masks keep them all
+      const near = VR.HzGame && world && this.q.hzCull !== false ? VR.HzGame.frame(this, world, F.cam, nearAll, vis) : nearAll;
       // sky
       this.gpuPass('sky');
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
