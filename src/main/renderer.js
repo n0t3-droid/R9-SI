@@ -7,6 +7,11 @@
   'use strict';
   const GL = VR.GL, S = VR.SHADERS, mat4 = VR.mat4;
   const VSTRIDE = 16;
+  // Innenraum-Detail (v0.56.9): the mini-voxel pieces under a roof keep their detail within k × the detail distance
+  // (at least 12 blocks), their boxes beyond, and cast nothing into the sun's map. 1 = as before — the default: on the
+  // owner's APU it bought about a millisecond in his town at Ultra (/kosten, 27 Nov 2026), within the noise; /kosten vxin
+  // measures it on any card (k 0.4)
+  VR.VxIn = VR.VxIn || { k: 1 };
 
   // ----------------------------------------------------------------- arena allocator
   class Arena {
@@ -591,7 +596,7 @@
         if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
         if (l === 3) { sec.vxOld = false; sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
         if (!n) continue;
-        const m = this.allocMesh(n); m.q = !!d.q;   // (Viereck-Index: the worker's quads, world.js marks them)
+        const m = this.allocMesh(n); m.q = !!d.q; m.split = d.split === undefined ? -1 : d.split;   // (Viereck-Index: the worker's quads, world.js marks them; Innenraum-Detail: the quads in the open first)
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
         gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
         sec.mesh[l] = m;
@@ -623,7 +628,7 @@
         if (st.o >= n) { st.l++; st.o = 0; continue; }
         const k = Math.min(n - st.o, Math.floor((maxBytes - done) / VSTRIDE));
         if (k <= 0) break;
-        if (!st.m[l]) { st.m[l] = this.allocMesh(n); st.m[l].q = !!d.q; }
+        if (!st.m[l]) { st.m[l] = this.allocMesh(n); st.m[l].q = !!d.q; st.m[l].split = d.split === undefined ? -1 : d.split; }
         const m = st.m[l];
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
         gl.bufferSubData(gl.ARRAY_BUFFER, (m.off + st.o) * VSTRIDE, d, st.o * 8, k * 8);
@@ -749,7 +754,7 @@
         step: (max) => {
           const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
           if (k <= 0) return 0;
-          if (!it.m) { it.m = R.allocMesh(n); it.m.q = !!d.q; }
+          if (!it.m) { it.m = R.allocMesh(n); it.m.q = !!d.q; it.m.split = d.split === undefined ? -1 : d.split; }
           const gl = R.gl;
           gl.bindBuffer(gl.ARRAY_BUFFER, it.m.arena.buf);
           gl.bufferSubData(gl.ARRAY_BUFFER, (it.m.off + it.o) * VSTRIDE, d, it.o * 8, k * 8);
@@ -799,7 +804,7 @@
     }
     uploadVx(s) {
       const gl = this.gl, d = s.vxData, n = d.length >> 3;
-      const m = this.allocMesh(n); m.q = !!d.q;
+      const m = this.allocMesh(n); m.q = !!d.q; m.split = d.split === undefined ? -1 : d.split;
       gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
       gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
       if (s.mesh[3]) s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap);
@@ -1057,19 +1062,29 @@
     }
 
     // sections with mini-voxel pieces, split by distance: near ones draw the detailed VX mesh, far ones the LOD boxes
-    splitVx(list, camPos, maxD) {
-      const near = this._vxNear || (this._vxNear = []), far = this._vxFar || (this._vxFar = []);
-      near.length = 0; far.length = 0;
+    // Innenraum-Detail (v0.56.9): within the detail distance D the quads under a roof (mesher partSky: after the ones in
+    // the open) keep their detail only within Rin = D × q.vxInK (at least 12): between Rin and D a section draws its
+    // open-sky detail and the boxes of its indoor part (mid). noMid (the shadow pass): no mid list
+    // (the shadow pass: part 1 — the pieces in the open — while Innenraum-Detail is on, the whole mesh otherwise)
+    vxInPart() { const k = this.q.vxInK === undefined ? (VR.VxIn ? VR.VxIn.k : 1) : this.q.vxInK; return k < 1 ? 1 : 0; }
+    splitVx(list, camPos, maxD, noMid) {
+      const near = this._vxNear || (this._vxNear = []), far = this._vxFar || (this._vxFar = []), mid = this._vxMid || (this._vxMid = []);
+      near.length = 0; far.length = 0; mid.length = 0;
       const D = Math.min(this.q.vxLod || 48, maxD || 1e9), D2 = D * D;
+      const kIn = this.q.vxInK === undefined ? (VR.VxIn ? VR.VxIn.k : 1) : this.q.vxInK, Rin = noMid || kIn >= 1 ? D : Math.min(D, Math.max(12, D * kIn)), R2 = Rin * Rin;
       for (const s of list) {
         if (!s.mesh[3] && !s.mesh[4]) continue;
-        const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2];
-        if (dx * dx + dy * dy * 0.5 + dz * dz < D2) { if (s.mesh[3]) near.push(s); else far.push(s); } else { if (s.mesh[4]) far.push(s); else near.push(s); }
+        const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2], d2 = dx * dx + dy * dy * 0.5 + dz * dz;
+        if (d2 < D2) {
+          if (!s.mesh[3]) far.push(s);
+          else if (d2 >= R2 && s.mesh[4] && s.mesh[3].split >= 0 && s.mesh[4].split >= 0) mid.push(s);
+          else near.push(s);
+        } else { if (s.mesh[4]) far.push(s); else near.push(s); }
       }
-      return { near, far };
+      return { near, far, mid };
     }
     // ------------------------------------------------ section drawing
-    drawSections(list, layer, prog, originsFrom, planes, reverse) {
+    drawSections(list, layer, prog, originsFrom, planes, reverse, part) {
       const gl = this.gl, cam = this.cam;
       const n = list.length;
       let batchArena = null, batchQ = false, cnt = 0;
@@ -1108,11 +1123,17 @@
         // every section with half its triangles (all the draws, half the triangles) — what the terrain's time follows
         const PR = Renderer.PROBE; if (PR === 'halfSec' && (k & 1)) continue;
         if (m.arena !== batchArena || q !== batchQ || cnt === 512) { flush(); batchArena = m.arena; batchQ = q; if (q && !this._qib && this.quadIB) this.quadIB(this.arenaMax()); }
-        if (q) { firsts[cnt] = m.off * 6; counts[cnt] = m.count * 1.5; } else { firsts[cnt] = m.off; counts[cnt] = m.count; }
+        if (part && q && m.split >= 0) {
+          // (Innenraum-Detail: part 1 the quads in the open, part 2 the ones under a roof — mesher partSky)
+          const nq = m.count >> 2, q0 = part === 1 ? 0 : Math.min(nq, m.split), q1 = part === 1 ? Math.min(nq, m.split) : nq;
+          if (q1 <= q0) continue;
+          firsts[cnt] = (m.off + q0 * 4) * 6; counts[cnt] = (q1 - q0) * 6;
+        } else if (part === 2) continue;   // (no split known: the whole mesh went with part 1)
+        else if (q) { firsts[cnt] = m.off * 6; counts[cnt] = m.count * 1.5; } else { firsts[cnt] = m.off; counts[cnt] = m.count; }
         if (PR === 'halfTri') counts[cnt] = Math.max(q ? 6 : 3, Math.floor(counts[cnt] / (q ? 12 : 6)) * (q ? 6 : 3));
         org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = s.grow !== undefined && s.grow < 1 ? 2 + s.grow : fade;   // (f-stipple: Stream.originW — a near column growing)
         cnt++;
-        this.stats.tris += q ? m.count / 2 : m.count / 3;
+        this.stats.tris += q ? counts[cnt - 1] / 3 : m.count / 3;
       }
       flush();
       void cam;
@@ -1174,13 +1195,13 @@
       gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.6, 3.0);
       const camPos = [cam.x, cam.y, cam.z];
       const draws0 = this.stats.draws;
-      const vxSplit = this.splitVx(list, camPos, 28);   // shadows of furniture detail only close by; boxes cast the rest
+      const vxSplit = this.splitVx(list, camPos, 28, true);   // shadows of furniture detail only close by; boxes cast the rest (Innenraum-Detail on: nothing under a roof casts into the sun's map — vxInPart)
       for (const [p, layer] of [[this.P.shadow, 0], [this.P.shadowCut, 1]]) {
         gl.useProgram(p.p);
         gl.uniformMatrix4fv(p.u.u_viewProj, false, this.shadowMat);
         if (layer === 1) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); gl.uniform1i(p.u.u_albedo, 0); }
         this.drawSections(list, layer, p, camPos, this.shadowPlanes, false);
-        if (layer === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false); }
+        if (layer === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false, this.vxInPart()); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false, this.vxInPart()); }
       }
       if (this.q.smoothProps || this.q.smoothFurn) this.drawProps(E, camPos, true);   // the palms and the furniture cast their shadows too
       gl.disable(gl.POLYGON_OFFSET_FILL);
@@ -1284,13 +1305,13 @@
       if (clear) gl.clear(gl.DEPTH_BUFFER_BIT);
       const camPos = this.shtCam || (this.shtCam = [0, 0, 0]); camPos[0] = cam.x; camPos[1] = cam.y; camPos[2] = cam.z;
       this.shtAll = true;   // (casters are drawn whatever their fade: a column fading in casts its shadow at once)
-      const vxSplit = this.splitVx(casters, camPos, 28);
+      const vxSplit = this.splitVx(casters, camPos, 28, true);
       for (const [p, l] of [[this.P.shadow, 0], [this.P.shadowCut, 1]]) {
         gl.useProgram(p.p);
         gl.uniformMatrix4fv(p.u.u_viewProj, false, this.shadowMat);
         if (l === 1) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); gl.uniform1i(p.u.u_albedo, 0); }
         this.drawSections(casters, l, p, camPos, this.shadowPlanes, false);
-        if (l === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false); }
+        if (l === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false, this.vxInPart()); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false, this.vxInPart()); }
       }
       this.shtAll = false;
       if (props && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, true);
@@ -1575,7 +1596,7 @@
         this.shadowOffUni(p.u);
         if (layer === 1) gl.disable(gl.CULL_FACE);
         this.drawSections(list, layer, p, camPos, this.planes, false);
-        if (layer === 0) { const sp = this.splitVx(list, camPos); this.drawSections(sp.near, 3, p, camPos, this.planes, false); this.drawSections(sp.far, 4, p, camPos, this.planes, false); }
+        if (layer === 0) { const sp = this.splitVx(list, camPos, undefined, true); this.drawSections(sp.near, 3, p, camPos, this.planes, false); this.drawSections(sp.far, 4, p, camPos, this.planes, false); }
         gl.enable(gl.CULL_FACE);
       }
     }
@@ -2303,6 +2324,7 @@
             this.vxResidency(vis, camPos);
             const sp = this.splitVx(near, camPos);
             this.drawSections(sp.near, 3, p, camPos, this.planes, false);
+            if (sp.mid.length) { this.drawSections(sp.mid, 3, p, camPos, this.planes, false, 1); this.drawSections(sp.mid, 4, p, camPos, this.planes, false, 2); }   // (Innenraum-Detail)
             this.drawSections(sp.far, 4, p, camPos, this.planes, false);
           }
           gl.enable(gl.CULL_FACE);

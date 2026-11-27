@@ -919,6 +919,7 @@
         // itself never blocks; a newer mesh of the section makes this one stale (alive), so an older mesh never lands
         // after a newer one
         if (m.q) for (const a of [m.opaque, m.cutout, m.trans, m.vx, m.vxFar]) if (a) a.q = true;   // (Viereck-Index: quads — the renderer draws them indexed)
+        if (m.q) { if (m.vx && m.vxOut >= 0) m.vx.split = m.vxOut; if (m.vxFar && m.vxFarOut >= 0) m.vxFar.split = m.vxFarOut; }   // (Innenraum-Detail: the quads in the open first — renderer splitVx)
         const R = this.renderer, alive = () => !this.dead && this.cols.get(c.key) === c && s.uTok === tok;
         const done = () => {
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close

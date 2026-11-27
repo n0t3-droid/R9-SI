@@ -281,6 +281,21 @@
     return S;
   };
 
+  // reorder a quad layer (32 uint16 a quad: 4 vertices × 8, the light in word 6, sky in its top 4 bits) so the quads
+  // with a corner under the open sky (sky ≥ 14) come first, the rest after, each in its own order; → their count
+  function partSky(a) {
+    if (!a || !a.length) return 0;
+    const nq = a.length >> 5; let nOut = 0;
+    for (let q = 0, o = 0; q < nq; q++, o += 32) if ((a[o + 6] >>> 12) >= 14 || (a[o + 14] >>> 12) >= 14 || (a[o + 22] >>> 12) >= 14 || (a[o + 30] >>> 12) >= 14) nOut++;
+    if (nOut === 0 || nOut === nq) return nOut;
+    const b = new Uint16Array(a.length); let wo = 0, wi = nOut * 32;
+    for (let q = 0, o = 0; q < nq; q++, o += 32) {
+      const out = (a[o + 6] >>> 12) >= 14 || (a[o + 14] >>> 12) >= 14 || (a[o + 22] >>> 12) >= 14 || (a[o + 30] >>> 12) >= 14;
+      if (out) { b.set(a.subarray(o, o + 32), wo); wo += 32; } else { b.set(a.subarray(o, o + 32), wi); wi += 32; }
+    }
+    a.set(b);
+    return nOut;
+  }
   VR.meshSection = function (job) {
     const T = R.T, TF = T.flags, TSH = T.shape, TL = T.layer, TTEX = T.tex, TTINT = T.tint, TTYPE = T.type, TRC = T.rc;
     if (!CTMK) ctmTables();
@@ -1065,7 +1080,14 @@
 
     const res = { opaque: bufs[0].out(), cutout: bufs[1].out(), trans: bufs[2].out(), vis: visMask };
     if (softH) res.softH = softH;   // r-gemalt: the drawn ground's column heights (× 64, world y; −32768 none)
-    if (vxSplit) { res.vx = bufs[3].out(); res.vxFar = bufs[4].out(); }
+    if (vxSplit) {
+      res.vx = bufs[3].out(); res.vxFar = bufs[4].out();
+      // Innenraum-Detail (v0.56.9): the mini-voxel quads under a roof — none of their four corners sees the open sky
+      // (sky light < 14) — after the ones in the open, in both layers; vxOut / vxFarOut count the quads in the open. The
+      // renderer draws the indoor part in detail only near the eye (its boxes beyond) and keeps it out of the sun's shadow
+      // map: in the owner's town nearly two thirds of the mini-voxel quads were furniture and fittings indoors (the lab)
+      res.vxOut = partSky(res.vx); res.vxFarOut = partSky(res.vxFar);
+    }
     if (vxSkipped) res.vxSkipped = vxSkipped;
     if (propOut) res.props = Int32Array.from(propOut);   // six ints per prop instance (see propTables)
     return res;

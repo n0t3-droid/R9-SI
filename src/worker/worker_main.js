@@ -212,7 +212,7 @@
         const tr = [o.buffer, c.buffer, t.buffer]; if (vx) tr.push(vx.buffer); if (vxFar) tr.push(vxFar.buffer);
         const pr = r.props ? (VR.SmoothVox ? VR.SmoothVox.variants(r.props) : r.props) : null; if (pr) tr.push(pr.buffer);
         if (r.softH) tr.push(r.softH.buffer);   // r-gemalt: the drawn ground's column heights   // smooth props: six ints an instance (mesher.js; t-form: a piece's look by its position)
-        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, q: !!m.quads, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, vxSkipped: r.vxSkipped || 0, softH: r.softH || null, ms: performance.now() - t0 }, tr);
+        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, q: !!m.quads, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, vxSkipped: r.vxSkipped || 0, vxOut: m.quads ? r.vxOut | 0 : -1, vxFarOut: m.quads ? r.vxFarOut | 0 : -1, softH: r.softH || null, ms: performance.now() - t0 }, tr);
       } else if (m.type === 'clock') {
         // e-uhr · Schattenuhr: the clocks of a section's cells (sunclock.js bakeSection) for the clock volume
         if (m.ids && !CLOCKCOL && LASTAVG) CLOCKCOL = VR.SunClock.colorTable(LASTAVG);
