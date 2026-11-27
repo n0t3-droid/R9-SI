@@ -36290,6 +36290,21 @@ return out;
 return S;
 };
 
+
+
+function partSky(a){
+if(!a|| !a.length)return 0;
+const nq=a.length>>5;let nOut=0;
+for(let q=0,o=0;q<nq;q++,o+=32)if((a[o+6]>>>12)>=14||(a[o+14]>>>12)>=14||(a[o+22]>>>12)>=14||(a[o+30]>>>12)>=14)nOut++;
+if(nOut===0||nOut===nq)return nOut;
+const b=new Uint16Array(a.length);let wo=0,wi=nOut*32;
+for(let q=0,o=0;q<nq;q++,o+=32){
+const out=(a[o+6]>>>12)>=14||(a[o+14]>>>12)>=14||(a[o+22]>>>12)>=14||(a[o+30]>>>12)>=14;
+if(out){b.set(a.subarray(o,o+32),wo);wo+=32;}else{b.set(a.subarray(o,o+32),wi);wi+=32;}
+}
+a.set(b);
+return nOut;
+}
 VR.meshSection=function(job){
 const T=R.T,TF=T.flags,TSH=T.shape,TL=T.layer,TTEX=T.tex,TTINT=T.tint,TTYPE=T.type,TRC=T.rc;
 if(!CTMK)ctmTables();
@@ -37074,7 +37089,14 @@ if(!isLava)for(let kk=0;kk<4;kk++){const k=3-kk;buf.v(x+pts[k][0],y+pts[k][1],z+
 
 const res={opaque:bufs[0].out(),cutout:bufs[1].out(),trans:bufs[2].out(),vis:visMask};
 if(softH)res.softH=softH;
-if(vxSplit){res.vx=bufs[3].out();res.vxFar=bufs[4].out();}
+if(vxSplit){
+res.vx=bufs[3].out();res.vxFar=bufs[4].out();
+
+
+
+
+res.vxOut=partSky(res.vx);res.vxFarOut=partSky(res.vxFar);
+}
 if(vxSkipped)res.vxSkipped=vxSkipped;
 if(propOut)res.props=Int32Array.from(propOut);
 return res;
@@ -52287,7 +52309,7 @@ const vx=r.vx?X(r.vx):null,vxFar=r.vxFar?X(r.vxFar):null;
 const tr=[o.buffer,c.buffer,t.buffer];if(vx)tr.push(vx.buffer);if(vxFar)tr.push(vxFar.buffer);
 const pr=r.props?(VR.SmoothVox?VR.SmoothVox.variants(r.props):r.props):null;if(pr)tr.push(pr.buffer);
 if(r.softH)tr.push(r.softH.buffer);
-post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,q: !!m.quads,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,softH:r.softH||null,ms:performance.now()-t0},tr);
+post({type:'mesh',id:m.id,key:m.key,sy:m.sy,ver:m.ver,q: !!m.quads,opaque:o,cutout:c,trans:t,vx,vxFar,props:pr,vis:r.vis,svWant,vxSkipped:r.vxSkipped||0,vxOut:m.quads?r.vxOut|0: -1,vxFarOut:m.quads?r.vxFarOut|0: -1,softH:r.softH||null,ms:performance.now()-t0},tr);
 }else if(m.type==='clock'){
 
 if(m.ids&& !CLOCKCOL&&LASTAVG)CLOCKCOL=VR.SunClock.colorTable(LASTAVG);
