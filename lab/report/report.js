@@ -82,6 +82,7 @@ module.exports = function report(o) {
         const depth = s.samples.map((x) => x.stack.length * 10);
         body += `<div><div class="sub">${esc(s.id)}: Frame-Zeit <span class="en">frame time</span> (ms) · <span style="color:var(--accent2)">Stufen ×10 <span class="en">rungs ×10</span></span></div>${chart([{ values: ft, color: 'var(--accent)', label: 'frame ms' }, { values: depth, color: 'var(--accent2)', label: 'Smart Quality rungs ×10' }], 360, 120, null, '')}</div>`;
       }
+      if (p.pruef && p.pruef.lines) body += `<div class="sub" style="margin-top:8px"><b>/prüfstand</b> <span class="en">test bench</span>:<br>${p.pruef.lines.map(esc).join('<br>')}</div>`;
       body += '</div>' + (p.errors && p.errors.length ? `<p class="bad">Fehler <span class="en">errors</span>: ${p.errors.slice(0, 3).map(esc).join('<br>')}</p>` : '') + '</div>';
     }
     body += '</section>';

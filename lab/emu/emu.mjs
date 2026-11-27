@@ -35,6 +35,7 @@ export const SCENES = {
   town: { de: 'im Dorf am Start (langsam umsehen)', en: 'in the spawn village (looking round slowly)' },
   sea: { de: 'über dem offenen Meer', en: 'over the open sea' },
   flight: { de: 'Flug über das Land (25 Blöcke/s)', en: 'flight over the land (25 blocks/s)' },
+  pruef: { de: 'der Prüfstand des Spiels (/prüfstand kurz: Lastsprünge, die Antwort der Smart Quality)', en: "the game's test bench (/prüfstand kurz: load steps, Smart Quality's answer)" },
 };
 const PROF = opt('profiles', 'office,old-laptop,potato').split(',').filter((p) => PROFILES[p]);
 const SCN = opt('scenes', 'town,sea,flight').split(',').filter((s) => SCENES[s]);
@@ -169,6 +170,18 @@ async function main() {
       await page.evaluate(() => { const g = VR.game; g.env.setTime(6000); g.zenFreezeTime = true; g.zenFreezeWeather = true; if (g.env.wx && g.env.wx.setMode) g.env.wx.setMode('off'); const p = g.player; p.flying = true; p.noclip = true; });
       await settle(page, 90);   // (the first land round the spawn)
       for (const sid of SCN) {
+        if (sid === 'pruef') {
+          // the game's own test bench at the spawn: its quarter plan, its analysis kept with the profile
+          await page.evaluate(([x, y, z]) => { const p = VR.game.player; clearInterval(window.__mv); p.teleport(x, y, z); }, [P.spawn[0], P.spawn[1] + 2, P.spawn[2]]);
+          await settle(page, 60);
+          for (let i = 0; i < 120; i++) { if (await page.evaluate(() => !VR.game.bench && !VR.game.sweep)) break; await sleep(500); }
+          await page.evaluate(() => VR.game.chat('/prüfstand kurz'));
+          let A = null;
+          for (let i = 0; i < 300 && !A; i++) { await sleep(500); A = await page.evaluate(() => (!VR.Pruefstand.on && VR.Pruefstand.last ? { analysis: VR.Pruefstand.last.analysis, lines: VR.Pruefstand.lines(VR.Pruefstand.last.analysis, 'de') } : null)).catch(() => null); }
+          prof.pruef = A;
+          log('  pruef  ' + (A ? A.lines.slice(1).join(' | ') : 'no result'));
+          continue;
+        }
         const start = sid === 'sea' ? P.sea : sid === 'flight' ? [P.spawn[0], 150, P.spawn[2]] : [P.spawn[0], P.spawn[1] + 2, P.spawn[2]];
         await page.evaluate(([x, y, z, sid]) => {
           const g = VR.game, p = g.player; clearInterval(window.__mv);

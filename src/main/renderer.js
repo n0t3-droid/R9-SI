@@ -551,7 +551,7 @@
       if (this.prof.total !== undefined) this.gpuMs = this.prof.total;
     }
     gpuPass(name) { if (this.prof) this.prof.mark(name); }
-    gpuTimerEnd() { if (this.prof) this.prof.end(); }
+    gpuTimerEnd() { const PS = VR.Pruefstand; if (PS && PS.gpuOn) { this.gpuPass('pruef'); PS.gpuBurn(this.gl, this); } if (this.prof) this.prof.end(); }   // (/prüfstand's GPU load inside the frame's timer)
 
     // ------------------------------------------------ section meshes
     // Viereck-Index: ONE index buffer for every arena — quad k is 4k 4k+1 4k+2, 4k 4k+2 4k+3 (the old expansion's

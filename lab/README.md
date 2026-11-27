@@ -8,7 +8,8 @@ node, ohne Browser, außer dem PC-Emulator. Es benutzt genau den Code, den auch 
 | **Weltlabor** (`lab.js map / iso / compare / places`) | Jeden Ort jeder Welt von oben oder schräg zeigen, in den echten Blockfarben. Zwei Generator-Versionen nebeneinander vergleichen. |
 | **Spürhunde** (`lab.js scan`, `detect/`) | Viele Welten automatisch nach Fehlern absuchen: Erde auf der Straße, Löcher in der Fahrbahn, Laternen oder Hecken in der Fahrbahn, Türen, aus denen man nicht hinauskommt, Pflanzen auf Pflaster, ineinander gewachsene oder schwebende Baumkronen, die Himmelsbahn mitten durch einen Ort. |
 | **Herkunft** (`lab.js why`) | Für einen Block sagen, welche Zeile des Generators ihn gesetzt hat (und was davor dort war). |
-| **PC-Emulator** (`emu/run.sh`) | Das echte Spiel in einem Browser ohne Fenster laufen lassen, den Prozessor gebremst wie ein älterer PC. Bildzeiten, Ruckler, jede Entscheidung der Smart Quality und den Fehler ihrer Vorhersage aufzeichnen. |
+| **PC-Emulator** (`emu/run.sh`) | Das echte Spiel in einem Browser ohne Fenster laufen lassen, den Prozessor gebremst wie ein älterer PC. Bildzeiten, Ruckler, jede Entscheidung der Smart Quality und den Fehler ihrer Vorhersage aufzeichnen. Die Szene `pruef` startet den Prüfstand des Spiels. |
+| **Prüfstand im Spiel** (`/prüfstand` im Chat) | Das Spiel belastet sich selbst mit bekannten Lastsprüngen (GPU, CPU, eine langsame Rampe) und misst, wie schnell und ruhig die Smart Quality antwortet — auf der echten Grafikkarte des Spielers. |
 | **Bericht** (`lab.js report`) | Alles als eine HTML-Seite mit Bildern; zwei Suchläufe (vorher, nachher) nebeneinander. |
 
 ```
@@ -46,6 +47,8 @@ without a browser, except for the PC emulator, and uses exactly the code the gam
   every Smart Quality decision and the error of its forecast. Honest limits: the throttling slows the page's main
   thread, not its workers; SwiftShader draws the picture in software, so the "graphics card" is the processor too —
   hence the small picture. The numbers compare builds and profiles; they promise nothing for a given real PC.
+- **Test bench in the game:** `/prüfstand` in the chat puts known load steps on the player's own machine (GPU, CPU, a slow
+  ramp) and times Smart Quality's answer; the emulator's scene `pruef` runs it headless.
 - **Report:** everything as one HTML page with pictures; two scans (before, after) side by side.
 
 Results go to `lab/out/`, which is not checked in. What the detectors found once and is fixed stays checked in the
