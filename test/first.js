@@ -148,7 +148,7 @@ console.log('5 · the arrival');
   check(FI.flare(FI.PRE) > 0.05 && near(FI.flare(FI.PRE + 0.6), 0) && FI.flare(0.4) >= FI.veil(0.4), 'the sun\'s flare outlasts the white by 0.6 s');
   // a game stub: the arrival holds, hands the vista to the wow actor after the veil, and the HUD comes back after the moment
   const mkGame = () => {
-    const g0 = { state: 'play', settings: { wowMoments: true }, meta: { id: 'w1', wowSeen: [] }, ui: { screen: null }, hideHud: false, saveMeta() {}, env: { day: 0 }, audio: { swell() {} } };
+    const g0 = { state: 'play', settings: { wowMoments: true, arriveMoment: true }, meta: { id: 'w1', wowSeen: [] }, ui: { screen: null }, hideHud: false, saveMeta() {}, env: { day: 0 }, audio: { swell() {} } };   // (arriveMoment: the slow arrival — Sofort spielen made the quick one the default, checked below)
     g0.input = { pressed: new Set(), mouse: { clicked: [false, false, false] }, padPressed: new Set(), tPressed: new Set() };
     g0.wow = new W.Actor(g0); g0.player = { pos: [10, 80, 10], dead: false };
     return g0;
@@ -190,6 +190,12 @@ console.log('5 · the arrival');
   check(!A.holds() && A.veilNow() === 0 && G.wow.t >= W.RISE + W.HOLD, 'a key during the veil: the white goes in 0.3 s and the camera falls back to the eyes at once');
   for (let i = 0; i < 90 && G.arrival; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
   check(!G.arrival && G.hideHud === false, '… and the HUD comes back after it');
+  // Sofort spielen (v0.56.9, the default): the white goes at once, no moment to wait through, the player plays within a second
+  G = mkGame(); delete G.settings.arriveMoment; G.arrivalPending = { vista: v }; while (FI.holdLoading(G, true, 1 / 30)); A = FI.arrive(G);
+  let heldQ = 0; for (let i = 0; i < 60 && G.arrival && A.holds(); i++) { G.wow.update(1 / 30); A.update(1 / 30); heldQ++; }
+  check(A.quick === true && heldQ <= 30 && !A.holds(), `Sofort spielen: the arrival lets go within a second (${(heldQ / 30).toFixed(2)} s), no key needed`);
+  for (let i = 0; i < 90 && G.arrival; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!G.arrival && G.hideHud === false, '… the HUD back');
   // the sun on the screen (the flare's place) from the camera the veil opens on
   const cam0 = { yaw: 0.7, pitch: 0.05, fov: 60 * DEG };
   const ahead = FI.sunScreen(fwd(0.7, 0.05), cam0, 16 / 9), right = FI.sunScreen(fwd(0.7 - 20 * DEG, 0.05), cam0, 16 / 9), up = FI.sunScreen(fwd(0.7, 0.05 + 10 * DEG), cam0, 16 / 9);

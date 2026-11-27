@@ -424,7 +424,12 @@
       // t-first: the start screen at once — its tiles in the first paint, the sky behind them when the textures are in
       // (titlescene.js); a ▶ before that waits for bootReady (start.js). The Studio's ▶ (#play=) keeps the loading screen
       this.bootReady = new Promise((res) => { this.bootDone = res; });
-      if (VR.TitleScene && !/[#&]play=/.test(location.hash || '')) { this.ui.show('title'); requestAnimationFrame(() => { this.titleShownMs = performance.now() - this.bootT0; setTimeout(() => { this.titlePaintMs = performance.now() - this.bootT0; }, 0); }); }
+      // Sofort spielen (v0.56.9): a first visit (nothing played in this browser yet) shows no start screen — the loading
+      // screen, then „Meine Welt" (bootStart). A browser driven by automation (the tests, the lab) keeps the start screen
+      // unless the page sets window.R9_AUTOSTART
+      this.instant = Game.instantFirst();
+      if (this.instant) this.ui.loading(T('g.load.textures'), 0.05);
+      else if (VR.TitleScene && !/[#&]play=/.test(location.hash || '')) { this.ui.show('title'); requestAnimationFrame(() => { this.titleShownMs = performance.now() - this.bootT0; setTimeout(() => { this.titlePaintMs = performance.now() - this.bootT0; }, 0); }); }
       else this.ui.loading(T('g.load.textures'), 0.05);
       const unlockAudio = () => { this.audio.resume(); };
       window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
@@ -498,6 +503,7 @@
       // ▶ Spielen in the R9 Studio comes here as index.html#play=<world>: that world opens directly, no title
       const playId = (/[#&]play=([^&]+)/.exec(location.hash || '') || [])[1];
       if (playId) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* */ } this.playWorldId(decodeURIComponent(playId)); }
+      else if (this.instant) this.bootStart();
       else this.startTitle();
       if (this.bootDone) this.bootDone();   // (t-first: a ▶ pressed meanwhile goes on now)
     }
@@ -517,6 +523,21 @@
       document.getElementById('ui').innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>${T('g.fatal.title')}</h2><div>${msg}</div><div style="color:#93a4c4">${T('g.fatal.hint')}</div></div>`;
     }
 
+    // ---------------------------------------------------------------- Sofort spielen (v0.56.9)
+    // a first visit goes straight into „Meine Welt" on its finest vista: no start screen, no click (Esc → „Speichern & zum
+    // Start" brings the start screen); a browser that has worlds after all (the flag lost) gets the start screen
+    async bootStart() {
+      let ws = null;
+      try { ws = await this.store.listWorlds(); } catch (e) { ws = null; }
+      if (this.state !== 'boot') return;
+      if (ws && !ws.length) {
+        const tx = VR.I18N && VR.I18N.tx;
+        this.instantStart = true;
+        this.createWorld({ name: tx ? tx('start.myWorld', null, 'Meine Welt', 'My World') : 'Meine Welt', mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true, first: true });
+        return;
+      }
+      this.startTitle();
+    }
     // ---------------------------------------------------------------- title panorama
     startTitle() {
       this.state = 'title';
@@ -577,6 +598,7 @@
     }
     async loadWorld(meta) { meta.lastPlayed = Date.now(); await this.store.saveWorld(meta); this.startWorld(meta, false); }
     async startWorld(meta, fresh) {
+      try { localStorage.setItem('r9si.played', '1'); } catch (e) { /* (a browser without storage starts on the start screen next time too) */ }
       this.ui.loading(T('g.load.prepare'), 0.02);
       this.teardownWorld();
       this.meta = meta;
@@ -1342,7 +1364,7 @@
         this.ui.updateHUD(true);
         if (this.meta.guest) this.ui.chatLine(T('g.chat.joined', { name: this.mp && this.mp.hostName ? this.mp.hostName : T('g.mp.friend') }), '#9affd8');
         else if (!(VR.Travel && VR.Travel.busy(this))) this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');   // u-dims: a trip's arrival says where you are instead (travel.js)
-        if (this.player.mode === 'zen') this.ui.chatLine(T('g.chat.zen'), '#b8ffcf');
+        if (this.player.mode === 'zen' && !this.instantStart) this.ui.chatLine(T('g.chat.zen'), '#b8ffcf');   // (Sofort spielen: the first world says no more than its welcome line)
         this.autosaveAt = performance.now() + 60000;
         this.startPrewarm();
       }
@@ -1836,5 +1858,15 @@
     }
   }
   VR.Game = Game;
+  // Sofort spielen (v0.56.9): nothing played in this browser yet ('r9si.played'), no world asked for in the address, and a
+  // person at the keys (an automated browser — navigator.webdriver — keeps the start screen unless window.R9_AUTOSTART)
+  Game.instantFirst = function () {
+    try {
+      if (typeof window === 'undefined' || typeof location === 'undefined') return false;
+      if (location.hash && location.hash.length > 1) return false;
+      if (!window.R9_AUTOSTART && typeof navigator !== 'undefined' && navigator.webdriver) return false;
+      return !localStorage.getItem('r9si.played');
+    } catch (e) { return false; }
+  };
   Game.PRESETS = PRESETS;   // (the quality presets, read by the tests: test/far_presets.js)
 })(VR);

@@ -209,6 +209,9 @@
       if (this.phase === 'moment' && !this.first && (anyKey(g.input) || heldKey(g.input))) { this.end(); return; }
       if (this.phase === 'veil') {
         this.t += d;
+        // (Sofort spielen, v0.56.9: the white goes at once and the view stays at the eyes — no swing to wait through;
+        // settings.arriveMoment brings the slow arrival back)
+        if (this.quick) { this.skip(); return; }
         if ((anyKey(g.input) || heldKey(g.input)) && !this.first) { this.skip(); return; }
         this.first = false;
         if (this.on && g.wow && g.wow.active === this.v) g.wow.t = WM.RISE;   // (the picture holds while the white thins)
@@ -327,6 +330,7 @@
       if (s && cam && s[1] > -0.02) sun = FI.sunScreen(s, cam, r && r.H ? r.W / r.H : 16 / 9);
     } catch (e) { sun = null; }
     A.sun = sun;
+    A.quick = !(g.settings && g.settings.arriveMoment === true);   // (Sofort spielen: play at once)
     A.begin();
     return A;
   };
