@@ -1,7 +1,7 @@
 // Horizontschatten in the real game (a headless browser, SwiftShader): from a valley, a walker's spot and the town of
 // the owner's world (seed 3616214791, Fliederfeld), the picture with the culling is the picture without it — pixel for
 // pixel (beyond the frames' own noise: the same frame drawn twice) — while fewer sections and triangles are drawn.
-// Very Low (potato) and Balanced. The world is frozen as in the golden shots (clock, weather, animals, people, craft).
+// Very Low (potato; PRESETS=potato,balanced adds Balanced). The world is frozen as in the golden shots (clock, weather, animals, people, craft).
 //   nohup bash test/wt_run.sh hzcull.mjs 1500 > .tmp_tests/hzcull.log 2>&1 &
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -73,15 +73,15 @@ if (started) {
     ['town', [294.5, 0, -1043.5], [340, 0, -1000]],
   ];
   for (const [name, P, T] of views) {
-    for (const pr of [['potato', 6], ['balanced', 6]]) {
+    for (const pr of (process.env.PRESETS || 'potato').split(',').map((p) => [p, 6])) {   // (PRESETS=potato,balanced: Balanced's remesh after the switch takes minutes on SwiftShader)
       await preset(pr[0], pr[1]); await freeze();
       if (name === 'town') { await lookFrom([294.5, 160, -1043.5], [300, 100, -1040]); await step(30, 16); for (let k = 0; k < 40; k++) { if (await ev(() => VR.game.world.isLoaded(294, -1044))) break; await step(10, 16); } const y = await ev(() => { const w = VR.game.world, c = w.col(294 >> 4, -1044 >> 4); return c && c.ready ? c.height[((-1044 & 15) << 4) | (294 & 15)] : 80; }); P[1] = y + 2.62; T[1] = y + 2; }
       await lookFrom(P, T);
       // settled (golden.mjs's rule) with the game running by itself (its drawn frames upload the meshes), however long
-      // it takes on a loaded machine (up to 4 minutes)
+      // it takes on a loaded machine (up to 7 minutes)
       await ev(() => { window.__norender = false; });
       const t0 = Date.now(); let s = null, n = 0;
-      while (Date.now() - t0 < 240000) {
+      while (Date.now() - t0 < 420000) {
         await wait(2000);
         s = await ev(() => { const g = VR.game, w = g.world, p = g.player; const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let k = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) k++; const ex = c.cx - pcx, ez = c.cz - pcz; if (k && ex * ex + ez * ez <= rd * rd) dirty += k; } return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, lod: g.horizon ? g.horizon.inflight || 0 : 0 }; });
         if (G.settledOk(s, n++)) { s.ok = true; break; }
