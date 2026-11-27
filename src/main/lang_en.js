@@ -2600,7 +2600,7 @@
     'g.zb.k.aurora': 'Aurora',
     'g.zb.k.meteor': 'Shooting star',
     'g.zb.k.murm': 'Starling murmuration',
-    'g.zb.k.rays': 'Sky rays',
+    'g.zb.k.rays': 'Cloud rays',
     'g.zb.k.festival': 'Village festival',
     'g.zb.k.ship': 'A ship landing',
     'g.zb.k.vista': 'A view',

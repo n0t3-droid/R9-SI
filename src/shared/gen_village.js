@@ -580,8 +580,10 @@
     const ops = tupleList(4), fills = tupleList(5);
     const crownCands = [];   // the shared palm crowns (vgen 7): [x, base, z, h, kind, road], placed by the crown pass
     const palms = [], drops = [];   // every palm placed: [kind, road, x, z, trunk h] (the node test counts them); the crowns no spot fits
-    const put = (x, y, z, s) => { ops.push(x, y, z, s); };
-    const fill = (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
+    // (VG.trace: the lab's provenance tracer — lab/lab.js why — is told every block op and fill; unset in the game)
+    const TR = VG.trace;
+    const put = TR ? (x, y, z, s) => { TR('put', x, y, z, s); ops.push(x, y, z, s); } : (x, y, z, s) => { ops.push(x, y, z, s); };
+    const fill = TR ? (x, z, y0, y1, s) => { if (y1 >= y0) { TR('fill', x, y0, z, s, y1); fills.push(x, z, y0, y1, s); } } : (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
     // F6: towns made from vgen 6 on carry the detail layer (gen_detail.js); older towns are planned exactly as before
     const detOn = !!(VR.Detail && VR.Detail.on(g));
     const detP = (x, y, z, nm, pr) => put(x, y, z, typeof nm === 'number' ? nm : st(nm, pr));
@@ -699,6 +701,10 @@
     const ringR = V2 ? (S.modern ? (RAD >= 200 ? [72 + rng.int(3), 158 + rng.int(3)] : [40 + rng.int(3), 82 + rng.int(3)]) : [Math.round((31 + rng.int(8)) * (AIRY ? 1.35 : 1))]) : [];
     const zebra = new Map();   // "x,z" → axis: zebra crossings at the plaza exits and where the ring roads cross the radials
     const zebraAt = (px, pz, nx, nz, pa) => { const ax = Math.abs(Math.cos(pa)) >= Math.abs(Math.sin(pa)) ? 1 : 0; for (let wv = -1; wv <= 1; wv++) zebra.set(Math.round(px + nx * wv) + ',' + Math.round(pz + nz * wv), ax); };
+    // vgen 22: the street furniture (street trees, palms, lamps, bus stops) waits until every road's band is claimed, so
+    // none stands in another road (a later road paved round a lamp or a palm of an earlier one — the lab's road detector)
+    const DEFER = g.vgen >= 22, streetJobs = [];
+    const street = (job) => { if (DEFER) streetJobs.push(job); else job(); };
     for (let r = 0; r < nR; r++) {
       yield;
       let ang = a0 + r * Math.PI * 2 / nR + (HOME && r === 0 ? 0 : (rng.next() - 0.5) * 0.5);
@@ -735,12 +741,12 @@
           if (o < 0 || occ[o] === 2 || occ[o] === 7) continue;
           if (occ[o] !== 1) { occ[o] = 1; roadCells.push([qx, qz, ry, Math.abs(wv) === 2 ? 1 : 0]); }
         }
-        if (S.trees && k % 10 === 4 && k > 4) {
+        if (S.trees && k % 10 === 4 && k > 4) street(() => {
           // street trees on the sidewalk line, alternating sides
           const side = (k / 10 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side), o2 = oi(tx, tz);
           if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st(detOn && S.modern ? 'dirt' : 'grass_block')); if (detOn && S.modern) decorJobs.push(() => VR.Detail.treeGrate({ P: detP, occ, oi, ground, plan }, tx, ty, tz, st, fill)); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
-        }
+        });
         if (S.pathLine) {
           if (S.tech) {
             // the trailer's streets glow along both edges
@@ -752,22 +758,22 @@
             lineCells.add(px + ',' + pz); lastC = [px, pz];
           }
         }
-        if (S.palms && k % 9 === 1 && k > 3) {
+        if (S.palms && k % 9 === 1 && k > 3) street(() => {
           const side = (k / 9 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side);
           let free = true;
           for (let a = -1; a <= 1 && free; a++) for (let b = -1; b <= 1; b++) { const o2 = oi(tx + a, tz + b); if (o2 < 0 || (occ[o2] !== 0 && occ[o2] !== 4)) { free = false; break; } }
           if (free) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) occ[oi(tx + a, tz + b)] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); if (VR.Plants && VR.Plants.on(g)) crownCands.push([tx, ty + 1, tz, 7 + ((tx + tz) & 3), 'street', r]);   // vgen 7: the avenue's shared crown (the crown pass places it; no air column is cleared under it)
           else { const ph = 7 + ((tx + tz) & 3) + ((tx * 7 + tz) % 3 === 0 ? 2 : 0); fill(tx, tz, ty + 1, ty + 14, AIR); VG.palm(put, tx, ty + 1, tz, ph); palms.push(['street', r, tx, tz, ph]); } }
-        }
+        });
         road.pts.push([px, ry + 1, pz]);
         if (S.modern) { const dist = Math.hypot(px - cx, pz - cz); if (k === 4 || ringR.some(Rr => Math.abs(Math.round(dist) - Rr) === 4)) { zebraAt(px, pz, nx, nz, pa); zk.push(k); } }
-        if (k % 9 === 5) {
+        if (k % 9 === 5) street(() => {
           const side = (k / 9 | 0) % 2 ? 1 : -1;
           const lx = Math.round(px + nx * (AIRY ? 3 : 2) * side), lz = Math.round(pz + nz * (AIRY ? 3 : 2) * side);
           const o = oi(lx, lz);
           if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz); const ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
-        }
+        });
       }
       if (detOn && S.modern) decorJobs.push(() => VR.Detail.roadDecor({ P: detP, occ, oi, ground, st, fill, AIR, rng: detRng, plan }, pts, sm, S));
       bandRoads.push({ pts, sm, RW: S.sidewalk || AIRY ? 2 : 1, zk });
@@ -814,7 +820,7 @@
             if (pin[k] !== undefined && pin[k + 1] === undefined && k + 4 < pts.length) zebraAt(pts[k + 4][0], pts[k + 4][1], -Math.sin(pts[k + 4][2]), Math.cos(pts[k + 4][2]), pts[k + 4][2]);
             // bus shelters and benches on the outer pavement
             const stop = k % 31 === 15, bench = k % 31 === 0;
-            if (stop || bench) {
+            if (stop || bench) street(() => {
               const side = 1, cells = [];
               let ok = true;
               for (let q = 0; q < (stop ? 3 : 1) && ok; q++) { const pt = pts[k + q]; if (!pt) { ok = false; break; } const qn = [-Math.sin(pt[2]), Math.cos(pt[2])]; for (const wv of [3, 4]) { const qx = Math.round(pt[0] + qn[0] * wv * side), qz = Math.round(pt[1] + qn[1] * wv * side), o = oi(qx, qz); if (o < 0 || occ[o] !== 0 || Math.abs(ground(qx, qz) - ry) > 2) { ok = false; break; } cells.push([qx, qz, wv, q]); } }
@@ -825,12 +831,12 @@
                   const sp = cells.find(c => c[2] === 4 && c[3] === 2); if (sp) put(sp[0], ry + 1, sp[1], st('vx_sign', { facing: 0, icon: 2 }));
                 } else { const b = cells.find(c => c[2] === 3); if (b) put(b[0], ry + 1, b[1], st('vx_bench', { facing: ((Math.round(pts[k][2] / (Math.PI / 2)) + 1) & 3) })); const pl = cells.find(c => c[2] === 4); if (pl) put(pl[0], ry + 1, pl[1], st('vx_tech_planter')); }
               }
-            }
+            });
           }
-          if (k % 11 === 6) {
+          if (k % 11 === 6) street(() => {
             const side = (k / 11 | 0) % 2 ? 1 : -1, lx = Math.round(px + nx * (AIRY ? 3 : 2) * side), lz = Math.round(pz + nz * (AIRY ? 3 : 2) * side), o = oi(lx, lz);
             if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz), ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
-          }
+          });
         }
         bandRoads.push({ pts, sm, RW: S.sidewalk || AIRY ? 2 : 1, zk });
         roads.push(road);
@@ -838,6 +844,59 @@
       }
     }
     const lineS = S.pathLine ? st(S.pathLine) : 0, walkS = S.sidewalk ? st(S.sidewalk) : 0;
+    // ---- the band of every road: the cells within RW + 0.5 of its float centre line, each at its nearest road's height
+    // (v0.56.5's finishing pass drew it after the lots; vgen 22 claims it here, before them, so a yard's margin no longer
+    // takes a diagonal gap of a lane — the lab's road detector found 318 such holes in 16 places, test/lab_roads.js)
+    const keyOf = (x, z) => x + ',' + z;
+    const laneW = (rw) => rw >= 2 ? 1.5 : rw + 0.5;
+    const near = (a) => Math.abs(Math.cos(a)) >= 0.906 || Math.abs(Math.sin(a)) >= 0.906;
+    const axisOf = (a) => Math.abs(Math.cos(a)) >= Math.abs(Math.sin(a)) ? 1 : 0;
+    const surf = (x, z) => (M.hash2(x, z, 5) & 7) === 0 ? pathAlt : pathS;
+    const BAND22 = g.vgen >= 22;
+    let cellAt = null, entry = null;   // key → {x, z, d, y, laneN, cover}; key → its road cell [x, z, y, walk]
+    const bandOf = function* () {
+      cellAt = new Map();
+      for (const R of bandRoads) {
+        const P = R.pts, n = P.length; R.cells = []; R.s = new Float64Array(n);
+        if (n < 2) continue;
+        for (let k = 1; k < n; k++) R.s[k] = R.s[k - 1] + Math.hypot(P[k][3] - P[k - 1][3], P[k][4] - P[k - 1][4]);
+        const BW = R.RW + 0.5, LW = laneW(R.RW), mine = new Map();
+        for (let k = 0; k + 1 < n; k++) {
+          if ((k & 127) === 0) yield;
+          const ax = P[k][3], az = P[k][4], ex = P[k + 1][3] - ax, ez = P[k + 1][4] - az, L2 = ex * ex + ez * ez;
+          if (L2 < 1e-9) continue;
+          const L = Math.sqrt(L2);
+          const x0 = Math.floor(Math.min(ax, ax + ex) - BW), x1 = Math.ceil(Math.max(ax, ax + ex) + BW), z0 = Math.floor(Math.min(az, az + ez) - BW), z1 = Math.ceil(Math.max(az, az + ez) + BW);
+          for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+            let t = ((x - ax) * ex + (z - az) * ez) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+            const qx = ax + t * ex, qz = az + t * ez, sd = ((x - qx) * -ez + (z - qz) * ex) / L, d = Math.abs(sd);
+            if (d > BW + 1e-9) continue;
+            const kk = keyOf(x, z), e = mine.get(kk);
+            if (!e || d < e.d) mine.set(kk, { x, z, d, sd, k, t, s: R.s[k] + t * L, ang: P[k][2] });
+          }
+        }
+        for (const [kk, e] of mine) {
+          const k1 = Math.min(n - 1, e.k + 1), y = Math.round(R.sm[e.k] + (R.sm[k1] - R.sm[e.k]) * e.t);
+          let c = cellAt.get(kk);
+          if (!c) { c = { x: e.x, z: e.z, d: e.d, y, laneN: 0, cover: 0 }; cellAt.set(kk, c); }
+          else if (e.d < c.d) { c.d = e.d; c.y = y; }
+          c.cover++; if (e.d <= LW + 1e-9) c.laneN++;
+          R.cells.push([kk, e.sd, e.s, e.ang]);
+        }
+      }
+    };
+    if (BAND22 && bandRoads.length) {
+      yield* bandOf();
+      entry = new Map(); for (const c of roadCells) entry.set(keyOf(c[0], c[1]), c);
+      for (const [kk, c] of cellAt) {
+        const o = oi(c.x, c.z); if (o < 0) continue;
+        const walk = walkS && c.laneN === 0 ? 1 : 0, en = entry.get(kk);
+        if (en) { c.y = en[2]; c.road = true; if (walkS && !zebra.has(kk)) en[3] = walk; }
+        else if (occ[o] === 0) { occ[o] = 1; c.road = true; const e = [c.x, c.z, c.y, walk]; roadCells.push(e); entry.set(kk, e); plan.roadFix = (plan.roadFix | 0) + 1; }
+        else if (occ[o] === 2 && Math.max(Math.abs(c.x - cx), Math.abs(c.z - cz)) === PR + 1) { c.y = py; c.road = true; c.rim = true; const e = [c.x, c.z, py, walk]; roadCells.push(e); entry.set(kk, e); }
+      }
+    }
+    for (const job of streetJobs) job();   // (vgen 22: the street furniture, on what the roads left free)
     let steps = 0;
     for (const [x, z, y, walk] of roadCells) {
       if ((++steps & 255) === 0) yield;
@@ -879,6 +938,7 @@
         const inner = u >= 0 && u < w && v >= 0 && v < d;
         if (inner) { if (c !== 0 && c !== 6) return VG.fail('inner' + c); } // a street lamp or palm gives way to a building
         else if (c === 3 || c === 2) return VG.fail('margin' + c);
+        else if (c === 1 && BAND22 && u >= -1 && u <= w && v >= 0 && v <= d) return VG.fail('ring');   // (vgen 22: a street keeps a cell clear of the side and back walls — the eaves, the chimney, the downpipes; the front faces its own road)
         if (Math.hypot(x - cx, z - cz) > RAD - 2) return VG.fail('radius');
         if (inner && (u === 0 || u === w - 1 || v === 0 || v === d - 1 || (u === du && v === d >> 1))) { const y = ground(x, z); if (y <= SEA) return null; mn = Math.min(mn, y); mx = Math.max(mx, y); }
       }
@@ -1200,10 +1260,17 @@
         F: lot.F, r: lot.r, w: lot.w, d: lot.d, ox: lot.ox, oz: lot.oz,
       };
     };
+    // vgen 22: a lot builds nothing in a street's walking space — its margin may reach a street at its side (a hedge row,
+    // a yard's paving stood in the lane; the lab's road detector). Only the road's surface and the two cells over it: a
+    // roof's eave, a gutter, a balcony over the pavement stay (and air: clearing the space is fine — but not the surface)
+    // (a downpipe over a street goes whole: its lower end alone would leave the pipe hanging in the air; the gutter along
+    // the eave stays with the roof)
+    const pipe = (s) => !!s && /^vm_downpipe/.test(R.types[R.T.type[s]].name);
+    const lotPut = (x, y, z, s) => { const e = entry && entry.get(keyOf(x, z)); if (e && ((y >= e[2] && y <= e[2] + 2 && (s || y === e[2])) || pipe(s))) { if (TR) TR('drop', x, y, z, s); return; } put(x, y, z, s); };
     let homeSeed = site.seed;
     for (const lot of lots) {
       yield;
-      const L = makeLot(put, lot.ox, lot.oz, lot.r);
+      const L = makeLot(BAND22 ? lotPut : put, lot.ox, lot.oz, lot.r);
       const lg = (u, v) => { const q = ROT[lot.r](u, v); return ground(lot.ox + q[0], lot.oz + q[1]); };
       // clear the air volume over the lot and fill the ground up to the floor
       lot.ground = lg;
@@ -1217,7 +1284,7 @@
         else {
           // yard: blend ground to the floor level, grassy
           const yy = lot.F - (flatKind ? 0 : 1);
-          if (gy < yy) fill(x, z, gy + 1, yy, st(site.style === 'desert' ? 'sand' : S.modern ? 'stacked_stone' : 'dirt'));   // modern lots sit on ledgestone retaining walls
+          if (gy < yy && !(BAND22 && occ[oi(x, z)] === 1)) fill(x, z, gy + 1, yy, st(site.style === 'desert' ? 'sand' : S.modern ? 'stacked_stone' : 'dirt'));   // modern lots sit on ledgestone retaining walls (vgen 22: never over the street — a yard above its road filled dirt onto the paving)
           if (occ[oi(x, z)] !== 1) { fill(x, z, yy + 1, Math.max(yy + 6, gy + 3), AIR); put(x, yy, z, st(site.style === 'desert' ? 'sand' : site.style === 'snowy' ? 'snow_block' : 'grass_block')); }
         }
       }
@@ -1274,7 +1341,7 @@
       }
       if (MODERN && lot.kind !== 'barn') {
         const mk = lot.kind === 'lot' ? 'home' : lot.kind;
-        const info = yield* VG.modern.buildSteps(mk, L, lot, { rng: lrng, ground: lg, beds: 2 + lrng.int(3), put, palms: site.style === 'savanna', F: lot.F });
+        const info = yield* VG.modern.buildSteps(mk, L, lot, { rng: lrng, ground: lg, beds: 2 + lrng.int(3), put, palms: site.style === 'savanna', F: lot.F, vgen: g.vgen });
         if (info) {
           if (mk === 'park') { plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](info.spot[0], info.spot[2]); return [lot.ox + q[0], info.spot[1], lot.oz + q[1]]; })(), seats: info.seats.map(p => { const q = ROT[lot.r](p[0], p[2]); return [lot.ox + q[0], p[1], lot.oz + q[1], (p[3] + lot.r) & 3]; }) }); continue; }
           const sm = recordInfo(lot, info);
@@ -1411,44 +1478,11 @@
     //     (a dash is a straight block: on a diagonal it was a yellow staircase), turned along the road; a zebra crossing
     //     as one full row across the lanes at its point, also only near an axis; none inside a junction
     if (bandRoads.length && g.vgen >= 21) {   // (vgen 21: a world made before keeps every chunk it generated — test/architecture.js)
-      const keyOf = (x, z) => x + ',' + z;
-      const laneW = (rw) => rw >= 2 ? 1.5 : rw + 0.5;
-      const near = (a) => Math.abs(Math.cos(a)) >= 0.906 || Math.abs(Math.sin(a)) >= 0.906;
-      const axisOf = (a) => Math.abs(Math.cos(a)) >= Math.abs(Math.sin(a)) ? 1 : 0;
-      const cellAt = new Map();   // key → {x, z, d, y, laneN, cover}
-      for (const R of bandRoads) {
-        const P = R.pts, n = P.length; R.cells = []; R.s = new Float64Array(n);
-        if (n < 2) continue;
-        for (let k = 1; k < n; k++) R.s[k] = R.s[k - 1] + Math.hypot(P[k][3] - P[k - 1][3], P[k][4] - P[k - 1][4]);
-        const BW = R.RW + 0.5, LW = laneW(R.RW), mine = new Map();
-        for (let k = 0; k + 1 < n; k++) {
-          if ((k & 127) === 0) yield;
-          const ax = P[k][3], az = P[k][4], ex = P[k + 1][3] - ax, ez = P[k + 1][4] - az, L2 = ex * ex + ez * ez;
-          if (L2 < 1e-9) continue;
-          const L = Math.sqrt(L2);
-          const x0 = Math.floor(Math.min(ax, ax + ex) - BW), x1 = Math.ceil(Math.max(ax, ax + ex) + BW), z0 = Math.floor(Math.min(az, az + ez) - BW), z1 = Math.ceil(Math.max(az, az + ez) + BW);
-          for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
-            let t = ((x - ax) * ex + (z - az) * ez) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
-            const qx = ax + t * ex, qz = az + t * ez, sd = ((x - qx) * -ez + (z - qz) * ex) / L, d = Math.abs(sd);
-            if (d > BW + 1e-9) continue;
-            const kk = keyOf(x, z), e = mine.get(kk);
-            if (!e || d < e.d) mine.set(kk, { x, z, d, sd, k, t, s: R.s[k] + t * L, ang: P[k][2] });
-          }
-        }
-        for (const [kk, e] of mine) {
-          const k1 = Math.min(n - 1, e.k + 1), y = Math.round(R.sm[e.k] + (R.sm[k1] - R.sm[e.k]) * e.t);
-          let c = cellAt.get(kk);
-          if (!c) { c = { x: e.x, z: e.z, d: e.d, y, laneN: 0, cover: 0 }; cellAt.set(kk, c); }
-          else if (e.d < c.d) { c.d = e.d; c.y = y; }
-          c.cover++; if (e.d <= LW + 1e-9) c.laneN++;
-          R.cells.push([kk, e.sd, e.s, e.ang]);
-        }
-      }
-      const entry = new Map(); for (const c of roadCells) entry.set(keyOf(c[0], c[1]), c);
-      const surf = (x, z) => (M.hash2(x, z, 5) & 7) === 0 ? pathAlt : pathS;
+      if (!cellAt) yield* bandOf();   // (vgen 22 drew the band before the lots)
+      if (!entry) { entry = new Map(); for (const c of roadCells) entry.set(keyOf(c[0], c[1]), c); }
       const dirtS = st(site.style === 'desert' ? 'sandstone' : 'dirt');
       let nFix = 0;
-      for (const [kk, c] of cellAt) {
+      if (!BAND22) for (const [kk, c] of cellAt) {   // (vgen 22 claimed and paved the band with the roads)
         if ((++nFix & 1023) === 0) yield;
         const o = oi(c.x, c.z); if (o < 0) continue;
         const walk = walkS && c.laneN === 0 ? 1 : 0, en = entry.get(kk);

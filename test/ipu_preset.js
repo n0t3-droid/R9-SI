@@ -1,6 +1,6 @@
 // F10 · Bandbreite: the five switches in the settings and the presets (game.js, settings_reg.js, ipu.js), no browser:
-//  a · the presets: off on every preset but Ultra · Leicht (on there — texLite aside: no preset turns it on, it softens far
-//      slopes); a switch changed by hand makes it „Eigene"
+//  a · the presets: off on every preset but Ultra · Leicht (on there — texLite and zPre aside, IPU.OPT_IN: no preset turns
+//      them on, they are the player's choice); a switch changed by hand makes it „Eigene"
 //  b · an integrated GPU (the owner's Radeon Graphics through ANGLE): any preset turns them on (Very Low: not zPre); the
 //      first start on that GPU turns them on once, a switch changed by hand stays until the next preset change; a dedicated
 //      GPU and SwiftShader keep the presets' values
@@ -32,8 +32,9 @@ const game = (gpu, preset) => {
   return g;
 };
 const all = (o, v) => SW.every(k => o[k] === v);
-// on: every switch but texLite (no preset turns it on: it softens far slopes — the player's choice), and on Very Low not zPre
-const on = (o, potato) => SW.every(k => o[k] === (k !== 'texLite' && !(potato && k === 'zPre')));
+// on: every switch but the player's own (IPU.OPT_IN: texLite softens far slopes; zPre since v0.55.87 — on the owner's
+// Radeon its prepass cost 14.3 ms and the frame was 18.5 ms faster without it), and on Very Low not zPre
+const on = (o, potato) => SW.every(k => o[k] === (!IPU.OPT_IN.includes(k) && !(potato && k === 'zPre')));
 
 console.log('a · the presets');
 {

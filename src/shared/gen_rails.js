@@ -65,32 +65,37 @@
   function build(g, link) {
     const A = link.a, B = link.b;
     const dx = B.x - A.x, dz = B.z - A.z, sx = Math.sign(dx) || 1, sz = Math.sign(dz) || 1;
-    const out = VG.rad(g) + 8, SHIFT = 10;
+    // the stations stand outside the towns: vgen 22 measures each end from its own place's radius (the airy villages
+    // reach 100 blocks out, the modern towns 230 — the line used to ramp down through their streets at 86, the lab's rail
+    // detector, test/lab_rails.js); older worlds keep the shared radius
+    const R22 = g.vgen >= 22, outA = (R22 ? VG.siteRad(g, A) : VG.rad(g)) + 8, outB = (R22 ? VG.siteRad(g, B) : VG.rad(g)) + 8, SHIFT = 10;
     const pts = [];
     const push = (x, z, dir) => { const L = pts[pts.length - 1]; if (L && L[0] === x && L[1] === z) return; pts.push([x, z, dir]); };
-    const adx = Math.abs(dx), adz = Math.abs(dz), JOG = out + 24;
+    const adx = Math.abs(dx), adz = Math.abs(dz), JOG = Math.max(outA, outB) + 24;
     if (adz < JOG && adx >= adz) {
       // straight along x, halfway between the two towns
-      if (adx < out * 2 + 30) return null;
+      if (adx < outA + outB + 30) return null;
       const z = A.z + Math.round(dz / 2);
-      for (let x = A.x + sx * out; x !== B.x - sx * out; x += sx) push(x, z, 0);
+      for (let x = A.x + sx * outA; x !== B.x - sx * outB; x += sx) push(x, z, 0);
     } else if (adx < JOG) {
-      if (adz < out * 2 + 30) return null;
+      if (adz < outA + outB + 30) return null;
       const x = A.x + Math.round(dx / 2);
-      for (let z = A.z + sz * out; z !== B.z - sz * out; z += sz) push(x, z, 1);
+      for (let z = A.z + sz * outA; z !== B.z - sz * outB; z += sz) push(x, z, 1);
     } else {
       // an L: leave along the longer axis on the side facing the other town (so lines from one town never share a
       // track), turn once, and arrive along the other axis
       if (adx >= adz) {
         const z0 = A.z + sz * SHIFT, x1 = B.x - sx * SHIFT;
-        for (let x = A.x + sx * out; x !== x1; x += sx) push(x, z0, 0);
+        if (R22 && Math.abs(x1 - A.x) <= outA) return null;
+        for (let x = A.x + sx * outA; x !== x1; x += sx) push(x, z0, 0);
         push(x1, z0, 2);
-        for (let z = z0 + sz; z !== B.z - sz * out; z += sz) push(x1, z, 1);
+        for (let z = z0 + sz; z !== B.z - sz * outB; z += sz) push(x1, z, 1);
       } else {
         const x0 = A.x + sx * SHIFT, z1 = B.z - sz * SHIFT;
-        for (let z = A.z + sz * out; z !== z1; z += sz) push(x0, z, 1);
+        if (R22 && Math.abs(z1 - A.z) <= outA) return null;
+        for (let z = A.z + sz * outA; z !== z1; z += sz) push(x0, z, 1);
         push(x0, z1, 2);
-        for (let x = x0 + sx; x !== B.x - sx * out; x += sx) push(x, z1, 0);
+        for (let x = x0 + sx; x !== B.x - sx * outB; x += sx) push(x, z1, 0);
       }
     }
     if (pts.length < 30) return null;

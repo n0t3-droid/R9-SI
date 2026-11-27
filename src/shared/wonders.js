@@ -56,11 +56,13 @@
   // generator lays its viaduct along (a line it drops later is still avoided — a wonder never cuts through one)
   function railSegs(g, A, B) {
     const VG = VR.VillageGen, dx = B.x - A.x, dz = B.z - A.z, sx = Math.sign(dx) || 1, sz = Math.sign(dz) || 1;
-    const out = VG.rad(g) + 8, SHIFT = 10, JOG = out + 24, adx = Math.abs(dx), adz = Math.abs(dz);
-    if (adz < JOG && adx >= adz) { const z = A.z + Math.round(dz / 2); return [[A.x + sx * out, z, B.x - sx * out, z]]; }
-    if (adx < JOG) { const x = A.x + Math.round(dx / 2); return [[x, A.z + sz * out, x, B.z - sz * out]]; }
-    if (adx >= adz) { const z0 = A.z + sz * SHIFT, x1 = B.x - sx * SHIFT; return [[A.x + sx * out, z0, x1, z0], [x1, z0, x1, B.z - sz * out]]; }
-    const x0 = A.x + sx * SHIFT, z1 = B.z - sz * SHIFT; return [[x0, A.z + sz * out, x0, z1], [x0, z1, B.x - sx * out, z1]];
+    // (vgen 22: each station measured from its own place's radius, as gen_rails.js lays it)
+    const R22 = g.vgen >= 22, oA = (R22 ? VG.siteRad(g, A) : VG.rad(g)) + 8, oB = (R22 ? VG.siteRad(g, B) : VG.rad(g)) + 8;
+    const SHIFT = 10, JOG = Math.max(oA, oB) + 24, adx = Math.abs(dx), adz = Math.abs(dz);
+    if (adz < JOG && adx >= adz) { const z = A.z + Math.round(dz / 2); return [[A.x + sx * oA, z, B.x - sx * oB, z]]; }
+    if (adx < JOG) { const x = A.x + Math.round(dx / 2); return [[x, A.z + sz * oA, x, B.z - sz * oB]]; }
+    if (adx >= adz) { const z0 = A.z + sz * SHIFT, x1 = B.x - sx * SHIFT; return [[A.x + sx * oA, z0, x1, z0], [x1, z0, x1, B.z - sz * oB]]; }
+    const x0 = A.x + sx * SHIFT, z1 = B.z - sz * SHIFT; return [[x0, A.z + sz * oA, x0, z1], [x0, z1, B.x - sx * oB, z1]];
   }
   // the villages within r of (x, z) (cells of the village grid)
   function villagesNear(g, x, z, r) {

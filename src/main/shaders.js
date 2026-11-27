@@ -3303,7 +3303,11 @@ uniform float u_appear;   // 0..1: a figure fading in (or out) where you look, d
 void main() {
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #ifdef APPEAR
+#ifdef SOFTFADE
+  if (u_appear < 1.0 && fadeT(gl_FragCoord.xy) >= u_appear) discard;   // (the terrain's soft grain, f-stipple)
+#else
   if (u_appear < 1.0 && bayer4(gl_FragCoord.xy) >= u_appear) discard;
+#endif
 #endif
   vec3 alb = v_color.rgb * u_tint;
   vec3 n = normalize(v_n);

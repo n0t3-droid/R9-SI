@@ -2600,7 +2600,7 @@
     'g.zb.k.aurora': 'Polarlicht',
     'g.zb.k.meteor': 'Sternschnuppe',
     'g.zb.k.murm': 'Starenschwarm',
-    'g.zb.k.rays': 'Himmelsrochen',
+    'g.zb.k.rays': 'Wolkenrochen',
     'g.zb.k.festival': 'Dorffest',
     'g.zb.k.ship': 'Landung eines Schiffs',
     'g.zb.k.vista': 'Aussicht',

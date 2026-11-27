@@ -435,7 +435,7 @@
           const q = [x, y + Math.min(1.4, fh * 0.75), z];
           if (!this.clear(q, true)) { SG.head++; continue; }
           if (!this.clear([x, y + Math.min(0.35, fh * 0.3), z])) { SG.feet++; continue; }
-          if (this.inSight(q)) { SG.sight++; continue; }   // (v0.56.5: beside the view — the clear lines above: seen once you look)
+          if (this.inSight(q, false)) { SG.sight++; continue; }   // (v0.56.5: beside the view — the clear lines above: seen once you look; without the view test the spot is beside the view by its angle)
           SG.ok++;
           cur[this.stg] = 0;
           return [x, y, z];
@@ -454,7 +454,7 @@
       }
       return fb;
     }
-    inSight(q) { const L = VR.EventLog; if (!L || !L.inView) return true; try { return !!L.inView(q, 1.2, this.g).inView; } catch (e) { return true; } }
+    inSight(q, dflt) { const d = dflt === undefined ? true : dflt, L = VR.EventLog; if (!L || !L.inView) return d; try { return !!L.inView(q, 1.2, this.g).inView; } catch (e) { return d; } }
     // the highest ground of a few spots ahead (the cairn's hilltop)
     fov() { const S = this.g.settings; return S && Number.isFinite(S.fov) ? S.fov * Math.PI / 180 : W.STAGE.fov; }
     aspect() { const r = this.g.renderer; return r && r.W > 0 && r.H > 0 ? r.W / r.H : 16 / 9; }

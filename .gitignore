@@ -6,3 +6,4 @@ test/ships/
 node_modules/
 *.log
 .DS_Store
+lab/out/

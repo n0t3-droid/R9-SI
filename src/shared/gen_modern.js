@@ -350,7 +350,9 @@
         info.stairs = n;
       }
     }
-    info.door = [cu, F + 1, V0]; info.outside = [cu, F, -2]; info.inside = [cu, F + 1, V0 + 4]; info.lights.push([cu, F + 7, V0 + 4]); info.roofTop = TOP + 7;
+    // (vgen 22: the spot in front of the door is between the portico and the fountain — [cu, F, −2] lay in the fountain's
+    // basin, the lab's door detector)
+    info.door = [cu, F + 1, V0]; info.outside = [cu, F, (o.vgen | 0) >= 22 ? -1 : -2]; info.inside = [cu, F + 1, V0 + 4]; info.lights.push([cu, F + 7, V0 + 4]); info.roofTop = TOP + 7;
     return info;
   };
 
@@ -489,7 +491,9 @@
       const path = u === cu || v === cv || u === 0 || v === 0 || u === w - 1 || v === d - 1;
       P(u, F, v, path ? 'paver_grey' : 'grass_block');
       for (let y = F + 1; y <= F + 6; y++) P(u, y, v, null);
-      if (!path && (u + v) % 4 === 0 && rng.chance(0.6)) P(u, F + 1, v, rng.pick(['vx_flowerbed', 'vx_flowerbed_tulips', 'vx_flowerbed_roses', 'short_grass']));
+      // (vgen 22: none where the fountain's basin and its travertine ring are laid below — a tuft stood on the ring, a
+      // bed over the water; the lab's plant detector. The draws stay, so the rest of the park is the same)
+      if (!path && (u + v) % 4 === 0 && rng.chance(0.6)) { const pl = rng.pick(['vx_flowerbed', 'vx_flowerbed_tulips', 'vx_flowerbed_roses', 'short_grass']); if (!((o.vgen | 0) >= 22 && Math.abs(u - cu) <= 2 && Math.abs(v - cv) <= 2)) P(u, F + 1, v, pl); }
     }
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) P(cu + a, F, cv + b, a === 0 && b === 0 ? 'granite_paver' : 'water');
     P(cu, F + 1, cv, 'vx_fountain'); for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) if (Math.abs(a) === 2 || Math.abs(b) === 2) P(cu + a, F, cv + b, 'travertine');

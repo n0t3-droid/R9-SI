@@ -262,7 +262,7 @@
 
   // ---------------------------------------------------------------- the key names the game polls: all bindable
   // keys of a viewer (the Zeitraffer's replay is a player of its own) and of the menus are not game actions
-  A.VIEWER_KEYS = { Equal: 'zeitraffer', NumpadAdd: 'zeitraffer', BracketRight: 'zeitraffer', Minus: 'zeitraffer', NumpadSubtract: 'zeitraffer', Home: 'zeitraffer', End: 'zeitraffer', ArrowUp: 'menus', ArrowDown: 'menus', Digit: 'hotbar (prefix)' };
+  A.VIEWER_KEYS = { Equal: 'zeitraffer', NumpadAdd: 'zeitraffer', BracketRight: 'zeitraffer', Minus: 'zeitraffer', NumpadSubtract: 'zeitraffer', Home: 'zeitraffer', End: 'zeitraffer', ArrowUp: 'menus', ArrowDown: 'menus', Digit: 'hotbar (prefix)', KeyK: 'fotomodus (the Kinoflug film, f-kino2)' };
 
   // ---------------------------------------------------------------- the page: classes, the CSS, the timer
   const hasDoc = typeof document !== 'undefined' && !!document.createElement && !!document.head;

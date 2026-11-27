@@ -570,7 +570,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 21 };   // vgen 21 (v0.56.5): a modern town's streets straight along the axes, the sky islands' trees on a grid, one kind per island · vgen 20 (v0.56.2): lone trees clear of the woods, sakura as the blossom · vgen 19 (v0.55.94): the stony peaks' strata in grey tones, no zebra bands · vgen 18 (t-trees2): every tree a new design grown from VR.Flora's grammars, palms on the beaches · vgen 17 (v-flora): the land between in bloom — L-system blossom trees and shrubs, colour fields, clover on the ways, the wonder spots · vgen 16 (f-polish9): the Sky Isles calmer from below, shorter sparser curtains — // vgen 15 (o-wander3): the Sky Isles as floating gardens — // vgen 14 (t-hangar): the Gate Temple's dark stone, gatehouse and gate glow, the Hangar Hall's bay, coffer, navy lining, round-icon screens, console desks and hero craft · vgen 13 (f-arrival): the trees' tops on their crowns, the vistas' views cleared as cones, the frame trees out of the eye's face · vgen 12 (t-polish2): the hall city's polished nave floor · vgen 11: the vistas (t-vista: eye-catchers, sight windows, vista spurs, the landmarks' silhouettes; vgen 10, t-land's land between, shipped with v0.46) · vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 22 };   // vgen 22 (v0.56.6, the lab's finds): the villages' roads claimed before the lots — no yard fills dirt over a street, no gap in a lane, no lamp, palm or hedge in a road — and the sky rails' stations outside each place's own radius · vgen 21 (v0.56.5): a modern town's streets straight along the axes, the sky islands' trees on a grid, one kind per island · vgen 20 (v0.56.2): lone trees clear of the woods, sakura as the blossom · vgen 19 (v0.55.94): the stony peaks' strata in grey tones, no zebra bands · vgen 18 (t-trees2): every tree a new design grown from VR.Flora's grammars, palms on the beaches · vgen 17 (v-flora): the land between in bloom — L-system blossom trees and shrubs, colour fields, clover on the ways, the wonder spots · vgen 16 (f-polish9): the Sky Isles calmer from below, shorter sparser curtains — // vgen 15 (o-wander3): the Sky Isles as floating gardens — // vgen 14 (t-hangar): the Gate Temple's dark stone, gatehouse and gate glow, the Hangar Hall's bay, coffer, navy lining, round-icon screens, console desks and hero craft · vgen 13 (f-arrival): the trees' tops on their crowns, the vistas' views cleared as cones, the frame trees out of the eye's face · vgen 12 (t-polish2): the hall city's polished nave floor · vgen 11: the vistas (t-vista: eye-catchers, sight windows, vista spurs, the landmarks' silhouettes; vgen 10, t-land's land between, shipped with v0.46) · vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
       if (o.first && VR.First) VR.First.mark(this, meta);   // (t-first: made from the start screen — it may open on its finest vista)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
@@ -921,6 +921,11 @@
       requestAnimationFrame((tt) => this.loop(tt));
       let dt = (t - this.last) / 1000; this.last = t;
       if (!(dt > 0)) dt = 0.016;
+      // (frameDt: the frame's real interval, up to 2 s — a tab away longer is no frame rate. The simulation steps at most
+      // 0.1 s, but the frame rate and Smart Quality's clocks count real seconds: on a PC at one frame a second they read
+      // 10 fps and waited 25 s for the first step — sq_slow.js, found with the lab's PC emulator)
+      this.frameDt = Math.min(dt, 2);
+      this.sqDt = (this.sqDt || 0) + this.frameDt;   // (the governor's time since its last call: Bildwarp's frames between)
       dt = Math.min(dt, 0.1);
       this.frame++;
       // main-thread time per frame vs. the frame interval: when the CPU is the bottleneck, lowering the
@@ -928,7 +933,7 @@
       const tj0 = performance.now();
       if (this.jsMs === undefined) this.jsMs = 8;
       this.cpuBound = this.jsMs > Math.max(9, dt * 1000 * 0.72) && dt > 1 / 55;
-      this.fpsAcc = (this.fpsAcc || 0) + dt; this.fpsN = (this.fpsN || 0) + 1;
+      this.fpsAcc = (this.fpsAcc || 0) + this.frameDt; this.fpsN = (this.fpsN || 0) + 1;
       if (this.fpsAcc > 0.5) { this.fps = this.fpsN / this.fpsAcc; this.fpsAcc = 0; this.fpsN = 0; }
       try {
         // F5 · Steuerung: menus and the chat take the pad as focus, not as game keys; the pad and the touch layer are
@@ -1037,9 +1042,16 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
+      // its clocks run on real seconds since its last call: the simulation's dt is clamped at 0.1 s, so below 10 fps they
+      // fell behind the wall clock, and with Bildwarp it is called on the whole frames only — the warps' time between was
+      // left out and the whole frames read faster than they came (sq_slow.js). At 10 fps and faster, without warps, the
+      // two are the same
+      const since = this.sqDt !== undefined ? this.sqDt : this.frameDt; this.sqDt = 0;
       if (this.bench || this.sweep) return;   // the Automatik run (or the Stufentest) measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aqState();
+      const rdt = since > dt ? Math.min(2, since) : dt;
+      aq.clock = (aq.clock || 0) + rdt;
       if (!S.dynRes || !this.fps) {
         if (aq.stack.length) this.aqReset(aq, S, w);
         this.cpuBound = (this.jsMs > Math.max(9, dt * 1000 * 0.72) && dt > 1 / 55) || !!this.slowBase;
@@ -1055,20 +1067,20 @@
       // who is the bottleneck? measured when the browser exposes GPU timing, estimated otherwise
       let gpuBound, cpuBound;
       if (gpuMs !== undefined) { gpuBound = gpuMs > budget * 0.85 && gpuMs >= jsMs * 0.9; cpuBound = jsMs > budget * 0.7 && jsMs > gpuMs * 0.8; }
-      else { cpuBound = jsMs > Math.max(9, dt * 1000 * 0.6) && dt > 1 / 55; gpuBound = !cpuBound; }
+      else { cpuBound = jsMs > Math.max(9, rdt * 1000 * 0.6) && rdt > 1 / 55; gpuBound = !cpuBound; }
       this.cpuBound = cpuBound || aq.c > 0 || !!this.slowBase;
       aq.gpuBound = gpuBound; aq.cpuBound = cpuBound;
       // a smoothed 2 s frame-rate window for decisions (the HUD fps is a 0.5 s window)
-      aq.winT += dt; aq.winN++;
+      aq.winT += rdt; aq.winN++;
       if (aq.winT >= 2) { aq.fpsWin = aq.winN / aq.winT; aq.winT = 0; aq.winN = 0; }
       const fps = aq.fpsWin || this.fps;
-      aq.hold = Math.max(0, aq.hold - dt);
-      const now = this.time;
+      aq.hold = Math.max(0, aq.hold - rdt);
+      const now = aq.clock;
       // v0.56.3 · Vorausschauend (aqpredict.js): the frame's cost line read half a second ahead, the surprise of a jump, what
       // each rung bought on this machine. measured: the GPU's own timing (a frame time alone cannot tell a cap from a load)
       const AP = VR.AQPredict, measured = gpuMs !== undefined, pp = AP ? (aq.pp || (aq.pp = AP.make())) : null;
-      const msNow = measured ? Math.max(gpuMs, jsMs) : dt * 1000;
-      if (pp) AP.push(pp, dt, msNow);
+      const msNow = measured ? Math.max(gpuMs, jsMs) : rdt * 1000;
+      if (pp) AP.push(pp, rdt, msNow);
       // probe result: did the last step help?
       if (aq.probe && aq.hold <= 0) {
         const pr = aq.probe; aq.probe = null;
@@ -1091,11 +1103,11 @@
       const gLadder = this.aqGpuRungs(S), cLadder = this.aqCpuRungs(S);
       // a frame-rate cap (vsync at 30 Hz, battery saver, a background tab) is not a bottleneck: both sides idle
       const capped = gpuMs !== undefined && fps > 0 && (gpuMs + jsMs) < (1000 / fps) * 0.55;
-      const struggling = fps < target - 8 && !capped && this.time > 4, fine = fps > target + 3 || capped;
+      const struggling = fps < target - 8 && !capped && now > 4, fine = fps > target + 3 || capped;
       // (a jump the line sees coming — a quarter over the budget half a second ahead, and a surprise, not noise — is met now,
       //  not after the 2 s window has fallen)
       const msAhead = pp ? AP.predict(pp) : 0;
-      const early = !!pp && !struggling && !capped && this.time > 4 && aq.hold <= 0 && !aq.probe && msAhead > budget * 1.25 && AP.surprise(pp) > 3;
+      const early = !!pp && !struggling && !capped && now > 4 && aq.hold <= 0 && !aq.probe && msAhead > budget * 1.25 && AP.surprise(pp) > 3;
       if (early) aq.earlyN = (aq.earlyN || 0) + 1;
       if ((struggling || early) && aq.hold <= 0 && !aq.probe) {
         aq.good = 0;
@@ -1115,7 +1127,7 @@
           aq.probe = { kind, fps0: fps, i: i0, k, ms0: pp ? AP.trend(pp).mean : 0 }; aq.hold = 2.5;
         }
       } else if (fine && aq.stack.length) {
-        aq.good += dt;
+        aq.good += rdt;
         // (a give-back that would not fit — this rung bought more than the headroom — waits: it would only be taken again)
         const topK = aq.stack[aq.stack.length - 1], topI = topK === 'g' ? aq.g - 1 : aq.c - 1;
         const safe = !(pp && measured && !capped) || AP.popSafe(pp, topK, topI, AP.trend(pp).mean, budget);
@@ -1125,8 +1137,8 @@
         }
       } else if (!fine) aq.good = 0;
       // F9: ten seconds of fine frames at this depth are remembered for this GPU (a struggling frame restarts the count)
-      if (struggling) aq.steady = 0; else if (fine) aq.steady += dt;
-      aq.memT -= dt;
+      if (struggling) aq.steady = 0; else if (fine) aq.steady += rdt;
+      aq.memT -= rdt;
       if (aq.steady >= 10 && aq.memT <= 0) { aq.memT = 2; this.aqRemember(aq, S); }
       // fell back within 8 s of a step up: wait longer next time (up to a minute)
       if (aq.upT && struggling && now - aq.upT < 8) { aq.backoff = Math.min(60, aq.backoff * 2); aq.upT = 0; }
