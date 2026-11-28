@@ -3,7 +3,8 @@
 // The horizon map: the land round an eye from above, in its real block colours; where the column's surface section is
 // hidden behind hills (src/shared/hzcull.js, the game's settings: smooth slopes' erosion, a standing eye) it is dyed
 // violet — the geometry the GPU no longer draws. The eye is the white dot.
-//   node lab/tools/hzmap.js --seed 3616214791 --at 562.5,69.62,-1359.5 --rd 10 --out lab/out/hzmap.png
+//   node lab/tools/hzmap.js --seed 3616214791 --at 562.5,69.62,-1359.5 --rd 10 --out lab/out/hzmap.png [--style dim]
+//   (--style dim: the hidden land darkened and hatched instead of violet)
 // ============================================================================
 'use strict';
 const W = require('../lib/world.js'), P = require('../lib/png.js'), C = require('../lib/colors.js');
@@ -29,7 +30,10 @@ function hzmap(o) {
     if (dx * dx + dz * dz > (rd + 0.5) * (rd + 0.5)) continue;
     const t = W.top(g, wx, wz, 255, (s) => !!s); if (!t.s) continue;
     let c = C.top(t.s, t.y, eye[1]);
-    if (hidden.has(cx + ',' + (t.y >> 4) + ',' + cz)) c = [c[0] * 0.35 + 150 * 0.65, c[1] * 0.35 + 60 * 0.65, c[2] * 0.35 + 210 * 0.65];
+    if (hidden.has(cx + ',' + (t.y >> 4) + ',' + cz)) {
+      if (o.style === 'dim') { const k = ((x + z) & 7) === 0 ? 0.55 : 0.22; c = [c[0] * k, c[1] * k, c[2] * k]; }   // (dim: darkened, a diagonal hatch — for worlds with violet land)
+      else c = [c[0] * 0.35 + 150 * 0.65, c[1] * 0.35 + 60 * 0.65, c[2] * 0.35 + 210 * 0.65];
+    }
     const i = (z * size + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
   }
   const ex = Math.floor(eye[0]) - X0, ez = Math.floor(eye[2]) - Z0;
@@ -40,7 +44,7 @@ module.exports = hzmap;
 if (require.main === module) {
   const A = {}; for (let i = 2; i < process.argv.length; i += 2) A[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
   const at = String(A.at || '562.5,69.62,-1359.5').split(',').map(Number);
-  const r = hzmap({ seed: +(A.seed || 3616214791), at, rd: +(A.rd || 10), delta: A.delta !== undefined ? +A.delta : 0.05 });
+  const r = hzmap({ seed: +(A.seed || 3616214791), at, rd: +(A.rd || 10), delta: A.delta !== undefined ? +A.delta : 0.05, style: A.style });
   const out = A.out || 'lab/out/hzmap.png';
   P.save(P.scale(r.img, +(A.px || 2)), out);
   console.log(`${out}: ${r.hidden}/${r.sections} sections hidden`);

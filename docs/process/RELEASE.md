@@ -34,3 +34,14 @@ The shots: `vista_vl`, `citadel_vl` (Very Low), `vista`, `citadel`, `plaza`, `fa
 `test/monkey.mjs`: 3 min of seeded random play (`MONKEY_SEED`), save → reload → 30 s more. A failure names the seed;
 the same seed replays the same input (the frame timing of the machine still differs, so a rare hang may need a few seeds:
 `MONKEY_SEED=2 bash test/wt_run.sh monkey.mjs 1200`).
+
+## GitHub (after the tag)
+- `docs/releases/<version>.md`: the public notes, written before tagging (bilingual, short, a table). The Release
+  workflow (`.github/workflows/release.yml`) puts them on the GitHub release with `R9-SI.html`, `R9-SI-Studio.html` and
+  `R9-SI.zip` (stable names: `releases/latest/download/R9-SI.html` is always the newest game). Without a file it writes a
+  short generic note. A release made by hand keeps its text; only the files are added.
+- `node docs/media/make_charts.js` redraws the README's pictures; its facts strip counts lines, tests, block types,
+  biomes and the book's formulas afresh. `node lab/tools/zahlen.js` re-measures the charts' data
+  (`docs/media/data/zahlen.json`) when the generator, the mesher or the horizon culling changed.
+- The owner uploads with `GITHUB-HOCHLADEN.cmd` (tags first, then main). The Pages workflow deploys the game to
+  https://n0t3-droid.github.io/R9-SI/ (once Pages is on), the Release workflow makes the release.

@@ -1,11 +1,14 @@
-# Builds the game and the Studio from the sources and publishes dist/ to GitHub Pages on every push to master or main.
-# Enable once in the repository: Settings → Pages → Source: "GitHub Actions". The game is then at
-# https://<user>.github.io/R9-SI/ (index.html) and the Studio at …/R9-SI/studio.html — single-player; playing
-# together needs the copy on claude.ai (its room service), the game says so itself.
+# Spiel und Studio als Webseite: baut beides aus dem Quelltext und stellt es auf GitHub Pages, bei jedem Push auf main.
+# The game and the Studio as a website: built from the sources and published to GitHub Pages on every push to main.
+#   https://n0t3-droid.github.io/R9-SI/            the game
+#   https://n0t3-droid.github.io/R9-SI/studio.html  the Studio
+# Pages must be switched on once (Settings → Pages → Source: "GitHub Actions"). Until then this run stays green and
+# leaves a note instead of failing. Online the game plays single-player; playing together needs the copy with a room
+# service, the game says so itself.
 name: Pages
 on:
   push:
-    branches: [master, main]
+    branches: [main, master]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,19 +20,41 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages: ${{ steps.pages.outputs.on }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node build.js
-      - run: node test/id_snapshot.js && node test/lang.js
-      - run: cp -r dist site && printf 'User-agent: *\nAllow: /\n' > site/robots.txt && rm -f site/artifact.html site/studio_artifact.html
-      - uses: actions/upload-pages-artifact@v3
+      - name: Bauen · build
+        run: node build.js
+      - name: Prüfen · check
+        run: node test/id_snapshot.js && node test/lang.js
+      - name: Seite · site
+        run: |
+          mkdir site
+          cp dist/index.html dist/studio.html site/
+          printf 'User-agent: *\nAllow: /\n' > site/robots.txt
+          touch site/.nojekyll
+      - name: Pages an? · Pages on?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          t="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/dev/null || true)"
+          if [ "$t" = "workflow" ]; then echo "on=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "on=0" >> "$GITHUB_OUTPUT"
+            echo "::notice title=GitHub Pages::Einmal einschalten: Settings → Pages → Source: GitHub Actions · Switch on once: Settings → Pages → Source: GitHub Actions"
+          fi
+      - if: steps.pages.outputs.on == '1'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: site
   deploy:
     needs: build
+    if: needs.build.outputs.pages == '1'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

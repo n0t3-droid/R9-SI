@@ -1,0 +1,72 @@
+# Jede Version als Download: zu jedem Versions-Tag eine GitHub-Release mit dem Spiel als Datei, ohne Handarbeit.
+# Every version as a download: for each version tag a GitHub release with the game as files, nothing done by hand.
+#   R9-SI.html          the whole game in one file: download, double-click, play
+#   R9-SI-Studio.html   the editor
+#   R9-SI.zip           both, the math book (PDF), the licence and a short read-me
+# Stable names, so https://github.com/n0t3-droid/R9-SI/releases/latest/download/R9-SI.html always is the newest game.
+# Runs on a new tag and on every push to main (then for the newest tag, if its release has no files yet). The notes come
+# from docs/releases/<tag>.md when it exists. A release made by hand keeps its text; only the files are added.
+name: Release
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Welche Version · which version
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"; fi
+          if [ -z "$TAG" ]; then echo "no version tag yet"; echo "skip=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] && gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'R9-SI.zip'; then
+            echo "$TAG already has its files"; echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Packen · pack
+        if: steps.v.outputs.skip != '1'
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          N="$RUNNER_TEMP/notes.md"
+          if [ -f "docs/releases/$TAG.md" ]; then cp "docs/releases/$TAG.md" "$N"
+          elif git show "origin/main:docs/releases/$TAG.md" > "$N" 2>/dev/null; then :
+          else
+            printf '%s\n' "**R9-SI $TAG** — eine ganze Voxelwelt in einer HTML-Datei · a whole voxel world in one HTML file." "" \
+              "▶ \`R9-SI.html\` herunterladen, doppelklicken, spielen · download, double-click, play." "" \
+              "Was neu ist · what is new: [docs/CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/$TAG/docs/CHANGELOG.md)" > "$N"
+          fi
+          cp .github/release/LIESMICH.txt "$RUNNER_TEMP/LIESMICH.txt"
+          git checkout -q "$TAG"
+          D="$RUNNER_TEMP/R9-SI-$TAG"; mkdir -p "$D"
+          cp play/R9-SI.html play/R9-SI-Studio.html LICENSE "$D/"
+          [ -f docs/R9-SI_Mathematik_und_Physik.pdf ] && cp docs/R9-SI_Mathematik_und_Physik.pdf "$D/"
+          sed "s/{TAG}/$TAG/g" "$RUNNER_TEMP/LIESMICH.txt" > "$D/LIESMICH.txt"
+          (cd "$RUNNER_TEMP" && zip -qr R9-SI.zip "R9-SI-$TAG")
+          mkdir -p "$RUNNER_TEMP/out" && cp play/R9-SI.html play/R9-SI-Studio.html "$RUNNER_TEMP/R9-SI.zip" "$RUNNER_TEMP/out/"
+          ls -la "$RUNNER_TEMP/out"
+      - name: Veröffentlichen · publish
+        if: steps.v.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          O="$RUNNER_TEMP/out"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$O/R9-SI.html" "$O/R9-SI-Studio.html" "$O/R9-SI.zip" --clobber
+          else
+            gh release create "$TAG" "$O/R9-SI.html" "$O/R9-SI-Studio.html" "$O/R9-SI.zip" --title "R9-SI $TAG" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          fi
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG"

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "Wenn du R9-SI zitierst, dann so · If you cite R9-SI, please cite it like this."
+title: "R9-SI: a whole voxel world in one HTML file"
+type: software
+authors:
+  - alias: n0t3
+    website: "https://github.com/n0t3-droid"
+repository-code: "https://github.com/n0t3-droid/R9-SI"
+url: "https://n0t3-droid.github.io/R9-SI/"
+license: MIT
+abstract: >-
+  An open-source browser voxel game and editor (WebGL 2, web workers, no engine, no dependencies) built entirely from
+  its own procedural code: fractal simplex terrain with versioned, byte-identical generation; light flood fill; surface
+  nets; horizon culling with a proof test; Rayleigh/Mie skies, GGX materials and an ACES tone curve; Karplus–Strong
+  strings and Eyring reverberation; Kepler orbits coasted with universal variables; and a quality governor that
+  forecasts the frame cost. Every formula is documented with the file it lives in.
+keywords:
+  - voxel
+  - webgl2
+  - procedural generation
+  - simplex noise
+  - horizon culling
+  - physically based rendering
+  - karplus-strong
+  - room acoustics
+  - orbital mechanics
+  - browser game

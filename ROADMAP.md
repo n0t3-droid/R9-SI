@@ -2,7 +2,7 @@
 
 The trailer ("Trailer of R9-SI") is the target: what the game should look like and what players
 should be able to do when it's finished. This file turns it into milestones. Each milestone ships as
-small playable versions (v0.9, v0.10, …) and updates the claude.ai link.
+small playable versions (v0.9, v0.10, …) and updates the online link.
 
 ## Principles
 

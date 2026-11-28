@@ -1,0 +1,19 @@
+R9-SI {TAG} — eine ganze Voxelwelt im Browser · a whole voxel world in your browser
+Open Source (MIT) · kostenlos · keine Installation · free · no install
+
+SPIELEN / PLAY
+  R9-SI.html          doppelklicken (Chrome, Edge, Firefox). Du bist sofort in deiner Welt.
+                      Double-click. You are in your world at once. Worlds are saved in your browser.
+  R9-SI-Studio.html   der Editor R9 Studio / the R9 Studio editor
+
+  Die Datei in einem normalen Browserfenster öffnen, nicht in einer Vorschau.
+  Open the file in a normal browser window, not in a preview pane.
+
+R9-SI_Mathematik_und_Physik.pdf   alle Formeln des Spiels, jede mit der Datei, in der sie steht.
+                                  every formula of the game, each with the file it lives in.
+
+Online spielen / play online:  https://n0t3-droid.github.io/R9-SI/
+Quelltext / source:            https://github.com/n0t3-droid/R9-SI
+
+Ein unabhängiges, nicht-kommerzielles Hobbyprojekt. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR
+ASSOCIATED WITH MOJANG OR MICROSOFT.

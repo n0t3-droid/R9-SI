@@ -1,44 +1,195 @@
-# R9-SI
-
 <p align="center"><img src="docs/media/banner.jpg" alt="R9-SI — eine Voxelwelt im Browser" width="100%"></p>
 
+<p align="center"><b>A whole voxel world in one HTML file.</b> Kostenlos · free · open source · no install.</p>
+
 <p align="center">
-<img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0f8a8f">
-<img alt="Free" src="https://img.shields.io/badge/kostenlos-free-e0752f">
-<img alt="No install" src="https://img.shields.io/badge/install-none%20%C2%B7%20one%20HTML%20file-1b2130">
-<img alt="WebGL 2" src="https://img.shields.io/badge/WebGL-2-5b6478">
+<a href="https://n0t3-droid.github.io/R9-SI/"><img src="docs/media/btn_play.svg" alt="Jetzt spielen · play in your browser" height="50"></a>
+<a href="https://github.com/n0t3-droid/R9-SI/releases/latest/download/R9-SI.html"><img src="docs/media/btn_download.svg" alt="R9-SI.html herunterladen · download" height="50"></a>
+<a href="docs/R9-SI_Mathematik_und_Physik.pdf"><img src="docs/media/btn_book.svg" alt="Mathe-Heft · math book (PDF)" height="50"></a>
+<a href="lab/README.md"><img src="docs/media/btn_lab.svg" alt="Das Labor · the lab" height="50"></a>
 </p>
 
+<p align="center">
+<a href="https://github.com/n0t3-droid/R9-SI/tags"><img alt="Version" src="https://img.shields.io/github/v/tag/n0t3-droid/R9-SI?sort=semver&label=Version&color=0f8a8f"></a>
+<a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/Lizenz-MIT-e0752f"></a>
+<img alt="0 dependencies" src="https://img.shields.io/badge/Abh%C3%A4ngigkeiten-0-7a46c8">
+<img alt="WebGL 2" src="https://img.shields.io/badge/WebGL-2-1b2130">
+<a href="https://github.com/n0t3-droid/R9-SI/actions/workflows/pages.yml"><img alt="Pages" src="https://github.com/n0t3-droid/R9-SI/actions/workflows/pages.yml/badge.svg"></a>
+</p>
 
-A browser voxel world (WebGL 2, web workers, no engine, no install) with its editor R9 Studio. Everything in it is
-procedural and our own: the terrain, the cities, the textures, the sky, the water, the sounds, the people.
+<p align="center"><img src="docs/media/facts.svg" alt="1 HTML file · 0 install · 0 dependencies · 2 364 block types · 109 biomes · 176 657 lines · 691 tests · 327 formulas" width="720"></p>
 
-## Gallery · Bilder
+Öffnen, und du bist in deiner Welt: kein Konto, kein Server, keine Installation. Alles darin ist eigener Code, von
+Gelände und Städten bis Himmel, Wasser, Klang und Planetenbahnen.
+*Open it and you are in your world: no account, no server, no install. Everything in it is our own code.*
 
-Every picture below is the game itself on its Ultra preset, rendered headless in software (SwiftShader) by
-[`test/marketing_shots.mjs`](test/marketing_shots.mjs) — no paint-over, no other engine. *Jedes Bild ist das Spiel selbst.*
+## 🖼 Bilder · Gallery
 
 <table>
 <tr><td><img src="docs/media/shot_vista.jpg" alt="The arrival vista at the golden hour"></td><td><img src="docs/media/shot_isles.jpg" alt="The Sky Isles by day"></td></tr>
 <tr><td><img src="docs/media/shot_pier.jpg" alt="Water at the pier: waves, refraction, fish"></td><td><img src="docs/media/shot_aurora.jpg" alt="Nova Haven at night"></td></tr>
 <tr><td colspan="2"><img src="docs/media/shot_citadel.jpg" alt="The Spire Citadel at night"></td></tr>
 </table>
+<sub>Jedes Bild ist das Spiel selbst auf Ultra, ohne Nachbearbeitung · every picture is the game itself
+(<a href="test/marketing_shots.mjs">test/marketing_shots.mjs</a>).</sub>
 
-## The mathematics as a book · Die Mathematik als Heft
+## ⚙️ So funktioniert's · How it works
 
-**[R9-SI — Die Mathematik und Physik einer Voxelwelt im Browser (PDF)](docs/R9-SI_Mathematik_und_Physik.pdf)** — 16
-chapters, 178 formulas, each one as the game computes it, with the file it lives in: simplex noise and the terrain's
-climate fields, light and ambient occlusion, surface nets, collision, Gerstner-like water with Lengyel's oblique mirror,
-wind, Rayleigh/Mie skies after Hillaire, GGX materials, ACES, the R9 Super Resolution, Kepler orbits with universal
-variables, the upload budget and the synthesized music. The source of the book is
-[`docs/math/r9si_mathematik.html`](docs/math/r9si_mathematik.html) (`node docs/math/build_pdf.mjs`).
+```mermaid
+flowchart TB
+  subgraph W ["Web Worker · im Hintergrund · in the background"]
+    direction LR
+    seed(["Seed"]) --> gen["Generator<br/>Rauschen · Klima · Städte"] --> light["Licht<br/>Flutfüllung"] --> mesh["Mesher<br/>Quads · Surface Nets"]
+  end
+  subgraph M ["Hauptthread und GPU · main thread and GPU"]
+    direction LR
+    up["Upload<br/>Byte-Budget"] --> cull["Culling<br/>Höhlen · Horizont · Sichtfeld"] --> draw["Bild<br/>Schatten · Wasser · Himmel · ACES"] --> sq{"Smart Quality<br/>Vorhersage · UCB"}
+    sq -. "Stufe ±" .-> draw
+  end
+  W -- "Meshes" --> M
+```
 
-## Play
+<sub>Generation is versioned (`vgen`): a world regenerates byte-identical for ever. Long tour: <a href="docs/TECHNIK.md">docs/TECHNIK.md</a>.</sub>
 
-**Download → double-click → play.** [`play/R9-SI.html`](play/R9-SI.html) is the whole game in one file; the editor is
-[`play/R9-SI-Studio.html`](play/R9-SI-Studio.html). On GitHub open the file and press *Download raw file*, or take the
-repository as a ZIP (*Code → Download ZIP*) and open `play/R9-SI.html`. Chrome, Edge or Firefox; worlds are saved in
-your browser. Build it yourself with `node build.js` → `dist/` (plain JavaScript, nothing to install).
+## 📐 Mathe, die man sieht · Math you can see
+
+Jede Formel steht so im Code, mit Datei. Jedes Diagramm ist aus dem Code oder aus Messungen gezeichnet
+([`docs/media/make_charts.js`](docs/media/make_charts.js), Rohdaten [`zahlen.json`](docs/media/data/zahlen.json)).
+
+### 🌄 Gelände · Terrain
+
+<img src="docs/media/terrain_profile.svg" alt="A kilometre of terrain from the generator" width="720">
+
+```math
+h(x,z)=\frac{\sum_{i=0}^{n-1} p^{\,i}\, S_i\!\left(\lambda^{i} f x,\ \lambda^{i} f z\right)}{\sum_{i=0}^{n-1} p^{\,i}},\qquad p=\tfrac12,\ \ \lambda=2
+```
+
+<img src="docs/media/noise_octaves.svg" alt="Four noise octaves and their sum" width="720">
+
+Jede Oktave hat ihren eigenen Keim, $`p`$ und $`\lambda`$ sind die Standardwerte · every octave has its own seed. → [`src/shared/noise.js`](src/shared/noise.js)
+
+### 💡 Licht · Light
+
+```math
+L(\mathbf p)=\max\Bigl(E(\mathbf p),\ \max_{\mathbf q\sim\mathbf p} L(\mathbf q)-1-\varphi(\mathbf p)\Bigr),\qquad w=2^{12}s+2^{8}r+2^{4}g+b
+```
+
+Himmelslicht 15 fällt senkrecht, Blocklicht flutet in R, G, B zugleich; vier Bits je Kanal in einem 16-Bit-Wort.
+*Sky light falls straight down, block light floods in three colours at once.* → [`src/shared/light_local.js`](src/shared/light_local.js)
+
+### ⛰ Horizontschatten · Horizon culling
+
+<img src="docs/media/horizon_map.svg" alt="The land round an eye, the hidden part darkened" width="720">
+
+```math
+T\ \text{verborgen}\iff\forall\beta\in B(T):\ \bigl[s^{\min}_\beta(T^{+\delta}),\ s^{\max}_\beta(T^{+\delta})\bigr]\subseteq I_\beta\!\left(O^{-\delta}\right)
+```
+
+```math
+s=\frac{y-e_y}{\lVert (x,z)-(e_x,e_z)\rVert}\qquad\text{(Hangneigung vom Auge } e\text{ aus; slope seen from the eye)}
+```
+
+Pro Richtung $`\beta`$ die Hangneigungen, die näherer Boden verdeckt; Wände um $`\delta`$ geschrumpft, Ziele gewachsen:
+das gilt dann für jedes Auge im Umkreis $`\delta`$. *Per direction the slopes nearer ground blocks; shrink the walls,
+grow the targets, and the verdict holds for every eye within δ.* → [`src/shared/hzcull.js`](src/shared/hzcull.js) ·
+Beweis · proof: [`test/hzcull.js`](test/hzcull.js)
+
+<img src="docs/media/horizon.svg" alt="Share of quads behind hills, 18 random eyes" width="720">
+
+### 🌈 Himmel und Bild · Sky and picture
+
+<img src="docs/media/sky_tone.svg" alt="Rayleigh scattering and the ACES tone curve" width="720">
+
+```math
+\tau_R(\lambda)\propto\lambda^{-4},\qquad P_R(\theta)=\tfrac34\left(1+\cos^2\theta\right),\qquad P_M(\theta)=\frac{1-g^2}{\left(1+g^2-2g\cos\theta\right)^{3/2}},\ \ g=0.76
+```
+
+```math
+f(x)=\frac{x\,(2.51x+0.03)}{x\,(2.43x+0.59)+0.14},\qquad D_{\mathrm{GGX}}(\mathbf h)=\frac{\alpha^2}{\pi\left((\mathbf n\cdot\mathbf h)^2(\alpha^2-1)+1\right)^2}
+```
+
+→ [`src/main/space_shaders.js`](src/main/space_shaders.js) · [`src/main/shaders.js`](src/main/shaders.js)
+
+### 🎸 Klang · Sound
+
+<img src="docs/media/sound.svg" alt="A plucked string and Eyring reverberation" width="720">
+
+```math
+y[n]=\rho\,\frac{y[n-N]+y[n-N-1]}{2},\qquad N=\frac{f_s}{f},\qquad \rho=\frac{10^{-3/(T_{60}f)}}{\cos(\pi f/f_s)}
+```
+
+```math
+T_{60}=\frac{0.161\,V}{-S\ln(1-\bar\alpha)+4mV},\qquad \frac{V}{S}=\frac{\bar\ell}{4}
+```
+
+Saiten werden gezupft, nicht abgespielt; der Hall kommt aus 48 Strahlen vom Ohr in die Blöcke.
+*Strings are plucked, not played back; the reverb comes from 48 rays cast from the ear.* → [`src/main/klangphys.js`](src/main/klangphys.js)
+
+### 🪐 Bahnen · Orbits
+
+<img src="docs/media/kepler.svg" alt="A transfer orbit, equal times sweep equal areas" width="720">
+
+```math
+\sqrt{\mu}\,\Delta t=\frac{\mathbf r_0\cdot\mathbf v_0}{\sqrt\mu}\,\chi^2C(z)+\left(1-\alpha r_0\right)\chi^3S(z)+r_0\,\chi,\qquad z=\alpha\chi^2,\quad \alpha=\frac{2}{r_0}-\frac{v_0^2}{\mu}
+```
+
+```math
+C(z)=\frac{1-\cos\sqrt z}{z},\qquad S(z)=\frac{\sqrt z-\sin\sqrt z}{\sqrt{z^3}}
+```
+
+→ [`src/shared/universe.js`](src/shared/universe.js) · Sonne, Riesenplanet, Monde und Schiffe · sun, giant, moons and ships
+
+### 🎛 Smart Quality
+
+```math
+\hat m(t+0.5\,\mathrm s)=a+b\,(t+0.5\,\mathrm s),\qquad z=\frac{\bar m_{\text{schnell}}-\bar m_{\text{langsam}}}{\sqrt{\sigma^2_{\text{langsam}}+1\,\mathrm{ms}^2}},\qquad \mathrm{UCB}_k=\bar r_k+c\sqrt{\frac{\ln N}{n_k}}
+```
+
+Das Spiel sieht teure Bilder kommen (Gerade durch 0,6 s), erkennt Überraschungen (z) und probiert die Stufe, die am
+meisten verspricht (UCB1). *It sees slow frames coming, tells surprise from noise and tries the most promising rung.*
+→ [`src/main/aqpredict.js`](src/main/aqpredict.js)
+
+### 🧊 Eine Koordinate in 16 Bit · a coordinate in 16 bits
+
+```math
+\mathbf p=\frac{\mathbf a}{2048}-4,\qquad \mathbf a\in\{0,\dots,65535\}^3\quad\Rightarrow\quad \Delta p=\tfrac{1}{2048}\ \text{Block}
+```
+
+→ [`src/shared/mesher.js`](src/shared/mesher.js) · [`src/main/shaders.js`](src/main/shaders.js) · alle 327 Formeln · all
+327 formulas: [**Mathe-Heft (PDF)**](docs/R9-SI_Mathematik_und_Physik.pdf)
+
+## 📊 Gemessen · Measured
+
+<img src="docs/media/gpu_costs.svg" alt="What a frame costs on a Ryzen APU at Ultra" width="720">
+
+<img src="docs/media/town_quads.svg" alt="Who fills a town's geometry" width="720">
+
+## ⬇ Alles kostenlos · Everything free
+
+| | Was · what | Wo · where |
+|---|---|---|
+| ▶ | Spiel online · play online | [n0t3-droid.github.io/R9-SI](https://n0t3-droid.github.io/R9-SI/) |
+| 🎮 | Spiel als eine Datei · the game as one file | [`R9-SI.html`](https://github.com/n0t3-droid/R9-SI/releases/latest/download/R9-SI.html) · [`play/`](play/) |
+| 🛠 | Editor R9 Studio (.schem .nbt .litematic .vox .json) | [`R9-SI-Studio.html`](https://github.com/n0t3-droid/R9-SI/releases/latest/download/R9-SI-Studio.html) |
+| 📦 | Alles in einem ZIP · everything zipped | [`R9-SI.zip`](https://github.com/n0t3-droid/R9-SI/releases/latest/download/R9-SI.zip) · [alle Versionen · all versions](https://github.com/n0t3-droid/R9-SI/releases) |
+| 📘 | Mathe-Heft, 33 Seiten · math book | [PDF](docs/R9-SI_Mathematik_und_Physik.pdf) · [Quelle · source](docs/math/r9si_mathematik.html) |
+| 🧪 | Labor: Welten vermessen, Fehler finden · the lab | [`lab/`](lab/README.md) |
+| 📈 | Rohdaten der Diagramme · the charts' data | [`zahlen.json`](docs/media/data/zahlen.json) · [`make_charts.js`](docs/media/make_charts.js) |
+| 🧾 | Der ganze Quelltext · all the source | [ZIP](https://github.com/n0t3-droid/R9-SI/archive/refs/heads/main.zip) · MIT |
+
+## 🔧 Selbst bauen · Build it yourself
+
+```bash
+git clone https://github.com/n0t3-droid/R9-SI && cd R9-SI
+node build.js                 # → dist/index.html (game) · dist/studio.html (editor)
+node test/hzcull.js           # one of 691 tests: ✓ / ✗ per check
+bash test/regress.sh          # the release set (browser tests need Playwright)
+```
+
+Bauen braucht nur Node, kein `npm install` · building needs Node only. Mitmachen · contributing: [CONTRIBUTING.md](CONTRIBUTING.md) ·
+alle Versionen · every release: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+## ⚖️ Rechtliches · Legal
 
 **An independent work.** R9-SI and R9 Studio are an independent, non-commercial hobby project — an original voxel game
 inspired by the block sandbox genre. They are not affiliated with, endorsed, sponsored or approved by any other game
@@ -49,94 +200,4 @@ trademark of Mojang. Impressum, privacy policy and credits: 📜 in the pause me
 Litematica (.litematic), MagicaVoxel (.vox) and R9 Bauteile (.json), and exports .schem, .vox and .json.
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. WorldEdit, Amulet,
 Axiom, Litematica, MCEdit and MagicaVoxel are names or trademarks of their respective owners, named only to describe
-which files the Studio reads and writes. Share only what is yours — every export says so in one line.
-
-The long release notes live in [docs/CHANGELOG.md](docs/CHANGELOG.md); how to work on the code in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## The mathematics and physics inside
-
-**The world.** Seeded simplex noise (2D/3D) with fractal sums shapes the land; the climate (temperature, humidity,
-height) picks the biome and the plants. Generation is versioned (`vgen`): a world made at any version regenerates
-byte-identical for ever, which `test/gen_same.js` pins with reference hashes. Block ids are append-only, so every saved
-world stays readable.
-
-**Light.** Sky light falls straight down, 15 at the top and −1 per blocked step; block light is an RGB flood fill (three
-channels at once, −1 per step, filtered through coloured glass). Each vertex carries its light word and an ambient
-occlusion term from its three neighbouring voxels; the mesher packs a vertex into 8 × 16 bits (position, texture layer,
-rotation, UV, face, AO, sway, light, tint).
-
-**The sky.** A procedural sky model with the sun, a ringed gas giant with its moons and a blue planet moving on their own
-orbits (angular radii in radians, the giant circling at ~33°, its ring never face-on); the day's colour runs through
-three measured stops — white-cyan at the horizon, blue, navy space with stars and the nebula at the zenith; lavender,
-violet, navy at dusk. The targets were measured from the trailer frames and the game lands within ΔE 7–11 per band.
-The fog takes the horizon's colour, so the far world never seams against the sky.
-
-**Water.** The surface is a sum of three Gerstner-like octaves with a crest-sharpening normal term, the same table on the
-CPU (the bob of a swimming player) and in the shader. The reflection is a planar mirror about the water plane with
-Lengyel's oblique near plane clipping whatever lies under the surface; refraction reads the scene colour and depth.
-
-**Weather and wind.** The weather schedule (clear, cloudy, fog, rain, storm, snow) is a pure function of the world seed,
-the day and the climate, so a host and every guest agree without a single message. There is one wind for the whole
-world: a function of world time whose terms repeat in thirds of a day, so midnight has no jump; the plants, the water,
-the clouds and the sound all read it.
-
-**Rendering.** Section meshes live in arena buffers and go out as multi-draws; cave and frustum culling decide what is
-drawn. The far world is a quadtree of LOD tiles (4-, 8-, 16-, 32-block cells) that the workers sample straight from the
-climate and density functions without generating chunks; a 64 × 64 mask of the chunks really drawn lets the shader cut
-the tiles away exactly there, and a 4 × 4 Bayer dither fades a new chunk in over 300 ms with the rule "never above the
-chunk's own fade", so no pixel is ever a hole. Shadows come from one cached map (3072² on Ultra) that is only redrawn
-when the sun stepped 0.25°, the camera left the middle 18 % of it or blocks changed nearby; four hardware-filtered
-compare taps soften it. HDR, bloom, god rays, ACES tone mapping, FXAA.
-
-**R9 Super Resolution.** The scene is rendered below the screen's resolution with a different sub-pixel offset every
-frame (a Halton 2,3 sequence over 8 frames); the resolve reprojects last frame's full-resolution result through the
-depth buffer, keeps what still agrees with the new samples (colour-box clipping) and blends the new jittered samples
-in, read back through a 5-tap Catmull-Rom fetch so the history never goes soft. Detail builds up over a few frames.
-
-**Smart quality.** Two ladders instead of one blur knob. The GPU ladder: shadow map every other frame → god rays off →
-shorter detail radius → smaller shadow map → simple clouds → only then a resolution step. The CPU ladder: simulation and
-mesh budgets → villagers drawn closer → fewer mesh jobs. Every step is probed and undone if it buys nothing; the
-decision reads the GPU's own timer queries against the main thread's time. The Automatik measures 3 s and picks a step
-on a ladder of nine (preset × view distance) from the ratio of frame time to budget; the Stufentest measures every step
-and names the one that is smooth (the slow frames still make 50 fps) and the one that is playable (30 fps median).
-
-**Streaming.** Uploads to the GPU are paid in bytes from a measured price: a 1 MB calibration at world start, then a
-ring of four GPU fences polled without blocking feeds a weighted fit of milliseconds per byte on this very machine; the
-frame's budget shrinks after an overrun and grows with headroom, meshes go up in packets that may straddle frames while
-the old mesh keeps drawing, and the queue is sorted by the view every frame — in front first, nearest first.
-
-**Form from voxels.** Any voxel volume becomes a smooth surface by naive surface nets: one vertex per dual cell at the
-mean of its sign-changing edge midpoints, one quad per sign-changing voxel edge, then two or three Laplacian passes
-clamped to ±0.35 voxel so a thin leg never collapses; creases stay where the material or colour changes sharply. The
-furniture, the palms, the Studio's new shapes (bodies of revolution, extrusions along a path, rounding) all pass through
-it; the fine 32-cells-a-block mesh is drawn only within a quarter of the detail radius.
-
-**People.** Villagers are a hi-res rig (1 voxel = 1/32 block) with joints that rotate about elbow and knee. Their poses
-are recomputed on a budget by distance (every frame within 24 blocks, every 2nd within 48, every 4th within 96, else every
-8th); a town's population follows a rule — one person per nine blocks of walkable street plus two per home — and nobody
-walks a path search for a walk nobody sees. Crowding is solved on a spatial grid; path-finding is budgeted per frame.
-
-**Space.** Our sun Helia, the ringed giant Amarant and its moons (home is the moon Herzwelt) move on Kepler orbits:
-each body's state comes from its elements by Newton's method on Kepler's equation, a ship in space follows patched conics
-— the body whose sphere of influence it is in pulls it with μ/r², a velocity-Verlet step integrates thrust and coasting is
-solved exactly with universal variables (energy and angular momentum kept to 1e-12 over a hundred orbits). Lengths are
-1/64 of real size with true gravity ratios, so a 3-km orbit round Herzwelt takes 11 minutes; between worlds and stars a
-drive openly labelled as fiction shortens what would take years. The climb bends the world by y − d²/2R, the air thins
-with a 400-m scale height, the sky's bodies glide from their postcard places to the directions the ephemeris gives; the
-moons' craters follow the real size-frequency slope (−2.9) and the simple-to-complex transition (18 km real), and every
-world's gravity sets its jumps and falls. The facts come from mission data: docs/universe/REFERENCE.md (120 sources).
-
-**Physics.** Per-block collision shapes, AABB sweeps against the voxel grid for the player, and voxel raycasts for
-targeting; the camera carries a head bob, a landing dip, a sprint field-of-view kick and the push of a placed block as
-pure curves that the node tests check against the very numbers the GPU adds for the plants' sway.
-
-**Textures and sound.** Every texture is painted procedurally at 32 × 32 — albedo, a height field turned into a normal
-map, roughness and emission — and forged in a worker, cached in IndexedDB. Every sound is synthesized when the audio
-starts: material families for steps, placing and breaking, bounded variations, a seeded pentatonic music plan, and an
-ambience (wind, rain, thunder, birds, crickets, water) on one bus that is muffled indoors and under water.
-
-
-## Tests
-
-Every test ends with `ALL OK` or `FAILED n`. Node tests pin the maths (`node test/<name>.js`); Playwright tests
-drive the game headless with SwiftShader and leave pictures in `test/shots/`; `bash test/regress.sh` runs them all.
+which files the Studio reads and writes. Share only what is yours — every export says so in one line. Code: [MIT](LICENSE).

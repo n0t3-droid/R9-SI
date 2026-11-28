@@ -383,7 +383,7 @@ Unharmonizität macht sie glockig. Die Musik ist ein gesäter Plan: derselbe Tag
 Wasser und drinnen dämpft ein Tiefpass den ganzen Bus.</p>
 
 <h2 id="eigen">16 · Eigene Verfahren</h2>
-<p class="lead">Neun Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
+<p class="lead">Zehn Bausteine von R9-SI sind keine Lehrbuchverfahren, sondern für dieses Spiel erfunden oder für
 dieses Spiel zusammengesetzt: für einen Browser,
 eine integrierte Grafikkarte und eine Welt, die sich jederzeit ändert. Jedes läuft im Spiel und hat einen Node-Test.</p>
 
@@ -594,6 +594,40 @@ beiden Leitern wählt UCB1 die vielversprechendere: \(\bar r+c\sqrt{\ln N/n}\), 
 von 21,8 s auf 2,4 s. An der Grenze (eine Stufe macht aus 45 fps 60 fps) fiel die Zahl der Wechsel in zwei Minuten von
 19 auf 1. Ehrliche Einschränkung: Das sind simulierte Szenen. Ohne GPU-Zeitmessung (manche Browser) bleibt es bei
 Trend und Überraschung, und eine Stufe wird wie früher zurückgegeben.</p>
+
+<h3>16.10 Horizontschatten — was hinter dem Hügel liegt</h3>
+<p class="src">src/shared/hzcull.js · src/main/hzgame.js · test/hzcull.js · lab/tools/zahlen.js</p>
+<p>Über offenem Hügelland zeichnete der Renderer jeden Abschnitt (\(16^3\) Blöcke), den der Höhlenlauf im Sichtfeld
+erreichte, auch die hinter dem nächsten Hügel. Die Idee: Vom Auge \(\mathbf e\) aus hat jeder Punkt eine Richtung und eine
+Hangneigung. Die Richtung ist ein Pseudo-Winkel ohne Trigonometrie, monoton im echten Winkel, mit Periode 4, verteilt auf
+\(B=1024\) Fächer:</p>
+\[ t=\frac{d_z}{|d_x|+|d_z|},\qquad \psi=\begin{cases}t & d_x\ge0,\ d_z\ge0\\ 2-t & d_x<0\\ 4+t & d_x\ge0,\ d_z<0\end{cases},\qquad \beta=\Big\lfloor\frac{\psi}{4}\,B\Big\rfloor,\qquad s=\frac{y-e_y}{d} \]
+<p>Verdecker sind die obersten durchgehenden Läufe aus undurchsichtigen Vollblöcken je Spalte, zusammengefasst zu
+Zellen von \(4\times4\), \(8\times8\) und \(16\times16\) Blöcken mit einem Band \([b,t]\). Für ein Stück einer Zelle zwischen
+den Abständen \(d_n\) und \(d_f\) ist jede Neigung im Intervall</p>
+\[ I=\Big[\max_{d\in[d_n,d_f]}\frac{b-e_y}{d},\ \ \min_{d\in[d_n,d_f]}\frac{t-e_y}{d}\Big] \]
+<p>in jedem Abstand des Stücks verdeckt. Ein Ziel (ein Abschnitt, gewachsen um \(\delta+1{,}25\) Blöcke für Geometrie über die
+Blöcke hinaus) überstreicht die Neigungen</p>
+\[ J=\Big[\min_{d\in[d_n,d_f]}\frac{y_0-e_y}{d},\ \ \max_{d\in[d_n,d_f]}\frac{y_1-e_y}{d}\Big] \]
+<p>Alles wird nach Abstand sortiert (Zählsortierung in halben Blöcken, bei Gleichstand das Ziel zuerst). Jeder Fächer hält
+<b>ein</b> Intervall \(I_\beta\): überlappende Intervalle näherer Verdecker werden vereinigt, getrennte durch das höhere
+ersetzt. Ein Ziel ist verborgen, wenn in jedem Fächer, den es berührt, sein ganzes Intervall darin liegt:</p>
+\[ \text{verborgen}(T)\iff\forall\beta\in B(T):\ \min I_\beta<\min J-\varepsilon\ \ \wedge\ \ \max I_\beta>\max J+\varepsilon,\qquad\varepsilon=0{,}002 \]
+<h3>Satz: Das Urteil gilt für jedes Auge im Umkreis δ</h3>
+<p>Verdecker werden um \(\delta\) geschrumpft (\(O^{-\delta}\)), Ziele um \(\delta\) gewachsen (\(T^{+\delta}\)). Sei
+\(\lVert\mathbf e'-\mathbf e\rVert\le\delta\) und \(\mathbf t\in T\). Der Strahl von \(\mathbf e'\) nach \(\mathbf t\), um
+\(\mathbf e-\mathbf e'\) verschoben, ist ein Strahl von \(\mathbf e\) nach <span style="white-space:nowrap">\(\mathbf t+(\mathbf e-\mathbf e')\in T^{+\delta}\).</span>
+Er wird in einem Punkt \(\mathbf q\in O^{-\delta}\) blockiert. Zurückverschoben liegt \(\mathbf q+(\mathbf e'-\mathbf e)\) in
+\(O\), also ist auch der ursprüngliche Strahl blockiert. \(\square\) Das Spiel rechnet darum nur neu, wenn sich das Auge
+weiter als \(\delta\) bewegt hat, mit</p>
+\[ \delta=\min\big(1{,}5,\ \max(0{,}05,\ 0{,}12\,v)\big)\qquad(v\text{ in Blöcken pro Sekunde}) \]
+<p>und schaltet sich ab, wenn das Auge schneller als 16 Blöcke/s fliegt, mehr als 48 Blöcke über dem Boden ist oder näher
+als 0,35 an einem Block steht. Der Node-Test schießt Voxelstrahlen von vielen Augen im Umkreis \(\delta\) zu den sichtbaren
+Flächen jedes verborgenen Abschnitts: kein einziger kommt durch.</p>
+<p><b>Gemessen.</b> Im Labor (18 zufällige Augen in drei Welten, Sichtweite 10, die Vierecke vom Mesher des Spiels) liegen
+im Mittel 22,6 % aller Vierecke hinter Hügeln (Würfel, stehendes Auge), 19,7 % mit weichen Hängen, 15,2 % beim Gehen
+(\(\delta=0{,}5\)) und 7,4 % mit runden Formen in voller Fahrt (\(\delta=1\)). Im Spiel, im Tal bei Fliederfeld, fielen 137
+von 333 Abschnitten weg, 9,8 % der Dreiecke, und auf einer integrierten Ryzen-Grafik 1,3 ms pro Bild.</p>
 
 <h2 id="schluss">17 · Offen und frei</h2>
 <p>R9-SI ist ein unabhängiges, nicht-kommerzielles Hobbyprojekt. Der vollständige Quelltext liegt auf GitHub; das Spiel ist
